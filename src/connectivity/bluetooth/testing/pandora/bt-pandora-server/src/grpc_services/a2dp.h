@@ -5,9 +5,15 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_TESTING_PANDORA_BT_PANDORA_SERVER_SRC_GRPC_SERVICES_A2DP_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_TESTING_PANDORA_BT_PANDORA_SERVER_SRC_GRPC_SERVICES_A2DP_H_
 
+#include <fidl/fuchsia.bluetooth.a2dp/cpp/fidl.h>
+
+#include "lib/fidl/cpp/wire/internal/transport.h"
 #include "third_party/github.com/google/bt-test-interfaces/src/pandora/a2dp.grpc.pb.h"
 
 class A2dpService : public pandora::A2DP::Service {
+ public:
+  explicit A2dpService(async_dispatcher_t* dispatcher);
+
   ::grpc::Status OpenSource(::grpc::ServerContext* context,
                             const ::pandora::OpenSourceRequest* request,
                             ::pandora::OpenSourceResponse* response) override;
@@ -46,6 +52,9 @@ class A2dpService : public pandora::A2DP::Service {
   ::grpc::Status CaptureAudio(
       ::grpc::ServerContext* context, const ::pandora::CaptureAudioRequest* request,
       ::grpc::ServerWriter<::pandora::CaptureAudioResponse>* writer) override;
+
+ private:
+  fidl::SyncClient<fuchsia_bluetooth_a2dp::AudioMode> audio_mode_client_;
 };
 
 #endif  // SRC_CONNECTIVITY_BLUETOOTH_TESTING_PANDORA_BT_PANDORA_SERVER_SRC_GRPC_SERVICES_A2DP_H_

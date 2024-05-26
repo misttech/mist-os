@@ -61,7 +61,7 @@
 //   to the port via |p| --> observer --> |rc| calls.
 //
 // 2) Situation after the packet is queued on signal match or the wait
-//    is canceled.
+//    is canceled through the Dispatcher.
 //
 //                                          +--------+
 //                                          |  Port  |
@@ -86,11 +86,33 @@
 //   guarded by the port's lock. It is cleared either in MaybeReap or
 //   in PortDispatcher::on_zero_handles.
 //
+// Cancelation ordering
+//
+// Observers can be canceled by way of the object or the port. Observers are
+// canceled by the object when the object's handle count reaches zero and when
+// waits are canceled by port_cancel. In this path the Dispatcher's lock is
+// acquired first and the observer is removed from the Dispatcher's observer
+// list, then the PortDispatcher lock is acquired and the observer is removed
+// from the PortDispatcher's observer list and may be cleaned up.
+//
+// When an observer is canceled through the port by way of port_cancel_key there
+// is a lock ordering issue. The PortDispatcher lock must be held to iterate
+// over pending observers but the locks for Dispatchers associated with these
+// observers cannot be acquired while holding the PortDispatcher lock. In this
+// case, the PortDispatcher first cancels each pending observer with the
+// PortDispatcher lock held by assigning the observer's packet's type to a
+// sentinel value and removing them from the PortDispatcher's list to a
+// temporary list. Then the PortDispatcher lock is released and the observers
+// are deregistered from their Dispatchers (acquiring the Dispatcher lock) one
+// at a time. If an observer fires in this state and attempts to queue a
+// packet PortDispatcher will check the type field and not queue the packet.
+//
 // Locking
 //
-// The PortDispatcher's lock guards PortDispatcher's list of observers
-// and the PortObserver's reference to its Dispatcher. The PortDispatcher
-// lock can be acquired while holding the Dispatcher's lock.
+// The PortDispatcher's lock guards PortDispatcher's list of observers, the
+// PortObserver's reference to its Dispatcher, and the packet type field on the
+// PortObserver's stored zx_port_packet_t in pending observers. The
+// PortDispatcher lock can be acquired while holding the Dispatcher's lock.
 //
 // The Dispatcher's lock guards the Dispatcher's list of observers and the
 // other fields on PortObserver, most notably the packet itself. The
@@ -110,6 +132,8 @@ struct PortAllocator {
   virtual void Free(PortPacket* port_packet) = 0;
 };
 
+constexpr zx_packet_type_t kPortPacketTypeCanceled = 0xffffffff;
+
 struct PortPacket final : public fbl::DoublyLinkedListable<PortPacket*> {
   zx_port_packet_t packet;
   const void* const handle;
@@ -123,6 +147,8 @@ struct PortPacket final : public fbl::DoublyLinkedListable<PortPacket*> {
   uint64_t key() const { return packet.key; }
   bool is_ephemeral() const { return allocator != nullptr; }
   void Free() { allocator->Free(this); }
+  void Cancel() { packet.type = kPortPacketTypeCanceled; }
+  bool is_canceled() const { return packet.type == kPortPacketTypeCanceled; }
 };
 
 struct PortInterruptPacket final : public fbl::DoublyLinkedListable<PortInterruptPacket*> {
@@ -154,6 +180,12 @@ class PortObserver final : public SignalObserver {
     Dispatcher* dispatcher = dispatcher_;
     dispatcher_ = nullptr;
     return dispatcher;
+  }
+
+  // May only be called while holding PortDispatcher lock.
+  void Cancel() {
+    DEBUG_ASSERT(port_lock_->lock().IsHeld());
+    packet_.Cancel();
   }
 
  private:
@@ -238,11 +270,20 @@ class PortDispatcher final : public SoloDispatcher<PortDispatcher, ZX_DEFAULT_PO
   // not in this queue. It is undefined to call this with a packet queued in another port.
   bool CancelQueued(PortPacket* port_packet);
 
+  // Cancel all pending waits and packets registered with |key|.
+  // Returns ZX_OK if any waits or packets were canceled and ZX_ERR_NOT_FOUND if
+  // no matching waits or packets were found.
+  zx_status_t CancelKey(uint64_t key);
+
   // Init hook that sets up the cache allocators used by this dispatcher.
   static void InitializeCacheAllocators(uint32_t level);
 
  private:
   explicit PortDispatcher(uint32_t options);
+
+  // Cancel all queued port packets matching |handle| (if not nullptr) and |key|.
+  // Returns true if any packets were canceled.
+  bool CancelQueuedPacketsLocked(const void* handle, uint64_t key) TA_REQ(get_lock());
 
   const uint32_t options_;
   Semaphore sema_;

@@ -345,7 +345,12 @@ void userboot_init(uint) {
   // It also gets many VMOs for VDSOs and other things.
   constexpr int kVariants = static_cast<int>(userboot::VdsoVariant::COUNT);
   KernelHandle<VmObjectDispatcher> vdso_kernel_handles[kVariants];
-  const VDso* vdso = VDso::Create(vdso_kernel_handles);
+  KernelHandle<VmObjectDispatcher> time_values_handle;
+  const VDso* vdso = VDso::Create(vdso_kernel_handles, &time_values_handle);
+  handles[userboot::kTimeValues] =
+      Handle::Make(ktl::move(time_values_handle), (vdso->vmo_rights() & (~ZX_RIGHT_EXECUTE)))
+          .release();
+  ASSERT(handles[userboot::kTimeValues]);
   for (int i = 0; i < kVariants; ++i) {
     handles[userboot::kFirstVdso + i] =
         Handle::Make(ktl::move(vdso_kernel_handles[i]), vdso->vmo_rights()).release();

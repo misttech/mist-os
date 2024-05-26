@@ -12,7 +12,7 @@ use {
 async fn test_open_node_on_directory() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2.unwrap_or_default() {
+    if !harness.config.supports_open2 {
         return;
     }
 
@@ -40,7 +40,7 @@ async fn test_open_node_on_directory() {
 async fn test_open_node_on_file() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2.unwrap_or_default() {
+    if !harness.config.supports_open2 {
         return;
     }
 
@@ -84,7 +84,7 @@ async fn test_open_node_on_file() {
 async fn test_set_attr_and_set_flags_on_node() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2.unwrap_or_default() {
+    if !harness.config.supports_open2 {
         return;
     }
 
@@ -135,7 +135,7 @@ async fn test_set_attr_and_set_flags_on_node() {
 async fn test_node_clone() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2.unwrap_or_default() {
+    if !harness.config.supports_open2 {
         return;
     }
 
@@ -169,7 +169,7 @@ async fn test_node_clone() {
 async fn test_open_node_with_attributes() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2.unwrap_or_default() {
+    if !harness.config.supports_open2 {
         return;
     }
 

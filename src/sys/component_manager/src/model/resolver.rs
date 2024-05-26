@@ -208,12 +208,12 @@ mod tests {
         anyhow::{format_err, Error},
         assert_matches::assert_matches,
         async_trait::async_trait,
-        cm_moniker::InstancedMoniker,
         cm_rust::NativeIntoFidl,
         cm_rust_testing::new_decl_from_json,
         fidl_fuchsia_component_decl as fdecl,
         hooks::Hooks,
         lazy_static::lazy_static,
+        moniker::Moniker,
         moniker::MonikerBase,
         routing::environment::{DebugRegistry, RunnerRegistry},
         routing::resolving::ComponentResolutionContext,
@@ -359,7 +359,7 @@ mod tests {
 
     async fn new_discovered_component(
         environment: Arc<Environment>,
-        instanced_moniker: InstancedMoniker,
+        moniker: Moniker,
         component_url: &str,
         startup: fdecl::StartupMode,
         on_terminate: fdecl::OnTerminate,
@@ -371,7 +371,8 @@ mod tests {
     ) -> Arc<ComponentInstance> {
         let component = ComponentInstance::new(
             environment,
-            instanced_moniker,
+            moniker,
+            0,
             component_url.parse().unwrap(),
             startup,
             on_terminate,
@@ -668,7 +669,7 @@ mod tests {
         .await;
         let child = new_discovered_component(
             root.environment.clone(),
-            InstancedMoniker::parse_str("/root:0/child:0")?,
+            Moniker::parse_str("root/child")?,
             "subpackage#meta/subcomp.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -730,7 +731,7 @@ mod tests {
         .await;
         let child = new_discovered_component(
             root.environment.clone(),
-            InstancedMoniker::parse_str("/root:0/child:0")?,
+            Moniker::parse_str("root/child")?,
             "subpackage#meta/subcomp.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -791,7 +792,7 @@ mod tests {
         .await;
         let child = new_discovered_component(
             root.environment.clone(),
-            InstancedMoniker::parse_str("/root:0/child:0")?,
+            Moniker::parse_str("root/child")?,
             "subpackage#meta/subcomp.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -852,7 +853,7 @@ mod tests {
 
         let child = new_discovered_component(
             root.environment.clone(),
-            InstancedMoniker::parse_str("/root:0/child:0")?,
+            Moniker::parse_str("root/child")?,
             "#meta/my-child.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -918,7 +919,7 @@ mod tests {
 
         let child_one = new_discovered_component(
             root.environment.clone(),
-            InstancedMoniker::parse_str("/root:0/child:0")?,
+            Moniker::parse_str("root/child")?,
             "#meta/my-child.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -932,7 +933,7 @@ mod tests {
 
         let child_two = new_discovered_component(
             root.environment.clone(),
-            InstancedMoniker::parse_str("/root:0/child:0")?,
+            Moniker::parse_str("root/child")?,
             "#meta/my-child2.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -992,7 +993,7 @@ mod tests {
 
         let child = new_discovered_component(
             root.environment.clone(),
-            InstancedMoniker::parse_str("/root:0/child:0")?,
+            Moniker::parse_str("root/child")?,
             "#meta/my-child.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1052,7 +1053,7 @@ mod tests {
 
         let child = new_discovered_component(
             root.environment.clone(),
-            InstancedMoniker::parse_str("/root:0/child:0")?,
+            Moniker::parse_str("root/child")?,
             "#meta/my-child.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1095,7 +1096,7 @@ mod tests {
 
         let child = new_discovered_component(
             root.environment.clone(),
-            InstancedMoniker::parse_str("/root:0/child:0")?,
+            Moniker::parse_str("root/child")?,
             "#meta/my-child.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1155,7 +1156,7 @@ mod tests {
 
         let child_one = new_discovered_component(
             root.environment.clone(),
-            InstancedMoniker::parse_str("/root:0/child:0")?,
+            Moniker::parse_str("root/child")?,
             "my-subpackage#meta/my-child.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1169,7 +1170,7 @@ mod tests {
 
         let child_two = new_discovered_component(
             root.environment.clone(),
-            InstancedMoniker::parse_str("/root:0/child:0/child2:0")?,
+            Moniker::parse_str("root/child/child2")?,
             "#meta/my-child2.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1239,7 +1240,7 @@ mod tests {
 
         let child_one = new_discovered_component(
             root.environment.clone(),
-            InstancedMoniker::parse_str("/root:0/child:0")?,
+            Moniker::parse_str("root/child")?,
             "my-subpackage#meta/my-child.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1253,7 +1254,7 @@ mod tests {
 
         let child_two = new_discovered_component(
             root.environment.clone(),
-            InstancedMoniker::parse_str("/root:0/child:0/child2:0")?,
+            Moniker::parse_str("root/child/child2")?,
             "#meta/my-child2.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1267,7 +1268,7 @@ mod tests {
 
         let child_three = new_discovered_component(
             root.environment.clone(),
-            InstancedMoniker::parse_str("/root:0/child:0/child2:0/child3:0")?,
+            Moniker::parse_str("root/child/child2/child3")?,
             "#meta/my-child3.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1350,7 +1351,7 @@ mod tests {
 
         let realm = new_discovered_component(
             root.environment.clone(),
-            InstancedMoniker::parse_str("/root:0/realm:0/child:0")?,
+            Moniker::parse_str("root/realm/child")?,
             "realm-builder://0/my-realm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1364,7 +1365,7 @@ mod tests {
 
         let child_one = new_discovered_component(
             root.environment.clone(),
-            InstancedMoniker::parse_str("/root:0/realm:0/child:0")?,
+            Moniker::parse_str("root/realm/child")?,
             "my-subpackage1#meta/sub1.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1378,7 +1379,7 @@ mod tests {
 
         let child_two = new_discovered_component(
             root.environment.clone(),
-            InstancedMoniker::parse_str("/root:0/realm:0/child:0/child2:0")?,
+            Moniker::parse_str("root/realm/child/child2")?,
             "#meta/sub1-child.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1392,7 +1393,7 @@ mod tests {
 
         let child_three = new_discovered_component(
             root.environment.clone(),
-            InstancedMoniker::parse_str("/root:0/realm:0/child:0/child2:0/child3:0")?,
+            Moniker::parse_str("root/realm/child/child2/child3")?,
             "my-subpackage2#meta/sub2.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -1406,7 +1407,7 @@ mod tests {
 
         let child_four = new_discovered_component(
             root.environment.clone(),
-            InstancedMoniker::parse_str("/root:0/realm:0/child:0/child2:0/child3:0/child4:0")?,
+            Moniker::parse_str("root/realm/child/child2/child3/child4")?,
             "#meta/sub2-child.cm",
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,

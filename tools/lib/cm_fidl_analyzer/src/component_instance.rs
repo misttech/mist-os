@@ -9,7 +9,6 @@ use {
     },
     async_trait::async_trait,
     cm_config::RuntimeConfig,
-    cm_moniker::{InstancedChildName, InstancedMoniker},
     cm_rust::{CapabilityDecl, CollectionDecl, ComponentDecl, ExposeDecl, OfferDecl, UseDecl},
     cm_types::{Name, Url},
     config_encoder::ConfigFields,
@@ -34,7 +33,6 @@ use {
 /// A representation of a v2 component instance.
 #[derive(Debug)]
 pub struct ComponentInstanceForAnalyzer {
-    instanced_moniker: InstancedMoniker,
     moniker: Moniker,
     pub(crate) decl: ComponentDecl,
     config: Option<ConfigFields>,
@@ -65,10 +63,8 @@ impl ComponentInstanceForAnalyzer {
     ) -> Arc<Self> {
         let environment =
             EnvironmentForAnalyzer::new_root(runner_registry, &runtime_config, &top_instance);
-        let instanced_moniker = InstancedMoniker::root();
-        let moniker = instanced_moniker.clone().without_instance_ids();
+        let moniker = Moniker::root();
         Arc::new(Self {
-            instanced_moniker,
             moniker,
             decl,
             config,
@@ -93,17 +89,14 @@ impl ComponentInstanceForAnalyzer {
         component_id_index: Arc<component_id_index::Index>,
     ) -> Result<Arc<Self>, BuildAnalyzerModelError> {
         let environment = EnvironmentForAnalyzer::new_for_child(&parent, child)?;
-        let instanced_moniker = parent.instanced_moniker.child(
-            InstancedChildName::try_new(
+        let moniker = parent.moniker.child(
+            ChildName::try_new(
                 child.child_moniker.name().as_str(),
                 child.child_moniker.collection().map(|c| c.as_str()),
-                0,
             )
             .expect("child moniker is guaranteed to be valid"),
         );
-        let moniker = instanced_moniker.clone().without_instance_ids();
         Ok(Arc::new(Self {
-            instanced_moniker,
             moniker,
             decl: child_component_decl,
             config,
@@ -154,10 +147,6 @@ impl ComponentInstanceForAnalyzer {
 #[async_trait]
 impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
     type TopInstance = TopInstanceForAnalyzer;
-
-    fn instanced_moniker(&self) -> &InstancedMoniker {
-        &self.instanced_moniker
-    }
 
     fn moniker(&self) -> &Moniker {
         &self.moniker

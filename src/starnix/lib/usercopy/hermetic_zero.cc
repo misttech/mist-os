@@ -6,6 +6,9 @@
 
 #include "hermetic_common.h"
 
+// Build with the following cc flags:
+//  `-O3 -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer`
+
 constexpr uint8_t kCh = 0;
 constexpr word kRepeatedCh = repeat_byte(kCh);
 

@@ -4,8 +4,10 @@
 
 #include "memory-pressure.h"
 
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -13,8 +15,6 @@
 
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/command_line.h"
-
-namespace sysmem = fuchsia_sysmem;
 
 void PrintHelp() {
   Log(""
@@ -51,89 +51,106 @@ int MemoryPressureCommand(const fxl::CommandLine& command_line, bool sleep) {
     return 1;
   }
 
-  sysmem::wire::HeapType heap = sysmem::wire::HeapType::kSystemRam;
+  fuchsia_sysmem::HeapType heap = fuchsia_sysmem::HeapType::kSystemRam;
   std::string heap_string;
   if (command_line.GetOptionValue("heap", &heap_string)) {
     char* endptr;
-    heap = static_cast<sysmem::wire::HeapType>(strtoull(heap_string.c_str(), &endptr, 0));
+    heap = static_cast<fuchsia_sysmem::HeapType>(strtoull(heap_string.c_str(), &endptr, 0));
     if (endptr != heap_string.c_str() + heap_string.size()) {
       LogError("Invalid heap string: %s\n", heap_string.c_str());
       return 1;
     }
   }
+  auto heap_type_result = sysmem::V2CopyFromV1HeapType(heap);
+  ZX_ASSERT(heap_type_result.is_ok());
+  auto heap_type = std::move(heap_type_result.value());
 
   bool physically_contiguous = command_line.HasOption("contiguous");
 
-  sysmem::wire::BufferCollectionConstraints constraints;
+  fuchsia_sysmem2::BufferCollectionConstraints constraints;
   std::string usage;
+  constraints.usage().emplace();
   if (command_line.GetOptionValue("usage", &usage)) {
     if (usage == "vulkan") {
-      constraints.usage.vulkan = sysmem::wire::kVulkanUsageTransferDst;
+      constraints.usage()->vulkan() = fuchsia_sysmem2::kVulkanImageUsageTransferDst;
     } else if (usage == "cpu") {
-      constraints.usage.cpu = sysmem::wire::kCpuUsageRead;
+      constraints.usage()->cpu() = fuchsia_sysmem2::kCpuUsageRead;
     } else {
       LogError("Invalid usage %s\n", usage.c_str());
       PrintHelp();
       return 1;
     }
   } else {
-    constraints.usage.vulkan = sysmem::wire::kVulkanUsageTransferDst;
+    constraints.usage()->vulkan() = fuchsia_sysmem2::kVulkanImageUsageTransferDst;
   }
-  constraints.min_buffer_count_for_camping = 1;
-  constraints.has_buffer_memory_constraints = true;
-  auto& mem_constraints = constraints.buffer_memory_constraints;
-  mem_constraints.physically_contiguous_required = physically_contiguous;
-  mem_constraints.min_size_bytes = static_cast<uint32_t>(size);
-  mem_constraints.cpu_domain_supported = true;
-  mem_constraints.ram_domain_supported = true;
-  mem_constraints.inaccessible_domain_supported = true;
-  mem_constraints.heap_permitted_count = 1;
-  mem_constraints.heap_permitted[0] = heap;
-  zx::result client_end = component::Connect<sysmem::Allocator>();
+  constraints.min_buffer_count_for_camping() = 1;
+  auto& mem_constraints = constraints.buffer_memory_constraints().emplace();
+  mem_constraints.physically_contiguous_required() = physically_contiguous;
+  mem_constraints.min_size_bytes() = static_cast<uint32_t>(size);
+  mem_constraints.cpu_domain_supported() = true;
+  mem_constraints.ram_domain_supported() = true;
+  mem_constraints.inaccessible_domain_supported() = true;
+  mem_constraints.permitted_heaps().emplace().emplace_back(sysmem::MakeHeap(heap_type, 0));
+  zx::result client_end = component::Connect<fuchsia_sysmem2::Allocator>();
   if (client_end.is_error()) {
     LogError("Failed to connect to sysmem services, error %d\n", client_end.status_value());
     return 1;
   }
-  fidl::WireSyncClient sysmem_allocator{std::move(client_end.value())};
-  if (const fidl::OneWayStatus status = sysmem_allocator->SetDebugClientInfo(
-          fidl::StringView::FromExternal(fsl::GetCurrentProcessName()),
-          fsl::GetCurrentProcessKoid());
-      !status.ok()) {
-    LogError("Failed to set debug client info, error %d\n", status.status());
+  fidl::SyncClient sysmem_allocator{std::move(client_end.value())};
+  fuchsia_sysmem2::AllocatorSetDebugClientInfoRequest set_debug_request;
+  set_debug_request.name() = fsl::GetCurrentProcessName();
+  set_debug_request.id() = fsl::GetCurrentProcessKoid();
+  if (const auto set_debug_result =
+          sysmem_allocator->SetDebugClientInfo(std::move(set_debug_request));
+      !set_debug_result.is_ok()) {
+    LogError("Failed to set debug client info - error: %s\n",
+             set_debug_result.error_value().status_string());
     return 1;
   };
 
   auto [client_collection_channel, server_collection] =
-      fidl::Endpoints<sysmem::BufferCollection>::Create();
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
 
-  if (const fidl::OneWayStatus status =
-          sysmem_allocator->AllocateNonSharedCollection(std::move(server_collection));
-      !status.ok()) {
-    LogError("Failed to allocate collection, error %d\n", status.status());
+  fuchsia_sysmem2::AllocatorAllocateNonSharedCollectionRequest allocate_non_shared_request;
+  allocate_non_shared_request.collection_request(std::move(server_collection));
+  if (const auto allocate_non_shared_result =
+          sysmem_allocator->AllocateNonSharedCollection(std::move(allocate_non_shared_request));
+      !allocate_non_shared_result.is_ok()) {
+    LogError("Failed to allocate collection - error: %s\n",
+             allocate_non_shared_result.error_value().status_string());
     return 1;
   }
-  fidl::WireSyncClient collection(std::move(client_collection_channel));
+  fidl::SyncClient collection(std::move(client_collection_channel));
 
-  if (const fidl::OneWayStatus status = collection->SetName(1000000, "sysmem-memory-pressure");
-      !status.ok()) {
-    LogError("Failed to set collection name, error %d\n", status.status());
+  fuchsia_sysmem2::NodeSetNameRequest set_name_request;
+  set_name_request.priority() = 1000000;
+  set_name_request.name() = "sysmem-memory-pressure";
+  if (const auto set_name_result = collection->SetName(std::move(set_name_request));
+      !set_name_result.is_ok()) {
+    LogError("Failed to set collection name - error: %s\n",
+             set_name_result.error_value().status_string());
     return 1;
   }
 
-  if (const fidl::OneWayStatus status = collection->SetConstraints(true, constraints);
-      !status.ok()) {
-    LogError("Failed to set collection constraints, error %d\n", status.status());
+  fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  set_constraints_request.constraints() = std::move(constraints);
+  if (const auto set_constraits_result =
+          collection->SetConstraints(std::move(set_constraints_request));
+      !set_constraits_result.is_ok()) {
+    LogError("Failed to set collection constraints - error: %s\n",
+             set_constraits_result.error_value().status_string());
     return 1;
   }
 
-  const fidl::WireResult result = collection->WaitForBuffersAllocated();
-  if (!result.ok()) {
-    LogError("Lost connection to sysmem services, error %d\n", result.status());
-    return 1;
-  }
-  auto const& response = result.value();
-  if (response.status != ZX_OK) {
-    LogError("Allocation error %d\n", response.status);
+  auto wait_result = collection->WaitForAllBuffersAllocated();
+  if (!wait_result.is_ok()) {
+    if (wait_result.error_value().is_framework_error()) {
+      LogError("Lost connection to sysmem services - framework_error: %s\n",
+               wait_result.error_value().framework_error().status_string());
+    } else {
+      LogError("Allocation error %u\n",
+               static_cast<uint32_t>(wait_result.error_value().domain_error()));
+    }
     return 1;
   }
   Log("Allocated %ld bytes. Sleeping forever\n", size);

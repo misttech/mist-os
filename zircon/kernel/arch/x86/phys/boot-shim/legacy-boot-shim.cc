@@ -18,10 +18,10 @@
 #include <ktl/optional.h>
 #include <phys/address-space.h>
 #include <phys/allocation.h>
+#include <phys/boot-zbi.h>
 #include <phys/main.h>
 #include <phys/stdio.h>
 #include <phys/symbolize.h>
-#include <phys/trampoline-boot.h>
 #include <phys/uart.h>
 
 #include "stdout.h"
@@ -36,9 +36,11 @@ void PhysMain(void* ptr, arch::EarlyTicks boot_ticks) {
   MainSymbolize symbolize(kLegacyShimName);
 
   // This also fills in gLegacyBoot.
-  InitMemory(ptr);
+  AddressSpace aspace;
+  InitMemory(ptr, &aspace);
 
-  UartFromZbi(LegacyBootShim::InputZbi(ktl::as_bytes(gLegacyBoot.ramdisk)), gLegacyBoot.uart);
+  const ktl::span ramdisk = ktl::as_bytes(gLegacyBoot.ramdisk);
+  UartFromZbi(LegacyBootShim::InputZbi(ramdisk), gLegacyBoot.uart);
   UartFromCmdLine(gLegacyBoot.cmdline, gLegacyBoot.uart);
   LegacyBootSetUartConsole(gLegacyBoot.uart);
 
@@ -50,10 +52,8 @@ void PhysMain(void* ptr, arch::EarlyTicks boot_ticks) {
   memalloc::Pool& memory = Allocation::GetPool();
   shim.InitMemConfig(memory);
 
-  TrampolineBoot boot;
+  BootZbi boot;
   if (shim.Load(boot)) {
-    AddressSpace aspace;
-    ArchSetUpAddressSpaceLate(aspace);
     memory.PrintMemoryRanges(symbolize.name());
     boot.Log();
     boot.Boot();
@@ -62,16 +62,14 @@ void PhysMain(void* ptr, arch::EarlyTicks boot_ticks) {
   abort();
 }
 
-bool LegacyBootShim::Load(TrampolineBoot& boot) {
-  return BootQuirksLoad(boot) || StandardLoad(boot);
-}
+bool LegacyBootShim::Load(BootZbi& boot) { return BootQuirksLoad(boot) || StandardLoad(boot); }
 
 // This is overridden in the special bug-compatibility shim.
-[[gnu::weak]] bool LegacyBootShim::BootQuirksLoad(TrampolineBoot& boot) { return false; }
+[[gnu::weak]] bool LegacyBootShim::BootQuirksLoad(BootZbi& boot) { return false; }
 
-bool LegacyBootShim::StandardLoad(TrampolineBoot& boot) {
+bool LegacyBootShim::StandardLoad(BootZbi& boot) {
   return Check("Not a bootable ZBI", boot.Init(input_zbi())) &&
-         Check("Failed to load ZBI", boot.Load(size_bytes())) &&
+         Check("Failed to load ZBI", boot.Load(static_cast<uint32_t>(size_bytes()))) &&
          Check("Failed to append boot loader items to data ZBI", AppendItems(boot.DataZbi()));
 }
 
@@ -86,20 +84,24 @@ bool LegacyBootShim::IsProperZbi() const {
   return result;
 }
 
-// The default implementation assumes a conforming ZBI image, that is the first item is the kernel
-// item, and items are appended. The symbols is weak, such that bug compatible shims can override
-// this. Examples of bugs are bootloaders prepending items to the zbi image.
+// The default implementation assumes a conforming ZBI image; that is, the
+// first item is the kernel item, and items are appended.  The symbols is weak,
+// such that bug compatible shims can override this.  Examples of such bugs are
+// bootloaders prepending items to the ZBI (preceding the original kernel).
 [[gnu::weak]] void UartFromZbi(LegacyBootShim::InputZbi zbi, uart::all::Driver& uart) {
-  uart = GetUartFromRange(zbi.begin(), zbi.end()).value_or(uart);
+  if (ktl::optional new_uart = GetUartFromRange(zbi.begin(), zbi.end())) {
+    uart = *new_uart;
+  }
   zbi.ignore_error();
 }
 
-ktl::optional<uart::all::Driver> GetUartFromRange(LegacyBootShim::InputZbi::iterator start,
-                                                  LegacyBootShim::InputZbi::iterator end) {
+ktl::optional<uart::all::Driver> GetUartFromRange(  //
+    LegacyBootShim::InputZbi::iterator start, LegacyBootShim::InputZbi::iterator end) {
   ktl::optional<uart::all::Driver> uart;
   UartDriver driver;
   while (start != end && start != start.view().end()) {
-    if (auto& [header, payload] = *start; header->type == ZBI_TYPE_KERNEL_DRIVER) {
+    auto& [header, payload] = *start;
+    if (header->type == ZBI_TYPE_KERNEL_DRIVER) {
       if (driver.Match(*header, payload.data())) {
         uart = driver.uart();
       }

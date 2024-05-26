@@ -149,8 +149,6 @@ nuc7_env = {
   }
 }
 
-# TODO(b/326499130): Delete nuc_env after all other repositories references are migrated to nuc7.
-nuc_env = nuc7_env
 _all_named_fuchsia_envs += [
   {
     name = "nuc7"

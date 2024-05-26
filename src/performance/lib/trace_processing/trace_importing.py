@@ -693,7 +693,7 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
                         outgoing_tid=outgoing_tid,
                         incoming_prio=incoming_prio,
                         outgoing_prio=outgoing_prio,
-                        outgoing_state=trace_model.ThreadState(outgoing_state),
+                        outgoing_state=outgoing_state,
                         args=args,
                     )
                 )

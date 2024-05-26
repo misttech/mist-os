@@ -134,12 +134,12 @@ int main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
 
-  fuchsia::sysmem::PixelFormatType input_format;
+  fuchsia::images2::PixelFormat input_format;
 
   if (format_str == kNV12) {
-    input_format = fuchsia::sysmem::PixelFormatType::NV12;
+    input_format = fuchsia::images2::PixelFormat::NV12;
   } else if (format_str == kI420) {
-    input_format = fuchsia::sysmem::PixelFormatType::I420;
+    input_format = fuchsia::images2::PixelFormat::I420;
   }
 
   std::string mime_type = "video/";
@@ -166,7 +166,7 @@ int main(int argc, char* argv[]) {
 
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
 
-  fuchsia::sysmem::AllocatorHandle allocator;
+  fuchsia::sysmem2::AllocatorHandle allocator;
   fuchsia::mediacodec::CodecFactoryHandle codec_factory;
 
   auto status = context->svc()->Connect(allocator.NewRequest());
@@ -199,18 +199,13 @@ int main(int argc, char* argv[]) {
   size_t frames_written = 0;
 
   // TODO(dalesat): add support for non-equal display and coded dimensions
-  fuchsia::sysmem::ImageFormat_2 image_format = {
-      .pixel_format =
-          {
-              .type = input_format,
-          },
-      .coded_width = input_width,
-      .coded_height = input_height,
-      .bytes_per_row = input_width,
-      .display_width = input_width,
-      .display_height = input_height,
-      .color_space = fuchsia::sysmem::ColorSpace{.type = fuchsia::sysmem::ColorSpaceType::REC709},
-  };
+  fuchsia::images2::ImageFormat image_format;
+  image_format.set_pixel_format(input_format);
+  image_format.set_size(fuchsia::math::SizeU{.width = input_width, .height = input_height});
+  image_format.set_bytes_per_row(input_width);
+  image_format.set_display_rect(
+      fuchsia::math::RectU{.x = 0, .y = 0, .width = input_width, .height = input_height});
+  image_format.set_color_space(fuchsia::images2::ColorSpace::REC709);
 
   encoder->Start(std::move(image_format), framerate);
 

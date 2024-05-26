@@ -434,7 +434,7 @@ TEST_F(BtHciBroadcomTest, HciProtocolUnknownMethod) {
 
   auto command =
       fuchsia_hardware_bluetooth::wire::VendorCommand::WithSetAclPriority(arena, builder.Build());
-  auto result = vendor_client->NewEncodeCommand(command);
+  auto result = vendor_client->EncodeCommand(command);
 
   ASSERT_EQ(result.status(), ZX_ERR_NOT_SUPPORTED);
 }
@@ -449,8 +449,7 @@ TEST_F(BtHciBroadcomInitializedTest, EncodeSetAclPrioritySuccessWithParametersHi
 
   auto command =
       fuchsia_hardware_bluetooth::wire::VendorCommand::WithSetAclPriority(arena, builder.Build());
-
-  auto result = vendor_client_->NewEncodeCommand(command);
+  auto result = vendor_client_->EncodeCommand(command);
   ASSERT_TRUE(result.ok());
   ASSERT_FALSE(result->is_error());
 
@@ -478,7 +477,7 @@ TEST_F(BtHciBroadcomInitializedTest, EncodeSetAclPrioritySuccessWithParametersNo
 
   auto command =
       fuchsia_hardware_bluetooth::wire::VendorCommand::WithSetAclPriority(arena, builder.Build());
-  auto result = vendor_client_->NewEncodeCommand(command);
+  auto result = vendor_client_->EncodeCommand(command);
   ASSERT_TRUE(result.ok());
   ASSERT_FALSE(result->is_error());
 

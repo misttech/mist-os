@@ -4,17 +4,19 @@
 
 """Provides an abstraction to assert that a set of metrics matches the expected one."""
 
+import os
+
 _OPTIONAL_SUFFIX: str = " [optional]"
 
 
 class MetricsAllowlist:
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str | os.PathLike[str]):
         """Creates a new metric allowlist.
 
         Args:
           file_path: path to the file containing the expected metrics.
         """
-        self.file_path: str = file_path
+        self.file_path = file_path
         self.optional_metrics: set[str] = set()
         self.expected_metrics: set[str] = set()
         self._should_summarize = True

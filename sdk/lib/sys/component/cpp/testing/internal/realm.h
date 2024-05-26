@@ -22,9 +22,7 @@ fidl::InterfaceHandle<fuchsia::io::Directory> OpenExposedDir(
     fuchsia::component::Realm_Sync* realm, const fuchsia::component::decl::ChildRef& child_ref);
 
 void CreateChild(fuchsia::component::Realm_Sync* realm,
-#if __Fuchsia_API_level__ >= 14
                  fidl::InterfaceRequest<fuchsia::component::Controller> controller,
-#endif
                  std::string collection, std::string name, std::string url);
 
 void DestroyChild(fuchsia::component::Realm_Sync* realm,

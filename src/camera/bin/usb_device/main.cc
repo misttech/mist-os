@@ -73,8 +73,8 @@ int main(int argc, char* argv[]) {
   auto control_sync_ptr = std::move(*(status_or));
 
   // Connect to required environment services.
-  fuchsia::sysmem::AllocatorHandle allocator_handle;
-  fuchsia::sysmem::AllocatorPtr allocator_ptr;
+  fuchsia::sysmem2::AllocatorHandle allocator_handle;
+  fuchsia::sysmem2::AllocatorPtr allocator_ptr;
   zx_status_t status = context->svc()->Connect(allocator_handle.NewRequest());
   if (status != ZX_OK) {
     FX_PLOGS(FATAL, status) << "Failed to request allocator service.";

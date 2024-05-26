@@ -7,7 +7,7 @@ use assert_matches::assert_matches;
 use async_helpers::hanging_get::asynchronous as hanging_get;
 use diagnostics_assertions::assert_data_tree;
 use fidl_fuchsia_bluetooth::Appearance;
-use fidl_fuchsia_bluetooth_host::HostRequest;
+use fidl_fuchsia_bluetooth_host::{BondingDelegateRequest, HostRequest};
 use fidl_fuchsia_bluetooth_sys::{self as sys, TechnologyType};
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_bluetooth::types::bonding_data::example;
@@ -133,7 +133,7 @@ fn host_is_in_dispatcher(id: &HostId, dispatcher: &HostDispatcher) -> bool {
 async fn apply_settings_fails_host_removed() {
     let dispatcher = hd_test::make_simple_test_dispatcher();
     let host_id = HostId(42);
-    let (mut host_server, _, _gatt_server) =
+    let (mut host_server, _, _gatt_server, _bonding) =
         hd_test::create_and_add_test_host_to_dispatcher(host_id, &dispatcher).await.unwrap();
     assert!(host_is_in_dispatcher(&host_id, &dispatcher));
     let run_host = async move {
@@ -164,7 +164,7 @@ async fn apply_settings_fails_host_removed() {
 async fn default_name_behavior() {
     let dispatcher = hd_test::make_simple_test_dispatcher();
     let host_id = HostId(42);
-    let (mut host_server, _, _gatt_server) =
+    let (mut host_server, _, _gatt_server, _bonding) =
         hd_test::create_and_add_test_host_to_dispatcher(host_id, &dispatcher).await.unwrap();
 
     let _host_server_answers_set_name = fasync::Task::spawn(async move {
@@ -209,18 +209,19 @@ async fn test_commit_bootstrap_doesnt_fail_from_host_failure() {
 
     // add a test host with a channel we provide, which fails on restore_bonds()
     let host_id = HostId(1);
-    let (mut host_server, _, _gatt_server) =
+    let (_host_server, _, _gatt_server, mut bonding_delegate_stream) =
         hd_test::create_and_add_test_host_to_dispatcher(host_id, &host_dispatcher).await.unwrap();
     assert!(host_is_in_dispatcher(&host_id, &host_dispatcher));
 
-    let run_host = async {
-        match host_server.try_next().await {
-            Ok(Some(HostRequest::RestoreBonds { bonds, responder })) => {
+    let run_delegate = async move {
+        match bonding_delegate_stream.try_next().await {
+            Ok(Some(BondingDelegateRequest::RestoreBonds { bonds, responder })) => {
                 // Fail by returning all bonds as errors
                 let _ = responder.send(&bonds);
             }
             x => panic!("Expected RestoreBonds Request but got: {:?}", x),
         }
+        bonding_delegate_stream
     };
 
     let identity = Identity {
@@ -231,8 +232,8 @@ async fn test_commit_bootstrap_doesnt_fail_from_host_failure() {
         )],
     };
     // Call dispatcher.commit_bootstrap() & assert that the result is success
-    let result =
-        futures::future::join(host_dispatcher.commit_bootstrap(vec![identity]), run_host).await.0;
+    let (result, _bonding_delegate_stream) =
+        futures::future::join(host_dispatcher.commit_bootstrap(vec![identity]), run_delegate).await;
     assert_matches!(result, Ok(()));
 }
 

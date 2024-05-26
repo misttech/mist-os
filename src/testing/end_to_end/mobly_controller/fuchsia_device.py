@@ -5,7 +5,7 @@
 """Mobly Controller for Fuchsia Device"""
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 import honeydew
 from honeydew.typing import custom_types
@@ -23,21 +23,18 @@ _FFX_CONFIG_OBJ: ffx.FfxConfig = ffx.FfxConfig()
 
 
 def create(
-    configs: List[Dict[str, Any]]
-) -> List[fuchsia_device_interface.FuchsiaDevice]:
+    configs: list[dict[str, Any]]
+) -> list[fuchsia_device_interface.FuchsiaDevice]:
     """Create Fuchsia device controller(s) and returns them.
 
     Required for Mobly controller registration.
 
     Args:
-        configs: List of dicts. Each dict representing a configuration for a
+        configs: list of dicts. Each dict representing a configuration for a
             Fuchsia device.
 
             Ensure to have following keys in the config dict:
             * name - Device name returned by `ffx target list`.
-            * ssh_private_key - Absolute path to the SSH private key file needed
-                to SSH into fuchsia device.
-            * ssh_user - Username to be used to SSH into fuchsia device.
             * transport - Transport to be used to perform the host-target
                 interactions.
             * ffx_path - Absolute path to FFX binary to use for the device.
@@ -77,24 +74,22 @@ def create(
         subtools_search_path=_get_ffx_subtools_search_path(configs),
     )
 
-    fuchsia_devices: List[fuchsia_device_interface.FuchsiaDevice] = []
+    fuchsia_devices: list[fuchsia_device_interface.FuchsiaDevice] = []
     for config in configs:
-        device_config: Dict[str, Any] = _parse_device_config(config)
+        device_config: dict[str, Any] = _parse_device_config(config)
         fuchsia_devices.append(
             honeydew.create_device(
                 device_name=device_config["name"],
                 transport=device_config["transport"],
                 ffx_config=_FFX_CONFIG_OBJ.get_config(),
                 device_ip_port=device_config.get("device_ip_port"),
-                ssh_private_key=device_config.get("ssh_private_key"),
-                ssh_user=device_config.get("ssh_user"),
             )
         )
     return fuchsia_devices
 
 
 def destroy(
-    fuchsia_devices: List[fuchsia_device_interface.FuchsiaDevice],
+    fuchsia_devices: list[fuchsia_device_interface.FuchsiaDevice],
 ) -> None:
     """Closes all created fuchsia devices.
 
@@ -114,8 +109,8 @@ def destroy(
 
 
 def get_info(
-    fuchsia_devices: List[fuchsia_device_interface.FuchsiaDevice],
-) -> List[Dict[str, Any]]:
+    fuchsia_devices: list[fuchsia_device_interface.FuchsiaDevice],
+) -> list[dict[str, Any]]:
     """Gets information from a list of FuchsiaDevice objects.
 
     Optional for Mobly controller registration.
@@ -134,16 +129,16 @@ def get_info(
 
 def _get_fuchsia_device_info(
     fuchsia_device: fuchsia_device_interface.FuchsiaDevice,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Returns information of a specific fuchsia device object.
 
     Args:
         fuchsia_device: FuchsiaDevice object.
 
     Returns:
-        Dict containing information of a fuchsia device.
+        dict containing information of a fuchsia device.
     """
-    device_info: Dict[str, Any] = {
+    device_info: dict[str, Any] = {
         "device_class": fuchsia_device.__class__.__name__,
         "persistent": {},
         "dynamic": {},
@@ -165,15 +160,15 @@ def _get_fuchsia_device_info(
     return device_info
 
 
-def _enable_mdns(configs: List[Dict[str, Any]]) -> bool:
+def _enable_mdns(configs: list[dict[str, Any]]) -> bool:
     for config in configs:
-        device_config: Dict[str, Any] = _parse_device_config(config)
+        device_config: dict[str, Any] = _parse_device_config(config)
         if not device_config.get("device_ip_port"):
             return True
     return False
 
 
-def _parse_device_config(config: Dict[str, str]) -> Dict[str, Any]:
+def _parse_device_config(config: dict[str, str]) -> dict[str, Any]:
     """Validates and parses mobly configuration associated with FuchsiaDevice.
 
     Args:
@@ -207,7 +202,7 @@ def _parse_device_config(config: Dict[str, str]) -> Dict[str, Any]:
     if "transport" not in config:
         raise RuntimeError("Missing transport field in the config")
 
-    device_config: Dict[str, Any] = {}
+    device_config: dict[str, Any] = {}
 
     for config_key, config_value in config.items():
         if config_key == "transport":
@@ -257,11 +252,11 @@ def _get_log_directory() -> str:
     )
 
 
-def _get_ffx_path(configs: List[Dict[str, Any]]) -> str:
+def _get_ffx_path(configs: list[dict[str, Any]]) -> str:
     """Returns the path to the FFX binary to use.
 
     Args:
-      configs: List of dicts. Each dict representing a configuration for a
+      configs: list of dicts. Each dict representing a configuration for a
             Fuchsia device.
 
     Returns:
@@ -275,11 +270,11 @@ def _get_ffx_path(configs: List[Dict[str, Any]]) -> str:
     raise RuntimeError("No FFX path found in any device config")
 
 
-def _get_ffx_subtools_search_path(configs: List[Dict[str, Any]]) -> str | None:
+def _get_ffx_subtools_search_path(configs: list[dict[str, Any]]) -> str | None:
     """Returns the ffx subtools search path to use.
 
     Args:
-      configs: List of dicts. Each dict representing a configuration for a
+      configs: list of dicts. Each dict representing a configuration for a
             Fuchsia device.
 
     Returns:

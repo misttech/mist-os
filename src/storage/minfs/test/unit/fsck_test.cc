@@ -116,10 +116,10 @@ class ConsistencyCheckerFixtureVerbose : public testing::Test {
     if (truncate_size > 0) {
       EXPECT_EQ(child->Truncate(truncate_size), ZX_OK);
     }
-    fs::VnodeAttributes stat;
-    EXPECT_EQ(child->GetAttributes(&stat), ZX_OK);
+    zx::result attributes = child->GetAttributes();
+    EXPECT_TRUE(attributes.is_ok()) << attributes.status_string();
     EXPECT_EQ(child->Close(), ZX_OK);
-    return stat;
+    return *attributes;
   }
 
   void TearDown() override { EXPECT_EQ(fs_.get(), nullptr); }
@@ -145,11 +145,11 @@ TEST_F(ConsistencyCheckerFixtureVerbose, TwoInodesPointToABlock) {
     file2_stat = CreateAndWrite("file2", 0, 0, 0);
   }
 
-  EXPECT_NE(file1_stat.inode, file2_stat.inode);
+  EXPECT_NE(file1_stat.id, file2_stat.id);
 
   // To keep test simple, we ensure here that inodes allocated for file1 and
   // file2 are within the same block in the inode table.
-  EXPECT_EQ(file1_stat.inode / kMinfsInodesPerBlock, file2_stat.inode / kMinfsInodesPerBlock);
+  EXPECT_EQ(*file1_stat.id / kMinfsInodesPerBlock, *file2_stat.id / kMinfsInodesPerBlock);
 
   std::unique_ptr<Bcache> bcache;
   DestroyMinfs(&bcache);
@@ -159,11 +159,11 @@ TEST_F(ConsistencyCheckerFixtureVerbose, TwoInodesPointToABlock) {
 
   Inode inodes[kMinfsInodesPerBlock];
   blk_t inode_block =
-      safemath::checked_cast<uint32_t>(sb.ino_block + (file1_stat.inode / kMinfsInodesPerBlock));
+      safemath::checked_cast<uint32_t>(sb.ino_block + (*file1_stat.id / kMinfsInodesPerBlock));
   EXPECT_TRUE(bcache->Readblk(inode_block, &inodes).is_ok());
 
-  size_t file1_ino = file1_stat.inode % kMinfsInodesPerBlock;
-  size_t file2_ino = file2_stat.inode % kMinfsInodesPerBlock;
+  size_t file1_ino = *file1_stat.id % kMinfsInodesPerBlock;
+  size_t file2_ino = *file2_stat.id % kMinfsInodesPerBlock;
 
   // The test code has hard dependency on filesystem layout.
   // TODO(https://fxbug.dev/42115635): Isolate this test from the on-disk format.
@@ -191,10 +191,10 @@ TEST_F(ConsistencyCheckerFixtureVerbose, TwoOffsetsPointToABlock) {
 
   Inode inodes[kMinfsInodesPerBlock];
   blk_t inode_block =
-      safemath::checked_cast<uint32_t>(sb.ino_block + (file_stat.inode / kMinfsInodesPerBlock));
+      safemath::checked_cast<uint32_t>(sb.ino_block + (*file_stat.id / kMinfsInodesPerBlock));
   EXPECT_TRUE(bcache->Readblk(inode_block, &inodes).is_ok());
 
-  size_t file_ino = file_stat.inode % kMinfsInodesPerBlock;
+  size_t file_ino = *file_stat.id % kMinfsInodesPerBlock;
 
   EXPECT_GT(inodes[file_ino].dnum[0], 0u);
   EXPECT_EQ(inodes[file_ino].dnum[1], 0u);
@@ -221,10 +221,10 @@ TEST_F(ConsistencyCheckerFixtureVerbose, IndirectBlocksShared) {
 
   Inode inodes[kMinfsInodesPerBlock];
   blk_t inode_block =
-      safemath::checked_cast<uint32_t>(sb.ino_block + (file_stat.inode / kMinfsInodesPerBlock));
+      safemath::checked_cast<uint32_t>(sb.ino_block + (*file_stat.id / kMinfsInodesPerBlock));
   EXPECT_TRUE(bcache->Readblk(inode_block, &inodes).is_ok());
 
-  size_t file_ino = file_stat.inode % kMinfsInodesPerBlock;
+  size_t file_ino = *file_stat.id % kMinfsInodesPerBlock;
 
   EXPECT_GT(inodes[file_ino].dnum[0], 0u);
   EXPECT_EQ(inodes[file_ino].dnum[1], 0u);

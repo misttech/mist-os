@@ -38,6 +38,7 @@ sdk_source_set("shared") {
     "register_info.h",
     "register_value.cc",
     "register_value.h",
+    "result.h",
     "serialization.cc",
     "serialization.h",
     "status.cc",

@@ -130,14 +130,17 @@ class PageQueues::LruIsolate {
             continue;
           }
         }
-        if (backlink.cow->ReclaimPage(backlink.page, backlink.offset,
-                                      VmCowPages::EvictionHintAction::Follow, compressor)) {
+        list_node_t freed_list = LIST_INITIAL_VALUE(freed_list);
+        if (uint64_t count = backlink.cow->ReclaimPage(backlink.page, backlink.offset,
+                                                       VmCowPages::EvictionHintAction::Follow,
+                                                       &freed_list, compressor);
+            count > 0) {
           if (backlink.cow->can_evict()) {
-            pq_lru_pages_evicted.Add(1);
+            pq_lru_pages_evicted.Add(count);
           } else {
-            pq_lru_pages_compressed.Add(1);
+            pq_lru_pages_compressed.Add(count);
           }
-          pmm_free_page(backlink.page);
+          pmm_free(&freed_list);
         }
       }
     }
@@ -1108,6 +1111,15 @@ void PageQueues::SetAnonymousZeroFork(vm_page_t* page, VmCowPages* object, uint6
 }
 
 void PageQueues::MoveToAnonymousZeroFork(vm_page_t* page) {
+  // The common case is that the |page| being moved was previously placed into the anonymous queue.
+  // If the zero fork queue is reclaimable, then most likely so is the anonymous queue, and so this
+  // move would be a no-op. As this case is common it is worth doing this quick check to
+  // short-circuit.
+  if (zero_fork_is_reclaimable_ &&
+      queue_is_reclaim(static_cast<PageQueue>(
+          page->object.get_page_queue_ref().load(ktl::memory_order_relaxed)))) {
+    return;
+  }
   DeferPendingSignals dps{*this};
   Guard<SpinLock, IrqSave> guard{&lock_};
   MoveToQueueLocked(

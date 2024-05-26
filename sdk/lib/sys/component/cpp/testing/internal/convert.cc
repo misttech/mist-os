@@ -6,6 +6,7 @@
 #include <lib/sys/component/cpp/testing/internal/convert.h>
 #include <lib/sys/component/cpp/testing/internal/errors.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
+#include <zircon/availability.h>
 
 namespace component_testing {
 namespace internal {
@@ -31,7 +32,6 @@ fuchsia::component::test::ChildOptions ConvertToFidl(const ChildOptions& options
     result.set_environment(std::string(options.environment));
   }
 
-#if __Fuchsia_API_level__ >= 13
   if (!options.config_overrides.empty()) {
     result.mutable_config_overrides()->reserve(options.config_overrides.size());
 
@@ -43,10 +43,25 @@ fuchsia::component::test::ChildOptions ConvertToFidl(const ChildOptions& options
       result.mutable_config_overrides()->push_back(std::move(override_clone));
     }
   }
-#endif
 
   return result;
 }
+
+namespace {
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+std::string NameFromDictionaryRef(const DictionaryRef& ref) {
+  size_t delim = ref.path.find('/');
+  if (delim == std::string_view::npos || ref.path.substr(0, delim) != "self") {
+    ZX_PANIC("DictionaryRef path must be of the form self/<dictionary_name>");
+  }
+  std::string_view name = ref.path.substr(delim + 1, ref.path.size());
+  if (name.find('/') != std::string_view::npos) {
+    ZX_PANIC("DictionaryRef path must be of the form self/<dictionary_name>");
+  }
+  return std::string(name);
+}
+#endif
+}  // namespace
 
 fuchsia::component::decl::Ref ConvertToFidl(Ref ref) {
   if (auto child_ref = cpp17_get_if<ChildRef>(&ref)) {
@@ -71,6 +86,13 @@ fuchsia::component::decl::Ref ConvertToFidl(Ref ref) {
   if (auto _ = cpp17_get_if<SelfRef>(&ref)) {
     return fuchsia::component::decl::Ref::WithSelf(fuchsia::component::decl::SelfRef());
   }
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  if (auto dictionary_ref = cpp17_get_if<DictionaryRef>(&ref)) {
+    fuchsia::component::decl::CapabilityRef result;
+    result.name = NameFromDictionaryRef(*dictionary_ref);
+    return fuchsia::component::decl::Ref::WithCapability(std::move(result));
+  }
+#endif
 
   ZX_PANIC("ConvertToFidl(Ref) reached unreachable block!");
 }
@@ -83,7 +105,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
     ZX_COMPONENT_ADD_STR_IF_PRESENT(protocol, as, fidl_capability);
     ZX_COMPONENT_ADD_STR_IF_PRESENT(protocol, path, fidl_capability);
     ZX_COMPONENT_ADD_IF_PRESENT(protocol, type, fidl_capability);
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     ZX_COMPONENT_ADD_STR_IF_PRESENT(protocol, from_dictionary, fidl_capability);
 #endif
 
@@ -95,7 +117,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
     fidl_capability.set_name(std::string(service->name));
     ZX_COMPONENT_ADD_STR_IF_PRESENT(service, as, fidl_capability);
     ZX_COMPONENT_ADD_STR_IF_PRESENT(service, path, fidl_capability);
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     ZX_COMPONENT_ADD_STR_IF_PRESENT(service, from_dictionary, fidl_capability);
 #endif
 
@@ -110,7 +132,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
     ZX_COMPONENT_ADD_STR_IF_PRESENT(directory, subdir, fidl_capability);
     ZX_COMPONENT_ADD_IF_PRESENT(directory, rights, fidl_capability);
     ZX_COMPONENT_ADD_STR_IF_PRESENT(directory, path, fidl_capability);
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     ZX_COMPONENT_ADD_STR_IF_PRESENT(directory, from_dictionary, fidl_capability);
 #endif
 
@@ -126,7 +148,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
     return fuchsia::component::test::Capability::WithStorage(std::move(fidl_capability));
   }
   if ([[maybe_unused]] auto dictionary = cpp17_get_if<Dictionary>(&capability)) {
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     fuchsia::component::test::Dictionary fidl_capability;
 
     fidl_capability.set_name(std::string(dictionary->name));
@@ -139,7 +161,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
 #endif
   }
   if ([[maybe_unused]] auto config = cpp17_get_if<Config>(&capability)) {
-#if __Fuchsia_API_level__ >= 20
+#if FUCHSIA_API_LEVEL_AT_LEAST(20)
     fuchsia::component::test::Config fidl_capability;
 
     fidl_capability.set_name(std::string(config->name));

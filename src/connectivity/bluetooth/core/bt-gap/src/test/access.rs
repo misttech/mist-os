@@ -23,7 +23,7 @@ use crate::{host_device, host_dispatcher, services::access};
 async fn test_pair() -> Result<(), Error> {
     let dispatcher = host_dispatcher::test::make_simple_test_dispatcher();
 
-    let (host_server, _, _gatt_server) =
+    let (host_server, _, _gatt_server, _bonding) =
         host_dispatcher::test::create_and_add_test_host_to_dispatcher(HostId(42), &dispatcher)
             .await
             .unwrap();
@@ -72,7 +72,7 @@ async fn test_discovery_over_adapter_change() -> Result<(), Error> {
     let hd = host_dispatcher::test::make_simple_test_dispatcher();
 
     // Add Host #1 to dispatcher and make active
-    let (host_server_1, host_1, _gatt_server_1) =
+    let (host_server_1, host_1, _gatt_server_1, _bonding) =
         host_dispatcher::test::create_and_add_test_host_to_dispatcher(HostId(1), &hd)
             .await
             .unwrap();
@@ -81,7 +81,7 @@ async fn test_discovery_over_adapter_change() -> Result<(), Error> {
     hd.set_active_host(HostId(1))?;
 
     // Add Host #2 to dispatcher
-    let (host_server_2, host_2, _gatt_server_2) =
+    let (host_server_2, host_2, _gatt_server_2, _bonding) =
         host_dispatcher::test::create_and_add_test_host_to_dispatcher(HostId(2), &hd)
             .await
             .unwrap();

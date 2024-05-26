@@ -173,18 +173,11 @@ def build_info_for_target(args, target):
         return ""
 
     result = json.loads(
-        run(args.ffx, "--target", target, "target", "show", "--json")
+        run(args.ffx, "--machine", "json", "--target", target, "target", "show")
     )
-    sdk_version = ""
-    product_config = ""
-    for entry in result:
-        if entry["label"] == "build":
-            for child in entry["child"]:
-                label = child["label"]
-                if label == "version":
-                    sdk_version = child["value"]
-                elif label == "product":
-                    product_config = child["value"]
+
+    sdk_version = result["build"]["version"]
+    product_config = result["build"]["product"]
 
     return BuildInfo(sdk_version=sdk_version, product_config=product_config)
 

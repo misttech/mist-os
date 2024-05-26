@@ -24,8 +24,8 @@ class VnodeFile final : public Vnode {
   void DidModifyStream() final;
 
   zx_status_t Truncate(size_t len) final;
-  zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
-  zx_status_t SetAttributes(fs::VnodeAttributesUpdate a) final;
+  zx::result<fs::VnodeAttributes> GetAttributes() const final;
+  zx::result<> UpdateAttributes(const fs::VnodeAttributesUpdate& attributes) final;
   zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) final;
   zx_status_t CloseNode() final;
   void Sync(SyncCallback closure) final;
@@ -39,7 +39,7 @@ class VnodeFile final : public Vnode {
 
   // Checks to see if the contents of this file were modified since the last time this method was
   // called. If the file was modified then the mtime is updated.
-  void UpdateModifiedIfVmoChanged() __TA_REQUIRES_SHARED(mutex_);
+  void UpdateModifiedIfVmoChanged() const __TA_REQUIRES_SHARED(mutex_);
 
   [[maybe_unused]] Memfs& memfs_;
 };

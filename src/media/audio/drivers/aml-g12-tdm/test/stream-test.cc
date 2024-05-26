@@ -243,8 +243,6 @@ class CodecTest : public SimpleCodecServer {
     started_ = true;
     return ZX_OK;
   }
-  bool IsBridgeable() override { return true; }
-  void SetBridgedMode(bool enable_bridged_mode) override {}
   DaiSupportedFormats GetDaiFormats() override {
     DaiSupportedFormats formats;
     formats.number_of_channels.push_back(2);

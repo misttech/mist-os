@@ -20,7 +20,7 @@ class VnodeVmo final : public Vnode {
 
  private:
   zx_status_t Read(void* data, size_t len, size_t off, size_t* out_actual) final;
-  zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
+  zx::result<fs::VnodeAttributes> GetAttributes() const final;
   zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) final;
   zx_status_t MakeLocalClone();
 

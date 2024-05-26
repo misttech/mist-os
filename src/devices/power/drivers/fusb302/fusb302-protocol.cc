@@ -11,6 +11,7 @@
 #include <zircon/status.h>
 
 #include <cstdint>
+#include <optional>
 #include <utility>
 
 #include "src/devices/power/drivers/fusb302/fusb302-fifos.h"
@@ -26,10 +27,12 @@ Fusb302Protocol::Fusb302Protocol(Fusb302Fifos& fifos)
                          usb_pd::MessageId(0), usb_pd::PowerRole::kSink,
                          usb_pd::SpecRevision::kRev2, usb_pd::DataRole::kUpstreamFacingPort),
       next_transmitted_message_id_(0),
-      next_expected_message_id_(0) {}
+      next_expected_message_id_(std::nullopt) {}
 
 zx::result<> Fusb302Protocol::MarkMessageAsRead() {
   ZX_DEBUG_ASSERT(HasUnreadMessage());
+  ZX_DEBUG_ASSERT_MSG(next_expected_message_id_.has_value(),
+                      "next_expected_message_id_ should be known after having received a message");
 
   const usb_pd::MessageId read_message_id = received_message_queue_.front().header().message_id();
   received_message_queue_.pop();
@@ -123,30 +126,39 @@ void Fusb302Protocol::ProcessReceivedMessage(const usb_pd::Message& message) {
 
   // Discard repeated messages.
   if (good_crc_transmission_pending_) {
-    if (header.message_id() == next_expected_message_id_.Next()) {
+    ZX_DEBUG_ASSERT_MSG(
+        next_expected_message_id_.has_value(),
+        "next_expected_message_id_ should be known after having received a message");
+    if (header.message_id() == next_expected_message_id_.value().Next()) {
       FDF_LOG(WARNING,
               "Received message with MessageID %" PRIu8
               " while expecting to have to send GoodCRC for Message ID %" PRIu8
               ". Fixing state, assuming GoodCRC was auto-generated.",
               static_cast<uint8_t>(header.message_id()),
-              static_cast<uint8_t>(next_expected_message_id_));
+              static_cast<uint8_t>(next_expected_message_id_.value()));
       next_expected_message_id_ = header.message_id();
     } else {
       FDF_LOG(WARNING,
               "PD protocol de-synchronization: discarded message with MessageID %" PRIu8
               " because we still need to send GoodCRC for MessageID %" PRIu8,
               static_cast<uint8_t>(header.message_id()),
-              static_cast<uint8_t>(next_expected_message_id_));
+              static_cast<uint8_t>(next_expected_message_id_.value()));
       return;
     }
   } else {
-    if (header.message_id() != next_expected_message_id_) {
-      FDF_LOG(WARNING,
-              "PD re-transmission: discarded message with MessageID %" PRIu8
-              " because next expected MessageID is %" PRIu8,
-              static_cast<uint8_t>(header.message_id()),
-              static_cast<uint8_t>(next_expected_message_id_));
-      return;
+    if (next_expected_message_id_.has_value()) {
+      if (header.message_id() != next_expected_message_id_.value()) {
+        FDF_LOG(WARNING,
+                "PD re-transmission: discarded message with MessageID %" PRIu8
+                " because next expected MessageID is %" PRIu8,
+                static_cast<uint8_t>(header.message_id()),
+                static_cast<uint8_t>(next_expected_message_id_.value()));
+        return;
+      }
+    } else {
+      next_expected_message_id_ = header.message_id();
+      FDF_LOG(INFO, "PD protocol stream started at MessageID %" PRIu8,
+              static_cast<uint8_t>(next_expected_message_id_.value()));
     }
   }
 
@@ -174,7 +186,7 @@ zx::result<> Fusb302Protocol::Transmit(const usb_pd::Message& message) {
 }
 
 void Fusb302Protocol::FullReset() {
-  next_expected_message_id_.Reset();
+  next_expected_message_id_ = std::nullopt;
   next_transmitted_message_id_.Reset();
   transmission_state_ = TransmissionState::kSuccess;
   good_crc_transmission_pending_ = false;
@@ -223,9 +235,11 @@ void Fusb302Protocol::DidTransmitGoodCrc() {
 
 void Fusb302Protocol::StampGoodCrcTemplate() {
   ZX_DEBUG_ASSERT(good_crc_transmission_pending_);
+  ZX_DEBUG_ASSERT_MSG(next_expected_message_id_.has_value(),
+                      "next_expected_message_id_ should be known after having received a message");
 
-  good_crc_template_.set_message_id(next_expected_message_id_);
-  next_expected_message_id_ = next_expected_message_id_.Next();
+  good_crc_template_.set_message_id(next_expected_message_id_.value());
+  next_expected_message_id_ = next_expected_message_id_.value().Next();
   good_crc_transmission_pending_ = false;
 }
 

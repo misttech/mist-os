@@ -121,7 +121,7 @@ void InitMemory(void* dtb, AddressSpace* aspace) {
 
   Allocation::Init(ranges, special_ranges);
   if (aspace) {
-    ArchSetUpAddressSpaceEarly(*aspace);
+    ArchSetUpAddressSpace(*aspace);
   }
   Allocation::GetPool().PrintMemoryRanges(ProgramName());
 

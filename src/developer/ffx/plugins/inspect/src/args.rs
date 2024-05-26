@@ -12,7 +12,7 @@ use std::path::PathBuf;
 #[argh(
     subcommand,
     name = "inspect",
-    description = "Query component nodes exposed via the Inspect API.",
+    description = "Query data exposed by components via the Inspect API.",
     example = "\
     If you wish to see the JSON format of Inspect, you must pass `--machine json` to the `ffx` \
     command. \n\

@@ -87,6 +87,7 @@ TEST_F(CodecTest, DeviceInfo) {
 
   ASSERT_TRUE(device->info().has_value());
   auto info = *device->info();
+
   EXPECT_TRUE(info.token_id().has_value());
 
   ASSERT_TRUE(info.device_type().has_value());
@@ -121,9 +122,13 @@ TEST_F(CodecTest, DeviceInfo) {
 
   EXPECT_FALSE(info.clock_domain().has_value());
 
-  EXPECT_FALSE(info.signal_processing_elements().has_value());
+  // signal_processing_elements is optional, but it can't be empty
+  EXPECT_FALSE(info.signal_processing_elements().has_value() &&
+               info.signal_processing_elements()->empty());
 
-  EXPECT_FALSE(info.signal_processing_topologies().has_value());
+  // signal_processing_topologies is optional, but it can't be empty
+  EXPECT_FALSE(info.signal_processing_topologies().has_value() &&
+               info.signal_processing_topologies()->empty());
 }
 
 TEST_F(CodecTest, DistinctTokenIds) {
@@ -755,8 +760,9 @@ TEST_F(CompositeTest, DeviceInfo) {
   EXPECT_TRUE(info.clock_domain().has_value());
 
   ASSERT_TRUE(info.signal_processing_elements().has_value());
-  ASSERT_TRUE(info.signal_processing_topologies().has_value());
   EXPECT_FALSE(info.signal_processing_elements()->empty());
+
+  ASSERT_TRUE(info.signal_processing_topologies().has_value());
   EXPECT_FALSE(info.signal_processing_topologies()->empty());
 }
 
@@ -1535,7 +1541,6 @@ TEST_F(CompositeTest, GetElements) {
     ASSERT_TRUE(element.id().has_value());
     ASSERT_TRUE(elements->at(0).type().has_value());
     ASSERT_TRUE(element.description().has_value());
-    ASSERT_FALSE(element.can_disable().has_value());
     ASSERT_TRUE(element.can_stop().has_value());
     ASSERT_TRUE(element.can_bypass().has_value());
     if (element.type() == fhasp::ElementType::kDaiInterconnect) {
@@ -1636,14 +1641,12 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   ASSERT_EQ(states.size(), FakeComposite::kElements.size());
 
   auto state = states.find(FakeComposite::kSourceDaiElementId)->second;
-  EXPECT_FALSE(state.latency().has_value());
   ASSERT_TRUE(state.type_specific().has_value());
   ASSERT_TRUE(state.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.started().has_value());
   ASSERT_TRUE(state.bypassed().has_value());
-  EXPECT_FALSE(state.enabled().has_value());
   ASSERT_TRUE(state.processing_delay().has_value());
 
-  EXPECT_EQ(*state.processing_delay(), FakeComposite::kSourceDaiElementProcessingDelay.get());
   const auto& endpt_state1 = state.type_specific()->dai_interconnect();
   ASSERT_TRUE(endpt_state1.has_value());
   ASSERT_TRUE(endpt_state1->plug_state().has_value());
@@ -1653,17 +1656,17 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   ASSERT_EQ(state.vendor_specific_data()->size(), 8u);
   EXPECT_EQ(state.vendor_specific_data()->at(0), 1u);
   EXPECT_EQ(state.vendor_specific_data()->at(7), 8u);
+  EXPECT_FALSE(*state.started());
   EXPECT_FALSE(*state.bypassed());
+  EXPECT_EQ(*state.processing_delay(), FakeComposite::kSourceDaiElementProcessingDelay.get());
 
   state = states.find(FakeComposite::kDestDaiElementId)->second;
-  EXPECT_FALSE(state.latency().has_value());
   ASSERT_TRUE(state.type_specific().has_value());
   ASSERT_TRUE(state.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.started().has_value());
   ASSERT_TRUE(state.bypassed().has_value());
-  EXPECT_FALSE(state.enabled().has_value());
   ASSERT_TRUE(state.processing_delay().has_value());
 
-  EXPECT_EQ(*state.processing_delay(), FakeComposite::kDestDaiElementProcessingDelay.get());
   const auto& endpt_state2 = state.type_specific()->dai_interconnect();
   ASSERT_TRUE(endpt_state2.has_value());
   ASSERT_TRUE(endpt_state2->plug_state().has_value());
@@ -1673,37 +1676,39 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   ASSERT_EQ(state.vendor_specific_data()->size(), 9u);
   EXPECT_EQ(state.vendor_specific_data()->at(0), 8u);
   EXPECT_EQ(state.vendor_specific_data()->at(8), 0u);
+  EXPECT_FALSE(*state.started());
   EXPECT_FALSE(*state.bypassed());
+  EXPECT_EQ(*state.processing_delay(), FakeComposite::kDestDaiElementProcessingDelay.get());
 
   state = states.find(FakeComposite::kSourceRbElementId)->second;
-  EXPECT_FALSE(state.latency().has_value());
   EXPECT_FALSE(state.type_specific().has_value());
   EXPECT_FALSE(state.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.started().has_value());
   ASSERT_TRUE(state.bypassed().has_value());
-  EXPECT_FALSE(state.enabled().has_value());
   ASSERT_TRUE(state.processing_delay().has_value());
 
+  EXPECT_TRUE(*state.started());
   EXPECT_FALSE(*state.bypassed());
   EXPECT_EQ(*state.processing_delay(), FakeComposite::kSourceRbElementProcessingDelay.get());
 
   state = states.find(FakeComposite::kDestRbElementId)->second;
-  EXPECT_FALSE(state.latency().has_value());
   EXPECT_FALSE(state.type_specific().has_value());
   EXPECT_FALSE(state.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.started().has_value());
   ASSERT_TRUE(state.bypassed().has_value());
-  EXPECT_FALSE(state.enabled().has_value());
   ASSERT_FALSE(state.processing_delay().has_value());
 
+  EXPECT_TRUE(*state.started());
   EXPECT_FALSE(*state.bypassed());
 
   state = states.find(FakeComposite::kMuteElementId)->second;
-  EXPECT_FALSE(state.latency().has_value());
   EXPECT_FALSE(state.type_specific().has_value());
   EXPECT_FALSE(state.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.started().has_value());
   ASSERT_TRUE(state.bypassed().has_value());
-  EXPECT_FALSE(state.enabled().has_value());
   EXPECT_FALSE(state.processing_delay().has_value());
 
+  EXPECT_TRUE(*state.started());
   EXPECT_TRUE(*state.bypassed());
 }
 
@@ -1729,7 +1734,6 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
     // Handle the Mute node
     if (element.type() == fhasp::ElementType::kMute && element.can_bypass().value_or(false)) {
       // By configuration, our Mute starts bypassed (we activate it as our ElementState change).
-      EXPECT_FALSE(state.enabled().has_value());
       ASSERT_TRUE(state.started().has_value());
       EXPECT_TRUE(*state.started());
       ASSERT_TRUE(state.bypassed().has_value());
@@ -1794,8 +1798,6 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
       EXPECT_FALSE(state_received.type_specific().has_value());
       EXPECT_FALSE(state_received.vendor_specific_data().has_value());
 
-      EXPECT_FALSE(state_received.enabled().has_value());
-
       ASSERT_TRUE(state_received.started().has_value());
       EXPECT_TRUE(*state_received.started());
 
@@ -1824,15 +1826,9 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
       EXPECT_EQ(*state_received.type_specific()->dai_interconnect()->external_delay(),
                 ZX_MSEC(element_id));
 
-      ASSERT_TRUE(state_received.type_specific()->dai_interconnect()->external_delay().has_value());
-      EXPECT_EQ(*state_received.type_specific()->dai_interconnect()->external_delay(),
-                ZX_MSEC(element_id));
-
       ASSERT_TRUE(state_received.vendor_specific_data().has_value());
       ASSERT_EQ(state_received.vendor_specific_data()->size(), 17u);
       EXPECT_EQ(state_received.vendor_specific_data()->at(16), 'Z');
-
-      EXPECT_FALSE(state_received.enabled().has_value());
 
       ASSERT_TRUE(state_received.started().has_value());
       EXPECT_TRUE(state_received.started());
@@ -1843,6 +1839,7 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
       ASSERT_TRUE(state_received.processing_delay().has_value());
       EXPECT_EQ(*state_received.processing_delay(), ZX_USEC(element_id));
     }
+
     // Compare to what we injected.
     ASSERT_FALSE(element_states_to_inject.find(element_id) == element_states_to_inject.end())
         << "WatchElementState response received for unknown element_id " << element_id;
@@ -1923,7 +1920,7 @@ TEST_F(CompositeTest, SetElementState) {
   ASSERT_TRUE(notify()->element_states().find(FakeComposite::kMuteElementId) !=
               notify()->element_states().end());
   notify()->clear_element_states();
-  fhasp::ElementState state{{.started = true, .bypassed = false}};
+  fhasp::SettableElementState state{{.started = true, .bypassed = false}};
 
   EXPECT_EQ(device->SetElementState(FakeComposite::kMuteElementId, state), ZX_OK);
 
@@ -1934,8 +1931,6 @@ TEST_F(CompositeTest, SetElementState) {
 
   EXPECT_FALSE(new_state.type_specific().has_value());
   EXPECT_FALSE(new_state.vendor_specific_data().has_value());
-
-  EXPECT_FALSE(new_state.enabled().has_value());
 
   ASSERT_TRUE(new_state.started().has_value());
   EXPECT_TRUE(*new_state.started());
@@ -1981,18 +1976,35 @@ TEST_F(StreamConfigTest, DeviceInfo) {
   auto info = GetDeviceInfo(device);
 
   EXPECT_TRUE(info.token_id());
-  EXPECT_TRUE(info.device_type());
-  EXPECT_EQ(*info.device_type(), fad::DeviceType::kOutput);
-  EXPECT_TRUE(info.device_name());
+
+  ASSERT_TRUE(info.device_type().has_value());
+  EXPECT_EQ(*info.device_type(), fuchsia_audio_device::DeviceType::kOutput);
+
+  ASSERT_TRUE(info.device_name().has_value());
+  EXPECT_FALSE(info.device_name()->empty());
+
   // manufacturer is optional, but it can't be an empty string
   EXPECT_TRUE(!info.manufacturer().has_value() || !info.manufacturer()->empty());
+
   // product is optional, but it can't be an empty string
   EXPECT_TRUE(!info.product().has_value() || !info.product()->empty());
+
   // unique_instance_id is optional
+
   EXPECT_TRUE(info.gain_caps());
+
   EXPECT_TRUE(info.plug_detect_caps());
+
   EXPECT_TRUE(info.clock_domain());
   EXPECT_EQ(*info.clock_domain(), fha::kClockDomainMonotonic);
+
+  // signal_processing_elements is optional, but it can't be empty
+  EXPECT_TRUE(!info.signal_processing_elements().has_value() ||
+              !info.signal_processing_elements()->empty());
+
+  // signal_processing_topologies is optional, but it can't be empty
+  EXPECT_TRUE(!info.signal_processing_topologies().has_value() ||
+              !info.signal_processing_topologies()->empty());
 }
 
 TEST_F(StreamConfigTest, DistinctTokenIds) {

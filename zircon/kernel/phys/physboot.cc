@@ -175,6 +175,10 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs, const ArchPatchInfo& pat
 
   ktl::span zbi = boot.DataZbi().storage();
 
+  if (gBootOptions->phys_verbose) {
+    boot.Log();
+  }
+
   // Prepare the handoff data structures.
   HandoffPrep prep;
   prep.Init(handoff_item->payload);

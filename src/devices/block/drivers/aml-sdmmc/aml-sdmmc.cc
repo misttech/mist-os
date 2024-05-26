@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.sdmmc/cpp/fidl.h>
 #include <inttypes.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>  // TODO(b/301003087): Needed for PDEV_DID_AMLOGIC_SDMMC_A, etc.
@@ -491,7 +492,11 @@ void AmlSdmmc::ServeDelayedRequests() {
   for (auto& request : delayed_requests_) {
     SdmmcRequestInfo* request_info = std::get_if<SdmmcRequestInfo>(&request);
     if (request_info != nullptr) {
-      DoRequestAndComplete(request_info->request, request_info->arena, request_info->completer);
+      // TODO(b/340925051): Convert reqs back to wire type, because the request processing pipeline
+      // uses wire types for performance. Remove this workaround once b/340925051 is resolved.
+      fidl::Arena<> arena;
+      const auto reqs = fidl::ToWire(arena, std::move(request_info->reqs));
+      DoRequestAndComplete(reqs, request_info->arena, request_info->completer);
       continue;
     }
     SdmmcTaskInfo* task_info = std::get_if<SdmmcTaskInfo>(&request);
@@ -1763,20 +1768,30 @@ void AmlSdmmc::Request(RequestRequestView request, fdf::Arena& arena,
       return;
     }
 
+    // TODO(b/340925051): Resource handles (e.g., VMOs) will close once this function returns. As a
+    // workaround, convert reqs to natural type, which maintains the lifetime of resource handles.
+    // Remove this workaround once b/340925051 is resolved.
+    std::vector<fuchsia_hardware_sdmmc::SdmmcReq> reqs;
+    auto reqs_natural = fidl::ToNatural(request->reqs);
+    if (reqs_natural.has_value()) {
+      reqs = std::move(reqs_natural.value());
+    }
+
     // Delay this request until power has been resumed.
     delayed_requests_.emplace_back(
-        SdmmcRequestInfo{request, std::move(arena), completer.ToAsync()});
+        SdmmcRequestInfo{std::move(reqs), std::move(arena), completer.ToAsync()});
     return;
   }
 
-  DoRequestAndComplete(request, arena, completer);
+  DoRequestAndComplete(request->reqs, arena, completer);
 }
 
 template <typename T>
-void AmlSdmmc::DoRequestAndComplete(RequestRequestView request, fdf::Arena& arena, T& completer) {
+void AmlSdmmc::DoRequestAndComplete(fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcReq> reqs,
+                                    fdf::Arena& arena, T& completer) {
   fidl::Array<uint32_t, 4> response;
-  for (const auto& req : request->reqs) {
-    zx_status_t status = RequestImpl(req, response.data());
+  for (size_t i = 0; i < reqs.count(); i++) {
+    zx_status_t status = RequestImpl(reqs[i], response.data());
     if (status != ZX_OK) {
       completer.buffer(arena).ReplyError(status);
       return;

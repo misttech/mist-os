@@ -1,0 +1,81 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_cc_test",
+    "fuchsia_unittest_package",
+)
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "controllers",
+    deps = [
+        ":fidl_controller",
+    ],
+)
+
+cc_library(
+    name = "helpers",
+    srcs = [
+        "helpers.cc",
+    ],
+    hdrs = [
+        "helpers.h",
+    ],
+    deps = [
+        "@fuchsia_sdk//pkg/zx",
+        "@pigweed//pw_bluetooth",
+    ],
+)
+
+cc_library(
+    name = "fidl_controller",
+    srcs = [
+        "fidl_controller.cc",
+    ],
+    hdrs = [
+        "fidl_controller.h",
+    ],
+    deps = [
+        ":helpers",
+        "//src/connectivity/bluetooth/core/bt-host/common",
+        "//src/connectivity/bluetooth/core/bt-host/iso",
+        "//src/connectivity/bluetooth/core/bt-host/transport",
+        "@fuchsia_sdk//pkg/async-cpp",
+        "@fuchsia_sdk//pkg/zx",
+        "@internal_sdk//fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
+        "@pigweed//pw_bluetooth",
+    ],
+)
+
+fuchsia_cc_test(
+    name = "controllers_test",
+    testonly = True,
+    srcs = [
+        "fidl_controller_test.cc",
+    ],
+    death_unittest = True,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":controllers",
+        "//src/connectivity/bluetooth/core/bt-host/fidl:fake_hci_test_fixture",
+        "//src/connectivity/bluetooth/core/bt-host/testing",
+        "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main",
+        "//src/connectivity/bluetooth/core/bt-host/testing:loop_fixture",
+        "//src/connectivity/bluetooth/core/bt-host/testing:test_helpers",
+    ],
+)
+
+fuchsia_unittest_package(
+    name = "test_pkg",
+    package_name = "controllers_tests",
+    testonly = True,
+    fuchsia_api_level = "HEAD",
+    unit_tests = [
+        ":controllers_test",
+    ],
+    visibility = ["//visibility:public"],
+)

@@ -68,6 +68,7 @@ if (toolchain_environment == "user.basic") {
       ":syscall-asm",
       "//src/zircon/lib/zircon:headers",
       "//zircon/kernel/lib/arch:headers",
+      "//zircon/kernel/lib/fasttime:headers",
       "//zircon/kernel/lib/userabi:headers",
       "//zircon/system/ulib/affine",
       "//zircon/vdso:private",

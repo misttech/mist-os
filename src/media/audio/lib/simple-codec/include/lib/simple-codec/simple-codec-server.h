@@ -95,14 +95,6 @@ class SimpleCodecServer : public SimpleCodecServerDeviceType,
   virtual GainState GetGainState() = 0;
   virtual void SetGainState(GainState state) = 0;
 
-  // Default to not bridgable.
-  virtual bool IsBridgeable() { return false; }
-  virtual void SetBridgedMode(bool enable_bridged_mode) {
-    if (enable_bridged_mode) {
-      zxlogf(ERROR, "bridged mode not supported");
-    }
-  }
-
   // Default only used for gain, mute and AGC support, override for custom signal processing API
   // usage.
   bool SupportsSignalProcessing() override { return false; }
@@ -130,7 +122,6 @@ class SimpleCodecServer : public SimpleCodecServerDeviceType,
   // Internal implementaions have the same name but different signatures.
   using SimpleCodecServerInternal::GetDaiFormats;
   using SimpleCodecServerInternal::GetProperties;
-  using SimpleCodecServerInternal::IsBridgeable;
   using SimpleCodecServerInternal::Reset;
   using SimpleCodecServerInternal::SetDaiFormat;
   using SimpleCodecServerInternal::Start;

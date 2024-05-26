@@ -17,7 +17,7 @@ use {
     fidl_fuchsia_bluetooth::{self as fbt, DeviceClass, MAJOR_DEVICE_CLASS_TOY},
     fidl_fuchsia_bluetooth_host::{self as _, HostStartDiscoveryRequest},
     fidl_fuchsia_bluetooth_sys::{self as fsys, TechnologyType},
-    fidl_fuchsia_bluetooth_test::{HciError, PeerProxy},
+    fidl_fuchsia_hardware_bluetooth::{HciError, PeerProxy},
     fuchsia_async::TimeoutExt,
     fuchsia_bluetooth::{
         constants::INTEGRATION_TIMEOUT,

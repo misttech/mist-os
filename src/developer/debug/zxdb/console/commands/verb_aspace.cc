@@ -21,9 +21,8 @@ namespace zxdb {
 namespace {
 
 const char kAspaceShortHelp[] = "aspace / as: Show address space for a process.";
-const char kAspaceHelp[] =
-    R"(aspace [ <address> ]
-
+const char kAspaceUsage[] = "aspace [ <address> ]";
+const char kAspaceHelp[] = R"(
   Alias: "as"
 
   Shows the address space map for the given process.
@@ -213,7 +212,7 @@ void RunVerbAspace(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) 
 }  // namespace
 
 VerbRecord GetAspaceVerbRecord() {
-  return VerbRecord(&RunVerbAspace, {"aspace", "as"}, kAspaceShortHelp, kAspaceHelp,
+  return VerbRecord(&RunVerbAspace, {"aspace", "as"}, kAspaceShortHelp, kAspaceUsage, kAspaceHelp,
                     CommandGroup::kQuery);
 }
 

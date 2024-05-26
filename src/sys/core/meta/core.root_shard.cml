@@ -221,6 +221,11 @@
             to: "#core",
             availability: "optional",
         },
+        {
+            service: "fuchsia.hardware.cpu.ctrl.Service",
+            from: "#bootstrap",
+            to: "#core",
+        },
     ],
     environments: [
         {

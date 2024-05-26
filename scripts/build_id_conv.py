@@ -10,9 +10,10 @@ This script allows for the conversion between ids.txt and .build-id formats.
 import argparse
 import errno
 import os
+from typing import Callable
 
 
-def abs_path(path, rel_to):
+def abs_path(path: str, rel_to: str) -> str:
     assert os.path.isabs(rel_to)
     if os.path.isabs(path):
         return path
@@ -20,7 +21,7 @@ def abs_path(path, rel_to):
         return os.path.abspath(os.path.join(rel_to, path))
 
 
-def read_ids_txt(ids_path, rel_to):
+def read_ids_txt(ids_path: str, rel_to: str) -> dict[str, str]:
     assert os.path.isabs(rel_to)
     with open(ids_path) as f:
         return {
@@ -29,7 +30,7 @@ def read_ids_txt(ids_path, rel_to):
         }
 
 
-def read_build_id_dir(build_id_dir):
+def read_build_id_dir(build_id_dir: str) -> dict[str, str]:
     assert os.path.isabs(build_id_dir)
     out = {}
     for root, dirs, files in os.walk(build_id_dir):
@@ -46,21 +47,21 @@ def read_build_id_dir(build_id_dir):
     return out
 
 
-def symlink(src, dst):
+def symlink(src: str, dst: str) -> None:
     assert os.path.isabs(src)
     if os.path.exists(dst):
         os.remove(dst)
     os.symlink(src, dst)
 
 
-def hardlink(src, dst):
+def hardlink(src: str, dst: str) -> None:
     src = os.path.realpath(src)
     if os.path.exists(dst):
         os.remove(dst)
     os.link(src, dst)
 
 
-def mkdir(path):
+def mkdir(path: str) -> None:
     try:
         os.makedirs(path)
     except OSError as e:
@@ -68,7 +69,7 @@ def mkdir(path):
             raise e
 
 
-def touch(path):
+def touch(path: str) -> None:
     if os.path.exists(path):
         os.utime(path, None)
     else:
@@ -76,7 +77,9 @@ def touch(path):
             return
 
 
-def write_build_id_dir(build_id_dir, link_func, mods):
+def write_build_id_dir(
+    build_id_dir: str, link_func: Callable[..., None], mods: dict[str, str]
+) -> None:
     for build_id, path in mods.items():
         mkdir(os.path.join(build_id_dir, build_id[:2]))
         link_func(
@@ -87,7 +90,7 @@ def write_build_id_dir(build_id_dir, link_func, mods):
 
 # if rel_to is None fix_path returns the absolute path. If rel_to
 # is not None it turns the path into a relative path.
-def fix_path(path, rel_to):
+def fix_path(path: str, rel_to: str | None) -> str:
     assert os.path.isabs(path)
     assert rel_to is None or os.path.isabs(rel_to)
     if rel_to is None:
@@ -95,7 +98,7 @@ def fix_path(path, rel_to):
     return os.path.relpath(path, rel_to)
 
 
-def write_ids_txt(ids_path, rel_to, mods):
+def write_ids_txt(ids_path: str, rel_to: str, mods: dict[str, str]) -> None:
     assert rel_to is None or os.path.isabs(rel_to)
     with open(ids_path, "w") as f:
         for build_id, path in sorted(mods.items()):
@@ -103,7 +106,7 @@ def write_ids_txt(ids_path, rel_to, mods):
             f.write("%s %s\n" % (build_id, path))
 
 
-def main(unparsed_args=None):
+def main(unparsed_args: list[str] | None = None) -> None:
     ids_fmt = "ids.txt"
     build_id_fmt = ".build-id"
     symlink_mode = "symlink"
@@ -148,9 +151,9 @@ def main(unparsed_args=None):
 
     args = parser.parse_args(unparsed_args)
 
-    input_paths = map(os.path.abspath, args.input)
+    input_paths_map = map(os.path.abspath, args.input)
     input_paths = list(
-        filter(os.path.exists, input_paths)
+        filter(os.path.exists, input_paths_map)
     )  # conventionally ignore empty inputs
     input_dirs = list(filter(os.path.isdir, input_paths))
     if len(input_dirs) > 0:

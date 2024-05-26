@@ -65,20 +65,6 @@ struct vdso_constants {
 
   uint32_t padding;
 
-  // Conversion factor for zx_ticks_get return values to seconds.
-  zx_ticks_t ticks_per_second;
-
-  // Offset for converting from the raw system timer to zx_ticks_t
-  zx_ticks_t raw_ticks_to_ticks_offset;
-
-  // Ratio which relates ticks (zx_ticks_get) to clock monotonic (zx_clock_get_monotonic).
-  // Specifically...
-  //
-  // ClockMono(ticks) = (ticks * N) / D
-  //
-  uint32_t ticks_to_mono_numerator;
-  uint32_t ticks_to_mono_denominator;
-
   // Total amount of physical memory in the system, in bytes.
   uint64_t physmem;
 

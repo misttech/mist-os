@@ -31,7 +31,7 @@ class RemoteDir : public Vnode {
 
   // |Vnode| implementation:
   fuchsia_io::NodeProtocolKinds GetProtocols() const final;
-  zx_status_t GetAttributes(VnodeAttributes* a) final;
+  zx::result<fs::VnodeAttributes> GetAttributes() const final;
   bool IsRemote() const final;
   zx_status_t OpenRemote(fuchsia_io::OpenFlags, fuchsia_io::ModeType, fidl::StringView,
                          fidl::ServerEnd<fuchsia_io::Node>) const final;

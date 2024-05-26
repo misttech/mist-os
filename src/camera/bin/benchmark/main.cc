@@ -14,7 +14,7 @@ int main(int argc, char* argv[]) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto context = sys::ComponentContext::Create();
 
-  fuchsia::sysmem::AllocatorHandle sysmem_allocator;
+  fuchsia::sysmem2::AllocatorHandle sysmem_allocator;
   context->svc()->Connect(sysmem_allocator.NewRequest());
 
   fuchsia::camera3::DeviceWatcherHandle camera_device_watcher;

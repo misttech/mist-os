@@ -208,7 +208,7 @@ class AmlSdmmc : public fdf::DriverBase, public fdf::WireServer<fuchsia_hardware
   };
 
   struct SdmmcRequestInfo {
-    RequestRequestView request;
+    std::vector<fuchsia_hardware_sdmmc::SdmmcReq> reqs;
     fdf::Arena arena;
     RequestCompleter::Async completer;
   };
@@ -242,8 +242,8 @@ class AmlSdmmc : public fdf::DriverBase, public fdf::WireServer<fuchsia_hardware
   template <typename T>
   void DoTaskAndComplete(fit::function<zx_status_t()>, fdf::Arena& arena, T& completer);
   template <typename T>
-  void DoRequestAndComplete(RequestRequestView request, fdf::Arena& arena, T& completer)
-      TA_REQ(lock_);
+  void DoRequestAndComplete(fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcReq> reqs,
+                            fdf::Arena& arena, T& completer) TA_REQ(lock_);
 
   uint32_t DistanceToFailingPoint(TuneSettings point,
                                   cpp20::span<const TuneResults> adj_delay_results);

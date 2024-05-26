@@ -84,22 +84,16 @@ std::shared_ptr<fcdecl::Offer> CreateFidlStorageOfferDecl(std::string_view sourc
 }
 
 std::shared_ptr<fctest::ChildOptions> CreateFidlChildOptions(
-    fcdecl::StartupMode startup_mode, std::string_view environment
-#if __Fuchsia_API_level__ >= 13
-    ,
-    std::vector<std::pair<std::string, fcdecl::ConfigValue>> config_overrides
-#endif
-) {
+    fcdecl::StartupMode startup_mode, std::string_view environment,
+    std::vector<std::pair<std::string, fcdecl::ConfigValue>> config_overrides) {
   fctest::ChildOptions options;
   options.set_environment(std::string(environment));
   options.set_startup(startup_mode);
-#if __Fuchsia_API_level__ >= 13
   for (auto& config_override : config_overrides) {
     options.mutable_config_overrides()->emplace_back();
     options.mutable_config_overrides()->back().set_key(config_override.first);
     options.mutable_config_overrides()->back().set_value(std::move(config_override.second));
   }
-#endif
 
   return std::make_shared<fctest::ChildOptions>(std::move(options));
 }

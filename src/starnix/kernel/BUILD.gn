@@ -125,6 +125,7 @@ rustc_library("starnix_core") {
     "device/sync_fence_registry.rs",
     "device/sync_file.rs",
     "device/terminal.rs",
+    "device/tun.rs",
     "device/zram.rs",
     "dynamic_thread_spawner.rs",
     "execution/mod.rs",
@@ -236,7 +237,9 @@ rustc_library("starnix_core") {
     "vfs/fd_table.rs",
     "vfs/file_object.rs",
     "vfs/file_server.rs",
-    "vfs/file_system.rs",
+    "vfs/file_system/file_system.rs",
+    "vfs/file_system/mod.rs",
+    "vfs/file_system/selinux_contexts.rs",
     "vfs/file_write_guard.rs",
     "vfs/fs_args.rs",
     "vfs/fs_context.rs",
@@ -290,12 +293,15 @@ rustc_library("starnix_core") {
     "//sdk/fidl/fuchsia.fs:fuchsia.fs_rust",
     "//sdk/fidl/fuchsia.hardware.adb:fuchsia.hardware.adb_rust",
     "//sdk/fidl/fuchsia.hardware.hrtimer:fuchsia.hardware.hrtimer_rust",
+    "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//sdk/fidl/fuchsia.images2:fuchsia.images2_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
     "//sdk/fidl/fuchsia.math:fuchsia.math_rust",
-    "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",
+    "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
+    "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
+    "//sdk/fidl/fuchsia.net.tun:fuchsia.net.tun_rust",
     "//sdk/fidl/fuchsia.posix:fuchsia.posix_rust",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
     "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_rust",
@@ -331,6 +337,8 @@ rustc_library("starnix_core") {
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
     "//src/lib/mundane",
+    "//src/lib/network/fidl_fuchsia_net_filter_ext",
+    "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
     "//src/lib/process_builder",
     "//src/lib/trace/rust:trace",
     "//src/lib/trace/rust:trace-observer",
@@ -411,6 +419,7 @@ rustc_library("starnix_core") {
     "//src/lib/test_util",
     "//src/storage/ext4/tests:test_img",
     "//src/storage/fxfs/platform:fxfs-testing",
+    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:test-case",
     "//third_party/rust_crates:tracing-mutex",
@@ -771,7 +780,7 @@ fuchsia_unittest_package("starnix-tests") {
       max_severity = "ERROR"
     }
   }
-  test_type = "system"
+  test_type = "starnix"
 }
 
 fuchsia_unittest_package("starnix_kernel_bin-tests") {
@@ -788,6 +797,7 @@ fuchsia_unittest_package("starnix_kernel_runner-tests") {
       max_severity = "ERROR"
     }
   }
+  test_type = "starnix"
 }
 
 fuchsia_unittest_package("starnix_lifecycle-tests") {

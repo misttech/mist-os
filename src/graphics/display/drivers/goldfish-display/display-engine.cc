@@ -6,7 +6,9 @@
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.images2/cpp/fidl.h>
+#include <fidl/fuchsia.math/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/time.h>
@@ -22,6 +24,8 @@
 #include <numeric>
 #include <vector>
 
+#include <bind/fuchsia/goldfish/platform/sysmem/heap/cpp/bind.h>
+#include <bind/fuchsia/sysmem/heap/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 
@@ -57,7 +61,7 @@ constexpr uint32_t GL_BGRA_EXT = 0x80E1;
 
 DisplayEngine::DisplayEngine(fidl::ClientEnd<fuchsia_hardware_goldfish::ControlDevice> control,
                              fidl::ClientEnd<fuchsia_hardware_goldfish_pipe::GoldfishPipe> pipe,
-                             fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_allocator,
+                             fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator,
                              std::unique_ptr<RenderControl> render_control,
                              async_dispatcher_t* display_event_dispatcher)
     : control_(std::move(control)),
@@ -159,31 +163,32 @@ void DisplayEngine::DisplayControllerImplResetDisplayControllerInterface() {
 namespace {
 
 uint32_t GetColorBufferFormatFromSysmemPixelFormat(
-    const fuchsia_sysmem::PixelFormat& pixel_format) {
-  switch (pixel_format.type()) {
-    case fuchsia_sysmem::PixelFormatType::kR8G8B8A8:
+    const fuchsia_images2::PixelFormat& pixel_format) {
+  switch (pixel_format) {
+    case fuchsia_images2::PixelFormat::kR8G8B8A8:
       return GL_BGRA_EXT;
-    case fuchsia_sysmem::PixelFormatType::kBgra32:
+    case fuchsia_images2::PixelFormat::kB8G8R8A8:
       return GL_RGBA;
     default:
       // This should not happen. The sysmem-negotiated pixel format must be supported.
-      ZX_ASSERT_MSG(false, "Import unsupported image: %u",
-                    static_cast<uint32_t>(pixel_format.type()));
+      ZX_ASSERT_MSG(false, "Import unsupported image: %u", static_cast<uint32_t>(pixel_format));
   }
 }
 
 }  // namespace
 
 zx::result<display::DriverImageId> DisplayEngine::ImportVmoImage(
-    const image_metadata_t& image_metadata, const fuchsia_sysmem::PixelFormat& pixel_format,
+    const image_metadata_t& image_metadata, const fuchsia_images2::PixelFormat& pixel_format,
     zx::vmo vmo, size_t offset) {
   auto color_buffer = std::make_unique<ColorBuffer>();
   color_buffer->is_linear_format = image_metadata.tiling_type == IMAGE_TILING_TYPE_LINEAR;
   const uint32_t color_buffer_format = GetColorBufferFormatFromSysmemPixelFormat(pixel_format);
 
   fidl::Arena unused_arena;
-  const uint32_t bytes_per_pixel =
-      ImageFormatStrideBytesPerWidthPixel(fidl::ToWire(unused_arena, pixel_format));
+  const uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(
+      PixelFormatAndModifier(pixel_format,
+                             /* ignored */
+                             fuchsia_images2::PixelFormatModifier::kLinear));
   color_buffer->size = fbl::round_up(image_metadata.width * image_metadata.height * bytes_per_pixel,
                                      static_cast<uint32_t>(PAGE_SIZE));
 
@@ -221,11 +226,15 @@ zx_status_t DisplayEngine::DisplayControllerImplImportBufferCollection(
   ZX_DEBUG_ASSERT_MSG(sysmem_allocator_client_.is_valid(), "sysmem allocator is not initialized");
 
   auto [collection_client_endpoint, collection_server_endpoint] =
-      fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
+      fidl::Endpoints<::fuchsia_sysmem2::BufferCollection>::Create();
 
+  fidl::Arena arena;
   auto bind_result = sysmem_allocator_client_->BindSharedCollection(
-      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(std::move(collection_token)),
-      std::move(collection_server_endpoint));
+      fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena)
+          .buffer_collection_request(std::move(collection_server_endpoint))
+          .token(
+              fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>(std::move(collection_token)))
+          .Build());
   if (!bind_result.ok()) {
     FDF_LOG(ERROR, "Cannot complete FIDL call BindSharedCollection: %s",
             bind_result.status_string());
@@ -262,39 +271,37 @@ zx_status_t DisplayEngine::DisplayControllerImplImportImage(
     return ZX_ERR_NOT_FOUND;
   }
 
-  const fidl::SyncClient<fuchsia_sysmem::BufferCollection>& collection_client = it->second;
-  fidl::Result check_result = collection_client->CheckBuffersAllocated();
+  const fidl::SyncClient<fuchsia_sysmem2::BufferCollection>& collection_client = it->second;
+  fidl::Result check_result = collection_client->CheckAllBuffersAllocated();
   // TODO(https://fxbug.dev/42072690): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (check_result.is_error()) {
-    return check_result.error_value().status();
-  }
-  const auto& check_response = check_result.value();
-  if (check_response.status() == ZX_ERR_UNAVAILABLE) {
-    return ZX_ERR_SHOULD_WAIT;
-  }
-  if (check_response.status() != ZX_OK) {
-    return check_response.status();
+    const auto& error = check_result.error_value();
+    if (error.is_domain_error() && error.domain_error() == fuchsia_sysmem2::Error::kPending) {
+      return ZX_ERR_SHOULD_WAIT;
+    }
+    return ZX_ERR_UNAVAILABLE;
   }
 
-  fidl::Result wait_result = collection_client->WaitForBuffersAllocated();
+  fidl::Result wait_result = collection_client->WaitForAllBuffersAllocated();
   // TODO(https://fxbug.dev/42072690): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (wait_result.is_error()) {
-    return wait_result.error_value().status();
+    const auto& error = wait_result.error_value();
+    if (error.is_domain_error() && error.domain_error() == fuchsia_sysmem2::Error::kPending) {
+      return ZX_ERR_SHOULD_WAIT;
+    }
+    return ZX_ERR_UNAVAILABLE;
   }
   auto& wait_response = wait_result.value();
-  if (wait_response.status() != ZX_OK) {
-    return wait_response.status();
-  }
   auto& collection_info = wait_response.buffer_collection_info();
 
   zx::vmo vmo;
-  if (index < collection_info.buffer_count()) {
-    vmo = std::move(collection_info.buffers()[index].vmo());
-    ZX_DEBUG_ASSERT(!collection_info.buffers()[index].vmo().is_valid());
+  if (index < collection_info->buffers()->size()) {
+    vmo = std::move(collection_info->buffers()->at(index).vmo().value());
+    ZX_DEBUG_ASSERT(!collection_info->buffers()->at(index).vmo()->is_valid());
   }
 
   if (!vmo.is_valid()) {
@@ -302,17 +309,18 @@ zx_status_t DisplayEngine::DisplayControllerImplImportImage(
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  if (!collection_info.settings().has_image_format_constraints()) {
+  if (!collection_info->settings()->image_format_constraints()) {
     FDF_LOG(ERROR, "Buffer collection doesn't have valid image format constraints");
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  uint64_t offset = collection_info.buffers()[index].vmo_usable_start();
-  if (collection_info.settings().buffer_settings().heap() !=
-      fuchsia_sysmem::HeapType::kGoldfishDeviceLocal) {
-    const auto& pixel_format = collection_info.settings().image_format_constraints().pixel_format();
+  uint64_t offset = collection_info->buffers()->at(index).vmo_usable_start().value();
+  if (collection_info->settings()->buffer_settings()->heap().value().heap_type() !=
+      bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_DEVICE_LOCAL) {
+    const auto& pixel_format =
+        collection_info->settings()->image_format_constraints()->pixel_format();
     zx::result<display::DriverImageId> import_vmo_result =
-        ImportVmoImage(*image_metadata, pixel_format, std::move(vmo), offset);
+        ImportVmoImage(*image_metadata, pixel_format.value(), std::move(vmo), offset);
     if (import_vmo_result.is_ok()) {
       *out_image_handle = display::ToBanjoDriverImageId(import_vmo_result.value());
       return ZX_OK;
@@ -645,50 +653,56 @@ zx_status_t DisplayEngine::DisplayControllerImplSetBufferCollectionConstraints(
             driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
-  const fidl::SyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
+  const fidl::SyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
 
-  fuchsia_sysmem::BufferCollectionConstraints constraints;
-  constraints.usage().display() = fuchsia_sysmem::kDisplayUsageLayer;
-  constraints.has_buffer_memory_constraints() = true;
-  auto& buffer_constraints = constraints.buffer_memory_constraints();
-  buffer_constraints.min_size_bytes() = 0;
-  buffer_constraints.max_size_bytes() = 0xffffffff;
-  buffer_constraints.physically_contiguous_required() = true;
-  buffer_constraints.secure_required() = false;
-  buffer_constraints.ram_domain_supported() = true;
-  buffer_constraints.cpu_domain_supported() = true;
-  buffer_constraints.inaccessible_domain_supported() = true;
-  buffer_constraints.heap_permitted_count() = 2;
-  buffer_constraints.heap_permitted()[0] = fuchsia_sysmem::HeapType::kSystemRam;
-  buffer_constraints.heap_permitted()[1] = fuchsia_sysmem::HeapType::kGoldfishDeviceLocal;
-  constraints.image_format_constraints_count() = 4;
-  for (uint32_t i = 0; i < constraints.image_format_constraints_count(); i++) {
-    auto& image_constraints = constraints.image_format_constraints()[i];
-    image_constraints.pixel_format().type() = i & 0b01 ? fuchsia_sysmem::PixelFormatType::kR8G8B8A8
-                                                       : fuchsia_sysmem::PixelFormatType::kBgra32;
-    image_constraints.pixel_format().has_format_modifier() = true;
-    image_constraints.pixel_format().format_modifier().value() =
-        i & 0b10 ? fuchsia_sysmem::kFormatModifierLinear
-                 : fuchsia_sysmem::kFormatModifierGoogleGoldfishOptimal;
-    image_constraints.color_spaces_count() = 1;
-    image_constraints.color_space()[0].type() = fuchsia_sysmem::ColorSpaceType::kSrgb;
-    image_constraints.min_coded_width() = 0;
-    image_constraints.max_coded_width() = 0xffffffff;
-    image_constraints.min_coded_height() = 0;
-    image_constraints.max_coded_height() = 0xffffffff;
-    image_constraints.min_bytes_per_row() = 0;
-    image_constraints.max_bytes_per_row() = 0xffffffff;
-    image_constraints.max_coded_width_times_coded_height() = 0xffffffff;
-    image_constraints.layers() = 1;
-    image_constraints.coded_width_divisor() = 1;
-    image_constraints.coded_height_divisor() = 1;
-    image_constraints.bytes_per_row_divisor() = 1;
-    image_constraints.start_offset_divisor() = 1;
-    image_constraints.display_width_divisor() = 1;
-    image_constraints.display_height_divisor() = 1;
+  auto constraints =
+      fuchsia_sysmem2::BufferCollectionConstraints()
+          .usage(fuchsia_sysmem2::BufferUsage().display(fuchsia_sysmem2::kDisplayUsageLayer))
+          .buffer_memory_constraints(
+              fuchsia_sysmem2::BufferMemoryConstraints()
+                  .min_size_bytes(0)
+                  .max_size_bytes(0xFFFFFFFF)
+                  .physically_contiguous_required(true)
+                  .secure_required(false)
+                  .ram_domain_supported(true)
+                  .cpu_domain_supported(true)
+                  .inaccessible_domain_supported(true)
+                  .permitted_heaps(std::vector{
+                      fuchsia_sysmem2::Heap()
+                          .heap_type(bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM)
+                          .id(0),
+                      fuchsia_sysmem2::Heap()
+                          .heap_type(
+                              bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_DEVICE_LOCAL)
+                          .id(0),
+
+                  }));
+  std::vector<fuchsia_sysmem2::ImageFormatConstraints> image_constraints_vec;
+  for (uint32_t i = 0; i < 4; i++) {
+    auto image_constraints =
+        fuchsia_sysmem2::ImageFormatConstraints()
+            .pixel_format(i & 0b01 ? fuchsia_images2::PixelFormat::kR8G8B8A8
+                                   : fuchsia_images2::PixelFormat::kB8G8R8A8)
+
+            .pixel_format_modifier(
+                i & 0b10 ? fuchsia_images2::PixelFormatModifier::kLinear
+                         : fuchsia_images2::PixelFormatModifier::kGoogleGoldfishOptimal)
+            .color_spaces(std::vector{fuchsia_images2::ColorSpace::kSrgb})
+            .min_size(fuchsia_math::SizeU().width(0).height(0))
+            .max_size(fuchsia_math::SizeU().width(0xFFFFFFFF).height(0xFFFFFFFF))
+            .min_bytes_per_row(0)
+            .max_bytes_per_row(0xFFFFFFFF)
+            .max_width_times_height(0xFFFFFFFF)
+            .bytes_per_row_divisor(1)
+            .start_offset_divisor(1)
+            .display_rect_alignment(fuchsia_math::SizeU().width(1).height(1));
+    image_constraints_vec.push_back(std::move(image_constraints));
   }
+  constraints.image_format_constraints(std::move(image_constraints_vec));
 
-  auto set_result = collection->SetConstraints({true, std::move(constraints)});
+  fuchsia_sysmem2::BufferCollectionSetConstraintsRequest request;
+  request.constraints(std::move(constraints));
+  auto set_result = collection->SetConstraints(std::move(request));
   if (set_result.is_error()) {
     FDF_LOG(ERROR, "%s: failed to set constraints", kTag);
     return set_result.error_value().status();

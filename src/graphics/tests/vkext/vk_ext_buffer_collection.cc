@@ -103,29 +103,32 @@ TEST_P(VulkanImageExtensionTest, BufferCollectionRGB565) {
 TEST_P(VulkanImageExtensionTest, BufferCollectionMultipleFormats) {
   ASSERT_TRUE(Initialize());
 
-  fuchsia::sysmem::ImageFormatConstraints nv12_image_constraints =
+  fuchsia::sysmem2::ImageFormatConstraints nv12_image_constraints =
       GetDefaultSysmemImageFormatConstraints();
-  nv12_image_constraints.pixel_format = {fuchsia::sysmem::PixelFormatType::NV12, false, {}};
-  nv12_image_constraints.color_space[0].type = fuchsia::sysmem::ColorSpaceType::REC709;
-  fuchsia::sysmem::ImageFormatConstraints bgra_image_constraints =
+  nv12_image_constraints.set_pixel_format(fuchsia::images2::PixelFormat::NV12);
+  nv12_image_constraints.mutable_color_spaces()->clear();
+  nv12_image_constraints.mutable_color_spaces()->emplace_back(fuchsia::images2::ColorSpace::REC709);
+  fuchsia::sysmem2::ImageFormatConstraints bgra_image_constraints =
       GetDefaultSysmemImageFormatConstraints();
-  fuchsia::sysmem::ImageFormatConstraints bgra_tiled_image_constraints =
+  fuchsia::sysmem2::ImageFormatConstraints bgra_tiled_image_constraints =
       GetDefaultSysmemImageFormatConstraints();
-  bgra_tiled_image_constraints.pixel_format = {
-      fuchsia::sysmem::PixelFormatType::BGRA32,
-      true,
-      {fuchsia::sysmem::FORMAT_MODIFIER_INTEL_I915_X_TILED}};
-  std::vector<fuchsia::sysmem::ImageFormatConstraints> all_constraints{
-      nv12_image_constraints, bgra_image_constraints, bgra_tiled_image_constraints};
+  bgra_tiled_image_constraints.set_pixel_format(fuchsia::images2::PixelFormat::B8G8R8A8);
+  bgra_tiled_image_constraints.set_pixel_format_modifier(
+      fuchsia::images2::PixelFormatModifier::INTEL_I915_X_TILED);
+  std::vector<fuchsia::sysmem2::ImageFormatConstraints> all_constraints;
+  all_constraints.emplace_back(std::move(nv12_image_constraints));
+  all_constraints.emplace_back(std::move(bgra_image_constraints));
+  all_constraints.emplace_back(std::move(bgra_tiled_image_constraints));
 
   // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
   // supported on Lavapipe.
   if (SupportsSysmemYuv()) {
-    ASSERT_TRUE(
-        Exec(VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, 64, 64, GetParam(), false, all_constraints));
+    ASSERT_TRUE(Exec(VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, 64, 64, GetParam(), false,
+                     fidl::Clone(all_constraints)));
   }
   vk_device_memory_ = {};
-  ASSERT_TRUE(Exec(VK_FORMAT_B8G8R8A8_UNORM, 64, 64, GetParam(), false, all_constraints));
+  ASSERT_TRUE(
+      Exec(VK_FORMAT_B8G8R8A8_UNORM, 64, 64, GetParam(), false, fidl::Clone(all_constraints)));
 }
 
 TEST_P(VulkanImageExtensionTest, MultiImageFormatEntrypoint) {
@@ -168,8 +171,8 @@ TEST_P(VulkanImageExtensionTest, R8) {
       CreateVkBufferCollectionForImage(std::move(vulkan_token), constraints);
 
   auto sysmem_collection_info = AllocateSysmemCollection({}, std::move(sysmem_token));
-  EXPECT_EQ(fuchsia::sysmem::PixelFormatType::R8,
-            sysmem_collection_info.settings.image_format_constraints.pixel_format.type);
+  EXPECT_EQ(fuchsia::images2::PixelFormat::R8,
+            sysmem_collection_info.settings().image_format_constraints().pixel_format());
 
   ASSERT_TRUE(InitializeDirectImage(*collection, image_create_info));
 
@@ -233,8 +236,8 @@ TEST_P(VulkanImageExtensionTest, R8ToL8) {
       CreateVkBufferCollectionForImage(std::move(vulkan_token), format_constraints);
 
   auto sysmem_collection_info = AllocateSysmemCollection({}, std::move(sysmem_token));
-  EXPECT_EQ(fuchsia::sysmem::PixelFormatType::L8,
-            sysmem_collection_info.settings.image_format_constraints.pixel_format.type);
+  EXPECT_EQ(fuchsia::images2::PixelFormat::L8,
+            sysmem_collection_info.settings().image_format_constraints().pixel_format());
 
   ASSERT_TRUE(InitializeDirectImage(*collection, image_create_info));
 
@@ -265,13 +268,14 @@ TEST_P(VulkanImageExtensionTest, NonPackedImage) {
   UniqueBufferCollection collection =
       CreateVkBufferCollectionForImage(std::move(vulkan_token), format_constraints);
 
-  fuchsia::sysmem::BufferCollectionConstraints constraints;
-  constraints.usage.vulkan = fuchsia::sysmem::vulkanUsageTransferDst;
-  constraints.image_format_constraints_count = 1;
-  constraints.image_format_constraints[0] = GetDefaultSysmemImageFormatConstraints();
-  constraints.image_format_constraints[0].min_coded_width = 64;
-  constraints.image_format_constraints[0].min_bytes_per_row = 1024;
-  auto sysmem_collection_info = AllocateSysmemCollection(constraints, std::move(sysmem_token));
+  fuchsia::sysmem2::BufferCollectionConstraints constraints;
+  constraints.mutable_usage()->set_vulkan(fuchsia::sysmem2::VULKAN_IMAGE_USAGE_TRANSFER_DST);
+  auto &ifc = constraints.mutable_image_format_constraints()->emplace_back();
+  ifc = GetDefaultSysmemImageFormatConstraints();
+  ifc.set_min_size(fuchsia::math::SizeU{.width = 64, .height = 1});
+  ifc.set_min_bytes_per_row(1024);
+  auto sysmem_collection_info =
+      AllocateSysmemCollection(std::move(constraints), std::move(sysmem_token));
 
   ASSERT_TRUE(InitializeDirectImage(*collection, image_create_info));
 
@@ -1137,12 +1141,11 @@ TEST(ByteOffsetCalculation, YTiling) {
   constexpr size_t kWidth = 256 / 4;
   constexpr size_t kHeight = 64;
   std::vector<uint32_t> tile_data(4096 * 2 * 2);
-  fuchsia::sysmem::BufferCollectionInfo_2 info;
-  info.settings.has_image_format_constraints = true;
-  auto &image_format_constraints = info.settings.image_format_constraints;
-  image_format_constraints.pixel_format.format_modifier.value =
-      fuchsia::sysmem::FORMAT_MODIFIER_INTEL_I915_Y_TILED;
-  image_format_constraints.bytes_per_row_divisor = 256;
+  fuchsia::sysmem2::BufferCollectionInfo info;
+  auto &image_format_constraints = *info.mutable_settings()->mutable_image_format_constraints();
+  image_format_constraints.set_pixel_format_modifier(
+      fuchsia::images2::PixelFormatModifier::INTEL_I915_Y_TILED);
+  image_format_constraints.set_bytes_per_row_divisor(256);
   for (size_t y = 0; y < kHeight; y++) {
     for (size_t x = 0; x < kWidth; x++) {
       size_t offset = GetImageByteOffset(x, y, info, kWidth, kHeight);
@@ -1187,7 +1190,7 @@ TEST_P(VulkanFormatTest, FastClear) {
   vk::UniqueImage image;
   vk::UniqueDeviceMemory memory;
 
-  fuchsia::sysmem::BufferCollectionInfo_2 sysmem_collection;
+  fuchsia::sysmem2::BufferCollectionInfo sysmem_collection;
   bool src_is_coherent;
   {
     auto [vulkan_token, local_token] = MakeSharedCollection<2>();
@@ -1208,34 +1211,28 @@ TEST_P(VulkanFormatTest, FastClear) {
         vk::ImageConstraintsInfoFlagBitsFUCHSIA::eCpuReadOften |
             vk::ImageConstraintsInfoFlagBitsFUCHSIA::eCpuWriteOften);
 
-    fuchsia::sysmem::BufferCollectionConstraints constraints;
-    constraints.usage.cpu = fuchsia::sysmem::cpuUsageRead;
-    constraints.has_buffer_memory_constraints = true;
-    constraints.buffer_memory_constraints.cpu_domain_supported = true;
-    constraints.buffer_memory_constraints.ram_domain_supported = true;
+    fuchsia::sysmem2::BufferCollectionConstraints constraints;
+    constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_READ);
+    auto &bmc = *constraints.mutable_buffer_memory_constraints();
+    bmc.set_cpu_domain_supported(true);
+    bmc.set_ram_domain_supported(true);
 
-    constraints.image_format_constraints_count = 2;
     {
       // Intel needs Y or YF tiling to do a fast clear.
-      auto &image_constraints = constraints.image_format_constraints[0];
-      image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::R8G8B8A8;
-      image_constraints.pixel_format.has_format_modifier = true;
-      image_constraints.pixel_format.format_modifier.value =
-          fuchsia::sysmem::FORMAT_MODIFIER_INTEL_I915_Y_TILED;
-      image_constraints.color_spaces_count = 1;
-      image_constraints.color_space[0].type = fuchsia::sysmem::ColorSpaceType::SRGB;
+      auto &image_constraints = constraints.mutable_image_format_constraints()->emplace_back();
+      image_constraints.set_pixel_format(fuchsia::images2::PixelFormat::R8G8B8A8);
+      image_constraints.set_pixel_format_modifier(
+          fuchsia::images2::PixelFormatModifier::INTEL_I915_Y_TILED);
+      image_constraints.mutable_color_spaces()->emplace_back(fuchsia::images2::ColorSpace::SRGB);
     }
     {
-      auto &image_constraints = constraints.image_format_constraints[1];
-      image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::R8G8B8A8;
-      image_constraints.pixel_format.has_format_modifier = true;
-      image_constraints.pixel_format.format_modifier.value =
-          fuchsia::sysmem::FORMAT_MODIFIER_LINEAR;
-      image_constraints.color_spaces_count = 1;
-      image_constraints.color_space[0].type = fuchsia::sysmem::ColorSpaceType::SRGB;
+      auto &image_constraints = constraints.mutable_image_format_constraints()->emplace_back();
+      image_constraints.set_pixel_format(fuchsia::images2::PixelFormat::R8G8B8A8);
+      image_constraints.set_pixel_format_modifier(fuchsia::images2::PixelFormatModifier::LINEAR);
+      image_constraints.mutable_color_spaces()->emplace_back(fuchsia::images2::ColorSpace::SRGB);
     }
 
-    sysmem_collection = AllocateSysmemCollection(constraints, std::move(local_token));
+    sysmem_collection = AllocateSysmemCollection(std::move(constraints), std::move(local_token));
 
     ASSERT_TRUE(InitializeDirectImage(*collection, image_create_info));
 
@@ -1385,7 +1382,7 @@ TEST_P(VulkanFormatTest, FastClear) {
 
   EXPECT_EQ(vk::Result::eSuccess, vulkan_context().queue().waitIdle());
 
-  ASSERT_TRUE(sysmem_collection.settings.has_image_format_constraints);
+  ASSERT_TRUE(sysmem_collection.settings().has_image_format_constraints());
   {
     void *addr;
     vk::Result result = ctx_->device()->mapMemory(*memory, 0 /* offset */, VK_WHOLE_SIZE,
@@ -1745,7 +1742,7 @@ TEST_F(VulkanExtensionTest, LinearNonPackedStride) {
   vk::UniqueDeviceMemory memory;
   bool src_is_coherent;
 
-  fuchsia::sysmem::BufferCollectionInfo_2 sysmem_collection;
+  fuchsia::sysmem2::BufferCollectionInfo sysmem_collection;
   {
     auto [vulkan_token, sysmem_token] = MakeSharedCollection<2>();
     constexpr bool kUseLinear = true;
@@ -1765,31 +1762,24 @@ TEST_F(VulkanExtensionTest, LinearNonPackedStride) {
         vk::ImageConstraintsInfoFlagBitsFUCHSIA::eCpuReadOften |
             vk::ImageConstraintsInfoFlagBitsFUCHSIA::eCpuWriteOften);
 
-    fuchsia::sysmem::ImageFormatConstraints bgra_image_constraints;
-    bgra_image_constraints.required_min_coded_width = 64;
-    bgra_image_constraints.required_min_coded_height = 64;
-    bgra_image_constraints.required_max_coded_width = 64;
-    bgra_image_constraints.required_max_coded_height = 64;
-    bgra_image_constraints.max_coded_width = 8192;
-    bgra_image_constraints.max_coded_height = 8192;
-    bgra_image_constraints.max_bytes_per_row = 0xffffffff;
-    bgra_image_constraints.bytes_per_row_divisor = 1024;
-    bgra_image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::R8G8B8A8;
-    bgra_image_constraints.pixel_format.has_format_modifier = true;
-    bgra_image_constraints.pixel_format.format_modifier.value =
-        fuchsia::sysmem::FORMAT_MODIFIER_LINEAR;
-    bgra_image_constraints.color_spaces_count = 1;
-    bgra_image_constraints.color_space[0].type = fuchsia::sysmem::ColorSpaceType::SRGB;
+    fuchsia::sysmem2::ImageFormatConstraints bgra_image_constraints;
+    bgra_image_constraints.set_required_min_size(fuchsia::math::SizeU{.width = 64, .height = 64});
+    bgra_image_constraints.set_required_max_size(fuchsia::math::SizeU{.width = 64, .height = 64});
+    bgra_image_constraints.set_max_size(::fuchsia::math::SizeU{.width = 8192, .height = 8192});
+    bgra_image_constraints.set_max_bytes_per_row(0xffffffff);
+    bgra_image_constraints.set_bytes_per_row_divisor(1024);
+    bgra_image_constraints.set_pixel_format(fuchsia::images2::PixelFormat::R8G8B8A8);
+    bgra_image_constraints.set_pixel_format_modifier(fuchsia::images2::PixelFormatModifier::LINEAR);
+    bgra_image_constraints.mutable_color_spaces()->emplace_back(fuchsia::images2::ColorSpace::SRGB);
 
-    EXPECT_LT(kDefaultWidth * 4, bgra_image_constraints.bytes_per_row_divisor);
-    fuchsia::sysmem::BufferCollectionConstraints constraints;
-    constraints.usage.cpu = fuchsia::sysmem::cpuUsageRead;
-    constraints.has_buffer_memory_constraints = true;
-    constraints.buffer_memory_constraints.cpu_domain_supported = true;
-    constraints.buffer_memory_constraints.ram_domain_supported = true;
-    constraints.image_format_constraints_count = 1;
-    constraints.image_format_constraints[0] = bgra_image_constraints;
-    sysmem_collection = AllocateSysmemCollection(constraints, std::move(sysmem_token));
+    EXPECT_LT(kDefaultWidth * 4, bgra_image_constraints.bytes_per_row_divisor());
+    fuchsia::sysmem2::BufferCollectionConstraints constraints;
+    constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_READ);
+    auto &bmc = *constraints.mutable_buffer_memory_constraints();
+    bmc.set_cpu_domain_supported(true);
+    bmc.set_ram_domain_supported(true);
+    constraints.mutable_image_format_constraints()->emplace_back(std::move(bgra_image_constraints));
+    sysmem_collection = AllocateSysmemCollection(std::move(constraints), std::move(sysmem_token));
 
     ASSERT_TRUE(InitializeDirectImage(*collection, image_create_info));
 
@@ -1808,8 +1798,8 @@ TEST_F(VulkanExtensionTest, LinearNonPackedStride) {
   size_t bytes_per_row = fbl::round_up(
       std::max(kDefaultWidth * kBytesPerPixel,
                static_cast<size_t>(
-                   sysmem_collection.settings.image_format_constraints.min_bytes_per_row)),
-      sysmem_collection.settings.image_format_constraints.bytes_per_row_divisor);
+                   sysmem_collection.settings().image_format_constraints().min_bytes_per_row())),
+      sysmem_collection.settings().image_format_constraints().bytes_per_row_divisor());
   auto layout = vulkan_context().device()->getImageSubresourceLayout(
       image.get(), vk::ImageSubresource(vk::ImageAspectFlagBits::eColor, 0, 0));
   EXPECT_EQ(bytes_per_row, layout.rowPitch);
@@ -1946,7 +1936,7 @@ TEST_F(VulkanExtensionTest, LinearNonPackedStride) {
 
   EXPECT_EQ(vk::Result::eSuccess, vulkan_context().queue().waitIdle());
 
-  ASSERT_TRUE(sysmem_collection.settings.has_image_format_constraints);
+  ASSERT_TRUE(sysmem_collection.settings().has_image_format_constraints());
   {
     void *addr;
     vk::Result result = ctx_->device()->mapMemory(*memory, 0 /* offset */, VK_WHOLE_SIZE,

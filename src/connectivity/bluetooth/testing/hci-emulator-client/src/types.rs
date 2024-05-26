@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_bluetooth_test as fidl;
+use fidl_fuchsia_hardware_bluetooth as fidl;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct LegacyAdvertisingState {

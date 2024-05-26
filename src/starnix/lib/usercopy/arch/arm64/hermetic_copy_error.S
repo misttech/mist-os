@@ -6,12 +6,6 @@
 // preconditions:
 //   - Only x29 (frame pointer), x30 (link register) on the stack.
 //   - faulting address in x0
-//
-// TODO: Is it safe to assume that the hermetic copy function will always save
-// the frame pointer and link register on the stack and nothing else? For now,
-// we rely on tests to validate these assumptions (tests will start to fail if
-// pre/post-conditions for `hermetic_copy_error` are not met when exercising
-// faulting user-mode copies.
 
 .globl hermetic_copy_error
 hermetic_copy_error:

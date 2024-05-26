@@ -6,14 +6,17 @@ use {
     crate::{
         bedrock::{
             program::{self as program, ComponentStopOutcome, Program, StopRequestSuccess},
-            sandbox_construction::{self, build_component_sandbox, extend_dict_with_offers},
+            sandbox_construction::{
+                self, build_component_sandbox, build_program_output_dictionary,
+                extend_dict_with_offers,
+            },
         },
         framework::controller,
         model::{
             actions::{shutdown, ActionsManager, DiscoverAction, StopAction},
             component::{
-                Component, ComponentInstance, Package, StartReason, WeakComponentInstance,
-                WeakExtendedInstance,
+                Component, ComponentInstance, IncarnationId, Package, StartReason,
+                WeakComponentInstance, WeakExtendedInstance,
             },
             context::ModelContext,
             environment::Environment,
@@ -46,7 +49,6 @@ use {
     cm_fidl_validator::error::DeclType,
     cm_fidl_validator::error::Error as ValidatorError,
     cm_logger::scoped::ScopedLogger,
-    cm_moniker::{IncarnationId, InstancedChildName},
     cm_rust::{
         CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, DeliveryType,
         FidlIntoNative, NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl,
@@ -467,6 +469,15 @@ impl ResolvedInstanceState {
         };
         state.add_static_children(component).await?;
 
+        let declared_dictionaries = Dict::new();
+        build_program_output_dictionary(
+            component,
+            &state.children,
+            &decl,
+            &state.component_input,
+            &state.program_output_dict,
+            &declared_dictionaries,
+        );
         let mut child_inputs = Default::default();
         build_component_sandbox(
             component,
@@ -475,10 +486,11 @@ impl ResolvedInstanceState {
             &state.component_input,
             &state.component_output_dict,
             &state.program_input_dict,
-            &state.program_output_dict,
+            &component.program_output(),
             &mut child_inputs,
             &mut state.collection_inputs,
             &mut state.bedrock_environments,
+            declared_dictionaries,
         );
         state.discover_static_children(child_inputs).await;
         Ok(state)
@@ -850,7 +862,7 @@ impl ResolvedInstanceState {
             collection,
         )?;
 
-        let child_moniker =
+        let child_name =
             ChildName::try_new(child.name.as_str(), collection.map(|c| c.name.as_str()))?;
 
         if !dynamic_offers.is_empty() {
@@ -859,18 +871,18 @@ impl ResolvedInstanceState {
                 &self.children,
                 &self.component_input,
                 &dynamic_offers,
+                &component.program_output(),
                 &mut child_input,
             );
         }
 
-        if self.get_child(&child_moniker).is_some() {
+        if self.get_child(&child_name).is_some() {
             return Err(AddChildError::InstanceAlreadyExists {
                 moniker: component.moniker().clone(),
-                child: child_moniker,
+                child: child_name,
             });
         }
-        // TODO(https://fxbug.dev/42059793): next_dynamic_instance_id should be per-collection.
-        let instance_id = match collection {
+        let incarnation_id = match collection {
             Some(_) => {
                 let id = self.next_dynamic_instance_id;
                 self.next_dynamic_instance_id += 1;
@@ -878,10 +890,10 @@ impl ResolvedInstanceState {
             }
             None => 0,
         };
-        let instanced_moniker = InstancedChildName::from_child_moniker(&child_moniker, instance_id);
         let child = ComponentInstance::new(
             self.environment_for_child(component, child, collection.clone()),
-            component.instanced_moniker.child(instanced_moniker),
+            component.moniker.child(child_name.clone()),
+            incarnation_id,
             child.url.clone(),
             child.startup,
             child.on_terminate.unwrap_or(fdecl::OnTerminate::None),
@@ -892,7 +904,7 @@ impl ResolvedInstanceState {
             component.persistent_storage_for_child(collection),
         )
         .await;
-        self.children.insert(child_moniker, child.clone());
+        self.children.insert(child_name, child.clone());
 
         self.dynamic_offers.extend(dynamic_offers.into_iter());
         self.dynamic_capabilities.extend(dynamic_capabilities.into_iter());

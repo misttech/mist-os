@@ -41,14 +41,33 @@ const std::unordered_map<std::string, std::unordered_set<std::string_view>> kCon
          "nand",                // Some internal bot
          "No_class_name_but_driver_url_is_fuchsia-boot:///dtr#meta/fvm.cm",  // paver-test
          "No_class_name_but_driver_url_is_fuchsia-boot:///fvm#meta/fvm.cm",  // installer_test.sh
-         "No_class_name_but_driver_url_is_fuchsia-boot:///gpt#meta/gpt.cm", // storage-verity-benchmarks
+         "No_class_name_but_driver_url_is_fuchsia-boot:///gpt#meta/gpt.cm",  // storage-verity-benchmarks
          "No_class_name_but_driver_url_is_fuchsia-boot:///dtr#meta/nand-broker.cm",  // nand-broker-test
          "No_class_name_but_driver_url_is_fuchsia-boot:///dtr#meta/sample-driver.cm",
      }},
-    {"Bind", {kAllowAllUses}},
+    {"Bind",
+     {
+         "block",                                                             // allow vim3 to boot
+         "No_class_name_but_driver_url_is_fuchsia-boot:///dtr#meta/test.cm",  //  bind-fail-test
+         "driver_runner_test",                                                // driver-runner-test
+         "test",  // power-manager-integration-test
+     }},
     {"Rebind", {kAllowAllUses}},
-    {"UnbindChildren", {kAllowAllUses}},
-    {"ScheduleUnbind", {kAllowAllUses}},
+    {"UnbindChildren",
+     {
+         "block",               // fshost_integration_tests_fxfs_no_fxblob.cm
+         "driver_runner_test",  // driver-runner-test
+     }},
+    {"ScheduleUnbind",
+     {
+         "bt-emulator",         // bt-host-integration-tests
+         "driver_runner_test",  // driver-runner-test
+         "nand",                // ram-nand-test
+         "No_class_name_but_driver_url_is_fuchsia-boot:///dtr#meta/ddk-lifecycle-test.cm",  // ddk-lifecycle-test
+         "No_class_name_but_driver_url_is_fuchsia-boot:///dtr#meta/fvm.cm",  // paver-test
+         "No_class_name_but_driver_url_is_fuchsia-boot:///fvm#meta/fvm.cm",
+         "No_class_name_but_driver_url_is_unbound",  // blobfs-ramdisk-test, and so many others
+     }},
     {"GetTopologicalPath", {kAllowAllUses}},
 });
 
@@ -187,7 +206,11 @@ void ControllerAllowlistPassthrough::GetTopologicalPath(
   if (compat_client_.is_valid()) {
     compat_client_->GetTopologicalPath().ThenExactlyOnce(
         [completer = completer.ToAsync()](auto &result) mutable {
-          completer.Reply(*result.Unwrap());
+          if (!result.ok()) {
+            completer.ReplyError(result.status());
+            return;
+          }
+          completer.Reply(result.value());
         });
   } else {
     std::shared_ptr locked_node = node_.lock();

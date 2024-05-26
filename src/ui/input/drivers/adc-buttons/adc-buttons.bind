@@ -7,12 +7,17 @@ composite adc_buttons;
 using fuchsia.adc;
 using fuchsia.hardware.adc;
 using fuchsia.platform;
+using fuchsia.devicetree;
 
 primary node "pdev" {
+  if fuchsia.devicetree.FIRST_COMPATIBLE == "fuchsia,adc-buttons" {
+    true;
+  } else {
     fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
     fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC;
     fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;
     fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.ADC_BUTTONS;
+  }
 }
 
 optional node "adc-0" {

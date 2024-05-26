@@ -3,7 +3,6 @@ TestBeds:
     Controllers:
       FuchsiaDevice:
         - name: "fuchsia-emulator"
-          ssh_private_key: ~/.ssh/fuchsia_ed25519
           # If running this test locally then specify the additional details
           # in power_switch_hw and power_switch_impl sections.
 

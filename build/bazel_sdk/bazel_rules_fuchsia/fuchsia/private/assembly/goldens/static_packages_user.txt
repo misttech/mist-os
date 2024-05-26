@@ -73,7 +73,6 @@ pkg-resolver
 ?setui_service
 ?soundplayer
 ?starnix
-?starnix_kernel
 ?stash
 system-update-committer
 ?system-update-configurator

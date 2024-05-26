@@ -538,8 +538,8 @@ impl Configurator for DefaultConfigurator {
                     if let Some(id) = e.id {
                         if let Some(element_type) = e.type_ {
                             if element_type == ElementType::Gain {
-                                let state = ElementState {
-                                    type_specific: Some(TypeSpecificElementState::Gain(
+                                let state = SettableElementState {
+                                    type_specific: Some(SettableTypeSpecificElementState::Gain(
                                         GainElementState {
                                             gain: Some(0.0f32),
                                             ..Default::default()
@@ -1510,8 +1510,6 @@ mod tests {
                 }
                 CodecRequest::Stop { responder: _ } => {}
                 CodecRequest::Start { responder: _ } => {}
-                CodecRequest::IsBridgeable { responder: _ } => {}
-                CodecRequest::SetBridgedMode { enable_bridged_mode: _, control_handle: _ } => {}
                 CodecRequest::GetDaiFormats { responder } => {
                     let formats = &[DaiSupportedFormats {
                         number_of_channels: vec![2],
@@ -1576,7 +1574,7 @@ mod tests {
                     if processing_element_id == TEST_CODEC_GAIN_PROCESSING_ELEMENT_ID {
                         match state.type_specific {
                             Some(type_specific) => match type_specific {
-                                TypeSpecificElementState::Gain(gain) => {
+                                SettableTypeSpecificElementState::Gain(gain) => {
                                     self.gain = gain.gain;
                                     return Ok(responder.send(Ok(()))?);
                                 }

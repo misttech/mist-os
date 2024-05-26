@@ -14,9 +14,17 @@
 #include <phys/allocation.h>
 #include <phys/main.h>
 
-void ArchSetUpAddressSpaceEarly(AddressSpace& aspace) {}
+namespace {
 
-void ArchSetUpAddressSpaceLate(AddressSpace& aspace) {
+void SetUpAddressSpace(AddressSpace& aspace) {
+  aspace.Init();
+  aspace.SetUpIdentityMappings();
+  aspace.Install();
+}
+
+}  // namespace
+
+void ArchSetUpAddressSpace(AddressSpace& aspace) {
   ZX_ASSERT_MSG(arch::BootCpuid<arch::CpuidAmdFeatureFlagsD>().lm(),
                 "CPU does not support 64-bit mode!");
   ZX_ASSERT_MSG(arch::BootCpuid<arch::CpuidFeatureFlagsD>().pse(), "x86-64 requires PSE support!");
@@ -44,14 +52,16 @@ void ArchSetUpAddressSpaceLate(AddressSpace& aspace) {
 
   // Set up the identity-mapping page tables.  This installs the %cr3 pointer.
   //
-  // On x86-32, the page tables are set up before paging is enabled, so there is
-  // no bootstrapping issue with accessing page table memory.  Conversely, the
-  // fixed .bss location based on the fixed 1 MiB load address may overlap with
-  // areas that should be reserved.  So it's preferable to go directly to the
-  // physical page allocator that respects explicitly reserved ranges.
-  aspace.Init();
-  aspace.SetUpIdentityMappings();
-  aspace.Install();
+  // Note that address-space-64.cc handles things quite differently to address
+  // the bootstrapping issue of setting up new page tables while paging is
+  // already enabled (but with very limited guarantees on what is in the page
+  // tables).  On x86-32, the page tables are set up before paging is enabled,
+  // so there is no bootstrapping issue with accessing page table memory.
+  // Conversely, the fixed .bss location based on the fixed 1 MiB load address
+  // may overlap with areas that should be reserved.  So it's preferable to go
+  // directly to the physical page allocator that respects explicitly reserved
+  // ranges.
+  SetUpAddressSpace(aspace);
 
   // Now actually turn on paging.  This affects us immediately in 32-bit mode,
   // as well as being mandatory for 64-bit mode.
@@ -59,5 +69,16 @@ void ArchSetUpAddressSpaceLate(AddressSpace& aspace) {
   arch::X86Cr0::Read().set_pg(true).Write();
 
   ZX_ASSERT(efer.ReadFrom(&msr).lma());
-  printf("Long mode active!\n");
+  printf("%s: Long mode active!\n", ProgramName());
+}
+
+// This just repeats allocation of all the page tables as done before, but in
+// the new state of the Allocation pool where the page tables used before are
+// no longer available and every other address range that needs to be avoided
+// during the trampoline handoff is reserved so the allocator won't use it.
+// The original page tables are leaked here, but this is the very last thing
+// done before the trampoline handoff wipes the slate clean anyway.
+void ArchPrepareAddressSpaceForTrampoline() {
+  ZX_DEBUG_ASSERT(gAddressSpace);
+  SetUpAddressSpace(*gAddressSpace);
 }

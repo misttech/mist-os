@@ -9,6 +9,7 @@
     program: {
         runner: "elf",
         binary: "bin/starnix_runner",
+        memory_attribution: "true",
     },
     collections: [
         {
@@ -18,7 +19,7 @@
         },
         {
             name: "kernels",
-            durability: "single_run",
+            durability: "transient",
         },
     ],
     capabilities: [
@@ -29,6 +30,7 @@
         {
             protocol: [
                 "fuchsia.component.runner.ComponentRunner",
+                "fuchsia.memory.attribution.Provider",
                 "fuchsia.starnix.runner.Manager",
             ],
         },
@@ -42,6 +44,12 @@
             protocol: "fuchsia.settings.Privacy",
             availability: "optional",
         },
+        {
+            // Sets the platform's data collection bit.
+            config: "fuchsia.starnix.runner.EnableDataCollection",
+            key: "enable_data_collection",
+            type: "bool",
+        },
     ],
     offer: [
         {
@@ -52,12 +60,14 @@
                 "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.logger.LogSink",
+                "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.root.Interfaces",
                 "fuchsia.net.routes.admin.RouteTableV4",
                 "fuchsia.net.routes.admin.RouteTableV6",
                 "fuchsia.net.routes.StateV4",
                 "fuchsia.net.routes.StateV6",
+                "fuchsia.net.tun.Control",
                 "fuchsia.posix.socket.packet.Provider",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.posix.socket.raw.Provider",
@@ -103,6 +113,11 @@
             to: "#playground",
         },
         {
+            directory: "boot-kernel",
+            from: "parent",
+            to: [ "#kernels" ],
+        },
+        {
             directory: "dev-hrtimer",
             from: "parent",
             to: [ "#kernels" ],
@@ -127,6 +142,10 @@
             protocol: [ "fuchsia.starnix.runner.Manager" ],
             from: "self",
         },
+        {
+            protocol: "fuchsia.memory.attribution.Provider",
+            from: "self",
+        },
     ],
     environments: [
         {
@@ -140,8 +159,4 @@
             ],
         },
     ],
-    config: {
-        // Sets the platform's data collection bit.
-        enable_data_collection: { type: "bool" },
-    },
 }

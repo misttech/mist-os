@@ -6,7 +6,7 @@
 #define SRC_CAMERA_DRIVERS_CONTROLLER_SHERLOCK_ISP_DEBUG_CONFIG_H_
 
 #include <fuchsia/camera2/hal/cpp/fidl.h>
-#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/images2/cpp/fidl.h>
 
 #include <vector>
 
@@ -29,8 +29,7 @@ constexpr uint32_t kDSStreamWidth = 1152;
 constexpr uint32_t kDSStreamHeight = 1440;
 constexpr uint32_t kFRStreamFrameRate = 30;
 constexpr uint32_t kDSStreamFrameRate = 30;
-constexpr fuchsia::sysmem::PixelFormatType kStreamPixelFormat =
-    fuchsia::sysmem::PixelFormatType::NV12;
+constexpr fuchsia::images2::PixelFormat kStreamPixelFormat = fuchsia::images2::PixelFormat::NV12;
 
 }  // namespace
 

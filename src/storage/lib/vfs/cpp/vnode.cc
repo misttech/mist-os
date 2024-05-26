@@ -19,9 +19,9 @@
 
 #include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
 
-namespace fio = fuchsia_io;
-
 #endif  // __Fuchsia__
+
+namespace fio = fuchsia_io;
 
 namespace fs {
 
@@ -161,9 +161,13 @@ zx_status_t Vnode::Lookup(std::string_view name, fbl::RefPtr<Vnode>* out) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t Vnode::GetAttributes(VnodeAttributes* a) { return ZX_ERR_NOT_SUPPORTED; }
+zx::result<fs::VnodeAttributes> Vnode::GetAttributes() const {
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
+}
 
-zx_status_t Vnode::SetAttributes(VnodeAttributesUpdate a) { return ZX_ERR_NOT_SUPPORTED; }
+zx::result<> Vnode::UpdateAttributes(const VnodeAttributesUpdate&) {
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
+}
 
 zx_status_t Vnode::Readdir(VdirCookie* cookie, void* dirents, size_t len, size_t* out_actual) {
   return ZX_ERR_NOT_SUPPORTED;
@@ -189,6 +193,20 @@ zx_status_t Vnode::Link(std::string_view name, fbl::RefPtr<Vnode> target) {
 void Vnode::Sync(SyncCallback closure) { closure(ZX_ERR_NOT_SUPPORTED); }
 
 bool Vnode::IsRemote() const { return false; }
+
+fio::Abilities Vnode::GetAbilities() const {
+  fio::Abilities abilities = fio::Abilities::kGetAttributes;
+  fio::NodeProtocolKinds protocols = GetProtocols();
+  if (protocols & fio::NodeProtocolKinds::kDirectory) {
+    abilities |= fio::Abilities::kUpdateAttributes | fio::Abilities::kModifyDirectory |
+                 fio::Abilities::kTraverse | fio::Abilities::kEnumerate;
+  }
+  if (protocols & fio::NodeProtocolKinds::kFile) {
+    abilities |= fio::Abilities::kReadBytes | fio::Abilities::kWriteBytes |
+                 fio::Abilities::kUpdateAttributes;
+  }
+  return abilities;
+}
 
 DirentFiller::DirentFiller(void* ptr, size_t len)
     : ptr_(static_cast<char*>(ptr)), pos_(0), len_(len) {}

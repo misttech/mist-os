@@ -4,6 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::ensure;
+use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::starnix_config::PlatformStarnixConfig;
 
 pub(crate) struct StarnixSubsystem;
@@ -31,16 +32,19 @@ impl DefineSubsystemConfiguration<PlatformStarnixConfig> for StarnixSubsystem {
                     builder.platform_bundle("wlan_wlanix");
                 }
 
-                builder
-                    .package("starnix")
-                    .component("meta/starnix_runner.cm")?
-                    .field("enable_data_collection", *context.build_type == BuildType::UserDebug)?;
+                builder.set_config_capability(
+                    "fuchsia.starnix.runner.EnableDataCollection",
+                    Config::new(
+                        ConfigValueType::Bool,
+                        (*context.build_type == BuildType::UserDebug).into(),
+                    ),
+                )?;
                 builder.platform_bundle("adb_support");
             } else {
-                builder
-                    .package("starnix")
-                    .component("meta/starnix_runner.cm")?
-                    .field("enable_data_collection", false)?;
+                builder.set_config_capability(
+                    "fuchsia.starnix.runner.EnableDataCollection",
+                    Config::new(ConfigValueType::Bool, false.into()),
+                )?;
             }
         }
         Ok(())

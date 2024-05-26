@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::{client::types, util::pseudo_energy::EwmaSignalData},
+    crate::{
+        client::types,
+        util::pseudo_energy::{EwmaSignalData, RssiVelocity},
+    },
     fuchsia_async as fasync,
     futures::channel::mpsc,
 };
@@ -16,6 +19,8 @@ pub struct ConnectionData {
     pub currently_fulfilled_connection: types::ConnectSelection,
     // Rolling signal data
     pub signal_data: EwmaSignalData,
+    // Rolling rssi velocity
+    pub rssi_velocity: RssiVelocity,
     // Roaming related metadata
     pub roam_decision_data: RoamDecisionData,
 }
@@ -28,11 +33,12 @@ impl ConnectionData {
     ) -> Self {
         Self {
             currently_fulfilled_connection,
+            signal_data,
+            rssi_velocity: RssiVelocity::new(signal_data.ewma_rssi.get()),
             roam_decision_data: RoamDecisionData::new(
                 signal_data.ewma_rssi.get(),
                 connection_start_time,
             ),
-            signal_data,
         }
     }
 }

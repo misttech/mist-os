@@ -92,11 +92,11 @@ void AdcButtonsDevice::GetInputReportsReader(GetInputReportsReaderRequestView re
 void AdcButtonsDevice::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
   fidl::Arena<kFeatureAndDescriptorBufferSize> allocator;
 
-  fuchsia_input_report::wire::DeviceInfo device_info;
-  device_info.vendor_id = static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle);
-  device_info.product_id =
-      static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kAdcButtons);
-  device_info.polling_rate = polling_rate_usec_;
+  auto device_info = fuchsia_input_report::wire::DeviceInformation::Builder(allocator);
+  device_info.vendor_id(static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
+  device_info.product_id(
+      static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kAdcButtons));
+  device_info.polling_rate(polling_rate_usec_);
 
   fidl::VectorView<fuchsia_input_report::wire::ConsumerControlButton> buttons(allocator,
                                                                               buttons_.size());
@@ -112,7 +112,7 @@ void AdcButtonsDevice::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
           .Build();
 
   const auto descriptor = fuchsia_input_report::wire::DeviceDescriptor::Builder(allocator)
-                              .device_info(device_info)
+                              .device_information(device_info.Build())
                               .consumer_control(consumer_control)
                               .Build();
 

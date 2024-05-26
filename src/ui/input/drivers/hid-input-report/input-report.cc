@@ -195,12 +195,13 @@ void InputReport::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
   hid_device_info_t info;
   hiddev_.GetHidDeviceInfo(&info);
 
-  fuchsia_input_report::wire::DeviceInfo fidl_info;
-  fidl_info.vendor_id = info.vendor_id;
-  fidl_info.product_id = info.product_id;
-  fidl_info.version = info.version;
-  fidl_info.polling_rate = info.polling_rate;
-  descriptor.set_device_info(descriptor_allocator, std::move(fidl_info));
+  fidl::Arena<kFidlDescriptorBufferSize> descriptor_info_allocator;
+  fuchsia_input_report::wire::DeviceInformation fidl_info(descriptor_info_allocator);
+  fidl_info.set_vendor_id(info.vendor_id);
+  fidl_info.set_product_id(info.product_id);
+  fidl_info.set_version(info.version);
+  fidl_info.set_polling_rate(descriptor_info_allocator, info.polling_rate);
+  descriptor.set_device_information(descriptor_allocator, fidl_info);
 
   if (sensor_count_) {
     fidl::VectorView<fuchsia_input_report::wire::SensorInputDescriptor> input(descriptor_allocator,
@@ -214,7 +215,7 @@ void InputReport::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
     device->CreateDescriptor(descriptor_allocator, descriptor);
   }
 
-  completer.Reply(std::move(descriptor));
+  completer.Reply(descriptor);
   fidl::Status result = completer.result_of_reply();
   if (result.status() != ZX_OK) {
     zxlogf(ERROR, "GetDescriptor: Failed to send descriptor: %s\n",

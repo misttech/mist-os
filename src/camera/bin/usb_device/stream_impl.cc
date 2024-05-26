@@ -4,11 +4,14 @@
 
 #include "src/camera/bin/usb_device/stream_impl.h"
 
+#include <fidl/fuchsia.sysmem2/cpp/hlcpp_conversion.h>
+#include <fuchsia/images2/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fit/function.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/trace/event.h>
 #include <lib/zx/time.h>
 #include <unistd.h>
@@ -48,12 +51,10 @@ using fuchsia::camera::StreamHandle;
 using fuchsia::camera::VideoFormat;
 using fuchsia::camera3::FrameInfo2;
 
-using fuchsia::sysmem::BufferCollectionConstraints;
-using fuchsia::sysmem::BufferCollectionInfo;
-using fuchsia::sysmem::BufferCollectionInfo_2;
-using fuchsia::sysmem::BufferCollectionPtr;
-using fuchsia::sysmem::BufferCollectionTokenHandle;
-using fuchsia::sysmem::BufferCollectionTokenPtr;
+using fuchsia::sysmem2::BufferCollectionConstraints;
+using fuchsia::sysmem2::BufferCollectionPtr;
+using fuchsia::sysmem2::BufferCollectionTokenHandle;
+using fuchsia::sysmem2::BufferCollectionTokenPtr;
 
 inline size_t ROUNDUP(size_t size, size_t page_size) {
   // Caveat: Only works for power of 2 page sizes.
@@ -61,8 +62,9 @@ inline size_t ROUNDUP(size_t size, size_t page_size) {
 }
 
 // Allocate driver-facing buffer collection.
-zx::result<BufferCollectionInfo> Gralloc(VideoFormat video_format, uint32_t num_buffers) {
-  BufferCollectionInfo buffer_collection_info;
+zx::result<fuchsia::sysmem::BufferCollectionInfo> Gralloc(VideoFormat video_format,
+                                                          uint32_t num_buffers) {
+  fuchsia::sysmem::BufferCollectionInfo buffer_collection_info;
 
   size_t buffer_size =
       ROUNDUP(video_format.format.height * video_format.format.planes[0].bytes_per_row, PAGE_SIZE);
@@ -212,7 +214,8 @@ void StreamImpl::OnFrameAvailable(FrameAvailableEvent info) {
 
 promise<BufferCollectionTokenPtr> StreamImpl::TokenSync(BufferCollectionTokenPtr token) {
   bridge<BufferCollectionTokenPtr> bridge;
-  token->Sync([token = std::move(token), completer = std::move(bridge.completer)]() mutable {
+  token->Sync([token = std::move(token), completer = std::move(bridge.completer)](
+                  fuchsia::sysmem2::Node_Sync_Result result) mutable {
     completer.complete_ok(std::move(token));
   });
   return bridge.consumer.promise();
@@ -221,33 +224,45 @@ promise<BufferCollectionTokenPtr> StreamImpl::TokenSync(BufferCollectionTokenPtr
 promise<void> StreamImpl::BufferCollectionSync(BufferCollectionPtr& collection) {
   bridge<void> bridge;
   collection->Sync(
-      [completer = std::move(bridge.completer)]() mutable { completer.complete_ok(); });
+      [completer = std::move(bridge.completer)](fuchsia::sysmem2::Node_Sync_Result result) mutable {
+        completer.complete_ok();
+      });
   return bridge.consumer.promise();
 }
 
-promise<BufferCollectionInfo_2, zx_status_t> StreamImpl::WaitForClientBufferCollectionAllocated() {
-  bridge<BufferCollectionInfo_2, zx_status_t> bridge;
-  client_buffer_collection_->WaitForBuffersAllocated(
+promise<fuchsia::sysmem2::BufferCollectionInfo, zx_status_t>
+StreamImpl::WaitForClientBufferCollectionAllocated() {
+  bridge<fuchsia::sysmem2::BufferCollectionInfo, zx_status_t> bridge;
+  client_buffer_collection_->WaitForAllBuffersAllocated(
       [completer = std::move(bridge.completer)](
-          zx_status_t status, BufferCollectionInfo_2 buffer_collection_info) mutable {
-        if (status != ZX_OK) {
-          FX_PLOGS(ERROR, status) << "Failed to allocate sysmem buffers.";
-          completer.complete_error(status);
+          fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result result) mutable {
+        if (result.is_framework_err()) {
+          FX_PLOGS(ERROR, fidl::ToUnderlying(result.framework_err()))
+              << "Failed to allocate sysmem buffers (framework_err).";
+          completer.complete_error(ZX_ERR_INTERNAL);
+          return;
         }
-        completer.complete_ok(std::move(buffer_collection_info));
+        if (result.is_err()) {
+          FX_PLOGS(ERROR, static_cast<uint32_t>(result.err()))
+              << "Failed to allocate sysmem buffers (sysmem2.Error).";
+          zx_status_t v1_status = sysmem::V1CopyFromV2Error(fidl::HLCPPToNatural(result.err()));
+          completer.complete_error(v1_status);
+          return;
+        }
+        completer.complete_ok(std::move(*result.response().mutable_buffer_collection_info()));
       });
   return bridge.consumer.promise();
 }
 
 promise<std::optional<BufferCollectionTokenPtr>> StreamImpl::SetClientParticipation(
-    uint64_t id, fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_handle) {
+    uint64_t id, fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token_handle) {
   return make_promise([this, id, token_handle = std::move(token_handle)]() mutable
                       -> promise<std::optional<BufferCollectionTokenPtr>> {
     auto it = clients_.find(id);
     if (it == clients_.end()) {
       FX_LOGS(ERROR) << description_ << ": Client " << id << " not found.";
       if (token_handle) {
-        token_handle.BindSync()->Close();
+        token_handle.BindSync()->Release();
       }
       ZX_DEBUG_ASSERT(false);
     }
@@ -272,28 +287,29 @@ promise<std::optional<BufferCollectionTokenPtr>> StreamImpl::SetClientParticipat
   });
 }
 
-promise<BufferCollectionInfo, zx_status_t> StreamImpl::InitBufferCollections(
+promise<fuchsia::sysmem::BufferCollectionInfo, zx_status_t> StreamImpl::InitBufferCollections(
     BufferCollectionTokenPtr token) {
   return InitializeClientSharedCollection(std::move(token))
       .and_then([this]() { return BufferCollectionSync(client_buffer_collection_); })
       .and_then([this]() { return SetClientBufferCollectionConstraints(); })
       .then([this](result<void>& /*result*/) { return WaitForClientBufferCollectionAllocated(); })
-      .and_then([this](BufferCollectionInfo_2& result) {
+      .and_then([this](fuchsia::sysmem2::BufferCollectionInfo& result) {
         return RegisterClientBufferCollectionDeallocationEvent()
             .and_then([this, result = std::move(result)]() mutable {
               return InitializeClientBuffers(std::move(result));
             })
             .and_then([]() {
-              VideoFormat video_format;
+              fuchsia::camera::VideoFormat video_format;
               UvcHackGetServerBufferVideoFormat(&video_format);
-              return fpromise::ok(video_format);
+              return fpromise::ok(std::move(video_format));
             })
-            .then([this](fpromise::result<VideoFormat>& result) {
+            .then([this](fpromise::result<fuchsia::camera::VideoFormat>& result) {
               return AllocateDriverBufferCollection(std::move(result.value()));
             });
       })
       .or_else([](zx_status_t& status) {
-        return make_result_promise<BufferCollectionInfo, zx_status_t>(fpromise::error(status));
+        return make_result_promise<fuchsia::sysmem::BufferCollectionInfo, zx_status_t>(
+            fpromise::error(status));
       });
 }
 
@@ -313,18 +329,18 @@ promise<void> StreamImpl::Cleanup(zx_status_t status, const std::string& message
     clients_.clear();
 
     // Unmap VMOs and close the VMO handles.
-    auto vmo_size = client_buffer_collection_info_.settings.buffer_settings.size_bytes;
-    for (uint32_t buffer_id = 0; buffer_id < client_buffer_collection_info_.buffer_count;
+    auto vmo_size = client_buffer_collection_info_.settings().buffer_settings().size_bytes();
+    for (uint32_t buffer_id = 0; buffer_id < client_buffer_collection_info_.buffers().size();
          buffer_id++) {
       uintptr_t vmo_virt_addr = client_buffer_id_to_virt_addr_[buffer_id];
       auto status = zx::vmar::root_self()->unmap(vmo_virt_addr, vmo_size);
       ZX_ASSERT(status == ZX_OK);
-      zx::vmo& vmo = client_buffer_collection_info_.buffers[buffer_id].vmo;
+      zx::vmo& vmo = *client_buffer_collection_info_.mutable_buffers()->at(buffer_id).mutable_vmo();
       vmo.reset();
     }
     client_buffer_id_to_virt_addr_.clear();
     if (client_buffer_collection_) {
-      client_buffer_collection_->Close();
+      client_buffer_collection_->Release();
     }
 
     // Cause this stream to be destroyed.
@@ -338,7 +354,10 @@ promise<void> StreamImpl::InitializeClientSharedCollection(BufferCollectionToken
     for (auto& client_i : clients_) {
       if (client_i.second->Participant()) {
         BufferCollectionTokenHandle client_token;
-        token->Duplicate(ZX_RIGHT_SAME_RIGHTS, client_token.NewRequest());
+        fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest dup_request;
+        dup_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
+        dup_request.set_token_request(client_token.NewRequest());
+        token->Duplicate(std::move(dup_request));
         client_i.second->ReceiveBufferCollection(std::move(client_token));
       }
     }
@@ -351,7 +370,10 @@ promise<void> StreamImpl::InitializeClientSharedCollection(BufferCollectionToken
           });
           constexpr uint32_t kNamePriority = 30;
           std::string name("fake");
-          client_buffer_collection_->SetName(kNamePriority, std::move(name));
+          fuchsia::sysmem2::NodeSetNameRequest set_name_request;
+          set_name_request.set_priority(kNamePriority);
+          set_name_request.set_name(std::move(name));
+          client_buffer_collection_->SetName(std::move(set_name_request));
         });
   });
 }
@@ -360,7 +382,9 @@ promise<void> StreamImpl::SetClientBufferCollectionConstraints() {
   return make_promise([this]() {
     BufferCollectionConstraints buffer_collection_constraints;
     UvcHackGetClientBufferCollectionConstraints(&buffer_collection_constraints);
-    client_buffer_collection_->SetConstraints(true, std::move(buffer_collection_constraints));
+    fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+    set_constraints_request.set_constraints(std::move(buffer_collection_constraints));
+    client_buffer_collection_->SetConstraints(std::move(set_constraints_request));
   });
 }
 
@@ -368,17 +392,21 @@ promise<void> StreamImpl::RegisterClientBufferCollectionDeallocationEvent() {
   return make_promise([this]() {
     zx::eventpair deallocation_event_client, deallocation_event_server;
     zx::eventpair::create(/*options=*/0, &deallocation_event_client, &deallocation_event_server);
-    client_buffer_collection_->AttachLifetimeTracking(std::move(deallocation_event_server), 0);
+    fuchsia::sysmem2::BufferCollectionAttachLifetimeTrackingRequest attach_lifetime_request;
+    attach_lifetime_request.set_server_end(std::move(deallocation_event_server));
+    attach_lifetime_request.set_buffers_remaining(0);
+    client_buffer_collection_->AttachLifetimeTracking(std::move(attach_lifetime_request));
     register_deallocation_event_(std::move(deallocation_event_client));
   });
 }
 
-promise<void> StreamImpl::InitializeClientBuffers(BufferCollectionInfo_2 buffer_collection_info) {
+promise<void> StreamImpl::InitializeClientBuffers(
+    fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info) {
   return make_promise([this, buffer_collection_info = std::move(buffer_collection_info)]() mutable {
-    for (uint32_t buffer_id = 0; buffer_id < buffer_collection_info.buffer_count; buffer_id++) {
+    for (uint32_t buffer_id = 0; buffer_id < buffer_collection_info.buffers().size(); buffer_id++) {
       // TODO(b/204456599) - Use VmoMapper helper class instead.
-      const zx::vmo& vmo = buffer_collection_info.buffers[buffer_id].vmo;
-      auto vmo_size = buffer_collection_info.settings.buffer_settings.size_bytes;
+      const zx::vmo& vmo = buffer_collection_info.buffers()[buffer_id].vmo();
+      auto vmo_size = buffer_collection_info.settings().buffer_settings().size_bytes();
       uintptr_t vmo_virt_addr = 0;
       auto status =
           zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0 /* vmar_offset */, vmo,
@@ -388,7 +416,7 @@ promise<void> StreamImpl::InitializeClientBuffers(BufferCollectionInfo_2 buffer_
     }
 
     // Initially place all buffers into free pool.
-    for (uint32_t buffer_id = 0; buffer_id < buffer_collection_info.buffer_count; buffer_id++) {
+    for (uint32_t buffer_id = 0; buffer_id < buffer_collection_info.buffers().size(); buffer_id++) {
       ReleaseClientFrame(buffer_id);
     }
 
@@ -397,17 +425,17 @@ promise<void> StreamImpl::InitializeClientBuffers(BufferCollectionInfo_2 buffer_
   });
 }
 
-promise<BufferCollectionInfo, zx_status_t> StreamImpl::AllocateDriverBufferCollection(
-    VideoFormat video_format) {
-  return make_promise([this, video_format = std::move(
-                                 video_format)]() -> result<BufferCollectionInfo, zx_status_t> {
+promise<fuchsia::sysmem::BufferCollectionInfo, zx_status_t>
+StreamImpl::AllocateDriverBufferCollection(fuchsia::camera::VideoFormat video_format) {
+  return make_promise([this, video_format = std::move(video_format)]() mutable
+                      -> result<fuchsia::sysmem::BufferCollectionInfo, zx_status_t> {
     auto buffer_or = Gralloc(std::move(video_format), 8);
     if (buffer_or.is_error()) {
       FX_LOGS(ERROR) << "Couldn't allocate. status: " << buffer_or.error_value();
       return fpromise::error(buffer_or.error_value());
     }
 
-    BufferCollectionInfo buffer_collection_info = std::move(*buffer_or);
+    fuchsia::sysmem::BufferCollectionInfo buffer_collection_info = std::move(*buffer_or);
 
     // Map all driver buffers.
     for (uint32_t buffer_id = 0; buffer_id < buffer_collection_info.buffer_count; buffer_id++) {
@@ -431,7 +459,8 @@ promise<BufferCollectionInfo, zx_status_t> StreamImpl::AllocateDriverBufferColle
   });
 }
 
-promise<void> StreamImpl::ConnectAndStartStream(BufferCollectionInfo buffer_collection_info) {
+promise<void> StreamImpl::ConnectAndStartStream(
+    fuchsia::sysmem::BufferCollectionInfo buffer_collection_info) {
   return make_promise([this, buffer_collection_info = std::move(buffer_collection_info)]() mutable {
     return make_promise([]() {
              FrameRate frame_rate;
@@ -446,8 +475,8 @@ promise<void> StreamImpl::ConnectAndStartStream(BufferCollectionInfo buffer_coll
   });
 }
 
-promise<void> StreamImpl::ConnectToStream(BufferCollectionInfo buffer_collection_info,
-                                          FrameRate frame_rate) {
+promise<void> StreamImpl::ConnectToStream(
+    fuchsia::sysmem::BufferCollectionInfo buffer_collection_info, FrameRate frame_rate) {
   return make_promise([this, buffer_collection_info = std::move(buffer_collection_info),
                        frame_rate = std::move(frame_rate)]() mutable -> promise<void> {
     // Create event pair to know if we or the driver disconnects.

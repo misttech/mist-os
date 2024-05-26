@@ -201,6 +201,17 @@ class Directory : public Node {
 
   void AddChild(const std::string& name, std::shared_ptr<Node> node) { children_[name] = node; }
 
+  std::shared_ptr<Node> RemoveChild(const std::string& name) {
+    auto iter = children_.find(name);
+    if (iter == children_.end()) {
+      return nullptr;
+    } else {
+      std::shared_ptr<Node> node = iter->second;
+      children_.erase(iter);
+      return node;
+    }
+  }
+
   std::shared_ptr<Node> Lookup(const std::string& name) {
     auto it = children_.find(name);
     if (it == children_.end()) {
@@ -274,6 +285,16 @@ class FileSystem {
       return nullptr;
     }
     return it->second;
+  }
+
+  bool Rename(const std::shared_ptr<Directory>& source_dir, const std::string& name,
+              const std::shared_ptr<Directory>& target_dir, const std::string& target_name) {
+    auto maybe_node = source_dir->RemoveChild(name);
+    if (!maybe_node) {
+      return false;
+    }
+    target_dir->AddChild(target_name, maybe_node);
+    return true;
   }
 
  private:
@@ -378,6 +399,13 @@ class FuseServer {
         OK_OR_RETURN(HandleAccess(node, in_header, &access_in));
         break;
       }
+      case FUSE_CREATE: {
+        struct fuse_create_in create_in = {};
+        memcpy(&create_in, in_payload, sizeof(create_in));
+        OK_OR_RETURN(HandleCreate(node, in_header, &create_in,
+                                  reinterpret_cast<const char*>(in_payload) + sizeof(create_in)));
+        break;
+      }
       case FUSE_GETATTR: {
         struct fuse_getattr_in getattr_in = {};
         memcpy(&getattr_in, in_payload, sizeof(getattr_in));
@@ -430,6 +458,14 @@ class FuseServer {
       case FUSE_FORGET:
         // no-op; these don't expect a response.
         break;
+      case FUSE_RENAME2: {
+        struct fuse_rename2_in rename_in = {};
+        memcpy(&rename_in, in_payload, sizeof(rename_in));
+        const char* name = reinterpret_cast<const char*>(in_payload) + sizeof(rename_in);
+        const char* target_name = name + strlen(name) + 1;
+        OK_OR_RETURN(HandleRename(node, in_header, &rename_in, name, target_name));
+        break;
+      }
       default:
         return testing::AssertionFailure() << "Unknown FUSE opcode: " << in_header.opcode;
     }
@@ -492,6 +528,27 @@ class FuseServer {
     return WriteStructResponse(in_header, entry_out);
   }
 
+  virtual testing::AssertionResult HandleCreate(const std::shared_ptr<Node>& dir_node,
+                                                const struct fuse_in_header& in_header,
+                                                const struct fuse_create_in* create_in,
+                                                const char* name) {
+    const std::shared_ptr dir = std::dynamic_pointer_cast<Directory>(dir_node);
+    if (!dir) {
+      return WriteDataFreeResponse(in_header, -ENOTDIR);
+    }
+
+    std::shared_ptr<File> node = fs_.AddFileAt(dir, std::string(name));
+
+    struct response {
+      fuse_entry_out entry_out;
+      fuse_open_out open_out;
+    } response = {};
+    node->PopulateEntry(response.entry_out);
+    response.open_out.fh = GetNextFileHandle();
+
+    return WriteStructResponse(in_header, response);
+  }
+
   virtual testing::AssertionResult HandleMkdir(const std::shared_ptr<Node>& dir_node,
                                                const struct fuse_in_header& in_header,
                                                const struct fuse_mkdir_in* mkdir_in,
@@ -524,6 +581,28 @@ class FuseServer {
   virtual testing::AssertionResult HandleRelease(const std::shared_ptr<Node>& node,
                                                  const struct fuse_in_header& in_header,
                                                  const struct fuse_release_in* release_in) {
+    return WriteAckResponse(in_header);
+  }
+
+  virtual testing::AssertionResult HandleRename(const std::shared_ptr<Node>& source_dir_node,
+                                                const struct fuse_in_header& in_header,
+                                                const struct fuse_rename2_in* rename_in,
+                                                const char* name, const char* target_name) {
+    const std::shared_ptr source_dir = std::dynamic_pointer_cast<Directory>(source_dir_node);
+    if (!source_dir)
+      return WriteDataFreeResponse(in_header, -ENOTDIR);
+
+    auto node = fs_.Lookup(rename_in->newdir);
+    if (!node)
+      return WriteDataFreeResponse(in_header, -EINVAL);
+
+    std::shared_ptr<Directory> target_dir = std::dynamic_pointer_cast<Directory>(node);
+    if (!target_dir)
+      return WriteDataFreeResponse(in_header, -ENOTDIR);
+
+    if (!fs_.Rename(source_dir, name, target_dir, target_name))
+      return WriteDataFreeResponse(in_header, -ENOENT);
+
     return WriteAckResponse(in_header);
   }
 
@@ -935,6 +1014,26 @@ TEST_F(FuseTest, XAttr) {
   ASSERT_EQ(errno, ENODATA);
 }
 
+TEST_F(FuseTest, Rename) {
+  ASSERT_TRUE(Mount());
+  std::string file = GetMountDir() + "/file";
+  test_helper::ScopedFD fd(open(file.c_str(), O_WRONLY | O_CREAT));
+  ASSERT_TRUE(fd.is_valid());
+
+  std::string dir = GetMountDir() + "/dir";
+  ASSERT_EQ(mkdir(dir.c_str(), 0777), 0);
+
+  std::string new_path = dir + "/new_name";
+  EXPECT_EQ(rename(file.c_str(), new_path.c_str()), 0);
+
+  struct stat stat_buf;
+
+  EXPECT_EQ(stat(file.c_str(), &stat_buf), -1);
+  EXPECT_EQ(errno, ENOENT);
+
+  EXPECT_EQ(stat(new_path.c_str(), &stat_buf), 0);
+}
+
 TEST_F(FuseServerTest, NoReqsUntilInitResponse) {
   class NoReqsUntilInitResponseServer : public FuseServer {
    public:
@@ -1045,6 +1144,27 @@ TEST_F(FuseServerTest, OverlongHeaderLength) {
   test_helper::ScopedFD fd(open(filename.c_str(), O_RDWR | O_CREAT));
   ASSERT_TRUE(fd.is_valid());
   fd.reset();
+}
+
+TEST_F(FuseServerTest, RevalidateEnoent) {
+  auto server = std::make_shared<FuseServer>();
+  ASSERT_TRUE(Mount(server));
+
+  std::string file = GetMountDir() + "/file";
+  {
+    test_helper::ScopedFD fd(open(file.c_str(), O_WRONLY | O_CREAT));
+    ASSERT_TRUE(fd.is_valid());
+  }
+
+  server->fs().RootDir()->RemoveChild("file");
+
+  // We removed `file` from behind Starnix's back; we should be able to recreate the file.  Starnix
+  // should try and revalidate the file which will result in ENOENT, which should cause it to loop
+  // around.
+  {
+    test_helper::ScopedFD fd(open(file.c_str(), O_WRONLY | O_CREAT | O_EXCL));
+    ASSERT_TRUE(fd.is_valid());
+  }
 }
 
 // Run the checks in a separate thread where we drop the |CAP_DAC_OVERRIDE|

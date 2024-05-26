@@ -19,6 +19,7 @@
 #include <lib/zxio/posix_mode.h>
 #include <lib/zxio/types.h>
 #include <sys/stat.h>
+#include <zircon/availability.h>
 #include <zircon/compiler.h>
 #include <zircon/fidl.h>
 #include <zircon/syscalls.h>
@@ -606,7 +607,7 @@ zx_status_t AttrGetCommon(const fidl::WireSyncClient<Protocol>& client, ToZxioAb
 template <typename Protocol>
 zx_status_t AttributesGetCommon(const fidl::WireSyncClient<Protocol>& client,
                                 zxio_node_attributes_t* inout_attr) {
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   // Construct query from has in inout_attr
   fio::NodeAttributesQuery query;
   if (inout_attr->has.protocols)
@@ -688,7 +689,7 @@ zx_status_t AttrSetCommon(const fidl::WireSyncClient<Protocol>& client, ToIo1Mod
 template <typename Protocol>
 zx_status_t AttributesSetCommon(const fidl::WireSyncClient<Protocol>& client,
                                 const zxio_node_attributes_t* attr) {
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   fidl::WireTableFrame<fio::wire::MutableNodeAttributes> create_attributes_frame;
   fio::wire::MutableNodeAttributes mutable_node_attributes;
 
@@ -755,7 +756,7 @@ zx_status_t Remote<Protocol>::AttrGet(zxio_node_attributes_t* inout_attr) {
 
 template <typename Protocol>
 zx_status_t Remote<Protocol>::AttrSet(const zxio_node_attributes_t* attr) {
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   // If these attributes are set, call `update_attributes` (io2) otherwise, we can fall back to
   // `SetAttr` to only update creation and modification time.
   if (attr->has.mode || attr->has.uid || attr->has.gid || attr->has.rdev || attr->has.access_time) {
@@ -1052,7 +1053,7 @@ template <typename Protocol>
 zx_status_t Remote<Protocol>::Open2(const char* path, size_t path_len,
                                     const zxio_open_options_t* options,
                                     zxio_node_attributes_t* inout_attr, zxio_storage_t* storage) {
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   zx::channel client_end, server_end;
   if (zx_status_t status = zx::channel::create(0, &client_end, &server_end); status != ZX_OK) {
     return status;
@@ -1580,7 +1581,7 @@ zx_status_t Remote<Protocol>::XattrRemove(const uint8_t* name, size_t name_len) 
 
 template <typename Protocol>
 zx_status_t Remote<Protocol>::Allocate(uint64_t offset, uint64_t len, zxio_allocate_mode_t mode) {
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   if (!client().is_valid()) {
     return ZX_ERR_BAD_STATE;
   }
@@ -1677,7 +1678,7 @@ class Directory : public Remote<fio::Directory> {
   }
 
   zx_status_t AttrSet(const zxio_node_attributes_t* attr) {
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     // If these attributes are set, call `update_attributes` (io2) otherwise, we can fall back to
     // `SetAttr` to only update creation and modification time.
     if (attr->has.mode || attr->has.uid || attr->has.gid || attr->has.rdev ||
@@ -1868,7 +1869,7 @@ class File : public Remote<fio::File> {
   }
 
   zx_status_t EnableVerity(const zxio_fsverity_descriptor_t* descriptor) {
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     fidl::WireTableFrame<fio::wire::VerificationOptions> verification_options_frame;
     fio::wire::VerificationOptions verification_options;
     auto builder = fio::wire::VerificationOptions::ExternalBuilder(
@@ -2108,7 +2109,7 @@ uint32_t zxio_get_posix_mode(zxio_node_protocols_t protocols, zxio_abilities_t a
   return mode;
 }
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 zx_status_t zxio_attr_from_wire(const fio::wire::NodeAttributes2& in, zxio_node_attributes_t* out) {
   if (out->has.protocols && in.immutable_attributes.has_protocols()) {
     out->protocols = static_cast<uint64_t>(in.immutable_attributes.protocols());

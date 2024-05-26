@@ -450,9 +450,9 @@ bool decode_video_stream_test(async::Loop* fidl_loop, thrd_t fidl_thread,
   fuchsia::mediacodec::CodecFactoryHandle codec_factory;
 
   component_context->svc()->Connect<fuchsia::mediacodec::CodecFactory>(codec_factory.NewRequest());
-  fuchsia::sysmem::AllocatorHandle sysmem;
+  fuchsia::sysmem2::AllocatorHandle sysmem;
 
-  component_context->svc()->Connect<fuchsia::sysmem::Allocator>(sysmem.NewRequest());
+  component_context->svc()->Connect<fuchsia::sysmem2::Allocator>(sysmem.NewRequest());
 
   std::unique_ptr<InputCopier> input_copier;
   if (is_secure_input)

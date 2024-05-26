@@ -13,7 +13,7 @@ from build_id_conv import main, touch
 
 # Tests reading and writing ids.txt files.
 class TestIdsTxt(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         # Create a temporary directory.
         self.test_dir = tempfile.mkdtemp()
 
@@ -23,13 +23,13 @@ class TestIdsTxt(unittest.TestCase):
         touch(os.path.join(self.sofiles_dir, "foo.so"))
         touch(os.path.join(self.sofiles_dir, "bar.so"))
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         shutil.rmtree(self.test_dir)
 
     # Tests reading/writing ids.txt files without explicit reference input/output directories:
     # - paths read from the input file should be interpreted as relative to its directory
     # - paths written in the output file should be absolute
-    def test_read_and_write(self):
+    def test_read_and_write(self) -> None:
         input_path = os.path.join(self.test_dir, "input-ids.txt")
         output_path = os.path.join(self.test_dir, "output-ids.txt")
         with open(input_path, mode="wt") as input_file:
@@ -55,7 +55,7 @@ class TestIdsTxt(unittest.TestCase):
             )
 
     # Tests that input paths are expanded correctly if a reference input directory is given.
-    def test_read_with_rel_in(self):
+    def test_read_with_rel_in(self) -> None:
         input_path = os.path.join(self.test_dir, "input-ids.txt")
         output_path = os.path.join(self.test_dir, "output-ids.txt")
         with open(input_path, mode="wt") as input_file:
@@ -83,7 +83,7 @@ class TestIdsTxt(unittest.TestCase):
             )
 
     # Tests that output paths are written correctly if a reference output directory is given.
-    def test_write_with_rel_out(self):
+    def test_write_with_rel_out(self) -> None:
         input_path = os.path.join(self.test_dir, "input-ids.txt")
         output_path = os.path.join(self.test_dir, "output-ids.txt")
         with open(input_path, mode="wt") as input_file:
@@ -113,7 +113,7 @@ class TestIdsTxt(unittest.TestCase):
 
 # Tests reading and writing .build-id directories.
 class TestBuildId(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         # Create a temporary directory.
         self.test_dir = tempfile.mkdtemp()
 
@@ -130,11 +130,11 @@ class TestBuildId(unittest.TestCase):
         ) as symbol_file:
             symbol_file.write("bar")
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         shutil.rmtree(self.test_dir)
 
     # Tests converting a .build-id directory into another .build-id directory containing hard links.
-    def test_read_and_write_with_hardlinks(self):
+    def test_read_and_write_with_hardlinks(self) -> None:
         output_dir = os.path.join(self.test_dir, "output-build-id-dir")
 
         main(
@@ -162,7 +162,7 @@ class TestBuildId(unittest.TestCase):
             self.assertEqual(symbol_file.read(), "bar")
 
     # Tests converting a .build-id directory into another .build-id directory containing symlinks.
-    def test_read_and_write_with_symlinks(self):
+    def test_read_and_write_with_symlinks(self) -> None:
         output_dir = os.path.join(self.test_dir, "output-build-id-dir")
 
         main(
@@ -188,7 +188,7 @@ class TestBuildId(unittest.TestCase):
 
 # Tests converting between ids.txt files and .build-id directories.
 class TestConversion(unittest.TestCase):
-    def test_from_ids_txt_to_build_id_dir(self):
+    def test_from_ids_txt_to_build_id_dir(self) -> None:
         with tempfile.TemporaryDirectory() as test_dir:
             # Create an ids.txt file and placeholder symbols files.
             input_path = os.path.join(test_dir, "input-ids.txt")
@@ -214,7 +214,7 @@ class TestConversion(unittest.TestCase):
                 os.path.isfile(os.path.join(output_dir, "ab/cdef00.debug"))
             )
 
-    def test_from_build_id_dir_to_ids_txt(self):
+    def test_from_build_id_dir_to_ids_txt(self) -> None:
         with tempfile.TemporaryDirectory() as test_dir:
             # Create a .build-id directory with placeholder symbols files in it.
             input_dir = os.path.join(test_dir, "input-build-id-dir")

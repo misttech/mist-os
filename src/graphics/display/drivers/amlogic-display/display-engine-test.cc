@@ -5,7 +5,7 @@
 #include "src/graphics/display/drivers/amlogic-display/display-engine.h"
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
-#include <fidl/fuchsia.sysmem/cpp/wire_test_base.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire_test_base.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -16,6 +16,9 @@
 #include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>
 
+#include "fidl/fuchsia.images2/cpp/wire_types.h"
+#include "fidl/fuchsia.sysmem2/cpp/wire_types.h"
+#include "lib/fidl/cpp/wire/arena.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
 #include "src/graphics/display/drivers/amlogic-display/video-input-unit.h"
@@ -31,46 +34,54 @@ namespace amlogic_display {
 
 namespace {
 
-namespace sysmem = fuchsia_sysmem;
-
 // TODO(https://fxbug.dev/42072949): Consider creating and using a unified set of sysmem
 // testing doubles instead of writing mocks for each display driver test.
 class MockBufferCollectionBase
-    : public fidl::testing::WireTestBase<fuchsia_sysmem::BufferCollection> {
+    : public fidl::testing::WireTestBase<fuchsia_sysmem2::BufferCollection> {
  public:
   MockBufferCollectionBase() = default;
   ~MockBufferCollectionBase() override = default;
 
   virtual void VerifyBufferCollectionConstraints(
-      const sysmem::wire::BufferCollectionConstraints& constraints) = 0;
+      const fuchsia_sysmem2::wire::BufferCollectionConstraints& constraints) = 0;
   virtual void VerifyName(const std::string& name) = 0;
 
   void SetConstraints(SetConstraintsRequestView request,
                       SetConstraintsCompleter::Sync& completer) override {
-    if (!request->has_constraints) {
+    if (!request->has_constraints()) {
       return;
     }
-    VerifyBufferCollectionConstraints(request->constraints);
+    VerifyBufferCollectionConstraints(request->constraints());
     set_constraints_called_ = true;
   }
 
   void SetName(SetNameRequestView request, SetNameCompleter::Sync& completer) override {
-    EXPECT_EQ(10u, request->priority);
-    VerifyName(std::string(request->name.data(), request->name.size()));
+    EXPECT_EQ(10u, request->priority());
+    VerifyName(std::string(request->name().data(), request->name().size()));
     set_name_called_ = true;
   }
 
-  void CheckBuffersAllocated(CheckBuffersAllocatedCompleter::Sync& completer) override {
-    completer.Reply(ZX_OK);
+  void CheckAllBuffersAllocated(CheckAllBuffersAllocatedCompleter::Sync& completer) override {
+    completer.Reply(fit::ok());
   }
 
-  void WaitForBuffersAllocated(WaitForBuffersAllocatedCompleter::Sync& completer) override {
-    sysmem::wire::BufferCollectionInfo2 collection;
-    collection.buffer_count = 1;
-    collection.settings.has_image_format_constraints = true;
-    collection.settings.image_format_constraints = image_format_constraints_;
-    EXPECT_EQ(ZX_OK, zx::vmo::create(ZX_PAGE_SIZE, 0u, &collection.buffers[0].vmo));
-    completer.Reply(ZX_OK, std::move(collection));
+  void WaitForAllBuffersAllocated(WaitForAllBuffersAllocatedCompleter::Sync& completer) override {
+    zx::vmo vmo;
+    EXPECT_EQ(ZX_OK, zx::vmo::create(ZX_PAGE_SIZE, 0u, &vmo));
+    auto collection = fuchsia_sysmem2::wire::BufferCollectionInfo::Builder(arena_)
+                          .buffers(std::vector{fuchsia_sysmem2::wire::VmoBuffer::Builder(arena_)
+                                                   .vmo(std::move(vmo))
+                                                   .vmo_usable_start(0)
+                                                   .Build()})
+                          .settings(fuchsia_sysmem2::wire::SingleBufferSettings::Builder(arena_)
+                                        .image_format_constraints(image_format_constraints_)
+                                        .Build())
+                          .Build();
+    auto response =
+        fuchsia_sysmem2::wire::BufferCollectionWaitForAllBuffersAllocatedResponse::Builder(arena_)
+            .buffer_collection_info(collection)
+            .Build();
+    completer.Reply(fit::ok(&response));
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
@@ -78,134 +89,134 @@ class MockBufferCollectionBase
   }
 
   void set_allocated_image_format_constraints(
-      const sysmem::wire::ImageFormatConstraints& image_format_constraints) {
+      const fuchsia_sysmem2::wire::ImageFormatConstraints& image_format_constraints) {
     image_format_constraints_ = image_format_constraints;
   }
   bool set_constraints_called() const { return set_constraints_called_; }
   bool set_name_called() const { return set_name_called_; }
 
  private:
+  fidl::Arena<fidl::kDefaultArenaInitialCapacity> arena_;
   bool set_constraints_called_ = false;
   bool set_name_called_ = false;
-  sysmem::wire::ImageFormatConstraints image_format_constraints_ = {};
+  fuchsia_sysmem2::wire::ImageFormatConstraints image_format_constraints_;
 };
 
 class MockBufferCollection : public MockBufferCollectionBase {
  public:
-  explicit MockBufferCollection(const std::vector<sysmem::wire::PixelFormatType>&
-                                    pixel_format_types = {sysmem::wire::PixelFormatType::kBgra32,
-                                                          sysmem::wire::PixelFormatType::kR8G8B8A8})
+  explicit MockBufferCollection(
+      const std::vector<fuchsia_images2::wire::PixelFormat>& pixel_format_types =
+          {fuchsia_images2::wire::PixelFormat::kB8G8R8A8,
+           fuchsia_images2::wire::PixelFormat::kR8G8B8A8})
       : supported_pixel_format_types_(pixel_format_types) {
-    set_allocated_image_format_constraints(kDefaultImageFormatConstraints);
+    set_allocated_image_format_constraints(
+        fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena_)
+            .pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8)
+            .pixel_format_modifier(fuchsia_images2::wire::PixelFormatModifier::kLinear)
+            .min_size(fuchsia_math::wire::SizeU{.width = 1, .height = 4})
+            .min_bytes_per_row(4096)
+            .Build());
   }
   ~MockBufferCollection() override = default;
 
   void VerifyBufferCollectionConstraints(
-      const sysmem::wire::BufferCollectionConstraints& constraints) override {
-    EXPECT_TRUE(constraints.buffer_memory_constraints.inaccessible_domain_supported);
-    EXPECT_FALSE(constraints.buffer_memory_constraints.cpu_domain_supported);
-    EXPECT_EQ(64u, constraints.image_format_constraints[0].bytes_per_row_divisor);
+      const fuchsia_sysmem2::wire::BufferCollectionConstraints& constraints) override {
+    EXPECT_TRUE(constraints.buffer_memory_constraints().inaccessible_domain_supported());
+    EXPECT_FALSE(constraints.buffer_memory_constraints().cpu_domain_supported());
+    EXPECT_EQ(64u, constraints.image_format_constraints().at(0).bytes_per_row_divisor());
 
     size_t expected_format_constraints_count = 0u;
-    const cpp20::span<const sysmem::wire::ImageFormatConstraints> image_format_constraints(
-        constraints.image_format_constraints.data(), constraints.image_format_constraints_count);
+    const cpp20::span<const fuchsia_sysmem2::wire::ImageFormatConstraints> image_format_constraints(
+        constraints.image_format_constraints().data(),
+        constraints.image_format_constraints().count());
 
     const bool has_bgra =
         std::find(supported_pixel_format_types_.begin(), supported_pixel_format_types_.end(),
-                  sysmem::wire::PixelFormatType::kBgra32) != supported_pixel_format_types_.end();
+                  fuchsia_images2::wire::PixelFormat::kB8G8R8A8) !=
+        supported_pixel_format_types_.end();
     if (has_bgra) {
       expected_format_constraints_count += 2;
       const bool image_constraints_contains_bgra32_and_linear = std::any_of(
           image_format_constraints.begin(), image_format_constraints.end(),
-          [](const sysmem::wire::ImageFormatConstraints& format) {
-            return format.pixel_format.type == sysmem::wire::PixelFormatType::kBgra32 &&
-                   format.pixel_format.format_modifier.value == sysmem::wire::kFormatModifierLinear;
+          [](const fuchsia_sysmem2::wire::ImageFormatConstraints& format) {
+            return format.pixel_format() == fuchsia_images2::wire::PixelFormat::kB8G8R8A8 &&
+                   format.pixel_format_modifier() ==
+                       fuchsia_images2::wire::PixelFormatModifier::kLinear;
           });
       EXPECT_TRUE(image_constraints_contains_bgra32_and_linear);
     }
 
     const bool has_rgba =
         std::find(supported_pixel_format_types_.begin(), supported_pixel_format_types_.end(),
-                  sysmem::wire::PixelFormatType::kR8G8B8A8) != supported_pixel_format_types_.end();
+                  fuchsia_images2::wire::PixelFormat::kR8G8B8A8) !=
+        supported_pixel_format_types_.end();
     if (has_rgba) {
       expected_format_constraints_count += 4;
       const bool image_constraints_contains_rgba32_and_linear = std::any_of(
           image_format_constraints.begin(), image_format_constraints.end(),
-          [](const sysmem::wire::ImageFormatConstraints& format) {
-            return format.pixel_format.type == sysmem::wire::PixelFormatType::kR8G8B8A8 &&
-                   format.pixel_format.format_modifier.value == sysmem::wire::kFormatModifierLinear;
+          [](const fuchsia_sysmem2::wire::ImageFormatConstraints& format) {
+            return format.pixel_format() == fuchsia_images2::wire::PixelFormat::kR8G8B8A8 &&
+                   format.pixel_format_modifier() ==
+                       fuchsia_images2::wire::PixelFormatModifier::kLinear;
           });
       EXPECT_TRUE(image_constraints_contains_rgba32_and_linear);
       const bool image_constraints_contains_rgba32_and_afbc_16x16 = std::any_of(
           image_format_constraints.begin(), image_format_constraints.end(),
-          [](const sysmem::wire::ImageFormatConstraints& format) {
-            return format.pixel_format.type == sysmem::wire::PixelFormatType::kR8G8B8A8 &&
-                   format.pixel_format.format_modifier.value ==
-                       sysmem::wire::kFormatModifierArmAfbc16X16SplitBlockSparseYuv;
+          [](const fuchsia_sysmem2::wire::ImageFormatConstraints& format) {
+            return format.pixel_format() == fuchsia_images2::wire::PixelFormat::kR8G8B8A8 &&
+                   format.pixel_format_modifier() ==
+                       fuchsia_images2::wire::PixelFormatModifier::kArmAfbc16X16SplitBlockSparseYuv;
           });
       EXPECT_TRUE(image_constraints_contains_rgba32_and_afbc_16x16);
     }
 
-    EXPECT_EQ(expected_format_constraints_count, constraints.image_format_constraints_count);
+    EXPECT_EQ(expected_format_constraints_count, constraints.image_format_constraints().count());
   }
 
   void VerifyName(const std::string& name) override { EXPECT_EQ(name, "Display"); }
 
  private:
-  std::vector<sysmem::wire::PixelFormatType> supported_pixel_format_types_;
-
-  static constexpr sysmem::wire::ImageFormatConstraints kDefaultImageFormatConstraints = {
-      .pixel_format =
-          fuchsia_sysmem::wire::PixelFormat{
-              .type = sysmem::wire::PixelFormatType::kBgra32,
-              .has_format_modifier = true,
-              .format_modifier = {sysmem::wire::kFormatModifierLinear},
-          },
-      .min_coded_height = 4,
-      .min_bytes_per_row = 4096,
-  };
+  fidl::Arena<fidl::kDefaultArenaInitialCapacity> arena_;
+  std::vector<fuchsia_images2::wire::PixelFormat> supported_pixel_format_types_;
 };
 
 class MockBufferCollectionForCapture : public MockBufferCollectionBase {
  public:
   MockBufferCollectionForCapture() {
-    set_allocated_image_format_constraints(kDefaultImageFormatConstraints);
+    set_allocated_image_format_constraints(
+        fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena_)
+            .pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8)
+            .pixel_format_modifier(fuchsia_images2::wire::PixelFormatModifier::kLinear)
+            .min_size(fuchsia_math::wire::SizeU{.width = 1, .height = 4})
+            .min_bytes_per_row(4096)
+            .Build());
   }
   ~MockBufferCollectionForCapture() override = default;
 
   void VerifyBufferCollectionConstraints(
-      const sysmem::wire::BufferCollectionConstraints& constraints) override {
-    EXPECT_TRUE(constraints.buffer_memory_constraints.inaccessible_domain_supported);
-    EXPECT_FALSE(constraints.buffer_memory_constraints.cpu_domain_supported);
-    EXPECT_EQ(64u, constraints.image_format_constraints[0].bytes_per_row_divisor);
+      const fuchsia_sysmem2::wire::BufferCollectionConstraints& constraints) override {
+    EXPECT_TRUE(constraints.buffer_memory_constraints().inaccessible_domain_supported());
+    EXPECT_FALSE(constraints.buffer_memory_constraints().cpu_domain_supported());
+    EXPECT_EQ(64u, constraints.image_format_constraints().at(0).bytes_per_row_divisor());
 
     size_t expected_format_constraints_count = 1u;
-    EXPECT_EQ(expected_format_constraints_count, constraints.image_format_constraints_count);
+    EXPECT_EQ(expected_format_constraints_count, constraints.image_format_constraints().count());
 
-    const auto& image_format_constraints = constraints.image_format_constraints;
-    EXPECT_EQ(image_format_constraints[0].pixel_format.type,
-              fuchsia_sysmem::wire::PixelFormatType::kBgr24);
-    EXPECT_TRUE(image_format_constraints[0].pixel_format.has_format_modifier);
-    EXPECT_EQ(image_format_constraints[0].pixel_format.format_modifier.value,
-              fuchsia_sysmem::wire::kFormatModifierLinear);
+    const auto& image_format_constraints = constraints.image_format_constraints();
+    EXPECT_EQ(image_format_constraints.at(0).pixel_format(),
+              fuchsia_images2::wire::PixelFormat::kB8G8R8);
+    EXPECT_TRUE(image_format_constraints.at(0).has_pixel_format_modifier());
+    EXPECT_EQ(image_format_constraints.at(0).pixel_format_modifier(),
+              fuchsia_images2::wire::PixelFormatModifier::kLinear);
   }
 
   void VerifyName(const std::string& name) override { EXPECT_EQ(name, "Display capture"); }
 
  private:
-  static constexpr sysmem::wire::ImageFormatConstraints kDefaultImageFormatConstraints = {
-      .pixel_format =
-          fuchsia_sysmem::wire::PixelFormat{
-              .type = sysmem::wire::PixelFormatType::kBgr24,
-              .has_format_modifier = true,
-              .format_modifier = {sysmem::wire::kFormatModifierLinear},
-          },
-      .min_coded_height = 4,
-      .min_bytes_per_row = 4096,
-  };
+  fidl::Arena<fidl::kDefaultArenaInitialCapacity> arena_;
 };
 
-class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocator> {
+class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem2::Allocator> {
  public:
   using MockBufferCollectionBuilder =
       fit::function<std::unique_ptr<MockBufferCollectionBase>(void)>;
@@ -223,15 +234,15 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
     ZX_ASSERT(mock_buffer_collection_builder_ != nullptr);
     auto buffer_collection_id = next_buffer_collection_id_++;
     active_buffer_collections_[buffer_collection_id] = {
-        .token_client = std::move(request->token),
+        .token_client = std::move(request->token()),
         .mock_buffer_collection = mock_buffer_collection_builder_(),
     };
 
     fidl::BindServer(
-        dispatcher_, std::move(request->buffer_collection_request),
+        dispatcher_, std::move(request->buffer_collection_request()),
         active_buffer_collections_[buffer_collection_id].mock_buffer_collection.get(),
         [this, buffer_collection_id](MockBufferCollectionBase*, fidl::UnbindInfo,
-                                     fidl::ServerEnd<fuchsia_sysmem::BufferCollection>) {
+                                     fidl::ServerEnd<fuchsia_sysmem2::BufferCollection>) {
           inactive_buffer_collection_tokens_.push_back(
               std::move(active_buffer_collections_[buffer_collection_id].token_client));
           active_buffer_collections_.erase(buffer_collection_id);
@@ -248,9 +259,9 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
     return active_buffer_collections_.at(most_recent_collection_id).mock_buffer_collection.get();
   }
 
-  std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+  std::vector<fidl::UnownedClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
   GetActiveBufferCollectionTokenClients() const {
-    std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+    std::vector<fidl::UnownedClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
         unowned_token_clients;
     unowned_token_clients.reserve(active_buffer_collections_.size());
 
@@ -260,9 +271,9 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
     return unowned_token_clients;
   }
 
-  std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+  std::vector<fidl::UnownedClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
   GetInactiveBufferCollectionTokenClients() const {
-    std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+    std::vector<fidl::UnownedClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
         unowned_token_clients;
     unowned_token_clients.reserve(inactive_buffer_collection_tokens_.size());
 
@@ -278,13 +289,13 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
 
  private:
   struct BufferCollection {
-    fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> token_client;
+    fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> token_client;
     std::unique_ptr<MockBufferCollectionBase> mock_buffer_collection;
   };
 
   std::unordered_map<display::DriverBufferCollectionId, BufferCollection>
       active_buffer_collections_;
-  std::vector<fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+  std::vector<fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
       inactive_buffer_collection_tokens_;
 
   display::DriverBufferCollectionId next_buffer_collection_id_ =
@@ -394,13 +405,14 @@ class FakeSysmemTest : public testing::Test {
     allocator_ = std::make_unique<MockAllocator>(loop_.dispatcher());
     allocator_->set_mock_buffer_collection_builder([] {
       // Allocate importable primary Image by default.
-      const std::vector<sysmem::wire::PixelFormatType> kPixelFormatTypes = {
-          sysmem::wire::PixelFormatType::kBgra32, sysmem::wire::PixelFormatType::kR8G8B8A8};
-      return std::make_unique<MockBufferCollection>(kPixelFormatTypes);
+      const std::vector<fuchsia_images2::wire::PixelFormat> kPixelFormats = {
+          fuchsia_images2::wire::PixelFormat::kB8G8R8A8,
+          fuchsia_images2::wire::PixelFormat::kR8G8B8A8};
+      return std::make_unique<MockBufferCollection>(kPixelFormats);
     });
 
     {
-      auto endpoints = fidl::Endpoints<sysmem::Allocator>::Create();
+      auto endpoints = fidl::Endpoints<fuchsia_sysmem2::Allocator>::Create();
       fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), allocator_.get());
       display_engine_->SetSysmemAllocatorForTesting(
           fidl::WireSyncClient(std::move(endpoints.client)));
@@ -444,11 +456,11 @@ bool PollUntil(Lambda predicate, zx::duration poll_interval, int max_intervals) 
 }
 
 TEST_F(FakeSysmemTest, ImportBufferCollection) {
-  zx::result<fidl::Endpoints<sysmem::BufferCollectionToken>> token1_endpoints =
-      fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  zx::result<fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>> token1_endpoints =
+      fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_OK(token1_endpoints.status_value());
-  zx::result<fidl::Endpoints<sysmem::BufferCollectionToken>> token2_endpoints =
-      fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  zx::result<fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>> token2_endpoints =
+      fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_OK(token2_endpoints.status_value());
 
   // Test ImportBufferCollection().
@@ -527,7 +539,8 @@ TEST_F(FakeSysmemTest, ImportBufferCollection) {
 }
 
 TEST_F(FakeSysmemTest, ImportImage) {
-  auto [token_client, token_server] = fidl::Endpoints<sysmem::BufferCollectionToken>::Create();
+  auto [token_client, token_server] =
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =
@@ -596,7 +609,8 @@ TEST_F(FakeSysmemTest, ImportImageForCapture) {
   allocator_->set_mock_buffer_collection_builder(
       [] { return std::make_unique<MockBufferCollectionForCapture>(); });
 
-  auto [token_client, token_server] = fidl::Endpoints<sysmem::BufferCollectionToken>::Create();
+  auto [token_client, token_server] =
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =
@@ -642,14 +656,16 @@ TEST_F(FakeSysmemTest, ImportImageForCapture) {
 TEST_F(FakeSysmemTest, SysmemRequirements) {
   MockBufferCollectionBase* collection = nullptr;
   allocator_->set_mock_buffer_collection_builder([&collection] {
-    const std::vector<sysmem::wire::PixelFormatType> kPixelFormatTypes = {
-        sysmem::wire::PixelFormatType::kBgra32, sysmem::wire::PixelFormatType::kR8G8B8A8};
-    auto new_buffer_collection = std::make_unique<MockBufferCollection>(kPixelFormatTypes);
+    const std::vector<fuchsia_images2::wire::PixelFormat> kPixelFormats = {
+        fuchsia_images2::wire::PixelFormat::kB8G8R8A8,
+        fuchsia_images2::wire::PixelFormat::kR8G8B8A8};
+    auto new_buffer_collection = std::make_unique<MockBufferCollection>(kPixelFormats);
     collection = new_buffer_collection.get();
     return new_buffer_collection;
   });
 
-  auto [token_client, token_server] = fidl::Endpoints<sysmem::BufferCollectionToken>::Create();
+  auto [token_client, token_server] =
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =
@@ -672,10 +688,10 @@ TEST_F(FakeSysmemTest, SysmemRequirements) {
 TEST_F(FakeSysmemTest, SysmemRequirements_BgraOnly) {
   MockBufferCollectionBase* collection = nullptr;
   allocator_->set_mock_buffer_collection_builder([&collection] {
-    const std::vector<sysmem::wire::PixelFormatType> kPixelFormatTypes = {
-        sysmem::wire::PixelFormatType::kBgra32,
+    const std::vector<fuchsia_images2::wire::PixelFormat> kPixelFormats = {
+        fuchsia_images2::wire::PixelFormat::kB8G8R8A8,
     };
-    auto new_buffer_collection = std::make_unique<MockBufferCollection>(kPixelFormatTypes);
+    auto new_buffer_collection = std::make_unique<MockBufferCollection>(kPixelFormats);
     collection = new_buffer_collection.get();
     return new_buffer_collection;
   });
@@ -683,7 +699,8 @@ TEST_F(FakeSysmemTest, SysmemRequirements_BgraOnly) {
     return format == fuchsia_images2::wire::PixelFormat::kB8G8R8A8;
   });
 
-  auto [token_client, token_server] = fidl::Endpoints<sysmem::BufferCollectionToken>::Create();
+  auto [token_client, token_server] =
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =
@@ -735,7 +752,8 @@ TEST_F(FakeSysmemTest, NoLeakCaptureCanvas) {
   allocator_->set_mock_buffer_collection_builder(
       [] { return std::make_unique<MockBufferCollectionForCapture>(); });
 
-  auto [token_client, token_server] = fidl::Endpoints<sysmem::BufferCollectionToken>::Create();
+  auto [token_client, token_server] =
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =

@@ -8,7 +8,9 @@ use {
     std::{ffi::CStr, future::Future, marker::PhantomData, mem, pin::Pin, ptr, task::Poll},
 };
 
-pub use sys::{TRACE_BLOB_TYPE_DATA, TRACE_BLOB_TYPE_LAST_BRANCH, TRACE_BLOB_TYPE_PERFETTO};
+pub use sys::{
+    trace_site_t, TRACE_BLOB_TYPE_DATA, TRACE_BLOB_TYPE_LAST_BRANCH, TRACE_BLOB_TYPE_PERFETTO,
+};
 
 /// `Scope` represents the scope of a trace event.
 #[derive(Copy, Clone)]
@@ -242,8 +244,11 @@ impl<'a> ArgValue for &'a str {
 #[macro_export]
 macro_rules! instant {
     ($category:expr, $name:expr, $scope:expr $(, $key:expr => $val:expr)*) => {
-        if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
-            $crate::instant(&context, $name, $scope, &[$($crate::ArgValue::of($key, $val)),*]);
+        {
+            static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
+                $crate::instant(&context, $name, $scope, &[$($crate::ArgValue::of($key, $val)),*]);
+            }
         }
     }
 }
@@ -318,9 +323,12 @@ pub fn alert(category: &'static CStr, name: &'static CStr) {
 #[macro_export]
 macro_rules! counter {
     ($category:expr, $name:expr, $counter_id:expr $(, $key:expr => $val:expr)*) => {
-        if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
-            $crate::counter(&context, $name, $counter_id,
-                &[$($crate::ArgValue::of($key, $val)),*])
+        {
+            static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
+                $crate::counter(&context, $name, $counter_id,
+                    &[$($crate::ArgValue::of($key, $val)),*])
+            }
         }
     }
 }
@@ -418,11 +426,14 @@ pub fn complete_duration(
 macro_rules! duration {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)* $(,)?) => {
         let mut args;
-        let _scope = if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
-            args = [$($crate::ArgValue::of($key, $val)),*];
-            Some($crate::duration($category, $name, &args))
-        } else {
-            None
+        let _scope =  {
+            static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
+                args = [$($crate::ArgValue::of($key, $val)),*];
+                Some($crate::duration($category, $name, &args))
+            } else {
+                None
+            }
         };
     }
 }
@@ -460,9 +471,12 @@ pub fn duration<'a>(
 #[macro_export]
 macro_rules! duration_begin {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)* $(,)?) => {
-        if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
-            $crate::duration_begin(&context, $name,
-                                   &[$($crate::ArgValue::of($key, $val)),*])
+        {
+            static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
+                $crate::duration_begin(&context, $name,
+                                       &[$($crate::ArgValue::of($key, $val)),*])
+            }
         }
     };
 }
@@ -483,8 +497,11 @@ macro_rules! duration_begin {
 #[macro_export]
 macro_rules! duration_end {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)* $(,)?) => {
-        if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
-            $crate::duration_end(&context, $name, &[$($crate::ArgValue::of($key, $val)),*])
+        {
+            static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
+                $crate::duration_end(&context, $name, &[$($crate::ArgValue::of($key, $val)),*])
+            }
         }
     };
 }
@@ -611,10 +628,13 @@ pub fn async_enter(
 #[macro_export]
 macro_rules! async_enter {
     ($id:expr, $category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
-        if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
-            Some($crate::AsyncScope::begin($id, $category, $name, &[$($crate::ArgValue::of($key, $val)),*]))
-        } else {
-            None
+        {
+            static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
+                Some($crate::AsyncScope::begin($id, $category, $name, &[$($crate::ArgValue::of($key, $val)),*]))
+            } else {
+                None
+            }
         }
     }
 }
@@ -645,8 +665,11 @@ macro_rules! async_enter {
 #[macro_export]
 macro_rules! async_instant {
     ($id:expr, $category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
-        if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
-            $crate::async_instant($id, &context, $name, &[$($crate::ArgValue::of($key, $val)),*]);
+        {
+            static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
+                $crate::async_instant($id, &context, $name, &[$($crate::ArgValue::of($key, $val)),*]);
+            }
         }
     }
 }
@@ -717,9 +740,12 @@ pub fn async_instant(
 #[macro_export]
 macro_rules! blob {
     ($category:expr, $name:expr, $bytes:expr $(, $key:expr => $val:expr)*) => {
-    if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
-        $crate::blob_fn(&context, $name, $bytes, &[$($crate::ArgValue::of($key, $val)),*])
-    }
+        {
+            static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
+                $crate::blob_fn(&context, $name, $bytes, &[$($crate::ArgValue::of($key, $val)),*])
+            }
+        }
     }
 }
 pub fn blob_fn(
@@ -749,9 +775,12 @@ pub fn blob_fn(
 #[macro_export]
 macro_rules! flow_begin {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
-        if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
-            $crate::flow_begin(&context, $name, $flow_id,
-                               &[$($crate::ArgValue::of($key, $val)),*])
+        {
+            static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
+                $crate::flow_begin(&context, $name, $flow_id,
+                                   &[$($crate::ArgValue::of($key, $val)),*])
+            }
         }
     }
 }
@@ -773,9 +802,12 @@ macro_rules! flow_begin {
 #[macro_export]
 macro_rules! flow_step {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
-        if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
-            $crate::flow_step(&context, $name, $flow_id,
-                              &[$($crate::ArgValue::of($key, $val)),*])
+        {
+            static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
+                $crate::flow_step(&context, $name, $flow_id,
+                                  &[$($crate::ArgValue::of($key, $val)),*])
+            }
         }
     }
 }
@@ -797,9 +829,12 @@ macro_rules! flow_step {
 #[macro_export]
 macro_rules! flow_end {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
-        if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
-            $crate::flow_end(&context, $name, $flow_id,
-                             &[$($crate::ArgValue::of($key, $val)),*])
+        {
+            static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
+                $crate::flow_end(&context, $name, $flow_id,
+                                 &[$($crate::ArgValue::of($key, $val)),*])
+            }
         }
     }
 }
@@ -942,6 +977,29 @@ pub struct TraceCategoryContext {
 
 impl TraceCategoryContext {
     #[inline]
+    pub fn acquire_cached(
+        category: &'static CStr,
+        site: &sys::trace_site_t,
+    ) -> Option<TraceCategoryContext> {
+        unsafe {
+            // SAFETY: The call to `trace_acquire_context_for_category_cached` is sound because
+            // all arguments are live and non-null. If this function returns a non-null
+            // pointer then it also guarantees that `category_ref` will have been initialized.
+            // Internally, it uses relaxed atomic semantics to load and store site.
+            let mut category_ref = mem::MaybeUninit::<sys::trace_string_ref_t>::uninit();
+            let raw = sys::trace_acquire_context_for_category_cached(
+                category.as_ptr(),
+                site.as_ptr(),
+                category_ref.as_mut_ptr(),
+            );
+            if raw != ptr::null() {
+                Some(TraceCategoryContext { raw, category_ref: category_ref.assume_init() })
+            } else {
+                None
+            }
+        }
+    }
+
     pub fn acquire(category: &'static CStr) -> Option<TraceCategoryContext> {
         unsafe {
             let mut category_ref = mem::MaybeUninit::<sys::trace_string_ref_t>::uninit();
@@ -1363,6 +1421,11 @@ mod sys {
         pub inline_string: *const libc::c_char,
     }
 
+    // trace_site_t is an opaque type that trace-engine uses per callsite to cache if the trace
+    // point is enabled. Internally, it is a 8 byte allocation accessed with relaxed atomic
+    // semantics.
+    pub type trace_site_t = std::sync::atomic::AtomicU64;
+
     // A trace_string_ref_t object is created from a string slice.
     // The trace_string_ref_t object is contained inside an Arg object.
     // whose lifetime matches the string slice to ensure that the memory
@@ -1715,6 +1778,12 @@ mod sys {
             out_ref: *mut trace_string_ref_t,
         ) -> *const trace_context_t;
 
+        pub fn trace_acquire_context_for_category_cached(
+            category_literal: *const libc::c_char,
+            trace_site: *const u64,
+            out_ref: *mut trace_string_ref_t,
+        ) -> *const trace_context_t;
+
         pub fn trace_release_context(context: *const trace_context_t);
 
         pub fn trace_acquire_prolonged_context() -> *const trace_prolonged_context_t;
@@ -1756,19 +1825,22 @@ pub struct TraceFutureArgs<'a> {
 #[macro_export]
 macro_rules! __impl_trace_future_args {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {{
-        let context = $crate::TraceCategoryContext::acquire($category);
-        let args = if context.is_some() {
-            vec![$($crate::ArgValue::of($key, $val)),*]
-        } else {
-            vec![]
-        };
-        $crate::TraceFutureArgs {
-            category: $category,
-            name: $name,
-            context: context,
-            args: args,
-            flow_id: $flow_id,
-            _use_trace_future_args: (),
+        {
+            static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            let context = $crate::TraceCategoryContext::acquire_cached($category, &CACHE);
+            let args = if context.is_some() {
+                vec![$($crate::ArgValue::of($key, $val)),*]
+            } else {
+                vec![]
+            };
+            $crate::TraceFutureArgs {
+                category: $category,
+                name: $name,
+                context: context,
+                args: args,
+                flow_id: $flow_id,
+                _use_trace_future_args: (),
+            }
         }
     }};
 }

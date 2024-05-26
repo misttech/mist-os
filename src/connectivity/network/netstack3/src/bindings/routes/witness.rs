@@ -50,3 +50,9 @@ pub(crate) const IPV6_MAIN_TABLE_ID: TableId<Ipv6> =
 pub(crate) fn main_table_id<I: Ip>() -> TableId<I> {
     I::map_ip((), |()| IPV4_MAIN_TABLE_ID, |()| IPV6_MAIN_TABLE_ID)
 }
+
+impl<I: Ip> TableId<I> {
+    pub(crate) fn is_main(&self) -> bool {
+        *self == main_table_id::<I>()
+    }
+}

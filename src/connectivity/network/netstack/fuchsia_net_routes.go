@@ -863,6 +863,7 @@ type installedRouteComparisonKey struct {
 	Version                         routetypes.IpProtoTag
 	EffectiveRoutePropertiesPresent bool
 	EffectiveRouteProperties        fnetRoutes.EffectiveRouteProperties
+	TableId                         uint32
 }
 
 // toInstalledRouteComparisonKey converts an InstalledRoute to an installedRouteComparisonKey.
@@ -872,12 +873,12 @@ func toInstalledRouteComparisonKey(r fidlconv.InstalledRoute) (installedRouteCom
 		return installedRouteComparisonKey{}, err
 	}
 
-	present, props := func() (bool, fnetRoutes.EffectiveRouteProperties) {
+	present, props, tableId := func() (bool, fnetRoutes.EffectiveRouteProperties, uint32) {
 		switch r.Version {
 		case routetypes.IPv4:
-			return r.V4.EffectivePropertiesPresent, r.V4.EffectiveProperties
+			return r.V4.EffectivePropertiesPresent, r.V4.EffectiveProperties, r.V4.TableId
 		case routetypes.IPv6:
-			return r.V6.EffectivePropertiesPresent, r.V6.EffectiveProperties
+			return r.V6.EffectivePropertiesPresent, r.V6.EffectiveProperties, r.V6.TableId
 		default:
 			panic(fmt.Sprintf("unknown IP Version tag %d", r.Version))
 		}
@@ -888,6 +889,7 @@ func toInstalledRouteComparisonKey(r fidlconv.InstalledRoute) (installedRouteCom
 		Version:                         r.Version,
 		EffectiveRoutePropertiesPresent: present,
 		EffectiveRouteProperties:        props,
+		TableId:                         tableId,
 	}, nil
 }
 
@@ -905,6 +907,7 @@ func fromInstalledRouteComparisonKey(r installedRouteComparisonKey) (fidlconv.In
 		result.V4.SetRoute(route)
 		result.V4.EffectivePropertiesPresent = r.EffectiveRoutePropertiesPresent
 		result.V4.EffectiveProperties = r.EffectiveRouteProperties
+		result.V4.SetTableId(r.TableId)
 	case routetypes.IPv6:
 		route, err := fidlconv.ToFidlRouteV6(r.V6)
 		if err != nil {
@@ -913,6 +916,7 @@ func fromInstalledRouteComparisonKey(r installedRouteComparisonKey) (fidlconv.In
 		result.V6.SetRoute(route)
 		result.V6.EffectivePropertiesPresent = r.EffectiveRoutePropertiesPresent
 		result.V6.EffectiveProperties = r.EffectiveRouteProperties
+		result.V6.SetTableId(r.TableId)
 	default:
 		panic(fmt.Sprintf("unknown IP Version tag %d", r.Version))
 	}

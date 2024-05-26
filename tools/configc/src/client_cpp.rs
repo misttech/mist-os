@@ -5,7 +5,7 @@
 use crate::common::load_manifest;
 use anyhow::{format_err, Context as _, Error};
 use argh::FromArgs;
-use config_client::cpp::{create_cpp_wrapper, CppSource, Flavor};
+use config_client::cpp::{create_cpp_wrapper, CppSource};
 use std::{
     fs,
     io::Write,
@@ -41,10 +41,6 @@ pub struct GenerateCppSource {
     /// path to clang-format binary
     #[argh(option)]
     clang_format: PathBuf,
-
-    /// runner flavor to use ('elf')
-    #[argh(option)]
-    flavor: Flavor,
 }
 
 impl GenerateCppSource {
@@ -56,7 +52,7 @@ impl GenerateCppSource {
             .ok_or_else(|| anyhow::format_err!("missing config declaration in manifest"))?;
 
         let CppSource { h_source, cc_source } =
-            create_cpp_wrapper(config_decl, self.namespace, self.fidl_library_name, self.flavor)
+            create_cpp_wrapper(config_decl, self.namespace, self.fidl_library_name)
                 .context("creating cpp elf wrapper")?;
 
         let formatted_cc_source = format_source(&self.clang_format, cc_source)?;

@@ -69,7 +69,7 @@ void InitAcpi(LegacyBoot& boot_info) {
 // initialization.
 [[gnu::weak]] void LegacyBootSetUartConsole(const uart::all::Driver& uart) { SetUartConsole(uart); }
 
-void LegacyBootInitMemory() {
+void LegacyBootInitMemory(AddressSpace* aspace) {
   InitAcpi(gLegacyBoot);
 
   constexpr auto as_memrange =
@@ -120,4 +120,10 @@ void LegacyBootInitMemory() {
 
   Allocation::Init(memalloc::AsRanges(gLegacyBoot.mem_config),
                    ktl::span(ranges).subspan(0, num_ranges));
+
+  if (aspace) {
+    // Now that the allocator is available, it can be used to set up the
+    // identity-mapping page tables and enable paging.
+    ArchSetUpAddressSpace(*aspace);
+  }
 }

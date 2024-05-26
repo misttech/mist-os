@@ -53,10 +53,10 @@ void MouseReport::ToFidlInputReport(
 }
 
 fuchsia_input_report::wire::DeviceDescriptor HidMouse::GetDescriptor(fidl::AnyArena& allocator) {
-  fuchsia_input_report::wire::DeviceInfo device_info;
-  device_info.vendor_id = static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle);
-  device_info.product_id =
-      static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kVirtioMouse);
+  auto device_info = fuchsia_input_report::wire::DeviceInformation::Builder(allocator);
+  device_info.vendor_id(static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
+  device_info.product_id(
+      static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kVirtioMouse));
 
   const auto input =
       fuchsia_input_report::wire::MouseInputDescriptor::Builder(allocator)
@@ -72,7 +72,7 @@ fuchsia_input_report::wire::DeviceDescriptor HidMouse::GetDescriptor(fidl::AnyAr
       fuchsia_input_report::wire::MouseDescriptor::Builder(allocator).input(input).Build();
 
   return fuchsia_input_report::wire::DeviceDescriptor::Builder(allocator)
-      .device_info(device_info)
+      .device_information(device_info.Build())
       .mouse(mouse)
       .Build();
 }

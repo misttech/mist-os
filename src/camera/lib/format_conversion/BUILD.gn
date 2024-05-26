@@ -12,5 +12,6 @@ source_set("format_conversion") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//zircon/system/ulib/image-format",
+    "//zircon/system/ulib/sysmem-version",
   ]
 }

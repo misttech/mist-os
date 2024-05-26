@@ -92,7 +92,7 @@ type CpuStats = struct {
 /// capability, programs that just want stats should use this service instead. If for some reason
 /// the protocol fails to retrieve stats, which will be an un-recoverable error, it will close the
 /// channel.
-@discoverable
+@discoverable(server="platform")
 closed protocol Stats {
     strict GetMemoryStats() -> (struct {
         stats MemoryStats;

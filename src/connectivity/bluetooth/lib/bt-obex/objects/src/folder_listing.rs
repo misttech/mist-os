@@ -593,16 +593,16 @@ mod tests {
                             FolderListingAttribute::Name("Jumar.txt".to_string()),
                             FolderListingAttribute::Created(FormattedDateTimeObj(
                                 NaiveDateTime::new(
-                                    NaiveDate::from_ymd(1997, 12, 09),
-                                    NaiveTime::from_hms(09, 03, 00),
+                                    NaiveDate::from_ymd_opt(1997, 12, 09).unwrap(),
+                                    NaiveTime::from_hms_opt(09, 03, 00).unwrap(),
                                 ),
                                 FormattedDateTimeObj::ISO_8601_TIME_FORMAT.to_string(),
                             )),
                             FolderListingAttribute::Size("6672".to_string()),
                             FolderListingAttribute::Modified(FormattedDateTimeObj(
                                 NaiveDateTime::new(
-                                    NaiveDate::from_ymd(1997, 12, 22),
-                                    NaiveTime::from_hms(16, 41, 00),
+                                    NaiveDate::from_ymd_opt(1997, 12, 22).unwrap(),
+                                    NaiveTime::from_hms_opt(16, 41, 00).unwrap(),
                                 ),
                                 FormattedDateTimeObj::ISO_8601_TIME_FORMAT.to_string(),
                             )),
@@ -615,8 +615,8 @@ mod tests {
                             FolderListingAttribute::Name("Obex.doc".to_string()),
                             FolderListingAttribute::Created(FormattedDateTimeObj(
                                 NaiveDateTime::new(
-                                    NaiveDate::from_ymd(1997, 01, 22),
-                                    NaiveTime::from_hms(10, 23, 00),
+                                    NaiveDate::from_ymd_opt(1997, 01, 22).unwrap(),
+                                    NaiveTime::from_hms_opt(10, 23, 00).unwrap(),
                                 ),
                                 FormattedDateTimeObj::ISO_8601_UTC_TIME_FORMAT.to_string(),
                             )),
@@ -624,8 +624,8 @@ mod tests {
                             FolderListingAttribute::Type("application/msword".to_string()),
                             FolderListingAttribute::Modified(FormattedDateTimeObj(
                                 NaiveDateTime::new(
-                                    NaiveDate::from_ymd(1997, 01, 22),
-                                    NaiveTime::from_hms(10, 23, 00),
+                                    NaiveDate::from_ymd_opt(1997, 01, 22).unwrap(),
+                                    NaiveTime::from_hms_opt(10, 23, 00).unwrap(),
                                 ),
                                 FormattedDateTimeObj::ISO_8601_UTC_TIME_FORMAT.to_string(),
                             )),
@@ -639,8 +639,8 @@ mod tests {
                             FolderListingAttribute::Name("System".to_string()),
                             FolderListingAttribute::Created(FormattedDateTimeObj(
                                 NaiveDateTime::new(
-                                    NaiveDate::from_ymd(1996, 11, 03),
-                                    NaiveTime::from_hms(14, 15, 00),
+                                    NaiveDate::from_ymd_opt(1996, 11, 03).unwrap(),
+                                    NaiveTime::from_hms_opt(14, 15, 00).unwrap(),
                                 ),
                                 FormattedDateTimeObj::ISO_8601_TIME_FORMAT.to_string(),
                             )),
@@ -652,8 +652,8 @@ mod tests {
                             FolderListingAttribute::Name("IR Inbox".to_string()),
                             FolderListingAttribute::Created(FormattedDateTimeObj(
                                 NaiveDateTime::new(
-                                    NaiveDate::from_ymd(1995, 03, 30),
-                                    NaiveTime::from_hms(10, 50, 00),
+                                    NaiveDate::from_ymd_opt(1995, 03, 30).unwrap(),
+                                    NaiveTime::from_hms_opt(10, 50, 00).unwrap(),
                                 ),
                                 FormattedDateTimeObj::ISO_8601_UTC_TIME_FORMAT.to_string(),
                             )),
@@ -731,16 +731,16 @@ mod tests {
                     FolderListingAttribute::Name("Jumar.txt".to_string()),
                     FolderListingAttribute::Created(FormattedDateTimeObj(
                         NaiveDateTime::new(
-                            NaiveDate::from_ymd(1997, 12, 09),
-                            NaiveTime::from_hms(09, 03, 00),
+                            NaiveDate::from_ymd_opt(1997, 12, 09).unwrap(),
+                            NaiveTime::from_hms_opt(09, 03, 00).unwrap(),
                         ),
                         FormattedDateTimeObj::ISO_8601_TIME_FORMAT.to_string(),
                     )),
                     FolderListingAttribute::Size("6672".to_string()),
                     FolderListingAttribute::Modified(FormattedDateTimeObj(
                         NaiveDateTime::new(
-                            NaiveDate::from_ymd(1997, 12, 22),
-                            NaiveTime::from_hms(16, 41, 00),
+                            NaiveDate::from_ymd_opt(1997, 12, 22).unwrap(),
+                            NaiveTime::from_hms_opt(16, 41, 00).unwrap(),
                         ),
                         FormattedDateTimeObj::ISO_8601_TIME_FORMAT.to_string(),
                     )),
@@ -753,8 +753,8 @@ mod tests {
                     FolderListingAttribute::Name("System".to_string()),
                     FolderListingAttribute::Created(FormattedDateTimeObj(
                         NaiveDateTime::new(
-                            NaiveDate::from_ymd(1996, 11, 03),
-                            NaiveTime::from_hms(14, 15, 00),
+                            NaiveDate::from_ymd_opt(1996, 11, 03).unwrap(),
+                            NaiveTime::from_hms_opt(14, 15, 00).unwrap(),
                         ),
                         FormattedDateTimeObj::ISO_8601_TIME_FORMAT.to_string(),
                     )),

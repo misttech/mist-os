@@ -40,7 +40,9 @@ pub trait IpProtoExt: Ip {
         + Debug
         + Display
         + PartialEq
-        + Eq;
+        + Eq
+        + PartialOrd
+        + Ord;
 }
 
 impl IpProtoExt for Ipv4 {
@@ -149,6 +151,9 @@ pub trait IpPacket<B: ByteSlice, I: IpExt>:
     ) -> IpParseResult<I, Self>
     where
         B: ByteSliceMut;
+
+    /// Copies the full packet into a `Vec`.
+    fn to_vec(&self) -> Vec<u8>;
 }
 
 impl<B: ByteSlice> IpPacket<B, Ipv4> for Ipv4Packet<B> {
@@ -195,6 +200,10 @@ impl<B: ByteSlice> IpPacket<B, Ipv4> for Ipv4Packet<B> {
     {
         crate::ipv4::reassemble_fragmented_packet(buffer, header, body_fragments)
     }
+
+    fn to_vec(&self) -> Vec<u8> {
+        self.to_vec()
+    }
 }
 
 impl<B: ByteSlice> IpPacket<B, Ipv6> for Ipv6Packet<B> {
@@ -239,6 +248,10 @@ impl<B: ByteSlice> IpPacket<B, Ipv6> for Ipv6Packet<B> {
     {
         crate::ipv6::reassemble_fragmented_packet(buffer, header, body_fragments)
     }
+
+    fn to_vec(&self) -> Vec<u8> {
+        self.to_vec()
+    }
 }
 
 /// A builder for IP packets.
@@ -251,15 +264,21 @@ pub trait IpPacketBuilder<I: IpExt>: PacketBuilder + Clone + Debug {
     /// Returns the source IP address for the builder.
     fn src_ip(&self) -> I::Addr;
 
+    /// Sets the source IP address for the builder.
+    fn set_src_ip(&mut self, addr: I::Addr);
+
     /// Returns the destination IP address for the builder.
     fn dst_ip(&self) -> I::Addr;
+
+    /// Sets the destination IP address for the builder.
+    fn set_dst_ip(&mut self, addr: I::Addr);
 
     /// Returns the IP protocol number for the builder.
     fn proto(&self) -> I::Proto;
 }
 
 /// An IPv4 or IPv6 protocol number.
-pub trait IpProtocol: From<IpProto> + Sealed + Send + Sync + 'static {}
+pub trait IpProtocol: From<IpProto> + From<u8> + Sealed + Send + Sync + 'static {}
 
 impl Sealed for Never {}
 
@@ -273,7 +292,7 @@ create_protocol_enum!(
     ///
     /// [protocol-numbers]: https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
     #[allow(missing_docs)]
-    #[derive(Copy, Clone, Hash, Eq, PartialEq)]
+    #[derive(Copy, Clone, Hash, Eq, Ord, PartialEq, PartialOrd)]
     pub enum IpProto: u8 {
         Tcp, 6, "TCP";
         Udp, 17, "UDP";
@@ -288,7 +307,7 @@ create_protocol_enum!(
     ///
     /// [protocol-numbers]: https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
     #[allow(missing_docs)]
-    #[derive(Copy, Clone, Hash, Eq, PartialEq)]
+    #[derive(Copy, Clone, Hash, Eq, Ord, PartialEq, PartialOrd)]
     pub enum Ipv4Proto: u8 {
         Icmp, 1, "ICMP";
         Igmp, 2, "IGMP";
@@ -310,7 +329,7 @@ create_protocol_enum!(
     ///
     /// [protocol-numbers]: https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
     #[allow(missing_docs)]
-    #[derive(Copy, Clone, Hash, Eq, PartialEq)]
+    #[derive(Copy, Clone, Hash, Eq, Ord, PartialEq, PartialOrd)]
     pub enum Ipv6Proto: u8 {
         Icmpv6, 58, "ICMPv6";
         NoNextHeader, 59, "NO NEXT HEADER";

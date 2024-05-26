@@ -17,10 +17,9 @@
 namespace zxdb {
 namespace {
 
-const char kShortHelp[] = "run-component: Run the component.";
-const char kHelp[] =
-    R"(run-component <url> [ <args>* ]
-
+const char kRunComponentShortHelp[] = "run-component: Run the component.";
+const char kRunComponentUsage[] = "run-component <url> [ <args>* ]";
+const char kRunComponentHelp[] = R"(
   Runs the component with the given URL.
 
   Components will be launched in the "ffx-laboratory" collection, similar to
@@ -85,7 +84,8 @@ void RunVerbRunComponent(const Command& cmd, fxl::RefPtr<CommandContext> cmd_con
 }  // namespace
 
 VerbRecord GetRunComponentVerbRecord() {
-  return {&RunVerbRunComponent, {"run-component"}, kShortHelp, kHelp, CommandGroup::kProcess};
+  return {&RunVerbRunComponent, {"run-component"}, kRunComponentShortHelp,
+          kRunComponentUsage,   kRunComponentHelp, CommandGroup::kProcess};
 }
 
 }  // namespace zxdb

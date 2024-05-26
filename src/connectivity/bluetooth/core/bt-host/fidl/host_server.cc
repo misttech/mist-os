@@ -271,12 +271,13 @@ void HostServer::SetConnectable(bool connectable, SetConnectableCallback callbac
 }
 
 void HostServer::RestoreBonds(::std::vector<fsys::BondingData> bonds,
-                              RestoreBondsCallback callback) {
+                              fhost::BondingDelegate::RestoreBondsCallback callback) {
   bt_log(INFO, "fidl", "%s", __FUNCTION__);
 
   if (bonds.empty()) {
     // Nothing to do. Reply with an empty list.
-    callback(fhost::Host_RestoreBonds_Result::WithResponse(fhost::Host_RestoreBonds_Response()));
+    callback(fhost::BondingDelegate_RestoreBonds_Result::WithResponse(
+        fhost::BondingDelegate_RestoreBonds_Response()));
     return;
   }
 
@@ -318,13 +319,15 @@ void HostServer::RestoreBonds(::std::vector<fsys::BondingData> bonds,
     }
   }
 
-  callback(fhost::Host_RestoreBonds_Result::WithResponse(
-      fhost::Host_RestoreBonds_Response(std::move(errors))));
+  callback(fhost::BondingDelegate_RestoreBonds_Result::WithResponse(
+      fhost::BondingDelegate_RestoreBonds_Response(std::move(errors))));
 }
 
 void HostServer::OnPeerBonded(const bt::gap::Peer& peer) {
   bt_log(DEBUG, "fidl", "%s", __FUNCTION__);
-  binding()->events().OnNewBondingData(fidl_helpers::PeerToFidlBondingData(adapter().get(), peer));
+  if (bonding_delegate_server_) {
+    bonding_delegate_server_->OnNewBondingData(peer);
+  }
 }
 
 void HostServer::RegisterLowEnergyConnection(
@@ -727,6 +730,15 @@ void HostServer::Shutdown() {
   }
 }
 
+void HostServer::SetBondingDelegate(
+    ::fidl::InterfaceRequest<::fuchsia::bluetooth::host::BondingDelegate> request) {
+  if (bonding_delegate_server_.has_value()) {
+    request.Close(ZX_ERR_ALREADY_BOUND);
+    return;
+  }
+  bonding_delegate_server_.emplace(std::move(request), this);
+}
+
 void HostServer::handle_unknown_method(uint64_t ordinal, bool method_has_response) {
   bt_log(WARN, "fidl", "Received unknown method with ordinal: %lu", ordinal);
 }
@@ -838,6 +850,55 @@ void HostServer::PeerWatcherServer::GetNext(
 void HostServer::PeerWatcherServer::handle_unknown_method(uint64_t ordinal,
                                                           bool method_has_response) {
   bt_log(WARN, "fidl", "PeerWatcher received unknown method with ordinal %lu", ordinal);
+}
+
+HostServer::BondingDelegateServer::BondingDelegateServer(
+    ::fidl::InterfaceRequest<::fuchsia::bluetooth::host::BondingDelegate> request, HostServer* host)
+    : ServerBase(this, std::move(request)), host_(host) {
+  binding()->set_error_handler(
+      [this](zx_status_t status) { host_->bonding_delegate_server_.reset(); });
+  // Initialize the peer watcher with all known bonded peers that are in the cache.
+  host_->adapter()->peer_cache()->ForEach([this](const bt::gap::Peer& peer) {
+    if (peer.bonded()) {
+      OnNewBondingData(peer);
+    }
+  });
+}
+
+void HostServer::BondingDelegateServer::OnNewBondingData(const bt::gap::Peer& peer) {
+  updated_.push(fidl_helpers::PeerToFidlBondingData(host_->adapter().get(), peer));
+  MaybeNotifyWatchBonds();
+}
+
+void HostServer::BondingDelegateServer::RestoreBonds(
+    ::std::vector<::fuchsia::bluetooth::sys::BondingData> bonds, RestoreBondsCallback callback) {
+  host_->RestoreBonds(std::move(bonds), std::move(callback));
+}
+void HostServer::BondingDelegateServer::WatchBonds(WatchBondsCallback callback) {
+  if (watch_bonds_cb_) {
+    binding()->Close(ZX_ERR_ALREADY_EXISTS);
+    host_->bonding_delegate_server_.reset();
+    return;
+  }
+  watch_bonds_cb_ = std::move(callback);
+  MaybeNotifyWatchBonds();
+}
+
+void HostServer::BondingDelegateServer::handle_unknown_method(uint64_t ordinal,
+                                                              bool method_has_response) {
+  bt_log(WARN, "fidl", "BondingDelegate received unknown method with ordinal %lu", ordinal);
+}
+
+// TODO(https://fxbug.dev/42158854): Support notifying removed bonds.
+void HostServer::BondingDelegateServer::MaybeNotifyWatchBonds() {
+  if (!watch_bonds_cb_ || updated_.empty()) {
+    return;
+  }
+
+  watch_bonds_cb_(fhost::BondingDelegate_WatchBonds_Result::WithResponse(
+      ::fuchsia::bluetooth::host::BondingDelegate_WatchBonds_Response::WithUpdated(
+          std::move(updated_.front()))));
+  updated_.pop();
 }
 
 bt::sm::IOCapability HostServer::io_capability() const {

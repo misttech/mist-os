@@ -28,9 +28,8 @@ constexpr int kNumSwitch = 1;
 constexpr int kRawSwitch = 2;
 
 const char kDisassembleShortHelp[] = "disassemble / di: Disassemble machine instructions.";
-const char kDisassembleHelp[] =
-    R"(disassemble [ --num=<lines> ] [ --raw ] [ <location> ]
-
+const char kDisassembleUsage[] = "disassemble [ --num=<lines> ] [ --raw ] [ <location> ]";
+const char kDisassembleHelp[] = R"(
   Alias: "di"
 
   Disassembles machine instructions at the given location. If no location is
@@ -40,7 +39,7 @@ const char kDisassembleHelp[] =
 Location arguments
 
 )" LOCATION_ARG_HELP("disassemble") LOCATION_EXPRESSION_HELP("disassemble")
-        R"(        It is the user's responsibility to make sure that the starting address
+    R"(        It is the user's responsibility to make sure that the starting address
         expression is appropriately aligned on an instruction boundary. For ARM
         this will be multiples of 4 bytes. For Intel, you will have to know
         some other way.
@@ -234,8 +233,8 @@ void RunDisassembleVerb(const Command& cmd, fxl::RefPtr<CommandContext> cmd_cont
 
 VerbRecord GetDisassembleVerbRecord() {
   VerbRecord disass(&RunDisassembleVerb, &CompleteInputLocation, {"disassemble", "di"},
-                    kDisassembleShortHelp, kDisassembleHelp, CommandGroup::kAssembly,
-                    SourceAffinity::kAssembly);
+                    kDisassembleShortHelp, kDisassembleUsage, kDisassembleHelp,
+                    CommandGroup::kAssembly, SourceAffinity::kAssembly);
   disass.param_type = VerbRecord::kOneParam;  // Don't require quoting for expressions.
 
   disass.switches.emplace_back(kNumSwitch, true, "num", 'n');

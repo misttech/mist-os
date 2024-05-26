@@ -210,11 +210,11 @@ pub fn check_task_getsid(source: &CurrentTask, target: &Task) -> Result<(), Errn
     check_if_selinux(source, |security_server| {
         let source_sid = get_current_sid(&source.thread_group);
         let target_sid = get_current_sid(&target.thread_group);
-        selinux_hooks::check_permission(
+        selinux_hooks::check_permissions(
             &security_server.as_permission_check(),
             source_sid,
             target_sid,
-            ProcessPermission::GetSession,
+            &[ProcessPermission::GetSession],
         )
     })
 }
@@ -1042,7 +1042,10 @@ mod tests {
             Ok(Vec::new())
         );
 
-        assert_eq!(set_procattr(&current_task, ProcAttr::Exec, VALID_SECURITY_CONTEXT.into()), Ok(()));
+        assert_eq!(
+            set_procattr(&current_task, ProcAttr::Exec, VALID_SECURITY_CONTEXT.into()),
+            Ok(())
+        );
 
         assert_eq!(
             get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Exec),
@@ -1063,7 +1066,10 @@ mod tests {
             Ok(Vec::new())
         );
 
-        assert_eq!(set_procattr(&current_task, ProcAttr::Exec, VALID_SECURITY_CONTEXT.into()), Ok(()));
+        assert_eq!(
+            set_procattr(&current_task, ProcAttr::Exec, VALID_SECURITY_CONTEXT.into()),
+            Ok(())
+        );
 
         assert_eq!(
             get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Exec),

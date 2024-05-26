@@ -42,7 +42,7 @@ impl HttpsDateClient for NetworkTimeClient {
                     .with_source(format_err!("Timed out after {:?}", https_timeout)))
             })
             .await?;
-        Ok(zx::Time::from_nanos(utc.timestamp_nanos()))
+        Ok(zx::Time::from_nanos(utc.timestamp_nanos_opt().unwrap()))
     }
 }
 

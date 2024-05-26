@@ -326,7 +326,7 @@ struct UseVideoDecoderParams {
   // codec_factory to take ownership of, use, and close by the
   //     time the function returns.
   fuchsia::mediacodec::CodecFactoryHandle codec_factory;
-  fuchsia::sysmem::AllocatorHandle sysmem;
+  fuchsia::sysmem2::AllocatorHandle sysmem;
   InStreamPeeker* in_stream = nullptr;
   InputCopier* input_copier = nullptr;
   uint64_t min_output_buffer_size = 0;

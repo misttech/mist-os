@@ -5,10 +5,6 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_START_COMPLETER_H_
 #define LIB_DRIVER_COMPONENT_CPP_START_COMPLETER_H_
 
-#include <zircon/availability.h>
-
-#if __Fuchsia_API_level__ >= 15
-
 #include <lib/fit/function.h>
 #include <lib/zx/result.h>
 
@@ -45,7 +41,5 @@ class StartCompleter final : public Completer {
 };
 
 }  // namespace fdf
-
-#endif
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_START_COMPLETER_H_

@@ -71,6 +71,7 @@ class MacInterface : public ::network::MacAddrDeviceInterface {
   netdev::wire::MacFilterMode default_mode_;
   fbl::Mutex lock_;
   fbl::DoublyLinkedList<std::unique_ptr<MacClientInstance>> clients_ __TA_GUARDED(lock_);
+  fbl::DoublyLinkedList<std::unique_ptr<MacClientInstance>> dead_clients_ __TA_GUARDED(lock_);
   fit::callback<void()> teardown_callback_ __TA_GUARDED(lock_);
 };
 

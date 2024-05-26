@@ -192,7 +192,6 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
                 Controllers:
                   FuchsiaDevice:
                     - name: fuchsia-54b2-038b-6e90
-                      ssh_private_key: ~/.ssh/fuchsia_ed25519
                       transport: default
             ```
 
@@ -205,7 +204,6 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             [
                 {
                     'name': 'fuchsia-54b2-038b-6e90',
-                    'ssh_private_key': '~/.ssh/fuchsia_ed25519',
                     'transport': 'default'
                 }
             ]
@@ -244,7 +242,6 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
                 Controllers:
                   FuchsiaDevice:
                     - name: fuchsia-54b2-038b-6e90
-                      ssh_private_key: ~/.ssh/fuchsia_ed25519
                       transport: default
             ```
 
@@ -259,7 +256,6 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             ```
             {
                 'name': 'fuchsia-54b2-038b-6e90',
-                'ssh_private_key': '~/.ssh/fuchsia_ed25519',
                 'transport': 'default'
             }
             ```

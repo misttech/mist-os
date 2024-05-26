@@ -63,7 +63,7 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
       __TA_EXCLUDES(mutex_);
   zx_status_t Append(const void* data, size_t len, size_t* out_end, size_t* out_actual) final
       __TA_EXCLUDES(mutex_);
-  zx_status_t GetAttributes(fs::VnodeAttributes* a) final __TA_EXCLUDES(mutex_);
+  zx::result<fs::VnodeAttributes> GetAttributes() const final __TA_EXCLUDES(mutex_);
   zx_status_t Truncate(size_t len) final __TA_EXCLUDES(mutex_);
   zx::result<std::string> GetDevicePath() const final __TA_EXCLUDES(mutex_);
   zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) final

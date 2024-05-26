@@ -30,11 +30,11 @@ assumptions about the type of performance test being written.
         modify the software-under-test to generate extra trace events.
 
         An example is [`perftest_trace_events_test`][perftest_trace_events_test]
-        which uses the `trace_processing` library to extracts a set of events.
+        which uses the `trace_processing` library to extract a set of events.
 
         Another example is [`flatland_benchmark`][flatland_benchmark]
-        which uses the `trace_processing.app_render` library to extracts a set
-        of events, then uses `perf_publish` to upload result.
+        which uses the `trace_processing.app_render` library to extract a set
+        of events, then uses `perf_publish` to upload the result.
 
         The test should use the [`python_perf_test`][python_perf_test]
         template as it includes all the necessary dependencies for trace

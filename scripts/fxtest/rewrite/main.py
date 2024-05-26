@@ -762,9 +762,13 @@ def has_tests_in_base(
         with open(base_file) as f:
             contents = json.load(f)
         manifests = contents["content"]["manifests"]
-    except (IOError, json.JSONDecodeError, KeyError) as e:
+    except (json.JSONDecodeError, KeyError) as e:
         recorder.emit_end(f"Parsing file failed: {e}", id=parse_id)
         raise e
+    except FileNotFoundError:
+        # No base packages found
+        recorder.emit_end(id=parse_id)
+        return False
 
     manifest_ends = {m.split("/")[-1] for m in manifests}
     in_base = [

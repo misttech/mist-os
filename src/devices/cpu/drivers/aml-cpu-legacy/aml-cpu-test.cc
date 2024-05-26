@@ -60,14 +60,19 @@ constexpr size_t kLittleClusterIdx =
 constexpr uint32_t kBigClusterCoreCount = 4;
 constexpr uint32_t kLittleClusterCoreCount = 2;
 
-constexpr legacy_cluster_size_t kClusterSizeMetadata[] = {
+constexpr uint8_t kBigClusterRelativePerformance = 255;
+constexpr uint8_t kLittleClusterRelativePerformance = 112;
+
+constexpr legacy_cluster_info_t kClusterSizeMetadata[] = {
     {
         .pd_id = kBigClusterIdx,
         .core_count = kBigClusterCoreCount,
+        .relative_performance = kBigClusterRelativePerformance,
     },
     {
         .pd_id = kLittleClusterIdx,
         .core_count = kLittleClusterCoreCount,
+        .relative_performance = kLittleClusterRelativePerformance,
     },
 };
 
@@ -337,7 +342,7 @@ TEST_F(AmlCpuBindingTest, TwoDomains) {
     // Find the cluster metadata that corresponds to this cluster index.
     const auto& cluster_size_meta_itr = std::find_if(
         std::begin(kClusterSizeMetadata), std::end(kClusterSizeMetadata),
-        [idx](const legacy_cluster_size_t& elem) -> bool { return idx == elem.pd_id; });
+        [idx](const legacy_cluster_info_t& elem) -> bool { return idx == elem.pd_id; });
 
     ASSERT_NE(cluster_size_meta_itr, std::end(kClusterSizeMetadata));
     ASSERT_EQ(cluster_size_meta_itr->core_count, device->ClusterCoreCount());
@@ -347,7 +352,8 @@ TEST_F(AmlCpuBindingTest, TwoDomains) {
 class AmlCpuTest : public AmlCpu {
  public:
   AmlCpuTest(ThermalSyncClient thermal)
-      : AmlCpu(nullptr, std::move(thermal), kBigClusterIdx, kBigClusterCoreCount) {}
+      : AmlCpu(nullptr, std::move(thermal), kBigClusterIdx, kBigClusterCoreCount,
+               kBigClusterRelativePerformance) {}
 
   zx::vmo inspect_vmo() { return inspector_.DuplicateVmo(); }
 };

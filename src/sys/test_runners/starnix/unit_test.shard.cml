@@ -8,6 +8,20 @@
     capabilities: [
         { protocol: "fuchsia.test.Suite" },
     ],
+    use: [
+        {
+            protocol: [
+                "fuchsia.kernel.Stats",
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.sysinfo.SysInfo",
+            ],
+        },
+        {
+            directory: "boot-kernel",
+            rights: [ "r*" ],
+            path: "/boot/kernel",
+        },
+    ],
     expose: [
         {
             protocol: "fuchsia.test.Suite",

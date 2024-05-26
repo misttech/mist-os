@@ -4,10 +4,16 @@
 
 import("//build/images/vbmeta.gni")
 import("//build/testing/boot_tests/boot_test.gni")
+import("//build/testing/environments.gni")
 import("//build/zbi/zbi.gni")
 import("//build/zbi/zbi_input.gni")
 
-# Composes a test zbi out of Zircon artifacts.
+_all_emu_envs = [ qemu_env ]
+if (current_cpu != "riscv64") {
+  _all_emu_envs += [ aemu_env ]
+}
+
+# Composes a test ZBI out of Zircon artifacts.
 #
 # The $target_name target is a group() that holds the metadata and is what
 # should be used in deps.  The actual zbi() target is defined as
@@ -19,35 +25,36 @@ import("//build/zbi/zbi_input.gni")
 #
 # Parameters
 #
-#   args (optional)
-#     [list of strings] Command line arguments for the resulting zbi. ZBI tests
-#     using the kernel and a non-default `userboot.next` options must add
-#     `userboot.{shutdown,reboot}` as well in order to guarantee that a success
-#     string is printed. See //zircon/system/utest/core:core-tests for a
-#     canonical example.
+#   * args
+#     - Optional: Command line arguments for the resulting ZBI.  ZBI tests
+#       using the kernel and a non-default `userboot.next` options must add
+#       `userboot.{shutdown,reboot}` as well in order to guarantee that a
+#       success string is printed. See //zircon/system/utest/core:core-tests
+#       for a canonical example.
+#     - Type: list(string)
 #
-#   device_types
-#     [list of strings] Devices the test should run on.
-#     Allowable values are those among the entries in
-#     //build/testing/platforms.gni; others will be ignored.
-#     Defaults to [ "QEMU" ].
+#   * disabled
+#     - Optional: See boot_test().
+#     - Type: bool
+#     - Default: false
 #
-#   qemu_kernel
-#     [label_with_toolchain] Label corresponding to the qemu-kernel image
-#     in images.json that should be used with the zbi_image. This will appear
-#     as the qemu_kernel_label in a boot_tests.json entry.
-#     TODO(joshuaseaton|mcgrathr): Use a QEMU-specific boot test template for
-#     specifying QEMU kernel + ZBI initrd, rather than allowing QEMU kernel to
-#     be supplied here.
+#   * environments
+#     - Optional: See boot_test().
+#     - Type: list(scope)
+#     - Default: [ qemu_env, aemu_env ]
 #
-#   disabled (optional, default: false)
-#     [boolean] When true, the generated image is considered disabled, that
-#     is any associated test should not be run automatically. Useful for
-#     generating build artifacts. By disabling a target the 'device_types'
-#     are set to an empty list.
+#   * qemu_kernel
+#     - Optional: Label corresponding to the qemu-kernel image in images.json
+#       that should be used with the zbi_image. This will appear as the
+#       qemu_kernel_label in a boot_tests.json entry.
+#       TODO(joshuaseaton|mcgrathr): Use a QEMU-specific boot test template for
+#       specifying QEMU kernel + ZBI initrd, rather than allowing QEMU kernel
+#       to be supplied here.
+#     - Type: label_with_toolchain
 #
-#   deps, data_deps, replace, complete, compress, metadata
-#     See //build/zbi/zbi.gni.
+#   * deps, data_deps, replace, complete, compress, metadata
+#     - Optional: See zbi().
+#
 template("zbi_test") {
   main_target = target_name
   zbi_target = "${target_name}.zbi"
@@ -167,37 +174,20 @@ template("zbi_test") {
     }
   }
 
-  target_device_types = [
-    "QEMU",
-    "AEMU",
-  ]
-
-  if (defined(invoker.device_types)) {
-    target_device_types = []
-    target_device_types = invoker.device_types
-  }
-
-  # AEMU does not support RISC-V.
-  if (current_cpu == "riscv64") {
-    target_device_types += [ "AEMU" ]
-    target_device_types -= [ "AEMU" ]
-  }
-
-  # If disabled, clear `target_device_types`.
-  if (defined(invoker.disabled) && invoker.disabled) {
-    target_device_types = []
-  }
-
   boot_test(main_target) {
     forward_variables_from(invoker,
                            [
                              "assert_no_deps",
                              "data_deps",
+                             "disabled",
+                             "environments",
                              "metadata",
                              "qemu_kernel",
                              "timeout",
                            ])
-    device_types = target_device_types
+    if (!defined(environments)) {
+      environments = _all_emu_envs
+    }
     zbi = ":$zbi_target"
     if (use_vbmeta) {
       vbmeta = ":$vbmeta_target"

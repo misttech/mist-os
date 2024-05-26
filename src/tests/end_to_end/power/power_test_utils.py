@@ -25,7 +25,6 @@ import time
 from collections import deque
 from collections.abc import Iterable, Mapping
 from trace_processing import trace_metrics, trace_model, trace_time
-from trace_processing.metrics import power as power_metrics
 from typing import Sequence
 
 # keep-sorted end
@@ -43,6 +42,10 @@ _LOGGER = logging.getLogger(__name__)
 _MEASUREPOWER_PATH_ENV_VARIABLE = "MEASUREPOWER_PATH"
 
 
+def _avg(avg: float, value: float, count: int) -> float:
+    return avg + (value - avg) / count
+
+
 def weighted_average(arr: Iterable[float], weights: Iterable[int]) -> float:
     return sum(
         itertools.starmap(
@@ -57,6 +60,8 @@ def weighted_average(arr: Iterable[float], weights: Iterable[int]) -> float:
 #
 # Normally, we'd compute the cross correlation and then take the argmax to line up the signals the
 # closest. Instead we'll do the argmax and the correlation at the same time to save on allocations.
+#
+# Precondition: len(signal) must be >= len(feature) for accurate results
 def cross_correlate_arg_max(
     signal: Sequence[float], feature: Sequence[float]
 ) -> tuple[float, int]:
@@ -68,6 +73,9 @@ def cross_correlate_arg_max(
         Where correlation is the maximum correlation between the signals and idx is the argmax that
         it occurred at.
     """
+
+    assert len(signal) >= len(feature)
+
     # Slide our feature across the signal and compute the dot product at each point
     return max(
         # Produce items of the form [(correlation1, idx1), (correlation2, idx2), ...] of which we
@@ -94,11 +102,93 @@ def cross_correlate_arg_max(
             # [
             #     [1,2] o [1,2],
             #     [2,3] o [1,2],
-            #     [3,5] o [1,2],
+            #     [3,4] o [1,2],
             # ]
             range(len(signal) - len(feature) + 1),
         )
     )
+
+
+@dataclasses.dataclass
+class PowerMetricSample:
+    """A sample of collected power metrics.
+
+    Args:
+      timestamp: timestamp of sample in nanoseconds since epoch.
+      voltage: voltage in Volts.
+      current: current in milliAmpere.
+      raw_aux: (optional) The raw 16 bit fine aux channel reading from a Monsoon power monitor.  Can
+               optionally be used for log synchronization and alignment
+    """
+
+    timestamp: int
+    voltage: float
+    current: float
+    raw_aux: int | None
+
+    def compute_power(self) -> float:
+        """Compute the power in Watts from sample.
+
+        Returns:
+          Power in Watts.
+        """
+        return self.voltage * self.current * 1e-3
+
+
+@dataclasses.dataclass
+class AggregatePowerMetrics:
+    """Aggregate power metrics representation.
+
+    Represents aggregated metrics over a number of power metrics samples.
+
+    Args:
+      sample_count: number of power metric samples.
+      max_power: maximum power in Watts over all samples.
+      mean_power: average power in Watts over all samples.
+      min_power: minimum power in Watts over all samples.
+    """
+
+    sample_count: int = 0
+    max_power: float = float("-inf")
+    mean_power: float = 0
+    min_power: float = float("inf")
+
+    def process_sample(self, sample: PowerMetricSample) -> None:
+        """Process a sample of power metrics.
+
+        Args:
+            sample: A sample of power metrics.
+        """
+        power = sample.compute_power()
+        self.sample_count += 1
+        self.max_power = max(self.max_power, power)
+        self.mean_power = _avg(self.mean_power, power, self.sample_count)
+        self.min_power = min(self.min_power, power)
+
+    def to_fuchsiaperf_results(self) -> list[trace_metrics.TestCaseResult]:
+        """Converts Power metrics to fuchsiaperf JSON object.
+
+        Returns:
+          List of JSON object.
+        """
+        results: list[trace_metrics.TestCaseResult] = [
+            trace_metrics.TestCaseResult(
+                label="MinPower",
+                unit=trace_metrics.Unit.watts,
+                values=[self.min_power],
+            ),
+            trace_metrics.TestCaseResult(
+                label="MeanPower",
+                unit=trace_metrics.Unit.watts,
+                values=[self.mean_power],
+            ),
+            trace_metrics.TestCaseResult(
+                label="MaxPower",
+                unit=trace_metrics.Unit.watts,
+                values=[self.max_power],
+            ),
+        ]
+        return results
 
 
 # Constants class
@@ -144,11 +234,10 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
 
     def __init__(self, power_samples_path: str) -> None:
         self._power_samples_path: str = power_samples_path
-        self._power_metrics: power_metrics.AggregatePowerMetrics = (
-            power_metrics.AggregatePowerMetrics()
-        )
+        self._power_metrics: AggregatePowerMetrics = AggregatePowerMetrics()
 
-    # Implements MetricsProcessor.process_metrics. Model is None to support legacy users.
+    # Implements MetricsProcessor.process_metrics. Model is unused and is None
+    # to support legacy users.
     def process_metrics(
         self, model: trace_model.Model | None = None
     ) -> list[trace_metrics.TestCaseResult]:
@@ -158,7 +247,7 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
             header = next(reader)
             _PowerCsvHeaders.assert_header(header)
             for row in reader:
-                sample = power_metrics.PowerMetricSample(
+                sample = PowerMetricSample(
                     timestamp=int(row[0]),
                     voltage=float(row[1]),
                     current=float(row[2]),
@@ -276,7 +365,7 @@ class PowerSampler:
 
     # DEPRECATED: Use .metric_processor().process_metrics() instead.
     # TODO(b/320778225): Remove once downstream users are refactored.
-    def to_fuchsiaperf_results(self) -> Sequence[trace_metrics.TestCaseResult]:
+    def to_fuchsiaperf_results(self) -> list[trace_metrics.TestCaseResult]:
         """Returns power metrics TestCaseResults"""
         assert self._state == _PowerSamplerState.STOPPED
         return self.metrics_processor().process_metrics(
@@ -290,6 +379,9 @@ class PowerSampler:
         return self._metrics_processor_impl()
 
     def should_generate_load(self) -> bool:
+        return False
+
+    def has_samples(self) -> bool:
         return False
 
     def merge_power_data(self, model: trace_model.Model, fxt_path: str) -> None:
@@ -345,11 +437,13 @@ class _RealPowerSampler(PowerSampler):
             self._config.output_dir,
             f"{self._config.metric_name}_power_samples.csv",
         )
+        self._sampled_data = False
 
     def _start_impl(self) -> None:
         _LOGGER.info("Starting power sampling")
         self._start_power_measurement()
         self._await_first_sample()
+        self._sampled_data = True
 
     def _stop_impl(self) -> None:
         _LOGGER.info("Stopping power sampling...")
@@ -357,12 +451,7 @@ class _RealPowerSampler(PowerSampler):
         _LOGGER.info("Power sampling stopped")
 
     def _metrics_processor_impl(self) -> trace_metrics.MetricsProcessor:
-        return trace_metrics.MetricsProcessorsSet(
-            (
-                PowerMetricsProcessor(power_samples_path=self._csv_output_path),
-                power_metrics.PowerMetricsProcessor(),
-            )
-        )
+        return PowerMetricsProcessor(power_samples_path=self._csv_output_path)
 
     def _start_power_measurement(self) -> None:
         assert self._config.measurepower_path
@@ -422,6 +511,9 @@ class _RealPowerSampler(PowerSampler):
     def should_generate_load(self) -> bool:
         return True
 
+    def has_samples(self) -> bool:
+        return self._sampled_data
+
     def merge_power_data(self, model: trace_model.Model, fxt_path: str) -> None:
         merge_power_data(model, self._csv_output_path, fxt_path)
 
@@ -444,8 +536,7 @@ def create_power_sampler(
             )
 
         _LOGGER.warning(
-            f"{_MEASUREPOWER_PATH_ENV_VARIABLE} env variable not set. "
-            "Using a no-op power sampler instead."
+            f"{_MEASUREPOWER_PATH_ENV_VARIABLE} env variable not set. Using a no-op power sampler instead."
         )
         return _NoopPowerSampler(config)
     else:
@@ -851,20 +942,36 @@ def merge_power_data(
     # Finally, we can get the cross correlation between power and cpu usage. We run a known cpu
     # heavy workload in the first 5ish seconds of the test so we limit our signal correlation to
     # that portion. Power and CPU readings can be offset in either direction, but shouldn't be
-    # separated by more than a second. Thus, we take the first 4 seconds of the power readings,
-    # attempt to match them up with the first 5 seconds of CPU readings, and then vice-versa.
-    # Afterwards, we choose an alignment by picking the higher of the two correlation scores.
+    # separated by more than a second.
+
+    # Due to limits on the maximum size of our traces, there is potential for particularly busy
+    # traces to not contain the entire first 5 seconds of the test. In order to ensure the
+    # correlation logic operates correctly, we need to compare consistent counts of samples for
+    # power and CPU readings. Thus, we take the a subset of the two datasets limited to a maximum
+    # of ~5 seconds worth of samples. (5khz * 5 seconds = 25000 samples) and compare it to the
+    # first ~4 seconds (80% of ~5 seconds) of the opposite dataset to attempt to match them up.
+    # This amounts to nominally comparing the first 4 seconds of power samples to the first 5
+    # seconds of CPU readings, and then vice-versa.
+    max_sequence_samples = 25000
+    signal_samples = min(
+        max_sequence_samples, len(avg_cpu_combined), len(power_samples)
+    )
+
+    # Ensures feature list is always shorter than the number of signal samples
+    feature_samples = int(0.8 * signal_samples)
     (
         power_after_cpu_correlation,
         power_after_cpu_correlation_idx,
     ) = cross_correlate_arg_max(
-        avg_cpu_combined[0:25000], [s.current for s in power_samples[0:20000]]
+        avg_cpu_combined[0:signal_samples],
+        [s.current for s in power_samples[0:feature_samples]],
     )
     (
         cpu_after_power_correlation,
         cpu_after_power_correlation_idx,
     ) = cross_correlate_arg_max(
-        [s.current for s in power_samples[0:25000]], avg_cpu_combined[0:20000]
+        [s.current for s in power_samples[0:signal_samples]],
+        avg_cpu_combined[0:feature_samples],
     )
     starting_ticks = 0
     if power_after_cpu_correlation >= cpu_after_power_correlation:

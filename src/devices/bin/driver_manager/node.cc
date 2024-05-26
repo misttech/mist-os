@@ -323,8 +323,7 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
     std::string_view node_name, std::vector<std::weak_ptr<Node>> parents,
     std::vector<std::string> parents_names,
     const std::vector<fuchsia_driver_framework::NodePropertyEntry>& parent_properties,
-    NodeManager* driver_binder, async_dispatcher_t* dispatcher, bool is_legacy,
-    uint32_t primary_index) {
+    NodeManager* driver_binder, async_dispatcher_t* dispatcher, uint32_t primary_index) {
   ZX_ASSERT(!parents.empty());
 
   if (parents.size() != parent_properties.size()) {
@@ -346,9 +345,9 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
   }
   DeviceInspect inspect =
       primary_node_ptr->inspect_.CreateChild(std::string(node_name), zx::vmo(), 0);
-  std::shared_ptr composite = std::make_shared<Node>(
-      node_name, std::move(parents), driver_binder, dispatcher, std::move(inspect), primary_index,
-      is_legacy ? NodeType::kLegacyComposite : NodeType::kComposite);
+  std::shared_ptr composite =
+      std::make_shared<Node>(node_name, std::move(parents), driver_binder, dispatcher,
+                             std::move(inspect), primary_index, NodeType::kComposite);
   composite->parents_names_ = std::move(parents_names);
 
   composite->SetCompositeParentProperties(parent_properties);
@@ -1184,11 +1183,6 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
 
 bool Node::EvaluateRematchFlags(fuchsia_driver_development::RestartRematchFlags rematch_flags,
                                 std::string_view requested_url) {
-  if (type_ == NodeType::kLegacyComposite &&
-      !(rematch_flags & fuchsia_driver_development::RestartRematchFlags::kLegacyComposite)) {
-    return false;
-  }
-
   if (type_ == NodeType::kComposite &&
       !(rematch_flags & fuchsia_driver_development::RestartRematchFlags::kCompositeSpec)) {
     return false;

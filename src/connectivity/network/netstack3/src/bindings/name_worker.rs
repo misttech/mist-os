@@ -13,6 +13,8 @@ pub(super) async fn serve(
     _ns: Netstack,
     _stream: DnsServerWatcherRequestStream,
 ) -> Result<(), fidl::Error> {
+    // TODO(https://fxbug.dev/341759423): Expose NDP-acquired DNS server
+    // configuration from netstack3.
     warn!("blocking forever serving {}", fnet_name::DnsServerWatcherMarker::DEBUG_NAME);
     futures::future::pending().await
 }

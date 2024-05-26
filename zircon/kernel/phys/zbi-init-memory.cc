@@ -50,7 +50,7 @@ void ZbiInitMemory(void* zbi, ktl::span<zbi_mem_range_t> mem_config,
 
   // Set up our own address space.
   if (aspace) {
-    ArchSetUpAddressSpaceEarly(*aspace);
+    ArchSetUpAddressSpace(*aspace);
   }
 
   if (gBootOptions->phys_verbose) {

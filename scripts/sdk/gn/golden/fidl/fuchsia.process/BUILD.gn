@@ -22,5 +22,5 @@ fidl_library("fuchsia.process") {
 }
 
 group("all") {
-  deps = [ ":fuchsia.process" ]
+  deps = [ ":fuchsia.process_cpp" ]
 }

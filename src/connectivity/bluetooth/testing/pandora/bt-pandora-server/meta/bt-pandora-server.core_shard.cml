@@ -16,6 +16,13 @@
             to: "#bt-pandora-server",
         },
         {
+            protocol: [ "fuchsia.bluetooth.a2dp.AudioMode" ],
+            from: "#bt-a2dp",
+            to: "#bt-pandora-server",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+        {
             protocol: [
                 "fuchsia.bluetooth.sys.Access",
                 "fuchsia.bluetooth.sys.HostWatcher",

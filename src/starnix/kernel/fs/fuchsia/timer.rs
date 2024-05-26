@@ -119,11 +119,11 @@ impl TimerFile {
     /// Returns an error if the `zx::Timer` could not be created.
     pub fn new_file(
         current_task: &CurrentTask,
-        clock_type: TimerWakeup,
+        wakeup_type: TimerWakeup,
         clock: TimerFileClock,
         flags: OpenFlags,
     ) -> Result<FileHandle, Errno> {
-        let timer: Arc<dyn TimerOps> = match clock_type {
+        let timer: Arc<dyn TimerOps> = match wakeup_type {
             TimerWakeup::Regular => Arc::new(ZxTimer::new()),
             TimerWakeup::Alarm => Arc::new(HrTimer::new()),
         };

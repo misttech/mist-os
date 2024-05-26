@@ -28,6 +28,13 @@
             path: "/fs_root",
         },
     ],
+    use: [
+        {
+            protocol: "fuchsia.element.GraphicalPresenter",
+            from: "parent",
+            availability: "optional",
+        },
+    ],
     expose: [
         {
             directory: "fs_root",

@@ -81,11 +81,6 @@
             to: "#session-manager",
         },
         {
-            resolver: "full-resolver",
-            from: "#full-resolver",
-            to: "#session-manager",
-        },
-        {
             protocol: [
                 "fuchsia.hwinfo.Board",
                 "fuchsia.hwinfo.Device",
@@ -367,9 +362,9 @@
             source_availability: "unknown",
         },
         {
+            dictionary: "trusted-app-capabilities",
             from: "#trusted-apps",
             to: "#session-manager",
-            dictionary: "trusted-app-capabilities",
             source_availability: "unknown",
         },
 

@@ -942,6 +942,8 @@ fn new_route_matches_new_route_args<I: Ip>(
     let fnet_routes_ext::InstalledRoute {
         route: fnet_routes_ext::Route { destination, action: _, properties: _ },
         effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric },
+        // TODO(https://fxbug.dev/336382905): Use the table ID.
+        table_id: _,
     } = new_route;
 
     let subnet_matches = subnet == destination;
@@ -962,6 +964,8 @@ fn installed_route_matches_netlink_message<I: Ip>(
     let fnet_routes_ext::InstalledRoute {
         route: fnet_routes_ext::Route { destination: subnet, action, properties: _ },
         effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric: priority },
+        // TODO(https://fxbug.dev/336382905): Use the table ID.
+        table_id: _,
     } = del_route;
 
     let (outbound_interface, next_hop) = match action {
@@ -1080,6 +1084,8 @@ impl NetlinkRouteMessage {
         fnet_routes_ext::InstalledRoute {
             route: fnet_routes_ext::Route { destination, action, properties: _ },
             effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric },
+            // TODO(https://fxbug.dev/336382905): Use the table ID.
+            table_id: _,
         }: fnet_routes_ext::InstalledRoute<I>,
         table: RouteTableKey,
     ) -> Result<Self, NetlinkRouteMessageConversionError> {
@@ -1569,6 +1575,8 @@ mod tests {
                 },
             },
             effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric },
+            // TODO(https://fxbug.dev/336382905): The tests should use the ID.
+            table_id: 0,
         }
     }
 
@@ -2048,6 +2056,8 @@ mod tests {
                 },
             },
             effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric: METRIC1 },
+            // TODO(https://fxbug.dev/336382905): The tests should use the ID.
+            table_id: 0,
         };
 
         let actual: Result<NetlinkRouteMessage, NetlinkRouteMessageConversionError> =
@@ -2838,6 +2848,8 @@ mod tests {
         event_fn(fnet_routes_ext::InstalledRoute {
             route,
             effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric },
+            // TODO(https://fxbug.dev/336382905): The tests should use the ID.
+            table_id: 0,
         })
         .try_into()
         .unwrap()

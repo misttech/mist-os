@@ -23,7 +23,7 @@ class FakeLegacyStream {
   // dispatcher. If dispatcher is omitted or null, uses the current thread's default dispatcher.
   static fpromise::result<std::unique_ptr<FakeLegacyStream>, zx_status_t> Create(
       fidl::InterfaceRequest<fuchsia::camera2::Stream> request,
-      fuchsia::sysmem::AllocatorPtr& allocator, uint32_t format_index = 0,
+      fuchsia::sysmem2::AllocatorPtr& allocator, uint32_t format_index = 0,
 
       async_dispatcher_t* dispatcher = nullptr);
 

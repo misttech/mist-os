@@ -11,13 +11,4 @@
         binary: "bin/starnix_core_lib_test",
         is_shared_process: "true",
     },
-    use: [
-        {
-            protocol: [
-                "fuchsia.kernel.Stats",
-                "fuchsia.kernel.VmexResource",
-                "fuchsia.sysinfo.SysInfo",
-            ],
-        },
-    ],
 }

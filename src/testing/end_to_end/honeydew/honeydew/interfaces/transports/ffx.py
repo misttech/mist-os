@@ -254,6 +254,33 @@ class FFX(abc.ABC):
         """
 
     @abc.abstractmethod
+    def run_ssh_cmd(
+        self,
+        cmd: str,
+        timeout: float | None = TIMEOUTS["FFX_CLI"],
+        capture_output: bool = True,
+    ) -> str:
+        """Executes and returns the output of `ffx -t target ssh <cmd>`.
+
+        Args:
+            cmd: SSH command to run.
+            timeout: Timeout to wait for the ffx command to return.
+            capture_output: When True, the stdout/err from the command will be
+                captured and returned. When False, the output of the command
+                will be streamed to stdout/err accordingly and it won't be
+                returned. Defaults to True.
+
+        Returns:
+            Output of `ffx -t target ssh <cmd>` when capture_output is set to
+            True, otherwise an empty string.
+
+        Raises:
+            errors.DeviceNotConnectedError: If FFX fails to reach target.
+            errors.FfxTimeoutError: In case of FFX command timeout.
+            errors.FfxCommandError: In case of other FFX command failure.
+        """
+
+    @abc.abstractmethod
     def wait_for_rcs_connection(
         self, timeout: float = TIMEOUTS["TARGET_RCS_CONNECTION_WAIT"]
     ) -> None:

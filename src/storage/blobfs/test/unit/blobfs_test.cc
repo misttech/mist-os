@@ -444,9 +444,10 @@ TEST(BlobfsFragmentationTest, FragmentationMetrics) {
   auto info = CreateBlob(root, kLargeFileNumBlocks * kBlobfsBlockSize);
   fbl::RefPtr<fs::Vnode> file;
   ASSERT_EQ(root->Lookup(info->path, &file), ZX_OK);
-  fs::VnodeAttributes attributes;
-  file->GetAttributes(&attributes);
-  uint64_t blocks = attributes.storage_size / 8192;
+
+  zx::result attributes = file->GetAttributes();
+  ASSERT_TRUE(attributes.is_ok());
+  uint64_t blocks = *attributes->storage_size / 8192;
 
   // For some reason, if it turns out that the random data is highly compressible then our math
   // belows blows up. Assert that is not the case.

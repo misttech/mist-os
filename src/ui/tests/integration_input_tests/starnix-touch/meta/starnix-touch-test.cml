@@ -31,5 +31,10 @@
             from: "parent",
             to: "#realm_builder",
         },
+        {
+            directory: "boot-kernel",
+            from: "parent",
+            to: "#realm_builder",
+        },
     ],
 }

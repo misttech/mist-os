@@ -205,14 +205,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.io/Directory.Enumerate",
-        "strictness": "strict",
-        "ordinal": "3937494568478622589",
-        "direction": "one_way",
-        "request": "fuchsia.io/Directory2EnumerateRequest"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.io/Directory.GetAttr",
         "strictness": "strict",
         "ordinal": "8689798978500614909",
@@ -710,14 +702,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.io/Directory2.Enumerate",
-        "strictness": "strict",
-        "ordinal": "3937494568478622589",
-        "direction": "one_way",
-        "request": "fuchsia.io/Directory2EnumerateRequest"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.io/Directory2.GetAttributes",
         "strictness": "strict",
         "ordinal": "4414537700416816443",
@@ -874,23 +858,6 @@
     },
     {
         "kind": "struct/member",
-        "name": "fuchsia.io/Directory2EnumerateRequest.iterator",
-        "ordinal": "2",
-        "type": "server_end:fuchsia.io/DirectoryIterator"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/Directory2EnumerateRequest.options",
-        "ordinal": "1",
-        "type": "fuchsia.io/DirectoryEnumerateOptions"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.io/Directory2EnumerateRequest",
-        "resourceness": "resource"
-    },
-    {
-        "kind": "struct/member",
         "name": "fuchsia.io/Directory2Open2Request.object_request",
         "ordinal": "3",
         "type": "zx/Handle:CHANNEL"
@@ -953,38 +920,6 @@
     },
     {
         "kind": "table/member",
-        "name": "fuchsia.io/DirectoryEntry.abilities",
-        "ordinal": "3",
-        "type": "fuchsia.io/Operations"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.io/DirectoryEntry.id",
-        "ordinal": "4",
-        "type": "uint64"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.io/DirectoryEntry.name",
-        "ordinal": "1",
-        "type": "string:255"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.io/DirectoryEntry.protocols",
-        "ordinal": "2",
-        "type": "fuchsia.io/NodeProtocolKinds"
-    },
-    {
-        "kind": "table",
-        "name": "fuchsia.io/DirectoryEntry"
-    },
-    {
-        "kind": "table",
-        "name": "fuchsia.io/DirectoryEnumerateOptions"
-    },
-    {
-        "kind": "table/member",
         "name": "fuchsia.io/DirectoryInfo.attributes",
         "ordinal": "1",
         "type": "fuchsia.io/NodeAttributes2"
@@ -992,31 +927,6 @@
     {
         "kind": "table",
         "name": "fuchsia.io/DirectoryInfo"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/DirectoryIterator.GetNext",
-        "strictness": "strict",
-        "ordinal": "4355173791087153387",
-        "direction": "two_way",
-        "response": "fuchsia.io/DirectoryIterator_GetNext_Response",
-        "error": "int32"
-    },
-    {
-        "kind": "protocol",
-        "name": "fuchsia.io/DirectoryIterator",
-        "openness": "closed",
-        "transport": "channel"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/DirectoryIterator_GetNext_Response.entries",
-        "ordinal": "1",
-        "type": "vector<fuchsia.io/DirectoryEntry>:8192"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.io/DirectoryIterator_GetNext_Response"
     },
     {
         "kind": "struct",

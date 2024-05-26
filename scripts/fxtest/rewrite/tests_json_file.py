@@ -122,12 +122,12 @@ class TestEntry:
             ret: list[typing.Self] = list(
                 map(TestEntry.from_dict, vals)  # type:ignore
             )
-            names: typing.Set[str] = set()
+            name_path_pairs: typing.Set[typing.Tuple[str, str | None]] = set()
             for v in ret:
-                if v.test.name in names:
+                if (v.test.name, v.test.path) in name_path_pairs:
                     raise TestFileError(
-                        f"Expected all names to be unique in tests.json, but found {v.test.name} twice."
+                        f"Expected all names/path pairs to be unique in tests.json, but found {v.test.name} twice for the same path."
                     )
-                names.add(v.test.name)
+                name_path_pairs.add((v.test.name, v.test.path))
 
             return ret

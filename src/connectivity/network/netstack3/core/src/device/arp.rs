@@ -16,6 +16,7 @@ use packet_formats::{
     arp::{ArpOp, ArpPacket, ArpPacketBuilder, HType},
     utils::NonZeroDuration,
 };
+use ref_cast::RefCast;
 use tracing::{debug, trace, warn};
 
 use crate::{
@@ -24,43 +25,20 @@ use crate::{
         TimerContext, TracingContext,
     },
     counters::Counter,
-    device::{
-        link::{LinkDevice, LinkUnicastAddress},
-        DeviceIdContext, FrameDestination, WeakDeviceIdentifier,
-    },
-    ip::device::nud::{
+    device::{link::LinkDevice, DeviceIdContext, FrameDestination, WeakDeviceIdentifier},
+    ip::nud::{
         self, ConfirmationFlags, DynamicNeighborUpdateSource, LinkResolutionContext,
         NudBindingsTypes, NudConfigContext, NudContext, NudHandler, NudSenderContext, NudState,
         NudTimerId, NudUserConfig,
     },
 };
 
-// NOTE(joshlf): This may seem a bit odd. Why not just say that `ArpDevice` is a
-// sub-trait of `L: LinkDevice` where `L::Address: HType`? Unfortunately, rustc
-// is still pretty bad at reasoning about where clauses. In a (never published)
-// earlier version of this code, I tried that approach. Even simple function
-// signatures like `fn foo<D: ArpDevice, P: PType, C, SC: ArpContext<D, P, C>>()` were
-// too much for rustc to handle. Even without trying to actually use the
-// associated `Address` type, that function signature alone would cause rustc to
-// complain that it wasn't guaranteed that `D::Address: HType`.
-//
-// Doing it this way instead sidesteps the problem by taking the `where` clause
-// out of the definition of `ArpDevice`. It's still present in the blanket impl,
-// but rustc seems OK with that.
-
 /// A link device whose addressing scheme is supported by ARP.
 ///
 /// `ArpDevice` is implemented for all `L: LinkDevice where L::Address: HType`.
-pub trait ArpDevice: LinkDevice<Address = Self::HType> {
-    type HType: HType + LinkUnicastAddress + core::fmt::Debug;
-}
+pub trait ArpDevice: LinkDevice<Address: HType> {}
 
-impl<L: LinkDevice> ArpDevice for L
-where
-    L::Address: HType + LinkUnicastAddress,
-{
-    type HType = L::Address;
-}
+impl<L: LinkDevice<Address: HType>> ArpDevice for L {}
 
 /// The identifier for timer events in the ARP layer.
 pub(crate) type ArpTimerId<L, D> = NudTimerId<Ipv4, L, D>;
@@ -71,7 +49,7 @@ pub struct ArpFrameMetadata<D: ArpDevice, DeviceId> {
     /// The ID of the ARP device.
     pub(super) device_id: DeviceId,
     /// The destination hardware address.
-    pub(super) dst_addr: D::HType,
+    pub(super) dst_addr: D::Address,
 }
 
 /// Counters for the ARP layer.
@@ -106,7 +84,7 @@ pub trait ArpSenderContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceI
     fn send_ip_packet_to_neighbor_link_addr<S>(
         &mut self,
         bindings_ctx: &mut BC,
-        dst_link_address: D::HType,
+        dst_link_address: D::Address,
         body: S,
     ) -> Result<(), S>
     where
@@ -157,7 +135,9 @@ impl<
 
 /// An execution context for the ARP protocol.
 pub trait ArpContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceId>>:
-    DeviceIdContext<D> + SendFrameContext<BC, ArpFrameMetadata<D, Self::DeviceId>>
+    DeviceIdContext<D>
+    + SendFrameContext<BC, ArpFrameMetadata<D, Self::DeviceId>>
+    + CounterContext<ArpCounters>
 {
     type ConfigCtx<'a>: ArpConfigContext;
 
@@ -189,7 +169,7 @@ pub trait ArpContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceId>>:
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
-    ) -> UnicastAddr<D::HType>;
+    ) -> UnicastAddr<D::Address>;
 
     /// Calls the function with a mutable reference to ARP state and the ARP
     /// configuration context.
@@ -218,26 +198,41 @@ pub trait ArpConfigContext {
     fn with_nud_user_config<O, F: FnOnce(&NudUserConfig) -> O>(&mut self, cb: F) -> O;
 }
 
-impl<
-        D: ArpDevice,
-        BC: ArpBindingsContext<D, CC::DeviceId>,
-        CC: ArpContext<D, BC> + CounterContext<ArpCounters>,
-    > NudContext<Ipv4, D, BC> for CC
-{
-    type ConfigCtx<'a> = <CC as ArpContext<D, BC>>::ConfigCtx<'a>;
+/// Provides a [`NudContext`] IPv4 implementation for a core context that
+/// implements [`ArpContext`].
+#[derive(RefCast)]
+#[repr(transparent)]
+pub struct ArpNudCtx<CC>(CC);
 
-    type SenderCtx<'a> = <CC as ArpContext<D, BC>>::ArpSenderCtx<'a>;
+impl<D, CC> DeviceIdContext<D> for ArpNudCtx<CC>
+where
+    D: ArpDevice,
+    CC: DeviceIdContext<D>,
+{
+    type DeviceId = CC::DeviceId;
+    type WeakDeviceId = CC::WeakDeviceId;
+}
+
+impl<D, CC, BC> NudContext<Ipv4, D, BC> for ArpNudCtx<CC>
+where
+    D: ArpDevice,
+    BC: ArpBindingsContext<D, CC::DeviceId>,
+    CC: ArpContext<D, BC>,
+{
+    type ConfigCtx<'a> = ArpNudCtx<CC::ConfigCtx<'a>>;
+    type SenderCtx<'a> = ArpNudCtx<CC::ArpSenderCtx<'a>>;
 
     fn with_nud_state_mut_and_sender_ctx<
         O,
         F: FnOnce(&mut NudState<Ipv4, D, BC>, &mut Self::SenderCtx<'_>) -> O,
     >(
         &mut self,
-        device_id: &CC::DeviceId,
+        device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        self.with_arp_state_mut_and_sender_ctx(device_id, |ArpState { nud }, core_ctx| {
-            cb(nud, core_ctx)
+        let Self(core_ctx) = self;
+        core_ctx.with_arp_state_mut_and_sender_ctx(device_id, |ArpState { nud }, core_ctx| {
+            cb(nud, ArpNudCtx::ref_cast_mut(core_ctx))
         })
     }
 
@@ -246,10 +241,13 @@ impl<
         F: FnOnce(&mut NudState<Ipv4, D, BC>, &mut Self::ConfigCtx<'_>) -> O,
     >(
         &mut self,
-        device_id: &CC::DeviceId,
+        device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        self.with_arp_state_mut(device_id, |ArpState { nud }, core_ctx| cb(nud, core_ctx))
+        let Self(core_ctx) = self;
+        core_ctx.with_arp_state_mut(device_id, |ArpState { nud }, core_ctx| {
+            cb(nud, ArpNudCtx::ref_cast_mut(core_ctx))
+        })
     }
 
     fn with_nud_state<O, F: FnOnce(&NudState<Ipv4, D, BC>) -> O>(
@@ -257,44 +255,49 @@ impl<
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        self.with_arp_state(device_id, |ArpState { nud }| cb(nud))
+        let Self(core_ctx) = self;
+        core_ctx.with_arp_state(device_id, |ArpState { nud }| cb(nud))
     }
 
     fn send_neighbor_solicitation(
         &mut self,
         bindings_ctx: &mut BC,
-        device_id: &CC::DeviceId,
-        lookup_addr: SpecifiedAddr<Ipv4Addr>,
-        remote_link_addr: Option<D::Address>,
+        device_id: &Self::DeviceId,
+        lookup_addr: SpecifiedAddr<<Ipv4 as net_types::ip::Ip>::Addr>,
+        remote_link_addr: Option<<D as LinkDevice>::Address>,
     ) {
-        send_arp_request(self, bindings_ctx, device_id, lookup_addr.get(), remote_link_addr)
+        let Self(core_ctx) = self;
+        send_arp_request(core_ctx, bindings_ctx, device_id, lookup_addr.get(), remote_link_addr)
     }
 }
 
-impl<CC: ArpConfigContext> NudConfigContext<Ipv4> for CC {
+impl<CC: ArpConfigContext> NudConfigContext<Ipv4> for ArpNudCtx<CC> {
     fn retransmit_timeout(&mut self) -> NonZeroDuration {
-        self.retransmit_timeout()
+        let Self(core_ctx) = self;
+        core_ctx.retransmit_timeout()
     }
 
     fn with_nud_user_config<O, F: FnOnce(&NudUserConfig) -> O>(&mut self, cb: F) -> O {
-        ArpConfigContext::with_nud_user_config(self, cb)
+        let Self(core_ctx) = self;
+        core_ctx.with_nud_user_config(cb)
     }
 }
 
 impl<D: ArpDevice, BC: ArpBindingsContext<D, CC::DeviceId>, CC: ArpSenderContext<D, BC>>
-    NudSenderContext<Ipv4, D, BC> for CC
+    NudSenderContext<Ipv4, D, BC> for ArpNudCtx<CC>
 {
     fn send_ip_packet_to_neighbor_link_addr<S>(
         &mut self,
         bindings_ctx: &mut BC,
-        dst_mac: D::HType,
+        dst_mac: D::Address,
         body: S,
     ) -> Result<(), S>
     where
         S: Serializer,
         S::Buffer: BufferMut,
     {
-        ArpSenderContext::send_ip_packet_to_neighbor_link_addr(self, bindings_ctx, dst_mac, body)
+        let Self(core_ctx) = self;
+        core_ctx.send_ip_packet_to_neighbor_link_addr(bindings_ctx, dst_mac, body)
     }
 }
 
@@ -346,7 +349,7 @@ fn handle_packet<
 ) {
     core_ctx.increment(|counters| &counters.rx_packets);
     // TODO(wesleyac) Add support for probe.
-    let packet = match buffer.parse::<ArpPacket<_, D::HType, Ipv4Addr>>() {
+    let packet = match buffer.parse::<ArpPacket<_, D::Address, Ipv4Addr>>() {
         Ok(packet) => packet,
         Err(err) => {
             // If parse failed, it's because either the packet was malformed, or
@@ -555,7 +558,7 @@ fn handle_packet<
 // TODO(https://fxbug.dev/42075782): allow this default to be overridden.
 //
 // [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
-const DEFAULT_ARP_REQUEST_PERIOD: Duration = crate::ip::device::state::RETRANS_TIMER_DEFAULT.get();
+const DEFAULT_ARP_REQUEST_PERIOD: Duration = crate::ip::nud::RETRANS_TIMER_DEFAULT.get();
 
 fn send_arp_request<
     D: ArpDevice,
@@ -570,7 +573,7 @@ fn send_arp_request<
 ) {
     if let Some(sender_protocol_addr) = core_ctx.get_protocol_addr(bindings_ctx, device_id) {
         let self_hw_addr = core_ctx.get_hardware_addr(bindings_ctx, device_id);
-        let dst_addr = remote_link_addr.unwrap_or(D::HType::BROADCAST);
+        let dst_addr = remote_link_addr.unwrap_or(D::Address::BROADCAST);
         core_ctx.increment(|counters| &counters.tx_requests);
         debug!("sending ARP request for {lookup_addr} to {dst_addr:?}");
         SendFrameContext::send_frame(
@@ -652,14 +655,15 @@ mod tests {
             link::testutil::FakeLinkDeviceId,
             testutil::{FakeDeviceId, FakeWeakDeviceId},
         },
-        ip::device::nud::{
+        ip::nud::{
             testutil::{
                 assert_dynamic_neighbor_state, assert_dynamic_neighbor_with_addr,
                 assert_neighbor_unknown,
             },
-            DynamicNeighborState, NudCounters, NudIcmpContext, Reachable, Stale,
+            DelegateNudContext, DynamicNeighborState, NudCounters, NudIcmpContext, Reachable,
+            Stale, UseDelegateNudContext,
         },
-        socket::address::SocketIpAddr,
+        socket::SocketIpAddr,
         testutil::assert_empty,
     };
 
@@ -827,6 +831,11 @@ mod tests {
             let FakeArpCtx { arp_state, config, .. } = &mut self.state;
             cb(arp_state, config)
         }
+    }
+
+    impl UseDelegateNudContext for FakeArpCtx {}
+    impl DelegateNudContext<Ipv4> for FakeArpCtx {
+        type Delegate<T> = ArpNudCtx<T>;
     }
 
     impl NudIcmpContext<Ipv4, EthernetLinkDevice, FakeBindingsCtxImpl> for FakeCoreCtxImpl {

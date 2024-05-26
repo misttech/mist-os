@@ -33,9 +33,9 @@ impl TestHarness {
         let config = proxy.get_config().await.expect("Could not get config from proxy");
 
         // Validate configuration options for consistency, disallow invalid combinations.
-        if config.supports_rename.unwrap_or_default() || config.supports_link.unwrap_or_default() {
+        if config.supports_rename || config.supports_link {
             assert!(
-                config.supports_get_token.unwrap_or_default(),
+                config.supports_get_token,
                 "GetToken must be supported for testing Rename/Link!"
             );
         }
@@ -79,6 +79,32 @@ impl TestHarness {
             | fio::Abilities::TRAVERSE
             | fio::Abilities::MODIFY_DIRECTORY
     }
+
+    /// Returns true if the harness supports at least one mutable attribute, false otherwise.
+    ///
+    /// *NOTE*: To allow testing both the io1 SetAttrs and io2 UpdateAttributes methods, harnesses
+    /// that support mutable attributes must support [`fio::NodeAttributesQuery::CREATION_TIME`]
+    /// and [`fio::NodeAttributesQuery::MODIFICATION_TIME`].
+    pub fn supports_mutable_attrs(&self) -> bool {
+        let all_mutable_attrs: fio::NodeAttributesQuery = fio::NodeAttributesQuery::ACCESS_TIME
+            | fio::NodeAttributesQuery::MODIFICATION_TIME
+            | fio::NodeAttributesQuery::CREATION_TIME
+            | fio::NodeAttributesQuery::MODE
+            | fio::NodeAttributesQuery::GID
+            | fio::NodeAttributesQuery::UID
+            | fio::NodeAttributesQuery::RDEV;
+        if self.config.supported_attributes.intersects(all_mutable_attrs) {
+            assert!(
+                self.config.supported_attributes.contains(
+                    fio::NodeAttributesQuery::CREATION_TIME
+                        | fio::NodeAttributesQuery::MODIFICATION_TIME
+                ),
+                "Harnesses must support at least CREATION_TIME if attributes are mutable."
+            );
+            return true;
+        }
+        false
+    }
 }
 
 async fn connect_to_harness() -> io_test::Io1HarnessProxy {
@@ -111,7 +137,7 @@ async fn connect_to_harness() -> io_test::Io1HarnessProxy {
 fn get_supported_dir_rights(config: &io_test::Io1Config) -> fio::OpenFlags {
     fio::OpenFlags::RIGHT_READABLE
         | fio::OpenFlags::RIGHT_WRITABLE
-        | if config.supports_executable_file.unwrap_or(false) {
+        | if config.supports_executable_file {
             fio::OpenFlags::RIGHT_EXECUTABLE
         } else {
             fio::OpenFlags::empty()

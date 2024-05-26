@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 
 #include "fault_test.h"
+#include "fault_test_suite.h"
 
 namespace {
 

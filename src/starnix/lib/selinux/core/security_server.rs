@@ -482,22 +482,9 @@ impl Query for SecurityServer {
 }
 
 impl AccessVectorComputer for SecurityServer {
-    fn access_vector_from_permission<P: ClassPermission + Into<Permission> + 'static>(
+    fn access_vector_from_permissions<P: ClassPermission + Into<Permission> + Clone + 'static>(
         &self,
-        permission: P,
-    ) -> AccessVector {
-        match &self.state.lock().policy {
-            Some(policy) => policy.parsed.access_vector_from_permission(permission),
-            None => AccessVector::NONE,
-        }
-    }
-
-    fn access_vector_from_permissions<
-        P: ClassPermission + Into<Permission> + 'static,
-        PI: IntoIterator<Item = P>,
-    >(
-        &self,
-        permissions: PI,
+        permissions: &[P],
     ) -> AccessVector {
         match &self.state.lock().policy {
             Some(policy) => policy.parsed.access_vector_from_permissions(permissions),

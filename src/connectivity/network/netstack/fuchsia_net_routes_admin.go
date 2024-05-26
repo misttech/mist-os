@@ -30,9 +30,6 @@ const (
 	routeSetV4Name  = "fuchsia.net.routes.admin/RouteSetV4"
 	routeSetV6Name  = "fuchsia.net.routes.admin/RouteSetV6"
 	routesAdminName = "fuchsia.net.routes.admin"
-
-	v4MainTableId = 0
-	v6MainTableId = 1
 )
 
 type UnauthenticatedError struct {

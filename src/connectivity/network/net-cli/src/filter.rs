@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_net_filter_ext::{
-    ControllerId, Domain, NamespaceId, Resource, ResourceId, RoutineId, RoutineType, Rule, RuleId,
-    Update,
+    ControllerId, Domain, InstalledIpRoutine, InstalledNatRoutine, IpHook, NamespaceId, NatHook,
+    Resource, ResourceId, RoutineId, RoutineType, Rule, RuleId, Update,
 };
-use itertools::Itertools;
 use std::collections::{BTreeMap, HashMap};
 
 /// A datatype storing the filtering resource state. Design inspired by nftables.
@@ -86,18 +85,97 @@ pub struct Namespace {
     routines: HashMap<RoutineId, Routine>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
+pub struct RoutinePriority(pub i32);
+
+#[derive(Debug, Default, PartialEq)]
+pub struct IpRoutines {
+    pub ingress: BTreeMap<RoutinePriority, Vec<Routine>>,
+    pub local_ingress: BTreeMap<RoutinePriority, Vec<Routine>>,
+    pub forwarding: BTreeMap<RoutinePriority, Vec<Routine>>,
+    pub local_egress: BTreeMap<RoutinePriority, Vec<Routine>>,
+    pub egress: BTreeMap<RoutinePriority, Vec<Routine>>,
+    pub uninstalled: Vec<Routine>,
+}
+
+impl IpRoutines {
+    pub fn has_installed_routines(&self) -> bool {
+        !self.ingress.is_empty()
+            || !self.local_ingress.is_empty()
+            || !self.forwarding.is_empty()
+            || !self.local_egress.is_empty()
+            || !self.egress.is_empty()
+    }
+
+    pub fn has_uninstalled_routines(&self) -> bool {
+        !self.uninstalled.is_empty()
+    }
+}
+
+#[derive(Debug, Default, PartialEq)]
+pub struct NatRoutines {
+    pub ingress: BTreeMap<RoutinePriority, Vec<Routine>>,
+    pub local_ingress: BTreeMap<RoutinePriority, Vec<Routine>>,
+    pub local_egress: BTreeMap<RoutinePriority, Vec<Routine>>,
+    pub egress: BTreeMap<RoutinePriority, Vec<Routine>>,
+    pub uninstalled: Vec<Routine>,
+}
+
+impl NatRoutines {
+    pub fn has_installed_routines(&self) -> bool {
+        !self.ingress.is_empty()
+            || !self.local_ingress.is_empty()
+            || !self.local_egress.is_empty()
+            || !self.egress.is_empty()
+    }
+
+    pub fn has_uninstalled_routines(&self) -> bool {
+        !self.uninstalled.is_empty()
+    }
+}
+
 impl Namespace {
     fn new(namespace: fidl_fuchsia_net_filter_ext::Namespace) -> Self {
         Self { id: namespace.id, domain: namespace.domain, routines: HashMap::new() }
     }
 
-    /// Gets an iterator over the Routines of this Namespace.
-    pub fn routines(&self) -> impl Iterator<Item = &Routine> {
-        self.routines
-            .values()
-            // TODO(https://fxbug.dev/329686169): Improve data structure and readability of
-            // Routines within a Namespace.
-            .sorted_by(|routine_a, routine_b| routine_b.priority().cmp(&routine_a.priority()))
+    /// Gets routines in a namespace grouped by their RoutineType.
+    pub fn routines(&self) -> (IpRoutines, NatRoutines) {
+        let mut ip_routines = IpRoutines::default();
+        let mut nat_routines = NatRoutines::default();
+
+        self.routines.values().for_each(|routine| {
+            let routine = routine.clone();
+            match routine.routine_type {
+                RoutineType::Nat(None) => nat_routines.uninstalled.push(routine),
+                RoutineType::Ip(None) => ip_routines.uninstalled.push(routine),
+                RoutineType::Nat(Some(InstalledNatRoutine { priority, hook })) => {
+                    let routines_on_hook = match hook {
+                        NatHook::Egress => &mut nat_routines.egress,
+                        NatHook::LocalEgress => &mut nat_routines.local_egress,
+                        NatHook::Ingress => &mut nat_routines.ingress,
+                        NatHook::LocalIngress => &mut nat_routines.local_ingress,
+                    };
+
+                    let routine_priority = RoutinePriority(priority);
+                    routines_on_hook.entry(routine_priority).or_default().push(routine)
+                }
+                RoutineType::Ip(Some(InstalledIpRoutine { priority, hook })) => {
+                    let routines_on_hook = match hook {
+                        IpHook::Egress => &mut ip_routines.egress,
+                        IpHook::LocalEgress => &mut ip_routines.local_egress,
+                        IpHook::Ingress => &mut ip_routines.ingress,
+                        IpHook::LocalIngress => &mut ip_routines.local_ingress,
+                        IpHook::Forwarding => &mut ip_routines.forwarding,
+                    };
+
+                    let routine_priority = RoutinePriority(priority);
+                    routines_on_hook.entry(routine_priority).or_default().push(routine)
+                }
+            }
+        });
+
+        (ip_routines, nat_routines)
     }
 
     fn find_routine_mut(&mut self, routine_id: &RoutineId) -> Option<&mut Routine> {
@@ -138,14 +216,6 @@ impl Routine {
     /// Gets an iterator over the rules in this routine, in order by rule's index.
     pub fn rules(&self) -> impl Iterator<Item = &Rule> {
         self.rules.values()
-    }
-
-    fn priority(&self) -> Option<i32> {
-        match &self.routine_type {
-            RoutineType::Ip(Some(ip)) => Some(ip.priority),
-            RoutineType::Nat(Some(nat)) => Some(nat.priority),
-            RoutineType::Ip(None) | RoutineType::Nat(None) => None,
-        }
     }
 
     fn add_rule(&mut self, rule: Rule) -> Option<Resource> {
@@ -210,7 +280,8 @@ impl Update for FilteringResources {
 
 #[cfg(test)]
 mod tests {
-    use fidl_fuchsia_net_filter_ext::{Action, InstalledIpRoutine, IpHook, Matchers};
+    use fidl_fuchsia_net_filter_ext::{Action, Matchers};
+    use itertools::Itertools;
 
     use super::*;
 
@@ -243,7 +314,9 @@ mod tests {
         ) -> Option<Vec<fidl_fuchsia_net_filter_ext::Routine>> {
             let routines = self
                 .find_namespace(&controller_id, &namespace_id)?
-                .routines()
+                .routines
+                .values()
+                .sorted_by(|routine_a, routine_b| routine_b.priority().cmp(&routine_a.priority()))
                 .map(|routine| routine.clone().into())
                 .collect();
 
@@ -257,9 +330,19 @@ mod tests {
             routine_id: RoutineId,
         ) -> Option<Vec<&Rule>> {
             self.find_namespace(&controller_id, &namespace_id)?
-                .routines()
-                .find(|routine| routine.id == routine_id)
+                .routines
+                .get(&routine_id)
                 .map(|routine| routine.rules.values().collect_vec())
+        }
+    }
+
+    impl Routine {
+        fn priority(&self) -> Option<i32> {
+            match &self.routine_type {
+                RoutineType::Ip(Some(ip)) => Some(ip.priority),
+                RoutineType::Nat(Some(nat)) => Some(nat.priority),
+                RoutineType::Ip(None) | RoutineType::Nat(None) => None,
+            }
         }
     }
 
@@ -317,6 +400,16 @@ mod tests {
                 priority,
                 hook: IpHook::Ingress,
             })),
+        }
+    }
+
+    fn test_routine_with_routine_type(
+        name: String,
+        routine_type: RoutineType,
+    ) -> fidl_fuchsia_net_filter_ext::Routine {
+        fidl_fuchsia_net_filter_ext::Routine {
+            id: RoutineId { namespace: test_namespace_a().id, name },
+            routine_type,
         }
     }
 
@@ -560,21 +653,190 @@ mod tests {
     }
 
     #[test]
+    fn add_routines_generates_correct_nat_ip_data_structure() {
+        let mut namespace = Namespace::new(test_namespace_a());
+        let routine_priority = RoutinePriority(12);
+
+        let ip_ingress = test_routine_with_routine_type(
+            "routine-ip-ingress".to_string(),
+            RoutineType::Ip(Some(InstalledIpRoutine {
+                priority: routine_priority.0,
+                hook: IpHook::Ingress,
+            })),
+        );
+        let ip_local_ingress = test_routine_with_routine_type(
+            "routine-ip-local-ingress".to_string(),
+            RoutineType::Ip(Some(InstalledIpRoutine {
+                priority: routine_priority.0,
+                hook: IpHook::LocalIngress,
+            })),
+        );
+        let ip_egress = test_routine_with_routine_type(
+            "routine-ip-egress".to_string(),
+            RoutineType::Ip(Some(InstalledIpRoutine {
+                priority: routine_priority.0,
+                hook: IpHook::Egress,
+            })),
+        );
+        let ip_local_egress = test_routine_with_routine_type(
+            "routine-ip-local-egress".to_string(),
+            RoutineType::Ip(Some(InstalledIpRoutine {
+                priority: routine_priority.0,
+                hook: IpHook::LocalEgress,
+            })),
+        );
+        let ip_forwarding = test_routine_with_routine_type(
+            "routine-ip-forwarding".to_string(),
+            RoutineType::Ip(Some(InstalledIpRoutine {
+                priority: routine_priority.0,
+                hook: IpHook::Forwarding,
+            })),
+        );
+        let ip_uninstalled = test_routine_with_routine_type(
+            "routine-ip-uninstalled".to_string(),
+            RoutineType::Ip(None),
+        );
+        let nat_ingress = test_routine_with_routine_type(
+            "routine-nat-ingress".to_string(),
+            RoutineType::Nat(Some(InstalledNatRoutine {
+                priority: routine_priority.0,
+                hook: NatHook::Ingress,
+            })),
+        );
+        let nat_local_ingress = test_routine_with_routine_type(
+            "routine-nat-local-ingress".to_string(),
+            RoutineType::Nat(Some(InstalledNatRoutine {
+                priority: routine_priority.0,
+                hook: NatHook::LocalIngress,
+            })),
+        );
+        let nat_egress = test_routine_with_routine_type(
+            "routine-nat-egress".to_string(),
+            RoutineType::Nat(Some(InstalledNatRoutine {
+                priority: routine_priority.0,
+                hook: NatHook::Egress,
+            })),
+        );
+        let nat_local_egress = test_routine_with_routine_type(
+            "routine-nat-local-egress".to_string(),
+            RoutineType::Nat(Some(InstalledNatRoutine {
+                priority: routine_priority.0,
+                hook: NatHook::LocalEgress,
+            })),
+        );
+        let nat_uninstalled = test_routine_with_routine_type(
+            "routine-nat-uninstalled".to_string(),
+            RoutineType::Nat(None),
+        );
+
+        let _ = namespace.add_routine(ip_ingress.clone());
+        let _ = namespace.add_routine(ip_local_ingress.clone());
+        let _ = namespace.add_routine(ip_egress.clone());
+        let _ = namespace.add_routine(ip_local_egress.clone());
+        let _ = namespace.add_routine(ip_forwarding.clone());
+        let _ = namespace.add_routine(ip_uninstalled.clone());
+        let _ = namespace.add_routine(nat_ingress.clone());
+        let _ = namespace.add_routine(nat_local_ingress.clone());
+        let _ = namespace.add_routine(nat_egress.clone());
+        let _ = namespace.add_routine(nat_local_egress.clone());
+        let _ = namespace.add_routine(nat_uninstalled.clone());
+
+        assert_eq!(
+            namespace.routines(),
+            (
+                IpRoutines {
+                    ingress: BTreeMap::from([(
+                        routine_priority.clone(),
+                        vec![Routine::new(ip_ingress)]
+                    )]),
+                    local_ingress: BTreeMap::from([(
+                        routine_priority.clone(),
+                        vec![Routine::new(ip_local_ingress)]
+                    )]),
+                    forwarding: BTreeMap::from([(
+                        routine_priority.clone(),
+                        vec![Routine::new(ip_forwarding)]
+                    )]),
+                    local_egress: BTreeMap::from([(
+                        routine_priority.clone(),
+                        vec![Routine::new(ip_local_egress)]
+                    )]),
+                    egress: BTreeMap::from([(
+                        routine_priority.clone(),
+                        vec![Routine::new(ip_egress)]
+                    )]),
+                    uninstalled: vec![Routine::new(ip_uninstalled)],
+                },
+                NatRoutines {
+                    ingress: BTreeMap::from([(
+                        routine_priority.clone(),
+                        vec![Routine::new(nat_ingress)]
+                    )]),
+                    local_ingress: BTreeMap::from([(
+                        routine_priority.clone(),
+                        vec![Routine::new(nat_local_ingress)]
+                    )]),
+                    local_egress: BTreeMap::from([(
+                        routine_priority.clone(),
+                        vec![Routine::new(nat_local_egress)]
+                    )]),
+                    egress: BTreeMap::from([(
+                        routine_priority.clone(),
+                        vec![Routine::new(nat_egress)]
+                    )]),
+                    uninstalled: vec![Routine::new(nat_uninstalled)],
+                },
+            )
+        );
+    }
+
+    #[test]
     fn add_routines_orders_by_priority() {
         let mut namespace = Namespace::new(test_namespace_a());
 
-        let routine_first = test_routine_with_priority("routine-a".to_string(), 14);
+        let routine_first = test_routine_with_priority("routine-a".to_string(), 12);
         let routine_second = test_routine_with_priority("routine-b".to_string(), 13);
-        let routine_third = test_routine_with_priority("routine-c".to_string(), 12);
+        let routine_third = test_routine_with_priority("routine-c".to_string(), 14);
 
         let _ = namespace.add_routine(routine_third.clone());
         let _ = namespace.add_routine(routine_first.clone());
         let _ = namespace.add_routine(routine_second.clone());
 
-        let routines: Vec<fidl_fuchsia_net_filter_ext::Routine> =
-            namespace.routines().map(|routine| routine.clone().into()).collect();
+        let routines: Vec<fidl_fuchsia_net_filter_ext::Routine> = namespace
+            .routines()
+            .0
+            .ingress
+            .values()
+            .flatten()
+            .map(|routine| routine.clone().into())
+            .collect();
 
         assert_eq!(routines, vec![routine_first, routine_second, routine_third]);
+    }
+
+    #[test]
+    fn add_routines_handles_duplicate_priority() {
+        const PRIORITY: i32 = 14;
+        let mut namespace = Namespace::new(test_namespace_a());
+
+        let routine_first = test_routine_with_priority("routine-a".to_string(), PRIORITY);
+        let routine_second = test_routine_with_priority("routine-b".to_string(), PRIORITY);
+
+        let _ = namespace.add_routine(routine_first.clone());
+        let _ = namespace.add_routine(routine_second.clone());
+
+        let routines: Vec<fidl_fuchsia_net_filter_ext::Routine> = namespace
+            .routines()
+            .0
+            .ingress
+            .values()
+            .flatten()
+            // Sort for deterministic testing.
+            .sorted_by(|routine_a, routine_b| routine_a.id.name.cmp(&routine_b.id.name))
+            .map(|routines| routines.clone().into())
+            .collect();
+
+        assert_eq!(routines, vec![routine_first, routine_second]);
     }
 
     #[test]

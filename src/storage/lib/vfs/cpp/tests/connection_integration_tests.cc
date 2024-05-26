@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -39,6 +39,28 @@ class FileOrDirectory : public fs::Vnode {
   fuchsia_io::NodeProtocolKinds GetProtocols() const final {
     return fuchsia_io::NodeProtocolKinds::kFile | fuchsia_io::NodeProtocolKinds::kDirectory;
   }
+
+  fs::VnodeAttributesQuery SupportedMutableAttributes() const final {
+    return fs::VnodeAttributesQuery::kModificationTime;
+  }
+
+  zx::result<fs::VnodeAttributes> GetAttributes() const final {
+    return zx::ok(fs::VnodeAttributes{
+        .id = 1234,
+        .modification_time = modification_time_,
+    });
+  }
+
+  zx::result<> UpdateAttributes(const fs::VnodeAttributesUpdate& attributes) final {
+    // Attributes not reported by |SupportedMutableAttributes()| should never be set in
+    // |attributes|.
+    ZX_ASSERT(!attributes.creation_time);
+    modification_time_ = *attributes.modification_time;
+    return zx::ok();
+  }
+
+ private:
+  uint64_t modification_time_;
 };
 
 // Helper method to monitor the OnOpen event, used by the tests below when
@@ -131,25 +153,24 @@ TEST_F(ConnectionTest, NodeGetSetFlagsOnFile) {
   zx::result fc = fidl::CreateEndpoints<fio::File>();
   ASSERT_OK(fc.status_value());
   ASSERT_OK(fdio_open_at(root.client.channel().get(), "file",
-                         static_cast<uint32_t>(fio::wire::OpenFlags::kRightReadable),
+                         static_cast<uint32_t>(fio::OpenFlags::kRightReadable),
                          fc->server.TakeChannel().release()));
 
   // Use GetFlags to get current flags and rights
   auto file_get_result = fidl::WireCall(fc->client)->GetFlags();
   EXPECT_OK(file_get_result.status());
-  EXPECT_EQ(fio::wire::OpenFlags::kRightReadable, file_get_result->flags);
+  EXPECT_EQ(fio::OpenFlags::kRightReadable, file_get_result->flags);
   {
     // Make modifications to flags with SetFlags: Note this only works for kOpenFlagAppend
     // based on posix standard
-    auto file_set_result = fidl::WireCall(fc->client)->SetFlags(fio::wire::OpenFlags::kAppend);
+    auto file_set_result = fidl::WireCall(fc->client)->SetFlags(fio::OpenFlags::kAppend);
     EXPECT_OK(file_set_result->s);
   }
   {
     // Check that the new flag is saved
     auto file_get_result = fidl::WireCall(fc->client)->GetFlags();
     EXPECT_OK(file_get_result->s);
-    EXPECT_EQ(fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kAppend,
-              file_get_result->flags);
+    EXPECT_EQ(fio::OpenFlags::kRightReadable | fio::OpenFlags::kAppend, file_get_result->flags);
   }
 }
 
@@ -161,19 +182,18 @@ TEST_F(ConnectionTest, NodeGetSetFlagsOnDirectory) {
   // Connect to Directory
   zx::result dc = fidl::CreateEndpoints<fio::Directory>();
   ASSERT_OK(dc.status_value());
-  ASSERT_OK(fdio_open_at(root.client.channel().get(), "dir",
-                         static_cast<uint32_t>(fio::wire::OpenFlags::kRightReadable |
-                                               fio::wire::OpenFlags::kRightWritable),
-                         dc->server.TakeChannel().release()));
+  ASSERT_OK(fdio_open_at(
+      root.client.channel().get(), "dir",
+      static_cast<uint32_t>(fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable),
+      dc->server.TakeChannel().release()));
 
   // Directories don't have settable flags, only report RIGHT_* flags.
   auto dir_get_result = fidl::WireCall(dc->client)->GetFlags();
   EXPECT_OK(dir_get_result->s);
-  EXPECT_EQ(fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightWritable,
-            dir_get_result->flags);
+  EXPECT_EQ(fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable, dir_get_result->flags);
 
   // Directories do not support setting flags.
-  auto dir_set_result = fidl::WireCall(dc->client)->SetFlags(fio::wire::OpenFlags::kAppend);
+  auto dir_set_result = fidl::WireCall(dc->client)->SetFlags(fio::OpenFlags::kAppend);
   EXPECT_EQ(dir_set_result->s, ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -183,37 +203,37 @@ TEST_F(ConnectionTest, PosixFlagDirectoryRightExpansion) {
   ASSERT_OK(ConnectClient(std::move(root.server)));
 
   // Combinations of POSIX flags to be tested.
-  const fio::wire::OpenFlags OPEN_FLAG_COMBINATIONS[]{
-      fio::wire::OpenFlags::kPosixWritable, fio::wire::OpenFlags::kPosixExecutable,
-      fio::wire::OpenFlags::kPosixWritable | fio::wire::OpenFlags::kPosixExecutable};
+  const fio::OpenFlags OPEN_FLAG_COMBINATIONS[]{
+      fio::OpenFlags::kPosixWritable, fio::OpenFlags::kPosixExecutable,
+      fio::OpenFlags::kPosixWritable | fio::OpenFlags::kPosixExecutable};
 
-  for (const fio::wire::OpenFlags OPEN_FLAGS : OPEN_FLAG_COMBINATIONS) {
+  for (const fio::OpenFlags OPEN_FLAGS : OPEN_FLAG_COMBINATIONS) {
     // Connect to drectory specifying the flag combination we want to test.
     zx::result dc = fidl::CreateEndpoints<fio::Directory>();
     ASSERT_OK(dc.status_value());
     ASSERT_OK(fdio_open_at(root.client.channel().get(), "dir",
-                           static_cast<uint32_t>(fio::wire::OpenFlags::kRightReadable | OPEN_FLAGS),
+                           static_cast<uint32_t>(fio::OpenFlags::kRightReadable | OPEN_FLAGS),
                            dc->server.TakeChannel().release()));
 
     // Ensure flags match those which we expect.
     auto dir_get_result = fidl::WireCall(dc->client)->GetFlags();
     EXPECT_OK(dir_get_result->s);
     auto dir_flags = dir_get_result->flags;
-    EXPECT_TRUE(fio::wire::OpenFlags::kRightReadable & dir_flags);
+    EXPECT_TRUE(fio::OpenFlags::kRightReadable & dir_flags);
     // Each POSIX flag should be expanded to its respective right(s).
-    if (OPEN_FLAGS & fio::wire::OpenFlags::kPosixWritable)
-      EXPECT_TRUE(fio::wire::OpenFlags::kRightWritable & dir_flags);
-    if (OPEN_FLAGS & fio::wire::OpenFlags::kPosixExecutable)
-      EXPECT_TRUE(fio::wire::OpenFlags::kRightExecutable & dir_flags);
+    if (OPEN_FLAGS & fio::OpenFlags::kPosixWritable)
+      EXPECT_TRUE(fio::OpenFlags::kRightWritable & dir_flags);
+    if (OPEN_FLAGS & fio::OpenFlags::kPosixExecutable)
+      EXPECT_TRUE(fio::OpenFlags::kRightExecutable & dir_flags);
 
     // Repeat test, but for file, which should not have any expanded rights.
     auto fc = fidl::Endpoints<fio::File>::Create();
     ASSERT_OK(fdio_open_at(root.client.channel().get(), "file",
-                           static_cast<uint32_t>(fio::wire::OpenFlags::kRightReadable | OPEN_FLAGS),
+                           static_cast<uint32_t>(fio::OpenFlags::kRightReadable | OPEN_FLAGS),
                            fc.server.TakeChannel().release()));
     auto file_get_result = fidl::WireCall(fc.client)->GetFlags();
     EXPECT_OK(file_get_result.status());
-    EXPECT_EQ(fio::wire::OpenFlags::kRightReadable, file_get_result->flags);
+    EXPECT_EQ(fio::OpenFlags::kRightReadable, file_get_result->flags);
   }
 }
 
@@ -226,27 +246,123 @@ TEST_F(ConnectionTest, FileGetSetFlagsOnFile) {
   zx::result fc = fidl::CreateEndpoints<fio::File>();
   ASSERT_OK(fc.status_value());
   ASSERT_OK(fdio_open_at(root.client.channel().get(), "file",
-                         static_cast<uint32_t>(fio::wire::OpenFlags::kRightReadable),
+                         static_cast<uint32_t>(fio::OpenFlags::kRightReadable),
                          fc->server.TakeChannel().release()));
 
   {
     // Use GetFlags to get current flags and rights
     auto file_get_result = fidl::WireCall(fc->client)->GetFlags();
     EXPECT_OK(file_get_result.status());
-    EXPECT_EQ(fio::wire::OpenFlags::kRightReadable, file_get_result->flags);
+    EXPECT_EQ(fio::OpenFlags::kRightReadable, file_get_result->flags);
   }
   {
     // Make modifications to flags with SetFlags: Note this only works for kOpenFlagAppend
     // based on posix standard
-    auto file_set_result = fidl::WireCall(fc->client)->SetFlags(fio::wire::OpenFlags::kAppend);
+    auto file_set_result = fidl::WireCall(fc->client)->SetFlags(fio::OpenFlags::kAppend);
     EXPECT_OK(file_set_result->s);
   }
   {
     // Check that the new flag is saved
     auto file_get_result = fidl::WireCall(fc->client)->GetFlags();
     EXPECT_OK(file_get_result->s);
-    EXPECT_EQ(fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kAppend,
-              file_get_result->flags);
+    EXPECT_EQ(fio::OpenFlags::kRightReadable | fio::OpenFlags::kAppend, file_get_result->flags);
+  }
+}
+
+TEST_F(ConnectionTest, GetSetIo1Attrs) {
+  // Create connection to vfs
+  auto root = fidl::Endpoints<fio::Directory>::Create();
+  ASSERT_OK(ConnectClient(std::move(root.server)));
+
+  // Connect to File
+  zx::result fc = fidl::CreateEndpoints<fio::File>();
+  ASSERT_OK(fc.status_value());
+  ASSERT_OK(fdio_open_at(
+      root.client.channel().get(), "file_or_dir",
+      static_cast<uint32_t>(fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable),
+      fc->server.TakeChannel().release()));
+  {
+    auto io1_attrs = fidl::WireCall(fc->client)->GetAttr();
+    ASSERT_OK(io1_attrs.status());
+    EXPECT_EQ(io1_attrs->attributes.modification_time, 0);
+  }
+
+  // Ensure we can't set creation time.
+  {
+    auto io1_attrs =
+        fidl::WireCall(fc->client)->SetAttr(fio::NodeAttributeFlags::kCreationTime, {});
+    ASSERT_OK(io1_attrs.status());
+    // ASSERT_EQ(io1_attrs->s, ZX_ERR_NOT_SUPPORTED);
+  }
+
+  // Update modification time.
+  {
+    auto io1_attrs = fidl::WireCall(fc->client)
+                         ->SetAttr(fio::NodeAttributeFlags::kModificationTime,
+                                   fio::wire::NodeAttributes{.modification_time = 1234});
+    ASSERT_OK(io1_attrs.status());
+    ASSERT_EQ(io1_attrs->s, ZX_OK);
+  }
+
+  // Check modification time was updated.
+  {
+    auto io1_attrs = fidl::WireCall(fc->client)->GetAttr();
+    ASSERT_OK(io1_attrs.status());
+    EXPECT_EQ(io1_attrs->attributes.modification_time, 1234);
+  }
+}
+
+// Test that the io2 GetAttributes and UpdateAttributes methods work as expected.
+TEST_F(ConnectionTest, GetUpdateIo2Attrs) {
+  // Create connection to vfs
+  auto root = fidl::Endpoints<fio::Directory>::Create();
+  ASSERT_OK(ConnectClient(std::move(root.server)));
+
+  // Connect to File
+  zx::result fc = fidl::CreateEndpoints<fio::File>();
+  ASSERT_OK(fc.status_value());
+  ASSERT_OK(fdio_open_at(
+      root.client.channel().get(), "file_or_dir",
+      static_cast<uint32_t>(fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable),
+      fc->server.TakeChannel().release()));
+  auto client = fidl::SyncClient(std::move(fc->client));
+  // Our test Vnode only reports a hard-coded ID in addition to protocols/abilities.
+  fio::ImmutableNodeAttributes expected_immutable_attrs = fio::ImmutableNodeAttributes();
+  expected_immutable_attrs.id() = 1234;
+  expected_immutable_attrs.abilities() = FileOrDirectory().GetAbilities();
+  expected_immutable_attrs.protocols() = FileOrDirectory().GetProtocols();
+  // Our test Vnode only supports modification time, and should default-initialize it to zero.
+  fio::MutableNodeAttributes expected_mutable_attrs = fio::MutableNodeAttributes();
+  expected_mutable_attrs.modification_time() = 0;
+  {
+    auto attrs = client->GetAttributes(fio::NodeAttributesQuery::kMask);
+    ASSERT_TRUE(attrs.is_ok());
+    EXPECT_EQ(attrs->immutable_attributes(), expected_immutable_attrs);
+    EXPECT_EQ(attrs->mutable_attributes(), expected_mutable_attrs);
+  }
+
+  // Ensure we can't set creation time.
+  {
+    fio::MutableNodeAttributes update = fio::MutableNodeAttributes();
+    update.creation_time() = 0;
+    auto result = client->UpdateAttributes(update);
+    ASSERT_TRUE(result.is_error());
+    EXPECT_EQ(result.error_value().domain_error(), ZX_ERR_NOT_SUPPORTED);
+  }
+
+  // Update modification time.
+  expected_mutable_attrs.modification_time() = 1234;
+  {
+    auto result = client->UpdateAttributes(expected_mutable_attrs);
+    ASSERT_TRUE(result.is_ok());
+  }
+
+  // Check modification time was updated and other attributes remain unchanged.
+  {
+    auto attrs = client->GetAttributes(fio::NodeAttributesQuery::kMask);
+    ASSERT_TRUE(attrs.is_ok());
+    EXPECT_EQ(attrs->immutable_attributes(), expected_immutable_attrs);
+    EXPECT_EQ(attrs->mutable_attributes(), expected_mutable_attrs);
   }
 }
 
@@ -259,10 +375,10 @@ TEST_F(ConnectionTest, FileSeekDirectory) {
   {
     zx::result dc = fidl::CreateEndpoints<fio::Directory>();
     ASSERT_OK(dc.status_value());
-    ASSERT_OK(fdio_open_at(root.client.channel().get(), "dir",
-                           static_cast<uint32_t>(fio::wire::OpenFlags::kRightReadable |
-                                                 fio::wire::OpenFlags::kRightWritable),
-                           dc->server.TakeChannel().release()));
+    ASSERT_OK(fdio_open_at(
+        root.client.channel().get(), "dir",
+        static_cast<uint32_t>(fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable),
+        dc->server.TakeChannel().release()));
 
     // Borrowing directory channel as file channel.
     auto dir_get_result =
@@ -422,7 +538,7 @@ TEST_F(ConnectionClosingTest, ClosingChannelImpliesClosingNode) {
     zx::result fc = fidl::CreateEndpoints<fio::Node>();
     ASSERT_OK(fc.status_value());
     ASSERT_OK(fidl::WireCall(root.client)
-                  ->Open(fio::wire::OpenFlags::kRightReadable, {},
+                  ->Open(fio::OpenFlags::kRightReadable, {},
                          fidl::StringView("count_outstanding_open_vnode"), std::move(fc->server))
                   .status());
     clients.push_back(std::move(fc->client));

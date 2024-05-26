@@ -23,10 +23,9 @@ use {
         },
     },
     ::routing::component_instance::ComponentInstanceInterface,
-    cm_moniker::InstancedExtendedMoniker,
     errors::{CapabilityProviderError, ModelError, OpenError},
     fidl_fuchsia_io as fio,
-    moniker::MonikerBase,
+    moniker::{ExtendedMoniker, MonikerBase},
     std::sync::Arc,
     vfs::{directory::entry::OpenRequest, remote::remote_dir},
 };
@@ -126,25 +125,18 @@ impl<'a> CapabilityOpenRequest<'a> {
     ) -> Result<(), ModelError> {
         // As of today, the storage component instance must contain the target. This is because it
         // is impossible to expose storage declarations up.
-        let moniker =
-            target.instanced_moniker().strip_prefix(&source.storage_source_moniker).unwrap();
+        let moniker = target.moniker().strip_prefix(&source.storage_source_moniker).unwrap();
 
         let dir_source = source.storage_provider.clone();
-        let storage_dir_proxy = storage::open_isolated_storage(
-            &source,
-            target.persistent_storage,
-            moniker.clone(),
-            target.instance_id(),
-        )
-        .await
-        .map_err(|e| ModelError::from(e))?;
+        let storage_dir_proxy =
+            storage::open_isolated_storage(&source, moniker.clone(), target.instance_id())
+                .await
+                .map_err(|e| ModelError::from(e))?;
 
         open_request.open_remote(remote_dir(storage_dir_proxy)).map_err(|err| {
             let source_moniker = match &dir_source {
-                Some(r) => {
-                    InstancedExtendedMoniker::ComponentInstance(r.instanced_moniker().clone())
-                }
-                None => InstancedExtendedMoniker::ComponentManager,
+                Some(r) => ExtendedMoniker::ComponentInstance(r.moniker().clone()),
+                None => ExtendedMoniker::ComponentManager,
             };
             ModelError::OpenStorageFailed { source_moniker, moniker, path: String::new(), err }
         })?;

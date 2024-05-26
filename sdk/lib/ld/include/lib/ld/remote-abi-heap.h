@@ -196,9 +196,10 @@ class RemoteAbiHeapLayout {
 // RemoteAbiHeapLayout constructor from RemoteAbiStub::data_size() and a
 // mutable RemoteLoadModule describing the same stub dynamic linker ELF file
 // presented to RemoteAbiStub::Init.
-template <class Elf, class AbiTraits>
+template <class RemoteModule, class AbiTraits>
 class RemoteAbiHeap {
  public:
+  using Elf = typename RemoteModule::Elf;
   using size_type = typename Elf::size_type;
   using Addr = typename Elf::Addr;
   using Phdr = typename Elf::Phdr;
@@ -219,8 +220,7 @@ class RemoteAbiHeap {
   // of the RemoteAbiHeap object.
   template <class Diagnostics>
   static zx::result<RemoteAbiHeap> Create(Diagnostics& diagnostics, size_type stub_data_size,
-                                          RemoteLoadModule<Elf>& stub_module,
-                                          RemoteAbiHeapLayout layout) {
+                                          RemoteModule& stub_module, RemoteAbiHeapLayout layout) {
     if (!stub_module.PrepareLoadInfo(diagnostics)) [[unlikely]] {
       return zx::error{ZX_ERR_NO_MEMORY};
     }
@@ -246,7 +246,7 @@ class RemoteAbiHeap {
     auto& new_segment = std::get<StubConstantSegment>(stub_module.load_info().segments().back());
 
     // Build the RemoteAbiHeap.
-    RemoteAbiHeap<Elf, AbiTraits> heap;
+    RemoteAbiHeap heap;
     heap.strtab_ = strtab.offset_;
     heap.size_bytes_ = memsz;
 
@@ -278,7 +278,7 @@ class RemoteAbiHeap {
   //
   // This should only be called on a stub_module that was previously modified
   // by a successful Create() call, and has since had its load_bias() set.
-  static size_type HeapVaddr(const RemoteLoadModule<Elf>& stub_module) {
+  static size_type HeapVaddr(const RemoteModule& stub_module) {
     const auto& segment = stub_module.load_info().segments().back();
     const size_type segment_vaddr =
         std::visit([](const auto& segment) { return segment.vaddr(); }, segment);
@@ -366,7 +366,7 @@ class RemoteAbiHeap {
   }
 
  private:
-  using LoadInfo = typename RemoteLoadModule<Elf>::LoadInfo;
+  using LoadInfo = typename RemoteModule::LoadInfo;
   using StubSegment = typename LoadInfo::Segment;
   using StubConstantSegment = typename LoadInfo::ConstantSegment;
 
@@ -398,7 +398,7 @@ class RemoteAbiHeap {
                                                         size_t segment_size) {
     assert(file_vmo);
 
-    const size_type page_size = RemoteLoadModule<Elf>::Loader::page_size();
+    const size_type page_size = RemoteModule::Loader::page_size();
     const size_type filesz = old_segment.filesz();
     const size_type memsz = (segment_size + page_size - 1) & -page_size;
 

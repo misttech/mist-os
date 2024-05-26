@@ -35,7 +35,8 @@ pub use convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};
 pub use counters::{Counter, CounterContext, ResourceCounterContext};
 pub use data_structures::token_bucket::TokenBucket;
 pub use device::{
-    AnyDevice, Device, DeviceIdAnyCompatContext, DeviceIdContext, DeviceIdentifier,
+    link::{LinkAddress, LinkDevice, LinkUnicastAddress},
+    AnyDevice, Device, DeviceIdAnyCompatContext, DeviceIdContext, DeviceIdentifier, EitherDeviceId,
     StrongDeviceIdentifier, WeakDeviceIdentifier,
 };
 pub use error::{
@@ -43,7 +44,10 @@ pub use error::{
     RemoteAddressError, SocketError, ZonedAddressError,
 };
 pub use event::{CoreEventContext, EventContext};
-pub use frame::{ReceivableFrameMeta, RecvFrameContext, SendFrameContext, SendableFrameMeta};
+pub use frame::{
+    FrameDestination, ReceivableFrameMeta, RecvFrameContext, RecvIpFrameMeta, SendFrameContext,
+    SendableFrameMeta,
+};
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
 pub use port_alloc::{simple_randomized_port_alloc, EphemeralPort, PortAllocImpl};
 pub use resource_references::{
@@ -64,6 +68,27 @@ pub use work_queue::WorkQueueReport;
 pub mod ref_counted_hash_map {
     pub use crate::data_structures::ref_counted_hash_map::{
         InsertResult, RefCountedHashMap, RefCountedHashSet, RemoveResult,
+    };
+}
+
+/// Common types and utilities for sockets.
+pub mod socket {
+    mod address;
+    mod base;
+
+    pub use address::{
+        AddrIsMappedError, AddrVecIter, ConnAddr, ConnInfoAddr, ConnIpAddr, DualStackConnIpAddr,
+        DualStackListenerIpAddr, DualStackLocalIp, DualStackRemoteIp, ListenerAddr, ListenerIpAddr,
+        SocketIpAddr, StrictlyZonedAddr,
+    };
+    pub use base::{
+        AddrEntry, AddrVec, Bound, BoundSocketMap, DualStackIpExt, EitherStack, FoundSockets,
+        IncompatibleError, InsertError, Inserter, Listener, ListenerAddrInfo, MaybeDualStack,
+        NotDualStackCapableError, RemoveResult, SetDualStackEnabledError, Shutdown, ShutdownType,
+        SocketAddrType, SocketDeviceUpdate, SocketDeviceUpdateNotAllowedError, SocketIpAddrExt,
+        SocketIpExt, SocketMapAddrSpec, SocketMapAddrStateSpec,
+        SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy, SocketMapStateSpec,
+        SocketMapUpdateSharingPolicy, SocketStateEntry, SocketZonedAddrExt, UpdateSharingError,
     };
 }
 
@@ -101,9 +126,12 @@ pub mod testutil {
     mod misc;
     mod monotonic_id;
 
-    pub use crate::device::testutil::{
-        FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,
-        MultipleDevicesId,
+    pub use crate::device::{
+        link::testutil::{FakeLinkAddress, FakeLinkDevice, FakeLinkDeviceId},
+        testutil::{
+            FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,
+            MultipleDevicesId,
+        },
     };
     pub use crate::event::testutil::FakeEventCtx;
     pub use crate::frame::testutil::{FakeFrameCtx, WithFakeFrameContext};

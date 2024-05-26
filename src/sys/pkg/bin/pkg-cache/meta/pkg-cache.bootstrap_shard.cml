@@ -66,6 +66,14 @@
             from: "#archivist",
             to: "#pkg-cache",
         },
+        {
+            directory: "boot",
+            from: "parent",
+            as: "bootfs-blobs",
+            to: "#pkg-cache",
+            rights: [ "rx*" ],
+            subdir: "blob",
+        },
     ],
     expose: [
         {

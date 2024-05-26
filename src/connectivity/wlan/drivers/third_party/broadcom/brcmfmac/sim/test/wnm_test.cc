@@ -11,6 +11,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/feature.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test/sim_test.h"
 #include "src/connectivity/wlan/lib/common/cpp/include/wlan/common/macaddr.h"
+#include "zxtest/zxtest.h"
 
 namespace wlan::brcmfmac {
 
@@ -217,6 +218,130 @@ TEST_F(WnmTest, RoamOnBtmReqButTargetApIgnoresReassoc) {
   // STA should not have associated with the target AP.
   EXPECT_EQ(0U, ap_1.GetNumAssociatedClient());
   EXPECT_EQ(1U, btm_req_frame_count_);
+
+  // Also verify that we got only the right disconnect.
+  ASSERT_EQ(client_ifc_.stats_.disassoc_indications.size(), 1U);
+  const wlan_fullmac_wire::WlanFullmacDisassocIndication& disassoc_ind =
+      client_ifc_.stats_.disassoc_indications.front();
+  EXPECT_EQ(disassoc_ind.reason_code, wlan_ieee80211::ReasonCode::kStaLeaving);
+  // Firmware-initiated disconnect with no SME-requested disconnect means
+  // locally initiated.
+  EXPECT_EQ(disassoc_ind.locally_initiated, true);
+  EXPECT_EQ(client_ifc_.stats_.deauth_indications.size(), 0U);
+  EXPECT_EQ(client_ifc_.stats_.disassoc_results.size(), 0U);
+  EXPECT_EQ(client_ifc_.stats_.deauth_results.size(), 0U);
+}
+
+// DUT is configured to roam when AP sends a BTM request, but while waiting for the target
+// BSS to respond, SME sends a disassoc which causes the roam to fail.
+TEST_F(WnmTest, RoamOnBtmReqButSmeDisassocInterruptsRoam) {
+  setup_btm_firmware_support_ = true;
+  PreInit();
+  Init();
+
+  simulation::FakeAp ap_0(env_.get(), kAp0Bssid, kDefaultSsid, kAp0Channel);
+  simulation::FakeAp ap_1(env_.get(), kAp1Bssid, kDefaultSsid, kAp1Channel);
+  ap_0.EnableBeacon(zx::msec(60));
+  ap_1.EnableBeacon(zx::msec(60));
+  // This AP will ignore reassociation, to give this test time to send SME Disassoc.
+  ap_1.SetAssocHandling(simulation::FakeAp::ASSOC_IGNORED);
+  aps_.push_back(&ap_0);
+  aps_.push_back(&ap_1);
+
+  client_ifc_.AssociateWith(ap_0, zx::msec(10));
+
+  common::MacAddr client_mac;
+  client_ifc_.GetMacAddr(&client_mac);
+  const simulation::SimBtmReqMode req_mode{.preferred_candidate_list_included = true};
+  const simulation::SimNeighborReportElement neighbor{
+      .bssid = kAp1Bssid,
+      .operating_class = kAp1OperatingClass,
+      .channel_number = kAp1Channel.primary,
+  };
+  const std::vector<simulation::SimNeighborReportElement> candidates({neighbor});
+  const simulation::SimBtmReqFrame btm_req(kAp0Bssid, client_mac, req_mode, candidates);
+  ScheduleBtmReq(btm_req, zx::sec(1));
+
+  constexpr wlan_ieee80211::ReasonCode disassoc_reason =
+      wlan_ieee80211::ReasonCode::kLeavingNetworkDisassoc;
+  // Schedule a disassoc from SME, just after the roam starts.
+  env_->ScheduleNotification([&] { client_ifc_.DisassociateFrom(kAp0Bssid, disassoc_reason); },
+                             zx::sec(1) + zx::msec(100));
+
+  env_->Run(kTestDuration);
+
+  // SME disassoc will incur disconnect.
+  EXPECT_EQ(SimInterface::AssocContext::kNone, client_ifc_.assoc_ctx_.state);
+  EXPECT_EQ(kAp0Bssid, client_ifc_.assoc_ctx_.bssid);
+  EXPECT_EQ(1U, client_ifc_.stats_.connect_attempts);
+  EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
+  // STA should not have associated with the target AP.
+  EXPECT_EQ(0U, ap_1.GetNumAssociatedClient());
+  EXPECT_EQ(1U, btm_req_frame_count_);
+
+  // Also verify that we got only the right disconnect.
+  EXPECT_EQ(client_ifc_.stats_.disassoc_results.size(), 1U);
+  EXPECT_EQ(client_ifc_.stats_.deauth_indications.size(), 0U);
+  EXPECT_EQ(client_ifc_.stats_.disassoc_indications.size(), 0U);
+  EXPECT_EQ(client_ifc_.stats_.deauth_results.size(), 0U);
+}
+
+// DUT is configured to roam when AP sends a BTM request, but while waiting for the target
+// BSS to respond, SME sends a deauth for the current BSS which causes the roam to fail.
+TEST_F(WnmTest, RoamOnBtmReqButSmeDeauthInterruptsRoam) {
+  setup_btm_firmware_support_ = true;
+  PreInit();
+  Init();
+
+  simulation::FakeAp ap_0(env_.get(), kAp0Bssid, kDefaultSsid, kAp0Channel);
+  simulation::FakeAp ap_1(env_.get(), kAp1Bssid, kDefaultSsid, kAp1Channel);
+  ap_0.EnableBeacon(zx::msec(60));
+  ap_1.EnableBeacon(zx::msec(60));
+  // This AP will ignore reassociation, to give this test time to send SME deauth.
+  ap_1.SetAssocHandling(simulation::FakeAp::ASSOC_IGNORED);
+  aps_.push_back(&ap_0);
+  aps_.push_back(&ap_1);
+
+  client_ifc_.AssociateWith(ap_0, zx::msec(10));
+
+  common::MacAddr client_mac;
+  client_ifc_.GetMacAddr(&client_mac);
+  const simulation::SimBtmReqMode req_mode{.preferred_candidate_list_included = true};
+  const simulation::SimNeighborReportElement neighbor{
+      .bssid = kAp1Bssid,
+      .operating_class = kAp1OperatingClass,
+      .channel_number = kAp1Channel.primary,
+  };
+  const std::vector<simulation::SimNeighborReportElement> candidates({neighbor});
+  const simulation::SimBtmReqFrame btm_req(kAp0Bssid, client_mac, req_mode, candidates);
+  ScheduleBtmReq(btm_req, zx::sec(1));
+
+  constexpr wlan_ieee80211::ReasonCode deauth_reason =
+      wlan_ieee80211::ReasonCode::kLeavingNetworkDeauth;
+  // Schedule a deauth from SME, just after the roam starts.
+  env_->ScheduleNotification([&] { client_ifc_.DeauthenticateFrom(kAp0Bssid, deauth_reason); },
+                             zx::sec(1) + zx::msec(100));
+
+  env_->Run(kTestDuration);
+
+  // SME deauth will incur disconnect.
+  EXPECT_EQ(SimInterface::AssocContext::kNone, client_ifc_.assoc_ctx_.state);
+  EXPECT_EQ(kAp0Bssid, client_ifc_.assoc_ctx_.bssid);
+  EXPECT_EQ(1U, client_ifc_.stats_.connect_attempts);
+  EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
+  // STA should not have associated with the target AP.
+  EXPECT_EQ(0U, ap_1.GetNumAssociatedClient());
+  EXPECT_EQ(1U, btm_req_frame_count_);
+
+  // Also verify that we got only the right disconnect.
+  ASSERT_EQ(client_ifc_.stats_.deauth_results.size(), 1U);
+  const auto& deauth_conf = client_ifc_.stats_.deauth_results.front();
+  ASSERT_TRUE(deauth_conf.has_peer_sta_address());
+  EXPECT_BYTES_EQ(deauth_conf.peer_sta_address().data(), kAp0Bssid.byte, ETH_ALEN);
+
+  EXPECT_EQ(client_ifc_.stats_.deauth_indications.size(), 0U);
+  EXPECT_EQ(client_ifc_.stats_.disassoc_results.size(), 0U);
+  EXPECT_EQ(client_ifc_.stats_.disassoc_indications.size(), 0U);
 }
 
 // DUT is configured to roam when AP sends a BTM request, but the firmware

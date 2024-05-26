@@ -7,12 +7,11 @@ use async_utils::hanging_get::server::HangingGet;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
 use fidl_fuchsia_power_suspend as fsuspend;
-use fidl_fuchsia_power_system as fsystem;
 use fidl_fuchsia_power_system::{
-    ApplicationActivityLevel, ExecutionStateLevel, FullWakeHandlingLevel, WakeHandlingLevel,
+    self as fsystem, ApplicationActivityLevel, ExecutionStateLevel, FullWakeHandlingLevel,
+    WakeHandlingLevel,
 };
 use fidl_test_sagcontrol as fctrl;
-use fidl_test_suspendcontrol as tsc;
 use fuchsia_async as fasync;
 use fuchsia_component::client as fclient;
 use fuchsia_component::client::connect_to_protocol;
@@ -63,7 +62,7 @@ pub struct SystemActivityGovernorControl {
 }
 
 impl SystemActivityGovernorControl {
-    pub async fn new(suspend_device: tsc::DeviceProxy) -> Rc<Self> {
+    pub async fn new() -> Rc<Self> {
         let topology = connect_to_protocol::<fbroker::TopologyMarker>().unwrap();
         let sag = connect_to_protocol::<fsystem::ActivityGovernorMarker>().unwrap();
         let sag_power_elements = sag.get_power_elements().await.unwrap();
@@ -127,22 +126,12 @@ impl SystemActivityGovernorControl {
             .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
             .collect();
 
-        // execution_state power level is initially Inactive and quickly changes to Active upon SAG
-        // start. Usually when the status_endpoints are fetched, SAG has finished this transition
-        // from Inactive to Active. The stable state initial state of execution_state is Active.
         let es_status = status_endpoints.remove("execution_state".into()).unwrap();
-        let mut initial_execution_state_level = ExecutionStateLevel::from_primitive(
+        let initial_execution_state_level = ExecutionStateLevel::from_primitive(
             es_status.watch_power_level().await.unwrap().unwrap(),
         )
         .unwrap();
-        // In rare cases, this transition hasn't happened. Get the stable state power level in a
-        // second watch call.
-        if initial_execution_state_level == ExecutionStateLevel::Inactive {
-            initial_execution_state_level = ExecutionStateLevel::from_primitive(
-                es_status.watch_power_level().await.unwrap().unwrap(),
-            )
-            .unwrap();
-        }
+
         let aa_status = status_endpoints.remove("application_activity".into()).unwrap();
         let initial_application_activity_level = ApplicationActivityLevel::from_primitive(
             aa_status.watch_power_level().await.unwrap().unwrap(),
@@ -200,22 +189,6 @@ impl SystemActivityGovernorControl {
                 let state = current_state_clone.lock().await.clone();
                 if state == *required_state_clone.lock().await {
                     publisher.set(state);
-                }
-
-                if new_status == ExecutionStateLevel::Inactive {
-                    assert_eq!(
-                        0,
-                        suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap()
-                    );
-                    suspend_device
-                        .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
-                            suspend_duration: Some(1i64),
-                            suspend_overhead: Some(1i64),
-                            ..Default::default()
-                        }))
-                        .await
-                        .unwrap()
-                        .unwrap();
                 }
             }
         })

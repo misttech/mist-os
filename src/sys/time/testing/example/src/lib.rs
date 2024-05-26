@@ -22,7 +22,9 @@ lazy_static! {
 }
 
 fn from_rfc2822(date: &str) -> zx::Time {
-    zx::Time::from_nanos(chrono::DateTime::parse_from_rfc2822(date).unwrap().timestamp_nanos())
+    zx::Time::from_nanos(
+        chrono::DateTime::parse_from_rfc2822(date).unwrap().timestamp_nanos_opt().unwrap(),
+    )
 }
 
 // An annotated example test that sets up the timekeeper test realm, and starts up the UTC clock.

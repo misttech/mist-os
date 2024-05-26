@@ -11,7 +11,6 @@
 #include <lib/fit/thread_safety.h>
 #include <lib/magma/platform/platform_connection_client.h>
 #include <lib/zx/channel.h>
-#include <zircon/availability.h>
 
 #include <mutex>
 
@@ -33,14 +32,8 @@ class PrimaryWrapper : public fidl::WireAsyncEventHandler<fuchsia_gpu_magma::Pri
       ::fidl::VectorView<fuchsia_gpu_magma::wire::CommandBuffer> command_buffers,
       ::fidl::VectorView<uint64_t> wait_semaphores, ::fidl::VectorView<uint64_t> signal_semaphores,
       fuchsia_gpu_magma::wire::CommandBufferFlags flags);
-#if __Fuchsia_API_level__ >= 15
   magma_status_t ExecuteInlineCommands(
       uint32_t context_id, ::fidl::VectorView<fuchsia_gpu_magma::wire::InlineCommand> commands);
-#else
-  magma_status_t ExecuteImmediateCommands(uint32_t context_id,
-                                          ::fidl::VectorView<uint8_t> command_data,
-                                          ::fidl::VectorView<uint64_t> semaphores);
-#endif
   magma_status_t MapBuffer(uint64_t buffer_id, uint64_t hw_va, uint64_t offset, uint64_t length,
                            fuchsia_gpu_magma::wire::MapFlags flags);
   magma_status_t UnmapBuffer(uint64_t buffer_id, uint64_t hw_va);
@@ -95,7 +88,7 @@ class PrimaryWrapper : public fidl::WireAsyncEventHandler<fuchsia_gpu_magma::Pri
   uint64_t inflight_bytes_ = 0;
   std::mutex flow_control_mutex_;
   std::mutex get_error_lock_;
-  FIT_GUARDED(get_error_lock_) magma_status_t error_{};
+  FIT_GUARDED(get_error_lock_) magma_status_t error_ {};
 };
 
 }  // namespace magma

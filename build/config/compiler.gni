@@ -6,7 +6,7 @@ if (is_debug) {
   # TODO(https://fxbug.dev/42170458): consider "debug"
   default_optimize = "none"
 } else {
-  default_optimize = "size"
+  default_optimize = "size_lto"
 }
 
 # NOTE: Keep in sync with //build/config/zircon/levels.gni

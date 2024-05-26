@@ -1147,8 +1147,12 @@ impl Timezone {
     fn format(&self, seconds: i64, rem_nanos: u32) -> impl std::fmt::Display {
         const TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S.%3f";
         match self {
-            Timezone::Local => Local.timestamp(seconds, rem_nanos).format(TIMESTAMP_FORMAT),
-            Timezone::Utc => Utc.timestamp(seconds, rem_nanos).format(TIMESTAMP_FORMAT),
+            Timezone::Local => {
+                Local.timestamp_opt(seconds, rem_nanos).unwrap().format(TIMESTAMP_FORMAT)
+            }
+            Timezone::Utc => {
+                Utc.timestamp_opt(seconds, rem_nanos).unwrap().format(TIMESTAMP_FORMAT)
+            }
         }
     }
 }

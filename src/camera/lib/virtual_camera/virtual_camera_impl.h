@@ -21,7 +21,7 @@ class VirtualCameraImpl : public VirtualCamera {
   VirtualCameraImpl();
   ~VirtualCameraImpl() override;
   static fpromise::result<std::unique_ptr<VirtualCamera>, zx_status_t> Create(
-      fidl::InterfaceHandle<fuchsia::sysmem::Allocator> allocator);
+      fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> allocator);
   fidl::InterfaceRequestHandler<fuchsia::camera3::Device> GetHandler() override;
   fpromise::result<void, std::string> CheckFrame(const void* data, size_t size,
                                                  const fuchsia::camera3::FrameInfo& info) override;
@@ -29,16 +29,16 @@ class VirtualCameraImpl : public VirtualCamera {
  private:
   void OnNewRequest(fidl::InterfaceRequest<fuchsia::camera3::Device> request);
   void OnDestruction();
-  void OnSetBufferCollection(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token);
+  void OnSetBufferCollection(fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token);
   void FrameTick();
   void FillFrame(uint32_t buffer_index);
   void EmbedMetadata(const fuchsia::camera3::FrameInfo& info);
 
   async::Loop loop_;
-  fuchsia::sysmem::AllocatorPtr allocator_;
+  fuchsia::sysmem2::AllocatorPtr allocator_;
   std::unique_ptr<FakeCamera> camera_;
   std::shared_ptr<FakeStream> stream_;
-  std::optional<fuchsia::sysmem::BufferCollectionInfo_2> buffers_;
+  std::optional<fuchsia::sysmem2::BufferCollectionInfo> buffers_;
   zx::time interrupt_start_time_;
   uint64_t frame_count_;
   std::queue<uint32_t> free_buffers_;

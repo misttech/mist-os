@@ -21,6 +21,9 @@
 CAMERA_DECL_ADL_STREAM_OPERATOR(fuchsia::camera2)
 CAMERA_DECL_ADL_STREAM_OPERATOR(fuchsia::camera2::hal)
 CAMERA_DECL_ADL_STREAM_OPERATOR(fuchsia::sysmem)
+CAMERA_DECL_ADL_STREAM_OPERATOR(fuchsia::sysmem2)
+CAMERA_DECL_ADL_STREAM_OPERATOR(fuchsia::images2)
+CAMERA_DECL_ADL_STREAM_OPERATOR(fuchsia::math)
 #undef CAMERA_DECL_ADL_STREAM_OPERATOR
 
 namespace camera::formatting {

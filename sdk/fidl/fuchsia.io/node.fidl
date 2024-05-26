@@ -137,6 +137,8 @@ closed protocol Node1 {
 
     /// Updates information about the node.
     ///
+    /// Returns `ZX_ERR_NOT_SUPPORTED` if any attributes specified by [`flags`] are not supported.
+    ///
     /// This method requires following rights: `OpenFlags.RIGHT_WRITABLE`, otherwise returns
     /// `ZX_ERR_BAD_HANDLE`.
     @selector("fuchsia.io1/Node.SetAttr")

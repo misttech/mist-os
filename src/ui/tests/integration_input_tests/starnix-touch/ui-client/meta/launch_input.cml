@@ -5,9 +5,5 @@
     program: {
         runner: "starnix_container",
         binary: "data/linux_bin/launch_input",
-        features: [ "framebuffer" ],
     },
-    use: [
-        { protocol: "fuchsia.element.GraphicalPresenter" },
-    ],
 }

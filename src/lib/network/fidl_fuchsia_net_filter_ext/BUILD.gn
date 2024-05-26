@@ -29,6 +29,12 @@ rustc_library("fidl_fuchsia_net_filter_ext") {
   ]
   sources = [ "src/lib.rs" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+
+  if (is_fuchsia) {
+    sources += [ "src/sync.rs" ]
+    deps += [ "//src/lib/zircon/rust:fuchsia-zircon" ]
+    test_deps += [ "//src/lib/fuchsia" ]
+  }
 }
 
 fuchsia_unittest_package("fidl-fuchsia-net-filter-ext-tests") {

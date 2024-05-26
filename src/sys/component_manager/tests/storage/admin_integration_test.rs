@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    cm_moniker::InstancedMoniker,
     component_events::{events::*, matcher::*},
     fidl::endpoints::{create_endpoints, create_proxy, ClientEnd},
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
@@ -16,7 +15,6 @@ use {
         channel::mpsc, future::BoxFuture, sink::SinkExt, Future, FutureExt, StreamExt, TryStreamExt,
     },
     maplit::hashset,
-    moniker::MonikerBase,
     std::collections::HashSet,
 };
 
@@ -106,13 +104,7 @@ async fn single_storage_user() {
     let storage_admin = connect_to_protocol::<fsys::StorageAdminMarker>().unwrap();
     let storage_users = collect_storage_user_monikers(&storage_admin, instance_moniker).await;
     assert_eq!(
-        storage_users
-            .iter()
-            .map(|moniker_with_instances| InstancedMoniker::parse_str(moniker_with_instances)
-                .unwrap()
-                .without_instance_ids()
-                .to_string())
-            .collect::<HashSet<_>>(),
+        storage_users,
         hashset! {
             storage_user_moniker.clone()
         }
@@ -182,16 +174,7 @@ async fn multiple_storage_users() {
 
     let storage_admin = connect_to_protocol::<fsys::StorageAdminMarker>().unwrap();
     let storage_users = collect_storage_user_monikers(&storage_admin, instance_moniker).await;
-    assert_eq!(
-        storage_users
-            .iter()
-            .map(|moniker_with_instances| InstancedMoniker::parse_str(moniker_with_instances)
-                .unwrap()
-                .without_instance_ids()
-                .to_string())
-            .collect::<HashSet<_>>(),
-        expected_storage_users
-    );
+    assert_eq!(storage_users, expected_storage_users);
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -219,13 +202,7 @@ async fn destroyed_storage_user() {
     let storage_admin = connect_to_protocol::<fsys::StorageAdminMarker>().unwrap();
     let storage_users = collect_storage_user_monikers(&storage_admin, &instance_moniker).await;
     assert_eq!(
-        storage_users
-            .iter()
-            .map(|moniker_with_instances| InstancedMoniker::parse_str(moniker_with_instances)
-                .unwrap()
-                .without_instance_ids()
-                .to_string())
-            .collect::<HashSet<_>>(),
+        storage_users,
         hashset! {
             storage_user_moniker.clone()
         }
@@ -240,15 +217,6 @@ async fn destroyed_storage_user() {
         .await
         .unwrap();
 
-    let storage_users = collect_storage_user_monikers(&storage_admin, ".")
-        .await
-        .iter()
-        .map(|moniker_with_instances| {
-            InstancedMoniker::parse_str(moniker_with_instances)
-                .unwrap()
-                .without_instance_ids()
-                .to_string()
-        })
-        .collect::<HashSet<_>>();
+    let storage_users = collect_storage_user_monikers(&storage_admin, ".").await;
     assert!(!storage_users.contains(&instance_moniker));
 }

@@ -9,11 +9,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformMediaConfig {
-    /// Enable Audio Device Registry.
-    /// TODO: Remove this once all clients are using the audio config.
-    #[serde(default)]
-    pub audio_device_registry_enabled: bool,
-
     #[serde(default)]
     pub audio: Option<AudioConfig>,
 

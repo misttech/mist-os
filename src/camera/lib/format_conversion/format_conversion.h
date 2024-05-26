@@ -16,12 +16,18 @@ namespace camera {
 
 fuchsia_sysmem::wire::ImageFormat2 ConvertToWireType(fuchsia::sysmem::ImageFormat_2 image_format);
 
+fuchsia_sysmem::wire::ImageFormat2 ConvertV2ToV1WireType(
+    const fuchsia::images2::ImageFormat& image_format);
+
 fuchsia_sysmem::wire::ImageFormatConstraints ConvertToWireType(
     fuchsia::sysmem::ImageFormatConstraints constraints);
 
 fuchsia_sysmem::wire::ImageFormat2 GetImageFormatFromConstraints(
     fuchsia_sysmem::wire::ImageFormatConstraints constraints, uint32_t coded_width,
     uint32_t coded_height);
+
+fuchsia_sysmem::wire::ImageFormatConstraints ConvertV2ToV1WireType(
+    const fuchsia::sysmem2::ImageFormatConstraints& constraints);
 
 }  // namespace camera
 

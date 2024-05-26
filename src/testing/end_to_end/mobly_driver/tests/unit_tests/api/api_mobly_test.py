@@ -178,12 +178,10 @@ class ApiMoblyTest(unittest.TestCase):
                         {
                             "type": "FuchsiaDevice",
                             "nodename": "fuchsia_abcd",
-                            "ssh_key": "key",
                         },
                     ],
                     "botanist_honeydew_map": {
                         "nodename": "name",
-                        "ssh_key": "ssh_private_key",
                     },
                 },
                 expected_config_obj={
@@ -195,7 +193,6 @@ class ApiMoblyTest(unittest.TestCase):
                                     {
                                         "ffx_path": "ffx_path",
                                         "name": "fuchsia_abcd",
-                                        "ssh_private_key": "key",
                                         "transport": "transport",
                                     }
                                 ]

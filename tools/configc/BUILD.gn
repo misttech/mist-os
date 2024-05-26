@@ -93,7 +93,6 @@ cpp_config_client_lib_source("cpp_elf_config_lib") {
   compiled_manifest = manifest_outputs[0]
   fidl_library_name = "my.config.lib"
   deps = [ ":config_manifest" ]
-  flavor = "elf"
   testonly = true
 }
 

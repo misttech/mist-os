@@ -503,16 +503,16 @@ void JobScheduler::HandleTimedOutAtoms() {
       DASSERT(soft_atom);
       if (soft_atom->platform_semaphores().size() == 1) {
         uint64_t semaphore_koid = soft_atom->platform_semaphores()[0]->id();
-        MAGMA_LOG(WARNING, "Timing out hung semaphore on client id %ld, koid %ld", client_id,
-                  semaphore_koid);
+        MAGMA_LOG(WARNING, "Semaphore hang: Timing out hung semaphore on client id %ld, koid %ld",
+                  client_id, semaphore_koid);
         std::vector<msd::msd_client_id_t> clients = GetSignalingClients(semaphore_koid);
         for (auto client_id : clients) {
           MAGMA_LOG(WARNING, "Signaled by atom on client id %ld", client_id);
           found_signaler_atoms_for_testing_++;
         }
       } else {
-        MAGMA_LOG(WARNING, "Timing out hung semaphore on client id %ld, %zd koids", client_id,
-                  soft_atom->platform_semaphores().size());
+        MAGMA_LOG(WARNING, "Semaphore hang: Timing out hung semaphore on client id %ld, %zd koids",
+                  client_id, soft_atom->platform_semaphores().size());
       }
       owner_->OutputHangMessage(/*hardware_hang*/ false);
       removed_waiting_atoms = true;

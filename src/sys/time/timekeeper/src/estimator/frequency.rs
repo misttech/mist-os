@@ -122,12 +122,11 @@ impl EstimationWindow {
         // The month is sufficient to tell us which leap second insertion point we are potentially
         // close to.
         let leap_second = match window_start_utc.month() {
-            1 => Utc.ymd(window_start_utc.year(), 1, 1),
-            6 | 7 => Utc.ymd(window_start_utc.year(), 7, 1),
-            12 => Utc.ymd(window_start_utc.year() + 1, 1, 1),
+            1 => Utc.with_ymd_and_hms(window_start_utc.year(), 1, 1, 0, 0, 0).unwrap(),
+            6 | 7 => Utc.with_ymd_and_hms(window_start_utc.year(), 7, 1, 0, 0, 0).unwrap(),
+            12 => Utc.with_ymd_and_hms(window_start_utc.year() + 1, 1, 1, 0, 0, 0).unwrap(),
             _ => return false,
-        }
-        .and_hms(0, 0, 0);
+        };
         // If the start of the estimation window is less than 12 hours after the leap second and the
         // end of the estimation window is less than 12 hours before the leap second, the estimation
         // window will overlap the 24 hour smearing period centered on the leap second.
@@ -248,7 +247,11 @@ mod test {
     /// Initial UTC is specified as an RFC3339 string.
     fn create_sample(utc_string: &str, monotonic: zx::Time) -> Sample {
         let chrono_utc = DateTime::parse_from_rfc3339(utc_string).expect("Invalid UTC string");
-        Sample::new(zx::Time::from_nanos(chrono_utc.timestamp_nanos()), monotonic, STD_DEV)
+        Sample::new(
+            zx::Time::from_nanos(chrono_utc.timestamp_nanos_opt().unwrap()),
+            monotonic,
+            STD_DEV,
+        )
     }
 
     /// Create a vector of evenly spaced samples following the supplied reference sample with a

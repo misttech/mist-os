@@ -15,7 +15,7 @@ use {
 #[fuchsia::test]
 async fn watch_dir_existing() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_directory_watchers.unwrap_or_default() {
+    if !harness.config.supports_directory_watchers {
         return;
     }
 
@@ -40,10 +40,10 @@ async fn watch_dir_existing() {
 #[fuchsia::test]
 async fn watch_dir_added_removed() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_directory_watchers.unwrap_or_default() {
+    if !harness.config.supports_directory_watchers {
         return;
     }
-    if !harness.config.supports_create.unwrap_or_default() {
+    if !harness.config.supports_create {
         return;
     }
 
@@ -96,10 +96,10 @@ async fn watch_dir_added_removed() {
 #[fuchsia::test]
 async fn watch_dir_existing_file_create_does_not_generate_new_event() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_directory_watchers.unwrap_or_default() {
+    if !harness.config.supports_directory_watchers {
         return;
     }
-    if !harness.config.supports_create.unwrap_or_default() {
+    if !harness.config.supports_create {
         return;
     }
 
@@ -155,13 +155,13 @@ async fn watch_dir_existing_file_create_does_not_generate_new_event() {
 #[fuchsia::test]
 async fn watch_dir_rename() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_directory_watchers.unwrap_or_default() {
+    if !harness.config.supports_directory_watchers {
         return;
     }
-    if !harness.config.supports_create.unwrap_or_default() {
+    if !harness.config.supports_create {
         return;
     }
-    if !harness.config.supports_rename.unwrap_or_default() {
+    if !harness.config.supports_rename {
         return;
     }
 

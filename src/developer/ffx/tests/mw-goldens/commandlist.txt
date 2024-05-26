@@ -4,10 +4,18 @@ ffx emu show
 ffx emu start
 ffx emu stop
 ffx product download
+ffx product get-artifacts
+ffx product get-image-path
 ffx product lookup
+ffx repository add-from-pm
+ffx repository create
+ffx repository publish
+ffx repository server start
+ffx repository server stop
 ffx target add
 ffx target list
 ffx target remove
+ffx target repository register
 ffx target snapshot
 ffx target screenshot
 ffx target show

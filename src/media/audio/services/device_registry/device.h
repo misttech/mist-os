@@ -118,7 +118,7 @@ class Device : public std::enable_shared_from_this<Device> {
   zx_status_t SetTopology(TopologyId topology_id);
   zx_status_t SetElementState(
       ElementId element_id,
-      const fuchsia_hardware_audio_signalprocessing::ElementState& element_state);
+      const fuchsia_hardware_audio_signalprocessing::SettableElementState& element_state);
 
   struct RingBufferInfo {
     fuchsia_audio::RingBuffer ring_buffer;

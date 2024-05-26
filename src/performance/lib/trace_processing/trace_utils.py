@@ -5,7 +5,7 @@
 
 import math
 import statistics
-from typing import Any, Iterable, Iterator, List, Optional, Set, Tuple, TypeVar
+from typing import Any, Iterable, List, Optional, Set, Tuple, Type
 
 from trace_processing import trace_model, trace_metrics, trace_time
 
@@ -38,7 +38,7 @@ def filter_events(
     category: Optional[str] = None,
     name: Optional[str] = None,
     type: type = object,
-) -> Iterator[trace_model.Event]:
+) -> Iterable[trace_model.Event]:
     """Filter |events| based on category, name, or type.
 
     Args:
@@ -48,8 +48,7 @@ def filter_events(
       type: Type of events to include. By default object to include all events.
 
     Returns:
-      An [Iterator] of filtered events. Note that Iterators can only be iterated a single time, so
-      the caller must create a local copy in order to loop over the filtered events more than once.
+      An [Iterable] of filtered events.
     """
 
     def event_matches(event: trace_model.Event) -> bool:
@@ -59,28 +58,6 @@ def filter_events(
         return type_matches and category_matches and name_matches
 
     return filter(event_matches, events)
-
-
-U = TypeVar("U", bound=trace_model.SchedulingRecord)
-
-
-def filter_records(
-    records: Iterable[trace_model.SchedulingRecord], type_: type[U]
-) -> Iterator[U]:
-    """Filters SchedulingRecords by type.
-
-    Easier for mypy to grok than using types with filter().
-
-    Args:
-        records: Iterable of SchedulingRecords to be filtered.
-        type_: The subclass of SchedulingRecord by which to filter.
-
-    Yields:
-        The elements of the iterable that are of the specified type.
-    """
-    for record in records:
-        if isinstance(record, type_):
-            yield record
 
 
 def total_event_duration(

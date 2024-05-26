@@ -2,15 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-exports_files(
-    glob([
-        "*.bzl",
-    ]),
-    visibility = ["//:__subpackages__"],
-)
-
 filegroup(
-    name = "all_starlark_files",
+    name = "bzl_srcs",
     srcs = glob(["*.bzl"]),
-    visibility = ["//:__subpackages__"],
+    visibility = ["//fuchsia:__pkg__"],
 )

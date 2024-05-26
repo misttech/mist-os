@@ -57,7 +57,7 @@ fpromise::result<std::unique_ptr<BufferCollageFlatland>, zx_status_t> BufferColl
     std::unique_ptr<simple_present::FlatlandConnection> flatland_connection,
     fuchsia::ui::composition::AllocatorHandle flatland_allocator,
     fuchsia::element::GraphicalPresenterHandle graphical_presenter,
-    fuchsia::sysmem::AllocatorHandle sysmem_allocator, fit::closure stop_callback) {
+    fuchsia::sysmem2::AllocatorHandle sysmem_allocator, fit::closure stop_callback) {
   auto collage = std::unique_ptr<BufferCollageFlatland>(new BufferCollageFlatland);
   collage->start_time_ = zx::clock::get_monotonic();
   collage->stop_callback_ = std::move(stop_callback);
@@ -93,17 +93,20 @@ fpromise::result<std::unique_ptr<BufferCollageFlatland>, zx_status_t> BufferColl
 
 // Called by stream_cycler when a new camera stream is available.
 fpromise::promise<uint32_t> BufferCollageFlatland::AddCollection(
-    fuchsia::sysmem::BufferCollectionTokenHandle token, fuchsia::sysmem::ImageFormat_2 image_format,
+    fuchsia::sysmem2::BufferCollectionTokenHandle token, fuchsia::images2::ImageFormat image_format,
     std::string description) {
   TRACE_DURATION("camera", "BufferCollageFlatland::AddCollection");
-  ZX_ASSERT(image_format.coded_width > 0);
-  ZX_ASSERT(image_format.coded_height > 0);
-  ZX_ASSERT(image_format.bytes_per_row > 0);
+  ZX_ASSERT(image_format.has_size());
+  ZX_ASSERT(image_format.size().width > 0);
+  ZX_ASSERT(image_format.size().height > 0);
+  ZX_ASSERT(image_format.has_bytes_per_row());
+  ZX_ASSERT(image_format.bytes_per_row() > 0);
   ZX_ASSERT(flatland_connection_);
 
   fpromise::bridge<uint32_t> task_bridge;
 
-  fit::closure add_collection = [this, token = std::move(token), image_format, description,
+  fit::closure add_collection = [this, token = std::move(token),
+                                 image_format = std::move(image_format), description,
                                  result = std::move(task_bridge.completer)]() mutable {
     auto collection_id = next_collection_id_++;
     FX_LOGS(DEBUG) << "Adding collection with ID " << collection_id << ".";
@@ -113,10 +116,10 @@ fpromise::promise<uint32_t> BufferCollageFlatland::AddCollection(
     auto name = "Collection (" + std::to_string(collection_id) + ")";
 
     SetRemoveCollectionViewOnError(view.buffer_collection, collection_id, name);
-    view.image_format = image_format;
+    view.image_format = fidl::Clone(image_format);
 
     // Bind token to |loop_| and duplicate the token.
-    fuchsia::sysmem::BufferCollectionTokenPtr token_ptr;
+    fuchsia::sysmem2::BufferCollectionTokenPtr token_ptr;
     SetStopOnError(token_ptr, "BufferCollectionToken");
     zx_status_t status = token_ptr.Bind(std::move(token), loop_.dispatcher());
     if (status != ZX_OK) {
@@ -125,24 +128,37 @@ fpromise::promise<uint32_t> BufferCollageFlatland::AddCollection(
       result.complete_error();
       return;
     }
-    fuchsia::sysmem::BufferCollectionTokenHandle scenic_token;
-    token_ptr->Duplicate(ZX_RIGHT_SAME_RIGHTS, scenic_token.NewRequest());
-    sysmem_allocator_->BindSharedCollection(std::move(token_ptr),
-                                            view.buffer_collection.NewRequest(loop_.dispatcher()));
+    fuchsia::sysmem2::BufferCollectionTokenHandle scenic_token;
+
+    fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest dup_request;
+    dup_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
+    dup_request.set_token_request(scenic_token.NewRequest());
+    token_ptr->Duplicate(std::move(dup_request));
+
+    fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+    bind_shared_request.set_token(std::move(token_ptr));
+    bind_shared_request.set_buffer_collection_request(
+        view.buffer_collection.NewRequest(loop_.dispatcher()));
+    sysmem_allocator_->BindSharedCollection(std::move(bind_shared_request));
 
     // Sync the collection and create flatland image using token provided by camera stream.
     view.buffer_collection->Sync([this, collection_id, token = std::move(scenic_token),
-                                  result = std::move(result)]() mutable {
+                                  result = std::move(result)](
+                                     fuchsia::sysmem2::Node_Sync_Result sync_result) mutable {
       ZX_ASSERT(collection_views_.find(collection_id) != collection_views_.end());
       auto& view = collection_views_[collection_id];
 
       // Set minimal constraints then wait for buffer allocation.
-      view.buffer_collection->SetConstraints(true, {.usage{.none = fuchsia::sysmem::noneUsage}});
+      fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+      set_constraints_request.mutable_constraints()->mutable_usage()->set_none(
+          fuchsia::sysmem2::NONE_USAGE);
+      view.buffer_collection->SetConstraints(std::move(set_constraints_request));
       view.ref_pair = allocation::BufferCollectionImportExportTokens::New();
       fuchsia::ui::composition::RegisterBufferCollectionArgs args = {};
 
       args.set_export_token(std::move(view.ref_pair.export_token));
-      args.set_buffer_collection_token(std::move(token));
+      args.set_buffer_collection_token(
+          fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(token.TakeChannel()));
       flatland_allocator_->RegisterBufferCollection(
           std::move(args), [this, collection_id, result = std::move(result)](
                                fuchsia::ui::composition::Allocator_RegisterBufferCollection_Result
@@ -155,11 +171,20 @@ fpromise::promise<uint32_t> BufferCollageFlatland::AddCollection(
             }
             ZX_ASSERT(collection_views_.find(collection_id) != collection_views_.end());
             auto& view = collection_views_[collection_id];
-            view.buffer_collection->WaitForBuffersAllocated(
+            view.buffer_collection->WaitForAllBuffersAllocated(
                 [this, collection_id, result = std::move(result)](
-                    zx_status_t status, fuchsia::sysmem::BufferCollectionInfo_2 buffers) mutable {
-                  if (status != ZX_OK) {
-                    FX_PLOGS(ERROR, status) << "Failed to allocate buffers.";
+                    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result
+                        wait_result) mutable {
+                  if (wait_result.is_framework_err()) {
+                    FX_PLOGS(ERROR, fidl::ToUnderlying(wait_result.framework_err()))
+                        << "Failed to allocate buffers (framework err).";
+                    Stop();
+                    result.complete_error();
+                    return;
+                  }
+                  if (wait_result.is_err()) {
+                    FX_PLOGS(ERROR, static_cast<uint32_t>(wait_result.err()))
+                        << "Failed to allocate buffers (err).";
                     Stop();
                     result.complete_error();
                     return;
@@ -168,15 +193,17 @@ fpromise::promise<uint32_t> BufferCollageFlatland::AddCollection(
                   auto& view = collection_views_[collection_id];
                   fuchsia::ui::composition::TransformId transform_id{.value = next_transform_id++};
                   view.transform_id = transform_id;
-                  view.buffer_count = buffers.buffer_count;
+                  uint32_t buffer_count = static_cast<uint32_t>(
+                      wait_result.response().buffer_collection_info().buffers().size());
+                  view.buffer_count = buffer_count;
 
                   // Rearranges layout to add the new view. Content doesn't get updated until
                   // PostShowBuffer is called.
                   UpdateLayout();
-                  for (uint32_t buffer_id = 0; buffer_id < buffers.buffer_count; ++buffer_id) {
+                  for (uint32_t buffer_id = 0; buffer_id < buffer_count; ++buffer_id) {
                     fuchsia::ui::composition::ImageProperties image_properties = {};
                     image_properties.set_size(
-                        {view.image_format.coded_width, view.image_format.coded_height});
+                        {view.image_format.size().width, view.image_format.size().height});
                     fuchsia::ui::composition::BufferCollectionImportToken import_token_copy;
                     view.ref_pair.import_token.value.duplicate(ZX_RIGHT_SAME_RIGHTS,
                                                                &import_token_copy.value);
@@ -219,7 +246,7 @@ void BufferCollageFlatland::RemoveCollection(uint32_t collection_id) {
 
   auto& view = it->second;
   if (view.buffer_collection.is_bound()) {
-    view.buffer_collection->Close();
+    view.buffer_collection->Release();
   }
 
   for (uint32_t buffer_id = 0; buffer_id < view.buffer_count; ++buffer_id) {
@@ -232,7 +259,7 @@ void BufferCollageFlatland::RemoveCollection(uint32_t collection_id) {
   flatland_->RemoveChild(kRootTransformId, view.transform_id);
   flatland_->ReleaseTransform(view.transform_id);
   if (view.buffer_collection.is_bound()) {
-    view.buffer_collection->Close();
+    view.buffer_collection->Release();
   }
   collection_views_.erase(it);
   UpdateLayout();
@@ -335,8 +362,8 @@ void BufferCollageFlatland::UpdateLayout() {
   float cell_height = static_cast<float>(height_) / static_cast<float>(rows) - kPadding;
   uint32_t index = 0;
   for (auto& [id, view] : collection_views_) {
-    float display_width = static_cast<float>(view.image_format.display_width);
-    float display_height = static_cast<float>(view.image_format.display_height);
+    float display_width = static_cast<float>(view.image_format.display_rect().width);
+    float display_height = static_cast<float>(view.image_format.display_rect().height);
     if (!view.view_created) {
       flatland_->CreateTransform(view.transform_id);
       flatland_->AddChild(kRootTransformId, view.transform_id);

@@ -5,10 +5,11 @@
 """Flatland Benchmark."""
 
 import os
-import itertools
 import time
+from importlib.resources import as_file, files
 from pathlib import Path
 
+import test_data
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import test_runner
@@ -83,7 +84,9 @@ class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
             json_trace_file
         )
 
-        app_render_latency_results = app_render.metrics_processor(
+        app_render_latency_results: list[
+            trace_metrics.TestCaseResult
+        ] = app_render.metrics_processor(
             model,
             {
                 "aggregateMetricsOnly": True,
@@ -91,7 +94,7 @@ class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
             },
         )
 
-        cpu_results = cpu.metrics_processor(
+        cpu_results: list[trace_metrics.TestCaseResult] = cpu.metrics_processor(
             model, {"aggregateMetricsOnly": False}
         )
 
@@ -100,18 +103,17 @@ class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
         )
 
         trace_metrics.TestCaseResult.write_fuchsiaperf_json(
-            results=itertools.chain.from_iterable(
-                (app_render_latency_results, cpu_results)
-            ),
+            results=app_render_latency_results + cpu_results,
             test_suite=f"{TEST_NAME}",
             output_path=fuchsiaperf_json_path,
         )
 
         expected_metrics_file = f"{TEST_NAME}.txt"
-        publish.publish_fuchsiaperf(
-            fuchsia_perf_file_paths=[fuchsiaperf_json_path],
-            expected_metric_names_filename=expected_metrics_file,
-        )
+        with as_file(files(test_data).joinpath(expected_metrics_file)) as f:
+            publish.publish_fuchsiaperf(
+                fuchsia_perf_file_paths=[fuchsiaperf_json_path],
+                expected_metric_names_filename=str(f),
+            )
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ use fuchsia_bluetooth::{profile::ValidScoConnectionParameters, types::PeerId};
 use fuchsia_inspect_derive::Unit;
 use futures::{Future, FutureExt, StreamExt};
 use std::collections::HashSet;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::error::ScoConnectError;
 use crate::features::CodecId;
@@ -159,32 +159,40 @@ impl ScoConnector {
     }
 
     async fn setup_sco_connection(
-        proxy: bredr::ProfileProxy,
+        profile_proxy: bredr::ProfileProxy,
         peer_id: PeerId,
         role: ScoInitiatorRole,
         params: Vec<bredr::ScoConnectionParameters>,
     ) -> Result<ScoConnection, ScoConnectError> {
-        let (client, mut requests) =
-            fidl::endpoints::create_request_stream::<bredr::ScoConnectionReceiverMarker>()?;
-        proxy.connect_sco(bredr::ProfileConnectScoRequest {
+        let (connection_proxy, server) =
+            fidl::endpoints::create_proxy::<bredr::ScoConnectionMarker>()?;
+        profile_proxy.connect_sco(bredr::ProfileConnectScoRequest {
             peer_id: Some(peer_id.into()),
             initiator: Some(role == ScoInitiatorRole::Initiate),
             params: Some(params),
-            receiver: Some(client),
+            connection: Some(server),
             ..Default::default()
         })?;
 
-        match requests.next().await {
-            Some(Ok(bredr::ScoConnectionReceiverRequest::Connected {
-                connection,
-                params,
-                control_handle: _,
-            })) => {
-                let params = params.try_into().map_err(|_| ScoConnectError::ScoInvalidArguments)?;
-                let proxy = connection.into_proxy().map_err(|_| ScoConnectError::ScoFailed)?;
-                Ok(ScoConnection { params, proxy })
+        match connection_proxy.take_event_stream().next().await {
+            Some(Ok(bredr::ScoConnectionEvent::OnConnectionComplete { payload })) => {
+                match payload {
+                    bredr::ScoConnectionOnConnectionCompleteRequest::ConnectedParams(params) => {
+                        let params =
+                            params.try_into().map_err(|_| ScoConnectError::ScoInvalidArguments)?;
+                        Ok(ScoConnection { params, proxy: connection_proxy })
+                    }
+                    bredr::ScoConnectionOnConnectionCompleteRequest::Error(err) => Err(err.into()),
+                    _ => {
+                        warn!("Received unknown ScoConnectionOnConnectionCompleteRequest");
+                        Err(ScoConnectError::ScoCanceled)
+                    }
+                }
             }
-            Some(Ok(bredr::ScoConnectionReceiverRequest::Error { error, .. })) => Err(error.into()),
+            Some(Ok(bredr::ScoConnectionEvent::_UnknownEvent { .. })) => {
+                warn!("Received unknown ScoConnectionEvent");
+                Err(ScoConnectError::ScoCanceled)
+            }
             Some(Err(e)) => Err(e.into()),
             None => Err(ScoConnectError::ScoCanceled),
         }

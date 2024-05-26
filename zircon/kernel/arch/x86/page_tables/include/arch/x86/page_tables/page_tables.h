@@ -1123,6 +1123,8 @@ class X86PageTableImpl : public X86PageTableBase {
         paddr_t ptable_phys = X86_VIRT_TO_PHYS(next_table);
 
         vm_page_t* page = paddr_to_vm_page(ptable_phys);
+        DEBUG_ASSERT_MSG(page, "phys address %#" PRIxPTR " from PTE %#" PRIxPTR " was invalid",
+                         ptable_phys, pt_val);
         if (level == PageTableLevel::PML4_L && IsRestricted() && referenced_pt_ != nullptr) {
           Guard<Mutex> a{AssertOrderedLock, &referenced_pt_->lock_, referenced_pt_->LockOrder()};
           pt_entry_t* referenced_entry = (pt_entry_t*)referenced_pt_->virt() + index;
@@ -1134,7 +1136,6 @@ class X86PageTableImpl : public X86PageTableBase {
         }
         UnmapEntry(cm, level, unmap_vaddr, e, /*was_terminal=*/false);
 
-        DEBUG_ASSERT(page);
         DEBUG_ASSERT_MSG(page->state() == vm_page_state::MMU,
                          "page %p state %u, paddr %#" PRIxPTR "\n", page,
                          static_cast<uint32_t>(page->state()), X86_VIRT_TO_PHYS(next_table));

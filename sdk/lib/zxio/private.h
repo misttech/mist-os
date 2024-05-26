@@ -118,7 +118,7 @@ zx_status_t zxio_symlink_init(zxio_storage_t* storage, fidl::ClientEnd<fuchsia_i
                               std::vector<uint8_t> target);
 #endif
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 zx_status_t zxio_attr_from_wire(const fuchsia_io::wire::NodeAttributes2& in,
                                 zxio_node_attributes_t* out);
 #endif

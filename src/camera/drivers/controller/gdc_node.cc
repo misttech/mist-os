@@ -4,8 +4,11 @@
 
 #include "src/camera/drivers/controller/gdc_node.h"
 
+#include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
+#include <fidl/fuchsia.sysmem2/cpp/hlcpp_conversion.h>
 #include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/trace/event.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -49,28 +52,29 @@ fpromise::result<std::unique_ptr<ProcessNode>, zx_status_t> GdcNode::Create(
   auto node =
       std::make_unique<camera::GdcNode>(dispatcher, attachments, std::move(frame_callback), gdc);
 
-  const fuchsia::sysmem::BufferCollectionInfo_2& output_buffer_collection = node->OutputBuffers();
-  const fuchsia::sysmem::BufferCollectionInfo_2& input_buffer_collection = node->InputBuffers();
-  ZX_ASSERT(output_buffer_collection.settings.has_image_format_constraints);
-  fuchsia_sysmem::wire::ImageFormatConstraints output_buffer_constraints =
-      ConvertToWireType(output_buffer_collection.settings.image_format_constraints);
-  ZX_ASSERT(input_buffer_collection.settings.has_image_format_constraints);
-  fuchsia_sysmem::wire::ImageFormatConstraints input_buffer_constraints =
-      ConvertToWireType(input_buffer_collection.settings.image_format_constraints);
+  const fuchsia::sysmem2::BufferCollectionInfo& output_buffer_collection = node->OutputBuffers();
+  const fuchsia::sysmem2::BufferCollectionInfo& input_buffer_collection = node->InputBuffers();
+  ZX_ASSERT(output_buffer_collection.settings().has_image_format_constraints());
+  ZX_ASSERT(input_buffer_collection.settings().has_image_format_constraints());
+
+  fuchsia_sysmem::wire::ImageFormatConstraints output_image_constraints =
+      ConvertV2ToV1WireType(output_buffer_collection.settings().image_format_constraints());
+  fuchsia_sysmem::wire::ImageFormatConstraints input_image_constraints =
+      ConvertV2ToV1WireType(input_buffer_collection.settings().image_format_constraints());
 
   std::vector<image_format_2_t> output_image_formats_wire;
   output_image_formats_wire.reserve(internal_gdc_node.image_formats.size());
   for (const auto& format : internal_gdc_node.image_formats) {
     output_image_formats_wire.push_back(sysmem::fidl_to_banjo(GetImageFormatFromConstraints(
-        output_buffer_constraints, format.coded_width, format.coded_height)));
+        output_image_constraints, format.size().width, format.size().height)));
   }
 
   // GDC only supports one input format and multiple output format at the
   // moment. So we take the first format from the previous node.
   // All existing usecases we support have only 1 format going into GDC.
   fuchsia_sysmem::wire::ImageFormat2 input_image_formats_wire =
-      GetImageFormatFromConstraints(input_buffer_constraints, node->InputFormats()[0].coded_width,
-                                    node->InputFormats()[0].coded_height);
+      GetImageFormatFromConstraints(input_image_constraints, node->InputFormats()[0].size().width,
+                                    node->InputFormats()[0].size().height);
 
   // Image format index refers to the final output format list of the pipeline. If this GDC node
   // only has one output format, then the image format index must not be meant for this node. If

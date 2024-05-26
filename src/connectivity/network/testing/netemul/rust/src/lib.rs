@@ -663,6 +663,21 @@ impl<'a> TestRealm<'a> {
         )
         .context("get interface event stream")
     }
+
+    /// Gets the table ID for the main route table.
+    pub async fn main_table_id<
+        I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+    >(
+        &self,
+    ) -> u32 {
+        let main_route_table = self
+            .connect_to_protocol::<I::RouteTableMarker>()
+            .expect("failed to connect to main route table");
+        fnet_routes_ext::admin::get_table_id::<I>(&main_route_table)
+            .await
+            .expect("failed to get_table_id")
+            .into()
+    }
 }
 
 /// A virtual Network.

@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_TESTS_VKEXT_VULKAN_EXTENSION_TEST_H_
 #define SRC_GRAPHICS_TESTS_VKEXT_VULKAN_EXTENSION_TEST_H_
 
-#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 
 #include <gtest/gtest.h>
 
@@ -18,12 +18,12 @@ vk::ImageCreateInfo GetDefaultImageCreateInfo(bool use_protected_memory, VkForma
                                               uint32_t width, uint32_t height, bool linear);
 vk::ImageFormatConstraintsInfoFUCHSIA GetDefaultRgbImageFormatConstraintsInfo();
 vk::ImageFormatConstraintsInfoFUCHSIA GetDefaultYuvImageFormatConstraintsInfo();
-fuchsia::sysmem::ImageFormatConstraints GetDefaultSysmemImageFormatConstraints();
+fuchsia::sysmem2::ImageFormatConstraints GetDefaultSysmemImageFormatConstraints();
 
-size_t GetImageByteOffset(size_t x, size_t y, const fuchsia::sysmem::BufferCollectionInfo_2 &info,
+size_t GetImageByteOffset(size_t x, size_t y, const fuchsia::sysmem2::BufferCollectionInfo &info,
                           size_t width, size_t height);
 void CheckImageFill(size_t width, size_t height, void *addr,
-                    const fuchsia::sysmem::BufferCollectionInfo_2 &info, uint32_t fill);
+                    const fuchsia::sysmem2::BufferCollectionInfo &info, uint32_t fill);
 
 class VulkanExtensionTest : public testing::Test {
  public:
@@ -31,8 +31,8 @@ class VulkanExtensionTest : public testing::Test {
   bool Initialize();
   bool Exec(VkFormat format, uint32_t width, uint32_t height, bool linear,
             bool repeat_constraints_as_non_protected,
-            const std::vector<fuchsia::sysmem::ImageFormatConstraints> &format_constraints =
-                std::vector<fuchsia::sysmem::ImageFormatConstraints>());
+            const std::vector<fuchsia::sysmem2::ImageFormatConstraints> &format_constraints =
+                std::vector<fuchsia::sysmem2::ImageFormatConstraints>());
   bool ExecBuffer(uint32_t size);
 
   void set_use_protected_memory(bool use) { use_protected_memory_ = use; }
@@ -55,12 +55,12 @@ class VulkanExtensionTest : public testing::Test {
 
   bool InitVulkan();
   bool InitSysmemAllocator();
-  std::vector<fuchsia::sysmem::BufferCollectionTokenSyncPtr> MakeSharedCollection(
+  std::vector<fuchsia::sysmem2::BufferCollectionTokenSyncPtr> MakeSharedCollection(
       uint32_t token_count);
   template <uint32_t token_count>
-  std::array<fuchsia::sysmem::BufferCollectionTokenSyncPtr, token_count> MakeSharedCollection() {
+  std::array<fuchsia::sysmem2::BufferCollectionTokenSyncPtr, token_count> MakeSharedCollection() {
     auto token_vector = MakeSharedCollection(token_count);
-    std::array<fuchsia::sysmem::BufferCollectionTokenSyncPtr, token_count> array;
+    std::array<fuchsia::sysmem2::BufferCollectionTokenSyncPtr, token_count> array;
     for (uint32_t i = 0; i < token_vector.size(); i++) {
       array[i] = std::move(token_vector[i]);
     }
@@ -68,12 +68,12 @@ class VulkanExtensionTest : public testing::Test {
   }
 
   UniqueBufferCollection CreateVkBufferCollectionForImage(
-      fuchsia::sysmem::BufferCollectionTokenSyncPtr token,
+      fuchsia::sysmem2::BufferCollectionTokenSyncPtr token,
       const vk::ImageFormatConstraintsInfoFUCHSIA constraints,
       vk::ImageConstraintsInfoFlagsFUCHSIA flags = {});
-  fuchsia::sysmem::BufferCollectionInfo_2 AllocateSysmemCollection(
-      std::optional<fuchsia::sysmem::BufferCollectionConstraints> constraints,
-      fuchsia::sysmem::BufferCollectionTokenSyncPtr token);
+  fuchsia::sysmem2::BufferCollectionInfo AllocateSysmemCollection(
+      std::optional<fuchsia::sysmem2::BufferCollectionConstraints> constraints,
+      fuchsia::sysmem2::BufferCollectionTokenSyncPtr token);
   bool InitializeDirectImage(vk::BufferCollectionFUCHSIA collection,
                              vk::ImageCreateInfo image_create_info);
   // Returns the memory type index if it succeeds; otherwise returns std::nullopt.
@@ -89,7 +89,7 @@ class VulkanExtensionTest : public testing::Test {
   bool device_supports_protected_memory_ = false;
   std::unique_ptr<VulkanContext> ctx_;
 
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
   vk::UniqueImage vk_image_;
   vk::UniqueBuffer vk_buffer_;
   vk::UniqueDeviceMemory vk_device_memory_;

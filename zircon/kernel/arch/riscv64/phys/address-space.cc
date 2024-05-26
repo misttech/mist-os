@@ -10,7 +10,7 @@
 #include <lib/arch/riscv64/page-table.h>
 #include <lib/boot-options/boot-options.h>
 
-void ArchSetUpAddressSpaceEarly(AddressSpace& aspace) {
+void ArchSetUpAddressSpace(AddressSpace& aspace) {
   if (gBootOptions && !gBootOptions->riscv64_phys_mmu) {
     return;
   }
@@ -19,7 +19,8 @@ void ArchSetUpAddressSpaceEarly(AddressSpace& aspace) {
   aspace.Install();
 }
 
-void ArchSetUpAddressSpaceLate(AddressSpace& aspace) {}
+// The MMU will be off when the trampoline runs, so there is nothing to do.
+void ArchPrepareAddressSpaceForTrampoline() {}
 
 void AddressSpace::ArchInstall() const {
   arch::RiscvSatp::Modify([root = root_paddr()](auto& satp) {

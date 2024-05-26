@@ -20,9 +20,8 @@ namespace zxdb {
 namespace {
 
 const char kDownShortHelp[] = "down: Move down the stack";
-const char kDownHelp[] =
-    R"(down
-
+const char kDownUsage[] = "down";
+const char kDownHelp[] = R"(
   Switch the active frame to the one below (forward in time from) the current.
 
 Examples
@@ -60,7 +59,8 @@ void RunVerbDown(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetDownVerbRecord() {
-  return VerbRecord(&RunVerbDown, {"down"}, kDownShortHelp, kDownHelp, CommandGroup::kGeneral);
+  return VerbRecord(&RunVerbDown, {"down"}, kDownShortHelp, kDownUsage, kDownHelp,
+                    CommandGroup::kGeneral);
 }
 
 // Shows the given frame for when it changes. This encapsulates the formatting options.

@@ -4,7 +4,6 @@
 
 #ifndef LIB_SYS_COMPONENT_CPP_TESTING_EXECUTION_CONTROLLER_H_
 #define LIB_SYS_COMPONENT_CPP_TESTING_EXECUTION_CONTROLLER_H_
-#if __Fuchsia_API_level__ >= 14
 
 #include <fuchsia/component/cpp/fidl.h>
 #include <lib/fit/result.h>
@@ -40,5 +39,4 @@ class ExecutionController final {
 
 }  // namespace component_testing
 
-#endif  // __Fuchsia_API_level__ >= 14
 #endif  // LIB_SYS_COMPONENT_CPP_TESTING_EXECUTION_CONTROLLER_H_

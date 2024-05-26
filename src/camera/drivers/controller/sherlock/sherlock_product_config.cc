@@ -6,6 +6,7 @@
 
 #include <sstream>
 
+#include "src/camera/drivers/controller/sherlock/common_util.h"
 #include "src/camera/drivers/controller/sherlock/isp_debug_config.h"
 #include "src/camera/drivers/controller/sherlock/monitoring_config.h"
 #include "src/camera/drivers/controller/sherlock/video_conferencing_config.h"
@@ -31,52 +32,42 @@ std::vector<fuchsia::camera2::hal::Config> SherlockProductConfig::ExternalConfig
   std::vector<fuchsia::camera2::hal::Config> configs;
 
   // Monitoring configuration.
-  configs.push_back(MonitoringConfig());
+  configs.emplace_back(MonitoringConfig());
 
   // Video conferencing configuration.
-  configs.push_back(VideoConferencingConfig(false));
+  configs.emplace_back(VideoConferencingConfig(false));
 
   // Video conferencing configuration with extended FOV enabled.
-  configs.push_back(VideoConferencingConfig(true));
+  configs.emplace_back(VideoConferencingConfig(true));
 
   return configs;
 }
 
 InternalConfigs SherlockProductConfig::InternalConfigs() const {
-  return {
-      .configs_info =
-          {
-              // Monitoring configuration.
-              {
-                  .streams_info =
-                      {
-                          {
-                              MonitorConfigFullRes(),
-                          },
-                          {
-                              MonitorConfigDownScaledRes(),
-                          },
-                      },
-                  .frame_rate_range = kMonitoringFrameRateRange,
-              },
-              // Video conferencing configuration with extended FOV disabled.
-              {
-                  .streams_info =
-                      {
-                          VideoConfigFullRes(false),
-                      },
-                  .frame_rate_range = kVideoFrameRateRange,
-              },
-              // Video conferencing configuration with extended FOV enabled.
-              {
-                  .streams_info =
-                      {
-                          VideoConfigFullRes(true),
-                      },
-                  .frame_rate_range = kVideoFrameRateRange,
-              },
-          },
-  };
+  struct InternalConfigs result;
+
+  // Monitoring configuration.
+  {
+    auto& item = result.configs_info.emplace_back();
+    item.streams_info = MakeVec(MonitorConfigFullRes(), MonitorConfigDownScaledRes());
+    item.frame_rate_range = kMonitoringFrameRateRange;
+  }
+
+  // Video conferencing configuration with extended FOV disabled.
+  {
+    auto& item = result.configs_info.emplace_back();
+    item.streams_info = MakeVec(VideoConfigFullRes(false));
+    item.frame_rate_range = kVideoFrameRateRange;
+  }
+
+  // Video conferencing configuration with extended FOV enabled.
+  {
+    auto& item = result.configs_info.emplace_back();
+    item.streams_info = MakeVec(VideoConfigFullRes(true));
+    item.frame_rate_range = kVideoFrameRateRange;
+  }
+
+  return result;
 }
 
 const char* SherlockProductConfig::GetGdcConfigFile(GdcConfig config_type) const {

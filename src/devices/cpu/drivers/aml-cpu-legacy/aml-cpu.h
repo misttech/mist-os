@@ -30,11 +30,12 @@ class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL
  public:
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(AmlCpu);
   AmlCpu(zx_device_t* device, fidl::WireSyncClient<fuchsia_thermal::Device> thermal_client,
-         size_t power_domain_index, uint32_t cluster_core_count)
+         size_t power_domain_index, uint32_t cluster_core_count, uint8_t relative_performance)
       : DeviceType(device),
         thermal_client_(std::move(thermal_client)),
         power_domain_index_(power_domain_index),
         cluster_core_count_(cluster_core_count),
+        relative_performance_(relative_performance),
         current_operating_point_(fuchsia_cpuctrl::wire::kDeviceOperatingPointP0) {}
 
   static zx_status_t Create(void* context, zx_device_t* device);
@@ -70,6 +71,7 @@ class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL
   fidl::WireSyncClient<fuchsia_thermal::Device> thermal_client_;
   size_t power_domain_index_;
   uint32_t cluster_core_count_;
+  const uint8_t relative_performance_;
 
   std::mutex lock_;
   uint32_t current_operating_point_ __TA_GUARDED(lock_);

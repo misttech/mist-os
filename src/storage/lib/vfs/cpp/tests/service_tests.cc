@@ -50,10 +50,9 @@ TEST(Service, ApiTest) {
   EXPECT_NULL(redirect);
 
   // get attr
-  fs::VnodeAttributes attr;
-  EXPECT_OK(svc->GetAttributes(&attr));
-  EXPECT_EQ(V_TYPE_FILE, attr.mode);
-  EXPECT_EQ(1, attr.link_count);
+  zx::result attr = svc->GetAttributes();
+  ASSERT_TRUE(attr.is_ok());
+  EXPECT_EQ(V_TYPE_FILE, attr->mode);
 
   // make some channels we can use for testing
   zx::channel c1, c2;

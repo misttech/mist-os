@@ -38,6 +38,7 @@ phys_toolchain = "//zircon/kernel/phys:kernel.phys_$current_cpu"
 #     - Optional: This can override keys in the `images` metadata entry.
 #     - Type: scope
 #     - Default: {}
+#
 # See executable() for other parameters.
 #
 template("phys_executable") {

@@ -152,6 +152,8 @@ struct PortStatus {
 class FakeNetworkPortImpl : public fdf::WireServer<fuchsia_hardware_network_driver::NetworkPort> {
  public:
   using OnSetActiveCallback = fit::function<void(bool)>;
+  using NetDevIfcClient = fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkDeviceIfc>;
+
   FakeNetworkPortImpl();
   ~FakeNetworkPortImpl() override;
 
@@ -164,12 +166,11 @@ class FakeNetworkPortImpl : public fdf::WireServer<fuchsia_hardware_network_driv
 
   PortInfo& port_info() { return port_info_; }
   const PortStatus& status() const { return status_; }
-  zx_status_t AddPort(uint8_t port_id, const fdf::Dispatcher& dispatcher,
-                      fidl::WireSyncClient<netdev::Device> device,
-                      FakeNetworkDeviceImpl& ifc_client);
-  zx_status_t AddPortNoWait(uint8_t port_id, const fdf::Dispatcher& dispatcher,
+  zx_status_t AddPort(uint8_t port_id, fdf_dispatcher_t* dispatcher,
+                      fidl::WireSyncClient<netdev::Device> device, NetDevIfcClient& netdev_ifc);
+  zx_status_t AddPortNoWait(uint8_t port_id, fdf_dispatcher_t* dispatcher,
                             fidl::WireSyncClient<netdev::Device> device,
-                            FakeNetworkDeviceImpl& ifc_client);
+                            NetDevIfcClient& netdev_ifc);
   void RemoveSync();
   void SetMac(fdf::ClientEnd<fuchsia_hardware_network_driver::MacAddr> client) {
     mac_client_end_ = std::move(client);
@@ -203,7 +204,7 @@ class FakeNetworkPortImpl : public fdf::WireServer<fuchsia_hardware_network_driv
   DISALLOW_COPY_ASSIGN_AND_MOVE(FakeNetworkPortImpl);
 
   std::optional<fdf::ServerBindingRef<fuchsia_hardware_network_driver::NetworkPort>> binding_;
-  FakeNetworkDeviceImpl* parent_ = nullptr;
+  NetDevIfcClient* netdev_ifc_ = nullptr;
   std::optional<fdf::ClientEnd<fuchsia_hardware_network_driver::MacAddr>> mac_client_end_;
   sync_completion_t wait_removed_;
   OnSetActiveCallback on_set_active_;
@@ -238,7 +239,9 @@ class FakeNetworkDeviceImpl
  public:
   using PrepareVmoHandler =
       fit::function<void(uint8_t, const zx::vmo&, PrepareVmoCompleter::Sync&)>;
-  FakeNetworkDeviceImpl();
+  // |dispatcher| is optional, if it is not provided the impl dispatcher from a call to CreateChild
+  // is used instead. This is provided for tests that don't call CreateChild.
+  explicit FakeNetworkDeviceImpl(fdf_dispatcher_t* dispatcher = nullptr);
   ~FakeNetworkDeviceImpl() override;
 
   zx::result<std::unique_ptr<NetworkDeviceInterface>> CreateChild(

@@ -455,35 +455,26 @@ TEST(RamdiskTests, RamdiskTestVmoWithParams) {
 // (where we expect it to be!) and verifies that it is removed when we
 // "unplug" the device.
 TEST(RamdiskTests, RamdiskTestFilesystem) {
+  fuchsia_hardware_block_partition::wire::Guid guid = {1, 2,  3,  4,  5,  6,  7,  8,
+                                                       9, 10, 11, 12, 13, 14, 15, 16};
   // Make a ramdisk
   std::unique_ptr<RamdiskTest> ramdisk;
-  ASSERT_NO_FATAL_FAILURE(RamdiskTest::Create(zx_system_get_page_size() / 2, 512, &ramdisk));
-  char ramdisk_path[PATH_MAX];
-  strlcpy(ramdisk_path, ramdisk_get_path(ramdisk->ramdisk_client()), sizeof(ramdisk_path));
+  ASSERT_NO_FATAL_FAILURE(RamdiskTest::CreateWithGuid(
+      zx_system_get_page_size() / 2, 512, guid.value.data(), guid.value.size(), &ramdisk));
 
-  // Ramdisk name is of the form: ".../NAME/block"
-  // Extract "NAME".
-  const char* name_end = strrchr(ramdisk_path, '/');
-  const char* name_start = name_end - 1;
-  while (*(name_start - 1) != '/')
-    name_start--;
-  char name[NAME_MAX];
-  memcpy(name, name_start, name_end - name_start);
-  name[name_end - name_start] = 0;
-
-  // Verify the ramdisk name
+  // Verify the ramdisk type
   fidl::UnownedClientEnd block_interface = ramdisk->block_interface();
 
   const fidl::WireResult result =
       fidl::WireCall(fidl::UnownedClientEnd<fuchsia_hardware_block_partition::Partition>(
                          block_interface.channel()))
-          ->GetName();
+          ->GetTypeGuid();
   ASSERT_TRUE(result.ok()) << result.FormatDescription();
   const fidl::WireResponse response = result.value();
   ASSERT_EQ(response.status, ZX_OK);
-  ASSERT_EQ(response.name.get(), std::string_view(name));
+  ASSERT_EQ(response.guid.get()->value, guid.value);
 
-  // Find the name of the ramdisk under "/dev/class/block", since it is a block device.
+  // Find the guid of the ramdisk under "/dev/class/block", since it is a block device.
   // Be slightly more lenient with errors during this section, since we might be poking
   // block devices that don't belong to us.
   char blockpath[PATH_MAX];
@@ -493,16 +484,17 @@ TEST(RamdiskTests, RamdiskTestFilesystem) {
   const auto closer = fit::defer([dir]() { closedir(dir); });
 
   typedef struct watcher_args {
-    const char* expected_name;
+    const fidl::Array<uint8_t, 16> expected_guid;
     char* blockpath;
     fbl::String filename;
     bool found;
   } watcher_args_t;
 
-  watcher_args_t args;
-  args.expected_name = name;
-  args.blockpath = blockpath;
-  args.found = false;
+  watcher_args_t args{
+      .expected_guid = guid.value,
+      .blockpath = blockpath,
+      .found = false,
+  };
 
   auto cb = [](int dirfd, int event, const char* fn, void* cookie) {
     watcher_args_t* args = static_cast<watcher_args_t*>(cookie);
@@ -519,7 +511,7 @@ TEST(RamdiskTests, RamdiskTestFilesystem) {
       return channel.status_value();
     }
 
-    const fidl::WireResult result = fidl::WireCall(channel.value())->GetName();
+    const fidl::WireResult result = fidl::WireCall(channel.value())->GetTypeGuid();
     if (!result.ok()) {
       return result.status();
     }
@@ -527,7 +519,7 @@ TEST(RamdiskTests, RamdiskTestFilesystem) {
     if (zx_status_t status = response.status; status != ZX_OK) {
       return status;
     }
-    if (response.name.get() != args->expected_name) {
+    if (response.guid.get()->value != args->expected_guid) {
       return ZX_OK;
     }
     // Found a device under /dev/class/block/XYZ with the name of the

@@ -65,6 +65,7 @@ common_deps = [
   "//third_party/rust_crates:rand",
   "//third_party/rust_crates:thiserror",
   "//third_party/rust_crates:tracing",
+  "//third_party/rust_crates:zerocopy",
 
   # TODO(https://fxbug.dev/42175119): re-enable check includes when the inspect/client.shard.cml
   # stops exposing diagnostics from framework.

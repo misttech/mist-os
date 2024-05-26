@@ -21,12 +21,12 @@ class EncoderClient {
   ~EncoderClient();
   static fpromise::result<std::unique_ptr<EncoderClient>, zx_status_t> Create(
       fuchsia::mediacodec::CodecFactoryHandle codec_factory,
-      fuchsia::sysmem::AllocatorHandle allocator, uint32_t bitrate, uint32_t gop_size,
+      fuchsia::sysmem2::AllocatorHandle allocator, uint32_t bitrate, uint32_t gop_size,
       const std::string& mime_type);
 
   // Connects to codec factory and sets up an encoder stream processor with the given
   // image format as input.
-  zx_status_t Start(fuchsia::sysmem::ImageFormat_2 image_format, uint32_t frame_rate);
+  zx_status_t Start(fuchsia::images2::ImageFormat image_format, uint32_t frame_rate);
 
   using OutputPacketHandler = fit::function<void(uint8_t* buffer, size_t len)>;
   void SetOutputPacketHandler(OutputPacketHandler handler) {
@@ -49,25 +49,25 @@ class EncoderClient {
   EncoderClient(uint32_t bitrate, uint32_t gop_size, const std::string& mime_type);
 
   using BoundBufferCollectionCallback =
-      fit::callback<void(fuchsia::sysmem::BufferCollectionTokenHandle&&)>;
+      fit::callback<void(fuchsia::sysmem2::BufferCollectionTokenHandle&&)>;
 
   // Allocate new buffer collection, duplicating a token to it, and passing both to the callback.
-  void CreateAndSyncBufferCollection(fuchsia::sysmem::BufferCollectionPtr& buffer_collection,
+  void CreateAndSyncBufferCollection(fuchsia::sysmem2::BufferCollectionPtr& buffer_collection,
                                      BoundBufferCollectionCallback callback);
 
   // Common helper function to wait for buffers
-  void BindAndSyncBufferCollection(fuchsia::sysmem::BufferCollectionPtr& buffer_collection,
-                                   fuchsia::sysmem::BufferCollectionTokenHandle token,
-                                   fuchsia::sysmem::BufferCollectionTokenHandle duplicated_token,
+  void BindAndSyncBufferCollection(fuchsia::sysmem2::BufferCollectionPtr& buffer_collection,
+                                   fuchsia::sysmem2::BufferCollectionTokenHandle token,
+                                   fuchsia::sysmem2::BufferCollectionTokenHandle duplicated_token,
                                    BoundBufferCollectionCallback callback);
 
   // On Ok, contains the buffer collection info and negotiated packet count.
   using BufferCollectionResult =
-      fpromise::result<std::pair<fuchsia::sysmem::BufferCollectionInfo_2, uint32_t>, zx_status_t>;
+      fpromise::result<std::pair<fuchsia::sysmem2::BufferCollectionInfo, uint32_t>, zx_status_t>;
   using ConfigurePortBufferCollectionCallback = fit::callback<void(BufferCollectionResult)>;
   void ConfigurePortBufferCollection(
-      fuchsia::sysmem::BufferCollectionPtr& buffer_collection,
-      fuchsia::sysmem::BufferCollectionTokenHandle codec_sysmem_token, bool is_output,
+      fuchsia::sysmem2::BufferCollectionPtr& buffer_collection,
+      fuchsia::sysmem2::BufferCollectionTokenHandle codec_sysmem_token, bool is_output,
       uint64_t new_buffer_lifetime_ordinal, uint64_t buffer_constraints_version_ordinal,
       ConfigurePortBufferCollectionCallback callback);
 
@@ -90,14 +90,14 @@ class EncoderClient {
 
   fuchsia::mediacodec::CodecFactoryPtr codec_factory_;
   fuchsia::media::StreamProcessorPtr codec_;
-  fuchsia::sysmem::AllocatorPtr sysmem_;
+  fuchsia::sysmem2::AllocatorPtr sysmem_;
 
   OutputPacketHandler output_packet_handler_;
   InputBufferReadyHandler input_buffer_ready_handler_;
   OutputEndOfStreamHandler output_end_of_stream_handler_;
 
-  fuchsia::sysmem::BufferCollectionPtr input_buffer_collection_;
-  fuchsia::sysmem::BufferCollectionPtr output_buffer_collection_;
+  fuchsia::sysmem2::BufferCollectionPtr input_buffer_collection_;
+  fuchsia::sysmem2::BufferCollectionPtr output_buffer_collection_;
 
   std::optional<fuchsia::media::StreamBufferConstraints> input_constraints_;
   std::optional<fuchsia::media::StreamOutputConstraints> last_output_constraints_;

@@ -24,6 +24,7 @@ driver_bind_rules("adc-buttons-bind") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_bindlib",
     "//src/devices/bind/fuchsia.adc",
+    "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.platform",
   ]
 }

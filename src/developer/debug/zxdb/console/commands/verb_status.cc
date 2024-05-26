@@ -24,8 +24,8 @@ namespace zxdb {
 namespace {
 
 const char kStatusShortHelp[] = "status: Show debugger status.";
-const char kStatusHelp[] = R"(status: Show debugger status.
-
+const char kStatusUsage[] = "status";
+const char kStatusHelp[] = R"(
   Shows information on the current connection, process, thread, etc. along
   with suggestions on what to do.
 )";
@@ -101,8 +101,8 @@ OutputBuffer GetPlatformArchLine(const Session* session) {
 }  // namespace
 
 VerbRecord GetStatusVerbRecord() {
-  return VerbRecord(&RunVerbStatus, {"status", "stat", "wtf"}, kStatusShortHelp, kStatusHelp,
-                    CommandGroup::kGeneral);
+  return VerbRecord(&RunVerbStatus, {"status", "stat", "wtf"}, kStatusShortHelp, kStatusUsage,
+                    kStatusHelp, CommandGroup::kGeneral);
 }
 
 OutputBuffer GetConnectionStatus(const Session* session) {

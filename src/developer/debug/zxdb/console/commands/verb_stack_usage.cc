@@ -33,9 +33,8 @@ namespace {
 const char kNoFramesError[] = "No frames, try \"pause\" and re-run \"stack-usage\".";
 
 const char kStackUsageShortHelp[] = "stack-usage: Summarize stack usage.";
-const char kStackUsageHelp[] =
-    R"(stack-usage
-
+const char kStackUsageUsage[] = "stack-usage";
+const char kStackUsageHelp[] = R"(
   Prints an overview of the stack usage for each thread of a process.
 
   To compute this table, zxdb locates for each thread the VMO mapping containing
@@ -399,8 +398,8 @@ ThreadStackUsage GetThreadStackUsage(ConsoleContext* console_context,
 }
 
 VerbRecord GetStackUsageVerbRecord() {
-  VerbRecord stack(&RunVerbStackUsage, {"stack-usage"}, kStackUsageShortHelp, kStackUsageHelp,
-                   CommandGroup::kQuery);
+  VerbRecord stack(&RunVerbStackUsage, {"stack-usage"}, kStackUsageShortHelp, kStackUsageUsage,
+                   kStackUsageHelp, CommandGroup::kQuery);
   return stack;
 }
 

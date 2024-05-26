@@ -4,7 +4,9 @@
 
 import json
 import os
+from importlib.resources import as_file, files
 
+import test_data
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import asserts, test_runner
@@ -101,10 +103,13 @@ class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
                     ITERATIONS_PER_TEST_PER_PROCESS,
                 )
 
-        publish.publish_fuchsiaperf(
-            results_files,
-            "fuchsia.microbenchmarks.tracing.txt",
-        )
+        with as_file(
+            files(test_data).joinpath("fuchsia.microbenchmarks.tracing.txt")
+        ) as f:
+            publish.publish_fuchsiaperf(
+                results_files,
+                str(f),
+            )
 
     # Run some of the microbenchmarks with tracing enabled but each category
     # disabled to measure the overhead of a trace event with the category turned
@@ -126,10 +131,15 @@ class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
             # All the real tracing categories are disabled, so we should get no trace events.
             asserts.assert_equal(list(model.all_events()), [])
 
-        publish.publish_fuchsiaperf(
-            results_files,
-            "fuchsia.microbenchmarks.tracing_categories_disabled.txt",
-        )
+        with as_file(
+            files(test_data).joinpath(
+                "fuchsia.microbenchmarks.tracing_categories_disabled.txt"
+            )
+        ) as f:
+            publish.publish_fuchsiaperf(
+                results_files,
+                str(f),
+            )
 
     # --- Rust Trace Library Benchmarks
     #
@@ -166,10 +176,15 @@ class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
         self._add_test_suite_suffix(
             results_file, ".tracing_categories_disabled"
         )
-        publish.publish_fuchsiaperf(
-            [results_file],
-            "fuchsia.trace_records.rust.tracing_categories_disabled.txt",
-        )
+        with as_file(
+            files(test_data).joinpath(
+                "fuchsia.trace_records.rust.tracing_categories_disabled.txt"
+            )
+        ) as f:
+            publish.publish_fuchsiaperf(
+                [results_file],
+                str(f),
+            )
 
     def test_tracing_rust_tracing_disabled(self) -> None:
         results_file: str = utils.single_run_test_component(
@@ -182,9 +197,12 @@ class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
         )
 
         self._add_test_suite_suffix(results_file, ".tracing_disabled")
-        publish.publish_fuchsiaperf(
-            [results_file], "fuchsia.trace_records.rust.tracing_disabled.txt"
-        )
+        with as_file(
+            files(test_data).joinpath(
+                "fuchsia.trace_records.rust.tracing_disabled.txt"
+            )
+        ) as f:
+            publish.publish_fuchsiaperf([results_file], str(f))
 
     def _run_tracing_microbenchmark(
         self, run_id: int, categories: list[str], results_suffix: str

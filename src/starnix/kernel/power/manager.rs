@@ -195,6 +195,16 @@ impl SuspendResumeManager {
                         fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
                             log_info!("Transiting to a low-power state");
                         }
+                        fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
+                            // TODO(b/337924793): Update Starnix to handle suspend failures.
+                            if let Err(e) = responder.send() {
+                                log_error!(
+                                    "OnSuspendFail server failed to send a respond to its
+                                    client: {}",
+                                    e
+                                );
+                            }
+                        }
                         fsystem::ActivityGovernorListenerRequest::_UnknownMethod {
                             ordinal,
                             ..

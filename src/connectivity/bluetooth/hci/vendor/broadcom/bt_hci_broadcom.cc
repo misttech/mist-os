@@ -94,8 +94,8 @@ void BtHciBroadcom::PrepareStop(fdf::PrepareStopCompleter completer) {
   completer(zx::ok());
 }
 
-void BtHciBroadcom::NewEncodeCommand(NewEncodeCommandRequestView request,
-                                     NewEncodeCommandCompleter::Sync& completer) {
+void BtHciBroadcom::EncodeCommand(EncodeCommandRequestView request,
+                                  EncodeCommandCompleter::Sync& completer) {
   uint8_t data_buffer[kBcmSetAclPriorityCmdSize];
   switch (request->Which()) {
     case fuchsia_hardware_bluetooth::wire::VendorCommand::Tag::kSetAclPriority: {

@@ -12,6 +12,7 @@ namespace zxdb {
 namespace {
 
 const char kStderrShortHelp[] = "stderr: Show process error output.";
+const char kStderrUsage[] = "stderr";
 
 void RunVerbStderr(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
   return RunVerbStdio(Verb::kStderr, cmd, cmd_context);
@@ -20,7 +21,7 @@ void RunVerbStderr(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) 
 }  // namespace
 
 VerbRecord GetStderrVerbRecord() {
-  return VerbRecord(&RunVerbStderr, {"stderr"}, kStderrShortHelp, kStdioHelp,
+  return VerbRecord(&RunVerbStderr, {"stderr"}, kStderrShortHelp, kStderrUsage, kStdioHelp,
                     CommandGroup::kProcess);
 }
 

@@ -6,7 +6,7 @@
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/txn_header.h>
@@ -67,34 +67,40 @@ Image::Image(uint32_t width, uint32_t height, int32_t stride,
       modifier_(modifier) {}
 
 Image* Image::Create(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint32_t width,
-                     uint32_t height, fuchsia_images2::wire::PixelFormat format, Pattern pattern,
+                     uint32_t height, fuchsia_images2::PixelFormat format, Pattern pattern,
                      uint32_t fg_color, uint32_t bg_color,
-                     fuchsia_images2::wire::PixelFormatModifier modifier) {
-  zx::result client_end = component::Connect<fuchsia_sysmem::Allocator>();
+                     fuchsia_images2::PixelFormatModifier modifier) {
+  zx::result client_end = component::Connect<fuchsia_sysmem2::Allocator>();
   if (client_end.is_error()) {
     fprintf(stderr, "Failed to connect to sysmem: %s\n", client_end.status_string());
     return nullptr;
   }
-  fidl::WireSyncClient allocator{std::move(client_end.value())};
+  fidl::SyncClient allocator{std::move(client_end.value())};
 
-  fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken> token;
+  fidl::SyncClient<fuchsia_sysmem2::BufferCollectionToken> token;
   {
-    auto [client, server] = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
-    const fidl::OneWayStatus result = allocator->AllocateSharedCollection(std::move(server));
-    if (!result.ok()) {
+    auto [client, server] = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
+    fuchsia_sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
+    allocate_shared_request.token_request() = std::move(server);
+    const auto allocate_shared_result =
+        allocator->AllocateSharedCollection(std::move(allocate_shared_request));
+    if (!allocate_shared_result.is_ok()) {
       fprintf(stderr, "Failed to allocate shared collection: %s\n",
-              result.FormatDescription().c_str());
+              allocate_shared_result.error_value().FormatDescription().c_str());
       return nullptr;
     }
     token.Bind(std::move(client));
   }
-  fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> display_token_handle;
+  fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> display_token_handle;
   {
-    auto [client, server] = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
-    const fidl::OneWayStatus result =
-        token->Duplicate(/*rights_attenuation_mask=*/0xffffffff, std::move(server));
-    if (!result.ok()) {
-      fprintf(stderr, "Failed to duplicate token: %s\n", result.FormatDescription().c_str());
+    auto [client, server] = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
+    fuchsia_sysmem2::BufferCollectionTokenDuplicateRequest dup_request;
+    dup_request.rights_attenuation_mask() = ZX_RIGHT_SAME_RIGHTS;
+    dup_request.token_request() = std::move(server);
+    const auto duplicate_result = token->Duplicate(std::move(dup_request));
+    if (!duplicate_result.is_ok()) {
+      fprintf(stderr, "Failed to duplicate token: %s\n",
+              duplicate_result.error_value().FormatDescription().c_str());
       return nullptr;
     }
     display_token_handle = std::move(client);
@@ -102,15 +108,16 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint32_t 
 
   static display::BufferCollectionId next_buffer_collection_id(fhdt::wire::kInvalidDispId + 1);
   display::BufferCollectionId buffer_collection_id = next_buffer_collection_id++;
-  if (!token->Sync().ok()) {
+  if (!token->Sync().is_ok()) {
     fprintf(stderr, "Failed to sync token\n");
     return nullptr;
   }
 
   fuchsia_hardware_display::wire::BufferCollectionId fidl_buffer_collection_id =
       display::ToFidlBufferCollectionId(buffer_collection_id);
-  auto import_result =
-      dc->ImportBufferCollection(fidl_buffer_collection_id, std::move(display_token_handle));
+  auto import_result = dc->ImportBufferCollection(
+      fidl_buffer_collection_id,
+      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(display_token_handle.TakeChannel()));
   if (!import_result.ok() || import_result.value().is_error()) {
     fprintf(stderr, "Failed to import buffer collection\n");
     return nullptr;
@@ -126,95 +133,76 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint32_t 
     return nullptr;
   }
 
-  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection;
+  fidl::SyncClient<fuchsia_sysmem2::BufferCollection> collection;
   {
-    auto [client, server] = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
-    const fidl::OneWayStatus result =
-        allocator->BindSharedCollection(token.TakeClientEnd(), std::move(server));
-    if (!result.ok()) {
-      fprintf(stderr, "Failed to bind shared collection: %s\n", result.FormatDescription().c_str());
+    auto [client, server] = fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
+    fuchsia_sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+    bind_shared_request.token() = token.TakeClientEnd();
+    bind_shared_request.buffer_collection_request() = std::move(server);
+    const auto bind_shared_result = allocator->BindSharedCollection(std::move(bind_shared_request));
+    if (!bind_shared_result.is_ok()) {
+      fprintf(stderr, "Failed to bind shared collection: %s\n",
+              bind_shared_result.error_value().FormatDescription().c_str());
       return nullptr;
     }
     collection.Bind(std::move(client));
   }
 
-  fuchsia_sysmem::wire::BufferCollectionConstraints constraints = {};
-  constraints.usage.cpu =
-      fuchsia_sysmem::wire::kCpuUsageReadOften | fuchsia_sysmem::wire::kCpuUsageWriteOften;
-  constraints.min_buffer_count_for_camping = 1;
-  constraints.has_buffer_memory_constraints = true;
-  fuchsia_sysmem::wire::BufferMemoryConstraints& buffer_constraints =
-      constraints.buffer_memory_constraints;
-  buffer_constraints.ram_domain_supported = true;
-  constraints.image_format_constraints_count = 1;
-  fuchsia_sysmem::wire::ImageFormatConstraints& image_constraints =
-      constraints.image_format_constraints[0];
+  fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  auto& constraints = set_constraints_request.constraints().emplace();
+  constraints.usage().emplace();
+  constraints.usage()->cpu() =
+      fuchsia_sysmem2::kCpuUsageReadOften | fuchsia_sysmem2::kCpuUsageWriteOften;
+  constraints.min_buffer_count_for_camping() = 1;
+  auto& buffer_constraints = constraints.buffer_memory_constraints().emplace();
+  buffer_constraints.ram_domain_supported() = true;
+  auto& image_constraints = constraints.image_format_constraints().emplace().emplace_back();
   if (format == fuchsia_images2::wire::PixelFormat::kB8G8R8A8) {
-    image_constraints.pixel_format.type = fuchsia_sysmem::wire::PixelFormatType::kBgra32;
-    image_constraints.color_spaces_count = 1;
-    image_constraints.color_space[0] = fuchsia_sysmem::wire::ColorSpace{
-        .type = fuchsia_sysmem::wire::ColorSpaceType::kSrgb,
-    };
-  } else if (format == fuchsia_images2::wire::PixelFormat::kR8G8B8A8) {
-    image_constraints.pixel_format.type = fuchsia_sysmem::wire::PixelFormatType::kR8G8B8A8;
-    image_constraints.color_spaces_count = 1;
-    image_constraints.color_space[0] = fuchsia_sysmem::wire::ColorSpace{
-        .type = fuchsia_sysmem::wire::ColorSpaceType::kSrgb,
-    };
-  } else if (format == fuchsia_images2::wire::PixelFormat::kNv12) {
-    image_constraints.pixel_format.type = fuchsia_sysmem::wire::PixelFormatType::kNv12;
-    image_constraints.color_spaces_count = 1;
-    image_constraints.color_space[0] = fuchsia_sysmem::wire::ColorSpace{
-        .type = fuchsia_sysmem::wire::ColorSpaceType::kRec709,
-    };
+    image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kB8G8R8A8;
+    image_constraints.color_spaces().emplace().emplace_back(fuchsia_images2::ColorSpace::kSrgb);
+  } else if (format == fuchsia_images2::PixelFormat::kR8G8B8A8) {
+    image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kR8G8B8A8;
+    image_constraints.color_spaces().emplace().emplace_back(fuchsia_images2::ColorSpace::kSrgb);
+  } else if (format == fuchsia_images2::PixelFormat::kNv12) {
+    image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
+    image_constraints.color_spaces().emplace().emplace_back(fuchsia_images2::ColorSpace::kRec709);
   } else {
     fprintf(stderr, "Unsupported pixel format type: %u\n", static_cast<uint32_t>(format));
     return nullptr;
   }
-  image_constraints.pixel_format.has_format_modifier = true;
-  image_constraints.pixel_format.format_modifier.value = fidl::ToUnderlying(modifier);
+  image_constraints.pixel_format_modifier() = modifier;
 
-  image_constraints.min_coded_width = width;
-  image_constraints.max_coded_width = width;
-  image_constraints.min_coded_height = height;
-  image_constraints.max_coded_height = height;
-  image_constraints.min_bytes_per_row = 0;
-  image_constraints.max_bytes_per_row = std::numeric_limits<uint32_t>::max();
-  image_constraints.max_coded_width_times_coded_height = std::numeric_limits<uint32_t>::max();
-  image_constraints.layers = 1;
-  image_constraints.coded_width_divisor = 1;
-  image_constraints.coded_height_divisor = 1;
-  image_constraints.bytes_per_row_divisor = 1;
-  image_constraints.start_offset_divisor = 1;
-  image_constraints.display_width_divisor = 1;
-  image_constraints.display_height_divisor = 1;
+  image_constraints.min_size() = {width, height};
+  image_constraints.max_size() = {width, height};
 
-  if (!collection->SetConstraints(true, constraints).ok()) {
+  if (!collection->SetConstraints(std::move(set_constraints_request)).is_ok()) {
     fprintf(stderr, "Failed to set local constraints\n");
     return nullptr;
   }
 
-  auto info_result = collection->WaitForBuffersAllocated();
-  if (!info_result.ok() || info_result.value().status != ZX_OK) {
+  auto info_result = collection->WaitForAllBuffersAllocated();
+  if (!info_result.is_ok()) {
     fprintf(stderr, "Failed to wait for buffers allocated: %s",
-            info_result.FormatDescription().c_str());
+            info_result.error_value().FormatDescription().c_str());
     return nullptr;
   }
 
-  if (!collection->Close().ok()) {
+  if (!collection->Release().is_ok()) {
     fprintf(stderr, "Failed to close buffer collection\n");
     return nullptr;
   }
 
-  auto& buffer_collection_info = info_result.value().buffer_collection_info;
-  uint32_t buffer_size = buffer_collection_info.settings.buffer_settings.size_bytes;
-  zx::vmo vmo(std::move(buffer_collection_info.buffers[0].vmo));
+  auto& buffer_collection_info = info_result.value().buffer_collection_info().value();
+  uint64_t buffer_size = buffer_collection_info.settings()->buffer_settings()->size_bytes().value();
+  zx::vmo vmo(std::move(buffer_collection_info.buffers()->at(0).vmo().value()));
 
   uint32_t minimum_row_bytes;
-  bool result = ImageFormatMinimumRowBytes(buffer_collection_info.settings.image_format_constraints,
-                                           width, &minimum_row_bytes);
+  bool result = ImageFormatMinimumRowBytes(
+      buffer_collection_info.settings()->image_format_constraints().value(), width,
+      &minimum_row_bytes);
   if (!result) {
-    minimum_row_bytes = buffer_collection_info.settings.image_format_constraints.min_bytes_per_row;
+    minimum_row_bytes =
+        buffer_collection_info.settings()->image_format_constraints()->min_bytes_per_row().value();
   }
 
   uint32_t stride_pixels = minimum_row_bytes / ImageFormatStrideBytesPerWidthPixel(

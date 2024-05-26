@@ -53,7 +53,7 @@ async fn restore_bonds(
     bonds: Vec<BondingData>,
 ) -> Result<Vec<BondingData>, Error> {
     let bonds: Vec<_> = bonds.into_iter().map(sys::BondingData::from).collect();
-    let fut = state.aux().host.restore_bonds(&bonds);
+    let fut = state.aux().bonding_delegate.restore_bonds(&bonds);
     let errors = fut.await?;
     Ok(errors.into_iter().map(BondingData::try_from).collect::<Result<Vec<_>, _>>()?)
 }

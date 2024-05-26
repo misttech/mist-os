@@ -43,6 +43,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_utils.h"
 #include "third_party/bcmdhd/crossdriver/include/proto/802.11.h"
 #include "wifi/wifi-config.h"
+#include "wlan/common/macaddr.h"
 #include "wlan/drivers/log.h"
 #include "zircon/errors.h"
 #include "zircon/types.h"
@@ -837,6 +838,10 @@ void SimFirmware::TriggerFirmwareDisassoc(wlan_ieee80211::ReasonCode reason) {
   DisassocLocalClient(reason);
 }
 
+void SimFirmware::TriggerFirmwareDeauth(wlan_ieee80211::ReasonCode reason) {
+  DeauthLocalClient(reason);
+}
+
 // Process an RX CTL message. We simply pass back the results of the previous TX CTL
 // operation, which has been stored in bcdc_response_. In real hardware, we may have to
 // indicate that the TX CTL operation has not completed. In simulated hardware, we perform
@@ -1508,21 +1513,9 @@ bool SimFirmware::FindAndRemoveClient(const common::MacAddr client_mac, bool mot
     if (client->mac_addr == client_mac) {
       if (motivation_deauth) {
         // The removal is triggered by a deauth frame.
-        if (client->state == Client::AUTHENTICATED) {
-          // When this client is authenticated but not associated, only send up BRCMF_E_DEAUTH_IND
-          // to driver.
+        if (client->state == Client::AUTHENTICATED || client->state == Client::ASSOCIATED) {
           SendEventToDriver(0, nullptr, BRCMF_E_DEAUTH_IND, BRCMF_E_STATUS_SUCCESS,
                             softap_ifidx_.value(), nullptr, 0, fidl::ToUnderlying(deauth_reason),
-                            client_mac);
-        } else if (client->state == Client::ASSOCIATED) {
-          // When this client is associated, send both BRCMF_E_DEAUTH_IND and BRCMF_E_DISASSOC_IND
-          // events up to driver.
-          SendEventToDriver(0, nullptr, BRCMF_E_DEAUTH_IND, BRCMF_E_STATUS_SUCCESS,
-                            softap_ifidx_.value(), nullptr, 0, fidl::ToUnderlying(deauth_reason),
-                            client_mac);
-          SendEventToDriver(0, nullptr, BRCMF_E_DISASSOC_IND, BRCMF_E_STATUS_SUCCESS,
-                            softap_ifidx_.value(), nullptr, BRCMF_EVENT_MSG_LINK,
-                            fidl::ToUnderlying(wlan_ieee80211::ReasonCode::kLeavingNetworkDisassoc),
                             client_mac);
         }
       } else {
@@ -1913,11 +1906,11 @@ void SimFirmware::DisassocLocalClient(wlan_ieee80211::ReasonCode reason) {
   BRCMF_DBG(SIM, "Driver initiated firmware disassoc.");
   if (assoc_state_.state == AssocState::ASSOCIATED ||
       assoc_state_.state == AssocState::REASSOCIATING) {
-    common::MacAddr srcAddr(GetMacAddr(kClientIfidx));
+    common::MacAddr src_addr(GetMacAddr(kClientIfidx));
     common::MacAddr bssid(assoc_state_.opts->bssid);
     // Transmit the disassoc req and since there is no response for it, indicate disassoc done to
     // driver now
-    simulation::SimDisassocReqFrame disassoc_req_frame(srcAddr, bssid, reason);
+    simulation::SimDisassocReqFrame disassoc_req_frame(src_addr, bssid, reason);
 
     // Restore the operating channel, in case reassociation attempt changed it.
     if (assoc_state_.state == AssocState::REASSOCIATING && assoc_state_.reassoc_opts) {
@@ -1931,12 +1924,27 @@ void SimFirmware::DisassocLocalClient(wlan_ieee80211::ReasonCode reason) {
     common::MacAddr srcAddr(GetMacAddr(kClientIfidx));
     common::MacAddr bssid(assoc_state_.opts->bssid);
     // Transmit the deauth frame clear AP state.
-    simulation::SimDeauthFrame deauth_req_frame(srcAddr, bssid, reason);
-    hw_.Tx(deauth_req_frame);
+    simulation::SimDeauthFrame deauth_frame(srcAddr, bssid, reason);
+    hw_.Tx(deauth_frame);
   }
 
   AuthClearContext();
   AssocClearContext();
+}
+
+// Deauthenticate the Local Client (request coming in from the driver)
+void SimFirmware::DeauthLocalClient(wlan_ieee80211::ReasonCode reason) {
+  BRCMF_DBG(SIM, "Driver initiated firmware deauth.");
+  if (auth_state_.state == AuthState::AUTHENTICATED) {
+    common::MacAddr src_addr(GetMacAddr(kClientIfidx));
+    common::MacAddr bssid(assoc_state_.opts->bssid);
+    // Transmit the deauth req and since there is no response for it, indicate deauth done to
+    // driver now
+    simulation::SimDeauthFrame deauth_frame(src_addr, bssid, reason);
+
+    hw_.Tx(deauth_frame);
+    SetStateToDeauthenticated(reason, true, bssid);
+  }
 }
 
 // Disassoc/deauth Request from FakeAP for the Client IF.
@@ -1956,21 +1964,13 @@ void SimFirmware::HandleDisconnectForClientIF(
 
   if (frame->MgmtFrameType() == simulation::SimManagementFrame::FRAME_TYPE_DEAUTH) {
     // The client could receive a deauth even after disassociation. Notify the driver always
-    SendEventToDriver(0, nullptr, BRCMF_E_DEAUTH_IND, BRCMF_E_STATUS_SUCCESS, kClientIfidx, 0, 0,
-                      fidl::ToUnderlying(reason), bssid);
-    if (auth_state_.state == AuthState::AUTHENTICATED) {
-      AuthClearContext();
-    }
-    // DEAUTH implies disassoc, so continue
-  }
-  // disassoc
-  if (assoc_state_.state != AssocState::ASSOCIATED) {
-    // Already disassoc'd, nothing more to do.
+    SetStateToDeauthenticated(reason, false, bssid);
     return;
   }
-
-  SetStateToDisassociated(reason, false);
-  AssocClearContext();
+  // disassoc
+  if (assoc_state_.state == AssocState::ASSOCIATED) {
+    SetStateToDisassociated(reason, false);
+  }
 }
 
 // precondition: was associated
@@ -1978,12 +1978,27 @@ void SimFirmware::SetStateToDisassociated(wlan_ieee80211::ReasonCode reason,
                                           bool locally_initiated) {
   // Disable beacon watchdog that triggers disconnect
   DisableBeaconWatchdog();
-  // Send the appropriate event to driver.
+  // Send the appropriate event(s) to driver.
   SendEventToDriver(0, nullptr, locally_initiated ? BRCMF_E_DISASSOC : BRCMF_E_DISASSOC_IND,
                     BRCMF_E_STATUS_SUCCESS, kClientIfidx, nullptr, 0, fidl::ToUnderlying(reason),
                     assoc_state_.opts->bssid, kDisassocEventDelay);
   SendEventToDriver(0, nullptr, BRCMF_E_LINK, BRCMF_E_STATUS_SUCCESS, kClientIfidx, nullptr, 0,
                     fidl::ToUnderlying(reason), assoc_state_.opts->bssid, kLinkEventDelay);
+  AssocClearContext();
+}
+
+void SimFirmware::SetStateToDeauthenticated(wlan_ieee80211::ReasonCode reason,
+                                            bool locally_initiated, const common::MacAddr& bssid) {
+  // Disable beacon watchdog that triggers disconnect
+  DisableBeaconWatchdog();
+  SendEventToDriver(0, nullptr, locally_initiated ? BRCMF_E_DEAUTH : BRCMF_E_DEAUTH_IND,
+                    BRCMF_E_STATUS_SUCCESS, kClientIfidx, 0, 0, fidl::ToUnderlying(reason), bssid);
+  if (assoc_state_.state == AssocState::ASSOCIATED) {
+    AssocClearContext();
+  }
+  SendEventToDriver(0, nullptr, BRCMF_E_LINK, BRCMF_E_STATUS_SUCCESS, kClientIfidx, nullptr, 0,
+                    fidl::ToUnderlying(reason), bssid, kLinkEventDelay);
+  AuthClearContext();
 }
 
 void SimFirmware::SetTargetBssInfo(const brcmf_bss_info_le& bss_info, cpp20::span<uint8_t> ie_buf) {

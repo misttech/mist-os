@@ -21,6 +21,7 @@ enum class Flags {
   fPhyResourceRemoval = 0x8,
   fBusyRTC,
   fPermanentlyDisableFwUpdate = 0xb,
+  fWriteBoosterEn = 0xe,
   fWBBufferFlushEn = 0xf,
   fWBBufferFlushDuringHibernate = 0x10,
   kFlagCount = 0x11,

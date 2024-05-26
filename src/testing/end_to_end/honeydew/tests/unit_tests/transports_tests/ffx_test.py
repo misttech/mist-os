@@ -606,7 +606,7 @@ class FfxTests(unittest.TestCase):
                 _ISOLATE_DIR,
             ]
             + ffx._FFX_CMDS["TARGET_SHOW"],
-            stderr=subprocess.STDOUT,
+            stderr=subprocess.PIPE,
             timeout=10,
         )
 
@@ -659,7 +659,7 @@ class FfxTests(unittest.TestCase):
     def test_ffx_run_test_component(
         self, mock_subprocess_check_call: mock.Mock
     ) -> None:
-        """Test case for ffx.run()"""
+        """Test case for ffx.run_test_component()"""
         self.assertEqual(
             self.ffx_obj_with_ip.run_test_component(
                 "fuchsia-pkg://fuchsia.com/testing#meta/test.cm",
@@ -692,6 +692,38 @@ class FfxTests(unittest.TestCase):
 
     @mock.patch.object(
         subprocess,
+        "check_call",
+        return_value=None,
+        autospec=True,
+    )
+    def test_ffx_run_ssh_cmd(
+        self, mock_subprocess_check_call: mock.Mock
+    ) -> None:
+        """Test case for ffx.run_ssh_cmd()"""
+        self.assertEqual(
+            self.ffx_obj_with_ip.run_ssh_cmd(
+                cmd="killall iperf3",
+                capture_output=False,
+            ),
+            "",
+        )
+
+        mock_subprocess_check_call.assert_called_with(
+            [
+                _BINARY_PATH,
+                "-t",
+                str(_TARGET_SSH_ADDRESS),
+                "--isolate-dir",
+                _ISOLATE_DIR,
+                "target",
+                "ssh",
+                "killall iperf3",
+            ],
+            timeout=10,
+        )
+
+    @mock.patch.object(
+        subprocess,
         "Popen",
         return_value=None,
         autospec=True,
@@ -707,6 +739,37 @@ class FfxTests(unittest.TestCase):
             ),
             None,
         )
+
+        mock_subprocess_popen_call.assert_called_with(
+            [
+                _BINARY_PATH,
+                "-t",
+                str(_TARGET_SSH_ADDRESS),
+                "--isolate-dir",
+                _ISOLATE_DIR,
+            ]
+            + ["a", "b", "c"],
+            text=True,
+            stdout="abc",
+        )
+
+    @mock.patch.object(
+        subprocess,
+        "Popen",
+        side_effect=FileNotFoundError("some error"),
+        autospec=True,
+    )
+    def test_ffx_popen_exception(
+        self, mock_subprocess_popen_call: mock.Mock
+    ) -> None:
+        """Test case for ffx.popen() raising FfxCommandError"""
+        with self.assertRaises(errors.FfxCommandError):
+            self.ffx_obj_with_ip.popen(
+                cmd=["a", "b", "c"],
+                # Popen forwards arbitrary kvargs to subprocess.Popen
+                text=True,  # example kvarg
+                stdout="abc",  # another example kvarg
+            )
 
         mock_subprocess_popen_call.assert_called_with(
             [

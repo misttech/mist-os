@@ -9,6 +9,7 @@
 
 #include <array>
 
+#include "src/developer/forensics/exceptions/constants.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -16,12 +17,13 @@ namespace forensics {
 namespace exceptions {
 namespace {
 
-bool SpawnSubprocess(zx::channel* client, zx::process* subprocess) {
+bool SpawnSubprocess(zx::channel* client, zx::process* subprocess, bool suspend_enabled) {
   static size_t subprocess_num{1};
   const std::string subprocess_name(fxl::StringPrintf("exception_handler_%03zu", subprocess_num++));
 
-  const std::array<const char*, 2> args = {
+  const std::array<const char*, 3> args = {
       subprocess_name.c_str(),
+      suspend_enabled ? kSuspendEnabledFlag : kNoSuspendEnabledFlag,
       nullptr,
   };
 
@@ -62,9 +64,10 @@ bool SpawnSubprocess(zx::channel* client, zx::process* subprocess) {
 
 }  // namespace
 
-ProcessHandler::ProcessHandler(async_dispatcher_t* dispatcher, LogMonikerFn log_moniker,
-                               fit::closure on_available)
+ProcessHandler::ProcessHandler(async_dispatcher_t* dispatcher, bool suspend_enabled,
+                               LogMonikerFn log_moniker, fit::closure on_available)
     : dispatcher_(dispatcher),
+      suspend_enabled_(suspend_enabled),
       log_moniker_(std::move(log_moniker)),
       on_available_(std::move(on_available)) {
   crash_reporter_.set_error_handler([this](const zx_status_t status) {
@@ -84,7 +87,7 @@ void ProcessHandler::Handle(zx::exception exception, zx::process process, zx::th
     zx::channel client;
 
     // If we are not able to spawn a sub-process, we will have to lose the exception.
-    if (!SpawnSubprocess(&client, &subprocess_)) {
+    if (!SpawnSubprocess(&client, &subprocess_, suspend_enabled_)) {
       const std::string thread_name =
           (thread.is_valid()) ? fsl::GetObjectName(thread.get()) : "unknown";
       const std::string process_name =

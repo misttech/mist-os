@@ -29,12 +29,14 @@ use net_types::MulticastAddr;
 use net_types::{
     ethernet::Mac,
     ip::{
-        AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion, Ipv4,
-        Ipv4Addr, Ipv6, Ipv6Addr, Subnet, SubnetEither,
+        AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion,
+        Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu, Subnet, SubnetEither,
     },
     SpecifiedAddr, UnicastAddr, Witness as _,
 };
+use netstack3_filter::FilterTimerId;
 use packet::{Buf, BufferMut};
+use zerocopy::ByteSlice;
 
 #[cfg(test)]
 use crate::context::testutil::{FakeNetwork, FakeNetworkLinks, FakeNetworkSpec};
@@ -55,24 +57,26 @@ use crate::{
         loopback::LoopbackDeviceId,
         DeviceClassMatcher, DeviceId, DeviceIdAndNameMatcher, DeviceLayerEventDispatcher,
         DeviceLayerStateTypes, DeviceLayerTypes, DeviceSendFrameError, EthernetDeviceId,
-        EthernetWeakDeviceId, PureIpDeviceId, PureIpWeakDeviceId, ReceiveQueueBindingsContext,
-        TransmitQueueBindingsContext, WeakDeviceId,
+        EthernetWeakDeviceId, LoopbackCreationProperties, LoopbackDevice, PureIpDeviceId,
+        PureIpWeakDeviceId, ReceiveQueueBindingsContext, TransmitQueueBindingsContext,
+        WeakDeviceId,
     },
     filter::FilterBindingsTypes,
     ip::{
+        self,
         device::{
-            config::{Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate},
-            nud::{self, LinkResolutionContext, LinkResolutionNotifier},
-            IpDeviceEvent,
+            IpDeviceConfigurationUpdate, IpDeviceEvent, Ipv4DeviceConfigurationUpdate,
+            Ipv6DeviceConfigurationUpdate,
         },
-        icmp::socket::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId},
-        raw::RawIpSocketsBindingsTypes,
-        types::{AddableEntry, AddableMetric, RawMetric},
-        IpLayerEvent,
+        icmp::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId},
+        nud::{self, LinkResolutionContext, LinkResolutionNotifier},
+        raw::{RawIpSocketId, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes},
+        AddRouteError, AddableEntryEither, AddableMetric, IpDeviceConfiguration, IpLayerEvent,
+        IpLayerTimerId, RawMetric,
     },
     state::{StackState, StackStateBuilder},
     sync::{DynDebugReferences, Mutex},
-    time::TimerId,
+    time::{TimerId, TimerIdInner},
     transport::{
         tcp::{
             buffer::{
@@ -95,16 +99,13 @@ pub use netstack3_base::testutil::{
 
 /// NDP test utilities.
 pub mod ndp {
-    pub use crate::device::ndp::testutil::*;
+    pub use crate::ip::icmp::testutil::{
+        neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet,
+    };
 }
 /// Context test utilities.
 pub mod context {
     pub use crate::context::testutil::*;
-}
-
-/// Device test utilities.
-pub mod device {
-    pub use crate::device::testutil::*;
 }
 
 /// The default interface routing metric for test interfaces.
@@ -225,7 +226,7 @@ where
         A::Version: crate::IpExt,
     {
         let (core_ctx, bindings_ctx) = self.contexts();
-        crate::ip::device::join_ip_multicast::<A::Version, _, _>(
+        ip::device::join_ip_multicast::<A::Version, _, _>(
             core_ctx,
             bindings_ctx,
             device,
@@ -244,7 +245,7 @@ where
         A::Version: crate::IpExt,
     {
         let (core_ctx, bindings_ctx) = self.contexts();
-        crate::ip::device::leave_ip_multicast::<A::Version, _, _>(
+        ip::device::leave_ip_multicast::<A::Version, _, _>(
             core_ctx,
             bindings_ctx,
             device,
@@ -263,7 +264,7 @@ where
     where
         A::Version: crate::IpExt,
     {
-        use crate::ip::{
+        use ip::{
             AddressStatus, IpDeviceStateContext, IpLayerIpExt, Ipv4PresentAddressStatus,
             Ipv6PresentAddressStatus,
         };
@@ -287,6 +288,7 @@ where
                 Ipv4PresentAddressStatus::Multicast => true,
                 Ipv4PresentAddressStatus::LimitedBroadcast
                 | Ipv4PresentAddressStatus::SubnetBroadcast
+                | Ipv4PresentAddressStatus::LoopbackSubnet
                 | Ipv4PresentAddressStatus::Unicast => false,
             },
             |Wrap(v6)| match v6 {
@@ -311,10 +313,10 @@ where
         let (core_ctx, bindings_ctx) = self.contexts();
         match I::VERSION {
             IpVersion::V4 => {
-                crate::ip::receive_ipv4_packet(core_ctx, bindings_ctx, device, frame_dst, buffer)
+                ip::receive_ipv4_packet(core_ctx, bindings_ctx, device, frame_dst, buffer)
             }
             IpVersion::V6 => {
-                crate::ip::receive_ipv6_packet(core_ctx, bindings_ctx, device, frame_dst, buffer)
+                ip::receive_ipv6_packet(core_ctx, bindings_ctx, device, frame_dst, buffer)
             }
         }
     }
@@ -322,23 +324,15 @@ where
     /// Add a route directly to the forwarding table.
     pub fn add_route(
         &mut self,
-        entry: crate::ip::types::AddableEntryEither<crate::device::DeviceId<BC>>,
-    ) -> Result<(), crate::ip::forwarding::AddRouteError> {
+        entry: AddableEntryEither<crate::device::DeviceId<BC>>,
+    ) -> Result<(), AddRouteError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         match entry {
-            crate::ip::types::AddableEntryEither::V4(entry) => {
-                crate::ip::forwarding::testutil::add_route::<Ipv4, _, _>(
-                    core_ctx,
-                    bindings_ctx,
-                    entry,
-                )
+            AddableEntryEither::V4(entry) => {
+                ip::testutil::add_route::<Ipv4, _, _>(core_ctx, bindings_ctx, entry)
             }
-            crate::ip::types::AddableEntryEither::V6(entry) => {
-                crate::ip::forwarding::testutil::add_route::<Ipv6, _, _>(
-                    core_ctx,
-                    bindings_ctx,
-                    entry,
-                )
+            AddableEntryEither::V6(entry) => {
+                ip::testutil::add_route::<Ipv6, _, _>(core_ctx, bindings_ctx, entry)
             }
         }
     }
@@ -351,32 +345,20 @@ where
     ) -> Result<(), crate::error::NotFoundError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         match subnet {
-            SubnetEither::V4(subnet) => crate::ip::forwarding::testutil::del_routes_to_subnet::<
-                Ipv4,
-                _,
-                _,
-            >(core_ctx, bindings_ctx, subnet),
-            SubnetEither::V6(subnet) => crate::ip::forwarding::testutil::del_routes_to_subnet::<
-                Ipv6,
-                _,
-                _,
-            >(core_ctx, bindings_ctx, subnet),
+            SubnetEither::V4(subnet) => {
+                ip::testutil::del_routes_to_subnet::<Ipv4, _, _>(core_ctx, bindings_ctx, subnet)
+            }
+            SubnetEither::V6(subnet) => {
+                ip::testutil::del_routes_to_subnet::<Ipv6, _, _>(core_ctx, bindings_ctx, subnet)
+            }
         }
     }
 
     /// Deletes all routes targeting `device`.
     pub(crate) fn del_device_routes(&mut self, device: &DeviceId<BC>) {
         let (core_ctx, bindings_ctx) = self.contexts();
-        crate::ip::forwarding::testutil::del_device_routes::<Ipv4, _, _>(
-            core_ctx,
-            bindings_ctx,
-            device,
-        );
-        crate::ip::forwarding::testutil::del_device_routes::<Ipv6, _, _>(
-            core_ctx,
-            bindings_ctx,
-            device,
-        );
+        ip::testutil::del_device_routes::<Ipv4, _, _>(core_ctx, bindings_ctx, device);
+        ip::testutil::del_device_routes::<Ipv6, _, _>(core_ctx, bindings_ctx, device);
     }
 
     /// Removes all of the routes through the device, then removes the device.
@@ -394,6 +376,89 @@ where
                 panic!("failed to remove ethernet device")
             }
         }
+    }
+
+    /// Enables or disables the device for IP version `I` and returns whether it
+    /// was enabled before.
+    #[netstack3_macros::context_ip_bounds(I, BC, crate)]
+    pub fn set_ip_device_enabled<I: crate::IpExt>(
+        &mut self,
+        device: &DeviceId<BC>,
+        enabled: bool,
+    ) -> bool {
+        let update =
+            IpDeviceConfigurationUpdate { ip_enabled: Some(enabled), ..Default::default() };
+        let prev =
+            self.core_api().device_ip::<I>().update_configuration(device, update.into()).unwrap();
+        prev.as_ref().ip_enabled.unwrap()
+    }
+
+    /// Enables `device`.
+    pub fn enable_device(&mut self, device: &DeviceId<BC>) {
+        let _was_enabled: bool = self.set_ip_device_enabled::<Ipv4>(device, true);
+        let _was_enabled: bool = self.set_ip_device_enabled::<Ipv6>(device, true);
+    }
+
+    /// Enables or disables IP packet routing on `device`.
+    #[netstack3_macros::context_ip_bounds(I, BC, crate)]
+    pub fn set_forwarding_enabled<I: crate::IpExt>(
+        &mut self,
+        device: &DeviceId<BC>,
+        enabled: bool,
+    ) {
+        let _config = self
+            .core_api()
+            .device_ip::<I>()
+            .update_configuration(
+                device,
+                IpDeviceConfigurationUpdate {
+                    forwarding_enabled: Some(enabled),
+                    ..Default::default()
+                }
+                .into(),
+            )
+            .unwrap();
+    }
+
+    /// Returns whether IP packet routing is enabled on `device`.
+    #[netstack3_macros::context_ip_bounds(I, BC, crate)]
+    pub fn is_forwarding_enabled<I: crate::IpExt>(&mut self, device: &DeviceId<BC>) -> bool {
+        let configuration = self.core_api().device_ip::<I>().get_configuration(device);
+        let IpDeviceConfiguration { forwarding_enabled, .. } = configuration.as_ref();
+        *forwarding_enabled
+    }
+
+    /// Adds a loopback device with the IPv4/IPv6 loopback addresses assigned.
+    pub fn add_loopback(&mut self) -> LoopbackDeviceId<BC>
+    where
+        <BC as DeviceLayerStateTypes>::DeviceIdentifier: Default,
+        <BC as DeviceLayerStateTypes>::LoopbackDeviceState: Default,
+    {
+        let loopback_id = self.core_api().device::<LoopbackDevice>().add_device_with_default_state(
+            LoopbackCreationProperties { mtu: Mtu::new(u32::MAX) },
+            DEFAULT_INTERFACE_METRIC,
+        );
+        let device_id: DeviceId<_> = loopback_id.clone().into();
+        self.enable_device(&device_id);
+
+        self.core_api()
+            .device_ip::<Ipv4>()
+            .add_ip_addr_subnet(
+                &device_id,
+                AddrSubnet::from_witness(Ipv4::LOOPBACK_ADDRESS, Ipv4::LOOPBACK_SUBNET.prefix())
+                    .unwrap(),
+            )
+            .unwrap();
+
+        self.core_api()
+            .device_ip::<Ipv6>()
+            .add_ip_addr_subnet(
+                &device_id,
+                AddrSubnet::from_witness(Ipv6::LOOPBACK_ADDRESS, Ipv6::LOOPBACK_SUBNET.prefix())
+                    .unwrap(),
+            )
+            .unwrap();
+        loopback_id
     }
 }
 
@@ -699,6 +764,16 @@ impl TimerContext for FakeBindingsCtx {
         time: Self::Instant,
         timer: &mut Self::Timer,
     ) -> Option<Self::Instant> {
+        // Filter out conntrack GC timers. We don't need conntrack GC in most
+        // tests, and this causes issues with tests that are expecting the
+        // netstack to quiesce.
+        match timer.dispatch_id.0 {
+            TimerIdInner::IpLayer(IpLayerTimerId::FilterTimerv4(FilterTimerId::ConntrackGc(_)))
+            | TimerIdInner::IpLayer(IpLayerTimerId::FilterTimerv6(FilterTimerId::ConntrackGc(_))) => {
+                return None
+            }
+            _ => {}
+        }
         self.with_inner_mut(|ctx| ctx.schedule_timer_instant(time, timer))
     }
 
@@ -783,15 +858,19 @@ impl DeferredResourceRemovalContext for FakeBindingsCtx {
     }
 }
 
+/// A link resolution notifier that ignores all notifications.
+#[derive(Debug)]
+pub struct NoOpLinkResolutionNotifier;
+
 impl<D: LinkDevice> LinkResolutionContext<D> for FakeBindingsCtx {
-    type Notifier = ();
+    type Notifier = NoOpLinkResolutionNotifier;
 }
 
-impl<D: LinkDevice> LinkResolutionNotifier<D> for () {
+impl<D: LinkDevice> LinkResolutionNotifier<D> for NoOpLinkResolutionNotifier {
     type Observer = ();
 
     fn new() -> (Self, Self::Observer) {
-        ((), ())
+        (NoOpLinkResolutionNotifier, ())
     }
 
     fn notify(self, _result: Result<D::Address, crate::error::AddressResolutionFailed>) {}
@@ -945,8 +1024,7 @@ impl FakeCtxBuilder {
     }
 
     /// Add an ARP table entry for a device's ARP table.
-    #[cfg(test)]
-    pub(crate) fn add_arp_table_entry(
+    pub fn add_arp_table_entry(
         &mut self,
         device: usize,
         // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
@@ -957,8 +1035,7 @@ impl FakeCtxBuilder {
     }
 
     /// Add an NDP table entry for a device's NDP table.
-    #[cfg(test)]
-    pub(crate) fn add_ndp_table_entry(
+    pub fn add_ndp_table_entry(
         &mut self,
         device: usize,
         // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
@@ -968,8 +1045,24 @@ impl FakeCtxBuilder {
         self.ndp_table_entries.push((device, ip, mac));
     }
 
+    /// Add either an NDP entry (if IPv6) or ARP entry (if IPv4) to a
+    /// `FakeCtxBuilder`.
+    pub fn add_arp_or_ndp_table_entry<A: IpAddress>(
+        &mut self,
+        device: usize,
+        // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
+        ip: SpecifiedAddr<A>,
+        mac: UnicastAddr<Mac>,
+    ) {
+        match ip.into() {
+            IpAddr::V4(ip) => self.add_arp_table_entry(device, ip, mac),
+            IpAddr::V6(ip) => {
+                self.add_ndp_table_entry(device, UnicastAddr::new(ip.get()).unwrap(), mac)
+            }
+        }
+    }
+
     /// Builds a `Ctx` from the present configuration with a default dispatcher.
-    #[cfg(any(test, feature = "testutils"))]
     pub fn build(self) -> (FakeCtx, Vec<EthernetDeviceId<FakeBindingsCtx>>) {
         self.build_with_modifications(|_| {})
     }
@@ -977,7 +1070,6 @@ impl FakeCtxBuilder {
     /// `build_with_modifications` is equivalent to `build`, except that after
     /// the `StackStateBuilder` is initialized, it is passed to `f` for further
     /// modification before the `Ctx` is constructed.
-    #[cfg(any(test, feature = "testutils"))]
     pub(crate) fn build_with_modifications<F: FnOnce(&mut StackStateBuilder)>(
         self,
         f: F,
@@ -989,7 +1081,6 @@ impl FakeCtxBuilder {
 
     /// Build a `Ctx` from the present configuration with a caller-provided
     /// dispatcher and `StackStateBuilder`.
-    #[cfg(any(test, feature = "testutils"))]
     pub(crate) fn build_with(
         self,
         state_builder: StackStateBuilder,
@@ -1023,7 +1114,7 @@ impl FakeCtxBuilder {
                         .update_configuration(&id, ipv6_config)
                         .unwrap();
                 }
-                crate::device::testutil::enable_device(&mut ctx, &id);
+                ctx.test_api().enable_device(&id);
                 match ip_and_subnet {
                     Some(addr_sub) => {
                         ctx.core_api().device_ip_any().add_ip_addr_subnet(&id, addr_sub).unwrap();
@@ -1051,7 +1142,7 @@ impl FakeCtxBuilder {
         for (subnet, idx) in device_routes {
             let device = &idx_to_device_id[idx];
             ctx.test_api()
-                .add_route(crate::ip::types::AddableEntryEither::without_gateway(
+                .add_route(AddableEntryEither::without_gateway(
                     subnet,
                     device.clone().into(),
                     AddableMetric::ExplicitMetric(RawMetric(0)),
@@ -1060,24 +1151,6 @@ impl FakeCtxBuilder {
         }
 
         (ctx, idx_to_device_id)
-    }
-}
-
-/// Add either an NDP entry (if IPv6) or ARP entry (if IPv4) to a
-/// `FakeCtxBuilder`.
-#[cfg(test)]
-pub(crate) fn add_arp_or_ndp_table_entry<A: IpAddress>(
-    builder: &mut FakeCtxBuilder,
-    device: usize,
-    // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
-    ip: SpecifiedAddr<A>,
-    mac: UnicastAddr<Mac>,
-) {
-    match ip.into() {
-        IpAddr::V4(ip) => builder.add_arp_table_entry(device, ip, mac),
-        IpAddr::V6(ip) => {
-            builder.add_ndp_table_entry(device, UnicastAddr::new(ip.get()).unwrap(), mac)
-        }
     }
 }
 
@@ -1174,6 +1247,17 @@ impl crate::device::socket::DeviceSocketBindingsContext<DeviceId<Self>> for Fake
     }
 }
 
+impl<I: crate::IpExt> RawIpSocketsBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
+    fn receive_packet<B: ByteSlice>(
+        &self,
+        _socket: &RawIpSocketId<I, WeakDeviceId<Self>, Self>,
+        _packet: &I::Packet<B>,
+        _device: &DeviceId<Self>,
+    ) {
+        unimplemented!()
+    }
+}
+
 impl DeviceLayerStateTypes for FakeBindingsCtx {
     type LoopbackDeviceState = ();
     type EthernetDeviceState = ();
@@ -1232,36 +1316,6 @@ pub enum DispatchedEvent {
     NeighborIpv6(nud::Event<Mac, EthernetWeakDeviceId<FakeBindingsCtx>, Ipv6, FakeInstant>),
 }
 
-impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeBindingsCtx>, I, FakeInstant>>
-    for IpDeviceEvent<WeakDeviceId<FakeBindingsCtx>, I, FakeInstant>
-{
-    fn from(
-        e: IpDeviceEvent<DeviceId<FakeBindingsCtx>, I, FakeInstant>,
-    ) -> IpDeviceEvent<WeakDeviceId<FakeBindingsCtx>, I, FakeInstant> {
-        match e {
-            IpDeviceEvent::AddressAdded { device, addr, state, valid_until } => {
-                IpDeviceEvent::AddressAdded { device: device.downgrade(), addr, state, valid_until }
-            }
-            IpDeviceEvent::AddressRemoved { device, addr, reason } => {
-                IpDeviceEvent::AddressRemoved { device: device.downgrade(), addr, reason }
-            }
-            IpDeviceEvent::AddressStateChanged { device, addr, state } => {
-                IpDeviceEvent::AddressStateChanged { device: device.downgrade(), addr, state }
-            }
-            IpDeviceEvent::EnabledChanged { device, ip_enabled } => {
-                IpDeviceEvent::EnabledChanged { device: device.downgrade(), ip_enabled }
-            }
-            IpDeviceEvent::AddressPropertiesChanged { device, addr, valid_until } => {
-                IpDeviceEvent::AddressPropertiesChanged {
-                    device: device.downgrade(),
-                    addr,
-                    valid_until,
-                }
-            }
-        }
-    }
-}
-
 /// A tuple of device ID and IP version.
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""))]
@@ -1280,58 +1334,15 @@ pub enum DispatchedFrame {
 
 impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeBindingsCtx>, I, FakeInstant>> for DispatchedEvent {
     fn from(e: IpDeviceEvent<DeviceId<FakeBindingsCtx>, I, FakeInstant>) -> DispatchedEvent {
-        I::map_ip(
-            e,
-            |e| DispatchedEvent::IpDeviceIpv4(e.into()),
-            |e| DispatchedEvent::IpDeviceIpv6(e.into()),
-        )
-    }
-}
-
-impl<I: Ip> From<IpLayerEvent<DeviceId<FakeBindingsCtx>, I>>
-    for IpLayerEvent<WeakDeviceId<FakeBindingsCtx>, I>
-{
-    fn from(
-        e: IpLayerEvent<DeviceId<FakeBindingsCtx>, I>,
-    ) -> IpLayerEvent<WeakDeviceId<FakeBindingsCtx>, I> {
-        match e {
-            IpLayerEvent::AddRoute(AddableEntry { subnet, device, gateway, metric }) => {
-                IpLayerEvent::AddRoute(AddableEntry {
-                    subnet,
-                    device: device.downgrade(),
-                    gateway,
-                    metric,
-                })
-            }
-            IpLayerEvent::RemoveRoutes { subnet, device, gateway } => {
-                IpLayerEvent::RemoveRoutes { subnet, device: device.downgrade(), gateway }
-            }
-        }
+        let e = e.map_device(|d| d.downgrade());
+        I::map_ip(e, |e| DispatchedEvent::IpDeviceIpv4(e), |e| DispatchedEvent::IpDeviceIpv6(e))
     }
 }
 
 impl<I: Ip> From<IpLayerEvent<DeviceId<FakeBindingsCtx>, I>> for DispatchedEvent {
     fn from(e: IpLayerEvent<DeviceId<FakeBindingsCtx>, I>) -> DispatchedEvent {
-        I::map_ip(
-            e,
-            |e| DispatchedEvent::IpLayerIpv4(e.into()),
-            |e| DispatchedEvent::IpLayerIpv6(e.into()),
-        )
-    }
-}
-
-impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeBindingsCtx>, I, FakeInstant>>
-    for nud::Event<Mac, EthernetWeakDeviceId<FakeBindingsCtx>, I, FakeInstant>
-{
-    fn from(
-        nud::Event { device, kind, addr, at }: nud::Event<
-            Mac,
-            EthernetDeviceId<FakeBindingsCtx>,
-            I,
-            FakeInstant,
-        >,
-    ) -> Self {
-        Self { device: device.downgrade(), kind, addr, at }
+        let e = e.map_device(|d| d.downgrade());
+        I::map_ip(e, |e| DispatchedEvent::IpLayerIpv4(e), |e| DispatchedEvent::IpLayerIpv6(e))
     }
 }
 
@@ -1341,11 +1352,8 @@ impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeBindingsCtx>, I, FakeInsta
     fn from(
         e: nud::Event<Mac, EthernetDeviceId<FakeBindingsCtx>, I, FakeInstant>,
     ) -> DispatchedEvent {
-        I::map_ip(
-            e,
-            |e| DispatchedEvent::NeighborIpv4(e.into()),
-            |e| DispatchedEvent::NeighborIpv6(e.into()),
-        )
+        let e = e.map_device(|d| d.downgrade());
+        I::map_ip(e, |e| DispatchedEvent::NeighborIpv4(e), |e| DispatchedEvent::NeighborIpv6(e))
     }
 }
 

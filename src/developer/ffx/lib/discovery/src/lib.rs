@@ -2,22 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use addr::TargetAddr;
-use anyhow::{anyhow, bail, Result};
+use crate::emulator_watcher::EmulatorWatcher;
+pub use crate::events::*;
+use anyhow::{anyhow, Result};
 use bitflags::bitflags;
-use emulator_instance::EmulatorInstances;
-use fuchsia_async::Task;
-use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
+use futures::channel::mpsc::{unbounded, UnboundedReceiver};
 use futures::Stream;
 use manual_targets::watcher::{
-    recommended_watcher as manual_recommended_watcher, ManualTargetEvent, ManualTargetState,
-    ManualTargetWatcher,
+    recommended_watcher as manual_recommended_watcher, ManualTargetEvent, ManualTargetWatcher,
 };
 use mdns_discovery::{recommended_watcher, MdnsWatcher};
-use std::fmt;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::task::{ready, Context, Poll};
-use std::{fmt::Display, pin::Pin};
 use usb_fastboot_discovery::{
     recommended_watcher as fastboot_watcher, FastbootEvent, FastbootUsbWatcher,
 };
@@ -26,118 +23,8 @@ use usb_fastboot_discovery::{
 // but rather some other well-defined type
 use fidl_fuchsia_developer_ffx as ffx;
 
-#[allow(dead_code)]
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub enum FastbootConnectionState {
-    Usb,
-    Tcp(Vec<TargetAddr>),
-    Udp(Vec<TargetAddr>),
-}
-
-impl Display for FastbootConnectionState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let res = match self {
-            Self::Usb => format!("Usb"),
-            Self::Tcp(addr) => format!("Tcp({:?})", addr),
-            Self::Udp(addr) => format!("Udp({:?})", addr),
-        };
-        write!(f, "{}", res)
-    }
-}
-
-#[allow(dead_code)]
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct FastbootTargetState {
-    pub serial_number: String,
-    pub connection_state: FastbootConnectionState,
-}
-
-impl Display for FastbootTargetState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {}", self.serial_number, self.connection_state)
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub enum TargetState {
-    Unknown,
-    Product(Vec<TargetAddr>),
-    Fastboot(FastbootTargetState),
-    Zedboot,
-}
-
-impl Display for TargetState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let res = match self {
-            TargetState::Unknown => "Unknown".to_string(),
-            TargetState::Product(addr) => format!("Product({:?})", addr),
-            TargetState::Fastboot(state) => format!("Fastboot({:?})", state),
-            TargetState::Zedboot => "Zedboot".to_string(),
-        };
-        write!(f, "{}", res)
-    }
-}
-
-#[allow(dead_code)]
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct TargetHandle {
-    pub node_name: Option<String>,
-    pub state: TargetState,
-}
-
-impl Display for TargetHandle {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = self.node_name.clone().unwrap_or("".to_string());
-        write!(f, "Node: \"{}\" in state: {}", name, self.state)
-    }
-}
-
-/// Target discovery events. See `wait_for_devices`.
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub enum TargetEvent {
-    /// Indicates a Target has been discovered.
-    Added(TargetHandle),
-    /// Indicates a Target has been lost.
-    Removed(TargetHandle),
-}
-
-struct EmulatorWatcher {
-    // Task for the drain loop
-    drain_task: Option<Task<()>>,
-}
-
-impl EmulatorWatcher {
-    async fn new(
-        instance_root: PathBuf,
-        sender: UnboundedSender<Result<TargetEvent>>,
-    ) -> Result<Self> {
-        let emu_instances = EmulatorInstances::new(instance_root.clone());
-        let existing = emulator_instance::get_all_targets(&emu_instances)?;
-        for i in existing {
-            let handle = i.try_into();
-            if let Ok(h) = handle {
-                let _ = sender.unbounded_send(Ok(TargetEvent::Added(h)));
-            }
-        }
-        let mut res = Self { drain_task: None };
-
-        // Emulator (and therefore notify thread) lifetime should last as long as the task,
-        // because it is moved into the loop
-        let mut watcher = emulator_instance::start_emulator_watching(instance_root.clone()).await?;
-        let task = Task::local(async move {
-            loop {
-                if let Some(act) = watcher.emulator_target_detected().await {
-                    let event = act.try_into();
-                    if let Ok(e) = event {
-                        let _ = sender.unbounded_send(Ok(e));
-                    }
-                }
-            }
-        });
-        res.drain_task.replace(task);
-        Ok(res)
-    }
-}
+mod emulator_watcher;
+pub mod events;
 
 #[allow(dead_code)]
 /// A stream of new devices as they appear on the bus. See [`wait_for_devices`].
@@ -179,6 +66,103 @@ where
     }
 }
 
+pub trait TargetEventStream: Stream<Item = Result<TargetEvent>> + std::marker::Unpin {}
+
+impl TargetEventStream for TargetStream {}
+
+pub trait TargetDiscovery<F> {
+    fn discover_devices(
+        &self,
+        filter: F,
+    ) -> impl std::future::Future<Output = Result<impl TargetEventStream>>;
+}
+
+pub struct DiscoveryBuilder {
+    emulator_instance_root: Option<PathBuf>,
+    notify_added: bool,
+    notify_removed: bool,
+    sources: DiscoverySources,
+}
+
+impl DiscoveryBuilder {
+    pub fn set_source(mut self, source: DiscoverySources) -> Self {
+        self.sources = source;
+        self
+    }
+
+    pub fn with_source(mut self, source: DiscoverySources) -> Self {
+        self.sources.insert(source);
+        self
+    }
+
+    pub fn with_emulator_instance_root(mut self, emulator_instance_root: PathBuf) -> Self {
+        self.emulator_instance_root = Some(emulator_instance_root);
+        self.sources.insert(DiscoverySources::EMULATOR);
+        self
+    }
+
+    pub fn notify_added(mut self, notify_added: bool) -> Self {
+        self.notify_added = notify_added;
+        self
+    }
+
+    pub fn notify_removed(mut self, notify_removed: bool) -> Self {
+        self.notify_removed = notify_removed;
+        self
+    }
+
+    pub fn build(self) -> Discovery {
+        Discovery {
+            emulator_instance_root: self.emulator_instance_root,
+            notify_added: self.notify_added,
+            notify_removed: self.notify_removed,
+            sources: self.sources,
+        }
+    }
+}
+
+impl Default for DiscoveryBuilder {
+    fn default() -> Self {
+        Self {
+            emulator_instance_root: None,
+            notify_added: true,
+            notify_removed: true,
+            sources: DiscoverySources::default(),
+        }
+    }
+}
+
+pub struct Discovery {
+    emulator_instance_root: Option<PathBuf>,
+    notify_added: bool,
+    notify_removed: bool,
+    sources: DiscoverySources,
+}
+
+impl Discovery {
+    pub fn builder() -> DiscoveryBuilder {
+        DiscoveryBuilder::default()
+    }
+}
+
+impl<F> TargetDiscovery<F> for Discovery
+where
+    F: TargetFilter,
+{
+    #[allow(refining_impl_trait)]
+    async fn discover_devices(&self, filter: F) -> Result<TargetStream> {
+        let stream = wait_for_devices(
+            filter,
+            self.emulator_instance_root.clone(),
+            self.notify_added,
+            self.notify_removed,
+            self.sources,
+        )
+        .await?;
+        Ok(stream)
+    }
+}
+
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct DiscoverySources: u8 {
@@ -188,6 +172,13 @@ bitflags! {
         const EMULATOR = 1 << 3;
     }
 }
+
+impl Default for DiscoverySources {
+    fn default() -> Self {
+        DiscoverySources::all()
+    }
+}
+
 pub async fn wait_for_devices<F>(
     filter: F,
     emulator_instance_root: Option<PathBuf>,
@@ -258,13 +249,14 @@ where
     let emulator_watcher = if sources.contains(DiscoverySources::EMULATOR) {
         let emulator_sender = sender.clone();
         if let Some(instance_root) = emulator_instance_root {
-            Some(EmulatorWatcher::new(instance_root, emulator_sender).await?)
+            Some(EmulatorWatcher::new(instance_root, emulator_sender)?)
         } else {
             None
         }
     } else {
         None
     };
+
     Ok(TargetStream {
         filter: Some(Box::new(filter)),
         queue,
@@ -275,152 +267,6 @@ where
         manual_targets_watcher,
         emulator_watcher,
     })
-}
-
-fn target_event_from_mdns_event(event: ffx::MdnsEventType) -> Option<Result<TargetEvent>> {
-    match event {
-        ffx::MdnsEventType::SocketBound(_) => {
-            // Unsupported
-            None
-        }
-        e @ _ => {
-            let converted = TargetEvent::try_from(e);
-            match converted {
-                Ok(m) => Some(Ok(m)),
-                Err(_) => None,
-            }
-        }
-    }
-}
-
-impl TryFrom<ffx::MdnsEventType> for TargetEvent {
-    type Error = anyhow::Error;
-
-    fn try_from(event: ffx::MdnsEventType) -> Result<Self, Self::Error> {
-        match event {
-            ffx::MdnsEventType::TargetFound(info) => {
-                let handle: TargetHandle = info.try_into()?;
-                Ok(TargetEvent::Added(handle))
-            }
-            ffx::MdnsEventType::TargetRediscovered(info) => {
-                let handle: TargetHandle = info.try_into()?;
-                Ok(TargetEvent::Added(handle))
-            }
-            ffx::MdnsEventType::TargetExpired(info) => {
-                let handle: TargetHandle = info.try_into()?;
-                Ok(TargetEvent::Removed(handle))
-            }
-            ffx::MdnsEventType::SocketBound(_) => {
-                anyhow::bail!("SocketBound events are not supported")
-            }
-        }
-    }
-}
-
-impl TryFrom<emulator_instance::EmulatorTargetAction> for TargetEvent {
-    type Error = anyhow::Error;
-
-    fn try_from(event: emulator_instance::EmulatorTargetAction) -> Result<Self, Self::Error> {
-        match event {
-            emulator_instance::EmulatorTargetAction::Add(info) => {
-                let handle: TargetHandle = info.try_into()?;
-                Ok(TargetEvent::Added(handle))
-            }
-            emulator_instance::EmulatorTargetAction::Remove(info) => {
-                let handle: TargetHandle = info.try_into()?;
-                Ok(TargetEvent::Removed(handle))
-            }
-        }
-    }
-}
-
-impl TryFrom<ffx::TargetInfo> for TargetHandle {
-    type Error = anyhow::Error;
-
-    fn try_from(info: ffx::TargetInfo) -> Result<Self, Self::Error> {
-        let addresses = info.addresses.ok_or(anyhow!("Addresses are populated"))?;
-        // Get the TargetAddrs
-        let mut addrs: Vec<_> = addresses.into_iter().map(TargetAddr::from).collect();
-        // Sorting them this way put ipv6 above ipv4
-        addrs.sort_by(|a, b| b.cmp(a));
-
-        if addrs.is_empty() {
-            bail!("There must be at least one target address")
-        }
-
-        let state = match info.fastboot_interface {
-            None => TargetState::Product(addrs),
-            Some(iface) => {
-                let serial_number = info.serial_number.unwrap_or("".to_string());
-                let connection_state = match iface {
-                    ffx::FastbootInterface::Usb => FastbootConnectionState::Usb,
-                    ffx::FastbootInterface::Udp => FastbootConnectionState::Udp(addrs),
-                    ffx::FastbootInterface::Tcp => FastbootConnectionState::Tcp(addrs),
-                };
-                TargetState::Fastboot(FastbootTargetState { serial_number, connection_state })
-            }
-        };
-        Ok(TargetHandle { node_name: info.nodename, state })
-    }
-}
-
-impl From<FastbootEvent> for TargetEvent {
-    fn from(fastboot_event: FastbootEvent) -> Self {
-        match fastboot_event {
-            FastbootEvent::Discovered(serial) => {
-                let handle = TargetHandle {
-                    node_name: Some("".to_string()),
-                    state: TargetState::Fastboot(FastbootTargetState {
-                        serial_number: serial.clone(),
-                        connection_state: FastbootConnectionState::Usb,
-                    }),
-                };
-                TargetEvent::Added(handle)
-            }
-            FastbootEvent::Lost(serial) => {
-                let handle = TargetHandle {
-                    node_name: Some("".to_string()),
-                    state: TargetState::Fastboot(FastbootTargetState {
-                        serial_number: serial.clone(),
-                        connection_state: FastbootConnectionState::Usb,
-                    }),
-                };
-                TargetEvent::Removed(handle)
-            }
-        }
-    }
-}
-
-impl From<ManualTargetEvent> for TargetEvent {
-    fn from(manual_target_event: ManualTargetEvent) -> Self {
-        match manual_target_event {
-            ManualTargetEvent::Discovered(manual_target, manual_state) => {
-                let state = match manual_state {
-                    ManualTargetState::Disconnected => TargetState::Unknown,
-                    ManualTargetState::Product => {
-                        TargetState::Product(vec![manual_target.addr().into()])
-                    }
-                    ManualTargetState::Fastboot => TargetState::Fastboot(FastbootTargetState {
-                        serial_number: "".to_string(),
-                        connection_state: FastbootConnectionState::Tcp(vec![manual_target
-                            .addr()
-                            .into()]),
-                    }),
-                };
-
-                let handle =
-                    TargetHandle { node_name: Some(manual_target.addr().to_string()), state };
-                TargetEvent::Added(handle)
-            }
-            ManualTargetEvent::Lost(manual_target) => {
-                let handle = TargetHandle {
-                    node_name: Some(manual_target.addr().to_string()),
-                    state: TargetState::Unknown,
-                };
-                TargetEvent::Removed(handle)
-            }
-        }
-    }
 }
 
 impl Stream for TargetStream {
@@ -464,325 +310,169 @@ impl Stream for TargetStream {
     }
 }
 
-// TODO(colnnelson): Should add a builder struct to allow for building of
-// custom TargetStreams
-
 #[cfg(test)]
-mod test {
+pub mod test {
     use super::*;
+    use addr::TargetAddr;
     use futures::StreamExt;
-    use manual_targets::watcher::ManualTarget;
     use pretty_assertions::assert_eq;
     use std::fs::File;
-    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV6};
+    use std::io::Write;
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use std::str::FromStr;
+    use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
-    #[test]
-    fn test_from_fastbootevent_for_targetevent() -> Result<()> {
-        {
-            let f = FastbootEvent::Lost("1234".to_string());
-            let t = TargetEvent::from(f);
-            assert_eq!(
-                t,
-                TargetEvent::Removed(TargetHandle {
-                    node_name: Some("".to_string()),
-                    state: TargetState::Fastboot(FastbootTargetState {
-                        serial_number: "1234".to_string(),
-                        connection_state: FastbootConnectionState::Usb,
-                    }),
-                })
-            );
-        }
+    /// Used for testing functions that take a TargetDiscovery<TargetFilter>
+    ///
+    /// In discover_devices the `filter` parameter is explicitly not used.
+    /// Test authors are expected to pass the VecDeque with the events "pre filtered"
+    /// You should have separate tests for your TargetFilter impls
+    pub struct TestDiscovery {
+        events: Rc<RefCell<VecDeque<Result<TargetEvent>>>>,
+    }
 
-        {
-            let f = FastbootEvent::Discovered("1234".to_string());
-            let t = TargetEvent::from(f);
-            assert_eq!(
-                t,
-                TargetEvent::Added(TargetHandle {
-                    node_name: Some("".to_string()),
-                    state: TargetState::Fastboot(FastbootTargetState {
-                        serial_number: "1234".to_string(),
-                        connection_state: FastbootConnectionState::Usb,
-                    }),
-                })
-            );
+    impl<F> TargetDiscovery<F> for TestDiscovery
+    where
+        F: TargetFilter,
+    {
+        #[allow(refining_impl_trait)]
+        async fn discover_devices(&self, _filter: F) -> Result<TestTargetStream> {
+            Ok(TestTargetStream { events: self.events.clone() })
         }
+    }
+
+    pub struct TestTargetStream {
+        events: Rc<RefCell<VecDeque<Result<TargetEvent>>>>,
+    }
+
+    impl TargetEventStream for TestTargetStream {}
+
+    impl Stream for TestTargetStream {
+        type Item = Result<TargetEvent>;
+
+        fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+            let event = self.events.borrow_mut().pop_front();
+            Poll::Ready(event)
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Example TestDiscovery Usage
+    ///////////////////////////////////////////////////////////////////////////
+
+    fn write_target_event<W: Write>(writer: &mut W, event: TargetEvent) -> Result<()> {
+        let symbol = match event {
+            TargetEvent::Added(_) => "+",
+            TargetEvent::Removed(_) => "-",
+        };
+
+        let handle = match event {
+            TargetEvent::Added(handle) => handle,
+            TargetEvent::Removed(handle) => handle,
+        };
+
+        let node_name = handle.node_name.unwrap_or("<unknown>".to_string());
+        let state = handle.state;
+
+        writeln!(writer, "{symbol}  {node_name}  {state}")?;
         Ok(())
     }
 
-    #[test]
-    fn test_try_from_targetinfo_for_targethandle() -> Result<()> {
-        {
-            let info: ffx::TargetInfo = Default::default();
-            assert!(TargetHandle::try_from(info).is_err());
+    /// Writes the events in a target event stream to the given writer
+    async fn write_event_stream(writer: &mut impl Write, mut stream: impl TargetEventStream) {
+        while let Some(s) = stream.next().await {
+            if let Ok(event) = s {
+                let _ = write_target_event(writer, event);
+            }
         }
-        {
-            let info = ffx::TargetInfo { nodename: Some("foo".to_string()), ..Default::default() };
-            assert!(TargetHandle::try_from(info).is_err());
-        }
-        {
-            let info = ffx::TargetInfo {
-                nodename: Some("foo".to_string()),
-                addresses: Some(vec![]),
-                ..Default::default()
-            };
-            assert!(TargetHandle::try_from(info).is_err());
-        }
-        {
-            let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-            let addr = TargetAddr::from(socket);
-            let addr_info: ffx::TargetAddrInfo = addr.into();
-            let info = ffx::TargetInfo {
-                nodename: Some("foo".to_string()),
-                addresses: Some(vec![addr_info]),
-                ..Default::default()
-            };
-            assert_eq!(
-                TargetHandle::try_from(info)?,
-                TargetHandle {
-                    node_name: Some("foo".to_string()),
-                    state: TargetState::Product(vec![addr])
-                }
-            );
-        }
-        {
-            let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-            let addr = TargetAddr::from(socket);
-            let addr_info: ffx::TargetAddrInfo = addr.into();
-            let info = ffx::TargetInfo {
-                nodename: Some("foo".to_string()),
-                addresses: Some(vec![addr_info]),
-                fastboot_interface: Some(ffx::FastbootInterface::Udp),
-                ..Default::default()
-            };
-            assert_eq!(
-                TargetHandle::try_from(info)?,
-                TargetHandle {
-                    node_name: Some("foo".to_string()),
-                    state: TargetState::Fastboot(FastbootTargetState {
-                        serial_number: "".to_string(),
-                        connection_state: FastbootConnectionState::Udp(vec![addr])
-                    })
-                }
-            );
-        }
-        {
-            let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-            let addr = TargetAddr::from(socket);
-            let addr_info: ffx::TargetAddrInfo = addr.into();
-            let info = ffx::TargetInfo {
-                nodename: Some("foo".to_string()),
-                addresses: Some(vec![addr_info]),
-                fastboot_interface: Some(ffx::FastbootInterface::Tcp),
-                ..Default::default()
-            };
-            assert_eq!(
-                TargetHandle::try_from(info)?,
-                TargetHandle {
-                    node_name: Some("foo".to_string()),
-                    state: TargetState::Fastboot(FastbootTargetState {
-                        serial_number: "".to_string(),
-                        connection_state: FastbootConnectionState::Tcp(vec![addr])
-                    })
-                }
-            );
-        }
-        {
-            let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-            let addr = TargetAddr::from(socket);
-            let addr_info: ffx::TargetAddrInfo = addr.into();
-            let info = ffx::TargetInfo {
-                nodename: Some("foo".to_string()),
-                addresses: Some(vec![addr_info]),
-                fastboot_interface: Some(ffx::FastbootInterface::Usb),
-                ..Default::default()
-            };
-            assert_eq!(
-                TargetHandle::try_from(info)?,
-                TargetHandle {
-                    node_name: Some("foo".to_string()),
-                    state: TargetState::Fastboot(FastbootTargetState {
-                        serial_number: "".to_string(),
-                        connection_state: FastbootConnectionState::Usb
-                    })
-                }
-            );
-        }
-        Ok(())
     }
 
-    #[test]
-    fn test_from_mdnseventtype_for_targetevent() -> Result<()> {
-        {
-            //SocketBound is not supported
-            let mdns_event = ffx::MdnsEventType::SocketBound(Default::default());
-            assert!(TargetEvent::try_from(mdns_event).is_err());
-        }
-        {
-            let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-            let addr = TargetAddr::from(socket);
-            let addr_info: ffx::TargetAddrInfo = addr.into();
-            let info = ffx::TargetInfo {
-                nodename: Some("foo".to_string()),
-                addresses: Some(vec![addr_info]),
-                ..Default::default()
-            };
-            let mdns_event = ffx::MdnsEventType::TargetFound(info);
-            assert_eq!(
-                TargetEvent::try_from(mdns_event)?,
-                TargetEvent::Added(TargetHandle {
-                    node_name: Some("foo".to_string()),
-                    state: TargetState::Product(vec![addr])
-                })
-            );
-        }
-        {
-            let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-            let addr = TargetAddr::from(socket);
-            let addr_info: ffx::TargetAddrInfo = addr.into();
-            let info = ffx::TargetInfo {
-                nodename: Some("foo".to_string()),
-                addresses: Some(vec![addr_info]),
-                ..Default::default()
-            };
-            let mdns_event = ffx::MdnsEventType::TargetRediscovered(info);
-            assert_eq!(
-                TargetEvent::try_from(mdns_event)?,
-                TargetEvent::Added(TargetHandle {
-                    node_name: Some("foo".to_string()),
-                    state: TargetState::Product(vec![addr])
-                })
-            );
-        }
-        {
-            let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-            let addr = TargetAddr::from(socket);
-            let addr_info: ffx::TargetAddrInfo = addr.into();
-            let info = ffx::TargetInfo {
-                nodename: Some("foo".to_string()),
-                addresses: Some(vec![addr_info]),
-                ..Default::default()
-            };
-            let mdns_event = ffx::MdnsEventType::TargetExpired(info);
-            assert_eq!(
-                TargetEvent::try_from(mdns_event)?,
-                TargetEvent::Removed(TargetHandle {
-                    node_name: Some("foo".to_string()),
-                    state: TargetState::Product(vec![addr])
-                })
-            );
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn test_from_emulatoreventtype_for_targetevent() -> Result<()> {
-        let addr = TargetAddr::from_str("127.0.0.1:8080")?;
-        {
-            let addr_info: ffx::TargetAddrInfo = addr.into();
-            let info = ffx::TargetInfo {
-                nodename: Some("foo".to_string()),
-                addresses: Some(vec![addr_info]),
-                ..Default::default()
-            };
-            let emulator_event = emulator_instance::EmulatorTargetAction::Add(info);
-            assert_eq!(
-                TargetEvent::try_from(emulator_event)?,
-                TargetEvent::Added(TargetHandle {
-                    node_name: Some("foo".to_string()),
-                    state: TargetState::Product(vec![addr])
-                })
-            );
-        }
-        {
-            let addr_info: ffx::TargetAddrInfo = addr.into();
-            let info = ffx::TargetInfo {
-                nodename: Some("foo".to_string()),
-                addresses: Some(vec![addr_info]),
-                ..Default::default()
-            };
-            let emulator_event = emulator_instance::EmulatorTargetAction::Remove(info);
-            assert_eq!(
-                TargetEvent::try_from(emulator_event)?,
-                TargetEvent::Removed(TargetHandle {
-                    node_name: Some("foo".to_string()),
-                    state: TargetState::Product(vec![addr])
-                })
-            );
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn test_from_manual_target_event_for_target_event() -> Result<()> {
-        {
-            let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-            let lifetime = None;
-            let manual_target_event = ManualTargetEvent::Discovered(
-                ManualTarget::new(addr, lifetime),
-                ManualTargetState::Product,
-            );
-            assert_eq!(
-                TargetEvent::from(manual_target_event),
-                TargetEvent::Added(TargetHandle {
-                    node_name: Some("127.0.0.1:8080".to_string()),
-                    state: TargetState::Product(vec![addr.into()]),
-                })
-            );
-        }
-        {
-            let addr = SocketAddr::V6(SocketAddrV6::new(
-                Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1),
-                8023,
-                0,
-                0,
-            ));
-            let lifetime = None;
-            let manual_target_event = ManualTargetEvent::Discovered(
-                ManualTarget::new(addr, lifetime),
-                ManualTargetState::Product,
-            );
-            assert_eq!(
-                TargetEvent::from(manual_target_event),
-                TargetEvent::Added(TargetHandle {
-                    node_name: Some("[::1]:8023".to_string()),
-                    state: TargetState::Product(vec![addr.into()]),
-                })
-            );
-        }
-        {
-            let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-            let lifetime = None;
-            let manual_target_event = ManualTargetEvent::Discovered(
-                ManualTarget::new(addr, lifetime),
-                ManualTargetState::Fastboot,
-            );
-            assert_eq!(
-                TargetEvent::from(manual_target_event),
-                TargetEvent::Added(TargetHandle {
-                    node_name: Some("127.0.0.1:8080".to_string()),
-                    state: TargetState::Fastboot(FastbootTargetState {
-                        serial_number: "".to_string(),
-                        connection_state: FastbootConnectionState::Tcp(vec![addr.into()])
-                    }),
-                })
-            );
-        }
-        {
-            let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-            let lifetime = None;
-            let manual_target_event = ManualTargetEvent::Lost(ManualTarget::new(addr, lifetime));
-            assert_eq!(
-                TargetEvent::from(manual_target_event),
-                TargetEvent::Removed(TargetHandle {
-                    node_name: Some("127.0.0.1:8080".to_string()),
+    #[fuchsia::test]
+    async fn test_write_event_stream() -> Result<()> {
+        let mut writer = vec![];
+        let disco = TestDiscovery {
+            events: Rc::new(RefCell::new(VecDeque::from([
+                Ok(TargetEvent::Added(TargetHandle {
+                    node_name: Some("magnus".to_string()),
                     state: TargetState::Unknown,
-                })
-            );
-        }
+                })),
+                Ok(TargetEvent::Added(TargetHandle {
+                    node_name: Some("abagail".to_string()),
+                    state: TargetState::Unknown,
+                })),
+                Ok(TargetEvent::Removed(TargetHandle {
+                    node_name: Some("abagail".to_string()),
+                    state: TargetState::Unknown,
+                })),
+            ]))),
+        };
+
+        let stream = disco.discover_devices(|_: &_| true).await?;
+
+        write_event_stream(&mut writer, stream).await;
+
+        assert_eq!(
+            String::from_utf8(writer).expect("we write uft8"),
+            r#"+  magnus  Unknown
++  abagail  Unknown
+-  abagail  Unknown
+"#
+        );
+
         Ok(())
     }
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Test DiscoveryBuilder
+    ///////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn test_discovery_builder_default() -> Result<()> {
+        let discovery = Discovery::builder().build();
+        assert_eq!(discovery.notify_added, true);
+        assert_eq!(discovery.notify_removed, true);
+        assert_eq!(discovery.sources, DiscoverySources::all());
+        assert!(discovery.emulator_instance_root.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn test_discovery_builder_changes() -> Result<()> {
+        let discovery = Discovery::builder()
+            .notify_added(false)
+            .notify_removed(false)
+            .set_source(DiscoverySources::MANUAL)
+            .with_source(DiscoverySources::EMULATOR)
+            .set_source(DiscoverySources::MDNS)
+            .with_source(DiscoverySources::USB)
+            .build();
+        assert_eq!(discovery.notify_added, false);
+        assert_eq!(discovery.notify_removed, false);
+        assert_eq!(discovery.sources, DiscoverySources::USB | DiscoverySources::MDNS);
+        assert!(discovery.emulator_instance_root.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn test_discovery_builder_with_root() -> Result<()> {
+        let discovery = Discovery::builder()
+            .set_source(DiscoverySources::MANUAL)
+            .with_emulator_instance_root(PathBuf::from_str("/tmp").expect("tmp is a valid path"))
+            .build();
+
+        assert_eq!(discovery.notify_added, true);
+        assert_eq!(discovery.notify_removed, true);
+        assert_eq!(discovery.sources, DiscoverySources::MANUAL | DiscoverySources::EMULATOR);
+        assert_eq!(
+            discovery.emulator_instance_root,
+            Some(PathBuf::from_str("/tmp").expect("tmp is a valid path"))
+        );
+        Ok(())
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    ///  TargetStream tests
+    ///////////////////////////////////////////////////////////////////////////
 
     fn true_target_filter(_handle: &TargetHandle) -> bool {
         true
@@ -955,7 +645,6 @@ mod test {
     }
 
     fn build_instance_file(dir: &PathBuf, name: &str) -> Result<File> {
-        use std::io::Write;
         let new_instance_dir = dir.join(String::from(name));
         std::fs::create_dir_all(&new_instance_dir)?;
         let new_instance_engine_file = new_instance_dir.join("engine.json");

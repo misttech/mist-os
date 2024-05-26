@@ -193,13 +193,35 @@ void HidInstance::GetReport(GetReportRequestView request, GetReportCompleter::Sy
     return;
   }
 
-  uint8_t report[needed];
-  size_t actual = 0;
-  zx_status_t status = base_->GetHidbusProtocol()->GetReport(static_cast<uint8_t>(request->type),
-                                                             request->id, report, needed, &actual);
+  auto& client = base_->GetHidbusProtocol();
+  if (std::holds_alternative<HidDevice::BanjoHidbusClient>(client)) {
+    uint8_t report[needed];
+    size_t actual = 0;
+    zx_status_t status = std::get<HidDevice::BanjoHidbusClient>(client).GetReport(
+        static_cast<uint8_t>(request->type), request->id, report, needed, &actual);
 
-  auto report_view = fidl::VectorView<uint8_t>::FromExternal(report, actual);
-  completer.Reply(status, report_view);
+    auto report_view = fidl::VectorView<uint8_t>::FromExternal(report, actual);
+    completer.Reply(status, report_view);
+    return;
+  } else if (std::holds_alternative<HidDevice::FidlHidbusClient>(client)) {
+    auto result = std::get<HidDevice::FidlHidbusClient>(client).sync()->GetReport(
+        request->type, request->id, needed);
+    if (!result.ok()) {
+      zxlogf(ERROR, "GetReport failed %s", result.error().FormatDescription().c_str());
+      completer.Reply(result.status(), {});
+      return;
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "GetReport failed %d", result->error_value());
+      completer.Reply(result->error_value(), {});
+      return;
+    }
+
+    completer.Reply(ZX_OK, result.value()->data);
+    return;
+  }
+
+  completer.Reply(ZX_ERR_INTERNAL, {});
 }
 
 void HidInstance::SetReport(SetReportRequestView request, SetReportCompleter::Sync& completer) {
@@ -211,10 +233,33 @@ void HidInstance::SetReport(SetReportRequestView request, SetReportCompleter::Sy
     return;
   }
 
-  zx_status_t status =
-      base_->GetHidbusProtocol()->SetReport(static_cast<uint8_t>(request->type), request->id,
-                                            request->report.data(), request->report.count());
-  completer.Reply(status);
+  auto& client = base_->GetHidbusProtocol();
+  if (std::holds_alternative<HidDevice::BanjoHidbusClient>(client)) {
+    auto status = std::get<HidDevice::BanjoHidbusClient>(client).SetReport(
+        static_cast<uint8_t>(request->type), request->id, request->report.data(),
+        request->report.count());
+    completer.Reply(status);
+    return;
+  }
+
+  if (std::holds_alternative<HidDevice::FidlHidbusClient>(client)) {
+    auto result = std::get<HidDevice::FidlHidbusClient>(client).sync()->SetReport(
+        request->type, request->id, request->report);
+    if (!result.ok()) {
+      zxlogf(ERROR, "SetReport failed %s", result.error().FormatDescription().c_str());
+      completer.Reply(result.status());
+      return;
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "SetReport failed %d", result->error_value());
+      completer.Reply(result->error_value());
+      return;
+    }
+    completer.Reply(ZX_OK);
+    return;
+  }
+
+  completer.Reply(ZX_ERR_INTERNAL);
 }
 
 void HidInstance::GetDeviceReportsReader(GetDeviceReportsReaderRequestView request,
@@ -282,6 +327,7 @@ void HidInstance::WriteToFifo(const uint8_t* report, size_t report_len, zx_time_
   if (was_empty) {
     SetReadable();
   }
+  testing_write_to_fifo_called_.Signal();
 }
 
 }  // namespace hid_driver

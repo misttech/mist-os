@@ -57,9 +57,7 @@ Before proceeding further please ensure you have completed the
             Controllers:
               FuchsiaDevice:
                 - name: fuchsia-201f-3b62-e9d3
-                  ssh_private_key: ~/.ssh/fuchsia_ed25519
                 - name: fuchsia-f80f-f96b-6f59
-                  ssh_private_key: ~/.ssh/fuchsia_ed25519
         ```
         Save this file inside the same folder as the test.
         Finally, update the BUILD.gn that you had created in

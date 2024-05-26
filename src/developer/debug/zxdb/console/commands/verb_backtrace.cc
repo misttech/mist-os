@@ -23,9 +23,8 @@ constexpr int kVerboseBacktrace = 3;
 constexpr int kForceRefresh = 4;
 
 const char kBacktraceShortHelp[] = "backtrace / bt: Print a backtrace.";
-const char kBacktraceHelp[] =
-    R"(backtrace / bt
-
+const char kBacktraceUsage[] = "backtrace / bt";
+const char kBacktraceHelp[] = R"(
   Prints a backtrace of the thread, including function parameters.
 
   To see just function names and line numbers, use "frame" or just "f".
@@ -103,7 +102,7 @@ void RunVerbBacktrace(const Command& cmd, fxl::RefPtr<CommandContext> cmd_contex
 
 VerbRecord GetBacktraceVerbRecord() {
   VerbRecord backtrace(&RunVerbBacktrace, {"backtrace", "where", "bt"}, kBacktraceShortHelp,
-                       kBacktraceHelp, CommandGroup::kQuery);
+                       kBacktraceUsage, kBacktraceHelp, CommandGroup::kQuery);
   SwitchRecord force_types(kForceAllTypes, false, "types", 't');
   SwitchRecord raw(kRawOutput, false, "raw", 'r');
   SwitchRecord verbose(kVerboseBacktrace, false, "verbose", 'v');

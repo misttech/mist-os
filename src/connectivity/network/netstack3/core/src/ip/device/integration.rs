@@ -14,74 +14,57 @@ use core::{
 };
 
 use lock_order::{
-    lock::{LockFor, UnlockedAccess},
+    lock::{LockLevelFor, UnlockedAccess, UnlockedAccessMarkerFor},
     relation::LockBefore,
     wrap::prelude::*,
 };
 use net_types::{
-    ip::{AddrSubnet, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu},
+    ip::{AddrSubnet, Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu},
     LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
 use packet::{EmptyBuf, Serializer};
-use packet_formats::{
-    icmp::{
-        ndp::{NeighborSolicitation, RouterSolicitation},
-        IcmpUnusedCode,
-    },
-    ip::IpExt,
+use packet_formats::icmp::{
+    ndp::{NeighborSolicitation, RouterSolicitation},
+    IcmpUnusedCode,
 };
 
 use crate::{
     context::{CoreEventContext, CoreTimerContext, CounterContext},
-    device::{AnyDevice, DeviceId, DeviceIdContext, WeakDeviceId},
+    device::{AnyDevice, DeviceId, DeviceIdContext, DeviceIdentifier, WeakDeviceId},
     error::{ExistsError, NotFoundError},
-    filter::{FilterHandlerProvider, FilterImpl, MaybeTransportPacket},
+    filter::FilterImpl,
     ip::{
         self,
         device::{
-            self, add_ip_addr_subnet_with_config,
-            dad::{
-                DadAddressContext, DadAddressStateRef, DadContext, DadEvent, DadHandler,
-                DadStateRef,
-            },
-            del_ip_addr_inner, get_ipv6_hop_limit, is_ip_device_enabled, is_ip_forwarding_enabled,
-            join_ip_multicast_with_config, leave_ip_multicast_with_config,
-            nud::{self, ConfirmationFlags, NudCounters, NudIpHandler},
-            route_discovery::{
-                Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext, Ipv6RouteDiscoveryContext,
-                Ipv6RouteDiscoveryState,
-            },
-            router_solicitation::{RsContext, RsHandler, RsState},
-            slaac::{
-                SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacAddrsMutAndConfig,
-                SlaacContext, SlaacCounters, SlaacState,
-            },
-            state::{
-                DualStackIpDeviceState, IpDeviceConfiguration, IpDeviceFlags,
-                IpDeviceMulticastGroups, IpDeviceStateBindingsTypes, Ipv4AddressEntry,
-                Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressEntry, Ipv6AddressFlags,
-                Ipv6AddressState, Ipv6DeviceConfiguration, SlaacConfig,
-            },
-            AddressRemovedReason, DelIpAddr, IpAddressId, IpAddressIdSpec, IpAddressIdSpecContext,
-            IpAddressState, IpDeviceAddr, IpDeviceBindingsContext, IpDeviceEvent, IpDeviceIpExt,
-            IpDeviceStateContext, IpDeviceTimerId, Ipv6DeviceAddr, Ipv6DeviceTimerId,
+            self, add_ip_addr_subnet_with_config, del_ip_addr_inner, get_ipv6_hop_limit,
+            is_ip_device_enabled, is_ip_forwarding_enabled, join_ip_multicast_with_config,
+            leave_ip_multicast_with_config, AddressRemovedReason, DadAddressContext,
+            DadAddressStateRef, DadContext, DadEvent, DadHandler, DadStateRef, DadTimerId,
+            DefaultHopLimit, DelIpAddr, DualStackIpDeviceState, IpAddressId, IpAddressIdSpec,
+            IpAddressIdSpecContext, IpAddressState, IpDeviceAddr, IpDeviceAddresses,
+            IpDeviceBindingsContext, IpDeviceConfiguration, IpDeviceEvent, IpDeviceFlags,
+            IpDeviceIpExt, IpDeviceMulticastGroups, IpDeviceStateBindingsTypes,
+            IpDeviceStateContext, IpDeviceStateIpExt, IpDeviceTimerId, Ipv4AddressEntry,
+            Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressEntry,
+            Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState, Ipv6DeviceAddr,
+            Ipv6DeviceConfiguration, Ipv6DeviceTimerId, Ipv6DiscoveredRoute,
+            Ipv6DiscoveredRoutesContext, Ipv6NetworkLearnedParameters, Ipv6RouteDiscoveryContext,
+            Ipv6RouteDiscoveryState, RsContext, RsHandler, RsState, SlaacAddressEntry,
+            SlaacAddressEntryMut, SlaacAddresses, SlaacAddrsMutAndConfig, SlaacConfig,
+            SlaacContext, SlaacCounters, SlaacState,
         },
         gmp::{
-            self,
-            igmp::{IgmpContext, IgmpGroupState, IgmpState, IgmpStateContext},
-            mld::{MldContext, MldGroupState, MldStateContext},
-            GmpHandler, GmpQueryHandler, GmpStateRef, MulticastGroupSet,
+            self, GmpHandler, GmpQueryHandler, GmpStateRef, IgmpContext, IgmpGroupState, IgmpState,
+            IgmpStateContext, MldContext, MldGroupState, MldStateContext, MulticastGroupSet,
         },
-        socket::ipv6_source_address_selection::SasCandidate,
-        types::AddableMetric,
-        AddressStatus, IpLayerIpExt, IpStateContext, Ipv4PresentAddressStatus,
-        Ipv6PresentAddressStatus, DEFAULT_TTL,
+        nud::{self, ConfirmationFlags, NudCounters, NudIpHandler},
+        socket::SasCandidate,
+        AddableMetric, AddressStatus, FilterHandlerProvider, IpLayerIpExt, IpStateContext,
+        Ipv4PresentAddressStatus, Ipv6PresentAddressStatus, RawMetric, DEFAULT_TTL,
     },
     sync::{RemoveResourceResultWithContext, WeakRc},
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
-
-use super::{dad::DadTimerId, state::Ipv6NetworkLearnedParameters};
 
 pub struct SlaacAddrs<'a, BC: BindingsContext> {
     pub(crate) core_ctx: CoreCtxWithIpDeviceConfiguration<
@@ -101,7 +84,7 @@ pub struct SlaacAddrs<'a, BC: BindingsContext> {
 /// type.
 pub struct SlaacAddrsIter<'x, BC: BindingsContext> {
     core_ctx: CoreCtx<'x, BC, crate::lock_ordering::IpDeviceAddresses<Ipv6>>,
-    addrs: ip::device::state::AddressIdIter<'x, Ipv6, BC>,
+    addrs: ip::device::AddressIdIter<'x, Ipv6, BC>,
     device_id: &'x DeviceId<BC>,
 }
 
@@ -152,7 +135,7 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
             let (addrs, mut locked) =
                 state.read_lock_and::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>();
             addrs.iter().for_each(|entry| {
-                let addr_sub = entry.addr_sub;
+                let addr_sub = *entry.addr_sub();
                 let mut locked = locked.adopt(&**entry);
                 let mut state = locked
                     .write_lock_with::<crate::lock_ordering::Ipv6DeviceAddressState, _>(|c| {
@@ -204,7 +187,7 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
             config,
         )
         .map(|entry| {
-            let addr_sub = entry.addr_sub;
+            let addr_sub = entry.addr_sub();
             let mut locked = core_ctx.core_ctx.adopt(entry.deref());
             let mut state = locked
                 .write_lock_with::<crate::lock_ordering::Ipv6DeviceAddressState, _>(|c| c.right());
@@ -458,24 +441,22 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
             self,
             device_id,
             |addrs, core_ctx| {
-                IpDeviceAddr::new_from_ipv6_source(
-                    crate::ip::socket::ipv6_source_address_selection::select_ipv6_source_address(
-                        remote,
-                        device_id,
-                        addrs.map(|addr_id| {
-                            device::IpDeviceAddressContext::<Ipv6, _>::with_ip_address_state(
-                                core_ctx,
-                                device_id,
-                                &addr_id,
-                                |Ipv6AddressState { flags, config: _ }| SasCandidate {
-                                    addr_sub: addr_id.addr_sub(),
-                                    flags: *flags,
-                                    device: device_id.clone(),
-                                },
-                            )
-                        }),
-                    ),
-                )
+                IpDeviceAddr::new_from_ipv6_source(crate::ip::socket::select_ipv6_source_address(
+                    remote,
+                    device_id,
+                    addrs.map(|addr_id| {
+                        device::IpDeviceAddressContext::<Ipv6, _>::with_ip_address_state(
+                            core_ctx,
+                            device_id,
+                            &addr_id,
+                            |Ipv6AddressState { flags, config: _ }| SasCandidate {
+                                addr_sub: addr_id.addr_sub(),
+                                flags: *flags,
+                                device: device_id.clone(),
+                            },
+                        )
+                    }),
+                ))
             },
         )
     }
@@ -565,6 +546,8 @@ fn assignment_state_v4<
                     Some(AddressStatus::Present(Ipv4PresentAddressStatus::Unicast))
                 } else if addr.get() == subnet.broadcast() {
                     Some(AddressStatus::Present(Ipv4PresentAddressStatus::SubnetBroadcast))
+                } else if device.is_loopback() && subnet.contains(addr.as_ref()) {
+                    Some(AddressStatus::Present(Ipv4PresentAddressStatus::LoopbackSubnet))
                 } else {
                     None
                 }
@@ -630,8 +613,6 @@ where
     >: IpDeviceStateContext<I, BC, DeviceId = Self::DeviceId>
         + GmpHandler<I, BC>
         + NudIpHandler<I, BC>,
-    DualStackIpDeviceState<BC>:
-        LockFor<crate::lock_ordering::IpDeviceFlags<I>, Data = IpDeviceFlags>,
     crate::lock_ordering::IpDeviceConfiguration<I>:
         LockBefore<crate::lock_ordering::IpDeviceFlags<I>>,
 {
@@ -938,7 +919,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
     }
 
     fn send_rs_packet<
-        S: Serializer<Buffer = EmptyBuf> + MaybeTransportPacket,
+        S: Serializer<Buffer = EmptyBuf>,
         F: FnOnce(Option<UnicastAddr<Ipv6Addr>>) -> S,
     >(
         &mut self,
@@ -953,7 +934,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
             core_ctx,
             device_id,
             |addrs, core_ctx| {
-                crate::ip::socket::ipv6_source_address_selection::select_ipv6_source_address(
+                crate::ip::socket::select_ipv6_source_address(
                     Some(dst_ip),
                     device_id,
                     addrs.map(|addr_id| {
@@ -998,7 +979,7 @@ impl<BC: BindingsContext> Ipv6DiscoveredRoutesContext<BC>
         Ipv6DiscoveredRoute { subnet, gateway }: Ipv6DiscoveredRoute,
     ) -> Result<(), crate::error::ExistsError> {
         let device_id = device_id.clone();
-        let entry = crate::ip::types::AddableEntry {
+        let entry = ip::AddableEntry {
             subnet,
             device: device_id,
             gateway: gateway.map(|g| (*g).into_specified()),
@@ -1008,19 +989,18 @@ impl<BC: BindingsContext> Ipv6DiscoveredRoutesContext<BC>
         // TODO(https://fxbug.dev/42079625): Rather than perform a synchronous
         // check for whether the route already exists, use a routes-admin
         // RouteSet to track the NDP-added route.
-        let already_exists = self.with_ip_routing_table(
-            |_core_ctx, table: &crate::ip::forwarding::ForwardingTable<Ipv6, _>| {
-                table.iter_table().any(|table_entry: &crate::ip::types::Entry<Ipv6Addr, _>| {
-                    &crate::ip::types::AddableEntry::from(table_entry.clone()) == &entry
+        let already_exists =
+            self.with_ip_routing_table(|_core_ctx, table: &ip::ForwardingTable<Ipv6, _>| {
+                table.iter_table().any(|table_entry: &ip::Entry<Ipv6Addr, _>| {
+                    &ip::AddableEntry::from(table_entry.clone()) == &entry
                 })
-            },
-        );
+            });
 
         if already_exists {
             return Err(crate::error::ExistsError);
         }
 
-        crate::ip::forwarding::request_context_add_route::<Ipv6, _, _>(bindings_ctx, entry);
+        ip::request_context_add_route::<Ipv6, _, _>(bindings_ctx, entry);
         Ok(())
     }
 
@@ -1030,7 +1010,7 @@ impl<BC: BindingsContext> Ipv6DiscoveredRoutesContext<BC>
         device_id: &Self::DeviceId,
         Ipv6DiscoveredRoute { subnet, gateway }: Ipv6DiscoveredRoute,
     ) {
-        crate::ip::forwarding::request_context_del_routes::<Ipv6, _, _>(
+        ip::request_context_del_routes::<Ipv6, _, _>(
             bindings_ctx,
             subnet,
             device_id.clone(),
@@ -1306,7 +1286,7 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpConte
 
     fn get_ip_addr_subnet(&mut self, device: &Self::DeviceId) -> Option<AddrSubnet<Ipv4Addr>> {
         let Self { config: _, core_ctx } = self;
-        crate::ip::device::get_ipv4_addr_subnet(core_ctx, device)
+        ip::device::get_ipv4_addr_subnet(core_ctx, device)
     }
 }
 
@@ -1422,6 +1402,7 @@ where
     }
 }
 
+#[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<
         'a,
         I: IpExt,
@@ -1434,7 +1415,7 @@ impl<
 
     fn filter_handler(&mut self) -> Self::Handler<'_> {
         let Self { config: _, core_ctx } = self;
-        FilterHandlerProvider::filter_handler(core_ctx)
+        FilterHandlerProvider::<I, BC>::filter_handler(core_ctx)
     }
 }
 
@@ -1526,5 +1507,107 @@ impl<I: IpDeviceIpExt, BT: BindingsTypes, L>
         dispatch_id: IpDeviceTimerId<I, WeakDeviceId<BT>, IpAddrCtxSpec<BT>>,
     ) -> BT::DispatchId {
         dispatch_id.into()
+    }
+}
+
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::IpDeviceAddresses<I>
+{
+    type Data = IpDeviceAddresses<I, BT>;
+}
+
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::IpDeviceGmp<I>
+{
+    type Data = IpDeviceMulticastGroups<I, BT>;
+}
+
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::IpDeviceDefaultHopLimit<I>
+{
+    type Data = DefaultHopLimit<I>;
+}
+
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::IpDeviceFlags<I>
+{
+    type Data = IpMarked<I, IpDeviceFlags>;
+}
+
+impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::Ipv6DeviceSlaac
+{
+    type Data = SlaacState<BT>;
+}
+
+impl<BT: IpDeviceStateBindingsTypes> UnlockedAccessMarkerFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::RoutingMetric
+{
+    type Data = RawMetric;
+    fn unlocked_access(t: &DualStackIpDeviceState<BT>) -> &Self::Data {
+        t.metric()
+    }
+}
+
+impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::IpDeviceConfiguration<Ipv4>
+{
+    type Data = Ipv4DeviceConfiguration;
+}
+
+impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::Ipv6DeviceLearnedParams
+{
+    type Data = Ipv6NetworkLearnedParameters;
+}
+
+impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::Ipv6DeviceRouteDiscovery
+{
+    type Data = Ipv6RouteDiscoveryState<BT>;
+}
+
+impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::Ipv6DeviceRouterSolicitations
+{
+    type Data = RsState<BT>;
+}
+
+impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::IpDeviceConfiguration<Ipv6>
+{
+    type Data = Ipv6DeviceConfiguration;
+}
+
+impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<Ipv4AddressEntry<BT>>
+    for crate::lock_ordering::Ipv4DeviceAddressState
+{
+    type Data = Ipv4AddressState<BT::Instant>;
+}
+
+impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<Ipv6AddressEntry<BT>>
+    for crate::lock_ordering::Ipv6DeviceAddressDad
+{
+    type Data = Ipv6DadState<BT>;
+}
+
+impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<Ipv6AddressEntry<BT>>
+    for crate::lock_ordering::Ipv6DeviceAddressState
+{
+    type Data = Ipv6AddressState<BT::Instant>;
+}
+
+impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::SlaacCounters> for StackState<BT> {
+    type Data = SlaacCounters;
+    type Guard<'l> = &'l SlaacCounters where Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        &self.slaac_counters()
+    }
+}
+
+impl<BT: BindingsTypes, L> CounterContext<SlaacCounters> for CoreCtx<'_, BT, L> {
+    fn with_counters<O, F: FnOnce(&SlaacCounters) -> O>(&self, cb: F) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::SlaacCounters>())
     }
 }

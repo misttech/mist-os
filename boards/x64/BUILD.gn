@@ -246,6 +246,10 @@ board_input_bundle("x64_common") {
       driver_components = [ "meta/e1000.cm" ]
     },
   ]
+
+  # Flag controlling kernel's uart implementation.
+  # TODO(https://fxbug.dev/326669461): Remove when migration is complete.
+  kernel_cmdline = [ "kernel.experimental.serial_migration=true" ]
 }
 
 board_input_bundle("paver") {

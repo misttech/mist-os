@@ -75,7 +75,16 @@ pub struct WatchMessage {
     pub filename: PathBuf,
 }
 
+#[derive(Debug, Eq, PartialEq)]
+enum WatcherState {
+    Watching,
+    TerminateOnNextPoll,
+    Terminated,
+}
+
 /// Provides a Stream of WatchMessages corresponding to filesystem events for a given directory.
+/// After receiving an error, the stream will return the error, and then will terminate. After it's
+/// terminated, the stream is fused and will continue to return None when polled.
 #[derive(Debug)]
 #[must_use = "futures/streams must be polled"]
 pub struct Watcher {
@@ -83,6 +92,7 @@ pub struct Watcher {
     // If idx >= buf.bytes().len(), you must call reset_buf() before get_next_msg().
     buf: MessageBuf,
     idx: usize,
+    state: WatcherState,
 }
 
 impl Unpin for Watcher {}
@@ -99,7 +109,12 @@ impl Watcher {
         zx::Status::ok(status).map_err(WatcherCreateError::WatchError)?;
         let mut buf = MessageBuf::new();
         buf.ensure_capacity_bytes(fio::MAX_BUF as usize);
-        Ok(Watcher { ch: fasync::Channel::from_channel(client_end.into_channel()), buf, idx: 0 })
+        Ok(Watcher {
+            ch: fasync::Channel::from_channel(client_end.into_channel()),
+            buf,
+            idx: 0,
+            state: WatcherState::Watching,
+        })
     }
 
     fn reset_buf(&mut self) {
@@ -122,9 +137,7 @@ impl Watcher {
 
 impl FusedStream for Watcher {
     fn is_terminated(&self) -> bool {
-        // `Watcher` never completes
-        // (FIXME: or does it? is an error completion?)
-        false
+        self.state == WatcherState::Terminated
     }
 }
 
@@ -133,13 +146,24 @@ impl Stream for Watcher {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = &mut *self;
+        // Once this stream has hit an error, it's likely unrecoverable at this level and should be
+        // closed. Clients can attempt to recover by creating a new Watcher.
+        if this.state == WatcherState::TerminateOnNextPoll {
+            this.state = WatcherState::Terminated;
+        }
+        if this.state == WatcherState::Terminated {
+            return Poll::Ready(None);
+        }
         if this.idx >= this.buf.bytes().len() {
             this.reset_buf();
         }
         if this.idx == 0 {
             match this.ch.recv_from(cx, &mut this.buf) {
                 Poll::Ready(Ok(())) => {}
-                Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e.into()))),
+                Poll::Ready(Err(e)) => {
+                    self.state = WatcherState::TerminateOnNextPoll;
+                    return Poll::Ready(Some(Err(e.into())));
+                }
                 Poll::Pending => return Poll::Pending,
             }
         }
@@ -217,13 +241,23 @@ impl<'a> VfsWatchMsg<'a> {
 mod tests {
     use super::*;
     use crate::OpenFlags;
+    use assert_matches::assert_matches;
+    use async_trait::async_trait;
     use fuchsia_async::{DurationExt, TimeoutExt};
     use fuchsia_zircon::prelude::*;
     use futures::prelude::*;
     use std::fmt::Debug;
     use std::fs::File;
     use std::path::Path;
+    use std::sync::Arc;
     use tempfile::tempdir;
+    use vfs::directory::dirents_sink;
+    use vfs::directory::entry_container::{Directory, DirectoryWatcher};
+    use vfs::directory::immutable::connection::ImmutableConnection;
+    use vfs::directory::traversal_position::TraversalPosition;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::node::{IsDirectory, Node};
+    use vfs::{ObjectRequestRef, ToObjectRequest};
 
     fn one_step<'a, S, OK, ERR>(s: &'a mut S) -> impl Future<Output = OK> + 'a
     where
@@ -250,8 +284,6 @@ mod tests {
         .unwrap();
         let mut w = Watcher::new(&dir).await.unwrap();
 
-        // TODO(tkilbourn): this assumes "." always comes before "file1". If this test ever starts
-        // flaking, handle the case of unordered EXISTING files.
         let msg = one_step(&mut w).await;
         assert_eq!(WatchEvent::EXISTING, msg.event);
         assert_eq!(Path::new("."), msg.filename);
@@ -318,5 +350,103 @@ mod tests {
         let msg = one_step(&mut w).await;
         assert_eq!(WatchEvent::REMOVE_FILE, msg.event);
         assert_eq!(Path::new(filename), msg.filename);
+    }
+
+    struct MockDirectory;
+
+    impl MockDirectory {
+        fn new() -> Arc<Self> {
+            Arc::new(Self)
+        }
+    }
+
+    #[async_trait]
+    impl Node for MockDirectory {
+        async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+            unimplemented!()
+        }
+        async fn get_attributes(
+            &self,
+            _query: fio::NodeAttributesQuery,
+        ) -> Result<fio::NodeAttributes2, zx::Status> {
+            unimplemented!();
+        }
+
+        fn close(self: Arc<Self>) {}
+    }
+
+    #[async_trait]
+    impl Directory for MockDirectory {
+        fn open(
+            self: Arc<Self>,
+            scope: ExecutionScope,
+            flags: fio::OpenFlags,
+            _path: vfs::path::Path,
+            server_end: fidl::endpoints::ServerEnd<fio::NodeMarker>,
+        ) {
+            flags.to_object_request(server_end).handle(|object_request| {
+                object_request.spawn_connection(
+                    scope,
+                    self.clone(),
+                    flags,
+                    ImmutableConnection::create,
+                )
+            });
+        }
+
+        fn open2(
+            self: Arc<Self>,
+            _scope: ExecutionScope,
+            _path: vfs::path::Path,
+            _protocols: fio::ConnectionProtocols,
+            _object_request: ObjectRequestRef<'_>,
+        ) -> Result<(), zx::Status> {
+            unimplemented!("Not implemented!");
+        }
+
+        async fn read_dirents<'a>(
+            &'a self,
+            _pos: &'a TraversalPosition,
+            _sink: Box<dyn dirents_sink::Sink>,
+        ) -> Result<(TraversalPosition, Box<dyn dirents_sink::Sealed>), zx::Status> {
+            unimplemented!("Not implemented");
+        }
+
+        fn register_watcher(
+            self: Arc<Self>,
+            _scope: ExecutionScope,
+            _mask: fio::WatchMask,
+            _watcher: DirectoryWatcher,
+        ) -> Result<(), zx::Status> {
+            // Don't do anything, just throw out the watcher, which should close the channel, to
+            // generate a PEER_CLOSED error.
+            Ok(())
+        }
+
+        fn unregister_watcher(self: Arc<Self>, _key: usize) {
+            unimplemented!("Not implemented");
+        }
+    }
+
+    impl IsDirectory for MockDirectory {}
+
+    #[fuchsia::test]
+    async fn test_error() {
+        let test_dir = MockDirectory::new();
+        let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let scope = ExecutionScope::new();
+        test_dir.open(
+            scope.clone(),
+            fio::OpenFlags::RIGHT_READABLE,
+            vfs::path::Path::dot(),
+            server.into_channel().into(),
+        );
+        let mut w = Watcher::new(&client).await.unwrap();
+        let msg = w.next().await.expect("the stream yielded no next item");
+        assert!(!w.is_terminated());
+        assert_matches!(msg, Err(WatcherStreamError::ChannelRead(zx::Status::PEER_CLOSED)));
+        assert!(!w.is_terminated());
+        assert_matches!(w.next().await, None);
+        assert!(w.is_terminated());
     }
 }

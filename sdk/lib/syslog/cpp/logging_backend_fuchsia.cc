@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 #include <assert.h>
-#include <fuchsia/logger/cpp/fidl.h>
+#include <fidl/fuchsia.diagnostics/cpp/fidl.h>
+#include <fidl/fuchsia.logger/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/executor.h>
@@ -118,7 +119,7 @@ class LogState {
   LogState(const fuchsia_logging::LogSettings& settings,
            const std::initializer_list<std::string>& tags);
 
-  fuchsia::logger::LogSinkPtr log_sink_;
+  fidl::SharedClient<fuchsia_logger::LogSink> log_sink_;
   void (*handler_)(void* context, fuchsia_logging::LogSeverity severity);
   void* handler_context_;
   async::Loop loop_;
@@ -161,31 +162,42 @@ class GlobalStateLock {
   ~GlobalStateLock() { FuchsiaLogReleaseState(); }
 };
 
-static fuchsia_logging::LogSeverity IntoLogSeverity(fuchsia::diagnostics::Severity severity) {
+static fuchsia_logging::LogSeverity IntoLogSeverity(fuchsia_diagnostics::Severity severity) {
   switch (severity) {
-    case fuchsia::diagnostics::Severity::TRACE:
+    case fuchsia_diagnostics::Severity::kTrace:
       return fuchsia_logging::LOG_TRACE;
-    case fuchsia::diagnostics::Severity::DEBUG:
+      break;
+    case fuchsia_diagnostics::Severity::kDebug:
       return fuchsia_logging::LOG_DEBUG;
-    case fuchsia::diagnostics::Severity::INFO:
+      break;
+    case fuchsia_diagnostics::Severity::kInfo:
       return fuchsia_logging::LOG_INFO;
-    case fuchsia::diagnostics::Severity::WARN:
+      break;
+    case fuchsia_diagnostics::Severity::kWarn:
       return fuchsia_logging::LOG_WARNING;
-    case fuchsia::diagnostics::Severity::ERROR:
+      break;
+    case fuchsia_diagnostics::Severity::kError:
       return fuchsia_logging::LOG_ERROR;
-    case fuchsia::diagnostics::Severity::FATAL:
+      break;
+    case fuchsia_diagnostics::Severity::kFatal:
       return fuchsia_logging::LOG_FATAL;
+      break;
   }
 }
 
 void LogState::HandleInterest() {
-  log_sink_->WaitForInterestChange(
-      [=](fuchsia::logger::LogSink_WaitForInterestChange_Result interest_result) {
-        auto interest = std::move(interest_result.response().data);
-        if (!interest.has_min_severity()) {
+  log_sink_->WaitForInterestChange().Then(
+      [=](fidl::Result<fuchsia_logger::LogSink::WaitForInterestChange>& interest_result) {
+        // FIDL can cancel the operation if the logger is being reconfigured
+        // which results in an error.
+        if (interest_result.is_error()) {
+          return;
+        }
+        auto interest = std::move(interest_result->data());
+        if (!interest.min_severity()) {
           min_severity_ = default_severity_;
         } else {
-          min_severity_ = IntoLogSeverity(interest.min_severity());
+          min_severity_ = IntoLogSeverity(*interest.min_severity());
         }
         handler_(handler_context_, min_severity_);
         HandleInterest();
@@ -208,28 +220,30 @@ void LogState::ConnectAsync() {
   }
 
   if (wait_for_initial_interest_) {
-    fuchsia::logger::LogSinkSyncPtr sync_log_sink;
-    sync_log_sink.Bind(std::move(logger));
-    fuchsia::logger::LogSink_WaitForInterestChange_Result interest_result;
-    sync_log_sink->WaitForInterestChange(&interest_result);
-    auto interest = std::move(interest_result.response().data);
-    if (!interest.has_min_severity()) {
+    fidl::SyncClient<fuchsia_logger::LogSink> sync_log_sink;
+    sync_log_sink.Bind(fidl::ClientEnd<fuchsia_logger::LogSink>(std::move(logger)));
+    auto interest_result = sync_log_sink->WaitForInterestChange();
+    auto interest = std::move(interest_result->data());
+    if (!interest.min_severity()) {
       min_severity_ = default_severity_;
     } else {
-      min_severity_ = IntoLogSeverity(interest.min_severity());
+      min_severity_ = IntoLogSeverity(*interest.min_severity());
     }
     handler_(handler_context_, min_severity_);
-    logger = sync_log_sink.Unbind().TakeChannel();
+    logger = sync_log_sink.TakeClientEnd().TakeChannel();
   }
 
-  if (log_sink_.Bind(std::move(logger), loop_.dispatcher()) != ZX_OK) {
-    return;
-  }
+  log_sink_.Bind(fidl::ClientEnd<fuchsia_logger::LogSink>(std::move(logger)), loop_.dispatcher());
   zx::socket local, remote;
   if (zx::socket::create(ZX_SOCKET_DATAGRAM, &local, &remote) != ZX_OK) {
     return;
   }
-  log_sink_->ConnectStructured(std::move(remote));
+  fidl::Request<fuchsia_logger::LogSink::ConnectStructured> request;
+  request.socket(std::move(remote));
+  if (log_sink_->ConnectStructured(std::move(request)).is_error()) {
+    return;
+  }
+
   HandleInterest();
   descriptor_ = std::move(local);
 }
@@ -256,13 +270,16 @@ void LogState::Connect() {
     } else {
       logger = zx::channel(provided_log_sink_);
     }
-    ::fuchsia::logger::LogSinkPtr logger_client;
-    logger_client.Bind(std::move(logger), loop_.dispatcher());
+    fidl::Client<fuchsia_logger::LogSink> logger_client;
+    logger_client.Bind(fidl::ClientEnd<fuchsia_logger::LogSink>(std::move(logger)),
+                       loop_.dispatcher());
     zx::socket local, remote;
     if (zx::socket::create(ZX_SOCKET_DATAGRAM, &local, &remote) != ZX_OK) {
       return;
     }
-    logger_client->ConnectStructured(std::move(remote));
+    if (logger_client->ConnectStructured(std::move(remote)).is_error()) {
+      return;
+    }
     descriptor_ = std::move(local);
   }
 }

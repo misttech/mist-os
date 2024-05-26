@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::subsystems::prelude::*;
-use anyhow::{anyhow, bail, Context};
+use crate::{common::DomainConfigDirectoryBuilder, subsystems::prelude::*};
+use anyhow::{anyhow, Context};
 use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
 use assembly_config_schema::platform_config::diagnostics_config::{
     ArchivistConfig, ArchivistPipeline, DiagnosticsConfig, PipelineType,
@@ -139,24 +139,34 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
                 BootfsPackageDestination::ArchivistPipelines,
             ))
             .directory("config");
+        let mut saw_feedback = false;
         for pipeline in archivist_pipelines {
             let ArchivistPipeline { name, files } = pipeline;
+            saw_feedback |= matches!(name, PipelineType::Feedback);
+            // TODO(https://fxbug.dev/342194194): improve how we handle disabling pipelines. This
+            // could probably be part of the structured configuration instead of a magic file.
             if files.is_empty() {
-                bail!("An archivist pipeline must have a non-zero number of files");
+                insert_disabled(pipelines, name)?;
+            } else {
+                for file in files {
+                    let filename = file.file_name().ok_or(anyhow!(
+                        "Failed to get filename for archivist pipeline: {}",
+                        &file
+                    ))?;
+                    pipelines.entry(FileEntry {
+                        source: file.clone(),
+                        destination: format!("{name}/{filename}"),
+                    })?;
+                }
             }
-            if *name == PipelineType::All && *context.build_type == BuildType::User {
-                bail!("The 'all' archivist pipeline is not allowed on user builds");
-            }
-
-            for file in files {
-                let filename = file
-                    .file_name()
-                    .ok_or(anyhow!("Failed to get filename for archivist pipeline: {}", &file))?;
-                pipelines.entry(FileEntry {
-                    source: file.clone(),
-                    destination: format!("{}/{}", name, filename),
-                })?;
-            }
+        }
+        // TODO(https://fxbug.dev/342194194): enable removing the "all" pipeline in user builds.
+        // This behavior is currently not implemented, but should.
+        // TODO(https://fxbug.dev/342194194): Feedback being empty on a non-user product means a
+        // different thing than other pipelines. Other pieplines would be disabled, but feedback
+        // isn't filtered. That configuration should be moved here instead of Archivist.
+        if !saw_feedback {
+            insert_disabled(pipelines, &PipelineType::Feedback)?;
         }
 
         let exception_handler_available = matches!(
@@ -260,6 +270,21 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
 
         Ok(())
     }
+}
+
+fn insert_disabled<T>(pipelines: &mut T, name: &PipelineType) -> anyhow::Result<()>
+where
+    T: DomainConfigDirectoryBuilder + ?Sized,
+{
+    let destination = format!("{name}/DISABLE_FILTERING.txt");
+    pipelines.entry_from_contents(
+        &destination,
+        concat!(
+            "The presence of this file in a pipeline config directory for the Archivist indicates ",
+            "that the Archivist should disable filtering by static selectors for this pipeline.",
+        ),
+    )?;
+    Ok(())
 }
 
 #[cfg(test)]

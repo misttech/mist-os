@@ -12,18 +12,32 @@ namespace {
 TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
   static const char* kDevicePaths[] = {
       "sys/platform/adc-9000",
+      "sys/platform/adc-buttons/adc-buttons_group/adc-buttons",
       "sys/platform/arm-mali-0",
       "sys/platform/audio-controller-ff642000/audio-controller-ff642000_group/aml-g12-audio-composite",
+
+      // bt-transport-uart is not included in bootfs on vim3.
+      "sys/platform/bt-uart-ffd24000/bt-uart-ffd24000_group/aml-uart",
+      // TODO(b/291154545): Add bluetooth paths when firmware is publicly available.
+      // "sys/platform/bt-uart-ffd24000/bt-uart-ffd24000_group/aml-uart/bt-transport-uart/bt-hci-broadcom",
+
       "sys/platform/canvas-ff638000/aml-canvas",
       "sys/platform/clock-controller-ff63c000/clocks",
       "sys/platform/clock-controller-ff63c000/clocks/clock-init",
+      "sys/platform/dsi-display-ff900000",
+      // TODO(https://fxbug.dev/42068759): Update topopath when dwmac is off
+      // netdevice migration.
+      "sys/platform/ethernet-phy-ff634000/ethernet-phy-ff634000_group/aml-ethernet/dwmac-ff3f0000_group/dwmac/Designware-MAC/netdevice-migration/network-device",
       "sys/platform/ethernet-phy-ff634000/ethernet-phy-ff634000_group/aml-ethernet/dwmac-ff3f0000_group/dwmac/eth_phy/phy_null_device",
       "sys/platform/fuchsia-sysmem/sysmem",
+      "sys/platform/gpio-buttons/gpio-buttons_group/buttons",
       "sys/platform/gpio-controller-ff634400/aml-gpio/gpio-init",
       "sys/platform/gpio-controller-ff634400/aml-gpio/gpio",
       "sys/platform/gpio-controller-ff634400/aml-gpio/gpio/gpio-93/fusb302-22_group/fusb302",
-      "sys/platform/gpu-ffe40000/gpu-ffe40000_group/aml-gpu",
+      "sys/platform/hdmi-display-ff900000",
+      "sys/platform/hrtimer-0/aml-hrtimer",
       "sys/platform/i2c-1c000",
+      "sys/platform/i2c-1c000/i2c-1c000_group/aml-i2c/i2c/i2c-1-56/touchscreen-38_group/focaltouch-HidDevice",
       "sys/platform/i2c-5000",
       "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c/i2c-0-24",
       "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c/i2c-0-24/khadas-mcu-18_group/vim3-mcu",
@@ -61,21 +75,55 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy",
       "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/dwc2",
       "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/dwc2/usb-ff400000_group/dwc2",
-      "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/dwc2/usb-ff400000_group/dwc2/usb-peripheral",
+      "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/dwc2/usb-ff400000_group/dwc2/usb-peripheral/function-000/cdc-eth-function",
       "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/xhci",
+      "sys/platform/power-controller/power-controller_group/power-impl/power-core/power-0",
+      "sys/platform/power-controller/power-controller_group/power-impl/power-core/power-0/cpu-controller-0_group/a311d-arm-a53",
+      "sys/platform/power-controller/power-controller_group/power-impl/power-core/power-0/cpu-controller-0_group/a311d-arm-a73",
+      "sys/platform/power-controller/power-controller_group/power-impl/power-core/power-1",
       "sys/platform/pt",
       "sys/platform/pt/dt-root",
-      "sys/platform/pt/suspend",
+      "sys/platform/pt/suspend/aml-suspend-device",
       "sys/platform/pwm-ffd1b000/aml-pwm-device",
       "sys/platform/pwm-ffd1b000/aml-pwm-device/pwm-0/pwm_a-regulator_group/pwm_vreg_big",
       "sys/platform/pwm-ffd1b000/aml-pwm-device/pwm-4/pwm-init_group/aml-pwm-init",
       "sys/platform/pwm-ffd1b000/aml-pwm-device/pwm-9/pwm_a0_d-regulator_group/pwm_vreg_little",
       "sys/platform/register-controller-1000",
-      "sys/platform/usb-ff500000/usb-ff500000_group/xhci/usb-bus",
+      "sys/platform/temperature-sensor-ff634800/temperature-sensor-ff634800_group/aml-trip-device",
+      "sys/platform/temperature-sensor-ff634c00/temperature-sensor-ff634c00_group/aml-trip-device",
+
+      "sys/platform/usb-ff500000/usb-ff500000_group/xhci",
+      // USB 2.0 Hub
+      // Ignored because we've had a spate of vim3 devices that seem to have
+      // broken or flaky root hubs, and we don't make use of the XHCI bus in
+      // any way so we'd rather ignore such failures than cause flakiness or
+      // have to remove more devices from the fleet.
+      // See b/296738636 for more information.
+      // "sys/platform/usb-ff500000/usb-ff500000_group/xhci/usb-bus",
       "sys/platform/video-decoder-ffd00000",
+
+#ifdef include_packaged_drivers
+      // RTC
+      "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c/i2c-0-81/rtc",
+
+      // WLAN
+      "sys/platform/mmc-ffe03000/mmc-ffe03000_group/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi_group/brcmfmac-wlanphyimpl",
+      "sys/platform/mmc-ffe03000/mmc-ffe03000_group/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi_group/brcmfmac-wlanphyimpl/wlanphy",
+
+      // GPU
+      "sys/platform/gpu-ffe40000/gpu-ffe40000_group/aml-gpu",
+#endif
+
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
+
+  static const char* kDisplayDevicePaths[] = {
+      "sys/platform/hdmi-display-ff900000/hdmi-display-ff900000_group/amlogic-display/display-coordinator",
+      "sys/platform/dsi-display-ff900000/dsi-display-ff900000_group/amlogic-display/display-coordinator",
+  };
+  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForOne(
+      cpp20::span(kDisplayDevicePaths, std::size(kDisplayDevicePaths))));
 }
 
 }  // namespace

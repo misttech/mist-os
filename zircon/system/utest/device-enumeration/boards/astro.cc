@@ -12,22 +12,22 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       "sys/platform/pt/astro/post-init/post-init",
       "sys/platform/05:03:1/aml-gpio/gpio",
       "sys/platform/05:03:1/aml-gpio/gpio-init",
-      "sys/platform/00:00:36/astro-buttons/buttons",
+      "sys/platform/astro-buttons/astro-buttons/buttons",
       "sys/platform/05:00:2/i2c-0/aml-i2c",
       "sys/platform/05:00:2:1/i2c-1/aml-i2c",
       "sys/platform/05:00:2:2/i2c-2/aml-i2c",
-      "sys/platform/05:03:17/aml-gpu-composite/aml-gpu",
-      "sys/platform/05:03:18/aml_usb_phy",
-      "sys/platform/05:00:3/bluetooth-composite-spec/aml-uart/bt-transport-uart",
-      "sys/platform/05:00:3/bluetooth-composite-spec/aml-uart/bt-transport-uart/bt-hci-broadcom",
+      "sys/platform/aml_gpu/aml-gpu-composite/aml-gpu",
+      "sys/platform/aml-usb-phy/aml_usb_phy",
+      "sys/platform/bt-uart/bluetooth-composite-spec/aml-uart/bt-transport-uart",
+      "sys/platform/bt-uart/bluetooth-composite-spec/aml-uart/bt-transport-uart/bt-hci-broadcom",
 
       // XHCI driver will not be loaded if we are in USB peripheral mode.
       // "xhci/xhci/usb-bus",
 
       "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
-      "sys/platform/05:03:d/display/amlogic-display/display-coordinator",
-      "sys/platform/05:00:10/aml-canvas",
-      "sys/platform/00:00:e/tee/optee",
+      "sys/platform/display/display/amlogic-display/display-coordinator",
+      "sys/platform/canvas/aml-canvas",
+      "sys/platform/tee/tee/optee",
       "sys/platform/05:00:f/raw_nand/aml-raw_nand/nand/bl2/skip-block",
       "sys/platform/05:00:f/raw_nand/aml-raw_nand/nand/tpl/skip-block",
       "sys/platform/05:00:f/raw_nand/aml-raw_nand/nand/fts/skip-block",
@@ -43,26 +43,26 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       "sys/platform/05:00:7/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
 
       "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
-      "sys/platform/05:03:11/clocks",
-      "sys/platform/05:03:11/clocks/clock-init",
-      "sys/platform/05:03:12:1/aml_tdm/astro-audio-i2s-out",
-      "sys/platform/05:03:13/aml_pdm/astro-audio-pdm-in",
-      "sys/platform/05:03:1a/aml_securemem/aml-securemem",
-      "sys/platform/05:03:1d/aml-pwm-device/pwm-4/pwm_init",
+      "sys/platform/astro-clk/clocks",
+      "sys/platform/astro-clk/clocks/clock-init",
+      "sys/platform/astro-i2s-audio-out/aml_tdm/astro-audio-i2s-out",
+      "sys/platform/astro-audio-pdm-in/aml_pdm/astro-audio-pdm-in",
+      "sys/platform/aml-secure-mem/aml_securemem/aml-securemem",
+      "sys/platform/pwm/aml-pwm-device/pwm-4/pwm_init",
 
       // CPU Device.
-      "sys/platform/03:03:6",
+      "sys/platform/aml-cpu",
       "class/cpu-ctrl/000",
-      "sys/platform/03:03:26/aml-power-impl-composite/power-impl/power-core/power-0/aml_cpu/s905d2-arm-a53",
+      "sys/platform/aml-power-impl-composite/aml-power-impl-composite/power-impl/power-core/power-0/aml_cpu/s905d2-arm-a53",
       // LED.
-      "sys/platform/05:00:1c/aml_light",
+      "sys/platform/gpio-light/aml_light",
       // RAM (DDR) control.
       "sys/platform/05:03:24/ram",
 
       // Power Device.
-      "sys/platform/03:03:26/aml-power-impl-composite",
-      "sys/platform/03:03:26/aml-power-impl-composite/power-impl/power-core",
-      "sys/platform/03:03:26/aml-power-impl-composite/power-impl/power-core/power-0",
+      "sys/platform/aml-power-impl-composite/aml-power-impl-composite",
+      "sys/platform/aml-power-impl-composite/aml-power-impl-composite/power-impl/power-core",
+      "sys/platform/aml-power-impl-composite/aml-power-impl-composite/power-impl/power-core/power-0",
 
       // Thermal
       "sys/platform/05:03:a/thermal",
@@ -81,7 +81,7 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       "class/temperature/003",
 
       // Registers Device.
-      "sys/platform/00:00:29",
+      "sys/platform/registers",
 #ifdef include_packaged_drivers
       "sys/platform/05:03:e/aml_video",
 

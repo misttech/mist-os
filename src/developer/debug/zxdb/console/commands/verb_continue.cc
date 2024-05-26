@@ -22,9 +22,8 @@ namespace {
 constexpr int kForwardSwitchID = 0;
 
 const char kContinueShortHelp[] = "continue / c: Continue a suspended thread or process.";
-const char kContinueHelp[] =
-    R"(continue / c [ --forward / -f ]
-
+const char kContinueUsage[] = "continue / c [ --forward / -f ]";
+const char kContinueHelp[] = R"(
   When a thread is stopped at an exception or a breakpoint, "continue" will
   continue the execution.
 
@@ -110,8 +109,9 @@ void RunVerbContinue(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context
 }  // namespace
 
 VerbRecord GetContinueVerbRecord() {
-  VerbRecord record{&RunVerbContinue, {"continue", "cont", "c"}, kContinueShortHelp,
-                    kContinueHelp,    CommandGroup::kStep,       SourceAffinity::kSource};
+  VerbRecord record{
+      &RunVerbContinue, {"continue", "cont", "c"}, kContinueShortHelp,     kContinueUsage,
+      kContinueHelp,    CommandGroup::kStep,       SourceAffinity::kSource};
   record.switches.emplace_back(kForwardSwitchID, false, "forward", 'f');
   return record;
 }

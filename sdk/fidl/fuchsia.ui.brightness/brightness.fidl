@@ -10,7 +10,7 @@ using zx;
 alias brightness = float32;
 
 /// Control provides an interface to manage the brightness component.
-@discoverable
+@discoverable(server="platform")
 closed protocol Control {
     /// Turns the auto-brightness mode on.
     /// SetManualBrightness will turn it off.

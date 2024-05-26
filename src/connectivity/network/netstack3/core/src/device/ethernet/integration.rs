@@ -32,7 +32,7 @@ use crate::{
     context::{CoreTimerContext, CounterContext},
     device::{
         self,
-        arp::{ArpConfigContext, ArpContext, ArpSenderContext, ArpState},
+        arp::{ArpConfigContext, ArpContext, ArpNudCtx, ArpSenderContext, ArpState},
         ethernet::{
             self, DynamicEthernetDeviceState, EthernetIpLinkDeviceDynamicStateContext,
             EthernetIpLinkDeviceStaticStateContext, EthernetLinkDevice, EthernetTimerId,
@@ -51,12 +51,13 @@ use crate::{
         EthernetDeviceCounters, EthernetDeviceId, EthernetWeakDeviceId,
     },
     ip::{
-        device::nud::{
-            NudConfigContext, NudContext, NudIcmpContext, NudSenderContext, NudState, NudUserConfig,
-        },
         icmp::NdpCounters,
+        nud::{
+            DelegateNudContext, NudConfigContext, NudContext, NudIcmpContext, NudSenderContext,
+            NudState, NudUserConfig, UseDelegateNudContext,
+        },
     },
-    socket::address::SocketIpAddr,
+    socket::SocketIpAddr,
     BindingsContext, BindingsTypes, CoreCtx,
 };
 
@@ -415,6 +416,13 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
             },
         )
     }
+}
+
+impl<BT: BindingsTypes, L> UseDelegateNudContext for CoreCtx<'_, BT, L> {}
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
+    DelegateNudContext<Ipv4> for CoreCtx<'_, BC, L>
+{
+    type Delegate<T> = ArpNudCtx<T>;
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<Ipv4>>>

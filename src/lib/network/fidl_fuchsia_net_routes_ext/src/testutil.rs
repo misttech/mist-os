@@ -370,6 +370,7 @@ pub(crate) mod internal {
                         metric: Some(seed),
                         ..Default::default()
                     }),
+                    table_id: Some(0),
                     ..Default::default()
                 }))
             },
@@ -393,6 +394,7 @@ pub(crate) mod internal {
                         metric: Some(seed),
                         ..Default::default()
                     }),
+                    table_id: Some(0),
                     ..Default::default()
                 }))
             },

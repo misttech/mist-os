@@ -22,7 +22,7 @@ TEST(StreamStorageTest, AddStreamConfigAndGetConfig) {
   camera::StreamStorage stream_storage_;
 
   camera::StreamConstraints constraints(fuchsia::camera2::CameraStreamType::MONITORING);
-  constraints.AddImageFormat(100, 100, fuchsia::sysmem::PixelFormatType::NV12);
+  constraints.AddImageFormat(100, 100, fuchsia::images2::PixelFormat::NV12);
 
   stream_storage_.SetStreamConfigAtIndex(0, constraints.ConvertToStreamConfig());
   stream_storage_.SetStreamConfigAtIndex(1, constraints.ConvertToStreamConfig());
@@ -37,7 +37,7 @@ TEST(StreamStorageTest, AddStreamConfigAndGetConfig_WithGaps) {
   camera::StreamStorage stream_storage_;
 
   camera::StreamConstraints constraints(fuchsia::camera2::CameraStreamType::MONITORING);
-  constraints.AddImageFormat(100, 100, fuchsia::sysmem::PixelFormatType::NV12);
+  constraints.AddImageFormat(100, 100, fuchsia::images2::PixelFormat::NV12);
 
   stream_storage_.SetStreamConfigAtIndex(0, constraints.ConvertToStreamConfig());
   stream_storage_.SetStreamConfigAtIndex(3, constraints.ConvertToStreamConfig());

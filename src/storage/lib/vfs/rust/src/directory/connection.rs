@@ -263,12 +263,6 @@ where
                 .trace(trace::trace_future_args!(c"storage", c"Directory::ReadDirents"))
                 .await?;
             }
-            fio::DirectoryRequest::Enumerate { options: _, iterator, control_handle: _ } => {
-                trace::duration!(c"storage", c"Directory::Enumerate");
-                // TODO(https://fxbug.dev/42157659): Handle unimplemented io2 method.
-                // Suppress any errors in the event a bad `iterator` channel was provided.
-                let _ = iterator.close_with_epitaph(Status::NOT_SUPPORTED);
-            }
             fio::DirectoryRequest::Rewind { responder } => {
                 trace::duration!(c"storage", c"Directory::Rewind");
                 self.seek = Default::default();

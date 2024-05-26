@@ -6,8 +6,8 @@
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire_test_base.h>
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
-#include <fidl/fuchsia.sysmem/cpp/wire_test_base.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire_test_base.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/intelgpucore/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -21,12 +21,10 @@
 #include <lib/zircon-internal/align.h>
 #include <lib/zx/vmar.h>
 
-#include <type_traits>
 #include <vector>
 
 #include <gtest/gtest.h>
 
-#include "lib/fidl/cpp/wire/connect_service.h"
 #include "src/devices/pci/testing/pci_protocol_fake.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/intel-i915/pci-ids.h"
@@ -76,42 +74,57 @@ namespace {
 // TODO(https://fxbug.dev/42072949): Consider creating and using a unified set of sysmem
 // testing doubles instead of writing mocks for each display driver test.
 class MockNoCpuBufferCollection
-    : public fidl::testing::WireTestBase<fuchsia_sysmem::BufferCollection> {
+    : public fidl::testing::WireTestBase<fuchsia_sysmem2::BufferCollection> {
  public:
-  void set_format_modifier(uint64_t format_modifier) { format_modifier_ = format_modifier; }
+  void set_format_modifier(fuchsia_images2::wire::PixelFormatModifier format_modifier) {
+    format_modifier_ = format_modifier;
+  }
 
   bool set_constraints_called() const { return set_constraints_called_; }
   void SetConstraints(SetConstraintsRequestView request,
                       SetConstraintsCompleter::Sync& _completer) override {
     set_constraints_called_ = true;
-    if (!request->has_constraints) {
+    if (!request->has_constraints()) {
       return;
     }
 
-    EXPECT_FALSE(request->constraints.buffer_memory_constraints.inaccessible_domain_supported);
-    EXPECT_FALSE(request->constraints.buffer_memory_constraints.cpu_domain_supported);
-    constraints_ = request->constraints;
+    EXPECT_TRUE(
+        !request->constraints().buffer_memory_constraints().has_inaccessible_domain_supported() ||
+        !request->constraints().buffer_memory_constraints().inaccessible_domain_supported());
+    EXPECT_TRUE(!request->constraints().buffer_memory_constraints().has_cpu_domain_supported() ||
+                !request->constraints().buffer_memory_constraints().cpu_domain_supported());
+    constraints_ = fidl::ToNatural(request->constraints());
   }
 
-  void CheckBuffersAllocated(CheckBuffersAllocatedCompleter::Sync& completer) override {
-    completer.Reply(ZX_OK);
+  void CheckAllBuffersAllocated(CheckAllBuffersAllocatedCompleter::Sync& completer) override {
+    completer.Reply(fit::ok());
   }
 
-  void WaitForBuffersAllocated(WaitForBuffersAllocatedCompleter::Sync& completer) override {
-    fuchsia_sysmem::wire::BufferCollectionInfo2 info;
-    info.settings.has_image_format_constraints = true;
-    auto& constraints = info.settings.image_format_constraints;
-    for (size_t i = 0; i < constraints_.image_format_constraints_count; i++) {
-      if (constraints_.image_format_constraints[i].pixel_format.format_modifier.value ==
+  void WaitForAllBuffersAllocated(WaitForAllBuffersAllocatedCompleter::Sync& completer) override {
+    auto info = fuchsia_sysmem2::wire::BufferCollectionInfo::Builder(arena_);
+
+    for (size_t i = 0; i < constraints_.image_format_constraints()->size(); i++) {
+      if (constraints_.image_format_constraints()->at(i).pixel_format_modifier() ==
           format_modifier_) {
-        constraints = constraints_.image_format_constraints[i];
+        auto& constraints = constraints_.image_format_constraints()->at(i);
+        constraints.bytes_per_row_divisor(kBytesPerRowDivisor);
+        info.settings(fuchsia_sysmem2::wire::SingleBufferSettings::Builder(arena_)
+                          .image_format_constraints(fidl::ToWire(arena_, constraints))
+                          .Build());
         break;
       }
     }
-    constraints.bytes_per_row_divisor = kBytesPerRowDivisor;
-    info.buffer_count = 1;
-    EXPECT_OK(zx::vmo::create(kBytesPerRowDivisor * kImageHeight, 0, &info.buffers[0].vmo));
-    completer.Reply(ZX_OK, std::move(info));
+    zx::vmo vmo;
+    EXPECT_OK(zx::vmo::create(kBytesPerRowDivisor * kImageHeight, 0, &vmo));
+    info.buffers(std::vector{fuchsia_sysmem2::wire::VmoBuffer::Builder(arena_)
+                                 .vmo(std::move(vmo))
+                                 .vmo_usable_start(0)
+                                 .Build()});
+    auto response =
+        fuchsia_sysmem2::wire::BufferCollectionWaitForAllBuffersAllocatedResponse::Builder(arena_)
+            .buffer_collection_info(info.Build())
+            .Build();
+    completer.Reply(fit::ok(&response));
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
@@ -119,12 +132,14 @@ class MockNoCpuBufferCollection
   }
 
  private:
+  fidl::Arena<fidl::kDefaultArenaInitialCapacity> arena_;
   bool set_constraints_called_ = false;
-  uint64_t format_modifier_ = fuchsia_sysmem::wire::kFormatModifierLinear;
-  fuchsia_sysmem::wire::BufferCollectionConstraints constraints_;
+  fuchsia_images2::wire::PixelFormatModifier format_modifier_ =
+      fuchsia_images2::wire::PixelFormatModifier::kLinear;
+  fuchsia_sysmem2::BufferCollectionConstraints constraints_;
 };
 
-class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocator> {
+class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem2::Allocator> {
  public:
   explicit MockAllocator(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {
     EXPECT_TRUE(dispatcher_);
@@ -132,23 +147,23 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
 
   void BindSharedCollection(BindSharedCollectionRequestView request,
                             BindSharedCollectionCompleter::Sync& completer) override {
-    const std::vector<fuchsia_sysmem::wire::PixelFormatType> kPixelFormatTypes = {
-        fuchsia_sysmem::wire::PixelFormatType::kBgra32,
-        fuchsia_sysmem::wire::PixelFormatType::kR8G8B8A8};
+    const std::vector<fuchsia_images2::wire::PixelFormat> kPixelFormatTypes = {
+        fuchsia_images2::wire::PixelFormat::kB8G8R8A8,
+        fuchsia_images2::wire::PixelFormat::kR8G8B8A8};
 
     display::DriverBufferCollectionId buffer_collection_id = next_buffer_collection_id_++;
     active_buffer_collections_[buffer_collection_id] = {
-        .token_client = std::move(request->token),
+        .token_client = std::move(request->token()),
         .mock_buffer_collection = std::make_unique<MockNoCpuBufferCollection>(),
     };
     most_recent_buffer_collection_ =
         active_buffer_collections_.at(buffer_collection_id).mock_buffer_collection.get();
 
     fidl::BindServer(
-        dispatcher_, std::move(request->buffer_collection_request),
+        dispatcher_, std::move(request->buffer_collection_request()),
         active_buffer_collections_[buffer_collection_id].mock_buffer_collection.get(),
         [this, buffer_collection_id](MockNoCpuBufferCollection*, fidl::UnbindInfo,
-                                     fidl::ServerEnd<fuchsia_sysmem::BufferCollection>) {
+                                     fidl::ServerEnd<fuchsia_sysmem2::BufferCollection>) {
           inactive_buffer_collection_tokens_.push_back(
               std::move(active_buffer_collections_[buffer_collection_id].token_client));
           active_buffer_collections_.erase(buffer_collection_id);
@@ -157,7 +172,7 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
 
   void SetDebugClientInfo(SetDebugClientInfoRequestView request,
                           SetDebugClientInfoCompleter::Sync& completer) override {
-    EXPECT_EQ(request->name.get().find("intel-i915"), 0u);
+    EXPECT_EQ(request->name().get().find("intel-i915"), 0u);
   }
 
   // Returns the most recent created BufferCollection server.
@@ -166,9 +181,9 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
     return most_recent_buffer_collection_;
   }
 
-  std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+  std::vector<fidl::UnownedClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
   GetActiveBufferCollectionTokenClients() const {
-    std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+    std::vector<fidl::UnownedClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
         unowned_token_clients;
     unowned_token_clients.reserve(active_buffer_collections_.size());
 
@@ -178,9 +193,9 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
     return unowned_token_clients;
   }
 
-  std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+  std::vector<fidl::UnownedClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
   GetInactiveBufferCollectionTokenClients() const {
-    std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+    std::vector<fidl::UnownedClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
         unowned_token_clients;
     unowned_token_clients.reserve(inactive_buffer_collection_tokens_.size());
 
@@ -196,14 +211,14 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
 
  private:
   struct BufferCollection {
-    fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> token_client;
+    fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> token_client;
     std::unique_ptr<MockNoCpuBufferCollection> mock_buffer_collection;
   };
 
   MockNoCpuBufferCollection* most_recent_buffer_collection_ = nullptr;
   std::unordered_map<display::DriverBufferCollectionId, BufferCollection>
       active_buffer_collections_;
-  std::vector<fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+  std::vector<fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
       inactive_buffer_collection_tokens_;
 
   display::DriverBufferCollectionId next_buffer_collection_id_ =
@@ -238,7 +253,7 @@ class IntegrationTest : public ::testing::Test, public loop_fixture::RealLoop {
 
     parent_ = MockDevice::FakeRootParent();
 
-    parent_->AddNsProtocol<fuchsia_sysmem::Allocator>(sysmem_.bind_handler(dispatcher()));
+    parent_->AddNsProtocol<fuchsia_sysmem2::Allocator>(sysmem_.bind_handler(dispatcher()));
 
     zx::result service_result = outgoing_.AddService<fuchsia_hardware_pci::Service>(
         fuchsia_hardware_pci::Service::InstanceHandler(
@@ -286,7 +301,7 @@ class FakeSysmemSingleThreadedTest : public testing::Test {
         display_(nullptr) {}
 
   void SetUp() override {
-    auto [sysmem_client, sysmem_server] = fidl::Endpoints<fuchsia_sysmem::Allocator>::Create();
+    auto [sysmem_client, sysmem_server] = fidl::Endpoints<fuchsia_sysmem2::Allocator>::Create();
     fidl::BindServer(loop_.dispatcher(), std::move(sysmem_server), &sysmem_);
 
     ASSERT_OK(display_.SetAndInitSysmemForTesting(fidl::WireSyncClient(std::move(sysmem_client))));
@@ -311,9 +326,9 @@ using ControllerWithFakeSysmemTest = FakeSysmemSingleThreadedTest;
 TEST_F(ControllerWithFakeSysmemTest, ImportBufferCollection) {
   const MockAllocator& allocator = sysmem_;
 
-  zx::result token1_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+  zx::result token1_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token1_endpoints.is_ok());
-  zx::result token2_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+  zx::result token2_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token2_endpoints.is_ok());
 
   // Test ImportBufferCollection().
@@ -400,7 +415,7 @@ TEST(IntelI915Display, ImportImage) {
 
   // Prepare fake sysmem.
   MockAllocator fake_sysmem(loop.dispatcher());
-  auto [sysmem_client, sysmem_server] = fidl::Endpoints<fuchsia_sysmem::Allocator>::Create();
+  auto [sysmem_client, sysmem_server] = fidl::Endpoints<fuchsia_sysmem2::Allocator>::Create();
   fidl::BindServer(loop.dispatcher(), std::move(sysmem_server), &fake_sysmem);
 
   // Prepare fake PCI.
@@ -425,7 +440,7 @@ TEST(IntelI915Display, ImportImage) {
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
   EXPECT_OK(display.DisplayControllerImplImportBufferCollection(
       kBanjoBufferCollectionId, token_endpoints->client.TakeChannel()));
@@ -483,7 +498,7 @@ TEST(IntelI915Display, ImportImage) {
 }
 
 TEST_F(ControllerWithFakeSysmemTest, SysmemRequirements) {
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
@@ -509,7 +524,7 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemRequirements) {
 }
 
 TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidType) {
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
@@ -613,7 +628,7 @@ TEST_F(IntegrationTest, SysmemImport) {
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
   EXPECT_OK(ctx->DisplayControllerImplImportBufferCollection(
       kBanjoBufferCollectionId, token_endpoints->client.TakeChannel()));
@@ -662,7 +677,7 @@ TEST_F(IntegrationTest, SysmemRotated) {
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
   EXPECT_OK(ctx->DisplayControllerImplImportBufferCollection(
       kBanjoBufferCollectionId, token_endpoints->client.TakeChannel()));
@@ -672,7 +687,7 @@ TEST_F(IntegrationTest, SysmemRotated) {
   MockAllocator& allocator = *sysmem();
   MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
   ASSERT_TRUE(collection);
-  collection->set_format_modifier(fuchsia_sysmem::wire::kFormatModifierIntelI915YTiled);
+  collection->set_format_modifier(fuchsia_images2::wire::PixelFormatModifier::kIntelI915YTiled);
 
   static constexpr image_buffer_usage_t kTiledDisplayUsage = {
       // Must be y or yf tiled so rotation is allowed.

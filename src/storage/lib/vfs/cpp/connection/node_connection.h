@@ -51,18 +51,14 @@ class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_
   void SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) final;
   void QueryFilesystem(QueryFilesystemCompleter::Sync& completer) final;
   void GetAttributes(fuchsia_io::wire::Node2GetAttributesRequest* request,
-                     GetAttributesCompleter::Sync& completer) final {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
+                     GetAttributesCompleter::Sync& completer) final;
   void UpdateAttributes(fuchsia_io::wire::MutableNodeAttributes* request,
-                        UpdateAttributesCompleter::Sync& completer) final {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
+                        UpdateAttributesCompleter::Sync& completer) final;
   void Reopen(fuchsia_io::wire::Node2ReopenRequest* request,
               ReopenCompleter::Sync& completer) final {
     request->object_request.Close(ZX_ERR_NOT_SUPPORTED);
   }
-#if __Fuchsia_API_level__ >= 18
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
   void ListExtendedAttributes(ListExtendedAttributesRequestView request,
                               ListExtendedAttributesCompleter::Sync& completer) final {
     request->iterator.Close(ZX_ERR_NOT_SUPPORTED);

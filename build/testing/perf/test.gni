@@ -47,6 +47,18 @@ performance_testing_environments = [
 #     Type: string
 #     Default: "fuchsia-controller"
 #
+#   data_sources (optional)
+#     See build/python/python_binary.gni
+#
+#   data_package_name (optional)
+#     See build/python/python_binary.gni
+#     Default: "test_data"
+#
+#   test_data_deps (optional)
+#    List of GN targets that are needed to build the data sources.
+#    Type: list(string)
+#    Default: empty list
+#
 #   timeout_secs (optional)
 #     See test_spec in build/testing/test_spec.gni
 #
@@ -64,6 +76,18 @@ template("python_perf_test") {
            "expected_metric_names_filepaths is required")
 
     _test_target_name = "${target_name}_test"
+
+    # Include expected metric files as data sources.
+    _data_sources = invoker.expected_metric_names_filepaths
+    if (defined(invoker.data_sources)) {
+      _data_sources += invoker.data_sources
+    }
+
+    # TODO(b/340319757): Conditionally require this after soft-transition.
+    _data_package_name = "test_data"
+    if (defined(invoker.data_package_name)) {
+      _data_package_name = invoker.data_package_name
+    }
 
     if (invoker.expected_metric_names_filepaths != []) {
       # host_test_data()'s internals require non-empty `sources`
@@ -112,8 +136,11 @@ template("python_perf_test") {
                                "main_source",
                                "params",
                                "params_source",
+                               "test_data_deps",
                                "timeout_secs",
                              ])
+      data_sources = _data_sources
+      data_package_name = _data_package_name
 
       if (defined(invoker.libraries)) {
         libraries = invoker.libraries
@@ -272,6 +299,10 @@ template("fuchsia_component_perf_test") {
                              "enable_mypy",
                            ])
 
+    # LINT.IfChange
+    data_package_name = "test_data"
+
+    # LINT.ThenChange(//src/performance/lib/perf_test/fuchsia_component_perf_test.py)
     expected_metric_names_filepaths = [ invoker.expected_metric_names_filepath ]
     main_source =
         "//src/performance/lib/perf_test/fuchsia_component_perf_test.py"

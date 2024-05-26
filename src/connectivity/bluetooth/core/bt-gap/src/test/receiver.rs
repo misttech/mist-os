@@ -9,7 +9,8 @@ use async_helpers::hanging_get::asynchronous as hanging_get;
 use fidl::endpoints::{self, Responder};
 use fidl_fuchsia_bluetooth_gatt2::Server_Request;
 use fidl_fuchsia_bluetooth_host::{
-    HostMarker, HostRequest, HostRequestStream, PeerWatcherMarker, ProtocolRequest, ReceiverMarker,
+    BondingDelegateMarker, HostMarker, HostRequest, HostRequestStream, PeerWatcherMarker,
+    ProtocolRequest, ReceiverMarker,
 };
 use fidl_fuchsia_bluetooth_sys::{HostInfo as FidlHostInfo, TechnologyType};
 use fuchsia_async as fasync;
@@ -22,6 +23,8 @@ use tracing::info;
 async fn handle_host_requests(id: HostId, mut stream: HostRequestStream) {
     let mut first_state_req = true;
     let mut peer_watcher_server: Option<fidl::endpoints::ServerEnd<PeerWatcherMarker>> = None;
+    let mut bonding_delegate_server: Option<fidl::endpoints::ServerEnd<BondingDelegateMarker>> =
+        None;
     while let Some(request) = stream.try_next().await.expect("Invalid Host request") {
         match request {
             HostRequest::WatchState { responder } => {
@@ -87,6 +90,11 @@ async fn handle_host_requests(id: HostId, mut stream: HostRequestStream) {
                 info!("SetPeerWatcher");
                 assert!(!peer_watcher_server.is_some());
                 peer_watcher_server = Some(peer_watcher);
+            }
+            HostRequest::SetBondingDelegate { delegate, .. } => {
+                info!("SetBondingDelegate");
+                assert!(!bonding_delegate_server.is_some());
+                bonding_delegate_server = Some(delegate);
             }
             x => panic!("Unexpected host server request: {:?}", x),
         }

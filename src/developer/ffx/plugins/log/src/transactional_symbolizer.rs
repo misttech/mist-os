@@ -25,7 +25,9 @@ use tokio::{
     process::{Child, ChildStdin, ChildStdout, Command},
 };
 
-use crate::{condition_variable::LocalConditionVariable, mutex::LocalOrderedMutex};
+use crate::{
+    condition_variable::LocalConditionVariable, error::LogError, mutex::LocalOrderedMutex,
+};
 
 /// Connection to a symbolizer.
 pub trait SymbolizerProcess {
@@ -259,9 +261,11 @@ pub struct RealSymbolizerProcess {
 
 impl RealSymbolizerProcess {
     /// Constructs a new symbolizer.
-    pub async fn new(enable_prettification: bool) -> anyhow::Result<Self> {
-        let sdk =
-            global_env_context().context("Loading global environment context")?.get_sdk().await?;
+    pub async fn new(enable_prettification: bool) -> Result<Self, LogError> {
+        let sdk = global_env_context().unwrap().get_sdk().await.map_err(|err| {
+            tracing::warn!(?err, "Failed to get SDK");
+            LogError::SdkNotAvailable { msg: "not found" }
+        })?;
         if let Err(e) = ensure_symbol_index_registered(&sdk).await {
             tracing::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
         }
@@ -276,7 +280,10 @@ impl RealSymbolizerProcess {
         if enable_prettification {
             args.push("--prettify-backtrace");
         }
-        let path = sdk.get_host_tool("symbolizer").context("getting symbolizer binary path")?;
+        let path = sdk.get_host_tool("symbolizer").map_err(|err| {
+            tracing::warn!(?err, "Failed to get symbolizer binary");
+            LogError::SdkNotAvailable { msg: "symbolizer not found" }
+        })?;
         let c = Command::new(path)
             .args(args)
             .stdout(Stdio::piped())

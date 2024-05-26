@@ -115,48 +115,6 @@ bt::sdp::DataElement MakeL2capProtocolListElement() {
   return protocol_list_el;
 }
 
-class FakeScoConnectionReceiver : public fidlbredr::testing::ScoConnectionReceiver_TestBase {
- public:
-  FakeScoConnectionReceiver(fidl::InterfaceRequest<ScoConnectionReceiver> request,
-                            async_dispatcher_t* dispatcher)
-      : binding_(this, std::move(request), dispatcher), connected_count_(0), error_count_(0) {}
-
-  void Connected(fidlbredr::ScoConnectionHandle connection,
-                 fidlbredr::ScoConnectionParameters params) override {
-    connection_.Bind(std::move(connection));
-    parameters_ = std::move(params);
-    connected_count_++;
-  }
-  void Error(fidlbredr::ScoErrorCode error) override {
-    error_ = error;
-    error_count_++;
-  }
-
-  void Close() { binding_.Close(ZX_ERR_PEER_CLOSED); }
-
-  size_t connected_count() const { return connected_count_; }
-  const fidlbredr::ScoConnectionPtr& connection() const { return connection_; }
-  fidlbredr::ScoConnectionPtr take_connection() { return std::move(connection_); }
-  const std::optional<fidlbredr::ScoConnectionParameters>& parameters() const {
-    return parameters_;
-  }
-
-  size_t error_count() const { return error_count_; }
-  const std::optional<fidlbredr::ScoErrorCode>& error() const { return error_; }
-
- private:
-  fidl::Binding<ScoConnectionReceiver> binding_;
-  size_t connected_count_;
-  fidlbredr::ScoConnectionPtr connection_;
-  std::optional<fidlbredr::ScoConnectionParameters> parameters_;
-  std::optional<uint16_t> max_tx_data_size_;
-  size_t error_count_;
-  std::optional<fidlbredr::ScoErrorCode> error_;
-  void NotImplemented_(const std::string& name) override {
-    FAIL() << name << " is not implemented";
-  }
-};
-
 using TestingBase = bthost::testing::AdapterTestFixture;
 class ProfileServerTest : public TestingBase {
  public:
@@ -511,23 +469,35 @@ class ProfileServerTestScoConnected : public ProfileServerTestConnectedPeer {
     std::vector<fidlbredr::ScoConnectionParameters> sco_params_list;
     sco_params_list.emplace_back(std::move(conn_params));
 
-    fidlbredr::ScoConnectionReceiverHandle receiver_handle;
-    FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
     fidlbredr::ProfileConnectScoRequest request;
     request.set_peer_id(fuchsia::bluetooth::PeerId{peer()->identifier().value()});
     request.set_initiator(false);
     request.set_params(std::move(sco_params_list));
-    request.set_receiver(std::move(receiver_handle));
-    client()->ConnectSco(std::move(request));
-    RunLoopUntilIdle();
-    test_device()->SendConnectionRequest(peer()->address(), pw::bluetooth::emboss::LinkType::SCO);
-    RunLoopUntilIdle();
-    ASSERT_TRUE(receiver.connection().is_bound());
-    sco_connection_ = receiver.take_connection();
+    fidlbredr::ScoConnectionHandle connection_handle;
+    request.set_connection(connection_handle.NewRequest());
+
+    sco_connection_ = connection_handle.Bind();
     sco_connection_.set_error_handler([this](zx_status_t status) {
       sco_connection_ = nullptr;
       sco_conn_error_ = status;
     });
+
+    std::optional<fidlbredr::ScoConnectionOnConnectionCompleteRequest> connection_complete;
+    sco_connection_.events().OnConnectionComplete =
+        [&](fidlbredr::ScoConnectionOnConnectionCompleteRequest request) {
+          connection_complete = std::move(request);
+        };
+
+    client()->ConnectSco(std::move(request));
+    RunLoopUntilIdle();
+    test_device()->SendConnectionRequest(peer()->address(), pw::bluetooth::emboss::LinkType::SCO);
+    RunLoopUntilIdle();
+    ASSERT_TRUE(connection_complete.has_value());
+    ASSERT_TRUE(connection_complete->is_connected_params());
+
+    // OnConnectionComplete should never be called again.
+    sco_connection_.events().OnConnectionComplete =
+        [](fidlbredr::ScoConnectionOnConnectionCompleteRequest request) { FAIL(); };
 
     // Find the link handle used for the SCO connection.
     bt::testing::FakePeer* fake_peer = test_device()->FindPeer(peer()->address());
@@ -973,18 +943,28 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectionReceiverReturnsValidSocket) {
 TEST_F(ProfileServerTest, ConnectScoWithInvalidParameters) {
   std::vector<fidlbredr::ScoConnectionParameters> bad_sco_params;
   bad_sco_params.emplace_back();
-  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
-  FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
   fidlbredr::ProfileConnectScoRequest request;
   request.set_peer_id(fuchsia::bluetooth::PeerId{1});
   request.set_initiator(true);
   request.set_params(std::move(bad_sco_params));
-  request.set_receiver(std::move(receiver_handle));
+  fidlbredr::ScoConnectionHandle connection_handle;
+  request.set_connection(connection_handle.NewRequest());
+
+  fidlbredr::ScoConnectionPtr sco_connection = connection_handle.Bind();
+  std::optional<zx_status_t> sco_connection_status;
+  sco_connection.set_error_handler([&](zx_status_t status) { sco_connection_status = status; });
+  std::optional<fidlbredr::ScoConnectionOnConnectionCompleteRequest> connection_complete;
+  sco_connection.events().OnConnectionComplete =
+      [&](fidlbredr::ScoConnectionOnConnectionCompleteRequest request) {
+        connection_complete = std::move(request);
+      };
+
   client()->ConnectSco(std::move(request));
   RunLoopUntilIdle();
-  ASSERT_TRUE(receiver.error().has_value());
-  EXPECT_EQ(receiver.error().value(), fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
-  EXPECT_FALSE(receiver.connection().is_bound());
+  ASSERT_TRUE(connection_complete);
+  ASSERT_TRUE(connection_complete->is_error());
+  EXPECT_EQ(connection_complete->error(), fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
+  EXPECT_FALSE(sco_connection.is_bound());
 }
 
 TEST_F(ProfileServerTest, ConnectScoWithMissingPeerId) {
@@ -992,26 +972,34 @@ TEST_F(ProfileServerTest, ConnectScoWithMissingPeerId) {
   EXPECT_TRUE(fidl_helpers::FidlToScoParameters(sco_params).is_ok());
   std::vector<fidlbredr::ScoConnectionParameters> sco_params_list;
   sco_params_list.emplace_back(std::move(sco_params));
-  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
-  FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
   fidlbredr::ProfileConnectScoRequest request;
   request.set_initiator(true);
   request.set_params(std::move(sco_params_list));
-  request.set_receiver(std::move(receiver_handle));
+  fidlbredr::ScoConnectionHandle connection_handle;
+  request.set_connection(connection_handle.NewRequest());
+
+  fidlbredr::ScoConnectionPtr sco_connection = connection_handle.Bind();
+  std::optional<zx_status_t> sco_connection_status;
+  sco_connection.set_error_handler([&](zx_status_t status) { sco_connection_status = status; });
+  std::optional<fidlbredr::ScoConnectionOnConnectionCompleteRequest> connection_complete;
+  sco_connection.events().OnConnectionComplete =
+      [&](fidlbredr::ScoConnectionOnConnectionCompleteRequest request) {
+        connection_complete = std::move(request);
+      };
+
   client()->ConnectSco(std::move(request));
   RunLoopUntilIdle();
-  ASSERT_TRUE(receiver.error().has_value());
-  EXPECT_EQ(receiver.error().value(), fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
-  EXPECT_FALSE(receiver.connection().is_bound());
+  ASSERT_TRUE(connection_complete);
+  ASSERT_TRUE(connection_complete->is_error());
+  EXPECT_EQ(connection_complete->error(), fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
+  EXPECT_FALSE(sco_connection.is_bound());
 }
 
-TEST_F(ProfileServerTest, ConnectScoWithMissingReceiverDoesNotCrash) {
+TEST_F(ProfileServerTest, ConnectScoWithMissingConnectionDoesNotCrash) {
   fidlbredr::ScoConnectionParameters sco_params = CreateScoConnectionParameters();
   EXPECT_TRUE(fidl_helpers::FidlToScoParameters(sco_params).is_ok());
   std::vector<fidlbredr::ScoConnectionParameters> sco_params_list;
   sco_params_list.emplace_back(std::move(sco_params));
-  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
-  FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
   fidlbredr::ProfileConnectScoRequest request;
   request.set_peer_id(fuchsia::bluetooth::PeerId{1});
   request.set_initiator(true);
@@ -1021,18 +1009,30 @@ TEST_F(ProfileServerTest, ConnectScoWithMissingReceiverDoesNotCrash) {
 }
 
 TEST_F(ProfileServerTest, ConnectScoWithEmptyParameters) {
-  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
-  FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
+  fidlbredr::ScoConnectionHandle connection_handle;
   fidlbredr::ProfileConnectScoRequest request;
   request.set_peer_id(fuchsia::bluetooth::PeerId{1});
   request.set_initiator(true);
   request.set_params({});
-  request.set_receiver(std::move(receiver_handle));
+  request.set_connection(connection_handle.NewRequest());
+
+  fidlbredr::ScoConnectionPtr sco_connection = connection_handle.Bind();
+  std::optional<zx_status_t> sco_connection_status;
+  sco_connection.set_error_handler([&](zx_status_t status) { sco_connection_status = status; });
+  std::optional<fidlbredr::ScoConnectionOnConnectionCompleteRequest> connection_complete;
+  sco_connection.events().OnConnectionComplete =
+      [&](fidlbredr::ScoConnectionOnConnectionCompleteRequest request) {
+        connection_complete = std::move(request);
+      };
+
   client()->ConnectSco(std::move(request));
   RunLoopUntilIdle();
-  ASSERT_TRUE(receiver.error().has_value());
-  EXPECT_EQ(receiver.error().value(), fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
-  EXPECT_FALSE(receiver.connection().is_bound());
+  ASSERT_TRUE(connection_complete);
+  ASSERT_TRUE(connection_complete->is_error());
+  EXPECT_EQ(connection_complete->error(), fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
+  EXPECT_FALSE(sco_connection.is_bound());
+  ASSERT_TRUE(sco_connection_status);
+  EXPECT_EQ(sco_connection_status.value(), ZX_ERR_PEER_CLOSED);
 }
 
 TEST_F(ProfileServerTest, ConnectScoInitiatorWithTooManyParameters) {
@@ -1040,18 +1040,30 @@ TEST_F(ProfileServerTest, ConnectScoInitiatorWithTooManyParameters) {
   sco_params_list.emplace_back(CreateScoConnectionParameters());
   sco_params_list.emplace_back(CreateScoConnectionParameters());
 
-  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
-  FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
+  fidlbredr::ScoConnectionHandle connection_handle;
   fidlbredr::ProfileConnectScoRequest request;
   request.set_peer_id(fuchsia::bluetooth::PeerId{1});
   request.set_initiator(true);
   request.set_params(std::move(sco_params_list));
-  request.set_receiver(std::move(receiver_handle));
+  request.set_connection(connection_handle.NewRequest());
+
+  fidlbredr::ScoConnectionPtr sco_connection = connection_handle.Bind();
+  std::optional<zx_status_t> sco_connection_status;
+  sco_connection.set_error_handler([&](zx_status_t status) { sco_connection_status = status; });
+  std::optional<fidlbredr::ScoConnectionOnConnectionCompleteRequest> connection_complete;
+  sco_connection.events().OnConnectionComplete =
+      [&](fidlbredr::ScoConnectionOnConnectionCompleteRequest request) {
+        connection_complete = std::move(request);
+      };
+
   client()->ConnectSco(std::move(request));
   RunLoopUntilIdle();
-  ASSERT_TRUE(receiver.error().has_value());
-  EXPECT_EQ(receiver.error().value(), fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
-  EXPECT_FALSE(receiver.connection().is_bound());
+  ASSERT_TRUE(connection_complete);
+  ASSERT_TRUE(connection_complete->is_error());
+  EXPECT_EQ(connection_complete->error(), fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
+  EXPECT_FALSE(sco_connection.is_bound());
+  ASSERT_TRUE(sco_connection_status);
+  EXPECT_EQ(sco_connection_status.value(), ZX_ERR_PEER_CLOSED);
 }
 
 TEST_F(ProfileServerTest, ConnectScoWithUnconnectedPeerReturnsError) {
@@ -1060,18 +1072,30 @@ TEST_F(ProfileServerTest, ConnectScoWithUnconnectedPeerReturnsError) {
   std::vector<fidlbredr::ScoConnectionParameters> sco_params_list;
   sco_params_list.emplace_back(std::move(sco_params));
 
-  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
-  FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
+  fidlbredr::ScoConnectionHandle connection_handle;
   fidlbredr::ProfileConnectScoRequest request;
   request.set_peer_id(fuchsia::bluetooth::PeerId{1});
   request.set_initiator(true);
   request.set_params(std::move(sco_params_list));
-  request.set_receiver(std::move(receiver_handle));
+  request.set_connection(connection_handle.NewRequest());
+
+  fidlbredr::ScoConnectionPtr sco_connection = connection_handle.Bind();
+  std::optional<zx_status_t> sco_connection_status;
+  sco_connection.set_error_handler([&](zx_status_t status) { sco_connection_status = status; });
+  std::optional<fidlbredr::ScoConnectionOnConnectionCompleteRequest> connection_complete;
+  sco_connection.events().OnConnectionComplete =
+      [&](fidlbredr::ScoConnectionOnConnectionCompleteRequest request) {
+        connection_complete = std::move(request);
+      };
+
   client()->ConnectSco(std::move(request));
   RunLoopUntilIdle();
-  ASSERT_TRUE(receiver.error().has_value());
-  EXPECT_EQ(receiver.error().value(), fidlbredr::ScoErrorCode::FAILURE);
-  EXPECT_FALSE(receiver.connection().is_bound());
+  ASSERT_TRUE(connection_complete);
+  ASSERT_TRUE(connection_complete->is_error());
+  EXPECT_EQ(connection_complete->error(), fidlbredr::ScoErrorCode::FAILURE);
+  EXPECT_FALSE(sco_connection.is_bound());
+  ASSERT_TRUE(sco_connection_status);
+  EXPECT_EQ(sco_connection_status.value(), ZX_ERR_PEER_CLOSED);
 }
 
 TEST_F(ProfileServerTestConnectedPeer, ConnectScoInitiatorSuccess) {
@@ -1081,22 +1105,33 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectScoInitiatorSuccess) {
   std::vector<fidlbredr::ScoConnectionParameters> sco_params_list;
   sco_params_list.emplace_back(std::move(sco_params));
 
-  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
-  FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
+  fidlbredr::ScoConnectionHandle connection_handle;
   fidlbredr::ProfileConnectScoRequest request;
   request.set_peer_id(fuchsia::bluetooth::PeerId{peer()->identifier().value()});
   request.set_initiator(true);
   request.set_params(std::move(sco_params_list));
-  request.set_receiver(std::move(receiver_handle));
+  request.set_connection(connection_handle.NewRequest());
+
+  fidlbredr::ScoConnectionPtr sco_connection = connection_handle.Bind();
+  std::optional<zx_status_t> sco_connection_status;
+  sco_connection.set_error_handler([&](zx_status_t status) { sco_connection_status = status; });
+  std::optional<fidlbredr::ScoConnectionOnConnectionCompleteRequest> connection_complete;
+  sco_connection.events().OnConnectionComplete =
+      [&](fidlbredr::ScoConnectionOnConnectionCompleteRequest request) {
+        connection_complete = std::move(request);
+      };
+
   client()->ConnectSco(std::move(request));
   RunLoopUntilIdle();
-  EXPECT_FALSE(receiver.error().has_value());
-  ASSERT_TRUE(receiver.connection().is_bound());
-  ASSERT_TRUE(receiver.parameters().has_value());
-  ASSERT_TRUE(receiver.parameters()->has_parameter_set());
-  EXPECT_EQ(receiver.parameters()->parameter_set(), fidlbredr::HfpParameterSet::T1);
-  ASSERT_TRUE(receiver.parameters()->has_max_tx_data_size());
-  EXPECT_EQ(receiver.parameters()->max_tx_data_size(), kSynchronousDataPacketLength);
+  ASSERT_TRUE(connection_complete);
+  ASSERT_TRUE(connection_complete->is_connected_params());
+  EXPECT_TRUE(sco_connection.is_bound());
+  ASSERT_TRUE(connection_complete->connected_params().has_parameter_set());
+  EXPECT_EQ(connection_complete->connected_params().parameter_set(),
+            fidlbredr::HfpParameterSet::T1);
+  ASSERT_TRUE(connection_complete->connected_params().has_max_tx_data_size());
+  EXPECT_EQ(connection_complete->connected_params().max_tx_data_size(),
+            kSynchronousDataPacketLength);
 }
 
 TEST_F(ProfileServerTestConnectedPeer, ConnectScoResponderSuccess) {
@@ -1107,63 +1142,155 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectScoResponderSuccess) {
   sco_params_list.emplace_back(CreateScoConnectionParameters(fidlbredr::HfpParameterSet::T2));
   sco_params_list.emplace_back(CreateScoConnectionParameters(fidlbredr::HfpParameterSet::D0));
 
-  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
-  FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
+  fidlbredr::ScoConnectionHandle connection_handle;
   fidlbredr::ProfileConnectScoRequest request;
   request.set_peer_id(fuchsia::bluetooth::PeerId{peer()->identifier().value()});
   request.set_initiator(false);
   request.set_params(std::move(sco_params_list));
-  request.set_receiver(std::move(receiver_handle));
+  request.set_connection(connection_handle.NewRequest());
+
+  fidlbredr::ScoConnectionPtr sco_connection = connection_handle.Bind();
+  std::optional<zx_status_t> sco_connection_status;
+  sco_connection.set_error_handler([&](zx_status_t status) { sco_connection_status = status; });
+  std::optional<fidlbredr::ScoConnectionOnConnectionCompleteRequest> connection_complete;
+  sco_connection.events().OnConnectionComplete =
+      [&](fidlbredr::ScoConnectionOnConnectionCompleteRequest request) {
+        connection_complete = std::move(request);
+      };
+
   client()->ConnectSco(std::move(request));
   RunLoopUntilIdle();
   // Receive a SCO connection request. The D0 parameters will be used to accept the request.
   test_device()->SendConnectionRequest(peer()->address(), pw::bluetooth::emboss::LinkType::SCO);
   RunLoopUntilIdle();
-  EXPECT_FALSE(receiver.error().has_value());
-  ASSERT_TRUE(receiver.connection().is_bound());
-  ASSERT_TRUE(receiver.parameters().has_value());
-  ASSERT_TRUE(receiver.parameters()->has_parameter_set());
-  EXPECT_EQ(receiver.parameters()->parameter_set(), fidlbredr::HfpParameterSet::D0);
+  ASSERT_TRUE(connection_complete);
+  ASSERT_TRUE(connection_complete->is_connected_params());
+  EXPECT_TRUE(sco_connection.is_bound());
+  ASSERT_TRUE(connection_complete->connected_params().has_parameter_set());
+  EXPECT_EQ(connection_complete->connected_params().parameter_set(),
+            fidlbredr::HfpParameterSet::D0);
+}
+
+TEST_F(ProfileServerTestConnectedPeer, ScoConnectionReadBeforeConnectionComplete) {
+  std::vector<fidlbredr::ScoConnectionParameters> sco_params_list;
+  sco_params_list.emplace_back(CreateScoConnectionParameters(fidlbredr::HfpParameterSet::D0));
+
+  fidlbredr::ScoConnectionHandle connection_handle;
+  fidlbredr::ProfileConnectScoRequest request;
+  request.set_peer_id(fuchsia::bluetooth::PeerId{peer()->identifier().value()});
+  request.set_initiator(false);
+  request.set_params(std::move(sco_params_list));
+  request.set_connection(connection_handle.NewRequest());
+
+  fidlbredr::ScoConnectionPtr sco_connection = connection_handle.Bind();
+  std::optional<zx_status_t> sco_connection_status;
+  sco_connection.set_error_handler([&](zx_status_t status) { sco_connection_status = status; });
+  std::optional<fidlbredr::ScoConnectionOnConnectionCompleteRequest> connection_complete;
+  sco_connection.events().OnConnectionComplete =
+      [&](fidlbredr::ScoConnectionOnConnectionCompleteRequest request) {
+        connection_complete = std::move(request);
+      };
+
+  client()->ConnectSco(std::move(request));
+  RunLoopUntilIdle();
+  ASSERT_FALSE(connection_complete);
+
+  sco_connection->Read([](fidlbredr::ScoConnection_Read_Result result) { FAIL(); });
+  RunLoopUntilIdle();
+  ASSERT_TRUE(sco_connection_status);
+  EXPECT_EQ(sco_connection_status.value(), ZX_ERR_IO_REFUSED);
+}
+
+TEST_F(ProfileServerTestConnectedPeer, ScoConnectionWriteBeforeConnectionComplete) {
+  std::vector<fidlbredr::ScoConnectionParameters> sco_params_list;
+  sco_params_list.emplace_back(CreateScoConnectionParameters(fidlbredr::HfpParameterSet::D0));
+
+  fidlbredr::ScoConnectionHandle connection_handle;
+  fidlbredr::ProfileConnectScoRequest request;
+  request.set_peer_id(fuchsia::bluetooth::PeerId{peer()->identifier().value()});
+  request.set_initiator(false);
+  request.set_params(std::move(sco_params_list));
+  request.set_connection(connection_handle.NewRequest());
+
+  fidlbredr::ScoConnectionPtr sco_connection = connection_handle.Bind();
+  std::optional<zx_status_t> sco_connection_status;
+  sco_connection.set_error_handler([&](zx_status_t status) { sco_connection_status = status; });
+  std::optional<fidlbredr::ScoConnectionOnConnectionCompleteRequest> connection_complete;
+  sco_connection.events().OnConnectionComplete =
+      [&](fidlbredr::ScoConnectionOnConnectionCompleteRequest request) {
+        connection_complete = std::move(request);
+      };
+
+  client()->ConnectSco(std::move(request));
+  RunLoopUntilIdle();
+  ASSERT_FALSE(connection_complete);
+
+  ::fuchsia::bluetooth::bredr::ScoConnectionWriteRequest write;
+  write.set_data({0x00});
+  sco_connection->Write(
+      std::move(write),
+      [](::fuchsia::bluetooth::bredr::ScoConnection_Write_Result result) { FAIL(); });
+  RunLoopUntilIdle();
+  ASSERT_TRUE(sco_connection_status);
+  EXPECT_EQ(sco_connection_status.value(), ZX_ERR_IO_REFUSED);
 }
 
 TEST_F(ProfileServerTestConnectedPeer, ConnectScoResponderUnconnectedPeerReturnsError) {
   std::vector<fidlbredr::ScoConnectionParameters> sco_params_list;
   sco_params_list.emplace_back(CreateScoConnectionParameters());
 
-  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
-  FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
+  fidlbredr::ScoConnectionHandle connection_handle;
   fidlbredr::ProfileConnectScoRequest request;
   request.set_peer_id(fuchsia::bluetooth::PeerId{1});
   request.set_initiator(false);
   request.set_params(std::move(sco_params_list));
-  request.set_receiver(std::move(receiver_handle));
-  client()->ConnectSco(std::move(request));
+  request.set_connection(connection_handle.NewRequest());
 
+  fidlbredr::ScoConnectionPtr sco_connection = connection_handle.Bind();
+  std::optional<zx_status_t> sco_connection_status;
+  sco_connection.set_error_handler([&](zx_status_t status) { sco_connection_status = status; });
+  std::optional<fidlbredr::ScoConnectionOnConnectionCompleteRequest> connection_complete;
+  sco_connection.events().OnConnectionComplete =
+      [&](fidlbredr::ScoConnectionOnConnectionCompleteRequest request) {
+        connection_complete = std::move(request);
+      };
+
+  client()->ConnectSco(std::move(request));
   RunLoopUntilIdle();
-  ASSERT_TRUE(receiver.error().has_value());
-  EXPECT_EQ(receiver.error().value(), fidlbredr::ScoErrorCode::FAILURE);
-  EXPECT_FALSE(receiver.connection().is_bound());
+  ASSERT_TRUE(connection_complete);
+  ASSERT_TRUE(connection_complete->is_error());
+  EXPECT_EQ(connection_complete->error(), fidlbredr::ScoErrorCode::FAILURE);
+  EXPECT_FALSE(sco_connection.is_bound());
+  ASSERT_TRUE(sco_connection_status);
+  EXPECT_EQ(sco_connection_status.value(), ZX_ERR_PEER_CLOSED);
 }
 
-TEST_F(ProfileServerTestConnectedPeer, ConnectScoInitiatorAndCloseReceiver) {
+TEST_F(ProfileServerTestConnectedPeer, ConnectScoInitiatorAndCloseProtocol) {
   fidlbredr::ScoConnectionParameters sco_params = CreateScoConnectionParameters();
   EXPECT_TRUE(fidl_helpers::FidlToScoParameters(sco_params).is_ok());
   std::vector<fidlbredr::ScoConnectionParameters> sco_params_list;
   sco_params_list.emplace_back(std::move(sco_params));
 
-  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
-  FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
   fidlbredr::ProfileConnectScoRequest request;
   request.set_peer_id(fuchsia::bluetooth::PeerId{peer()->identifier().value()});
   request.set_initiator(true);
   request.set_params(std::move(sco_params_list));
-  request.set_receiver(std::move(receiver_handle));
-  client()->ConnectSco(std::move(request));
+  fidlbredr::ScoConnectionHandle connection_handle;
+  request.set_connection(connection_handle.NewRequest());
 
-  receiver.Close();
+  fidlbredr::ScoConnectionPtr sco_connection = connection_handle.Bind();
+  std::optional<zx_status_t> sco_connection_status;
+  sco_connection.set_error_handler([&](zx_status_t status) { sco_connection_status = status; });
+  std::optional<fidlbredr::ScoConnectionOnConnectionCompleteRequest> connection_complete;
+  sco_connection.events().OnConnectionComplete =
+      [&](fidlbredr::ScoConnectionOnConnectionCompleteRequest request) {
+        connection_complete = std::move(request);
+      };
+
+  client()->ConnectSco(std::move(request));
+  sco_connection.Unbind();
   RunLoopUntilIdle();
-  EXPECT_FALSE(receiver.error().has_value());
-  EXPECT_FALSE(receiver.connection().is_bound());
+  ASSERT_FALSE(connection_complete);
 }
 
 // Verifies that the profile server gracefully ignores connection results after the receiver has
@@ -1174,28 +1301,33 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectScoInitiatorAndCloseReceiverBefore
   std::vector<fidlbredr::ScoConnectionParameters> sco_params_list;
   sco_params_list.emplace_back(std::move(sco_params));
 
-  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
-  FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
-
   test_device()->SetDefaultCommandStatus(bt::hci_spec::kEnhancedSetupSynchronousConnection,
                                          pw::bluetooth::emboss::StatusCode::SUCCESS);
   fidlbredr::ProfileConnectScoRequest request;
   request.set_peer_id(fuchsia::bluetooth::PeerId{peer()->identifier().value()});
   request.set_initiator(true);
   request.set_params(std::move(sco_params_list));
-  request.set_receiver(std::move(receiver_handle));
-  client()->ConnectSco(std::move(request));
+  fidlbredr::ScoConnectionHandle connection_handle;
+  request.set_connection(connection_handle.NewRequest());
 
-  receiver.Close();
+  fidlbredr::ScoConnectionPtr sco_connection = connection_handle.Bind();
+  std::optional<zx_status_t> sco_connection_status;
+  sco_connection.set_error_handler([&](zx_status_t status) { sco_connection_status = status; });
+  std::optional<fidlbredr::ScoConnectionOnConnectionCompleteRequest> connection_complete;
+  sco_connection.events().OnConnectionComplete =
+      [&](fidlbredr::ScoConnectionOnConnectionCompleteRequest request) {
+        connection_complete = std::move(request);
+      };
+
+  client()->ConnectSco(std::move(request));
+  sco_connection.Unbind();
   RunLoopUntilIdle();
-  EXPECT_FALSE(receiver.error().has_value());
-  EXPECT_FALSE(receiver.connection().is_bound());
+  ASSERT_FALSE(connection_complete);
   test_device()->SendCommandChannelPacket(bt::testing::SynchronousConnectionCompletePacket(
       0x00, peer()->address(), bt::hci_spec::LinkType::kSCO,
       pw::bluetooth::emboss::StatusCode::CONNECTION_TIMEOUT));
   RunLoopUntilIdle();
-  EXPECT_FALSE(receiver.error().has_value());
-  EXPECT_FALSE(receiver.connection().is_bound());
+  ASSERT_FALSE(connection_complete);
 }
 
 class ProfileServerTestFakeAdapter : public bt::fidl::testing::FakeAdapterTestFixture {
@@ -2271,9 +2403,10 @@ TEST_F(ProfileServerTestScoConnected, ScoConnectionRead2Packets) {
   // Queue a read request before the packet is received.
   std::optional<fidlbredr::RxPacketStatus> packet_status;
   std::optional<std::vector<uint8_t>> packet;
-  sco_connection()->Read([&](fidlbredr::RxPacketStatus status, std::vector<uint8_t> cb_packet) {
-    packet_status = status;
-    packet = std::move(cb_packet);
+  sco_connection()->Read([&](::fuchsia::bluetooth::bredr::ScoConnection_Read_Result result) {
+    ASSERT_TRUE(result.is_response());
+    packet_status = result.response().status_flag();
+    packet = std::move(*result.response().mutable_data());
   });
   RunLoopUntilIdle();
   EXPECT_FALSE(packet_status);
@@ -2308,9 +2441,10 @@ TEST_F(ProfileServerTestScoConnected, ScoConnectionRead2Packets) {
   test_device()->SendScoDataChannelPacket(packet_buffer_1);
   RunLoopUntilIdle();
 
-  sco_connection()->Read([&](fidlbredr::RxPacketStatus status, std::vector<uint8_t> cb_packet) {
-    packet_status = status;
-    packet = std::move(cb_packet);
+  sco_connection()->Read([&](::fuchsia::bluetooth::bredr::ScoConnection_Read_Result result) {
+    ASSERT_TRUE(result.is_response());
+    packet_status = result.response().status_flag();
+    packet = std::move(*result.response().mutable_data());
   });
   RunLoopUntilIdle();
   ASSERT_TRUE(packet_status);
@@ -2322,9 +2456,10 @@ TEST_F(ProfileServerTestScoConnected, ScoConnectionRead2Packets) {
 TEST_F(ProfileServerTestScoConnected, ScoConnectionReadWhileReadPendingClosesConnection) {
   std::optional<fidlbredr::RxPacketStatus> packet_status_0;
   std::optional<std::vector<uint8_t>> packet_0;
-  sco_connection()->Read([&](fidlbredr::RxPacketStatus status, std::vector<uint8_t> cb_packet) {
-    packet_status_0 = status;
-    packet_0 = std::move(cb_packet);
+  sco_connection()->Read([&](::fuchsia::bluetooth::bredr::ScoConnection_Read_Result result) {
+    ASSERT_TRUE(result.is_response());
+    packet_status_0 = result.response().status_flag();
+    packet_0 = std::move(*result.response().mutable_data());
   });
 
   RunLoopUntilIdle();
@@ -2333,9 +2468,10 @@ TEST_F(ProfileServerTestScoConnected, ScoConnectionReadWhileReadPendingClosesCon
 
   std::optional<fidlbredr::RxPacketStatus> packet_status_1;
   std::optional<std::vector<uint8_t>> packet_1;
-  sco_connection()->Read([&](fidlbredr::RxPacketStatus status, std::vector<uint8_t> cb_packet) {
-    packet_status_1 = status;
-    packet_1 = std::move(cb_packet);
+  sco_connection()->Read([&](::fuchsia::bluetooth::bredr::ScoConnection_Read_Result result) {
+    ASSERT_TRUE(result.is_response());
+    packet_status_1 = result.response().status_flag();
+    packet_1 = std::move(*result.response().mutable_data());
   });
 
   RunLoopUntilIdle();
@@ -2349,16 +2485,9 @@ TEST_F(ProfileServerTestScoConnected, ScoConnectionReadWhileReadPendingClosesCon
 }
 
 TEST_F(ProfileServerTestOffloadedScoConnected, ScoConnectionReadFails) {
-  std::optional<fidlbredr::RxPacketStatus> packet_status;
-  std::optional<std::vector<uint8_t>> packet;
-  sco_connection()->Read([&](fidlbredr::RxPacketStatus status, std::vector<uint8_t> cb_packet) {
-    packet_status = status;
-    packet = std::move(cb_packet);
-  });
-
+  sco_connection()->Read(
+      [&](::fuchsia::bluetooth::bredr::ScoConnection_Read_Result result) { FAIL(); });
   RunLoopUntilIdle();
-  EXPECT_FALSE(packet_status);
-  EXPECT_FALSE(packet);
   EXPECT_FALSE(sco_connection());
   ASSERT_TRUE(sco_conn_error());
   EXPECT_EQ(sco_conn_error().value(), ZX_ERR_IO_NOT_PRESENT);
@@ -2387,13 +2516,23 @@ TEST_F(ProfileServerTestScoConnected, ScoConnectionWriteTwice) {
     sco_cb_count++;
   });
   int write_cb_0_count = 0;
-  sco_connection()->Write(payload_0.ToVector(), [&] { write_cb_0_count++; });
+  fidlbredr::ScoConnectionWriteRequest request_0;
+  request_0.set_data(payload_0.ToVector());
+  sco_connection()->Write(std::move(request_0), [&](fidlbredr::ScoConnection_Write_Result result) {
+    ASSERT_TRUE(result.is_response());
+    write_cb_0_count++;
+  });
   RunLoopUntilIdle();
   EXPECT_EQ(sco_cb_count, 1);
   EXPECT_EQ(write_cb_0_count, 1);
 
   int write_cb_1_count = 0;
-  sco_connection()->Write(payload_1.ToVector(), [&] { write_cb_1_count++; });
+  fidlbredr::ScoConnectionWriteRequest request_1;
+  request_1.set_data(payload_1.ToVector());
+  sco_connection()->Write(std::move(request_1), [&](fidlbredr::ScoConnection_Write_Result result) {
+    ASSERT_TRUE(result.is_response());
+    write_cb_1_count++;
+  });
   RunLoopUntilIdle();
   EXPECT_EQ(sco_cb_count, 2);
   EXPECT_EQ(write_cb_1_count, 1);
@@ -2401,27 +2540,25 @@ TEST_F(ProfileServerTestScoConnected, ScoConnectionWriteTwice) {
   test_device()->ClearScoDataCallback();
 }
 
-TEST_F(ProfileServerTestScoConnected, ScoConnectionWriteTooLarge) {
-  bt::StaticByteBuffer<kSynchronousDataPacketLength + 1> payload_buffer;
-  payload_buffer.Fill(0x00);
-
-  int sco_cb_count = 0;
-  test_device()->SetScoDataCallback([&](const bt::ByteBuffer& buffer) { sco_cb_count++; });
+TEST_F(ProfileServerTestScoConnected, ScoConnectionWriteMissingDataField) {
   int write_cb_count = 0;
-  sco_connection()->Write(payload_buffer.ToVector(), [&] { write_cb_count++; });
+  // The `data` field is not set.
+  fidlbredr::ScoConnectionWriteRequest request;
+  sco_connection()->Write(std::move(request),
+                          [&](fidlbredr::ScoConnection_Write_Result result) { write_cb_count++; });
   RunLoopUntilIdle();
-  EXPECT_EQ(sco_cb_count, 0);
   EXPECT_EQ(write_cb_count, 0);
   EXPECT_FALSE(sco_connection());
   ASSERT_TRUE(sco_conn_error());
-  EXPECT_EQ(sco_conn_error().value(), ZX_ERR_IO);
-
-  test_device()->ClearScoDataCallback();
+  EXPECT_EQ(sco_conn_error().value(), ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(ProfileServerTestOffloadedScoConnected, ScoConnectionWriteFails) {
   int write_cb_count = 0;
-  sco_connection()->Write(/*data=*/{0x00}, [&] { write_cb_count++; });
+  fidlbredr::ScoConnectionWriteRequest request;
+  request.set_data({0x00});
+  sco_connection()->Write(std::move(request),
+                          [&](fidlbredr::ScoConnection_Write_Result result) { write_cb_count++; });
   RunLoopUntilIdle();
   EXPECT_EQ(write_cb_count, 0);
   EXPECT_FALSE(sco_connection());

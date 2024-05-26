@@ -20,9 +20,10 @@ import (
 type protoList []string
 
 type docGenFlags struct {
-	outDir  string
-	zipFile string
-	protos  protoList
+	outDir   string
+	zipFile  string
+	protos   protoList
+	basePath string
 }
 
 func (pl *protoList) String() string {
@@ -36,6 +37,7 @@ func (pl *protoList) Set(value string) error {
 
 func parseFlags() docGenFlags {
 	var flags docGenFlags
+	flag.StringVar(&flags.basePath, "base_path", "", "The base path for the TOC.")
 	flag.StringVar(&flags.outDir, "out_dir", "", "path to a directory which will contain output files.")
 	flag.StringVar(&flags.zipFile, "zip_file", "", "path to a file containing the zip file.")
 	flag.Var(&flags.protos, "proto", "path to a protobuf, as a textproto, file which contains the docs")
@@ -65,6 +67,10 @@ func main() {
 
 	var fileProvider bazel_docgen.FileProvider
 
+	if flags.basePath == "" {
+		log.Fatalln("--base_path is a required path")
+	}
+
 	if flags.outDir != "" {
 		if flags.zipFile != "" {
 			log.Fatalln("--zip_file must not be set when using --out_dir.")
@@ -84,5 +90,5 @@ func main() {
 		roots = append(roots, unmarshalProto(proto))
 	}
 
-	bazel_docgen.RenderModuleInfo(roots, renderer, fileProvider)
+	bazel_docgen.RenderModuleInfo(roots, renderer, fileProvider, flags.basePath)
 }

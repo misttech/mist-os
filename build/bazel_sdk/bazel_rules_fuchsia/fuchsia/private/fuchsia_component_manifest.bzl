@@ -107,6 +107,13 @@ def _fuchsia_component_manifest_impl(ctx):
     for w in include_path_dict.keys():
         include_path.extend(["--includepath", w])
 
+    # LINT.IfChange
+    config_values_package_path_args = [
+        "--config-package-path",
+        "meta/%s.cvf" % ctx.attr.component_name,
+    ]
+    # LINT.ThenChange(//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/private/fuchsia_structured_config.bzl)
+
     ctx.actions.run(
         executable = sdk.cmc,
         arguments = [
@@ -116,7 +123,7 @@ def _fuchsia_component_manifest_impl(ctx):
             manifest_in.path,
             "--includeroot",
             manifest_in.path[:-len(manifest_in.basename)],
-        ] + include_path,
+        ] + include_path + config_values_package_path_args,
         inputs = [manifest_in] + includes,
         outputs = [
             manifest_out,

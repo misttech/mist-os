@@ -25,7 +25,6 @@ use {
     ::routing::capability_source::ComponentCapability,
     anyhow::{format_err, Context, Error},
     async_trait::async_trait,
-    cm_moniker::InstancedMoniker,
     cm_rust::{ExposeDecl, OfferDecl, StorageDecl, UseDecl},
     cm_types::Name,
     component_id_index::InstanceId,
@@ -282,16 +281,14 @@ impl StorageAdmin {
                     object,
                     control_handle: _,
                 } => {
-                    let instanced_moniker = InstancedMoniker::try_from(relative_moniker.as_str())?;
-                    let moniker =
-                        component.moniker().concat(&instanced_moniker.without_instance_ids());
+                    let moniker = Moniker::try_from(relative_moniker.as_str())?;
+                    let absolute_moniker = component.moniker().concat(&moniker);
                     let instance_id =
-                        component.component_id_index().id_for_moniker(&moniker).cloned();
+                        component.component_id_index().id_for_moniker(&absolute_moniker).cloned();
 
                     let dir_proxy = storage::open_isolated_storage(
                         &backing_dir_source_info,
-                        component.persistent_storage,
-                        instanced_moniker,
+                        moniker,
                         instance_id.as_ref(),
                     )
                     .await?;
@@ -361,16 +358,7 @@ impl StorageAdmin {
                     relative_moniker: moniker_str,
                     responder,
                 } => {
-                    // Tolerate either an instanced moniker or a "normal" moniker here.
-                    // Most code-paths below and within `delete_isolated_storage()` ignore the instance
-                    // IDs, save for one. Those clients that require that level of specificity (unlikely)
-                    // will be able to specify them.
-                    let parsed_moniker =
-                        InstancedMoniker::try_from(moniker_str.as_str()).or_else(|_| {
-                            Moniker::try_from(moniker_str.as_str()).and_then(|m| {
-                                Ok(InstancedMoniker::from_moniker_with_zero_value_instance_ids(&m))
-                            })
-                        });
+                    let parsed_moniker = Moniker::try_from(moniker_str.as_str());
                     let response = match parsed_moniker {
                         Err(error) => {
                             warn!(
@@ -379,16 +367,15 @@ impl StorageAdmin {
                             );
                             Err(fcomponent::Error::InvalidArguments)
                         }
-                        Ok(instanced_moniker) => {
-                            let moniker = component
-                                .moniker()
-                                .concat(&instanced_moniker.without_instance_ids());
-                            let instance_id =
-                                component.component_id_index().id_for_moniker(&moniker).cloned();
+                        Ok(moniker) => {
+                            let absolute_moniker = component.moniker().concat(&moniker);
+                            let instance_id = component
+                                .component_id_index()
+                                .id_for_moniker(&absolute_moniker)
+                                .cloned();
                             let res = storage::delete_isolated_storage(
                                 backing_dir_source_info.clone(),
-                                component.persistent_storage,
-                                instanced_moniker,
+                                moniker,
                                 instance_id.as_ref(),
                             )
                             .await;
@@ -759,7 +746,7 @@ impl StorageAdmin {
 
                 if backing_dir_info == storage_capability_source_info {
                     let moniker = component
-                        .instanced_moniker()
+                        .moniker()
                         .strip_prefix(&backing_dir_info.storage_source_moniker)
                         .unwrap();
                     storage_users.push(moniker);

@@ -40,10 +40,9 @@ TEST(PseudoDir, ApiTest) {
   EXPECT_NULL(redirect);
 
   // get attributes
-  fs::VnodeAttributes attr;
-  EXPECT_EQ(ZX_OK, dir->GetAttributes(&attr));
-  EXPECT_EQ(V_TYPE_DIR | V_IRUSR, attr.mode);
-  EXPECT_EQ(1, attr.link_count);
+  zx::result attr = dir->GetAttributes();
+  ASSERT_TRUE(attr.is_ok());
+  EXPECT_EQ(V_TYPE_DIR | V_IRUSR, attr->mode);
 
   // lookup entries
   fbl::RefPtr<fs::Vnode> node;

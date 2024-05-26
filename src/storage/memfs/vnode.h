@@ -16,13 +16,14 @@ class Dnode;
 
 class Vnode : public fs::PagedVnode {
  public:
-  zx_status_t SetAttributes(fs::VnodeAttributesUpdate a) override;
+  fs::VnodeAttributesQuery SupportedMutableAttributes() const override;
+  zx::result<> UpdateAttributes(const fs::VnodeAttributesUpdate& attributes) override;
   void Sync(SyncCallback closure) override;
 
   // To be more specific: Is this vnode connected into the directory hierarchy?
   // VnodeDirs can be unlinked, and this method will subsequently return false.
   bool IsDirectory() const { return dnode_ != nullptr; }
-  void UpdateModified();
+  void UpdateModified() const;
 
   ~Vnode() override;
 
@@ -50,7 +51,9 @@ class Vnode : public fs::PagedVnode {
 
   uint64_t ino_ = 0;
   uint64_t create_time_ = 0;
-  uint64_t modify_time_ = 0;
+  // Mutable so we can update the vnode's modified time when attributes are queried.
+  // The modification time might need to be synchronized with writes to the paged VMO.
+  mutable uint64_t modify_time_ = 0;
 
   void VmoRead(uint64_t offset, uint64_t length) final { ZX_PANIC("Not supported"); }
   void VmoDirty(uint64_t offset, uint64_t length) final { ZX_PANIC("Not supported"); }

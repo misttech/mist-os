@@ -1310,7 +1310,6 @@ mod tests {
         anyhow::Result,
         assert_matches::assert_matches,
         cm_config::RuntimeConfig,
-        cm_moniker::InstancedMoniker,
         cm_rust::{
             Availability, ComponentDecl, DependencyType, RegistrationSource, ResolverRegistration,
             RunnerRegistration, UseProtocolDecl, UseSource, UseStorageDecl,
@@ -1385,16 +1384,8 @@ mod tests {
             .to_string()
         );
 
-        // Include tests for `.instanced_moniker()` alongside `.moniker()`
-        // until`.instanced_moniker()` is removed from the public API.
         assert_eq!(root_instance.moniker(), &Moniker::root());
-        assert_eq!(root_instance.instanced_moniker(), &InstancedMoniker::root());
-
         assert_eq!(child_instance.moniker(), &Moniker::parse_str("child").unwrap());
-        assert_eq!(
-            child_instance.instanced_moniker(),
-            &InstancedMoniker::parse_str("child:0").unwrap()
-        );
 
         match root_instance.try_get_parent()? {
             ExtendedInstanceInterface::AboveRoot(_) => {}
@@ -1403,7 +1394,6 @@ mod tests {
         match child_instance.try_get_parent()? {
             ExtendedInstanceInterface::Component(component) => {
                 assert_eq!(component.moniker(), root_instance.moniker());
-                assert_eq!(component.instanced_moniker(), root_instance.instanced_moniker())
             }
             _ => panic!("child instance's parent should be root component"),
         }
@@ -1413,7 +1403,6 @@ mod tests {
             .map(|locked| locked.get_child(&ChildName::try_new("child", None).unwrap()))?;
         assert!(get_child.is_some());
         assert_eq!(get_child.as_ref().unwrap().moniker(), child_instance.moniker());
-        assert_eq!(get_child.unwrap().instanced_moniker(), child_instance.instanced_moniker());
 
         let root_environment = root_instance.environment();
         let child_environment = child_instance.environment();
@@ -1428,10 +1417,6 @@ mod tests {
         match child_environment.env().parent() {
             WeakExtendedInstanceInterface::Component(component) => {
                 assert_eq!(component.upgrade()?.moniker(), root_instance.moniker());
-                assert_eq!(
-                    component.upgrade()?.instanced_moniker(),
-                    root_instance.instanced_moniker()
-                )
             }
             _ => panic!("child environment's parent should be root component"),
         }

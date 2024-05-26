@@ -23,7 +23,7 @@ use signal_hook::iterator::Signals;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::{collections::HashMap, io, io::Write, time::Duration};
-use target::TargetInfo;
+use target::{TargetInfo, TargetMode};
 use timeout::timeout;
 use tracing_subscriber::filter::LevelFilter;
 
@@ -234,6 +234,7 @@ async fn list_targets_main(args: SubCommandListTargets) -> Result<(), FunnelErro
 
     Ok(())
 }
+
 async fn funnel_main(args: SubCommandHost) -> Result<(), FunnelError> {
     tracing::trace!("Discoving targets...");
     let wait_duration = Duration::from_secs(args.wait_for_target_time);
@@ -368,8 +369,10 @@ where
                     }
                     TargetEvent::Added(handle) => match handle.state {
                         TargetState::Product(addr) => {
-                            targets
-                                .insert(handle.node_name.unwrap_or_else(|| "".to_string()), addr);
+                            targets.insert(
+                                handle.node_name.unwrap_or_else(|| "".to_string()),
+                                (addr, TargetMode::Product),
+                            );
                         }
                         TargetState::Fastboot(fb_state) => {
                             match fb_state.connection_state {
@@ -381,7 +384,7 @@ where
                                     // We support fastboot over tcp!
                                     targets.insert(
                                         handle.node_name.unwrap_or_else(|| "".to_string()),
-                                        tcp_state,
+                                        (tcp_state, TargetMode::Fastboot),
                                     );
                                 }
                                 FastbootConnectionState::Udp(udp_state) => {
@@ -417,9 +420,10 @@ where
     }
     let res = targets
         .iter()
-        .map(|(nodename, addresses)| TargetInfo {
+        .map(|(nodename, (addresses, mode))| TargetInfo {
             nodename: nodename.to_string(),
             addresses: addresses.clone(),
+            mode: mode.clone(),
         })
         .collect();
     Ok(res)

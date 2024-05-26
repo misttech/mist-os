@@ -10,9 +10,9 @@ use {
         AdvertisingData, AdvertisingHandleMarker, AdvertisingModeHint, AdvertisingParameters,
         PeripheralError, PeripheralStartAdvertisingResult as AdvertisingResult,
     },
-    fidl_fuchsia_bluetooth_test::{
-        ConnectionState, HciEmulatorProxy, LegacyAdvertisingType, LowEnergyPeerParameters,
-        PeerProxy, MAX_LEGACY_ADVERTISING_DATA_LENGTH,
+    fidl_fuchsia_hardware_bluetooth::{
+        ConnectionState, EmulatorProxy, LegacyAdvertisingType, LowEnergyPeerParameters, PeerProxy,
+        MAX_LEGACY_ADVERTISING_DATA_LENGTH,
     },
     fuchsia_async::{self as fasync, DurationExt, TimeoutExt},
     fuchsia_bluetooth::{
@@ -80,7 +80,7 @@ fn default_address() -> Address {
     Address::Public([1, 0, 0, 0, 0, 0])
 }
 
-async fn add_fake_peer(proxy: &HciEmulatorProxy, address: &Address) -> Result<PeerProxy, Error> {
+async fn add_fake_peer(proxy: &EmulatorProxy, address: &Address) -> Result<PeerProxy, Error> {
     let (local, remote) = fidl::endpoints::create_proxy()?;
     let params = LowEnergyPeerParameters {
         address: Some(address.into()),

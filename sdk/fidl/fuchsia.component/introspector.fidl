@@ -14,7 +14,7 @@ using zx;
 /// The component framework provides this capability to components that use
 /// `fuchsia.component.Introspector` from framework.
 @available(added=HEAD)
-@discoverable
+@discoverable(server="platform")
 open protocol Introspector {
     /// Obtains the moniker relative to this realm of the component
     /// corresponding to the provided token. Runners may obtain the token via

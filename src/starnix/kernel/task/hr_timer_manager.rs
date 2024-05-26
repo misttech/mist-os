@@ -5,7 +5,7 @@
 use fidl_fuchsia_hardware_hrtimer as fhrtimer;
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, HandleRef};
 use starnix_sync::{Mutex, MutexGuard};
-use starnix_uapi::{errno, errors::Errno};
+use starnix_uapi::{errno, errors::Errno, from_status_like_fdio};
 
 use std::{collections::BinaryHeap, sync::Arc};
 
@@ -222,11 +222,21 @@ impl HrTimer {
 
 impl TimerOps for HrTimerHandle {
     fn start(&self, current_task: &CurrentTask, deadline: zx::Time) -> Result<(), Errno> {
+        // Before (re)starting the timer, ensure the signal is cleared.
+        self.event
+            .as_handle_ref()
+            .signal(zx::Signals::EVENT_SIGNALED, zx::Signals::NONE)
+            .map_err(|status| from_status_like_fdio!(status))?;
         current_task.kernel().hrtimer_manager.add_timer(self, deadline)?;
         Ok(())
     }
 
     fn stop(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+        // Clear the signal when stopping the hrtimer.
+        self.event
+            .as_handle_ref()
+            .signal(zx::Signals::EVENT_SIGNALED, zx::Signals::NONE)
+            .map_err(|status| from_status_like_fdio!(status))?;
         Ok(current_task.kernel().hrtimer_manager.remove_timer(self)?)
     }
 
@@ -246,21 +256,17 @@ struct HrTimerNode {
     /// This is used to determine the order of the nodes in the heap.
     deadline: zx::Time,
     hr_timer: HrTimerHandle,
-    /// Track creation time for cmp tie-breaking.
-    creation_time: zx::Time,
 }
 
 impl HrTimerNode {
     fn new(deadline: zx::Time, hr_timer: HrTimerHandle) -> Self {
-        Self { deadline, hr_timer, creation_time: zx::Time::get_monotonic() }
+        Self { deadline, hr_timer }
     }
 }
 
 impl PartialEq for HrTimerNode {
     fn eq(&self, other: &Self) -> bool {
-        self.deadline == other.deadline
-            && Arc::ptr_eq(&self.hr_timer, &other.hr_timer)
-            && self.creation_time == other.creation_time
+        self.deadline == other.deadline && Arc::ptr_eq(&self.hr_timer, &other.hr_timer)
     }
 }
 
@@ -271,8 +277,7 @@ impl Ord for HrTimerNode {
         // Sooner the deadline, higher the priority.
         match other.deadline.cmp(&self.deadline) {
             std::cmp::Ordering::Equal => {
-                // If deadlines are equal, compare creation times
-                other.creation_time.cmp(&self.creation_time)
+                Arc::as_ptr(&other.hr_timer).cmp(&Arc::as_ptr(&self.hr_timer))
             }
             other => other,
         }
@@ -411,13 +416,30 @@ mod tests {
         assert!(hrtimer_manager.current_deadline().is_none());
     }
 
+    #[fuchsia::test(threads = 2)]
+    async fn hr_timer_manager_update_deadline() {
+        let hrtimer_manager = init_hr_timer_manager();
+
+        let timer = HrTimer::new();
+        let sooner_deadline = zx::Time::after(zx::Duration::from_seconds(1));
+        let later_deadline = zx::Time::after(zx::Duration::from_seconds(2));
+
+        assert!(hrtimer_manager.add_timer(&timer, later_deadline).is_ok());
+        assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == later_deadline));
+        assert!(hrtimer_manager.add_timer(&timer, sooner_deadline).is_ok());
+        // Make sure no duplicate timers.
+        assert_eq!(hrtimer_manager.lock().timer_heap.len(), 1);
+        assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == sooner_deadline));
+    }
+
     #[fuchsia::test]
     async fn hr_timer_node_cmp() {
         let time = zx::Time::after(zx::Duration::from_seconds(1));
-        let timer = HrTimer::new();
-        let node1 = HrTimerNode::new(time, timer.clone());
-        let node2 = HrTimerNode::new(time, timer.clone());
+        let timer1 = HrTimer::new();
+        let node1 = HrTimerNode::new(time, timer1.clone());
+        let timer2 = HrTimer::new();
+        let node2 = HrTimerNode::new(time, timer2.clone());
 
-        assert!(node1 >= node2 && node1 != node2 && node1 > node2);
+        assert!(node1 != node2 && node1.cmp(&node2) != std::cmp::Ordering::Equal);
     }
 }

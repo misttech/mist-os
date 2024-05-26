@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/affine/ratio.h>
+#include <lib/fasttime.h>
 
 #include "private.h"
 
 // By default, when we get clock monotonic, simply transform the tick counter
 // using the user-mode resident VDSO version of zx_ticks_get.
 __EXPORT zx_time_t _zx_clock_get_monotonic(void) {
-  affine::Ratio ticks_to_mono_ratio(DATA_CONSTANTS.ticks_to_mono_numerator,
-                                    DATA_CONSTANTS.ticks_to_mono_denominator);
-  return ticks_to_mono_ratio.Scale(VDSO_zx_ticks_get());
+  return internal::compute_monotonic_time<internal::FasttimeVerificationMode::kSkip>(
+      DATA_TIME_VALUES);
 }
 
 VDSO_INTERFACE_FUNCTION(zx_clock_get_monotonic);
@@ -23,8 +22,8 @@ VDSO_INTERFACE_FUNCTION(zx_clock_get_monotonic);
 // ticks to clock mono in user mode (just like the default version), but it will
 // query its ticks from the via_kernel version of zx_ticks_get.
 VDSO_KERNEL_EXPORT zx_time_t CODE_clock_get_monotonic_via_kernel_ticks(void) {
-  affine::Ratio ticks_to_mono_ratio(DATA_CONSTANTS.ticks_to_mono_numerator,
-                                    DATA_CONSTANTS.ticks_to_mono_denominator);
+  affine::Ratio ticks_to_mono_ratio(DATA_TIME_VALUES.ticks_to_mono_numerator,
+                                    DATA_TIME_VALUES.ticks_to_mono_denominator);
   return ticks_to_mono_ratio.Scale(SYSCALL_zx_ticks_get_via_kernel());
 }
 

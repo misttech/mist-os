@@ -10,6 +10,8 @@ use {
     test_realm_helpers::{constants::TESTCONTROLLER_DRIVER_TOPOLOGICAL_PATH, tracing::Tracing},
 };
 
+pub mod sme_helpers;
+
 pub struct DriversOnlyTestRealm {
     pub testcontroller_proxy: fidl_testcontroller::TestControllerProxy,
     _tracing: Option<Tracing>,

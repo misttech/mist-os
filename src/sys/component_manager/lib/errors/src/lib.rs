@@ -11,12 +11,11 @@ use {
     anyhow::Error,
     clonable_error::ClonableError,
     cm_config::CompatibilityCheckError,
-    cm_moniker::{InstancedExtendedMoniker, InstancedMoniker},
     cm_rust::UseDecl,
     cm_types::{Name, Url},
     component_id_index::InstanceId,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
-    moniker::{ChildName, Moniker, MonikerError},
+    moniker::{ChildName, ExtendedMoniker, Moniker, MonikerError},
     router_error::{Explain, RouterError},
     sandbox::ConversionError,
     serve_processargs::BuildNamespaceError,
@@ -49,8 +48,8 @@ pub enum ModelError {
         err
     )]
     OpenStorageFailed {
-        source_moniker: InstancedExtendedMoniker,
-        moniker: InstancedMoniker,
+        source_moniker: ExtendedMoniker,
+        moniker: Moniker,
         path: String,
         #[source]
         err: zx::Status,
@@ -1088,7 +1087,7 @@ impl EventsError {
 pub enum StorageError {
     #[error("failed to open {:?}'s directory {}: {} ", dir_source_moniker, dir_source_path, err)]
     OpenRoot {
-        dir_source_moniker: Option<InstancedMoniker>,
+        dir_source_moniker: Option<Moniker>,
         dir_source_path: cm_types::Path,
         #[source]
         err: ClonableError,
@@ -1102,9 +1101,9 @@ pub enum StorageError {
         err
     )]
     Open {
-        dir_source_moniker: Option<InstancedMoniker>,
+        dir_source_moniker: Option<Moniker>,
         dir_source_path: cm_types::Path,
-        moniker: InstancedMoniker,
+        moniker: Moniker,
         instance_id: Option<InstanceId>,
         #[source]
         err: ClonableError,
@@ -1117,7 +1116,7 @@ pub enum StorageError {
         err
     )]
     OpenById {
-        dir_source_moniker: Option<InstancedMoniker>,
+        dir_source_moniker: Option<Moniker>,
         dir_source_path: cm_types::Path,
         instance_id: InstanceId,
         #[source]
@@ -1132,20 +1131,20 @@ pub enum StorageError {
         err
     )]
     Remove {
-        dir_source_moniker: Option<InstancedMoniker>,
+        dir_source_moniker: Option<Moniker>,
         dir_source_path: cm_types::Path,
-        moniker: InstancedMoniker,
+        moniker: Moniker,
         instance_id: Option<InstanceId>,
         #[source]
         err: ClonableError,
     },
     #[error("storage path for moniker={}, instance_id={:?} is invalid", moniker, instance_id)]
-    InvalidStoragePath { moniker: InstancedMoniker, instance_id: Option<InstanceId> },
+    InvalidStoragePath { moniker: Moniker, instance_id: Option<InstanceId> },
 }
 
 impl StorageError {
     pub fn open_root(
-        dir_source_moniker: Option<InstancedMoniker>,
+        dir_source_moniker: Option<Moniker>,
         dir_source_path: cm_types::Path,
         err: impl Into<Error>,
     ) -> Self {
@@ -1153,9 +1152,9 @@ impl StorageError {
     }
 
     pub fn open(
-        dir_source_moniker: Option<InstancedMoniker>,
+        dir_source_moniker: Option<Moniker>,
         dir_source_path: cm_types::Path,
-        moniker: InstancedMoniker,
+        moniker: Moniker,
         instance_id: Option<InstanceId>,
         err: impl Into<Error>,
     ) -> Self {
@@ -1169,7 +1168,7 @@ impl StorageError {
     }
 
     pub fn open_by_id(
-        dir_source_moniker: Option<InstancedMoniker>,
+        dir_source_moniker: Option<Moniker>,
         dir_source_path: cm_types::Path,
         instance_id: InstanceId,
         err: impl Into<Error>,
@@ -1178,9 +1177,9 @@ impl StorageError {
     }
 
     pub fn remove(
-        dir_source_moniker: Option<InstancedMoniker>,
+        dir_source_moniker: Option<Moniker>,
         dir_source_path: cm_types::Path,
-        moniker: InstancedMoniker,
+        moniker: Moniker,
         instance_id: Option<InstanceId>,
         err: impl Into<Error>,
     ) -> Self {
@@ -1193,10 +1192,7 @@ impl StorageError {
         }
     }
 
-    pub fn invalid_storage_path(
-        moniker: InstancedMoniker,
-        instance_id: Option<InstanceId>,
-    ) -> Self {
+    pub fn invalid_storage_path(moniker: Moniker, instance_id: Option<InstanceId>) -> Self {
         Self::InvalidStoragePath { moniker, instance_id }
     }
 }

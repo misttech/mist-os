@@ -13,7 +13,7 @@ use zerocopy::{
     AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Unaligned,
 };
 
-use crate::icmp::{IcmpIpExt, IcmpPacket, IcmpUnusedCode};
+use crate::icmp::{IcmpIpExt, IcmpPacket, IcmpPacketRaw, IcmpUnusedCode};
 use crate::utils::NonZeroDuration;
 
 /// An ICMPv6 packet with an NDP message.
@@ -25,6 +25,17 @@ pub enum NdpPacket<B: ByteSlice> {
     NeighborSolicitation(IcmpPacket<Ipv6, B, NeighborSolicitation>),
     NeighborAdvertisement(IcmpPacket<Ipv6, B, NeighborAdvertisement>),
     Redirect(IcmpPacket<Ipv6, B, Redirect>),
+}
+
+/// A raw ICMPv6 packet with an NDP message.
+#[allow(missing_docs)]
+#[derive(Debug)]
+pub enum NdpPacketRaw<B: ByteSlice> {
+    RouterSolicitation(IcmpPacketRaw<Ipv6, B, RouterSolicitation>),
+    RouterAdvertisement(IcmpPacketRaw<Ipv6, B, RouterAdvertisement>),
+    NeighborSolicitation(IcmpPacketRaw<Ipv6, B, NeighborSolicitation>),
+    NeighborAdvertisement(IcmpPacketRaw<Ipv6, B, NeighborAdvertisement>),
+    Redirect(IcmpPacketRaw<Ipv6, B, Redirect>),
 }
 
 /// A non-zero lifetime conveyed through NDP.

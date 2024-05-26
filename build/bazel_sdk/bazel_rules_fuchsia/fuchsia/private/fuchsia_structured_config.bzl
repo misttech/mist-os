@@ -135,8 +135,6 @@ def _cpp_config_client_lib_source_impl(ctx):
             ctx.attr.fidl_library_name,
             "--clang-format",
             ctx.executable._clang_format.path,
-            "--flavor",
-            ctx.attr._flavor,
         ],
         inputs = [ctx.file.cm_label, ctx.executable._clang_format],
         outputs = [h_source_file, cc_source_file],
@@ -195,11 +193,10 @@ def fuchsia_structured_config_values(
     Args:
       name: Target name. Required.
       cm_label: Target that generates the component manifest. Required.
-
-      One and only one of the following are required:
-        values_source: The JSON5 file containing the concrete values for the generated file.
-        values: a starlark dictionary containing literal values for the generated file.
-
+      values_source: The JSON5 file containing the concrete values for the generated file.
+        This must not be set if using `values`.
+      values: a starlark dictionary containing literal values for the generated file.
+        This must not be set if using `values_source`.
       component_name: The basename of the component manifest within the package's meta/ dir.
       cvf_output_name: The name of the cvf file that is being produced.
     """
@@ -212,10 +209,11 @@ def fuchsia_structured_config_values(
         _generated_values_label = "%s_generated_values" % name
         _value_file_deps = [":" + _generated_values_label]
         _value_file = "%s_values_from_literal.json" % name
+        _json_string = json.encode(values).replace("\"", "\\\"")
         native.genrule(
             name = _generated_values_label,
             outs = [_value_file],
-            cmd = "echo %s > $@" % values,
+            cmd = "echo \"%s\" > $@" % _json_string,
         )
 
     _cvf_output_name = component_name
@@ -223,7 +221,6 @@ def fuchsia_structured_config_values(
         _cvf_output_name = cvf_output_name
 
     # compile the value file
-    resource_target = name
     cvf_target = "%s_cvf" % name
     _cvf(
         name = cvf_target,
@@ -233,9 +230,11 @@ def fuchsia_structured_config_values(
 
     # package the value file
     fuchsia_package_resource(
-        name = resource_target,
+        name = name,
         src = ":" + cvf_target,
+        # LINT.IfChange
         dest = "meta/%s.cvf" % _cvf_output_name,
+        # LINT.ThenChange(//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/private/fuchsia_component_manifest.bzl)
     )
 
 #######################################

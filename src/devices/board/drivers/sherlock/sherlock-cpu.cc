@@ -28,13 +28,15 @@ const std::vector<fpbus::Mmio> cpu_mmios{
     }},
 };
 
-constexpr amlogic_cpu::legacy_cluster_size_t cluster_sizes[] = {
+constexpr amlogic_cpu::legacy_cluster_info_t cluster_sizes[] = {
     {.pd_id =
          static_cast<uint32_t>(fuchsia_hardware_thermal::wire::PowerDomain::kBigClusterPowerDomain),
-     .core_count = 4},
+     .core_count = 4,
+     .relative_performance = 255},
     {.pd_id = static_cast<uint32_t>(
          fuchsia_hardware_thermal::wire::PowerDomain::kLittleClusterPowerDomain),
-     .core_count = 2},
+     .core_count = 2,
+     .relative_performance = 112},  // Approximation based on a performance measurement on Vim3.
 };
 
 const std::vector<fpbus::Metadata> cpu_metadata{

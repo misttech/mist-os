@@ -14,10 +14,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Iterator
 
 
 # Prints a diff (if there is one) of the two files, and returns True if there was a difference.
-def diff_files(golden, generated):
+def diff_files(golden: str, generated: str) -> bool:
     diff_exists = False
     with open(golden) as golden_file, open(generated) as generated_file:
         for line in difflib.unified_diff(
@@ -32,17 +33,17 @@ def diff_files(golden, generated):
 
 
 # Finds all files in a directory recursively. The paths include `dir` as a prefix.
-def get_files_in_dir(dir):
+def get_files_in_dir(dir: str) -> Iterator[str]:
     for root, dirs, files in os.walk(dir):
         for file in files:
             yield os.path.join(root, file)
 
 
-def eprint(msg):
+def eprint(msg: str) -> None:
     print(msg, file=sys.stderr)
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Invokes `fx create` and compares its output with a set of golden files."
     )
@@ -103,7 +104,7 @@ def main():
         # For each golden file not matched against a generated file, print an error.
         for golden_path in golden_files:
             error = True
-            base_path = golden_path[len(script_dir) + 1 :]
+            base_path = golden_path[len(proc_args.test_dir) + 1 :]
             eprint(
                 "golden file {0} missing in generated project".format(base_path)
             )

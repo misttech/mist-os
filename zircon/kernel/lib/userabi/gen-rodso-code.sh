@@ -51,6 +51,12 @@ grok_code_symbols() {
   while read symbol type addr size rest; do
     case "$symbol" in
     CODE_*|DATA_*|SYSCALL_*|_start)
+      if ! [[ $symbol =~ ^[A-Za-z0-9_]*$ ]]; then
+        # This check verifies that we are not matching any additional symbols
+        # the compiler generates. These symbols consist of a function or
+        # variable name suffixed with non-identifier characters like "."
+        continue
+      fi
       if [ "$symbol" = _start ]; then
         symbol=ENTRY
       fi

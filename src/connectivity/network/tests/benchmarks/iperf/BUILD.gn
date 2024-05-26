@@ -43,15 +43,6 @@ foreach(test_config, _test_configs) {
   _runtime_deps_label = "${_test_label}_runtime_deps"
   _benchmarks += [ ":${_test_label}" ]
 
-  if (is_host) {
-    host_test_data(_runtime_deps_label) {
-      _runtime_deps_dir = "${target_out_dir}/${_test_label}_test/runtime_deps"
-      sources = [ "${root_out_dir}/iperf3" ]
-      outputs = [ "${_runtime_deps_dir}/{{source_file_part}}" ]
-      deps = [ "//third_party/iperf:bin" ]
-    }
-  }
-
   python_perf_test(_test_label) {
     main_source = "netstack_iperf_test.py"
     expected_metric_names_filepaths = [ "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.netstack.iperf_benchmarks.${test_config.label}.txt" ]
@@ -61,13 +52,17 @@ foreach(test_config, _test_configs) {
       "//src/performance/lib/py_test_utils:perf_test_utils",
       "//src/performance/lib/trace_processing",
     ]
+
+    data_package_name = "test_data"
+    data_sources = [ "${root_out_dir}/iperf3" ]
+
     target_deps = [ "//third_party/iperf:iperf3_pkg" ]
 
     params = test_config
 
     # TODO(https://fxbug.dev/42125198): Enable host build for non-linux hosts as well.
     if (host_os == "linux") {
-      deps = [ ":${_runtime_deps_label}($host_toolchain)" ]
+      test_data_deps = [ "//third_party/iperf:bin($host_toolchain)" ]
     }
 
     transport = "fuchsia-controller"

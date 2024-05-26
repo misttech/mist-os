@@ -142,9 +142,10 @@ async fn get_missing_blobs(proxy: &fpkg::NeededBlobsProxy) -> Vec<fpkg::BlobInfo
 // Verifies that:
 //   1. all requested blobs are actually needed by the package
 //   2. no blob is requested more than once
-// Uses OpenPackageTracking protection.
+//   3. after the Get, all the package's blobs are in blobfs
 async fn get_and_verify_package(
     package_cache: &fpkg::PackageCacheProxy,
+    gc_protection: fpkg::GcProtection,
     pkg: &Package,
 ) -> fio::DirectoryProxy {
     let meta_blob_info =
@@ -154,12 +155,7 @@ async fn get_and_verify_package(
         fidl::endpoints::create_proxy::<fpkg::NeededBlobsMarker>().unwrap();
     let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
     let get_fut = package_cache
-        .get(
-            &meta_blob_info,
-            fpkg::GcProtection::OpenPackageTracking,
-            needed_blobs_server_end,
-            dir_server_end,
-        )
+        .get(&meta_blob_info, gc_protection, needed_blobs_server_end, dir_server_end)
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 
     let (meta_far, _) = pkg.contents();
@@ -220,9 +216,12 @@ pub async fn write_needed_blobs(
 // PackageCache.Get requires that the caller not write the same blob concurrently across
 // separate calls and this fn does not enforce that, so this fn should not be called with
 // packages that share blobs.
+// Uses OpenPackageTracking
 async fn get_and_verify_packages(proxy: &fpkg::PackageCacheProxy, packages: &[Package]) {
     let () = futures::stream::iter(packages)
-        .for_each_concurrent(None, move |pkg| get_and_verify_package(proxy, pkg).map(|_| {}))
+        .for_each_concurrent(None, move |pkg| {
+            get_and_verify_package(proxy, fpkg::GcProtection::OpenPackageTracking, pkg).map(|_| {})
+        })
         .await;
 }
 
@@ -371,6 +370,7 @@ struct TestEnvBuilder<BlobfsAndSystemImageFut> {
         Box<dyn FnOnce(blobfs_ramdisk::Implementation) -> BlobfsAndSystemImageFut>,
     ignore_system_image: bool,
     blob_implementation: Option<blobfs_ramdisk::Implementation>,
+    bootfs_blobs: HashMap<Hash, Vec<u8>>,
 }
 
 impl TestEnvBuilder<BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>> {
@@ -390,6 +390,7 @@ impl TestEnvBuilder<BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>> {
             paver_service_builder: None,
             ignore_system_image: false,
             blob_implementation: None,
+            bootfs_blobs: HashMap::new(),
         }
     }
 }
@@ -416,6 +417,7 @@ where
             paver_service_builder: self.paver_service_builder,
             ignore_system_image: self.ignore_system_image,
             blob_implementation: self.blob_implementation,
+            bootfs_blobs: self.bootfs_blobs,
         }
     }
 
@@ -450,6 +452,7 @@ where
             paver_service_builder: self.paver_service_builder,
             ignore_system_image: self.ignore_system_image,
             blob_implementation: Some(blobfs_ramdisk::Implementation::from_env()),
+            bootfs_blobs: self.bootfs_blobs,
         }
     }
 
@@ -471,6 +474,11 @@ where
     fn blobfs_impl(self, impl_: blobfs_ramdisk::Implementation) -> Self {
         assert_eq!(self.blob_implementation, None);
         Self { blob_implementation: Some(impl_), ..self }
+    }
+
+    fn add_bootfs_blob(mut self, hash: Hash, contents: Vec<u8>) -> Self {
+        assert_matches!(self.bootfs_blobs.insert(hash, contents), None);
+        self
     }
 
     async fn build(self) -> TestEnv<ConcreteBlobfs> {
@@ -580,8 +588,26 @@ where
                 .unwrap();
         }
 
+        let bootfs_blobs = {
+            // The capability is optional, so if there are no bootfs blobs give pkg-cache a broken
+            // proxy.
+            if self.bootfs_blobs.is_empty() {
+                vfs::remote::remote_dir(
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap().0,
+                )
+            } else {
+                let dir = vfs::directory::immutable::simple();
+                for (hash, contents) in self.bootfs_blobs {
+                    let () =
+                        dir.add_entry(hash.to_string(), vfs::file::read_only(contents)).unwrap();
+                }
+                dir as Arc<dyn vfs::directory::entry::DirectoryEntry>
+            }
+        };
+
         let local_child_out_dir = vfs::pseudo_directory! {
             "blob" => vfs::remote::remote_dir(blobfs.root_proxy()),
+            "bootfs-blobs" => bootfs_blobs,
             "svc" => local_child_svc_dir,
         };
         if matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob) {
@@ -678,6 +704,11 @@ where
                         Capability::directory("blob-exec")
                             .path("/blob")
                             .rights(fio::RW_STAR_DIR | fio::Operations::EXECUTE),
+                    )
+                    .capability(
+                        Capability::directory("bootfs-blobs")
+                            .path("/bootfs-blobs")
+                            .rights(fio::RX_STAR_DIR),
                     )
                     .from(&service_reflector)
                     .to(&pkg_cache),

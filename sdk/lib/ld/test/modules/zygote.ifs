@@ -1,0 +1,8 @@
+--- !ifs-v1
+IfsVersion:      3.0
+SoName:          libzygote-test.so.1
+Symbols:
+  - { Name: called_by_zygote_dep, Type: Func }
+  - { Name: initialized_data, Type: Object, Size: 8 }
+  - { Name: zygote_test_main, Type: Func }
+...

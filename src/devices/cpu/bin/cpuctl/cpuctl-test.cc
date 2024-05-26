@@ -23,6 +23,10 @@ constexpr uint32_t kInitialOperatingPoint = 0;
 
 constexpr uint32_t kNumLogicalCores = 4;
 
+constexpr uint8_t kDefaultRelativePerformance = 255;
+
+constexpr uint32_t kDefaultDomainId = 1;
+
 constexpr uint64_t kLogicalCoreIds[kNumLogicalCores] = {1, 2, 3, 4};
 
 class FakeCpuDevice : public fidl::testing::WireTestBase<cpuctrl::Device> {
@@ -44,6 +48,8 @@ class FakeCpuDevice : public fidl::testing::WireTestBase<cpuctrl::Device> {
   void GetNumLogicalCores(GetNumLogicalCoresCompleter::Sync& completer) override;
   void GetLogicalCoreId(GetLogicalCoreIdRequestView request,
                         GetLogicalCoreIdCompleter::Sync& completer) override;
+  void GetDomainId(GetDomainIdCompleter::Sync& completer) override;
+  void GetRelativePerformance(GetRelativePerformanceCompleter::Sync& completer) override;
 
   uint32_t current_opp_ = kInitialOperatingPoint;
   unsigned int opp_set_count_ = 0;
@@ -88,6 +94,14 @@ void FakeCpuDevice::SetCurrentOperatingPoint(SetCurrentOperatingPointRequestView
 
 void FakeCpuDevice::GetCurrentOperatingPoint(GetCurrentOperatingPointCompleter::Sync& completer) {
   completer.Reply(current_opp_);
+}
+
+void FakeCpuDevice::GetDomainId(GetDomainIdCompleter::Sync& completer) {
+  completer.Reply(kDefaultDomainId);
+}
+
+void FakeCpuDevice::GetRelativePerformance(GetRelativePerformanceCompleter::Sync& completer) {
+  completer.ReplySuccess(kDefaultRelativePerformance);
 }
 
 class TestCpuPerformanceDomain : public CpuPerformanceDomain {
@@ -174,6 +188,20 @@ TEST_F(PerformanceDomainTest, TestSetCurrentOperatingPoint) {
 
   // Make sure there was exactly one successful call to SetCurrentOperatingPoint.
   EXPECT_EQ(cpu().OppSetCount(), 1);
+}
+
+TEST_F(PerformanceDomainTest, TestGetRelativePerformance) {
+  const auto [relative_perf_status, relative_perf] = pd().GetRelativePerformance();
+
+  EXPECT_OK(relative_perf_status);
+  EXPECT_EQ(relative_perf, kDefaultRelativePerformance);
+}
+
+TEST_F(PerformanceDomainTest, TestGetDomainId) {
+  const auto [domain_id_status, domain_id] = pd().GetDomainId();
+
+  EXPECT_OK(domain_id_status);
+  EXPECT_EQ(domain_id, kDefaultDomainId);
 }
 
 }  // namespace

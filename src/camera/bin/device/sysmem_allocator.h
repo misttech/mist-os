@@ -17,15 +17,15 @@
 namespace camera {
 
 struct BufferCollectionWithLifetime {
-  fuchsia::sysmem::BufferCollectionInfo_2 buffers;
+  fuchsia::sysmem2::BufferCollectionInfo buffers;
   zx::eventpair deallocation_complete;
 };
 
 class SysmemAllocator {
  public:
-  explicit SysmemAllocator(fuchsia::sysmem::AllocatorHandle allocator);
+  explicit SysmemAllocator(fuchsia::sysmem2::AllocatorHandle allocator);
 
-  const fuchsia::sysmem::AllocatorPtr& fidl() const { return allocator_; }
+  const fuchsia::sysmem2::AllocatorPtr& fidl() const { return allocator_; }
 
   // This method will bind `token` to a new `BufferCollection` and `name` and `constraints` will
   // be set on the collection. Upon a successful allocation, the collection will be closed and
@@ -34,11 +34,11 @@ class SysmemAllocator {
   //
   // An error is returned from the promise if the allocation is unable to complete for any reason.
   fpromise::promise<BufferCollectionWithLifetime, zx_status_t> BindSharedCollection(
-      fuchsia::sysmem::BufferCollectionTokenHandle token,
-      fuchsia::sysmem::BufferCollectionConstraints constraints, std::string name);
+      fuchsia::sysmem2::BufferCollectionTokenHandle token,
+      fuchsia::sysmem2::BufferCollectionConstraints constraints, std::string name);
 
  private:
-  fuchsia::sysmem::AllocatorPtr allocator_;
+  fuchsia::sysmem2::AllocatorPtr allocator_;
 
   // This should always be the last thing in the object. Otherwise scheduled tasks within this scope
   // which reference members of this object may be allowed to run after destruction of this object

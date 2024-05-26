@@ -282,14 +282,10 @@ pub(crate) mod test_utils {
     /// it does not exist in the InstanceState of its parent. Assumes the parent is not destroyed
     /// yet.
     pub async fn is_child_deleted(parent: &ComponentInstance, child: &ComponentInstance) -> bool {
-        let instanced_moniker =
-            child.instanced_moniker().leaf().expect("Root component cannot be destroyed");
+        let moniker = child.moniker().leaf().expect("Root component cannot be destroyed");
 
         // Verify the parent-child relationship
-        assert_eq!(
-            parent.instanced_moniker().child(instanced_moniker.clone()),
-            *child.instanced_moniker()
-        );
+        assert_eq!(parent.moniker().child(moniker.clone()), *child.moniker());
 
         let parent_state = parent.lock_state().await;
         let parent_resolved_state = parent_state.get_resolved_state().expect("not resolved");

@@ -20,7 +20,6 @@ from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
 from honeydew.transports import sl4f as sl4f_transport
-from honeydew.transports import ssh as ssh_transport
 from honeydew.typing import custom_types
 
 _TARGET_NAME: str = "fuchsia-emulator"
@@ -54,7 +53,6 @@ class InitTests(unittest.TestCase):
         "check_connection",
         autospec=True,
     )
-    @mock.patch.object(ssh_transport.SSH, "check_connection", autospec=True)
     @mock.patch.object(ffx_transport.FFX, "check_connection", autospec=True)
     @mock.patch.object(
         fuchsia_controller_transport.FuchsiaController,
@@ -65,7 +63,6 @@ class InitTests(unittest.TestCase):
     def test_create_device_return_fc_device(
         self,
         mock_fc_context: mock.Mock,
-        mock_ssh_check_connection: mock.Mock,
         mock_ffx_check_connection: mock.Mock,
         mock_fc_check_connection: mock.Mock,
         mock_sl4f_check_connection: mock.Mock,
@@ -75,7 +72,6 @@ class InitTests(unittest.TestCase):
         self.assertIsInstance(
             honeydew.create_device(
                 device_name=_INPUT_ARGS["target_name"],
-                ssh_private_key="/tmp/pkey",
                 transport=custom_types.TRANSPORT.FUCHSIA_CONTROLLER,
                 ffx_config=_INPUT_ARGS["ffx_config"],
             ),
@@ -95,11 +91,8 @@ class InitTests(unittest.TestCase):
 
         mock_ffx_check_connection.assert_called()
 
-        mock_ssh_check_connection.assert_called()
-
         mock_sl4f_check_connection.assert_not_called()
 
-    @mock.patch.object(ssh_transport.SSH, "check_connection", autospec=True)
     @mock.patch.object(ffx_transport.FFX, "check_connection", autospec=True)
     @mock.patch.object(
         ffx_transport.FFX,
@@ -124,14 +117,12 @@ class InitTests(unittest.TestCase):
         mock_fc_check_connection: mock.Mock,
         mock_ffx_add_target: mock.Mock,
         mock_ffx_check_connection: mock.Mock,
-        mock_ssh_check_connection: mock.Mock,
     ) -> None:
         """Test case for honeydew.create_device() where it returns a device
         from an IpPort."""
         self.assertIsInstance(
             honeydew.create_device(
                 device_name=_INPUT_ARGS["target_name"],
-                ssh_private_key="/tmp/pkey",
                 transport=custom_types.TRANSPORT.FUCHSIA_CONTROLLER,
                 ffx_config=_INPUT_ARGS["ffx_config"],
                 device_ip_port=_INPUT_ARGS["target_ip_port"],
@@ -154,8 +145,6 @@ class InitTests(unittest.TestCase):
         mock_ffx_add_target.assert_called()
         mock_ffx_check_connection.assert_called()
 
-        mock_ssh_check_connection.assert_called()
-
     @mock.patch.object(
         fc_fuchsia_device.FuchsiaDevice,
         "__init__",
@@ -171,7 +160,6 @@ class InitTests(unittest.TestCase):
             honeydew.create_device(
                 device_name=_INPUT_ARGS["target_name"],
                 transport=custom_types.TRANSPORT.FUCHSIA_CONTROLLER,
-                ssh_private_key="/tmp/pkey",
                 device_ip_port=_INPUT_ARGS["target_ip_port"],
                 ffx_config=_INPUT_ARGS["ffx_config"],
             )

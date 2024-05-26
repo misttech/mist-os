@@ -152,9 +152,8 @@ void OnListProcessesComplete(fxl::RefPtr<CommandContext> cmd_context, const std:
 }
 
 const char kPsShortHelp[] = "ps: Prints the process tree of the debugged system.";
-const char kPsHelp[] =
-    R"(ps [ <filter-string> ]
-
+const char kPsUsage[] = "ps [ <filter-string> ]";
+const char kPsHelp[] = R"(
   Prints the process tree of the debugged system.
 
   If a filter-string is provided only jobs and processes whose names contain the
@@ -182,7 +181,7 @@ void RunVerbPs(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetPsVerbRecord() {
-  VerbRecord record(&RunVerbPs, {"ps"}, kPsShortHelp, kPsHelp, CommandGroup::kGeneral);
+  VerbRecord record(&RunVerbPs, {"ps"}, kPsShortHelp, kPsUsage, kPsHelp, CommandGroup::kGeneral);
   record.param_type = VerbRecord::kOneParam;  // Allow spaces in the filter string.
   return record;
 }

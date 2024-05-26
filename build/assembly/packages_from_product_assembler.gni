@@ -96,7 +96,7 @@ template("packages_from_product_assembler") {
     ]
     if (_is_bazel_assembled) {
       args += [
-        "--rebase",
+        "--bazel-execroot",
         rebase_path(bazel_execroot, root_build_dir),
       ]
     }

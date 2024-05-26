@@ -23,9 +23,8 @@ namespace {
 constexpr int kDumpIndexSwitch = 1;
 
 const char kSymStatShortHelp[] = "sym-stat: Print process symbol status.";
-const char kSymStatHelp[] =
-    R"(sym-stat [ --dump-index ]
-
+const char kSymStatUsage[] = "sym-stat [ --dump-index ]";
+const char kSymStatHelp[] = R"(
   Prints out symbol information.
 
   With no arguments, this refreshes the symbol index and shows global
@@ -203,7 +202,7 @@ void RunVerbSymStat(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context)
 }  // namespace
 
 VerbRecord GetSymStatVerbRecord() {
-  VerbRecord sym_stat(&RunVerbSymStat, {"sym-stat"}, kSymStatShortHelp, kSymStatHelp,
+  VerbRecord sym_stat(&RunVerbSymStat, {"sym-stat"}, kSymStatShortHelp, kSymStatUsage, kSymStatHelp,
                       CommandGroup::kSymbol);
   sym_stat.switches.emplace_back(kDumpIndexSwitch, false, "dump-index", 0);
   return sym_stat;

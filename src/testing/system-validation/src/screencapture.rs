@@ -6,7 +6,6 @@ use {
     fidl_fuchsia_ui_composition::{ScreenshotFormat, ScreenshotMarker, ScreenshotTakeRequest},
     fuchsia_component::client::connect_to_protocol,
     fuchsia_zircon as zx,
-    png::HasParameters,
     std::convert::TryInto,
     std::fs,
     std::io::BufWriter,
@@ -20,10 +19,7 @@ pub async fn take_screenshot() {
     let screenshot =
         connect_to_protocol::<ScreenshotMarker>().expect("failed to connect to Screenshot");
     let data = screenshot
-        .take(ScreenshotTakeRequest {
-            format: Some(ScreenshotFormat::BgraRaw),
-            ..Default::default()
-        })
+        .take(ScreenshotTakeRequest { format: Some(ScreenshotFormat::Png), ..Default::default() })
         .await
         .expect("cannot take screenshot using scenic");
     let image_size = data.size.expect("no data size returned from screenshot");
@@ -31,11 +27,6 @@ pub async fn take_screenshot() {
     let screenshot_file = fs::File::create(SCREENSHOT_FILE)
         .unwrap_or_else(|e| panic!("cannot create file {}: {:?}", SCREENSHOT_FILE, e));
     let ref mut w = BufWriter::new(screenshot_file);
-
-    let mut encoder = png::Encoder::new(w, image_size.width, image_size.height);
-    encoder.set(png::BitDepth::Eight);
-    encoder.set(png::ColorType::RGBA);
-    let mut writer = encoder.write_header().unwrap();
 
     let mut image_data = vec![0u8; raw_data_size.try_into().unwrap()];
     let image_vmo = data.vmo.expect("failed to obtain vmo handle for screenshot");
@@ -55,7 +46,8 @@ pub async fn take_screenshot() {
     }
     // NOTE: Remove once https://fxbug.dev/42060028 is added.
     bgra_to_rbga(&mut image_data);
-    writer.write_image_data(&image_data).expect("failed to write image data as PNG");
+    w.write_image_data(&image_data).expect("failed to write image data as PNG");
+    w.flush().unwrap();
 }
 
 /// Performs inplace BGRA -> RGBA.

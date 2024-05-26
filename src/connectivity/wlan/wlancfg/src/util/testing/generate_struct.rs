@@ -335,6 +335,5 @@ pub fn generate_random_ewma_signal_data() -> EwmaSignalData {
         rng.gen_range(-80..-20),
         rng.gen_range(0..80),
         rng.gen_range(0..10) as usize,
-        rng.gen_range(0..10) as usize,
     )
 }

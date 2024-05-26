@@ -507,8 +507,12 @@ template("fidl_library") {
       layer = "cpp_wire_types"
       headers = [ "fidl/${library_name}/cpp/wire_types.h" ]
       sources = [ "fidl/${library_name}/cpp/wire_types.cc" ]
-
       layer_deps = [ "cpp_common" ]
+
+      # This is required for a library that `ContainsDriverReferences`.
+      # Drivers are not supported by the GN SDK, but the tests build all
+      # libraries using generic rules. See https://fxbug.dev/340944762.
+      public_deps = [ "${fuchsia_sdk}/pkg/fidl_driver" ]
     },
 
     {
@@ -534,6 +538,10 @@ template("fidl_library") {
       sources = [ "fidl/${library_name}/cpp/natural_types.cc" ]
       public_deps = [ "${fuchsia_sdk}/pkg/fidl_cpp_base_v2" ]
       layer_deps = [ "cpp_common" ]
+
+      # See the comment for the same line in "cpp_wire_types" and
+      # https://fxbug.dev/340944762.
+      public_deps += [ "${fuchsia_sdk}/pkg/fidl_driver_natural" ]
     },
 
     {
@@ -579,32 +587,6 @@ template("fidl_library") {
       headers = [ "fidl/${library_name}/cpp/test_base.h" ]
       layer_deps = [ "cpp" ]
       testonly = true
-    },
-
-    {
-      layer = "cpp_driver_wire"  # AKA: wire_driver_messaging
-      headers = [
-        "fidl/${library_name}/cpp/driver/wire.h",
-        "fidl/${library_name}/cpp/driver/wire_messaging.h",
-      ]
-      sources = [ "fidl/${library_name}/cpp/driver/wire_messaging.cc" ]
-      public_deps = [ "${fuchsia_sdk}/pkg/fidl_driver" ]
-      layer_deps = [ "cpp_wire_types" ]
-    },
-
-    {
-      layer = "cpp_driver"  # AKA: driver_messaging
-      headers = [
-        "fidl/${library_name}/cpp/driver/natural_messaging.h",
-        "fidl/${library_name}/cpp/driver/fidl.h",
-      ]
-      sources = [ "fidl/${library_name}/cpp/driver/natural_messaging.cc" ]
-      public_deps = [ "${fuchsia_sdk}/pkg/fidl_driver_natural" ]
-      layer_deps = [
-        "cpp_driver_wire",
-        "cpp_natural_types",
-        "cpp_type_conversions",
-      ]
     },
 
     {

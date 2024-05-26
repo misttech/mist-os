@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
-#include <lib/driver/legacy-bind-constants/legacy-bind-constants.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <zircon/errors.h>
 
@@ -16,6 +15,7 @@
 #include <string>
 #include <vector>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 
 namespace fdf {
@@ -119,6 +119,20 @@ void Node::AddSmc(fuchsia_hardware_platform_bus::Smc smc) {
   add_platform_device_ = true;
 }
 
+void Node::AddPowerConfig(fuchsia_hardware_power::PowerElementConfiguration power_config) {
+  if (!pbus_node_.power_config()) {
+    pbus_node_.power_config() = std::vector<fuchsia_hardware_power::PowerElementConfiguration>();
+  }
+  pbus_node_.power_config()->emplace_back(std::move(power_config));
+  add_platform_device_ = true;
+}
+
+uint32_t Node::GetPublishIndex() const { return manager_->GetPublishIndex(id()); }
+
+zx::result<> Node::ChangePublishOrder(uint32_t new_index) {
+  return manager_->ChangePublishOrder(id(), new_index);
+}
+
 zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> &pbus,
                            fidl::SyncClient<fuchsia_driver_framework::CompositeNodeManager> &mgr,
                            fidl::SyncClient<fuchsia_driver_framework::Node> &fdf_node) {
@@ -200,24 +214,25 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
       fdf::ParentSpec platform_node;
       platform_node.properties() = node_properties_;
       auto additional_node_properties = std::vector<fdf::NodeProperty>{
-          fdf::MakeProperty(BIND_PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
-          fdf::MakeProperty(BIND_PLATFORM_DEV_VID,
+          fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
+          fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
                             bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC),
-          fdf::MakeProperty(BIND_PLATFORM_DEV_DID,
+          fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
                             bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_DEVICETREE),
-          fdf::MakeProperty(BIND_PLATFORM_DEV_INSTANCE_ID, id_),
+          fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, id_),
       };
       platform_node.properties().insert(platform_node.properties().end(),
                                         additional_node_properties.begin(),
                                         additional_node_properties.end());
 
       platform_node.bind_rules() = std::vector<fdf::BindRule>{
-          fdf::MakeAcceptBindRule(BIND_PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
-          fdf::MakeAcceptBindRule(BIND_PLATFORM_DEV_VID,
+          fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                                  bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
+          fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
                                   bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC),
-          fdf::MakeAcceptBindRule(BIND_PLATFORM_DEV_DID,
+          fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
                                   bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_DEVICETREE),
-          fdf::MakeAcceptBindRule(BIND_PLATFORM_DEV_INSTANCE_ID, id_),
+          fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, id_),
       };
       parents_.insert(parents_.begin(), std::move(platform_node));
     } else if (add_non_platform_device) {

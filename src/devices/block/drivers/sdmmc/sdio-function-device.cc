@@ -85,6 +85,17 @@ zx_status_t SdioFunctionDevice::AddDevice(const sdio_func_hw_info_t& hw_info) {
 
   fidl::Arena arena;
 
+  auto connector = devfs_connector_.Bind(fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  if (connector.is_error()) {
+    return connector.status_value();
+  }
+
+  auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
+                   .connector(*std::move(connector))
+                   .connector_supports(fuchsia_device_fs::ConnectionType::kDevice)
+                   .class_name("sdio")
+                   .Build();
+
   fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 4);
   properties[0] = fdf::MakeProperty(arena, BIND_PROTOCOL, ZX_PROTOCOL_SDIO);
   properties[1] = fdf::MakeProperty(arena, BIND_SDIO_VID, hw_info.manufacturer_id);
@@ -100,6 +111,7 @@ zx_status_t SdioFunctionDevice::AddDevice(const sdio_func_hw_info_t& hw_info) {
                         .name(arena, sdio_function_name_)
                         .offers2(arena, std::move(offers))
                         .properties(properties)
+                        .devfs_args(devfs)
                         .Build();
 
   auto result =
@@ -280,6 +292,12 @@ void SdioFunctionDevice::DriverTransportImpl::RequestCardReset(
 void SdioFunctionDevice::DriverTransportImpl::PerformTuning(
     fdf::Arena& arena, PerformTuningCompleter::Sync& completer) {
   completer.buffer(arena).Reply(parent_->PerformTuning());
+}
+
+void SdioFunctionDevice::ZirconTransportImpl::DevfsConnect(
+    fidl::ServerEnd<fuchsia_hardware_sdio::Device> server) {
+  bindings_.AddBinding(parent_->sdio_parent_->parent()->driver_async_dispatcher(),
+                       std::move(server), this, fidl::kIgnoreBindingClosure);
 }
 
 void SdioFunctionDevice::ZirconTransportImpl::GetDevHwInfo(GetDevHwInfoCompleter::Sync& completer) {

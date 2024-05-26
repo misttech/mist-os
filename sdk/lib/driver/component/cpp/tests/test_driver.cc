@@ -236,4 +236,15 @@ void TestDriver::on_fidl_error(fidl::UnbindInfo error) {
 void TestDriver::handle_unknown_event(
     fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) {}
 
+DriverRegistration StartFailTestDriver::GetDriverRegistration() {
+  // Use a custom DriverRegistration to create the DUT. Without this, the 'TestDriver'
+  // implementation will be used by default.
+  return FUCHSIA_DRIVER_REGISTRATION_V1(fdf_internal::DriverServer<StartFailTestDriver>::initialize,
+                                        fdf_internal::DriverServer<StartFailTestDriver>::destroy);
+}
+
+void StartFailTestDriver::Start(fdf::StartCompleter completer) {
+  completer(zx::error(ZX_ERR_INTERNAL));
+}
+
 FUCHSIA_DRIVER_EXPORT(TestDriver);

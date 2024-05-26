@@ -15,6 +15,85 @@
 	#address-cells = <2>;
 	#size-cells = <2>;
 
+	cpus:cpus {
+		#address-cells = <2>;
+		#size-cells = <0>;
+
+		cpu-map {
+			cluster0:cluster0 {
+				core0 {
+					cpu = <&CPU0>;
+				};
+				core1 {
+					cpu = <&CPU1>;
+				};
+			};
+			cluster1:cluster1 {
+				core0 {
+					cpu = <&CPU2>;
+				};
+				core1 {
+					cpu = <&CPU3>;
+				};
+				core2 {
+					cpu = <&CPU4>;
+				};
+				core3 {
+					cpu = <&CPU5>;
+				};
+			};
+		};
+
+		CPU0:cpu@0 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53","arm,armv8";
+			reg = <0x0 0x0>;
+			enable-method = "psci";
+		};
+
+		CPU1:cpu@1 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53","arm,armv8";
+			reg = <0x0 0x1>;
+			enable-method = "psci";
+		};
+
+		CPU2:cpu@100 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a73","arm,armv8";
+			reg = <0x0 0x100>;
+			enable-method = "psci";
+		};
+
+		CPU3:cpu@101 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a73","arm,armv8";
+			reg = <0x0 0x101>;
+			enable-method = "psci";
+		};
+
+		CPU4:cpu@102 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a73","arm,armv8";
+			reg = <0x0 0x102>;
+			enable-method = "psci";
+		};
+
+		CPU5:cpu@103 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a73","arm,armv8";
+			reg = <0x0 0x103>;
+			enable-method = "psci";
+		};
+	};
+
+	pwrc: power-controller {
+		compatible = "amlogic,power";
+		#power-domain-cells = <1>;
+		regulators = <&vddcpu0 &vddcpu1>;
+		regulator-names = "pwm_vreg_little", "pwm_vreg_big";
+	};
+
 	canvas: canvas@ff638000{
 		compatible = "amlogic,canvas";
 		reg = <0x0 0xff638000 0x0 0x2000>;
@@ -25,6 +104,32 @@
 		compatible = "amlogic,g12b-clk";
 		reg = <0x00 0xff63c000 0x00 0x2000>, <0x00 0xff620000 0x00 0x10000>, <0x00 0xffd18000 0x00 0x1000>;
 		#clock-cells = <1>;
+	};
+
+	hdmi-display@ff900000 {
+		compatible = "amlogic,display";
+		reg = <0x0 A311D_VPU_BASE 0x0 A311D_VPU_LENGTH>,
+			<0x0 A311D_TOP_MIPI_DSI_BASE 0x0 A311D_TOP_MIPI_DSI_LENGTH>,
+			<0x0 A311D_DSI_PHY_BASE 0x0 A311D_DSI_PHY_LENGTH>,
+			<0x0 A311D_MIPI_DSI_BASE 0x0 A311D_MIPI_DSI_LENGTH>,
+			<0x0 A311D_HIU_BASE 0x0 A311D_HIU_LENGTH>,
+			<0x0 A311D_AOBUS_BASE 0x0 A311D_AOBUS_LENGTH>,
+			<0x0 A311D_RESET_BASE 0x0 A311D_RESET_LENGTH>,
+			<0x0 A311D_GPIO_BASE 0x0 A311D_GPIO_LENGTH>,
+			<0x0 A311D_HDMITX_CONTROLLER_IP_BASE 0x0 A311D_HDMITX_CONTROLLER_IP_LENGTH>,
+			<0x0 A311D_HDMITX_TOP_LEVEL_BASE 0x0 A311D_HDMITX_TOP_LEVEL_LENGTH>;
+		interrupts = <GIC_SPI 3 GIC_IRQ_MODE_EDGE_RISING>,
+			<GIC_SPI 89 GIC_IRQ_MODE_EDGE_RISING>,
+			<GIC_SPI 86 GIC_IRQ_MODE_EDGE_RISING>;
+		iommus = <&dummy_iommu 9>;
+		smcs = <2 1 0>;
+		gpios = <&gpio_expander 0 0>,
+			<&gpio A311D_GPIOH(2) 0>;
+		gpio-names = "LCD_RESET", "HDMI_HOTPLUG_DETECT";
+		fuchsia,sysmem = <&sysmem>;
+		amlogic,canvas = <&canvas>;
+		display-detect = <&display_detect>;
+		display-detect-names = "HDMI";
 	};
 
 	vddcpu0: pwm_a0_d-regulator {
@@ -54,10 +159,40 @@
 	pwm_a0_d_regulator_pins: pwm-a0-d-regulator-pins {
 		pins = <A311D_GPIOE(1)>;
 		function = <0 A311D_GPIOE_1_PWM_D_FN>;
+		output-low;
 	};
 
 	pwm_a_regulator_pins: pwm-a-regulator-pins {
 		pins = <A311D_GPIOE(2)>;
 		function = <0 A311D_GPIOE_2_PWM_D_FN>;
+		output-low;
+	};
+};
+
+&aobus {
+	cpu-controller@0 {
+		compatible = "amlogic,cpu";
+		reg = <0x0 0x0 0x0 A311D_AOBUS_LENGTH>;
+		clocks = <&clock 0x10000 &clock 0x10001 &clock 0x100000>,
+				<&clock 0x10003 &clock 0x10004 &clock 0x100001>;
+		clock-names = "SYS_PLL_DIV16", "SYS_CPU_DIV16", "SYS_CPU_BIG_CLK",
+				"SYS_PLLB_DIV16", "SYS_CPUB_DIV16", "SYS_CPU_LITTLE_CLK";
+		power-domains = <&pwrc 0 &pwrc 1>;
+
+		performance-domains {
+			a311d-arm-a73-domain {
+				domain-id = <1>;
+				relative-performance = <255>;
+				cpus = <&CPU2 &CPU3 &CPU4 &CPU5>;
+				operating-points = <&cpu_opp_table1>;
+			};
+
+			a311d-arm-a53-domain {
+				domain-id = <2>;
+				relative-performance = <112>;
+				cpus = <&CPU0 &CPU1>;
+				operating-points = <&cpu_opp_table0>;
+			};
+		};
 	};
 };

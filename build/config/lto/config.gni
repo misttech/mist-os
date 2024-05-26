@@ -8,4 +8,8 @@ declare_args() {
 
   # ThinLTO cache directory path.
   thinlto_cache_dir = rebase_path("$root_out_dir/thinlto-cache", root_build_dir)
+
+  # Whether to enable -ffat-lto-objects in LTO builds.
+  # https://llvm.org/docs/FatLTO.html
+  fat_lto_objects = true
 }

@@ -71,6 +71,18 @@
                 "abi_revision": "0xDB83211C067E1052",
                 "status": "in-development"
             }
+        },
+        "special_api_levels": {
+            "HEAD": {
+                "abi_revision": "0xDB83211C067E1052",
+                "as_u32": 4292870144,
+                "status": "in-development"
+            },
+            "PLATFORM": {
+                "abi_revision": "0xDB83211C067E1052",
+                "as_u32": 4293918720,
+                "status": "in-development"
+            }
         }
     },
     "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json"

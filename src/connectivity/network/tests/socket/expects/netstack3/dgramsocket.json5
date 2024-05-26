@@ -53,7 +53,6 @@
                 "NetDatagramTest/DatagramSocketErrWithIOMethodCmsgCacheInvalidationTest.ClearsErrWithIOWithCmsgCache/InvalidCmsgCacheRecv",
                 "NetDatagramTest/DatagramSocketErrWithIOMethodCmsgCacheInvalidationTest.ClearsErrWithIOWithCmsgCache/InvalidCmsgCacheRecvfrom",
                 "NetDatagramTest/DatagramSocketErrWithIOMethodCmsgCacheInvalidationTest.ClearsErrWithIOWithCmsgCache/InvalidCmsgCacheRecvmsg",
-                "NetDatagramTest.PingIpv4LoopbackAddresses",
                 "NetDatagramSocketsCmsgRecvIPv4Tests/NetDatagramSocketsCmsgRecvTest.NullPtrNoControlMessages/IPv4_SOL_IP_IP_TOS_AfterSocketSetup",
                 "NetDatagramSocketsCmsgRecvIPv4Tests/NetDatagramSocketsCmsgRecvTest.NullPtrNoControlMessages/IPv4_SOL_IP_IP_TOS_BetweenSendAndRecv",
                 "NetDatagramSocketsCmsgRecvIPv4Tests/NetDatagramSocketsCmsgRecvTest.NullPtrNoControlMessages/IPv4_SOL_IP_IP_TTL_AfterSocketSetup",

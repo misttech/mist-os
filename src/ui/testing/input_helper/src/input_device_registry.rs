@@ -128,7 +128,7 @@ impl InputDeviceRegistry {
             .collect();
         self.add_device(DeviceDescriptor {
             // Required for DeviceDescriptor.
-            device_info: Some(new_fake_device_info()),
+            device_information: Some(new_fake_device_info()),
             keyboard: Some(KeyboardDescriptor {
                 input: Some(KeyboardInputDescriptor {
                     keys3: Some(all_keys),
@@ -143,7 +143,7 @@ impl InputDeviceRegistry {
     pub fn add_mouse_device(&mut self) -> Result<InputDevice, Error> {
         self.add_device(DeviceDescriptor {
             // Required for DeviceDescriptor.
-            device_info: Some(new_fake_device_info()),
+            device_information: Some(new_fake_device_info()),
             mouse: Some(MouseDescriptor {
                 input: Some(MouseInputDescriptor {
                     movement_x: Some(Axis {

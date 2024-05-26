@@ -17,7 +17,10 @@ import elfinfo
 
 
 def get_sdk_debug_path(binary):
-    build_id = elfinfo.get_elf_info(binary).build_id
+    elf_info = elfinfo.get_elf_info(binary)
+    if not elf_info:
+        raise RuntimeError(f"Unable to extract ELF info from {binary}")
+    build_id = elf_info.build_id
     return ".build-id/" + build_id[:2] + "/" + build_id[2:] + ".debug"
 
 

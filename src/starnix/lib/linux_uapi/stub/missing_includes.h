@@ -9,6 +9,7 @@
 // defined using functions
 
 #include <asm/ioctls.h>
+#include <linux/if_tun.h>
 #include <linux/seccomp.h>
 
 // generate.py will remove __bindgen_missing_ from the start of constant names.
@@ -173,5 +174,7 @@ typedef __kernel_gid_t gid_t;
 typedef __kernel_ino_t ino_t;
 typedef __kernel_mode_t mode_t;
 typedef __kernel_off_t off_t;
+
+C(TUNSETIFF);
 
 #endif  // SRC_STARNIX_LIB_LINUX_UAPI_STUB_MISSING_INCLUDES_H_

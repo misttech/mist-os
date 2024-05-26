@@ -10,6 +10,7 @@
 #include <fuchsia/hardware/sdio/cpp/banjo.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/devfs/cpp/connector.h>
 
 #include <atomic>
 #include <memory>
@@ -91,6 +92,8 @@ class SdioFunctionDevice : public ddk::SdioProtocol<SdioFunctionDevice> {
    public:
     explicit ZirconTransportImpl(SdioFunctionDevice* parent) : parent_(parent) {}
 
+    void DevfsConnect(fidl::ServerEnd<fuchsia_hardware_sdio::Device> server);
+
    private:
     void GetDevHwInfo(GetDevHwInfoCompleter::Sync& completer) override;
     void EnableFn(EnableFnCompleter::Sync& completer) override;
@@ -116,13 +119,16 @@ class SdioFunctionDevice : public ddk::SdioProtocol<SdioFunctionDevice> {
     void PerformTuning(PerformTuningCompleter::Sync& completer) override;
 
     SdioFunctionDevice* const parent_;
+    fidl::ServerBindingGroup<fuchsia_hardware_sdio::Device> bindings_;
   };
 
   SdioFunctionDevice(SdioControllerDevice* sdio_parent, uint32_t func)
       : function_(static_cast<uint8_t>(func)),
         sdio_parent_(sdio_parent),
         driver_transport_impl_(this),
-        zircon_transport_impl_(this) {
+        zircon_transport_impl_(this),
+        devfs_connector_(
+            fit::bind_member<&ZirconTransportImpl::DevfsConnect>(&zircon_transport_impl_)) {
     sdio_function_name_ = "sdmmc-sdio-" + std::to_string(func);
   }
 
@@ -186,6 +192,7 @@ class SdioFunctionDevice : public ddk::SdioProtocol<SdioFunctionDevice> {
   compat::SyncInitializedDeviceServer compat_server_;
   DriverTransportImpl driver_transport_impl_;
   ZirconTransportImpl zircon_transport_impl_;
+  driver_devfs::Connector<fuchsia_hardware_sdio::Device> devfs_connector_;
 };
 
 }  // namespace sdmmc

@@ -41,7 +41,7 @@ closed protocol KeyboardWatch {
 };
 
 /// The SetUI protocol for reading and modifying the keyboard settings.
-@discoverable
+@discoverable(server="platform")
 closed protocol Keyboard {
     compose KeyboardSet;
     compose KeyboardWatch;

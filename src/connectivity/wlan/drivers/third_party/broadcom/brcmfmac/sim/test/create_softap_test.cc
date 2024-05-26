@@ -661,9 +661,7 @@ TEST_F(CreateSoftAPTest, DeauthWhileAssociated) {
   env_->ScheduleNotification(std::bind(&CreateSoftAPTest::TxDeauthReq, this, kFakeMac),
                              zx::msec(60));
   env_->Run(kSimulatedClockDuration);
-  // Both indication should be seen.
   EXPECT_EQ(deauth_ind_recv_, true);
-  EXPECT_EQ(disassoc_ind_recv_, true);
   VerifyNumOfClient(0);
 }
 

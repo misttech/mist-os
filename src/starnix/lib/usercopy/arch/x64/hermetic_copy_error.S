@@ -6,9 +6,6 @@
 // preconditions:
 //   - saved rbp in (%rsp)
 //   - faulting address in %rax
-//
-// TODO: Is it safe to assume that the hermetic copy function
-// will always have a frame pointer and nothing else on the stack?
 
 .globl hermetic_copy_error
 hermetic_copy_error:

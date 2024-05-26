@@ -7,8 +7,7 @@
 namespace dl {
 
 ModuleHandle* RuntimeDynamicLinker::FindModule(Soname name) {
-  if (auto it = std::find(loaded_modules_.begin(), loaded_modules_.end(), name);
-      it != loaded_modules_.end()) {
+  if (auto it = std::find(modules_.begin(), modules_.end(), name); it != modules_.end()) {
     // TODO(https://fxbug.dev/328135195): increase reference count.
     // TODO(https://fxbug.dev/326120230): update flags
     ModuleHandle& found = *it;

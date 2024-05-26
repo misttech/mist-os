@@ -19,6 +19,7 @@ fidl("fuchsia.camera3") {
   public_deps = [
     "//sdk/fidl/fuchsia.math",
     "//sdk/fidl/fuchsia.sysmem",
+    "//sdk/fidl/fuchsia.sysmem2",
   ]
 
   enable_hlcpp = true

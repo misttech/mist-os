@@ -163,14 +163,14 @@ impl Drop for FidlPipe {
 mod test {
     use super::*;
 
-    use crate::overnet_connector::OvernetConnection;
+    use crate::overnet_connector::{OvernetConnection, OvernetConnectionError};
     use tokio::io::BufReader;
 
     #[derive(Debug)]
     struct AutoFailConnector;
 
     impl OvernetConnector for AutoFailConnector {
-        async fn connect(&mut self) -> Result<OvernetConnection> {
+        async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError> {
             let (sock1, sock2) = fidl::Socket::create_stream();
             let sock1 = fidl::AsyncSocket::from_socket(sock1);
             let sock2 = fidl::AsyncSocket::from_socket(sock2);
@@ -192,7 +192,7 @@ mod test {
     struct DoNothingConnector;
 
     impl OvernetConnector for DoNothingConnector {
-        async fn connect(&mut self) -> Result<OvernetConnection> {
+        async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError> {
             let (sock1, sock2) = fidl::Socket::create_stream();
             let sock1 = fidl::AsyncSocket::from_socket(sock1);
             let sock2 = fidl::AsyncSocket::from_socket(sock2);

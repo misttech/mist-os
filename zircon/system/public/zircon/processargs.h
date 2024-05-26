@@ -6,6 +6,7 @@
 #define ZIRCON_PROCESSARGS_H_
 
 #include <stdint.h>
+#include <zircon/availability.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
@@ -153,12 +154,12 @@ struct zx_proc_args {
 // https://fuchsia.dev/fuchsia-src/glossary?hl=en#outgoing-directory
 #define PA_DIRECTORY_REQUEST 0x3Bu
 
-#if __Fuchsia_API_level__ >= HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 // A |fuchsia.component.sandbox/Dictionary| client endpoint where the process
 // may find a dictionary that it has stowed away earlier via
 // |fuchsia.process.Lifecycle/OnEscrow|.
 //
-// TODO(https://fxbug.dev/319754472): This processarg is an experimental element
+// TODO(https://fxbug.dev/341127825): This processarg is an experimental element
 // added as we iterate on stopping a component. It may be changed or removed.
 // Do not depend on it unless you're one of the initial customers trying to stop
 // your component.

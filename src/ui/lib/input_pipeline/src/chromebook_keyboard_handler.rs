@@ -102,8 +102,9 @@ struct Inner {
 }
 
 /// Returns true if the provided device info matches the Chromebook keyboard.
-fn is_chromebook_keyboard(device_info: &fidl_fuchsia_input_report::DeviceInfo) -> bool {
-    device_info.product_id == PRODUCT_ID && device_info.vendor_id == VENDOR_ID
+fn is_chromebook_keyboard(device_info: &fidl_fuchsia_input_report::DeviceInformation) -> bool {
+    device_info.product_id.unwrap_or_default() == PRODUCT_ID
+        && device_info.vendor_id.unwrap_or_default() == VENDOR_ID
 }
 
 #[async_trait(?Send)]
@@ -119,7 +120,7 @@ impl UnhandledInputHandler for ChromebookKeyboardHandler {
                 device_descriptor: InputDeviceDescriptor::Keyboard(ref keyboard_descriptor),
                 event_time,
                 trace_id,
-            } if is_chromebook_keyboard(&keyboard_descriptor.device_info) => {
+            } if is_chromebook_keyboard(&keyboard_descriptor.device_information) => {
                 self.inspect_status.count_received_event(InputEvent::from(input_event));
                 self.process_keyboard_event(
                     event,
@@ -422,22 +423,24 @@ mod tests {
         static ref MATCHING_KEYBOARD_DESCRIPTOR: InputDeviceDescriptor =
             InputDeviceDescriptor::Keyboard(KeyboardDeviceDescriptor {
                 keys: vec![],
-                device_info: fidl_fuchsia_input_report::DeviceInfo {
-                    vendor_id: VENDOR_ID,
-                    product_id: PRODUCT_ID,
-                    version: 42,
-                    polling_rate: 1000,
+                device_information: fidl_fuchsia_input_report::DeviceInformation {
+                    vendor_id: Some(VENDOR_ID),
+                    product_id: Some(PRODUCT_ID),
+                    version: Some(42),
+                    polling_rate: Some(1000),
+                    ..Default::default()
                 },
                 device_id: 43,
             });
         static ref MISMATCHING_KEYBOARD_DESCRIPTOR: InputDeviceDescriptor =
             InputDeviceDescriptor::Keyboard(KeyboardDeviceDescriptor {
                 keys: vec![],
-                device_info: fidl_fuchsia_input_report::DeviceInfo {
-                    vendor_id: VENDOR_ID + 10,
-                    product_id: PRODUCT_ID,
-                    version: 42,
-                    polling_rate: 1000,
+                device_information: fidl_fuchsia_input_report::DeviceInformation {
+                    vendor_id: Some(VENDOR_ID + 10),
+                    product_id: Some(PRODUCT_ID),
+                    version: Some(42),
+                    polling_rate: Some(1000),
+                    ..Default::default()
                 },
                 device_id: 43,
             });

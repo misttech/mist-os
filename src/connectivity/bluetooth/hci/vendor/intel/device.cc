@@ -247,8 +247,8 @@ void Device::handle_unknown_method(
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
-void Device::NewEncodeCommand(NewEncodeCommandRequestView request,
-                              NewEncodeCommandCompleter::Sync& completer) {
+void Device::EncodeCommand(EncodeCommandRequestView request,
+                           EncodeCommandCompleter::Sync& completer) {
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 void Device::OpenHci(OpenHciCompleter::Sync& completer) {

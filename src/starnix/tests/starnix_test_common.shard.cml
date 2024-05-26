@@ -23,12 +23,20 @@
             url: "netstack#meta/netstack.cm",
         },
         {
+            name: "network-tun",
+            url: "network-tun#meta/network-tun.cm",
+        },
+        {
             name: "fake-power-broker",
             url: "fake-power-broker#meta/fake-power-broker.cm",
         },
         {
             name: "fake-system-activity-governor",
             url: "fake-system-activity-governor#meta/fake-system-activity-governor.cm",
+        },
+        {
+            name: "fake-hrtimer",
+            url: "fake-hrtimer#meta/fake-hrtimer.cm",
         },
     ],
     capabilities: [
@@ -99,6 +107,7 @@
         },
         {
             protocol: [
+                "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.root.Interfaces",
                 "fuchsia.net.routes.admin.RouteTableV4",
@@ -113,7 +122,17 @@
             to: [ "#kernel" ],
         },
         {
+            protocol: [ "fuchsia.net.tun.Control" ],
+            from: "#network-tun",
+            to: [ "#kernel" ],
+        },
+        {
             directory: "dev-gpu",
+            from: "parent",
+            to: [ "#kernel" ],
+        },
+        {
+            directory: "boot-kernel",
             from: "parent",
             to: [ "#kernel" ],
         },
@@ -124,6 +143,11 @@
                 "#fake-system-activity-governor",
                 "#netstack",
             ],
+        },
+        {
+            directory: "dev-hrtimer",
+            from: "#fake-hrtimer",
+            to: [ "#kernel" ],
         },
     ],
     environments: [

@@ -35,5 +35,10 @@
             to: "#realm_builder",
             availability: "optional",
         },
+        {
+            directory: "boot-kernel",
+            from: "parent",
+            to: "#realm_builder",
+        },
     ],
 }

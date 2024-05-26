@@ -467,14 +467,18 @@ fit::result<BootZbi::Error> TrampolineBoot::Load(uint32_t extra_data_capacity,
   // In the x86-64 case, we set up page-tables out of the .bss, which must
   // persist after booting the next kernel payload; however, this part of the
   // .bss might be clobbered by that self-same fixed load image. To avoid that
-  // issue, now that physical memory management as been bootstrapped, we re-set
-  // up the address space out of the allocator, which will avoid allocating
-  // from out of the load image's range that we just reserved.
-#ifdef __x86_64__
-  if (gAddressSpace) {
-    ArchSetUpAddressSpaceLate(*gAddressSpace);
-  }
-#endif
+  // issue, now that physical memory management has been bootstrapped, we
+  // re-set up the address space out of the allocator, which will avoid
+  // allocating from out of the load image's range that we just reserved.
+  //
+  // In the x86-32 case, page tables came from the normal Allocation pool
+  // originally, but the pages chosen when ArchSetUpAddressSpace ran might
+  // overlap with areas that are now reserved.  But as on x86-64, after other
+  // reservations it's now safe to choose page table pages with the allocator.
+  //
+  // On other machines, this is a no-op.  The page tables now in use may indeed
+  // be clobbered by the trampoline copying, but by then the MMU will be off.
+  ArchPrepareAddressSpaceForTrampoline();
 
   return fit::ok();
 }

@@ -167,6 +167,8 @@ class FakePlatformDevice : public fidl::Server<fuchsia_hardware_platform_device:
 };
 
 // Power Specific.
+// TODO(https://fxbug.dev/342124966): Move to the Power Framework Testing Client
+// at //src/power/testing/client.
 class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::ActivityGovernor> {
  public:
   FakeSystemActivityGovernor(zx::event wake_handling) : wake_handling_(std::move(wake_handling)) {}
@@ -210,6 +212,7 @@ class FakeLeaseControl : public fidl::Server<fuchsia_power_broker::LeaseControl>
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::LeaseControl> md,
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
 
+ private:
   fuchsia_power_broker::LeaseStatus lease_status_ = fuchsia_power_broker::LeaseStatus::kSatisfied;
 };
 
@@ -217,16 +220,14 @@ class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
  public:
   void Lease(fuchsia_power_broker::LessorLeaseRequest& request,
              LeaseCompleter::Sync& completer) override {
+    if (lease_error_) {
+      completer.Reply(fit::error(fuchsia_power_broker::LeaseError::kInternal));
+      return;
+    }
     auto lease_control = fidl::CreateEndpoints<fuchsia_power_broker::LeaseControl>();
-    auto lease_control_impl = std::make_unique<FakeLeaseControl>();
-    lease_control_ = lease_control_impl.get();
-    lease_control_binding_ = fidl::BindServer<fuchsia_power_broker::LeaseControl>(
+    lease_control_binding_.emplace(
         fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(lease_control->server),
-        std::move(lease_control_impl),
-        [this](FakeLeaseControl* impl, fidl::UnbindInfo info,
-               fidl::ServerEnd<fuchsia_power_broker::LeaseControl> server_end) mutable {
-          lease_requested_ = false;
-        });
+        &lease_control_, [this](fidl::UnbindInfo info) mutable { lease_requested_ = false; });
 
     lease_requested_ = true;
     completer.Reply(fit::success(std::move(lease_control->client)));
@@ -236,11 +237,52 @@ class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
 
   bool GetLeaseRequested() { return lease_requested_; }
+  void SetLeaseError() { lease_error_ = true; }
 
  private:
   bool lease_requested_ = false;
-  FakeLeaseControl* lease_control_;
-  std::optional<fidl::ServerBindingRef<fuchsia_power_broker::LeaseControl>> lease_control_binding_;
+  bool lease_error_ = false;
+  FakeLeaseControl lease_control_;
+  std::optional<fidl::ServerBinding<fuchsia_power_broker::LeaseControl>> lease_control_binding_;
+};
+
+class FakeRequiredLevel : public fidl::Server<fuchsia_power_broker::RequiredLevel> {
+ public:
+  void Watch(WatchCompleter::Sync& completer) override {
+    ZX_ASSERT(!completer_);
+    completer_.emplace(completer.ToAsync());
+  }
+
+  void SetRequiredLevel(fuchsia_power_broker::PowerLevel level) {
+    ZX_ASSERT(completer_);
+    completer_->Reply(fit::success(level));
+    completer_.reset();
+  }
+
+  bool WatchReceived() { return completer_.has_value(); }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::RequiredLevel> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+ private:
+  std::optional<WatchCompleter::Async> completer_;
+};
+
+class FakeCurrentLevel : public fidl::Server<fuchsia_power_broker::CurrentLevel> {
+ public:
+  void Update(fuchsia_power_broker::CurrentLevelUpdateRequest& request,
+              UpdateCompleter::Sync& completer) override {
+    current_level_ = request.current_level();
+    completer.Reply(fit::success());
+  }
+
+  fuchsia_power_broker::PowerLevel current_level() { return current_level_; }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::CurrentLevel> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+ private:
+  fuchsia_power_broker::PowerLevel current_level_ = 0;
 };
 
 class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
@@ -255,14 +297,18 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
     auto element_control = fidl::CreateEndpoints<fuchsia_power_broker::ElementControl>();
     element_control_server_ = std::move(element_control->server);
     if (request.lessor_channel()) {
-      auto lessor_impl = std::make_unique<FakeLessor>();
-      wake_lessor_ = lessor_impl.get();
-      fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor_binding =
-          fidl::BindServer<fuchsia_power_broker::Lessor>(
-              fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-              std::move(*request.lessor_channel()), std::move(lessor_impl),
-              [](FakeLessor* impl, fidl::UnbindInfo info,
-                 fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) mutable {});
+      fidl::BindServer<fuchsia_power_broker::Lessor>(
+          fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(*request.lessor_channel()),
+          &wake_lessor_);
+    }
+
+    if (request.level_control_channels()) {
+      fidl::BindServer<fuchsia_power_broker::RequiredLevel>(
+          fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+          std::move(request.level_control_channels()->required()), &required_level_);
+      fidl::BindServer<fuchsia_power_broker::CurrentLevel>(
+          fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+          std::move(request.level_control_channels()->current()), &current_level_);
     }
 
     fuchsia_power_broker::TopologyAddElementResponse result{
@@ -278,10 +324,15 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
   fidl::ServerEnd<fuchsia_power_broker::ElementControl>& element_control_server() {
     return element_control_server_;
   }
-  bool GetLeaseRequested() { return wake_lessor_ && wake_lessor_->GetLeaseRequested(); }
+  FakeRequiredLevel& required_level() { return required_level_; }
+  FakeCurrentLevel& current_level() { return current_level_; }
+  bool GetLeaseRequested() { return wake_lessor_.GetLeaseRequested(); }
+  void SetLeaseError() { wake_lessor_.SetLeaseError(); }
 
  private:
-  FakeLessor* wake_lessor_ = nullptr;
+  FakeLessor wake_lessor_;
+  FakeRequiredLevel required_level_;
+  FakeCurrentLevel current_level_;
   fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_server_;
   fidl::ServerBindingGroup<fuchsia_power_broker::Topology> bindings_;
 };
@@ -766,6 +817,65 @@ TEST_F(DriverTest, WaitTriggering) {
   }
 }
 
+TEST_F(DriverTest, RunningPowerElement) {
+  // Wait until we have received the Watch.
+  runtime().RunUntil([this]() {
+    return RunInEnvironmentTypeContext<bool>(
+        [](TestEnvironment& env) { return env.power_broker().required_level().WatchReceived(); });
+  });
+
+  // The driver sets the CurrentLevel to the RequiredLevel kWakeHandlingLeaseOn.
+  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+    env.power_broker().required_level().SetRequiredLevel(AmlHrtimerServer::kWakeHandlingLeaseOn);
+  });
+  runtime().RunUntil([this]() {
+    return RunInEnvironmentTypeContext<fuchsia_power_broker::PowerLevel>([](TestEnvironment& env) {
+             return env.power_broker().current_level().current_level();
+           }) == AmlHrtimerServer::kWakeHandlingLeaseOn;
+  });
+
+  // Wait until we have received the Watch.
+  runtime().RunUntil([this]() {
+    return RunInEnvironmentTypeContext<bool>(
+        [](TestEnvironment& env) { return env.power_broker().required_level().WatchReceived(); });
+  });
+
+  // The driver sets the CurrentLevel to the RequiredLevel 0.
+  RunInEnvironmentTypeContext(
+      [](TestEnvironment& env) { env.power_broker().required_level().SetRequiredLevel(0); });
+  runtime().RunUntil([this]() {
+    return RunInEnvironmentTypeContext<fuchsia_power_broker::PowerLevel>([](TestEnvironment& env) {
+             return env.power_broker().current_level().current_level();
+           }) == 0;
+  });
+
+  // Wait until we have received the Watch.
+  runtime().RunUntil([this]() {
+    return RunInEnvironmentTypeContext<bool>(
+        [](TestEnvironment& env) { return env.power_broker().required_level().WatchReceived(); });
+  });
+}
+
+TEST_F(DriverTest, LeaseError) {
+  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+    env.power_broker().SetLeaseError();
+    env.platform_device().TriggerAllIrqs();
+  });
+
+  // Timers id 0 to 8 inclusive but not 4 support wait (via IRQ notification).
+  for (uint64_t i = 0; i < 9; ++i) {
+    if (i == 4) {
+      continue;
+    }
+    auto result_start =
+        client_->StartAndWait({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
+    ASSERT_TRUE(result_start.is_error());
+    ASSERT_TRUE(result_start.error_value().is_domain_error());
+    ASSERT_EQ(result_start.error_value().domain_error(),
+              fuchsia_hardware_hrtimer::DriverError::kBadState);
+  }
+}
+
 TEST_F(DriverTest, WaitStop) {
   // Timers id 0 to 8 inclusive but not 4 support wait (via IRQ notification).
   for (uint64_t i = 0; i < 9; ++i) {
@@ -947,7 +1057,7 @@ TEST_F(DriverTestNoPower, WaitTriggeringNoPower) {
         client_->StartAndWait({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
     ASSERT_TRUE(result_start.is_error());  // Must fail, no power configuration.
     ASSERT_EQ(result_start.error_value().domain_error(),
-              fuchsia_hardware_hrtimer::DriverError::kNotSupported);
+              fuchsia_hardware_hrtimer::DriverError::kBadState);
   }
 }
 

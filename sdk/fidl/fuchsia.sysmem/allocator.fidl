@@ -6,10 +6,9 @@ library fuchsia.sysmem;
 using fuchsia.sysmem2;
 using zx;
 
-// Needs ForDeprecatedCBindings because used with "FIDL Simple C Bindings".
 /// Allocates system memory buffers.
 ///
-@discoverable
+@discoverable(server="platform")
 closed protocol Allocator {
     /// Allocates a BufferCollection on behalf of a single client (aka initiator)
     /// who is also the only participant (from the point of view of sysmem).

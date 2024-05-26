@@ -546,44 +546,44 @@ zx::result<> VnodeMinfs::WriteInternal(Transaction* transaction, const uint8_t* 
   return zx::ok();
 }
 
-zx_status_t VnodeMinfs::GetAttributes(fs::VnodeAttributes* a) {
+zx::result<fs::VnodeAttributes> VnodeMinfs::GetAttributes() const {
   FX_LOGS(DEBUG) << "minfs_getattr() vn=" << this << "(#" << ino_ << ")";
-  return Vfs()->GetNodeOperations()->get_attr.Track([&] {
+  return Vfs()->GetNodeOperations()->get_attr.Track([&]() -> zx::result<fs::VnodeAttributes> {
     // This transaction exists because acquiring the block size and block
     // count may be unsafe without locking.
     //
     // TODO(unknown): Improve locking semantics of pending data allocation to make this less
     // confusing.
     Transaction transaction(fs_);
-    *a = fs::VnodeAttributes();
-    a->mode = DTYPE_TO_VTYPE(MinfsMagicType(inode_.magic)) | V_IRUSR | V_IWUSR | V_IRGRP | V_IROTH;
-    a->inode = ino_;
-    a->content_size = GetSize();
-    a->storage_size = GetBlockCount() * fs_->BlockSize();
-    a->link_count = inode_.link_count;
-    a->creation_time = inode_.create_time;
-    a->modification_time = inode_.modify_time;
-    return ZX_OK;
+    return zx::ok(fs::VnodeAttributes{
+        .id = ino_,
+        .content_size = GetSize(),
+        .storage_size = GetBlockCount() * fs_->BlockSize(),
+        .link_count = inode_.link_count,
+        .creation_time = inode_.create_time,
+        .modification_time = inode_.modify_time,
+        .mode =
+            DTYPE_TO_VTYPE(MinfsMagicType(inode_.magic)) | V_IRUSR | V_IWUSR | V_IRGRP | V_IROTH,
+    });
   });
 }
 
-zx_status_t VnodeMinfs::SetAttributes(fs::VnodeAttributesUpdate attr) {
+fs::VnodeAttributesQuery VnodeMinfs::SupportedMutableAttributes() const {
+  return fs::VnodeAttributesQuery::kCreationTime | fs::VnodeAttributesQuery::kModificationTime;
+}
+
+zx::result<> VnodeMinfs::UpdateAttributes(const fs::VnodeAttributesUpdate& attributes) {
   int dirty = 0;
   FX_LOGS(DEBUG) << "minfs_setattr() vn=" << this << "(#" << ino_ << ")";
-  return Vfs()->GetNodeOperations()->set_attr.Track([&] {
-    if (attr.has_creation_time()) {
-      inode_.create_time = attr.take_creation_time();
+  return zx::make_result(Vfs()->GetNodeOperations()->set_attr.Track([&] {
+    if (attributes.creation_time) {
+      inode_.create_time = *attributes.creation_time;
       dirty = 1;
     }
-    if (attr.has_modification_time()) {
-      inode_.modify_time = attr.take_modification_time();
+    if (attributes.modification_time) {
+      inode_.modify_time = *attributes.modification_time;
       dirty = 1;
     }
-    if (attr.any()) {
-      // any unhandled field update is unsupported
-      return ZX_ERR_INVALID_ARGS;
-    }
-
     // Commit transaction if dirty cache is disabled. Otherwise this will
     // happen later.
     if (dirty && !DirtyCacheEnabled()) {
@@ -597,7 +597,7 @@ zx_status_t VnodeMinfs::SetAttributes(fs::VnodeAttributesUpdate attr) {
       fs_->CommitTransaction(std::move(transaction_or.value()));
     }
     return ZX_OK;
-  });
+  }));
 }
 
 VnodeMinfs::VnodeMinfs(Minfs* fs) : fs_(fs) {}

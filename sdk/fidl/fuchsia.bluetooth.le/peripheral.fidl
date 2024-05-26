@@ -136,7 +136,7 @@ closed protocol AdvertisedPeripheral {
     }) -> ();
 };
 
-@discoverable
+@discoverable(server="platform")
 closed protocol Peripheral {
     /// Start advertising continuously as a LE peripheral. If advertising cannot
     /// be initiated then `advertised_peripheral` will be closed and an error

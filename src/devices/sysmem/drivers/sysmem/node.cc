@@ -14,6 +14,9 @@ namespace sysmem_driver {
 
 using Error = fuchsia_sysmem2::Error;
 
+// This is to avoid potentially unbounded debug_client_info.name size.
+const size_t kMaxDebugNameSize = 4 * 1024;
+
 Node::Node(fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection,
            NodeProperties* node_properties, zx::unowned_channel server_end)
     : logical_buffer_collection_(std::move(logical_buffer_collection)),
@@ -94,6 +97,12 @@ void Node::SetErrorHandler(fit::function<void(zx_status_t)> error_handler) {
 void Node::Fail(Error error) { CloseChannel(error); }
 
 void Node::SetDebugClientInfoInternal(ClientDebugInfo debug_info) {
+  if (!node_properties().client_debug_info().name.empty()) {
+    debug_info.name = debug_info.name + " (was " + node_properties().client_debug_info().name + ")";
+    if (debug_info.name.size() > kMaxDebugNameSize) {
+      debug_info.name.resize(kMaxDebugNameSize);
+    }
+  }
   node_properties().client_debug_info() = debug_info;
   debug_id_property_ =
       inspect_node_.CreateUint("debug_id", node_properties().client_debug_info().id);

@@ -58,6 +58,7 @@ class SimInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImp
     std::list<wlan_fullmac_wire::WlanFullmacAssocInd> assoc_indications;
     std::list<wlan_fullmac_wire::WlanFullmacAuthInd> auth_indications;
     std::list<wlan_fullmac_wire::WlanFullmacImplIfcBaseDeauthConfRequest> deauth_results;
+    std::list<wlan_fullmac_wire::WlanFullmacImplIfcBaseDisassocConfRequest> disassoc_results;
     std::list<wlan_fullmac_wire::WlanFullmacDeauthIndication> deauth_indications;
     std::list<wlan_fullmac_wire::WlanFullmacDisassocIndication> disassoc_indications;
     std::list<wlan_fullmac_wire::WlanFullmacChannelSwitchInfo> csa_indications;
@@ -160,6 +161,7 @@ class SimInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImp
   void AssociateWith(const simulation::FakeAp& ap,
                      std::optional<zx::duration> delay = std::nullopt);
 
+  void DisassociateFrom(const common::MacAddr& bssid, wlan_ieee80211::ReasonCode reason);
   void DeauthenticateFrom(const common::MacAddr& bssid, wlan_ieee80211::ReasonCode reason);
 
   // Scan operations

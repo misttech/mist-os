@@ -174,14 +174,6 @@ impl Error {
         )
     }
 
-    pub fn invalid_storage(
-        decl_type: DeclType,
-        keyword: impl Into<String>,
-        storage: impl Into<String>,
-    ) -> Self {
-        Error::InvalidStorage(DeclField { decl: decl_type, field: keyword.into() }, storage.into())
-    }
-
     pub fn invalid_environment(
         decl_type: DeclType,
         keyword: impl Into<String>,
@@ -551,10 +543,6 @@ mod tests {
         assert_eq!(
             format!("{}", Error::invalid_collection(DeclType::Child, "source", "child")),
             "\"child\" is referenced in Child.source but it does not appear in collections."
-        );
-        assert_eq!(
-            format!("{}", Error::invalid_storage(DeclType::Child, "source", "name")),
-            "\"name\" is referenced in Child.source but it does not appear in storage."
         );
     }
 }

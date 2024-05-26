@@ -53,8 +53,6 @@ class FakeCodec : public audio::SimpleCodecServer, public signal_fidl::SignalPro
   }
   zx_status_t Stop() override { return ZX_ERR_NOT_SUPPORTED; }
   zx_status_t Start() override { return ZX_OK; }
-  bool IsBridgeable() override { return false; }
-  void SetBridgedMode(bool enable_bridged_mode) override {}
   bool SupportsSignalProcessing() override { return true; }
   void SignalProcessingConnect(
       fidl::InterfaceRequest<signal_fidl::SignalProcessing> signal_processing) override {
@@ -64,7 +62,7 @@ class FakeCodec : public audio::SimpleCodecServer, public signal_fidl::SignalPro
     signal_fidl::Element pe;
     pe.set_id(kAglPeId);
     pe.set_type(signal_fidl::ElementType::AUTOMATIC_GAIN_LIMITER);
-    pe.set_can_disable(true);
+    pe.set_can_stop(true);
     std::vector<signal_fidl::Element> pes;
     pes.emplace_back(std::move(pe));
     signal_fidl::Reader_GetElements_Response response(std::move(pes));
@@ -72,11 +70,11 @@ class FakeCodec : public audio::SimpleCodecServer, public signal_fidl::SignalPro
     result.set_response(std::move(response));
     callback(std::move(result));
   }
-  void SetElementState(uint64_t processing_element_id, signal_fidl::ElementState state,
+  void SetElementState(uint64_t processing_element_id, signal_fidl::SettableElementState state,
                        SetElementStateCallback callback) override {
     ASSERT_EQ(processing_element_id, kAglPeId);
-    ASSERT_TRUE(state.has_enabled());
-    agl_enabled_ = state.enabled();
+    ASSERT_TRUE(state.has_started());
+    agl_enabled_ = state.started() && (!state.has_bypassed() || !state.bypassed());
     callback(signal_fidl::SignalProcessing_SetElementState_Result::WithResponse(
         signal_fidl::SignalProcessing_SetElementState_Response()));
   }

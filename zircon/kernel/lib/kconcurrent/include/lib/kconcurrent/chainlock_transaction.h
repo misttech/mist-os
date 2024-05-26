@@ -483,12 +483,11 @@ class TA_SCOPED_CAP ChainLockTransaction : public ::kconcurrent::ChainLockTransa
     debug_.AssertNumLocksHeld(0);
     debug_.AssertNotFinalized();
 
-    auto pause = [this]() {
+    auto pause = [this](const struct percpu& pcpu) {
       if (conflict_id_) {
-        struct percpu* pcpu = arch_get_curr_percpu();
         do {
           arch::Yield();
-        } while (pcpu->chain_lock_conflict_id.load(ktl::memory_order_acquire) == conflict_id_);
+        } while (pcpu.chain_lock_conflict_id.load(ktl::memory_order_acquire) == conflict_id_);
         conflict_id_ = 0;
       } else {
         arch::Yield();
@@ -510,12 +509,13 @@ class TA_SCOPED_CAP ChainLockTransaction : public ::kconcurrent::ChainLockTransa
     // of the CLT was instantiated.  If we added (to the arch level) the ability
     // to check the saved state to see if IRQs were already disabled when we
     // entered, we can skip the un-register/re-register steps.
+    const struct percpu& pcpu = *arch_get_curr_percpu();
     if constexpr (kType != CltType::NoIrqSave) {
       DoUnregister();
-      pause();
+      pause(pcpu);
       DoRegister();
     } else {
-      pause();
+      pause(pcpu);
     }
   }
 

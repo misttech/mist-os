@@ -14,9 +14,8 @@ namespace zxdb {
 namespace {
 
 const char kClsShortHelp[] = "cls: clear screen.";
-const char kClsHelp[] =
-    R"(cls
-
+const char kClsUsage[] = "cls";
+const char kClsHelp[] = R"(
   Clears the contents of the console. Similar to "clear" on a shell.
 
   There are no arguments.
@@ -31,7 +30,8 @@ void RunVerbCls(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetClsVerbRecord() {
-  return VerbRecord(&RunVerbCls, {"cls"}, kClsShortHelp, kClsHelp, CommandGroup::kGeneral);
+  return VerbRecord(&RunVerbCls, {"cls"}, kClsShortHelp, kClsUsage, kClsHelp,
+                    CommandGroup::kGeneral);
 }
 
 }  // namespace zxdb

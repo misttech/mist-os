@@ -30,3 +30,9 @@ platform(
     ],
     visibility = ["//visibility:public"],
 )
+
+filegroup(
+    name = "bzl_srcs",
+    srcs = glob(["*.bzl"]),
+    visibility = ["//fuchsia:__pkg__"],
+)

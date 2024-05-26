@@ -24,9 +24,8 @@ namespace {
 constexpr int kClearSwitch = 1;
 
 const char kPauseShortHelp[] = "pause / pa: Pause a thread or process.";
-const char kPauseHelp[] =
-    R"(pause / pa
-
+const char kPauseUsage[] = "pause / pa";
+const char kPauseHelp[] = R"(
   When a thread or process is running, "pause" will stop execution so state
   can be inspected or the thread single-stepped.
 
@@ -207,7 +206,7 @@ void RunVerbPause(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetPauseVerbRecord() {
-  VerbRecord pause(&RunVerbPause, {"pause", "pa"}, kPauseShortHelp, kPauseHelp,
+  VerbRecord pause(&RunVerbPause, {"pause", "pa"}, kPauseShortHelp, kPauseUsage, kPauseHelp,
                    CommandGroup::kProcess);
   pause.switches.push_back(SwitchRecord(kClearSwitch, false, "clear-state", 'c'));
   return pause;

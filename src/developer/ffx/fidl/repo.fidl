@@ -153,22 +153,6 @@ closed protocol RepositoryRegistry {
         target_identifier string:<rc.NODE_NAME_MAX, optional>;
     }) -> () error RepositoryError;
 
-    /// List the packages in the repository named `name`.
-    strict ListPackages(resource struct {
-        name string:MAX_NAME;
-        iterator server_end:RepositoryPackagesIterator;
-        /// Fields to include. This defaults to being empty (and therefore including none of the
-        /// fields that can be toggled by this parameter).
-        include_fields ListFields;
-    }) -> () error RepositoryError;
-
-    /// List the components in the package named `package_name` from a repo named `repository_name` .
-    strict ShowPackage(resource struct {
-        repository_name string:MAX_NAME;
-        package_name string:MAX_NAME;
-        iterator server_end:PackageEntryIterator;
-    }) -> () error RepositoryError;
-
     /// Get a list associating repositories with the targets they have been registered to.
     strict ListRegisteredTargets(resource struct {
         iterator server_end:RepositoryTargetsIterator;
@@ -186,52 +170,10 @@ closed protocol RepositoryIterator {
     });
 };
 
-closed protocol PackageEntryIterator {
-    strict Next() -> (struct {
-        entries vector<PackageEntry>:MAX;
-    });
-};
-
-closed protocol RepositoryPackagesIterator {
-    strict Next() -> (struct {
-        packages vector<RepositoryPackage>:MAX;
-    });
-};
-
 closed protocol RepositoryTargetsIterator {
     strict Next() -> (struct {
         registrations vector<RepositoryTarget>:MAX;
     });
-};
-
-type PackageEntry = table {
-    /// Blob name
-    1: path string:MAX_PATH;
-    /// Blob's merkle hash
-    2: hash string:MAX_PATH;
-    /// Size in bytes of this blob.
-    3: size uint64;
-    /// Last modification timestamp (seconds since UNIX epoch). May be null
-    /// depending on repository source.
-    4: modified uint64;
-};
-
-type ListFields = flexible bits : uint32 {
-    COMPONENTS = 0x00000001; // If present, component info will be included
-};
-
-type RepositoryPackage = table {
-    /// Package name
-    1: name string:2048;
-    /// Package's merkle hash
-    2: hash string:2048;
-    /// Size in bytes of all blobs in this package.
-    3: size uint64;
-    /// Last modification timestamp (seconds since UNIX epoch). May be null depending on repository
-    /// source.
-    4: modified uint64;
-    /// List of blobs in this package: currently, this is only components.
-    5: entries vector<PackageEntry>:MAX;
 };
 
 type RepositoryTarget = table {

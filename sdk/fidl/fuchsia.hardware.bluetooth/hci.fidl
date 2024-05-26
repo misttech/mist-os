@@ -20,6 +20,105 @@ type ScoSampleRate = flexible enum : uint8 {
     KHZ_16 = 2;
 };
 
+const EVENT_MAX uint64 = 257;
+const COMMAND_MAX uint64 = 258;
+const ACL_PACKET_MAX uint64 = 65539;
+const ISO_PACKET_MAX uint64 = 16387;
+const SCO_PACKET_MAX uint64 = 258;
+
+/// Packet received by the host from the controller.
+type ReceivedPacket = flexible union {
+    1: event vector<byte>:EVENT_MAX;
+    2: acl vector<byte>:ACL_PACKET_MAX;
+    3: iso vector<byte>:ISO_PACKET_MAX;
+};
+
+/// Packet sent by the host to the controller.
+type SentPacket = flexible union {
+    1: command vector<byte>:COMMAND_MAX;
+    2: acl vector<byte>:ACL_PACKET_MAX;
+    3: iso vector<byte>:ISO_PACKET_MAX;
+};
+
+type ScoPacket = struct {
+    packet vector<byte>:SCO_PACKET_MAX;
+};
+
+open protocol ScoConnection {
+    /// More than one Send can be pending simultaneously.
+    /// Prefer to limit the number of pending calls to avoid overflow.
+    /// A maximum of 10 pending calls is suggested.
+    flexible Send(ScoPacket) -> ();
+
+    /// More than one packet event can be sent before acknowledged. Each packet must be
+    /// acknowledged with `AckReceive`. Servers should limit the number of pending acknowledgements
+    /// to avoid channel overflow. A maximum of 10 unacked packets is recommended.
+    flexible -> OnReceive(ScoPacket);
+    flexible AckReceive();
+
+    /// The server will close the protocol when `Stop` is received. This is useful for
+    /// synchronization (e.g. before configuring another `ScoConnection`).
+    flexible Stop();
+};
+
+open protocol Snoop {
+    /// A packet has been transmitted/received. Some number of packets can be observed before the
+    /// client stalls. The client is allowed to drop packets if the server takes too long to
+    /// acknowledge packets.
+    flexible ObservePacket(table {
+        /// Monotonically increasing packet count. Used for flow control in conjunction with
+        /// `OnAcknowledgePackets`.
+        1: sequence uint64;
+        /// Either `sent` or `received` will be set, but not both.
+        2: sent SentPacket;
+        3: received ReceivedPacket;
+    });
+
+    /// Acknowledge packets have been received up to `sequence`.
+    flexible -> OnAcknowledgePackets(struct {
+        sequence uint64;
+    });
+
+    /// Sent by the client after `OnAcknowledgePackets` is received if packets were dropped since
+    /// the last `ObservePacket`.
+    flexible OnDroppedPackets(table {
+        1: sent uint32;
+        2: received uint32;
+    });
+};
+
+open protocol HciTransport {
+    /// More than one Send can be pending simultaneously.
+    /// Prefer to limit the number of pending calls to avoid overflow.
+    /// A maximum of 10 pending calls is suggested.
+    /// If an event or SCO packet is received by the server, the server should close the protocol.
+    flexible Send(SentPacket) -> ();
+
+    /// More than one packet event can be sent before acknowledged. Each packet must be
+    /// acknowledged with `AckReceive`. Servers should limit the number of pending acknowledgements
+    /// to avoid channel overflow. A maximum of 10 unacked packets is recommended. If a command or
+    /// SCO packet is received by the client, the client should close the protocol.
+    flexible -> OnReceive(ReceivedPacket);
+    flexible AckReceive();
+
+    /// Establish a SCO connection. Only 1 SCO connection can be configured at a time.
+    flexible ConfigureSco(resource table {
+        /// Required.
+        1: coding_format ScoCodingFormat;
+        /// Required.
+        2: encoding ScoEncoding;
+        /// Required.
+        3: sample_rate ScoSampleRate;
+        /// Required.
+        4: connection server_end:ScoConnection;
+    });
+
+    /// Set a `Snoop` client that will be notified of all sent and received packets.
+    flexible SetSnoop(resource struct {
+        snoop client_end:Snoop;
+    });
+};
+
 open protocol Hci {
     /// Open the two-way HCI command channel for sending HCI commands and
     /// receiving event packets.  Returns ZX_ERR_ALREADY_BOUND if the channel

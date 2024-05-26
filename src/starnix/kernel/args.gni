@@ -10,7 +10,7 @@ declare_args() {
   starnix_enable_tracing = true
 
   # Whether or not high-throughput tracing (e.g. per-syscall) is enabled globally.
-  starnix_enable_tracing_firehose = false
+  starnix_enable_tracing_firehose = true
 
   # Compiles-in trace and debug logging in release builds. By default, these
   # logs are compiled-out for performance reasons. For more information, see

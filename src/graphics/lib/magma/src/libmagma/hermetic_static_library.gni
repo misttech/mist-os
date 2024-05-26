@@ -52,10 +52,12 @@ template("hermetic_static_library") {
 
     libcpp_path =
         "$clang_prefix/../lib/${current_target_tuple}/noexcept/libc++.a"
+    fatlto_relocatable_path = "//build/config/lto/fatlto.relocatable.ld"
     inputs = [
       get_label_info(deps[0], "target_out_dir") +
           "/lib${output_target}_nonhermetic.a",
       libcpp_path,
+      fatlto_relocatable_path,
     ]
     outputs = [ "$target_out_dir/${output_target}_temp.o" ]
 
@@ -74,6 +76,7 @@ template("hermetic_static_library") {
       "-o",
       rebase_path(outputs[0], root_build_dir),
       rebase_path(libcpp_path, root_build_dir),
+      rebase_path(fatlto_relocatable_path, root_build_dir),
     ]
   }
 

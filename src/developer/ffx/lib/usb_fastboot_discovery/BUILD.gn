@@ -23,6 +23,7 @@ if (is_host) {
     ]
 
     test_deps = [
+      "//src/lib/fuchsia",
       "//third_party/rust_crates:futures",
       "//third_party/rust_crates:pretty_assertions",
     ]

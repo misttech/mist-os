@@ -69,7 +69,10 @@ python_mobly_test("nuc_target_identity_tests") {
   ]
   params_source = "params_x64.yaml"
   transport = "fuchsia-controller"
-  environments = [ nuc_env ]
+  environments = [
+    nuc7_env,
+    nuc11_env,
+  ]
   deps = target_identity_deps
 }
 

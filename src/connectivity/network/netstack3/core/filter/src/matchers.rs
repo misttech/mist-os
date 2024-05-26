@@ -203,15 +203,39 @@ impl<I: IpExt, DeviceClass> PacketMatcher<I, DeviceClass> {
 #[cfg(test)]
 pub(crate) mod testutil {
     use const_unwrap::const_unwrap_option;
+    use netstack3_base::{
+        testutil::{FakeStrongDeviceId, FakeWeakDeviceId},
+        DeviceIdentifier, StrongDeviceIdentifier,
+    };
 
     use super::*;
     use crate::context::testutil::FakeDeviceClass;
 
-    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+    #[derive(Clone, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
     pub struct FakeDeviceId {
         pub id: NonZeroU64,
         pub name: String,
         pub class: FakeDeviceClass,
+    }
+
+    impl StrongDeviceIdentifier for FakeDeviceId {
+        type Weak = FakeWeakDeviceId<Self>;
+
+        fn downgrade(&self) -> Self::Weak {
+            FakeWeakDeviceId(self.clone())
+        }
+    }
+
+    impl DeviceIdentifier for FakeDeviceId {
+        fn is_loopback(&self) -> bool {
+            false
+        }
+    }
+
+    impl FakeStrongDeviceId for FakeDeviceId {
+        fn is_alive(&self) -> bool {
+            true
+        }
     }
 
     impl InterfaceProperties<FakeDeviceClass> for FakeDeviceId {

@@ -15,6 +15,7 @@ driver_bind_rules("focaltech_touch_bind") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_bindlib",
+    "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.focaltech.platform",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",

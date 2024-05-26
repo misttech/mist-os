@@ -130,8 +130,12 @@ func prune(ctx context.Context, bfrs []elflib.BinaryFileRef) ([]elflib.BinaryFil
 			}
 			if !hasDex {
 				// Found a file that doesn't have a debug_info section or a dex
-				// section, this is an error.
-				return nil, fmt.Errorf("%s missing .debug_info and .dex sections", bfr.Filepath)
+				// section, output a warning and continue. This was formerly a hard
+				// error, but after https://fxbug.dev/342649089, it has been
+				// downgraded to a warning.
+				// TODO(https://fxbug.dev/342649089): Evaluate if this should return
+				// to blocking status or not.
+				logger.Warningf(ctx, "%s missing .debug_info and .dex sections", bfr.Filepath)
 			}
 
 			// Fallthrough if the file has a dex section but no debug_info section.

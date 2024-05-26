@@ -22,7 +22,11 @@ namespace ld {
 // It may or may not be the first or only dynamic linking session performed on
 // the same process.  Each dynamic linking session defines its own symbolic
 // dynamic linking domain and has its own passive ABI (stub dynamic linker).
-// TODO(https://fxbug.dev/326524302): Describe Zygote options.
+//
+// The second optional template parameter can select the "zygote mode"
+// implementation.  This is used by the <lib/ld/remote-zygote.h> API, which
+// provides the ld::RemoteZygote::Linker alias.  The zygote-mode linker is used
+// in the same ways as the plain ld::RemoteDynamicLinker described here.
 //
 // Before creating an ld::RemoteDynamicLinker, the ld::RemoteAbiStub must be
 // provided (see <lib/ld/remote-abi-stub.h>).  Only a single ld::RemoteAbiStub
@@ -34,12 +38,48 @@ namespace ld {
 // The dynamic linking session proceeds in these phases, with one method each:
 //
 // * `Init()` starts the session by finding and decoding all the modules.  This
-//   starts with initial modules (such as a main executable), and acquires
-//   their transitive DT_NEEDED dependencies via a callback function.
-//   Additional "pre-decoded" modules may be specified to Init, such as a vDSO:
-//   these are linked in even if they are not referenced by any DT_NEEDED
-//   dependency; they always appear in the passive ABI, and if unreferenced
-//   will be last in the list and have `.symbols_visible = false`.
+//   starts with root modules (such as a main executable), and acquires their
+//   transitive DT_NEEDED dependencies via a callback function.  Additional
+//   "implicit" modules may be specified to Init, such as a vDSO: these are
+//   linked in even if they are not referenced by any DT_NEEDED dependency;
+//   they always appear in the passive ABI, and if unreferenced will be last in
+//   the list and have `.symbols_visible = false`.
+//
+//   Implicit modules serve multiple purposes.  One is just to satisfy any
+//   DT_NEEDED dependencies for them--but that could just as well be handled by
+//   giving the callback function special-case logic for certain names.  What's
+//   unique about implicit modules is that they will be there even if they are
+//   not referenced by any DT_NEEDED entry.  The use cases are things that are
+//   going to be in the address space anyway for some reason other than use of
+//   their symbolic ABI via dynamic linking.
+//
+//   One kind reason something is in the address space without its symbolic ABI
+//   being used is that its code and/or data addresses are part of a direct ABI
+//   used in some other way.  An example of this is the stub dynamic linker
+//   (and likewise, the traditional in-process startup dynamic linker
+//   implementing similar logic case): it contains runtime entry points used
+//   implicitly by certain kinds of TLS accesses, so dynamic linking may
+//   resolve certain relocations using addresses in this implicit shared
+//   library, even though nothing refers to its DT_SONAME, nor to any symbol it
+//   defines.  Another example is a vDSO: the process startup ABI includes
+//   passing pointers into the vDSO image in various ways, so programs that
+//   don't have a DT_NEEDED dependency on the vDSO anywhere might still have
+//   code that follows those pointers and needs its code or data to be intact.
+//
+//   Another reason something is preemptively put into the address space is to
+//   make sure its symbolic ABI will be available at runtime to things that use
+//   it opportunistically or in special ways rather than via normal dynamic
+//   linking dependencies.  When a module with `.symbols_visible = false` on
+//   the list is also what it looks like when a module was added via `dlopen`
+//   without using the `RTLD_GLOBAL` flag: a later attempt to `dlopen` that
+//   name (or something else that transitively reaches a DT_NEEDED for that
+//   same name) will find the module already loaded, and not try to load it
+//   afresh.  Finally, it's important that every module that is present in the
+//   address space for whatever reason be represented in the passive ABI of any
+//   dynamic linking domain that might interact with it.  For example, unwinder
+//   implemnentations will consult this module list (via the `dl_iterate_phdr`
+//   API) to map any PC they come across to a module and find its unwinding
+//   metadata.  Things go awry if a PC does not lie in a known module.
 //
 // * `Allocate()` sets the load address for each module using zx_vmar_allocate.
 //   Each module gets a VMAR to reserve its part of the address space, and the
@@ -47,14 +87,45 @@ namespace ld {
 //   step that binds the dynamic linking session to a particular address layout
 //   and set of relocation results, which depend on all the addresses.  The
 //   session is now appropriate only for a single particular process, or a
-//   single zygote that will spawn identical processes.
+//   single zygote that will spawn identical processes.  This is the first
+//   point at which there is any need for a Zircon process to actually exist.
+//   Creating the process and ultimately launching it are outside the scope of
+//   this API.  The call to Allocate() must supply a zx::unowned_vmar where
+//   zx::vmar::allocate() calls will be made to place each module.  That can be
+//   the root VMAR of a process, or a smaller VMAR.  It must be large enough to
+//   fit all the module images (including their .bss space beyond the size of
+//   each ELF file image), and must permit the necessary mapping operations
+//   (read, write, and execute, usually).  The absolute addresses for any
+//   `Preplaced()` (`InitModule::WithLoadBias`) uses and their image sizes must
+//   lie within this VMAR.
 //
 // * `Relocate()` fills in all the segment data that will need to be mapped in.
 //   That is, it performs relocation on all modules and completes the passive
-//   ABI data in the stub dynamic linker module.
+//   ABI data in the stub dynamic linker module.  When the Diagnostics object
+//   passed to `Init()` used a policy of reporting multiple errors before
+//   bailing out, then `Init()` returned "successfully" even if there were
+//   errors reported such as an invalid ELF file or a `get_dep` callback that
+//   couldn't find the file.  It may be appropriate to check the Diagnostics
+//   object's error count and bail out before attempting relocation.  It's also
+//   safe to have the policy of attempting relocation despite past errors in
+//   the Init phase.  Any modules not decoded with sufficient success to safely
+//   attempt relocation will be skipped.  Relocating the remaining modules may
+//   produce many additional errors due to partially-decoded or corrupt
+//   metadata or undefined symbols that would have come from missing or
+//   corrupted files.  Such additional logging of e.g. undefined symbols may be
+//   deemed useful, or not.  It is highly discouraged to proceed past the
+//   Relocate phase on to additional calls if there were any errors reported
+//   during or before the Relocate phase.  There is likely little benefit in
+//   doing the address space layout or loading work to report additional error
+//   details, and actually launching the process could be disastrous.
 //
 // * `Load()` loads all the segments finalized by `Relocate()` into the VMARs
-//   created by `Allocate()`.
+//   created by `Allocate()`.  Since the VMARs have already been created and
+//   the VMOs of segment contents already completed, nothing can usually go
+//   wrong here except for resource exhaustion in creating mappings new VMOs
+//   (either zero-fill or copy-on-write copies of relocated segments).  If
+//   anything does go wrong, the process address space may be left in an
+//   indeterminate state until the ld::RemoteDynamicLinker object is destroyed.
 //
 // * `Commit()` finally ensures that the VMARs created and mappings made can't
 //   be changed or destroyed.  If Commit() is not called, then all the VMARs
@@ -64,8 +135,9 @@ namespace ld {
 // The VMAR handles are no longer available and the VmarLoader objects would
 // need to be reinitialized to be used again.  The segment VMO handles are
 // still available, but when not in zygote mode they are in use by process
-// mappings and must not be touched.  TODO(https://fxbug.dev/326524302): In
-// Zygote mode, it can also be distilled into a zygote.
+// mappings and must not be touched.  In zygote mode, the relocated segment
+// VMOs will be made read-only and then reused (directly for RELRO mappings or
+// via copy-on-write copies) to load additional as-relocated process images.
 //
 // Various other methods are provided for interrogating the list of modules and
 // accessing the dynamic linker stub module and the ld::RemoteAbi object.
@@ -83,50 +155,116 @@ class RemoteDynamicLinker {
   using TlsDescResolver = ld::StaticTlsDescResolver<Elf>;
   using TlsdescRuntimeHooks = typename TlsDescResolver::RuntimeHooks;
 
-  // Each initial module has a name.  For the main executable this is "".
-  // For explicitly-loaded modules, it's the name by which they were loaded.
-  // This will become Module::name() and link_map.name in the passive ABI.
-  struct InitModule {
-    Soname name = abi::Abi<Elf>::kExecutableName;
-    DecodedModulePtr decoded_module;
-  };
-
-  using InitModuleList = cpp20::span<InitModule>;
-
-  // Each predecoded module is only known by its DT_SONAME.  When Init
-  // implicitly creates the RemoteLoadModule for it, that will always get a
-  // `.name()` string that matches its DT_SONAME, so there is no name supplied
-  // here as there is for an initial module.
+  // The Init method takes an InitModuleList as an argument.  Each element
+  // describes an initial module, which is either a root module or an
+  // implicitly-loaded module.  Init loads all these modules and all their
+  // transitive dependencies as indicated by DT_NEEDED entries.
   //
-  // If the module is referenced transitively from an initial module, then its
-  // link_map.name pointer will point into the DT_NEEDED string in the
-  // DT_STRTAB of the (first) module that used it, which its loaded_by_modid
-  // will point to.  If it's not referenced at all, it will go on the list the
-  // `symbols_visible` flag in its ld::abi::Abi<>::Module set to false and its
-  // link_map.name pointer will point into the DT_SONAME of the DT_STRTAB in
-  // this module itself, with std::nullopt for its loaded_by_modid.  Either
-  // pointer is an identical string, but the RemoteAbiTranscriber needs to know
-  // where each pointer came from.
-  struct PredecodedModule {
+  // Convenience functions are provided for creating InitModule objects for the
+  // usual cases, or they can be default-constructed or aggregate-initialized
+  // and their members set directly.  Each object requires a DecodedModulePtr,
+  // acquired via <lib/ld/remote-decoded-module.h> RemoteDecodedModule::Create.
+  //
+  // The root modules are distinguished by having the `.visible_name` member
+  // set.  The module list for this dynamic linking session starts with the
+  // root modules in the order provided.  The list is then extended with all
+  // their transitive dependencies, in breadth-first order, aka "load order".
+  //
+  // Each module with `.visible_name = std::nullopt` is an implicitly-loaded
+  // module.  These are always loaded, but their place in the load order
+  // depends on the DT_NEEDED dependency graph.  An implicitly-loaded module
+  // must have a DT_SONAME; when a DT_NEEDED entry matches that name, the
+  // module goes onto the list.  If no DT_NEEDED entry required the module,
+  // then it is still loaded, but appears last in the list, with false for its
+  // ld::abi::Abi<>::Module::symbols_visible flag.
+  //
+  // The `.load` member may optionally be initialized to direct how to load
+  // that module.
+  struct InitModule {
+    // This is the default type for the `.load` member.  It says that the
+    // module can go anywhere in the address space, leaving the choice up to
+    // the kernel's ASLR within the VMAR passed to the Allocate method.
+    struct LoadAnywhere {};
+
+    // This type requests loading at a specific load address, which is
+    // represented as the bias added to `.decoded_module->vaddr_start()`.
+    struct WithLoadBias {
+      WithLoadBias() = delete;
+      constexpr explicit WithLoadBias(size_type bias) : load_bias{bias} {}
+
+      size_type load_bias;
+    };
+    static_assert(!std::is_default_constructible_v<WithLoadBias>);
+    static_assert(std::is_trivially_copyable_v<WithLoadBias>);
+
+    // This type indicates that the module is already present in the process
+    // address space and does not need to be loaded at all.  This module is
+    // treated specially in that its DT_NEEDED dependencies won't be examined,
+    // and the module itself won't be loaded.  Instead, it will just go into
+    // the module list and provide symbol definitions as if it had been loaded.
+    // As in WithLoadBias, its load address is specified in terms of the bias
+    // added to its `.decoded_module->vaddr_start()`, as returned by the
+    // load_bias() method on An existing module from a previous session.
+    struct AlreadyLoaded {
+      AlreadyLoaded() = delete;
+      constexpr explicit AlreadyLoaded(size_type bias) : load_bias{bias} {}
+
+      size_type load_bias;
+    };
+    static_assert(!std::is_default_constructible_v<AlreadyLoaded>);
+    static_assert(std::is_trivially_copyable_v<AlreadyLoaded>);
+
+    // This is the type of the `.load` member: one of the above, with the
+    // default-constructed state being LoadAnywhere.
+    using Load = std::variant<LoadAnywhere, WithLoadBias, AlreadyLoaded>;
+
+    // This is the module to load.  It must be a valid pointer whose
+    // `->HasModule()` returns true, indicating it was decoded sufficiently
+    // successfully to attempt relocation safely.
     DecodedModulePtr decoded_module;
-    // TODO(https://fxbug.dev/326524302): Add an optional setting for a module
-    // already loaded into the address space.
+
+    // This indicates whether this is a visible initial module, i.e. a root
+    // module.  The root modules go first in the load order and their symbols
+    // are always marked as visible in ld::abi::Abi<>::Module::symbols_visible.
+    // Each root module has a name.  A standard main executable is the only
+    // root module and usually called ld::abi::Abi<>::kExecutableName (the
+    // empty string, which is not the same as having no name!).  If left as
+    // std::nullopt, this is instead an implicitly-loaded module.
+    std::optional<Soname> visible_name;
+
+    // This can be set to one of the types defined above to direct the loading.
+    // When left to the default construction, this gets LoadAnywhere.
+    Load load;
   };
 
-  template <size_t Count>
-  using PredecodedModuleList = std::array<PredecodedModule, Count>;
+  // The Init method takes a vector of InitModule objects, whose
+  // `.decoded_module` references are consumed by the call.
+  using InitModuleList = std::vector<InitModule>;
 
-  // This corresponds 1:1 to the predecoded_modules list passed into
-  // Init, giving the position in .modules() where each was inserted.
-  template <size_t Count>
-  using PredecodedPositions = std::array<size_t, Count>;
+  // On success, the Init method returns a vector whose size matches the
+  // InitModuleList::size() of the argument list.  Each InitResult element is
+  // an iterator into the `modules()` list that corresponds to the InitModule
+  // with the same index in the InitModuleList argument.
+  using InitResult = std::vector<typename List::iterator>;
 
+  // The `get_dep` callback passed to the Init method gets a DT_NEEDED string
+  // and must return a value convertible to this.  The std::nullopt value
+  // indicates the module could not be found or could not decoded, and
+  // diagnostics have already been logged about those details.  Otherwise, it
+  // must be a non-null DecodedModulePtr; often that module will have a
+  // DT_SONAME matching the requested name, but it need not have a DT_SONAME at
+  // all and if it does it need not match the requested name.  (Later DT_NEEDED
+  // dependencies on either the name in the original request or the DT_SONAME
+  // will all reuse the same module and not repeat the callback.)
   using GetDepResult = std::optional<DecodedModulePtr>;
 
+  // If default-constructed, set_abi_stub() must be used before Init().
   RemoteDynamicLinker() = default;
 
+  // The object is movable and move-assignable.
   RemoteDynamicLinker(RemoteDynamicLinker&&) = default;
 
+  // The AbiStubPtr can be set in the constructor or with set_abi_stub().
   explicit RemoteDynamicLinker(AbiStubPtr abi_stub) : abi_stub_{std::move(abi_stub)} {}
 
   RemoteDynamicLinker& operator=(RemoteDynamicLinker&&) = default;
@@ -135,10 +273,66 @@ class RemoteDynamicLinker {
 
   void set_abi_stub(AbiStubPtr abi_stub) { abi_stub_ = std::move(abi_stub); }
 
+  // Shorthand to create an InitialModuleList element for a root module, which
+  // always has an explicit name.
+  static InitModule RootModule(DecodedModulePtr decoded_module, const Soname& visible_name) {
+    return InitModule{
+        .decoded_module = std::move(decoded_module),
+        .visible_name = visible_name,
+    };
+  }
+
+  // Shorthand to create an InitialModuleList element for the common case: the
+  // main executable as root module.
+  static InitModule Executable(DecodedModulePtr decoded_module) {
+    return RootModule(std::move(decoded_module), abi::Abi<Elf>::kExecutableName);
+  }
+
+  // Shorthand to create an InitialModuleList element for an implicit module,
+  // such as the vDSO.
+  static InitModule Implicit(DecodedModulePtr decoded_module) {
+    return InitModule{.decoded_module = std::move(decoded_module)};
+  }
+
+  // Shorthand to create an InitialModuleList element for a module whose load
+  // bias is chosen rather than left to ASLR.  If the optional visible_name is
+  // given, this is a root module; otherwise it's an implicit module.
+  static InitModule Preplaced(  //
+      DecodedModulePtr decoded_module, size_type load_bias,
+      std::optional<Soname> visible_name = std::nullopt) {
+    return InitModule{.decoded_module = std::move(decoded_module),
+                      .visible_name = visible_name,
+                      .load = WithLoadBias{load_bias}};
+  }
+
+  // Shorthand to create an InitialModuleList element for a module already
+  // loaded in place.
+  static InitModule Preloaded(  //
+      DecodedModulePtr decoded_module, size_type load_bias,
+      std::optional<Soname> visible_name = std::nullopt) {
+    return InitModule{.decoded_module = std::move(decoded_module),
+                      .visible_name = visible_name,
+                      .load = AlreadyLoaded{load_bias}};
+  }
+
+  // Shorthand for turning a previous set of initial modules into a new one.
+  // This produces the list for a secondary dynamic linking session that takes
+  // the initial modules from this session as preloaded implicit modules.  This
+  // takes the (successful) return value from Init, but it should be used only
+  // after the Allocate phase when all the load addresses are known.
+  InitModuleList PreloadedImplicit(const InitResult& list) {
+    InitModuleList result;
+    result.reserve(list.size());
+    for (const auto& mod : list) {
+      result.emplace_back(Preloaded(mod->decoded_module(), mod->load_bias()));
+    }
+    return result;
+  }
+
   // Other accessors should be used only after a successful Init call (below).
 
-  RemoteAbi<Elf>& remote_abi() { return remote_abi_; }
-  const RemoteAbi<Elf>& remote_abi() const { return remote_abi_; }
+  RemoteAbi<Module>& remote_abi() { return remote_abi_; }
+  const RemoteAbi<Module>& remote_abi() const { return remote_abi_; }
 
   List& modules() { return modules_; }
   const List& modules() const { return modules_; }
@@ -245,84 +439,109 @@ class RemoteDynamicLinker {
     return OnModules(ValidModules(), std::forward<T>(callback));
   }
 
-  // Initialize the session by finding and decoding all the modules.  The
-  // initial_modules go on the list first, and then dependencies are added.
-  // The predecoded_modules are used by SONAME as needed, and if unreferenced
-  // go on the list with `.symbols_visible = false`.  For any other dependency,
-  // call the get_dep function as `GepDepResult(Soname)`.  The return type is
-  // an alias for `std::optional<DecodedModulePtr>`.  The function is
-  // responsible for doing its own diagnostics logging as needed.  If it
-  // returns `std::nullopt`, then Init returns `std::nullopt` immediately, as
-  // when the Diagnostics object returns false.  If it instead returns a null
-  // DecodedModulePtr, that is treated like the Diagnostics object returning
-  // true after a failure: that dependency is omitted, but processing
-  // continues.  The return value is `std::nullopt` if the Diagnostics object
-  // returned false for an error or the get_dep function returned
-  // `std::nullopt`; otherwise, it yields array of indices into modules() of
-  // where each of the predecoded_modules was placed.  On success, the
-  // modules() list is complete, remote_abi() has been initialized, and
-  // abi_stub_module() can be used.
-  template <class Diagnostics, typename GetDep, size_t PredecodedCount>
-  std::optional<PredecodedPositions<PredecodedCount>> Init(
-      Diagnostics& diag, InitModuleList initial_modules, GetDep&& get_dep,
-      PredecodedModuleList<PredecodedCount> predecoded_modules) {
+  // Initialize the session by finding and decoding all the modules.  The root
+  // modules from initial_modules (those with `.visible_name` set) go onto the
+  // list first in the same order in which they appear there, and then all the
+  // transitive dependencies are added in breadth-first order.
+  //
+  // The implicit modules are used by DT_SONAME as needed.  Any module that is
+  // never referenced via DT_NEEDED goes onto the list at the end, with its
+  // `.symbols_visible = false`.  Note that implicit modules never have their
+  // own DT_NEEDED lists examined: they are expected either to have no
+  // dependencies or to have had their dependencies preloaded in some fashion.
+  //
+  // For any other dependency, call get_dep as `GepDepResult(Soname)`.  The
+  // return value is an alias for `std::optional<DecodedModulePtr>`.  This
+  // callback is responsible for doing its own diagnostics logging as needed.
+  // If it returns `std::nullopt`, then Init will return `std::nullopt`
+  // immediately, as when the Diagnostics object returns false.  If it instead
+  // returns a null DecodedModulePtr, that will be treated like the Diagnostics
+  // object returning true after a failure: that dependency will be omitted,
+  // but processing continues.
+  //
+  // The return value is `std::nullopt` if the Diagnostics object returned
+  // false for an error or the get_dep function returned `std::nullopt`.
+  //
+  // The InitResult on success has the same number of elements as the argument
+  // initial_modules list, each giving the iterator into `.modules()` for that
+  // initial module's place in the load order.  The modules() list is complete,
+  // remote_abi() has been initialized, and abi_stub_module() can be used.
+  template <class Diagnostics, typename GetDep>
+  std::optional<InitResult> Init(Diagnostics& diag, InitModuleList initial_modules,
+                                 GetDep&& get_dep) {
     static_assert(std::is_invocable_r_v<GetDepResult, GetDep, Soname>);
 
     assert(abi_stub_);
 
     assert(!initial_modules.empty());
 
-    assert(std::all_of(predecoded_modules.begin(), predecoded_modules.end(),
-                       [](const auto& pdm) { return pdm.decoded_module->HasModule(); }));
+    assert(std::all_of(initial_modules.begin(), initial_modules.end(), [](const auto& init) {
+      return init.decoded_module && init.decoded_module->HasModule();
+    }));
 
-    // Start the list with the initial modules.  The first one is the main
+    auto next_modid = [this]() -> uint32_t { return static_cast<uint32_t>(modules_.size()); };
+
+    // Start the list with the root modules.  The first one is the main
     // executable if there is such a thing.  It gets symbolizer module ID 0.
-    for (auto& mod : initial_modules) {
-      EmplaceModule(mod.name, std::nullopt, std::move(mod.decoded_module));
+    std::vector<uint32_t> initial_modules_modid(initial_modules.size(), static_cast<uint32_t>(-1));
+    size_t implicit_module_count = 1;  // The stub counts specially.
+    for (size_t i = 0; i < initial_modules.size(); ++i) {
+      InitModule& init_module = initial_modules[i];
+      if (init_module.visible_name) {
+        initial_modules_modid[i] = next_modid();
+        EmplaceModule(*init_module.visible_name, std::nullopt,
+                      std::move(init_module.decoded_module));
+        PlaceInitModule(modules_.back(), init_module.load);
+      } else {
+        ++implicit_module_count;
+      }
     }
 
-    // This records the position in modules_ where each predecoded module
-    // lands.  Initially, each element is -1 to indicate the corresponding
-    // argument hasn't been consumed yet.
-    constexpr size_t kNpos = -1;
-    PredecodedPositions<PredecodedCount> predecoded_positions;
-    for (size_t& pos : predecoded_positions) {
-      pos = kNpos;
-    }
-
-    // If it's in the predecoded_modules list, then return that decoded module
-    // and update predecoded_positions accordingly.
-    auto find_predecoded = [this, &predecoded_modules, &predecoded_positions](
-                               const Soname& soname, uint32_t modid) -> DecodedModulePtr {
-      // The stub is an always-injected predecoded module.  Its location in the
-      // list needs to be recorded specially so abi_stub_module() can find it.
-      if (soname == kStubSoname) {
-        stub_modid_ = modid;
-        return abi_stub_->decoded_module();
+    // If it's in the initial_modules list with no visible_name, then return
+    // that decoded module and update initial_modules_modid accordingly.
+    auto find_implicit = [this, &initial_modules, &initial_modules_modid, &implicit_module_count](
+                             Module& module, uint32_t modid) -> bool {
+      // Short-circuit if all implicit modules have already been consumed.
+      if (implicit_module_count == 0) {
+        return false;
       }
 
-      for (size_t i = 0; i < PredecodedCount; ++i) {
-        size_t& pos = predecoded_positions[i];
-        PredecodedModule& predecoded = predecoded_modules[i];
-        if (pos != kNpos) {
-          // This one has already been used.
-          assert(!predecoded.decoded_module);
-          continue;
-        }
-        if (predecoded.decoded_module->soname() == soname) {
-          predecoded_positions[i] = modid;
-          return std::exchange(predecoded.decoded_module, {});
+      auto use_decoded = [&module, modid, this](DecodedModulePtr decoded) {
+        module.set_decoded(std::move(decoded), modid, true, max_tls_modid_);
+      };
+
+      // The stub is an always-injected implicit module.  Its location in the
+      // list needs to be recorded specially so abi_stub_module() can find it.
+      if (module.name() == kStubSoname) {
+        assert(implicit_module_count > 0);
+        --implicit_module_count;
+        stub_modid_ = modid;
+        use_decoded(abi_stub_->decoded_module());
+        return true;
+      }
+
+      for (size_t i = 0; i < initial_modules.size(); ++i) {
+        InitModule& init_module = initial_modules[i];
+        if (!init_module.visible_name && init_module.decoded_module->soname() == module.name()) {
+          assert(implicit_module_count > 0);
+          --implicit_module_count;
+          initial_modules_modid[i] = modid;
+          // Don't check this element again.
+          init_module.visible_name = module.name();
+          use_decoded(std::move(init_module.decoded_module));
+          PlaceInitModule(module, init_module.load);
+          return true;
         }
       }
 
       return {};
     };
 
-    // The initial modules now form a queue of modules to be loaded.  Iterate
-    // over that queue, adding additional entries onto the queue for each
-    // DT_NEEDED list.  Once past the initial modules, each RemoteDecodedModule
-    // must be acquired.  The total number of iterations is not known until the
-    // loop terminates, every transitive dependency having been decoded.
+    // The root modules now form a queue of modules to be loaded.  Iterate over
+    // that queue, adding additional entries onto the queue for each DT_NEEDED
+    // list.  Once past the root modules, each RemoteDecodedModule must be
+    // acquired.  The total number of iterations is not known until the loop
+    // terminates, every transitive dependency having been decoded.
     for (size_t idx = 0; idx < modules_.size(); ++idx) {
       Module& mod = modules_[idx];
 
@@ -330,14 +549,13 @@ class RemoteDynamicLinker {
       const uint32_t modid = static_cast<uint32_t>(idx);
 
       if (!mod.HasDecoded()) {
-        // This isn't one of the initial modules, so it's only a needed SONAME.
+        // This isn't one of the root modules, so it's only a needed SONAME.
 
-        if (auto predecoded = find_predecoded(mod.name(), modid)) {
-          // The SONAME matches one of the predecoded modules.  Importantly,
+        if (find_implicit(mod, modid)) {
+          // The SONAME matches one of the implicit modules.  Importantly,
           // these modules' DT_NEEDED lists are not examined to enqueue more
           // dependencies.  This module is in this dynamic linking namespace,
           // but its dependencies are not necessarily in the same namespace.
-          mod.set_decoded(std::move(predecoded), modid, true, max_tls_modid_);
           continue;
         }
 
@@ -357,22 +575,27 @@ class RemoteDynamicLinker {
       EnqueueDeps(mod);
     }
 
-    // Any remaining predecoded modules that weren't reached go on the end of
-    // the list, with .symbols_visible=false.
-    for (size_t i = 0; i < PredecodedCount; ++i) {
-      size_t& pos = predecoded_positions[i];
-      if (pos != kNpos) {
-        // This one was already placed.
-        assert(!predecoded_modules[i].decoded_module);
-        continue;
+    // Any remaining implicit modules that weren't reached go on the end of the
+    // list, with .symbols_visible=false.
+    if (implicit_module_count > 0) {
+      for (size_t i = 0; i < initial_modules.size(); ++i) {
+        InitModule& init_module = initial_modules[i];
+        if (!init_module.visible_name) {
+          initial_modules_modid[i] = next_modid();
+          EmplaceUnreferenced(std::move(init_module.decoded_module));
+          PlaceInitModule(modules_.back(), init_module.load);
+          if (--implicit_module_count == (stub_modid_ == 0 ? 1 : 0)) {
+            break;
+          }
+        }
       }
-      EmplaceUnreferenced(std::move(predecoded_modules[i].decoded_module));
-    }
+      assert(implicit_module_count == (stub_modid_ == 0 ? 1 : 0));
 
-    // And finally the same for the stub dynamic linker.
-    if (stub_modid_ == 0) {
-      stub_modid_ = static_cast<uint32_t>(modules_.size());
-      EmplaceUnreferenced(abi_stub_->decoded_module());
+      // And finally the same for the stub dynamic linker.
+      if (stub_modid_ == 0) {
+        stub_modid_ = next_modid();
+        EmplaceUnreferenced(abi_stub_->decoded_module());
+      }
     }
 
     // Now that the full module list is set, the RemoteAbi can be initialized.
@@ -388,7 +611,16 @@ class RemoteDynamicLinker {
       return {};
     }
 
-    return predecoded_positions;
+    // Now that the modules_ list won't change and invalidate its iterators,
+    // reify the initial_modules indices into iterators into it.
+    std::optional<InitResult> result{std::in_place};
+    result->reserve(initial_modules_modid.size());
+    for (uint32_t modid : initial_modules_modid) {
+      assert(modid != static_cast<uint32_t>(-1));
+      result->push_back(modules_.begin() + modid);
+    }
+    assert(result->size() == initial_modules.size());
+    return result;
   }
 
   // Initialize the loader and allocate the address region for each module,
@@ -397,8 +629,33 @@ class RemoteDynamicLinker {
   // then this will just skip any modules that weren't substantially decoded.
   template <class Diagnostics>
   bool Allocate(Diagnostics& diag, zx::unowned_vmar vmar) {
-    auto allocate = [&diag, &vmar = *vmar](Module& module) -> bool {
-      return module.Allocate(diag, vmar);
+    auto allocate = [&vmar = *vmar, vmar_base = std::optional<uint64_t>{},
+                     &diag](Module& module) mutable -> bool {
+      if (module.preloaded()) {
+        // This was an InitModule::AlreadyLoaded case where PlaceInitialModule
+        // called Module::Preloaded.  There's nothing to do here: this module
+        // is already in the address space.
+        return true;
+      }
+
+      std::optional<size_t> vmar_offset;
+      if (module.module().vaddr_end != 0) {
+        // Init did SetModuleVaddrBounds for an InitModule::WithLoadBias case.
+        // Turn the vaddr_start into an offset within this VMAR.
+        if (!vmar_base) {
+          zx_info_vmar_t info;
+          zx_status_t status = vmar.get_info(ZX_INFO_VMAR, &info, sizeof(info), nullptr, nullptr);
+          if (status != ZX_OK) [[unlikely]] {
+            return diag.SystemError("ZX_INFO_VMAR: ", elfldltl::ZirconError{status});
+          }
+          vmar_base = info.base;
+        }
+        if (module.module().vaddr_start < *vmar_base) [[unlikely]] {
+          return diag.SystemError("chosen load address below VMAR base");
+        }
+        vmar_offset = module.module().vaddr_start - *vmar_base;
+      }
+      return module.Allocate(diag, vmar, vmar_offset);
     };
     return OnModules(ValidModules(), allocate);
   }
@@ -450,7 +707,28 @@ class RemoteDynamicLinker {
       // Resolve against the successfully decoded modules, ignoring the others.
       return module.Relocate(diag, valid_modules, tls_desc_resolver);
     };
-    return OnModules(valid_modules, relocate) && FinishAbi(diag);
+
+    // After the segments are complete, make sure all the VMO handles are
+    // read-only so they don't accidentally get mutated.  This isn't necessary
+    // in non-zygote mode since the object won't usually be saved long anyway.
+    auto protect_segments = [&diag](auto& module) -> bool {
+      return module.load_info().VisitSegments([&diag](auto& segment) -> bool {
+        using SegmentType = std::decay_t<decltype(segment)>;
+        if constexpr (elfldltl::kSegmentHasFilesz<SegmentType>) {
+          zx::result<> result = segment.MakeImmutable();
+          if (result.is_error()) [[unlikely]] {
+            return diag.SystemError(  //
+                "cannot drop ZX_RIGHT_WRITE from finished zygote VMO",
+                elfldltl::ZirconError{result.error_value()});
+          }
+        }
+        return true;
+      });
+    };
+
+    return OnModules(valid_modules, relocate) && FinishAbi(diag) &&
+           (Zygote == RemoteLoadZygote::kNo ||  // No need for non-zygote.
+            OnModules(valid_modules, protect_segments));
   }
 
   // Load each module into the VMARs created by Allocate.  This should only be
@@ -482,7 +760,11 @@ class RemoteDynamicLinker {
   // mappings and must not be disturbed.  The VmarLoader object for each module
   // will be in moved-from state, and cannot be used without reinitialization.
   //
-  // TODO(https://fxbug.dev/326524302): Describe Zygote options.
+  // In zygote mode, this object can be moved into the ld::RemoteZygote
+  // constructor after Commit().  If it's moved in without Commit(), then all
+  // the mappings made in the original process VMAR will be destroyed and the
+  // existing process should not be started, but the zygote will still work
+  // just the same to start more processes.
   void Commit() {
     for (Module& module : ValidModules()) {
       // After this, destroying the module won't destroy its VMAR any more.  No
@@ -493,6 +775,13 @@ class RemoteDynamicLinker {
   }
 
  private:
+  using Loader = typename Module::Loader;
+
+  using InitModuleLoad = typename InitModule::Load;
+  using LoadAnywhere = typename InitModule::LoadAnywhere;
+  using WithLoadBias = typename InitModule::WithLoadBias;
+  using AlreadyLoaded = typename InitModule::AlreadyLoaded;
+
   static constexpr Soname kStubSoname = abi::Abi<Elf>::kSoname;
 
   // Add a new module to the list.  If no decoded_module is supplied here,
@@ -524,14 +813,34 @@ class RemoteDynamicLinker {
     }
   }
 
-  // Call EmplaceModule for a predecoded module that was never referenced by
-  // any DT_NEEDED.  This module will use its DT_SONAME as its name, and it
-  // will be recorded as not being loaded by any other module.  This tells the
-  // ABI remoting that the name string is found in its own RODATA (where its
+  // Call EmplaceModule for an implicit module that was never referenced by any
+  // DT_NEEDED.  This module will use its DT_SONAME as its name, and it will be
+  // recorded as not being loaded by any other module.  This tells the ABI
+  // remoting that the name string is found in its own RODATA (where its
   // DT_STRTAB is) rather than in a referring module's RODATA (its DT_STRTAB).
   void EmplaceUnreferenced(DecodedModulePtr decoded) {
     assert(decoded);
     EmplaceModule(decoded->soname(), std::nullopt, std::move(decoded), false);
+  }
+
+  // Dispatch to another overload for the specific type.
+  static void PlaceInitModule(Module& mod, const InitModuleLoad& load) {
+    auto place = [&mod](const auto& load) { PlaceInitModule(mod, load); };
+    std::visit(place, load);
+  }
+
+  // Nothing special for a LoadAnywhere initial module.
+  static void PlaceInitModule(Module& mod, LoadAnywhere anywhere) {}
+
+  // For a WithLoadBias case, store the address for Allocate() to use.
+  static void PlaceInitModule(Module& mod, WithLoadBias preplaced) {
+    mod.Preplaced(preplaced.load_bias);
+  }
+
+  // For an AlreadyLoaded case, set up the addresses and make sure Allocate()
+  // skips the module.
+  static void PlaceInitModule(Module& mod, AlreadyLoaded preloaded) {
+    mod.Preloaded(preloaded.load_bias);
   }
 
   template <class Diagnostics>
@@ -570,7 +879,7 @@ class RemoteDynamicLinker {
   }
 
   AbiStubPtr abi_stub_;
-  RemoteAbi<Elf> remote_abi_;
+  RemoteAbi<Module> remote_abi_;
   List modules_;
   size_type max_tls_modid_ = 0;
   uint32_t stub_modid_ = 0;

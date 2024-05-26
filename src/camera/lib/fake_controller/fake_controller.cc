@@ -93,7 +93,7 @@ static std::vector<fuchsia::camera2::hal::Config> DefaultConfigs() {
 
 fpromise::result<std::unique_ptr<FakeController>, zx_status_t> FakeController::Create(
     fidl::InterfaceRequest<fuchsia::camera2::hal::Controller> request,
-    fuchsia::sysmem::AllocatorHandle allocator) {
+    fuchsia::sysmem2::AllocatorHandle allocator) {
   auto controller = std::make_unique<FakeController>();
 
   zx_status_t status = controller->loop_.StartThread("Fake Controller Loop");

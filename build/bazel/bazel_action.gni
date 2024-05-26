@@ -124,44 +124,22 @@ declare_args() {
 #     Type: list of paths relative to target_out_dir.
 #     Default: empty
 #
-#   build_id_directories: (optional)
-#     When build_id_directories is set the action will copy all of the debug
-#     symbols in the build-id into the root .build-id directory.
+#   fuchsia_package_outputs: (optional)
+#      A scope describing where to place various Fuchsia package related
+#      output files. Should only be used when bazel_inputs contains a single
+#      label pointing to a Bazel fuchsia_package() or fuchsia_test_package()
+#      macro. Scope schema is:
 #
-#     The arguments use the same scopes as those used in copy_outputs which
-#     means they can use the same string templates.
+#          archive: (required)
+#             output path for the package's archive, relative to $root_build_dir.
 #
-#     The tool will look for build directories that have a 2 character name and
-#     then copy all of the contents. Thus the structure of the directory should
-#     look like:
-#     - .stamp (the stamp file for copy_outputs)
-#     - ab/
-#        - xyz.debug
-#        - 12345
-#     - oe/
-#        - abcd
+#          manifest: (optional)
+#             output path for the package's manifest file, relative to $root_build_dir.
 #
-#     IMPORTANT: For incremental build correctness, the build-id directory must
-#     contain a file name `.stamp` which represent the state of the entire
-#     build-id directory. The name of this file can be changed via the
-#     build_id_stamp_name variable if a different value is used.
-#
-#       # Specify where the build ids are
-#       build_id_directories = [
-#         {
-#           bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_build_id_dir"
-#           ninja = "${bazel_build_target}_build_id_dir"
-#         }
-#       ]
-#
-#     Type: list of scopes.
-#     Default: empty
-#
-#   build_id_stamp_name: (optional)
-#     An optional name to use for the stamp file to look for when tracking
-#     a build_id_directories entry.
-#     Type: string
-#     Default: .stamp
+#          copy_debug_symbols: (optional)
+#             A boolean flag, set it to true to copy all debug symbols from
+#             the package's ELF binaries to the top-level ${root_build_dir}/.build-id/
+#             directory.
 #
 #   extra_bazel_args: (optional)
 #     A list extra command line arguments to pass to Bazel.
@@ -180,17 +158,6 @@ declare_args() {
 #     will build remotely using RBE.
 #     Type: boolean
 #     Default: `enable_bazel_remote_rbe` (global)
-#
-#   output_groups: (optional)
-#     A list of values to pass to the --output_groups flag when calling bazel.
-#     This value will follow the conventions defined by bazel which can be found
-#     at https://bazel.build/reference/command-line-reference#flag--output_groups.
-#     Passing ["foo"] will only build the "foo" group and will omit the default
-#     set of files. If you want the union of the default set and the "foo" set
-#     then pass ["+foo"].
-#     The output_groups flag affects the execution phase and so should only be
-#     added to commands that execute a build.
-#     Type: list of string.
 #
 #   include_host_tools_licenses: (optional)
 #     Set this to true to include the licenses of host tool dependencies in
@@ -266,48 +233,40 @@ template("bazel_action") {
   assert(defined(invoker.command), "command must be defined!")
   assert(defined(invoker.bazel_targets), "bazel_targets must be defined!")
   assert(invoker.bazel_targets != [], "bazel_targets cannot be empty!")
-  assert(invoker.copy_outputs != [], "`copy_outputs` cannot be empty")
+
+  assert(
+      defined(invoker.copy_outputs) || defined(invoker.fuchsia_package_outputs),
+      "`copy_outputs` or `fuchsia_package_outputs` must be defined")
+
+  if (defined(invoker.copy_outputs) &&
+      !defined(invoker.fuchsia_package_outputs)) {
+    assert(invoker.copy_outputs != [], "`copy_outputs` cannot be empty.")
+  }
+  _copy_outputs = []
+  if (defined(invoker.copy_outputs)) {
+    _copy_outputs = invoker.copy_outputs
+  }
 
   _needs_dir_copy = false
   _bazel_output_list = []
   _ninja_output_list = []
-  _build_id_dirs = []
-  _copy_ouputs = invoker.copy_outputs
-
   _directory_timestamp_outputs = []
   if (defined(invoker.directory_timestamp_outputs)) {
     _needs_dir_copy = true
     _directory_timestamp_outputs += invoker.directory_timestamp_outputs
   }
 
-  # Set up our build id directories
-  _build_id_stamp_name = ".stamp"
-  if (defined(invoker.build_id_stamp_name)) {
-    _build_id_stamp_name = invoker.build_id_stamp_name
+  _bazel_targets = invoker.bazel_targets
+
+  if (defined(invoker.fuchsia_package_outputs)) {
+    assert(
+        _bazel_targets == [ _bazel_targets[0] ],
+        "When fuchsia_package_outputs is set, bazel_targets must include a single target, got: ${_bazel_targets}")
+
+    _fuchsia_package_outputs = invoker.fuchsia_package_outputs
   }
 
-  if (defined(invoker.build_id_directories)) {
-    _needs_dir_copy = true
-    foreach(entry, invoker.build_id_directories) {
-      assert(
-          "$entry" != entry,
-          "`build_id_directories` items must be scopes, string found: \"$entry\"")
-
-      assert(defined(entry.bazel),
-             "`build_id_directories` scope requires bazel key: $entry")
-      assert(defined(entry.ninja),
-             "`build_id_directories` scope requires ninja key: $entry")
-
-      _build_id_dirs += [ "${target_out_dir}/${entry.ninja}" ]
-      _copy_ouputs += [ entry ]
-      _directory_timestamp_outputs +=
-          [ "${entry.ninja}/${_build_id_stamp_name}" ]
-    }
-  } else {
-    not_needed([ "_build_id_stamp_name" ])
-  }
-
-  foreach(entry, _copy_ouputs) {
+  foreach(entry, _copy_outputs) {
     assert("$entry" != entry,
            "`copy_outputs` items must be scopes, string found: \"$entry\"")
 
@@ -325,11 +284,9 @@ template("bazel_action") {
     _allow_directory_in_outputs = invoker.allow_directory_in_outputs
   }
 
-  _num_bazel_outputs = 0
   _bazel_outputs = []
 
   # Compute the value of the TARGET_OUT_XXX shortcuts.
-  _bazel_targets = invoker.bazel_targets
   _bazel_target = get_label_info(_bazel_targets[0], "name")
   _bazel_target_package =
       rebase_path(get_label_info(_bazel_targets[0], "dir"), "//")
@@ -367,7 +324,6 @@ template("bazel_action") {
            "Unsupported substitution in `copy_outputs` path: $path")
 
     _bazel_outputs += [ path ]
-    _num_bazel_outputs += 1
   }
 
   _ninja_outputs = _ninja_output_list
@@ -529,13 +485,36 @@ template("bazel_action") {
              "--bazel-outputs",
            ] + _bazel_outputs + [ "--bazel-targets" ] + _bazel_targets +
            [ "--ninja-outputs" ] + rebase_path(_outputs, root_build_dir) +
-           [ "--build-id-dirs" ] + rebase_path(_build_id_dirs, root_build_dir) +
            [
              "--depfile",
              rebase_path(depfile, root_build_dir),
              "--path-mapping",
              rebase_path(_path_mapping, root_build_dir),
            ]
+    if (defined(_fuchsia_package_outputs)) {
+      if (defined(_fuchsia_package_outputs.archive) ||
+          defined(_fuchsia_package_outputs.manifest)) {
+        inputs += [ "//build/bazel/starlark/FuchsiaPackageInfo_archive_and_manifest.cquery" ]
+      }
+      if (defined(_fuchsia_package_outputs.archive)) {
+        outputs += [ _fuchsia_package_outputs.archive ]
+        args += [
+          "--fuchsia-package-output-archive",
+          rebase_path(_fuchsia_package_outputs.archive, root_build_dir),
+        ]
+      }
+      if (defined(_fuchsia_package_outputs.manifest)) {
+        args += [
+          "--fuchsia-package-output-manifest",
+          rebase_path(_fuchsia_package_outputs.manifest, root_build_dir),
+        ]
+      }
+      if (defined(_fuchsia_package_outputs.copy_debug_symbols) &&
+          _fuchsia_package_outputs.copy_debug_symbols) {
+        args += [ "--fuchsia-package-copy-debug-symbols" ]
+        inputs += [ "//build/bazel/starlark/FuchsiaDebugSymbolInfo_debug_symbol_dirs.cquery" ]
+      }
+    }
 
     if (_allow_directory_in_outputs) {
       args += [ "--allow-directory-in-outputs" ]
@@ -658,16 +637,6 @@ template("bazel_action") {
       args += [ "--compilation_mode=opt" ]
     } else {
       assert("Unsupported mode optimize = $optimize")
-    }
-
-    # Pass in the output groups if defined
-    if (defined(invoker.output_groups)) {
-      foreach(output_group, invoker.output_groups) {
-        # output groups can be a comma separated list or accumulated from
-        # multiple --output_groups flags. The logic is easier if we just pass
-        # multiple flags.
-        args += [ "--output_groups=${output_group}" ]
-      }
     }
 
     # If the c++ version is 20, we overwrite the copts to use

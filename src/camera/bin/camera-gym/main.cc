@@ -32,7 +32,7 @@ constexpr zx::duration kDefaultAutoCycleInterval = zx::msec(CONFIGURATION_CYCLE_
 namespace {
 int Setup(std::optional<zx::duration> auto_cycle_interval, async::Loop* buffer_collage_loop,
           async::Loop* cycler_loop, std::unique_ptr<sys::ComponentContext> context) {
-  fuchsia::sysmem::AllocatorHandle buffer_collage_allocator;
+  fuchsia::sysmem2::AllocatorHandle buffer_collage_allocator;
   zx_status_t status = context->svc()->Connect(buffer_collage_allocator.NewRequest());
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to request Allocator service.";
@@ -74,7 +74,7 @@ int Setup(std::optional<zx::duration> auto_cycle_interval, async::Loop* buffer_c
     return EXIT_FAILURE;
   }
 
-  fuchsia::sysmem::AllocatorHandle stream_cycler_allocator;
+  fuchsia::sysmem2::AllocatorHandle stream_cycler_allocator;
   status = context->svc()->Connect(stream_cycler_allocator.NewRequest());
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to request Allocator service.";
@@ -100,11 +100,11 @@ int Setup(std::optional<zx::duration> auto_cycle_interval, async::Loop* buffer_c
   std::set<uint32_t> collection_ids;
 
   camera::StreamCycler::AddCollectionHandler add_collection_handler =
-      [&collage, &collection_ids](fuchsia::sysmem::BufferCollectionTokenHandle token,
-                                  fuchsia::sysmem::ImageFormat_2 image_format,
+      [&collage, &collection_ids](fuchsia::sysmem2::BufferCollectionTokenHandle token,
+                                  fuchsia::images2::ImageFormat image_format,
                                   std::string description) -> uint32_t {
     auto result = fpromise::run_single_threaded(
-        collage->AddCollection(std::move(token), image_format, std::move(description)));
+        collage->AddCollection(std::move(token), std::move(image_format), std::move(description)));
     if (result.is_error()) {
       FX_LOGS(FATAL) << "Failed to add collection to collage.";
       return 0;

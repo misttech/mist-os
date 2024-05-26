@@ -10,8 +10,6 @@
 
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 
-namespace fio = fuchsia_io;
-
 namespace fs {
 
 Service::Service(Connector connector) : connector_(std::move(connector)) {}
@@ -22,13 +20,11 @@ fuchsia_io::NodeProtocolKinds Service::GetProtocols() const {
   return fuchsia_io::NodeProtocolKinds::kConnector;
 }
 
-zx_status_t Service::GetAttributes(VnodeAttributes* attr) {
+zx::result<fs::VnodeAttributes> Service::GetAttributes() const {
   // TODO(https://fxbug.dev/42106031): V_TYPE_FILE isn't right, we should use a type for services
-  *attr = VnodeAttributes();
-  attr->mode = V_TYPE_FILE;
-  attr->inode = fio::wire::kInoUnknown;
-  attr->link_count = 1;
-  return ZX_OK;
+  return zx::ok(VnodeAttributes{
+      .mode = V_TYPE_FILE,
+  });
 }
 
 zx_status_t Service::ConnectService(zx::channel channel) {

@@ -73,6 +73,11 @@ class UsbVirtualDevice : public UsbVirtualDeviceType,
     completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_usb_dci::UsbDci> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbVirtualDevice);
 

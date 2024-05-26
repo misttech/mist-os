@@ -8,7 +8,7 @@ using fuchsia.ui.views;
 /// The Presenter service provides a way for applications to ask that a view be
 /// added to a view tree, leaving any window management concerns up to the
 /// discretion of the presenter implementation.
-@discoverable
+@discoverable(server="platform")
 @available(deprecated=10, removed=14, note="Instead, use fuchsia.element.GraphicalPresenter")
 closed protocol Presenter {
     /// Request that the View's contents be displayed on the screen as a `Presentation`.

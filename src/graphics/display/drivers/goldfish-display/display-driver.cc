@@ -6,7 +6,7 @@
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/driver/compat/cpp/banjo_server.h>
 #include <lib/driver/compat/cpp/device_server.h>
@@ -38,23 +38,28 @@ zx_koid_t GetKoid(zx_handle_t handle) {
   return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
 }
 
-zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> CreateAndInitializeSysmemAllocator(
+zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> CreateAndInitializeSysmemAllocator(
     fdf::Namespace* incoming) {
-  zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> connect_sysmem_service_result =
-      incoming->Connect<fuchsia_hardware_sysmem::Service::AllocatorV1>();
+  zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> connect_sysmem_service_result =
+      incoming->Connect<fuchsia_hardware_sysmem::Service::AllocatorV2>();
   if (connect_sysmem_service_result.is_error()) {
     FDF_LOG(ERROR, "Failed to connect to the sysmem Allocator FIDL protocol: %s",
             connect_sysmem_service_result.status_string());
     return connect_sysmem_service_result.take_error();
   }
-  fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_allocator =
+  fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator =
       std::move(connect_sysmem_service_result).value();
 
   const zx_koid_t pid = GetKoid(zx_process_self());
   static constexpr std::string_view kDebugName = "goldfish-display";
+  fidl::Arena arena;
   fidl::OneWayStatus set_debug_status =
       fidl::WireCall(sysmem_allocator)
-          ->SetDebugClientInfo(fidl::StringView::FromExternal(kDebugName), pid);
+          ->SetDebugClientInfo(
+              fuchsia_sysmem2::wire::AllocatorSetDebugClientInfoRequest::Builder(arena)
+                  .name(kDebugName)
+                  .id(pid)
+                  .Build());
   if (!set_debug_status.ok()) {
     FDF_LOG(ERROR, "Failed to set sysmem allocator debug info: %s",
             set_debug_status.status_string());
@@ -125,14 +130,14 @@ zx::result<> DisplayDriver::Start() {
   fidl::ClientEnd<fuchsia_hardware_goldfish_pipe::GoldfishPipe> pipe =
       std::move(connect_pipe_service_result).value();
 
-  zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> create_sysmem_allocator_result =
+  zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> create_sysmem_allocator_result =
       CreateAndInitializeSysmemAllocator(incoming().get());
   if (create_sysmem_allocator_result.is_error()) {
     FDF_LOG(ERROR, "Failed to create and initialize sysmem allocator: %s",
             create_sysmem_allocator_result.status_string());
     return create_sysmem_allocator_result.take_error();
   }
-  fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_allocator =
+  fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator =
       std::move(create_sysmem_allocator_result).value();
 
   zx::result<std::unique_ptr<RenderControl>> create_render_control_result =

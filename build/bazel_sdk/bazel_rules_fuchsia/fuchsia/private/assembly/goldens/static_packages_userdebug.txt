@@ -61,7 +61,7 @@ forensics
 ?network
 ?network-tun
 ?omaha-client
-?overnet-usb-package
+?overnet-usb
 pkg-resolver
 ?pkgctl
 ?process-resolver
@@ -84,7 +84,6 @@ pkg-resolver
 ?soundplayer
 ?sshd-host
 ?starnix
-?starnix_kernel
 ?start_sl4f
 ?stash
 system-update-committer

@@ -562,7 +562,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                 }
             };
 
-            let mut watcher = match emulator_targets::start_emulator_watching(instance_root).await {
+            let mut watcher = match emulator_targets::start_emulator_watching(instance_root) {
                 Ok(w) => w,
                 Err(e) => {
                     tracing::error!("Could not create emulator watcher: {e:?}");

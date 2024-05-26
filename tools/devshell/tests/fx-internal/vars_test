@@ -409,9 +409,9 @@ TEST_fx-caller() {
 
 TEST_get-ssh-components() {
     cat >"${ffx}.mock_side_effects" <<INPUT
-if [[ "\$3" == "ssh.pub" ]]; then
+if [[ "\$5" == "ssh.pub" ]]; then
   echo  "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
-elif [[ "\$3" == "ssh.priv" ]]; then
+elif [[ "\$5" == "ssh.priv" ]]; then
   echo  "${BT_TEMP_DIR}/.ssh/fuchsia_private"
 fi
 INPUT

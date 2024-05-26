@@ -834,6 +834,7 @@ async fn udp_send_msg_preflight_fidl_ndp<N: Netstack>(
         fnet_routes_ext::InstalledRoute {
             route: fnet_routes_ext::Route { destination, action, properties: _ },
             effective_properties: _,
+            table_id: _,
         }: fnet_routes_ext::InstalledRoute<Ipv6>,
         want: net_types::ip::Subnet<net_types::ip::Ipv6Addr>,
         interface_id: u64,

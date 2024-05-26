@@ -368,23 +368,16 @@ void DevicePort::Bind(fidl::ServerEnd<netdev::Port> req) {
 }
 
 void DevicePort::GetInfo(GetInfoCompleter::Sync& completer) {
-  fidl::WireTableFrame<netdev::wire::PortInfo> frame;
-  netdev::wire::PortInfo port_info(
-      fidl::ObjectView<fidl::WireTableFrame<netdev::wire::PortInfo>>::FromExternal(&frame));
-  auto tx_support = fidl::VectorView<netdev::wire::FrameTypeSupport>::FromExternal(supported_tx_);
-  auto rx_support = fidl::VectorView<netdev::wire::FrameType>::FromExternal(supported_rx_);
-  fidl::WireTableFrame<netdev::wire::PortBaseInfo> base_info_frame;
-  netdev::wire::PortBaseInfo port_base_info(
-      fidl::ObjectView<fidl::WireTableFrame<netdev::wire::PortBaseInfo>>::FromExternal(
-          &base_info_frame));
+  fidl::Arena arena;
 
-  port_base_info.set_port_class(port_class_)
-      .set_tx_types(fidl::ObjectView<decltype(tx_support)>::FromExternal(&tx_support))
-      .set_rx_types(fidl::ObjectView<decltype(rx_support)>::FromExternal(&rx_support));
+  netdev::wire::PortBaseInfo port_base_info = netdev::wire::PortBaseInfo::Builder(arena)
+                                                  .port_class(port_class_)
+                                                  .tx_types(supported_tx_)
+                                                  .rx_types(supported_rx_)
+                                                  .Build();
 
-  port_info.set_id(id_).set_base_info(
-      fidl::ObjectView<netdev::wire::PortBaseInfo>::FromExternal(&port_base_info));
-
+  netdev::wire::PortInfo port_info =
+      netdev::wire::PortInfo::Builder(arena).id(id_).base_info(port_base_info).Build();
   completer.Reply(port_info);
 }
 
@@ -414,19 +407,14 @@ void DevicePort::Clone(CloneRequestView request, CloneCompleter::Sync& _complete
 }
 
 void DevicePort::GetCounters(GetCountersCompleter::Sync& completer) {
-  fidl::WireTableFrame<netdev::wire::PortGetCountersResponse> frame;
-  netdev::wire::PortGetCountersResponse rsp(
-      fidl::ObjectView<fidl::WireTableFrame<netdev::wire::PortGetCountersResponse>>::FromExternal(
-          &frame));
-  uint64_t tx_frames = counters_.tx_frames;
-  rsp.set_tx_frames(fidl::ObjectView<uint64_t>::FromExternal(&tx_frames));
-  uint64_t tx_bytes = counters_.tx_bytes;
-  rsp.set_tx_bytes(fidl::ObjectView<uint64_t>::FromExternal(&tx_bytes));
-  uint64_t rx_frames = counters_.rx_frames;
-  rsp.set_rx_frames(fidl::ObjectView<uint64_t>::FromExternal(&rx_frames));
-  uint64_t rx_bytes = counters_.rx_bytes;
-  rsp.set_rx_bytes(fidl::ObjectView<uint64_t>::FromExternal(&rx_bytes));
+  fidl::Arena arena;
 
+  netdev::wire::PortGetCountersResponse rsp = netdev::wire::PortGetCountersResponse::Builder(arena)
+                                                  .tx_frames(counters_.tx_frames)
+                                                  .tx_bytes(counters_.tx_bytes)
+                                                  .rx_frames(counters_.rx_frames)
+                                                  .rx_bytes(counters_.rx_bytes)
+                                                  .Build();
   completer.Reply(rsp);
 }
 

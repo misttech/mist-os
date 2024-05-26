@@ -515,13 +515,10 @@ TEST_P(BlobTest, GetAttributes) {
   uint64_t block_count;
 
   auto check_attributes = [&](const fs::VnodeAttributes& attributes) {
-    ASSERT_EQ(attributes.mode, unsigned{V_TYPE_FILE | V_IRUSR | V_IXUSR});
-    ASSERT_EQ(attributes.inode, inode);
-    ASSERT_EQ(attributes.content_size, 64u);
-    ASSERT_EQ(attributes.storage_size, block_count * kBlobfsBlockSize);
-    ASSERT_EQ(attributes.link_count, 1u);
-    ASSERT_EQ(attributes.creation_time, 0u);
-    ASSERT_EQ(attributes.modification_time, 0u);
+    EXPECT_EQ(attributes.mode, unsigned{V_TYPE_FILE | V_IRUSR | V_IXUSR});
+    EXPECT_EQ(attributes.id, inode);
+    EXPECT_EQ(attributes.content_size, 64u);
+    EXPECT_EQ(attributes.storage_size, block_count * kBlobfsBlockSize);
   };
 
   {
@@ -539,9 +536,9 @@ TEST_P(BlobTest, GetAttributes) {
     inode = blob->Ino();
     block_count = blobfs()->GetNode(inode)->block_count;
 
-    fs::VnodeAttributes attributes;
-    ASSERT_EQ(file->GetAttributes(&attributes), ZX_OK);
-    check_attributes(attributes);
+    zx::result attributes = file->GetAttributes();
+    ASSERT_TRUE(attributes.is_ok()) << attributes.status_string();
+    check_attributes(*attributes);
   }
 
   Remount();
@@ -549,9 +546,9 @@ TEST_P(BlobTest, GetAttributes) {
   auto root = OpenRoot();
   fbl::RefPtr<fs::Vnode> file;
   ASSERT_EQ(root->Lookup(info->path, &file), ZX_OK);
-  fs::VnodeAttributes attributes;
-  ASSERT_EQ(file->GetAttributes(&attributes), ZX_OK);
-  check_attributes(attributes);
+  zx::result attributes = file->GetAttributes();
+  ASSERT_TRUE(attributes.is_ok()) << attributes.status_string();
+  check_attributes(*attributes);
 }
 
 TEST_P(BlobTest, AppendSetsOutEndCorrectly) {

@@ -116,6 +116,10 @@ sunset_resolutions() {
   fx-error "$ ffx config remove repository.server.listen"
   fx-error "$ ffx doctor --restart-daemon"
   fx-error ""
+  fx-error "Finally, if you are using a remote workflow like \`fx serve-remote\` or"
+  fx-error "\`funnel\` you may need to do these commands on your local and remote"
+  fx-error "computers."
+  fx-error ""
   exit 1
 }
 

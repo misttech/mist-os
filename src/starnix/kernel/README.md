@@ -13,7 +13,7 @@ In order to run starnix, we need to build `//src/starnix`.
 For faster iteration, configure your build with incremental compilation:
 
 ```sh
-fx set core.x64 --auto-dir --args 'rust_incremental="incremental"' --with //src/starnix,//src/starnix:tests
+fx set workbench.x64 --auto-dir --args 'rust_incremental="incremental"' --with //src/starnix:tests, //src/starnix/containers
 fx build
 ```
 
@@ -126,16 +126,24 @@ minimal binary in an empty container.
 
 ### Getting a shell
 
-Once you have a Starnix container running, you can attach a console to that
-container and run a shell. For example, if you have created a container with
-the moniker `/core/starnix_runner/playground:<container-name>`, you can use the
-following command to attach a shell:
-
-```sh
-ffx starnix console -m /core/starnix_runner/playground:<container-name> /bin/bash
+Running a shell first requires running a container that has a shell binary. In
+this example, let's use the Alpine container:
+```
+ffx component run /core/starnix_runner/playground:alpine fuchsia-pkg://fuchsia.com/alpine#meta/alpine_container.cm
 ```
 
-This command assumes the container has a shell binary at `/bin/bash`. If you wish
+Note that the alpine container is not included in the build by default, so
+you'll need to add `//src/starnix/containers/alpine:alpine_package` to your
+build targets.
+
+Once you have this Starnix container running, you can attach a console to that
+container and run a shell by running:
+
+```sh
+ffx starnix console -m /core/starnix_runner/playground:alpine /bin/sh
+```
+
+This command assumes the container has a shell binary at `/bin/sh`. If you wish
 to run another binary, you have to specify the full path.
 
 If you omit the `-m` argument, `ffx starnix console` will look for a Starnix
@@ -262,14 +270,14 @@ You can view Inspect data exposed by starnix using `ffx inspect`.
 To view the thread groups currently running, run:
 
 ```
-ffx inspect show core/starnix_runner/bionic:root/container/kernel/thread_groups
+ffx inspect show core/starnix_runner/alpine:root/container/kernel/thread_groups
 ```
 
 You can also view the number of syscalls that have been executed (after enabling
 the "syscall_stats" feature):
 
 ```
-ffx inspect show core/starnix_runner/bionic:root:syscall_stats
+ffx inspect show core/starnix_runner/alpine:root:syscall_stats
 ```
 
 ## Logging

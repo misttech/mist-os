@@ -17,9 +17,8 @@ namespace zxdb {
 namespace {
 
 const char kUpShortHelp[] = "up: Move up the stack";
-const char kUpHelp[] =
-    R"(up
-
+const char kUpUsage[] = "up";
+const char kUpHelp[] = R"(
   Switch the active frame to the one above (backward in time from) the current.
 
 Examples
@@ -76,7 +75,7 @@ void RunVerbUp(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetUpVerbRecord() {
-  return VerbRecord(&RunVerbUp, {"up"}, kUpShortHelp, kUpHelp, CommandGroup::kGeneral);
+  return VerbRecord(&RunVerbUp, {"up"}, kUpShortHelp, kUpUsage, kUpHelp, CommandGroup::kGeneral);
 }
 
 }  // namespace zxdb

@@ -124,7 +124,7 @@ int main(int argc, char* argv[]) {
 
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
 
-  fuchsia::sysmem::AllocatorHandle allocator;
+  fuchsia::sysmem2::AllocatorHandle allocator;
   fuchsia::camera3::DeviceWatcherHandle watcher;
   fuchsia::mediacodec::CodecFactoryHandle codec_factory;
 
@@ -175,8 +175,8 @@ int main(int argc, char* argv[]) {
   size_t frames_written = 0;
 
   CameraClient::AddCollectionHandler add_collection_handler =
-      [&encoder](fuchsia::sysmem::BufferCollectionTokenHandle token,
-                 fuchsia::sysmem::ImageFormat_2 image_format,
+      [&encoder](fuchsia::sysmem2::BufferCollectionTokenHandle token,
+                 fuchsia::images2::ImageFormat image_format,
                  fuchsia::camera3::FrameRate frame_rate) -> uint32_t {
     encoder->Start(std::move(token), std::move(image_format), frame_rate.numerator);
     return 0;

@@ -944,7 +944,7 @@ mod tests {
             0x00, 0x30, 0x00, 0x5a, 0x00, 0x00, // Time = "20230224T124130Z" (UTC), 34 bytes
         ];
         let result = Header::decode(&utc_time_buf).expect("can decode a utc time header");
-        assert_matches!(result, Header::TimeIso8601(t) if t == NaiveDate::from_ymd(2023, 2, 24).and_hms(12, 41, 30));
+        assert_matches!(result, Header::TimeIso8601(t) if t == NaiveDate::from_ymd_opt(2023, 2, 24).unwrap().and_hms_opt(12, 41, 30).unwrap());
 
         let local_time_buf = [
             0x44, // HI = Time ISO 8601
@@ -954,7 +954,7 @@ mod tests {
             0x00, 0x30, 0x00, 0x00, // Time = "20230224T124130" (UTC), 32 bytes
         ];
         let result = Header::decode(&local_time_buf).expect("can decode a local time header");
-        assert_matches!(result, Header::TimeIso8601(t) if t == NaiveDate::from_ymd(2023, 2, 24).and_hms(12, 41, 30));
+        assert_matches!(result, Header::TimeIso8601(t) if t == NaiveDate::from_ymd_opt(2023, 2, 24).unwrap().and_hms_opt(12, 41, 30).unwrap());
 
         // The timestamp corresponds to September 9, 2001 at 01:46:40.
         let timestamp_buf = [
@@ -962,7 +962,7 @@ mod tests {
             0x3b, 0x9a, 0xca, 0x00, // Timestamp = 1e9 seconds after Jan 1, 1970.
         ];
         let result = Header::decode(&timestamp_buf).expect("can decode a timestamp header");
-        assert_matches!(result, Header::Time4Byte(t) if t == NaiveDate::from_ymd(2001, 9, 9).and_hms(1, 46, 40));
+        assert_matches!(result, Header::Time4Byte(t) if t == NaiveDate::from_ymd_opt(2001, 9, 9).unwrap().and_hms_opt(1, 46, 40).unwrap());
     }
 
     #[fuchsia::test]
@@ -1111,8 +1111,8 @@ mod tests {
     fn encode_time_header_success() {
         // Represents the date "20150603T123456Z" - 34 bytes in UTF 16.
         let time = Header::TimeIso8601(NaiveDateTime::new(
-            NaiveDate::from_ymd(2015, 6, 3),
-            NaiveTime::from_hms_milli(12, 34, 56, 0),
+            NaiveDate::from_ymd_opt(2015, 6, 3).unwrap(),
+            NaiveTime::from_hms_milli_opt(12, 34, 56, 0).unwrap(),
         ));
         // Total length should be 3 bytes (ID, Length) + 34 bytes (Time).
         assert_eq!(time.encoded_len(), 37);
@@ -1129,7 +1129,7 @@ mod tests {
         ];
         assert_eq!(buf, expected_buf);
 
-        let timestamp = Header::Time4Byte(NaiveDateTime::from_timestamp(1_000_000, 0));
+        let timestamp = Header::Time4Byte(NaiveDateTime::from_timestamp_opt(1_000_000, 0).unwrap());
         assert_eq!(timestamp.encoded_len(), 5);
         let mut buf = vec![0; timestamp.encoded_len()];
         timestamp.encode(&mut buf).expect("can encode");

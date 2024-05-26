@@ -56,10 +56,12 @@ impl FfxMain for ListTool {
 
 async fn show_targets(
     cmd: ListCommand,
-    infos: Vec<ffx::TargetInfo>,
+    mut infos: Vec<ffx::TargetInfo>,
     writer: &mut VerifiedMachineWriter<Vec<JsonTarget>>,
     context: &EnvironmentContext,
 ) -> Result<()> {
+    // Provide stable output. Use "unstable" since we don't care about the original ordering.
+    infos.sort_unstable_by(|a, b| a.nodename.cmp(&b.nodename));
     match infos.len() {
         0 => {
             // Printed to stderr, so that if a user is parsing output, say from a formatted
@@ -484,6 +486,30 @@ mod test {
             .await?;
         assert_eq!(true, do_connect_to_target(&env.context, &ListCommand::default()).await);
 
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_sorted_output() -> Result<()> {
+        let env = ffx_config::test_init().await.unwrap();
+        let cmd = ListCommand::default();
+        let test_buffers = TestBuffers::default();
+        let mut writer = VerifiedMachineWriter::new_test(None, &test_buffers);
+        let ti1 = ffx::TargetInfo {
+            nodename: Some(String::from("z")),
+            addresses: Some(vec![]),
+            rcs_state: Some(ffx::RemoteControlState::Unknown),
+            target_state: Some(ffx::TargetState::Unknown),
+            ..Default::default()
+        };
+        let ti2 = ffx::TargetInfo { nodename: Some(String::from("a")), ..ti1.clone() };
+        let infos = vec![ti1, ti2];
+        show_targets(cmd, infos, &mut writer, &env.context).await?;
+        let out: Vec<String> =
+            test_buffers.into_stdout_str().lines().map(|s| s.to_string()).collect();
+        // Line 0 is the header
+        assert!(out[1].starts_with("a"));
+        assert!(out[2].starts_with("z"));
         Ok(())
     }
 }

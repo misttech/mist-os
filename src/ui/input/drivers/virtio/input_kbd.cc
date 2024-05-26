@@ -191,10 +191,10 @@ void KeyboardReport::ToFidlInputReport(
 }
 
 fuchsia_input_report::wire::DeviceDescriptor HidKeyboard::GetDescriptor(fidl::AnyArena& allocator) {
-  fuchsia_input_report::wire::DeviceInfo device_info;
-  device_info.vendor_id = static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle);
-  device_info.product_id =
-      static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kVirtioKeyboard);
+  auto device_info = fuchsia_input_report::wire::DeviceInformation::Builder(allocator);
+  device_info.vendor_id(static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
+  device_info.product_id(
+      static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kVirtioKeyboard));
 
   const auto input =
       fuchsia_input_report::wire::KeyboardInputDescriptor::Builder(allocator).keys3(kKeys).Build();
@@ -213,7 +213,7 @@ fuchsia_input_report::wire::DeviceDescriptor HidKeyboard::GetDescriptor(fidl::An
                             .Build();
 
   return fuchsia_input_report::wire::DeviceDescriptor::Builder(allocator)
-      .device_info(device_info)
+      .device_information(device_info.Build())
       .keyboard(keyboard)
       .Build();
 }

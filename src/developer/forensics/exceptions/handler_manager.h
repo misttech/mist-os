@@ -24,7 +24,7 @@ namespace exceptions {
 class HandlerManager {
  public:
   HandlerManager(async_dispatcher_t* dispatcher, CrashCounter crash_counter,
-                 size_t max_num_handlers, zx::duration exception_ttl);
+                 size_t max_num_handlers, zx::duration exception_ttl, bool suspend_enabled);
 
   // Spawns a dedicated handler for |exception|. This way if the exception handling logic
   // were to crash, e.g., while generating the minidump from the process, only the sub-process would

@@ -101,9 +101,9 @@ int main(int argc, char* argv[]) {
   // InterfacePtr bindings objects on the fidl_thread as the binding objects
   // can only be safely used from a single thread.
   fuchsia::mediacodec::CodecFactoryHandle codec_factory;
-  fuchsia::sysmem::AllocatorHandle sysmem;
+  fuchsia::sysmem2::AllocatorHandle sysmem;
   component_context->svc()->Connect<fuchsia::mediacodec::CodecFactory>(codec_factory.NewRequest());
-  component_context->svc()->Connect<fuchsia::sysmem::Allocator>(sysmem.NewRequest());
+  component_context->svc()->Connect<fuchsia::sysmem2::Allocator>(sysmem.NewRequest());
 
   std::string input_file = command_line.positional_args()[0];
   std::string output_file_name;

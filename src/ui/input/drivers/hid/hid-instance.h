@@ -6,13 +6,13 @@
 #define SRC_UI_INPUT_DRIVERS_HID_HID_INSTANCE_H_
 
 #include <fidl/fuchsia.hardware.input/cpp/wire.h>
-#include <fuchsia/hardware/hidbus/cpp/banjo.h>
 #include <fuchsia/hardware/hiddevice/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
+#include <lib/sync/cpp/completion.h>
 
 #include <array>
 #include <list>
@@ -55,6 +55,9 @@ class HidInstance : public fidl::WireServer<fuchsia_hardware_input::Device>,
 
   void CloseInstance();
   void WriteToFifo(const uint8_t* report, size_t report_len, zx_time_t time);
+
+  // TODO(b/341791565): Refactor tests so that testing_write_to_fifo_called_ is not needed.
+  libsync::Completion testing_write_to_fifo_called_;
 
  private:
   void SetReadable();

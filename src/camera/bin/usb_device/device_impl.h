@@ -40,10 +40,10 @@ class DeviceImpl final : public actor::ActorBase, public fuchsia::ui::policy::Me
   // caller must ensure these outlive the returned DeviceImpl.
   static promise<std::unique_ptr<DeviceImpl>, zx_status_t> Create(
       async_dispatcher_t* dispatcher, fuchsia::camera::ControlSyncPtr control,
-      fuchsia::sysmem::AllocatorPtr allocator, zx::event bad_state_event);
+      fuchsia::sysmem2::AllocatorPtr allocator, zx::event bad_state_event);
 
   DeviceImpl(async_dispatcher_t* dispatcher, fuchsia::camera::ControlSyncPtr control,
-             fuchsia::sysmem::AllocatorPtr allocator, zx::event bad_state_event);
+             fuchsia::sysmem2::AllocatorPtr allocator, zx::event bad_state_event);
   ~DeviceImpl() override;
 
   // Returns a service handler for use with a service directory.
@@ -75,8 +75,8 @@ class DeviceImpl final : public actor::ActorBase, public fuchsia::ui::policy::Me
                                   zx::eventpair driver_token);
 
   void AllocatorBindSharedCollection(
-      fuchsia::sysmem::BufferCollectionTokenHandle token,
-      fidl::InterfaceRequest<fuchsia::sysmem::BufferCollection> request);
+      fuchsia::sysmem2::BufferCollectionTokenHandle token,
+      fidl::InterfaceRequest<fuchsia::sysmem2::BufferCollection> request);
 
   // |fuchsia::ui::policy::MediaButtonsListener|
   void OnEvent(fuchsia::ui::input::MediaButtonsEvent event,
@@ -128,7 +128,7 @@ class DeviceImpl final : public actor::ActorBase, public fuchsia::ui::policy::Me
   async_dispatcher_t* stream_dispatcher_;
 
   fuchsia::camera::ControlSyncPtr control_;
-  fuchsia::sysmem::AllocatorPtr allocator_;
+  fuchsia::sysmem2::AllocatorPtr allocator_;
   zx::event bad_state_event_;
 
   fidl::Binding<fuchsia::ui::policy::MediaButtonsListener> button_listener_binding_;

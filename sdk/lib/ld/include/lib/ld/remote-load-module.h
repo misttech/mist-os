@@ -12,7 +12,6 @@
 #include <type_traits>
 #include <vector>
 
-#include "internal/filter-view.h"
 #include "remote-decoded-module.h"
 
 namespace ld {
@@ -174,18 +173,52 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
   }
 
   // Initialize the loader and allocate the address region for the module,
-  // updating the module's runtime addr fields on success.
+  // updating the module's runtime address fields on success.  The optional
+  // vmar_offset argument can pick the load address used, in terms of the
+  // offset within the containing VMAR.  The kernel chooses by default.
   template <class Diagnostics>
-  bool Allocate(Diagnostics& diag, const zx::vmar& vmar) {
+  bool Allocate(Diagnostics& diag, const zx::vmar& vmar,
+                std::optional<size_t> vmar_offset = std::nullopt) {
+    assert(loader_);
     if (this->HasModule()) [[likely]] {
-      loader_ = Loader{vmar};
-      if (!loader_.Allocate(diag, this->decoded().load_info())) {
+      loader_.emplace(vmar);
+      if (!loader_->Allocate(diag, this->decoded().load_info(), vmar_offset)) {
         return false;
       }
-      SetModuleVaddrBounds(module_, this->decoded().load_info(), loader_.load_bias());
+      SetModuleVaddrBounds(module_, this->decoded().load_info(), loader_->load_bias());
     }
     return true;
   }
+
+  // Before Allocate() is called, this can be used to store a chosen vaddr that
+  // RemoteDynamicLinker can fetch back to compute the vmar_offset to pass to
+  // Allocate().
+  void Preplaced(size_type load_bias) {
+    SetModuleVaddrBounds(module_, this->decoded().load_info(), load_bias);
+    assert(preplaced());
+  }
+
+  // As an alternative to calling Allocate(), instead mark this module as
+  // already loaded with a known load bias.
+  void Preloaded(size_type load_bias) {
+    // Before Allocate(), loader_ is a default-constructed Loader, which won't
+    // work.  Allocate() would reset it to one that will work.  Instead, reset
+    // it std::nullopt to tell Load() to just skip this module.
+    loader_ = std::nullopt;
+    Preplaced(load_bias);
+    assert(preloaded());
+  }
+
+  // Returns the absolute vaddr_start if Preplaced() or Preloaded() was called.
+  std::optional<size_type> preplaced() const {
+    if (module_.vaddr_end == 0) {
+      return std::nullopt;
+    }
+    return module_.vaddr_start;
+  }
+
+  // Returns true if Preloaded() was called rather than Allocate().
+  bool preloaded() const { return !loader_; }
 
   // Before relocation can mutate any segments, load_info() needs to be set up
   // with its own copies of the segments, including copy-on-write cloning any
@@ -193,6 +226,18 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
   // segments need to be adjusted before relocation.
   template <class Diagnostics>
   bool PrepareLoadInfo(Diagnostics& diag) {
+    if (preloaded()) {
+      // Later work like the ABI remoting needs load_info_ to be set up with
+      // all the vaddr details, though it will never be passed to Loader::Load
+      // or LoadInfoMutableMemory.  The basic LoadInfo instantiation doesn't
+      // have segment VMOs, so copying into it from the RemoteDecodedModule
+      // won't copy them.  Then copying back into load_info_ won't install any
+      // VMO handles, but preserves all the vaddr details.
+      LoadInfoWithWrapper<elfldltl::NoSegmentWrapper> basic_info;
+      return basic_info.CopyFrom(diag, this->decoded().load_info()) &&
+             load_info_.CopyFrom(diag, basic_info);
+    }
+
     return !load_info_.segments().empty() ||  // Shouldn't be done twice!
            load_info_.CopyFrom(diag, this->decoded().load_info());
   }
@@ -201,6 +246,11 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
   bool Relocate(Diagnostics& diag, ModuleList& modules, const TlsDescResolver& tls_desc_resolver) {
     if (!PrepareLoadInfo(diag)) [[unlikely]] {
       return false;
+    }
+
+    if (preloaded()) {
+      // Skip relocation for a preloaded module.
+      return true;
     }
 
     auto mutable_memory = elfldltl::LoadInfoMutableMemory{
@@ -218,9 +268,11 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
   }
 
   // Load the module into its allocated vaddr region.
+  // This is a no-op if Prelaoded() was called instead of Allocate().
   template <class Diagnostics>
   bool Load(Diagnostics& diag) {
-    return loader_.Load(diag, load_info_, this->decoded().vmo().borrow());
+    return preloaded() ||  // Nothing to do if the module was preloaded.
+           loader_->Load(diag, load_info_, this->decoded().vmo().borrow());
   }
 
   // This must be the last method called with the loader. Direct the loader to
@@ -228,9 +280,11 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
   void Commit() {
     assert(this->HasModule());
 
-    // This returns the Loader::Relro object that holds the VMAR handle.  But
-    // we don't need it because the RELRO segment was mapped read-only anyway.
-    std::ignore = std::move(loader_).Commit(typename LoadInfo::Region{});
+    if (loader_) {
+      // This returns the Loader::Relro object that holds the VMAR handle.  But
+      // it's not needed because the RELRO segment was always mapped read-only.
+      std::ignore = std::move(*loader_).Commit(typename LoadInfo::Region{});
+    }
   }
 
   void set_decoded(DecodedPtr decoded, uint32_t modid, bool symbols_visible,
@@ -265,7 +319,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
 
   Module module_;
   LoadInfo load_info_;
-  Loader loader_;
+  std::optional<Loader> loader_{std::in_place};
   std::optional<uint32_t> loaded_by_modid_;
 };
 static_assert(std::is_move_constructible_v<RemoteLoadModule<>>);

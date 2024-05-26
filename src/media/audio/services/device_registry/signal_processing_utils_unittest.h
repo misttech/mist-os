@@ -183,8 +183,45 @@ const fhasp::ElementState kGenericElementState{{
     .bypassed = false,
     .processing_delay = ZX_USEC(333),
 }};
+const fhasp::SettableElementState kSettableGenericElementState{{
+    // .type_specific is unspecified
+    .vendor_specific_data = {{8, 7, 6, 5, 4, 3, 2, 1, 0}},
+    .started = true,
+    .bypassed = false,
+}};
 const fhasp::ElementState kDynamicsElementState{{
     .type_specific = fhasp::TypeSpecificElementState::WithDynamics({{
+        .band_states = {{
+            {{
+                .id = 1,
+                .min_frequency = 0,
+                .max_frequency = 24000,
+                .threshold_db = -10.0f,
+                .threshold_type = fhasp::ThresholdType::kAbove,
+                .ratio = 10.0f,
+                .knee_width_db = 1.0f,
+                .attack = ZX_USEC(1),
+                .release = ZX_USEC(10),
+                .output_gain_db = -1.0f,
+                .input_gain_db = 0.0f,
+                .level_type = fhasp::LevelType::kPeak,
+                .lookahead = ZX_USEC(10),
+                .linked_channels = true,
+            }},
+            {{
+                .id = 2,
+                .min_frequency = 220,
+                .max_frequency = 222,
+                .threshold_db = -20.0f,
+                .threshold_type = fhasp::ThresholdType::kBelow,
+                .ratio = 20.0f,
+            }},
+        }},
+    }}),
+    .started = true,
+}};
+const fhasp::SettableElementState kSettableDynamicsElementState{{
+    .type_specific = fhasp::SettableTypeSpecificElementState::WithDynamics({{
         .band_states = {{
             {{
                 .id = 1,
@@ -276,8 +313,64 @@ const fhasp::ElementState kEqualizerElementState{{
     }}),
     .started = true,
 }};
+const fhasp::SettableElementState kSettableEqualizerElementState{{
+    .type_specific = fhasp::SettableTypeSpecificElementState::WithEqualizer({{
+        .band_states = {{
+            {{
+                .id = 1,
+                .type = fhasp::EqualizerBandType::kPeak,
+                .frequency = 110,
+                .q = 1.0f,
+                .gain_db = 1.0f,
+                .enabled = true,
+            }},
+            {{
+                .id = 2,
+                .type = fhasp::EqualizerBandType::kNotch,
+                .frequency = 220,
+                .q = 2.0f,
+                .enabled = true,
+            }},
+            {{
+                .id = 3,
+                .type = fhasp::EqualizerBandType::kLowCut,
+                .frequency = 330,
+                .q = 3.0f,
+                .enabled = true,
+            }},
+            {{
+                .id = 4,
+                .type = fhasp::EqualizerBandType::kHighCut,
+                .frequency = 440,
+                .q = 4.0f,
+                .enabled = true,
+            }},
+            {{
+                .id = 5,
+                .type = fhasp::EqualizerBandType::kLowShelf,
+                .frequency = 550,
+                .q = 5.0f,
+                .gain_db = 5.0f,
+                .enabled = true,
+            }},
+            {{
+                .id = 6,
+                .type = fhasp::EqualizerBandType::kHighShelf,
+                .frequency = 660,
+                .q = 6.0f,
+                .gain_db = 6.0f,
+                .enabled = true,
+            }},
+        }},
+    }}),
+    .started = true,
+}};
 const fhasp::ElementState kGainElementState{{
     .type_specific = fhasp::TypeSpecificElementState::WithGain({{.gain = 0.0f}}),
+    .started = true,
+}};
+const fhasp::SettableElementState kSettableGainElementState{{
+    .type_specific = fhasp::SettableTypeSpecificElementState::WithGain({{.gain = 0.0f}}),
     .started = true,
 }};
 const fhasp::ElementState kVendorSpecificElementState{{
@@ -285,15 +378,30 @@ const fhasp::ElementState kVendorSpecificElementState{{
     .vendor_specific_data = {{0, 1, 2, 3, 4, 5, 6, 7, 8}},
     .started = true,
 }};
+const fhasp::SettableElementState kSettableVendorSpecificElementState{{
+    .type_specific = fhasp::SettableTypeSpecificElementState::WithVendorSpecific({}),
+    .vendor_specific_data = {{0, 1, 2, 3, 4, 5, 6, 7, 8}},
+    .started = true,
+}};
 const fhasp::ElementState kElementStateStopped{{
+    .started = false,
+}};
+const fhasp::SettableElementState kSettableElementStateStopped{{
     .started = false,
 }};
 const fhasp::ElementState kElementStateBypassed{{
     .started = true,
     .bypassed = true,
 }};
+const fhasp::SettableElementState kSettableElementStateBypassed{{
+    .started = true,
+    .bypassed = true,
+}};
 const fhasp::ElementState kElementStateEmpty{
     // .started (required) is unspecified
+};
+const fhasp::SettableElementState kSettableElementStateEmpty{
+    // .started is not required, so this is compliant
 };
 
 // Topology ids

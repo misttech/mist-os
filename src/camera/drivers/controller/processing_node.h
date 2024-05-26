@@ -33,10 +33,10 @@ class ProcessNode {
   // Wrapper for a set of input/output buffer collections and their associated formats.
   struct BufferAttachments {
     std::optional<std::reference_wrapper<BufferCollection>> input_collection;
-    std::optional<std::reference_wrapper<const std::vector<fuchsia::sysmem::ImageFormat_2>>>
+    std::optional<std::reference_wrapper<const std::vector<fuchsia::images2::ImageFormat>>>
         input_formats;
     std::optional<std::reference_wrapper<BufferCollection>> output_collection;
-    std::optional<std::reference_wrapper<const std::vector<fuchsia::sysmem::ImageFormat_2>>>
+    std::optional<std::reference_wrapper<const std::vector<fuchsia::images2::ImageFormat>>>
         output_formats;
   };
 
@@ -90,16 +90,16 @@ class ProcessNode {
   void SendFrame(uint32_t index, frame_metadata_t metadata, fit::closure release_callback) const;
 
   // Provides the node access to the input buffer collection it was created with.
-  const fuchsia::sysmem::BufferCollectionInfo_2& InputBuffers() const;
+  const fuchsia::sysmem2::BufferCollectionInfo& InputBuffers() const;
 
   // Provides the node access to the image formats associated with its inputs.
-  const std::vector<fuchsia::sysmem::ImageFormat_2>& InputFormats() const;
+  const std::vector<fuchsia::images2::ImageFormat>& InputFormats() const;
 
   // Provides the node access to the output buffer collection it was created with.
-  const fuchsia::sysmem::BufferCollectionInfo_2& OutputBuffers() const;
+  const fuchsia::sysmem2::BufferCollectionInfo& OutputBuffers() const;
 
   // Provides the node access to the image formats associated with its outputs.
-  const std::vector<fuchsia::sysmem::ImageFormat_2>& OutputFormats() const;
+  const std::vector<fuchsia::images2::ImageFormat>& OutputFormats() const;
 
   // fuchsia.hardware.camerahwaccel.*Callback implementations. The node receives these callbacks
   // serially on the dispatcher it was created with.

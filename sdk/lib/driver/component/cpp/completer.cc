@@ -2,12 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <zircon/assert.h>
-
-#if __Fuchsia_API_level__ >= 15
-
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/start_completer.h>
+#include <zircon/assert.h>
 
 namespace fdf {
 
@@ -23,5 +20,3 @@ void Completer::operator()(zx::result<> result) {
 }
 
 }  // namespace fdf
-
-#endif

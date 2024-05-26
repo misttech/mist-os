@@ -3,9 +3,13 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/sys/test_runners/rust/default.shard.cml",
         "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],
+    program: {
+        binary: "bin/archive_reader_integration_test",
+    },
     children: [
         {
             name: "archivist",
@@ -16,19 +20,25 @@
             url: "fuchsia-pkg://fuchsia.com/archive-reader-integration-tests#meta/driver.cm",
         },
     ],
-    capabilities: [],
-    offer: [
+    collections: [
         {
-            protocol: "fuchsia.diagnostics.ArchiveAccessor",
-            from: "#archivist",
-            to: "#driver",
+            name: "coll",
+            durability: "transient",
         },
+    ],
+    use: [
+        {
+            protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
+            from: "#archivist",
+        },
+    ],
+    offer: [
         {
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
             to: [
                 "#archivist",
-                "#driver",
+                "#coll",
             ],
         },
         {
@@ -47,12 +57,6 @@
             as: "config-data",
             to: "#archivist",
             subdir: "archivist",
-        },
-    ],
-    expose: [
-        {
-            protocol: "fuchsia.test.Suite",
-            from: "#driver",
         },
     ],
 }

@@ -49,7 +49,7 @@ int64_t StreamSinkConsumerWriter::Packet::FramesRemaining() const {
 }
 
 fuchsia_audio::wire::Packet StreamSinkConsumerWriter::Packet::ToFidl(fidl::AnyArena& arena) const {
-  FX_CHECK(0 <= write_offset_ < payload_range_max_size_)
+  FX_CHECK((0 <= write_offset_) && (write_offset_ <= payload_range_max_size_))
       << "write_offset_=" << write_offset_  //
       << ", payload_range_max_size_=" << payload_range_max_size_;
 

@@ -16,6 +16,7 @@ driver_bind_rules("aml-cpu-bind") {
     "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.google.platform",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",

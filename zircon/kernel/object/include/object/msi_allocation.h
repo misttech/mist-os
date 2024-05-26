@@ -20,7 +20,7 @@
 #include <ktl/move.h>
 #include <object/resource_dispatcher.h>
 
-// An MsiAllocation is a wrapper around an allocated block oVf MSI interrupts.
+// An MsiAllocation is a wrapper around an allocated block of MSI interrupts.
 // It allows for multiple MsiInterruptDispatchers to share an allocated block, and
 // synchronize access to an MSI capability dealing with multiple IRQs.
 //

@@ -7,7 +7,7 @@
 
 #include <fidl/fuchsia.hardware.goldfish.pipe/cpp/wire.h>
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
-#include <fidl/fuchsia.sysmem/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/fdf/cpp/dispatcher.h>
@@ -36,7 +36,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
   // `display_event_dispatcher` must be non-null and outlive `DisplayEngine`.
   explicit DisplayEngine(fidl::ClientEnd<fuchsia_hardware_goldfish::ControlDevice> control,
                          fidl::ClientEnd<fuchsia_hardware_goldfish_pipe::GoldfishPipe> pipe,
-                         fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_allocator,
+                         fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator,
                          std::unique_ptr<RenderControl> render_control,
                          async_dispatcher_t* display_event_dispatcher);
 
@@ -162,9 +162,9 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
   // until the device is released.
   zx_status_t InitSysmemAllocatorClient();
 
-  zx::result<display::DriverImageId> ImportVmoImage(const image_metadata_t& image_metadata,
-                                                    const fuchsia_sysmem::PixelFormat& pixel_format,
-                                                    zx::vmo vmo, size_t offset);
+  zx::result<display::DriverImageId> ImportVmoImage(
+      const image_metadata_t& image_metadata, const fuchsia_images2::PixelFormat& pixel_format,
+      zx::vmo vmo, size_t offset);
 
   zx_status_t SetupPrimaryDisplay();
   zx_status_t PresentPrimaryDisplayConfig(const DisplayConfig& display_config);
@@ -175,11 +175,11 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
   fidl::WireSyncClient<fuchsia_hardware_goldfish_pipe::GoldfishPipe> pipe_ TA_GUARDED(lock_);
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
+  fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_allocator_client_;
 
   // Imported sysmem buffer collections.
   std::unordered_map<display::DriverBufferCollectionId,
-                     fidl::SyncClient<fuchsia_sysmem::BufferCollection>>
+                     fidl::SyncClient<fuchsia_sysmem2::BufferCollection>>
       buffer_collections_;
 
   std::unique_ptr<RenderControl> rc_;

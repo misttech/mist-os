@@ -41,7 +41,8 @@ size_t NumSubprocesses() {
 using ExceptionBrokerTest = UnitTestFixture;
 
 TEST_F(ExceptionBrokerTest, IsActive) {
-  auto broker = ExceptionBroker::Create(dispatcher(), &InspectRoot(), 0, zx::sec(0));
+  auto broker = ExceptionBroker::Create(dispatcher(), &InspectRoot(), 0, zx::sec(0),
+                                        /*suspend_enabled=*/false);
 
   bool called{false};
   broker->IsActive([&called] { called = true; });
@@ -74,7 +75,9 @@ using ProcessHandlerTest = UnitTestFixture;
 
 TEST_F(ProcessHandlerTest, ManagesSubprocessLifetime) {
   {
-    ProcessHandler process_handler(dispatcher(), [](const std::string&) {}, [] {});
+    // TODO(https://fxbug.dev/333110044): Test with suspend enabled + disabled.
+    ProcessHandler process_handler(
+        dispatcher(), /*suspend_enabled=*/false, [](const std::string&) {}, [] {});
     ASSERT_EQ(NumSubprocesses(), 0u);
 
     process_handler.Handle(zx::exception{}, zx::process{}, zx::thread{});
@@ -91,8 +94,11 @@ TEST_F(ProcessHandlerTest, ManagesSubprocessLifetime) {
 
 TEST_F(ProcessHandlerTest, OnAvailableCalled) {
   bool available = false;
+
+  // TODO(https://fxbug.dev/333110044): Test with suspend enabled + disabled.
   ProcessHandler process_handler(
-      dispatcher(), [](const std::string&) {}, [&available] { available = true; });
+      dispatcher(), /*suspend_enabled=*/false, [](const std::string&) {},
+      [&available] { available = true; });
 
   process_handler.Handle(zx::exception{}, zx::process{}, zx::thread{});
 

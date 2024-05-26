@@ -23,28 +23,56 @@ zx_status_t FidlErrorToStatus(const ErrorType& e) {
 // Returns a lambda that can be used as the callback passed to |Then| or |ThenExactlyOnce| on the
 // return value from making an async FIDL request over |bridge_client_|.
 // The returned lambda will forward the result to the provided |completer|.
+//
+// Framework errors that result in channel closure are propagated by closing the completer with
+// an epitaph, which results in closing the underlying transport.
+// Framework errors that do not result in channel closure are either:
+// - Returned as a domain error if |FidlMethod| has one.
+// - Logged then ignored if |FidlMethod| does not have a domain error. If |FidlMethod| returns a
+//   response to the caller, then a default-initialized response is returned.
 template <typename FidlMethod, typename AsyncCompleter>
 auto ForwardResult(AsyncCompleter completer,
                    cpp20::source_location loc = cpp20::source_location::current()) {
-  // This function can be applied to FIDL protocols on both the channel and driver transports.
-  constexpr bool channel_transport =
-      std::is_same_v<typename FidlMethod::Protocol::Transport, fidl::internal::ChannelTransport>;
-  using ResultType = typename std::conditional_t<channel_transport, fidl::Result<FidlMethod>,
-                                                 fdf::Result<FidlMethod>>;
-
-  return [completer = std::move(completer), loc](ResultType& result) mutable {
+  return [completer = std::move(completer), loc](auto& result) mutable {
     ltrace(0, nullptr, "Forwarding result for %s", loc.function_name());
     if (result.is_error()) {
       lerror("Result not ok for %s: %s", loc.function_name(),
              result.error_value().FormatDescription().c_str());
     }
 
-    constexpr bool has_reply = FidlMethod::kHasNonEmptyUserFacingResponse ||
-                               FidlMethod::kHasDomainError || FidlMethod::kHasFrameworkError;
-    if constexpr (has_reply) {
+    if constexpr (FidlMethod::kHasDomainError) {
+      // If we get a framework error that results in channel closure, then we close the channel.
+      if (result.is_error() && result.error_value().is_framework_error()) {
+        fidl::Status& framework_error = result.error_value().framework_error();
+        if (framework_error.is_peer_closed()) {
+          completer.Close(framework_error.status());
+          return;
+        }
+      }
+
+      // Framework errors that do not result in channel closure get sent up as a domain error
+      // instead.
       completer.Reply(result.map_error([](auto error) { return FidlErrorToStatus(error); }));
     } else {
-      completer.Reply();
+      // If we get an error that results in channel closure, then we close the channel.
+      if (result.is_error() && result.error_value().is_peer_closed()) {
+        completer.Close(result.error_value().status());
+        return;
+      }
+
+      if constexpr (FidlMethod::kHasNonEmptyUserFacingResponse) {
+        if (result.is_error()) {
+          // If the error did not result in channel closure, then reply with some
+          // default-initialized value.
+          // TODO(https://fxbug.dev/341756361) Remove this when API is cleaned up.
+          completer.Reply({});
+        } else {
+          completer.Reply(result.value());
+        }
+      } else {
+        // completer.Reply() has no parameters only if FidlMethod does not return a value or error.
+        completer.Reply();
+      }
     }
   };
 }

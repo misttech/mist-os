@@ -167,8 +167,8 @@ class TestDeviceBase {
 };
 
 constexpr char kMediaCodecPath[] = "/dev/class/media-codec";
-constexpr std::string_view kTopologicalPathSuffix = "/aml_video/amlogic_video";
-constexpr std::string_view kTestTopologicalPathSuffix = "/aml_video/test_amlogic_video";
+constexpr std::string_view kTopologicalPathSuffix = "/amlogic_video";
+constexpr std::string_view kTestTopologicalPathSuffix = "/test_amlogic_video";
 
 // Requires the driver to be in the system image, so disabled by default.
 TEST(TestRunner, DISABLED_RunTests) {

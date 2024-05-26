@@ -195,13 +195,13 @@ void StreamImpl::OnFrameAvailable(fuchsia::camera2::FrameAvailableInfo info) {
 }
 
 void StreamImpl::SetBufferCollection(
-    uint64_t id, fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_handle) {
+    uint64_t id, fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token_handle) {
   TRACE_DURATION("camera", "StreamImpl::SetBufferCollection");
   auto it = clients_.find(id);
   if (it == clients_.end()) {
     FX_LOGS(ERROR) << description_ << ": Client " << id << " not found.";
     if (token_handle) {
-      token_handle.BindSync()->Close();
+      token_handle.BindSync()->Release();
     }
     ZX_DEBUG_ASSERT(false);
     return;
@@ -211,7 +211,7 @@ void StreamImpl::SetBufferCollection(
   client->Participant() = !!token_handle;
 
   if (token_handle) {
-    token_handle.BindSync()->Close();
+    token_handle.BindSync()->Release();
   }
 
   frame_waiters_.clear();
@@ -228,19 +228,23 @@ void StreamImpl::SetBufferCollection(
   legacy_stream_->GetBuffers(
       [this, legacy_stream_needs_start](fuchsia::sysmem::BufferCollectionTokenHandle token_handle) {
         // Duplicate and send each client a token.
-        std::map<uint64_t, fuchsia::sysmem::BufferCollectionTokenHandle> client_tokens;
-        fuchsia::sysmem::BufferCollectionTokenPtr token = token_handle.Bind();
+        std::map<uint64_t, fuchsia::sysmem2::BufferCollectionTokenHandle> client_tokens;
+        fuchsia::sysmem2::BufferCollectionTokenPtr token =
+            fuchsia::sysmem2::BufferCollectionTokenHandle(token_handle.TakeChannel()).Bind();
         for (auto& client_i : clients_) {
           if (client_i.second->Participant()) {
-            token->Duplicate(ZX_RIGHT_SAME_RIGHTS, client_tokens[client_i.first].NewRequest());
+            fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest dup_request;
+            dup_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
+            dup_request.set_token_request(client_tokens[client_i.first].NewRequest());
+            token->Duplicate(std::move(dup_request));
           }
         }
         token->Sync([this, token = std::move(token), client_tokens = std::move(client_tokens),
-                     legacy_stream_needs_start]() mutable {
+                     legacy_stream_needs_start](fuchsia::sysmem2::Node_Sync_Result result) mutable {
           for (auto& [id, token] : client_tokens) {
             auto it = clients_.find(id);
             if (it == clients_.end()) {
-              token.BindSync()->Close();
+              token.BindSync()->Release();
             } else {
               it->second->ReceiveBufferCollection(std::move(token));
             }
@@ -328,8 +332,8 @@ void StreamImpl::SetCropRegion(uint64_t id, std::unique_ptr<fuchsia::math::RectF
       y_max = y_min + region->height;
     }
     legacy_stream_->SetRegionOfInterest(x_min, y_min, x_max, y_max, [](zx_status_t status) {
-      // TODO(https://fxbug.dev/42128040): Make this an error once RegionOfInterest support is known at
-      // init time. FX_PLOGS(WARNING, status) << "Stream does not support crop region.";
+      // TODO(https://fxbug.dev/42128040): Make this an error once RegionOfInterest support is known
+      // at init time. FX_PLOGS(WARNING, status) << "Stream does not support crop region.";
     });
   }
   current_crop_region_ = std::move(region);

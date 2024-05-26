@@ -10,6 +10,9 @@
     program: {
         binary: "bin/power_broker_test",
     },
+    capabilities: [
+        { protocol: "fuchsia.power.broker.Topology" },
+    ],
     use: [
         {
             protocol: "fuchsia.power.broker.Topology",

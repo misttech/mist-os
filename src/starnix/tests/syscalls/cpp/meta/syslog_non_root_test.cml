@@ -10,4 +10,11 @@
         binary: "data/tests/syslog_non_root",
         test_type: "gtest",
     },
+    offer: [
+        {
+            protocol: [ "fuchsia.element.GraphicalPresenter" ],
+            from: "#ui",
+            to: [ "#container" ],
+        },
+    ],
 }

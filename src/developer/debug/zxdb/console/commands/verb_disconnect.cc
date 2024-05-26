@@ -15,10 +15,9 @@ namespace zxdb {
 
 namespace {
 
-const char kDisconnectShortHelp[] = R"(disconnect: Disconnect from the remote system.)";
-const char kDisconnectHelp[] =
-    R"(disconnect
-
+const char kDisconnectShortHelp[] = "disconnect: Disconnect from the remote system.";
+const char kDisconnectUsage[] = "disconnect";
+const char kDisconnectHelp[] = R"(
   Disconnects from the remote system, or cancels an in-progress connection if
   there is one.
 
@@ -38,8 +37,8 @@ void RunVerbDisconnect(const Command& cmd, fxl::RefPtr<CommandContext> cmd_conte
 }  // namespace
 
 VerbRecord GetDisconnectVerbRecord() {
-  return VerbRecord(&RunVerbDisconnect, {"disconnect"}, kDisconnectShortHelp, kDisconnectHelp,
-                    CommandGroup::kGeneral);
+  return VerbRecord(&RunVerbDisconnect, {"disconnect"}, kDisconnectShortHelp, kDisconnectUsage,
+                    kDisconnectHelp, CommandGroup::kGeneral);
 }
 
 }  // namespace zxdb

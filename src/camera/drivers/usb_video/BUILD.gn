@@ -56,6 +56,7 @@ source_set("lib") {
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fzl",
+    "//zircon/system/ulib/sysmem-version",
   ]
 }
 

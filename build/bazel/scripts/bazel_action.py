@@ -18,11 +18,19 @@ import sys
 
 from typing import Any, Dict, List, Optional, Set, TypeAlias
 
+# Directory where to find Starlark input files.
+_STARLARK_DIR = os.path.join(os.path.dirname(__file__), "..", "starlark")
+
 # A type for the JSON-decoded content describing the @legacy_ninja_build_outputs repository.
 LegacyInputsManifest: TypeAlias = List[Dict[str, Any]]
 
 # A type for the JSON-decoded content describing the @gn_targets repository.
 GnTargetsManifest: TypeAlias = List[Dict[str, Any]]
+
+# The name of the root Bazel workspace as it appears in its WORKSPACE.bazel file.
+# LINT.IfChange
+_BAZEL_ROOT_WORKSPACE_NAME = "main"
+# LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
 
 # A list of built-in Bazel workspaces like @bazel_tools// which are actually
 # stored in the prebuilt Bazel install_base directory with a timestamp *far* in
@@ -236,6 +244,19 @@ def debug(msg: str) -> None:
         print("BAZEL_ACTION_DEBUG: " + msg, file=sys.stderr)
 
 
+def get_input_starlark_file_path(filename: str) -> str:
+    """Return the path of a input starlark file for Bazel queries.
+
+    Args:
+       filename: File name, searched in //build/bazel/starlark/
+    Returns:
+       file path to the corresponding file.
+    """
+    result = os.path.join(_STARLARK_DIR, filename)
+    assert os.path.isfile(result), f"Missing starlark input file: {result}"
+    return result
+
+
 def copy_file_if_changed(src_path: str, dst_path: str) -> None:
     """Copy |src_path| to |dst_path| if they are different."""
     # NOTE: For some reason, filecmp.cmp() will return True if
@@ -363,6 +384,17 @@ assert is_likely_build_id_path("/src/.build-id/ae/23094.so")
 assert not is_likely_build_id_path("/src/.build-id/log.txt")
 
 
+def copy_build_id_dir(build_id_dir: str) -> None:
+    """Copy debug symbols from a source .build-id directory, to the top-level one."""
+    for path in os.listdir(build_id_dir):
+        bid_path = os.path.join(build_id_dir, path)
+        if len(path) == 2 and os.path.isdir(bid_path):
+            for obj in os.listdir(bid_path):
+                src_path = os.path.join(bid_path, obj)
+                dst_path = os.path.join(_BUILD_ID_PREFIX, path, obj)
+                copy_file_if_changed(src_path, dst_path)
+
+
 def is_likely_content_hash_path(path: str) -> bool:
     """Return True if file path is likely based on a content hash.
 
@@ -385,8 +417,15 @@ assert not is_likely_content_hash_path("/src/.build-id/log.txt")
 
 
 def find_bazel_execroot(workspace_dir: str) -> str:
+    """Return the path of the Bazel execroot."""
     return os.path.normpath(
-        os.path.join(workspace_dir, "..", "output_base", "execroot", "main")
+        os.path.join(
+            workspace_dir,
+            "..",
+            "output_base",
+            "execroot",
+            _BAZEL_ROOT_WORKSPACE_NAME,
+        )
     )
 
 
@@ -1041,10 +1080,17 @@ def main() -> int:
     )
 
     parser.add_argument(
-        "--build-id-dirs",
-        default=[],
-        nargs="*",
-        help="The build-id directories to copy to the root build-id dir.",
+        "--fuchsia-package-output-archive",
+        help="Output path for Fuchsia package archive file.",
+    )
+    parser.add_argument(
+        "--fuchsia-package-output-manifest",
+        help="Output path for Fuchsia package manifest file.",
+    )
+    parser.add_argument(
+        "--fuchsia-package-copy-debug-symbols",
+        action="store_true",
+        help="Copy debug symbols from Fuchsia package target to top-level .build-id/ directory.",
     )
 
     parser.add_argument("--depfile", help="Ninja depfile output path.")
@@ -1065,11 +1111,18 @@ def main() -> int:
     if not args.bazel_targets:
         return parser.error("A least one --bazel-targets value is needed!")
 
-    if not args.bazel_outputs:
-        return parser.error("At least one --bazel-outputs value is needed!")
+    _build_fuchsia_package = args.command == "build" and (
+        args.fuchsia_package_output_archive
+        or args.fuchsia_package_output_manifest
+        or args.fuchsia_package_copy_debug_symbols
+    )
 
-    if not args.ninja_outputs:
-        return parser.error("At least one --ninja-outputs value is needed!")
+    if args.command == "build" and not _build_fuchsia_package:
+        if not args.bazel_outputs:
+            return parser.error("At least one --bazel-outputs value is needed!")
+
+        if not args.ninja_outputs:
+            return parser.error("At least one --ninja-outputs value is needed!")
 
     if len(args.bazel_outputs) != len(args.ninja_outputs):
         return parser.error(
@@ -1305,6 +1358,9 @@ def main() -> int:
         if bazel_source_files is None:
             return 1
 
+        if _DEBUG:
+            debug("SOURCE FILES:\n%s\n" % "\n".join(bazel_source_files))
+
         # Remove the ' (null)' suffix of each result line.
         source_files = [l.partition(" (null)")[0] for l in bazel_source_files]
 
@@ -1360,6 +1416,13 @@ def main() -> int:
     # CQ/CI bots usable.
     cmd += configured_args + args.bazel_targets + ["--verbose_failures"]
 
+    if args.fuchsia_package_copy_debug_symbols:
+        # Ensure the build_id directories are produced.
+        cmd += ["--output_groups=+build_id_dirs"]
+
+    if _DEBUG:
+        debug("BUILD_CMD: " + " ".join(shlex.quote(c) for c in cmd))
+
     ret2 = subprocess.run(cmd)
     if ret2.returncode != 0:
         print(
@@ -1385,18 +1448,57 @@ def main() -> int:
     for src_path, dst_path in zip(src_paths, args.ninja_outputs):
         copy_file_if_changed(src_path, dst_path)
 
-    # Copy all of our build_id_dir items over to the root build-id path. This
-    # checks for the standard format that our SDK supports for build ids of
-    # having the first 2 digits of the build-id be a directory. We will ignore
-    # anything that doesn't match that format.
-    for build_id_dir in args.build_id_dirs:
-        for path in os.listdir(build_id_dir):
-            bid_path = os.path.join(build_id_dir, path)
-            if len(path) == 2 and os.path.isdir(bid_path):
-                for obj in os.listdir(bid_path):
-                    src_path = os.path.join(bid_path, obj)
-                    dst_path = os.path.join(_BUILD_ID_PREFIX, path, obj)
-                    copy_file_if_changed(src_path, dst_path)
+    if _build_fuchsia_package:
+        bazel_execroot = find_bazel_execroot(args.workspace_dir)
+
+        def run_starlark_cquery(starlark_filename: str) -> List[str]:
+            return get_bazel_query_output(
+                "cquery",
+                [
+                    "--config=quiet",
+                    "--output=starlark",
+                    "--starlark:file",
+                    get_input_starlark_file_path(starlark_filename),
+                    f"{query_targets}",
+                ]
+                + configured_args,
+            )
+
+        if (
+            args.fuchsia_package_output_archive
+            or args.fuchsia_package_output_manifest
+        ):
+            # Run a cquery to extract the FuchsiaPackageInfo provider values.
+            fuchsia_package_info = run_starlark_cquery(
+                "FuchsiaPackageInfo_archive_and_manifest.cquery"
+            )
+            assert (
+                len(fuchsia_package_info) == 2
+            ), f"Unexpected FuchsiaPackageInfo cquery result: {fuchsia_package_info}"
+            # Get all paths, which are relative to the Bazel execroot.
+            bazel_archive_path, bazel_manifest_path = fuchsia_package_info
+            bazel_debug_symbol_dirs = fuchsia_package_info[2:]
+
+            if args.fuchsia_package_output_archive:
+                copy_file_if_changed(
+                    os.path.join(bazel_execroot, bazel_archive_path),
+                    args.fuchsia_package_output_archive,
+                )
+
+            if args.fuchsia_package_output_manifest:
+                copy_file_if_changed(
+                    os.path.join(bazel_execroot, bazel_manifest_path),
+                    args.fuchsia_package_output_manifest,
+                )
+
+        if args.fuchsia_package_copy_debug_symbols:
+            debug_symbol_dirs = run_starlark_cquery(
+                "FuchsiaDebugSymbolInfo_debug_symbol_dirs.cquery"
+            )
+            for debug_symbol_dir in debug_symbol_dirs:
+                copy_build_id_dir(
+                    os.path.join(bazel_execroot, debug_symbol_dir)
+                )
 
     if args.path_mapping:
         # When determining source path of the copied output, follow links to get
@@ -1414,7 +1516,7 @@ def main() -> int:
 
     if args.depfile:
         # Perform a cquery to get all source inputs for the targets, this
-        # returns a list of Bazel labesl followed by "(null)" because these
+        # returns a list of Bazel labels followed by "(null)" because these
         # are never configured. E.g.:
         #
         #  //build/bazel/examples/hello_world:hello_world (null)
@@ -1429,7 +1531,7 @@ def main() -> int:
 
         # Convert output labels to paths relative to the current directory.
         if _DEBUG:
-            debug("ALL INPUTS:\n%s" % "\n".join(all_inputs))
+            debug("ALL INPUTS:\n%s\n" % "\n".join(all_inputs))
 
         ignored_labels = []
         all_sources = set()

@@ -23,7 +23,8 @@ class VDso : public RoDso {
   //
   // The RoDso VMO is created in vmo_kernel_handles[Variant::NEXT]
   // with the VDso variants in the other slots.
-  static const VDso* Create(KernelHandle<VmObjectDispatcher>* vmo_kernel_handles);
+  static const VDso* Create(KernelHandle<VmObjectDispatcher>* vmo_kernel_handles,
+                            KernelHandle<VmObjectDispatcher>* time_values_handle);
 
   static bool vmo_is_vdso(const fbl::RefPtr<VmObject>& vmo) {
 #ifdef KERNEL_NO_USERABI
@@ -56,6 +57,7 @@ class VDso : public RoDso {
 
   VDso(KernelHandle<VmObjectDispatcher>* vmo_kernel_handles);
   void CreateVariant(Variant, KernelHandle<VmObjectDispatcher>* vmo_kernel_handle);
+  void CreateTimeValuesVmo(KernelHandle<VmObjectDispatcher>* time_values_handle);
 
   bool vmo_is_vdso_impl(const fbl::RefPtr<VmObject>& vmo_ref) const {
     if (vmo_ref == vmo()->vmo())

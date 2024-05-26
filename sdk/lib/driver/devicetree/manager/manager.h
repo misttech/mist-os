@@ -57,6 +57,12 @@ class Manager final : public NodeManager {
   // Returns node with phandle |id|.
   zx::result<ReferenceNode> GetReferenceNode(Phandle id) override;
 
+  // Returns index of the node in the publish list.
+  uint32_t GetPublishIndex(uint32_t node_id) override;
+
+  // Moves the node with |node_id| to the |new_index| in the publish list.
+  zx::result<> ChangePublishOrder(uint32_t node_id, uint32_t new_index) override;
+
  private:
   std::vector<uint8_t> fdt_blob_;
   devicetree::Devicetree tree_;

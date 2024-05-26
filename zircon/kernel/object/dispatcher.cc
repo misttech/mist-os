@@ -75,7 +75,7 @@ void Dispatcher::fbl_recycle() {
   SafeDeleter::Delete(this);
 }
 
-zx_status_t Dispatcher::AddObserver(SignalObserver* observer, const Handle* handle,
+zx_status_t Dispatcher::AddObserver(SignalObserver* observer, const void* handle,
                                     zx_signals_t signals, Dispatcher::TriggerMode trigger_mode) {
   canary_.Assert();
   ZX_DEBUG_ASSERT(observer != nullptr);
@@ -124,7 +124,7 @@ bool Dispatcher::RemoveObserver(SignalObserver* observer, zx_signals_t* signals)
   return false;
 }
 
-void Dispatcher::Cancel(const Handle* handle) {
+void Dispatcher::Cancel(const void* handle) {
   canary_.Assert();
   ZX_DEBUG_ASSERT(is_waitable());
 
@@ -147,7 +147,7 @@ void Dispatcher::Cancel(const Handle* handle) {
   }
 }
 
-bool Dispatcher::CancelByKey(const Handle* handle, const void* port, uint64_t key) {
+bool Dispatcher::CancelByKey(const void* handle, const void* port, uint64_t key) {
   canary_.Assert();
   ZX_DEBUG_ASSERT(is_waitable());
 

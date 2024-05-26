@@ -110,6 +110,10 @@ TEST_F(TimeoutTest, AssocTimeout) {
 TEST_F(TimeoutTest, DisassocTimeout) {
   Init();
 
+  simulation::FakeAp ap(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
+  ap.EnableBeacon(kBeaconInterval);
+  client_ifc_.AssociateWith(ap, zx::msec(10));
+
   // Ignore disassociation req in sim-fw.
   WithSimDevice([this](brcmfmac::SimDevice* device) {
     brcmf_simdev* sim = device->GetSim();
@@ -126,9 +130,11 @@ TEST_F(TimeoutTest, DisassocTimeout) {
   EXPECT_EQ(client_ifc_.stats_.deauth_results.size(), 1U);
 }
 
-// This test case will verify the following senerio: After the driver issuing a connect command to
-// firmware, sme sends a deauth_req to driver before firmware response, and sme issue a scan after
-// that, the scan will be successfully executed.
+// This test case will verify the following scenario:
+// - the driver issues a connect command to firmware,
+// - before the firmware responds to the connect command, SME sends a deauth_req to driver
+// - SME issues a scan after that
+// - the scan is successfully executed.
 TEST_F(TimeoutTest, ScanAfterAssocTimeout) {
   Init();
 

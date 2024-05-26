@@ -7,7 +7,7 @@ using fuchsia.mem;
 using zx;
 
 /// Protocol for retrieving kcounter information.
-@discoverable
+@discoverable(server="platform")
 closed protocol Counter {
     /// Retrives a VMO containining summarized kcounter data. The vmo returned
     /// in `buffer` is in "inspect-vmo" format, documented elsewhere.

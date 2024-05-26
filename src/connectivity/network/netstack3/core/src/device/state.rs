@@ -18,8 +18,8 @@ use crate::{
     },
     inspect::Inspectable,
     ip::{
-        device::{state::DualStackIpDeviceState, IpAddressIdSpec, IpDeviceTimerId},
-        types::RawMetric,
+        device::{DualStackIpDeviceState, IpAddressIdSpec, IpDeviceTimerId},
+        RawMetric,
     },
     sync::{RwLock, WeakRc},
 };
@@ -90,7 +90,7 @@ pub(crate) struct IpLinkDeviceStateInner<T, BT: DeviceLayerTypes> {
 
 impl<T, BC: DeviceLayerTypes + TimerContext> IpLinkDeviceStateInner<T, BC> {
     /// Create a new `IpLinkDeviceState` with a link-specific state `link`.
-    pub(super) fn new<
+    pub fn new<
         D: WeakDeviceIdentifier,
         A: IpAddressIdSpec,
         CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D, A>, BC>

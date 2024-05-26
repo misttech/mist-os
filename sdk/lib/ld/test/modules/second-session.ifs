@@ -1,0 +1,6 @@
+--- !ifs-v1
+IfsVersion:      3.0
+SoName:          libsecond-session-test.so.1
+Symbols:
+  - { Name: defined_in_main_executable, Type: Func }
+...

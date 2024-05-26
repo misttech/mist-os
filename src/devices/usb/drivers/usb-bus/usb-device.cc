@@ -7,10 +7,11 @@
 #include <fidl/fuchsia.hardware.usb.device/cpp/wire.h>
 #include <fuchsia/hardware/usb/bus/c/banjo.h>
 #include <fuchsia/hardware/usb/c/banjo.h>
-#include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/usb/cpp/bind.h>
 #include <ddktl/fidl.h>
 #include <fbl/auto_lock.h>
 #include <usb/usb.h>
@@ -962,16 +963,19 @@ zx_status_t UsbDevice::Init(async_dispatcher_t* dispatcher) {
   char name[16];
   snprintf(name, sizeof(name), "%03d", device_id_);
 
-  zx_device_prop_t props[] = {
-      {BIND_USB_VID, 0, device_desc_.id_vendor},
-      {BIND_USB_PID, 0, device_desc_.id_product},
-      {BIND_USB_CLASS, 0, device_desc_.b_device_class},
-      {BIND_USB_SUBCLASS, 0, device_desc_.b_device_sub_class},
-      {BIND_USB_PROTOCOL, 0, device_desc_.b_device_protocol},
+  zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::USB_VID, static_cast<uint32_t>(device_desc_.id_vendor)),
+      ddk::MakeStrProperty(bind_fuchsia::USB_PID, static_cast<uint32_t>(device_desc_.id_product)),
+      ddk::MakeStrProperty(bind_fuchsia::USB_CLASS,
+                           static_cast<uint32_t>(device_desc_.b_device_class)),
+      ddk::MakeStrProperty(bind_fuchsia::USB_SUBCLASS,
+                           static_cast<uint32_t>(device_desc_.b_device_sub_class)),
+      ddk::MakeStrProperty(bind_fuchsia::USB_PROTOCOL,
+                           static_cast<uint32_t>(device_desc_.b_device_protocol)),
   };
   status = DdkAdd(ddk::DeviceAddArgs(name)
-                      .set_props(props)
-                      .set_proto_id(ZX_PROTOCOL_USB_DEVICE)
+                      .set_str_props(props)
+                      .set_proto_id(bind_fuchsia_usb::BIND_PROTOCOL_DEVICE)
                       .set_fidl_service_offers(offers)
                       .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {

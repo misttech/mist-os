@@ -33,7 +33,7 @@ type PlugDetectCapabilities = flexible enum {
 };
 
 /// Endpoint types.
-@available(added=12, deprecated=20)
+@available(added=12, removed=20)
 type EndpointType = flexible enum : uint8 {
     /// The endpoint represents a ring buffer.
     /// A ring buffer processing element's id allows for multi-ring buffer topologies to
@@ -46,7 +46,7 @@ type EndpointType = flexible enum : uint8 {
 };
 
 /// Parameters for an `Element` with `type` equal to `ENDPOINT`.
-@available(added=12, deprecated=20)
+@available(added=12, removed=20)
 type Endpoint = table {
     /// Specifies what the endpoint represents.
     ///
@@ -59,7 +59,7 @@ type Endpoint = table {
 };
 
 /// State for an `Element` with `type` equal to `ENDPOINT`.
-@available(added=12, deprecated=20)
+@available(added=12, removed=20)
 type EndpointElementState = table {
     /// If included the plug detect state for this endpoint.
     ///

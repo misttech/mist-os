@@ -85,22 +85,22 @@ void ProcessNode::SendFrame(uint32_t index, frame_metadata_t metadata,
   frame_callback_(std::move(token), metadata);
 }
 
-const fuchsia::sysmem::BufferCollectionInfo_2& ProcessNode::InputBuffers() const {
+const fuchsia::sysmem2::BufferCollectionInfo& ProcessNode::InputBuffers() const {
   ZX_ASSERT(attachments_.input_collection.has_value());
   return attachments_.input_collection->get().buffers;
 }
 
-const std::vector<fuchsia::sysmem::ImageFormat_2>& ProcessNode::InputFormats() const {
+const std::vector<fuchsia::images2::ImageFormat>& ProcessNode::InputFormats() const {
   ZX_ASSERT(attachments_.input_formats.has_value());
   return attachments_.input_formats->get();
 }
 
-const fuchsia::sysmem::BufferCollectionInfo_2& ProcessNode::OutputBuffers() const {
+const fuchsia::sysmem2::BufferCollectionInfo& ProcessNode::OutputBuffers() const {
   ZX_ASSERT(attachments_.output_collection.has_value());
   return attachments_.output_collection->get().buffers;
 }
 
-const std::vector<fuchsia::sysmem::ImageFormat_2>& ProcessNode::OutputFormats() const {
+const std::vector<fuchsia::images2::ImageFormat>& ProcessNode::OutputFormats() const {
   ZX_ASSERT(attachments_.output_formats.has_value());
   return attachments_.output_formats->get();
 }

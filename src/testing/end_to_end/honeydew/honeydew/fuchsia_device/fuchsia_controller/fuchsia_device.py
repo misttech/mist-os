@@ -61,13 +61,11 @@ from honeydew.interfaces.transports import (
     fuchsia_controller as fuchsia_controller_transport_interface,
 )
 from honeydew.interfaces.transports import sl4f as sl4f_transport_interface
-from honeydew.interfaces.transports import ssh as ssh_transport_interface
 from honeydew.transports import fastboot as fastboot_transport
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
-from honeydew.transports import ssh as ssh_transport
 from honeydew.typing import custom_types
 from honeydew.utils import properties
 
@@ -113,13 +111,8 @@ class FuchsiaDevice(
         device_name: Device name returned by `ffx target list`.
         ffx_config: Config that need to be used while running FFX commands.
         device_ip_port: IP Address and port of the device.
-        ssh_private_key: Absolute path to the SSH private key file needed to SSH
-            into fuchsia device.
-        ssh_user: Username to be used to SSH into fuchsia device.
-            Default is "fuchsia".
 
     Raises:
-        errors.SSHCommandError: if SSH connection check fails.
         errors.FFXCommandError: if FFX connection check fails.
         errors.FuchsiaControllerError: if FC connection check fails.
     """
@@ -129,8 +122,6 @@ class FuchsiaDevice(
         device_name: str,
         ffx_config: custom_types.FFXConfig,
         device_ip_port: custom_types.IpPort | None = None,
-        ssh_private_key: str | None = None,
-        ssh_user: str | None = None,
     ) -> None:
         _LOGGER.debug("Initializing Fuchsia-Controller based FuchsiaDevice")
 
@@ -145,9 +136,6 @@ class FuchsiaDevice(
         ) = None
         if self._ip_address_port:
             self._ip_address = self._ip_address_port.ip
-
-        self._ssh_private_key: str | None = ssh_private_key
-        self._ssh_user: str | None = ssh_user
 
         self._on_device_boot_fns: list[Callable[[], None]] = []
 
@@ -245,30 +233,6 @@ class FuchsiaDevice(
         return self._build_info["version"]
 
     # List all transports
-    @properties.Transport
-    def ssh(self) -> ssh_transport_interface.SSH:
-        """Returns the SSH transport object.
-
-        Returns:
-            SSH transport interface implementation.
-
-        Raises:
-            errors.SSHCommandError: Failed to instantiate.
-        """
-        if not self._ssh_private_key:
-            raise errors.SSHCommandError(
-                "ssh_private_key argument need to be passed during device "
-                "init in-order to SSH into the device"
-            )
-        ssh_obj: ssh_transport_interface.SSH = ssh_transport.SSH(
-            device_name=self.device_name,
-            ip_port=self._ip_address_port,
-            username=self._ssh_user,
-            private_key=self._ssh_private_key,
-            ffx_transport=self.ffx,
-        )
-        return ssh_obj
-
     @properties.Transport
     def ffx(self) -> ffx_transport_interface.FFX:
         """Returns the FFX transport object.
@@ -459,13 +423,9 @@ class FuchsiaDevice(
         """Ensure device is healthy.
 
         Raises:
-            errors.SshConnectionError
             errors.FfxConnectionError
             errors.FuchsiaControllerConnectionError
         """
-        if self._ssh_private_key:
-            self.ssh.check_connection()
-
         # Note - FFX need to be invoked first before FC as FC depends on the daemon that will be created by FFX
         self.ffx.check_connection()
         self.fuchsia_controller.check_connection()

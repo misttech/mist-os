@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_net_filter::{
-    Domain, InstalledIpRoutine, InstalledNatRoutine, IpInstallationHook, IpRoutine, Namespace,
-    NatInstallationHook, NatRoutine, Routine, RoutineId, RoutineType, Rule,
+// This file contains translation between fuchsia.net.filter data structures and Linux
+// iptables structures.
+
+use fidl_fuchsia_net_filter_ext::{
+    Domain, InstalledIpRoutine, InstalledNatRoutine, IpHook, Namespace, NamespaceId, NatHook,
+    Routine, RoutineId, RoutineType, Rule,
 };
 use starnix_logging::track_stub;
 use starnix_uapi::{
@@ -17,7 +20,14 @@ use std::collections::HashMap;
 use std::ffi::CStr;
 use zerocopy::{FromBytes, FromZeros, NoCell};
 
-#[derive(Debug, Default)]
+const TABLE_NAT: &str = "nat";
+const CHAIN_PREROUTING: &str = "PREROUTING";
+const CHAIN_INPUT: &str = "INPUT";
+const CHAIN_FORWARD: &str = "FORWARD";
+const CHAIN_OUTPUT: &str = "OUTPUT";
+const CHAIN_POSTROUTING: &str = "POSTROUTING";
+
+#[derive(Debug)]
 pub struct IpTable {
     /// The original ipt_replace struct from Linux.
     /// TODO(b/307908515): Remove once we can recreate this information from other fields.
@@ -61,11 +71,7 @@ pub fn parse_ipt_replace(bytes: &[u8]) -> Result<IpTable, Errno> {
 
     Ok(IpTable {
         ipt_replace: replace_info,
-        namespace: Namespace {
-            id: Some(table_name),
-            domain: Some(Domain::Ipv4),
-            ..Default::default()
-        },
+        namespace: Namespace { id: NamespaceId(table_name), domain: Domain::Ipv4 },
         routines: routines.into_values().collect(),
         // TODO(b/307908515): Create Rules from entries.
         rules: vec![],
@@ -92,63 +98,53 @@ fn create_routines(
                 return error!(EINVAL);
             }
 
-            let routine_type: RoutineType = match table_name.as_str() {
-                "nat" => RoutineType::Nat(NatRoutine {
-                    installation: match chain_name.as_str() {
-                        "PREROUTING" => Some(InstalledNatRoutine {
-                            hook: Some(NatInstallationHook::Ingress),
-                            ..Default::default()
-                        }),
-                        "INPUT" => Some(InstalledNatRoutine {
-                            hook: Some(NatInstallationHook::LocalIngress),
-                            ..Default::default()
-                        }),
-                        "OUTPUT" => Some(InstalledNatRoutine {
-                            hook: Some(NatInstallationHook::LocalEgress),
-                            ..Default::default()
-                        }),
-                        "POSTROUTING" => Some(InstalledNatRoutine {
-                            hook: Some(NatInstallationHook::Egress),
-                            ..Default::default()
-                        }),
-                        _ => None,
-                    },
-                    ..Default::default()
-                }),
-                _ => RoutineType::Ip(IpRoutine {
-                    installation: match chain_name.as_str() {
-                        "PREROUTING" => Some(InstalledIpRoutine {
-                            hook: Some(IpInstallationHook::Ingress),
-                            ..Default::default()
-                        }),
-                        "INPUT" => Some(InstalledIpRoutine {
-                            hook: Some(IpInstallationHook::LocalIngress),
-                            ..Default::default()
-                        }),
-                        "FORWARD" => Some(InstalledIpRoutine {
-                            hook: Some(IpInstallationHook::Forwarding),
-                            ..Default::default()
-                        }),
-                        "OUTPUT" => Some(InstalledIpRoutine {
-                            hook: Some(IpInstallationHook::LocalEgress),
-                            ..Default::default()
-                        }),
-                        "POSTROUTING" => Some(InstalledIpRoutine {
-                            hook: Some(IpInstallationHook::Egress),
-                            ..Default::default()
-                        }),
-                        _ => None,
-                    },
-                    ..Default::default()
-                }),
+            let routine_type = match (table_name.as_str(), chain_name.as_str()) {
+                (TABLE_NAT, CHAIN_PREROUTING) => RoutineType::Nat(Some(InstalledNatRoutine {
+                    hook: NatHook::Ingress,
+                    priority: 0,
+                })),
+                (TABLE_NAT, CHAIN_INPUT) => RoutineType::Nat(Some(InstalledNatRoutine {
+                    hook: NatHook::LocalIngress,
+                    priority: 0,
+                })),
+                (TABLE_NAT, CHAIN_OUTPUT) => RoutineType::Nat(Some(InstalledNatRoutine {
+                    hook: NatHook::LocalEgress,
+                    priority: 0,
+                })),
+                (TABLE_NAT, CHAIN_POSTROUTING) => RoutineType::Nat(Some(InstalledNatRoutine {
+                    hook: NatHook::Egress,
+                    priority: 0,
+                })),
+                (TABLE_NAT, _) => RoutineType::Nat(None),
+                (_, CHAIN_PREROUTING) => {
+                    RoutineType::Ip(Some(InstalledIpRoutine { hook: IpHook::Ingress, priority: 0 }))
+                }
+                (_, CHAIN_INPUT) => RoutineType::Ip(Some(InstalledIpRoutine {
+                    hook: IpHook::LocalIngress,
+                    priority: 0,
+                })),
+                (_, CHAIN_FORWARD) => RoutineType::Ip(Some(InstalledIpRoutine {
+                    hook: IpHook::Forwarding,
+                    priority: 0,
+                })),
+                (_, CHAIN_OUTPUT) => RoutineType::Ip(Some(InstalledIpRoutine {
+                    hook: IpHook::LocalEgress,
+                    priority: 0,
+                })),
+                (_, CHAIN_POSTROUTING) => {
+                    RoutineType::Ip(Some(InstalledIpRoutine { hook: IpHook::Egress, priority: 0 }))
+                }
+                (_, _) => RoutineType::Ip(None),
             };
 
             routines.insert(
                 entry.byte_offset,
                 Routine {
-                    id: Some(RoutineId { namespace: table_name.clone(), name: chain_name.clone() }),
-                    type_: Some(routine_type),
-                    ..Default::default()
+                    id: RoutineId {
+                        namespace: NamespaceId(table_name.clone()),
+                        name: chain_name.clone(),
+                    },
+                    routine_type: routine_type,
                 },
             );
         }
@@ -443,11 +439,11 @@ mod tests {
 
         let table = parse_ipt_replace(&bytes).unwrap();
 
-        assert_eq!(table.namespace.id.unwrap(), "filter");
+        assert_eq!(table.namespace.id.0, "filter");
         assert_eq!(table.routines.len(), 1);
-        let routine_id = &table.routines.first().as_ref().unwrap().id.as_ref().unwrap();
+        let routine_id = &table.routines.first().as_ref().unwrap().id;
         assert_eq!(routine_id.name, "mychain");
-        assert_eq!(routine_id.namespace, "filter");
+        assert_eq!(routine_id.namespace.0, "filter");
     }
 
     #[::fuchsia::test]

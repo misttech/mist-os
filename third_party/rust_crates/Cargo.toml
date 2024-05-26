@@ -70,7 +70,7 @@ camino = { version = "1.1.1", features = ["proptest1", "serde1"] }
 # https://github.com/rust-lang/cargo/issues/4463. Until there's an escape
 # hatch, all we can do is document and shed a silent tear while we wait for the
 # ecosystem to migrate away from time 0.1.
-chrono = "0.4.11"
+chrono = { version = "0.4.34", default-features = false }
 chrono-english = "0.1.7"
 clap = "2.34"
 crc = "1.8.1"
@@ -157,6 +157,8 @@ num-derive = "0.4.2"
 num-traits = "0.2.18"
 omaha_client = "0.1"
 once_cell = "1.17.0"
+nu-ansi-term = "0.46.0"
+overload = "0.1.1"
 p256 = { version = "0.11.1", features = ["pem", "serde"] }
 pkcs8 = "0.9.0"
 paste = "1.0"
@@ -217,7 +219,7 @@ toml = "0.5"
 toml_edit = "0.2.1"
 tracing = { version = "0.1.40", default-features = false, features = ["std", "attributes"] }
 tracing-core = "0.1.32"
-tracing-log = "0.1.3"
+tracing-log = "0.2.0"
 tracing-mutex = { version = "0.3.0", features = ["lockapi", "parkinglot"] }
 typed-builder = "0.10.0"
 unicase = "2.7.0"
@@ -241,7 +243,7 @@ zerocopy = { version = "0.8.0-alpha.5", features = ["derive", "simd"] }
 zstd = "0.11.2"
 
 [dependencies.tracing-subscriber]
-version = "0.3.15"
+version = "0.3.18"
 default-features = false
 features = ["env-filter", "fmt", "registry", "std", "tracing-log"]
 
@@ -338,9 +340,13 @@ termcolor = { path = "ask2patch/termcolor" }
 walkdir = { path = "ask2patch/walkdir" }
 
 ### Empty Forks: empty forks kept only for satisfying cargo's resolution
+android-tzdata = { path = "empty/android-tzdata" }
+android_system_properties = { path = "empty/android_system_properties" }
 cc = { path = "empty/cc" }
 crossterm_winapi = { path = "empty/crossterm_winapi" }
 ctor = { path = "empty/ctor" }
+iana-time-zone-haiku = { path = "empty/iana-time-zone-haiku" }
+js-sys = { path = "empty/js-sys" }
 miow = { path = "empty/miow" }
 ntapi = { path = "empty/ntapi" }
 output_vt100 = { path = "empty/output_vt100" }
@@ -349,15 +355,18 @@ rustversion = { path = "empty/rustversion" }
 wasi-0_10_1 = { path = "empty/wasi-0.10.1", package = "wasi" }
 wasi-0_10_0_preview1 = { path = "empty/wasi-0.10.0+wasi-snapshot-preview1", package = "wasi" }
 wasi-0_11_0_preview1 = { path = "empty/wasi-0.11.0+wasi-snapshot-preview1", package = "wasi" }
+wasm-bindgen = { path = "empty/wasm-bindgen" }
 web-sys = { path = "empty/web-sys" }
 wepoll-ffi = { path = "empty/wepoll-ffi" }
 winapi = { path = "empty/winapi" }
 winapi-util = { path = "empty/winapi-util" }
 windows = { path = "empty/windows" }
+windows-core = { path = "empty/windows-core" }
 windows-sys-0_42_0 = { package = "windows-sys", path = "empty/windows-sys-0.42.0" }
 windows-sys-0_45_0 = { package = "windows-sys", path = "empty/windows-sys-0.45.0" }
 windows-sys-0_48_0 = { package = "windows-sys", path = "empty/windows-sys-0.48.0" }
-windows-targets = { path = "empty/windows-targets" }
+windows-targets-0_48_5 = { package = "windows-targets", path = "empty/windows-targets-0.48.5" }
+windows-targets-0_52_0 = { package = "windows-targets", path = "empty/windows-targets-0.52.0" }
 
 ### Forks: vendored crates whose code doesn't match the upstream version
 async-io = { path = "forks/async-io" }

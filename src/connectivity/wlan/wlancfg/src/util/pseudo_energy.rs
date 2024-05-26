@@ -36,6 +36,29 @@ impl EwmaPseudoDecibel {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EwmaSignalData {
+    pub ewma_rssi: EwmaPseudoDecibel,
+    pub ewma_snr: EwmaPseudoDecibel,
+}
+
+impl EwmaSignalData {
+    pub fn new(
+        initial_rssi: impl Into<f64>,
+        initial_snr: impl Into<f64>,
+        ewma_weight: usize,
+    ) -> Self {
+        Self {
+            ewma_rssi: EwmaPseudoDecibel::new(ewma_weight, initial_rssi),
+            ewma_snr: EwmaPseudoDecibel::new(ewma_weight, initial_snr),
+        }
+    }
+    pub fn update_with_new_measurement(&mut self, rssi: impl Into<f64>, snr: impl Into<f64>) {
+        self.ewma_rssi.update_average(rssi);
+        self.ewma_snr.update_average(snr);
+    }
+}
+
 /// Calculates the rate of change across a vector of dB measurements by determining
 /// the slope of the line of best fit using least squares regression. Return is technically
 /// dB(f64)/t where t is the unit of time used in the vector. Returns error if integer overflows.
@@ -44,8 +67,8 @@ impl EwmaPseudoDecibel {
 /// abstraction for monitoring real-world signal changes.
 ///
 /// Intended to be used for RSSI Values, ranging from -128 to -1.
-pub fn calculate_pseudodecibel_velocity(historical_pdb: Vec<f64>) -> Result<f64, Error> {
-    let n = i32::try_from(historical_pdb.len())?;
+fn calculate_raw_velocity(samples: Vec<f64>) -> Result<f64, Error> {
+    let n = i32::try_from(samples.len())?;
     if n < 2 {
         return Err(format_err!("At least two data points required to calculate velocity"));
     }
@@ -56,12 +79,7 @@ pub fn calculate_pseudodecibel_velocity(historical_pdb: Vec<f64>) -> Result<f64,
     let mut sum_x2: i32 = 0;
 
     // Least squares regression summations, returning an error if there are any overflows
-    for (i, y) in historical_pdb.iter().enumerate() {
-        if *y >= 0.0 {
-            return Err(format_err!(
-                "Function is intended for RSSI values, which should be -128 < n < 0"
-            ));
-        }
+    for (i, y) in samples.iter().enumerate() {
         let x = i32::try_from(i).map_err(|_| format_err!("failed to convert index to i32"))?;
         sum_x = sum_x.checked_add(x).ok_or_else(|| format_err!("overflow of X summation"))?;
         sum_y =
@@ -85,38 +103,28 @@ pub fn calculate_pseudodecibel_velocity(historical_pdb: Vec<f64>) -> Result<f64,
 
 // Struct for tracking the exponentially weighted moving average (EWMA) signal measurements.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct EwmaSignalData {
-    pub ewma_rssi: EwmaPseudoDecibel,
-    pub ewma_snr: EwmaPseudoDecibel,
-    pub ewma_rssi_velocity: EwmaPseudoDecibel,
+pub struct RssiVelocity {
+    curr_velocity: f64,
+    prev_rssi: f64,
 }
-
-impl EwmaSignalData {
-    pub fn new(
-        initial_rssi: impl Into<f64>,
-        initial_snr: impl Into<f64>,
-        ewma_weight: usize,
-        ewma_velocity_weight: usize,
-    ) -> Self {
-        Self {
-            ewma_rssi: EwmaPseudoDecibel::new(ewma_weight, initial_rssi),
-            ewma_snr: EwmaPseudoDecibel::new(ewma_weight, initial_snr),
-            ewma_rssi_velocity: EwmaPseudoDecibel::new(ewma_velocity_weight, 0.0),
-        }
+impl RssiVelocity {
+    pub fn new(initial_rssi: impl Into<f64>) -> Self {
+        Self { curr_velocity: 0.0, prev_rssi: initial_rssi.into() }
     }
-    pub fn update_with_new_measurement(&mut self, rssi: impl Into<f64>, snr: impl Into<f64>) {
-        let prev_rssi = self.ewma_rssi.get();
-        self.ewma_rssi.update_average(rssi);
-        self.ewma_snr.update_average(snr);
 
-        match calculate_pseudodecibel_velocity(vec![prev_rssi, self.ewma_rssi.get()]) {
-            Ok(velocity) => {
-                self.ewma_rssi_velocity.update_average(velocity);
-            }
+    pub fn get(&mut self) -> f64 {
+        self.curr_velocity
+    }
+
+    pub fn update(&mut self, rssi: impl Into<f64>) {
+        let rssi: f64 = rssi.into();
+        match calculate_raw_velocity(vec![self.prev_rssi, rssi]) {
+            Ok(velocity) => self.curr_velocity = velocity,
             Err(e) => {
-                error!("Failed to calculate SignalData velocity: {:?}", e);
+                error!("Failed to update velocity: {:?}", e);
             }
         }
+        self.prev_rssi = rssi;
     }
 }
 
@@ -162,36 +170,27 @@ mod tests {
         assert_lt!(ewma_signal.get(), -90.9);
     }
 
-    /// Vector argument must have length >=2, and be negative.
+    /// Vector argument must have length >=2.
     #[fuchsia::test]
     fn test_insufficient_args() {
-        assert!(calculate_pseudodecibel_velocity(vec![]).is_err());
-        assert!(calculate_pseudodecibel_velocity(vec![-60.0]).is_err());
-        assert!(calculate_pseudodecibel_velocity(vec![-60.0, 20.0]).is_err());
+        assert!(calculate_raw_velocity(vec![]).is_err());
+        assert!(calculate_raw_velocity(vec![-60.0]).is_err());
     }
 
     #[fuchsia::test]
     fn test_calculate_negative_velocity() {
+        assert_eq!(calculate_raw_velocity(vec![-60.0, -75.0]).expect("failed to calculate"), -15.0);
         assert_eq!(
-            calculate_pseudodecibel_velocity(vec![-60.0, -75.0]).expect("failed to calculate"),
-            -15.0
-        );
-        assert_eq!(
-            calculate_pseudodecibel_velocity(vec![-40.0, -50.0, -58.0, -64.0])
-                .expect("failed to calculate"),
+            calculate_raw_velocity(vec![-40.0, -50.0, -58.0, -64.0]).expect("failed to calculate"),
             -8.0
         );
     }
 
     #[fuchsia::test]
     fn test_calculate_positive_velocity() {
+        assert_eq!(calculate_raw_velocity(vec![-48.0, -45.0]).expect("failed to calculate"), 3.0);
         assert_eq!(
-            calculate_pseudodecibel_velocity(vec![-48.0, -45.0]).expect("failed to calculate"),
-            3.0
-        );
-        assert_eq!(
-            calculate_pseudodecibel_velocity(vec![-70.0, -55.0, -45.0, -30.0])
-                .expect("failed to calculate"),
+            calculate_raw_velocity(vec![-70.0, -55.0, -45.0, -30.0]).expect("failed to calculate"),
             13.0
         );
     }
@@ -199,7 +198,7 @@ mod tests {
     #[fuchsia::test]
     fn test_calculate_constant_zero_velocity() {
         assert_eq!(
-            calculate_pseudodecibel_velocity(vec![-25.0, -25.0, -25.0, -25.0, -25.0, -25.0])
+            calculate_raw_velocity(vec![-25.0, -25.0, -25.0, -25.0, -25.0, -25.0])
                 .expect("failed to calculate"),
             0.0
         );
@@ -208,10 +207,8 @@ mod tests {
     #[fuchsia::test]
     fn test_calculate_oscillating_zero_velocity() {
         assert_eq!(
-            calculate_pseudodecibel_velocity(
-                vec![-35.0, -45.0, -35.0, -25.0, -35.0, -45.0, -35.0,]
-            )
-            .expect("failed to calculate"),
+            calculate_raw_velocity(vec![-35.0, -45.0, -35.0, -25.0, -35.0, -45.0, -35.0,])
+                .expect("failed to calculate"),
             0.0
         );
     }
@@ -219,23 +216,30 @@ mod tests {
     #[fuchsia::test]
     fn test_calculate_min_max_velocity() {
         assert_eq!(
-            calculate_pseudodecibel_velocity(vec![-1.0, -128.0]).expect("failed to calculate"),
+            calculate_raw_velocity(vec![-1.0, -128.0]).expect("failed to calculate"),
             -127.0
         );
-        assert_eq!(
-            calculate_pseudodecibel_velocity(vec![-128.0, -1.0]).expect("failed to calculate"),
-            127.0
-        );
+        assert_eq!(calculate_raw_velocity(vec![-128.0, -1.0]).expect("failed to calculate"), 127.0);
     }
 
     #[fuchsia::test]
     fn test_update_with_new_measurements() {
-        let mut signal_data = EwmaSignalData::new(-40, 30, 10, 3);
+        let mut signal_data = EwmaSignalData::new(-40, 30, 10);
         signal_data.update_with_new_measurement(-60, 15);
         assert_lt!(signal_data.ewma_rssi.get(), -40.0);
         assert_gt!(signal_data.ewma_rssi.get(), -60.0);
         assert_lt!(signal_data.ewma_snr.get(), 30.0);
         assert_gt!(signal_data.ewma_snr.get(), 15.0);
-        assert_lt!(signal_data.ewma_rssi_velocity.get(), 0.0);
+    }
+
+    #[fuchsia::test]
+    fn test_update_rssi_velocity() {
+        let mut velocity = RssiVelocity::new(-40.0);
+        velocity.update(-80.0);
+        assert_lt!(velocity.get(), 0.0);
+
+        let mut velocity = RssiVelocity::new(-40.0);
+        velocity.update(-20.0);
+        assert_gt!(velocity.get(), 0.0);
     }
 }

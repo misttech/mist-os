@@ -19,10 +19,16 @@ namespace hrtimer {
 
 class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
  public:
+  // Cast is needed because PowerLevel and BinaryPowerLevel are distinct types.
+  static const fuchsia_power_broker::PowerLevel kWakeHandlingLeaseOn =
+      static_cast<fuchsia_power_broker::PowerLevel>(fuchsia_power_broker::BinaryPowerLevel::kOn);
+
   AmlHrtimerServer(
       async_dispatcher_t* dispatcher, fdf::MmioBuffer mmio,
       std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control,
-      fidl::SyncClient<fuchsia_power_broker::Lessor> lease, zx::interrupt irq_a,
+      fidl::SyncClient<fuchsia_power_broker::Lessor> lessor,
+      fidl::SyncClient<fuchsia_power_broker::CurrentLevel> current_level,
+      fidl::Client<fuchsia_power_broker::RequiredLevel> required_level, zx::interrupt irq_a,
       zx::interrupt irq_b, zx::interrupt irq_c, zx::interrupt irq_d, zx::interrupt irq_f,
       zx::interrupt irq_g, zx::interrupt irq_h, zx::interrupt irq_i);
 
@@ -35,7 +41,7 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
   }
   bool HasWaitCompleter(size_t timer_index) {
     ZX_ASSERT(timer_index < kNumberOfTimers);
-    return timers_[timer_index].wait_completer.has_value();
+    return timers_[timer_index].power_enabled_wait_completer.has_value();
   }
   bool StartTicksLeftFitInHardware(size_t timer_index) {
     ZX_ASSERT(timer_index < kNumberOfTimers);
@@ -83,17 +89,18 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
     std::optional<zx::event> event;
     zx::interrupt irq;
     async::IrqMethod<Timer, &Timer::HandleIrq> irq_handler{this};
-    std::optional<StartAndWaitCompleter::Async> wait_completer;
+    // Completer saved to reply to a StartAndWait power aware FIDL call.
+    std::optional<StartAndWaitCompleter::Async> power_enabled_wait_completer;
     uint64_t start_ticks_left = 0;
   };
 
   static constexpr size_t kNumberOfTimers = 9;
-  static const fuchsia_power_broker::PowerLevel kWakeHandlingLeaseOn =
-      static_cast<fuchsia_power_broker::PowerLevel>(fuchsia_power_broker::BinaryPowerLevel::kOn);
 
   static size_t TimerIndexFromId(uint64_t id) { return id; }
 
   fit::result<const fuchsia_hardware_hrtimer::DriverError> StartHardware(size_t timer_index);
+  zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> LeaseWakeHandling();
+  void WatchRequiredLevel();
 
   TimersProperties timers_properties_[kNumberOfTimers] = {
       // clang-format off
@@ -130,8 +137,15 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
       Timer(*this, timers_properties_[8])};
   std::optional<fdf::MmioBuffer> mmio_;
   zx::interrupt irq_;
+  // Need to keep the ElementControl channel end (returned from adding the power element
+  // aml-timer-wake) so the power element stays in the topology.
   std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control_;
+  // This Lessor client allows us to request a lease on the WakeHandling power element.
   fidl::SyncClient<fuchsia_power_broker::Lessor> wake_handling_lessor_;
+  // FIDL client used to update the Power Broker about the power element level.
+  fidl::SyncClient<fuchsia_power_broker::CurrentLevel> current_level_;
+  // FIDL client used to monitor the power level to be set as required by the Power Broker.
+  fidl::Client<fuchsia_power_broker::RequiredLevel> required_level_;
   async_dispatcher_t* dispatcher_;
 };
 }  // namespace hrtimer

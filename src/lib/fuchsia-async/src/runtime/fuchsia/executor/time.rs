@@ -19,7 +19,7 @@ impl Time {
     ///
     /// This function requires that an executor has been set up.
     pub fn now() -> Self {
-        EHandle::local().inner.now()
+        EHandle::local().inner().now()
     }
 
     /// Compute a deadline for the time in the future that is the

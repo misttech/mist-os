@@ -7,12 +7,12 @@ use super::{
     instrumentation::{Collector, LocalCollector, WakeupReason},
     packets::{PacketReceiver, PacketReceiverMap, ReceiverRegistration},
     time::Time,
+    ScopeRef,
 };
 use crate::atomic_future::{AtomicFuture, AttemptPollResult};
 use crossbeam::queue::SegQueue;
 use fuchsia_sync::Mutex;
 use fuchsia_zircon::{self as zx};
-use rustc_hash::FxHashMap as HashMap;
 use std::{
     any::Any,
     cell::RefCell,
@@ -22,7 +22,7 @@ use std::{
     panic::Location,
     sync::atomic::{AtomicBool, AtomicI64, AtomicU16, AtomicU64, AtomicUsize, Ordering},
     sync::{Arc, Weak},
-    task::{Context, Poll, RawWaker, RawWakerVTable, Waker},
+    task::{Context, RawWaker, RawWakerVTable, Waker},
     u64, usize,
 };
 
@@ -34,7 +34,7 @@ pub(crate) const TASK_READY_WAKEUP_ID: u64 = u64::MAX - 1;
 pub(crate) const MAIN_TASK_ID: usize = 0;
 
 thread_local!(
-    static EXECUTOR: RefCell<Option<(Arc<Inner>, TimerHeap)>> = RefCell::new(None)
+    static EXECUTOR: RefCell<Option<(ScopeRef, TimerHeap)>> = RefCell::new(None)
 );
 
 pub(crate) fn with_local_timer_heap<F, R>(f: F) -> R
@@ -75,13 +75,12 @@ fn make_threads_state(sleeping: u8, notified: u8) -> u16 {
     sleeping as u16 | ((notified as u16) << 8)
 }
 
-pub(super) struct Inner {
+pub(super) struct Executor {
     pub(super) port: zx::Port,
     pub(super) done: AtomicBool,
     is_local: bool,
     receivers: Mutex<PacketReceiverMap<Arc<dyn PacketReceiver>>>,
     task_count: AtomicUsize,
-    task_state: Mutex<TaskState>,
     pub(super) ready_tasks: SegQueue<Arc<Task>>,
     time: ExecutorTime,
     pub(super) collector: Collector,
@@ -96,12 +95,7 @@ pub(super) struct Inner {
     pub(super) owner_data: Mutex<Option<Box<dyn Any + Send>>>,
 }
 
-struct TaskState {
-    all_tasks: HashMap<usize, Arc<Task>>,
-    join_wakers: HashMap<usize, Waker>,
-}
-
-impl Inner {
+impl Executor {
     #[cfg_attr(trace_level_logging, track_caller)]
     pub fn new(time: ExecutorTime, is_local: bool, num_threads: u8) -> Self {
         #[cfg(trace_level_logging)]
@@ -110,16 +104,12 @@ impl Inner {
         let source = None;
 
         let collector = Collector::new();
-        Inner {
+        Executor {
             port: zx::Port::create(),
             done: AtomicBool::new(false),
             is_local,
             receivers: Mutex::new(PacketReceiverMap::new()),
             task_count: AtomicUsize::new(MAIN_TASK_ID + 1),
-            task_state: Mutex::new(TaskState {
-                all_tasks: HashMap::default(),
-                join_wakers: HashMap::default(),
-            }),
             ready_tasks: SegQueue::new(),
             time,
             collector,
@@ -131,11 +121,11 @@ impl Inner {
         }
     }
 
-    pub fn set_local(self: Arc<Self>, timers: TimerHeap) {
+    pub fn set_local(root_scope: ScopeRef, timers: TimerHeap) {
         EXECUTOR.with(|e| {
             let mut e = e.borrow_mut();
             assert!(e.is_none(), "Cannot create multiple Fuchsia Executors");
-            *e = Some((self, timers));
+            *e = Some((root_scope, timers));
         });
     }
 
@@ -178,16 +168,18 @@ impl Inner {
     }
 
     #[cfg_attr(trace_level_logging, track_caller)]
-    pub fn spawn(self: &Arc<Self>, future: AtomicFuture<'static>) -> usize {
-        // Prevent a deadlock in `.all_tasks` when a task is spawned from a custom
-        // Drop impl while the executor is being torn down.
-        if self.done.load(Ordering::SeqCst) {
-            return usize::MAX;
-        }
+    pub fn spawn(self: &Arc<Self>, scope: &ScopeRef, future: AtomicFuture<'static>) -> usize {
         let next_id = self.task_count.fetch_add(1, Ordering::Relaxed);
-        let task = Task::new(next_id, future, self.clone());
+        let task = {
+            let mut scope_state = scope.lock();
+            if scope_state.cancelled {
+                return usize::MAX;
+            }
+            let task = Task::new(next_id, scope.clone(), future);
+            scope_state.all_tasks.insert(next_id, task.clone());
+            task
+        };
         self.collector.task_created(next_id, task.source());
-        self.task_state.lock().all_tasks.insert(next_id, task.clone());
         task.wake();
         next_id
     }
@@ -195,6 +187,7 @@ impl Inner {
     #[cfg_attr(trace_level_logging, track_caller)]
     pub fn spawn_local<F: Future<Output = R> + 'static, R: 'static>(
         self: &Arc<Self>,
+        scope: &ScopeRef,
         future: F,
         detached: bool,
     ) -> usize {
@@ -207,15 +200,15 @@ impl Inner {
 
         // SAFETY: We've confirmed that the futures here will never be used across multiple threads,
         // so the Send requirements that `new_local` requires should be met.
-        self.spawn(unsafe { AtomicFuture::new_local(future, detached) })
+        self.spawn(scope, unsafe { AtomicFuture::new_local(future, detached) })
     }
 
     /// Spawns the main future.
-    pub fn spawn_main(self: &Arc<Self>, future: AtomicFuture<'static>) {
-        let task = Task::new(MAIN_TASK_ID, future, self.clone());
+    pub fn spawn_main(self: &Arc<Self>, root_scope: &ScopeRef, future: AtomicFuture<'static>) {
+        let task = Task::new(MAIN_TASK_ID, root_scope.clone(), future);
         self.collector.task_created(MAIN_TASK_ID, task.source());
         assert!(
-            self.task_state.lock().all_tasks.insert(MAIN_TASK_ID, task.clone()).is_none(),
+            root_scope.lock().all_tasks.insert(MAIN_TASK_ID, task.clone()).is_none(),
             "Existing main task"
         );
         task.wake();
@@ -385,19 +378,15 @@ impl Inner {
     /// [3]: by returning an upgraded Arc, tokio trusts callers to not "use it for too long", an
     /// opaque non-clone-copy-or-send guard would be stronger than this. See:
     /// https://github.com/tokio-rs/tokio/blob/b42f21ec3e212ace25331d0c13889a45769e6006/tokio/src/io/driver/mod.rs#L297
-    pub fn on_parent_drop(&self) {
-        // Drop all tasks
-        let all_tasks = std::mem::take(&mut self.task_state.lock().all_tasks);
-
+    pub fn on_parent_drop(&self, root_scope: &ScopeRef) {
+        // Drop all tasks.
         // Any use of fasync::unblock can involve a waker. Wakers hold weak references to tasks, but
         // as part of waking, there's an upgrade to a strong reference, so for a small amount of
         // time `fasync::unblock` can hold a strong reference to a task which in turn holds the
         // future for the task which in turn could hold references to receivers, which, if we did
         // nothing about it, would trip the assertion below. For that reason, we forcibly drop the
         // task futures here.
-        for (_, task) in all_tasks {
-            task.future.try_drop().expect("Failed to drop task");
-        }
+        root_scope.drop_all_tasks();
 
         // Drop all of the uncompleted tasks
         while let Some(_) = self.ready_tasks.pop() {}
@@ -437,7 +426,7 @@ impl Inner {
     // The debugger looks for this function on the stack, so if its (fully-qualified) name changes,
     // the debugger needs to be updated.
     // LINT.IfChange
-    pub fn worker_lifecycle<const UNTIL_STALLED: bool>(self: &Arc<Inner>) {
+    pub fn worker_lifecycle<const UNTIL_STALLED: bool>(self: &Arc<Executor>) {
         // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
         let mut local_collector = self.collector.create_local_collector();
 
@@ -552,31 +541,13 @@ impl Inner {
     /// # Safety
     ///
     /// The caller must guarantee that the executor isn't running.
-    pub(super) unsafe fn drop_main_task(&self) {
-        if let Some(task) = self.task_state.lock().all_tasks.remove(&MAIN_TASK_ID) {
+    pub(super) unsafe fn drop_main_task(&self, root_scope: &ScopeRef) {
+        if let Some(task) = root_scope.lock().all_tasks.remove(&MAIN_TASK_ID) {
             // Even though we've removed the task from active tasks, it could still be in
             // pending_tasks, so we have to drop the future here. At time of writing, this is only
             // used by the local executor and there could only be something in ready_tasks if
             // there's a panic.
             task.future.drop_future_unchecked();
-        }
-    }
-
-    /// Polls for a join result for the given task ID.
-    ///
-    /// # Safety
-    ///
-    /// The caller must guarantee that `R` is the correct type.
-    pub unsafe fn poll_join_result<R>(&self, task_id: usize, cx: &mut Context<'_>) -> Poll<R> {
-        let mut tasks = self.task_state.lock();
-        let Some(task) = tasks.all_tasks.get(&task_id) else { return Poll::Pending };
-        if let Some(result) = task.future.take_result() {
-            tasks.join_wakers.remove(&task_id);
-            tasks.all_tasks.remove(&task_id);
-            Poll::Ready(result)
-        } else {
-            tasks.join_wakers.insert(task_id, cx.waker().clone());
-            Poll::Pending
         }
     }
 
@@ -593,7 +564,7 @@ impl Inner {
             AttemptPollResult::IFinished => {
                 let mut waker = None;
                 {
-                    let mut tasks = self.task_state.lock();
+                    let mut tasks = task.scope.lock();
                     if !task.future.is_detached_or_cancelled() {
                         waker = tasks.join_wakers.remove(&task.id);
                     } else if task.id != MAIN_TASK_ID {
@@ -606,7 +577,7 @@ impl Inner {
                 true
             }
             AttemptPollResult::Cancelled => {
-                self.task_state.lock().all_tasks.remove(&task.id);
+                task.scope.lock().all_tasks.remove(&task.id);
                 true
             }
             _ => false,
@@ -617,12 +588,12 @@ impl Inner {
 /// A handle to an executor.
 #[derive(Clone)]
 pub struct EHandle {
-    pub(super) inner: Arc<Inner>,
+    pub(super) root_scope: ScopeRef,
 }
 
 impl fmt::Debug for EHandle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("EHandle").field("port", &self.inner.port).finish()
+        f.debug_struct("EHandle").field("port", &self.inner().port).finish()
     }
 }
 
@@ -633,20 +604,28 @@ impl EHandle {
     ///
     /// If called outside the context of an active async executor.
     pub fn local() -> Self {
-        let inner = EXECUTOR
+        let root_scope = EXECUTOR
             .with(|e| e.borrow().as_ref().map(|x| x.0.clone()))
             .expect("Fuchsia Executor must be created first");
 
-        EHandle { inner }
+        EHandle { root_scope }
     }
 
     pub(super) fn rm_local() {
         EXECUTOR.with(|e| *e.borrow_mut() = None);
     }
 
+    /// The root scope of the executor.
+    ///
+    /// This can be used to spawn tasks that live as long as the executor, and
+    /// to create shorter-lived child scopes.
+    pub fn root_scope(&self) -> &ScopeRef {
+        &self.root_scope
+    }
+
     /// Get a reference to the Fuchsia `zx::Port` being used to listen for events.
     pub fn port(&self) -> &zx::Port {
-        &self.inner.port
+        &self.inner().port
     }
 
     /// Registers a `PacketReceiver` with the executor and returns a registration.
@@ -655,19 +634,24 @@ impl EHandle {
     where
         T: PacketReceiver,
     {
-        let key = self.inner.receivers.lock().insert(receiver.clone()) as u64;
+        let key = self.inner().receivers.lock().insert(receiver.clone()) as u64;
 
         ReceiverRegistration { ehandle: self.clone(), key, receiver }
     }
 
+    #[inline(always)]
+    pub(super) fn inner(&self) -> &Arc<Executor> {
+        &self.root_scope.executor()
+    }
+
     pub(crate) fn deregister_receiver(&self, key: u64) {
         let key = key as usize;
-        let mut lock = self.inner.receivers.lock();
+        let mut lock = self.inner().receivers.lock();
         if lock.contains(key) {
             lock.remove(key);
         } else {
             // The executor is shutting down and already removed the entry.
-            assert!(self.inner.done.load(Ordering::SeqCst), "Missing receiver to deregister");
+            assert!(self.inner().done.load(Ordering::SeqCst), "Missing receiver to deregister");
         }
     }
 
@@ -681,9 +665,10 @@ impl EHandle {
     #[cfg_attr(trace_level_logging, track_caller)]
     pub(crate) fn spawn<R: Send + 'static>(
         &self,
+        scope: &ScopeRef,
         future: impl Future<Output = R> + Send + 'static,
     ) -> usize {
-        self.inner.spawn(AtomicFuture::new(future, false))
+        self.inner().spawn(scope, AtomicFuture::new(future, false))
     }
 
     /// Spawn a new task to be run on this executor.
@@ -692,16 +677,17 @@ impl EHandle {
     /// may be run on either a singlethreaded or multithreaded executor.
     #[cfg_attr(trace_level_logging, track_caller)]
     pub fn spawn_detached(&self, future: impl Future<Output = ()> + Send + 'static) {
-        self.inner.spawn(AtomicFuture::new(future, true));
+        self.inner().spawn(self.root_scope(), AtomicFuture::new(future, true));
     }
 
     /// See `Inner::spawn_local`.
     #[cfg_attr(trace_level_logging, track_caller)]
     pub(crate) fn spawn_local<R: 'static>(
         &self,
+        scope: &ScopeRef,
         future: impl Future<Output = R> + 'static,
     ) -> usize {
-        self.inner.spawn_local(future, false)
+        self.inner().spawn_local(scope, future, false)
     }
 
     /// Spawn a new task to be run on this executor.
@@ -711,59 +697,25 @@ impl EHandle {
     /// this executor is a LocalExecutor.
     #[cfg_attr(trace_level_logging, track_caller)]
     pub fn spawn_local_detached(&self, future: impl Future<Output = ()> + 'static) {
-        self.inner.spawn_local(future, true);
-    }
-
-    /// Marks the task as detached.
-    pub(crate) fn detach(&self, task_id: usize) {
-        let mut tasks = self.inner.task_state.lock();
-        if let Some(task) = tasks.all_tasks.get(&task_id) {
-            task.future.detach();
-        }
-        tasks.join_wakers.remove(&task_id);
-    }
-
-    /// Cancels the task.
-    ///
-    /// # Safety
-    ///
-    /// The caller must guarantee that `R` is the correct type.
-    pub(crate) unsafe fn cancel<R>(&self, task_id: usize) -> Option<R> {
-        let mut tasks = self.inner.task_state.lock();
-        tasks.join_wakers.remove(&task_id);
-        tasks.all_tasks.get(&task_id).and_then(|task| {
-            if task.future.cancel() {
-                self.inner.ready_tasks.push(task.clone());
-            }
-            task.future.take_result()
-        })
-    }
-
-    /// See `Inner::poll_join_result`.
-    pub(crate) unsafe fn poll_join_result<R>(
-        &self,
-        task_id: usize,
-        cx: &mut Context<'_>,
-    ) -> Poll<R> {
-        self.inner.poll_join_result(task_id, cx)
+        self.inner().spawn_local(self.root_scope(), future, true);
     }
 }
 
 pub(super) struct Task {
     id: usize,
-    future: AtomicFuture<'static>,
-    executor: Arc<Inner>,
+    pub(super) future: AtomicFuture<'static>,
+    pub(super) scope: ScopeRef,
     #[cfg(trace_level_logging)]
     source: &'static Location<'static>,
 }
 
 impl Task {
     #[cfg_attr(trace_level_logging, track_caller)]
-    fn new(id: usize, future: AtomicFuture<'static>, executor: Arc<Inner>) -> Arc<Self> {
+    fn new(id: usize, scope: ScopeRef, future: AtomicFuture<'static>) -> Arc<Self> {
         let this = Arc::new(Self {
             id,
             future,
-            executor,
+            scope,
             #[cfg(trace_level_logging)]
             source: Location::caller(),
         });
@@ -776,8 +728,8 @@ impl Task {
 
     fn wake(self: &Arc<Self>) {
         if self.future.mark_ready() {
-            self.executor.ready_tasks.push(self.clone());
-            self.executor.notify_task_ready();
+            self.scope.executor().ready_tasks.push(self.clone());
+            self.scope.executor().notify_task_ready();
         }
     }
 
@@ -891,7 +843,7 @@ mod tests {
             }
         });
 
-        assert!(e.ehandle.inner.task_state.lock().join_wakers.is_empty());
+        assert!(e.ehandle.root_scope.lock().join_wakers.is_empty());
     }
 
     #[test]
@@ -942,6 +894,6 @@ mod tests {
             assert_eq!(task.cancel(), Some(()));
         });
 
-        assert!(e.ehandle.inner.task_state.lock().join_wakers.is_empty());
+        assert!(e.ehandle.root_scope.lock().join_wakers.is_empty());
     }
 }

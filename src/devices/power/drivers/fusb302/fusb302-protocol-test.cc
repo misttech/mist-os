@@ -210,6 +210,21 @@ TEST_F(Fusb302ProtocolTest, DrainReceiveFifoOneMessage) {
   EXPECT_EQ(0x2701912c, protocol_->FirstUnreadMessage().data_objects()[0]);
 }
 
+TEST_F(Fusb302ProtocolTest, DrainReceiveFifoOneMessageMidStream) {
+  MockReceiveFifoNotEmpty();
+  MockReceiveSourceCapabilities(usb_pd::MessageId(3));
+  MockReceiveFifoEmpty();
+
+  EXPECT_OK(protocol_->DrainReceiveFifo());
+
+  ASSERT_TRUE(protocol_->HasUnreadMessage());
+  EXPECT_EQ(usb_pd::MessageType::kSourceCapabilities,
+            protocol_->FirstUnreadMessage().header().message_type());
+  EXPECT_EQ(usb_pd::MessageId(3), protocol_->FirstUnreadMessage().header().message_id());
+  ASSERT_EQ(1u, protocol_->FirstUnreadMessage().data_objects().size());
+  EXPECT_EQ(0x2701912c, protocol_->FirstUnreadMessage().data_objects()[0]);
+}
+
 TEST_F(Fusb302ProtocolTest, MarkMessageAsReadAfterHardwareRepliedGoodCrc) {
   MockReceiveFifoNotEmpty();
   MockReceiveGetSinkCapabilities(usb_pd::MessageId(0));
@@ -251,7 +266,22 @@ TEST_F(Fusb302ProtocolTest, MarkMessageAsReadTransmitsGoodCrc) {
   EXPECT_EQ(usb_pd::MessageId(0), protocol_->next_transmitted_message_id());
 }
 
-TEST_F(Fusb302ProtocolTest, DrainReceiveFifoIgnoresMismatchedMessageId) {
+TEST_F(Fusb302ProtocolTest, DrainReceiveFifoIgnoresRepeatedMessageIdAfterSync) {
+  // Get the PD protocol to sync up Message ID 4.
+  {
+    MockReceiveFifoNotEmpty();
+    MockReceiveSourceCapabilities(usb_pd::MessageId(4));
+    MockReceiveFifoEmpty();
+
+    MockTransmitFifoEmpty();
+    MockNoBmcTransmissionDetected();
+    MockWriteGoodCrcToFifo(usb_pd::MessageId(4));
+
+    EXPECT_OK(protocol_->DrainReceiveFifo());
+    EXPECT_OK(protocol_->MarkMessageAsRead());
+    ASSERT_FALSE(protocol_->HasUnreadMessage());
+  }
+
   MockReceiveFifoNotEmpty();
   MockReceiveSourceCapabilities(usb_pd::MessageId(4));
   MockReceiveFifoEmpty();
@@ -260,18 +290,58 @@ TEST_F(Fusb302ProtocolTest, DrainReceiveFifoIgnoresMismatchedMessageId) {
   EXPECT_FALSE(protocol_->HasUnreadMessage());
 }
 
+TEST_F(Fusb302ProtocolTest, DrainReceiveFifoIgnoresMismatchedMessageIdAfterSync) {
+  // Get the PD protocol to sync up Message ID 4.
+  {
+    MockReceiveFifoNotEmpty();
+    MockReceiveSourceCapabilities(usb_pd::MessageId(4));
+    MockReceiveFifoEmpty();
+
+    MockTransmitFifoEmpty();
+    MockNoBmcTransmissionDetected();
+    MockWriteGoodCrcToFifo(usb_pd::MessageId(4));
+
+    EXPECT_OK(protocol_->DrainReceiveFifo());
+    EXPECT_OK(protocol_->MarkMessageAsRead());
+    ASSERT_FALSE(protocol_->HasUnreadMessage());
+  }
+
+  MockReceiveFifoNotEmpty();
+  MockReceiveSourceCapabilities(usb_pd::MessageId(3));
+  MockReceiveFifoEmpty();
+
+  EXPECT_OK(protocol_->DrainReceiveFifo());
+  EXPECT_FALSE(protocol_->HasUnreadMessage());
+}
+
 TEST_F(Fusb302ProtocolTest, DrainReceiveFifoValidMessageAfterMismatchedMessageId) {
+  // Get the PD protocol to sync up Message ID 4.
+  {
+    MockReceiveFifoNotEmpty();
+    MockReceiveSourceCapabilities(usb_pd::MessageId(4));
+    MockReceiveFifoEmpty();
+
+    MockTransmitFifoEmpty();
+    MockNoBmcTransmissionDetected();
+    MockWriteGoodCrcToFifo(usb_pd::MessageId(4));
+
+    EXPECT_OK(protocol_->DrainReceiveFifo());
+    ASSERT_TRUE(protocol_->HasUnreadMessage());
+    EXPECT_OK(protocol_->MarkMessageAsRead());
+    ASSERT_FALSE(protocol_->HasUnreadMessage());
+  }
+
   MockReceiveFifoNotEmpty();
-  MockReceiveSourceCapabilities(usb_pd::MessageId(4));
+  MockReceiveSourceCapabilities(usb_pd::MessageId(3));
   MockReceiveFifoNotEmpty();
-  MockReceiveGetSinkCapabilities(usb_pd::MessageId(0));
+  MockReceiveGetSinkCapabilities(usb_pd::MessageId(5));
   MockReceiveFifoEmpty();
 
   EXPECT_OK(protocol_->DrainReceiveFifo());
   ASSERT_TRUE(protocol_->HasUnreadMessage());
   EXPECT_EQ(usb_pd::MessageType::kGetSinkCapabilities,
             protocol_->FirstUnreadMessage().header().message_type());
-  EXPECT_EQ(usb_pd::MessageId(0), protocol_->FirstUnreadMessage().header().message_id());
+  EXPECT_EQ(usb_pd::MessageId(5), protocol_->FirstUnreadMessage().header().message_id());
 }
 
 TEST_F(Fusb302ProtocolTest, MarkMessageAsReadSendingGoodCrcUpdatesReceiveCounter) {

@@ -355,10 +355,13 @@ fn categorize_tests(tests_json: Vec<TestsJsonEntry>) -> Result<Vec<CategorizedTe
                         match entry.product_bundle {
                             Some(_pb_name) => {
                                 match entry.environments.pop() {
-                                    None => Err(anyhow!(
-                                        "Unable to categorize test: {:?}",
-                                        entry.test.test_label
-                                    )),
+                                    None => Ok(E2eTestInfo::try_from((
+                                        entry.test,
+                                        "NA".to_string(),
+                                        vec![],
+                                    ))
+                                    .with_context(|| format!("test: {}", label))?
+                                    .into()),
                                     Some(Environments { dimensions, tags, .. }) => {
                                         match dimensions.device_type {
                                             Some(device_type) =>
@@ -735,6 +738,23 @@ mod tests {
               "path": "/boot/test/the-test",
               "runtime_deps": "gen/src/some/path/to/test/bootfs_test.deps.json"
             }
+          },
+          {
+            "environments": [],
+            "product_bundle": "some_product.some_board_vim3",
+            "test": {
+              "build_rule": "bootfs_test",
+              "cpu": "arm64",
+              "isolated": true,
+              "label": "//src/some/path/to/test:test(//build/toolchain/fuchsia:arm64)",
+              "log_settings": {
+                "max_severity": "WARN"
+              },
+              "name": "/boot/test/the-test",
+              "os": "fuchsia",
+              "path": "/boot/test/the-test",
+              "runtime_deps": "gen/src/some/path/to/test/bootfs_test.deps.json"
+            }
           }
           ]);
         let parsed: Vec<TestsJsonEntry> = serde_json::from_value(json).unwrap();
@@ -832,6 +852,27 @@ mod tests {
                 path: "/boot/test/the-test".into(),
                 runtime_deps: Some("gen/src/some/path/to/test/bootfs_test.deps.json".into()),
                 device_type: "Vim3".into(),
+                tags: vec![]
+            })
+        );
+
+        let e2e_test_bootfs_no_env: &CategorizedTestInfo = &categorized[4];
+        assert_eq!(e2e_test_bootfs_no_env.name(), "/boot/test/the-test");
+        assert_eq!(
+            e2e_test_bootfs_no_env.label(),
+            "//src/some/path/to/test:test(//build/toolchain/fuchsia:arm64)"
+        );
+        assert_eq!(
+            e2e_test_bootfs_no_env,
+            &CategorizedTestInfo::E2e(E2eTestInfo {
+                basic_info: BasicTestInfo {
+                    name: "/boot/test/the-test".into(),
+                    test_label: "//src/some/path/to/test:test(//build/toolchain/fuchsia:arm64)"
+                        .into(),
+                },
+                path: "/boot/test/the-test".into(),
+                runtime_deps: Some("gen/src/some/path/to/test/bootfs_test.deps.json".into()),
+                device_type: "NA".into(),
                 tags: vec![]
             })
         );

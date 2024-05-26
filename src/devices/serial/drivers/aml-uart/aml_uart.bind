@@ -8,12 +8,17 @@ using fuchsia.amlogic.platform;
 using fuchsia.gpio;
 using fuchsia.platform;
 using fuchsia.pwm;
+using fuchsia.devicetree;
 
 primary node "pdev" {
+  if fuchsia.devicetree.FIRST_COMPATIBLE == "amlogic,bt-uart" {
+    true;
+  } else {
     fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
     fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
     fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;
     fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.UART;
+  }
 }
 
 node "pwm" {

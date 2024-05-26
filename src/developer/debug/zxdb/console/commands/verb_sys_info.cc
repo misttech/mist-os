@@ -17,9 +17,8 @@ namespace zxdb {
 namespace {
 
 const char kSysInfoShortHelp[] = "sys-info: Get general information about the target system.";
-const char kSysInfoHelp[] =
-    R"(sys-info
-
+const char kSysInfoUsage[] = "sys-info";
+const char kSysInfoHelp[] = R"(
   Get general information about the target system. This includes aspects such as
   build version, number of CPUs, memory, etc.)";
 
@@ -58,7 +57,7 @@ void RunVerbSysInfo(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context)
 }  // namespace
 
 VerbRecord GetSysInfoVerbRecord() {
-  return VerbRecord(&RunVerbSysInfo, {"sys-info"}, kSysInfoShortHelp, kSysInfoHelp,
+  return VerbRecord(&RunVerbSysInfo, {"sys-info"}, kSysInfoShortHelp, kSysInfoUsage, kSysInfoHelp,
                     CommandGroup::kGeneral);
 }
 

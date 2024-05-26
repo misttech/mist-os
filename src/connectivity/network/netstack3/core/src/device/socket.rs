@@ -27,6 +27,8 @@ use crate::{
 };
 
 mod integration;
+#[cfg(test)]
+mod integration_tests;
 
 /// A selector for frames based on link-layer protocol number.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
@@ -831,9 +833,8 @@ mod tests {
             testutil::{
                 FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId,
             },
-            DeviceId, DeviceIdentifier, StrongDeviceIdentifier,
+            DeviceIdentifier, StrongDeviceIdentifier,
         },
-        testutil::CtxPairExt as _,
     };
 
     use super::*;
@@ -1584,33 +1585,5 @@ mod tests {
             ]
         );
         assert!(all_sockets.is_empty());
-    }
-
-    #[test]
-    fn drop_real_ids() {
-        /// Test with a real `CoreCtx` to assert that IDs aren't dropped in the
-        /// wrong order.
-        use crate::testutil::{FakeCtxBuilder, TEST_ADDRS_V4};
-        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(TEST_ADDRS_V4).build();
-
-        let mut api = ctx.core_api().device_socket();
-
-        let never_bound = api.create(Mutex::default());
-        let bound_any_device = {
-            let id = api.create(Mutex::default());
-            api.set_device(&id, TargetDevice::AnyDevice);
-            id
-        };
-        let bound_specific_device = {
-            let id = api.create(Mutex::default());
-            api.set_device(
-                &id,
-                TargetDevice::SpecificDevice(&DeviceId::Ethernet(device_ids[0].clone())),
-            );
-            id
-        };
-
-        // Make sure the socket IDs go out of scope before `ctx`.
-        drop((never_bound, bound_any_device, bound_specific_device));
     }
 }

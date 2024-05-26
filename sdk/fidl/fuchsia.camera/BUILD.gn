@@ -21,7 +21,10 @@ fidl("fuchsia.camera") {
     "overview.fidl",
   ]
 
-  public_deps = [ "//sdk/fidl/fuchsia.sysmem" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.sysmem",
+    "//sdk/fidl/fuchsia.sysmem2",
+  ]
 
   enable_hlcpp = true
 }

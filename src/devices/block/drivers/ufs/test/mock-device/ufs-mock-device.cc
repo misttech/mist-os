@@ -15,6 +15,7 @@ UfsLogicalUnit::UfsLogicalUnit() {
       .bDescriptorIDN = static_cast<size_t>(DescriptorType::kUnit),
       .bLUEnable = 0x00,
       .bLogicalBlockSize = kMockBlockSizeShift,
+      .dLUNumWriteBoosterBufferAllocUnits = 0,
   };
 }
 
@@ -101,6 +102,10 @@ UfsMockDevice::UfsMockDevice(zx::interrupt irq)
   device_desc_.bUD0BaseOffset = 0x16;
   device_desc_.bUDConfigPLength = 0x1A;
 
+  ExtendedUfsFeaturesSupport extended_ufs_feature_support;
+  extended_ufs_feature_support.set_writebooster_support(true);
+  device_desc_.dExtendedUfsFeaturesSupport = htobe32(extended_ufs_feature_support.value);
+
   std::memset(&geometry_desc_, 0, sizeof(geometry_desc_));
   geometry_desc_.bLength = sizeof(GeometryDescriptor);
   geometry_desc_.bDescriptorIDN = static_cast<size_t>(DescriptorType::kGeometry);
@@ -115,6 +120,8 @@ UfsMockDevice::UfsMockDevice(zx::interrupt irq)
   } else if (kMaxLunCount == 32) {
     geometry_desc_.bMaxNumberLU = 0x01;
   }
+  geometry_desc_.bAllocationUnitSize = 0x01;
+  geometry_desc_.dSegmentSize = htobe32(0x2000);  // 4MiB segment size
 
   std::memset(&power_desc_, 0, sizeof(power_desc_));
   power_desc_.bLength = sizeof(PowerParametersDescriptor);
@@ -122,7 +129,19 @@ UfsMockDevice::UfsMockDevice(zx::interrupt irq)
 
   SetAttribute(Attributes::bBootLunEn, true);
   SetAttribute(Attributes::bCurrentPowerMode, static_cast<uint32_t>(UfsPowerMode::kActive));
+
   SetAttribute(Attributes::bActiveIccLevel, kHighestActiveIcclevel);
+
+  // Enable WriteBooster
+  device_desc_.bWriteBoosterBufferType =
+      static_cast<uint8_t>(WriteBoosterBufferType::kSharedBuffer);
+  device_desc_.dNumSharedWriteBoosterBufferAllocUnits = betoh32(1);
+  device_desc_.bWriteBoosterBufferPreserveUserSpaceEn =
+      static_cast<uint8_t>(UserSpaceConfigurationOption::kPreserveUserSpace);
+  SetAttribute(Attributes::bWBBufferLifeTimeEst,
+               0x01);  // 0% - 10% WriteBooster Buffer life time used
+  SetAttribute(Attributes::bAvailableWBBufferSize, 10);  // 100%
+  SetAttribute(Attributes::dCurrentWBBufferSize, 0x01);
 }
 
 zx_status_t UfsMockDevice::AddLun(uint8_t lun) {

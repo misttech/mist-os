@@ -68,6 +68,8 @@ if (is_host) {
       rebase_path("testdata/test_lib.textproto", root_build_dir),
       "--out_dir",
       rebase_path("${target_gen_dir}/goldens", root_build_dir),
+      "--base_path",
+      "some/path",  # This should match the golden files
     ]
     outputs = [
       "${target_gen_dir}/goldens/_toc.yaml",

@@ -172,16 +172,11 @@ pub(super) async fn delete_storage(routed_storage: RoutedStorage) -> Result<(), 
     // As of today, the storage component instance must contain the target. This is because
     // it is impossible to expose storage declarations up.
     let moniker = target
-        .instanced_moniker()
+        .moniker()
         .strip_prefix(&routed_storage.backing_dir_info.storage_source_moniker)
         .unwrap();
-    storage::delete_isolated_storage(
-        routed_storage.backing_dir_info,
-        target.persistent_storage,
-        moniker,
-        target.instance_id(),
-    )
-    .await
+    storage::delete_isolated_storage(routed_storage.backing_dir_info, moniker, target.instance_id())
+        .await
 }
 
 static ROUTE_ERROR_HELP: &'static str = "To learn more, see \
@@ -197,7 +192,7 @@ pub async fn report_routing_failure(
 ) {
     target
         .with_logger_as_default(|| {
-            let availability = request.target_use_availability().unwrap_or(Availability::Required);
+            let availability = request.availability().unwrap_or(Availability::Required);
             match availability {
                 Availability::Required => {
                     // TODO(https://fxbug.dev/42060474): consider changing this to `error!()`

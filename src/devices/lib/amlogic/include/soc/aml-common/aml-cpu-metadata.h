@@ -57,7 +57,8 @@ typedef struct operating_point {
 typedef struct legacy_cluster_size {
   PerfDomainId pd_id;
   uint32_t core_count;
-} legacy_cluster_size_t;
+  uint8_t relative_performance;
+} legacy_cluster_info_t;
 
 }  // namespace amlogic_cpu
 

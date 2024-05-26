@@ -18,12 +18,6 @@ rustc_test("integration_tests_bin") {
   sources = [ "src/lib.rs" ]
 }
 
-fuchsia_component("driver") {
-  testonly = true
-  deps = [ ":integration_tests_bin" ]
-  manifest = "meta/driver.cml"
-}
-
 fuchsia_component("archive_reader_integration_test") {
   testonly = true
   deps = [ ":integration_tests_bin" ]
@@ -32,10 +26,7 @@ fuchsia_component("archive_reader_integration_test") {
 
 fuchsia_test_package("archive-reader-integration-tests") {
   test_components = [ ":archive_reader_integration_test" ]
-  deps = [
-    ":driver",
-    "//src/diagnostics/archivist:archivist-for-embedding-bundle",
-  ]
+  deps = [ "//src/diagnostics/archivist:archivist-for-embedding-bundle" ]
 }
 
 group("tests") {

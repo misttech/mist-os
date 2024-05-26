@@ -173,6 +173,8 @@ impl DhcpV6Pd {
     }
 
     pub fn start(&self) -> Result<(), anyhow::Error> {
+        self.stop(); // ensure stop in case the online task is not terminated
+
         info!(tag = "dhcp_v6_pd", "Starting attempt to lease a prefix via DHCPv6-PD...");
         let prefix_provider =
             connect_to_protocol::<PrefixProviderMarker>().context("dhcpv6pd.start")?;

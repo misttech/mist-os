@@ -9,6 +9,11 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/devicetree/visitors/load-visitors.h>
 
+#include "visitors/vim3-adc-buttons.h"
+#include "visitors/vim3-gpio-buttons.h"
+#include "visitors/vim3-nna.h"
+#include "visitors/vim3-wifi.h"
+
 namespace vim3_dt {
 
 zx::result<> Vim3Devicetree::Start() {
@@ -26,6 +31,29 @@ zx::result<> Vim3Devicetree::Start() {
     FDF_LOG(ERROR, "Failed to create visitors: %s", visitors.status_string());
     return visitors.take_error();
   }
+
+  // Insert visitors with workarounds for vim3.
+  if (zx::result result = (*visitors)->RegisterVisitor<Vim3AdcButtonsVisitor>();
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to register vim3 adc buttons visitor");
+    return result.take_error();
+  };
+
+  if (zx::result result = (*visitors)->RegisterVisitor<Vim3GpioButtonsVisitor>();
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to register vim3 gpio buttons visitor");
+    return result.take_error();
+  };
+
+  if (zx::result result = (*visitors)->RegisterVisitor<Vim3WifiVisitor>(); result.is_error()) {
+    FDF_LOG(ERROR, "Failed to register vim3 wifi visitor");
+    return result.take_error();
+  };
+
+  if (zx::result result = (*visitors)->RegisterVisitor<Vim3NnaVisitor>(); result.is_error()) {
+    FDF_LOG(ERROR, "Failed to register vim3 nna visitor");
+    return result.take_error();
+  };
 
   visitors_ = std::move(*visitors);
 

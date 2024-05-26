@@ -49,15 +49,6 @@ source_set("printf") {
   deps = [ ":pw_log" ]
 }
 
-source_set("dfv1") {
-  sources = [ "log_dfv1.cc" ]
-  deps = [
-    ":pw_log",
-    "//src/devices/lib/driver",
-    "//src/lib/ddk",
-  ]
-}
-
 source_set("dfv2") {
   sources = [ "log_dfv2.cc" ]
   deps = [

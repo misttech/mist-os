@@ -367,11 +367,16 @@ fn write_descriptor(writer: &mut impl Write, descriptor: &fir::DeviceDescriptor)
         writer,
         "device_info",
         1,
-        &descriptor.device_info,
+        &descriptor.device_information,
         |writer, device_info, indent| {
-            write_display(writer, "vendor_id", indent, &device_info.vendor_id)?;
-            write_display(writer, "product_id", indent, &device_info.product_id)?;
-            write_display(writer, "version", indent, &device_info.version)?;
+            write_display(writer, "vendor_id", indent, &device_info.vendor_id.unwrap_or_default())?;
+            write_display(
+                writer,
+                "product_id",
+                indent,
+                &device_info.product_id.unwrap_or_default(),
+            )?;
+            write_display(writer, "version", indent, &device_info.version.unwrap_or_default())?;
             Ok(())
         },
     )?;

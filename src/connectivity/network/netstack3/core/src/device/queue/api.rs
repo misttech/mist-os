@@ -198,7 +198,7 @@ where
     /// If packets remain in the RX queue after a batch of RX packets has been
     /// handled, the RX task will be scheduled to run again so the next batch of
     /// RX packets may be handled. See
-    /// [`DeviceLayerEventDispatcher::wake_rx_task`] for more details.
+    /// [`ReceiveQueueBindingsContext::wake_rx_task`] for more details.
     pub fn handle_queued_frames(
         &mut self,
         device_id: &<C::CoreContext as DeviceIdContext<D>>::DeviceId,

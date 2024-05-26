@@ -33,13 +33,8 @@
 namespace component_testing {
 
 // Default child options provided to all components.
-const ChildOptions kDefaultChildOptions{.startup_mode = StartupMode::LAZY,
-                                        .environment = ""
-#if __Fuchsia_API_level__ >= 13
-                                        ,
-                                        .config_overrides = {}
-#endif
-};
+const ChildOptions kDefaultChildOptions{
+    .startup_mode = StartupMode::LAZY, .environment = "", .config_overrides = {}};
 
 // Default child collection name for constructed root.
 constexpr char kDefaultCollection[] = "realm_builder";
@@ -227,9 +222,14 @@ class Realm final {
   // Replaces the value of a given configuration field
   Realm& SetConfigValue(const std::string& name, const std::string& key, ConfigValue value);
 
-#if __Fuchsia_API_level__ >= 20
+#if FUCHSIA_API_LEVEL_AT_LEAST(20)
   // Adds Configuration Capabilities to the root realm.
   Realm& AddConfiguration(std::vector<ConfigCapability> configurations);
+#endif
+
+#if __Fuchsia_API_level__ >= 20
+  // Adds a capability to the root realm.
+  Realm& AddCapability(fuchsia::component::decl::Capability capability);
 #endif
 
   // Fetches the Component decl of the given child. This operation is only
@@ -348,9 +348,14 @@ class RealmBuilder final {
   // Allow setting configuration values without loading packaged configuration.
   RealmBuilder& InitMutableConfigToEmpty(const std::string& name);
 
-#if __Fuchsia_API_level__ >= 20
+#if FUCHSIA_API_LEVEL_AT_LEAST(20)
   // Adds Configuration Capabilities to the root realm.
   RealmBuilder& AddConfiguration(std::vector<ConfigCapability> configurations);
+#endif
+
+#if __Fuchsia_API_level__ >= 20
+  // Adds a capability to the root realm.
+  RealmBuilder& AddCapability(fuchsia::component::decl::Capability capability);
 #endif
 
   // Replaces the value of a given configuration field for the root realm.
@@ -385,13 +390,11 @@ class RealmBuilder final {
   // generated string is used.
   RealmBuilder& SetRealmName(const std::string& name);
 
-#if __Fuchsia_API_level__ >= 14
   // Sets whether or not the realm will be started when `Build` is called.
   RealmBuilder& StartOnBuild(bool start_on_build) {
     start_on_build_ = start_on_build;
     return *this;
   }
-#endif
 
   // Build the realm root prepared by the associated builder methods, e.g. |AddComponent|.
   // |dispatcher| must be non-null, or |async_get_default_dispatcher| must be

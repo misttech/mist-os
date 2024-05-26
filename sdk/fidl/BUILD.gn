@@ -260,6 +260,7 @@ _sdk_partner_internal_fidl_libraries = [
   "fuchsia.posix.socket.packet",
   "fuchsia.posix.socket.raw",
   "fuchsia.power.metrics",
+  "fuchsia.session.power",
   "fuchsia.starnix.container",
   "fuchsia.starnix.runner",
   "fuchsia.sys2",

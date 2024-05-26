@@ -9,6 +9,31 @@ group("tests") {
   deps = [ "tests" ]
 }
 
+zx_library("scsi") {
+  sdk = "source"
+  sdk_headers = [
+    "lib/scsi/controller.h",
+    "lib/scsi/disk.h",
+  ]
+  sources = [
+    "controller.cc",
+    "disk.cc",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
+    "//src/devices/block/lib/common:common",
+    "//zircon/third_party/ulib/safemath",
+  ]
+  public_deps = [
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//src/devices/bin/driver_runtime",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/hwreg",
+  ]
+}
+
 zx_library("scsi-dfv1") {
   sdk = "source"
   sdk_headers = [

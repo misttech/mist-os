@@ -122,7 +122,7 @@ pub async fn has_child<'a>(component: &'a ComponentInstance, moniker: &'a str) -
 }
 
 /// Return the incarnation id of the given child.
-pub async fn get_incarnation_id<'a>(component: &'a ComponentInstance, moniker: &'a str) -> u32 {
+pub async fn get_incarnation_id<'a>(component: &'a ComponentInstance, moniker: &'a str) -> u64 {
     component
         .lock_state()
         .await

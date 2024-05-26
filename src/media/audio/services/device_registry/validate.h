@@ -89,6 +89,22 @@ bool ValidateVendorSpecificElementState(
     const fuchsia_hardware_audio_signalprocessing::ElementState& element_state,
     const fuchsia_hardware_audio_signalprocessing::Element& element);
 
+bool ValidateSettableElementState(
+    const fuchsia_hardware_audio_signalprocessing::SettableElementState& element_state,
+    const fuchsia_hardware_audio_signalprocessing::Element& element);
+bool ValidateSettableDynamicsElementState(
+    const fuchsia_hardware_audio_signalprocessing::SettableElementState& element_state,
+    const fuchsia_hardware_audio_signalprocessing::Element& element);
+bool ValidateSettableEqualizerElementState(
+    const fuchsia_hardware_audio_signalprocessing::SettableElementState& element_state,
+    const fuchsia_hardware_audio_signalprocessing::Element& element);
+bool ValidateSettableGainElementState(
+    const fuchsia_hardware_audio_signalprocessing::SettableElementState& element_state,
+    const fuchsia_hardware_audio_signalprocessing::Element& element);
+bool ValidateSettableVendorSpecificElementState(
+    const fuchsia_hardware_audio_signalprocessing::SettableElementState& element_state,
+    const fuchsia_hardware_audio_signalprocessing::Element& element);
+
 bool ValidateRingBufferFormatSets(
     const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets);
 bool ValidateRingBufferFormat(const fuchsia_hardware_audio::Format& ring_buffer_format);

@@ -1933,7 +1933,7 @@ mod test {
             .map(|(i, e)| {
                 TargetAddrEntry::new(
                     TargetAddr::from(e),
-                    Utc.ymd(2014 + (i as i32), 10, 31).and_hms(9, 10, 12),
+                    Utc.with_ymd_and_hms(2014 + (i as i32), 10, 31, 9, 10, 12).unwrap(),
                     TargetAddrStatus::ssh(),
                 )
             })
@@ -1971,7 +1971,7 @@ mod test {
             .map(|(i, e)| {
                 TargetAddrEntry::new(
                     TargetAddr::from(e),
-                    Utc.ymd(2014 + (i as i32), 10, 31).and_hms(9, 10, 12),
+                    Utc.with_ymd_and_hms(2014 + (i as i32), 10, 31, 9, 10, 12).unwrap(),
                     TargetAddrStatus::ssh(),
                 )
             })
@@ -2529,7 +2529,7 @@ mod test {
                 Some("foo"),
                 std::iter::once(TargetAddrEntry::new(
                     SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 22).into(),
-                    chrono::MIN_DATETIME,
+                    chrono::DateTime::<Utc>::MIN_UTC,
                     TargetAddrStatus::ssh().manually_added(),
                 )),
             );

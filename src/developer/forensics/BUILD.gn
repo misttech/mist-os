@@ -72,8 +72,13 @@ fuchsia_package("pkg") {
 ###############################################################################
 # COMPONENTS
 ###############################################################################
-fuchsia_component("exceptions") {
+fuchsia_component_manifest("exceptions_manifest") {
+  component_name = "exceptions"
   manifest = "exceptions/meta/exceptions.cml"
+}
+
+fuchsia_component("exceptions") {
+  cm_label = ":exceptions_manifest"
 
   deps = [
     ":exception_handler_exe",
@@ -99,6 +104,7 @@ fuchsia_component("feedback") {
 executable("unified_binary") {
   sources = [ "unified_binary.cc" ]
   deps = [
+    ":exceptions_config",
     "exceptions:main",
     "exceptions/handler:main",
     "feedback:main",
@@ -218,4 +224,8 @@ config_data("feedback_userdebug_config_for_eng") {
   sources = [ "feedback/configs/build_type/userdebug.json" ]
 
   outputs = [ "build_type/override_config.json" ]
+}
+
+fuchsia_structured_config_cpp_elf_lib("exceptions_config") {
+  cm_label = ":exceptions_manifest"
 }

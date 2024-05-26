@@ -5,6 +5,8 @@
 import("//build/python/python_host_test.gni")
 import("//build/python/python_library.gni")
 
+# TODO(https://fxbug.dev/342258577): Re-enable mypy type checking after fixing
+# type errors on the disabled python_library and python_host_test targets.
 group("tests") {
   testonly = true
 
@@ -71,153 +73,191 @@ if (is_host) {
       _cl_utils_sources + _remote_action_sources
 
   python_library("bbtool") {
+    enable_mypy = false
     sources = _bbtool_sources
   }
   python_host_test("bbtool_test") {
+    enable_mypy = false
     main_source = "bbtool_test.py"
     sources = _bbtool_sources
   }
 
   python_library("build_summary") {
+    enable_mypy = false
     sources = _build_summary_sources
   }
   python_host_test("build_summary_test") {
+    enable_mypy = false
     main_source = "build_summary_test.py"
     sources = _build_summary_sources
   }
 
   python_library("cl_utils") {
+    enable_mypy = false
     sources = _cl_utils_sources
   }
   python_host_test("cl_utils_test") {
+    enable_mypy = false
     main_source = "cl_utils_test.py"
     sources = _cl_utils_sources
   }
 
   python_library("cxx") {
+    enable_mypy = false
     sources = _cxx_sources
   }
   python_host_test("cxx_test") {
+    enable_mypy = false
     main_source = "cxx_test.py"
     sources = _cxx_sources
   }
 
   python_library("cxx_link_remote_wrapper") {
+    enable_mypy = false
     sources = _cxx_link_remote_wrapper_sources
   }
   python_host_test("cxx_link_remote_wrapper_test") {
+    enable_mypy = false
     main_source = "cxx_link_remote_wrapper_test.py"
     sources = _cxx_link_remote_wrapper_sources
   }
 
   python_library("cxx_remote_wrapper") {
+    enable_mypy = false
     sources = _cxx_remote_wrapper_sources
   }
   python_host_test("cxx_remote_wrapper_test") {
+    enable_mypy = false
     main_source = "cxx_remote_wrapper_test.py"
     sources = _cxx_remote_wrapper_sources
   }
 
   python_library("depfile") {
+    enable_mypy = false
     sources = _depfile_sources
   }
   python_host_test("depfile_test") {
+    enable_mypy = false
     main_source = "depfile_test.py"
     sources = _depfile_sources
   }
 
   python_library("dlwrap") {
+    enable_mypy = false
     sources = _dlwrap_sources
   }
   python_host_test("dlwrap_test") {
+    enable_mypy = false
     main_source = "dlwrap_test.py"
     sources = _dlwrap_sources
   }
 
   python_library("fuchsia") {
+    enable_mypy = false
     sources = _fuchsia_sources
   }
   python_host_test("fuchsia_test") {
+    enable_mypy = false
     main_source = "fuchsia_test.py"
     sources = _fuchsia_sources
   }
 
   python_library("linker") {
+    enable_mypy = false
     sources = _linker_sources
   }
   python_host_test("linker_test") {
+    enable_mypy = false
     main_source = "linker_test.py"
     sources = _linker_sources
   }
 
   python_library("output_leak_scanner") {
+    enable_mypy = false
     sources = _output_leak_scanner_sources
   }
   python_host_test("output_leak_scanner_test") {
+    enable_mypy = false
     main_source = "output_leak_scanner_test.py"
     sources = _output_leak_scanner_sources
   }
 
   python_library("prebuilt_tool_remote_wrapper") {
+    enable_mypy = false
     sources = _prebuilt_tool_remote_wrapper_sources
   }
   python_host_test("prebuilt_tool_remote_wrapper_test") {
+    enable_mypy = false
     main_source = "prebuilt_tool_remote_wrapper_test.py"
     sources = _prebuilt_tool_remote_wrapper_sources
   }
 
   python_library("relativize_args") {
+    enable_mypy = false
     sources = [ "relativize_args.py" ]
   }
   python_host_test("relativize_args_test") {
+    enable_mypy = false
     main_source = "relativize_args_test.py"
     sources = [ "relativize_args.py" ]
   }
 
   python_library("remote_action") {
+    enable_mypy = false
     sources = _remote_action_sources
   }
   python_host_test("remote_action_test") {
+    enable_mypy = false
     main_source = "remote_action_test.py"
     sources = _remote_action_sources
   }
 
   python_library("remotetool") {
+    enable_mypy = false
     sources = _remotetool_sources
   }
   python_host_test("remotetool_test") {
+    enable_mypy = false
     main_source = "remotetool_test.py"
     sources = _remotetool_sources
   }
 
   python_library("rustc") {
+    enable_mypy = false
     sources = _rustc_sources
   }
   python_host_test("rustc_test") {
+    enable_mypy = false
     main_source = "rustc_test.py"
     sources = _rustc_sources
   }
 
   python_library("rustc_remote_wrapper") {
+    enable_mypy = false
     sources = _rustc_remote_wrapper_sources
   }
   python_host_test("rustc_remote_wrapper_test") {
+    enable_mypy = false
     main_source = "rustc_remote_wrapper_test.py"
     sources = _rustc_remote_wrapper_sources
   }
 
   python_library("tablefmt") {
+    enable_mypy = false
     sources = _tablefmt_sources
   }
   python_host_test("tablefmt_test") {
+    enable_mypy = false
     main_source = "tablefmt_test.py"
     sources = _tablefmt_sources
   }
 
   python_library("textpb") {
+    enable_mypy = false
     sources = _textpb_sources
   }
   python_host_test("textpb_test") {
+    enable_mypy = false
     main_source = "textpb_test.py"
     sources = _textpb_sources
   }

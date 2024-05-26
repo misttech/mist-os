@@ -765,9 +765,31 @@ impl<B: ByteSlice> Ipv6Packet<B> {
             Ipv6Proto::Proto(IpProto::Reserved) => Nat64TranslationResult::Drop,
         }
     }
+
+    /// Copies the packet (Header + Extensions + Body) into a `Vec`.
+    pub fn to_vec(&self) -> Vec<u8> {
+        let Ipv6Packet { fixed_hdr, extension_hdrs, body, proto: _ } = self;
+        let mut buf = Vec::with_capacity(
+            fixed_hdr.bytes().len() + extension_hdrs.bytes().len() + body.as_bytes().len(),
+        );
+        buf.extend(fixed_hdr.bytes());
+        buf.extend(extension_hdrs.bytes());
+        buf.extend(body.as_bytes());
+        buf
+    }
 }
 
 impl<B: ByteSliceMut> Ipv6Packet<B> {
+    /// Set the source IP address.
+    pub fn set_src_ip(&mut self, addr: Ipv6Addr) {
+        self.fixed_hdr.src_ip = addr;
+    }
+
+    /// Set the destination IP address.
+    pub fn set_dst_ip(&mut self, addr: Ipv6Addr) {
+        self.fixed_hdr.dst_ip = addr;
+    }
+
     /// Set the hop limit.
     pub fn set_hop_limit(&mut self, hlim: u8) {
         self.fixed_hdr.hop_limit = hlim;
@@ -957,6 +979,18 @@ impl<B: ByteSlice> Ipv6PacketRaw<B> {
     }
 }
 
+impl<B: ByteSliceMut> Ipv6PacketRaw<B> {
+    /// Set the source IP address.
+    pub fn set_src_ip(&mut self, addr: Ipv6Addr) {
+        self.fixed_hdr.src_ip = addr;
+    }
+
+    /// Set the destination IP address.
+    pub fn set_dst_ip(&mut self, addr: Ipv6Addr) {
+        self.fixed_hdr.dst_ip = addr;
+    }
+}
+
 /// A builder for IPv6 packets.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Ipv6PacketBuilder {
@@ -1123,8 +1157,16 @@ impl IpPacketBuilder<Ipv6> for Ipv6PacketBuilder {
         self.src_ip
     }
 
+    fn set_src_ip(&mut self, addr: Ipv6Addr) {
+        self.src_ip = addr;
+    }
+
     fn dst_ip(&self) -> Ipv6Addr {
         self.dst_ip
+    }
+
+    fn set_dst_ip(&mut self, addr: Ipv6Addr) {
+        self.dst_ip = addr;
     }
 
     fn proto(&self) -> Ipv6Proto {
@@ -1185,8 +1227,16 @@ where
         self.prefix_builder.src_ip
     }
 
+    fn set_src_ip(&mut self, addr: Ipv6Addr) {
+        self.prefix_builder.src_ip = addr;
+    }
+
     fn dst_ip(&self) -> Ipv6Addr {
         self.prefix_builder.dst_ip
+    }
+
+    fn set_dst_ip(&mut self, addr: Ipv6Addr) {
+        self.prefix_builder.dst_ip = addr;
     }
 
     fn proto(&self) -> Ipv6Proto {
@@ -1281,6 +1331,7 @@ mod tests {
         let packet = body.parse::<Ipv6Packet<_>>().unwrap();
         verify_ipv6_packet(&packet, IPV6_PACKET);
 
+        // Verify serialization via builders.
         let buffer = packet
             .body()
             .into_serializer()
@@ -1289,6 +1340,9 @@ mod tests {
             .serialize_vec_outer()
             .unwrap();
         assert_eq!(buffer.as_ref(), ETHERNET_FRAME.bytes);
+
+        // Verify serialization via `to_vec`.
+        assert_eq!(&packet.to_vec()[..], IPV6_PACKET.bytes);
     }
 
     #[test]
@@ -1303,6 +1357,7 @@ mod tests {
         let packet = body.parse::<Ipv6Packet<_>>().unwrap();
         verify_ipv6_packet(&packet, IPV6_PACKET);
 
+        // Verify serialization via builders.
         let buffer = packet
             .body()
             .into_serializer()
@@ -1311,6 +1366,26 @@ mod tests {
             .serialize_vec_outer()
             .unwrap();
         assert_eq!(buffer.as_ref(), ETHERNET_FRAME.bytes);
+
+        // Verify serialization via `to_vec`.
+        assert_eq!(&packet.to_vec()[..], IPV6_PACKET.bytes);
+    }
+
+    #[test]
+    fn test_parse_serialize_with_extension_headers() {
+        // NB; Use MLD as test data arbitrarily, because it includes IPv6
+        // extension headers.
+        use crate::testdata::mld_router_report::*;
+
+        let mut buf = REPORT;
+        let packet = buf.parse::<Ipv6Packet<_>>().unwrap();
+        assert_eq!(packet.iter_extension_hdrs().count(), 1);
+
+        // NB: Don't verify serialization via builders, as they omit IPv6
+        // extension headers.
+
+        // Verify serialization via `to_vec`.
+        assert_eq!(&packet.to_vec()[..], REPORT);
     }
 
     fn fixed_hdr_to_bytes(fixed_hdr: FixedHeader) -> [u8; IPV6_FIXED_HDR_LEN] {

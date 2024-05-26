@@ -287,10 +287,10 @@ class FocaltechTest : public testing::Test {
 
 void VerifyDescriptor(const fuchsia_input_report::wire::DeviceDescriptor& descriptor, int64_t x_max,
                       int64_t y_max) {
-  EXPECT_TRUE(descriptor.has_device_info());
-  EXPECT_EQ(descriptor.device_info().vendor_id,
+  EXPECT_TRUE(descriptor.has_device_information());
+  EXPECT_EQ(descriptor.device_information().vendor_id(),
             static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
-  EXPECT_EQ(descriptor.device_info().product_id,
+  EXPECT_EQ(descriptor.device_information().product_id(),
             static_cast<uint32_t>(
                 fuchsia_input_report::wire::VendorGoogleProductId::kFocaltechTouchscreen));
 

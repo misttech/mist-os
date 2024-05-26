@@ -94,6 +94,14 @@ impl IcmpEchoRequest {
         self.id_seq.id.get()
     }
 
+    /// Sets the ID of this message.
+    ///
+    /// WARNING: If this message is part of a parsed [`IcmpPacket`], the
+    /// packet's checksum must also be updated accordingly.
+    pub fn set_id(&mut self, id: u16) {
+        self.id_seq.id = id.into();
+    }
+
     /// The sequence number of this message.
     pub fn seq(&self) -> u16 {
         self.id_seq.seq.get()
@@ -118,6 +126,14 @@ impl IcmpEchoReply {
     /// The ID of this message.
     pub fn id(&self) -> u16 {
         self.id_seq.id.get()
+    }
+
+    /// Sets the ID of this message.
+    ///
+    /// WARNING: If this message is part of a parsed [`IcmpPacket`], the
+    /// packet's checksum must also be updated accordingly.
+    pub fn set_id(&mut self, id: u16) {
+        self.id_seq.id = id.into();
     }
 
     /// The sequence number of this message.

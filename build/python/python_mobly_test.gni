@@ -80,6 +80,12 @@ import("//build/testing/host_test_data.gni")
 #    Type: list(string)
 #    Default: empty list
 #
+#   data_sources (optional)
+#     See build/python/python_binary.gni
+#
+#   data_package_name (required if |data_sources| is provided, else optional)
+#     See build/python/python_binary.gni
+#
 #  test_dir (optional)
 #    Path to where the test executes.
 #    Type: string
@@ -190,6 +196,8 @@ template("python_mobly_test") {
                            [
                              "main_source",
                              "sources",
+                             "data_sources",
+                             "data_package_name",
                            ])
     testonly = _testonly
     enable_mypy = _enable_mypy
@@ -206,7 +214,9 @@ template("python_mobly_test") {
     } else {
       deps += [ "//third_party/mobly:mobly_no_testonly" ]
     }
-
+    if (defined(invoker.test_data_deps)) {
+      deps += invoker.test_data_deps
+    }
     if (defined(invoker.libraries)) {
       deps += invoker.libraries
     }

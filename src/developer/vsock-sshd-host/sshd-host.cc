@@ -39,11 +39,10 @@ class DevNullVnode : public fs::Vnode {
 
   zx_status_t Truncate(size_t len) override { return ZX_OK; }
 
-  zx_status_t GetAttributes(fs::VnodeAttributes* a) override {
-    a->mode = V_TYPE_CDEV | V_IRUSR | V_IWUSR;
-    a->content_size = 0;
-    a->link_count = 1;
-    return ZX_OK;
+  zx::result<fs::VnodeAttributes> GetAttributes() const override {
+    return zx::ok(fs::VnodeAttributes{
+        .mode = V_TYPE_CDEV | V_IRUSR | V_IWUSR,
+    });
   }
 
   fuchsia_io::NodeProtocolKinds GetProtocols() const override {

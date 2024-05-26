@@ -33,7 +33,10 @@ use net_types::{
 };
 use netstack3_core::routes::AddableMetric;
 
-use crate::bindings::{util::TryIntoFidlWithContext, BindingsCtx, Ctx, IpExt};
+use crate::bindings::{
+    util::{EntryAndTableId, TryIntoFidlWithContext},
+    BindingsCtx, Ctx, IpExt,
+};
 
 pub(crate) mod admin;
 use admin::{StrongUserRouteSet, WeakUserRouteSet};
@@ -70,6 +73,7 @@ pub(crate) enum Change<A: IpAddress> {
     RouteOp(RouteOp<A>, WeakSetMembership<A::Version>),
     RemoveSet(WeakUserRouteSet<A::Version>),
     RemoveMatchingDevice(WeakDeviceId),
+    RemoveTable(TableId<A::Version>),
 }
 
 pub(crate) enum ChangeEither {
@@ -422,12 +426,32 @@ where
         loop {
             futures::select_biased!(
                 route_work_item = route_work_receivers.next() => {
-                    let Some((Some(route_work_item), rest)) = route_work_item else {
+                    let Some((Some(route_work_item), mut rest)) = route_work_item else {
                         continue;
                     };
+                    let removing =  matches!(route_work_item, RouteWorkItem {
+                        change: Change::RemoveTable(_),
+                        responder: _,
+                    });
+                    // No new requests will be accepted.
+                    if removing {
+                        rest.close();
+                    }
                     Self::handle_route_change(&mut ctx, tables, update_dispatcher, route_work_item)
                         .await;
-                    route_work_receivers.push(rest.into_future());
+                    if removing {
+                        rest.filter_map(|RouteWorkItem {
+                            change: _,
+                            responder,
+                        }| futures::future::ready(responder))
+                        .for_each(|responder| futures::future::ready(
+                            responder.send(Err(ChangeError::TableRemoved)).unwrap_or_else(|err| {
+                                tracing::error!("failed to respond to the change request: {err:?}");
+                            })
+                        )).await;
+                    } else {
+                        route_work_receivers.push(rest.into_future());
+                    }
                 },
                 table_work_item = table_work_receiver.next() => {
                     let Some(table_work_item) = table_work_item else {
@@ -535,6 +559,7 @@ where
         | Change::RouteOp(_, SetMembership::CoreNdp)
         | Change::RouteOp(_, SetMembership::InitialDeviceRoutes)
         | Change::RouteOp(_, SetMembership::Loopback) => main_table_id::<I>(),
+        Change::RemoveTable(table_id) => *table_id,
     };
 
     let table = tables.get_mut(&table_id).expect("missing table {table_id:?}");
@@ -612,20 +637,31 @@ where
                 return Ok(ChangeOutcome::NoChange);
             }
             TableChange::Remove(itertools::Either::Right(itertools::Either::Right(
-                itertools::Either::Right(entries.into_iter()),
+                itertools::Either::Right(itertools::Either::Left(entries.into_iter())),
+            )))
+        }
+        Change::RemoveTable(_table_id) => {
+            let removed = std::mem::take(&mut table.inner)
+                .into_iter()
+                .map(|(entry, EntryData { generation, set_membership: _ })| (entry, generation));
+            TableChange::Remove(itertools::Either::Right(itertools::Either::Right(
+                itertools::Either::Right(itertools::Either::Right(removed)),
             )))
         }
     };
 
-    let new_routes = table
-        .inner
-        .iter()
-        .map(|(entry, data)| {
-            let device_metric = ctx.api().device_ip::<I>().get_routing_metric(&entry.device);
-            entry.clone().resolve_metric(device_metric).with_generation(data.generation)
-        })
-        .collect::<Vec<_>>();
-    ctx.api().routes::<I>().set_routes(new_routes);
+    // TODO(https://fxbug.dev/341194323): Store all route tables in Core.
+    if table_id.is_main() {
+        let new_routes = table
+            .inner
+            .iter()
+            .map(|(entry, data)| {
+                let device_metric = ctx.api().device_ip::<I>().get_routing_metric(&entry.device);
+                entry.clone().resolve_metric(device_metric).with_generation(data.generation)
+            })
+            .collect::<Vec<_>>();
+        ctx.api().routes::<I>().set_routes(new_routes);
+    }
 
     match table_change {
         TableChange::Add(entry) => {
@@ -650,7 +686,7 @@ where
                     )
                 }
             }
-            let installed_route = entry
+            let installed_route = EntryAndTableId { entry, table_id }
                 .try_into_fidl_with_ctx(ctx.bindings_ctx())
                 .expect("failed to convert route to FIDL");
             route_update_dispatcher
@@ -664,7 +700,10 @@ where
             // Clone the Ctx so we can capture it in the mapping iterator. This
             // is cheaper than collecting into a Vec to eliminate the borrow.
             let mut ctx_clone = ctx.clone();
-            let removed = removed.map(|(entry, _generation)| to_entry::<I>(&mut ctx_clone, entry));
+            let removed = removed.map(|(entry, _generation)| EntryAndTableId {
+                entry: to_entry::<I>(&mut ctx_clone, entry),
+                table_id,
+            });
             notify_removed_routes::<I>(ctx.bindings_ctx(), route_update_dispatcher, removed, table)
                 .await;
         }
@@ -676,13 +715,13 @@ where
 async fn notify_removed_routes<I: Ip>(
     bindings_ctx: &crate::bindings::BindingsCtx,
     dispatcher: &crate::bindings::routes::state::RouteUpdateDispatcher<I>,
-    removed_routes: impl IntoIterator<Item = netstack3_core::routes::Entry<I::Addr, DeviceId>>,
+    removed_routes: impl IntoIterator<Item = EntryAndTableId<I>>,
     table: &Table<I::Addr>,
 ) {
     let mut devices_with_default_routes: Option<HashSet<_>> = None;
     let mut already_notified_devices = HashSet::new();
 
-    for entry in removed_routes {
+    for EntryAndTableId { entry, table_id } in removed_routes {
         if entry.subnet.prefix() == 0 {
             // Check if there are now no default routes on this device.
             let devices_with_default_routes = (&mut devices_with_default_routes)
@@ -708,8 +747,9 @@ async fn notify_removed_routes<I: Ip>(
                 )
             }
         }
-        let installed_route =
-            entry.try_into_fidl_with_ctx(bindings_ctx).expect("failed to convert route to FIDL");
+        let installed_route = EntryAndTableId { entry, table_id }
+            .try_into_fidl_with_ctx(bindings_ctx)
+            .expect("failed to convert route to FIDL");
         dispatcher
             .notify(crate::bindings::routes::state::RoutingTableUpdate::<I>::RouteRemoved(
                 installed_route,

@@ -431,6 +431,7 @@ assoc_values!(VmoOp, [
     TRY_LOCK =         sys::ZX_VMO_OP_TRY_LOCK;
     DONT_NEED =        sys::ZX_VMO_OP_DONT_NEED;
     ALWAYS_NEED =      sys::ZX_VMO_OP_ALWAYS_NEED;
+    PREFETCH =         sys::ZX_VMO_OP_PREFETCH;
 ]);
 
 unsafe_handle_properties!(object: Vmo,

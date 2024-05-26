@@ -40,6 +40,8 @@ fuchsia_cc_driver(
     ],
     output_name = "vim3-clk",
     deps = [
+        "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+        "//sdk/lib/driver/compat/cpp",
         "//src/devices/lib/amlogic",
         "//src/lib/ddk:ddk_metadata",
         "@fuchsia_sdk//bind/fuchsia.test:fuchsia.test_cc",
@@ -49,9 +51,7 @@ fuchsia_cc_driver(
         "@fuchsia_sdk//pkg/driver_runtime_cpp",
         "@fuchsia_sdk//pkg/hwreg",
         "@fuchsia_sdk//pkg/mmio",
-        "@internal_sdk//fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
         "@internal_sdk//fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
-        "@internal_sdk//pkg/driver_compat",
     ],
 )
 
@@ -92,6 +92,8 @@ fuchsia_cc_test(
         "vim3_clk.h",
     ],
     deps = [
+        "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+        "//sdk/lib/driver/compat/cpp",
         "//src/devices/lib/amlogic",
         "//src/lib/ddk:ddk_metadata",
         "@com_google_googletest//:gtest",
@@ -106,9 +108,7 @@ fuchsia_cc_test(
         "@fuchsia_sdk//pkg/driver_runtime_cpp",
         "@fuchsia_sdk//pkg/hwreg",
         "@fuchsia_sdk//pkg/mmio",
-        "@internal_sdk//fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
         "@internal_sdk//fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
-        "@internal_sdk//pkg/driver_compat",
         "@internal_sdk//pkg/driver_testing_cpp_gtest_fixture",
         "@internal_sdk//pkg/mmio-test-helper",
     ],

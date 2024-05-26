@@ -127,6 +127,22 @@ executable("process_launch_failure_unittest_exe") {
   ]
 }
 
+executable("wake_lease_unittest_exe") {
+  testonly = true
+
+  sources = [ "wake_lease_unittest.cc" ]
+
+  deps = [
+    "//src/developer/forensics/exceptions:constants",
+    "//src/developer/forensics/exceptions/handler:lib",
+    "//src/developer/forensics/testing:gtest_with_syslog_main",
+    "//src/developer/forensics/testing:unit_test_fixture",
+    "//src/developer/forensics/testing/stubs:power_broker",
+    "//src/developer/forensics/testing/stubs:system_activity_governor",
+    "//third_party/googletest:gtest",
+  ]
+}
+
 executable("stub_exception_handler_exe") {
   testonly = true
 
@@ -175,16 +191,23 @@ fuchsia_component("exception_broker_config_test") {
   ]
 }
 
+# TODO(https://fxbug.dev/333110044): Test with suspend enabled/disabled.
 fuchsia_test_component("exception_broker_integration_test") {
   manifest = "meta/exception_broker_integration_test.cml"
 
   deps = [
+    ":config_suspend_disabled",
     ":crasher",
     ":exception_broker_integration_test_exe",
   ]
 
   # Depends on config_data which is a system capability.
   test_type = "system"
+}
+
+fuchsia_component_manifest("config_suspend_disabled") {
+  component_name = "config_suspend_disabled"
+  manifest = "meta/config_suspend_disabled.cml"
 }
 
 fuchsia_component("exception_broker_unittest") {
@@ -215,6 +238,13 @@ fuchsia_component("process_launch_failure_unittest") {
   ]
 }
 
+fuchsia_unittest_component("wake_lease_unittest") {
+  deps = [
+    ":wake_lease_unittest_exe",
+    "//src/sys/test_runners/gtest:death_test",
+  ]
+}
+
 ###############################################################################
 # PACKAGES
 ###############################################################################
@@ -223,11 +253,12 @@ fuchsia_test_package("exception-broker-tests") {
     ":exception_broker_config_test",
     ":exception_broker_unittest",
     ":process_launch_failure_unittest",
+    ":wake_lease_unittest",
   ]
 
   test_specs = {
     log_settings = {
-      max_severity = "ERROR"
+      max_severity = "FATAL"
     }
   }
 }

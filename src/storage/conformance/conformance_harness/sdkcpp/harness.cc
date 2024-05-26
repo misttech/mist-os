@@ -21,6 +21,7 @@
 #include <memory>
 #include <vector>
 
+namespace fio = fuchsia_io;
 namespace fio_test = fuchsia_io_test;
 
 zx_status_t DummyWriter(const std::vector<uint8_t>&) { return ZX_OK; }
@@ -42,20 +43,10 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
     config.supports_get_backing_memory(true);
     config.supports_remote_dir(true);
     config.supports_get_token(true);
+    config.supported_attributes(fio::NodeAttributesQuery::kContentSize |
+                                fio::NodeAttributesQuery::kStorageSize);
 
-    // Unsupported options:
-    config.supports_create(false);
-    config.supports_executable_file(false);
-    config.supports_rename(false);
-    config.supports_link(false);
-    config.supports_set_attr(false);
-    config.supports_unlink(false);
-    config.supports_get_attributes(false);
-    config.supports_update_attributes(false);
-    config.supports_directory_watchers(false);
-    config.supports_open2(false);
     // TODO(https://fxbug.dev/324112857): Support append when adding Open2.
-    config.supports_append(false);
 
     completer.Reply(std::move(config));
   }
@@ -63,10 +54,8 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
   void GetDirectory(GetDirectoryRequest& request, GetDirectoryCompleter::Sync& completer) final {
     auto dir = std::make_unique<vfs::PseudoDir>();
 
-    if (request.root().entries()) {
-      for (auto& entry : *request.root().entries()) {
-        AddEntry(std::move(*entry), *dir);
-      }
+    for (auto& entry : request.root().entries()) {
+      AddEntry(std::move(*entry), *dir);
     }
 
     // TODO(https://fxbug.dev/311176363): Support the new C++ bindings in the SDK VFS so that we can
@@ -84,12 +73,10 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
       case fio_test::DirectoryEntry::Tag::kDirectory: {
         fio_test::Directory directory = std::move(entry.directory().value());
         auto dir_entry = std::make_unique<vfs::PseudoDir>();
-        if (directory.entries()) {
-          for (auto& child_entry : *directory.entries()) {
-            AddEntry(std::move(*child_entry), *dir_entry);
-          }
+        for (auto& child_entry : directory.entries()) {
+          AddEntry(std::move(*child_entry), *dir_entry);
         }
-        ZX_ASSERT_MSG(dest.AddEntry(*directory.name(), std::move(dir_entry)) == ZX_OK,
+        ZX_ASSERT_MSG(dest.AddEntry(directory.name(), std::move(dir_entry)) == ZX_OK,
                       "Failed to add Directory entry!");
         break;
       }
@@ -99,20 +86,23 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
         // TODO(https://fxbug.dev/311176363): Support the new C++ bindings in the SDK VFS so we can
         // construct a `vfs::RemoteDir` using a `fidl::ClientEnd` directly.
         auto remote_dir_entry =
-            std::make_unique<vfs::RemoteDir>(remote_directory.remote_client()->TakeChannel());
-        dest.AddEntry(*remote_directory.name(), std::move(remote_dir_entry));
+            std::make_unique<vfs::RemoteDir>(remote_directory.remote_client().TakeChannel());
+        dest.AddEntry(remote_directory.name(), std::move(remote_dir_entry));
         break;
       }
       case fio_test::DirectoryEntry::Tag::kFile: {
         fio_test::File file = std::move(entry.file().value());
         zx::vmo vmo;
-        zx_status_t status = zx::vmo::create(file.contents()->size(), {}, &vmo);
+        zx_status_t status = zx::vmo::create(file.contents().size(), {}, &vmo);
         ZX_ASSERT_MSG(status == ZX_OK, "Failed to create VMO: %s", zx_status_get_string(status));
-        status = vmo.write(file.contents()->data(), 0, file.contents()->size());
-        ZX_ASSERT_MSG(status == ZX_OK, "Failed to write to VMO: %s", zx_status_get_string(status));
-        auto file_entry = std::make_unique<vfs::VmoFile>(std::move(vmo), file.contents()->size(),
+        if (!file.contents().empty()) {
+          status = vmo.write(file.contents().data(), 0, file.contents().size());
+          ZX_ASSERT_MSG(status == ZX_OK, "Failed to write to VMO: %s",
+                        zx_status_get_string(status));
+        }
+        auto file_entry = std::make_unique<vfs::VmoFile>(std::move(vmo), file.contents().size(),
                                                          vfs::VmoFile::WriteMode::kWritable);
-        ZX_ASSERT_MSG(dest.AddEntry(*file.name(), std::move(file_entry)) == ZX_OK,
+        ZX_ASSERT_MSG(dest.AddEntry(file.name(), std::move(file_entry)) == ZX_OK,
                       "Failed to add File entry!");
         break;
       }

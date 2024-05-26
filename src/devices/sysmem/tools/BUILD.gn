@@ -21,6 +21,7 @@ source_set("common_srcs") {
     "//sdk/lib/component/incoming/cpp",
     "//src/lib/fsl",
     "//src/lib/fxl:fxl_cli",
+    "//zircon/system/ulib/sysmem-version",
   ]
 }
 

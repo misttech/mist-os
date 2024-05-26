@@ -19,7 +19,6 @@
         {
             type: "expect_failure_with_err_logs",
             matchers: [
-                "fallback_on_error_response_code_ns3",
                 "discovered_dns_netcfg_basic_ns3",
                 "discovered_dns_netcfg_advanced_ns3",
             ],

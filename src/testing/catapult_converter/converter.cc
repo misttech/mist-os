@@ -324,6 +324,10 @@ void Convert(rapidjson::Document* input, rapidjson::Document* output, const Conv
     AddSharedDiagnostic("fuchsiaIntegrationPublicRevisions",
                         helper.MakeString(args->integration_public_git_commit));
   }
+  if (args->smart_integration_git_commit) {
+    AddSharedDiagnostic("fuchsiaSmartIntegrationRevisions",
+                        helper.MakeString(args->smart_integration_git_commit));
+  }
 
   // The "logUrls" diagnostic contains a list of [name, url] tuples.
   rapidjson::Value log_url_array;
@@ -425,6 +429,7 @@ int ConverterMain(int argc, char** argv) {
       "The following are optional and may be provided to include additional information:\n"
       "  --integration-internal-git-commit STRING\n"
       "  --public-internal-git-commit STRING\n"
+      "  --smart-integration-git-commit STRING\n"
       "See README.md for the meanings of these parameters.\n";
 
   // Parse command line arguments.
@@ -439,6 +444,7 @@ int ConverterMain(int argc, char** argv) {
       {"product-versions", required_argument, nullptr, 'v'},
       {"integration-internal-git-commit", required_argument, nullptr, 'g'},
       {"integration-public-git-commit", required_argument, nullptr, 'p'},
+      {"smart-integration-git-commit", required_argument, nullptr, 's'},
   };
   ConverterArgs args;
   const char* input_filename = nullptr;
@@ -478,6 +484,9 @@ int ConverterMain(int argc, char** argv) {
         break;
       case 'p':
         args.integration_public_git_commit = optarg;
+        break;
+      case 's':
+        args.smart_integration_git_commit = optarg;
         break;
     }
   }

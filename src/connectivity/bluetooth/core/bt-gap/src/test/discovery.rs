@@ -102,7 +102,7 @@ proptest! {
         // Add mock host 1 to dispatcher and make active
         let add_mock_host_fut_1 = host_dispatcher::test::create_and_add_test_host_to_dispatcher(HostId(1), &hd);
         let mut add_mock_host_fut_1 = pin!(add_mock_host_fut_1);
-        let (host_stream_1, host_device_1, _gatt_server_1) = executor.run_singlethreaded(&mut add_mock_host_fut_1).unwrap();
+        let (host_stream_1, host_device_1, _gatt_server_1, _bonding) = executor.run_singlethreaded(&mut add_mock_host_fut_1).unwrap();
         let host_info_1 = Arc::new(RwLock::new(host_device_1.info()));
         hd.set_active_host(host_device_1.id())?;
         let mut active_host = 1;
@@ -113,7 +113,7 @@ proptest! {
         // Add mock host 2 to dispatcher but do NOT make active.
         let add_mock_host_fut_2 = host_dispatcher::test::create_and_add_test_host_to_dispatcher(HostId(2), &hd);
         let mut add_mock_host_fut_2 = pin!(add_mock_host_fut_2);
-        let (host_stream_2, host_device_2, _gatt_server_2) = executor.run_singlethreaded(&mut add_mock_host_fut_2).unwrap();
+        let (host_stream_2, host_device_2, _gatt_server_2, _bonding) = executor.run_singlethreaded(&mut add_mock_host_fut_2).unwrap();
         let host_info_2 = Arc::new(RwLock::new(host_device_2.info()));
 
         let mut host_server_task_2 =

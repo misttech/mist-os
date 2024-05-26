@@ -16,6 +16,7 @@
         {
             protocol: [
                 "fuchsia.media.Audio",
+                "fuchsia.media.AudioCore",
                 "fuchsia.scheduler.RoleManager",
             ],
         },

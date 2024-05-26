@@ -21,7 +21,9 @@ mod state;
 pub type ConntrackConnection<I, BT> = conntrack::Connection<I, BT, state::ConntrackExternalData>;
 
 pub use api::FilterApi;
-pub use context::{FilterBindingsContext, FilterBindingsTypes, FilterContext, FilterIpContext};
+pub use context::{
+    FilterBindingsContext, FilterBindingsTypes, FilterContext, FilterIpContext, NatContext,
+};
 pub use logic::{
     FilterHandler, FilterImpl, FilterTimerId, IngressVerdict, ProofOfEgressCheck, Verdict,
 };
@@ -30,8 +32,8 @@ pub use matchers::{
     PortMatcher, TransportProtocolMatcher,
 };
 pub use packets::{
-    ForwardedPacket, IpPacket, MaybeTransportPacket, NestedWithInnerIpPacket,
-    TransportPacketSerializer, TxPacket,
+    ForwardedPacket, IcmpMessage, IpPacket, NestedWithInnerIpPacket, TransportPacketSerializer,
+    TxPacket,
 };
 pub use state::{
     validation::{ValidRoutines, ValidationError},

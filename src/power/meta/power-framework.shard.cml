@@ -79,6 +79,11 @@
             to: [ "#cpu_manager" ],
         },
         {
+            service: [ "fuchsia.hardware.cpu.ctrl.Service" ],
+            from: "#boot-drivers",
+            to: [ "#cpu_manager" ],
+        },
+        {
             directory: "dev-topological",
             from: "#devfs-with-pkg",
             to: [

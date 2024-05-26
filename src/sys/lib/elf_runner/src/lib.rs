@@ -27,7 +27,7 @@ use {
         vdso_vmo::get_next_vdso_vmo,
     },
     ::routing::policy::ScopedPolicyChecker,
-    chrono::{DateTime, NaiveDateTime, Utc},
+    chrono::{NaiveDateTime, TimeZone as _, Utc},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_diagnostics_types::{
@@ -468,7 +468,8 @@ impl ElfRunner {
                 clock_transformation.apply(zx::Time::from_nanos(process_start_time)).into_nanos();
             let seconds = (utc_timestamp / 1_000_000_000) as i64;
             let nanos = (utc_timestamp % 1_000_000_000) as u32;
-            let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(seconds, nanos), Utc);
+            let dt =
+                Utc.from_utc_datetime(&NaiveDateTime::from_timestamp_opt(seconds, nanos).unwrap());
             runtime_dir.add_process_start_time_utc_estimate(dt.to_string())
         };
 

@@ -11,6 +11,7 @@ rustc_library("lib") {
 
   deps = [
     "//src/developer/ffx/lib/rcs:lib",
+    "//src/developer/ffx/lib/ssh:lib",
     "//src/developer/ffx/lib/target:lib",
   ]
 

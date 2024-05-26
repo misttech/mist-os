@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::bail;
+use anyhow::{bail, Context};
 use itertools::Itertools;
 use serde::{
     de::{Error, Unexpected},
@@ -428,6 +428,7 @@ struct VersionHistoryDataJson {
     #[serde(rename = "type")]
     element_type: String,
     api_levels: BTreeMap<String, ApiLevelJson>,
+    special_api_levels: BTreeMap<String, SpecialApiLevelJson>,
 }
 
 #[derive(Deserialize)]
@@ -438,6 +439,13 @@ struct VersionHistoryJson {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Deserialize)]
 struct ApiLevelJson {
+    pub abi_revision: AbiRevision,
+    pub status: Status,
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Deserialize)]
+struct SpecialApiLevelJson {
+    pub as_u32: u32,
     pub abi_revision: AbiRevision,
     pub status: Status,
 }
@@ -469,6 +477,24 @@ fn parse_version_history(bytes: &[u8]) -> anyhow::Result<Vec<Version>> {
         });
     }
 
+    for (key, value) in v.data.special_api_levels {
+        let api_level: ApiLevel =
+            key.parse().with_context(|| format!("Unknown special API level: {}", key))?;
+        if api_level.as_u32() != value.as_u32 {
+            bail!(
+                "Special API level {} had unexpected numerical value {} (Expected {})",
+                api_level,
+                value.as_u32,
+                api_level.as_u32()
+            )
+        }
+        versions.push(Version {
+            api_level,
+            abi_revision: value.abi_revision,
+            status: value.status,
+        });
+    }
+
     versions.sort_by_key(|s| s.api_level);
 
     let Some(latest_api_version) = versions.last() else {
@@ -478,24 +504,6 @@ fn parse_version_history(bytes: &[u8]) -> anyhow::Result<Vec<Version>> {
     if latest_api_version.status == Status::Unsupported {
         bail!("most recent API level must not be 'unsupported'")
     }
-
-    // TODO: https://fxrev.dev/42082683 - the mutable pseudo-API-levels should
-    // use an ABI revision that corresponds to a specific release, rather than
-    // reusing the one from the "latest" API level.
-    let latest_abi_revision = latest_api_version.abi_revision;
-
-    // HEAD version.
-    versions.push(Version {
-        api_level: ApiLevel::HEAD,
-        abi_revision: latest_abi_revision,
-        status: Status::InDevelopment,
-    });
-    // PLATFORM version.
-    versions.push(Version {
-        api_level: ApiLevel::PLATFORM,
-        abi_revision: latest_abi_revision,
-        status: Status::InDevelopment,
-    });
 
     Ok(versions)
 }
@@ -531,6 +539,18 @@ mod tests {
                     "2":{
                         "abi_revision":"0x50cbc6e8a39e1e2c",
                         "status":"in-development"
+                    }
+                },
+                "special_api_levels": {
+                    "HEAD": {
+                        "as_u32": 4292870144,
+                        "abi_revision": "0x50cbc6e8a39e1e2c",
+                        "status": "in-development"
+                    },
+                    "PLATFORM": {
+                        "as_u32": 4293918720,
+                        "abi_revision": "0x50cbc6e8a39e1e2c",
+                        "status": "in-development"
                     }
                 }
             },
@@ -570,7 +590,8 @@ mod tests {
             "data": {
                 "name": "Platform version map",
                 "type": "version_history",
-                "api_levels": {}
+                "api_levels": {},
+                "special_api_levels": {}
             },
             "schema_id": "some-schema"
         }"#;
@@ -587,7 +608,8 @@ mod tests {
             "data": {
                 "name": "some-name",
                 "type": "version_history",
-                "api_levels": {}
+                "api_levels": {},
+                "special_api_levels": {}
             },
             "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json"
         }"#;
@@ -604,7 +626,8 @@ mod tests {
             "data": {
                 "name": "Platform version map",
                 "type": "some-type",
-                "api_levels": {}
+                "api_levels": {},
+                "special_api_levels": {}
             },
             "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json"
         }"#;
@@ -649,6 +672,7 @@ mod tests {
                             "status": Status::InDevelopment,
                         }
                     },
+                    "special_api_levels": {},
                 },
                 "schema_id": VERSION_HISTORY_SCHEMA_ID,
             }))
@@ -657,6 +681,55 @@ mod tests {
             assert_eq!(parse_version_history(&expected_bytes[..]).unwrap_err().to_string(), err);
         }
     }
+
+    #[test]
+    fn test_parse_history_rejects_bogus_special_levels() {
+        let input = br#"{
+            "data": {
+                "name": "Platform version map",
+                "type": "version_history",
+                "api_levels": {},
+                "special_api_levels": {
+                    "WACKY_WAVING_INFLATABLE_ARM_FLAILING_TUBE_MAN": {
+                        "as_u32": 1234,
+                        "abi_revision": "0x50cbc6e8a39e1e2c",
+                        "status": "in-development"
+                    }
+                }
+            },
+            "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json"
+        }"#;
+
+        assert_eq!(
+            parse_version_history(&input[..]).unwrap_err().to_string(),
+            "Unknown special API level: WACKY_WAVING_INFLATABLE_ARM_FLAILING_TUBE_MAN"
+        );
+    }
+
+    #[test]
+    fn test_parse_history_rejects_misnumbered_special_levels() {
+        let input = br#"{
+            "data": {
+                "name": "Platform version map",
+                "type": "version_history",
+                "api_levels": {},
+                "special_api_levels": {
+                    "HEAD": {
+                        "as_u32": 1234,
+                        "abi_revision": "0x50cbc6e8a39e1e2c",
+                        "status": "in-development"
+                    }
+                }
+            },
+            "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json"
+        }"#;
+
+        assert_eq!(
+            parse_version_history(&input[..]).unwrap_err().to_string(),
+            "Special API level HEAD had unexpected numerical value 1234 (Expected 4292870144)"
+        );
+    }
+
     pub const FAKE_VERSION_HISTORY: VersionHistory = VersionHistory {
         versions: &[
             Version {

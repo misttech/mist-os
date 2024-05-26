@@ -22,11 +22,13 @@ import("//build/python/python_host_test.gni")
 
 if (is_host) {
   python_host_test("update_platform_version_tests") {
+    enable_mypy = true
     main_source = "update_platform_version_tests.py"
     sources = [ "update_platform_version.py" ]
   }
 
   python_host_test("freeze_in_development_api_level_test") {
+    enable_mypy = true
     main_source = "freeze_in_development_api_level_test.py"
     sources = [ "freeze_in_development_api_level.py" ]
   }

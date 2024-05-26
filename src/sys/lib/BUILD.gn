@@ -9,7 +9,6 @@ group("tests") {
     "bitflags-serde-legacy:tests",
     "cm_config:tests",
     "cm_fidl_validator:tests",
-    "cm_moniker:tests",
     "cm_rust:tests",
     "cm_types:tests",
     "component-events:tests",

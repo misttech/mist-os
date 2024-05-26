@@ -1213,6 +1213,21 @@ mod tests {
             .now_or_never();
         assert!(event.is_none());
 
+        // Check flags on directory opened. These are not exactly the flags we
+        // set in `open_exposed_dir`, because fuchsia.io transforms POSIX_*
+        // flags into their respective {RIGHT_READABLE, RIGHT_WRITABLE,
+        // RIGHT_EXECUTABLE} variants if and only if all intermediate nodes are
+        // readable, writable, or executable. Additionally, we already know
+        // this is a directory, and fuchsia.io does not propagate that flag.
+        let (status, flags) = dir_proxy.get_flags().await.expect("getting exposed dir flags");
+        assert_matches!(zx::Status::ok(status), Ok(()));
+        assert_eq!(
+            flags,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::RIGHT_EXECUTABLE
+        );
+
         // Now that it was asserted that "system:0" has yet to start,
         // assert that it starts after making connection below.
         let echo_proxy =

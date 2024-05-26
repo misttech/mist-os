@@ -126,6 +126,12 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
       if (!pending_request_->cmd_complete) {
         return RequestStatus::COMMAND;
       }
+      if (!pending_request_->data.empty()) {
+        if (pending_request_->cmd_flags & SDMMC_CMD_READ) {
+          return RequestStatus::READ_DATA_PIO;
+        }
+        return RequestStatus::WRITE_DATA_PIO;
+      }
       if (has_data) {
         return RequestStatus::TRANSFER_DATA_DMA;
       }
@@ -157,10 +163,16 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
     explicit PendingRequest(const sdmmc_req_t& request)
         : cmd_idx(request.cmd_idx),
           cmd_flags(request.cmd_flags),
+          blocksize(request.blocksize),
           status(InterruptStatus::Get().FromValue(0).set_error(1)) {}
+
+    bool data_transfer_complete() const {
+      return !(cmd_flags & SDMMC_RESP_DATA_PRESENT) || data.empty();
+    }
 
     const uint32_t cmd_idx;
     const uint32_t cmd_flags;
+    const uint32_t blocksize;
 
     // If false, a command is in progress on the bus, and the interrupt thread is waiting for the
     // command complete interrupt.
@@ -177,6 +189,11 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
     // register (and always sets the general error bit). If no error  occurred the interrupt thread
     // sets this field to zero.
     InterruptStatus status;
+
+    // For a non-DMA request, data points to the buffer to read from/write to. This buffer may be
+    // owned by vmo_mapper.
+    cpp20::span<uint8_t> data;
+    fzl::VmoMapper vmo_mapper;
   };
 
   using SdmmcVmoStore = DmaDescriptorBuilder<OwnedVmoInfo>::VmoStore;
@@ -200,6 +217,7 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
                                           DmaDescriptorBuilder<OwnedVmoInfo>& builder) TA_REQ(mtx_);
   zx_status_t SetUpDma(const sdmmc_req_t& request, DmaDescriptorBuilder<OwnedVmoInfo>& builder)
       TA_REQ(mtx_);
+  zx_status_t SetUpBuffer(const sdmmc_req_t& request, PendingRequest* pending_request) TA_REQ(mtx_);
   zx_status_t FinishRequest(const sdmmc_req_t& request, uint32_t out_response[4],
                             const PendingRequest& pending_request) TA_REQ(mtx_);
 
@@ -212,6 +230,7 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
   bool CmdStageComplete() TA_REQ(mtx_);
   void TransferComplete() TA_REQ(mtx_);
   bool DataStageReadReady() TA_REQ(mtx_);
+  void DataStageWriteReady() TA_REQ(mtx_);
 
   zx::interrupt irq_;
   thrd_t irq_thread_;

@@ -3,24 +3,22 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
+        "driver_component/driver.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
+        binary: "driver/network-device.so",
         bind: "meta/bind/network-device.bindbc",
         colocate: "true",
-        compat: "driver/network-device.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
     use: [
         { service: "fuchsia.hardware.network.driver.Service" },
         {
-            protocol: [
-                "fuchsia.scheduler.RoleManager",
-            ],
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
         },
     ],
 }

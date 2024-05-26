@@ -11,6 +11,8 @@ group("mobly") {
 }
 
 python_library("mobly_no_testonly") {
+  enable_mypy = false
+
   # In-tree-only tests should prefer ":mobly" because that enforces that only
   # testonly code uses regular Mobly. This target should be used for tests or
   # dependencies of tests that are packaged into the SDK, since they cannot be

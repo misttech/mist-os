@@ -7,11 +7,14 @@ import("//build/board.gni")
 import("//build/config/build_id.gni")
 import("//build/config/clang/clang.gni")
 import("//build/config/current_target_tuple.gni")
-
+import("//build/config/fuchsia/target_api_level.gni")
 import("//build/config/sanitizers/sanitizer_default_options.gni")
 import("//build/config/sysroot.gni")
+import("//build/icu/third_party_icu_headers.gni")
 import("//build/toolchain/ccache.gni")
 import("//build/toolchain/rbe.gni")
+import("//src/lib/icu/third_party_icu_headers.gni")
+
 if (support_rust) {
   import("//build/rust/config.gni")
   import("//zircon/public/sysroot/rust.gni")
@@ -60,12 +63,11 @@ config("compiler") {
   }
 
   if (support_rust) {
-    if (!is_debug || rust_rbe_enable) {
-      # fxbug.dev/85921#c15: forcing one codegen unit produces
+    if (!is_debug) {
+      # https://fxbug.dev/42166874#c15: forcing one codegen unit produces
       # smaller binaries but makes builds slower.
       # Enforce one codegen unit only when we really care about
-      # size (release builds), or when RBE is enabled (and then
-      # the benefits of parallelized codegen are diminished).
+      # size (release builds).
       configs += [ "//build/config/rust:one_codegen_unit" ]
     }
 
@@ -81,6 +83,26 @@ config("compiler") {
                                 []),
                     root_build_dir)
 
+    # When linking C++ runtime libraries into Rust binaries, we should use
+    # the correct multilib variant.
+    #
+    # TODO(https://fxbug.dev/42177702): Rather then hardcoding the directory names here,
+    # these should ideally come from runtime.json.
+    _multilib_dir = ""
+    if (toolchain_variant.tags + [ "asan" ] - [ "asan" ] !=
+        toolchain_variant.tags) {
+      _multilib_dir = "/asan+noexcept"
+    } else if (toolchain_variant.tags + [ "hwasan" ] - [ "hwasan" ] !=
+               toolchain_variant.tags) {
+      _multilib_dir = "/hwasan+noexcept"
+    } else {
+      _multilib_dir = "/noexcept"
+    }
+
+    # Which libc++ to link:
+    _libcxx_dir =
+        "${rebased_clang_prefix}/../lib/${current_target_tuple}${_multilib_dir}"
+
     rustflags = [
       "-L",
       rebase_path(rust_sysroot_dir, root_build_dir) + "/lib",
@@ -90,23 +112,28 @@ config("compiler") {
       # These could alternatively come from clang's '--print-search-dirs', but that would require an
       # exec_script and post-processing of the output or a JSON file generated during the toolchain
       # build.
-      "-Clink-arg=-L" + rebased_clang_prefix + "/../lib/" +
-          current_target_tuple,
-      "-Clink-arg=-L" + _clang_resource_dir + "/lib/" + current_target_tuple,
+      "-Clink-arg=-L${_libcxx_dir}",
+      "-Clink-arg=-L${_clang_resource_dir}/lib/${current_target_tuple}",
       "-Clink-arg=--pack-dyn-relocs=relr",
       "-Clink-arg=-dynamic-linker=ld.so.1",
       "-Clink-arg=--icf=all",
     ]
 
-    # TODO(fxbug.dev/53078): Eventually the default in the compler driver.
+    if (rust_rbe_enable) {
+      rustflags += [ "--remote-flag=--cxx-stdlibdir=${_libcxx_dir}" ]
+    }
+
+    # TODO(https://fxbug.dev/42130451): Eventually the default in the compler driver.
     rustflags += [ "-Clink-arg=-zrel" ]
   }
 }
 
 config("compiler_sysroot") {
-  cflags = [ "--sysroot=" + rebase_path(sysroot, root_build_dir) ]
-  asmflags = cflags
-  ldflags = cflags
+  if (defined(sysroot) && sysroot != "") {
+    cflags = [ "--sysroot=" + rebase_path(sysroot, root_build_dir) ]
+    asmflags = cflags
+    ldflags = cflags
+  }
 }
 
 config("compiler_target") {
@@ -116,6 +143,13 @@ config("compiler_target") {
 }
 
 config("compiler_fuchsia_api_level") {
+  if (is_gcc || !is_mistos) {
+    defines = [ "__Fuchsia_API_level__=${clang_fuchsia_api_level}" ]
+  } else {
+    cflags = [ "-ffuchsia-api-level=${clang_fuchsia_api_level}" ]
+    asmflags = cflags
+    ldflags = cflags
+  }
 }
 
 config("shared_library_config") {
@@ -171,11 +205,11 @@ config("static_cpp_standard_library") {
 }
 
 config("dynamic_rust_standard_library") {
-  # -Cprefer-dynamic is incompatible with (Thin)LTO.
-  if (toolchain_variant.tags + [ "lto" ] - [ "lto" ] ==
-      toolchain_variant.tags) {
-    rustflags = [ "-Cprefer-dynamic" ]
-  }
+  rustflags = [ "-Cprefer-dynamic" ]
+}
+
+config("static_rust_standard_library") {
+  rustflags = [ "-Cprefer-dynamic=no" ]
 }
 
 # Configure a larger (2MB) stack size for Rust binaries.

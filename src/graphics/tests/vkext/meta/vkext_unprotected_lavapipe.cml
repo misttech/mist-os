@@ -3,22 +3,13 @@
 // found in the LICENSE file.
 {
     include: [
-        "inspect/offer.shard.cml",
-        "syslog/offer.shard.cml",
-        "trace/offer.shard.cml",
+        "//src/graphics/tests/common/meta/vulkan.offer.shard.cml",
+        "syslog/client.shard.cml",
     ],
     children: [
         {
             name: "test",
             url: "vkext-test#meta/vkext-test-child.cm",
-        },
-        {
-            name: "vulkan_loader",
-            url: "vulkan_loader#meta/vulkan_loader.cm",
-        },
-        {
-            name: "vulkan_loader_mock_directories",
-            url: "vulkan_loader_mock_directories#meta/vulkan_loader_test_lib_provider.cm",
         },
     ],
     capabilities: [
@@ -53,60 +44,6 @@
             from: "self",
             to: "#test",
             config: "fuchsia.gpu.test.SupportSysmemLinearNonRGBA",
-        },
-        {
-            protocol: "fuchsia.vulkan.loader.Loader",
-            from: "#vulkan_loader",
-            to: "#test",
-            rights: [ "r*" ],
-        },
-        {
-            protocol: "fuchsia.sysmem.Allocator",
-            from: "parent",
-            to: "#test",
-            rights: [ "r*" ],
-        },
-        {
-            protocol: "fuchsia.tracing.provider.Registry",
-            from: "parent",
-            to: "#test",
-            rights: [ "r*" ],
-        },
-        {
-            directory: "dev-gpu",
-            from: "#vulkan_loader_mock_directories",
-            to: "#vulkan_loader",
-            rights: [ "r*" ],
-        },
-        {
-            directory: "dev-goldfish-pipe",
-            from: "#vulkan_loader_mock_directories",
-            to: "#vulkan_loader",
-            rights: [ "r*" ],
-        },
-        {
-            directory: "dev-goldfish-control",
-            from: "#vulkan_loader_mock_directories",
-            to: "#vulkan_loader",
-            rights: [ "r*" ],
-        },
-        {
-            directory: "dev-goldfish-address-space",
-            from: "#vulkan_loader_mock_directories",
-            to: "#vulkan_loader",
-            rights: [ "r*" ],
-        },
-        {
-            directory: "dev-goldfish-sync",
-            from: "#vulkan_loader_mock_directories",
-            to: "#vulkan_loader",
-            rights: [ "r*" ],
-        },
-        {
-            directory: "dev-gpu-dependency-injection",
-            from: "#vulkan_loader_mock_directories",
-            to: "#vulkan_loader",
-            rights: [ "r*" ],
         },
     ],
     expose: [

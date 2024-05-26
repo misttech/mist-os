@@ -48,11 +48,7 @@ bool RequestedCmsgSet::ip_ttl() const {
 }
 
 bool RequestedCmsgSet::ip_recvorigdstaddr() const {
-#if __Fuchsia_API_level__ >= 15
   return static_cast<bool>(requests_ & CmsgRequests::kIpRecvorigdstaddr);
-#else
-  return false;
-#endif
 }
 
 bool RequestedCmsgSet::ipv6_tclass() const {

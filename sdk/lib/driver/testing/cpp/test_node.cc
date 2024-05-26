@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#if __Fuchsia_API_level__ >= 15
-
 #include <lib/async/default.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fdf/cpp/dispatcher.h>
@@ -200,5 +198,3 @@ void TestNode::RemoveChild(const std::string& name) {
 }
 
 }  // namespace fdf_testing
-
-#endif

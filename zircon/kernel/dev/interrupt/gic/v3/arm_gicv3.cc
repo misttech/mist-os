@@ -63,21 +63,29 @@ static uint32_t gic_get_base_vector() {
 
 static uint32_t gic_get_max_vector() { return gic_max_int; }
 
-static void gic_wait_for_rwp(uint64_t reg) {
+static bool gic_wait_for_mask(uint64_t reg, uint64_t mask, uint64_t expect) {
   int count = 1000000;
-  while (arm_gicv3_read32(reg) & (1 << 31)) {
+  while ((arm_gicv3_read32(reg) & mask) != expect) {
     count -= 1;
     if (!count) {
-      LTRACEF("arm_gicv3: rwp timeout 0x%x\n", arm_gicv3_read32(reg));
-      return;
+      LTRACEF("arm_gicv3: wait timeout reg:0x%lx, val:0x%x, mask:0x%lx\n", reg,
+              arm_gicv3_read32(reg), mask);
+      return false;
     }
+  }
+  return true;
+}
+
+static void gic_wait_for_rwp(uint64_t reg) {
+  // Maintain the current log message for RWP timeouts.
+  if (!gic_wait_for_mask(reg, GICD_CTLR_RWP, 0)) {
+    LTRACEF("arm_gicv3: rwp timeout 0x%x\n", arm_gicv3_read32(reg));
   }
 }
 
 static void gic_set_enable(uint vector, bool enable) {
   int reg = vector / 32;
   uint32_t mask = (uint32_t)(1ULL << (vector % 32));
-
   if (vector < 32) {
     cpu_num_t cpu_id = arch_curr_cpu_num();
     if (enable) {
@@ -96,8 +104,30 @@ static void gic_set_enable(uint vector, bool enable) {
   }
 }
 
+// Redistributors for each PE need to woken up before they will
+// distribute interrupts.
+// https://developer.arm.com/documentation/198123/0302/Configuring-the-Arm-GIC
+static void gic_redistributor_sleep(bool sleep) {
+  cpu_num_t cpu = arch_curr_cpu_num();
+  DEBUG_ASSERT(arch_ints_disabled());
+
+  // TODO(drewry): we may need to check GICD_CTRL_DS to ensure we can access.
+  uint waker = arm_gicv3_read32(GICR_WAKER(cpu));
+  if (sleep) {
+    waker |= WAKER_PROCESSOR_SLEEP;
+  } else {
+    waker &= ~WAKER_PROCESSOR_SLEEP;
+  }
+  arm_gicv3_write32(GICR_WAKER(cpu), waker);
+  uint64_t val = sleep ? 1 : 0;
+  gic_wait_for_mask(GICR_WAKER(cpu), WAKER_CHILDREN_ASLEEP, val);
+}
+
 static void gic_init_percpu_early() {
   cpu_num_t cpu = arch_curr_cpu_num();
+
+  // wake up the redistributor
+  gic_redistributor_sleep(false);
 
   // redistributer config: configure sgi/ppi as non-secure group 1.
   arm_gicv3_write32(GICR_IGROUPR0(cpu), ~0);
@@ -446,6 +476,11 @@ static void gic_shutdown_cpu() {
 
   // Disable group 1 interrupts at the CPU interface.
   gic_write_igrpen(0);
+
+  // Mark the PE as offline. This will keep the redistributor from routing
+  // interrupts and for any interrupts targeting it, trigger a wake-request to
+  // the power controller.
+  gic_redistributor_sleep(true);
 }
 
 static bool gic_msi_is_supported() { return false; }

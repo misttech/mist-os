@@ -34,6 +34,17 @@ std::pair<zx_status_t, uint64_t> CpuPerformanceDomain::GetNumLogicalCores() {
   return std::make_pair(resp.status(), resp.status() == ZX_OK ? resp.value().count : 0);
 }
 
+std::pair<zx_status_t, uint64_t> CpuPerformanceDomain::GetRelativePerformance() {
+  auto resp = cpu_client_->GetRelativePerformance();
+  return std::make_pair(resp.status(),
+                        resp.status() == ZX_OK ? resp.value()->relative_performance : 0);
+}
+
+std::pair<zx_status_t, uint64_t> CpuPerformanceDomain::GetDomainId() {
+  auto resp = cpu_client_->GetDomainId();
+  return std::make_pair(resp.status(), resp.status() == ZX_OK ? resp.value().domain_id : 0);
+}
+
 std::tuple<zx_status_t, uint64_t, cpuctrl::wire::CpuOperatingPointInfo>
 CpuPerformanceDomain::GetCurrentOperatingPoint() {
   constexpr cpuctrl::wire::CpuOperatingPointInfo kEmptyOpp = {

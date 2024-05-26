@@ -5,8 +5,10 @@
 """Input Latency Benchmark."""
 
 import os
+from importlib.resources import as_file, files
 from pathlib import Path
 
+import test_data
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.typing import ui as ui_custom_types
 from honeydew.interfaces.device_classes import fuchsia_device
@@ -80,7 +82,9 @@ class InputBenchmark(fuchsia_base_test.FuchsiaBaseTest):
             json_trace_file
         )
 
-        input_latency_results = input_latency.metrics_processor(
+        input_latency_results: list[
+            trace_metrics.TestCaseResult
+        ] = input_latency.metrics_processor(
             model, {"aggregateMetricsOnly": False}
         )
 
@@ -95,10 +99,11 @@ class InputBenchmark(fuchsia_base_test.FuchsiaBaseTest):
         )
 
         expected_metrics_file = f"{TEST_NAME}.txt"
-        publish.publish_fuchsiaperf(
-            fuchsia_perf_file_paths=[fuchsiaperf_json_path],
-            expected_metric_names_filename=expected_metrics_file,
-        )
+        with as_file(files(test_data).joinpath(expected_metrics_file)) as f:
+            publish.publish_fuchsiaperf(
+                fuchsia_perf_file_paths=[fuchsiaperf_json_path],
+                expected_metric_names_filename=str(f),
+            )
 
 
 if __name__ == "__main__":

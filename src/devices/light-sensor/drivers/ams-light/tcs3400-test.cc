@@ -664,17 +664,17 @@ TEST_F(Tcs3400Test, GetDescriptor) {
 
   const auto response = client->GetDescriptor();
   ASSERT_TRUE(response.ok());
-  ASSERT_TRUE(response.value().descriptor.has_device_info());
+  ASSERT_TRUE(response.value().descriptor.has_device_information());
   ASSERT_TRUE(response.value().descriptor.has_sensor());
   ASSERT_TRUE(response.value().descriptor.sensor().has_input());
   ASSERT_EQ(response.value().descriptor.sensor().input().count(), 1);
   ASSERT_TRUE(response.value().descriptor.sensor().input()[0].has_values());
   ASSERT_EQ(response.value().descriptor.sensor().input()[0].values().count(), 4);
 
-  EXPECT_EQ(response.value().descriptor.device_info().vendor_id,
+  EXPECT_EQ(response.value().descriptor.device_information().vendor_id(),
             static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
   EXPECT_EQ(
-      response.value().descriptor.device_info().product_id,
+      response.value().descriptor.device_information().product_id(),
       static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kAmsLightSensor));
 
   const auto& sensor_axes = response.value().descriptor.sensor().input()[0].values();

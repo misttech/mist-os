@@ -28,9 +28,6 @@ config("fidl-wire-deprecated-mutable-tables") {
 
     #------------------
     #------------------
-
-    #------------------
-    #------------------
     "//sdk/lib/driver_test_realm/platform:bin",
 
     #------------------
@@ -40,34 +37,6 @@ config("fidl-wire-deprecated-mutable-tables") {
     #------------------
     #------------------
     "//sdk/lib/sys/cpp/tests:component_cpp_unittests_bin",
-
-    #------------------
-    #------------------
-    "//src/connectivity/lib/network-device/cpp",
-
-    #------------------
-    #------------------
-    "//src/connectivity/lib/network-device/cpp:cpp-test",
-
-    #------------------
-    #------------------
-    "//src/connectivity/network/drivers/network-device:driver-test",
-
-    #------------------
-    #------------------
-    "//src/connectivity/network/drivers/network-device/device",
-
-    #------------------
-    #------------------
-    "//src/connectivity/network/drivers/network-device/device:device_ddk",
-
-    #------------------
-    #------------------
-    "//src/connectivity/network/drivers/network-device/device:microbenchmarks_bin",
-
-    #------------------
-    #------------------
-    "//src/connectivity/network/drivers/network-device/device:test_bin",
 
     #------------------
     #------------------

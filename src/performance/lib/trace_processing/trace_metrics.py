@@ -15,8 +15,9 @@ import dataclasses
 import enum
 import json
 import logging
+import os
 import pathlib
-from typing import Any, Iterable, Sequence
+from typing import Any, Dict, List, Union
 
 import trace_processing.trace_model as trace_model
 
@@ -58,9 +59,9 @@ class TestCaseResult:
 
     label: str
     unit: Unit
-    values: list[float]
+    values: List[float]
 
-    def to_json(self, test_suite: str) -> dict[str, Any]:
+    def to_json(self, test_suite: str) -> Dict[str, Any]:
         return {
             "label": self.label,
             "test_suite": test_suite,
@@ -70,7 +71,7 @@ class TestCaseResult:
 
     @staticmethod
     def write_fuchsiaperf_json(
-        results: Iterable["TestCaseResult"],
+        results: list["TestCaseResult"],
         test_suite: str,
         output_path: pathlib.Path,
     ) -> None:
@@ -88,7 +89,7 @@ class TestCaseResult:
         results_json = [r.to_json(test_suite) for r in results]
         with open(output_path, "w") as outfile:
             json.dump(results_json, outfile, indent=4)
-        _LOGGER.info(f"Wrote {len(results_json)} results into {output_path}")
+        _LOGGER.info(f"Wrote {len(results)} results into {output_path}")
 
 
 class MetricsProcessor(abc.ABC):
@@ -117,9 +118,7 @@ class MetricsProcessor(abc.ABC):
         return self.__class__.__name__
 
     @abc.abstractmethod
-    def process_metrics(
-        self, model: trace_model.Model
-    ) -> Sequence[TestCaseResult]:
+    def process_metrics(self, model: trace_model.Model) -> List[TestCaseResult]:
         """Generates metrics from the given model.
 
         Args:
@@ -128,6 +127,7 @@ class MetricsProcessor(abc.ABC):
         Returns:
             List[TestCaseResult]: The generated metrics.
         """
+        pass
 
     def process_and_save_metrics(
         self,
@@ -152,25 +152,21 @@ class MetricsProcessor(abc.ABC):
 class ConstantMetricsProcessor(MetricsProcessor):
     """A metrics processor that return a constant list of result."""
 
-    def __init__(self, results: Sequence[TestCaseResult]):
-        self.results: Sequence[TestCaseResult] = results
+    def __init__(self, results: List[TestCaseResult]):
+        self.results: List[TestCaseResult] = results
 
-    def process_metrics(
-        self, model: trace_model.Model
-    ) -> Sequence[TestCaseResult]:
+    def process_metrics(self, model: trace_model.Model) -> List[TestCaseResult]:
         return self.results
 
 
 class MetricsProcessorsSet(MetricsProcessor):
     """A processor that aggregates N sub-processors."""
 
-    def __init__(self, sub_processors: Sequence[MetricsProcessor]):
-        self.sub_processors: Sequence[MetricsProcessor] = sub_processors
+    def __init__(self, sub_processors: List[MetricsProcessor]):
+        self.sub_processors: List[MetricsProcessor] = sub_processors
 
-    def process_metrics(
-        self, model: trace_model.Model
-    ) -> Sequence[TestCaseResult]:
-        results: list[TestCaseResult] = []
+    def process_metrics(self, model: trace_model.Model) -> List[TestCaseResult]:
+        results = []
         _LOGGER.info(
             f"Combining metrics from {len(self.sub_processors)} subprocessors..."
         )

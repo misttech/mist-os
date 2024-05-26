@@ -5,9 +5,32 @@
 #ifndef ZIRCON_AVAILABILITY_H_
 #define ZIRCON_AVAILABILITY_H_
 
+// When targeting the Fuchsia platform, `__Fuchsia_API_level__` must always be
+// specified and valid to ensure proper application of Platform Versioning.
+// For Clang, which defaults to level 0, the target level should always be
+// specified with `-ffuchsia-api-level`.
+#if defined(__Fuchsia__)
+#if !defined(__Fuchsia_API_level__) || __Fuchsia_API_level__ == 0
+// TODO(https://fxbug.dev/327691011): Change to `#error` once the toolchain
+// build targets a specific API level.
+#warning `__Fuchsia_API_level__` must be set to a non-zero value. For Clang, use `-ffuchsia-api-level`.
+#endif  // !defined(__Fuchsia_API_level__) || __Fuchsia_API_level__ == 0
+#endif  // defined(__Fuchsia__)
+
 // Availability attributes.
 
-#if defined(__Fuchsia_API_level__) && defined(__clang__)
+// Only apply availability attributes when they are supported and will be used.
+// Clang already handles only applying the attribute to the specified platform,
+// so the __Fuchsia__ condition is at most a minor compile-time optimization
+// when the macros are encountered in non-Fuchsia builds.
+#if defined(__clang__) && defined(__Fuchsia__)
+
+// When targeting the Fuchsia platform, Clang compares the level(s) specified in
+// the availability attributes below against the target API level, so it is
+// important that the level has been specified correctly. Clang does not perform
+// availability checks if the API level is unspecified or 0.
+// The above check of `__Fuchsia_API_level__` also ensures a non-zero level has
+// been specified because Clang uses `-ffuchsia-api-level` for both.
 
 // An API that was added to the platform.
 //
@@ -64,13 +87,13 @@
                               deprecated = level_deprecated, obsoleted = level_removed, \
                               message = msg)))
 
-#else  // __Fuchsia_API_level__
+#else  // defined(__clang__) && defined(__Fuchsia__)
 
 #define ZX_AVAILABLE_SINCE(level_added)
 #define ZX_DEPRECATED_SINCE(level_added, level_deprecated, msg)
 #define ZX_REMOVED_SINCE(level_added, level_deprecated, level_removed, msg)
 
-#endif  // __Fuchsia_API_level__
+#endif  // defined(__clang__) && defined(__Fuchsia__)
 
 // To avoid mistakenly using a non-existent name or unpublished API level, the levels specified in
 // the following macros are converted to calls to a macro containing the specified API level in its
@@ -85,13 +108,16 @@
 // Use to guard code that is added and/or removed at specific API levels.
 // `level` must be a one of:
 //  * a positive decimal integer literal no greater than the largest current stable API level
-//    * Supported levels are defined in availability_levels.h.
-//    * Support for older retired API levels may be removed over time.
+//    * Valid levels are defined in availability_levels.inc.
+//    * Support for older retired API levels as parameters may be removed over time.
 //  * `NEXT` - for code to be included in the next stable API level.
-//    * TODO(https://fxbug.dev/323889271): Add support for NEXT as a parameter.
+//    * TODO(https://fxbug.dev/326277078): Add support for NEXT as a parameter.
 //  * `HEAD` - for either of the following:
 //    * In-development code that is not ready to be exposed in an SDK
-//  * * Code that should only be in Platform builds.
+//    * Code that should only be in Platform builds.
+//  * `PLATFORM` - for code that must behave differently when building the Fuchsia Platform vs.
+//     when building code that runs on it. This is useful when removing an API element while
+//     continuing to provide runtime support at previous API levels. It should only be used in-tree.
 
 // The target API level is `level` or greater.
 #define FUCHSIA_API_LEVEL_AT_LEAST(level) (__Fuchsia_API_level__ >= FUCHSIA_API_LEVEL_(level))
@@ -102,20 +128,17 @@
 // The target API level is `level` or less.
 #define FUCHSIA_API_LEVEL_AT_MOST(level) (__Fuchsia_API_level__ <= FUCHSIA_API_LEVEL_(level))
 
-// Do NOT use this value directly. Use one of the macros above instead.
-// The value of __Fuchsia_API_level__ when the target API level is HEAD.
-#define FUCHSIA_INTERNAL_USE_ONLY_FUCHSIA_HEAD_() 4292870144
-
-// Obsolete mechanism for determining whether the target API level is HEAD.
-// Use one of the macros above instead.
-// TODO(https://fxbug.dev/42084512): Remove FUCHSIA_HEAD once all code is using
-// the macros above. In the short term, consider defining it as a string like
-// "do not use" so uses of it will fail to compile.
-#define FUCHSIA_HEAD FUCHSIA_INTERNAL_USE_ONLY_FUCHSIA_HEAD_()
-
 // The macros referenced by the output of `FUCHSIA_API_LEVEL_()` must be defined for each API level.
 // They are defined in the following file, which must be included after the macros above because it
 // may use those macros.
 #include <zircon/availability_levels.inc>
+
+// Obsolete mechanism for determining whether the target API level is HEAD.
+// Use one of the macros above instead.
+// Rather than not defining this identifier, which would cause the preprocessor
+// to silently treat any instances as zero, define it as a string, which will
+// cause a compiler error if it is used in a preprocessor comparison.
+#define FUCHSIA_HEAD \
+  "DEPRECATED: Use one of the FUCHSIA_API_LEVEL_*() macros in availability.h instead."
 
 #endif  // ZIRCON_AVAILABILITY_H_

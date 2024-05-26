@@ -197,14 +197,10 @@ TEST_F(VnodeTest, SetAttributes) {
   ASSERT_TRUE(dir_fs_vnode.is_ok()) << dir_fs_vnode.status_string();
   fbl::RefPtr<VnodeF2fs> dir_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(dir_fs_vnode));
 
-  ASSERT_EQ(dir_vnode->SetAttributes(fs::VnodeAttributesUpdate()
-                                         .set_modification_time(std::nullopt)
-                                         .set_creation_time(std::nullopt)),
-            ZX_OK);
-  ASSERT_EQ(dir_vnode->SetAttributes(fs::VnodeAttributesUpdate()
-                                         .set_modification_time(std::make_optional(1UL))
-                                         .set_creation_time(std::make_optional(1UL))),
-            ZX_OK);
+  ASSERT_EQ(dir_vnode->UpdateAttributes({}), zx::ok());
+  ASSERT_EQ(dir_vnode->UpdateAttributes(
+                fs::VnodeAttributesUpdate{.creation_time = 1, .modification_time = 1}),
+            zx::ok());
 
   ASSERT_EQ(dir_vnode->Close(), ZX_OK);
   dir_vnode = nullptr;

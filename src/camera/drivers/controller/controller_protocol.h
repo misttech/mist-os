@@ -23,7 +23,8 @@ namespace camera {
 
 class ControllerImpl : public fuchsia::camera2::hal::Controller {
  public:
-  ControllerImpl(async_dispatcher_t* dispatcher, fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator,
+  ControllerImpl(async_dispatcher_t* dispatcher,
+                 fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator,
                  const ddk::IspProtocolClient& isp, const ddk::GdcProtocolClient& gdc,
                  const ddk::Ge2dProtocolClient& ge2d, LoadFirmwareCallback load_firmware);
   void Connect(fidl::InterfaceRequest<fuchsia::camera2::hal::Controller> request);

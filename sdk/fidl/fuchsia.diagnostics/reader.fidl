@@ -154,7 +154,7 @@ type StreamParameters = table {
 };
 
 /// Outer protocol for interacting with the different diagnostics data sources.
-@discoverable
+@discoverable(server="platform")
 @available(added=18)
 open protocol ArchiveAccessor {
     /// Creates an iterator over diagnostics data on the system.

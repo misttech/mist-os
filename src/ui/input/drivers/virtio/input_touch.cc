@@ -50,10 +50,10 @@ void TouchReport::ToFidlInputReport(
 }
 
 fuchsia_input_report::wire::DeviceDescriptor HidTouch::GetDescriptor(fidl::AnyArena& allocator) {
-  fuchsia_input_report::wire::DeviceInfo device_info;
-  device_info.vendor_id = static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle);
-  device_info.product_id =
-      static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kVirtioTouchscreen);
+  auto device_info = fuchsia_input_report::wire::DeviceInformation::Builder(allocator);
+  device_info.vendor_id(static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
+  device_info.product_id(
+      static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kVirtioTouchscreen));
 
   fidl::VectorView<fuchsia_input_report::wire::ContactInputDescriptor> contacts(allocator,
                                                                                 kMaxTouchPoints);
@@ -74,7 +74,7 @@ fuchsia_input_report::wire::DeviceDescriptor HidTouch::GetDescriptor(fidl::AnyAr
       fuchsia_input_report::wire::TouchDescriptor::Builder(allocator).input(input).Build();
 
   return fuchsia_input_report::wire::DeviceDescriptor::Builder(allocator)
-      .device_info(device_info)
+      .device_information(device_info.Build())
       .touch(touch)
       .Build();
 }

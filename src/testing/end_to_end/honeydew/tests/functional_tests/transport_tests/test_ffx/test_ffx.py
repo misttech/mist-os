@@ -110,6 +110,11 @@ class FFXTransportTests(fuchsia_base_test.FuchsiaBaseTest):
         )
         asserts.assert_in("PASSED", output)
 
+    def test_ffx_run_ssh_cmd(self) -> None:
+        """Test case for FFX.run_ssh_cmd()."""
+        cmd: str = "ls"
+        self.device.ffx.run_ssh_cmd(cmd)
+
 
 if __name__ == "__main__":
     test_runner.main()

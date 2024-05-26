@@ -12,7 +12,7 @@ use starnix_uapi::{
     fsverity_read_metadata_arg, user_address::UserAddress, FS_VERITY_HASH_ALG_SHA256,
     FS_VERITY_HASH_ALG_SHA512,
 };
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::AsBytes;
 
 #[derive(Copy, Clone, Debug, Eq, FromPrimitive, PartialEq)]
 enum HashAlgorithm {
@@ -91,12 +91,6 @@ fn fsverity_measurement(descriptor: &fsverity_descriptor) -> Result<Box<[u8]>, E
     }
 }
 
-#[derive(FromBytes, FromZeros, NoCell)]
-struct FsVerityDigestHeader {
-    digest_algorithm: u16,
-    digest_size: u16,
-}
-
 #[derive(Debug, FromPrimitive)]
 enum MetadataType {
     MerkleTree = 1,
@@ -141,8 +135,7 @@ pub mod ioctl {
         vfs::{
             fsverity::{
                 fsverity_descriptor_from_enable_arg, fsverity_enable_arg, fsverity_measurement,
-                fsverity_read_metadata_arg, FsVerityDigestHeader, FsVerityState, HashAlgorithm,
-                MetadataType,
+                fsverity_read_metadata_arg, FsVerityState, HashAlgorithm, MetadataType,
             },
             FileObject, FileWriteGuardMode,
         },
@@ -152,6 +145,7 @@ pub mod ioctl {
     use starnix_uapi::{
         errno, error,
         errors::Errno,
+        uapi,
         user_address::{UserAddress, UserRef},
     };
     use zerocopy::AsBytes;
@@ -191,9 +185,9 @@ pub mod ioctl {
         arg: UserAddress,
         file: &FileObject,
     ) -> Result<SyscallResult, Errno> {
-        let header_ref = UserRef::<FsVerityDigestHeader>::new(arg);
+        let header_ref = UserRef::<uapi::fsverity_digest>::new(arg);
         let digest_addr = header_ref.next().addr();
-        let header = task.read_object(header_ref)?;
+        let header = task.read_object(header_ref.clone())?;
         match &*file.node().fsverity.lock() {
             FsVerityState::FsVerity => {
                 let block_size = file.name.entry.node.fs().statfs(task)?.f_bsize as u32;
@@ -204,9 +198,6 @@ pub mod ioctl {
                     file.node().ops().get_fsverity_descriptor(block_size.ilog2() as u8)?;
                 let digest_algorithm = HashAlgorithm::from_u8(descriptor.hash_algorithm)
                     .ok_or_else(|| errno!(EINVAL))?;
-                if descriptor.hash_algorithm as u16 != header.digest_algorithm {
-                    return error!(EINVAL);
-                }
                 let required_size = match digest_algorithm {
                     HashAlgorithm::SHA256 => 32,
                     HashAlgorithm::SHA512 => 64,
@@ -214,6 +205,12 @@ pub mod ioctl {
                 if (header.digest_size as usize) < required_size {
                     return error!(EOVERFLOW);
                 }
+                let output_header = uapi::fsverity_digest {
+                    digest_algorithm: descriptor.hash_algorithm as u16,
+                    digest_size: required_size as u16,
+                    ..Default::default()
+                };
+                task.write_object(header_ref, &output_header)?;
                 task.write_memory(digest_addr, &fsverity_measurement(&descriptor)?)?;
                 Ok(SUCCESS)
             }

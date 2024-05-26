@@ -11,21 +11,33 @@ using zx;
 /// will come from the device itself. Other, non-HID devices may assign the
 /// ids in the driver, so it will be the driver author's responsibility to
 /// assign sensible ids.
+@available(removed=20)
 type DeviceInfo = struct {
     vendor_id uint32;
     product_id uint32;
     version uint32;
+};
 
-    /// polling rate if applicable in usec
-    @available(added=HEAD)
-    polling_rate zx.Duration;
+/// DeviceInformation provides more information about the device and lets a
+/// client distinguish between devices (e.g between two touchscreens that come
+/// from different vendors). If the device is a HID device, then the id
+/// information will come from the device itself. Other, non-HID devices may
+/// assign the ids in the driver, so it will be the driver author's
+/// responsibility to assign sensible ids.
+@available(added=20)
+type DeviceInformation = table {
+    1: vendor_id uint32;
+    2: product_id uint32;
+    3: version uint32;
+    4: polling_rate zx.Duration;
 };
 
 /// `DeviceDescriptor` describes a physical input device. Some physical devices may
 /// send multiple types of reports (E.g: a physical touchscreen can send touch and
 /// stylus reports, so it will have both a TouchDescriptor and a StylusDescriptor).
 type DeviceDescriptor = table {
-    /// `device_info` should always be present to help distinguish between physical devices.
+    /// This field is removed. Use device_information instead.
+    @available(removed=20)
     1: device_info DeviceInfo;
 
     /// When `mouse` is present the device has a mouse.
@@ -44,6 +56,11 @@ type DeviceDescriptor = table {
     /// When `consumer_control` is present the device has a ConsumerControl
     /// device.
     6: consumer_control ConsumerControlDescriptor;
+
+    /// `device_information` should always be present to help distinguish
+    /// between physical devices.
+    @available(added=20)
+    7: device_information DeviceInformation;
 };
 
 /// Describes the output reports that a physical input device will accept.

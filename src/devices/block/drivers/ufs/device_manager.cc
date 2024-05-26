@@ -4,6 +4,7 @@
 
 #include "src/devices/block/drivers/ufs/device_manager.h"
 
+#include <lib/fit/defer.h>
 #include <lib/trace/event.h>
 #include <lib/zx/clock.h>
 
@@ -90,6 +91,17 @@ zx::result<> DeviceManager::GetControllerDescriptor() {
   geometry_descriptor_ =
       response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<GeometryDescriptor>();
 
+  // TODO(https://fxbug.dev/42075643): We need to functionalize the code to get max_lun_count_.
+  if (geometry_descriptor_.bMaxNumberLU == 0) {
+    max_lun_count_ = 8;
+  } else if (geometry_descriptor_.bMaxNumberLU == 1) {
+    max_lun_count_ = 32;
+  } else {
+    zxlogf(ERROR, "Invalid Geometry Descriptor bMaxNumberLU value=%d",
+           geometry_descriptor_.bMaxNumberLU);
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
   // The kDeviceDensityUnit is defined in the spec as 512.
   // qTotalRawDeviceCapacity use big-endian byte ordering.
   constexpr uint32_t kDeviceDensityUnit = 512;
@@ -99,8 +111,8 @@ zx::result<> DeviceManager::GetControllerDescriptor() {
   return zx::ok();
 }
 
-zx::result<uint32_t> DeviceManager::ReadAttribute(Attributes attribute) {
-  ReadAttributeUpiu read_attribute_upiu(attribute);
+zx::result<uint32_t> DeviceManager::ReadAttribute(Attributes attribute, uint8_t index) {
+  ReadAttributeUpiu read_attribute_upiu(attribute, index);
   auto query_response = req_processor_.SendQueryRequestUpiu(read_attribute_upiu);
   if (query_response.is_error()) {
     return query_response.take_error();
@@ -108,8 +120,8 @@ zx::result<uint32_t> DeviceManager::ReadAttribute(Attributes attribute) {
   return zx::ok(query_response->GetResponse<AttributeResponseUpiu>().GetAttribute());
 }
 
-zx::result<> DeviceManager::WriteAttribute(Attributes attribute, uint32_t value) {
-  WriteAttributeUpiu write_attribute_upiu(attribute, value);
+zx::result<> DeviceManager::WriteAttribute(Attributes attribute, uint32_t value, uint8_t index) {
+  WriteAttributeUpiu write_attribute_upiu(attribute, value, index);
   auto query_response = req_processor_.SendQueryRequestUpiu(write_attribute_upiu);
   if (query_response.is_error()) {
     return query_response.take_error();
@@ -166,6 +178,226 @@ zx::result<UnitDescriptor> DeviceManager::ReadUnitDescriptor(uint8_t lun) {
     return response.take_error();
   }
   return zx::ok(response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<UnitDescriptor>());
+}
+
+zx::result<> DeviceManager::ConfigureWriteBooster(inspect::Node &wb_node) {
+  // Copy to access the unaligned value.
+  const ExtendedUfsFeaturesSupport kExtendedUfsFeaturesSupport{
+      betoh32(device_descriptor_.dExtendedUfsFeaturesSupport)};
+
+  if (!kExtendedUfsFeaturesSupport.writebooster_support()) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  if (zx::result<> result = EnableWriteBooster(wb_node); result.is_error()) {
+    zxlogf(ERROR, "Failed to enable WriteBooster: %s", result.status_string());
+    return result.take_error();
+  }
+
+  auto disable_write_booster = fit::defer([&] {
+    if (is_write_booster_enabled_) {
+      if (zx::result<> result = DisableWriteBooster(); result.is_error()) {
+        zxlogf(ERROR, "Failed to disable WriteBooster: %s", result.status_string());
+      } else {
+        zxlogf(WARNING, "WriteBooster is disabled");
+      }
+    }
+  });
+
+  // Get WriteBooster buffer parameters.
+  write_booster_buffer_type_ =
+      static_cast<WriteBoosterBufferType>(device_descriptor_.bWriteBoosterBufferType);
+  wb_node.RecordUint("write_booster_buffer_type", static_cast<uint8_t>(write_booster_buffer_type_));
+
+  user_space_configuration_option_ = static_cast<UserSpaceConfigurationOption>(
+      device_descriptor_.bWriteBoosterBufferPreserveUserSpaceEn);
+  wb_node.RecordUint("user_space_configuration_option",
+                     static_cast<uint8_t>(user_space_configuration_option_));
+
+  // Find the size of the write buffer.
+  uint32_t alloc_units = 0;
+  if (write_booster_buffer_type_ == WriteBoosterBufferType::kSharedBuffer) {
+    alloc_units = betoh32(device_descriptor_.dNumSharedWriteBoosterBufferAllocUnits);
+  } else if (write_booster_buffer_type_ == WriteBoosterBufferType::kLuDedicatedBuffer) {
+    for (uint8_t lun = 0; lun < max_lun_count_; ++lun) {
+      ReadDescriptorUpiu read_unit_desc_upiu(DescriptorType::kUnit, lun);
+      auto response = req_processor_.SendQueryRequestUpiu(read_unit_desc_upiu);
+      if (response.is_error()) {
+        continue;
+      }
+      auto unit_desc =
+          response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<UnitDescriptor>();
+      alloc_units = betoh32(unit_desc.dLUNumWriteBoosterBufferAllocUnits);
+      if (alloc_units > 0) {
+        // Found a dedicated buffer from LU.
+        write_booster_dedicated_lu_ = lun;
+        wb_node.RecordUint("write_booster_dedicated_lu", write_booster_dedicated_lu_);
+        break;
+      }
+    }
+  } else {
+    zxlogf(WARNING, "Not supported WriteBooster buffer type: 0x%x",
+           static_cast<uint8_t>(write_booster_buffer_type_));
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  if (alloc_units == 0) {
+    // Unable to enable WriteBooster due to lack of resources.
+    zxlogf(WARNING, "The WriteBooster buffer size is zero.");
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  uint32_t write_booster_buffer_size_in_bytes =
+      alloc_units * static_cast<uint32_t>(geometry_descriptor_.bAllocationUnitSize) *
+      (betoh32(geometry_descriptor_.dSegmentSize)) * kSectorSize;
+  wb_node.RecordUint("write_booster_buffer_size_in_bytes", write_booster_buffer_size_in_bytes);
+
+  zx::result<bool> result = IsWriteBoosterBufferLifeTimeLeft();
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to IsWriteBoosterBufferLifeTimeLeft(): %s", result.status_string());
+    return result.take_error();
+  }
+  if (!result.value()) {
+    // Unable to enable WriteBooster due to lack of resources.
+    zxlogf(WARNING, "Exceeded its maximum estimated WriteBooster Buffer life time");
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  // TODO(https://fxbug.dev/42075643): Need to handle WRITEBOOSTER_FLUSH_NEEDED exception case.
+
+  disable_write_booster.cancel();
+  zxlogf(INFO, "WriteBooster is enabled");
+  return zx::ok();
+}
+
+zx::result<bool> DeviceManager::IsWriteBoosterBufferLifeTimeLeft() {
+  uint8_t buffer_lun = write_booster_buffer_type_ == WriteBoosterBufferType::kLuDedicatedBuffer
+                           ? write_booster_dedicated_lu_
+                           : 0;
+  zx::result<uint32_t> life_time = ReadAttribute(Attributes::bWBBufferLifeTimeEst, buffer_lun);
+  if (life_time.is_error()) {
+    return life_time.take_error();
+  }
+  if (life_time.value()) {
+    if (life_time == kExceededWriteBoosterBufferLifeTime) {
+      return zx::ok(false);
+    }
+  }
+
+  return zx::ok(true);
+}
+
+zx::result<> DeviceManager::EnableWriteBooster(inspect::Node &wb_node) {
+  // Enable WriteBooster.
+  SetFlagUpiu set_wb_upiu(Flags::fWriteBoosterEn);
+  if (auto response = req_processor_.SendQueryRequestUpiu(set_wb_upiu); response.is_error()) {
+    return response.take_error();
+  }
+  is_write_booster_enabled_ = true;
+  wb_node.RecordBool("is_write_booster_enabled", is_write_booster_enabled_);
+
+  // Enable WriteBooster buffer flush during hibernate.
+  SetFlagUpiu set_wb_flush_hibern8_upiu(Flags::fWBBufferFlushDuringHibernate);
+  if (auto response = req_processor_.SendQueryRequestUpiu(set_wb_flush_hibern8_upiu);
+      response.is_error()) {
+    return response.take_error();
+  }
+  wb_node.RecordBool("writebooster_buffer_flush_during_hibernate", true);
+
+  // Enable WriteBooster buffer flush.
+  // TODO(https://fxbug.dev/42075643): For Samsung Exynos, ignore this flush behaviour due to the
+  // quirk of not supporting manual flush.
+  SetFlagUpiu set_wb_flush_upiu(Flags::fWBBufferFlushEn);
+  if (auto response = req_processor_.SendQueryRequestUpiu(set_wb_flush_upiu); response.is_error()) {
+    return response.take_error();
+  }
+  is_write_booster_flush_enabled_ = true;
+  wb_node.RecordBool("writebooster_buffer_flush_enabled", is_write_booster_flush_enabled_);
+
+  return zx::ok();
+}
+
+zx::result<> DeviceManager::DisableWriteBooster() {
+  if (is_write_booster_flush_enabled_) {
+    // Disable WriteBooster buffer flush.
+    ClearFlagUpiu clear_wb_flush_upiu(Flags::fWBBufferFlushEn);
+    if (auto response = req_processor_.SendQueryRequestUpiu(clear_wb_flush_upiu);
+        response.is_error()) {
+      return response.take_error();
+    }
+    is_write_booster_flush_enabled_ = false;
+    // TODO(https://fxbug.dev/42075643): The inspect value of |writebooster_buffer_flush_enabled|
+    // should be set to false.
+  }
+
+  // Disable WriteBooster buffer flush during hibernate.
+  ClearFlagUpiu clear_wb_flush_hibern8_upiu(Flags::fWBBufferFlushDuringHibernate);
+  if (auto response = req_processor_.SendQueryRequestUpiu(clear_wb_flush_hibern8_upiu);
+      response.is_error()) {
+    return response.take_error();
+  }
+  // TODO(https://fxbug.dev/42075643): The inspect value of
+  // |writebooster_buffer_flush_during_hibernate| should be set to false.
+
+  // Disable WriteBooster.
+  ClearFlagUpiu clear_wb_upiu(Flags::fWriteBoosterEn);
+  if (auto response = req_processor_.SendQueryRequestUpiu(clear_wb_upiu); response.is_error()) {
+    return response.take_error();
+  }
+  is_write_booster_enabled_ = false;
+  // TODO(https://fxbug.dev/42075643): The inspect value of |is_write_booster_enabled| should be set
+  // to false.
+
+  return zx::ok();
+}
+
+zx::result<bool> DeviceManager::NeedWriteBoosterBufferFlush() {
+  if (!is_write_booster_enabled_) {
+    return zx::ok(false);
+  }
+
+  auto result = IsWriteBoosterBufferLifeTimeLeft();
+  if (result.is_error()) {
+    return result.take_error();
+  }
+  if (!result.value()) {
+    if (auto result = DisableWriteBooster(); result.is_error()) {
+      zxlogf(ERROR, "Failed to disable WriteBooster: %s", result.status_string());
+      return result.take_error();
+    }
+    return zx::ok(false);
+  }
+
+  uint8_t buffer_lun = write_booster_buffer_type_ == WriteBoosterBufferType::kLuDedicatedBuffer
+                           ? write_booster_dedicated_lu_
+                           : 0;
+  auto available_buffer_size = ReadAttribute(Attributes::bAvailableWBBufferSize, buffer_lun);
+  if (available_buffer_size.is_error()) {
+    return available_buffer_size.take_error();
+  }
+
+  switch (user_space_configuration_option_) {
+    case UserSpaceConfigurationOption::kUserSpaceReduction: {
+      // In kUserSpaceReduction mode, flush should be performed when 10% or less of the buffer is
+      // left.
+      constexpr uint32_t k10PercentBufferRemains = 0x01;
+      return zx::ok(available_buffer_size.value() <= k10PercentBufferRemains);
+    }
+    case UserSpaceConfigurationOption::kPreserveUserSpace: {
+      // In kPreserveUserSpace mode, flush should be performed when the current buffer is greater
+      // than 0 and the available buffer below write_booster_flush_threshold_ is left.
+      auto current_buffer_size = ReadAttribute(Attributes::dCurrentWBBufferSize, buffer_lun);
+      if (current_buffer_size.is_error()) {
+        return current_buffer_size.take_error();
+      }
+      if (!current_buffer_size.value()) {
+        return zx::ok(false);
+      }
+      return zx::ok(available_buffer_size.value() < write_booster_flush_threshold_);
+    }
+    default:
+      return zx::error(ZX_ERR_INVALID_ARGS);
+  }
 }
 
 zx::result<> DeviceManager::InitReferenceClock(inspect::Node &controller_node) {
@@ -435,7 +667,19 @@ zx::result<> DeviceManager::Suspend() {
 
   // TODO(https://fxbug.dev/42075643): We need to wait for the in flight I/O.
   // TODO(https://fxbug.dev/42075643): Disable background operations.
-  // TODO(https://fxbug.dev/42075643): Device's write back buffer must be flushed.
+
+  // We should check if WriteBooster Flush is needed. If so, we should postpone changing the power
+  // mode.
+  zx::result<bool> result = NeedWriteBoosterBufferFlush();
+  if (result.is_error()) {
+    return result.take_error();
+  }
+  if (result.value()) {
+    // TODO(https://fxbug.dev/42075643): We need to keep the power mode active until the
+    // Writebooster flush is complete.
+    zxlogf(WARNING, "WriteBooster buffer flush is needed");
+    return zx::ok();
+  }
 
   if (zx::result<> result = controller_.Notify(NotifyEvent::kPrePowerModeChange, 0);
       result.is_error()) {

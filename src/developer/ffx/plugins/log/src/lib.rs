@@ -16,7 +16,7 @@ use log_command::{
         dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, LogFormatter,
         Symbolize, WriterContainer,
     },
-    InstanceGetter, LogSubCommand, WatchCommand,
+    InstanceGetter, LogProcessingResult, LogSubCommand, WatchCommand,
 };
 use std::io::Write;
 use transactional_symbolizer::{RealSymbolizerProcess, TransactionalSymbolizer};
@@ -315,7 +315,7 @@ where
         )
         .await?;
         formatter.set_boot_timestamp(connection.boot_timestamp as i64);
-        let maybe_err = dump_logs_from_socket(
+        let result = dump_logs_from_socket(
             connection.log_socket,
             &mut formatter,
             symbolizer_channel.as_ref(),
@@ -324,8 +324,14 @@ where
         if stream_mode == fidl_fuchsia_diagnostics::StreamMode::Snapshot {
             break;
         }
-        if let Err(value) = maybe_err {
-            writeln!(formatter.writer().stderr(), "{value}")?;
+        match result {
+            Ok(LogProcessingResult::Exit) => {
+                break;
+            }
+            Ok(LogProcessingResult::Continue) => {}
+            Err(value) => {
+                writeln!(formatter.writer().stderr(), "{value}")?;
+            }
         }
     }
     Ok(())
@@ -864,7 +870,12 @@ ffx log --force-select.
                 moniker: "ffx".into(),
                 severity: Severity::Info,
                 timestamp_nanos: Timestamp::from(
-                    parse_time("1980-01-01T00:00:03").unwrap().time.naive_utc().timestamp_nanos(),
+                    parse_time("1980-01-01T00:00:03")
+                        .unwrap()
+                        .time
+                        .naive_utc()
+                        .timestamp_nanos_opt()
+                        .unwrap(),
                 ),
             })
             .set_pid(1)
@@ -946,7 +957,12 @@ ffx log --force-select.
                 moniker: "ffx".into(),
                 severity: Severity::Info,
                 timestamp_nanos: Timestamp::from(
-                    parse_time("1980-01-01T00:00:03").unwrap().time.naive_utc().timestamp_nanos(),
+                    parse_time("1980-01-01T00:00:03")
+                        .unwrap()
+                        .time
+                        .naive_utc()
+                        .timestamp_nanos_opt()
+                        .unwrap(),
                 ),
             })
             .set_pid(1)
@@ -1041,7 +1057,8 @@ ffx log --force-select.
                             .unwrap()
                             .time
                             .naive_utc()
-                            .timestamp_nanos(),
+                            .timestamp_nanos_opt()
+                            .unwrap(),
                     ),
                 })
                 .set_pid(1)
@@ -1057,7 +1074,8 @@ ffx log --force-select.
                             .unwrap()
                             .time
                             .naive_utc()
-                            .timestamp_nanos(),
+                            .timestamp_nanos_opt()
+                            .unwrap(),
                     ),
                 })
                 .set_pid(1)
@@ -1073,7 +1091,8 @@ ffx log --force-select.
                             .unwrap()
                             .time
                             .naive_utc()
-                            .timestamp_nanos(),
+                            .timestamp_nanos_opt()
+                            .unwrap(),
                     ),
                 })
                 .set_pid(1)
@@ -1236,7 +1255,7 @@ ffx log --force-select.
             test_buffers.stdout.into_string(),
             format!(
                 "[{}][ffx] INFO: Hello world!\u{1b}[m\n",
-                Local.timestamp(0, 1).format(TIMESTAMP_FORMAT)
+                Local.timestamp_opt(0, 1).unwrap().format(TIMESTAMP_FORMAT)
             )
         );
         assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));

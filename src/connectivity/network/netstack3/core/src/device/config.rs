@@ -8,7 +8,7 @@ use net_types::ip::Ip;
 
 use crate::{
     device::{Device, DeviceIdContext},
-    ip::device::nud::{NudUserConfig, NudUserConfigUpdate},
+    ip::nud::{NudUserConfig, NudUserConfigUpdate},
 };
 
 /// Device ARP configuration.

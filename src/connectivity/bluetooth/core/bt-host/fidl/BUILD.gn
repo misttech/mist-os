@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_fuchsia_test_package.gni")
 import("//build/fuzz.gni")
 import("//build_overrides/pigweed.gni")
 import("//src/connectivity/bluetooth/core/bt-host/build/bt_gtest_package.gni")
@@ -181,4 +182,9 @@ fuchsia_library_fuzzer("host_server_watch_peers_fuzzer") {
     "//src/connectivity/bluetooth/core/bt-host/testing:fuzzing",
     "//src/connectivity/bluetooth/core/bt-host/testing:fuzztest_driver",
   ]
+}
+
+bazel_fuchsia_test_package("test_pkg") {
+  test_package_name = "bt_host_fidl_tests_bazel"
+  test_component_names = [ "fidl_test_autogen_cml" ]
 }

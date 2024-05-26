@@ -903,7 +903,6 @@ zx_status_t AmlogicVideo::SetDeviceType(zx_device_t* parent) {
     if (!strcmp(str_props[i].key, bind_fuchsia_devicetree::FIRST_COMPATIBLE.c_str())) {
       ZX_ASSERT(str_props[i].property_value.data_type == ZX_DEVICE_PROPERTY_VALUE_STRING);
       compatible = std::string(str_props[i].property_value.data.str_val);
-      break;
     }
   }
 

@@ -33,4 +33,11 @@
             from: 'self',
         },
     ],
+    config: {
+        // If value is less than 0 then it is ignored.
+        protected_memory_size_override: { type: "int32" },
+
+        // If value is less than 0 then it is ignored.
+        contiguous_memory_size_override: { type: "int32" },
+    },
 }

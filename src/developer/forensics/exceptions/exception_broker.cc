@@ -25,13 +25,11 @@ constexpr char kEnableJitdConfigPath[] = "/config/data/exceptions/enable_jitd_on
 
 }  // namespace
 
-std::unique_ptr<ExceptionBroker> ExceptionBroker::Create(async_dispatcher_t* dispatcher,
-                                                         inspect::Node* inspect_root,
-                                                         size_t max_num_handlers,
-                                                         zx::duration exception_ttl,
-                                                         const char* override_filepath) {
-  auto broker = std::unique_ptr<ExceptionBroker>(
-      new ExceptionBroker(dispatcher, inspect_root, max_num_handlers, exception_ttl));
+std::unique_ptr<ExceptionBroker> ExceptionBroker::Create(
+    async_dispatcher_t* dispatcher, inspect::Node* inspect_root, size_t max_num_handlers,
+    zx::duration exception_ttl, bool suspend_enabled, const char* override_filepath) {
+  auto broker = std::unique_ptr<ExceptionBroker>(new ExceptionBroker(
+      dispatcher, inspect_root, max_num_handlers, exception_ttl, suspend_enabled));
 
   // Check if JITD should be enabled at startup. For now existence means it's activated.
   if (!override_filepath)
@@ -52,8 +50,10 @@ std::unique_ptr<ExceptionBroker> ExceptionBroker::Create(async_dispatcher_t* dis
 }
 
 ExceptionBroker::ExceptionBroker(async_dispatcher_t* dispatcher, inspect::Node* inspect_root,
-                                 size_t max_num_handlers, zx::duration exception_ttl)
-    : handler_manager_(dispatcher, CrashCounter(inspect_root), max_num_handlers, exception_ttl) {}
+                                 size_t max_num_handlers, zx::duration exception_ttl,
+                                 bool suspend_enabled)
+    : handler_manager_(dispatcher, CrashCounter(inspect_root), max_num_handlers, exception_ttl,
+                       suspend_enabled) {}
 
 // OnException -------------------------------------------------------------------------------------
 

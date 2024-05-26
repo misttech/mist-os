@@ -40,6 +40,9 @@ fuchsia_cc_driver(
     ],
     output_name = "aml-i2c",
     deps = [
+        "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+        "//sdk/lib/driver/compat/cpp",
+        "//sdk/lib/driver/compat/cpp:logging",
         "//src/devices/lib/amlogic",
         "//src/lib/ddk:ddk_metadata",
         "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
@@ -49,10 +52,7 @@ fuchsia_cc_driver(
         "@fuchsia_sdk//pkg/mmio",
         "@fuchsia_sdk//pkg/trace",
         "@fuchsia_sdk//pkg/zx",
-        "@internal_sdk//fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
         "@internal_sdk//fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_cpp",
-        "@internal_sdk//pkg/driver_compat",
-        "@internal_sdk//pkg/driver_compat_logging",
     ],
 )
 
@@ -92,9 +92,13 @@ fuchsia_cc_test(
         "-Wno-vla-cxx-extension",
     ],
     deps = [
+        "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+        "//sdk/lib/driver/compat/cpp",
+        "//sdk/lib/driver/compat/cpp:logging",
         "//src/devices/lib/amlogic",
         "//src/lib/ddk:ddk_metadata",
         "@com_google_googletest//:gtest_main",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
         "@fuchsia_sdk//pkg/async-loop-default",
         "@fuchsia_sdk//pkg/async_patterns_testing_cpp",
         "@fuchsia_sdk//pkg/driver_component_cpp",
@@ -104,13 +108,8 @@ fuchsia_cc_test(
         "@fuchsia_sdk//pkg/mmio",
         "@fuchsia_sdk//pkg/trace",
         "@fuchsia_sdk//pkg/zx",
-        "@internal_sdk//fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
         "@internal_sdk//fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo_cpp",
         "@internal_sdk//fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_cpp",
-        "@internal_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
-        "@internal_sdk//pkg/driver_compat",
-        "@internal_sdk//pkg/driver_compat_logging",
-        "@internal_sdk//pkg/driver_runtime",
         "@internal_sdk//pkg/fake-mmio-reg",
     ],
 )

@@ -37,6 +37,11 @@
             storage: "tmp",
             path: "/tmp",
         },
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            key: "suspend_enabled",
+            type: "bool",
+        },
     ],
     expose: [
         {

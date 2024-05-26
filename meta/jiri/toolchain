@@ -24,7 +24,7 @@
          TODO(mcgrathr): repo/bot link about provenance
     -->
     <package name="fuchsia/third_party/clang/${platform}"
-             version="git_revision:145176dc0c93566ce4aef721044d49ab8ba50f87"
+             version="git_revision:3809e20afc68d7d03821f0ec59b928dcf9befbf4"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64,windows-amd64"
              path="prebuilt/third_party/clang/{{.OS}}-{{.Arch}}"/>
 
@@ -48,7 +48,7 @@
          From Rust on Fuchsia team
     -->
     <package name="fuchsia/third_party/rust/host/${platform}"
-             version="git_revision:703dc9ce64d9b31a239a7280d9b5f9ddd85ffed6"
+             version="git_revision:39d2f2affdd6b2856ab4b91359cc0d32b90bd26f"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
              path="prebuilt/third_party/rust/{{.OS}}-{{.Arch}}"/>
 
@@ -56,15 +56,15 @@
          From Rust on Fuchsia team
     -->
     <package name="fuchsia/third_party/rust/target/fuchsia"
-             version="git_revision:703dc9ce64d9b31a239a7280d9b5f9ddd85ffed6"
+             version="git_revision:39d2f2affdd6b2856ab4b91359cc0d32b90bd26f"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
              path="prebuilt/third_party/rust/{{.OS}}-{{.Arch}}"/>
     <package name="fuchsia/third_party/rust/target/x86_64-apple-darwin"
-             version="git_revision:703dc9ce64d9b31a239a7280d9b5f9ddd85ffed6"
+             version="git_revision:39d2f2affdd6b2856ab4b91359cc0d32b90bd26f"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
              path="prebuilt/third_party/rust/{{.OS}}-{{.Arch}}"/>
     <package name="fuchsia/third_party/rust/target/x86_64-unknown-linux-gnu"
-             version="git_revision:703dc9ce64d9b31a239a7280d9b5f9ddd85ffed6"
+             version="git_revision:39d2f2affdd6b2856ab4b91359cc0d32b90bd26f"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
              path="prebuilt/third_party/rust/{{.OS}}-{{.Arch}}"/>
 
@@ -75,10 +75,14 @@
              version="git_revision:cf821ee2dbc2ed61dfc25a814dcc8d090f9fda03"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
              path="prebuilt/third_party/sysroot/linux"/>
+    <package name="fuchsia/third_party/sysroot/focal"
+             version="git_revision:702eb9654703a7cec1cadf93a7e3aa269d053943"
+             platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
+             path="prebuilt/third_party/sysroot/ubuntu20.04"/>
 
     <!-- GN from https://gn.googlesource.com/gn/ -->
     <package name="gn/gn/${platform}"
-             version="git_revision:f284b6b47039a2d7edfcbfc51f52664f82b5a789"
+             version="git_revision:df98b86690c83b81aedc909ded18857296406159"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"
              path="prebuilt/third_party/gn/{{.OS}}-{{.Arch}}"/>
 

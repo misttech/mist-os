@@ -40,8 +40,8 @@ class StreamImpl : public actor::ActorBase {
                                   fidl::InterfaceRequest<fuchsia::camera::Stream>, zx::eventpair)>;
   // Called by the stream when it needs to call BindSharedCollection.
   using AllocatorBindSharedCollectionCallback =
-      fit::function<promise<void>(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
-                                  fidl::InterfaceRequest<fuchsia::sysmem::BufferCollection>)>;
+      fit::function<promise<void>(fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>,
+                                  fidl::InterfaceRequest<fuchsia::sysmem2::BufferCollection>)>;
   // Called by the stream to register a BufferCollection deallocation devent.
   using RegisterDeallocationEvent = fit::function<promise<void>(zx::eventpair deallocation_event)>;
   // Called by the stream when it has no more clients.
@@ -79,26 +79,26 @@ class StreamImpl : public actor::ActorBase {
   void OnFrameAvailable(fuchsia::camera::FrameAvailableEvent info);
 
   // Calls Sync on the given token and then produces that token when the sync is complete.
-  promise<fuchsia::sysmem::BufferCollectionTokenPtr> TokenSync(
-      fuchsia::sysmem::BufferCollectionTokenPtr token);
+  promise<fuchsia::sysmem2::BufferCollectionTokenPtr> TokenSync(
+      fuchsia::sysmem2::BufferCollectionTokenPtr token);
 
   // Calls Sync on the given BufferCollection and the promise completes when the sync is complete.
-  promise<void> BufferCollectionSync(fuchsia::sysmem::BufferCollectionPtr& collection);
+  promise<void> BufferCollectionSync(fuchsia::sysmem2::BufferCollectionPtr& collection);
 
   // Calls WaitForBuffersAllocated on client_buffer_collection_ and then returns either a status in
-  // the case of an error or the BufferCollectionInfo_2 if it was successful.
-  promise<fuchsia::sysmem::BufferCollectionInfo_2, zx_status_t>
+  // the case of an error or the BufferCollectionInfo if it was successful.
+  promise<fuchsia::sysmem2::BufferCollectionInfo, zx_status_t>
   WaitForClientBufferCollectionAllocated();
 
   // Given an InterfaceHandle<BufferCollectionToken> with a valid underlying channel, the client
   // will be set as a participant and the returned promise will yield the bound token for further
   // use. Otherwise, the client will not be a participant and the promise will yield nullopt.
-  promise<std::optional<fuchsia::sysmem::BufferCollectionTokenPtr>> SetClientParticipation(
-      uint64_t id, fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_handle);
+  promise<std::optional<fuchsia::sysmem2::BufferCollectionTokenPtr>> SetClientParticipation(
+      uint64_t id, fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token_handle);
 
   // Renegotiate buffers or opt out of buffer renegotiation for the client with the given id.
   promise<fuchsia::sysmem::BufferCollectionInfo, zx_status_t> InitBufferCollections(
-      fuchsia::sysmem::BufferCollectionTokenPtr token);
+      fuchsia::sysmem2::BufferCollectionTokenPtr token);
 
   // The following functions are async daisy-chained to execute the steps to initialize the
   // client-facing buffer collection:
@@ -108,11 +108,11 @@ class StreamImpl : public actor::ActorBase {
   // 3. WaitForClientBufferCollectionAllocated - Wait for the allocation to finish
   // 4. RegisterDeallocationEvent - so it is known when the client BufferCollection is deallocated
   // 5. InitializeClientBuffers - Initialize individual buffers
-  promise<void> InitializeClientSharedCollection(fuchsia::sysmem::BufferCollectionTokenPtr token);
+  promise<void> InitializeClientSharedCollection(fuchsia::sysmem2::BufferCollectionTokenPtr token);
   promise<void> SetClientBufferCollectionConstraints();
   promise<void> RegisterClientBufferCollectionDeallocationEvent();
   promise<void> InitializeClientBuffers(
-      fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info);
+      fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info);
 
   // Allocate the driver-facing buffer collection.
   promise<fuchsia::sysmem::BufferCollectionInfo, zx_status_t> AllocateDriverBufferCollection(
@@ -130,8 +130,8 @@ class StreamImpl : public actor::ActorBase {
 
   // Our local stub to call BindSharedCollection at DeviceImpl.
   void AllocatorBindSharedCollection(
-      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_handle,
-      fidl::InterfaceRequest<fuchsia::sysmem::BufferCollection> request);
+      fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token_handle,
+      fidl::InterfaceRequest<fuchsia::sysmem2::BufferCollection> request);
 
   // Process incoming UVC camera frame in preparation for sending to client.
   void ProcessFrameForSend(uint32_t buffer_id);
@@ -157,7 +157,7 @@ class StreamImpl : public actor::ActorBase {
     void CloseConnection(zx_status_t status);
 
     // Add the given token to the client's token queue.
-    void ReceiveBufferCollection(fuchsia::sysmem::BufferCollectionTokenHandle token);
+    void ReceiveBufferCollection(fuchsia::sysmem2::BufferCollectionTokenHandle token);
 
     // Update the client's resolution.
     void ReceiveResolution(fuchsia::math::Size coded_size);
@@ -207,7 +207,7 @@ class StreamImpl : public actor::ActorBase {
     } frame_logging_state_;
     uint64_t id_;
     fidl::Binding<fuchsia::camera3::Stream> binding_;
-    HangingGetHelper<fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>> buffers_;
+    HangingGetHelper<fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>> buffers_;
     HangingGetHelper<fuchsia::math::Size,
                      fit::function<bool(fuchsia::math::Size, fuchsia::math::Size)>>
         resolution_;
@@ -219,7 +219,7 @@ class StreamImpl : public actor::ActorBase {
   };
 
   async_dispatcher_t* dispatcher_;
-  fuchsia::sysmem::AllocatorPtr allocator_;
+  fuchsia::sysmem2::AllocatorPtr allocator_;
   const fuchsia::camera3::StreamProperties2& properties_;
   std::map<uint64_t, std::unique_ptr<Client>> clients_;
   uint64_t client_id_next_ = 1;
@@ -236,11 +236,11 @@ class StreamImpl : public actor::ActorBase {
   zx::eventpair stream_token_;
 
   // Client-facing buffer collection
-  fuchsia::sysmem::BufferCollectionInfo_2 client_buffer_collection_info_;
-  fuchsia::sysmem::BufferCollectionPtr client_buffer_collection_;
+  fuchsia::sysmem2::BufferCollectionInfo client_buffer_collection_info_;
+  fuchsia::sysmem2::BufferCollectionPtr client_buffer_collection_;
 
   // Driver-facing buffer collection
-  fuchsia::sysmem::BufferCollectionInfo driver_buffer_collection_info_;
+  fuchsia::sysmem2::BufferCollectionInfo driver_buffer_collection_info_;
 
   // Maps client-facing buffer ID to the buffer's virtual address.
   std::map<uint32_t, uintptr_t> client_buffer_id_to_virt_addr_;

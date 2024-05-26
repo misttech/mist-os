@@ -298,9 +298,6 @@ TEST_F(Tas58xxTest, GetInfo5825) {
 }
 
 TEST_F(Tas58xxTest, CheckState) {
-  auto info = client_.IsBridgeable();
-  EXPECT_EQ(info.value(), false);
-
   auto format = client_.GetGainFormat();
   EXPECT_EQ(format.value().min_gain, -103.0);
   EXPECT_EQ(format.value().max_gain, 24.0);
@@ -499,12 +496,13 @@ TEST_F(Tas58xxSignalProcessingTest, SetGain) {
     mock_i2c_.ExpectWriteStop({0x4c, 0x48});  // digital vol -12dB.
 
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState state;
+    signal_fidl::SettableElementState state;
     state.set_started(true);
     state.set_bypassed(false);
     signal_fidl::GainElementState gain_control;
     gain_control.set_gain(-12.0f);
-    auto control_params = signal_fidl::TypeSpecificElementState::WithGain(std::move(gain_control));
+    auto control_params =
+        signal_fidl::SettableTypeSpecificElementState::WithGain(std::move(gain_control));
     state.set_type_specific(std::move(control_params));
     ASSERT_OK(signal_processing_client_->SetElementState(
         result.response().processing_elements[kGainPeIndex].id(), std::move(state), &state_result));
@@ -533,7 +531,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetGain) {
   // no I2C transaction.
   {
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState state;
+    signal_fidl::SettableElementState state;
     ASSERT_OK(signal_processing_client_->SetElementState(
         result.response().processing_elements[kGainPeIndex].id(), std::move(state), &state_result));
     ASSERT_FALSE(state_result.is_err());
@@ -544,7 +542,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetGain) {
     mock_i2c_.ExpectWriteStop({0x4c, 0x30});  // digital vol 0dB, disable Gain.
 
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState state;
+    signal_fidl::SettableElementState state;
     state.set_started(true);
     state.set_bypassed(true);
     ASSERT_OK(signal_processing_client_->SetElementState(
@@ -575,12 +573,13 @@ TEST_F(Tas58xxSignalProcessingTest, SetGain) {
     mock_i2c_.ExpectWriteStop({0x4c, 0x30});  // digital vol 0dB, disable Gain.
 
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState state;
+    signal_fidl::SettableElementState state;
     state.set_started(true);
     state.set_bypassed(true);
     signal_fidl::GainElementState gain_control;
     gain_control.set_gain(-12.0f);
-    auto control_params = signal_fidl::TypeSpecificElementState::WithGain(std::move(gain_control));
+    auto control_params =
+        signal_fidl::SettableTypeSpecificElementState::WithGain(std::move(gain_control));
     state.set_type_specific(std::move(control_params));
     ASSERT_OK(signal_processing_client_->SetElementState(
         result.response().processing_elements[kGainPeIndex].id(), std::move(state), &state_result));
@@ -614,7 +613,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetMute) {
         {0x03, 0x08});  // Muted = true.
 
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState state;
+    signal_fidl::SettableElementState state;
     state.set_started(true);
     state.set_bypassed(false);
     ASSERT_OK(signal_processing_client_->SetElementState(
@@ -638,7 +637,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetMute) {
   // If no enable/disable is provided, then there should be no change and no I2C transaction.
   {
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState state;
+    signal_fidl::SettableElementState state;
     ASSERT_OK(signal_processing_client_->SetElementState(
         result.response().processing_elements[kMutePeIndex].id(), std::move(state), &state_result));
     ASSERT_FALSE(state_result.is_err());
@@ -650,7 +649,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetMute) {
         {0x03, 0x00});  // Muted = false.
 
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState state;
+    signal_fidl::SettableElementState state;
     state.set_started(true);
     state.set_bypassed(true);
     ASSERT_OK(signal_processing_client_->SetElementState(
@@ -692,7 +691,7 @@ TEST_F(Tas58xxSignalProcessingTest, WatchAgl) {
 
     // Control with started and not bypassed.
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState state;
+    signal_fidl::SettableElementState state;
     state.set_started(true);
     state.set_bypassed(false);
     ASSERT_OK(signal_processing_client_->SetElementState(
@@ -719,7 +718,7 @@ TEST_F(Tas58xxSignalProcessingTest, WatchAgl) {
 
     // Control with bypassed = true.
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState state;
+    signal_fidl::SettableElementState state;
     state.set_started(true);
     state.set_bypassed(true);
     ASSERT_OK(signal_processing_client_->SetElementState(
@@ -755,7 +754,7 @@ TEST_F(Tas58xxSignalProcessingTest, WatchAglUpdates) {
 
     // Control with started and not bypassed.
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState state;
+    signal_fidl::SettableElementState state;
     state.set_started(true);
     state.set_bypassed(false);
     ASSERT_OK(signal_processing_client_->SetElementState(
@@ -796,7 +795,7 @@ TEST_F(Tas58xxSignalProcessingTest, WatchAglUpdates) {
 
     // Control with started but also bypassed (effectively disabled).
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState state;
+    signal_fidl::SettableElementState state;
     state.set_started(true);
     state.set_bypassed(true);
     ASSERT_OK(signal_processing_client_->SetElementState(
@@ -818,7 +817,7 @@ TEST_F(Tas58xxSignalProcessingTest, WatchAglUpdates) {
 
     // Control with started and not bypassed.
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState state;
+    signal_fidl::SettableElementState state;
     state.set_started(true);
     state.set_bypassed(false);
     ASSERT_OK(signal_processing_client_->SetElementState(
@@ -924,7 +923,7 @@ TEST_F(Tas58xxSignalProcessingTest, WatchEqualizerUpdates) {
     // Control the EQ by disable the whole processing element.
     mock_i2c_.ExpectWriteStop({0x66, 0x07});  // Enable bypass EQ.
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState control;
+    signal_fidl::SettableElementState control;
     control.set_started(true);
     control.set_bypassed(true);
     ASSERT_OK(signal_processing_client_->SetElementState(
@@ -959,7 +958,7 @@ TEST_F(Tas58xxSignalProcessingTest, WatchEqualizerUpdates) {
     // Control the EQ by disable the whole processing element.
     mock_i2c_.ExpectWriteStop({0x66, 0x07});  // Enable bypass EQ.
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState control;
+    signal_fidl::SettableElementState control;
     control.set_started(true);
     control.set_bypassed(true);
     ASSERT_OK(signal_processing_client_->SetElementState(
@@ -1031,7 +1030,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerBandDisabled) {
 
   // Now we send the EQ control disabling the first band.
   signal_fidl::SignalProcessing_SetElementState_Result state_result;
-  signal_fidl::ElementState control;
+  signal_fidl::SettableElementState control;
   control.set_started(true);
   control.set_bypassed(false);
   std::vector<signal_fidl::EqualizerBandState> bands_control;
@@ -1047,7 +1046,8 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerBandDisabled) {
   bands_control.emplace_back(std::move(band_control));
   signal_fidl::EqualizerElementState eq_control;
   eq_control.set_band_states(std::move(bands_control));
-  auto control_params = signal_fidl::TypeSpecificElementState::WithEqualizer(std::move(eq_control));
+  auto control_params =
+      signal_fidl::SettableTypeSpecificElementState::WithEqualizer(std::move(eq_control));
   control.set_type_specific(std::move(control_params));
   ASSERT_OK(signal_processing_client_->SetElementState(
       result.response().processing_elements[kEqualizerPeIndex].id(), std::move(control),
@@ -1082,7 +1082,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerDifferentRequests) {
         .ExpectWriteStop({0x00, 0x00})               // page 0.
         .ExpectWriteStop({0x7f, 0x00});              // book 0.
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState control;
+    signal_fidl::SettableElementState control;
     control.set_started(true);
     control.set_bypassed(false);
     std::vector<signal_fidl::EqualizerBandState> bands_control;
@@ -1098,7 +1098,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerDifferentRequests) {
     signal_fidl::EqualizerElementState eq_control;
     eq_control.set_band_states(std::move(bands_control));
     auto control_params =
-        signal_fidl::TypeSpecificElementState::WithEqualizer(std::move(eq_control));
+        signal_fidl::SettableTypeSpecificElementState::WithEqualizer(std::move(eq_control));
     control.set_type_specific(std::move(control_params));
     ASSERT_OK(signal_processing_client_->SetElementState(
         result.response().processing_elements[kEqualizerPeIndex].id(), std::move(control),
@@ -1110,7 +1110,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerDifferentRequests) {
   {
     mock_i2c_.ExpectWriteStop({0x66, 0x06});  // Disable bypass EQ since PE is enabled.
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState control;
+    signal_fidl::SettableElementState control;
     control.set_started(true);
     control.set_bypassed(false);
     std::vector<signal_fidl::EqualizerBandState> bands_control;
@@ -1121,7 +1121,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerDifferentRequests) {
     signal_fidl::EqualizerElementState eq_control;
     eq_control.set_band_states(std::move(bands_control));
     auto control_params =
-        signal_fidl::TypeSpecificElementState::WithEqualizer(std::move(eq_control));
+        signal_fidl::SettableTypeSpecificElementState::WithEqualizer(std::move(eq_control));
     control.set_type_specific(std::move(control_params));
     ASSERT_OK(signal_processing_client_->SetElementState(
         result.response().processing_elements[kEqualizerPeIndex].id(), std::move(control),
@@ -1133,7 +1133,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerDifferentRequests) {
   {
     mock_i2c_.ExpectWriteStop({0x66, 0x06});  // Disable bypass EQ since PE is enabled.
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState control;
+    signal_fidl::SettableElementState control;
     control.set_started(true);
     control.set_bypassed(false);
     std::vector<signal_fidl::EqualizerBandState> bands_control;
@@ -1151,7 +1151,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerDifferentRequests) {
     signal_fidl::EqualizerElementState eq_control;
     eq_control.set_band_states(std::move(bands_control));
     auto control_params =
-        signal_fidl::TypeSpecificElementState::WithEqualizer(std::move(eq_control));
+        signal_fidl::SettableTypeSpecificElementState::WithEqualizer(std::move(eq_control));
     control.set_type_specific(std::move(control_params));
     ASSERT_OK(signal_processing_client_->SetElementState(
         result.response().processing_elements[kEqualizerPeIndex].id(), std::move(control),
@@ -1202,7 +1202,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerBandEnabledWithCodecStarted) {
 
   // Control the band.
   signal_fidl::SignalProcessing_SetElementState_Result state_result;
-  signal_fidl::ElementState control;
+  signal_fidl::SettableElementState control;
   control.set_started(true);
   control.set_bypassed(false);
   std::vector<signal_fidl::EqualizerBandState> bands_control;
@@ -1219,7 +1219,8 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerBandEnabledWithCodecStarted) {
   bands_control.emplace_back(std::move(band_control));
   signal_fidl::EqualizerElementState eq_control;
   eq_control.set_band_states(std::move(bands_control));
-  auto control_params = signal_fidl::TypeSpecificElementState::WithEqualizer(std::move(eq_control));
+  auto control_params =
+      signal_fidl::SettableTypeSpecificElementState::WithEqualizer(std::move(eq_control));
   control.set_type_specific(std::move(control_params));
   ASSERT_OK(signal_processing_client_->SetElementState(
       result.response().processing_elements[kEqualizerPeIndex].id(), std::move(control),
@@ -1277,7 +1278,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizer2BandsEnabled) {
   // Control the first band.
   {
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState control;
+    signal_fidl::SettableElementState control;
     control.set_started(true);
     control.set_bypassed(false);
     std::vector<signal_fidl::EqualizerBandState> bands_control;
@@ -1295,7 +1296,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizer2BandsEnabled) {
     signal_fidl::EqualizerElementState eq_control;
     eq_control.set_band_states(std::move(bands_control));
     auto control_params =
-        signal_fidl::TypeSpecificElementState::WithEqualizer(std::move(eq_control));
+        signal_fidl::SettableTypeSpecificElementState::WithEqualizer(std::move(eq_control));
 
     control.set_type_specific(std::move(control_params));
     ASSERT_OK(signal_processing_client_->SetElementState(
@@ -1307,7 +1308,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizer2BandsEnabled) {
   // Control the second band.
   {
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState control;
+    signal_fidl::SettableElementState control;
     control.set_started(true);
     control.set_bypassed(false);
     std::vector<signal_fidl::EqualizerBandState> bands_control;
@@ -1326,7 +1327,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizer2BandsEnabled) {
     signal_fidl::EqualizerElementState eq_control;
     eq_control.set_band_states(std::move(bands_control));
     auto control_params =
-        signal_fidl::TypeSpecificElementState::WithEqualizer(std::move(eq_control));
+        signal_fidl::SettableTypeSpecificElementState::WithEqualizer(std::move(eq_control));
 
     control.set_type_specific(std::move(control_params));
     ASSERT_OK(signal_processing_client_->SetElementState(
@@ -1402,7 +1403,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerElementDisabled) {
   // Now we send the EQ control disabling the processing element.
   {
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState control;
+    signal_fidl::SettableElementState control;
     control.set_started(true);
     control.set_bypassed(true);
     ASSERT_OK(signal_processing_client_->SetElementState(
@@ -1434,7 +1435,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerElementDisabled) {
   // Now we send the EQ control disabling the processing element.
   {
     signal_fidl::SignalProcessing_SetElementState_Result state_result;
-    signal_fidl::ElementState control;
+    signal_fidl::SettableElementState control;
     control.set_started(true);
     control.set_bypassed(true);
     std::vector<signal_fidl::EqualizerBandState> bands_control;
@@ -1452,7 +1453,7 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerElementDisabled) {
     signal_fidl::EqualizerElementState eq_control;
     eq_control.set_band_states(std::move(bands_control));
     auto control_params =
-        signal_fidl::TypeSpecificElementState::WithEqualizer(std::move(eq_control));
+        signal_fidl::SettableTypeSpecificElementState::WithEqualizer(std::move(eq_control));
     control.set_type_specific(std::move(control_params));
     ASSERT_OK(signal_processing_client_->SetElementState(
         result.response().processing_elements[kEqualizerPeIndex].id(), std::move(control),

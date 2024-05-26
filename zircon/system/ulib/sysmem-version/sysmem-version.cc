@@ -64,12 +64,12 @@ template <typename T>
 struct IsFidlScalar<
     T, typename std::enable_if<fidl::IsFidlType<T>::value &&
                                (std::is_arithmetic<T>::value || std::is_enum<T>::value)>::type>
-    : std::true_type {};
+    : std::true_type{};
 template <typename T>
 struct IsFidlScalar<T, typename std::enable_if<fidl::IsFidlType<T>::value &&
                                                (internal::HasOperatorUInt32<T>::value ||
                                                 internal::HasOperatorUInt64<T>::value)>::type>
-    : std::true_type {};
+    : std::true_type{};
 
 template <typename DstType, typename SrcType, bool allow_bigger_src, typename Enable = void>
 struct IsCompatibleAssignmentFidlScalarTypes : std::false_type {};
@@ -86,7 +86,7 @@ struct IsCompatibleAssignmentFidlScalarTypes<
          (std::is_same<RemoveCVRef_t<DstType>, uint64_t>::value &&
           std::is_same<RemoveCVRef_t<SrcType>, uint32_t>::value) ||
          (allow_bigger_src && std::is_same<RemoveCVRef_t<DstType>, uint32_t>::value &&
-          std::is_same<RemoveCVRef_t<SrcType>, uint64_t>::value))>::type> : std::true_type {};
+          std::is_same<RemoveCVRef_t<SrcType>, uint64_t>::value))>::type> : std::true_type{};
 template <typename DstType, typename SrcType, bool allow_bigger_src = false>
 inline constexpr bool IsCompatibleAssignmentFidlScalarTypes_v =
     IsCompatibleAssignmentFidlScalarTypes<DstType, SrcType, allow_bigger_src>::value;
@@ -1355,7 +1355,7 @@ fpromise::result<fuchsia_sysmem::wire::ImageFormatConstraints> V1CopyFromV2Image
 #endif  // __Fuchsia_API_level__ >= 19
 
 fpromise::result<fuchsia_sysmem::ImageFormat2> V1CopyFromV2ImageFormat(
-    fuchsia_images2::ImageFormat& v2) {
+    const fuchsia_images2::ImageFormat& v2) {
   fuchsia_sysmem::ImageFormat2 v1{};
 
   if (!v2.pixel_format().has_value()) {
@@ -1436,10 +1436,16 @@ fpromise::result<fuchsia_sysmem::ImageFormat2> V1CopyFromV2ImageFormat(
   return fpromise::ok(std::move(v1));
 }
 
+fpromise::result<fuchsia_sysmem::ImageFormat2> V1CopyFromV2ImageFormat(
+    fuchsia_images2::ImageFormat& v2) {
+  const fuchsia_images2::ImageFormat& const_v2 = v2;
+  return V1CopyFromV2ImageFormat(const_v2);
+}
+
 #if __Fuchsia_API_level__ >= 19
 
 fpromise::result<fuchsia_sysmem::wire::ImageFormat2> V1CopyFromV2ImageFormat(
-    fuchsia_images2::wire::ImageFormat& v2) {
+    const fuchsia_images2::wire::ImageFormat& v2) {
   auto v2_natural = fidl::ToNatural(v2);
   auto v1_natural_result = V1CopyFromV2ImageFormat(v2_natural);
   if (v1_natural_result.is_error()) {
@@ -1447,6 +1453,12 @@ fpromise::result<fuchsia_sysmem::wire::ImageFormat2> V1CopyFromV2ImageFormat(
   }
   UnusedArena unused_arena;
   return fpromise::ok(fidl::ToWire(unused_arena, v1_natural_result.value()));
+}
+
+fpromise::result<fuchsia_sysmem::wire::ImageFormat2> V1CopyFromV2ImageFormat(
+    fuchsia_images2::wire::ImageFormat& v2) {
+  const fuchsia_images2::wire::ImageFormat& const_v2 = v2;
+  return V1CopyFromV2ImageFormat(const_v2);
 }
 
 fpromise::result<fuchsia_sysmem::SingleBufferSettings> V1CopyFromV2SingleBufferSettings(

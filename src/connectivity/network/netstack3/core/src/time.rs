@@ -14,14 +14,15 @@ use crate::{
     context::{CoreCtx, CoreTimerContext, HandleableTimer, TimerHandler},
     device::{DeviceLayerTimerId, WeakDeviceId},
     ip::{
-        device::{integration::IpAddrCtxSpec, IpDeviceIpExt, IpDeviceTimerId},
+        device::{IpDeviceIpExt, IpDeviceTimerId},
+        device_integration::IpAddrCtxSpec,
         IpLayerTimerId,
     },
     transport::TransportLayerTimerId,
     BindingsTypes,
 };
 
-pub use netstack3_base::{Instant, LocalTimerHeap};
+pub use netstack3_base::Instant;
 
 /// The identifier for any timer event.
 #[derive(Derivative, GenericOverIp)]

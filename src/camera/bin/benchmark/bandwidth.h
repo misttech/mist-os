@@ -6,7 +6,7 @@
 
 #include <fuchsia/camera3/cpp/fidl.h>
 #include <fuchsia/hardware/ram/metrics/cpp/fidl.h>
-#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <lib/fit/function.h>
 
 #include <sstream>
@@ -19,7 +19,7 @@ namespace camera::benchmark {
 // Measures memory bandwidth consumption by the camera stack.
 class Bandwidth {
  public:
-  Bandwidth(fuchsia::sysmem::AllocatorHandle sysmem_allocator,
+  Bandwidth(fuchsia::sysmem2::AllocatorHandle sysmem_allocator,
             fuchsia::camera3::DeviceWatcherHandle camera_device_watcher,
             fuchsia::hardware::ram::metrics::DeviceHandle metrics_device,
             async_dispatcher_t* dispatcher);
@@ -42,7 +42,7 @@ class Bandwidth {
   void WriteResults(std::string mode, std::vector<RamChannelMeasurement> results);
   std::ostream& sink();
 
-  fuchsia::sysmem::AllocatorPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorPtr sysmem_allocator_;
   fuchsia::camera3::DeviceWatcherPtr camera_device_watcher_;
   fuchsia::hardware::ram::metrics::DevicePtr metrics_device_;
   async_dispatcher_t* dispatcher_;
@@ -52,8 +52,8 @@ class Bandwidth {
   std::vector<fuchsia::camera3::Configuration> camera_configurations_;
   struct PerStream {
     fuchsia::camera3::StreamPtr ptr;
-    fuchsia::sysmem::BufferCollectionTokenPtr token;
-    fuchsia::sysmem::BufferCollectionPtr collection;
+    fuchsia::sysmem2::BufferCollectionTokenPtr token;
+    fuchsia::sysmem2::BufferCollectionPtr collection;
     fuchsia::camera3::Stream::GetNextFrameCallback frame_callback;
     uint64_t frames_received = 0;
   };

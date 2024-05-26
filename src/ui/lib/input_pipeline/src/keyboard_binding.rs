@@ -228,13 +228,13 @@ impl KeyboardEvent {
 }
 
 /// A [`KeyboardDeviceDescriptor`] contains information about a specific keyboard device.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct KeyboardDeviceDescriptor {
     /// All the [`fidl_fuchsia_input::Key`]s available on the keyboard device.
     pub keys: Vec<fidl_fuchsia_input::Key>,
 
     /// The vendor ID, product ID and version.
-    pub device_info: fidl_fuchsia_input_report::DeviceInfo,
+    pub device_information: fidl_fuchsia_input_report::DeviceInformation,
 
     /// The unique identifier of this device.
     pub device_id: u32,
@@ -245,11 +245,12 @@ impl Default for KeyboardDeviceDescriptor {
     fn default() -> Self {
         KeyboardDeviceDescriptor {
             keys: vec![],
-            device_info: fidl_fuchsia_input_report::DeviceInfo {
-                vendor_id: 0,
-                product_id: 0,
-                version: 0,
-                polling_rate: 0,
+            device_information: fidl_fuchsia_input_report::DeviceInformation {
+                vendor_id: Some(0),
+                product_id: Some(0),
+                version: Some(0),
+                polling_rate: Some(0),
+                ..Default::default()
             },
             device_id: 0,
         }
@@ -379,13 +380,13 @@ impl KeyboardBinding {
             }
         };
 
-        let device_info = descriptor.device_info.ok_or_else(|| {
-            input_device_status.health_node.set_unhealthy("Empty device_info in descriptor");
+        let device_info = descriptor.device_information.ok_or_else(|| {
+            input_device_status.health_node.set_unhealthy("Empty device_information in descriptor");
             // Logging in addition to returning an error, as in some test
             // setups the error may never be displayed to the user.
             metrics_logger.log_error(
                 InputPipelineErrorMetricDimensionEvent::KeyboardEmptyDeviceInfo,
-                std::format!("DRIVER BUG: empty device_info for device_id: {}", device_id),
+                std::format!("DRIVER BUG: empty device_information for device_id: {}", device_id),
             );
             format_err!("empty device info for device_id: {}", device_id)
         })?;
@@ -399,7 +400,7 @@ impl KeyboardBinding {
                     event_sender: input_event_sender,
                     device_descriptor: KeyboardDeviceDescriptor {
                         keys: keys3.unwrap_or_default(),
-                        device_info,
+                        device_information: device_info,
                         device_id,
                     },
                 },

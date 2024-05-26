@@ -10,15 +10,21 @@ use {
     fidl_fuchsia_input_injection::InputDeviceRegistryProxy,
     fidl_fuchsia_input_report::{
         Axis, ConsumerControlButton, ConsumerControlDescriptor, ConsumerControlInputDescriptor,
-        ContactInputDescriptor, DeviceDescriptor, DeviceInfo, InputDeviceMarker,
+        ContactInputDescriptor, DeviceDescriptor, DeviceInformation, InputDeviceMarker,
         KeyboardDescriptor, KeyboardInputDescriptor, MouseDescriptor, MouseInputDescriptor, Range,
         TouchDescriptor, TouchInputDescriptor, TouchType, Unit, UnitType, TOUCH_MAX_CONTACTS,
     },
 };
 
 // Use this to place required DeviceInfo into DeviceDescriptor.
-fn new_fake_device_info() -> DeviceInfo {
-    DeviceInfo { product_id: 42, vendor_id: 43, version: u32::MAX, polling_rate: 1000 }
+fn new_fake_device_info() -> DeviceInformation {
+    DeviceInformation {
+        product_id: Some(42),
+        vendor_id: Some(43),
+        version: Some(u32::MAX),
+        polling_rate: Some(1000),
+        ..Default::default()
+    }
 }
 
 /// Implements the `synthesizer::InputDeviceRegistry` trait, and the client side
@@ -35,7 +41,7 @@ impl synthesizer::InputDeviceRegistry for self::InputDeviceRegistry {
     ) -> Result<Box<dyn synthesizer::InputDevice>, Error> {
         self.add_device(DeviceDescriptor {
             // Required for DeviceDescriptor.
-            device_info: Some(new_fake_device_info()),
+            device_information: Some(new_fake_device_info()),
             touch: Some(TouchDescriptor {
                 input: Some(TouchInputDescriptor {
                     contacts: Some(
@@ -88,7 +94,7 @@ impl synthesizer::InputDeviceRegistry for self::InputDeviceRegistry {
             .collect();
         self.add_device(DeviceDescriptor {
             // Required for DeviceDescriptor.
-            device_info: Some(new_fake_device_info()),
+            device_information: Some(new_fake_device_info()),
             keyboard: Some(KeyboardDescriptor {
                 input: Some(KeyboardInputDescriptor {
                     keys3: Some(all_keys.clone()),
@@ -103,7 +109,7 @@ impl synthesizer::InputDeviceRegistry for self::InputDeviceRegistry {
     fn add_media_buttons_device(&mut self) -> Result<Box<dyn synthesizer::InputDevice>, Error> {
         self.add_device(DeviceDescriptor {
             // Required for DeviceDescriptor.
-            device_info: Some(new_fake_device_info()),
+            device_information: Some(new_fake_device_info()),
             consumer_control: Some(ConsumerControlDescriptor {
                 input: Some(ConsumerControlInputDescriptor {
                     buttons: Some(vec![
@@ -130,7 +136,7 @@ impl synthesizer::InputDeviceRegistry for self::InputDeviceRegistry {
     ) -> Result<Box<dyn synthesizer::InputDevice>, Error> {
         self.add_device(DeviceDescriptor {
             // Required for DeviceDescriptor.
-            device_info: Some(new_fake_device_info()),
+            device_information: Some(new_fake_device_info()),
             mouse: Some(MouseDescriptor {
                 input: Some(MouseInputDescriptor {
                     movement_x: Some(Axis {

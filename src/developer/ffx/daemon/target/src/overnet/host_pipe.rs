@@ -7,11 +7,11 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use compat_info::CompatibilityInfo;
 use ffx_daemon_core::events;
-use ffx_daemon_events::{HostPipeErr, TargetEvent};
+use ffx_daemon_events::TargetEvent;
 use ffx_ssh::parse::{
     parse_ssh_output, read_ssh_line, write_ssh_log, HostAddr, ParseSshConnectionError, PipeError,
 };
-use ffx_ssh::ssh::build_ssh_command_with_ssh_path;
+use ffx_ssh::ssh::{build_ssh_command_with_ssh_path, SshError};
 use fuchsia_async::{unblock, Task, TimeoutExt, Timer};
 use nix::{
     errno::Errno,
@@ -331,22 +331,7 @@ impl HostPipeChild {
                 Ok(res) => res,
                 Err(e) => {
                     ssh.kill().await?;
-                    // Flush any remaining lines, but let's not wait more than one second
-                    let mut lb = ffx_ssh::parse::LineBuffer::new();
-                    let mut last_line = "".to_string();
-                    while let Ok(line) = read_ssh_line(&mut lb, &mut stderr)
-                        .on_timeout(Duration::from_secs(1), || {
-                            Err(ParseSshConnectionError::Timeout)
-                        })
-                        .await
-                    {
-                        if verbose_ssh {
-                            write_ssh_log("E", &line).await;
-                        }
-                        tracing::error!("SSH stderr: {line}");
-                        last_line = line;
-                    }
-
+                    let ssh_err = ffx_ssh::ssh::extract_ssh_error(&mut stderr, verbose_ssh).await;
                     if let Some(status) = ssh.try_wait()? {
                         match status.code() {
                             // Possible to catch more error codes here, hence the use of a match.
@@ -362,11 +347,9 @@ impl HostPipeChild {
                         fuchsia_async::Timer::new(std::time::Duration::from_secs(2)).await;
                         tracing::error!("ssh child status is {:?}", ssh.try_wait());
                     }
-                    event_queue
-                        .push(TargetEvent::SshHostPipeErr(HostPipeErr::from(last_line)))
-                        .unwrap_or_else(|e| {
-                            tracing::warn!("queueing host pipe err event: {:?}", e)
-                        });
+                    event_queue.push(TargetEvent::SshHostPipeErr(ssh_err)).unwrap_or_else(|e| {
+                        tracing::warn!("queueing host pipe err event: {:?}", e)
+                    });
                     return Err(e);
                 }
             };
@@ -402,7 +385,7 @@ impl HostPipeChild {
                             tracing::info!("SSH stderr: {:?}", line.trim());
                             stderr_buf.push_line(line.clone());
                             event_queue
-                                .push(TargetEvent::SshHostPipeErr(HostPipeErr::from(line)))
+                                .push(TargetEvent::SshHostPipeErr(SshError::from(line)))
                                 .unwrap_or_else(|e| {
                                     tracing::warn!("queueing host pipe err event: {:?}", e)
                                 });
@@ -762,7 +745,7 @@ mod test {
         _buf: Rc<LogBuffer>,
         events: events::Queue<TargetEvent>,
     ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
-        events.push(TargetEvent::SshHostPipeErr(HostPipeErr::Unknown("foo".to_string()))).unwrap();
+        events.push(TargetEvent::SshHostPipeErr(SshError::Unknown("foo".to_string()))).unwrap();
         Ok((
             Some(HostAddr("127.0.0.1".to_string())),
             HostPipeChild::fake_new(

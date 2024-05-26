@@ -25,7 +25,7 @@ TEST(ExceptionBrokerConfig, NonExistanceShouldNotActivate) {
   inspect::Inspector inspector;
   auto broker =
       ExceptionBroker::Create(loop.dispatcher(), &inspector.GetRoot(), /*max_num_handlers=*/1u,
-                              /*exception_ttl=*/zx::hour(1));
+                              /*exception_ttl=*/zx::hour(1), /*suspend_enabled=*/false);
 
   ASSERT_FALSE(broker->limbo_manager().active());
 }
@@ -33,9 +33,9 @@ TEST(ExceptionBrokerConfig, NonExistanceShouldNotActivate) {
 TEST(ExceptionBrokerConfig, ExistanceShouldActivate) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   inspect::Inspector inspector;
-  auto broker =
-      ExceptionBroker::Create(loop.dispatcher(), &inspector.GetRoot(), /*max_num_handlers=*/
-                              1u, /*exception_ttl=*/zx::hour(1), kTestConfigFile);
+  auto broker = ExceptionBroker::Create(
+      loop.dispatcher(), &inspector.GetRoot(), /*max_num_handlers=*/
+      1u, /*exception_ttl=*/zx::hour(1), /*suspend_enabled=*/false, kTestConfigFile);
 
   ASSERT_TRUE(broker->limbo_manager().active());
 
@@ -50,9 +50,9 @@ constexpr char kFilterConfigFile[] = "/pkg/data/filter_jitd_config.json";
 TEST(ExceptionBrokerConfig, FilterArray) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   inspect::Inspector inspector;
-  auto broker =
-      ExceptionBroker::Create(loop.dispatcher(), &inspector.GetRoot(), /*max_num_handlers=*/1u,
-                              /*exception_ttl=*/zx::hour(1), kFilterConfigFile);
+  auto broker = ExceptionBroker::Create(
+      loop.dispatcher(), &inspector.GetRoot(), /*max_num_handlers=*/1u,
+      /*exception_ttl=*/zx::hour(1), /*suspend_enabled=*/false, kFilterConfigFile);
 
   ASSERT_TRUE(broker->limbo_manager().active());
 

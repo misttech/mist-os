@@ -11,12 +11,6 @@ package(
     default_visibility = ["//:__subpackages__"],
 )
 
-# Include HEAD api level in the list of valid target APIs.
-api_levels = [
-    str(target_api.api_level)
-    for target_api in INTERNAL_ONLY_VALID_TARGET_APIS
-] + ["HEAD"]
-
 # The version of the Fuchsia toolchain. Specific to particular local builds of
 # Fuchsia or particular versions of the IDK.
 constraint_setting(
@@ -27,12 +21,12 @@ constraint_setting(
 # Target API level constraints.
 [
     config_setting(
-        name = "api_level_%s" % api_level,
+        name = "api_level_%s" % api_level.api_level,
         flag_values = {
-            "//fuchsia:fuchsia_api_level": api_level,
+            "//fuchsia:fuchsia_api_level": api_level.api_level,
         },
     )
-    for api_level in api_levels
+    for api_level in INTERNAL_ONLY_VALID_TARGET_APIS
 ]
 
 # CPU based configurations
@@ -104,15 +98,15 @@ selects.config_setting_group(
     selects.config_setting_group(
         name = "is_%s_api_%s" % (
             cpu,
-            api_level,
+            api_level.api_level,
         ),
         match_all = [
             "@platforms//os:fuchsia",
             ":cpu_%s" % cpu,
-            ":api_level_%s" % api_level,
+            ":api_level_%s" % api_level.api_level,
         ],
     )
-    for api_level in api_levels
+    for api_level in INTERNAL_ONLY_VALID_TARGET_APIS
     for cpu in [
         "arm64",
         "x64",

@@ -19,9 +19,8 @@ namespace zxdb {
 namespace {
 
 const char kSymNearShortHelp[] = "sym-near / sn: Print symbol for an address.";
-const char kSymNearHelp[] =
-    R"(sym-near <address-expression>
-
+const char kSymNearUsage[] = "sym-near <address-expression>";
+const char kSymNearHelp[] = R"(
   Alias: "sn"
 
   Finds the symbol nearest to the given address. This command is useful for
@@ -71,8 +70,8 @@ void RunVerbSymNear(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context)
 }  // namespace
 
 VerbRecord GetSymNearVerbRecord() {
-  VerbRecord sym_near(&RunVerbSymNear, {"sym-near", "sn"}, kSymNearShortHelp, kSymNearHelp,
-                      CommandGroup::kSymbol);
+  VerbRecord sym_near(&RunVerbSymNear, {"sym-near", "sn"}, kSymNearShortHelp, kSymNearUsage,
+                      kSymNearHelp, CommandGroup::kSymbol);
   sym_near.param_type = VerbRecord::kOneParam;
   return sym_near;
 }

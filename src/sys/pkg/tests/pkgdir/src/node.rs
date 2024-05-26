@@ -11,8 +11,7 @@ use {
 
 #[fuchsia::test]
 async fn get_attr() {
-    let (_ns, dirs) = dirs_to_test().await;
-    for source in dirs {
+    for source in dirs_to_test().await {
         get_attr_per_package_source(source).await
     }
 }
@@ -174,8 +173,7 @@ async fn get_attr_per_package_source(source: PackageSource) {
 
 #[fuchsia::test]
 async fn close() {
-    let (_ns, dirs) = dirs_to_test().await;
-    for source in dirs {
+    for source in dirs_to_test().await {
         close_per_package_source(source).await
     }
 }
@@ -211,8 +209,7 @@ async fn close_per_package_source(source: PackageSource) {
 
 #[fuchsia::test]
 async fn describe() {
-    let (_ns, dirs) = dirs_to_test().await;
-    for source in dirs {
+    for source in dirs_to_test().await {
         describe_per_package_source(source).await
     }
 }
@@ -317,8 +314,7 @@ async fn assert_describe_meta_file(package_root: &fio::DirectoryProxy, path: &st
 
 #[fuchsia::test]
 async fn get_flags() {
-    let (_ns, dirs) = dirs_to_test().await;
-    for source in dirs {
+    for source in dirs_to_test().await {
         get_flags_per_package_source(source).await
     }
 }
@@ -436,8 +432,7 @@ async fn assert_get_flags_meta_dir(root_dir: &fio::DirectoryProxy, path: &str) {
 
 #[fuchsia::test]
 async fn set_flags() {
-    let (_ns, dirs) = dirs_to_test().await;
-    for source in dirs {
+    for source in dirs_to_test().await {
         set_flags_per_package_source(source).await
     }
 }
@@ -538,8 +533,7 @@ impl SetFlagsOutcome<'_> {
 
 #[fuchsia::test]
 async fn set_attr() {
-    let (_ns, dirs) = dirs_to_test().await;
-    for source in dirs {
+    for source in dirs_to_test().await {
         set_attr_per_package_source(source).await
     }
 }
@@ -589,8 +583,7 @@ async fn verify_set_attr(node: fio::NodeProxy) -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn sync() {
-    let (_ns, dirs) = dirs_to_test().await;
-    for source in dirs {
+    for source in dirs_to_test().await {
         sync_per_package_source(source).await
     }
 }

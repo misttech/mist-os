@@ -30,29 +30,13 @@ pub trait PermissionCheck: AccessVectorComputer + Query + private::PermissionChe
     ///
     /// *Do not provide alternative implementations of this trait.* There must be one consistent
     /// way of computing `has_permission()` in terms of `Query::query()`.
-    fn has_permission<P: ClassPermission + Into<Permission> + 'static>(
+    fn has_permissions<P: ClassPermission + Into<Permission> + Clone + 'static>(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        permission: P,
+        permissions: &[P],
     ) -> bool {
-        let target_class = permission.class();
-        let permission_access_vector = self.access_vector_from_permission(permission);
-        let permitted_access_vector = self.query(source_sid, target_sid, target_class.into());
-        permission_access_vector & permitted_access_vector == permission_access_vector
-    }
-
-    fn has_permissions<
-        P: ClassPermission + Into<Permission> + 'static,
-        PI: IntoIterator<Item = P>,
-    >(
-        &self,
-        source_sid: SecurityId,
-        target_sid: SecurityId,
-        permissions: PI,
-    ) -> bool {
-        let mut permissions = permissions.into_iter().peekable();
-        let target_class = match permissions.peek() {
+        let target_class = match permissions.first() {
             Some(permission) => permission.class(),
             None => return true,
         };
@@ -80,29 +64,13 @@ pub trait PermissionCheckMut:
     ///
     /// *Do not provide alternative implementations of this trait.* There must be one consistent
     /// way of computing `has_permission()` in terms of `QueryMut::query()`.
-    fn has_permission<P: ClassPermission + Into<Permission> + 'static>(
+    fn has_permissions<P: ClassPermission + Into<Permission> + Clone + 'static>(
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        permission: P,
+        permissions: &[P],
     ) -> bool {
-        let target_class = permission.class();
-        let permission_access_vector = self.access_vector_from_permission(permission);
-        let permitted_access_vector = self.query(source_sid, target_sid, target_class.into());
-        permission_access_vector & permitted_access_vector == permission_access_vector
-    }
-
-    fn has_permissions<
-        P: ClassPermission + Into<Permission> + 'static,
-        PI: IntoIterator<Item = P>,
-    >(
-        &mut self,
-        source_sid: SecurityId,
-        target_sid: SecurityId,
-        permissions: PI,
-    ) -> bool {
-        let mut permissions = permissions.into_iter().peekable();
-        let target_class = match permissions.peek() {
+        let target_class = match permissions.first() {
             Some(permission) => permission.class(),
             None => return true,
         };
@@ -133,19 +101,9 @@ impl<'a> PermissionCheckImpl<'a> {
 }
 
 impl<'a> AccessVectorComputer for PermissionCheckImpl<'a> {
-    fn access_vector_from_permission<P: ClassPermission + Into<Permission> + 'static>(
+    fn access_vector_from_permissions<P: ClassPermission + Into<Permission> + Clone + 'static>(
         &self,
-        permission: P,
-    ) -> AccessVector {
-        self.security_server.access_vector_from_permission(permission)
-    }
-
-    fn access_vector_from_permissions<
-        P: ClassPermission + Into<Permission> + 'static,
-        PI: IntoIterator<Item = P>,
-    >(
-        &self,
-        permissions: PI,
+        permissions: &[P],
     ) -> AccessVector {
         self.security_server.access_vector_from_permissions(permissions)
     }
@@ -202,14 +160,13 @@ mod tests {
 
     fn access_vector_from_permissions<
         'a,
-        P: ClassPermission + Into<Permission> + 'static,
-        PI: IntoIterator<Item = P>,
+        P: ClassPermission + Into<Permission> + Clone + 'static,
     >(
-        permissions: PI,
+        permissions: &[P],
     ) -> AccessVector {
         let mut access_vector = AccessVector::NONE;
-        for permission in permissions.into_iter() {
-            access_vector |= access_vector_from_permission(permission);
+        for permission in permissions {
+            access_vector |= access_vector_from_permission(permission.clone());
         }
         access_vector
     }
@@ -229,20 +186,11 @@ mod tests {
     }
 
     impl AccessVectorComputer for DenyAllPermissions {
-        fn access_vector_from_permission<P: ClassPermission + Into<Permission> + 'static>(
-            &self,
-            permission: P,
-        ) -> AccessVector {
-            access_vector_from_permission(permission)
-        }
-
         fn access_vector_from_permissions<
-            'a,
-            P: ClassPermission + Into<Permission> + 'static,
-            PI: IntoIterator<Item = P>,
+            P: ClassPermission + Into<Permission> + Clone + 'static,
         >(
             &self,
-            permissions: PI,
+            permissions: &[P],
         ) -> AccessVector {
             access_vector_from_permissions(permissions)
         }
@@ -264,20 +212,11 @@ mod tests {
     }
 
     impl AccessVectorComputer for AllowAllPermissions {
-        fn access_vector_from_permission<P: ClassPermission + Into<Permission> + 'static>(
-            &self,
-            permission: P,
-        ) -> AccessVector {
-            access_vector_from_permission(permission)
-        }
-
         fn access_vector_from_permissions<
-            'a,
-            P: ClassPermission + Into<Permission> + 'static,
-            PI: IntoIterator<Item = P>,
+            P: ClassPermission + Into<Permission> + Clone + 'static,
         >(
             &self,
-            permissions: PI,
+            permissions: &[P],
         ) -> AccessVector {
             access_vector_from_permissions(permissions)
         }
@@ -290,44 +229,44 @@ mod tests {
 
         // Use permissions that are mapped to access vector bits in
         // `access_vector_from_permission`.
-        let permissions = vec![ProcessPermission::Fork, ProcessPermission::Transition];
-        for permission in permissions.iter() {
+        let permissions = [ProcessPermission::Fork, ProcessPermission::Transition];
+        for permission in &permissions {
             // DenyAllPermissions denies.
             assert_eq!(
                 false,
-                PermissionCheck::has_permission(
+                PermissionCheck::has_permissions(
                     &deny_all,
                     *A_TEST_SID,
                     *A_TEST_SID,
-                    permission.clone()
+                    &[permission.clone()]
                 )
             );
             assert_eq!(
                 false,
-                PermissionCheckMut::has_permission(
+                PermissionCheckMut::has_permissions(
                     &mut deny_all,
                     *A_TEST_SID,
                     *A_TEST_SID,
-                    permission.clone()
+                    &[permission.clone()]
                 )
             );
             // AllowAllPermissions allows.
             assert_eq!(
                 true,
-                PermissionCheck::has_permission(
+                PermissionCheck::has_permissions(
                     &allow_all,
                     *A_TEST_SID,
                     *A_TEST_SID,
-                    permission.clone()
+                    &[permission.clone()]
                 )
             );
             assert_eq!(
                 true,
-                PermissionCheckMut::has_permission(
+                PermissionCheckMut::has_permissions(
                     &mut allow_all,
                     *A_TEST_SID,
                     *A_TEST_SID,
-                    permission.clone()
+                    &[permission.clone()]
                 )
             );
         }
@@ -335,12 +274,7 @@ mod tests {
         // DenyAllPermissions denies.
         assert_eq!(
             false,
-            PermissionCheck::has_permissions(
-                &deny_all,
-                *A_TEST_SID,
-                *A_TEST_SID,
-                permissions.clone()
-            )
+            PermissionCheck::has_permissions(&deny_all, *A_TEST_SID, *A_TEST_SID, &permissions)
         );
         assert_eq!(
             false,
@@ -348,19 +282,14 @@ mod tests {
                 &mut deny_all,
                 *A_TEST_SID,
                 *A_TEST_SID,
-                permissions.clone()
+                &permissions
             )
         );
 
         // AllowAllPermissions allows.
         assert_eq!(
             true,
-            PermissionCheck::has_permissions(
-                &allow_all,
-                *A_TEST_SID,
-                *A_TEST_SID,
-                permissions.clone()
-            )
+            PermissionCheck::has_permissions(&allow_all, *A_TEST_SID, *A_TEST_SID, &permissions)
         );
         assert_eq!(
             true,
@@ -368,7 +297,7 @@ mod tests {
                 &mut allow_all,
                 *A_TEST_SID,
                 *A_TEST_SID,
-                permissions.clone()
+                &permissions
             )
         );
 
@@ -380,7 +309,7 @@ mod tests {
                 &deny_all,
                 *A_TEST_SID,
                 *A_TEST_SID,
-                empty_permissions.clone()
+                &empty_permissions
             )
         );
         assert_eq!(
@@ -389,7 +318,7 @@ mod tests {
                 &mut deny_all,
                 *A_TEST_SID,
                 *A_TEST_SID,
-                empty_permissions.clone()
+                &empty_permissions
             )
         );
         assert_eq!(
@@ -398,7 +327,7 @@ mod tests {
                 &allow_all,
                 *A_TEST_SID,
                 *A_TEST_SID,
-                empty_permissions.clone()
+                &empty_permissions
             )
         );
         assert_eq!(
@@ -407,7 +336,7 @@ mod tests {
                 &mut allow_all,
                 *A_TEST_SID,
                 *A_TEST_SID,
-                empty_permissions.clone()
+                &empty_permissions
             )
         );
     }

@@ -10,7 +10,7 @@ use {
 #[fuchsia::test]
 async fn get_token_with_sufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_get_token.unwrap_or_default() {
+    if !harness.config.supports_get_token {
         return;
     }
 
@@ -27,7 +27,7 @@ async fn get_token_with_sufficient_rights() {
 #[fuchsia::test]
 async fn get_token_with_insufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_get_token.unwrap_or_default() {
+    if !harness.config.supports_get_token {
         return;
     }
 

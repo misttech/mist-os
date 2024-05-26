@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
+#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <lib/devicetree/devicetree.h>
 #include <zircon/errors.h>
 
@@ -31,6 +32,10 @@ class NodeManager {
  public:
   // Returns node with phandle |id|.
   virtual zx::result<ReferenceNode> GetReferenceNode(Phandle id) = 0;
+
+  virtual uint32_t GetPublishIndex(uint32_t node_id) = 0;
+
+  virtual zx::result<> ChangePublishOrder(uint32_t node_id, uint32_t new_index) = 0;
 };
 
 // Node represents the nodes in the device tree along with it's properties.
@@ -55,6 +60,15 @@ class Node {
   void AddNodeSpec(fuchsia_driver_framework::ParentSpec spec);
 
   void AddSmc(fuchsia_hardware_platform_bus::Smc smc);
+
+  void AddPowerConfig(fuchsia_hardware_power::PowerElementConfiguration config);
+
+  // Returns the index of the node in the nodes publish list.
+  uint32_t GetPublishIndex() const;
+
+  // Move this node up/down in the publish list.
+  // Returns error if the index is out of range.
+  zx::result<> ChangePublishOrder(uint32_t new_index);
 
   // Publish this node.
   // TODO(https://fxbug.dev/42059490): Switch to fdf::SyncClient when it's available.
@@ -115,7 +129,7 @@ class Node {
 
 class ReferenceNode {
  public:
-  explicit ReferenceNode(const Node* node) : node_(node) {}
+  explicit ReferenceNode(Node* node) : node_(node) {}
 
   const std::unordered_map<std::string_view, devicetree::PropertyValue>& properties() const {
     return node_->properties();
@@ -128,12 +142,14 @@ class ReferenceNode {
 
   std::optional<Phandle> phandle() const { return node_->phandle(); }
 
+  Node* GetNode() const { return node_; }
+
   ParentNode parent() const;
 
   explicit operator bool() const { return (node_ != nullptr); }
 
  private:
-  const Node* node_;
+  Node* node_;
 };
 
 class ParentNode {
@@ -151,12 +167,14 @@ class ParentNode {
     return node_->properties();
   }
 
+  Node* GetNode() const { return node_; }
+
   ParentNode parent() const { return node_->parent(); }
 
   ReferenceNode MakeReferenceNode() const { return ReferenceNode(node_); }
 
  private:
-  const Node* node_;
+  Node* node_;
 };
 
 class ChildNode {

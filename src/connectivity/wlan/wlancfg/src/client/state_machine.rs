@@ -7,7 +7,6 @@ use {
         client::{
             connection_selection::{
                 scoring_functions::score_current_connection_signal_data, EWMA_SMOOTHING_FACTOR,
-                EWMA_VELOCITY_SMOOTHING_FACTOR,
             },
             roaming::local_roam_manager::LocalRoamManagerApi,
             types,
@@ -561,9 +560,8 @@ async fn connected_state(
         options.ap_state.tracked.signal.rssi_dbm,
         options.ap_state.tracked.signal.snr_db,
         EWMA_SMOOTHING_FACTOR,
-        EWMA_VELOCITY_SMOOTHING_FACTOR,
     );
-    let initial_score = score_current_connection_signal_data(signal_data);
+    let initial_score = score_current_connection_signal_data(signal_data, 0.0);
 
     // Used to receive roam requests. The sender is cloned to send to the RoamManager.
     let (roam_sender, mut roam_receiver) = mpsc::unbounded::<types::ScannedCandidate>();
@@ -1311,7 +1309,6 @@ mod tests {
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
                     EWMA_SMOOTHING_FACTOR,
-                    EWMA_VELOCITY_SMOOTHING_FACTOR,
                 ),
                 // TODO: record average phy rate over connection once available
                 average_tx_rate: 0,
@@ -1933,7 +1930,6 @@ mod tests {
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
                     EWMA_SMOOTHING_FACTOR,
-                    EWMA_VELOCITY_SMOOTHING_FACTOR,
                 ),
                 // TODO: record average phy rate over connection once available
                 average_tx_rate: 0,
@@ -2015,7 +2011,6 @@ mod tests {
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
                     EWMA_SMOOTHING_FACTOR,
-                    EWMA_VELOCITY_SMOOTHING_FACTOR,
                 ),
                 // TODO: record average phy rate over connection once available
                 average_tx_rate: 0,
@@ -2215,7 +2210,6 @@ mod tests {
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
                     EWMA_SMOOTHING_FACTOR,
-                    EWMA_VELOCITY_SMOOTHING_FACTOR,
                 ),
                 average_tx_rate: 0,
             },
@@ -2457,7 +2451,6 @@ mod tests {
                     first_bss_desc.rssi_dbm,
                     first_bss_desc.snr_db,
                     EWMA_SMOOTHING_FACTOR,
-                    EWMA_VELOCITY_SMOOTHING_FACTOR,
                 ),
                 // TODO: record average phy rate over connection once available
                 average_tx_rate: 0,
@@ -2736,12 +2729,8 @@ mod tests {
 
         // The tracked signal data uses the RSS/SNR data from the time of connection and the first
         // stats are sent after updated with the first signal report data.
-        let mut expected_signal_data = EwmaSignalData::new(
-            init_rssi,
-            init_snr,
-            EWMA_SMOOTHING_FACTOR,
-            EWMA_VELOCITY_SMOOTHING_FACTOR,
-        );
+        let mut expected_signal_data =
+            EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR);
         expected_signal_data.update_with_new_measurement(rssi_1, snr_1);
 
         // Verify that connection stats are sent out

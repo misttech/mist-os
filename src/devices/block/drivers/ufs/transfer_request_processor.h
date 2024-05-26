@@ -97,7 +97,8 @@ class TransferRequestProcessor : public RequestProcessor {
                                             uint16_t response_offset, uint16_t response_length,
                                             uint16_t prdt_offset, uint32_t prdt_entry_count);
   zx::result<> GetResponseStatus(TransferRequestDescriptor *descriptor,
-                                 AbstractResponseUpiu &response, uint8_t transaction_type);
+                                 AbstractResponseUpiu &response,
+                                 UpiuTransactionCodes transaction_code);
 
   zx::result<> ScsiCompletion(uint8_t slot_num, RequestSlot &request_slot,
                               TransferRequestDescriptor *descriptor);

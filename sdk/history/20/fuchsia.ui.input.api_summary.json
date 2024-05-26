@@ -682,6 +682,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.ui.input/MediaButtonsEvent.function",
+        "ordinal": "6",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.ui.input/MediaButtonsEvent.mic_mute",
         "ordinal": "2",
         "type": "bool"

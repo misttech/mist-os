@@ -23,7 +23,7 @@ use packet_formats::{
     icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode},
     utils::NonZeroDuration,
 };
-use rand::RngCore;
+use rand::Rng;
 
 use crate::{
     counters::Counter,
@@ -90,10 +90,10 @@ pub enum ConnectionError {
     TimedOut,
 }
 
-impl From<IcmpErrorCode> for Option<ConnectionError> {
+impl ConnectionError {
     // Notes: the following mappings are guided by the packetimpact test here:
     // https://cs.opensource.google/gvisor/gvisor/+/master:test/packetimpact/tests/tcp_network_unreachable_test.go;drc=611e6e1247a0691f5fd198f411c68b3bc79d90af
-    fn from(err: IcmpErrorCode) -> Self {
+    fn try_from_icmp_error(err: IcmpErrorCode) -> Option<Self> {
         match err {
             IcmpErrorCode::V4(Icmpv4ErrorCode::DestUnreachable(code)) => match code {
                 Icmpv4DestUnreachableCode::DestNetworkUnreachable => {
@@ -185,7 +185,7 @@ pub(crate) struct TcpState<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBi
 }
 
 impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> TcpState<I, D, BT> {
-    pub(crate) fn new(now: BT::Instant, rng: &mut impl RngCore) -> Self {
+    pub(crate) fn new(now: BT::Instant, rng: &mut impl Rng) -> Self {
         Self {
             isn_generator: IsnGenerator::new(now, rng),
             sockets: Sockets::new(),

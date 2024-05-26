@@ -24,9 +24,8 @@ namespace {
 constexpr int kForceReloadSwitch = 1;
 
 const char kLibsShortHelp[] = "libs: Show loaded libraries for a process.";
-const char kLibsHelp[] =
-    R"(libs
-
+const char kLibsUsage[] = "libs";
+const char kLibsHelp[] = R"(
   Shows the loaded library information for the given process.
 
   This will update the library list from the target process and will attempt to
@@ -89,7 +88,8 @@ void RunVerbLibs(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetLibsVerbRecord() {
-  VerbRecord libs(&RunVerbLibs, {"libs"}, kLibsShortHelp, kLibsHelp, CommandGroup::kQuery);
+  VerbRecord libs(&RunVerbLibs, {"libs"}, kLibsShortHelp, kLibsUsage, kLibsHelp,
+                  CommandGroup::kQuery);
   libs.switches.push_back(SwitchRecord(kForceReloadSwitch, false, "reload", 'r'));
   return libs;
 }

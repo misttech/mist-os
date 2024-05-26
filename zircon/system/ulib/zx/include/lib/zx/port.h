@@ -42,6 +42,10 @@ class port final : public object<port> {
   zx_status_t cancel(const object_base& source, uint64_t key) const ZX_AVAILABLE_SINCE(7) {
     return zx_port_cancel(get(), source.get(), key);
   }
+
+  zx_status_t cancel_key(uint32_t options, uint64_t key) const ZX_AVAILABLE_SINCE(20) {
+    return zx_port_cancel_key(get(), options, key);
+  }
 } ZX_AVAILABLE_SINCE(7);
 
 using unowned_port = unowned<port> ZX_AVAILABLE_SINCE(7);

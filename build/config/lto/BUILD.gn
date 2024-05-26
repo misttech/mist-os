@@ -3,13 +3,57 @@
 # found in the LICENSE file.
 
 import("//build/config/lto/config.gni")
+import("//build/config/riscv64/riscv64.gni")
 import("//build/toolchain/variant.gni")
+
+config("fat-lto-objects") {
+  # only add fat-lto-objects when the feature is enabled
+  if (fat_lto_objects) {
+    # TODO(https://fxbug.dev/340553826): - Add FatLTO support for Mach-O and COFF file formats
+    # Currently, FatLTO requires ELF, so its only valid on non-EFI Fuchsia and Linux
+    is_elf = current_os != "mac" && current_os != "win"
+    if (is_elf) {
+      cflags = [ "-ffat-lto-objects" ]
+      ldflags = cflags
+    }
+  }
+}
+
+config("no-fat-lto-objects-compilation") {
+  if (fat_lto_objects) {
+    cflags = [ "-fno-fat-lto-objects" ]
+  }
+}
+
+config("no-fat-lto-objects-linking") {
+  if (fat_lto_objects) {
+    ldflags = [ "-Wl,--no-fat-lto-objects" ]
+  }
+}
+
+config("no-fat-lto-objects") {
+  if (fat_lto_objects) {
+    configs = [
+      ":no-fat-lto-objects-compilation",
+      ":no-fat-lto-objects-linking",
+    ]
+  }
+}
 
 config("lto-clang") {
   cflags = [ "-flto" ]
 
+  configs = [ ":fat-lto-objects" ]
+
+  # TODO(https://fxbug.dev/42086180): The workarounds below are required to
+  # avoid code generation bugs during LTO. They can be removed once LTO
+  # properly handles riscv target features
+  if (current_cpu == "riscv64") {
+    configs += [ "//build/config/riscv64:lto-workarounds" ]
+  }
+
   if (!is_fuchsia || is_kernel) {
-    configs = [ ":lto-whole-program-devirtualization" ]
+    configs += [ ":lto-whole-program-devirtualization" ]
   }
 
   ldflags = cflags
@@ -24,16 +68,6 @@ config("lto-clang") {
       "$disable_branch_funneling",
     ]
     ldflags += [ "-Wl,-mllvm,$disable_branch_funneling" ]
-
-    # TODO(https://fxbug.dev/42086180): The linker flags below are required to avoid code
-    # generation bugs during LTO. They can be removed once LTO properly handles
-    # target features
-    if (target_cpu == "riscv64") {
-      ldflags += [
-        "-Wl,-mllvm,-mattr=+c",
-        "-Wl,-mllvm,-mattr=+relax",
-      ]
-    }
   }
 }
 
@@ -66,6 +100,13 @@ config("lto-rust") {
     "-Clinker-plugin-lto",
     "-Zsplit-lto-unit",
   ]
+
+  # TODO(https://fxbug.dev/42086180): The workarounds below are required to
+  # avoid code generation bugs during LTO. They can be removed once LTO
+  # properly handles riscv target features
+  if (current_cpu == "riscv64") {
+    configs = [ "//build/config/riscv64:lto-workarounds" ]
+  }
 }
 
 # This can be appended with:
@@ -95,6 +136,14 @@ variant("lto") {
 config("thinlto-clang") {
   cflags = [ "-flto=thin" ]
   ldflags = cflags
+  configs = [ ":fat-lto-objects" ]
+
+  # TODO(https://fxbug.dev/42086180): The workarounds below are required to
+  # avoid code generation bugs during LTO. They can be removed once LTO
+  # properly handles riscv target features
+  if (current_cpu == "riscv64") {
+    configs += [ "//build/config/riscv64:lto-workarounds" ]
+  }
 
   # These switches have the same meaning but different spellings for
   # lld-link vs ld.lld.
@@ -119,16 +168,6 @@ config("thinlto-clang") {
     # periodically garbage-collected by the ThinLTO driver.
     "-Wl,${_cache_dir}$thinlto_cache_dir",
   ]
-
-  # TODO(https://fxbug.dev/42086180): The linker flags below are required to avoid code
-  # generation bugs during LTO. They can be removed once LTO properly handles
-  # target features
-  if (target_cpu == "riscv64") {
-    ldflags += [
-      "-Wl,-mllvm,-mattr=+c",
-      "-Wl,-mllvm,-mattr=+relax",
-    ]
-  }
 }
 
 config("thinlto-rust") {
@@ -141,19 +180,27 @@ config("thinlto-rust") {
   # lld-link vs ld.lld.
   if (current_os == "win") {
     _cache_dir = "/lldltocache:"
+  } else if (current_os == "mac") {
+    _cache_dir = "-cache_path_lto,"
   } else {
     _cache_dir = "--thinlto-cache-dir="
   }
 
-  if (is_fuchsia) {
-    # On fuchsia, rustc directly calls lld.
-    rust_linkarg = "-Clink-args"
-  } else {
-    # On all other platforms, rustc calls clang, which calls lld.
-    rust_linkarg = "-Clink-args=-Wl"
+  rust_linkarg = "-Clink-args="
+
+  if (!is_fuchsia) {
+    # On non-Fuchsia platforms, rustc calls clang, which calls lld.
+    rust_linkarg += "-Wl,"
   }
 
-  rustflags += [ "${rust_linkarg}=${_cache_dir}$thinlto_cache_dir" ]
+  rustflags += [ "${rust_linkarg}${_cache_dir}${thinlto_cache_dir}" ]
+
+  # TODO(https://fxbug.dev/42086180): The workarounds below are required to
+  # avoid code generation bugs during LTO. They can be removed once LTO
+  # properly handles riscv target features
+  if (current_cpu == "riscv64") {
+    configs = [ "//build/config/riscv64:lto-workarounds" ]
+  }
 }
 
 variant("thinlto") {

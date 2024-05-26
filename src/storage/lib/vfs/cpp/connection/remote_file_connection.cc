@@ -145,8 +145,8 @@ void RemoteFileConnection::WriteAt(WriteAtRequestView request, WriteAtCompleter:
 zx_status_t RemoteFileConnection::SeekInternal(fuchsia_io::wire::SeekOrigin origin,
                                                int64_t requested_offset) {
   FS_PRETTY_TRACE_DEBUG("[FileSeek] rights: ", rights());
-  fs::VnodeAttributes attr;
-  if (zx_status_t status = vnode()->GetAttributes(&attr); status != ZX_OK) {
+  zx::result attr = vnode()->GetAttributes();
+  if (!attr.is_ok()) {
     return ZX_ERR_STOP;
   }
   size_t n;
@@ -174,16 +174,16 @@ zx_status_t RemoteFileConnection::SeekInternal(fuchsia_io::wire::SeekOrigin orig
       }
       break;
     case fio::wire::SeekOrigin::kEnd:
-      n = attr.content_size + requested_offset;
+      n = *attr->content_size + requested_offset;
       if (requested_offset < 0) {
         // if negative seek
-        if (n > attr.content_size) {
+        if (n > *attr->content_size) {
           // wrapped around. attempt to seek before start
           return ZX_ERR_INVALID_ARGS;
         }
       } else {
         // positive seek
-        if (n < attr.content_size) {
+        if (n < *attr->content_size) {
           // wrapped around
           return ZX_ERR_INVALID_ARGS;
         }

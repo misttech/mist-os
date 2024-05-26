@@ -51,13 +51,13 @@ func (f *FFXTool) StopDaemon(ctx context.Context) error {
 	return err
 }
 
-type targetEntry struct {
+type TargetEntry struct {
 	NodeName    string   `json:"nodename"`
 	Addresses   []string `json:"addresses"`
 	TargetState string   `json:"target_state"`
 }
 
-func (f *FFXTool) TargetList(ctx context.Context) ([]targetEntry, error) {
+func (f *FFXTool) TargetList(ctx context.Context) ([]TargetEntry, error) {
 	args := []string{
 		"--machine",
 		"json",
@@ -67,28 +67,28 @@ func (f *FFXTool) TargetList(ctx context.Context) ([]targetEntry, error) {
 
 	stdout, err := f.runFFXCmd(ctx, args...)
 	if err != nil {
-		return []targetEntry{}, fmt.Errorf("ffx target list failed: %w", err)
+		return []TargetEntry{}, fmt.Errorf("ffx target list failed: %w", err)
 	}
 
 	if len(stdout) == 0 {
-		return []targetEntry{}, nil
+		return []TargetEntry{}, nil
 	}
 
-	var entries []targetEntry
+	var entries []TargetEntry
 	if err := json.Unmarshal(stdout, &entries); err != nil {
-		return []targetEntry{}, err
+		return []TargetEntry{}, err
 	}
 
 	return entries, nil
 }
 
-func (f *FFXTool) TargetListForNode(ctx context.Context, nodeName string) ([]targetEntry, error) {
+func (f *FFXTool) TargetListForNode(ctx context.Context, nodeName string) ([]TargetEntry, error) {
 	entries, err := f.TargetList(ctx)
 	if err != nil {
-		return []targetEntry{}, err
+		return []TargetEntry{}, err
 	}
 
-	var matchingTargets []targetEntry
+	var matchingTargets []TargetEntry
 
 	for _, target := range entries {
 		if target.NodeName == nodeName {

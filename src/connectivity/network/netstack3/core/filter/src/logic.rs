@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::num::NonZeroU16;
+use core::{num::NonZeroU16, ops::RangeInclusive};
+
 use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
 use netstack3_base::HandleableTimer;
 use packet_formats::ip::IpExt;
 use tracing::error;
 
 use crate::{
-    context::{FilterBindingsContext, FilterBindingsTypes, FilterIpContext},
+    context::{FilterBindingsContext, FilterIpContext},
     matchers::InterfaceProperties,
     packets::{IpPacket, MaybeTransportPacket, TransportPacket},
     state::{Action, FilterIpMetadata, Hook, Routine, Rule, TransparentProxy},
@@ -75,11 +76,21 @@ enum RoutineResult<I: IpExt> {
         /// The bound port of the local socket to redirect the packet to.
         port: NonZeroU16,
     },
+    /// Destination NAT (DNAT) should be performed to redirect the packet to the
+    /// local host.
+    Redirect {
+        /// The optional range of destination ports used to rewrite the packet.
+        ///
+        /// If absent, the destination port of the packet is not rewritten.
+        // TODO(https://fxbug.dev/333419001): implement Redirect NAT.
+        #[allow(dead_code)]
+        dst_port: Option<RangeInclusive<NonZeroU16>>,
+    },
 }
 
 fn check_routine<I, P, D, DeviceClass>(
     Routine { rules }: &Routine<I, DeviceClass, ()>,
-    packet: &mut P,
+    packet: &P,
     interfaces: &Interfaces<'_, D>,
 ) -> RoutineResult<I>
 where
@@ -98,7 +109,8 @@ where
                 Action::Jump(target) => match check_routine(target.get(), packet, interfaces) {
                     result @ (RoutineResult::Accept
                     | RoutineResult::Drop
-                    | RoutineResult::TransparentLocalDelivery { .. }) => return result,
+                    | RoutineResult::TransparentLocalDelivery { .. }
+                    | RoutineResult::Redirect { .. }) => return result,
                     RoutineResult::Return => continue,
                 },
                 Action::TransparentProxy(proxy) => {
@@ -127,6 +139,9 @@ where
                     };
                     return RoutineResult::TransparentLocalDelivery { addr, port };
                 }
+                Action::Redirect { dst_port } => {
+                    return RoutineResult::Redirect { dst_port: dst_port.clone() }
+                }
             }
         }
     }
@@ -135,7 +150,7 @@ where
 
 fn check_routines_for_hook<I, P, D, DeviceClass>(
     hook: &Hook<I, DeviceClass, ()>,
-    packet: &mut P,
+    packet: &P,
     interfaces: Interfaces<'_, D>,
 ) -> Verdict
 where
@@ -150,8 +165,11 @@ where
             RoutineResult::Drop => return Verdict::Drop,
             result @ RoutineResult::TransparentLocalDelivery { .. } => {
                 unreachable!(
-                    "immediate local delivery is only valid in INGRESS hook; got {result:?}"
+                    "transparent local delivery is only valid in INGRESS hook; got {result:?}"
                 )
+            }
+            result @ RoutineResult::Redirect { .. } => {
+                unreachable!("Redirect NAT is only valid in NAT routines; got {result:?}")
             }
         }
     }
@@ -160,7 +178,7 @@ where
 
 fn check_routines_for_ingress<I, P, D, DeviceClass>(
     hook: &Hook<I, DeviceClass, ()>,
-    packet: &mut P,
+    packet: &P,
     interfaces: Interfaces<'_, D>,
 ) -> IngressVerdict<I>
 where
@@ -176,6 +194,9 @@ where
             RoutineResult::TransparentLocalDelivery { addr, port } => {
                 return IngressVerdict::TransparentLocalDelivery { addr, port };
             }
+            result @ RoutineResult::Redirect { .. } => {
+                unreachable!("Redirect NAT is only valid in NAT routines; got {result:?}")
+            }
         }
     }
     Verdict::Accept.into()
@@ -183,32 +204,34 @@ where
 
 /// An implementation of packet filtering logic, providing entry points at
 /// various stages of packet processing.
-pub trait FilterHandler<I: IpExt, BT: FilterBindingsTypes> {
+pub trait FilterHandler<I: IpExt, BC: FilterBindingsContext> {
     /// The ingress hook intercepts incoming traffic before a routing decision
     /// has been made.
     fn ingress_hook<P, D, M>(
         &mut self,
+        bindings_ctx: &mut BC,
         packet: &mut P,
         interface: &D,
         metadata: &mut M,
     ) -> IngressVerdict<I>
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BT::DeviceClass>,
-        M: FilterIpMetadata<I, BT>;
+        D: InterfaceProperties<BC::DeviceClass>,
+        M: FilterIpMetadata<I, BC>;
 
     /// The local ingress hook intercepts incoming traffic that is destined for
     /// the local host.
     fn local_ingress_hook<P, D, M>(
         &mut self,
+        bindings_ctx: &mut BC,
         packet: &mut P,
         interface: &D,
         metadata: &mut M,
     ) -> Verdict
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BT::DeviceClass>,
-        M: FilterIpMetadata<I, BT>;
+        D: InterfaceProperties<BC::DeviceClass>,
+        M: FilterIpMetadata<I, BC>;
 
     /// The forwarding hook intercepts incoming traffic that is destined for
     /// another host.
@@ -221,34 +244,36 @@ pub trait FilterHandler<I: IpExt, BT: FilterBindingsTypes> {
     ) -> Verdict
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BT::DeviceClass>,
-        M: FilterIpMetadata<I, BT>;
+        D: InterfaceProperties<BC::DeviceClass>,
+        M: FilterIpMetadata<I, BC>;
 
     /// The local egress hook intercepts locally-generated traffic before a
     /// routing decision has been made.
     fn local_egress_hook<P, D, M>(
         &mut self,
+        bindings_ctx: &mut BC,
         packet: &mut P,
         interface: &D,
         metadata: &mut M,
     ) -> Verdict
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BT::DeviceClass>,
-        M: FilterIpMetadata<I, BT>;
+        D: InterfaceProperties<BC::DeviceClass>,
+        M: FilterIpMetadata<I, BC>;
 
     /// The egress hook intercepts all outgoing traffic after a routing decision
     /// has been made.
     fn egress_hook<P, D, M>(
         &mut self,
+        bindings_ctx: &mut BC,
         packet: &mut P,
         interface: &D,
         metadata: &mut M,
     ) -> (Verdict, ProofOfEgressCheck)
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BT::DeviceClass>,
-        M: FilterIpMetadata<I, BT>;
+        D: InterfaceProperties<BC::DeviceClass>,
+        M: FilterIpMetadata<I, BC>;
 }
 
 /// The "production" implementation of packet filtering.
@@ -257,48 +282,85 @@ pub trait FilterHandler<I: IpExt, BT: FilterBindingsTypes> {
 /// [`FilterIpContext`].
 pub struct FilterImpl<'a, CC>(pub &'a mut CC);
 
-impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandler<I, BT>
+impl<I: IpExt, BC: FilterBindingsContext, CC: FilterIpContext<I, BC>> FilterHandler<I, BC>
     for FilterImpl<'_, CC>
 {
     fn ingress_hook<P, D, M>(
         &mut self,
+        bindings_ctx: &mut BC,
         packet: &mut P,
         interface: &D,
-        _metadata: &mut M,
+        metadata: &mut M,
     ) -> IngressVerdict<I>
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BT::DeviceClass>,
-        M: FilterIpMetadata<I, BT>,
+        D: InterfaceProperties<BC::DeviceClass>,
+        M: FilterIpMetadata<I, BC>,
     {
         let Self(this) = self;
         this.with_filter_state(|state| {
-            check_routines_for_ingress(
+            // There isn't going to be an existing connection in the metadata
+            // before this hook, so we don't have to look.
+            let conn = state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet);
+
+            let verdict = match check_routines_for_ingress(
                 &state.installed_routines.get().ip.ingress,
                 packet,
                 Interfaces { ingress: Some(interface), egress: None },
-            )
+            ) {
+                v @ IngressVerdict::Verdict(Verdict::Drop) => return v,
+                v @ IngressVerdict::Verdict(Verdict::Accept)
+                | v @ IngressVerdict::TransparentLocalDelivery { .. } => v,
+            };
+
+            if let Some(conn) = conn {
+                let res = metadata.replace_conntrack_connection(conn);
+                debug_assert!(res.is_none());
+            }
+
+            verdict
         })
     }
 
     fn local_ingress_hook<P, D, M>(
         &mut self,
+        bindings_ctx: &mut BC,
         packet: &mut P,
         interface: &D,
-        _metadata: &mut M,
+        metadata: &mut M,
     ) -> Verdict
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BT::DeviceClass>,
-        M: FilterIpMetadata<I, BT>,
+        D: InterfaceProperties<BC::DeviceClass>,
+        M: FilterIpMetadata<I, BC>,
     {
         let Self(this) = self;
         this.with_filter_state(|state| {
-            check_routines_for_hook(
+            let conn = metadata.take_conntrack_connection().or_else(|| {
+                // If packet reassembly happened, then there won't be a
+                // connection in the metadata.
+                state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
+            });
+
+            let verdict = match check_routines_for_hook(
                 &state.installed_routines.get().ip.local_ingress,
                 packet,
                 Interfaces { ingress: Some(interface), egress: None },
-            )
+            ) {
+                Verdict::Drop => return Verdict::Drop,
+                Verdict::Accept => Verdict::Accept,
+            };
+
+            if let Some(conn) = conn {
+                match state.conntrack.finalize_connection(bindings_ctx, conn) {
+                    Ok(_) => {}
+                    // TODO(https://fxbug.dev/318717702): When implementing
+                    // NAT, errors should be handled.
+                    Err(_) => {}
+                }
+            }
+
+            verdict
         })
     }
 
@@ -311,8 +373,8 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
     ) -> Verdict
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BT::DeviceClass>,
-        M: FilterIpMetadata<I, BT>,
+        D: InterfaceProperties<BC::DeviceClass>,
+        M: FilterIpMetadata<I, BC>,
     {
         let Self(this) = self;
         this.with_filter_state(|state| {
@@ -326,44 +388,80 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
 
     fn local_egress_hook<P, D, M>(
         &mut self,
+        bindings_ctx: &mut BC,
         packet: &mut P,
         interface: &D,
-        _metadata: &mut M,
+        metadata: &mut M,
     ) -> Verdict
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BT::DeviceClass>,
-        M: FilterIpMetadata<I, BT>,
+        D: InterfaceProperties<BC::DeviceClass>,
+        M: FilterIpMetadata<I, BC>,
     {
         let Self(this) = self;
         this.with_filter_state(|state| {
-            check_routines_for_hook(
+            // There isn't going to be an existing connection in the metadata
+            // before this hook, so we don't have to look.
+            let conn = state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet);
+
+            let verdict = match check_routines_for_hook(
                 &state.installed_routines.get().ip.local_egress,
                 packet,
                 Interfaces { ingress: None, egress: Some(interface) },
-            )
+            ) {
+                Verdict::Drop => return Verdict::Drop,
+                Verdict::Accept => Verdict::Accept,
+            };
+
+            if let Some(conn) = conn {
+                let res = metadata.replace_conntrack_connection(conn);
+                debug_assert!(res.is_none());
+            }
+
+            verdict
         })
     }
 
     fn egress_hook<P, D, M>(
         &mut self,
+        bindings_ctx: &mut BC,
         packet: &mut P,
         interface: &D,
-        _metadata: &mut M,
+        metadata: &mut M,
     ) -> (Verdict, ProofOfEgressCheck)
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BT::DeviceClass>,
-        M: FilterIpMetadata<I, BT>,
+        D: InterfaceProperties<BC::DeviceClass>,
+        M: FilterIpMetadata<I, BC>,
     {
         let Self(this) = self;
         (
             this.with_filter_state(|state| {
-                check_routines_for_hook(
+                let conn = metadata.take_conntrack_connection().or_else(|| {
+                    // If packet reassembly happened, then there won't be a
+                    // connection in the metadata.
+                    state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
+                });
+
+                let verdict = match check_routines_for_hook(
                     &state.installed_routines.get().ip.egress,
                     packet,
                     Interfaces { ingress: None, egress: Some(interface) },
-                )
+                ) {
+                    Verdict::Drop => return Verdict::Drop,
+                    Verdict::Accept => Verdict::Accept,
+                };
+
+                if let Some(conn) = conn {
+                    match state.conntrack.finalize_connection(bindings_ctx, conn) {
+                        Ok(_) => {}
+                        // TODO(https://fxbug.dev/333419001): When implementing
+                        // NAT, errors should be handled.
+                        Err(_) => {}
+                    }
+                }
+
+                verdict
             }),
             ProofOfEgressCheck { _private_field_to_prevent_construction_outside_of_module: () },
         )
@@ -402,21 +500,33 @@ pub mod testutil {
     /// Provides an implementation of [`FilterHandler`].
     pub struct NoopImpl;
 
-    impl<I: IpExt, BT: FilterBindingsTypes> FilterHandler<I, BT> for NoopImpl {
-        fn ingress_hook<P, D, M>(&mut self, _: &mut P, _: &D, _: &mut M) -> IngressVerdict<I>
+    impl<I: IpExt, BC: FilterBindingsContext> FilterHandler<I, BC> for NoopImpl {
+        fn ingress_hook<P, D, M>(
+            &mut self,
+            _: &mut BC,
+            _: &mut P,
+            _: &D,
+            _: &mut M,
+        ) -> IngressVerdict<I>
         where
             P: IpPacket<I>,
-            D: InterfaceProperties<BT::DeviceClass>,
-            M: FilterIpMetadata<I, BT>,
+            D: InterfaceProperties<BC::DeviceClass>,
+            M: FilterIpMetadata<I, BC>,
         {
             Verdict::Accept.into()
         }
 
-        fn local_ingress_hook<P, D, M>(&mut self, _: &mut P, _: &D, _: &mut M) -> Verdict
+        fn local_ingress_hook<P, D, M>(
+            &mut self,
+            _: &mut BC,
+            _: &mut P,
+            _: &D,
+            _: &mut M,
+        ) -> Verdict
         where
             P: IpPacket<I>,
-            D: InterfaceProperties<BT::DeviceClass>,
-            M: FilterIpMetadata<I, BT>,
+            D: InterfaceProperties<BC::DeviceClass>,
+            M: FilterIpMetadata<I, BC>,
         {
             Verdict::Accept
         }
@@ -424,31 +534,32 @@ pub mod testutil {
         fn forwarding_hook<P, D, M>(&mut self, _: &mut P, _: &D, _: &D, _: &mut M) -> Verdict
         where
             P: IpPacket<I>,
-            D: InterfaceProperties<BT::DeviceClass>,
-            M: FilterIpMetadata<I, BT>,
+            D: InterfaceProperties<BC::DeviceClass>,
+            M: FilterIpMetadata<I, BC>,
         {
             Verdict::Accept
         }
 
-        fn local_egress_hook<P, D, M>(&mut self, _: &mut P, _: &D, _: &mut M) -> Verdict
+        fn local_egress_hook<P, D, M>(&mut self, _: &mut BC, _: &mut P, _: &D, _: &mut M) -> Verdict
         where
             P: IpPacket<I>,
-            D: InterfaceProperties<BT::DeviceClass>,
-            M: FilterIpMetadata<I, BT>,
+            D: InterfaceProperties<BC::DeviceClass>,
+            M: FilterIpMetadata<I, BC>,
         {
             Verdict::Accept
         }
 
         fn egress_hook<P, D, M>(
             &mut self,
+            _: &mut BC,
             _: &mut P,
             _: &D,
             _: &mut M,
         ) -> (Verdict, ProofOfEgressCheck)
         where
             P: IpPacket<I>,
-            D: InterfaceProperties<BT::DeviceClass>,
-            M: FilterIpMetadata<I, BT>,
+            D: InterfaceProperties<BC::DeviceClass>,
+            M: FilterIpMetadata<I, BC>,
         {
             (Verdict::Accept, ProofOfEgressCheck::forge_proof_for_test())
         }
@@ -497,7 +608,7 @@ mod tests {
         assert_eq!(
             check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &Routine { rules: Vec::new() },
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 &Interfaces { ingress: None, egress: None },
             ),
             RoutineResult::Return
@@ -517,7 +628,7 @@ mod tests {
         assert_eq!(
             check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &routine,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 &Interfaces { ingress: None, egress: None },
             ),
             RoutineResult::Drop
@@ -526,18 +637,18 @@ mod tests {
 
     struct NullMetadata {}
 
-    impl<I: IpExt, BT: FilterBindingsTypes> FilterIpMetadata<I, BT> for NullMetadata {
+    impl<I: IpExt, BC: FilterBindingsContext> FilterIpMetadata<I, BC> for NullMetadata {
         fn take_conntrack_connection(
             &mut self,
-        ) -> Option<crate::conntrack::Connection<I, BT, ConntrackExternalData>> {
-            unimplemented!();
+        ) -> Option<crate::conntrack::Connection<I, BC, ConntrackExternalData>> {
+            None
         }
 
         fn replace_conntrack_connection(
             &mut self,
-            _conn: crate::conntrack::Connection<I, BT, ConntrackExternalData>,
-        ) -> Option<crate::conntrack::Connection<I, BT, ConntrackExternalData>> {
-            unimplemented!();
+            _conn: crate::conntrack::Connection<I, BC, ConntrackExternalData>,
+        ) -> Option<crate::conntrack::Connection<I, BC, ConntrackExternalData>> {
+            None
         }
     }
 
@@ -546,7 +657,7 @@ mod tests {
         assert_eq!(
             check_routines_for_hook::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &Hook::default(),
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 Interfaces { ingress: None, egress: None },
             ),
             Verdict::Accept
@@ -564,7 +675,7 @@ mod tests {
         assert_eq!(
             check_routines_for_hook::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &hook,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 Interfaces { ingress: None, egress: None },
             ),
             Verdict::Accept
@@ -584,7 +695,7 @@ mod tests {
         assert_eq!(
             check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &routine,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 &Interfaces { ingress: None, egress: None },
             ),
             RoutineResult::Accept
@@ -608,7 +719,7 @@ mod tests {
         assert_eq!(
             check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &routine,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 &Interfaces { ingress: None, egress: None },
             ),
             RoutineResult::Accept
@@ -633,7 +744,7 @@ mod tests {
         assert_eq!(
             check_routines_for_hook::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &hook,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 Interfaces { ingress: None, egress: None },
             ),
             Verdict::Drop
@@ -662,7 +773,7 @@ mod tests {
         assert_eq!(
             check_routines_for_hook::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &hook,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 Interfaces { ingress: None, egress: None },
             ),
             Verdict::Drop
@@ -693,7 +804,7 @@ mod tests {
         assert_eq!(
             check_routines_for_ingress::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &ingress,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 Interfaces { ingress: None, egress: None },
             ),
             IngressVerdict::TransparentLocalDelivery { addr: Ipv4::DST_IP, port: TPROXY_PORT }
@@ -716,7 +827,7 @@ mod tests {
         assert_eq!(
             check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &routine,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 &Interfaces { ingress: None, egress: None },
             ),
             RoutineResult::Drop
@@ -739,7 +850,7 @@ mod tests {
         assert_eq!(
             check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &routine,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 &Interfaces { ingress: None, egress: None },
             ),
             RoutineResult::Accept
@@ -762,7 +873,7 @@ mod tests {
         assert_eq!(
             check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &routine,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 &Interfaces { ingress: None, egress: None },
             ),
             RoutineResult::Drop
@@ -782,7 +893,7 @@ mod tests {
         assert_eq!(
             check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &routine,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 &Interfaces { ingress: None, egress: None },
             ),
             RoutineResult::Return
@@ -813,6 +924,7 @@ mod tests {
         );
         assert_eq!(
             FilterImpl(&mut ctx).ingress_hook(
+                &mut bindings_ctx,
                 &mut FakeIpPacket::<I, FakeTcpSegment>::arbitrary_value(),
                 &wlan_interface(),
                 &mut NullMetadata {},
@@ -834,6 +946,7 @@ mod tests {
         );
         assert_eq!(
             FilterImpl(&mut ctx).local_ingress_hook(
+                &mut bindings_ctx,
                 &mut FakeIpPacket::<I, FakeTcpSegment>::arbitrary_value(),
                 &wlan_interface(),
                 &mut NullMetadata {},
@@ -878,6 +991,7 @@ mod tests {
         );
         assert_eq!(
             FilterImpl(&mut ctx).local_egress_hook(
+                &mut bindings_ctx,
                 &mut FakeIpPacket::<I, FakeTcpSegment>::arbitrary_value(),
                 &wlan_interface(),
                 &mut NullMetadata {},
@@ -900,6 +1014,7 @@ mod tests {
         assert_eq!(
             FilterImpl(&mut ctx)
                 .egress_hook(
+                    &mut bindings_ctx,
                     &mut FakeIpPacket::<I, FakeTcpSegment>::arbitrary_value(),
                     &wlan_interface(),
                     &mut NullMetadata {},
@@ -977,6 +1092,7 @@ mod tests {
         );
 
         FilterImpl(&mut ctx).local_ingress_hook(
+            &mut bindings_ctx,
             &mut FakeIpPacket::<I, _> {
                 body: FakeTcpSegment { dst_port: port, src_port: 11111 },
                 ..ArbitraryValue::arbitrary_value()
@@ -1016,6 +1132,7 @@ mod tests {
         );
 
         FilterImpl(&mut ctx).local_ingress_hook(
+            &mut bindings_ctx,
             &mut FakeIpPacket::<I, FakeTcpSegment>::arbitrary_value(),
             &interface,
             &mut NullMetadata {},

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{errors::IntoExitCode, TargetInfo};
+use crate::{errors::IntoExitCode, target::TargetMode, TargetInfo};
 use addr::TargetAddr;
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
@@ -138,7 +138,7 @@ fn build_ssh_args<W: Write>(
         );
     }
 
-    let remote_forwards = vec![
+    let mut remote_forwards = vec![
         // Requests from the remote to ssh to localhost:8022 will be forwarded to the
         // target.
         (8022, 22, "SSH and Overnet"),
@@ -153,10 +153,13 @@ fn build_ssh_args<W: Write>(
         (9080, 80, "SL4F"),
         // UMA log requests to port 8888 on the remote are forwarded to target port 8888.
         (8888, 8888, "UMA Log"),
-        // Some targets use Fastboot over TCP which listens on 5554
-        (5554, 5554, "Fastboot over TCP"),
         (5555, 5555, "Android ADB"),
     ];
+
+    if target.mode == TargetMode::Fastboot {
+        // Some targets use Fastboot over TCP which listens on 5554
+        remote_forwards.push((5554, 5554, "Fastboot over TCP"));
+    }
 
     let mut res: Vec<String> = vec![
         // We want all binds for the port forwards, since the device may be using IPv4 or IPv6, and the server may be using an IPv6 address to look it up.
@@ -276,6 +279,7 @@ mod test {
         let target = TargetInfo {
             nodename: "kiriona".to_string(),
             addresses: vec![src_ipv4.into(), src.into()],
+            mode: TargetMode::Product,
         };
 
         let mut writer = vec![];
@@ -295,7 +299,6 @@ mod test {
             "-o RemoteForward 8443 [ff00::]:8443",
             "-o RemoteForward 9080 [ff00::]:80",
             "-o RemoteForward 8888 [ff00::]:8888",
-            "-o RemoteForward 5554 [ff00::]:5554",
             "-o RemoteForward 5555 [ff00::]:5555",
             "-o RemoteForward 5556 [ff00::]:5556",
             "-o LocalForward *:8081 localhost:8081",
@@ -313,7 +316,6 @@ mod test {
   * Remote Host port 8443 --> Target port 8443 [ libassistant ]
   * Remote Host port 9080 --> Target port 80 [ SL4F ]
   * Remote Host port 8888 --> Target port 8888 [ UMA Log ]
-  * Remote Host port 5554 --> Target port 5554 [ Fastboot over TCP ]
   * Remote Host port 5555 --> Target port 5555 [ Android ADB ]
   * Remote Host port 5556 --> Target port 5556   [ User Defined ]
   * Local Host port 8081 --> Cloudtop port 8081 [ Repository ]
@@ -323,6 +325,70 @@ mod test {
         Ok(())
     }
 
+    #[test]
+    fn test_make_args_fastboot() -> Result<()> {
+        let src = TargetAddrInfo::Ip(TargetIp {
+            ip: IpAddress::Ipv6(Ipv6Address {
+                addr: Ipv6Addr::new(0xff00, 0, 0, 0, 0, 0, 0, 0).octets(),
+            }),
+            scope_id: 2,
+        });
+
+        let src_ipv4 = TargetAddrInfo::Ip(TargetIp {
+            ip: IpAddress::Ipv4(Ipv4Address { addr: Ipv4Addr::new(127, 0, 0, 1).octets() }),
+            scope_id: 0,
+        });
+
+        let target = TargetInfo {
+            nodename: "kiriona".to_string(),
+            addresses: vec![src_ipv4.into(), src.into()],
+            mode: TargetMode::Fastboot,
+        };
+
+        let mut writer = vec![];
+        let got = build_ssh_args(&mut writer, target, "/foo", vec![8081], vec![5556])?;
+
+        let want: Vec<&str> = vec![
+            "-o AddressFamily any",
+            "-o ControlPath /foo",
+            "-o ControlMaster auto",
+            "-o RequestTTY no",
+            "-o ExitOnForwardFailure yes",
+            "-o StreamLocalBindUnlink yes",
+            "-o RemoteForward 8022 [ff00::]:22",
+            "-o RemoteForward 2345 [ff00::]:2345",
+            "-o RemoteForward 8007 [ff00::]:8007",
+            "-o RemoteForward 8008 [ff00::]:8008",
+            "-o RemoteForward 8443 [ff00::]:8443",
+            "-o RemoteForward 9080 [ff00::]:80",
+            "-o RemoteForward 8888 [ff00::]:8888",
+            "-o RemoteForward 5555 [ff00::]:5555",
+            "-o RemoteForward 5554 [ff00::]:5554",
+            "-o RemoteForward 5556 [ff00::]:5556",
+            "-o LocalForward *:8081 localhost:8081",
+        ];
+
+        assert_eq!(got, want);
+
+        assert_eq!(
+            String::from_utf8(writer).unwrap(),
+            r#"Setting up ssh forwards like so:
+  * Remote Host port 8022 --> Target port 22 [ SSH and Overnet ]
+  * Remote Host port 2345 --> Target port 2345 [ zxdb and fidlcat ]
+  * Remote Host port 8007 --> Target port 8007 [ libassistant ]
+  * Remote Host port 8008 --> Target port 8008 [ libassistant ]
+  * Remote Host port 8443 --> Target port 8443 [ libassistant ]
+  * Remote Host port 9080 --> Target port 80 [ SL4F ]
+  * Remote Host port 8888 --> Target port 8888 [ UMA Log ]
+  * Remote Host port 5555 --> Target port 5555 [ Android ADB ]
+  * Remote Host port 5554 --> Target port 5554 [ Fastboot over TCP ]
+  * Remote Host port 5556 --> Target port 5556   [ User Defined ]
+  * Local Host port 8081 --> Cloudtop port 8081 [ Repository ]
+"#
+            .to_string()
+        );
+        Ok(())
+    }
     #[test]
     fn test_make_args_empty_nodename() -> Result<()> {
         let src = TargetAddrInfo::Ip(TargetIp {
@@ -355,7 +421,6 @@ mod test {
             "-o RemoteForward 8443 [ff00::]:8443",
             "-o RemoteForward 9080 [ff00::]:80",
             "-o RemoteForward 8888 [ff00::]:8888",
-            "-o RemoteForward 5554 [ff00::]:5554",
             "-o RemoteForward 5555 [ff00::]:5555",
             "-o LocalForward *:8081 localhost:8081",
         ];
@@ -396,7 +461,6 @@ mod test {
             "-o RemoteForward 8443 [ff00::]:8443",
             "-o RemoteForward 9080 [ff00::]:80",
             "-o RemoteForward 8888 [ff00::]:8888",
-            "-o RemoteForward 5554 [ff00::]:5554",
             "-o RemoteForward 5555 [ff00::]:5555",
             "-o LocalForward *:8081 localhost:8081",
             "-o LocalForward *:8085 localhost:8085",

@@ -48,6 +48,7 @@ pub enum MessageInternal {
     },
 }
 
+#[derive(Clone, Copy)]
 struct ChildView {
     viewport_transform_id: ui_comp::TransformId,
     viewport_content_id: ui_comp::ContentId,
@@ -131,6 +132,14 @@ impl TilingWm {
                     .add_child(&self.root_transform_id, &viewport_transform_id)
                     .context("GraphicalPresenterPresentView add_child")?;
 
+                // Track all of the child view's resources.
+                let new_tile_id = TileId(self.next_tile_id);
+                let new_tile = ChildView { viewport_transform_id, viewport_content_id };
+                self.tiles.insert(new_tile_id, new_tile);
+                self.next_tile_id += 1;
+
+                self.layout_tiles();
+
                 // Flush the changes.
                 self.flatland
                     .present(ui_comp::PresentArgs {
@@ -138,12 +147,6 @@ impl TilingWm {
                         ..Default::default()
                     })
                     .context("GraphicalPresenterPresentView present")?;
-
-                // Track all of the child view's resources.
-                let new_tile_id = TileId(self.next_tile_id);
-                self.next_tile_id += 1;
-                self.tiles
-                    .insert(new_tile_id, ChildView { viewport_transform_id, viewport_content_id });
 
                 // Alert the client that the view has been presented, then begin servicing ViewController requests.
                 let view_controller_request_stream = view_controller_request_stream.unwrap();
@@ -175,8 +178,11 @@ impl TilingWm {
                 // (for example) because this component crashed and the handle was auto-closed.
                 control_handle.shutdown_with_epitaph(zx::Status::OK);
                 match &mut self.tiles.remove(&tile_id) {
-                    Some(tile) => Self::release_tile_resources(&self.flatland, tile)
-                        .context("DismissClient release_tile_resources")?,
+                    Some(tile) => {
+                        self.layout_tiles();
+                        Self::release_tile_resources(&self.flatland, tile)
+                            .context("DismissClient release_tile_resources")?;
+                    }
                     None => error!("Tile not found after client requested dismiss: {tile_id}"),
                 }
 
@@ -184,8 +190,11 @@ impl TilingWm {
             }
             MessageInternal::ClientDied { tile_id } => {
                 match &mut self.tiles.remove(&tile_id) {
-                    Some(tile) => Self::release_tile_resources(&self.flatland, tile)
-                        .context("ClientDied release_tile_resources")?,
+                    Some(tile) => {
+                        self.layout_tiles();
+                        Self::release_tile_resources(&self.flatland, tile)
+                            .context("ClientDied release_tile_resources")?;
+                    }
                     None => error!("Tile not found after client died: {tile_id}"),
                 }
 
@@ -306,6 +315,51 @@ impl TilingWm {
             requested_presentation_time: Some(0),
             ..Default::default()
         })?)
+    }
+
+    fn layout_tiles(&mut self) {
+        let fullscreen_height = self.layout_info.logical_size.unwrap().height;
+        let fullscreen_width = self.layout_info.logical_size.unwrap().width;
+        let num_tiles = self.tiles.len() as u32;
+        let mut columns = (num_tiles as f32).sqrt().ceil() as u32;
+        let mut rows = (columns + num_tiles - 1) / columns;
+        if fullscreen_height > fullscreen_width {
+            std::mem::swap(&mut columns, &mut rows);
+        }
+        let tile_height = (fullscreen_height as f32) / (rows as f32);
+        let mut tile_idx = 0;
+        let mut tiles_in_row = columns;
+        for r in 0..rows {
+            if r == rows - 1 && (num_tiles % columns) != 0 {
+                tiles_in_row = num_tiles % columns;
+            }
+            let tile_width = (fullscreen_width as f32) / (tiles_in_row as f32);
+            let tile_size = fidl_fuchsia_math::SizeU {
+                width: (tile_width as u32),
+                height: (tile_height as u32),
+            };
+            let viewport_properties =
+                ui_comp::ViewportProperties { logical_size: Some(tile_size), ..Default::default() };
+            for c in 0..tiles_in_row {
+                // Get next ChildView in order that will be added to this row/column slot
+                let mut next_view: Option<&ChildView> = None;
+                while next_view.is_none() {
+                    next_view = self.tiles.get(&TileId(tile_idx));
+                    tile_idx += 1
+                }
+                let view = next_view.unwrap();
+                let viewport_translation = fidl_fuchsia_math::Vec_ {
+                    x: (c as i32) * (tile_width as i32),
+                    y: (r as i32) * (tile_height as i32),
+                };
+                self.flatland
+                    .set_viewport_properties(&view.viewport_content_id, &viewport_properties)
+                    .expect("TilingWM failed to set tile's viewport properties");
+                self.flatland
+                    .set_translation(&view.viewport_transform_id, &viewport_translation)
+                    .expect("TilingWM failed to set tile's translation");
+            }
+        }
     }
 
     fn watch_layout(

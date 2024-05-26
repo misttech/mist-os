@@ -21,7 +21,6 @@ group("core-tools") {
     "//src/recovery/factory_reset:tools",
     "//src/sys/pkg/bin/far",
     "//src/ui/tools:scenic",
-    "//src/ui/tools/tiles",
     "//third_party/curl:curl_pkg",
     "//third_party/iperf:iperf3_pkg",
     "//third_party/openssh-portable:scp-shell-pkg",

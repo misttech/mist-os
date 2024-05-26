@@ -104,15 +104,11 @@ impl LogFilterCriteria {
     /// Returns true if the given 'LogsData' matches the filter string by
     /// message, moniker, or component URL.
     fn matches_filter_string(filter_string: &str, message: &str, log: &LogsData) -> bool {
-        let filter_moniker = Moniker::from_str(filter_string);
-        let moniker = Moniker::from_str(log.moniker.as_str());
+        let moniker = log.moniker.as_str();
         return message.contains(filter_string)
             || log.moniker.contains(filter_string)
-            || moniker.clone().map(|m| m.to_string().contains(filter_string)).unwrap_or(false)
-            || match (moniker, filter_moniker) {
-                (Ok(m), Ok(f)) => m.to_string().contains(&f.to_string()),
-                _ => false,
-            }
+            || log.file_path().map_or(false, |s| s.contains(filter_string))
+            || moniker.contains(filter_string)
             || log.metadata.component_url.as_ref().map_or(false, |s| s.contains(filter_string));
     }
 
@@ -776,6 +772,25 @@ mod test {
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("included message")
+            .build()
+            .into()
+        )));
+    }
+
+    #[test]
+    fn filter_fiters_filename() {
+        let cmd = LogCommand { filter: vec!["sometestfile".into()], ..empty_dump_command() };
+        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
+
+        assert!(criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                moniker: "core/last_segment".into(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_file("sometestfile")
+            .set_message("hello world")
             .build()
             .into()
         )));

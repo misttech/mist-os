@@ -1,0 +1,19 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Library that exports the wifi-config.h file to support the transition
+# to bazel.
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "broadcom",
+    hdrs = [
+        "include/wifi/wifi-config.h",
+    ],
+    includes = [
+        "include",
+    ],
+    target_compatible_with = ["@platforms//os:fuchsia"],
+)

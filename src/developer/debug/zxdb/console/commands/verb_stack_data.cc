@@ -24,10 +24,10 @@ namespace {
 constexpr int kOffsetSwitch = 100;
 
 const char kStackDataShortHelp[] = "stack-data: Analyze stack data.";
-const char kStackDataHelp[] =
+const char kStackDataUsage[] =
     R"(stack-data [ --offset=<offset> ] [ --num=<lines> ] [ --size=<bytes> ]
-           [ <address-expression> ]
-
+           [ <address-expression> ])";
+const char kStackDataHelp[] = R"(
   Prints a stack analysis. This is a special case of "mem-analyze" that
   defaults to showing the memory address starting at the current frame's stack
   pointer, and annotates the values with the current thread's registers and
@@ -121,8 +121,8 @@ void RunVerbStackData(const Command& cmd, fxl::RefPtr<CommandContext> cmd_contex
 }  // namespace
 
 VerbRecord GetStackDataVerbRecord() {
-  VerbRecord stack(&RunVerbStackData, {"stack-data"}, kStackDataShortHelp, kStackDataHelp,
-                   CommandGroup::kQuery);
+  VerbRecord stack(&RunVerbStackData, {"stack-data"}, kStackDataShortHelp, kStackDataUsage,
+                   kStackDataHelp, CommandGroup::kQuery);
   stack.switches.emplace_back(kMemAnalyzeSizeSwitch, true, "size", 's');
   stack.switches.emplace_back(kMemAnalyzeNumSwitch, true, "num", 'n');
   stack.switches.push_back(SwitchRecord(kOffsetSwitch, true, "offset", 'o'));

@@ -31,7 +31,7 @@ type NamespaceError = flexible enum {
 
 /// Protocol for performing namespace operations.
 @available(added=20)
-@discoverable
+@discoverable(server="platform")
 open protocol Namespace {
     flexible Create(resource struct {
         entries vector<NamespaceInputEntry>:MAX;

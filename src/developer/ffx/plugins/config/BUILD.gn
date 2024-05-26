@@ -25,7 +25,10 @@ ffx_plugin("ffx_config_plugin") {
     "//third_party/rust_crates:tracing",
   ]
 
-  test_deps = [ "//src/lib/fuchsia" ]
+  test_deps = [
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:tempfile",
+  ]
 
   args_sources = [ "src/args.rs" ]
 

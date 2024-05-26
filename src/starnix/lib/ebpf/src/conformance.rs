@@ -758,6 +758,7 @@ pub mod test {
     #[test_case(ubpf_test_data!("subnet.data"))]
     #[test_case(local_test_data!("err-read-only-helper.data"))]
     #[test_case(local_test_data!("err-write-r10.data"))]
+    #[test_case(local_test_data!("exponential-verification.data"))]
     #[test_case(local_test_data!("null-checks-propagated.data"))]
     #[test_case(local_test_data!("read-only-helper.data"))]
     #[test_case(local_test_data!("stack-access.data"))]

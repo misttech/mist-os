@@ -90,13 +90,13 @@ bool FeatureValueValid(int64_t value, const T& axis) {
 }
 
 constexpr size_t kMaxFeatureReports = 10;
-const inspect::StringReference kEventTime("event_time");
-const inspect::StringReference kReportingIntervalUs("report_interval_us");
-const inspect::StringReference kReportingState("reporting_state");
-const inspect::StringReference kSensitivity("sensitivity");
-const inspect::StringReference kThresholdHigh("threshold_high");
-const inspect::StringReference kThresholdLow("threshold_low");
-const inspect::StringReference kIntegrationTimeUs("integration_time_us");
+constexpr std::string_view kEventTime("event_time");
+constexpr std::string_view kReportingIntervalUs("report_interval_us");
+constexpr std::string_view kReportingState("reporting_state");
+constexpr std::string_view kSensitivity("sensitivity");
+constexpr std::string_view kThresholdHigh("threshold_high");
+constexpr std::string_view kThresholdLow("threshold_low");
+constexpr std::string_view kIntegrationTimeUs("integration_time_us");
 
 void RecordReport(inspect::Node& n, tcs::Tcs3400FeatureReport report) {
   n.RecordUint(kEventTime, (report.event_time - zx::time()).to_nsecs());
@@ -397,10 +397,10 @@ void Tcs3400Device::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
 
   fidl::Arena<kFeatureAndDescriptorBufferSize> allocator;
 
-  fuchsia_input_report::wire::DeviceInfo device_info;
-  device_info.vendor_id = static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle);
-  device_info.product_id =
-      static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kAmsLightSensor);
+  auto device_info = fuchsia_input_report::wire::DeviceInformation::Builder(allocator);
+  device_info.vendor_id(static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
+  device_info.product_id(
+      static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kAmsLightSensor));
 
   auto sensor_axes = SensorAxisVector(allocator, 4);
   sensor_axes[0] = MakeLightSensorAxis(fuchsia_input_report::wire::SensorType::kLightIlluminance);
@@ -445,7 +445,7 @@ void Tcs3400Device::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
                                      .Build();
 
   const auto descriptor = fuchsia_input_report::wire::DeviceDescriptor::Builder(allocator)
-                              .device_info(device_info)
+                              .device_information(device_info.Build())
                               .sensor(sensor_descriptor)
                               .Build();
 

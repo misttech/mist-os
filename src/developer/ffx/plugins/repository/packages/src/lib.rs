@@ -4,20 +4,22 @@
 
 use {
     anyhow::{Context as _, Result},
+    async_trait::async_trait,
+    camino::Utf8Path,
     chrono::{offset::Utc, DateTime},
     errors::ffx_bail,
-    ffx_core::ffx_plugin,
+    ffx_config::{environment::EnvironmentKind, EnvironmentContext},
     ffx_repository_packages_args::{
         ExtractArchiveSubCommand, ListSubCommand, PackagesCommand, PackagesSubCommand,
         ShowSubCommand,
     },
-    ffx_writer::Writer,
+    fho::{FfxMain, FfxTool, MachineWriter, ToolIO},
     fuchsia_hash::Hash,
     fuchsia_hyper::new_https_client,
     fuchsia_pkg::PackageArchiveBuilder,
     fuchsia_repo::{
         repo_client::{PackageEntry, RepoClient},
-        repository::RepoProvider,
+        repository::{PmRepository, RepoProvider},
     },
     humansize::{file_size_opts, FileSize},
     pkg::repo::repo_spec_to_backend,
@@ -30,8 +32,29 @@ use {
 };
 
 const MAX_HASH: usize = 11;
+const REPO_PATH_RELATIVE_TO_BUILD_DIR: &str = "amber-files";
 
-// TODO(121214): Fix incorrect- or invalid-type, and undiscriminated writer declarations
+type PackagesWriter = MachineWriter<Vec<PackagesOutput>>;
+
+#[derive(FfxTool)]
+pub struct PackagesTool {
+    #[command]
+    cmd: PackagesCommand,
+    context: EnvironmentContext,
+}
+
+fho::embedded_plugin!(PackagesTool);
+
+#[async_trait(?Send)]
+impl FfxMain for PackagesTool {
+    type Writer = PackagesWriter;
+
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+        packages_impl(self.cmd, self.context, writer).await?;
+        Ok(())
+    }
+}
+
 #[derive(serde::Serialize)]
 #[serde(untagged)]
 pub enum PackagesOutput {
@@ -48,33 +71,32 @@ pub struct RepositoryPackage {
     entries: Option<Vec<PackageEntry>>,
 }
 
-#[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
-pub async fn packages(
+async fn packages_impl(
     cmd: PackagesCommand,
-    #[ffx(machine = Vec<PackagesOutput>)] mut writer: Writer,
+    context: EnvironmentContext,
+    mut writer: PackagesWriter,
 ) -> Result<()> {
     match cmd.subcommand {
-        PackagesSubCommand::List(subcmd) => list_impl(subcmd, None, &mut writer).await,
-        PackagesSubCommand::Show(subcmd) => show_impl(subcmd, None, &mut writer).await,
-        PackagesSubCommand::ExtractArchive(subcmd) => extract_archive_impl(subcmd).await,
+        PackagesSubCommand::List(subcmd) => list_impl(subcmd, context, None, &mut writer).await,
+        PackagesSubCommand::Show(subcmd) => show_impl(subcmd, context, None, &mut writer).await,
+        PackagesSubCommand::ExtractArchive(subcmd) => extract_archive_impl(subcmd, context).await,
     }
 }
 
 async fn show_impl(
     cmd: ShowSubCommand,
+    context: EnvironmentContext,
     table_format: Option<TableFormat>,
-    writer: &mut Writer,
+    writer: &mut PackagesWriter,
 ) -> Result<()> {
-    let repo_name = get_repo_name(cmd.repository.clone()).await?;
-
-    let repo = connect(&repo_name).await?;
+    let repo = connect_to_repo(cmd.repository.clone(), context).await?;
 
     let Some(mut blobs) = repo
         .show_package(&cmd.package, cmd.include_subpackages)
         .await
         .with_context(|| format!("showing package {}", cmd.package))?
     else {
-        ffx_bail!("repository {:?} does not contain package {}", repo_name, cmd.package)
+        ffx_bail!("repository does not contain package {}", cmd.package)
     };
 
     blobs.sort();
@@ -93,7 +115,7 @@ fn print_blob_table(
     cmd: &ShowSubCommand,
     blobs: &[PackageEntry],
     table_format: Option<TableFormat>,
-    writer: &mut Writer,
+    writer: &mut PackagesWriter,
 ) -> Result<()> {
     let mut table = Table::new();
     let mut header = row!("NAME", "SIZE", "HASH", "MODIFIED");
@@ -137,12 +159,11 @@ fn print_blob_table(
 
 async fn list_impl(
     cmd: ListSubCommand,
+    context: EnvironmentContext,
     table_format: Option<TableFormat>,
-    writer: &mut Writer,
+    writer: &mut PackagesWriter,
 ) -> Result<()> {
-    let repo_name = get_repo_name(cmd.repository.clone()).await?;
-
-    let repo = connect(&repo_name).await?;
+    let repo = connect_to_repo(cmd.repository.clone(), context).await?;
 
     let mut packages = vec![];
     for package in repo.list_packages().await? {
@@ -180,33 +201,11 @@ async fn list_impl(
     Ok(())
 }
 
-async fn connect(repo_name: &str) -> Result<RepoClient<Box<dyn RepoProvider>>> {
-    let Some(repo_spec) = pkg::config::get_repository(&repo_name)
-        .await
-        .with_context(|| format!("Finding repo spec for {repo_name}"))?
-    else {
-        ffx_bail!("No configuration found for {repo_name}")
-    };
-
-    let https_client = new_https_client();
-    let backend = repo_spec_to_backend(&repo_spec, https_client)
-        .with_context(|| format!("Creating a repo backend for {repo_name}"))?;
-
-    let mut repo = RepoClient::from_trusted_remote(backend)
-        .await
-        .with_context(|| format!("Connecting to {repo_name}"))?;
-
-    // Make sure the repository is up to date.
-    repo.update().await.with_context(|| format!("Updating repository {repo_name}"))?;
-
-    Ok(repo)
-}
-
 fn print_package_table(
     cmd: &ListSubCommand,
     packages: Vec<RepositoryPackage>,
     table_format: Option<TableFormat>,
-    writer: &mut Writer,
+    writer: &mut PackagesWriter,
 ) -> Result<()> {
     let mut table = Table::new();
     let mut header = row!("NAME", "SIZE", "HASH", "MODIFIED");
@@ -271,30 +270,69 @@ fn to_rfc2822(time: SystemTime) -> String {
     DateTime::<Utc>::from(time).to_rfc2822()
 }
 
-async fn get_repo_name(repository: Option<String>) -> Result<String> {
-    if let Some(repo_name) = repository {
-        Ok(repo_name)
+async fn connect_to_repo(
+    repo_name: Option<String>,
+    context: EnvironmentContext,
+) -> Result<RepoClient<Box<dyn RepoProvider>>> {
+    // If we specified a repository on the CLI, try to look up its repository spec.
+    let repo_spec = if let Some(repo_name) = repo_name {
+        if let Some(repo_spec) = pkg::config::get_repository(&repo_name)
+            .await
+            .with_context(|| format!("Finding repo spec for {repo_name}"))?
+        {
+            Some(repo_spec)
+        } else {
+            ffx_bail!("No configuration found for {repo_name}")
+        }
     } else if let Some(repo_name) = pkg::config::get_default_repository().await? {
-        Ok(repo_name)
+        // Otherwise, check if the default repository exists. Don't error out if
+        // it doesn't.
+        pkg::config::get_repository(&repo_name)
+            .await
+            .with_context(|| format!("Finding repo spec for {repo_name}"))?
     } else {
-        ffx_bail!(
-            "Either a default repository must be set, or the -r flag must be provided.\n\
-                You can set a default repository using: `ffx repository default set <name>`."
-        )
-    }
+        None
+    };
+
+    // If we have a repository spec, create a backend for it. Otherwise we'll
+    // see if we are in the fuchsia repository and try to use it.
+    let backend = if let Some(repo_spec) = repo_spec {
+        repo_spec_to_backend(&repo_spec, new_https_client())
+            .with_context(|| format!("Creating a repo backend"))?
+    } else if let EnvironmentKind::InTree { build_dir: Some(build_dir), .. } = context.env_kind() {
+        let build_dir = Utf8Path::from_path(&build_dir)
+            .with_context(|| format!("converting repo path to UTF-8 {:?}", build_dir))?;
+
+        let backend =
+            PmRepository::builder(build_dir.join(REPO_PATH_RELATIVE_TO_BUILD_DIR)).build();
+
+        Box::new(backend)
+    } else {
+        ffx_bail!("No configuration found for the repository")
+    };
+
+    let mut repo = RepoClient::from_trusted_remote(backend)
+        .await
+        .with_context(|| format!("Connecting to repository"))?;
+
+    // Make sure the repository is up to date.
+    repo.update().await.with_context(|| format!("Updating repository"))?;
+
+    Ok(repo)
 }
 
-async fn extract_archive_impl(cmd: ExtractArchiveSubCommand) -> Result<()> {
-    let repo_name = get_repo_name(cmd.repository.clone()).await?;
-
-    let repo = connect(&repo_name).await?;
+async fn extract_archive_impl(
+    cmd: ExtractArchiveSubCommand,
+    context: EnvironmentContext,
+) -> Result<()> {
+    let repo = connect_to_repo(cmd.repository.clone(), context).await?;
 
     let Some(entries) = repo
         .show_package(&cmd.package, true)
         .await
         .with_context(|| format!("showing package {}", cmd.package))?
     else {
-        ffx_bail!("repository {:?} does not contain package {}", repo_name, cmd.package)
+        ffx_bail!("repository does not contain package {}", cmd.package)
     };
 
     let entry_is_meta_far =
@@ -349,6 +387,7 @@ mod test {
         super::*,
         ffx_config::ConfigLevel,
         ffx_package_archive_utils::{read_file_entries, ArchiveEntry, FarArchiveReader},
+        fho::TestBuffers,
         fuchsia_async as fasync,
         fuchsia_repo::test_utils,
         pretty_assertions::assert_eq,
@@ -383,20 +422,28 @@ mod test {
         env
     }
 
-    async fn run_impl(cmd: ListSubCommand, writer: &mut Writer) {
+    async fn run_impl(
+        cmd: ListSubCommand,
+        context: EnvironmentContext,
+        writer: &mut PackagesWriter,
+    ) {
         timeout::timeout(
             std::time::Duration::from_millis(1000),
-            list_impl(cmd, Some(FormatBuilder::new().padding(1, 1).build()), writer),
+            list_impl(cmd, context, Some(FormatBuilder::new().padding(1, 1).build()), writer),
         )
         .await
         .unwrap()
         .unwrap();
     }
 
-    async fn run_impl_for_show_command(cmd: ShowSubCommand, writer: &mut Writer) {
+    async fn run_impl_for_show_command(
+        cmd: ShowSubCommand,
+        context: EnvironmentContext,
+        writer: &mut PackagesWriter,
+    ) {
         timeout::timeout(
             std::time::Duration::from_millis(1000),
-            show_impl(cmd, Some(FormatBuilder::new().padding(1, 1).build()), writer),
+            show_impl(cmd, context, Some(FormatBuilder::new().padding(1, 1).build()), writer),
         )
         .await
         .unwrap()
@@ -406,9 +453,10 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_package_list_truncated_hash() {
         let tmp = tempfile::tempdir().unwrap();
-        let _env = setup_repo(tmp.path()).await;
+        let env = setup_repo(tmp.path()).await;
 
-        let mut writer = Writer::new_test(None);
+        let test_buffers = TestBuffers::default();
+        let mut writer = PackagesWriter::new_test(None, &test_buffers);
 
         run_impl(
             ListSubCommand {
@@ -416,6 +464,7 @@ mod test {
                 full_hash: false,
                 include_components: false,
             },
+            env.context.clone(),
             &mut writer,
         )
         .await;
@@ -430,9 +479,9 @@ mod test {
         let pkg2_path = blobs_path.join(PKG2_HASH);
         let pkg2_modified = to_rfc2822(std::fs::metadata(pkg2_path).unwrap().modified().unwrap());
 
-        let actual = writer.test_output().unwrap();
+        let (stdout, stderr) = test_buffers.into_strings();
         assert_eq!(
-            actual,
+            stdout,
             format!(
                 " NAME        SIZE      HASH         MODIFIED \n \
                 package1/0  24.03 KB  {pkg1_hash}  {pkg1_modified} \n \
@@ -440,15 +489,16 @@ mod test {
             ),
         );
 
-        assert_eq!(writer.test_error().unwrap(), "");
+        assert_eq!(stderr, "");
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_package_list_full_hash() {
         let tmp = tempfile::tempdir().unwrap();
-        let _env = setup_repo(tmp.path()).await;
+        let env = setup_repo(tmp.path()).await;
 
-        let mut writer = Writer::new_test(None);
+        let test_buffers = TestBuffers::default();
+        let mut writer = PackagesWriter::new_test(None, &test_buffers);
 
         run_impl(
             ListSubCommand {
@@ -456,6 +506,7 @@ mod test {
                 full_hash: true,
                 include_components: false,
             },
+            env.context.clone(),
             &mut writer,
         )
         .await;
@@ -470,9 +521,9 @@ mod test {
         let pkg2_path = blobs_path.join(PKG2_HASH);
         let pkg2_modified = to_rfc2822(std::fs::metadata(pkg2_path).unwrap().modified().unwrap());
 
-        let actual = writer.test_output().unwrap();
+        let (stdout, stderr) = test_buffers.into_strings();
         assert_eq!(
-            actual,
+            stdout,
             format!(
                 " NAME        SIZE      HASH                                                              MODIFIED \n \
                 package1/0  24.03 KB  {pkg1_hash}  {pkg1_modified} \n \
@@ -480,15 +531,16 @@ mod test {
             ),
         );
 
-        assert_eq!(writer.test_error().unwrap(), "");
+        assert_eq!(stderr, "");
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_package_list_including_components() {
         let tmp = tempfile::tempdir().unwrap();
-        let _env = setup_repo(tmp.path()).await;
+        let env = setup_repo(tmp.path()).await;
 
-        let mut writer = Writer::new_test(None);
+        let test_buffers = TestBuffers::default();
+        let mut writer = PackagesWriter::new_test(None, &test_buffers);
 
         run_impl(
             ListSubCommand {
@@ -496,6 +548,7 @@ mod test {
                 full_hash: false,
                 include_components: true,
             },
+            env.context.clone(),
             &mut writer,
         )
         .await;
@@ -510,9 +563,9 @@ mod test {
         let pkg2_path = blobs_path.join(PKG2_HASH);
         let pkg2_modified = to_rfc2822(std::fs::metadata(pkg2_path).unwrap().modified().unwrap());
 
-        let actual = writer.test_output().unwrap();
+        let (stdout, stderr) = test_buffers.into_strings();
         assert_eq!(
-            actual,
+            stdout,
             format!(
                 " NAME        SIZE      HASH         MODIFIED                         COMPONENTS \n \
                 package1/0  24.03 KB  {pkg1_hash}  {pkg1_modified}  meta/package1.cm \n \
@@ -520,15 +573,16 @@ mod test {
             ),
         );
 
-        assert_eq!(writer.test_error().unwrap(), "");
+        assert_eq!(stderr, "");
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_show_package_truncated_hash() {
         let tmp = tempfile::tempdir().unwrap();
-        let _env = setup_repo(tmp.path()).await;
+        let env = setup_repo(tmp.path()).await;
 
-        let mut writer = Writer::new_test(None);
+        let test_buffers = TestBuffers::default();
+        let mut writer = PackagesWriter::new_test(None, &test_buffers);
 
         run_impl_for_show_command(
             ShowSubCommand {
@@ -537,6 +591,7 @@ mod test {
                 include_subpackages: false,
                 package: "package1/0".to_string(),
             },
+            env.context.clone(),
             &mut writer,
         )
         .await;
@@ -557,9 +612,9 @@ mod test {
         let pkg1_lib_modified =
             to_rfc2822(std::fs::metadata(pkg1_lib_path).unwrap().modified().unwrap());
 
-        let actual = writer.test_output().unwrap();
+        let (stdout, stderr) = test_buffers.into_strings();
         assert_eq!(
-            actual,
+            stdout,
             format!(
                 " NAME                           SIZE   HASH         MODIFIED \n \
                   bin/package1                   15 B   {pkg1_bin_hash}  {pkg1_bin_modified} \n \
@@ -573,15 +628,16 @@ mod test {
             ),
         );
 
-        assert_eq!(writer.test_error().unwrap(), "");
+        assert_eq!(stderr, "");
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_show_package_full_hash() {
         let tmp = tempfile::tempdir().unwrap();
-        let _env = setup_repo(tmp.path()).await;
+        let env = setup_repo(tmp.path()).await;
 
-        let mut writer = Writer::new_test(None);
+        let test_buffers = TestBuffers::default();
+        let mut writer = PackagesWriter::new_test(None, &test_buffers);
 
         run_impl_for_show_command(
             ShowSubCommand {
@@ -590,6 +646,7 @@ mod test {
                 include_subpackages: false,
                 package: "package1/0".to_string(),
             },
+            env.context.clone(),
             &mut writer,
         )
         .await;
@@ -610,9 +667,9 @@ mod test {
         let pkg1_lib_modified =
             to_rfc2822(std::fs::metadata(pkg1_lib_path).unwrap().modified().unwrap());
 
-        let actual = writer.test_output().unwrap();
+        let (stdout, stderr) = test_buffers.into_strings();
         assert_eq!(
-            actual,
+            stdout,
             format!(
                 " NAME                           SIZE   HASH                                                              MODIFIED \n \
                   bin/package1                   15 B   {pkg1_bin_hash}  {pkg1_bin_modified} \n \
@@ -626,15 +683,16 @@ mod test {
             ),
         );
 
-        assert_eq!(writer.test_error().unwrap(), "");
+        assert_eq!(stderr, "");
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_show_package_with_subpackages() {
         let tmp = tempfile::tempdir().unwrap();
-        let _env = setup_repo(tmp.path()).await;
+        let env = setup_repo(tmp.path()).await;
 
-        let mut writer = Writer::new_test(None);
+        let test_buffers = TestBuffers::default();
+        let mut writer = PackagesWriter::new_test(None, &test_buffers);
 
         run_impl_for_show_command(
             ShowSubCommand {
@@ -643,6 +701,7 @@ mod test {
                 include_subpackages: true,
                 package: "package1/0".to_string(),
             },
+            env.context.clone(),
             &mut writer,
         )
         .await;
@@ -663,9 +722,9 @@ mod test {
         let pkg1_lib_modified =
             to_rfc2822(std::fs::metadata(pkg1_lib_path).unwrap().modified().unwrap());
 
-        let actual = writer.test_output().unwrap();
+        let (stdout, stderr) = test_buffers.into_strings();
         assert_eq!(
-            actual,
+            stdout,
             format!(
                 " NAME                           SUBPACKAGE  SIZE   HASH         MODIFIED \n \
                   bin/package1                   <root>      15 B   {pkg1_bin_hash}  {pkg1_bin_modified} \n \
@@ -679,20 +738,23 @@ mod test {
             ),
         );
 
-        assert_eq!(writer.test_error().unwrap(), "");
+        assert_eq!(stderr, "");
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_extract_archive() {
         let tmp = tempfile::tempdir().unwrap();
-        let _env = setup_repo(&tmp.path().join("repo")).await;
+        let env = setup_repo(&tmp.path().join("repo")).await;
 
         let archive_path = tmp.path().join("archive.far");
-        extract_archive_impl(ExtractArchiveSubCommand {
-            out: archive_path.clone(),
-            repository: Some("devhost".to_string()),
-            package: "package1/0".to_string(),
-        })
+        extract_archive_impl(
+            ExtractArchiveSubCommand {
+                out: archive_path.clone(),
+                repository: Some("devhost".to_string()),
+                package: "package1/0".to_string(),
+            },
+            env.context.clone(),
+        )
         .await
         .unwrap();
 

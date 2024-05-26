@@ -37,11 +37,16 @@ class LdLoadZirconProcessTestsBase : public LdLoadZirconLdsvcTestsBase {
 
   void set_process(zx::process process);
 
+  void Start(TestProcessArgs* bootstrap, zx::channel bootstrap_receiver,
+             std::optional<size_t> stack_size, const zx::thread& thread, uintptr_t entry,
+             uintptr_t vdso_base, const zx::vmar& root_vmar);
+
   int64_t Run(TestProcessArgs* bootstrap, std::optional<size_t> stack_size,
               const zx::thread& thread, uintptr_t entry, uintptr_t vdso_base,
               const zx::vmar& root_vmar);
 
   // Wait for the process to die and collect its exit code.
+  // This clears the process() so a new one can be installed.
   int64_t Wait();
 
  private:

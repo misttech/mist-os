@@ -31,13 +31,10 @@ from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
 from honeydew.transports import sl4f as sl4f_transport
-from honeydew.transports import ssh as ssh_transport
 from honeydew.typing import custom_types
 
 _INPUT_ARGS: dict[str, Any] = {
     "device_name": "fuchsia-emulator",
-    "ssh_private_key": "/tmp/.ssh/pkey",
-    "ssh_user": "root",
     "ffx_config": custom_types.FFXConfig(
         isolate_dir=fuchsia_controller.IsolateDir("/tmp/isolate"),
         logs_dir="/tmp/logs",
@@ -61,11 +58,6 @@ class FuchsiaDeviceFCPreferredTests(unittest.TestCase):
                 autospec=True,
             ) as mock_fc_create_context,
             mock.patch.object(
-                ssh_transport.SSH,
-                "check_connection",
-                autospec=True,
-            ) as mock_ssh_check_connection,
-            mock.patch.object(
                 ffx_transport.FFX,
                 "check_connection",
                 autospec=True,
@@ -88,7 +80,6 @@ class FuchsiaDeviceFCPreferredTests(unittest.TestCase):
         ):
             self.fd_obj = fc_preferred_fuchsia_device.FuchsiaDevice(
                 device_name=_INPUT_ARGS["device_name"],
-                ssh_private_key=_INPUT_ARGS["ssh_private_key"],
                 ffx_config=_INPUT_ARGS["ffx_config"],
             )
 
@@ -98,8 +89,6 @@ class FuchsiaDeviceFCPreferredTests(unittest.TestCase):
             mock_fc_check_connection.assert_called()
 
             mock_ffx_check_connection.assert_called()
-
-            mock_ssh_check_connection.assert_called()
 
             mock_sl4f_start_server.assert_called_once_with(self.fd_obj.sl4f)
             mock_sl4f_check_connection.assert_called()
@@ -181,14 +170,8 @@ class FuchsiaDeviceFCPreferredTests(unittest.TestCase):
         "check_connection",
         autospec=True,
     )
-    @mock.patch.object(
-        ssh_transport.SSH,
-        "check_connection",
-        autospec=True,
-    )
     def test_health_check(
         self,
-        mock_ssh_check_connection: mock.Mock,
         mock_ffx_check_connection: mock.Mock,
         mock_fc_check_connection: mock.Mock,
         mock_sl4f_check_connection: mock.Mock,
@@ -197,7 +180,6 @@ class FuchsiaDeviceFCPreferredTests(unittest.TestCase):
         self.fd_obj.health_check()
 
         mock_ffx_check_connection.assert_called_once_with(self.fd_obj.ffx)
-        mock_ssh_check_connection.assert_called_once_with(self.fd_obj.ssh)
         mock_fc_check_connection.assert_called_once_with(
             self.fd_obj.fuchsia_controller
         )

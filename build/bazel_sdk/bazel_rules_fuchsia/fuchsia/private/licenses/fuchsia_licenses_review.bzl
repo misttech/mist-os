@@ -13,6 +13,7 @@ def _fuchsia_licenses_review(ctx):
         "--spdx_input=%s" % ctx.file.spdx_input.path,
         "--output_dir=%s" % out_dir.path,
         "--output_file=%s" % out_zip.path,
+        "--quiet",
     ]
 
     if ctx.file.classification_input:

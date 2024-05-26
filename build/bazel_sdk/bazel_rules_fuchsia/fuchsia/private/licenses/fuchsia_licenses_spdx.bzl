@@ -54,6 +54,7 @@ def _fuchsia_licenses_spdx_impl(ctx):
             "--root_package_homepage=%s" % ctx.attr.root_package_homepage,
             "--document_namespace=%s" % ctx.attr.document_namespace,
             "--licenses_cross_refs_base_url=%s" % ctx.attr.licenses_cross_refs_base_url,
+            "--quiet",
         ],
     )
 

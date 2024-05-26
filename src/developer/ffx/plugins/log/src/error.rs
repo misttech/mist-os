@@ -6,6 +6,7 @@ use crate::transactional_symbolizer::ReadError;
 use ffx_config::api::ConfigError;
 use fidl_fuchsia_developer_ffx::{OpenTargetError, TargetConnectionError};
 use fidl_fuchsia_developer_remotecontrol::{ConnectCapabilityError, IdentifyHostError};
+use log_command::log_formatter::FormatterError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -19,11 +20,17 @@ pub enum LogError {
     #[error(transparent)]
     UnknownError(#[from] anyhow::Error),
     #[error(transparent)]
+    FormatterError(#[from] FormatterError),
+    #[error(transparent)]
     ConfigError(#[from] ConfigError),
     #[error(transparent)]
     FidlError(#[from] fidl::Error),
     #[error("No boot timestamp")]
     NoBootTimestamp,
+    #[error(
+        "SDK not available, please use --symbolize off to disable symbolization. Reason: {msg}"
+    )]
+    SdkNotAvailable { msg: &'static str },
     #[error("failed to connect: {:?}", error)]
     ConnectCapabilityError { error: ConnectCapabilityError },
     #[error(transparent)]
@@ -52,6 +59,7 @@ impl From<log_command::LogError> for LogError {
             FfxError(err) => Self::UnknownError(err.into()),
             Utf8Error(err) => Self::UnknownError(err.into()),
             FidlError(err) => Self::UnknownError(err.into()),
+            FormatterError(err) => Self::FormatterError(err),
         }
     }
 }
@@ -70,6 +78,7 @@ impl From<LogError> for fho::Error {
             | OpenTargetError { .. }
             | TargetConnectionError { .. }
             | IdentifyHostError { .. }
+            | SdkNotAvailable { .. }
             | ConnectCapabilityError { .. } => fho::Error::User(value.into()),
             // these errors are probably an unexpected problem with no actionable error output.
             FidlError(err) => fho::Error::Unexpected(err.into()),
@@ -77,6 +86,7 @@ impl From<LogError> for fho::Error {
             ConfigError(err) => fho::Error::Unexpected(err.into()),
             SymbolizerError(err) => fho::Error::Unexpected(err.into()),
             DaemonRetriesDisabled => fho::Error::Unexpected(value.into()),
+            FormatterError(error) => fho::Error::Unexpected(error.into()),
         }
     }
 }

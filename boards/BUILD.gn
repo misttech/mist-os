@@ -5,32 +5,24 @@
 assert(current_toolchain == default_toolchain,
        "Boards are only defined in the default toolchain")
 
-declare_args() {
-  # Additional boards (such as vendor boards) that are to be added to the build
-  # graph, and built when all boards for a given architecture are built.  These
-  # boards MUST be valid in the configured default_toolchain, and be for the
-  # current 'target_cpu'.
-  additional_boards = []
-}
-
 group("boards") {
   deps = [ ":$target_cpu" ]
 }
 
 if (target_cpu == "x64") {
   group("x64") {
-    deps = [ "//boards/x64" ] + additional_boards
+    deps = [ "//boards/x64" ]
   }
 } else if (target_cpu == "arm64") {
   group("arm64") {
     deps = [
-             "//boards/arm64",
-             "//boards/qemu-arm64",
-             "//boards/vim3",
-           ] + additional_boards
+      "//boards/arm64",
+      "//boards/qemu-arm64",
+      "//boards/vim3",
+    ]
   }
 } else if (target_cpu == "riscv64") {
   group("riscv64") {
-    deps = [ "//boards/riscv64" ] + additional_boards
+    deps = [ "//boards/riscv64" ]
   }
 }

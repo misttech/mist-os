@@ -8,10 +8,11 @@
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/stdcompat/span.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zircon-internal/align.h>
 #include <unistd.h>
 #include <zircon/process.h>
@@ -44,7 +45,8 @@
 
 namespace fhd = fuchsia_hardware_display;
 namespace fhdt = fuchsia_hardware_display_types;
-namespace sysmem = fuchsia_sysmem;
+namespace images2 = fuchsia_images2;
+namespace sysmem2 = fuchsia_sysmem2;
 namespace sysinfo = fuchsia_sysinfo;
 
 using display_test::ColorLayer;
@@ -61,7 +63,7 @@ constexpr display::BufferCollectionId kBufferCollectionId(12);
 // Use a large ID to avoid conflict with Image IDs allocated by VirtualLayers.
 constexpr display::ImageId kCaptureImageId(std::numeric_limits<uint64_t>::max());
 zx::event client_event_;
-fidl::WireSyncClient<sysmem::BufferCollection> collection_;
+fidl::SyncClient<sysmem2::BufferCollection> collection_;
 zx::vmo capture_vmo;
 
 enum TestBundle {
@@ -338,46 +340,53 @@ zx_status_t capture_setup(Display& display) {
   }
 
   // get connection to sysmem
-  zx::result sysmem_client = component::Connect<sysmem::Allocator>();
+  zx::result sysmem_client = component::Connect<sysmem2::Allocator>();
   if (sysmem_client.is_error()) {
     printf("Could not connect to sysmem Allocator %s\n", sysmem_client.status_string());
     return sysmem_client.status_value();
   }
-  auto sysmem_allocator = fidl::WireSyncClient(std::move(sysmem_client.value()));
+  auto sysmem_allocator = fidl::SyncClient(std::move(sysmem_client.value()));
 
   // Create and import token
-  zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  zx::result token_endpoints = fidl::CreateEndpoints<sysmem2::BufferCollectionToken>();
   if (token_endpoints.is_error()) {
     printf("Could not create token channel %d\n", token_endpoints.error_value());
     return token_endpoints.error_value();
   }
-  auto token = fidl::WireSyncClient(std::move(token_endpoints->client));
+  auto token = fidl::SyncClient(std::move(token_endpoints->client));
 
   // pass token server to sysmem allocator
-  fidl::Status alloc_status =
-      sysmem_allocator->AllocateSharedCollection(std::move(token_endpoints->server));
-  if (alloc_status.status() != ZX_OK) {
+  sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
+  allocate_shared_request.token_request() = std::move(token_endpoints->server);
+  auto allocate_shared_result =
+      sysmem_allocator->AllocateSharedCollection(std::move(allocate_shared_request));
+  if (!allocate_shared_result.is_ok()) {
     printf("Could not pass token to sysmem allocator: %s\n",
-           alloc_status.FormatDescription().c_str());
-    return alloc_status.status();
+           allocate_shared_result.error_value().FormatDescription().c_str());
+    return allocate_shared_result.error_value().status();
   }
 
   // duplicate the token and pass to display driver
-  zx::result token_dup_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  zx::result token_dup_endpoints = fidl::CreateEndpoints<sysmem2::BufferCollectionToken>();
   if (token_dup_endpoints.is_error()) {
     printf("Could not create duplicate token channel %d\n", token_dup_endpoints.error_value());
     return token_dup_endpoints.error_value();
   }
-  fidl::WireSyncClient display_token(std::move(token_dup_endpoints->client));
-  auto dup_res = token->Duplicate(ZX_RIGHT_SAME_RIGHTS, std::move(token_dup_endpoints->server));
-  if (dup_res.status() != ZX_OK) {
-    printf("Could not duplicate token: %s\n", dup_res.FormatDescription().c_str());
-    return dup_res.status();
+  fidl::SyncClient display_token(std::move(token_dup_endpoints->client));
+  fuchsia_sysmem2::BufferCollectionTokenDuplicateRequest dup_request;
+  dup_request.rights_attenuation_mask() = ZX_RIGHT_SAME_RIGHTS;
+  dup_request.token_request() = std::move(token_dup_endpoints->server);
+  auto dup_res = token->Duplicate(std::move(dup_request));
+  if (!dup_res.is_ok()) {
+    printf("Could not duplicate token: %s\n", dup_res.error_value().FormatDescription().c_str());
+    return dup_res.error_value().status();
   }
   // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
   (void)token->Sync();
-  auto import_resp = dc->ImportBufferCollection(
-      display::ToFidlBufferCollectionId(kBufferCollectionId), display_token.TakeClientEnd());
+  auto import_resp =
+      dc->ImportBufferCollection(display::ToFidlBufferCollectionId(kBufferCollectionId),
+                                 fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(
+                                     display_token.TakeClientEnd().TakeChannel()));
   if (import_resp.status() != ZX_OK) {
     printf("Could not import token: %s\n", import_resp.FormatDescription().c_str());
     return import_resp.status();
@@ -395,66 +404,61 @@ zx_status_t capture_setup(Display& display) {
   }
 
   // setup our our constraints for buffer to be allocated
-  zx::result collection_endpoints = fidl::CreateEndpoints<sysmem::BufferCollection>();
+  zx::result collection_endpoints = fidl::CreateEndpoints<sysmem2::BufferCollection>();
   if (collection_endpoints.is_error()) {
     printf("Could not create collection channel %d\n", collection_endpoints.error_value());
     return collection_endpoints.error_value();
   }
   // let's return token
-  fidl::Status bind_resp = sysmem_allocator->BindSharedCollection(
-      token.TakeClientEnd(), std::move(collection_endpoints->server));
-  if (bind_resp.status() != ZX_OK) {
-    printf("Could not bind to shared collection: %s\n", bind_resp.FormatDescription().c_str());
-    return bind_resp.status();
+  fuchsia_sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.token() = token.TakeClientEnd();
+  bind_shared_request.buffer_collection_request() = std::move(collection_endpoints->server);
+  auto bind_resp = sysmem_allocator->BindSharedCollection(std::move(bind_shared_request));
+  if (!bind_resp.is_ok()) {
+    printf("Could not bind to shared collection: %s\n",
+           bind_resp.error_value().FormatDescription().c_str());
+    return bind_resp.error_value().status();
   }
 
   // finally setup our constraints
-  sysmem::wire::BufferCollectionConstraints constraints = {};
-  constraints.usage.cpu = sysmem::wire::kCpuUsageReadOften | sysmem::wire::kCpuUsageWriteOften;
-  constraints.min_buffer_count_for_camping = 1;
-  constraints.has_buffer_memory_constraints = true;
-  constraints.buffer_memory_constraints.ram_domain_supported = true;
-  constraints.image_format_constraints_count = 1;
-  sysmem::wire::ImageFormatConstraints& image_constraints = constraints.image_format_constraints[0];
+  fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  auto& constraints = set_constraints_request.constraints().emplace();
+  constraints.usage().emplace().cpu() = sysmem2::kCpuUsageReadOften | sysmem2::kCpuUsageWriteOften;
+  constraints.min_buffer_count_for_camping() = 1;
+  constraints.buffer_memory_constraints().emplace().ram_domain_supported() = true;
+  sysmem2::ImageFormatConstraints& image_constraints =
+      constraints.image_format_constraints().emplace().emplace_back();
   if (platform == AMLOGIC_PLATFORM) {
-    image_constraints.pixel_format.type = sysmem::wire::PixelFormatType::kBgr24;
+    image_constraints.pixel_format() = images2::PixelFormat::kB8G8R8;
   } else {
-    image_constraints.pixel_format.type = sysmem::wire::PixelFormatType::kBgra32;
+    image_constraints.pixel_format() = images2::PixelFormat::kB8G8R8A8;
   }
-  image_constraints.color_spaces_count = 1;
-  image_constraints.color_space[0] = sysmem::wire::ColorSpace{
-      .type = sysmem::wire::ColorSpaceType::kSrgb,
-  };
-  image_constraints.min_coded_width = 0;
-  image_constraints.max_coded_width = std::numeric_limits<uint32_t>::max();
-  image_constraints.min_coded_height = 0;
-  image_constraints.max_coded_height = std::numeric_limits<uint32_t>::max();
-  image_constraints.min_bytes_per_row = 0;
-  image_constraints.max_bytes_per_row = std::numeric_limits<uint32_t>::max();
-  image_constraints.max_coded_width_times_coded_height = std::numeric_limits<uint32_t>::max();
-  image_constraints.layers = 1;
-  image_constraints.coded_width_divisor = 1;
-  image_constraints.coded_height_divisor = 1;
-  image_constraints.bytes_per_row_divisor = 1;
-  image_constraints.start_offset_divisor = 1;
-  image_constraints.display_width_divisor = 1;
-  image_constraints.display_height_divisor = 1;
+  image_constraints.color_spaces().emplace().emplace_back(images2::ColorSpace::kSrgb);
 
-  collection_ = fidl::WireSyncClient(std::move(collection_endpoints->client));
-  fidl::Status collection_resp = collection_->SetConstraints(true, constraints);
-  if (collection_resp.status() != ZX_OK) {
-    printf("Could not set buffer constraints: %s\n", collection_resp.FormatDescription().c_str());
-    return collection_resp.status();
+  collection_ = fidl::SyncClient(std::move(collection_endpoints->client));
+  auto set_constraints_result = collection_->SetConstraints(std::move(set_constraints_request));
+  if (!set_constraints_result.is_ok()) {
+    printf("Could not set buffer constraints: %s\n",
+           set_constraints_result.error_value().FormatDescription().c_str());
+    return set_constraints_result.error_value().status();
   }
 
   // wait for allocation
-  auto wait_resp = collection_->WaitForBuffersAllocated();
-  if (wait_resp.status() != ZX_OK) {
-    printf("Wait for buffer allocation failed: %s\n", wait_resp.FormatDescription().c_str());
-    return wait_resp.status();
+  auto wait_resp = collection_->WaitForAllBuffersAllocated();
+  if (!wait_resp.is_ok()) {
+    printf("Wait for buffer allocation failed: %s\n",
+           wait_resp.error_value().FormatDescription().c_str());
+    zx_status_t status;
+    if (wait_resp.error_value().is_framework_error()) {
+      status = ZX_ERR_INTERNAL;
+    } else {
+      status = sysmem::V1CopyFromV2Error(wait_resp.error_value().domain_error());
+    }
+    return status;
   }
 
-  capture_vmo = std::move(wait_resp.value().buffer_collection_info.buffers[0].vmo);
+  capture_vmo =
+      std::move(wait_resp.value().buffer_collection_info()->buffers()->at(0).vmo().value());
 
   // import image for capture
   // TODO(https://fxbug.dev/332521780): Display clients will be required to

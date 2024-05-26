@@ -11,7 +11,7 @@ use {
 #[fuchsia::test]
 async fn create_directory_with_create_if_absent_flag() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_create.unwrap_or_default() {
+    if !harness.config.supports_create {
         return;
     }
 
@@ -51,7 +51,7 @@ async fn create_directory_with_create_if_absent_flag() {
 #[fuchsia::test]
 async fn create_file_with_sufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_create.unwrap_or_default() {
+    if !harness.config.supports_create {
         return;
     }
 
@@ -81,7 +81,7 @@ async fn create_file_with_sufficient_rights() {
 #[fuchsia::test]
 async fn create_file_with_insufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_create.unwrap_or_default() {
+    if !harness.config.supports_create {
         return;
     }
 

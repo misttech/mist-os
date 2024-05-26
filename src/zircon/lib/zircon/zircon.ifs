@@ -103,6 +103,7 @@ Symbols:
   - { Name: _zx_pci_set_irq_mode, Type: Func }
   - { Name: _zx_pmt_unpin, Type: Func }
   - { Name: _zx_port_cancel, Type: Func }
+  - { Name: _zx_port_cancel_key, Type: Func }
   - { Name: _zx_port_create, Type: Func }
   - { Name: _zx_port_queue, Type: Func }
   - { Name: _zx_port_wait, Type: Func }
@@ -307,6 +308,7 @@ Symbols:
   - { Name: zx_pci_set_irq_mode, Type: Func, Weak: true }
   - { Name: zx_pmt_unpin, Type: Func, Weak: true }
   - { Name: zx_port_cancel, Type: Func, Weak: true }
+  - { Name: zx_port_cancel_key, Type: Func, Weak: true }
   - { Name: zx_port_create, Type: Func, Weak: true }
   - { Name: zx_port_queue, Type: Func, Weak: true }
   - { Name: zx_port_wait, Type: Func, Weak: true }

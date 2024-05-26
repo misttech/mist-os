@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/dns"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/filter"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/pprof"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
@@ -669,7 +670,7 @@ func Main() {
 		stubV4 := routesAdmin.RouteTableV4WithCtxStub{
 			Impl: &routesAdminRouteTableV4Impl{
 				routesAdminMainRouteTable: routesAdminMainRouteTable{
-					tableId: v4MainTableId,
+					tableId: fidlconv.V4MainRouteTableId,
 					token:   tokenV4,
 				},
 				ns: ns,
@@ -682,7 +683,7 @@ func Main() {
 		stubV6 := routesAdmin.RouteTableV6WithCtxStub{
 			Impl: &routesAdminRouteTableV6Impl{
 				routesAdminMainRouteTable: routesAdminMainRouteTable{
-					tableId: v6MainTableId,
+					tableId: fidlconv.V6MainRouteTableId,
 					token:   tokenV6,
 				},
 				ns: ns,

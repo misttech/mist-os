@@ -48,6 +48,8 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.hardware.camera:fuchsia.hardware.camera_cpp",
     "//sdk/fidl/fuchsia.hardware.camera:fuchsia.hardware.camera_hlcpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_hlcpp_conversion",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_hlcpp",
     "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_hlcpp",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/fit-promise",
@@ -55,6 +57,7 @@ source_set("lib") {
     "//sdk/lib/sys/cpp",
     "//src/camera/lib/cobalt_logger",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/sysmem-version",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
   ]

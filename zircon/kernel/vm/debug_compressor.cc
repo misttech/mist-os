@@ -47,9 +47,7 @@ void VmDebugCompressor::Add(vm_page_t* page, VmCowPages* object, uint64_t offset
     }
     // If currently empty then the compression thread will need a kick.
     signal = list_->empty();
-    struct Entry entry {
-      fbl::MakeRefPtrUpgradeFromRaw(object, guard), page, offset
-    };
+    struct Entry entry{fbl::MakeRefPtrUpgradeFromRaw(object, guard), page, offset};
     // Callers of |Add| are required to ensure |object| lives till the end of the call, so the
     // upgrade should never fail.
     ASSERT(entry.cow);
@@ -84,11 +82,13 @@ void VmDebugCompressor::CompressThread() {
     for (Entry entry = Pop(); entry.cow; entry = Pop()) {
       status = instance.get().Arm();
       ASSERT(status == ZX_OK);
-      if (entry.cow->ReclaimPage(entry.page, entry.offset, VmCowPages::EvictionHintAction::Ignore,
-                                 &instance.get())) {
-        pq_compress_debug_random_compression.Add(1);
-        DEBUG_ASSERT(!list_in_list(&entry.page->queue_node));
-        pmm_free_page(entry.page);
+      list_node_t freed_list = LIST_INITIAL_VALUE(freed_list);
+      if (uint64_t count = entry.cow->ReclaimPage(entry.page, entry.offset,
+                                                  VmCowPages::EvictionHintAction::Ignore,
+                                                  &freed_list, &instance.get());
+          count > 0) {
+        pq_compress_debug_random_compression.Add(count);
+        pmm_free(&freed_list);
       }
     }
   } while (true);

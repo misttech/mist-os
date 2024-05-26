@@ -54,27 +54,29 @@ use crate::{
     },
     convert::{BidirectionalConverter as _, OwnedOrRefsBidirectionalConverter},
     data_structures::socketmap::{IterShadows as _, SocketMap},
-    device::{AnyDevice, DeviceIdContext, StrongDeviceIdentifier as _, WeakDeviceIdentifier},
+    device::{
+        AnyDevice, DeviceIdContext, EitherDeviceId, StrongDeviceIdentifier as _,
+        WeakDeviceIdentifier,
+    },
     error::{ExistsError, LocalAddressError, ZonedAddressError},
     inspect::{Inspector, InspectorDeviceExt},
     ip::{
+        self,
         icmp::IcmpErrorCode,
         socket::{
             DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreationError, IpSocketHandler,
         },
-        EitherDeviceId, IpExt, IpSockCreateAndSendError, TransportIpContext,
+        IpExt, IpSockCreateAndSendError, TransportIpContext,
     },
     socket::{
-        self,
-        address::{
-            AddrIsMappedError, ConnAddr, ConnIpAddr, DualStackListenerIpAddr, DualStackRemoteIp,
-            ListenerAddr, ListenerIpAddr, SocketIpAddr, TryUnmapResult,
-        },
-        AddrVec, Bound, EitherStack, IncompatibleError, InsertError, Inserter, ListenerAddrInfo,
-        MaybeDualStack, NotDualStackCapableError, RemoveResult, SetDualStackEnabledError,
-        ShutdownType, SocketMapAddrSpec, SocketMapAddrStateSpec,
-        SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy, SocketMapStateSpec,
-        SocketMapUpdateSharingPolicy, UpdateSharingError,
+        self, AddrIsMappedError, AddrVec, Bound, ConnAddr, ConnIpAddr, DualStackListenerIpAddr,
+        DualStackLocalIp, DualStackRemoteIp, EitherStack, IncompatibleError, InsertError, Inserter,
+        ListenerAddr, ListenerAddrInfo, ListenerIpAddr, MaybeDualStack, NotDualStackCapableError,
+        RemoveResult, SetDualStackEnabledError, ShutdownType, SocketDeviceUpdate,
+        SocketDeviceUpdateNotAllowedError, SocketIpAddr, SocketIpExt, SocketMapAddrSpec,
+        SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy,
+        SocketMapStateSpec, SocketMapUpdateSharingPolicy, SocketZonedAddrExt as _,
+        UpdateSharingError,
     },
     sync::{RemoveResourceResult, RwLock},
     transport::tcp::{
@@ -90,8 +92,22 @@ use crate::{
 
 pub use accept_queue::ListenerNotifier;
 
+/// A marker trait for dual-stack socket features.
+///
+/// This trait acts as a marker for [`DualStackBaseIpExt`] for both `Self` and
+/// `Self::OtherVersion`.
+pub trait DualStackIpExt:
+    DualStackBaseIpExt + crate::socket::DualStackIpExt<OtherVersion: DualStackBaseIpExt>
+{
+}
+
+impl<I> DualStackIpExt for I where
+    I: DualStackBaseIpExt + crate::socket::DualStackIpExt<OtherVersion: DualStackBaseIpExt>
+{
+}
+
 /// A dual stack IP extension trait for TCP.
-pub trait DualStackIpExt: crate::socket::DualStackIpExt {
+pub trait DualStackBaseIpExt: crate::socket::DualStackIpExt + SocketIpExt + ip::IpExt {
     /// For `Ipv4`, this is [`EitherStack<TcpSocketId<Ipv4, _, _>, TcpSocketId<Ipv6, _, _>>`],
     /// and for `Ipv6` it is just `TcpSocketId<Ipv6>`.
     type DemuxSocketId<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>: SpecSocketId;
@@ -113,18 +129,24 @@ pub trait DualStackIpExt: crate::socket::DualStackIpExt {
     /// (by reference) to a dual stack TCP socket ID.
     fn as_dual_stack_ip_socket<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         id: &Self::DemuxSocketId<D, BT>,
-    ) -> EitherStack<&TcpSocketId<Self, D, BT>, &TcpSocketId<Self::OtherVersion, D, BT>>;
+    ) -> EitherStack<&TcpSocketId<Self, D, BT>, &TcpSocketId<Self::OtherVersion, D, BT>>
+    where
+        Self::OtherVersion: DualStackBaseIpExt;
 
     /// Determines which stack the demux socket ID belongs to and converts
     /// (by value) to a dual stack TCP socket ID.
     fn into_dual_stack_ip_socket<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         id: Self::DemuxSocketId<D, BT>,
-    ) -> EitherStack<TcpSocketId<Self, D, BT>, TcpSocketId<Self::OtherVersion, D, BT>>;
+    ) -> EitherStack<TcpSocketId<Self, D, BT>, TcpSocketId<Self::OtherVersion, D, BT>>
+    where
+        Self::OtherVersion: DualStackBaseIpExt;
 
     /// Turns a [`TcpSocketId`] of the current stack into the demuxer ID.
     fn into_demux_socket_id<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         id: TcpSocketId<Self, D, BT>,
-    ) -> Self::DemuxSocketId<D, BT>;
+    ) -> Self::DemuxSocketId<D, BT>
+    where
+        Self::OtherVersion: DualStackBaseIpExt;
 
     fn get_conn_info<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         conn_and_addr: &Self::ConnectionAndAddr<D, BT>,
@@ -137,7 +159,9 @@ pub trait DualStackIpExt: crate::socket::DualStackIpExt {
             BT::ReturnedBuffers,
             BT::ListenerNotifierOrProvidedBuffers,
         >,
-    >;
+    >
+    where
+        Self::OtherVersion: DualStackBaseIpExt;
     fn get_defunct<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         conn_and_addr: &Self::ConnectionAndAddr<D, BT>,
     ) -> bool;
@@ -155,10 +179,11 @@ pub trait DualStackIpExt: crate::socket::DualStackIpExt {
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         demux_id: Self::DemuxSocketId<CC::WeakDeviceId, BC>,
-    );
+    ) where
+        Self::OtherVersion: DualStackBaseIpExt;
 }
 
-impl DualStackIpExt for Ipv4 {
+impl DualStackBaseIpExt for Ipv4 {
     type DemuxSocketId<D: WeakDeviceIdentifier, BT: TcpBindingsTypes> =
         EitherStack<TcpSocketId<Ipv4, D, BT>, TcpSocketId<Ipv6, D, BT>>;
     type ConnectionAndAddr<D: WeakDeviceIdentifier, BT: TcpBindingsTypes> =
@@ -240,7 +265,7 @@ pub struct Ipv6Options {
     pub(crate) dual_stack_enabled: bool,
 }
 
-impl DualStackIpExt for Ipv6 {
+impl DualStackBaseIpExt for Ipv6 {
     type DemuxSocketId<D: WeakDeviceIdentifier, BT: TcpBindingsTypes> = TcpSocketId<Ipv6, D, BT>;
     type ConnectionAndAddr<D: WeakDeviceIdentifier, BT: TcpBindingsTypes> = EitherStack<
         (Connection<Ipv6, Ipv6, D, BT>, ConnAddr<ConnIpAddr<Ipv6Addr, NonZeroU16, NonZeroU16>, D>),
@@ -729,14 +754,14 @@ pub trait DualStackDemuxIdConverter<I: DualStackIpExt> {
     fn convert<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         &self,
         id: TcpSocketId<I, D, BT>,
-    ) -> <I::OtherVersion as DualStackIpExt>::DemuxSocketId<D, BT>;
+    ) -> <I::OtherVersion as DualStackBaseIpExt>::DemuxSocketId<D, BT>;
 }
 
 impl DualStackDemuxIdConverter<Ipv6> for Ipv6SocketIdToIpv4DemuxIdConverter {
     fn convert<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         &self,
         id: TcpSocketId<Ipv6, D, BT>,
-    ) -> <Ipv4 as DualStackIpExt>::DemuxSocketId<D, BT> {
+    ) -> <Ipv4 as DualStackBaseIpExt>::DemuxSocketId<D, BT> {
         EitherStack::OtherStack(id)
     }
 }
@@ -759,7 +784,7 @@ pub trait TcpDualStackContext<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: Tc
     fn into_other_demux_socket_id(
         &self,
         id: TcpSocketId<I, D, BT>,
-    ) -> <I::OtherVersion as DualStackIpExt>::DemuxSocketId<D, BT> {
+    ) -> <I::OtherVersion as DualStackBaseIpExt>::DemuxSocketId<D, BT> {
         self.other_demux_id_converter().convert(id)
     }
 
@@ -1521,8 +1546,12 @@ pub enum TcpSocketStateInner<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: Tcp
     Bound(BoundSocketState<I, D, BT>),
 }
 
+struct TcpPortAlloc<'a, I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
+    &'a BoundSocketMap<I, D, BT>,
+);
+
 impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> PortAllocImpl
-    for BoundSocketMap<I, D, BT>
+    for TcpPortAlloc<'_, I, D, BT>
 {
     const EPHEMERAL_RANGE: RangeInclusive<u16> = 49152..=65535;
     type Id = Option<SocketIpAddr<I::Addr>>;
@@ -1534,6 +1563,7 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> PortAlloc
     type PortAvailableArg = Option<NonZeroU16>;
 
     fn is_port_available(&self, addr: &Self::Id, port: u16, arg: &Option<NonZeroU16>) -> bool {
+        let Self(socketmap) = self;
         // We can safely unwrap here, because the ports received in
         // `is_port_available` are guaranteed to be in `EPHEMERAL_RANGE`.
         let port = NonZeroU16::new(port).unwrap();
@@ -1552,11 +1582,11 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> PortAlloc
         // there are no sockets that are shadowing it.
 
         root_addr.iter_shadows().chain(core::iter::once(root_addr.clone())).all(|a| match &a {
-            AddrVec::Listen(l) => self.listeners().get_by_addr(&l).is_none(),
+            AddrVec::Listen(l) => socketmap.listeners().get_by_addr(&l).is_none(),
             AddrVec::Conn(_c) => {
                 unreachable!("no connection shall be included in an iteration from a listener")
             }
-        }) && self.get_shadower_counts(&root_addr) == 0
+        }) && socketmap.get_shadower_counts(&root_addr) == 0
     }
 }
 
@@ -1571,13 +1601,14 @@ impl<'a, I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> PortA
     for TcpDualStackPortAlloc<'a, I, D, BT>
 {
     const EPHEMERAL_RANGE: RangeInclusive<u16> =
-        <BoundSocketMap<I, D, BT> as PortAllocImpl>::EPHEMERAL_RANGE;
+        <TcpPortAlloc<'a, I, D, BT> as PortAllocImpl>::EPHEMERAL_RANGE;
     type Id = ();
     type PortAvailableArg = ();
 
     fn is_port_available(&self, (): &Self::Id, port: u16, (): &Self::PortAvailableArg) -> bool {
         let Self(this, other) = self;
-        this.is_port_available(&None, port, &None) && other.is_port_available(&None, port, &None)
+        TcpPortAlloc(this).is_port_available(&None, port, &None)
+            && TcpPortAlloc(other).is_port_available(&None, port, &None)
     }
 }
 
@@ -1868,11 +1899,8 @@ where
             // Extract the specified address and the device. The
             // device is either the one from the address or the one
             // to which the socket was previously bound.
-            let (addr, required_device) =
-                crate::transport::resolve_addr_with_device::<I::Addr, _, _, _>(
-                    addr,
-                    bound_device.clone(),
-                )
+            let (addr, required_device) = addr
+                .resolve_addr_with_device(bound_device.clone())
                 .map_err(LocalAddressError::Zone)?;
 
             let mut assigned_to = core_ctx.get_devices_with_assigned_addr(addr.clone().into());
@@ -1894,7 +1922,7 @@ where
             match algorithm::simple_randomized_port_alloc(
                 &mut bindings_ctx.rng(),
                 &local_ip,
-                socketmap,
+                &TcpPortAlloc(socketmap),
                 &None,
             ) {
                 Some(port) => NonZeroU16::new(port).expect("ephemeral ports must be non-zero"),
@@ -2102,11 +2130,11 @@ where
                 |()| BindAddr::BindInOneStack(EitherStack::ThisStack(None)),
                 |()| BindAddr::BindInBothStacks,
             ),
-            Some(addr) => match socket::address::try_unmap(addr) {
-                TryUnmapResult::CannotBeUnmapped(addr) => {
+            Some(addr) => match DualStackLocalIp::<I, _>::new(addr) {
+                DualStackLocalIp::ThisStack(addr) => {
                     BindAddr::BindInOneStack(EitherStack::ThisStack(Some(addr)))
                 }
-                TryUnmapResult::Mapped(addr) => {
+                DualStackLocalIp::OtherStack(addr) => {
                     BindAddr::BindInOneStack(EitherStack::OtherStack(addr))
                 }
             },
@@ -2478,7 +2506,7 @@ where
             core_ctx.with_socket_mut_isn_transport_demux(id, |core_ctx, socket_state, isn| {
                 let TcpSocketState { socket_state, ip_options } = socket_state;
                 debug!("connect on {id:?} to {remote_ip:?}:{remote_port}");
-                let remote_ip = socket::address::dual_stack_remote_ip::<I, _>(remote_ip);
+                let remote_ip = DualStackRemoteIp::<I, _>::new(remote_ip);
                 let (local_addr, sharing, socket_options, buffer_sizes, socket_extra) =
                     match socket_state {
                         TcpSocketStateInner::Bound(BoundSocketState::Connected {
@@ -3235,13 +3263,14 @@ where
             ip: ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) },
         } = addr;
 
-        if !crate::socket::can_device_change(
-            Some(local_ip.as_ref()),
-            Some(remote_ip.as_ref()),
-            old_device.as_ref(),
-            new_device.as_ref(),
-        ) {
-            return Err(SetDeviceError::ZoneChange);
+        let update = SocketDeviceUpdate {
+            local_ip: Some(local_ip.as_ref()),
+            remote_ip: Some(remote_ip.as_ref()),
+            old_device: old_device.as_ref(),
+        };
+        match update.check_update(new_device.as_ref()) {
+            Ok(()) => (),
+            Err(SocketDeviceUpdateNotAllowedError) => return Err(SetDeviceError::ZoneChange),
         }
         let new_socket = core_ctx
             .new_ip_socket(
@@ -3277,8 +3306,7 @@ where
         demux_id: &WireI::DemuxSocketId<D, C::BindingsContext>,
         ip_addr: ListenerIpAddr<WireI::Addr, NonZeroU16>,
         old_device: &mut Option<D>,
-        new_device: Option<&D::Strong>,
-        weak_device: Option<D>,
+        new_device: Option<&D>,
         DemuxState { socketmap }: &mut DemuxState<WireI, D, C::BindingsContext>,
     ) -> Result<(), SetDeviceError>
     where
@@ -3290,16 +3318,16 @@ where
             .entry(demux_id, &ListenerAddr { ip: ip_addr, device: old_device.clone() })
             .expect("invalid ID");
 
-        if !crate::socket::can_device_change(
-            ip_addr.addr.as_ref().map(|a| a.as_ref()), /* local_ip */
-            None,                                      /* remote_ip */
-            old_device.as_ref(),
-            new_device,
-        ) {
-            return Err(SetDeviceError::ZoneChange);
+        let update = SocketDeviceUpdate {
+            local_ip: ip_addr.addr.as_ref().map(|a| a.as_ref()),
+            remote_ip: None,
+            old_device: old_device.as_ref(),
+        };
+        match update.check_update(new_device) {
+            Ok(()) => (),
+            Err(SocketDeviceUpdateNotAllowedError) => return Err(SetDeviceError::ZoneChange),
         }
-
-        match entry.try_update_addr(ListenerAddr { device: weak_device, ip: ip_addr }) {
+        match entry.try_update_addr(ListenerAddr { device: new_device.cloned(), ip: ip_addr }) {
             Ok(entry) => {
                 *old_device = entry.get_addr().device.clone();
                 Ok(())
@@ -3388,107 +3416,90 @@ where
                     _listener,
                     _sharing,
                     addr,
-                ))) => {
-                    let new_device = new_device.as_ref();
-                    match core_ctx {
-                        MaybeDualStack::NotDualStack((core_ctx, converter)) => {
-                            let ListenerAddr { ip, device } = converter.convert(addr);
-                            core_ctx.with_demux_mut(|demux| {
-                                Self::set_device_listener(
-                                    &I::into_demux_socket_id(id.clone()),
-                                    ip.clone(),
-                                    device,
-                                    new_device,
-                                    weak_device,
-                                    demux,
-                                )
-                            })
-                        }
-                        MaybeDualStack::DualStack((core_ctx, converter)) => {
-                            match converter.convert(addr) {
-                                ListenerAddr {
-                                    ip: DualStackListenerIpAddr::ThisStack(ip),
-                                    device,
-                                } => {
-                                    TcpDemuxContext::<I, _, _>::with_demux_mut(core_ctx, |demux| {
+                ))) => match core_ctx {
+                    MaybeDualStack::NotDualStack((core_ctx, converter)) => {
+                        let ListenerAddr { ip, device } = converter.convert(addr);
+                        core_ctx.with_demux_mut(|demux| {
+                            Self::set_device_listener(
+                                &I::into_demux_socket_id(id.clone()),
+                                ip.clone(),
+                                device,
+                                weak_device.as_ref(),
+                                demux,
+                            )
+                        })
+                    }
+                    MaybeDualStack::DualStack((core_ctx, converter)) => {
+                        match converter.convert(addr) {
+                            ListenerAddr { ip: DualStackListenerIpAddr::ThisStack(ip), device } => {
+                                TcpDemuxContext::<I, _, _>::with_demux_mut(core_ctx, |demux| {
+                                    Self::set_device_listener(
+                                        &I::into_demux_socket_id(id.clone()),
+                                        ip.clone(),
+                                        device,
+                                        weak_device.as_ref(),
+                                        demux,
+                                    )
+                                })
+                            }
+                            ListenerAddr {
+                                ip: DualStackListenerIpAddr::OtherStack(ip),
+                                device,
+                            } => {
+                                let other_demux_id =
+                                    core_ctx.into_other_demux_socket_id(id.clone());
+                                TcpDemuxContext::<I::OtherVersion, _, _>::with_demux_mut(
+                                    core_ctx,
+                                    |demux| {
                                         Self::set_device_listener(
-                                            &I::into_demux_socket_id(id.clone()),
+                                            &other_demux_id,
                                             ip.clone(),
                                             device,
-                                            new_device,
-                                            weak_device,
+                                            weak_device.as_ref(),
                                             demux,
                                         )
-                                    })
-                                }
-                                ListenerAddr {
-                                    ip: DualStackListenerIpAddr::OtherStack(ip),
-                                    device,
-                                } => {
-                                    let other_demux_id =
-                                        core_ctx.into_other_demux_socket_id(id.clone());
-                                    TcpDemuxContext::<I::OtherVersion, _, _>::with_demux_mut(
-                                        core_ctx,
-                                        |demux| {
+                                    },
+                                )
+                            }
+                            ListenerAddr {
+                                ip: DualStackListenerIpAddr::BothStacks(port),
+                                device,
+                            } => {
+                                let other_demux_id =
+                                    core_ctx.into_other_demux_socket_id(id.clone());
+                                core_ctx.with_both_demux_mut(|demux, other_demux| {
+                                    Self::set_device_listener(
+                                        &I::into_demux_socket_id(id.clone()),
+                                        ListenerIpAddr { addr: None, identifier: *port },
+                                        device,
+                                        weak_device.as_ref(),
+                                        demux,
+                                    )?;
+                                    match Self::set_device_listener(
+                                        &other_demux_id,
+                                        ListenerIpAddr { addr: None, identifier: *port },
+                                        device,
+                                        weak_device.as_ref(),
+                                        other_demux,
+                                    ) {
+                                        Ok(()) => Ok(()),
+                                        Err(e) => {
                                             Self::set_device_listener(
-                                                &other_demux_id,
-                                                ip.clone(),
+                                                &I::into_demux_socket_id(id.clone()),
+                                                ListenerIpAddr { addr: None, identifier: *port },
                                                 device,
-                                                new_device,
-                                                weak_device,
+                                                device.clone().as_ref(),
                                                 demux,
                                             )
-                                        },
-                                    )
-                                }
-                                ListenerAddr {
-                                    ip: DualStackListenerIpAddr::BothStacks(port),
-                                    device,
-                                } => {
-                                    let other_demux_id =
-                                        core_ctx.into_other_demux_socket_id(id.clone());
-                                    let old_device = device.as_ref().and_then(|d| d.upgrade());
-                                    let old_weak_device = device.clone();
-                                    core_ctx.with_both_demux_mut(|demux, other_demux| {
-                                        Self::set_device_listener(
-                                            &I::into_demux_socket_id(id.clone()),
-                                            ListenerIpAddr { addr: None, identifier: *port },
-                                            device,
-                                            new_device.clone(),
-                                            weak_device.clone(),
-                                            demux,
-                                        )?;
-                                        match Self::set_device_listener(
-                                            &other_demux_id,
-                                            ListenerIpAddr { addr: None, identifier: *port },
-                                            device,
-                                            new_device,
-                                            weak_device,
-                                            other_demux,
-                                        ) {
-                                            Ok(()) => Ok(()),
-                                            Err(e) => {
-                                                Self::set_device_listener(
-                                                    &I::into_demux_socket_id(id.clone()),
-                                                    ListenerIpAddr {
-                                                        addr: None,
-                                                        identifier: *port,
-                                                    },
-                                                    device,
-                                                    old_device.as_ref(),
-                                                    old_weak_device,
-                                                    demux,
-                                                )
-                                                .expect("failed to revert back the device setting");
-                                                Err(e)
-                                            }
+                                            .expect("failed to revert back the device setting");
+                                            Err(e)
                                         }
-                                    })
-                                }
+                                    }
+                                })
                             }
                         }
                     }
-                }
+                },
             }
         })
     }
@@ -4702,10 +4713,7 @@ where
     let local_ip = listener_addr.as_ref().and_then(|la| la.ip.addr);
     let bound_device = listener_addr.as_ref().and_then(|la| la.device.clone());
     let local_port = listener_addr.as_ref().map(|la| la.ip.identifier);
-    let (remote_ip, device) = crate::transport::resolve_addr_with_device::<WireI::Addr, _, _, _>(
-        remote_ip,
-        bound_device,
-    )?;
+    let (remote_ip, device) = remote_ip.resolve_addr_with_device(bound_device)?;
 
     let ip_sock = core_ctx
         .new_ip_socket(
@@ -4735,7 +4743,7 @@ where
         || match algorithm::simple_randomized_port_alloc(
             &mut bindings_ctx.rng(),
             &Some(*ip_sock.local_ip()),
-            socketmap,
+            &TcpPortAlloc(socketmap),
             &Some(remote_port),
         ) {
             Some(port) => Ok(NonZeroU16::new(port).expect("ephemeral ports must be non-zero")),
@@ -5021,8 +5029,8 @@ mod tests {
     use crate::{
         context::{
             testutil::{
-                FakeCoreCtx, FakeInstant, FakeLinkResolutionNotifier, FakeNetwork, FakeNetworkSpec,
-                FakeTimerCtx, InstantAndData, PendingFrameData, StepResult, WithFakeFrameContext,
+                FakeCoreCtx, FakeInstant, FakeNetwork, FakeNetworkSpec, FakeTimerCtx,
+                InstantAndData, PendingFrameData, StepResult, WithFakeFrameContext,
                 WithFakeTimerContext,
             },
             ContextProvider, InstantContext, ReferenceNotifiers,
@@ -5035,8 +5043,9 @@ mod tests {
         },
         filter::{FilterBindingsTypes, TransportPacketSerializer},
         ip::{
-            device::{nud::LinkResolutionContext, state::IpDeviceStateIpExt},
+            device::IpDeviceStateIpExt,
             icmp::{IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode},
+            nud::{testutil::FakeLinkResolutionNotifier, LinkResolutionContext},
             socket::{
                 testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
                 IpSockSendError, IpSocketBindingsContext, MmsError, SendOptions,

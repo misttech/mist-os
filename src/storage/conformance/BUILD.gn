@@ -75,7 +75,6 @@ rustc_test("io1_conformance_test") {
     "tests/describe.rs",
     "tests/directory.rs",
     "tests/directory/create.rs",
-    "tests/directory/enumerate.rs",
     "tests/directory/get_token.rs",
     "tests/directory/link.rs",
     "tests/directory/open.rs",

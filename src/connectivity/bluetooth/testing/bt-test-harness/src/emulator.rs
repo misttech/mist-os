@@ -11,12 +11,12 @@
 ///
 ///    - Providing access to a value of type `EmulatorState` within the Harness's State type, by
 ///      implementing `AsMut<EmulatorState>` on the state type
-///    - Providing access to a fidl proxy of type `HciEmulatorProxy`, by implementing
-///      `AsRef<HciEmulatorProxy>` on the auxilliary (Aux) type
+///    - Providing access to a fidl proxy of type `EmulatorProxy`, by implementing
+///      `AsRef<EmulatorProxy>` on the auxiliary (Aux) type
 ///
 /// This module defines the `EmulatorState` type, which represents the state common to the hci
 /// emulator. It also provides common functionality for working with emulator behavior via this
-/// state and via the HciEmulatorProxy.
+/// state and via the EmulatorProxy.
 ///
 /// The `expectation` submodule provides useful expectations (see `fuchsia_bluetooth::expectation`)
 /// that can be used to write idiomatic testcases using these harnesses.
@@ -48,15 +48,15 @@
 ///     }
 ///     ```
 ///
-/// Then, define an auxilliary type including the `HciEmulatorProxy`, and also implement `AsRef`:
+/// Then, define an auxiliary type including the `EmulatorProxy`, and also implement `AsRef`:
 ///
 ///     ```
 ///     pub struct Aux {
 ///         peripheral: PeripheralProxy,
-///         emulator: HciEmulatorProxy,
+///         emulator: EmulatorProxy,
 ///     }
-///     impl AsRef<HciEmulatorProxy> for Aux {
-///         fn as_ref(&self) -> &HciEmulatorProxy {
+///     impl AsRef<EmulatorProxy> for Aux {
+///         fn as_ref(&self) -> &EmulatorProxy {
 ///             &self.emulator
 ///         }
 ///     }
@@ -81,8 +81,8 @@
 use {
     anyhow::{format_err, Error},
     fidl_fuchsia_bluetooth::{DeviceClass, MAJOR_DEVICE_CLASS_TOY},
-    fidl_fuchsia_bluetooth_test::{
-        AdvertisingData, BredrPeerParameters, ConnectionState, HciEmulatorProxy,
+    fidl_fuchsia_hardware_bluetooth::{
+        AdvertisingData, BredrPeerParameters, ConnectionState, EmulatorProxy,
         LowEnergyPeerParameters, PeerProxy,
     },
     fuchsia_bluetooth::{
@@ -156,7 +156,7 @@ pub fn default_bredr_peer(addr: &Address) -> BredrPeerParameters {
 }
 
 pub fn add_le_peer(
-    proxy: &HciEmulatorProxy,
+    proxy: &EmulatorProxy,
     parameters: LowEnergyPeerParameters,
 ) -> impl Future<Output = Result<PeerProxy, Error>> {
     match fidl::endpoints::create_proxy() {
@@ -174,7 +174,7 @@ pub fn add_le_peer(
 }
 
 pub fn add_bredr_peer(
-    proxy: &HciEmulatorProxy,
+    proxy: &EmulatorProxy,
     parameters: BredrPeerParameters,
 ) -> impl Future<Output = Result<PeerProxy, Error>> {
     match fidl::endpoints::create_proxy() {
@@ -195,9 +195,9 @@ pub async fn watch_controller_parameters<H, S, A>(harness: H) -> Result<(), Erro
 where
     H: ExpectableState<State = S> + ExpectableExt<S, A>,
     S: AsMut<EmulatorState> + 'static,
-    A: AsRef<HciEmulatorProxy>,
+    A: AsRef<EmulatorProxy>,
 {
-    let proxy = HciEmulatorProxy::clone(harness.aux().as_ref());
+    let proxy = EmulatorProxy::clone(harness.aux().as_ref());
     loop {
         let cp = proxy.watch_controller_parameters().await?;
         harness.write_state().as_mut().controller_parameters = Some(cp.into());
@@ -211,9 +211,9 @@ pub async fn watch_advertising_states<H, S, A>(harness: H) -> Result<(), Error>
 where
     H: ExpectableState<State = S> + ExpectableExt<S, A>,
     S: AsMut<EmulatorState> + 'static,
-    A: AsRef<HciEmulatorProxy>,
+    A: AsRef<EmulatorProxy>,
 {
-    let proxy = HciEmulatorProxy::clone(harness.aux().as_ref());
+    let proxy = EmulatorProxy::clone(harness.aux().as_ref());
     loop {
         let states = proxy.watch_legacy_advertising_states().await?;
         harness
@@ -235,7 +235,7 @@ pub async fn watch_peer_connection_states<H, S, A>(
 where
     H: ExpectableState<State = S> + ExpectableExt<S, A>,
     S: AsMut<EmulatorState> + 'static,
-    A: AsRef<HciEmulatorProxy>,
+    A: AsRef<EmulatorProxy>,
 {
     loop {
         let mut result = proxy.watch_connection_states().await?;
@@ -254,7 +254,7 @@ where
 /// Utilities used for setting up expectation predicates on the HCI emulator state transitions.
 pub mod expectation {
     use {
-        super::*, fidl_fuchsia_bluetooth_test::LegacyAdvertisingType,
+        super::*, fidl_fuchsia_hardware_bluetooth::LegacyAdvertisingType,
         fuchsia_bluetooth::expectation::Predicate,
     };
 

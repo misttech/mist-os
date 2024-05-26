@@ -134,7 +134,7 @@ zx::result<std::vector<PropertyValue>> ReferenceProperty::Parse(Node& node,
   return zx::ok(std::move(values));
 }
 
-std::optional<std::pair<ReferenceNode, PropertyCells>> PropertyValue::AsReference() {
+std::optional<std::pair<ReferenceNode, PropertyCells>> PropertyValue::AsReference() const {
   if (!parent_) {
     return std::nullopt;
   }

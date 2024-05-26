@@ -12,12 +12,11 @@ zx_status_t TestSession::Open(fidl::WireSyncClient<netdev::Device>& netdevice, c
   if (zx_status_t status = Init(num_descriptors, buffer_size); status != ZX_OK) {
     return status;
   }
-  zx::result info_status = GetInfo();
+  zx::result info_status = GetInfo(flags);
   if (info_status.is_error()) {
     return info_status.status_value();
   }
   netdev::wire::SessionInfo& info = info_status.value();
-  info.set_options(flags);
 
   auto session_name = fidl::StringView::FromExternal(name);
 
@@ -56,7 +55,8 @@ zx_status_t TestSession::Init(uint16_t descriptor_count, uint64_t buffer_size) {
   return ZX_OK;
 }
 
-zx::result<netdev::wire::SessionInfo> TestSession::GetInfo() {
+zx::result<netdev::wire::SessionInfo> TestSession::GetInfo(
+    std::optional<netdev::wire::SessionFlags> with_flags) {
   if (!data_vmo_.is_valid() || !descriptors_vmo_.is_valid()) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
@@ -69,13 +69,17 @@ zx::result<netdev::wire::SessionInfo> TestSession::GetInfo() {
       status != ZX_OK) {
     return zx::error(status);
   }
-  netdev::wire::SessionInfo info(alloc_);
-  info.set_data(std::move(data_vmo));
-  info.set_descriptors(std::move(descriptors_vmo));
-  info.set_descriptor_version(NETWORK_DEVICE_DESCRIPTOR_VERSION);
-  info.set_descriptor_length(static_cast<uint8_t>(sizeof(buffer_descriptor_t) / sizeof(uint64_t)));
-  info.set_descriptor_count(descriptors_count_);
-  return zx::ok(info);
+  auto builder =
+      netdev::wire::SessionInfo::Builder(alloc_)
+          .data(std::move(data_vmo))
+          .descriptors(std::move(descriptors_vmo))
+          .descriptor_version(NETWORK_DEVICE_DESCRIPTOR_VERSION)
+          .descriptor_length(static_cast<uint8_t>(sizeof(buffer_descriptor_t) / sizeof(uint64_t)))
+          .descriptor_count(descriptors_count_);
+  if (with_flags.has_value()) {
+    builder.options(with_flags.value());
+  }
+  return zx::ok(builder.Build());
 }
 
 void TestSession::Setup(fidl::ClientEnd<netdev::Session> session, netdev::wire::Fifos fifos) {

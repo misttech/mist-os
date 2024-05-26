@@ -14,7 +14,7 @@ use core::fmt::{self, Debug, Formatter};
 use core::ops::Range;
 
 use internet_checksum::Checksum;
-use net_types::ip::{Ipv4, Ipv4Addr, Ipv6Addr};
+use net_types::ip::{IpAddress, Ipv4, Ipv4Addr, Ipv6Addr};
 use packet::records::options::OptionSequenceBuilder;
 use packet::records::options::OptionsRaw;
 use packet::{
@@ -534,12 +534,41 @@ impl<B: ByteSlice> Ipv4Packet<B> {
             Ipv4Proto::Proto(IpProto::Reserved) => Nat64TranslationResult::Drop,
         }
     }
+
+    /// Copies the packet (Header + Options + Body) into a `Vec`.
+    pub fn to_vec(&self) -> Vec<u8> {
+        let Ipv4Packet { hdr_prefix, options, body } = self;
+        let mut buf = Vec::with_capacity(
+            hdr_prefix.bytes().len() + options.bytes().len() + body.as_bytes().len(),
+        );
+        buf.extend(hdr_prefix.bytes());
+        buf.extend(options.bytes());
+        buf.extend(body.as_bytes());
+        buf
+    }
 }
 
-impl<B> Ipv4Packet<B>
-where
-    B: ByteSliceMut,
-{
+impl<B: ByteSliceMut> Ipv4Packet<B> {
+    /// Set the source IP address.
+    ///
+    /// Set the source IP address and update the header checksum accordingly.
+    pub fn set_src_ip_and_update_checksum(&mut self, addr: Ipv4Addr) {
+        let old_bytes = self.hdr_prefix.src_ip.bytes();
+        self.hdr_prefix.hdr_checksum =
+            internet_checksum::update(self.hdr_prefix.hdr_checksum, &old_bytes, addr.bytes());
+        self.hdr_prefix.src_ip = addr;
+    }
+
+    /// Set the destination IP address.
+    ///
+    /// Set the destination IP address and update the header checksum accordingly.
+    pub fn set_dst_ip_and_update_checksum(&mut self, addr: Ipv4Addr) {
+        let old_bytes = self.hdr_prefix.dst_ip.bytes();
+        self.hdr_prefix.hdr_checksum =
+            internet_checksum::update(self.hdr_prefix.hdr_checksum, &old_bytes, addr.bytes());
+        self.hdr_prefix.dst_ip = addr;
+    }
+
     /// Set the Time To Live (TTL).
     ///
     /// Set the TTL and update the header checksum accordingly.
@@ -651,6 +680,28 @@ impl<B: ByteSlice> Ipv4PacketRaw<B> {
     }
 }
 
+impl<B: ByteSliceMut> Ipv4PacketRaw<B> {
+    /// Set the source IP address.
+    ///
+    /// Set the source IP address and update the header checksum accordingly.
+    pub fn set_src_ip_and_update_checksum(&mut self, addr: Ipv4Addr) {
+        let old_bytes = self.hdr_prefix.src_ip.bytes();
+        self.hdr_prefix.hdr_checksum =
+            internet_checksum::update(self.hdr_prefix.hdr_checksum, &old_bytes, addr.bytes());
+        self.hdr_prefix.src_ip = addr;
+    }
+
+    /// Set the destination IP address.
+    ///
+    /// Set the destination IP address and update the header checksum accordingly.
+    pub fn set_dst_ip_and_update_checksum(&mut self, addr: Ipv4Addr) {
+        let old_bytes = self.hdr_prefix.dst_ip.bytes();
+        self.hdr_prefix.hdr_checksum =
+            internet_checksum::update(self.hdr_prefix.hdr_checksum, &old_bytes, addr.bytes());
+        self.hdr_prefix.dst_ip = addr;
+    }
+}
+
 /// A records parser for IPv4 options.
 ///
 /// See [`Options`] for more details.
@@ -741,8 +792,16 @@ where
         self.prefix_builder.src_ip
     }
 
+    fn set_src_ip(&mut self, addr: Ipv4Addr) {
+        self.prefix_builder.set_src_ip(addr);
+    }
+
     fn dst_ip(&self) -> Ipv4Addr {
         self.prefix_builder.dst_ip
+    }
+
+    fn set_dst_ip(&mut self, addr: Ipv4Addr) {
+        self.prefix_builder.set_dst_ip(addr);
     }
 
     fn proto(&self) -> Ipv4Proto {
@@ -907,8 +966,16 @@ impl IpPacketBuilder<Ipv4> for Ipv4PacketBuilder {
         self.src_ip
     }
 
+    fn set_src_ip(&mut self, addr: Ipv4Addr) {
+        self.src_ip = addr;
+    }
+
     fn dst_ip(&self) -> Ipv4Addr {
         self.dst_ip
+    }
+
+    fn set_dst_ip(&mut self, addr: Ipv4Addr) {
+        self.dst_ip = addr;
     }
 
     fn proto(&self) -> Ipv4Proto {
@@ -1193,6 +1260,7 @@ mod tests {
         let packet = body.parse::<Ipv4Packet<_>>().unwrap();
         verify_ipv4_packet(&packet, IPV4_PACKET);
 
+        // Verify serialization via builders.
         let buffer = packet
             .body()
             .into_serializer()
@@ -1201,6 +1269,9 @@ mod tests {
             .serialize_vec_outer()
             .unwrap();
         assert_eq!(buffer.as_ref(), ETHERNET_FRAME.bytes);
+
+        // Verify serialization via `to_vec`.
+        assert_eq!(&packet.to_vec()[..], IPV4_PACKET.bytes);
     }
 
     #[test]
@@ -1215,6 +1286,7 @@ mod tests {
         let packet = body.parse::<Ipv4Packet<_>>().unwrap();
         verify_ipv4_packet(&packet, IPV4_PACKET);
 
+        // Verify serialization via builders.
         let buffer = packet
             .body()
             .into_serializer()
@@ -1223,6 +1295,26 @@ mod tests {
             .serialize_vec_outer()
             .unwrap();
         assert_eq!(buffer.as_ref(), ETHERNET_FRAME.bytes);
+
+        // Verify serialization via `to_vec`.
+        assert_eq!(&packet.to_vec()[..], IPV4_PACKET.bytes);
+    }
+
+    #[test]
+    fn test_parse_serialize_with_options() {
+        // NB; Use IGMPv2 as test data arbitrarily, because it includes IP
+        // header options.
+        use crate::testdata::igmpv2_membership::report::*;
+
+        let mut buf = IP_PACKET_BYTES;
+        let packet = buf.parse::<Ipv4Packet<_>>().unwrap();
+        assert_eq!(packet.iter_options().count(), 1);
+
+        // NB: Don't verify serialization via builders, as they omit IP header
+        // options.
+
+        // Verify serialization via `to_vec`.
+        assert_eq!(&packet.to_vec()[..], IP_PACKET_BYTES);
     }
 
     fn hdr_prefix_to_bytes(hdr_prefix: HeaderPrefix) -> [u8; 20] {

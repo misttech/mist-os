@@ -41,9 +41,8 @@ constexpr int kLineSwitch = 5;
 constexpr int kDwarfExprSwitch = 6;
 
 const char kSymDebugShortHelp[] = "sym-debug: Print debug symbol information.";
-const char kSymDebugHelp[] =
-    R"(sym-debug ( -f | -i | -t | -l ) [ <address-expression> ]
-
+const char kSymDebugUsage[] = "sym-debug ( -f | -i | -t | -l ) [ <address-expression> ]";
+const char kSymDebugHelp[] = R"(
   This command takes a flag for what to print and an optional address. If no
   address-expression is given, the current frame's instruction pointer will be
   used.
@@ -74,7 +73,7 @@ Printing modes
 Options
 
 )" DWARF_EXPR_COMMAND_SWTICH_HELP
-    R"(
+                             R"(
 Examples
 
   sym-debug -l
@@ -378,8 +377,8 @@ void RunVerbSymDebug(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context
 }  // namespace
 
 VerbRecord GetSymDebugVerbRecord() {
-  VerbRecord sym_debug(&RunVerbSymDebug, {"sym-debug"}, kSymDebugShortHelp, kSymDebugHelp,
-                       CommandGroup::kSymbol);
+  VerbRecord sym_debug(&RunVerbSymDebug, {"sym-debug"}, kSymDebugShortHelp, kSymDebugUsage,
+                       kSymDebugHelp, CommandGroup::kSymbol);
   sym_debug.param_type = VerbRecord::kOneParam;
 
   SwitchRecord call_return_switch(kCallReturnSwitch, false, "call-return", 'r');

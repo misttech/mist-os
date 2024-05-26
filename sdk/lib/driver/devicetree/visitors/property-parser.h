@@ -132,7 +132,7 @@ class PropertyValue : public devicetree::PropertyValue {
                          std::optional<ReferenceNode> parent = std::nullopt)
       : devicetree::PropertyValue(bytes), parent_(parent) {}
 
-  std::optional<std::pair<ReferenceNode, PropertyCells>> AsReference();
+  std::optional<std::pair<ReferenceNode, PropertyCells>> AsReference() const;
 
  private:
   // Parent is present for ReferenceProperty.

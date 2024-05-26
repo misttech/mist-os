@@ -13,7 +13,7 @@ use {
 #[fuchsia::test]
 async fn open_remote_directory_test() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_remote_dir.unwrap_or_default() {
+    if !harness.config.supports_remote_dir {
         return;
     }
 
@@ -42,7 +42,7 @@ async fn open_remote_directory_test() {
 #[fuchsia::test]
 async fn open_remote_file_test() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_remote_dir.unwrap_or_default() {
+    if !harness.config.supports_remote_dir {
         return;
     }
 
@@ -90,7 +90,7 @@ async fn open_remote_file_test() {
 #[fuchsia::test]
 async fn open_remote_directory_right_escalation_test() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_remote_dir.unwrap_or_default() {
+    if !harness.config.supports_remote_dir {
         return;
     }
 
@@ -137,9 +137,7 @@ async fn open_remote_directory_right_escalation_test() {
 #[fuchsia::test]
 async fn open2_remote_directory_test() {
     let harness = TestHarness::new().await;
-    if !(harness.config.supports_remote_dir.unwrap_or_default()
-        && harness.config.supports_open2.unwrap_or_default())
-    {
+    if !(harness.config.supports_remote_dir && harness.config.supports_open2) {
         return;
     }
     let remote_name = "remote_directory";
@@ -175,9 +173,7 @@ async fn open2_remote_directory_test() {
 #[fuchsia::test]
 async fn open2_remote_file_test() {
     let harness = TestHarness::new().await;
-    if !(harness.config.supports_remote_dir.unwrap_or_default()
-        && harness.config.supports_open2.unwrap_or_default())
-    {
+    if !(harness.config.supports_remote_dir && harness.config.supports_open2) {
         return;
     }
 
@@ -244,9 +240,7 @@ async fn open2_remote_file_test() {
 #[fuchsia::test]
 async fn open2_remote_directory_right_escalation_test() {
     let harness = TestHarness::new().await;
-    if !(harness.config.supports_remote_dir.unwrap_or_default()
-        && harness.config.supports_open2.unwrap_or_default())
-    {
+    if !(harness.config.supports_remote_dir && harness.config.supports_open2) {
         return;
     }
 

@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import contextlib
-import typing
 import fuzzy_matcher
 import io
 import json
@@ -13,13 +12,13 @@ import unittest
 
 
 class PreserveEnvAndCaptureOutputTestCase(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self._old_fuchsia_dir = os.getenv("FUCHSIA_DIR")
         self.stdout = io.StringIO()
         self._context = contextlib.redirect_stdout(self.stdout)
         self._context.__enter__()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         if self._old_fuchsia_dir:
             os.environ["FUCHSIA_DIR"] = self._old_fuchsia_dir
         self._context.__exit__(None, None, None)
@@ -27,7 +26,7 @@ class PreserveEnvAndCaptureOutputTestCase(unittest.TestCase):
 
 
 class TestSearchLocations(PreserveEnvAndCaptureOutputTestCase):
-    def test_environment_variable_unset(self):
+    def test_environment_variable_unset(self) -> None:
         del os.environ["FUCHSIA_DIR"]
 
         with self.assertRaises(Exception) as ex:
@@ -37,7 +36,7 @@ class TestSearchLocations(PreserveEnvAndCaptureOutputTestCase):
             str(ex.exception), "Environment variable FUCHSIA_DIR must be set"
         )
 
-    def test_not_a_file(self):
+    def test_not_a_file(self) -> None:
         with tempfile.TemporaryDirectory() as dir:
             path = os.path.join(dir, "tmpfile")
             with open(path, "w"):
@@ -51,7 +50,7 @@ class TestSearchLocations(PreserveEnvAndCaptureOutputTestCase):
                 str(ex.exception), f"Path {path} should be a directory"
             )
 
-    def test_missing_tests_json(self):
+    def test_missing_tests_json(self) -> None:
         with tempfile.TemporaryDirectory() as dir:
             with open(os.path.join(dir, ".fx-build-dir"), "w") as f:
                 f.write("out/other")
@@ -70,7 +69,7 @@ class TestSearchLocations(PreserveEnvAndCaptureOutputTestCase):
                 f"Expected to find a test list file at {expected}",
             )
 
-    def test_success(self):
+    def test_success(self) -> None:
         with tempfile.TemporaryDirectory() as dir:
             path = os.path.join(dir, ".fx-build-dir")
             with open(os.path.join(dir, ".fx-build-dir"), "w") as f:
@@ -93,9 +92,7 @@ class TestSearchLocations(PreserveEnvAndCaptureOutputTestCase):
 
 
 class TestTestsFileMatcher(unittest.TestCase):
-    def _write_names(
-        self, dir, names: typing.List[str | typing.Tuple[str, str]]
-    ) -> str:
+    def _write_names(self, dir: str, names: list[str | tuple[str, str]]) -> str:
         path = os.path.join(dir, "tests.json")
         with open(path, "w") as f:
             l = []
@@ -109,14 +106,14 @@ class TestTestsFileMatcher(unittest.TestCase):
             json.dump(l, f)
         return path
 
-    def test_empty_file(self):
+    def test_empty_file(self) -> None:
         with tempfile.TemporaryDirectory() as dir:
             path = self._write_names(dir, [])
             tests_matcher = fuzzy_matcher.TestsFileMatcher(path)
             matcher = fuzzy_matcher.Matcher(threshold=0.75)
             self.assertEqual(tests_matcher.find_matches("foo", matcher), [])
 
-    def test_exact_matches(self):
+    def test_exact_matches(self) -> None:
         with tempfile.TemporaryDirectory() as dir:
             path = self._write_names(
                 dir,
@@ -153,7 +150,7 @@ class TestTestsFileMatcher(unittest.TestCase):
                 ["my-host-test"],
             )
 
-    def test_labels(self):
+    def test_labels(self) -> None:
         with tempfile.TemporaryDirectory() as dir:
             path = self._write_names(
                 dir,
@@ -235,7 +232,7 @@ fuchsia_test_package("{x}") {{
 
 
 class TestBuildFileMatcher(unittest.TestCase):
-    def test_simple_packages(self):
+    def test_simple_packages(self) -> None:
         with tempfile.TemporaryDirectory() as dir:
             os.makedirs(os.path.join(dir, "src"))
             with open(os.path.join(dir, "src", "BUILD.gn"), "w") as f:
@@ -284,7 +281,7 @@ class TestBuildFileMatcher(unittest.TestCase):
                 [("yet-another-real-name", "--with //src:yet-another-package")],
             )
 
-    def test_simple_labels(self):
+    def test_simple_labels(self) -> None:
         with tempfile.TemporaryDirectory() as dir:
             os.makedirs(os.path.join(dir, "src"))
             with open(os.path.join(dir, "src", "BUILD.gn"), "w") as f:
@@ -318,7 +315,7 @@ class TestBuildFileMatcher(unittest.TestCase):
                 ],
             )
 
-    def test_packages_with_components(self):
+    def test_packages_with_components(self) -> None:
         with tempfile.TemporaryDirectory() as dir:
             os.makedirs(os.path.join(dir, "src", "nested"))
             with open(os.path.join(dir, "src", "nested", "BUILD.gn"), "w") as f:
@@ -358,7 +355,7 @@ class TestBuildFileMatcher(unittest.TestCase):
                 [("component-real-name", "--with //src/nested:test-package")],
             )
 
-    def test_custom_package_name(self):
+    def test_custom_package_name(self) -> None:
         with tempfile.TemporaryDirectory() as dir:
             os.makedirs(os.path.join(dir, "src"))
             with open(os.path.join(dir, "src", "BUILD.gn"), "w") as f:
@@ -399,7 +396,7 @@ class TestBuildFileMatcher(unittest.TestCase):
 
 
 class TestTimingTracker(PreserveEnvAndCaptureOutputTestCase):
-    def test_timing(self):
+    def test_timing(self) -> None:
         fuzzy_matcher.TimingTracker.reset()
 
         with fuzzy_matcher.TimingTracker("Test timings"):
@@ -422,7 +419,7 @@ class TestTimingTracker(PreserveEnvAndCaptureOutputTestCase):
 
 
 class TestCommand(PreserveEnvAndCaptureOutputTestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self.dir = tempfile.TemporaryDirectory()
         with open(os.path.join(self.dir.name, ".fx-build-dir"), "w") as f:
@@ -463,25 +460,25 @@ class TestCommand(PreserveEnvAndCaptureOutputTestCase):
 
         os.environ["FUCHSIA_DIR"] = str(self.dir.name)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.dir.cleanup()
         return super().tearDown()
 
-    def test_bad_arguments(self):
+    def test_bad_arguments(self) -> None:
         with self.assertRaises(Exception) as ex:
             fuzzy_matcher.main(["foo", "--threshold", "3"])
         self.assertEqual(
             str(ex.exception), "--threshold must be between 0 and 1"
         )
 
-    def test_without_matches(self):
+    def test_without_matches(self) -> None:
         fuzzy_matcher.main(["afkdjsflkejkgh"])
         self.assertTrue(
             "No matching tests" in self.stdout.getvalue(),
             "Could not find expected string in " + self.stdout.getvalue(),
         )
 
-    def test_component_match(self):
+    def test_component_match(self) -> None:
         fuzzy_matcher.main(
             ["foo-test-component", "--threshold", "1", "--no-color"]
         )
@@ -494,7 +491,7 @@ foo-test-component (100.00% similar)
 """.strip(),
         )
 
-    def test_package_match(self):
+    def test_package_match(self) -> None:
         fuzzy_matcher.main(["kernel", "--threshold", ".75", "--no-color"])
 
         self.assertEqual(
@@ -505,7 +502,7 @@ kernel-tests (90.00% similar)
 """.strip(),
         )
 
-    def test_multi_match(self):
+    def test_multi_match(self) -> None:
         fuzzy_matcher.main(
             ["tests", "--threshold", ".2", "--no-color", "--max-results=3"]
         )
@@ -523,7 +520,7 @@ integration-tests (59.22% similar)
 """.strip(),
         )
 
-    def test_with_without_tests_json_match(self):
+    def test_with_without_tests_json_match(self) -> None:
         fuzzy_matcher.main(
             ["foo-test-component", "--threshold", "1", "--no-color"]
         )

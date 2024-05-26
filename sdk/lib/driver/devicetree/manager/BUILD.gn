@@ -44,15 +44,17 @@ sdk_source_set("manager") {
     "visitor.h",
   ]
 
-  non_sdk_local_deps =
-      [ "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp" ]
+  non_sdk_local_deps = [
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
+  ]
 
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/driver/legacy-bind-constants",
     "//sdk/lib/zbi-format",
+    "//src/devices/bind/fuchsia",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform",
   ]
 
@@ -82,7 +84,7 @@ test("devicetree-manager-test") {
     "//sdk/lib/driver/devicetree/visitors:driver-visitor",
     "//sdk/lib/driver/devicetree/visitors:registry",
     "//sdk/lib/driver/devicetree/visitors/default",
-    "//sdk/lib/driver/legacy-bind-constants",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree_cpp",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/lib/fxl/test:gtest_main",

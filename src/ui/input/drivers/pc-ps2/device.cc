@@ -237,12 +237,12 @@ void I8042Device::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
   fidl::Arena allocator;
   auto descriptor = fuchsia_input_report::wire::DeviceDescriptor::Builder(allocator);
 
-  fuchsia_input_report::wire::DeviceInfo device_info;
-  device_info.vendor_id = static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle);
+  auto device_info = fuchsia_input_report::wire::DeviceInformation::Builder(allocator);
+  device_info.vendor_id(static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
 
   if (protocol_ == fuchsia_hardware_input::BootProtocol::kKbd) {
-    device_info.product_id =
-        static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kPcPs2Keyboard);
+    device_info.product_id(
+        static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kPcPs2Keyboard));
     std::vector<fuchsia_input::wire::Key> keys3;
     // Add usual HID keys
     for (const auto& key : kSet1UsageMap) {
@@ -302,8 +302,8 @@ void I8042Device::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
     kbd_descriptor.output(kbd_out_desc.Build());
     descriptor.keyboard(kbd_descriptor.Build());
   } else if (protocol_ == fuchsia_hardware_input::BootProtocol::kMouse) {
-    device_info.product_id =
-        static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kPcPs2Mouse);
+    device_info.product_id(
+        static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kPcPs2Mouse));
     fidl::VectorView<uint8_t> buttons(allocator, kMouseButtonCount);
     buttons[0] = 0x01;
     buttons[1] = 0x02;
@@ -327,7 +327,7 @@ void I8042Device::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
     mouse_descriptor.input(mouse_in_desc.Build());
     descriptor.mouse(mouse_descriptor.Build());
   }
-  descriptor.device_info(device_info);
+  descriptor.device_information(device_info.Build());
 
   completer.Reply(descriptor.Build());
 }

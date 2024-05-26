@@ -6,7 +6,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.wlan.ieee80211") {
   sdk_category = "partner"
   stable = true
-  sdk_area = "Unknown"
+  sdk_area = "WLAN"
 
   sources = [
     "constants.fidl",

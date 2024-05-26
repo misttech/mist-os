@@ -53,8 +53,7 @@ void VirtualCameraAgent::AddToDeviceWatcher(AddToDeviceWatcherCallback callback)
 void VirtualCameraAgent::AddStreamConfig(
     uint64_t index, fuchsia::camera::test::virtualcamera::StreamConfig config) {
   StreamConstraints constraints(fuchsia::camera2::CameraStreamType::MONITORING);
-  constraints.AddImageFormat(config.width(), config.height(),
-                             fuchsia::sysmem::PixelFormatType::NV12);
+  constraints.AddImageFormat(config.width(), config.height(), fuchsia::images2::PixelFormat::NV12);
   stream_storage_.SetStreamConfigAtIndex(index, constraints.ConvertToStreamConfig());
 }
 

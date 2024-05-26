@@ -34,7 +34,7 @@ const MAX_CHILD_COUNT uint32 = 128;
 ///
 /// The component framework provides this service to components that use
 /// `fuchsia.component.Realm`.
-@discoverable
+@discoverable(server="platform")
 closed protocol Realm {
     /// Opens the exposed directory of a child component instance. When this
     /// function successfully returns, `exposed_dir` is bound to a directory

@@ -22,12 +22,15 @@ use crate::{
     ip::{
         self,
         device::{
-            config::IpDeviceConfigurationHandler,
-            nud::{NudBindingsContext, NudContext},
-            IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
+            IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceConfigurationHandler,
+            IpDeviceIpExt,
         },
         icmp::{IcmpBindingsContext, IcmpBindingsTypes},
-        raw::RawIpSocketsBindingsTypes,
+        nud::{NudBindingsContext, NudContext},
+        raw::{
+            RawIpSocketMapContext, RawIpSocketStateContext, RawIpSocketsBindingsContext,
+            RawIpSocketsBindingsTypes,
+        },
         socket::IpSocketContext,
         IpLayerBindingsContext, IpLayerContext, IpLayerIpExt,
     },
@@ -48,6 +51,7 @@ pub trait IpExt:
     + ip::device::IpDeviceIpExt
     + transport::tcp::socket::DualStackIpExt
     + socket::datagram::DualStackIpExt
+    + ip::raw::RawIpSocketsIpExt
 {
 }
 
@@ -58,6 +62,7 @@ impl<O> IpExt for O where
         + ip::device::IpDeviceIpExt
         + transport::tcp::socket::DualStackIpExt
         + socket::datagram::DualStackIpExt
+        + ip::raw::RawIpSocketsIpExt
 {
 }
 
@@ -71,7 +76,7 @@ pub trait CoreContext<I, BC>:
     transport::udp::StateContext<I, BC>
     + CounterContext<UdpCounters<I>>
     + TcpContext<I, BC>
-    + ip::icmp::socket::StateContext<I, BC>
+    + ip::icmp::IcmpSocketStateContext<I, BC>
     + ip::icmp::IcmpStateContext
     + IpLayerContext<I, BC>
     + NudContext<I, EthernetLinkDevice, BC>
@@ -83,7 +88,8 @@ pub trait CoreContext<I, BC>:
         EthernetLinkDevice,
         DeviceId = EthernetDeviceId<BC>,
         WeakDeviceId = EthernetWeakDeviceId<BC>,
-    >
+    > + RawIpSocketMapContext<I, BC>
+    + RawIpSocketStateContext<I, BC>
 where
     I: IpExt,
     BC: IpBindingsContext<I>,
@@ -97,7 +103,7 @@ where
     O: transport::udp::StateContext<I, BC>
         + CounterContext<UdpCounters<I>>
         + TcpContext<I, BC>
-        + ip::icmp::socket::StateContext<I, BC>
+        + ip::icmp::IcmpSocketStateContext<I, BC>
         + ip::icmp::IcmpStateContext
         + IpLayerContext<I, BC>
         + NudContext<I, EthernetLinkDevice, BC>
@@ -109,7 +115,8 @@ where
             EthernetLinkDevice,
             DeviceId = EthernetDeviceId<BC>,
             WeakDeviceId = EthernetWeakDeviceId<BC>,
-        >,
+        > + RawIpSocketMapContext<I, BC>
+        + RawIpSocketStateContext<I, BC>,
 {
 }
 
@@ -147,6 +154,7 @@ pub trait IpBindingsContext<I: IpExt>:
     + TcpBindingsContext
     + FilterBindingsContext
     + IcmpBindingsContext<I, DeviceId<Self>>
+    + RawIpSocketsBindingsContext<I, DeviceId<Self>>
     + IpDeviceBindingsContext<I, DeviceId<Self>>
     + IpLayerBindingsContext<I, DeviceId<Self>>
     + NudBindingsContext<I, EthernetLinkDevice, EthernetDeviceId<Self>>
@@ -167,6 +175,7 @@ where
         + TcpBindingsContext
         + FilterBindingsContext
         + IcmpBindingsContext<I, DeviceId<Self>>
+        + RawIpSocketsBindingsContext<I, DeviceId<Self>>
         + IpDeviceBindingsContext<I, DeviceId<Self>>
         + IpLayerBindingsContext<I, DeviceId<Self>>
         + NudBindingsContext<I, EthernetLinkDevice, EthernetDeviceId<Self>>

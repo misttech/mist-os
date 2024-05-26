@@ -213,6 +213,13 @@ open protocol ActivityGovernorListener {
     /// There is no guarantee the server will receive this message before
     /// suspension is triggered by the platform.
     flexible OnSuspend();
+
+    /// Called when the activity governor detects a suspend failure.
+    ///
+    /// The server is expected to respond to this notification. The activity
+    /// governor will not attempt to suspend again until it receives the
+    /// respond.
+    flexible OnSuspendFail() -> ();
 };
 
 /// A service for exposing events and power elements managed by the system

@@ -471,7 +471,6 @@ library_headers("ddk-deprecated-binding-headers") {
   headers = [ "lib/ddk/binding.h" ]
   public_deps = [ ":ddk" ]
   visibility = [
-    "//src/connectivity/bluetooth/core/bt-host:*",
     "//src/devices/bin/driver_manager:*",
     "//src/devices/board/drivers/astro:*",
     "//src/devices/board/drivers/integration-test:*",
@@ -484,11 +483,8 @@ library_headers("ddk-deprecated-binding-headers") {
     "//src/devices/bus/drivers/pci:*",
     "//src/devices/bus/drivers/platform:*",
     "//src/devices/bus/drivers/platform/test:*",
-    "//src/devices/nand/drivers/ram-nand:*",
     "//src/devices/tests/libdriver-integration-test:*",
-    "//src/devices/usb/drivers/usb-bus:*",
     "//src/lib/ddk/tests:*",
-    "//src/media/audio/lib/simple-codec:*",
   ]
 }
 

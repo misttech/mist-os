@@ -64,6 +64,8 @@ def run_mypy_on_binary_target(
     target_name: str,
     gen_dir: str,
     src_files: list[str],
+    data_sources: list[str],
+    data_package_name: str | None,
     lib_infos: list[dict[str, object]],
 ) -> int:
     """
@@ -74,6 +76,8 @@ def run_mypy_on_binary_target(
         target_name: The name of the target being built.
         gen_dir: The path to the generated directory
         src_files: The list of sources of the binary target.
+        data_sources: The list of data source file paths.
+        data_package_name: Name of the Python package to store data sources in.
         lib_infos: The list of library dependencies of the binary target
 
     Returns:
@@ -88,7 +92,15 @@ def run_mypy_on_binary_target(
     src_map: dict[str, str] = {}
 
     # Copy over the sources of this target to the tmp directory.
-    package_python_binary.copy_binary_sources(tmp_dir, src_files, src_map)
+    ret = package_python_binary.copy_binary_sources(
+        dest_dir=tmp_dir,
+        sources=src_files,
+        data_sources=data_sources,
+        data_package_name=data_package_name,
+        src_map=src_map,
+    )
+    if ret != 0:
+        return ret
 
     # Copy mypy enabled library sources to the tmp directory.
     package_python_binary.copy_library_sources(

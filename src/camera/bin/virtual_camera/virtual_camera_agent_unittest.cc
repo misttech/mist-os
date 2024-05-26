@@ -132,7 +132,7 @@ TEST_F(VirtualCameraAgentTest, TestConnectToHalController) {
 
         camera::StreamConstraints constraints(fuchsia::camera2::CameraStreamType::MONITORING);
         constraints.AddImageFormat(config.width(), config.height(),
-                                   fuchsia::sysmem::PixelFormatType::NV12);
+                                   fuchsia::images2::PixelFormat::NV12);
         fuchsia::camera2::hal::Config expected_config;
         expected_config.stream_configs.push_back(constraints.ConvertToStreamConfig());
         EXPECT_TRUE(fidl::Equals(*next_config, expected_config));

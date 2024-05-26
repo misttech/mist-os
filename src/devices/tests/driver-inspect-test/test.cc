@@ -31,18 +31,17 @@ class InspectTestCase : public gtest::RealLoopFixture {
 
   void SetUp() override {
     IsolatedDevmgr::Args args;
-
-    args.device_list.push_back({
-        .vid = PDEV_VID_TEST,
-        .pid = PDEV_PID_INSPECT_TEST,
-        .did = 0,
-    });
+    board_test::DeviceEntry dev = {};
+    strlcpy(dev.name, kPlatformDeviceName, sizeof(dev.name));
+    dev.vid = PDEV_VID_TEST;
+    dev.pid = PDEV_PID_INSPECT_TEST;
+    dev.did = 0;
+    args.device_list.push_back(dev);
 
     ASSERT_EQ(ZX_OK, IsolatedDevmgr::Create(&args, &devmgr_));
 
     static char path_buf[128];
-    snprintf(path_buf, sizeof(path_buf), "sys/platform/%x:%x:0/inspect-test", PDEV_VID_TEST,
-             PDEV_PID_INSPECT_TEST);
+    snprintf(path_buf, sizeof(path_buf), "sys/platform/%s/inspect-test", kPlatformDeviceName);
     zx::result channel = device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(), path_buf);
     ASSERT_EQ(ZX_OK, channel.status_value());
     client_ = fidl::ClientEnd<TestInspect>{std::move(channel.value())};
@@ -55,9 +54,14 @@ class InspectTestCase : public gtest::RealLoopFixture {
     using diagnostics::reader::ArchiveReader;
     using diagnostics::reader::SanitizeMonikerForSelectors;
 
-    const std::string moniker =
-        std::string{"realm_builder:"} + devmgr_.RealmChildName() +
-        "/driver_test_realm/realm_builder:0/boot-drivers:dev.sys.platform.11_13_0";
+    std::string moniker;
+    {
+      std::ostringstream builder;
+      builder << "realm_builder:" << devmgr_.RealmChildName()
+              << "/driver_test_realm/realm_builder:0/boot-drivers:dev.sys.platform."
+              << kPlatformDeviceName;
+      moniker = builder.str();
+    }
 
     return fpromise::make_ok_promise(
                std::unique_ptr<ArchiveReader>(new ArchiveReader(
@@ -99,6 +103,8 @@ class InspectTestCase : public gtest::RealLoopFixture {
   }
 
  private:
+  static constexpr char kPlatformDeviceName[board_test::kNameLengthMax] = "test-platform-device";
+
   IsolatedDevmgr devmgr_;
   fidl::ClientEnd<TestInspect> client_;
 };

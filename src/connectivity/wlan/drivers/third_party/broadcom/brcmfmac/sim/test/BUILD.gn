@@ -226,10 +226,10 @@ executable("data_frame_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("disassoc_test") {
-  output_name = "disassoc_test"
+executable("disconnect_test") {
+  output_name = "disconnect_test"
   testonly = true
-  sources = [ "disassoc_test.cc" ]
+  sources = [ "disconnect_test.cc" ]
   deps = [
     ":sim_test",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
@@ -557,7 +557,7 @@ _tests = [
   "crash_recovery_test",
   "create_softap_test",
   "data_frame_test",
-  "disassoc_test",
+  "disconnect_test",
   "dynamic_if_test",
   "err_inject_test",
   "escan_params_test",

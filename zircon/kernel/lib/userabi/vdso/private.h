@@ -13,7 +13,11 @@
 // This defines the struct shared with the kernel.
 #include <lib/userabi/vdso-constants.h>
 
+// This defines the struct used by libfasttime and the time syscalls.
+#include <lib/time-values-abi.h>
+
 extern __LOCAL const struct vdso_constants DATA_CONSTANTS;
+extern __LOCAL struct internal::TimeValues DATA_TIME_VALUES;
 
 extern "C" {
 
@@ -51,10 +55,6 @@ extern "C" {
 __LOCAL decltype(zx_clock_get_monotonic) CODE_clock_get_monotonic_via_kernel_ticks;
 __LOCAL decltype(zx_deadline_after) CODE_deadline_after_via_kernel_mono;
 __LOCAL decltype(zx_deadline_after) CODE_deadline_after_via_kernel_ticks;
-
-#if __aarch64__
-__LOCAL decltype(zx_ticks_get) CODE_ticks_get_arm_a73;
-#endif
 
 }  // extern "C"
 

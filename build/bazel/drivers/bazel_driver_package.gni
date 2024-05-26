@@ -57,25 +57,11 @@ template("bazel_driver_package") {
                              "inputs",
                            ])
     command = "build"
-    output_groups = [ "+build_id_dir" ]
-    allow_directory_in_outputs = true
-    bazel_targets = [ bazel_target + "_fuchsia_package" ]
-    copy_outputs = [
-      {
-        bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_pkg/package_manifest.json"
-        ninja = "$package_name/package_manifest.json"
-      },
-      {
-        bazel = "{{BAZEL_TARGET_OUT_DIR}}/$package_name.far"
-        ninja = "$package_name.far"
-      },
-    ]
-    build_id_directories = [
-      {
-        bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_build_id_dir"
-        ninja = "${bazel_build_target}_build_id_dir"
-      },
-    ]
+    bazel_targets = [ bazel_target ]
+    fuchsia_package_outputs = {
+      archive = "$target_out_dir/$package_name.far"
+      copy_debug_symbols = true
+    }
 
     metadata = {
       # Used by the check_included_drivers template.

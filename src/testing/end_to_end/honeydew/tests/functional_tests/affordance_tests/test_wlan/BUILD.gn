@@ -65,5 +65,5 @@ group("core_vim3_staging_sl4f_tests") {
 # Package groups for WLAN.
 group("wlan_packages") {
   testonly = true
-  public_deps = [ "honeydew:sl4f_packages" ]
+  public_deps = [ "../../../../:sl4f_packages" ]
 }

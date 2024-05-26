@@ -44,17 +44,12 @@ bool VmoFile::ValidateRights(fuchsia_io::Rights rights) const {
   return true;
 }
 
-zx_status_t VmoFile::GetAttributes(VnodeAttributes* attr) {
-  *attr = VnodeAttributes();
-  attr->mode = V_TYPE_FILE | V_IRUSR;
-  if (writable_) {
-    attr->mode |= V_IWUSR;
-  }
-  attr->inode = fio::wire::kInoUnknown;
-  attr->content_size = length_;
-  attr->storage_size = fbl::round_up(attr->content_size, zx_system_get_page_size());
-  attr->link_count = 1;
-  return ZX_OK;
+zx::result<fs::VnodeAttributes> VmoFile::GetAttributes() const {
+  return zx::ok(fs::VnodeAttributes{
+      .content_size = length_,
+      .storage_size = fbl::round_up(length_, zx_system_get_page_size()),
+      .mode = V_TYPE_FILE | V_IRUSR | (writable_ ? V_IWUSR : 0),
+  });
 }
 
 zx_status_t VmoFile::Read(void* data, size_t length, size_t offset, size_t* out_actual) {

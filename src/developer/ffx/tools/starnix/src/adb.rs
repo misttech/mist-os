@@ -5,8 +5,7 @@
 use anyhow::{Context, Result};
 use argh::{ArgsInfo, FromArgs};
 use async_net::{Ipv4Addr, TcpListener, TcpStream};
-use fho::SimpleWriter;
-use fidl_fuchsia_developer_ffx::{TargetCollectionProxy, TargetQuery};
+use fho::{Connector, SimpleWriter};
 use fidl_fuchsia_developer_remotecontrol as rc;
 use fidl_fuchsia_starnix_container as fstarcontainer;
 use fuchsia_async as fasync;
@@ -89,37 +88,13 @@ fn find_open_port(start: u16) -> u16 {
     }
 }
 
-async fn connect_to_rcs(
-    target_collection_proxy: &TargetCollectionProxy,
-    query: &TargetQuery,
-) -> Result<rc::RemoteControlProxy> {
-    let (client, server) = fidl::endpoints::create_proxy().expect("Failed to create endpoints.");
-    target_collection_proxy
-        .open_target(query, server)
-        .await
-        .expect("Fidl error opening target.")
-        .expect("Failed to open target.");
-    let (rcs_client, rcs_server) =
-        fidl::endpoints::create_proxy().expect("Failed to create rcs endpoints.");
-    client
-        .open_remote_control(rcs_server)
-        .await
-        .expect("Fidl error opening remote control")
-        .expect("Error opening remote control.");
-    Ok(rcs_client)
-}
-
 pub async fn starnix_adb(
     command: &StarnixAdbCommand,
-    rcs_proxy: &rc::RemoteControlProxy,
-    target_collection_proxy: &TargetCollectionProxy,
+    rcs_connector: &Connector<rc::RemoteControlProxy>,
     _writer: SimpleWriter,
 ) -> Result<()> {
-    let node_name = rcs_proxy.identify_host().await.expect("").expect("").nodename;
-    let target_query = TargetQuery { string_matcher: node_name, ..Default::default() };
-
     let reconnect = || async {
-        let rcs_proxy = connect_to_rcs(&target_collection_proxy, &target_query).await?;
+        let rcs_proxy = connect_to_rcs(rcs_connector).await?;
         anyhow::Ok((
             connect_to_contoller(&rcs_proxy, command.moniker.clone()).await?,
             Arc::new(AtomicBool::new(false)),

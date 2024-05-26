@@ -1986,6 +1986,13 @@ impl Document {
         }
     }
 
+    pub fn all_config_names(&self) -> Vec<&Name> {
+        self.capabilities
+            .as_ref()
+            .map(|c| c.iter().filter_map(|c| c.config.as_ref()).collect())
+            .unwrap_or_else(|| vec![])
+    }
+
     pub fn all_environment_names(&self) -> Vec<&Name> {
         self.environments
             .as_ref()
@@ -3890,6 +3897,17 @@ impl FilterClause for Use {
 impl PathClause for Use {
     fn path(&self) -> Option<&Path> {
         self.path.as_ref()
+    }
+}
+
+impl FromClause for Use {
+    fn from_(&self) -> OneOrMany<AnyRef<'_>> {
+        let one = match &self.from {
+            Some(from) => AnyRef::from(from),
+            // Default for `use`.
+            None => AnyRef::Parent,
+        };
+        OneOrMany::One(one)
     }
 }
 

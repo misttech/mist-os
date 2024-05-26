@@ -5,6 +5,7 @@
 import("//build/python/python_library.gni")
 
 python_library("yaml") {
+  enable_mypy = false
   source_root = "//third_party/pyyaml/src/lib/yaml"
   sources = [
     "__init__.py",

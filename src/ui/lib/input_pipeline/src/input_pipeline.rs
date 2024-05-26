@@ -788,7 +788,7 @@ mod tests {
         match input_device_request {
             fidl_fuchsia_input_report::InputDeviceRequest::GetDescriptor { responder } => {
                 let _ = responder.send(&fidl_fuchsia_input_report::DeviceDescriptor {
-                    device_info: None,
+                    device_information: None,
                     mouse: Some(fidl_fuchsia_input_report::MouseDescriptor {
                         input: Some(fidl_fuchsia_input_report::MouseInputDescriptor {
                             movement_x: None,

@@ -37,6 +37,32 @@ open protocol DiscoverySession {
     flexible Stop();
 };
 
+open protocol BondingDelegate {
+    /// Restores existing bonded devices to the host. An authenticated session will be established
+    /// for future connections using the provided bonding data.
+    ///
+    /// If bonding data for the LE transport is available, then the host will establish a connection
+    /// if the peer directs connectable advertisements to us.
+    ///
+    /// If any of the entries in `bonds` could not be restored, then they will be returned in
+    /// `errors`. This can happen for entries that are malformed and for peers that are already
+    /// known to the bt-host. An empty `errors` list indicates that all bonds were successfully
+    /// restored.
+    flexible RestoreBonds(struct {
+        bonds vector<sys.BondingData>:MAX;
+    }) -> (struct {
+        errors vector<sys.BondingData>:MAX;
+    });
+
+    /// Get the next bonding update. The request will hang until the next update.
+    flexible WatchBonds() -> (flexible union {
+        /// Notifies when bonding data for a peer has been added/updated.
+        1: updated sys.BondingData;
+        /// Notifies when a bond is removed due to authentication failures.
+        2: removed bt.PeerId;
+    });
+};
+
 open protocol PeerWatcher {
     /// Get the next peer update. The request will hang until the next update.
     flexible GetNext() -> (flexible union {
@@ -230,29 +256,10 @@ open protocol Host {
         delegate client_end:sys.PairingDelegate;
     });
 
-    /// Restores existing bonded devices to the host. An authenticated session will be established
-    /// for future connections using the provided bonding data.
-    ///
-    /// If bonding data for the LE transport is available, then the host will automatically
-    /// establish a connection when the peer is in range and connectable.
-    ///
-    /// If any of the entries in `bonds` could not be restored, then they will be returned in
-    /// `errors`. This can happen for entries that are malformed and for peers that are already
-    /// known to the bt-host. An empty `errors` list indicates that all bonds were successfully
-    /// restored.
-    flexible RestoreBonds(struct {
-        bonds vector<sys.BondingData>:MAX;
-    }) -> (struct {
-        errors vector<sys.BondingData>:MAX;
+    /// Set a BondingDelegate protocol that will be notified of new and removed bonds that need to
+    /// be persisted. If a delegate is already set, the new `delegate` will be closed with
+    /// ALREADY_BOUND
+    flexible SetBondingDelegate(resource struct {
+        delegate server_end:BondingDelegate;
     });
-
-    // ===== Events =====
-
-    /// Notifies when bonding data for a peer has been updated.
-    flexible -> OnNewBondingData(struct {
-        data sys.BondingData;
-    });
-
-    // TODO(https://fxbug.dev/42158854): Introduce a "OnBondRemoved()" event to notify when existing
-    // keys become stale.
 };

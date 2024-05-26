@@ -15,9 +15,8 @@ namespace zxdb {
 namespace {
 
 const char kAuthShortHelp[] = "auth: Authenticate with a symbol server. [deprecated]";
-const char kAuthHelp[] =
-    R"(DEPRECATED auth [credentials]
-
+const char kAuthUsage[] = "DEPRECATED auth [credentials]";
+const char kAuthHelp[] = R"(
   OOB auth workflow is deprecated (go/oauth-oob-deprecation). To authenticate, please run the
   following command and restart zxdb
 
@@ -37,7 +36,8 @@ void RunVerbAuth(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetAuthVerbRecord() {
-  return VerbRecord(&RunVerbAuth, {"auth"}, kAuthShortHelp, kAuthHelp, CommandGroup::kSymbol);
+  return VerbRecord(&RunVerbAuth, {"auth"}, kAuthShortHelp, kAuthUsage, kAuthHelp,
+                    CommandGroup::kSymbol);
 }
 
 }  // namespace zxdb

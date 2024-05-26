@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.io/cpp/wire_types.h>
 #include <lib/fdio/vfs.h>
 #include <lib/zx/result.h>
+#include <zircon/availability.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
@@ -33,6 +34,8 @@
 // API requirements. These type names should start with "Vnode" to reduce confusion with their FIDL
 // counterparts.
 namespace fs {
+
+class Vnode;
 
 namespace Rights {
 
@@ -74,7 +77,7 @@ enum class VnodeProtocol : uint8_t {
   kService = uint64_t{fuchsia_io::NodeProtocolKinds::kConnector},
   kDirectory = uint64_t{fuchsia_io::NodeProtocolKinds::kDirectory},
   kFile = uint64_t{fuchsia_io::NodeProtocolKinds::kFile},
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   kSymlink = uint64_t{fuchsia_io::NodeProtocolKinds::kSymlink},
 #endif
 };
@@ -138,7 +141,7 @@ struct VnodeConnectionOptions {
   // Translates the io1 flags passed by the client into an equivalent set of io2 protocols.
   constexpr fuchsia_io::NodeProtocolKinds protocols() const {
     constexpr fuchsia_io::NodeProtocolKinds kSupportedIo1Protocols =
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
         // Symlinks are not supported via io1.
         fuchsia_io::NodeProtocolKinds::kMask ^ fuchsia_io::NodeProtocolKinds::kSymlink;
 #else
@@ -167,66 +170,85 @@ struct VnodeConnectionOptions {
 
 fuchsia_io::OpenFlags RightsToOpenFlags(fuchsia_io::Rights rights);
 
-// Objective information about a filesystem node, used to implement |Vnode::GetAttributes|.
-struct VnodeAttributes {
-  uint32_t mode = {};
-  uint64_t inode = {};
-  uint64_t content_size = {};
-  uint64_t storage_size = {};
-  uint64_t link_count = {};
-  uint64_t creation_time = {};
-  uint64_t modification_time = {};
+using VnodeAttributesQuery = fuchsia_io::NodeAttributesQuery;
 
+// Objective information about a filesystem node, used to implement |Vnode::GetAttributes|.
+// Filesystems should only report those attributes which it has support for.
+//
+// Note that only attributes for which existing filesystems support are currently implemented.
+// Additional attributes can be supported by adding them to this struct, and updating the
+// |NodeAttributeBuilder::Build()| function accordingly.
+struct VnodeAttributes {
+  std::optional<uint64_t> id;
+  std::optional<uint64_t> content_size;
+  std::optional<uint64_t> storage_size;
+  std::optional<uint64_t> link_count;
+
+  std::optional<uint64_t> creation_time;
+  std::optional<uint64_t> modification_time;
+
+  // POSIX Compatibility Attributes
+  // TODO(https://fxbug.dev/340626555): Add support for uid/gid.
+  std::optional<uint32_t> mode;
+
+  // Compare two |VnodeAttributes| instances for equality.
   bool operator==(const VnodeAttributes& other) const {
-    return mode == other.mode && inode == other.inode && content_size == other.content_size &&
+    return id == other.id && content_size == other.content_size &&
            storage_size == other.storage_size && link_count == other.link_count &&
-           creation_time == other.creation_time && modification_time == other.modification_time;
+           creation_time == other.creation_time && modification_time == other.modification_time &&
+           mode == other.mode;
   }
 
   // Converts from |VnodeAttributes| to fuchsia.io v1 |NodeAttributes|.
   fuchsia_io::wire::NodeAttributes ToIoV1NodeAttributes() const;
 };
 
-// A request to update pieces of the |VnodeAttributes|. The fuchsia.io protocol only allows mutating
-// the creation time and modification time. When a field is present, it indicates that the
-// corresponding field should be updated.
-class VnodeAttributesUpdate {
- public:
-  VnodeAttributesUpdate& set_creation_time(std::optional<uint64_t> v) {
-    creation_time_ = v;
-    return *this;
+// A request to update pieces of the |VnodeAttributes| via |Vnode::SetAttributes|. Filesystems may
+// only support a sub-set of all possible attributes.
+//
+// Note that only attributes for which existing filesystems support are currently implemented.
+// Additional attributes can be supported by adding them to this struct, and updating the
+// |FromIo1()| and |FromIo2()| functions accordingly.
+struct VnodeAttributesUpdate {
+  std::optional<uint64_t> creation_time;
+  std::optional<uint64_t> modification_time;
+  // TODO(https://fxbug.dev/340626555): Add support for mode/uid/gid.
+
+  // Return a set of flags representing those attributes which we want to update.
+  constexpr VnodeAttributesQuery Query() const {
+    VnodeAttributesQuery query;
+    if (creation_time) {
+      query |= VnodeAttributesQuery::kCreationTime;
+    }
+    if (modification_time) {
+      query |= VnodeAttributesQuery::kModificationTime;
+    }
+    return query;
   }
 
-  VnodeAttributesUpdate& set_modification_time(std::optional<uint64_t> v) {
-    modification_time_ = v;
-    return *this;
+  static constexpr VnodeAttributesUpdate FromIo1(const fuchsia_io::wire::NodeAttributes& attrs,
+                                                 fuchsia_io::NodeAttributeFlags flags) {
+    VnodeAttributesUpdate attr_update;
+    if (flags & fuchsia_io::NodeAttributeFlags::kCreationTime) {
+      attr_update.creation_time = attrs.creation_time;
+    }
+    if (flags & fuchsia_io::NodeAttributeFlags::kModificationTime) {
+      attr_update.modification_time = attrs.modification_time;
+    }
+    return attr_update;
   }
 
-  bool any() const { return creation_time_.has_value() || modification_time_.has_value(); }
-
-  bool has_creation_time() const { return creation_time_.has_value(); }
-
-  // Moves out the creation time. Requires |creation_time_| to be present. After this method
-  // returns, |creation_time_| is absent.
-  uint64_t take_creation_time() {
-    uint64_t v = creation_time_.value();
-    creation_time_ = std::nullopt;
-    return v;
+  static constexpr VnodeAttributesUpdate FromIo2(
+      const fuchsia_io::wire::MutableNodeAttributes& attrs) {
+    VnodeAttributesUpdate attr_update;
+    if (attrs.has_creation_time()) {
+      attr_update.creation_time = attrs.creation_time();
+    }
+    if (attrs.has_modification_time()) {
+      attr_update.modification_time = attrs.modification_time();
+    }
+    return attr_update;
   }
-
-  bool has_modification_time() const { return modification_time_.has_value(); }
-
-  // Moves out the modification time. Requires |modification_time_| to be present. After this method
-  // returns, |modification_time_| is absent.
-  uint64_t take_modification_time() {
-    uint64_t v = modification_time_.value();
-    modification_time_ = std::nullopt;
-    return v;
-  }
-
- private:
-  std::optional<uint64_t> creation_time_ = {};
-  std::optional<uint64_t> modification_time_ = {};
 };
 
 // Indicates if and when a new object should be created when opening a node.
@@ -254,7 +276,30 @@ fuchsia_io::Rights DownscopeRights(fuchsia_io::Rights rights, VnodeProtocol prot
 zx::result<VnodeProtocol> NegotiateProtocol(fuchsia_io::NodeProtocolKinds supported,
                                             fuchsia_io::NodeProtocolKinds requested);
 
-#if !defined(__Fuchsia__) || __Fuchsia_API_level__ >= 19
+// Encapsulates the state of a node's wire attributes on the stack. Used by connections for sending
+// an OnRepresentation event or responding to a fuchsia.io/Node.GetAttributes call.
+class NodeAttributeBuilder {
+ public:
+  using NodeAttributes2 = fuchsia_io::wire::NodeAttributes2;
+  using ImmutableAttrs = fuchsia_io::wire::ImmutableNodeAttributes;
+  using MutableAttrs = fuchsia_io::wire::MutableNodeAttributes;
+
+  // Build and return a wire object that uses this object as storage. This object **must** outlive
+  // the returned wire table. The resulting table will include all attributes specified by |query|
+  // that the vnode supports.
+  zx::result<NodeAttributes2> Build(const Vnode& vnode, fuchsia_io::NodeAttributesQuery query);
+
+ private:
+  // Data referenced by the table frames below:
+  VnodeAttributes attributes;
+  fuchsia_io::Abilities abilities;
+  fuchsia_io::NodeProtocolKinds protocols;
+  // Table frames the final wire object will be built from:
+  fidl::WireTableFrame<ImmutableAttrs> immutable_frame;
+  fidl::WireTableFrame<MutableAttrs> mutable_frame;
+};
+
+#if !defined(__Fuchsia__) || FUCHSIA_API_LEVEL_AT_LEAST(19)
 constexpr CreationMode CreationModeFromFidl(fuchsia_io::CreationMode mode) {
   switch (mode) {
     case fuchsia_io::CreationMode::kNever:

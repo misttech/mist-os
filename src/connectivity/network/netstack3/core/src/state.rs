@@ -4,7 +4,7 @@
 
 //! Structs containing the entire stack state.
 
-use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6};
+use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
 
 use crate::{
     api::CoreApi,
@@ -13,16 +13,14 @@ use crate::{
         arp::ArpCounters, DeviceCounters, DeviceId, DeviceLayerState, EthernetDeviceCounters,
         PureIpDeviceCounters, WeakDeviceId,
     },
-    filter::FilterBindingsTypes,
     ip::{
         self,
-        device::nud::NudCounters,
-        device::slaac::SlaacCounters,
+        device::SlaacCounters,
         icmp::{IcmpState, NdpCounters},
+        nud::NudCounters,
         IpCounters, IpLayerIpExt, IpLayerTimerId, IpStateInner, Ipv4State, Ipv6State,
     },
     socket::datagram,
-    sync::RwLock,
     time::TimerId,
     transport::{self, tcp::TcpCounters, udp::UdpCounters, TransportLayerState},
     BindingsContext, BindingsTypes, CoreCtx,
@@ -100,22 +98,6 @@ impl<BT: BindingsTypes> StackState<BT> {
         )
     }
 
-    pub(crate) fn filter<I: packet_formats::ip::IpExt>(
-        &self,
-    ) -> &RwLock<crate::filter::State<I, BT>> {
-        #[derive(GenericOverIp)]
-        #[generic_over_ip(I, Ip)]
-        struct Wrap<'a, I: packet_formats::ip::IpExt, BT: FilterBindingsTypes>(
-            &'a RwLock<crate::filter::State<I, BT>>,
-        );
-        let Wrap(state) = I::map_ip(
-            IpInvariant(self),
-            |IpInvariant(state)| Wrap(state.ipv4.filter()),
-            |IpInvariant(state)| Wrap(state.ipv6.filter()),
-        );
-        state
-    }
-
     pub(crate) fn nud_counters<I: Ip>(&self) -> &NudCounters<I> {
         I::map_ip(
             IpInvariant(self),
@@ -125,7 +107,7 @@ impl<BT: BindingsTypes> StackState<BT> {
     }
 
     pub(crate) fn ndp_counters(&self) -> &NdpCounters {
-        &self.ipv6.icmp().ndp_counters
+        &self.ipv6.icmp.ndp_counters
     }
 
     pub(crate) fn device_counters(&self) -> &DeviceCounters {
@@ -153,17 +135,17 @@ impl<BT: BindingsTypes> StackState<BT> {
     }
 
     pub(crate) fn slaac_counters(&self) -> &SlaacCounters {
-        &self.ipv6.slaac_counters()
+        &self.ipv6.slaac_counters
     }
 
     pub(crate) fn inner_ip_state<I: IpLayerIpExt>(&self) -> &IpStateInner<I, DeviceId<BT>, BT> {
-        I::map_ip((), |()| self.ipv4.inner(), |()| self.ipv6.inner())
+        I::map_ip((), |()| &self.ipv4.inner, |()| &self.ipv6.inner)
     }
 
     pub(crate) fn inner_icmp_state<I: ip::IpExt + datagram::DualStackIpExt>(
         &self,
     ) -> &IcmpState<I, WeakDeviceId<BT>, BT> {
-        I::map_ip((), |()| &self.ipv4.icmp().inner, |()| &self.ipv6.icmp().inner)
+        I::map_ip((), |()| &self.ipv4.icmp.inner, |()| &self.ipv6.icmp.inner)
     }
 }
 

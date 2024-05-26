@@ -20,7 +20,7 @@ async fn set_pairing_delegate() {
     let hd = host_dispatcher::test::make_simple_test_dispatcher();
 
     // Add Host #1 to dispatcher and make active
-    let (_host_server_1, _host_1, _gatt_server_1) =
+    let (_host_server_1, _host_1, _gatt_server_1, _bonding) =
         host_dispatcher::test::create_and_add_test_host_to_dispatcher(HostId(1), &hd)
             .await
             .unwrap();

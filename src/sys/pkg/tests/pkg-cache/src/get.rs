@@ -140,7 +140,12 @@ async fn get_and_hold_directory() {
     let package = PackageBuilder::new("pkg-a").build().await.unwrap();
 
     // Request and write a package, hold the package directory.
-    let dir = get_and_verify_package(&env.proxies.package_cache, &package).await;
+    let dir = get_and_verify_package(
+        &env.proxies.package_cache,
+        fpkg::GcProtection::OpenPackageTracking,
+        &package,
+    )
+    .await;
 
     let meta_blob_info = BlobInfo { blob_id: BlobId::from(*package.hash()).into(), length: 0 };
 
@@ -359,8 +364,12 @@ async fn get_package_already_present_on_fs_with_pre_closed_needed_blobs() {
 // available via PackageCache.Get without needing to write any more blobs
 async fn verify_superpackage_get(superpackage: &Package, subpackages: &[Package]) {
     let env = TestEnv::builder().build().await;
-    let _: fio::DirectoryProxy =
-        get_and_verify_package(&env.proxies.package_cache, superpackage).await;
+    let _: fio::DirectoryProxy = get_and_verify_package(
+        &env.proxies.package_cache,
+        fpkg::GcProtection::OpenPackageTracking,
+        superpackage,
+    )
+    .await;
 
     for subpackage in subpackages {
         let _: fio::DirectoryProxy =
@@ -745,7 +754,12 @@ async fn get_uses_open_packages_to_short_circuit() {
         .unwrap();
 
     // Add the package to the open package cache.
-    let dir = crate::get_and_verify_package(&env.proxies.package_cache, &pkg).await;
+    let dir = crate::get_and_verify_package(
+        &env.proxies.package_cache,
+        fpkg::GcProtection::OpenPackageTracking,
+        &pkg,
+    )
+    .await;
 
     // Delete its content blob.
     let content_hash = fuchsia_merkle::from_slice(blob_content).root();
@@ -799,4 +813,66 @@ async fn get_uses_open_packages_to_short_circuit() {
         get_missing_blobs(&needed_blobs).await,
         vec![fpkg::BlobInfo { blob_id: BlobId::from(content_hash).into(), length: 0 }]
     );
+}
+
+#[fuchsia_async::run_singlethreaded(test)]
+async fn bootfs_used_to_serve_package_directories_but_not_prevent_fetching() {
+    let blob_content = b"base-blob-contents";
+    let blob_hash = fuchsia_merkle::from_slice(blob_content).root();
+    let base_package = PackageBuilder::new("a-base-package")
+        .add_resource_at("a-base-blob", &blob_content[..])
+        .build()
+        .await
+        .unwrap();
+    let system_image_package =
+        SystemImageBuilder::new().static_packages(&[&base_package]).build().await;
+    let env = TestEnv::builder()
+        .blobfs_from_system_image_and_extra_packages(&system_image_package, &[&base_package])
+        .await
+        .add_bootfs_blob(blob_hash, blob_content.to_vec())
+        .build()
+        .await;
+
+    // The blobs are preferentially read from bootfs.
+    // Delete the content blob from blobfs.
+    let () = env.blobfs.client().delete_blob(&blob_hash).await.unwrap();
+    // The package is a base package and get_already_cached uses open package tracking, so the Get
+    // will short-circuit and not check for the blobs.
+    let pkg_dir = env.get_already_cached(&base_package.hash().to_string()).await.unwrap();
+    // Double-check that the blob is still missing from blobfs.
+    assert!(!env.blobfs.client().has_blob(&blob_hash).await);
+    // The content blob is readable from the package directory because it is served from bootfs.
+    let () = base_package.verify_contents(&pkg_dir).await.unwrap();
+
+    // Blobs will be written to blobfs during resolution even if they are already in bootfs.
+    let compressed = delivery_blob::generate(delivery_blob::DeliveryBlobType::Type1, blob_content);
+    let pkg_cache = env.client();
+    let mut get = pkg_cache
+        .get(
+            fpkg_ext::BlobInfo { blob_id: BlobId::from(*base_package.hash()).into(), length: 0 },
+            // Retained protection prevents the short-circuiting from the package being in base.
+            fpkg::GcProtection::Retained,
+        )
+        .unwrap();
+    assert_matches!(get.open_meta_blob().await.unwrap(), None);
+    let missing = get.get_missing_blobs().try_concat().await.unwrap();
+    // The deleted blob should be requested, even though it is in bootfs.
+    assert_eq!(missing, vec![fpkg_ext::BlobInfo { blob_id: blob_hash.into(), length: 0 }]);
+    let blob = get.open_blob(blob_hash.into()).await.unwrap().unwrap();
+    let (blob, closer) = (blob.blob, blob.closer);
+    let blob = match blob.truncate(compressed.len() as u64).await.unwrap() {
+        fpkg_ext::cache::TruncateBlobSuccess::NeedsData(blob) => blob,
+        fpkg_ext::cache::TruncateBlobSuccess::AllWritten(_) => panic!("not the empty blob"),
+    };
+    let blob = match blob.write(&compressed).await.unwrap() {
+        fpkg_ext::cache::BlobWriteSuccess::NeedsData(_) => panic!("blob should be written"),
+        fpkg_ext::cache::BlobWriteSuccess::AllWritten(blob) => blob,
+    };
+    let () = blob.blob_written().await.unwrap();
+    closer.close().await;
+    let _: fuchsia_pkg::PackageDirectory = get.finish().await.unwrap();
+    // Double-check that the blob is now in blobfs.
+    assert!(env.blobfs.client().has_blob(&blob_hash).await);
+
+    let () = env.stop().await;
 }

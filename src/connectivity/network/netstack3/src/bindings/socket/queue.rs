@@ -64,13 +64,22 @@ impl<M> MessageQueue<M> {
     pub(crate) fn receive(&mut self, message: impl BodyLen + Into<M>) {
         let Self { queue, local_event } = self;
         let body_len = message.body_len();
+        let queue_was_empty = queue.is_empty();
         match queue.push(message) {
             Err(NoSpace) => {
                 trace!("dropping {}-byte packet because the receive queue is full", body_len)
             }
-            Ok(()) => local_event
-                .signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_INCOMING)
-                .unwrap_or_else(|e| error!("signal peer failed: {:?}", e)),
+            Ok(()) => {
+                // NB: If the queue is non-empty, it would be redundant to
+                // signal the event. Avoid the unnecessary syscall.
+                // This is a safe optimization because signals are only set
+                // on the event while holding an `&mut MessageQueue`.
+                if queue_was_empty {
+                    local_event
+                        .signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_INCOMING)
+                        .unwrap_or_else(|e| error!("signal peer failed: {:?}", e))
+                }
+            }
         }
     }
 

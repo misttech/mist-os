@@ -16,9 +16,8 @@ namespace zxdb {
 namespace {
 
 const char kStepiShortHelp[] = "stepi / si: Single-step a thread one machine instruction.";
-const char kStepiHelp[] =
-    R"(stepi / si [ <count> ]
-
+const char kStepiUsage[] = "stepi / si [ <count> ]";
+const char kStepiHelp[] = R"(
   When a thread is stopped, "stepi" will execute <count> machine instructions
   and stop the thread again. If <count> is not specified it will default to 1.
   If the thread is running it will issue an error.
@@ -72,7 +71,7 @@ void RunVerbStepi(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetStepiVerbRecord() {
-  return VerbRecord(&RunVerbStepi, {"stepi", "si"}, kStepiShortHelp, kStepiHelp,
+  return VerbRecord(&RunVerbStepi, {"stepi", "si"}, kStepiShortHelp, kStepiUsage, kStepiHelp,
                     CommandGroup::kAssembly, SourceAffinity::kAssembly);
 }
 

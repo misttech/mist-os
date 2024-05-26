@@ -43,7 +43,11 @@ impl SignalInterface {
     }
 
     /// Set processing element state.
-    pub async fn set_element_state(&self, id: u64, state: ElementState) -> Result<(), Error> {
+    pub async fn set_element_state(
+        &self,
+        id: u64,
+        state: SettableElementState,
+    ) -> Result<(), Error> {
         self.get_proxy()?
             .clone()
             .set_element_state(id, &state)

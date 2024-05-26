@@ -10,6 +10,7 @@
 #include <lib/zbi-format/zbi.h>
 #include <lib/zx/result.h>
 
+#include <algorithm>
 #include <cstddef>
 
 namespace fdf {
@@ -178,6 +179,30 @@ zx::result<ReferenceNode> Manager::GetReferenceNode(Phandle id) {
   }
 
   return zx::ok(ReferenceNode(node->second));
+}
+
+uint32_t Manager::GetPublishIndex(uint32_t node_id) {
+  for (uint32_t index = 0; index < nodes_publish_order_.size(); index++) {
+    if (nodes_publish_order_[index]->id() == node_id) {
+      return index;
+    }
+  }
+  ZX_ASSERT_MSG(false, "Should not reach here. Node id should always be valid.");
+  return 0;
+}
+
+zx::result<> Manager::ChangePublishOrder(uint32_t node_id, uint32_t new_index) {
+  if (new_index >= nodes_publish_order_.size()) {
+    FDF_LOG(
+        ERROR,
+        "The change publish order request index (%d) is out of range. The list only contains %zu items.",
+        new_index, nodes_publish_order_.size());
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  std::swap(nodes_publish_order_[new_index], nodes_publish_order_[GetPublishIndex(node_id)]);
+
+  return zx::ok();
 }
 
 }  // namespace fdf_devicetree

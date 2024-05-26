@@ -89,7 +89,7 @@ closed protocol ScanResultWatcher {
     });
 };
 
-@discoverable
+@discoverable(server="platform")
 closed protocol Central {
     /// Scans for nearby LE peripherals and broadcasters. If the scan cannot be
     /// initiated, then `result_watcher` will be closed with an epitaph.

@@ -215,7 +215,7 @@ pub enum PureIpDeviceTxDequeue {}
 // queue is introduced in the future, this lock-level may be trivially used.
 pub enum PureIpDeviceRxDequeue {}
 
-pub(crate) struct FilterState<I>(PhantomData<I>, Never);
+pub struct FilterState<I>(PhantomData<I>, Never);
 
 impl LockAfter<Unlocked> for LoopbackTxDequeue {}
 impl_lock_after!(LoopbackTxDequeue => EthernetTxDequeue);

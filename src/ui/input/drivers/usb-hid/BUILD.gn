@@ -41,11 +41,13 @@ fuchsia_driver("usb-hid-driver") {
   sources = [ "usb-hid.cc" ]
   deps = [
     ":usb_hid_bind",
-    "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.composite:fuchsia.hardware.usb.composite_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/devices/usb/lib/usb",
     "//src/devices/usb/lib/usb:hid",
     "//src/lib/ddk",
@@ -78,10 +80,10 @@ fuchsia_driver("usb-one-endpoint-hid-fake-usb-driver") {
   sources = [ "function/one-endpoint-hid-function.cc" ]
   deps = [
     ":one_endpoint_hid_bind",
-    "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.function:fuchsia.hardware.usb.function_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_cpp",
     "//sdk/lib/fit",
     "//src/devices/lib/driver",
     "//src/devices/usb/lib/usb",
@@ -112,10 +114,10 @@ fuchsia_driver("usb-two-endpoint-hid-fake-usb-driver") {
   sources = [ "function/two-endpoint-hid-function.cc" ]
   deps = [
     ":two_endpoint_hid_bind",
-    "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.function:fuchsia.hardware.usb.function_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_cpp",
     "//sdk/lib/fit",
     "//src/devices/lib/driver",
     "//src/devices/usb/lib/usb",

@@ -70,21 +70,24 @@ namespace zxdb {
 VerbRecord::VerbRecord() = default;
 
 VerbRecord::VerbRecord(CommandExecutor exec, std::initializer_list<std::string> aliases,
-                       const char* short_help, const char* help, CommandGroup group,
-                       SourceAffinity source_affinity)
+                       const char* short_help, const char* usage, const char* help,
+                       CommandGroup group, SourceAffinity source_affinity)
     : exec(std::move(exec)),
       aliases(aliases),
       short_help(short_help),
+      usage(usage),
       help(help),
       command_group(group),
       source_affinity(source_affinity) {}
 
 VerbRecord::VerbRecord(CommandExecutor exec, CommandCompleter complete,
                        std::initializer_list<std::string> aliases, const char* short_help,
-                       const char* help, CommandGroup group, SourceAffinity source_affinity)
+                       const char* usage, const char* help, CommandGroup group,
+                       SourceAffinity source_affinity)
     : exec(std::move(exec)),
       aliases(aliases),
       short_help(short_help),
+      usage(usage),
       help(help),
       command_group(group),
       source_affinity(source_affinity),

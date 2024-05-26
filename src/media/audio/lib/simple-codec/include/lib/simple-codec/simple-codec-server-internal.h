@@ -56,8 +56,6 @@ class SimpleCodecServerInternal {
   void Start(Codec::StartCallback callback, SimpleCodecServerInstance<T>* instance);
   void GetProperties(Codec::GetPropertiesCallback callback);
   void GetHealthState(Codec::GetHealthStateCallback callback) { callback({}); }
-  void IsBridgeable(Codec::IsBridgeableCallback callback);
-  void SetBridgedMode(bool enable_bridged_mode);
   void GetDaiFormats(Codec::GetDaiFormatsCallback callback);
   void SetDaiFormat(fuchsia::hardware::audio::DaiFormat format,
                     Codec::SetDaiFormatCallback callback);
@@ -73,7 +71,7 @@ class SimpleCodecServerInternal {
       fuchsia::hardware::audio::signalprocessing::SignalProcessing::GetElementsCallback callback);
   void SetElementState(
       uint64_t processing_element_id,
-      fuchsia::hardware::audio::signalprocessing::ElementState state,
+      fuchsia::hardware::audio::signalprocessing::SettableElementState state,
       fuchsia::hardware::audio::signalprocessing::SignalProcessing::SetElementStateCallback
           callback,
       SimpleCodecServerInstance<T>* instance);
@@ -136,7 +134,7 @@ class SimpleCodecServerInstance
     parent_->GetElements(std::move(callback));
   }
   void SetElementState(uint64_t processing_element_id,
-                       fuchsia::hardware::audio::signalprocessing::ElementState state,
+                       fuchsia::hardware::audio::signalprocessing::SettableElementState state,
                        SetElementStateCallback callback) override {
     parent_->SetElementState(processing_element_id, std::move(state), std::move(callback), this);
   }
@@ -160,12 +158,6 @@ class SimpleCodecServerInstance
                    fuchsia::hardware::audio::signalprocessing::SignalProcessing::SetTopologyCallback
                        callback) override {
     parent_->SetTopology(topology_id, std::move(callback));
-  }
-  void IsBridgeable(IsBridgeableCallback callback) override {
-    parent_->IsBridgeable(std::move(callback));
-  }
-  void SetBridgedMode(bool enable_bridged_mode) override {
-    parent_->SetBridgedMode(enable_bridged_mode);
   }
   void GetDaiFormats(GetDaiFormatsCallback callback) override {
     parent_->GetDaiFormats(std::move(callback));

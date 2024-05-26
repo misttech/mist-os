@@ -10,3 +10,5 @@ toc:
   path: /docs/development/tools/fuchsia-controller/getting-started-in-tree.md
 - title: "Best practices on using async Python in Fuchsia Controller"
   path: /docs/development/tools/fuchsia-controller/async-python.md
+- title: "FIDL bindings in Python"
+  path: /docs/development/tools/fuchsia-controller/fidl-bindings.md

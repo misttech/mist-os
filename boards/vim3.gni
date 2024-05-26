@@ -22,11 +22,14 @@
 # by default.
 # Cq-Include-Trybots: luci.turquoise.global.try:bringup.vim3-debug,core.vim3-debug,core.vim3-vg-debug
 
+import("//build/devicetree/args.gni")
+
 has_board = true
 target_cpu = "arm64"
 
 # Board configuration for Product Assembly
 board_configuration_label = "//boards/vim3"
+devicetree_board_driver = true
 
 board_name = "vim3"
 board_description = "A generic vim3 device"

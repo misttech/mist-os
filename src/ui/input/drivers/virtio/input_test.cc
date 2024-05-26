@@ -83,11 +83,11 @@ TEST_F(VirtioInputTest, MultiTouchReportDescriptor) {
   EXPECT_FALSE(descriptor.has_mouse());
   EXPECT_FALSE(descriptor.has_sensor());
 
-  ASSERT_TRUE(descriptor.has_device_info());
-  EXPECT_EQ(descriptor.device_info().vendor_id,
+  ASSERT_TRUE(descriptor.has_device_information());
+  EXPECT_EQ(descriptor.device_information().vendor_id(),
             static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
   EXPECT_EQ(
-      descriptor.device_info().product_id,
+      descriptor.device_information().product_id(),
       static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kVirtioTouchscreen));
 
   ASSERT_TRUE(descriptor.has_touch());
@@ -270,10 +270,10 @@ TEST_F(VirtioInputTest, MouseReportDescriptor) {
   EXPECT_FALSE(descriptor.has_sensor());
   EXPECT_FALSE(descriptor.has_touch());
 
-  ASSERT_TRUE(descriptor.has_device_info());
-  EXPECT_EQ(descriptor.device_info().vendor_id,
+  ASSERT_TRUE(descriptor.has_device_information());
+  EXPECT_EQ(descriptor.device_information().vendor_id(),
             static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
-  EXPECT_EQ(descriptor.device_info().product_id,
+  EXPECT_EQ(descriptor.device_information().product_id(),
             static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kVirtioMouse));
 
   ASSERT_TRUE(descriptor.has_mouse());
@@ -523,11 +523,11 @@ TEST_F(VirtioInputTest, KeyboardReportDescriptor) {
   EXPECT_FALSE(descriptor.has_sensor());
   EXPECT_FALSE(descriptor.has_touch());
 
-  ASSERT_TRUE(descriptor.has_device_info());
-  EXPECT_EQ(descriptor.device_info().vendor_id,
+  ASSERT_TRUE(descriptor.has_device_information());
+  EXPECT_EQ(descriptor.device_information().vendor_id(),
             static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
   EXPECT_EQ(
-      descriptor.device_info().product_id,
+      descriptor.device_information().product_id(),
       static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kVirtioKeyboard));
 
   ASSERT_TRUE(descriptor.has_keyboard());

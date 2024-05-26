@@ -11,7 +11,7 @@ using fuchsia.intl;
 /// Supported SettingsEpitaph enums:
 /// REQUEST_NOT_SUPPORTED, INTERNAL_SERVICE_ERROR, PERSISTENT_STORAGE_ERROR,
 /// FILE_READ_ERROR
-@discoverable
+@discoverable(server="platform")
 closed protocol Intl {
     /// Gets the current [IntlSettings]. Returns immediately on first call;
     /// subsequent calls return when the value changes.

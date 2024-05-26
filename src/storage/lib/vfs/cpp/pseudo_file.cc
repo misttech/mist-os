@@ -40,16 +40,9 @@ bool PseudoFile::ValidateRights(fuchsia_io::Rights rights) const {
   return true;
 }
 
-zx_status_t PseudoFile::GetAttributes(VnodeAttributes* attr) {
-  *attr = VnodeAttributes();
-  attr->mode = V_TYPE_FILE;
-  if (read_handler_)
-    attr->mode |= V_IRUSR;
-  if (write_handler_)
-    attr->mode |= V_IWUSR;
-  attr->inode = fio::wire::kInoUnknown;
-  attr->link_count = 1;
-  return ZX_OK;
+zx::result<fs::VnodeAttributes> PseudoFile::GetAttributes() const {
+  return zx::ok(VnodeAttributes{.mode = V_TYPE_FILE | (read_handler_ ? V_IRUSR : 0) |
+                                        (write_handler_ ? V_IWUSR : 0)});
 }
 
 BufferedPseudoFile::BufferedPseudoFile(ReadHandler read_handler, WriteHandler write_handler,
@@ -88,10 +81,12 @@ zx_status_t BufferedPseudoFile::Content::CloseNode() {
   return ZX_OK;
 }
 
-zx_status_t BufferedPseudoFile::Content::GetAttributes(fs::VnodeAttributes* a) {
-  zx_status_t status = file_->GetAttributes(a);
-  a->content_size = output_.size();
-  return status;
+zx::result<fs::VnodeAttributes> BufferedPseudoFile::Content::GetAttributes() const {
+  zx::result attributes = file_->GetAttributes();
+  if (attributes.is_ok()) {
+    attributes->content_size = output_.size();
+  }
+  return attributes;
 }
 
 zx_status_t BufferedPseudoFile::Content::Read(void* data, size_t length, size_t offset,
@@ -185,8 +180,8 @@ zx_status_t UnbufferedPseudoFile::Content::CloseNode() {
   return ZX_OK;
 }
 
-zx_status_t UnbufferedPseudoFile::Content::GetAttributes(fs::VnodeAttributes* a) {
-  return file_->GetAttributes(a);
+zx::result<fs::VnodeAttributes> UnbufferedPseudoFile::Content::GetAttributes() const {
+  return file_->GetAttributes();
 }
 
 zx_status_t UnbufferedPseudoFile::Content::Read(void* data, size_t length, size_t offset,

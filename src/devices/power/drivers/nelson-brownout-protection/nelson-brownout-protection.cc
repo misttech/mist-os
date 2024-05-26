@@ -63,8 +63,8 @@ zx_status_t CodecClientAgl::SetAgl(bool enable) {
     return ZX_ERR_NOT_SUPPORTED;
   }
   fidl::Arena arena;
-  auto state = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(arena);
-  state.enabled(enable);
+  auto state = fuchsia_hardware_audio_signalprocessing::wire::SettableElementState::Builder(arena);
+  state.started(true).bypassed(!enable);
   auto set_state = signal_processing_->SetElementState(agl_id_.value(), state.Build());
   if (!set_state.ok()) {
     zxlogf(ERROR, "Failed to call signal processing set element state: %s",

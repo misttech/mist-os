@@ -84,7 +84,9 @@ impl Framebuffer {
             let vmo = Arc::new(server.get_vmo()?);
             let vmo_len = vmo.info().map_err(|_| errno!(EINVAL))?.size_bytes as u32;
             // Fill the buffer with white pixels as a placeholder.
-            if let Err(err) = vmo.write(&vec![0xff; vmo_len as usize], 0) {
+            if let Err(err) =
+                vmo.write(&vec![0xff, 0x00, 0xff, 0xff].repeat((vmo_len / 4) as usize), 0)
+            {
                 log_warn!("could not write initial framebuffer: {:?}", err);
             }
 
@@ -126,16 +128,14 @@ impl Framebuffer {
         if let Some(server) = &self.server {
             let view_bound_protocols = self.view_bound_protocols.lock().take().unwrap();
             let view_identity = self.view_identity.lock().take().unwrap();
-            if let Some(incoming_dir) = incoming_dir {
-                log_info!("Presenting view using GraphicalPresenter");
-                start_presentation_loop(
-                    kernel,
-                    server.clone(),
-                    view_bound_protocols,
-                    view_identity,
-                    incoming_dir,
-                );
-            }
+            log_info!("Presenting view using GraphicalPresenter");
+            start_presentation_loop(
+                kernel,
+                server.clone(),
+                view_bound_protocols,
+                view_identity,
+                incoming_dir,
+            );
         }
 
         Ok(())

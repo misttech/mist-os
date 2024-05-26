@@ -158,10 +158,10 @@ void Gt6853Device::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
 
   fidl::Arena<kDescriptorBufferSize> allocator;
 
-  fuchsia_input_report::wire::DeviceInfo device_info;
-  device_info.vendor_id = static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle);
-  device_info.product_id =
-      static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kGoodixTouchscreen);
+  auto device_info = fuchsia_input_report::wire::DeviceInformation::Builder(allocator);
+  device_info.vendor_id(static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
+  device_info.product_id(
+      static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kGoodixTouchscreen));
 
   fidl::VectorView<fuchsia_input_report::wire::ContactInputDescriptor> touch_input_contacts(
       allocator, kMaxContacts);
@@ -182,7 +182,7 @@ void Gt6853Device::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
   touch_descriptor.input(touch_input_descriptor.Build());
 
   auto descriptor = fuchsia_input_report::wire::DeviceDescriptor::Builder(allocator);
-  descriptor.device_info(device_info);
+  descriptor.device_information(device_info.Build());
   descriptor.touch(touch_descriptor.Build());
 
   completer.Reply(descriptor.Build());

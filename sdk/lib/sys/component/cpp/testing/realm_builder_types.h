@@ -45,7 +45,7 @@ struct Protocol final {
   cpp17::optional<std::string_view> as = cpp17::nullopt;
   cpp17::optional<DependencyType> type = cpp17::nullopt;
   cpp17::optional<std::string_view> path = cpp17::nullopt;
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
 #endif
 };
@@ -57,7 +57,7 @@ struct Service final {
   std::string_view name;
   cpp17::optional<std::string_view> as = cpp17::nullopt;
   cpp17::optional<std::string_view> path = cpp17::nullopt;
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
 #endif
 };
@@ -71,7 +71,7 @@ struct Directory final {
   cpp17::optional<std::string_view> subdir = cpp17::nullopt;
   cpp17::optional<fuchsia::io::Operations> rights = cpp17::nullopt;
   cpp17::optional<std::string_view> path = cpp17::nullopt;
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
 #endif
 };
@@ -222,7 +222,7 @@ using LocalComponentFactory = fit::function<std::unique_ptr<LocalComponentImpl>(
 
 // Type for either variation of implementation passed to AddLocalChild(): the
 // deprecated raw pointer, or one of the valid callback functions.
-#if __Fuchsia_API_level__ < 17
+#if FUCHSIA_API_LEVEL_LESS_THAN(17)
 // TODO(https://fxbug.dev/296292544): Remove variant when build support for API level 16 is removed.
 // Ignore warnings caused by the use of the deprecated `LocalComponent` type as it is part of the
 // implementation that supports the deprecated type.
@@ -249,13 +249,11 @@ struct ChildOptions {
   // this object.
   std::string_view environment;
 
-#if __Fuchsia_API_level__ >= 13
   // Structured Configuration overrides to be applied to the child.
   // Only keys declared by the child component as overridable by parent may
   // be provided.
   using ConfigOverride = fuchsia::component::decl::ConfigOverride;
   std::vector<ConfigOverride> config_overrides;
-#endif
 };
 
 struct SelfRef {};
@@ -280,7 +278,14 @@ struct FrameworkRef {};
 // "void".
 struct VoidRef {};
 
-using Ref = cpp17::variant<ParentRef, ChildRef, CollectionRef, FrameworkRef, VoidRef, SelfRef>;
+// A reference to a dictiory capability defined by this component. `path` must
+// have the format "self/<dictionary_name>".
+struct DictionaryRef {
+  std::string_view path;
+};
+
+using Ref = cpp17::variant<ParentRef, ChildRef, CollectionRef, FrameworkRef, VoidRef, SelfRef,
+                           DictionaryRef>;
 
 struct Route {
   std::vector<Capability> capabilities;
@@ -375,15 +380,9 @@ class ConfigValue {
   // Friend class needed in order to invoke |TakeAsFidl|.
   friend class Realm;
 
-#if __Fuchsia_API_level__ < 13
-  fuchsia::component::config::ValueSpec TakeAsFidl();
-  explicit ConfigValue(fuchsia::component::config::ValueSpec spec);
-  fuchsia::component::config::ValueSpec spec;
-#elif __Fuchsia_API_level__ >= 13
   fuchsia::component::decl::ConfigValueSpec TakeAsFidl();
   explicit ConfigValue(fuchsia::component::decl::ConfigValueSpec spec);
   fuchsia::component::decl::ConfigValueSpec spec;
-#endif
 };
 
 // Defines a configuration capability.

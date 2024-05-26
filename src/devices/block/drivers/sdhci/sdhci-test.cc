@@ -2021,4 +2021,94 @@ TEST_F(SdhciTest, DmaSplitSizeAndAligntmentBoundaries) {
   dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
+TEST_F(SdhciTest, BufferedRead) {
+  ASSERT_NO_FATAL_FAILURE(CreateDut(SDHCI_QUIRK_NO_DMA));
+
+  mock_sdhci_.ExpectGetBaseClock(100'000'000);
+  EXPECT_OK(dut_->Init());
+
+  constexpr uint32_t kTestWord = 0x1234'5678;
+  BufferData::Get().FromValue(kTestWord).WriteTo(&mmio_);
+
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(512 * 8, 0, &vmo));
+
+  const sdmmc_buffer_region_t buffer = {
+      .buffer = {.vmo = vmo.get()},
+      .type = SDMMC_BUFFER_TYPE_VMO_HANDLE,
+      .offset = 512,
+      .size = 512 * 6,
+  };
+
+  const sdmmc_req_t request = {
+      .cmd_idx = SDMMC_READ_MULTIPLE_BLOCK,
+      .cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS,
+      .arg = 0,
+      .blocksize = 512,
+      .suppress_error_messages = false,
+      .client_id = 0,
+      .buffers_list = &buffer,
+      .buffers_count = 1,
+  };
+  uint32_t response[4] = {};
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
+
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
+
+  uint32_t actual;
+
+  // Make sure the test word was written to the beginning and end of the buffer, but not outside the
+  // range we wanted.
+
+  EXPECT_OK(vmo.read(&actual, 512 - sizeof(actual), sizeof(actual)));
+  EXPECT_NE(actual, kTestWord);
+
+  EXPECT_OK(vmo.read(&actual, 512, sizeof(actual)));
+  EXPECT_EQ(actual, kTestWord);
+
+  EXPECT_OK(vmo.read(&actual, (512 * 7) - sizeof(actual), sizeof(actual)));
+  EXPECT_EQ(actual, kTestWord);
+
+  EXPECT_OK(vmo.read(&actual, (512 * 7), sizeof(actual)));
+  EXPECT_NE(actual, kTestWord);
+}
+
+TEST_F(SdhciTest, BufferedWrite) {
+  ASSERT_NO_FATAL_FAILURE(CreateDut(SDHCI_QUIRK_NO_DMA));
+
+  mock_sdhci_.ExpectGetBaseClock(100'000'000);
+  EXPECT_OK(dut_->Init());
+
+  constexpr uint32_t kTestWord = 0x1234'5678;
+
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(512 * 8, 0, &vmo));
+  EXPECT_OK(vmo.write(&kTestWord, (512 * 7) - sizeof(kTestWord), sizeof(kTestWord)));
+
+  const sdmmc_buffer_region_t buffer = {
+      .buffer = {.vmo = vmo.get()},
+      .type = SDMMC_BUFFER_TYPE_VMO_HANDLE,
+      .offset = 512,
+      .size = 512 * 6,
+  };
+
+  const sdmmc_req_t request = {
+      .cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK,
+      .cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS,
+      .arg = 0,
+      .blocksize = 512,
+      .suppress_error_messages = false,
+      .client_id = 0,
+      .buffers_list = &buffer,
+      .buffers_count = 1,
+  };
+  uint32_t response[4] = {};
+  EXPECT_OK(dut_->SdmmcRequest(&request, response));
+
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
+
+  // The data port should hold the last word from the buffer.
+  EXPECT_EQ(BufferData::Get().ReadFrom(&mmio_).reg_value(), kTestWord);
+}
+
 }  // namespace sdhci

@@ -30,11 +30,14 @@ source_set("overnet-usb-lib") {
     "//sdk/banjo/fuchsia.hardware.usb.composite:fuchsia.hardware.usb.composite_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.function:fuchsia.hardware.usb.function_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_banjo_cpp",
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
     "//sdk/fidl/fuchsia.hardware.overnet:fuchsia.hardware.overnet_cpp",
+    "//sdk/lib/driver/compat/cpp:cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/devfs/cpp:cpp",
+    "//sdk/lib/driver/logging/cpp:cpp",
     "//src/devices/bind/fuchsia.google.platform.usb:fuchsia.google.platform.usb_cpp",
-    "//src/devices/usb/lib/usb",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//src/devices/usb/lib/usb:usb-dfv2-compat-logging",
     "//zircon/system/ulib/async",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
@@ -45,17 +48,13 @@ source_set("overnet-usb-lib") {
 }
 
 fuchsia_driver("overnet-usb-driver") {
-  # visibility = [ ":*" ]
   output_name = "overnet-usb"
 
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  deps = [
-    ":overnet-usb-lib",
-    "//src/devices/lib/driver",
-  ]
+  deps = [ ":overnet-usb-lib" ]
 }
 
 fuchsia_driver_component("overnet-usb") {
@@ -66,6 +65,7 @@ fuchsia_driver_component("overnet-usb") {
 }
 
 fuchsia_driver_package("overnet-usb-package") {
+  package_name = "overnet-usb"
   driver_components = [ ":overnet-usb" ]
 }
 

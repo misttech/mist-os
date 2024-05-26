@@ -30,18 +30,18 @@ load(":utils.bzl", "fuchsia_cpu_from_ctx", "label_name", "make_resource_struct",
 _FUCHSIA_OS_PLATFORM = "@platforms//os:fuchsia"
 
 def get_driver_component_manifests(package):
-    """ Returns a list of the manifest paths for drivers in the package
+    """Returns a list of the manifest paths for drivers in the package
 
     Args:
-        - package: the package to parse
+        package: the package to parse
     """
     return [entry.dest for entry in package[FuchsiaPackageInfo].packaged_components if entry.component_info.is_driver]
 
 def get_component_manifests(package):
-    """ Returns a list of the manifest paths for all components in the package
+    """Returns a list of the manifest paths for all components in the package
 
     Args:
-        - package: the package to parse
+        package: the package to parse.
     """
     return [entry.dest for entry in package[FuchsiaPackageInfo].packaged_components]
 
@@ -503,6 +503,24 @@ def _build_fuchsia_package_impl(ctx):
         else:
             collected_blobs[resource.dest] = resource.src.path
 
+    # A FuchsiaDebugSymbolInfo value that covers all debug symbol
+    # directories needed for this package.
+    #
+    # TODO(https://fxbug.dev/339038603): Only use processed_binaries
+    # for this once all dependencies use the right rules to expose
+    # their debug symbols.
+    #
+    fuchsia_debug_symbols_info = collect_debug_symbols(
+        _debug_info,
+        ctx.attr.subpackages,
+        ctx.attr.test_components,
+        ctx.attr.components,
+        ctx.attr.resources,
+        ctx.attr.processed_binaries,
+        ctx.attr.tools,
+        ctx.attr._fuchsia_sdk_debug_symbols,
+    )
+
     return [
         DefaultInfo(files = depset(output_files), executable = stub_executable(ctx)),
         FuchsiaPackageInfo(
@@ -514,21 +532,10 @@ def _build_fuchsia_package_impl(ctx):
             meta_far = meta_far,
             package_resources = package_resources,
             packaged_components = packaged_components,
-            # TODO: Remove this field, change usages to FuchsiaDebugSymbolInfo.
-            build_id_dir = (get_build_id_dirs(_debug_info) + [None])[0],
         ),
-        collect_debug_symbols(
-            _debug_info,
-            ctx.attr.subpackages,
-            ctx.attr.test_components,
-            ctx.attr.components,
-            ctx.attr.resources,
-            ctx.attr.processed_binaries,
-            ctx.attr.tools,
-            ctx.attr._fuchsia_sdk_debug_symbols,
-        ),
+        fuchsia_debug_symbols_info,
         OutputGroupInfo(
-            build_id_dir = _debug_info.build_id_dirs.values()[0],
+            build_id_dirs = depset(transitive = fuchsia_debug_symbols_info.build_id_dirs.values()),
         ),
     ]
 

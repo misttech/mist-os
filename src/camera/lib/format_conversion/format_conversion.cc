@@ -4,7 +4,10 @@
 
 #include "format_conversion.h"
 
+#include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
+#include <fidl/fuchsia.sysmem2/cpp/hlcpp_conversion.h>
 #include <lib/image-format/image_format.h>
+#include <lib/sysmem-version/sysmem-version.h>
 
 #include "fidl/fuchsia.sysmem/cpp/wire_types.h"
 
@@ -37,6 +40,17 @@ fuchsia_sysmem::wire::ImageFormat2 ConvertToWireType(fuchsia::sysmem::ImageForma
       .pixel_aspect_ratio_width = image_format.pixel_aspect_ratio_width,
       .pixel_aspect_ratio_height = image_format.pixel_aspect_ratio_height,
   };
+}
+
+fuchsia_sysmem::wire::ImageFormat2 ConvertV2ToV1WireType(
+    const fuchsia::images2::ImageFormat& image_format) {
+  auto image_format_v2_natural = fidl::HLCPPToNatural(fidl::Clone(image_format));
+  auto image_format_v1_natural_result = sysmem::V1CopyFromV2ImageFormat(image_format_v2_natural);
+  ZX_ASSERT(image_format_v1_natural_result.is_ok());
+  auto image_format_v1_natural = std::move(image_format_v1_natural_result.value());
+  auto image_format_v1 = fidl::NaturalToHLCPP(std::move(image_format_v1_natural));
+  auto image_format_v1_wire = ConvertToWireType(image_format_v1);
+  return image_format_v1_wire;
 }
 
 // TODO: Please use fidl::ToWire() instead.  See sysmem-version.cc for an UnusedArena that can
@@ -86,6 +100,20 @@ fuchsia_sysmem::wire::ImageFormatConstraints ConvertToWireType(
       .required_min_bytes_per_row = constraints.required_min_bytes_per_row,
       .required_max_bytes_per_row = constraints.required_max_bytes_per_row,
   };
+}
+
+fuchsia_sysmem::wire::ImageFormatConstraints ConvertV2ToV1WireType(
+    const fuchsia::sysmem2::ImageFormatConstraints& constraints) {
+  auto image_format_constraints_v2_natural = fidl::HLCPPToNatural(fidl::Clone(constraints));
+  auto image_format_constraints_v1_natural_result =
+      sysmem::V1CopyFromV2ImageFormatConstraints(image_format_constraints_v2_natural);
+  ZX_ASSERT(image_format_constraints_v1_natural_result.is_ok());
+  auto image_format_constraints_v1_natural =
+      std::move(image_format_constraints_v1_natural_result.value());
+  auto image_format_constraints_v1 =
+      fidl::NaturalToHLCPP(std::move(image_format_constraints_v1_natural));
+  auto image_format_constraints_v1_wire = ConvertToWireType(image_format_constraints_v1);
+  return image_format_constraints_v1_wire;
 }
 
 fuchsia_sysmem::wire::ImageFormat2 GetImageFormatFromConstraints(

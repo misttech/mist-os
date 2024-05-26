@@ -43,8 +43,6 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
   void SetLocalData(::fuchsia::bluetooth::sys::HostData host_data) override;
   void SetPeerWatcher(
       ::fidl::InterfaceRequest<::fuchsia::bluetooth::host::PeerWatcher> peer_watcher) override;
-  void RestoreBonds(::std::vector<fuchsia::bluetooth::sys::BondingData> bonds,
-                    RestoreBondsCallback callback) override;
   void SetLocalName(::std::string local_name, SetLocalNameCallback callback) override;
   void SetDeviceClass(fuchsia::bluetooth::DeviceClass device_class,
                       SetDeviceClassCallback callback) override;
@@ -66,6 +64,8 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
             PairCallback callback) override;
   void Forget(::fuchsia::bluetooth::PeerId id, ForgetCallback callback) override;
   void Shutdown() override;
+  void SetBondingDelegate(
+      ::fidl::InterfaceRequest<::fuchsia::bluetooth::host::BondingDelegate> request) override;
   void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
 
  private:
@@ -125,6 +125,30 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
     WeakSelf<PeerWatcherServer> weak_self_;
   };
 
+  class BondingDelegateServer : public ServerBase<::fuchsia::bluetooth::host::BondingDelegate> {
+   public:
+    explicit BondingDelegateServer(
+        ::fidl::InterfaceRequest<::fuchsia::bluetooth::host::BondingDelegate> request,
+        HostServer* host);
+
+    void OnNewBondingData(const bt::gap::Peer& peer);
+
+   private:
+    // BondingDelegate overrides:
+    void RestoreBonds(::std::vector<::fuchsia::bluetooth::sys::BondingData> bonds,
+                      RestoreBondsCallback callback) override;
+    void WatchBonds(WatchBondsCallback callback) override;
+    void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
+
+    void MaybeNotifyWatchBonds();
+
+    HostServer* host_;
+    // Queued bond updates that will be sent on the next call to WatchBonds.
+    std::queue<::fuchsia::bluetooth::sys::BondingData> updated_;
+    fit::callback<void(::fuchsia::bluetooth::host::BondingDelegate_WatchBonds_Result)>
+        watch_bonds_cb_;
+  };
+
   // bt::gap::PairingDelegate overrides:
   bt::sm::IOCapability io_capability() const override;
   void CompletePairing(bt::PeerId id, bt::sm::Result<> status) override;
@@ -168,6 +192,9 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
 
   // Resolves any HostInfo watcher with the current adapter state.
   void NotifyInfoChange();
+
+  void RestoreBonds(::std::vector<::fuchsia::bluetooth::sys::BondingData> bonds,
+                    ::fuchsia::bluetooth::host::BondingDelegate::RestoreBondsCallback callback);
 
   // Helper for binding a fidl::InterfaceRequest to a FIDL server of type
   // ServerType.
@@ -214,6 +241,8 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
   bt_lib_fidl::HangingGetter<fuchsia::bluetooth::sys::HostInfo> info_getter_;
 
   std::optional<PeerWatcherServer> peer_watcher_server_;
+
+  std::optional<BondingDelegateServer> bonding_delegate_server_;
 
   // Keep this as the last member to make sure that all weak pointers are
   // invalidated before other members get destroyed.

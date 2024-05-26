@@ -6,6 +6,7 @@ import("//build/python/python_library.gni")
 import("//third_party/jinja2/jinja2/py_srcs.gni")
 
 python_library("jinja2") {
+  enable_mypy = false
   source_root = "jinja2"
   sources = third_party_jinja2_srcs
 }

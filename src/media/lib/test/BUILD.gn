@@ -44,6 +44,8 @@ source_set("codec_client") {
   deps = [
     "//sdk/fidl/fuchsia.mediacodec:fuchsia.mediacodec_hlcpp",
     "//sdk/lib/syslog/cpp",
+    "//src/devices/bind/fuchsia.amlogic.platform.sysmem.heap:fuchsia.amlogic.platform.sysmem.heap_cpp",
+    "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
     "//src/lib/fsl",
     "//src/lib/fxl",
     "//src/media/lib/test:codec_buffer",

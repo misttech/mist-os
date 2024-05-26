@@ -21,25 +21,9 @@
 namespace network::internal {
 
 template <typename F>
-void WithWireStatus(F fn, const fuchsia_hardware_network::wire::PortStatus& status) {
-  fidl::WireTableFrame<netdev::wire::PortStatus> frame;
-  netdev::wire::PortStatus wire_status(
-      fidl::ObjectView<fidl::WireTableFrame<netdev::wire::PortStatus>>::FromExternal(&frame));
-  wire_status.set_flags(status.flags());
-  wire_status.set_mtu(status.mtu());
-
-  fn(wire_status);
-}
-
-template <typename F>
 void WithWireStatus(F fn, netdev::wire::StatusFlags flags, uint32_t mtu) {
-  fidl::WireTableFrame<netdev::wire::PortStatus> frame;
-  netdev::wire::PortStatus wire_status(
-      fidl::ObjectView<fidl::WireTableFrame<netdev::wire::PortStatus>>::FromExternal(&frame));
-  wire_status.set_flags(flags);
-  wire_status.set_mtu(mtu);
-
-  fn(wire_status);
+  fidl::Arena arena;
+  fn(netdev::wire::PortStatus::Builder(arena).flags(flags).mtu(mtu).Build());
 }
 
 class StatusWatcher : public fbl::DoublyLinkedListable<std::unique_ptr<StatusWatcher>>,

@@ -55,9 +55,12 @@ function cleanup {
 
 trap cleanup EXIT
 
+# shellcheck source=tools/devshell/lib/vars.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 fx-config-read
+# shellcheck source=tools/devshell/lib/fvm.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/fvm.sh || exit $?
+# shellcheck source=tools/devshell/lib/disktools.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/disktools.sh || exit $?
 
 build_flag=true
@@ -112,7 +115,7 @@ authkeys_path="$(get-ssh-authkeys)" || {
 
 qemu_dir="${PREBUILT_QEMU_DIR}/bin"
 
-build_targets=()
+build_labels=()
 
 # Not all builds use an FVM or Fxfs image so failing to find a source image is OK.
 is_fvm=1
@@ -120,8 +123,10 @@ image_source="$(fx-fvm-find-raw-source)"
 if [[ -z "${image_source}" ]]; then
   is_fvm=0
   image_source="$(fx-command-run list-build-artifacts --name storage-full --type fxfs-blk --allow-empty images)"
+  if [[ -n "${image_source}" ]]; then
+    build_labels+=("$(fx-command-run list-build-artifacts --show-label --name storage-full --type fxfs-blk --allow-empty images)")
+  fi
 fi
-[[ -n "${image_source}" ]] && build_targets+=( "${image_source}" )
 
 args=(
   -a "${FUCHSIA_ARCH}"
@@ -132,31 +137,33 @@ args=(
 # build-produced image file, which could cause timestamp issues with that file.
 # Construction of the new ZBI adds ~/.ssh/fuchsia_authorized_keys for SSH
 # access.
-imgdir="$(mktemp -d ${FUCHSIA_BUILD_DIR}/tmp.XXX)"
+imgdir="$(mktemp -d "${FUCHSIA_BUILD_DIR}"/tmp.XXX)"
 if [[ ! -d "${imgdir}" ]]; then
   echo >&2 "Failed to create temporary directory"
   exit 1
 fi
 CLEANUP_LIST+=("$imgdir")
 
-if (( $UEFI )); then
+if (( "$UEFI" )); then
   args+=(--uefi)
 else
   if [[ -z "${KERNEL_IMAGE}" ]]; then
     KERNEL_IMAGE="$(fx-command-run list-build-artifacts --cpu "$FUCHSIA_ARCH" --type kernel --name qemu-kernel images)"
-    build_targets+=( "${KERNEL_IMAGE}" )
+    KERNEL_LABEL="$(fx-command-run list-build-artifacts --show-label --cpu "$FUCHSIA_ARCH" --type kernel --name qemu-kernel images)"
+    build_labels+=( "${KERNEL_LABEL}" )
     KERNEL_IMAGE="${FUCHSIA_BUILD_DIR}/${KERNEL_IMAGE}"
   fi
   if [[ -z "${ZBI_IMAGE}" ]]; then
     ZBI_IMAGE="$(fx-command-run list-build-artifacts --cpu "$FUCHSIA_ARCH" --type zbi --name zircon-a images)"
-    build_targets+=( "${ZBI_IMAGE}" )
+    ZBI_LABEL="$(fx-command-run list-build-artifacts --show-label --cpu "$FUCHSIA_ARCH" --type zbi --name zircon-a images)"
+    build_labels+=( "${ZBI_LABEL}" )
     ZBI_IMAGE="${FUCHSIA_BUILD_DIR}/${ZBI_IMAGE}"
   fi
 
-  if $build_flag && [ ${#build_targets[@]} -gt 0 ]; then
-    _targets="$(printf ", %s" "${build_targets[@]}")"
-    echo >&2 "Building ${_targets:2}"
-    fx-command-run build "${build_targets[@]}"
+  if $build_flag && [ ${#build_labels[@]} -gt 0 ]; then
+    _labels="$(printf ", %s" "${build_labels[@]}")"
+    echo >&2 "Building ${_labels:2}"
+    fx-command-run build "${build_labels[@]}"
   fi
 
   if [[ "${ZBI_IMAGE}" != - ]]; then
@@ -176,7 +183,7 @@ fi
 if [[ -n "${image_source}" ]]; then
   img_raw="${imgdir}/raw.blk"
   # Stage the disk image and expand to IMAGE_SIZE if needed.
-  if (( $is_fvm )); then
+  if (( "$is_fvm" )); then
     fvm_tool="$(fx-command-run host-tool --print fvm)"
     fx-fvm-extend-image "${fvm_tool}" "${FUCHSIA_BUILD_DIR}/${image_source}" "${img_raw}" "${IMAGE_SIZE}"
   else
@@ -207,6 +214,6 @@ else
   # directory (again, to avoid pathnames in the tarball)
   echo >&2 "Packaging into ${PKG_TARGET}"
   cd "${SYMLINK_PATH}" > /dev/null
-  tar cvzf "${PKG_TARGET}" --dereference *
+  tar cvzf "${PKG_TARGET}" --dereference ./*
   echo >&2 "done"
 fi

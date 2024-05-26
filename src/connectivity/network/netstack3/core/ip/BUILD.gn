@@ -1,0 +1,160 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_library.gni")
+import(
+    "//src/connectivity/network/netstack3/core/rustc_library_with_features.gni")
+
+rustc_library_with_features("netstack3-ip") {
+  edition = "2021"
+  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+  sources = [
+    "src/api.rs",
+    "src/base.rs",
+    "src/datagram.rs",
+    "src/datagram/spec_context.rs",
+    "src/datagram/uninstantiable.rs",
+    "src/device.rs",
+    "src/device/api.rs",
+    "src/device/config.rs",
+    "src/device/dad.rs",
+    "src/device/nud.rs",
+    "src/device/nud/api.rs",
+    "src/device/opaque_iid.rs",
+    "src/device/route_discovery.rs",
+    "src/device/router_solicitation.rs",
+    "src/device/slaac.rs",
+    "src/device/state.rs",
+    "src/forwarding.rs",
+    "src/gmp.rs",
+    "src/gmp/igmp.rs",
+    "src/gmp/mld.rs",
+    "src/icmp.rs",
+    "src/icmp/socket.rs",
+    "src/ipv6.rs",
+    "src/lib.rs",
+    "src/path_mtu.rs",
+    "src/raw.rs",
+    "src/raw/protocol.rs",
+    "src/raw/state.rs",
+    "src/reassembly.rs",
+    "src/socket.rs",
+    "src/types.rs",
+    "src/uninstantiable.rs",
+  ]
+  deps = [
+    "//src/connectivity/lib/net-types",
+    "//src/connectivity/lib/packet-formats",
+    "//src/connectivity/network/lib/explicit",
+    "//src/connectivity/network/netstack3/core/lock-order",
+    "//src/connectivity/network/netstack3/core/macros:netstack3-macros",
+    "//src/lib/const-unwrap",
+    "//src/lib/fakealloc",
+    "//src/lib/network/packet",
+    "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:derivative",
+    "//third_party/rust_crates:either",
+    "//third_party/rust_crates:hmac",
+    "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:ref-cast",
+    "//third_party/rust_crates:sha2",
+    "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:zerocopy",
+
+    # TODO(https://github.com/rust-lang/rust/issues/62502): remove this module.
+    "//src/connectivity/network/netstack3/core/fakestd",
+  ]
+
+  _testutils_deps = []
+
+  if (!is_host) {
+    configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
+  }
+
+  feature_sets = [
+    {
+      features = []
+      deps += [
+        "//src/connectivity/network/netstack3/core/base:netstack3-base",
+        "//src/connectivity/network/netstack3/core/filter:netstack3-filter",
+      ]
+    },
+
+    # A variant of the netstack3-ip library that exposes test utilities.
+    {
+      target_name = "netstack3-ip-testutils"
+      testonly = true
+      features = [
+        "testutils",
+        "instrumented",
+      ]
+      deps += _testutils_deps
+      deps += [
+        "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
+        "//src/connectivity/network/netstack3/core/filter:netstack3-filter-testutils",
+      ]
+    },
+    {
+      target_name = "netstack3-ip-benchmarks"
+      testonly = true
+      features = [ "testutils" ]
+      deps += _testutils_deps
+      deps += [
+        "//src/connectivity/network/netstack3/core/base:netstack3-base-benchmarks",
+        "//src/connectivity/network/netstack3/core/filter:netstack3-filter-benchmarks",
+      ]
+      configs += [ "//src/connectivity/network/netstack3/core:benchmark" ]
+    },
+    {
+      target_name = "netstack3-ip-instrumented"
+      with_unit_tests = true
+      features = [ "instrumented" ]
+      non_test_deps = [
+        "//src/connectivity/network/netstack3/core/base:netstack3-base-instrumented",
+        "//src/connectivity/network/netstack3/core/filter:netstack3-filter-instrumented",
+      ]
+      test_deps = [
+        "//src/connectivity/lib/ip-test-macro",
+        "//src/connectivity/lib/net-declare",
+        "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
+        "//src/connectivity/network/netstack3/core/filter:netstack3-filter-testutils",
+        "//third_party/rust_crates:itertools",
+        "//third_party/rust_crates:test-case",
+      ]
+      test_deps += _testutils_deps
+    },
+  ]
+  if (is_host) {
+    feature_sets += [
+      {
+        target_name = "netstack3-ip-loom"
+        features = [
+          "testutils",
+          "instrumented",
+        ]
+        testonly = true
+        deps += _testutils_deps
+        deps += [
+          "//src/connectivity/network/netstack3/core/base:netstack3-base-loom",
+          "//src/connectivity/network/netstack3/core/filter:netstack3-filter-loom",
+        ]
+        configs += [ "//src/connectivity/network/netstack3/core:loom" ]
+      },
+    ]
+  }
+}
+
+fuchsia_unittest_package("netstack3-core-ip-test") {
+  deps = [ ":netstack3-ip-instrumented_test" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":netstack3-core-ip-test",
+    ":netstack3-ip-instrumented_test($host_toolchain)",
+  ]
+}

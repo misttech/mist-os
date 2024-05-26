@@ -96,7 +96,7 @@ class Bindgen:
             "-nostdlibinc",
             # Use the `HEAD` API level.
             #
-            # NOTE(hjfreyer): It's not totally clear that FUCHSIA_HEAD is the
+            # NOTE(hjfreyer): It's not totally clear that the value of HEAD is the
             # right value here. If some parts of the C structures are missing,
             # we may want to investigate setting this to a different value like
             # `PLATFORM`.

@@ -293,16 +293,18 @@ TEST(MemfsTest, CreateFile) {
   zx::result file = root->Create("foobar", fs::CreationType::kFile);
   ASSERT_TRUE(file.is_ok()) << file.status_string();
   auto directory = static_cast<fbl::RefPtr<fs::Vnode>>(root);
-  fs::VnodeAttributes directory_attr, file_attr;
-  ASSERT_OK(directory->GetAttributes(&directory_attr));
-  ASSERT_OK(file->GetAttributes(&file_attr));
+
+  zx::result directory_attr = directory->GetAttributes();
+  ASSERT_TRUE(directory_attr.is_ok()) << directory_attr.status_string();
+  zx::result file_attr = file.value()->GetAttributes();
+  ASSERT_TRUE(file_attr.is_ok()) << file_attr.status_string();
 
   // Directory created before file.
-  ASSERT_LE(directory_attr.creation_time, file_attr.creation_time);
+  ASSERT_LE(directory_attr->creation_time, file_attr->creation_time);
 
   // Observe that the modify time of the directory is larger than the file.
   // This implies "the file is created, then the directory is updated".
-  ASSERT_GE(directory_attr.modification_time, file_attr.modification_time);
+  ASSERT_GE(directory_attr->modification_time, file_attr->modification_time);
 }
 
 TEST(MemfsTest, SubdirectoryUpdateTime) {
@@ -324,12 +326,13 @@ TEST(MemfsTest, SubdirectoryUpdateTime) {
   // Overwrite a file at "index".
   index->DidModifyStream();
 
-  fs::VnodeAttributes subdirectory_attr, index_attr;
-  ASSERT_OK(subdirectory->GetAttributes(&subdirectory_attr));
-  ASSERT_OK(index->GetAttributes(&index_attr));
+  zx::result subdirectory_attr = subdirectory->GetAttributes();
+  ASSERT_TRUE(subdirectory_attr.is_ok()) << subdirectory_attr.status_string();
+  zx::result index_attr = index->GetAttributes();
+  ASSERT_TRUE(index_attr.is_ok()) << index_attr.status_string();
 
   // "index" was written after "subdirectory".
-  ASSERT_LE(subdirectory_attr.modification_time, index_attr.modification_time);
+  ASSERT_LE(subdirectory_attr->modification_time, index_attr->modification_time);
 }
 
 TEST(MemfsTest, SubPageContentSize) {
@@ -472,9 +475,10 @@ TEST(MemfsTest, WriteMaxFileSize) {
   size_t actual = 0;
   ASSERT_OK(stream->writev_at(0, kMaxFileSize - 1, &iov, 1, &actual));
   ASSERT_EQ(actual, data.size());
-  fs::VnodeAttributes attributes;
-  ASSERT_OK(file->GetAttributes(&attributes));
-  ASSERT_EQ(attributes.content_size, kMaxFileSize);
+
+  zx::result attributes = file->GetAttributes();
+  ASSERT_TRUE(attributes.is_ok()) << attributes.status_string();
+  ASSERT_EQ(attributes->content_size, kMaxFileSize);
 
   // Try to write beyond the max file size.
   ASSERT_STATUS(stream->writev_at(0, kMaxFileSize, &iov, 1, &actual), ZX_ERR_OUT_OF_RANGE);
@@ -490,9 +494,9 @@ TEST(MemfsTest, TruncateToMaxFileSize) {
   zx::result file = root->Create("file", fs::CreationType::kFile);
   ASSERT_OK(file.status_value());
   ASSERT_OK(file->Truncate(kMaxFileSize));
-  fs::VnodeAttributes attributes;
-  ASSERT_OK(file->GetAttributes(&attributes));
-  ASSERT_EQ(attributes.content_size, kMaxFileSize);
+  zx::result attributes = file->GetAttributes();
+  ASSERT_TRUE(attributes.is_ok()) << attributes.status_string();
+  ASSERT_EQ(attributes->content_size, kMaxFileSize);
 
   // Try to truncate beyond the max file size.
   ASSERT_STATUS(file->Truncate(kMaxFileSize + 1), ZX_ERR_OUT_OF_RANGE);

@@ -121,10 +121,10 @@ void AccelerationInputDevice::GetDescriptor(GetDescriptorCompleter::Sync& comple
 
   fidl::Arena<kDescriptorBufferSize> allocator;
 
-  fir_fidl::DeviceInfo device_info;
-  device_info.vendor_id = static_cast<uint32_t>(fir_fidl::VendorId::kGoogle);
-  device_info.product_id =
-      static_cast<uint32_t>(fir_fidl::VendorGoogleProductId::kGoldfishAccelerationSensor);
+  auto device_info = fir_fidl::DeviceInformation::Builder(allocator);
+  device_info.vendor_id(static_cast<uint32_t>(fir_fidl::VendorId::kGoogle));
+  device_info.product_id(
+      static_cast<uint32_t>(fir_fidl::VendorGoogleProductId::kGoldfishAccelerationSensor));
 
   fidl::VectorView<fir_fidl::SensorAxis> sensor_axes(allocator, 3);
   sensor_axes[0].axis = kAxis;
@@ -142,7 +142,7 @@ void AccelerationInputDevice::GetDescriptor(GetDescriptorCompleter::Sync& comple
   sensor_descriptor.input(sensor_input_descriptor);
 
   auto descriptor = fir_fidl::DeviceDescriptor::Builder(allocator);
-  descriptor.device_info(device_info);
+  descriptor.device_information(device_info.Build());
   descriptor.sensor(sensor_descriptor.Build());
 
   completer.Reply(descriptor.Build());
@@ -235,10 +235,10 @@ void GyroscopeInputDevice::GetDescriptor(GetDescriptorCompleter::Sync& completer
 
   fidl::Arena<kDescriptorBufferSize> allocator;
 
-  fir_fidl::DeviceInfo device_info;
-  device_info.vendor_id = static_cast<uint32_t>(fir_fidl::VendorId::kGoogle);
-  device_info.product_id =
-      static_cast<uint32_t>(fir_fidl::VendorGoogleProductId::kGoldfishGyroscopeSensor);
+  auto device_info = fir_fidl::DeviceInformation::Builder(allocator);
+  device_info.vendor_id(static_cast<uint32_t>(fir_fidl::VendorId::kGoogle));
+  device_info.product_id(
+      static_cast<uint32_t>(fir_fidl::VendorGoogleProductId::kGoldfishGyroscopeSensor));
 
   fidl::VectorView<fir_fidl::SensorAxis> sensor_axes(allocator, 3);
   sensor_axes[0].axis = kAxis;
@@ -256,7 +256,7 @@ void GyroscopeInputDevice::GetDescriptor(GetDescriptorCompleter::Sync& completer
   sensor_descriptor.input(sensor_input_descriptor);
 
   auto descriptor = fir_fidl::DeviceDescriptor::Builder(allocator);
-  descriptor.device_info(device_info);
+  descriptor.device_information(device_info.Build());
   descriptor.sensor(sensor_descriptor.Build());
 
   completer.Reply(descriptor.Build());
@@ -350,10 +350,10 @@ void RgbcLightInputDevice::GetDescriptor(GetDescriptorCompleter::Sync& completer
 
   fidl::Arena<kDescriptorBufferSize> allocator;
 
-  fir_fidl::DeviceInfo device_info;
-  device_info.vendor_id = static_cast<uint32_t>(fir_fidl::VendorId::kGoogle);
-  device_info.product_id =
-      static_cast<uint32_t>(fir_fidl::VendorGoogleProductId::kGoldfishRgbcLightSensor);
+  auto device_info = fir_fidl::DeviceInformation::Builder(allocator);
+  device_info.vendor_id(static_cast<uint32_t>(fir_fidl::VendorId::kGoogle));
+  device_info.product_id(
+      static_cast<uint32_t>(fir_fidl::VendorGoogleProductId::kGoldfishRgbcLightSensor));
 
   fidl::VectorView<fir_fidl::SensorAxis> sensor_axes(allocator, 4);
   sensor_axes[0].axis = kAxis;
@@ -373,7 +373,7 @@ void RgbcLightInputDevice::GetDescriptor(GetDescriptorCompleter::Sync& completer
   sensor_descriptor.input(sensor_input_descriptor);
 
   auto descriptor = fir_fidl::DeviceDescriptor::Builder(allocator);
-  descriptor.device_info(device_info);
+  descriptor.device_information(device_info.Build());
   descriptor.sensor(sensor_descriptor.Build());
 
   completer.Reply(descriptor.Build());

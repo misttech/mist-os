@@ -23,8 +23,7 @@ const TEST_PKG_HASH: &str = "44e7704720706ffd287bf0d27133cec7d609581547095ab6c6f
 
 #[fuchsia::test]
 async fn read() {
-    let (_ns, dirs) = dirs_to_test().await;
-    for source in dirs {
+    for source in dirs_to_test().await {
         read_per_package_source(source).await
     }
 }
@@ -106,8 +105,7 @@ async fn assert_read_exceeds_buffer_success(root_dir: &fio::DirectoryProxy, path
 
 #[fuchsia::test]
 async fn read_at() {
-    let (_ns, dirs) = dirs_to_test().await;
-    for source in dirs {
+    for source in dirs_to_test().await {
         read_at_per_package_source(source).await
     }
 }
@@ -223,8 +221,7 @@ async fn assert_read_at_is_unaffected_by_seek(root_dir: &fio::DirectoryProxy, pa
 
 #[fuchsia::test]
 async fn seek() {
-    let (_ns, dirs) = dirs_to_test().await;
-    for source in dirs {
+    for source in dirs_to_test().await {
         seek_per_package_source(source).await
     }
 }
@@ -342,8 +339,7 @@ async fn assert_seek_past_end_end_origin(
 
 #[fuchsia::test]
 async fn get_backing_memory() {
-    let (_ns, dirs) = dirs_to_test().await;
-    for source in dirs {
+    for source in dirs_to_test().await {
         get_backing_memory_per_package_source(source).await
     }
 }
@@ -465,8 +461,7 @@ async fn test_get_backing_memory_success(
 
 #[fuchsia::test]
 async fn clone() {
-    let (_ns, dirs) = dirs_to_test().await;
-    for source in dirs {
+    for source in dirs_to_test().await {
         clone_per_package_source(source).await
     }
 }
@@ -526,8 +521,7 @@ async fn assert_clone_sends_on_open_event(package_root: &fio::DirectoryProxy, pa
 
 #[fuchsia::test]
 async fn unsupported() {
-    let (_ns, dirs) = dirs_to_test().await;
-    for source in dirs {
+    for source in dirs_to_test().await {
         unsupported_per_package_source(source).await
     }
 }

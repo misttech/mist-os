@@ -16,6 +16,7 @@
 #include <gtest/gtest.h>
 
 #include "fault_test.h"
+#include "fault_test_suite.h"
 
 #if !defined(__NR_memfd_create)
 #if defined(__x86_64__)

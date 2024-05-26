@@ -6,20 +6,20 @@ use {
     anyhow::{format_err, Error},
     fidl::endpoints::RequestStream,
     fidl_fuchsia_bluetooth_host::{
-        DiscoverySessionRequestStream, HostControlHandle, HostMarker, HostRequest,
-        HostRequestStream,
+        BondingDelegateRequestStream, DiscoverySessionRequestStream, HostControlHandle, HostMarker,
+        HostRequest, HostRequestStream,
     },
     fidl_fuchsia_bluetooth_sys::HostInfo as FidlHostInfo,
     fuchsia_bluetooth::types::{
         bonding_data::example, Address, BondingData, HostId, HostInfo, Peer, PeerId,
     },
     fuchsia_sync::RwLock,
-    futures::{future, join, stream::StreamExt},
+    futures::{future, future::Either, join, pin_mut, stream::StreamExt, FutureExt},
     std::sync::Arc,
     test_util::assert_gt,
 };
 
-use crate::host_device::{HostDevice, HostListener};
+use crate::host_device::{test::FakeHostServer, HostDevice, HostListener};
 
 // An impl that ignores all events
 impl HostListener for () {
@@ -53,6 +53,7 @@ async fn host_device_set_local_name() -> Result<(), Error> {
     let expected_name = "EXPECTED_NAME".to_string();
     let info = Arc::new(RwLock::new(host.info()));
     let server = Arc::new(RwLock::new(server));
+    let _delegate = expect_set_bonding_delegate(server.clone()).await?;
 
     // Assign a name and verify that that it gets written to the bt-host device over FIDL.
     let set_name = host.set_name(expected_name.clone());
@@ -84,6 +85,7 @@ async fn test_discovery_session() -> Result<(), Error> {
     let host = HostDevice::mock(HostId(1), address, "/dev/class/bt-hci/test".to_string(), client);
     let info_server = Arc::new(RwLock::new(host.info()));
     let server = Arc::new(RwLock::new(server));
+    let _delegate = expect_set_bonding_delegate(server.clone()).await?;
 
     // Simulate request to establish discovery session
     let discovery_proxy = host.start_discovery()?;
@@ -121,9 +123,11 @@ async fn test_discovery_session() -> Result<(), Error> {
 // over multiple paginated iterations
 #[fuchsia::test(allow_stalls = false)]
 async fn host_device_restore_bonds() -> Result<(), Error> {
-    let (client, server) = fidl::endpoints::create_proxy_and_stream::<HostMarker>()?;
+    let (client, host_request_stream) = fidl::endpoints::create_proxy_and_stream::<HostMarker>()?;
     let address = Address::Public([0, 0, 0, 0, 0, 0]);
     let host = HostDevice::mock(HostId(1), address, "/dev/class/bt-hci/test".to_string(), client);
+    let mut fake_host_server =
+        FakeHostServer::new(host_request_stream, Arc::new(RwLock::new(host.info())));
 
     // TODO(https://fxbug.dev/42160922): Assume that 256 bonds is enough to cause HostDevice to use multiple
     // FIDL calls to transmit all of the bonds (at this time, the maximum message size is 64 KiB
@@ -133,30 +137,20 @@ async fn host_device_restore_bonds() -> Result<(), Error> {
     });
     let restore_bonds = host.restore_bonds(bonds.collect());
 
-    // Create testing Host server that responds to each request with a completed future until
-    // restore_bonds yields a result
-    let mut num_restore_bonds_calls: i32 = 0;
-    let run_host = server.take_until(restore_bonds).for_each(|request| {
-        match request {
-            Ok(HostRequest::RestoreBonds { responder, .. }) => {
-                // Succeed always by not sending back any rejected bonds
-                let _ = responder.send(&[]);
-                num_restore_bonds_calls += 1;
-            }
-            x => panic!("Expected RestoreBonds Request but got: {:?}", x),
-        }
-        future::ready(())
-    });
-
-    let _ = run_host.await;
-    assert_gt!(num_restore_bonds_calls, 1);
+    {
+        let run_server = fake_host_server.run().fuse();
+        pin_mut!(run_server);
+        let result = futures::future::select(restore_bonds.fuse(), run_server).await;
+        assert!(matches!(result, Either::Left { .. }));
+    }
+    assert_gt!(fake_host_server.num_restore_bonds_calls, 1);
     Ok(())
 }
 
 // TODO(https://fxbug.dev/42115226): Add host.fidl emulation to bt-fidl-mocks and use that instead.
-async fn expect_call<F>(stream: Arc<RwLock<HostRequestStream>>, f: F) -> Result<(), Error>
+async fn expect_call<F, D>(stream: Arc<RwLock<HostRequestStream>>, f: F) -> Result<D, Error>
 where
-    F: FnOnce(Arc<HostControlHandle>, HostRequest) -> Result<(), Error>,
+    F: FnOnce(Arc<HostControlHandle>, HostRequest) -> Result<D, Error>,
 {
     let control_handle = Arc::new(stream.read().control_handle());
     let mut stream = stream.write();
@@ -166,6 +160,16 @@ where
     } else {
         Err(format_err!("No event received"))
     }
+}
+
+async fn expect_set_bonding_delegate(
+    stream: Arc<RwLock<HostRequestStream>>,
+) -> Result<BondingDelegateRequestStream, Error> {
+    expect_call(stream, |_, e| match e {
+        HostRequest::SetBondingDelegate { delegate, .. } => Ok(delegate.into_stream().unwrap()),
+        _ => Err(format_err!("Unexpected!")),
+    })
+    .await
 }
 
 // Updates host with new info

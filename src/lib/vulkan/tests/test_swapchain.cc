@@ -75,23 +75,28 @@ class FakeFlatland : public fuchsia::ui::composition::testing::Allocator_TestBas
     auto [_, import_token_koid] = fsl::GetKoids(args.export_token().value.get());
     registered_koids.insert(import_token_koid);
 
-    fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator;
+    fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator;
     zx_status_t status = fdio_service_connect(
-        "/svc/fuchsia.sysmem.Allocator", sysmem_allocator.NewRequest().TakeChannel().release());
+        "/svc/fuchsia.sysmem2.Allocator", sysmem_allocator.NewRequest().TakeChannel().release());
     EXPECT_EQ(status, ZX_OK);
-    sysmem_allocator->SetDebugClientInfo(fsl::GetCurrentProcessName(),
-                                         fsl::GetCurrentProcessKoid());
+    sysmem_allocator->SetDebugClientInfo(
+        std::move(fuchsia::sysmem2::AllocatorSetDebugClientInfoRequest{}
+                      .set_name(fsl::GetCurrentProcessName())
+                      .set_id(fsl::GetCurrentProcessKoid())));
 
-    fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
+    fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
     status = sysmem_allocator->BindSharedCollection(
-        args.mutable_buffer_collection_token()->BindSync(), buffer_collection.NewRequest());
+        std::move(fuchsia::sysmem2::AllocatorBindSharedCollectionRequest{}
+                      .set_token(fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>(
+                          args.mutable_buffer_collection_token()->TakeChannel()))
+                      .set_buffer_collection_request(buffer_collection.NewRequest())));
     EXPECT_EQ(status, ZX_OK);
 
-    fuchsia::sysmem::BufferCollectionConstraints constraints;
-    status = buffer_collection->SetConstraints(false, constraints);
+    status = buffer_collection->SetConstraints(
+        fuchsia::sysmem2::BufferCollectionSetConstraintsRequest{});
     EXPECT_EQ(status, ZX_OK);
 
-    status = buffer_collection->Close();
+    status = buffer_collection->Release();
     EXPECT_EQ(status, ZX_OK);
   }
 

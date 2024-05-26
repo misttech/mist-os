@@ -802,7 +802,10 @@ class Scheduler {
   void AssertInScheduler(const Thread& t) const TA_REQ(queue_lock_) TA_ASSERT_SHARED(t.get_lock())
       TA_ASSERT(t.get_scheduler_variable_lock()) {
     [&]() TA_NO_THREAD_SAFETY_ANALYSIS {
-      DEBUG_ASSERT_MSG((t.scheduler_state().curr_cpu() == this_cpu_),
+      // TODO(johngro): Come back here and remove the `&t == active_thread_`
+      // clause once other system-wide invariants have been cleaned up.  See
+      // http://fxbug.dev/340551498 for details.
+      DEBUG_ASSERT_MSG((t.scheduler_state().curr_cpu() == this_cpu_) || (&t == active_thread_),
                        "Thread %lu expected to be a member of scheduler %u, but curr_cpu says %u",
                        t.tid(), this_cpu_, t.scheduler_state().curr_cpu());
     }();

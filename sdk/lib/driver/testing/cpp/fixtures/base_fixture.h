@@ -70,7 +70,6 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
  public:
   BaseDriverTestFixture()
       : env_wrapper_(runtime_.StartBackgroundDispatcher()->async_dispatcher(), std::in_place) {
-    dut_.emplace(&runtime_);
     start_args_ = env_wrapper_.SyncCall(&internal::EnvWrapper<EnvironmentType>::Init);
 
     outgoing_directory_client_ =
@@ -344,6 +343,8 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
   }
 
  private:
+  bool StartedSuccessfully() const { return start_result_.has_value() && start_result_->is_ok(); }
+
   fidl::ClientEnd<fuchsia_io::Directory> ConnectToDriverSvcDir() {
     auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
     zx_status_t status = fdio_open_at(outgoing_directory_client_.handle()->get(), "/svc",
@@ -355,9 +356,7 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
   }
 
   zx::result<> StartDriverImpl(fit::callback<void(fdf::DriverStartArgs&)> args_modifier) {
-    if (!start_args_.has_value()) {
-      return zx::error(ZX_ERR_BAD_STATE);
-    }
+    ZX_ASSERT_MSG(!start_result_.has_value(), "Cannot start multiple times in a row.");
 
     if (args_modifier) {
       args_modifier(start_args_.value());
@@ -366,27 +365,34 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
     fdf::DriverStartArgs start_args = std::move(start_args_.value());
     start_args_.reset();
 
-    ZX_ASSERT_MSG(dut_.has_value(),
-                  "Cannot call StartDriver after ShutdownDispatchersAndDestroyDriverImpl.");
-    return dut_->Start(std::move(start_args));
+    dut_.emplace(&runtime_);
+    start_result_ = dut_->Start(std::move(start_args));
+    return start_result_.value();
   }
 
   zx::result<> StopDriverImpl() {
-    if (prepare_stop_result_.has_value()) {
-      return zx::error(ZX_ERR_BAD_STATE);
+    ZX_ASSERT_MSG(start_result_.has_value(), "Cannot stop without having started.");
+    ZX_ASSERT_MSG(!prepare_stop_result_.has_value(), "Cannot stop multiple times in a row.");
+
+    if (StartedSuccessfully()) {
+      ZX_ASSERT_MSG(dut_.has_value(),
+                    "Cannot call StopDriver after ShutdownDispatchersAndDestroyDriverImpl.");
+      prepare_stop_result_.emplace(dut_->PrepareStop());
+    } else {
+      prepare_stop_result_.emplace(zx::ok());
     }
 
-    ZX_ASSERT_MSG(dut_.has_value(),
-                  "Cannot call StopDriver after ShutdownDispatchersAndDestroyDriverImpl.");
-    zx::result prepare_stop_result = dut_->PrepareStop();
-    prepare_stop_result_.emplace(prepare_stop_result);
-    return prepare_stop_result;
+    return prepare_stop_result_.value();
   }
 
   void ShutdownDispatchersAndDestroyDriverImpl() {
-    ZX_ASSERT_MSG(prepare_stop_result_.has_value(),
-                  "Ensure that StopDriver is called when kAutoStopDriver is false.");
     if (dut_.has_value()) {
+      if (StartedSuccessfully()) {
+        ZX_ASSERT_MSG(
+            prepare_stop_result_.has_value(),
+            "Ensure that StopDriver is called when kAutoStopDriver=false and start was successful.");
+      }
+
       env_wrapper_.reset();
       runtime_.ShutdownAllDispatchers(dut_->GetDispatcher()->get());
       dut_.reset();
@@ -396,7 +402,7 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
   fdf_testing::DriverRuntime runtime_;
   async_patterns::TestDispatcherBound<internal::EnvWrapper<EnvironmentType>> env_wrapper_;
 
-  // The dut_ is created through the constructor, and becomes a nullopt through
+  // The dut_ is created through the |StartDriverImpl|, and becomes a nullopt through
   // |ShutdownDispatchersAndDestroyDriverImpl|.
   std::optional<internal::DriverWrapper<DriverType, kDriverOnForeground>> dut_;
 
@@ -404,6 +410,7 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
 
   std::optional<fdf::UnownedSynchronizedDispatcher> bg_task_dispatcher_;
   std::optional<fdf::DriverStartArgs> start_args_;
+  std::optional<zx::result<>> start_result_;
   std::optional<zx::result<>> prepare_stop_result_;
 };
 

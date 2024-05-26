@@ -28,14 +28,14 @@ def _get_fuchsia_source_relative_path(repo_ctx, path):
        to the resulting file path, to ensure the repository rule is always
        re-run when the file changes.
     """
-    if repo_ctx.attr.fuchsia_source_dir:
-        return repo_ctx.path("%s/%s/%s" % (
-            repo_ctx.workspace_root,
-            repo_ctx.attr.fuchsia_source_dir,
-            path,
-        ))
-    else:
+    fuchsia_source_dir = repo_ctx.attr.fuchsia_source_dir
+    if not fuchsia_source_dir:
         return repo_ctx.path(Label("@//:" + path))
+
+    if not fuchsia_source_dir.startswith("/"):
+        fuchsia_source_dir = "%s/%s" % (repo_ctx.workspace_root, fuchsia_source_dir)
+
+    return "%s/%s" % (fuchsia_source_dir, path)
 
 def _get_ninja_output_dir(repo_ctx):
     """Compute the Ninja output directory used by this workspace.
@@ -270,4 +270,20 @@ fuchsia_build_config_repository = repository_rule(
                   "current workspace.",
         ),
     },
+)
+
+### BzlMod support.
+
+def _fuchsia_build_config_ext_impl(module_ctx):
+    fuchsia_source_dir = module_ctx.os.environ.get("LOCAL_FUCHSIA_PLATFORM_BUILD", "")
+    if fuchsia_source_dir:
+        fuchsia_source_dir += "/../.."
+
+    fuchsia_build_config_repository(
+        name = "fuchsia_build_config",
+        fuchsia_source_dir = fuchsia_source_dir,
+    )
+
+fuchsia_build_config_ext = module_extension(
+    implementation = _fuchsia_build_config_ext_impl,
 )

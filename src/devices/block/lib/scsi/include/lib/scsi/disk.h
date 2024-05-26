@@ -7,14 +7,11 @@
 
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/scsi/controller.h>
 #include <stdint.h>
 
-#include <ddktl/device.h>
-#include <fbl/ref_counted.h>
-#include <fbl/ref_ptr.h>
 #include <fbl/string_printf.h>
 
 namespace scsi {
@@ -44,24 +41,14 @@ struct DiskOptions {
   bool use_read_write_12;
 };
 
-class Disk;
-using DeviceType = ddk::Device<Disk>;
-
 // |Disk| represents a single SCSI direct access block device.
 // |Disk| bridges between the Zircon block protocol and SCSI commands/responses.
-class Disk : public DeviceType,
-             public ddk::BlockImplProtocol<Disk, ddk::base_protocol>,
-             public fbl::RefCounted<Disk> {
+class Disk : public ddk::BlockImplProtocol<Disk> {
  public:
   // Public so that we can use make_unique.
   // Clients should use Disk::Bind().
-  Disk(zx_device_t* parent, Controller* controller, uint8_t target, uint16_t lun,
-       DiskOptions disk_options)
-      : DeviceType(parent),
-        controller_(controller),
-        target_(target),
-        lun_(lun),
-        disk_options_(disk_options) {}
+  Disk(Controller* controller, uint8_t target, uint16_t lun, DiskOptions disk_options)
+      : controller_(controller), target_(target), lun_(lun), disk_options_(disk_options) {}
 
   // Create a Disk at a specific target/lun.
   // |controller| is a pointer to the scsi::Controller this disk is attached to.
@@ -70,14 +57,19 @@ class Disk : public DeviceType,
   // A |max_transfer_bytes| value of fuchsia_hardware_block::wire::kMaxTransferUnbounded implies
   // there is no limit on the transfer size.
   // Returns a Disk* to allow for removal of removable media disks.
-  static zx::result<fbl::RefPtr<Disk>> Bind(zx_device_t* parent, Controller* controller,
-                                            uint8_t target, uint16_t lun,
-                                            uint32_t max_transfer_bytes, DiskOptions disk_options);
+  static zx::result<std::unique_ptr<Disk>> Bind(Controller* controller, uint8_t target,
+                                                uint16_t lun, uint32_t max_transfer_bytes,
+                                                DiskOptions disk_options);
+
+  // Remove this disk device.
+  void RemoveDevice() {
+    auto result = node_controller_->Remove();
+    if (!result.ok()) {
+      FDF_LOGL(ERROR, logger(), "Failed to call Remove on node controller.");
+    }
+  }
 
   fbl::String DiskName() const { return fbl::StringPrintf("scsi-disk-%u-%u", target_, lun_); }
-
-  // DeviceType functions.
-  void DdkRelease();
 
   // ddk::BlockImplProtocol functions.
   void BlockImplQuery(block_info_t* info_out, size_t* block_op_size_out);
@@ -103,6 +95,8 @@ class Disk : public DeviceType,
  private:
   zx_status_t AddDisk(uint32_t max_transfer_bytes);
 
+  fdf::Logger& logger();
+
   Controller* const controller_;
   const uint8_t target_;
   const uint16_t lun_;
@@ -120,6 +114,11 @@ class Disk : public DeviceType,
   uint32_t block_size_bytes_;
 
   DiskOptions disk_options_;
+
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> node_controller_;
+
+  compat::BanjoServer block_impl_server_{ZX_PROTOCOL_BLOCK_IMPL, this, &block_impl_protocol_ops_};
+  compat::SyncInitializedDeviceServer compat_server_;
 };
 
 }  // namespace scsi

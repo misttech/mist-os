@@ -41,9 +41,6 @@ constexpr size_t kBootstrapMemoryBytes = 512 * 1024;
 alignas(ZX_MIN_PAGE_SIZE) ktl::array<ktl::byte, kBootstrapMemoryBytes> gBootstrapMemory;
 
 void SetUpAddressSpace(AddressSpace& aspace) {
-  // Ensure that executable pages are allowed.
-  hwreg::X86MsrIo msr;
-  arch::X86ExtendedFeatureEnableRegisterMsr::Get().ReadFrom(&msr).set_nxe(1).WriteTo(&msr);
   aspace.Init();
   aspace.SetUpIdentityMappings();
   aspace.Install();
@@ -51,7 +48,11 @@ void SetUpAddressSpace(AddressSpace& aspace) {
 
 }  // namespace
 
-void ArchSetUpAddressSpaceEarly(AddressSpace& aspace) {
+void ArchSetUpAddressSpace(AddressSpace& aspace) {
+  // Ensure that executable pages are allowed.
+  hwreg::X86MsrIo msr;
+  arch::X86ExtendedFeatureEnableRegisterMsr::Get().ReadFrom(&msr).set_nxe(1).WriteTo(&msr);
+
   memalloc::Pool& pool = Allocation::GetPool();
 
   uint64_t bootstrap_start = reinterpret_cast<uintptr_t>(gBootstrapMemory.data());
@@ -73,4 +74,13 @@ void ArchSetUpAddressSpaceEarly(AddressSpace& aspace) {
   aspace.SetPageTableAllocationBounds(ktl::nullopt, ktl::nullopt);
 }
 
-void ArchSetUpAddressSpaceLate(AddressSpace& aspace) { SetUpAddressSpace(aspace); }
+// This just repeats allocation of all the page tables as done before, but in
+// the new state of the Allocation pool where the page tables used before are
+// no longer available and every other address range that needs to be avoided
+// during the trampoline handoff is reserved so the allocator won't use it.
+// The original page tables are leaked here, but this is the very last thing
+// done before the trampoline handoff wipes the slate clean anyway.
+void ArchPrepareAddressSpaceForTrampoline() {
+  ZX_DEBUG_ASSERT(gAddressSpace);
+  SetUpAddressSpace(*gAddressSpace);
+}

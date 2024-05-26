@@ -79,15 +79,15 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
   zx_status_t status;
 
   // Determine the cluster size of each cluster.
-  auto cluster_sizes =
-      ddk::GetMetadataArray<legacy_cluster_size_t>(parent, DEVICE_METADATA_CLUSTER_SIZE_LEGACY);
-  if (!cluster_sizes.is_ok()) {
-    return cluster_sizes.error_value();
+  auto cluster_info_metadata =
+      ddk::GetMetadataArray<legacy_cluster_info_t>(parent, DEVICE_METADATA_CLUSTER_SIZE_LEGACY);
+  if (!cluster_info_metadata.is_ok()) {
+    return cluster_info_metadata.error_value();
   }
 
-  std::map<PerfDomainId, uint32_t> cluster_core_counts;
-  for (auto cluster_size : cluster_sizes.value()) {
-    cluster_core_counts[cluster_size.pd_id] = cluster_size.core_count;
+  std::map<PerfDomainId, legacy_cluster_info_t> cluster_info_map;
+  for (auto cluster_info : cluster_info_metadata.value()) {
+    cluster_info_map[cluster_info.pd_id] = cluster_info;
   }
 
   // The Thermal Driver is our parent and it exports an interface with one
@@ -157,11 +157,12 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
       continue;
     }
 
-    const auto& cluster_core_count = cluster_core_counts.find(i);
-    if (cluster_core_count == cluster_core_counts.end()) {
+    const auto& cluster_core_info_it = cluster_info_map.find(i);
+    if (cluster_core_info_it == cluster_info_map.end()) {
       zxlogf(ERROR, "aml-cpu: Could not find cluster core count for cluster %lu", i);
       return ZX_ERR_NOT_FOUND;
     }
+    const auto& cluster_core_info = cluster_core_info_it->second;
 
     // If the FIDL client has been previously consumed, create a new one. Then build the CPU device
     // and consume the FIDL client.
@@ -172,7 +173,8 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
       }
     }
     auto cpu_device = std::make_unique<AmlCpu>(parent, std::move(thermal_fidl_client), i,
-                                               cluster_core_count->second);
+                                               cluster_core_info.core_count,
+                                               cluster_core_info.relative_performance);
     thermal_fidl_client = {};
 
     cpu_device->SetCpuInfo(cpu_version_packed);
@@ -320,8 +322,7 @@ void AmlCpu::GetDomainId(GetDomainIdCompleter::Sync& completer) {
 }
 
 void AmlCpu::GetRelativePerformance(GetRelativePerformanceCompleter::Sync& completer) {
-  // Platform does not provide this information.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  completer.ReplySuccess(relative_performance_);
 }
 
 void AmlCpu::SetCpuInfo(uint32_t cpu_version_packed) {

@@ -225,8 +225,10 @@ fn add_execution_info_to_table(
                 table.add_row(row!(r->"Runtime:", "ELF"));
                 if let Some(utc_estimate) = process_start_time_utc_estimate {
                     table.add_row(row!(r->"Running since:", utc_estimate));
-                } else if let Some(ticks) = process_start_time {
-                    table.add_row(row!(r->"Running since:", format!("{} ticks", ticks)));
+                } else if let Some(nanos_since_boot) = process_start_time {
+                    table.add_row(
+                        row!(r->"Running since:", format!("{} ns since boot", nanos_since_boot)),
+                    );
                 }
 
                 table.add_row(row!(r->"Job ID:", job_id));

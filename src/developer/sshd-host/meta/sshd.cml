@@ -318,5 +318,10 @@
             ],
             availability: "optional",
         },
+
+        // Services
+        {
+            service: [ "fuchsia.hardware.cpu.ctrl.Service" ],
+        },
     ],
 }

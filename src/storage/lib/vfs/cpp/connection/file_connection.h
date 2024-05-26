@@ -10,6 +10,7 @@
 #endif
 
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <zircon/availability.h>
 
 #include <cstdint>
 
@@ -60,18 +61,14 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   void SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) override;
   void QueryFilesystem(QueryFilesystemCompleter::Sync& completer) final;
   void GetAttributes(fuchsia_io::wire::Node2GetAttributesRequest* request,
-                     GetAttributesCompleter::Sync& completer) final {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
+                     GetAttributesCompleter::Sync& completer) final;
   void UpdateAttributes(fuchsia_io::wire::MutableNodeAttributes* request,
-                        UpdateAttributesCompleter::Sync& completer) final {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
+                        UpdateAttributesCompleter::Sync& completer) final;
   void Reopen(fuchsia_io::wire::Node2ReopenRequest* request,
               ReopenCompleter::Sync& completer) final {
     request->object_request.Close(ZX_ERR_NOT_SUPPORTED);
   }
-#if __Fuchsia_API_level__ >= 18
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
   void ListExtendedAttributes(ListExtendedAttributesRequestView request,
                               ListExtendedAttributesCompleter::Sync& completer) final {
     request->iterator.Close(ZX_ERR_NOT_SUPPORTED);
@@ -102,13 +99,11 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   void Resize(ResizeRequestView request, ResizeCompleter::Sync& completer) final;
   void GetBackingMemory(GetBackingMemoryRequestView request,
                         GetBackingMemoryCompleter::Sync& completer) final;
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   void Allocate(AllocateRequestView request, AllocateCompleter::Sync& completer) final {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
-#endif
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
   void EnableVerity(EnableVerityRequestView request, EnableVerityCompleter::Sync& completer) final {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }

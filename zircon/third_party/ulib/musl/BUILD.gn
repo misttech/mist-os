@@ -84,10 +84,20 @@ config("musl_internal.config") {
 }
 
 if (toolchain_variant.base == "//zircon/system/ulib/c:user.libc_$target_cpu") {
-  group("musl") {
+  group("legacy-impl") {
     visibility = [ "//zircon/system/ulib/c:*" ]
     deps = [
+      ":common-impl",
       "ldso",
+    ]
+  }
+
+  group("common-impl") {
+    visibility = [
+      ":*",
+      "//zircon/system/ulib/c:*",
+    ]
+    deps = [
       "pthread",
       "src/complex",
       "src/conf",
@@ -125,6 +135,11 @@ if (toolchain_variant.base == "//zircon/system/ulib/c:user.libc_$target_cpu") {
       "src/unistd",
       "third_party/tre",
     ]
+  }
+
+  group("new-impl") {
+    visibility = [ "//zircon/system/ulib/c:*" ]
+    deps = [ ":common-impl" ]
   }
 }
 

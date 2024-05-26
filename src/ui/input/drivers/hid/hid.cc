@@ -5,7 +5,6 @@
 #include "hid.h"
 
 #include <assert.h>
-#include <fuchsia/hardware/hidbus/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -25,10 +24,11 @@
 #include <bind/fuchsia/hid/cpp/bind.h>
 #include <fbl/auto_lock.h>
 
-#include "fuchsia/hardware/hiddevice/c/banjo.h"
 #include "src/ui/input/drivers/hid/hid-instance.h"
 
 namespace hid_driver {
+
+namespace fhidbus = fuchsia_hardware_hidbus;
 
 namespace {
 
@@ -220,6 +220,10 @@ void HidDevice::DdkUnbind(ddk::UnbindTxn txn) {
   txn.Reply();
 }
 
+void HidDevice::OnReportReceived(fidl::WireEvent<fhidbus::Hidbus::OnReportReceived>* event) {
+  IoQueue(this, event->buf.data(), event->buf.count(), event->timestamp);
+}
+
 void HidDevice::IoQueue(void* cookie, const uint8_t* buf, size_t len, zx_time_t time) {
   HidDevice* hid = static_cast<HidDevice*>(cookie);
 
@@ -356,16 +360,47 @@ zx_status_t HidDevice::HidDeviceGetReport(hid_report_type_t rpt_type, uint8_t rp
     return ZX_ERR_INTERNAL;
   }
 
-  uint8_t report[HID_MAX_REPORT_LEN];
-  size_t actual = 0;
-  zx_status_t status = hidbus_.GetReport(rpt_type, rpt_id, report, needed, &actual);
-  if (status != ZX_OK) {
-    return status;
+  if (std::holds_alternative<BanjoHidbusClient>(hidbus_)) {
+    uint8_t report[HID_MAX_REPORT_LEN];
+    size_t actual = 0;
+    zx_status_t status =
+        std::get<BanjoHidbusClient>(hidbus_).GetReport(rpt_type, rpt_id, report, needed, &actual);
+    if (status != ZX_OK) {
+      return status;
+    }
+    if (actual > report_count) {
+      zxlogf(ERROR, "GetReport returned more than expected %zu > %zu. Capping at %zu", actual,
+             report_count, report_count);
+      actual = report_count;
+    }
+    memcpy(out_report_data, report, actual);
+    *out_report_actual = actual;
+    return ZX_OK;
+  } else if (std::holds_alternative<FidlHidbusClient>(hidbus_)) {
+    auto result = std::get<FidlHidbusClient>(hidbus_).sync()->GetReport(
+        static_cast<fuchsia_hardware_input::ReportType>(rpt_type), rpt_id, needed);
+    if (!result.ok()) {
+      zxlogf(ERROR, "FIDL transport failed on GetReport(): %s",
+             result.error().FormatDescription().c_str());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "HID device failed to get report: %d", result->error_value());
+      return result->error_value();
+    }
+    size_t actual = result.value()->data.count();
+    if (actual > report_count) {
+      zxlogf(ERROR, "GetReport returned more than expected %zu > %zu. Capping at %zu", actual,
+             report_count, report_count);
+      actual = report_count;
+    }
+    memcpy(out_report_data, result.value()->data.data(), actual);
+    *out_report_actual = actual;
+    return ZX_OK;
   }
-  memcpy(out_report_data, report, actual);
-  *out_report_actual = actual;
 
-  return ZX_OK;
+  ZX_DEBUG_ASSERT(false);
+  return ZX_ERR_INTERNAL;
 }
 
 zx_status_t HidDevice::HidDeviceSetReport(hid_report_type_t rpt_type, uint8_t rpt_id,
@@ -375,8 +410,28 @@ zx_status_t HidDevice::HidDeviceSetReport(hid_report_type_t rpt_type, uint8_t rp
   if (needed < report_count) {
     return ZX_ERR_BUFFER_TOO_SMALL;
   }
-  zx_status_t status = hidbus_.SetReport(rpt_type, rpt_id, report_data, report_count);
-  return status;
+
+  if (std::holds_alternative<BanjoHidbusClient>(hidbus_)) {
+    return std::get<BanjoHidbusClient>(hidbus_).SetReport(rpt_type, rpt_id, report_data,
+                                                          report_count);
+  } else if (std::holds_alternative<FidlHidbusClient>(hidbus_)) {
+    auto result = std::get<FidlHidbusClient>(hidbus_).sync()->SetReport(
+        static_cast<fuchsia_hardware_input::ReportType>(rpt_type), rpt_id,
+        fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(report_data), report_count));
+    if (!result.ok()) {
+      zxlogf(ERROR, "FIDL transport failed on SetReport(): %s",
+             result.error().FormatDescription().c_str());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "HID device failed to set report: %d", result->error_value());
+      return result->error_value();
+    }
+    return ZX_OK;
+  }
+
+  ZX_DEBUG_ASSERT(false);
+  return ZX_ERR_INTERNAL;
 }
 
 hidbus_ifc_protocol_ops_t hid_ifc_ops = {
@@ -384,47 +439,108 @@ hidbus_ifc_protocol_ops_t hid_ifc_ops = {
 };
 
 zx_status_t HidDevice::SetReportDescriptor() {
-  hid_report_desc_.resize(HID_MAX_DESC_LEN);
-  size_t actual = 0;
-  zx_status_t status = hidbus_.GetDescriptor(HID_DESCRIPTION_TYPE_REPORT, hid_report_desc_.data(),
-                                             hid_report_desc_.size(), &actual);
-  if (status != ZX_OK) {
-    return status;
+  if (std::holds_alternative<BanjoHidbusClient>(hidbus_)) {
+    hid_report_desc_.resize(HID_MAX_DESC_LEN);
+    size_t actual = 0;
+    zx_status_t status = std::get<BanjoHidbusClient>(hidbus_).GetDescriptor(
+        HID_DESCRIPTION_TYPE_REPORT, hid_report_desc_.data(), hid_report_desc_.size(), &actual);
+    if (status != ZX_OK) {
+      return status;
+    }
+    hid_report_desc_.resize(actual);
+  } else if (std::holds_alternative<FidlHidbusClient>(hidbus_)) {
+    auto result = std::get<FidlHidbusClient>(hidbus_).sync()->GetDescriptor(
+        fhidbus::wire::HidDescriptorType::kReport);
+    if (!result.ok()) {
+      zxlogf(ERROR, "FIDL transport failed on GetDescriptor(): %s",
+             result.error().FormatDescription().c_str());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "HID device failed to get descriptor: %d", result->error_value());
+      return result->error_value();
+    }
+    hid_report_desc_ = std::vector<uint8_t>(
+        result.value()->data.data(), result.value()->data.data() + result.value()->data.count());
+  } else {
+    ZX_DEBUG_ASSERT(false);
+    zxlogf(ERROR, "Client is neither Banjo nor FIDL");
+    return ZX_ERR_INTERNAL;
   }
-  hid_report_desc_.resize(actual);
 
   if (!info_.boot_device) {
     return ZX_OK;
   }
 
-  hid_protocol_t protocol;
-  status = hidbus_.GetProtocol(&protocol);
-  if (status != ZX_OK) {
-    if (status == ZX_ERR_NOT_SUPPORTED) {
-      status = ZX_OK;
+  fhidbus::HidProtocol protocol;
+  if (std::holds_alternative<BanjoHidbusClient>(hidbus_)) {
+    auto status = std::get<BanjoHidbusClient>(hidbus_).GetProtocol(
+        reinterpret_cast<hid_protocol_t*>(&protocol));
+    if (status != ZX_OK) {
+      if (status == ZX_ERR_NOT_SUPPORTED) {
+        status = ZX_OK;
+      }
+      return status;
     }
-    return status;
+  } else if (std::holds_alternative<FidlHidbusClient>(hidbus_)) {
+    auto result = std::get<FidlHidbusClient>(hidbus_).sync()->GetProtocol();
+    if (!result.ok()) {
+      zxlogf(ERROR, "FIDL transport failed on GetProtocol(): %s",
+             result.error().FormatDescription().c_str());
+      return result.status();
+    }
+    if (result->is_error()) {
+      if (result->error_value() == ZX_ERR_NOT_SUPPORTED) {
+        return ZX_OK;
+      }
+      return result->error_value();
+    }
+    protocol = result.value()->protocol;
+  } else {
+    ZX_DEBUG_ASSERT(false);
+    zxlogf(ERROR, "Client is neither Banjo nor FIDL");
+    return ZX_ERR_INTERNAL;
   }
 
   // Only continue if the device was put into the boot protocol.
-  if (protocol != HID_PROTOCOL_BOOT) {
+  if (protocol != fhidbus::HidProtocol::kBoot) {
     return ZX_OK;
   }
 
   // If we are a boot protocol kbd, we need to use the right HID descriptor.
   if (info_.device_class == HID_DEVICE_CLASS_KBD) {
+    size_t actual = 0;
     const uint8_t* boot_kbd_desc = get_boot_kbd_report_desc(&actual);
     hid_report_desc_.resize(actual);
     memcpy(hid_report_desc_.data(), boot_kbd_desc, actual);
 
     // Disable numlock
     uint8_t zero = 0;
-    hidbus_.SetReport(HID_REPORT_TYPE_OUTPUT, 0, &zero, sizeof(zero));
+    if (std::holds_alternative<BanjoHidbusClient>(hidbus_)) {
+      std::get<BanjoHidbusClient>(hidbus_).SetReport(HID_REPORT_TYPE_OUTPUT, 0, &zero,
+                                                     sizeof(zero));
+    } else if (std::holds_alternative<FidlHidbusClient>(hidbus_)) {
+      auto result = std::get<FidlHidbusClient>(hidbus_).sync()->SetReport(
+          static_cast<fuchsia_hardware_input::ReportType>(
+              fuchsia_hardware_input::ReportType::kOutput),
+          0, fidl::VectorView<uint8_t>::FromExternal(&zero, sizeof(zero)));
+      if (!result.ok()) {
+        zxlogf(ERROR, "FIDL transport failed on SetReport(): %s",
+               result.error().FormatDescription().c_str());
+      }
+      if (result->is_error()) {
+        zxlogf(ERROR, "HID device failed to set report: %d", result->error_value());
+      }
+    } else {
+      ZX_DEBUG_ASSERT(false);
+      zxlogf(ERROR, "Client is neither Banjo nor FIDL");
+    }
     // ignore failure for now
   }
 
   // If we are a boot protocol pointer, we need to use the right HID descriptor.
   if (info_.device_class == HID_DEVICE_CLASS_POINTER) {
+    size_t actual = 0;
     const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&actual);
 
     hid_report_desc_.resize(actual);
@@ -441,12 +557,35 @@ void HidDevice::RemoveInstance(HidInstance& instance) {
   instance_list_.erase(instance);
 }
 
-zx_status_t HidDevice::Bind(ddk::HidbusProtocolClient hidbus_proto) {
-  hidbus_ = hidbus_proto;
-
-  if (zx_status_t status = hidbus_.Query(0, &info_); status != ZX_OK) {
-    zxlogf(ERROR, "hid: bind: hidbus query failed: %s", zx_status_get_string(status));
-    return status;
+zx_status_t HidDevice::Bind() {
+  if (std::holds_alternative<BanjoHidbusClient>(hidbus_)) {
+    if (zx_status_t status = std::get<BanjoHidbusClient>(hidbus_).Query(0, &info_);
+        status != ZX_OK) {
+      zxlogf(ERROR, "hid: bind: hidbus query failed: %s", zx_status_get_string(status));
+      return status;
+    }
+  } else if (std::holds_alternative<FidlHidbusClient>(hidbus_)) {
+    auto result = std::get<FidlHidbusClient>(hidbus_).sync()->Query();
+    if (!result.ok()) {
+      zxlogf(ERROR, "FIDL transport failed on Query(): %s",
+             result.error().FormatDescription().c_str());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "HID device failed to query: %d", result->error_value());
+      return result->error_value();
+    }
+    info_.boot_device = result.value()->info.boot_protocol() != fhidbus::HidBootProtocol::kNone;
+    info_.device_class = static_cast<hid_device_class_t>(result.value()->info.boot_protocol());
+    info_.dev_num = result.value()->info.dev_num();
+    info_.polling_rate = result.value()->info.polling_rate();
+    info_.product_id = result.value()->info.product_id();
+    info_.vendor_id = result.value()->info.vendor_id();
+    info_.version = result.value()->info.version();
+  } else {
+    ZX_DEBUG_ASSERT(false);
+    zxlogf(ERROR, "Client is neither Banjo nor FIDL");
+    return ZX_ERR_INTERNAL;
   }
 
   snprintf(name_.data(), name_.size(), "hid-device-%03d", info_.dev_num);
@@ -484,16 +623,46 @@ zx_status_t HidDevice::Bind(ddk::HidbusProtocolClient hidbus_proto) {
   }
 
   // TODO: delay calling start until we've been opened by someone
-  if (zx_status_t status = hidbus_.Start(this, &hid_ifc_ops); status != ZX_OK) {
-    zxlogf(ERROR, "hid: could not start hid device: %s", zx_status_get_string(status));
-    ReleaseReassemblyBuffer();
-    return status;
-  }
+  if (std::holds_alternative<BanjoHidbusClient>(hidbus_)) {
+    if (zx_status_t status = std::get<BanjoHidbusClient>(hidbus_).Start(this, &hid_ifc_ops);
+        status != ZX_OK) {
+      zxlogf(ERROR, "hid: could not start hid device: %s", zx_status_get_string(status));
+      ReleaseReassemblyBuffer();
+      return status;
+    }
 
-  if (zx_status_t status = hidbus_.SetIdle(0, 0); status != ZX_OK) {
-    zxlogf(DEBUG, "hid: [W] set_idle failed for %s: %s", name_.data(),
-           zx_status_get_string(status));
-    // continue anyway
+    if (zx_status_t status = std::get<BanjoHidbusClient>(hidbus_).SetIdle(0, 0); status != ZX_OK) {
+      zxlogf(DEBUG, "hid: [W] set_idle failed for %s: %s", name_.data(),
+             zx_status_get_string(status));
+      // continue anyway
+    }
+  } else if (std::holds_alternative<FidlHidbusClient>(hidbus_)) {
+    {
+      auto result = std::get<FidlHidbusClient>(hidbus_).sync()->Start();
+      if (!result.ok()) {
+        zxlogf(ERROR, "FIDL transport failed on Start(): %s",
+               result.error().FormatDescription().c_str());
+        ReleaseReassemblyBuffer();
+        return result.status();
+      }
+      if (result->is_error()) {
+        zxlogf(ERROR, "HID device failed to start: %d", result->error_value());
+        ReleaseReassemblyBuffer();
+        return result->error_value();
+      }
+    }
+
+    {
+      auto result = std::get<FidlHidbusClient>(hidbus_).sync()->SetIdle(0, 0);
+      if (!result.ok()) {
+        zxlogf(ERROR, "FIDL transport failed on SetIdle(): %s",
+               result.error().FormatDescription().c_str());
+      }
+      if (result->is_error()) {
+        zxlogf(ERROR, "HID device failed to set idle: %d", result->error_value());
+      }
+      // continue anyway
+    }
   }
 
   if (zx_status_t status =
@@ -508,17 +677,27 @@ zx_status_t HidDevice::Bind(ddk::HidbusProtocolClient hidbus_proto) {
 }
 
 static zx_status_t hid_bind(void* ctx, zx_device_t* parent) {
-  zx_status_t status;
-  auto dev = std::make_unique<HidDevice>(parent);
-
+  std::unique_ptr<HidDevice> dev;
+  // Prefer Banjo
   hidbus_protocol_t hidbus;
-  if (device_get_protocol(parent, ZX_PROTOCOL_HIDBUS, &hidbus)) {
-    zxlogf(ERROR, "hid: bind: no hidbus protocol");
+  zx_status_t status = device_get_protocol(parent, ZX_PROTOCOL_HIDBUS, &hidbus);
+  if (status == ZX_OK) {
+    zxlogf(INFO, "HID driver uses banjo client protocol");
+    dev = std::make_unique<HidDevice>(parent, ddk::HidbusProtocolClient(&hidbus));
+  } else {
+    zxlogf(WARNING, "Failed to get Banjo client protocol with %d. Trying FIDL", status);
+    // Try FIDL
+    auto client_end = ddk::Device<void>::DdkConnectFidlProtocol<fhidbus::Service::Device>(parent);
+    if (client_end.is_ok()) {
+      dev = std::make_unique<HidDevice>(parent, std::move(client_end).value());
+    }
+  }
+  if (!dev) {
+    zxlogf(ERROR, "Parent supports neither Banjo nor FIDL");
     return ZX_ERR_INTERNAL;
   }
 
-  ddk::HidbusProtocolClient client = ddk::HidbusProtocolClient(&hidbus);
-  status = dev->Bind(client);
+  status = dev->Bind();
   if (status == ZX_OK) {
     // devmgr is now in charge of the memory for dev.
     [[maybe_unused]] auto ptr = dev.release();

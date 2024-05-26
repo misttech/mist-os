@@ -292,8 +292,9 @@ if (use_bringup_assembly) {
       ":assembly_cache_packages.list",
       ":base_packages.list",
 
-      # ":cache_packages.list",
-      # ":universe_packages.list",
+      # These are still necessary for fx list-packages.
+      ":cache_packages.list",
+      ":universe_packages.list",
     ]
   }
 

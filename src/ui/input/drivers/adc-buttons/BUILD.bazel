@@ -33,7 +33,7 @@ _common_deps = [
     "@fuchsia_sdk//pkg/input_report_reader",
     "@fuchsia_sdk//pkg/mmio",
     "@internal_sdk//fidl/fuchsia.buttons:fuchsia.buttons_cpp",
-    "@internal_sdk//fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
     "@internal_sdk//pkg/fbl",
 ]
 
@@ -43,6 +43,7 @@ fuchsia_driver_bind_bytecode(
     rules = "adc-buttons.bind",
     deps = [
         "@fuchsia_sdk//bind/fuchsia.adc",
+        "@fuchsia_sdk//bind/fuchsia.devicetree",
         "@fuchsia_sdk//bind/fuchsia.platform",
         "@fuchsia_sdk//fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_bindlib",
     ],
@@ -89,12 +90,10 @@ fuchsia_cc_test(
     size = "small",
     srcs = ["adc-buttons-test.cc"] + _common_sources,
     deps = [
+        "//sdk/lib/driver/compat/cpp",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
-        "@fuchsia_sdk//pkg/async",
-        "@fuchsia_sdk//pkg/async_patterns_testing_cpp",
-        "@internal_sdk//pkg/driver_compat",
-        "@internal_sdk//pkg/driver_testing_cpp",
+        "@internal_sdk//pkg/driver_testing_cpp_gtest_fixture",
     ] + _common_deps,
 )
 

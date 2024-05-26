@@ -10,6 +10,8 @@ toc:
   path: /docs/concepts/components/v2/capabilities
 - title: "Configuration capabilities"
   path: /docs/concepts/components/v2/capabilities/configuration.md
+- title: "Dictionary capabilities"
+  path: /docs/concepts/components/v2/capabilities/dictionary.md
 - title: "Directory capabilities"
   path: /docs/concepts/components/v2/capabilities/directory.md
 - title: "Event capabilities"

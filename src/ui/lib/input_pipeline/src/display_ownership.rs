@@ -267,11 +267,12 @@ fn empty_keyboard_device_descriptor() -> input_device::InputDeviceDescriptor {
         // Should descriptor be something sensible?
         KeyboardDeviceDescriptor {
             keys: vec![],
-            device_info: fidl_fuchsia_input_report::DeviceInfo {
-                vendor_id: 0,
-                product_id: 0,
-                version: 0,
-                polling_rate: 0,
+            device_information: fidl_fuchsia_input_report::DeviceInformation {
+                vendor_id: Some(0),
+                product_id: Some(0),
+                version: Some(0),
+                polling_rate: Some(0),
+                ..Default::default()
             },
             device_id: 0,
         },

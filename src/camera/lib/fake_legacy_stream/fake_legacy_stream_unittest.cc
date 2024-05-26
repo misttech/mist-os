@@ -38,7 +38,7 @@ class FakeLegacyStreamTest : public gtest::TestLoopFixture {
   fuchsia::camera2::StreamPtr stream_;
   std::unique_ptr<camera::FakeLegacyStream> fake_legacy_stream_;
   std::vector<fuchsia::camera2::FrameAvailableInfo> frames_;
-  fuchsia::sysmem::AllocatorPtr allocator_;
+  fuchsia::sysmem2::AllocatorPtr allocator_;
 };
 
 // Conformant Stream client.

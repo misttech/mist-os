@@ -26,7 +26,7 @@ pub(super) fn check_task_create_access(
     // When creating a process there is no transition involved, the source and target SIDs
     // are the current SID.
     let target_sid = task_sid;
-    check_permission(permission_check, task_sid, target_sid, ProcessPermission::Fork)
+    check_permissions(permission_check, task_sid, target_sid, &[ProcessPermission::Fork])
 }
 
 /// Checks the SELinux permissions required for exec. Returns the SELinux state of a resolved
@@ -50,27 +50,30 @@ pub(super) fn check_exec_access(
     if current_sid == new_sid {
         // To `exec()` a binary in the caller's domain, the caller must be granted
         // "execute_no_trans" permission to the binary.
-        if !security_server.has_permission(
+        if !security_server.has_permissions(
             current_sid,
             executable_sid,
-            FilePermission::ExecuteNoTrans,
+            &[FilePermission::ExecuteNoTrans],
         ) {
             // TODO(http://b/330904217): once filesystems are labeled, deny access.
             log_debug!("execute_no_trans permission is denied, ignoring.");
         }
     } else {
         // Domain transition, check that transition is allowed.
-        if !security_server.has_permission(current_sid, new_sid, ProcessPermission::Transition) {
+        if !security_server.has_permissions(current_sid, new_sid, &[ProcessPermission::Transition])
+        {
             return error!(EACCES);
         }
         // Check that the executable file has an entry point into the new domain.
-        if !security_server.has_permission(new_sid, executable_sid, FilePermission::Entrypoint) {
+        if !security_server.has_permissions(new_sid, executable_sid, &[FilePermission::Entrypoint])
+        {
             // TODO(http://b/330904217): once filesystems are labeled, deny access.
             log_debug!("entrypoint permission is denied, ignoring.");
         }
         // Check that ptrace permission is allowed if the process is traced.
         if let Some(ptracer_sid) = security_state.ptracer_sid {
-            if !security_server.has_permission(ptracer_sid, new_sid, ProcessPermission::Ptrace) {
+            if !security_server.has_permissions(ptracer_sid, new_sid, &[ProcessPermission::Ptrace])
+            {
                 return error!(EACCES);
             }
         }
@@ -99,7 +102,7 @@ pub(super) fn check_getsched_access(
     source_sid: SecurityId,
     target_sid: SecurityId,
 ) -> Result<(), Errno> {
-    check_permission(permission_check, source_sid, target_sid, ProcessPermission::GetSched)
+    check_permissions(permission_check, source_sid, target_sid, &[ProcessPermission::GetSched])
 }
 
 /// Checks if the task with `source_sid` is allowed to set scheduling parameters for the task with
@@ -109,7 +112,7 @@ pub(super) fn check_setsched_access(
     source_sid: SecurityId,
     target_sid: SecurityId,
 ) -> Result<(), Errno> {
-    check_permission(permission_check, source_sid, target_sid, ProcessPermission::SetSched)
+    check_permissions(permission_check, source_sid, target_sid, &[ProcessPermission::SetSched])
 }
 
 /// Checks if the task with `source_sid` is allowed to get the process group ID of the task with
@@ -119,7 +122,7 @@ pub(super) fn check_getpgid_access(
     source_sid: SecurityId,
     target_sid: SecurityId,
 ) -> Result<(), Errno> {
-    check_permission(permission_check, source_sid, target_sid, ProcessPermission::GetPgid)
+    check_permissions(permission_check, source_sid, target_sid, &[ProcessPermission::GetPgid])
 }
 
 /// Checks if the task with `source_sid` is allowed to set the process group ID of the task with
@@ -129,7 +132,7 @@ pub(super) fn check_setpgid_access(
     source_sid: SecurityId,
     target_sid: SecurityId,
 ) -> Result<(), Errno> {
-    check_permission(permission_check, source_sid, target_sid, ProcessPermission::SetPgid)
+    check_permissions(permission_check, source_sid, target_sid, &[ProcessPermission::SetPgid])
 }
 
 /// Checks if the task with `source_sid` is allowed to send `signal` to the task with `target_sid`.
@@ -141,20 +144,34 @@ pub(super) fn check_signal_access(
 ) -> Result<(), Errno> {
     match signal {
         // The `sigkill` permission is required for sending SIGKILL.
-        SIGKILL => {
-            check_permission(permission_check, source_sid, target_sid, ProcessPermission::SigKill)
-        }
+        SIGKILL => check_permissions(
+            permission_check,
+            source_sid,
+            target_sid,
+            &[ProcessPermission::SigKill],
+        ),
         // The `sigstop` permission is required for sending SIGSTOP.
-        SIGSTOP => {
-            check_permission(permission_check, source_sid, target_sid, ProcessPermission::SigStop)
-        }
+        SIGSTOP => check_permissions(
+            permission_check,
+            source_sid,
+            target_sid,
+            &[ProcessPermission::SigStop],
+        ),
         // The `sigchld` permission is required for sending SIGCHLD.
-        SIGCHLD => {
-            check_permission(permission_check, source_sid, target_sid, ProcessPermission::SigChld)
-        }
+        SIGCHLD => check_permissions(
+            permission_check,
+            source_sid,
+            target_sid,
+            &[ProcessPermission::SigChld],
+        ),
         // The `signal` permission is required for sending any signal other than SIGKILL, SIGSTOP
         // or SIGCHLD.
-        _ => check_permission(permission_check, source_sid, target_sid, ProcessPermission::Signal),
+        _ => check_permissions(
+            permission_check,
+            source_sid,
+            target_sid,
+            &[ProcessPermission::Signal],
+        ),
     }
 }
 
@@ -164,11 +181,11 @@ pub(super) fn check_ptrace_access_and_update_state(
     tracer_sid: SecurityId,
     tracee_security_state: &mut ThreadGroupState,
 ) -> Result<(), Errno> {
-    check_permission(
+    check_permissions(
         permission_check,
         tracer_sid,
         tracee_security_state.current_sid,
-        ProcessPermission::Ptrace,
+        &[ProcessPermission::Ptrace],
     )
     .and_then(|_| {
         // If tracing is allowed, set the `ptracer_sid` of the tracee with the tracer's SID.
@@ -234,14 +251,14 @@ pub fn set_procattr(
     Ok(())
 }
 
-/// Checks if `permission` is allowed from the task with `source_sid` to the task with `target_sid`.
-pub(super) fn check_permission<P: ClassPermission + Into<Permission> + 'static>(
+/// Checks if `permissions` are allowed from the task with `source_sid` to the task with `target_sid`.
+pub(super) fn check_permissions<P: ClassPermission + Into<Permission> + Clone + 'static>(
     permission_check: &impl PermissionCheck,
     source_sid: SecurityId,
     target_sid: SecurityId,
-    permission: P,
+    permissions: &[P],
 ) -> Result<(), Errno> {
-    match permission_check.has_permission(source_sid, target_sid, permission) {
+    match permission_check.has_permissions(source_sid, target_sid, permissions) {
         true => Ok(()),
         false => error!(EACCES),
     }

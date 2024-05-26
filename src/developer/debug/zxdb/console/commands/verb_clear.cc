@@ -17,9 +17,8 @@ namespace zxdb {
 namespace {
 
 const char kClearShortHelp[] = "clear / cl: Clear a breakpoint.";
-const char kClearHelp[] =
-    R"(clear [ <location> ]
-
+const char kClearUsage[] = "clear [ <location> ]";
+const char kClearHelp[] = R"(
   Alias: "cl"
 
   By default, "clear" will delete the current active breakpoint. Clear a named
@@ -33,7 +32,7 @@ const char kClearHelp[] =
 Location arguments
 
 )" LOCATION_ARG_HELP("clear")
-        R"(
+    R"(
 See also
 
   "help break": To create breakpoints.
@@ -84,7 +83,7 @@ void RunVerbClear(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetClearVerbRecord() {
-  return VerbRecord(&RunVerbClear, {"clear", "cl"}, kClearShortHelp, kClearHelp,
+  return VerbRecord(&RunVerbClear, {"clear", "cl"}, kClearShortHelp, kClearUsage, kClearHelp,
                     CommandGroup::kBreakpoint);
 }
 

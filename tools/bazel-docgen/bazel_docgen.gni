@@ -19,6 +19,9 @@ import("//build/bazel/bazel_action.gni")
 #   reference_repo_path: (required)
 #     The path to copy these documents when built in infrastructure.
 #
+#   docsite_base_path: (required)
+#      The base path for all docs on the docsite. eg. reference/bazel_sdk
+#
 #   output_name: (optional)
 #     The name of the zip file to create. This file will be created relative to
 #     the target_gen_dir.
@@ -35,6 +38,8 @@ template("bazel_docgen") {
   assert(defined(invoker.docset_name), "docset_name must be defined")
   assert(defined(invoker.reference_repo_path),
          "reference_repo_path must be defined")
+  assert(defined(invoker.docsite_base_path),
+         "docsite_base_path must be defined")
 
   compiled_action(target_name) {
     tool = "//tools/bazel-docgen:bin"
@@ -68,6 +73,8 @@ template("bazel_docgen") {
     args = proto_args + [
              "--zip_file",
              rebase_path(out_zip, root_build_dir),
+             "--base_path",
+             invoker.docsite_base_path,
            ]
 
     outputs = [ out_zip ]

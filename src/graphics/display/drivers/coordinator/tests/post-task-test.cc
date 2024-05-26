@@ -52,7 +52,22 @@ TEST(CallFromDestructorTest, CallsCallbackAsCapture) {
   EXPECT_TRUE(callback_called);
 }
 
-TEST(CallFromDestructorTest, DoesNotCallCallbackAfterMovedFrom) {
+TEST(CallFromDestructorTest, MoveConstructor) {
+  int callback_call_count = 0;
+  {
+    CallFromDestructor moved_from([&] { ++callback_call_count; });
+    {
+      CallFromDestructor moved_to = std::move(moved_from);
+      EXPECT_EQ(callback_call_count, 0) << "Moving should not invoke the callback";
+    }
+    EXPECT_EQ(callback_call_count, 1)
+        << "Destroying the moved-to instance should invoke the callback";
+  }
+  EXPECT_EQ(callback_call_count, 1)
+      << "Destroying the moved-from instance should not invoke the callback";
+}
+
+TEST(CallFromDestructorTest, DoesNotCallCallbackAfterCallbackMovedFrom) {
   static constexpr size_t kCaptureSize = 16;
   bool callback_called = false;
   fit::inline_callback<void(), kCaptureSize> moved_to;

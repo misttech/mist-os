@@ -250,21 +250,8 @@ TEST_F(Dfv2NodeTest, TestEvaluateRematchFlags) {
   auto parent_1 = CreateNode("p1");
   auto parent_2 = CreateNode("p2");
 
-  auto legacy_composite = CreateCompositeNode("legacy-composite", {parent_1, parent_2}, {{}, {}},
-                                              /* is_legacy*/ true, /* primary_index */ 0);
-
-  ASSERT_FALSE(legacy_composite->EvaluateRematchFlags(
-      fuchsia_driver_development::RestartRematchFlags::kRequested |
-          fuchsia_driver_development::RestartRematchFlags::kNonRequested,
-      "some-url"));
-  ASSERT_TRUE(legacy_composite->EvaluateRematchFlags(
-      fuchsia_driver_development::RestartRematchFlags::kRequested |
-          fuchsia_driver_development::RestartRematchFlags::kNonRequested |
-          fuchsia_driver_development::RestartRematchFlags::kLegacyComposite,
-      "some-url"));
-
   auto composite = CreateCompositeNode("composite", {parent_1, parent_2}, {{}, {}},
-                                       /* is_legacy*/ false, /* primary_index */ 0);
+                                       /* primary_index */ 0);
 
   ASSERT_FALSE(composite->EvaluateRematchFlags(
       fuchsia_driver_development::RestartRematchFlags::kRequested |
@@ -274,13 +261,6 @@ TEST_F(Dfv2NodeTest, TestEvaluateRematchFlags) {
       fuchsia_driver_development::RestartRematchFlags::kRequested |
           fuchsia_driver_development::RestartRematchFlags::kNonRequested |
           fuchsia_driver_development::RestartRematchFlags::kLegacyComposite,
-      "some-url"));
-
-  ASSERT_TRUE(legacy_composite->EvaluateRematchFlags(
-      fuchsia_driver_development::RestartRematchFlags::kRequested |
-          fuchsia_driver_development::RestartRematchFlags::kNonRequested |
-          fuchsia_driver_development::RestartRematchFlags::kLegacyComposite |
-          fuchsia_driver_development::RestartRematchFlags::kCompositeSpec,
       "some-url"));
 }
 
@@ -295,8 +275,7 @@ TEST_F(Dfv2NodeTest, RemoveCompositeNodeForRebind) {
   ASSERT_TRUE(parent_node_2->HasDriverComponent());
   ASSERT_EQ(driver_manager::NodeState::kRunning, parent_node_2->GetNodeState());
 
-  auto composite = CreateCompositeNode("composite", {parent_node_1, parent_node_2}, {{}, {}},
-                                       /* is_legacy*/ false);
+  auto composite = CreateCompositeNode("composite", {parent_node_1, parent_node_2}, {{}, {}});
   StartTestDriver(composite);
   ASSERT_TRUE(composite->HasDriverComponent());
   ASSERT_EQ(driver_manager::NodeState::kRunning, composite->GetNodeState());
@@ -334,8 +313,7 @@ TEST_F(Dfv2NodeTest, RemoveCompositeNodeForRebind_Dealloc) {
   ASSERT_TRUE(parent_node_2->HasDriverComponent());
   ASSERT_EQ(driver_manager::NodeState::kRunning, parent_node_2->GetNodeState());
 
-  auto composite = CreateCompositeNode("composite", {parent_node_1, parent_node_2}, {{}, {}},
-                                       /* is_legacy*/ false);
+  auto composite = CreateCompositeNode("composite", {parent_node_1, parent_node_2}, {{}, {}});
   StartTestDriver(composite);
   ASSERT_TRUE(composite->HasDriverComponent());
   ASSERT_EQ(driver_manager::NodeState::kRunning, composite->GetNodeState());
@@ -371,8 +349,7 @@ TEST_F(Dfv2NodeTest, RestartOnCrashComposite) {
   ASSERT_TRUE(parent_node_2->HasDriverComponent());
   ASSERT_EQ(driver_manager::NodeState::kRunning, parent_node_2->GetNodeState());
 
-  auto composite = CreateCompositeNode("composite", {parent_node_1, parent_node_2}, {{}, {}},
-                                       /* is_legacy*/ false);
+  auto composite = CreateCompositeNode("composite", {parent_node_1, parent_node_2}, {{}, {}});
   StartTestDriver(composite, {.host_restart_on_crash = true});
 
   ASSERT_TRUE(composite->HasDriverComponent());
@@ -409,7 +386,7 @@ TEST_F(Dfv2NodeTest, TestCompositeNodeProperties) {
   parent_properties.emplace_back(kParent1Name, kParent1NodeProperties);
   parent_properties.emplace_back(kParent2Name, kParent2NodeProperties);
   auto composite = CreateCompositeNode("composite", {parent_1, parent_2}, parent_properties,
-                                       /* is_legacy*/ false, /* primary_index */ 0);
+                                       /* primary_index */ 0);
 
   // Verify primary parent properties. Primary parent should be parent 1.
   const auto& primary_parent_node_properties = composite->GetNodeProperties();

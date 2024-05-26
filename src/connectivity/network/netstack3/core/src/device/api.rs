@@ -37,7 +37,7 @@ use crate::{
             IpAddressIdSpecContext, IpDeviceBindingsContext, IpDeviceConfigurationContext,
             IpDeviceTimerId, Ipv6DeviceConfigurationContext,
         },
-        types::RawMetric,
+        RawMetric,
     },
     sync::RemoveResourceResultWithContext,
     Inspector,
@@ -382,7 +382,7 @@ pub trait DeviceApiCoreContext<
     + OriginTrackerContext
     + DeviceCollectionContext<D, BC>
     + DeviceConfigurationContext<D>
-    + RecvFrameContext<BC, D::FrameMetadata<BaseDeviceId<D, BC>>>
+    + RecvFrameContext<D::FrameMetadata<BaseDeviceId<D, BC>>, BC>
     + ResourceCounterContext<Self::DeviceId, DeviceCounters>
     + ResourceCounterContext<Self::DeviceId, D::Counters>
     + CoreTimerContext<D::TimerId<Self::WeakDeviceId>, BC>
@@ -397,7 +397,7 @@ where
         + OriginTrackerContext
         + DeviceCollectionContext<D, BC>
         + DeviceConfigurationContext<D>
-        + RecvFrameContext<BC, D::FrameMetadata<BaseDeviceId<D, BC>>>
+        + RecvFrameContext<D::FrameMetadata<BaseDeviceId<D, BC>>, BC>
         + ResourceCounterContext<Self::DeviceId, DeviceCounters>
         + ResourceCounterContext<Self::DeviceId, D::Counters>
         + CoreTimerContext<D::TimerId<Self::WeakDeviceId>, BC>,

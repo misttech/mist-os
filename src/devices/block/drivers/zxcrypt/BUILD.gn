@@ -67,9 +67,6 @@ fuchsia_driver("zxcrypt-driver") {
     "//src/security/lib/zxcrypt:zxcrypt-client",
     "//src/security/lib/zxcrypt:zxcrypt-fdio",
   ]
-
-  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 fuchsia_driver_component("zxcrypt") {

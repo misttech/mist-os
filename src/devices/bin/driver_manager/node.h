@@ -93,9 +93,8 @@ enum class Collection : uint8_t {
 };
 
 enum class NodeType {
-  kNormal,           // Normal non-composite node.
-  kLegacyComposite,  // Composite node created from the legacy system.
-  kComposite,        // Composite node created from composite node specs.
+  kNormal,     // Normal non-composite node.
+  kComposite,  // Composite node created from composite node specs.
 };
 
 enum class DriverState : uint8_t {
@@ -122,8 +121,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
       std::string_view node_name, std::vector<std::weak_ptr<Node>> parents,
       std::vector<std::string> parents_names,
       const std::vector<fuchsia_driver_framework::NodePropertyEntry>& parent_properties,
-      NodeManager* driver_binder, async_dispatcher_t* dispatcher, bool is_legacy,
-      uint32_t primary_index = 0);
+      NodeManager* driver_binder, async_dispatcher_t* dispatcher, uint32_t primary_index = 0);
 
   // NodeShutdownBridge
   // Exposed for testing.
@@ -177,9 +175,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
                    fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
                    fit::callback<void(zx::result<>)> cb);
 
-  bool IsComposite() const {
-    return type_ == NodeType::kLegacyComposite || type_ == NodeType::kComposite;
-  }
+  bool IsComposite() const { return type_ == NodeType::kComposite; }
 
   // Exposed for testing.
   // Set properties to non-composite node properties containing a clone of `properties` and

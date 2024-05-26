@@ -41,6 +41,12 @@
   properties.push_back({.value = std::move(s)}); \
   COMMON_END()
 
+#define ENUM_FLEXIBLE_END() \
+    default: return "<unknown value>";} \
+  }(); \
+  properties.push_back({.value = std::move(s)}); \
+  COMMON_END()
+
 #define BITS_BEGIN(ns, type) \
   COMMON_BEGIN(ns, type) \
 

@@ -64,6 +64,16 @@
             ],
             path: "/blob",
         },
+
+        // Served package directories will look for blobs in this directory, if it is available,
+        // before looking in the "blob-exec" directory. This enables de-duping of VMOs backed by
+        // files that are in both bootfs and blobfs.
+        {
+            directory: "bootfs-blobs",
+            rights: [ "rx*" ],
+            path: "/bootfs-blobs",
+            availability: "optional",
+        },
         {
             protocol: [
                 "fuchsia.boot.Arguments",

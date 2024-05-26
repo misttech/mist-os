@@ -33,12 +33,12 @@ class MsiDispatcher final : public SoloDispatcher<MsiDispatcher, ZX_DEFAULT_MSI_
   }
 
   zx_obj_type_t get_type() const final { return ZX_OBJ_TYPE_MSI; }
-  void GetInfo(zx_info_msi_t* info) { msi_alloc_->GetInfo(info); }
-  fbl::RefPtr<MsiAllocation>& msi_allocation() { return msi_alloc_; }
+  void GetInfo(zx_info_msi_t* info) const { msi_alloc_->GetInfo(info); }
+  const fbl::RefPtr<MsiAllocation>& msi_allocation() const { return msi_alloc_; }
 
  private:
   explicit MsiDispatcher(fbl::RefPtr<MsiAllocation>&& msi_alloc)
       : msi_alloc_(ktl::move(msi_alloc)) {}
-  fbl::RefPtr<MsiAllocation> msi_alloc_;
+  const fbl::RefPtr<MsiAllocation> msi_alloc_;
 };
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_MSI_DISPATCHER_H_

@@ -390,6 +390,7 @@ fn new_installed_route<I: fnet_routes_ext::FidlRouteIpExt>(
     interface: u64,
     metric: u32,
     metric_is_inherited: bool,
+    table_id: u32,
 ) -> fnet_routes_ext::InstalledRoute<I> {
     let specified_metric = if metric_is_inherited {
         fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty)
@@ -410,6 +411,7 @@ fn new_installed_route<I: fnet_routes_ext::FidlRouteIpExt>(
             },
         },
         effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric: metric },
+        table_id,
     }
 }
 
@@ -434,12 +436,14 @@ const DEFAULT_INTERFACE_METRIC: u32 = 100;
 // The initial IPv4 routes that are installed on the loopback interface.
 fn initial_loopback_routes_v4<N: Netstack>(
     loopback_id: u64,
+    table_id: u32,
 ) -> impl Iterator<Item = fnet_routes_ext::InstalledRoute<Ipv4>> {
     [new_installed_route(
         net_subnet_v4!("127.0.0.0/8"),
         loopback_id,
         DEFAULT_INTERFACE_METRIC,
         true,
+        table_id,
     )]
     .into_iter()
     // TODO(https://fxbug.dev/42074061) Unify the loopback routes between
@@ -451,6 +455,7 @@ fn initial_loopback_routes_v4<N: Netstack>(
                 loopback_id,
                 DEFAULT_INTERFACE_METRIC,
                 true,
+                table_id,
             )))
         }
         NetstackVersion::Netstack2 { tracing: _, fast_udp: _ } | NetstackVersion::ProdNetstack2 => {
@@ -462,34 +467,45 @@ fn initial_loopback_routes_v4<N: Netstack>(
 // The initial IPv6 routes that are installed on the loopback interface.
 fn initial_loopback_routes_v6<N: Netstack>(
     loopback_id: u64,
+    table_id: u32,
 ) -> impl Iterator<Item = fnet_routes_ext::InstalledRoute<Ipv6>> {
-    [new_installed_route(net_subnet_v6!("::1/128"), loopback_id, DEFAULT_INTERFACE_METRIC, true)]
-        .into_iter()
-        // TODO(https://fxbug.dev/42074061) Unify the loopback routes between
-        // Netstack2 and Netstack3
-        .chain(match N::VERSION {
-            NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => {
-                Either::Left(std::iter::once(new_installed_route(
-                    net_subnet_v6!("ff00::/8"),
-                    loopback_id,
-                    DEFAULT_INTERFACE_METRIC,
-                    true,
-                )))
-            }
-            NetstackVersion::Netstack2 { tracing: _, fast_udp: _ }
-            | NetstackVersion::ProdNetstack2 => Either::Right(std::iter::empty()),
-        })
+    [new_installed_route(
+        net_subnet_v6!("::1/128"),
+        loopback_id,
+        DEFAULT_INTERFACE_METRIC,
+        true,
+        table_id,
+    )]
+    .into_iter()
+    // TODO(https://fxbug.dev/42074061) Unify the loopback routes between
+    // Netstack2 and Netstack3
+    .chain(match N::VERSION {
+        NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => {
+            Either::Left(std::iter::once(new_installed_route(
+                net_subnet_v6!("ff00::/8"),
+                loopback_id,
+                DEFAULT_INTERFACE_METRIC,
+                true,
+                table_id,
+            )))
+        }
+        NetstackVersion::Netstack2 { tracing: _, fast_udp: _ } | NetstackVersion::ProdNetstack2 => {
+            Either::Right(std::iter::empty())
+        }
+    })
 }
 
 // The initial IPv4 routes that are installed on an ethernet interface.
 fn initial_ethernet_routes_v4(
     ethernet_id: u64,
+    table_id: u32,
 ) -> impl Iterator<Item = fnet_routes_ext::InstalledRoute<Ipv4>> {
     [new_installed_route(
         net_subnet_v4!("224.0.0.0/4"),
         ethernet_id,
         DEFAULT_INTERFACE_METRIC,
         true,
+        table_id,
     )]
     .into_iter()
 }
@@ -497,6 +513,7 @@ fn initial_ethernet_routes_v4(
 // The initial IPv6 routes that are installed on the ethernet interface.
 fn initial_ethernet_routes_v6(
     ethernet_id: u64,
+    table_id: u32,
 ) -> impl Iterator<Item = fnet_routes_ext::InstalledRoute<Ipv6>> {
     [
         new_installed_route(
@@ -504,12 +521,14 @@ fn initial_ethernet_routes_v6(
             ethernet_id,
             DEFAULT_INTERFACE_METRIC,
             true,
+            table_id,
         ),
         new_installed_route(
             net_subnet_v6!("ff00::/8"),
             ethernet_id,
             DEFAULT_INTERFACE_METRIC,
             true,
+            table_id,
         ),
     ]
     .into_iter()
@@ -518,7 +537,12 @@ fn initial_ethernet_routes_v6(
 // Verifies the startup behavior of the watcher protocols; including the
 // expected preinstalled routes.
 #[netstack_test]
-async fn watcher_existing<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext::FidlRouteIpExt>(
+async fn watcher_existing<
+    N: Netstack,
+    I: net_types::ip::Ip
+        + fnet_routes_ext::FidlRouteIpExt
+        + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+>(
     name: &str,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
@@ -541,6 +565,7 @@ async fn watcher_existing<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext::F
         .expect("install interface");
     let interface_id = interface.id();
 
+    let main_table_id = realm.main_table_id::<I>().await;
     // The routes we expected to be installed in the netstack by default.
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]
@@ -551,15 +576,15 @@ async fn watcher_existing<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext::F
         IpInvariant((loopback_id, interface_id)),
         |IpInvariant((loopback_id, interface_id))| {
             RoutesHolder(
-                initial_loopback_routes_v4::<N>(loopback_id.get())
-                    .chain(initial_ethernet_routes_v4(interface_id))
+                initial_loopback_routes_v4::<N>(loopback_id.get(), main_table_id)
+                    .chain(initial_ethernet_routes_v4(interface_id, main_table_id))
                     .collect::<Vec<_>>(),
             )
         },
         |IpInvariant((loopback_id, interface_id))| {
             RoutesHolder(
-                initial_loopback_routes_v6::<N>(loopback_id.get())
-                    .chain(initial_ethernet_routes_v6(interface_id))
+                initial_loopback_routes_v6::<N>(loopback_id.get(), main_table_id)
+                    .chain(initial_ethernet_routes_v6(interface_id, main_table_id))
                     .collect::<Vec<_>>(),
             )
         },
@@ -610,7 +635,9 @@ const TEST_SUBNET_V6: net_types::ip::Subnet<Ipv6Addr> = net_subnet_v6!("fd::/64"
 #[netstack_test]
 async fn watcher_add_before_watch<
     N: Netstack,
-    I: net_types::ip::Ip + fnet_routes_ext::FidlRouteIpExt,
+    I: net_types::ip::Ip
+        + fnet_routes_ext::FidlRouteIpExt
+        + fnet_routes_ext::admin::FidlRouteAdminIpExt,
 >(
     name: &str,
 ) {
@@ -618,6 +645,7 @@ async fn watcher_add_before_watch<
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
     let device = sandbox.create_endpoint(name).await.expect("create endpoint");
     let interface = device.into_interface_in_realm(&realm).await.expect("add endpoint to Netstack");
+    let main_table_id = realm.main_table_id::<I>().await;
 
     let subnet: net_types::ip::Subnet<I::Addr> =
         I::map_ip((), |()| TEST_SUBNET_V4, |()| TEST_SUBNET_V6);
@@ -637,7 +665,7 @@ async fn watcher_add_before_watch<
         .await
         .expect("failed to collect existing routes");
     let expected_route =
-        new_installed_route(subnet, interface.id(), DEFAULT_INTERFACE_METRIC, true);
+        new_installed_route(subnet, interface.id(), DEFAULT_INTERFACE_METRIC, true, main_table_id);
     assert!(
         existing.contains(&expected_route),
         "route: {:?}, existing: {:?}",
@@ -648,13 +676,19 @@ async fn watcher_add_before_watch<
 
 // Verifies the watcher protocols correctly report `added` and `removed` events.
 #[netstack_test]
-async fn watcher_add_remove<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext::FidlRouteIpExt>(
+async fn watcher_add_remove<
+    N: Netstack,
+    I: net_types::ip::Ip
+        + fnet_routes_ext::FidlRouteIpExt
+        + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+>(
     name: &str,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
     let device = sandbox.create_endpoint(name).await.expect("create endpoint");
     let interface = device.into_interface_in_realm(&realm).await.expect("add endpoint to Netstack");
+    let main_table_id = realm.main_table_id::<I>().await;
 
     let subnet: net_types::ip::Subnet<I::Addr> =
         I::map_ip((), |()| TEST_SUBNET_V4, |()| TEST_SUBNET_V6);
@@ -681,7 +715,7 @@ async fn watcher_add_remove<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext:
         Some(Ok(fnet_routes_ext::Event::<I>::Added(route))) => route
     );
     let expected_route =
-        new_installed_route(subnet, interface.id(), DEFAULT_INTERFACE_METRIC, true);
+        new_installed_route(subnet, interface.id(), DEFAULT_INTERFACE_METRIC, true, main_table_id);
     assert_eq!(added_route, expected_route);
 
     // Remove the test route.
@@ -782,7 +816,9 @@ async fn watcher_outlives_state<
 #[netstack_test]
 async fn watcher_multiple_instances<
     N: Netstack,
-    I: net_types::ip::Ip + fnet_routes_ext::FidlRouteIpExt,
+    I: net_types::ip::Ip
+        + fnet_routes_ext::FidlRouteIpExt
+        + fnet_routes_ext::admin::FidlRouteAdminIpExt,
 >(
     name: &str,
 ) {
@@ -792,6 +828,7 @@ async fn watcher_multiple_instances<
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
     let device = sandbox.create_endpoint(name).await.expect("create endpoint");
     let interface = device.into_interface_in_realm(&realm).await.expect("add endpoint to Netstack");
+    let main_table_id = realm.main_table_id::<I>().await;
 
     let state_proxy =
         realm.connect_to_protocol::<I::StateMarker>().expect("failed to connect to routes/State");
@@ -837,8 +874,13 @@ async fn watcher_multiple_instances<
             },
         );
         interface.add_subnet_route(subnet.into_ext()).await.expect("failed to add route");
-        let expected_route =
-            new_installed_route(subnet, interface.id(), DEFAULT_INTERFACE_METRIC, true);
+        let expected_route = new_installed_route(
+            subnet,
+            interface.id(),
+            DEFAULT_INTERFACE_METRIC,
+            true,
+            main_table_id,
+        );
         expected_existing_routes.push(expected_route);
 
         // Observe an `added` event on all connected watchers.

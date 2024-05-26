@@ -46,10 +46,6 @@ pub const CONNECTION_SELECTION_REQUEST_BUFFER_SIZE: usize = 100;
 /// Number of previous RSSI measurements to exponentially weigh into average.
 /// TODO(https://fxbug.dev/42165706): Tune smoothing factor.
 pub(crate) const EWMA_SMOOTHING_FACTOR: usize = 10;
-/// Number of previous RSSI velocities to exponentially weigh into the average. Keeping the number
-/// small lets the number react quickly and have a magnitude similar to if it weren't smoothed as
-/// an EWMA, but makes the EWMA less resistant to momentary outliers.
-pub(crate) const EWMA_VELOCITY_SMOOTHING_FACTOR: usize = 3;
 
 const INSPECT_EVENT_LIMIT_FOR_CONNECTION_SELECTIONS: usize = 10;
 

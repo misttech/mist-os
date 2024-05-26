@@ -19,9 +19,8 @@ namespace zxdb {
 namespace {
 
 const char kLocalsShortHelp[] = "locals: Print local variables and function args.";
-const char kLocalsHelp[] =
-    R"(locals
-
+const char kLocalsUsage[] = "locals";
+const char kLocalsHelp[] = R"(
   Prints all local variables and the current function's arguments. By default
   it will print the variables for the currently selected stack frame.
 
@@ -31,7 +30,7 @@ const char kLocalsHelp[] =
 Arguments
 
 )" PRINT_COMMAND_SWITCH_HELP
-    R"(
+                           R"(
 Examples
 
   locals
@@ -132,7 +131,7 @@ void RunVerbLocals(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) 
 }  // namespace
 
 VerbRecord GetLocalsVerbRecord() {
-  VerbRecord locals(&RunVerbLocals, {"locals"}, kLocalsShortHelp, kLocalsHelp,
+  VerbRecord locals(&RunVerbLocals, {"locals"}, kLocalsShortHelp, kLocalsUsage, kLocalsHelp,
                     CommandGroup::kQuery);
   AppendPrintCommandSwitches(&locals);
   return locals;

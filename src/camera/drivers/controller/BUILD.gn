@@ -68,6 +68,8 @@ source_set("source") {
     "//sdk/fidl/fuchsia.camera2.debug:fuchsia.camera2.debug_hlcpp",
     "//sdk/fidl/fuchsia.camera2.hal:fuchsia.camera2.hal_hlcpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_hlcpp_conversion",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_hlcpp_conversion",
 
     # The LLCPP bindings for fuchsia.hardware.camera is used by controller_device.h
     "//sdk/fidl/fuchsia.hardware.camera:fuchsia.hardware.camera_cpp",
@@ -88,6 +90,7 @@ source_set("source") {
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/image-format",
+    "//zircon/system/ulib/sysmem-version",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",

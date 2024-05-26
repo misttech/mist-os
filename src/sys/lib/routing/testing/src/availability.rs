@@ -7,7 +7,6 @@ use {
         CheckUse, ComponentEventRoute, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,
         ServiceInstance,
     },
-    cm_moniker::InstancedMoniker,
     cm_rust::*,
     cm_rust_testing::*,
     fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status,
@@ -220,7 +219,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                 },
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
-                    storage_relation: Some(InstancedMoniker::try_from(vec!["c:0"]).unwrap()),
+                    storage_relation: Some(Moniker::try_from(vec!["c"]).unwrap()),
                     from_cm_namespace: false,
                     storage_subdir: Some("cache".to_string()),
                     expected_res: ExpectedResult::Ok,

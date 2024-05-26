@@ -22,6 +22,12 @@ type BinaryPowerLevel = strict enum : PowerLevel {
     ON = 1;
 };
 
+/// See the #fulfillment-policy-definition of the Power Topology RFC:
+/// https://fuchsia-review.googlesource.com/c/fuchsia/+/1004754 for a description of dependency
+/// types. Note, ACTIVE and PASSIVE are not concepts in the RFC and readers should interpret
+/// assertive as ACTIVE and opportunistic as PASSIVE.
+// TODO(b/341766303): make dependency types and comments consistent with Power Topology RFC once it
+// has been accepted.
 type DependencyType = strict enum {
     ACTIVE = 1;
     PASSIVE = 2;
@@ -37,6 +43,11 @@ alias DependencyToken = zx.Handle:EVENT;
 /// Power dependency from an already specified element's PowerLevel to another.
 /// The dependent Element should already be known from context.
 type LevelDependency = resource struct {
+    /// Must match the expected type of the DependencyToken, i.e. ACTIVE must be used if the token
+    /// is specified to be an active dependency token and PASSIVE must be used if the token is
+    /// specified to be a passive dependency token.
+    // TODO(b/341766303): make this comment consistent with Power Topology RFC once it has been
+    // accepted.
     dependency_type DependencyType;
     dependent_level PowerLevel;
     /// Must supply a token registered via the RegisterDependencyToken call of

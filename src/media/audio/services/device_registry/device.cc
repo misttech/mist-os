@@ -1175,7 +1175,7 @@ zx_status_t Device::SetTopology(uint64_t topology_id) {
 
 // If the method does not return ZX_OK, then the driver was not called.
 zx_status_t Device::SetElementState(ElementId element_id,
-                                    const fhasp::ElementState& element_state) {
+                                    const fhasp::SettableElementState& element_state) {
   ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
 
   if (state_ == State::Error) {
@@ -1197,7 +1197,7 @@ zx_status_t Device::SetElementState(ElementId element_id,
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (!ValidateElementState(element_state, sig_proc_element_map_.at(element_id).element)) {
+  if (!ValidateSettableElementState(element_state, sig_proc_element_map_.at(element_id).element)) {
     ADR_WARN_METHOD() << "invalid ElementState for element_id " << element_id;
     return ZX_ERR_INVALID_ARGS;
   }

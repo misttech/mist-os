@@ -19,10 +19,10 @@
 #include <utility>
 #include <vector>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/devicetree/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <gtest/gtest.h>
-#include <sdk/lib/driver/legacy-bind-constants/legacy-bind-constants.h>
 
 #include "manager-test-helper.h"
 #include "test-data/basic-properties.h"
@@ -468,12 +468,13 @@ TEST_F(ManagerTest, TestPbusCompositeSpec) {
 
   EXPECT_TRUE(testing::CheckHasProperties(
       {{
-          fdf::MakeProperty(BIND_PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
+          fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
       }},
       (*mgr_request.parents())[0].properties(), true));
   EXPECT_TRUE(testing::CheckHasBindRules(
       {
-          fdf::MakeAcceptBindRule(BIND_PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
+          fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                                  bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
       },
       (*mgr_request.parents())[0].bind_rules(), true));
 
@@ -481,6 +482,22 @@ TEST_F(ManagerTest, TestPbusCompositeSpec) {
                                           (*mgr_request.parents())[1].properties(), false));
   EXPECT_TRUE(testing::CheckHasBindRules({{fdf::MakeAcceptBindRule(kTestKey, kTestProperty)}},
                                          (*mgr_request.parents())[1].bind_rules(), false));
+}
+
+TEST_F(ManagerTest, TestPublishOrder) {
+  Manager manager(testing::LoadTestBlob("/pkg/test-data/simple.dtb"));
+  DefaultVisitors<> visitor;
+  ASSERT_EQ(ZX_OK, manager.Walk(visitor).status_value());
+  auto& first_node = manager.nodes()[0];
+  auto first_node_id = first_node->id();
+  auto& second_node = manager.nodes()[1];
+  auto second_node_id = second_node->id();
+  EXPECT_EQ(first_node->GetPublishIndex(), 0u);
+  EXPECT_EQ(second_node->GetPublishIndex(), 1u);
+  EXPECT_TRUE(first_node->ChangePublishOrder(1u).is_ok());
+  EXPECT_EQ(manager.nodes()[0]->id(), second_node_id);
+  EXPECT_EQ(manager.nodes()[1]->id(), first_node_id);
+  ASSERT_TRUE(DoPublish(manager).is_ok());
 }
 
 }  // namespace

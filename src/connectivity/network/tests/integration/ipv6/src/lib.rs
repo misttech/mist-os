@@ -705,6 +705,11 @@ async fn on_and_off_link_route_discovery<N: Netstack>(
     let (_network, realm, iface, fake_ep) =
         setup_network::<N>(&sandbox, name, Some(METRIC)).await.expect("failed to setup network");
 
+    let main_route_table = realm
+        .connect_to_protocol::<fidl_fuchsia_net_routes_admin::RouteTableV6Marker>()
+        .expect("failed to connect to protocol");
+    let main_table_id = main_route_table.get_table_id().await.expect("failed to get table id");
+
     if forwarding {
         enable_ipv6_forwarding(&iface).await;
     }
@@ -754,6 +759,7 @@ async fn on_and_off_link_route_discovery<N: Netstack>(
                     },
                 },
                 effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric: METRIC },
+                table_id: main_table_id,
             },
             // Test that a route to `SUBNET_WITH_MORE_SPECIFIC_ROUTE` exists
             // through the router.
@@ -774,6 +780,7 @@ async fn on_and_off_link_route_discovery<N: Netstack>(
                     },
                 },
                 effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric: METRIC },
+                table_id: main_table_id,
             },
             // Test that the prefix should be discovered after it is advertised.
             fnet_routes_ext::InstalledRoute::<Ipv6> {
@@ -792,6 +799,7 @@ async fn on_and_off_link_route_discovery<N: Netstack>(
                     },
                 },
                 effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric: METRIC },
+                table_id: main_table_id,
             },
         ][..],
     )
@@ -1308,6 +1316,7 @@ async fn add_device_adds_link_local_subnet_route<N: Netstack>(name: &str) {
                 let fnet_routes_ext::InstalledRoute {
                     route: fnet_routes_ext::Route { destination, action, properties: _ },
                     effective_properties: _,
+                    table_id: _,
                 } = route;
                 let (outbound_interface, next_hop) = match action {
                     fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {

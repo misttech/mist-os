@@ -19,9 +19,8 @@ namespace zxdb {
 namespace {
 
 const char kStepShortHelp[] = "step / s: Step one source line, going into subroutines.";
-const char kStepHelp[] =
-    R"(step [ <function-fragment> ]
-
+const char kStepUsage[] = "step [ <function-fragment> ]";
+const char kStepHelp[] = R"(
   Alias: "s"
 
   When a thread is stopped, "step" will execute one source line and stop the
@@ -116,8 +115,8 @@ void RunVerbStep(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetStepVerbRecord() {
-  return VerbRecord(&RunVerbStep, {"step", "s"}, kStepShortHelp, kStepHelp, CommandGroup::kStep,
-                    SourceAffinity::kSource);
+  return VerbRecord(&RunVerbStep, {"step", "s"}, kStepShortHelp, kStepUsage, kStepHelp,
+                    CommandGroup::kStep, SourceAffinity::kSource);
 }
 
 }  // namespace zxdb

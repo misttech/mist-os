@@ -44,7 +44,10 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.camera2.hal:fuchsia.camera2.hal_hlcpp",
     "//sdk/fidl/fuchsia.camera3:fuchsia.camera3_hlcpp",
     "//sdk/fidl/fuchsia.hardware.camera:fuchsia.hardware.camera_hlcpp",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_hlcpp_conversion",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_hlcpp_conversion",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_hlcpp",
     "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_hlcpp",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/fit-promise",
@@ -52,6 +55,7 @@ source_set("lib") {
     "//sdk/lib/sys/cpp",
     "//src/camera/lib/cobalt_logger",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/sysmem-version",
     "//zircon/system/ulib/trace",
   ]
 
@@ -94,6 +98,7 @@ executable("camera_device_unittest_bin") {
     "//sdk/fidl/fuchsia.camera2.hal:fuchsia.camera2.hal_hlcpp",
     "//sdk/fidl/fuchsia.camera3:fuchsia.camera3_hlcpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_hlcpp",
     "//sdk/lib/inspect/testing/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/cpp/testing:unit",

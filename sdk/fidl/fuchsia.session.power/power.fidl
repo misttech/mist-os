@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.session.power;
 
-using fuchsia.power.broker;
+using zx;
 
 /// Lets the session manager handoff a power lease to a session component.
 ///
@@ -18,7 +18,15 @@ open protocol Handoff {
     /// Take the lease.
     flexible Take() -> (resource struct {
         /// A lease on the power element.
-        lease client_end:fuchsia.power.broker.LeaseControl;
+        ///
+        /// This is secretly a `fuchsia.power.broker.LeaseControl` channel
+        /// but we'd like to avoid exposing that to `ffx`. When that protocol
+        /// is stabilized, we can replace the channel with that here.
+        ///
+        /// TODO(https://fxbug.dev/339474151): This may also become an
+        /// eventpair as the linked bug tracks migrating lease control channel
+        /// to eventpair.
+        lease zx.Handle;
     }) error HandoffError;
 };
 

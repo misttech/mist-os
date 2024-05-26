@@ -651,7 +651,7 @@ int MsdArmDevice::GpuInterruptThreadLoop() {
     auto irq_status = registers::GpuIrqFlags::GetStatus().ReadFrom(register_io_.get());
 
     if (!irq_status.reg_value()) {
-      MAGMA_LOG(WARNING, "Got unexpected GPU IRQ with no flags set");
+      MAGMA_LOG(WARNING, "GPU fault: Got unexpected GPU IRQ with no flags set");
     }
 
     auto clear_flags = registers::GpuIrqFlags::GetIrqClear().FromValue(irq_status.reg_value());
@@ -687,7 +687,7 @@ int MsdArmDevice::GpuInterruptThreadLoop() {
     }
 
     if (irq_status.reg_value()) {
-      MAGMA_LOG(WARNING, "Got unexpected GPU IRQ %d", irq_status.reg_value());
+      MAGMA_LOG(WARNING, "GPU fault: Got unexpected GPU IRQ %d", irq_status.reg_value());
       uint64_t fault_addr =
           registers::GpuFaultAddress::Get().ReadFrom(register_io_.get()).reg_value();
       {
@@ -785,7 +785,7 @@ magma::Status MsdArmDevice::ProcessJobInterrupt(uint64_t time) {
 
       // Soft stopping isn't counted as an actual failure.
       if (result != kArmMaliResultSoftStopped && !dumped_on_failure) {
-        MAGMA_LOG(WARNING, "Got failed slot bitmask %x with result code %x",
+        MAGMA_LOG(WARNING, "Job fault: Got failed slot bitmask %x with result code %x",
                   static_cast<uint32_t>(irq_status.failed_slots()), raw_result);
         ProcessDumpStatusToLog();
         dumped_on_failure = true;
@@ -827,7 +827,7 @@ magma::Status MsdArmDevice::ProcessMmuInterrupt() {
     {
       auto mapping = address_manager_->GetMappingForSlot(slot);
       if (!mapping) {
-        MAGMA_LOG(WARNING, "Fault on idle slot %d", slot);
+        MAGMA_LOG(WARNING, "MMU fault: Fault on idle slot %d", slot);
       } else {
         connection = mapping->connection();
       }
@@ -837,9 +837,10 @@ magma::Status MsdArmDevice::ProcessMmuInterrupt() {
           registers::AsRegisters(slot).FaultAddress().ReadFrom(register_io_.get()).reg_value();
       bool kill_context = true;
       if (irq_status.bf_flags() & (1 << slot)) {
-        MAGMA_LOG(WARNING,
-                  "Bus fault at address 0x%lx on slot %d, client id: %ld, context count: %ld",
-                  address, slot, connection->client_id(), connection->context_count());
+        MAGMA_LOG(
+            WARNING,
+            "MMU fault: Bus fault at address 0x%lx on slot %d, client id: %ld, context count: %ld",
+            address, slot, connection->client_id(), connection->context_count());
       } else {
         if (connection->PageInMemory(address)) {
           DLOG("Paged in address %lx", address);
@@ -847,7 +848,7 @@ magma::Status MsdArmDevice::ProcessMmuInterrupt() {
         } else {
           MAGMA_LOG(
               WARNING,
-              "Failed to page in address 0x%lx on slot %d, client id: %ld, context count: %ld",
+              "MMU fault: Failed to page in address 0x%lx on slot %d, client id: %ld, context count: %ld",
               address, slot, connection->client_id(), connection->context_count());
         }
       }

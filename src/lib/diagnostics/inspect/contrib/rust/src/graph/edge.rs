@@ -28,8 +28,7 @@ impl Edge {
     ) -> Self
     where
         I: VertexId,
-        M: IntoIterator<Item = &'a Metadata<'a>>,
-        M::IntoIter: Clone,
+        M: IntoIterator<Item = Metadata<'a>>,
     {
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
         let to_id = to.id().get_id();
@@ -37,15 +36,14 @@ impl Edge {
         let (node, metadata) = from.outgoing_edges_node.atomic_update(|parent| {
             let node = parent.create_child(to_id.as_ref());
             node.record_uint("edge_id", id);
-            if let Some(ref events_tracker) = events_tracker {
-                events_tracker.record_added(
-                    from.id().get_id().as_ref(),
-                    to_id.as_ref(),
-                    id,
-                    metadata_iterator.clone(),
-                );
-            }
-            let metadata = EdgeGraphMetadata::new(&node, id, metadata_iterator, events_tracker);
+            let metadata = EdgeGraphMetadata::new(
+                &node,
+                id,
+                metadata_iterator,
+                events_tracker,
+                from.id().get_id().as_ref(),
+                to_id.as_ref(),
+            );
             (node, metadata)
         });
         // We store the REAL Node in the incoming edges and return an Edge holding a weak reference

@@ -6,9 +6,12 @@
 
 import logging
 import statistics
-from typing import Any, Iterable, Iterator, Sequence
+from typing import Any, Dict, Iterable, Iterator, List
 
-from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
+import trace_processing.trace_metrics as trace_metrics
+import trace_processing.trace_model as trace_model
+import trace_processing.trace_time as trace_time
+import trace_processing.trace_utils as trace_utils
 
 
 _LOGGER: logging.Logger = logging.getLogger("AppRenderLatencyMetricsProcessor")
@@ -19,8 +22,8 @@ _DISPLAY_VSYNC_EVENT_NAME: str = "Display::Controller::OnDisplayVsync"
 
 
 def metrics_processor(
-    model: trace_model.Model, extra_args: dict[str, Any]
-) -> Sequence[trace_metrics.TestCaseResult]:
+    model: trace_model.Model, extra_args: Dict[str, Any]
+) -> List[trace_metrics.TestCaseResult]:
     """Computes latency from Scenic present to vsync.
 
     Args:
@@ -59,7 +62,7 @@ class AppRenderLatencyMetricsProcessor(trace_metrics.MetricsProcessor):
 
     def process_metrics(
         self, model: trace_model.Model
-    ) -> Sequence[trace_metrics.TestCaseResult]:
+    ) -> List[trace_metrics.TestCaseResult]:
         # This method looks for a possible race between trace event start in Scenic and magma.
         # We can safely skip these events. See https://fxbug.dev/322849857 for more details.
         model = trace_utils.adjust_to_common_process_start(
@@ -75,8 +78,8 @@ class AppRenderLatencyMetricsProcessor(trace_metrics.MetricsProcessor):
             name=_PRESENT_EVENT_NAME.format(self._debug_name),
         )
 
-        present_latencies: list[float] = []
-        vsync_events: list[trace_model.Event] = []
+        present_latencies: List[float] = []
+        vsync_events: List[trace_model.Event] = []
 
         for present_flow_event in present_flow_events:
             if not isinstance(present_flow_event, trace_model.FlowEvent):
@@ -96,18 +99,18 @@ class AppRenderLatencyMetricsProcessor(trace_metrics.MetricsProcessor):
             vsync_events.append(vsync)
 
         if len(vsync_events) == 0:
-            _LOGGER.fatal("Not enough valid vsyncs")
+            _LOGGER.fatal(f"Not enough valid vsyncs")
 
         present_latency_mean: float = statistics.mean(present_latencies)
         _LOGGER.info(f"Average Present Latency: {present_latency_mean}")
 
         if len(vsync_events) < 2:
             _LOGGER.fatal(
-                "Less than two vsync events are present. Perhaps the trace duration "
-                "is too short to provide fps information"
+                f"Less than two vsync events are present. Perhaps the trace duration"
+                f" is too short to provide fps information"
             )
 
-        fps_values: list[float] = []
+        fps_values: List[float] = []
         for i in range(len(vsync_events) - 1):
             # Two renders may be squashed into one.
             if vsync_events[i + 1].start == vsync_events[i].start:
@@ -118,7 +121,7 @@ class AppRenderLatencyMetricsProcessor(trace_metrics.MetricsProcessor):
             )
 
         if len(fps_values) == 0:
-            _LOGGER.fatal("Not enough valid vsyncs")
+            _LOGGER.fatal(f"Not enough valid vsyncs")
 
         fps_mean: float = statistics.mean(fps_values)
         _LOGGER.info(f"Average FPS: {fps_mean}")

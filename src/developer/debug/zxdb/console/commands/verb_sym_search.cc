@@ -29,9 +29,8 @@ constexpr int kSymSearchUnfold = 1;
 constexpr int kSymSearchListAll = 2;
 
 const char kSymSearchShortHelp[] = "sym-search: Search for symbols.";
-const char kSymSearchHelp[] =
-    R"(sym-search [--all] [--unfold] [<regexp>]
-
+const char kSymSearchUsage[] = "sym-search [--all] [--unfold] [<regexp>]";
+const char kSymSearchHelp[] = R"(
   Searches for symbols loaded by a process.
 
   By default will display all the symbols loaded by the process, truncated to a
@@ -236,8 +235,8 @@ void RunVerbSymSearch(const Command& cmd, fxl::RefPtr<CommandContext> cmd_contex
 }  // namespace
 
 VerbRecord GetSymSearchVerbRecord() {
-  VerbRecord search(&RunVerbSymSearch, {"sym-search"}, kSymSearchShortHelp, kSymSearchHelp,
-                    CommandGroup::kSymbol);
+  VerbRecord search(&RunVerbSymSearch, {"sym-search"}, kSymSearchShortHelp, kSymSearchUsage,
+                    kSymSearchHelp, CommandGroup::kSymbol);
   search.switches.emplace_back(kSymSearchListAll, false, "all", 'a');
   search.switches.emplace_back(kSymSearchUnfold, false, "unfold", 'u');
   return search;

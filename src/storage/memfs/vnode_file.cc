@@ -74,7 +74,7 @@ zx_status_t VnodeFile::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo
   return ZX_OK;
 }
 
-zx_status_t VnodeFile::GetAttributes(fs::VnodeAttributes* attr) {
+zx::result<fs::VnodeAttributes> VnodeFile::GetAttributes() const {
   uint64_t content_size = 0;
   {
     fs::SharedLock lock(mutex_);
@@ -84,20 +84,20 @@ zx_status_t VnodeFile::GetAttributes(fs::VnodeAttributes* attr) {
     }
   }
 
-  *attr = fs::VnodeAttributes();
-  attr->inode = ino_;
-  attr->mode = V_TYPE_FILE | V_IRUSR | V_IWUSR | V_IRGRP | V_IROTH;
-  attr->content_size = content_size;
-  attr->storage_size = fbl::round_up(attr->content_size, GetPageSize());
-  attr->link_count = link_count_;
-  attr->creation_time = create_time_;
-  attr->modification_time = modify_time_;
-  return ZX_OK;
+  return zx::ok(fs::VnodeAttributes{
+      .id = ino_,
+      .content_size = content_size,
+      .storage_size = fbl::round_up(content_size, GetPageSize()),
+      .link_count = link_count_,
+      .creation_time = create_time_,
+      .modification_time = modify_time_,
+      .mode = V_TYPE_FILE | V_IRUSR | V_IWUSR | V_IRGRP | V_IROTH,
+  });
 }
 
-zx_status_t VnodeFile::SetAttributes(fs::VnodeAttributesUpdate attr) {
+zx::result<> VnodeFile::UpdateAttributes(const fs::VnodeAttributesUpdate& attributes) {
   // Reset the vmo stats when mtime is explicitly set.
-  if (attr.has_modification_time()) {
+  if (attributes.modification_time) {
     fs::SharedLock lock(mutex_);
     if (paged_vmo().is_valid()) {
       zx_pager_vmo_stats vmo_stats;
@@ -105,11 +105,11 @@ zx_status_t VnodeFile::SetAttributes(fs::VnodeAttributesUpdate attr) {
           zx_pager_query_vmo_stats(memfs_.pager_for_next_vdso_syscalls().get(), paged_vmo().get(),
                                    ZX_PAGER_RESET_VMO_STATS, &vmo_stats, sizeof(vmo_stats));
       if (status != ZX_OK) {
-        return status;
+        return zx::error(status);
       }
     }
   }
-  return Vnode::SetAttributes(attr);
+  return Vnode::UpdateAttributes(attributes);
 }
 
 zx_status_t VnodeFile::Truncate(size_t length) {
@@ -150,7 +150,7 @@ void VnodeFile::Sync(SyncCallback closure) {
   UpdateModifiedIfVmoChanged();
 }
 
-void VnodeFile::UpdateModifiedIfVmoChanged() {
+void VnodeFile::UpdateModifiedIfVmoChanged() const {
   if (!paged_vmo().is_valid()) {
     return;
   }

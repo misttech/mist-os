@@ -25,9 +25,8 @@ namespace zxdb {
 namespace {
 
 const char kRunShortHelp[] = "run / r: Run the program. (Linux-only)";
-const char kRunHelp[] =
-    R"(run [ <binary path> <program args>* ]
-
+const char kRunUsage[] = "run [ <binary path> <program args>* ]";
+const char kRunHelp[] = R"(
   Alias: "r"
 
   Run the given binary with the given arguments. This command is supported only
@@ -93,7 +92,8 @@ void RunVerbRun(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetRunVerbRecord() {
-  VerbRecord run(&RunVerbRun, {"run", "r"}, kRunShortHelp, kRunHelp, CommandGroup::kProcess);
+  VerbRecord run(&RunVerbRun, {"run", "r"}, kRunShortHelp, kRunUsage, kRunHelp,
+                 CommandGroup::kProcess);
   return run;
 }
 

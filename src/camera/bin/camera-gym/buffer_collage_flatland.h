@@ -64,8 +64,8 @@ inline fpromise::result<zx::event, zx_status_t> MakeEventBridge(async_dispatcher
 
 // Defines a view used to render a single camera stream.
 struct CollectionView {
-  fuchsia::sysmem::ImageFormat_2 image_format;
-  fuchsia::sysmem::BufferCollectionPtr buffer_collection;
+  fuchsia::images2::ImageFormat image_format;
+  fuchsia::sysmem2::BufferCollectionPtr buffer_collection;
   std::map<uint32_t, ContentId> buffer_id_to_content_id;
   uint32_t buffer_count;
   bool muted = false;
@@ -91,13 +91,13 @@ class BufferCollageFlatland {
       std::unique_ptr<simple_present::FlatlandConnection> flatland_connection,
       fuchsia::ui::composition::AllocatorHandle flatland_allocator,
       fuchsia::element::GraphicalPresenterHandle graphical_presenter,
-      fuchsia::sysmem::AllocatorHandle sysmem_allocator, fit::closure stop_callback = nullptr);
+      fuchsia::sysmem2::AllocatorHandle sysmem_allocator, fit::closure stop_callback = nullptr);
 
   // Registers a new buffer collection and adds it to the views, updating the layout of existing
   // collections to fit. Returns an id representing the collection. Collections are initially
   // hidden and must be made visible using PostSetCollectionVisibility.
-  fpromise::promise<uint32_t> AddCollection(fuchsia::sysmem::BufferCollectionTokenHandle token,
-                                            fuchsia::sysmem::ImageFormat_2 image_format,
+  fpromise::promise<uint32_t> AddCollection(fuchsia::sysmem2::BufferCollectionTokenHandle token,
+                                            fuchsia::images2::ImageFormat image_format,
                                             std::string description);
 
   // Removes the collection with the given |collection_id| from the view and updates the layout to
@@ -140,7 +140,7 @@ class BufferCollageFlatland {
 
   // Thread used for processing camera stream buffers and calling Flatland API.
   async::Loop loop_;
-  fuchsia::sysmem::AllocatorPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorPtr sysmem_allocator_;
   fuchsia::element::GraphicalPresenterPtr graphical_presenter_;
   fit::closure stop_callback_;
   std::unique_ptr<simple_present::FlatlandConnection> flatland_connection_;

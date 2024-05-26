@@ -159,7 +159,7 @@ impl LightSensorBinding {
                 return Err(format_err!("Could not get descriptor for device_id: {}", device_id));
             }
         };
-        let device_info = descriptor.device_info.ok_or_else(|| {
+        let device_info = descriptor.device_information.ok_or_else(|| {
             input_device_status.health_node.set_unhealthy("Empty device_info in descriptor.");
             // Logging in addition to returning an error, as in some test
             // setups the error may never be displayed to the user.
@@ -227,8 +227,8 @@ impl LightSensorBinding {
                     LightSensorBinding {
                         event_sender: input_event_sender,
                         device_descriptor: LightSensorDeviceDescriptor {
-                            vendor_id: device_info.vendor_id,
-                            product_id: device_info.product_id,
+                            vendor_id: device_info.vendor_id.unwrap_or_default(),
+                            product_id: device_info.product_id.unwrap_or_default(),
                             device_id,
                             sensor_layout,
                         },

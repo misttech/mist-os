@@ -9,7 +9,7 @@
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/stdcompat/span.h>
@@ -63,7 +63,7 @@ class DisplayEngine final : public DisplayEngineInterface {
   // `bus_device` and `coordinator_events` must not be null, and must outlive
   // the newly created instance. `gpu_device` must not be null.
   DisplayEngine(zx_device_t* bus_device, DisplayCoordinatorEventsInterface* coordinator_events,
-                fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_client,
+                fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client,
                 std::unique_ptr<VirtioGpuDevice> gpu_device);
   ~DisplayEngine();
 
@@ -74,7 +74,7 @@ class DisplayEngine final : public DisplayEngineInterface {
   void OnCoordinatorConnected() override;
   zx::result<> ImportBufferCollection(
       display::DriverBufferCollectionId driver_buffer_collection_id,
-      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> buffer_collection_token) override;
+      fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_collection_token) override;
   zx::result<> ReleaseBufferCollection(
       display::DriverBufferCollectionId driver_buffer_collection_id) override;
   zx::result<display::DriverImageId> ImportImage(
@@ -142,14 +142,14 @@ class DisplayEngine final : public DisplayEngineInterface {
   fbl::Mutex flush_lock_;
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_;
+  fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_;
 
   zx_device_t* const bus_device_;
   DisplayCoordinatorEventsInterface& coordinator_events_;
 
   // Imported sysmem buffer collections.
   std::unordered_map<display::DriverBufferCollectionId,
-                     fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>
+                     fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>>
       buffer_collections_;
 
   struct imported_image* latest_fb_ = nullptr;

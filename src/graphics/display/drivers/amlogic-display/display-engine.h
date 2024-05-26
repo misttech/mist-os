@@ -7,7 +7,7 @@
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/device-protocol/display-panel.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -141,7 +141,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
   }
 
   void SetSysmemAllocatorForTesting(
-      fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client) {
+      fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_allocator_client) {
     sysmem_ = std::move(sysmem_allocator_client);
   }
 
@@ -236,7 +236,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
   fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev_;
   fidl::WireSyncClient<fuchsia_hardware_amlogiccanvas::Device> canvas_;
   // The sysmem allocator client used to bind incoming buffer collection tokens.
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_;
+  fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_;
 
   // Locks used by the display driver
   fbl::Mutex display_mutex_;  // general display state (i.e. display_id)
@@ -255,7 +255,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
 
   // Imported sysmem buffer collections.
   std::unordered_map<display::DriverBufferCollectionId,
-                     fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>
+                     fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>>
       buffer_collections_;
 
   // Imported Images

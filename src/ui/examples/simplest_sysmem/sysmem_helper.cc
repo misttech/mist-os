@@ -27,8 +27,7 @@ BufferCollectionConstraints CreateDefaultConstraints(BufferConstraint buffer_con
                                        fuchsia::sysmem2::CPU_USAGE_WRITE_OFTEN);
   constraints.set_min_buffer_count(buffer_constraint.buffer_count);
 
-  constraints.mutable_image_format_constraints()->reserve(1);
-  auto& image_constraints = constraints.mutable_image_format_constraints()->at(0);
+  auto& image_constraints = constraints.mutable_image_format_constraints()->emplace_back();
   image_constraints.mutable_color_spaces()->push_back(fuchsia::images2::ColorSpace::SRGB);
   image_constraints.set_pixel_format(buffer_constraint.pixel_format_type);
   image_constraints.set_pixel_format_modifier(fuchsia::images2::PixelFormatModifier::LINEAR);

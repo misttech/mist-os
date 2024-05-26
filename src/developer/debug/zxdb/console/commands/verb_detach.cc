@@ -21,9 +21,8 @@ namespace zxdb {
 namespace {
 
 const char kDetachShortHelp[] = "detach: Detach from a process.";
-const char kDetachHelp[] =
-    R"(detach [pid]
-
+const char kDetachUsage[] = "detach [pid]";
+const char kDetachHelp[] = R"(
   Detaches the debugger from a running process.
   The process will continue running.
 
@@ -175,7 +174,7 @@ void RunVerbDetach(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) 
 }  // namespace
 
 VerbRecord GetDetachVerbRecord() {
-  return VerbRecord(&RunVerbDetach, {"detach"}, kDetachShortHelp, kDetachHelp,
+  return VerbRecord(&RunVerbDetach, {"detach"}, kDetachShortHelp, kDetachUsage, kDetachHelp,
                     CommandGroup::kProcess);
 }
 

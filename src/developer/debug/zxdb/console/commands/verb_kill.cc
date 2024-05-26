@@ -16,9 +16,8 @@ namespace zxdb {
 namespace {
 
 const char kKillShortHelp[] = "kill / k: Terminate a process";
-const char kKillHelp[] =
-    R"(kill
-
+const char kKillUsage[] = "kill";
+const char kKillHelp[] = R"(
   Terminates a process attached in the debugger.
 
   By default the current process is detached.
@@ -54,7 +53,8 @@ void RunVerbKill(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetKillVerbRecord() {
-  return VerbRecord(&RunVerbKill, {"kill", "k"}, kKillShortHelp, kKillHelp, CommandGroup::kProcess);
+  return VerbRecord(&RunVerbKill, {"kill", "k"}, kKillShortHelp, kKillUsage, kKillHelp,
+                    CommandGroup::kProcess);
 }
 
 }  // namespace zxdb

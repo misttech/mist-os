@@ -728,7 +728,7 @@ Vcpu::Vcpu(Guest& guest, uint16_t vpid, Thread* thread)
 }
 
 Vcpu::~Vcpu() {
-  const cpu_num_t cpu = [this]() -> cpu_num_t {
+  {
     // Taking the Thread list lock guarantees that our thread cannot be in the
     // Exiting stage of our migration function as Thread::Exit holds the list
     // lock during the migration callback.  `thread_` is only ever mutated
@@ -742,16 +742,15 @@ Vcpu::~Vcpu() {
       // |this| after destruction of the VCPU.
       thread_->SetMigrateFnLocked(nullptr);
       thread_->SetContextSwitchFnLocked(nullptr);
-
-      return last_cpu_;
     }
-
-    // TODO(johngro): Is this correct?  If the thread has exited, should it have
-    // cleaned up its own vmcs_page as it exited?  By returning INVALID_CPU
-    // here, we are going to ensure that we are not going to clean anything up
-    // after the thread has exited.
-    return INVALID_CPU;
-  }();
+  }
+  // last_cpu_ would normally be guarded by thread_->get_lock(), but in the case where thread_ has
+  // already exited and become nullptr we still need to clear the vmcs off the last cpu the thread
+  // ran on. As we are in the destructor, and have already cleared out any potential thread_
+  // migration function, we are safe to just read last_cpu_ directly here. Note that it is being in
+  // the destructor that causes the lock annotations to be okay with this load, but it is being
+  // specifically after removal of any migrate method that actually makes this safe.
+  const cpu_num_t cpu = last_cpu_;
 
   if (vmcs_page_.IsAllocated() && cpu != INVALID_CPU) {
     // Clear VMCS state from the CPU.

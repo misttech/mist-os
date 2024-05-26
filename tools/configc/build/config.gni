@@ -289,10 +289,6 @@ template("rust_config_client_lib_source") {
 #     Name for the internal FIDL library.
 #     Type: string
 #
-#   flavor (required)
-#     Runner flavor for client library
-#     Type: string
-#
 #   namespace (optional)
 #     Namespace used by the C++ library.
 #     Type: string
@@ -308,8 +304,6 @@ template("cpp_config_client_lib_source") {
          "the path to a compiled component manifest must be specified")
   assert(defined(invoker.fidl_library_name),
          "the name of the internal FIDL library must be specified")
-  assert(defined(invoker.flavor),
-         "the flavor of the FIDL library must be specified ('elf' or 'driver')")
   if (defined(invoker.namespace)) {
     namespace = invoker.namespace
   } else {
@@ -352,8 +346,6 @@ template("cpp_config_client_lib_source") {
       invoker.fidl_library_name,
       "--clang-format",
       "${rebased_clang_prefix}/clang-format",
-      "--flavor",
-      invoker.flavor,
     ]
 
     outputs = [

@@ -32,9 +32,11 @@ source_set("config") {
     "//sdk/banjo/fuchsia.hardware.ge2d:fuchsia.hardware.ge2d_banjo_cpp",
     "//sdk/fidl/fuchsia.camera2:fuchsia.camera2_hlcpp",
     "//sdk/fidl/fuchsia.camera2.hal:fuchsia.camera2.hal_hlcpp",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_hlcpp_conversion",
     "//src/camera/drivers/controller/configs",
     "//src/camera/lib/formatting",
     "//src/camera/lib/stream_utils:stream_configs",
+    "//zircon/system/ulib/sysmem-version",
   ]
 }
 

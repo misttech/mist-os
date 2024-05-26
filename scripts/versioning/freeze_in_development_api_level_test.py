@@ -26,7 +26,7 @@ TEST_VERSION_HISTORY_FILE_CONTENT = {
 
 
 class TestFreezePlatformVersionMethods(unittest.TestCase):
-    def test_freeze_version_history(self):
+    def test_freeze_version_history(self) -> None:
         expected_version_history = {
             "data": {
                 "name": "Platform version map",

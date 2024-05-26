@@ -9,7 +9,7 @@ use {
         host_watcher::{activate_fake_host, HostWatcherHarness},
     },
     fidl_fuchsia_bluetooth_sys::ProcedureTokenProxy,
-    fidl_fuchsia_bluetooth_test::{AdvertisingData, LowEnergyPeerParameters, PeerProxy},
+    fidl_fuchsia_hardware_bluetooth::{AdvertisingData, LowEnergyPeerParameters, PeerProxy},
     fuchsia_bluetooth::{
         constants::INTEGRATION_TIMEOUT,
         expectation::asynchronous::{ExpectableExt, ExpectableStateExt},

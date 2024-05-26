@@ -103,6 +103,7 @@ func TestSet(t *testing.T) {
 
 	t.Run("populates set_artifacts fields (Rust)", func(t *testing.T) {
 		staticSpec := proto.Clone(staticSpec).(*fintpb.Static)
+		staticSpec.UseGoma = true
 		staticSpec.RustRbeEnable = true // This turns on RBE.
 		runner := &fakeSubprocessRunner{
 			mockStdout: []byte("some stdout"),
@@ -114,6 +115,9 @@ func TestSet(t *testing.T) {
 		if !strings.HasPrefix(artifacts.GnTracePath, contextSpec.ArtifactDir) {
 			t.Errorf("Expected setImpl to set a gn_trace_path in the artifact dir (%q) but got: %q",
 				contextSpec.ArtifactDir, artifacts.GnTracePath)
+		}
+		if !artifacts.UseGoma {
+			t.Errorf("Expected setImpl to set use_goma")
 		}
 		if !artifacts.EnableRbe {
 			t.Errorf("Expected setImpl to set enable_rbe")
@@ -373,6 +377,7 @@ func TestGenArgs(t *testing.T) {
 			},
 			expectedArgs: []string{
 				`rustc_prefix="/tmp/rust_toolchain"`,
+				`use_goma=true`,
 			},
 		},
 		{

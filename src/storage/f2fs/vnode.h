@@ -98,8 +98,10 @@ class VnodeF2fs : public fs::PagedVnode,
 
   ino_t Ino() const { return ino_; }
 
-  zx_status_t GetAttributes(fs::VnodeAttributes *a) final __TA_EXCLUDES(mutex_);
-  zx_status_t SetAttributes(fs::VnodeAttributesUpdate attr) final __TA_EXCLUDES(mutex_);
+  zx::result<fs::VnodeAttributes> GetAttributes() const final __TA_EXCLUDES(mutex_);
+  fs::VnodeAttributesQuery SupportedMutableAttributes() const final;
+  zx::result<> UpdateAttributes(const fs::VnodeAttributesUpdate &attributes) final
+      __TA_EXCLUDES(mutex_);
 
   fuchsia_io::NodeProtocolKinds GetProtocols() const override;
 
@@ -352,7 +354,7 @@ class VnodeF2fs : public fs::PagedVnode,
   }
   void SetDirLevel(const uint8_t level) TA_NO_THREAD_SAFETY_ANALYSIS { dir_level_ = level; }
   template <typename T>
-  const timespec &GetTime() TA_NO_THREAD_SAFETY_ANALYSIS {
+  const timespec &GetTime() const TA_NO_THREAD_SAFETY_ANALYSIS {
     return time_->Get<T>();
   }
 

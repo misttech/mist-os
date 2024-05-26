@@ -21,7 +21,8 @@ int main(int argc, const char** argv) {
     return ::forensics::exceptions::main();
   }
   if (argv0.rfind("exception_handler_") == 0) {
-    return ::forensics::exceptions::handler::main(argv0);
+    FX_CHECK(argc >= 2);
+    return ::forensics::exceptions::handler::main(argv0, argv[1]);
   }
   if (argv0 == "/pkg/bin/feedback") {
     return ::forensics::feedback::main();

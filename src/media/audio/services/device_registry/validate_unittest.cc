@@ -656,5 +656,37 @@ TEST(ValidateTest, ValidateVendorSpecificElementState) {
   EXPECT_TRUE(ValidateElementState(kVendorSpecificElementState, kVendorSpecificElement));
 }
 
+TEST(ValidateTest, ValidateSettableElementState) {
+  EXPECT_TRUE(ValidateSettableElementState(kSettableGenericElementState, kAgcElement));
+}
+
+TEST(ValidateTest, ValidateSettableDynamicsElementState) {
+  EXPECT_TRUE(
+      ValidateSettableDynamicsElementState(kSettableDynamicsElementState, kDynamicsElement));
+
+  EXPECT_TRUE(ValidateSettableElementState(kSettableDynamicsElementState, kDynamicsElement));
+}
+
+TEST(ValidateTest, ValidateSettableEqualizerElementState) {
+  EXPECT_TRUE(
+      ValidateSettableEqualizerElementState(kSettableEqualizerElementState, kEqualizerElement));
+
+  EXPECT_TRUE(ValidateSettableElementState(kSettableEqualizerElementState, kEqualizerElement));
+}
+
+TEST(ValidateTest, ValidateSettableGainElementState) {
+  EXPECT_TRUE(ValidateSettableGainElementState(kSettableGainElementState, kGainElement));
+
+  EXPECT_TRUE(ValidateSettableElementState(kSettableGainElementState, kGainElement));
+}
+
+TEST(ValidateTest, ValidateSettableVendorSpecificElementState) {
+  EXPECT_TRUE(ValidateSettableVendorSpecificElementState(kSettableVendorSpecificElementState,
+                                                         kVendorSpecificElement));
+
+  EXPECT_TRUE(
+      ValidateSettableElementState(kSettableVendorSpecificElementState, kVendorSpecificElement));
+}
+
 }  // namespace
 }  // namespace media_audio

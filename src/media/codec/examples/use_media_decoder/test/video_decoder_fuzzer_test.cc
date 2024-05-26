@@ -120,8 +120,8 @@ int run_fuzzer_test_instance(std::string input_file_path, UseVideoDecoderFunctio
 
   fuchsia::mediacodec::CodecFactoryHandle codec_factory;
   component_context->svc()->Connect<fuchsia::mediacodec::CodecFactory>(codec_factory.NewRequest());
-  fuchsia::sysmem::AllocatorHandle sysmem;
-  component_context->svc()->Connect<fuchsia::sysmem::Allocator>(sysmem.NewRequest());
+  fuchsia::sysmem2::AllocatorHandle sysmem;
+  component_context->svc()->Connect<fuchsia::sysmem2::Allocator>(sysmem.NewRequest());
 
   UseVideoDecoderParams params{.fidl_loop = &fidl_loop,
                                .fidl_thread = fidl_thread,

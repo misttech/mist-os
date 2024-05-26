@@ -170,8 +170,21 @@ class Fusb302Protocol {
   // next transmitted message.
   usb_pd::MessageId next_transmitted_message_id_;
 
-  // If `good_crc_transmission_pending_` is true, we're waiting to send a GoodCRC.
-  usb_pd::MessageId next_expected_message_id_;
+  // The expected MessageID for the next packet from the other side, if known.
+  //
+  // This PD protocol implementation supports being started up in the middle of
+  // a PD packet stream, where the other side has already sent some packets.
+  // This support is absolutely necessary for hardware that automatically
+  // generates GoodCRC packets (such as the FUSB302B), because sending a GoodCRC
+  // acknowledges the original packet and commits us to replying to it.
+  //
+  // We "lock onto" the first valid PD packet we receive, which determines the
+  // next expected MessageID. After this first packet, we only accept packets
+  // with correct MessageID sequence numbers.
+  //
+  // If `good_crc_transmission_pending_` is true, we're waiting to send a
+  // GoodCRC for the last received message (which has the MessageID).
+  std::optional<usb_pd::MessageId> next_expected_message_id_;
 
   bool good_crc_transmission_pending_ = false;
 

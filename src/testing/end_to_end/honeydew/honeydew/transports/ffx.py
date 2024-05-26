@@ -57,6 +57,7 @@ _FFX_CMDS: dict[str, list[str]] = {
     "TARGET_WAIT": ["target", "wait", "--timeout"],
     "TARGET_WAIT_DOWN": ["target", "wait", "--down", "--timeout"],
     "TEST_RUN": ["test", "run"],
+    "TARGET_SSH": ["target", "ssh"],
 }
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -548,7 +549,7 @@ class FFX(ffx_interface.FFX):
             _LOGGER.debug("Executing command `%s`", " ".join(ffx_cmd))
             if capture_output:
                 output: str = subprocess.check_output(
-                    ffx_cmd, stderr=subprocess.STDOUT, timeout=timeout
+                    ffx_cmd, stderr=subprocess.PIPE, timeout=timeout
                 ).decode()
                 if log_output:
                     _LOGGER.debug(
@@ -609,10 +610,16 @@ class FFX(ffx_interface.FFX):
 
         Returns:
             The Popen object of `ffx -t {target} {cmd}`.
+
+        Raises:
+            errors.FfxCommandError: On failure.
         """
         ffx_cmd: list[str] = self._generate_ffx_cmd(cmd=cmd)
         _LOGGER.info("Opening ffx process `%s`...", " ".join(ffx_cmd))
-        return subprocess.Popen(ffx_cmd, **kwargs)
+        try:
+            return subprocess.Popen(ffx_cmd, **kwargs)
+        except Exception as err:  # pylint: disable=broad-except
+            raise errors.FfxCommandError(f"`{cmd}` command failed") from err
 
     def run_test_component(
         self,
@@ -665,6 +672,35 @@ class FFX(ffx_interface.FFX):
             cmd.append("--")
             cmd += test_component_args
         return self.run(cmd, timeout=timeout, capture_output=capture_output)
+
+    def run_ssh_cmd(
+        self,
+        cmd: str,
+        timeout: float | None = ffx_interface.TIMEOUTS["FFX_CLI"],
+        capture_output: bool = True,
+    ) -> str:
+        """Executes and returns the output of `ffx -t target ssh <cmd>`.
+
+        Args:
+            cmd: SSH command to run.
+            timeout: Timeout to wait for the ffx command to return.
+            capture_output: When True, the stdout/err from the command will be
+                captured and returned. When False, the output of the command
+                will be streamed to stdout/err accordingly and it won't be
+                returned. Defaults to True.
+
+        Returns:
+            Output of `ffx -t target ssh <cmd>` when capture_output is set to
+            True, otherwise an empty string.
+
+        Raises:
+            errors.DeviceNotConnectedError: If FFX fails to reach target.
+            errors.FfxTimeoutError: In case of FFX command timeout.
+            errors.FfxCommandError: In case of other FFX command failure.
+        """
+        ffx_cmd: list[str] = _FFX_CMDS["TARGET_SSH"][:]
+        ffx_cmd.append(cmd)
+        return self.run(ffx_cmd, timeout=timeout, capture_output=capture_output)
 
     def wait_for_rcs_connection(
         self,

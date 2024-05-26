@@ -4,6 +4,7 @@
 library fuchsia.sys2;
 
 using fuchsia.component;
+using fuchsia.component.decl;
 
 /// Routing error for a particular capability.
 type RouteError = table {
@@ -43,6 +44,10 @@ type RouteReport = table {
     /// Metadata about the instances in a service. Populated only for aggregated services.
     @available(added=12)
     5: service_instances vector<ServiceInstance>:MAX;
+
+    /// The requested level of availability of the capability.
+    @available(added=HEAD)
+    6: availability fuchsia.component.decl.Availability;
 };
 
 /// Metadata about a service instance.

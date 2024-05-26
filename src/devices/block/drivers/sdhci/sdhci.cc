@@ -230,6 +230,10 @@ void Sdhci::TransferComplete() {
     zxlogf(ERROR, "Transfer complete interrupt received before command complete");
     pending_request_->status.set_error(1).set_command_timeout_error(1);
     ErrorRecovery();
+  } else if (!pending_request_->data_transfer_complete()) {
+    zxlogf(ERROR, "Transfer complete interrupt received before data transferred");
+    pending_request_->status.set_error(1).set_data_timeout_error(1);
+    ErrorRecovery();
   } else {
     CompleteRequest();
   }
@@ -243,7 +247,30 @@ bool Sdhci::DataStageReadReady() {
     return true;
   }
 
+  if (SupportsAdma2() || pending_request_->data_transfer_complete()) {
+    return false;
+  }
+
+  for (uint32_t i = 0; i < pending_request_->blocksize; i += sizeof(uint32_t)) {
+    const uint32_t data = BufferData::Get().ReadFrom(&regs_mmio_buffer_).reg_value();
+    memcpy(pending_request_->data.data(), &data, sizeof(data));
+    pending_request_->data = pending_request_->data.subspan(sizeof(data));
+  }
+
   return false;
+}
+
+void Sdhci::DataStageWriteReady() {
+  if (SupportsAdma2() || pending_request_->data_transfer_complete()) {
+    return;
+  }
+
+  for (uint32_t i = 0; i < pending_request_->blocksize; i += sizeof(uint32_t)) {
+    uint32_t data;
+    memcpy(&data, pending_request_->data.data(), sizeof(data));
+    pending_request_->data = pending_request_->data.subspan(sizeof(data));
+    BufferData::Get().FromValue(data).WriteTo(&regs_mmio_buffer_);
+  }
 }
 
 void Sdhci::ErrorRecovery() {
@@ -314,11 +341,14 @@ void Sdhci::HandleTransferInterrupt(const InterruptStatus status) {
 
   // Clear the interrupt status to indicate that a normal interrupt was handled.
   pending_request_->status = InterruptStatus::Get().FromValue(0);
+  if (status.command_complete() && CmdStageComplete()) {
+    return;
+  }
   if (status.buffer_read_ready() && DataStageReadReady()) {
     return;
   }
-  if (status.command_complete() && CmdStageComplete()) {
-    return;
+  if (status.buffer_write_ready()) {
+    DataStageWriteReady();
   }
   if (status.transfer_complete()) {
     TransferComplete();
@@ -339,13 +369,29 @@ zx_status_t Sdhci::SdmmcRegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo 
                                                                     .size = size,
                                                                     .rights = vmo_rights,
                                                                 });
-  const uint32_t read_perm = (vmo_rights & SDMMC_VMO_RIGHT_READ) ? ZX_BTI_PERM_READ : 0;
-  const uint32_t write_perm = (vmo_rights & SDMMC_VMO_RIGHT_WRITE) ? ZX_BTI_PERM_WRITE : 0;
-  zx_status_t status = stored_vmo.Pin(bti_, read_perm | write_perm, true);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to pin VMO %u for client %u: %s", vmo_id, client_id,
-           zx_status_get_string(status));
-    return status;
+
+  if (SupportsAdma2()) {
+    const uint32_t read_perm = (vmo_rights & SDMMC_VMO_RIGHT_READ) ? ZX_BTI_PERM_READ : 0;
+    const uint32_t write_perm = (vmo_rights & SDMMC_VMO_RIGHT_WRITE) ? ZX_BTI_PERM_WRITE : 0;
+    zx_status_t status = stored_vmo.Pin(bti_, read_perm | write_perm, true);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to pin VMO %u for client %u: %s", vmo_id, client_id,
+             zx_status_get_string(status));
+      return status;
+    }
+  } else {
+    const uint32_t write_perm = (vmo_rights & SDMMC_VMO_RIGHT_WRITE) ? ZX_VM_PERM_WRITE : 0;
+    zx_status_t status = stored_vmo.Map(ZX_VM_PERM_READ | write_perm);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to map VMO %u for client %u: %s", vmo_id, client_id,
+             zx_status_get_string(status));
+      return status;
+    }
+    if (offset > stored_vmo.data().size() || size > (stored_vmo.data().size() - offset)) {
+      zxlogf(ERROR, "Invalid size or offset for VMO %u for client %u: %s", vmo_id, client_id,
+             zx_status_get_string(status));
+      return ZX_ERR_OUT_OF_RANGE;
+    }
   }
 
   return registered_vmo_stores_[client_id].RegisterWithKey(vmo_id, std::move(stored_vmo));
@@ -374,10 +420,6 @@ zx_status_t Sdhci::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]
   if (req->client_id >= std::size(registered_vmo_stores_)) {
     return ZX_ERR_OUT_OF_RANGE;
   }
-  if (!SupportsAdma2()) {
-    // TODO(https://fxbug.dev/42058171): Add support for PIO requests.
-    return ZX_ERR_NOT_SUPPORTED;
-  }
 
   DmaDescriptorBuilder<OwnedVmoInfo> builder(*req, registered_vmo_stores_[req->client_id],
                                              dma_boundary_alignment_, bti_.borrow());
@@ -391,7 +433,7 @@ zx_status_t Sdhci::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]
     }
 
     if (zx::result pending_request = StartRequest(*req, builder); pending_request.is_ok()) {
-      pending_request_.emplace(*pending_request);
+      pending_request_.emplace(*std::move(pending_request));
     } else {
       return pending_request.status_value();
     }
@@ -404,7 +446,7 @@ zx_status_t Sdhci::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]
 
   PendingRequest pending_request = *std::move(pending_request_);
   pending_request_.reset();
-  return FinishRequest(*req, out_response, pending_request);
+  return FinishRequest(*req, out_response, std::move(pending_request));
 }
 
 zx::result<Sdhci::PendingRequest> Sdhci::StartRequest(const sdmmc_req_t& request,
@@ -434,6 +476,8 @@ zx::result<Sdhci::PendingRequest> Sdhci::StartRequest(const sdmmc_req_t& request
 
   const auto blocksize = static_cast<BlockSizeType>(request.blocksize);
 
+  PendingRequest pending_request(request);
+
   if (is_tuning_request) {
     // The SDHCI controller has special logic to handle tuning transfers, so there is no need to set
     // up any DMA buffers.
@@ -447,22 +491,35 @@ zx::result<Sdhci::PendingRequest> Sdhci::StartRequest(const sdmmc_req_t& request
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
 
-    if (const zx_status_t status = SetUpDma(request, builder); status != ZX_OK) {
-      return zx::error(status);
+    size_t blockcount = 0;
+    if (SupportsAdma2()) {
+      if (zx_status_t status = SetUpDma(request, builder); status != ZX_OK) {
+        return zx::error(status);
+      }
+
+      blockcount = builder.block_count();
+      transfer_mode.set_dma_enable(1);
+    } else {
+      if (zx_status_t status = SetUpBuffer(request, &pending_request)) {
+        return zx::error(status);
+      }
+
+      blockcount = pending_request.data.size() / blocksize;
+      transfer_mode.set_dma_enable(0);
     }
 
-    if (builder.block_count() > std::numeric_limits<BlockCountType>::max()) {
-      zxlogf(ERROR, "Block count (%lu) exceeds the maximum (%u)", builder.block_count(),
+    if (blockcount > std::numeric_limits<BlockCountType>::max()) {
+      zxlogf(ERROR, "Block count (%lu) exceeds the maximum (%u)", blockcount,
              std::numeric_limits<BlockCountType>::max());
       return zx::error(ZX_ERR_OUT_OF_RANGE);
     }
 
-    transfer_mode.set_dma_enable(1).set_multi_block(builder.block_count() > 1 ? 1 : 0);
-
-    const auto blockcount = static_cast<BlockCountType>(builder.block_count());
+    transfer_mode.set_multi_block(blockcount > 1 ? 1 : 0);
 
     BlockSize::Get().FromValue(blocksize).WriteTo(&regs_mmio_buffer_);
-    BlockCount::Get().FromValue(blockcount).WriteTo(&regs_mmio_buffer_);
+    BlockCount::Get()
+        .FromValue(static_cast<BlockCountType>(blockcount))
+        .WriteTo(&regs_mmio_buffer_);
   } else {
     BlockSize::Get().FromValue(0).WriteTo(&regs_mmio_buffer_);
     BlockCount::Get().FromValue(0).WriteTo(&regs_mmio_buffer_);
@@ -484,7 +541,7 @@ zx::result<Sdhci::PendingRequest> Sdhci::StartRequest(const sdmmc_req_t& request
   transfer_mode.WriteTo(&regs_mmio_buffer_);
   command.WriteTo(&regs_mmio_buffer_);
 
-  return zx::ok(PendingRequest{request});
+  return zx::ok(std::move(pending_request));
 }
 
 zx_status_t Sdhci::SetUpDma(const sdmmc_req_t& request,
@@ -525,6 +582,65 @@ zx_status_t Sdhci::SetUpDma(const sdmmc_req_t& request,
   return ZX_OK;
 }
 
+zx_status_t Sdhci::SetUpBuffer(const sdmmc_req_t& request, PendingRequest* const pending_request) {
+  if (request.buffers_count != 1) {
+    zxlogf(ERROR, "Only one buffer is supported without DMA");
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  auto& buffer = request.buffers_list[0];
+  if (buffer.size % request.blocksize != 0) {
+    zxlogf(ERROR, "Total buffer size (%lu) is not a multiple of the request block size (%u)",
+           buffer.size, request.blocksize);
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (request.blocksize % sizeof(uint32_t) != 0) {
+    zxlogf(ERROR, "Block size (%u) is not a multiple of %zu", request.blocksize, sizeof(uint32_t));
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  if (buffer.type == SDMMC_BUFFER_TYPE_VMO_HANDLE) {
+    const uint32_t write_perm = (request.cmd_flags & SDMMC_CMD_READ) ? ZX_VM_PERM_WRITE : 0;
+
+    zx::unowned_vmo buffer_vmo(buffer.buffer.vmo);
+    zx_status_t status =
+        pending_request->vmo_mapper.Map(*buffer_vmo, 0, 0, ZX_VM_PERM_READ | write_perm);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to map request VMO: %s", zx_status_get_string(status));
+      return status;
+    }
+
+    if (buffer.offset > pending_request->vmo_mapper.size() ||
+        buffer.size > (pending_request->vmo_mapper.size() - buffer.offset)) {
+      zxlogf(ERROR, "Buffer size and offset out of range of the VMO");
+      return ZX_ERR_OUT_OF_RANGE;
+    }
+
+    pending_request->data = {
+        reinterpret_cast<uint8_t*>(pending_request->vmo_mapper.start()) + buffer.offset,
+        buffer.size};
+  } else if (buffer.type == SDMMC_BUFFER_TYPE_VMO_ID) {
+    vmo_store::StoredVmo<OwnedVmoInfo>* vmo =
+        registered_vmo_stores_[request.client_id].GetVmo(buffer.buffer.vmo_id);
+    if (vmo == nullptr) {
+      zxlogf(ERROR, "Unknown VMO ID %u for client %u", buffer.buffer.vmo_id, request.client_id);
+      return ZX_ERR_NOT_FOUND;
+    }
+
+    // Size and offset were previously validated by RegisterVmo().
+    const cpp20::span<uint8_t> data = vmo->data().subspan(vmo->meta().offset, vmo->meta().size);
+    if (buffer.offset > data.size() || buffer.size > (data.size() - buffer.offset)) {
+      zxlogf(ERROR, "Buffer size and offset out of range of the VMO");
+      return ZX_ERR_OUT_OF_RANGE;
+    }
+    pending_request->data = data.subspan(buffer.offset, buffer.size);
+  } else {
+    zxlogf(ERROR, "Unknown buffer type %u", buffer.type);
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  return ZX_OK;
+}
+
 zx_status_t Sdhci::FinishRequest(const sdmmc_req_t& request, uint32_t out_response[4],
                                  const PendingRequest& pending_request) {
   constexpr uint32_t kResponseMask = SDMMC_RESP_LEN_136 | SDMMC_RESP_LEN_48 | SDMMC_RESP_LEN_48B;
@@ -538,7 +654,8 @@ zx_status_t Sdhci::FinishRequest(const sdmmc_req_t& request, uint32_t out_respon
         WaitForReset(SoftwareReset::Get().FromValue(0).set_reset_cmd(1).set_reset_dat(1));
   }
 
-  if ((request.cmd_flags & SDMMC_RESP_DATA_PRESENT) && (request.cmd_flags & SDMMC_CMD_READ)) {
+  if ((request.cmd_flags & SDMMC_RESP_DATA_PRESENT) && (request.cmd_flags & SDMMC_CMD_READ) &&
+      SupportsAdma2()) {
     const cpp20::span<const sdmmc_buffer_region_t> regions{request.buffers_list,
                                                            request.buffers_count};
     for (const auto& region : regions) {
@@ -1075,6 +1192,12 @@ void Sdhci::DdkInit(ddk::InitTxn txn) {
     if (existing_metadata->has_max_command_packing()) {
       builder.max_command_packing(existing_metadata->max_command_packing());
     }
+  }
+
+  if (!SupportsAdma2()) {
+    // Non-DMA requests are only allowed to use a single buffer, so tell the core driver to disable
+    // command packing. This limitation could be removed in the future.
+    builder.max_command_packing(0);
   }
 
   fit::result metadata = fidl::Persist(builder.Build());

@@ -4,7 +4,7 @@
 
 #include "src/camera/lib/virtual_camera/virtual_camera.h"
 
-#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/sys/cpp/component_context.h>
 #include <zircon/status.h>
@@ -20,9 +20,13 @@ class VirtualCameraTest : public gtest::RealLoopFixture {
   virtual void SetUp() override {
     context_->svc()->Connect(allocator_.NewRequest());
     SetFailOnError(allocator_);
-    allocator_->SetDebugClientInfo(fsl::GetCurrentProcessName() + "-client",
-                                   fsl::GetCurrentProcessKoid());
-    fidl::InterfaceHandle<fuchsia::sysmem::Allocator> allocator;
+
+    fuchsia::sysmem2::AllocatorSetDebugClientInfoRequest set_debug_request;
+    set_debug_request.set_name(fsl::GetCurrentProcessName() + "-client");
+    set_debug_request.set_id(fsl::GetCurrentProcessKoid());
+    allocator_->SetDebugClientInfo(std::move(set_debug_request));
+
+    fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> allocator;
     context_->svc()->Connect(allocator.NewRequest());
     auto result = camera::VirtualCamera::Create(std::move(allocator));
     ASSERT_TRUE(result.is_ok());
@@ -46,7 +50,7 @@ class VirtualCameraTest : public gtest::RealLoopFixture {
   }
 
   std::unique_ptr<sys::ComponentContext> context_;
-  fuchsia::sysmem::AllocatorPtr allocator_;
+  fuchsia::sysmem2::AllocatorPtr allocator_;
   std::unique_ptr<camera::VirtualCamera> virtual_camera_;
 };
 
@@ -68,36 +72,50 @@ TEST_F(VirtualCameraTest, FramesReceived) {
   SetFailOnError(stream, "Stream");
   camera->ConnectToStream(0, stream.NewRequest());
 
-  fuchsia::sysmem::BufferCollectionTokenPtr token;
-  allocator_->AllocateSharedCollection(token.NewRequest());
-  token->Sync([&] { stream->SetBufferCollection(std::move(token)); });
-  fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> client_token;
+  fuchsia::sysmem2::BufferCollectionTokenPtr token;
+  fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
+  allocate_shared_request.set_token_request(token.NewRequest());
+  allocator_->AllocateSharedCollection(std::move(allocate_shared_request));
+
+  token->Sync([&](fuchsia::sysmem2::Node_Sync_Result result) {
+    stream->SetBufferCollection(
+        fuchsia::sysmem::BufferCollectionTokenHandle(token.Unbind().TakeChannel()));
+  });
+  fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> client_token;
   bool token_received = false;
   stream->WatchBufferCollection(
-      [&](fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token) {
-        client_token = std::move(token);
+      [&](fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_v1) {
+        auto token_v2 = fuchsia::sysmem2::BufferCollectionTokenHandle(token_v1.TakeChannel());
+        client_token = std::move(token_v2);
         token_received = true;
       });
   RunLoopUntilFailureOr(token_received);
 
-  fuchsia::sysmem::BufferCollectionPtr collection;
+  fuchsia::sysmem2::BufferCollectionPtr collection;
   SetFailOnError(collection, "BufferCollection");
-  allocator_->BindSharedCollection(std::move(client_token), collection.NewRequest());
 
-  fuchsia::sysmem::BufferCollectionConstraints constraints{
-      .usage{.cpu = fuchsia::sysmem::cpuUsageRead}, .min_buffer_count_for_camping = 2};
-  collection->SetConstraints(true, constraints);
-  fuchsia::sysmem::BufferCollectionInfo_2 buffers_received;
+  fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.set_token(std::move(client_token));
+  bind_shared_request.set_buffer_collection_request(collection.NewRequest());
+  allocator_->BindSharedCollection(std::move(bind_shared_request));
+
+  fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  auto& constraints = *set_constraints_request.mutable_constraints();
+  constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_READ);
+  constraints.set_min_buffer_count_for_camping(2);
+  collection->SetConstraints(std::move(set_constraints_request));
+
+  fuchsia::sysmem2::BufferCollectionInfo buffers_received;
   bool buffers_allocated = false;
-  collection->WaitForBuffersAllocated(
-      [&](zx_status_t status, fuchsia::sysmem::BufferCollectionInfo_2 buffers) {
-        ASSERT_EQ(status, ZX_OK);
-        buffers_received = std::move(buffers);
+  collection->WaitForAllBuffersAllocated(
+      [&](fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result result) {
+        ASSERT_TRUE(result.is_response());
+        buffers_received = std::move(*result.response().mutable_buffer_collection_info());
         buffers_allocated = true;
       });
   RunLoopUntilFailureOr(buffers_allocated);
   ASSERT_FALSE(HasFailure());
-  collection->Close();
+  collection->Release();
 
   constexpr uint32_t kTargetFrameCount = 11;
   uint32_t frames_received = 0;
@@ -105,9 +123,10 @@ TEST_F(VirtualCameraTest, FramesReceived) {
   fit::function<void(fuchsia::camera3::FrameInfo)> check_frame;
   check_frame = [&](fuchsia::camera3::FrameInfo info) {
     fzl::VmoMapper mapper;
-    ASSERT_EQ(mapper.Map(buffers_received.buffers[info.buffer_index].vmo, 0,
-                         buffers_received.settings.buffer_settings.size_bytes, ZX_VM_PERM_READ),
-              ZX_OK);
+    ASSERT_EQ(
+        mapper.Map(buffers_received.buffers()[info.buffer_index].vmo(), 0,
+                   buffers_received.settings().buffer_settings().size_bytes(), ZX_VM_PERM_READ),
+        ZX_OK);
     auto result = virtual_camera_->CheckFrame(mapper.start(), mapper.size(), info);
     EXPECT_TRUE(result.is_ok()) << result.error();
     result = virtual_camera_->CheckFrame(mapper.start(), 0, info);

@@ -17,8 +17,7 @@ namespace forensics::stubs {
 
 // Returns an 8-bit BGRA image of a |image_dim_in_px| x |image_dim_in_px| checkerboard, where each
 // white/black region is a 10x10 pixel square.
-fuchsia::ui::composition::ScreenshotTakeResponse CreateCheckerboardScreenshot(
-    uint32_t image_dim_in_px);
+fuchsia::ui::composition::ScreenshotTakeResponse CreateFakePNGScreenshot(uint32_t image_dim_in_px);
 
 using ScreenshotBase = MULTI_BINDING_STUB_FIDL_SERVER(fuchsia::ui::composition, Screenshot);
 

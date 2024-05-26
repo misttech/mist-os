@@ -11,26 +11,26 @@
 namespace camera {
 
 struct BufferCollection {
-  fuchsia::sysmem::BufferCollectionPtr ptr;
-  fuchsia::sysmem::BufferCollectionInfo_2 buffers;
+  fuchsia::sysmem2::BufferCollectionPtr ptr;
+  fuchsia::sysmem2::BufferCollectionInfo buffers;
 };
 
 class ControllerMemoryAllocator {
  public:
-  explicit ControllerMemoryAllocator(fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator);
+  explicit ControllerMemoryAllocator(fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator);
 
   // Takes in a set of constraints and allocates memory using sysmem based on those
   // constraints.
   zx_status_t AllocateSharedMemory(
-      const std::vector<fuchsia::sysmem::BufferCollectionConstraints>& constraints,
+      const std::vector<fuchsia::sysmem2::BufferCollectionConstraints>& constraints,
       BufferCollection& out_buffer_collection, const std::string& name) const;
 
   // Duplicates the provided token, assigns it "default" constraints, and returns the collection.
-  fuchsia::sysmem::BufferCollectionHandle AttachObserverCollection(
-      fuchsia::sysmem::BufferCollectionTokenHandle& token);
+  fuchsia::sysmem2::BufferCollectionHandle AttachObserverCollection(
+      fuchsia::sysmem2::BufferCollectionTokenHandle& token);
 
  private:
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
 };
 
 }  // namespace camera

@@ -223,6 +223,7 @@ impl<I: net_types::ip::Ip> TryFrom<froutes_ext::InstalledRoute<I>> for Forwardin
         let froutes_ext::InstalledRoute {
             route: froutes_ext::Route { destination, action, properties: _ },
             effective_properties: froutes_ext::EffectiveRouteProperties { metric },
+            table_id: _,
         } = route;
         let (device_id, next_hop) = match action {
             froutes_ext::RouteAction::Forward(froutes_ext::RouteTarget {

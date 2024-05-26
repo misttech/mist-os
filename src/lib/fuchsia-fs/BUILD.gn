@@ -29,6 +29,7 @@ rustc_library("fuchsia-fs") {
     "//src/lib/fuchsia",
     "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:proptest",
     "//third_party/rust_crates:tempfile",
   ]

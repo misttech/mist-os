@@ -72,6 +72,15 @@ DebugAgent::DebugAgent(std::unique_ptr<SystemInterface> system_interface)
   system_interface_->GetComponentManager().SetDebugAgent(this);
   system_interface_->GetLimboProvider().set_on_enter_limbo(
       [this](const LimboProvider::Record& record) { OnProcessEnteredLimbo(record); });
+
+#ifdef __Fuchsia__
+  // Watch the root job.
+  root_job_ = system_interface_->GetRootJob();
+  auto status = root_job_->WatchJobExceptions(this);
+  if (status.has_error()) {
+    LOGS(Error) << "Failed to watch the root job: " << status.message();
+  }
+#endif  // __Fuchsia__
 }
 
 fxl::WeakPtr<DebugAgent> DebugAgent::GetWeakPtr() { return weak_factory_.GetWeakPtr(); }
@@ -103,15 +112,6 @@ void DebugAgent::Connect(std::unique_ptr<debug::BufferedStream> stream) {
   buffered_stream_ = std::move(stream);
 
   FX_CHECK(buffered_stream_->Start()) << "Failed to connect to the FIDL socket";
-
-#ifdef __Fuchsia__
-  // Watch the root job.
-  root_job_ = system_interface_->GetRootJob();
-  auto status = root_job_->WatchJobExceptions(this);
-  if (status.has_error()) {
-    LOGS(Error) << "Failed to watch the root job: " << status.message();
-  }
-#endif  // __Fuchsia__
 }
 
 void DebugAgent::Disconnect() {

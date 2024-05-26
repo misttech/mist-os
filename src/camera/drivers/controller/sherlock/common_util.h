@@ -27,11 +27,22 @@ inline constexpr uint32_t kVideoThrottledOutputFrameRate = kSensorMaxFramesPerSe
 inline constexpr uint32_t kGdcBytesPerRowDivisor = 16;
 inline constexpr uint32_t kGe2dBytesPerRowDivisor = 32;
 inline constexpr uint32_t kIspBytesPerRowDivisor = 128;
+
+template <typename ElementType>
+inline void MakeVecHelper(std::vector<ElementType>& vec) {}
+
+template <typename ElementType, typename... Elements>
+inline void MakeVecHelper(std::vector<ElementType>& vec, ElementType&& element0,
+                          Elements&&... rest) {
+  vec.emplace_back(std::move(element0));
+  MakeVecHelper(vec, std::forward<ElementType&&>(rest)...);
+}
+
 }  // namespace
 
 fuchsia::camera2::StreamProperties GetStreamProperties(fuchsia::camera2::CameraStreamType type);
 
-fuchsia::sysmem::BufferCollectionConstraints InvalidConstraints();
+fuchsia::sysmem2::BufferCollectionConstraints InvalidConstraints();
 
 struct ConstraintsOverrides {
   std::optional<uint32_t> min_buffer_count_for_camping;
@@ -43,11 +54,20 @@ struct ConstraintsOverrides {
 // constraints to the collection (e.g. min_buffer_count), but they also represent aggregate views of
 // the controller constraints to the client (specifically, min_buffer_count_for_camping). Because it
 // is not possible for a collection client to voluntarily relinquish ownership of its camping
-// allocation (https://fxbug.dev/42182036) it is necessary to set this field to zero when the constraints are
-// being used as a proxy to reserve space for a future client.
-fuchsia::sysmem::BufferCollectionConstraints CopyConstraintsWithOverrides(
+// allocation (https://fxbug.dev/42182036) it is necessary to set this field to zero when the
+// constraints are being used as a proxy to reserve space for a future client.
+fuchsia::sysmem2::BufferCollectionConstraints CopyConstraintsWithOverrides(
     const fuchsia::sysmem::BufferCollectionConstraints& original,
     ConstraintsOverrides overrides = ConstraintsOverrides{});
+
+// This template can be used to syntactically-inline initialize a vector whose element type is
+// move-only.
+template <typename ElementType, typename... Elements>
+std::vector<ElementType> MakeVec(ElementType&& element0, Elements&&... rest) {
+  std::vector<ElementType> result;
+  MakeVecHelper(result, std::move(element0), rest...);
+  return result;
+}
 
 }  // namespace camera
 

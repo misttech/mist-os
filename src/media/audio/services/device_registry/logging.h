@@ -115,6 +115,9 @@ void LogElement(const fuchsia_hardware_audio_signalprocessing::Element& element)
 void LogTopology(const fuchsia_hardware_audio_signalprocessing::Topology& topology);
 void LogElementState(
     const std::optional<fuchsia_hardware_audio_signalprocessing::ElementState>& element_state);
+void LogSettableElementState(
+    const std::optional<fuchsia_hardware_audio_signalprocessing::SettableElementState>&
+        element_state);
 
 void LogElementRingBufferFormatSets(
     const std::vector<fuchsia_audio_device::ElementRingBufferFormatSet>&
