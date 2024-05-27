@@ -48,7 +48,6 @@ zx::result<fs::VnodeAttributes> VmoFile::GetAttributes() const {
   return zx::ok(fs::VnodeAttributes{
       .content_size = length_,
       .storage_size = fbl::round_up(length_, zx_system_get_page_size()),
-      .mode = V_TYPE_FILE | V_IRUSR | (writable_ ? V_IWUSR : 0),
   });
 }
 

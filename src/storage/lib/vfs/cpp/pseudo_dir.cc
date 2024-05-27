@@ -29,7 +29,6 @@ zx::result<VnodeAttributes> PseudoDir::GetAttributes() const {
   return zx::ok(fs::VnodeAttributes{
       .content_size = 0,
       .storage_size = 0,
-      .mode = V_TYPE_DIR | V_IRUSR,
   });
 }
 
@@ -76,8 +75,10 @@ zx_status_t PseudoDir::Readdir(VdirCookie* cookie, void* data, size_t len, size_
     if (!attr.is_ok()) {
       continue;
     }
-    if (df.Next(it->name(), VTYPE_TO_DTYPE(attr->mode.value_or(0)),
-                attr->id.value_or(fio::kInoUnknown)) != ZX_OK) {
+    uint32_t mode =
+        attr->mode ? *attr->mode
+                   : internal::GetPosixMode(it->node()->GetProtocols(), it->node()->GetAbilities());
+    if (df.Next(it->name(), VTYPE_TO_DTYPE(mode), attr->id.value_or(fio::kInoUnknown)) != ZX_OK) {
       *out_actual = df.BytesFilled();
       return ZX_OK;
     }

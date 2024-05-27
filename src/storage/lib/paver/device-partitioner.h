@@ -71,10 +71,11 @@ constexpr char kOpaqueVolumeContentType[] = "opauqe_volume";
 struct PartitionSpec {
  public:
   // Creates a spec with the given partition and default (null) content type.
-  explicit PartitionSpec(Partition partition) : PartitionSpec(partition, std::string_view()) {}
+  explicit constexpr PartitionSpec(Partition partition)
+      : PartitionSpec(partition, std::string_view()) {}
 
   // Creates a spec with the given partition and content type.
-  PartitionSpec(Partition partition, std::string_view content_type)
+  constexpr PartitionSpec(Partition partition, std::string_view content_type)
       : partition(partition), content_type(content_type) {}
 
   // Returns a descriptive string for logging.

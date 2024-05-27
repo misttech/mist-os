@@ -154,11 +154,11 @@ void FileConnection::Sync(SyncCompleter::Sync& completer) {
 }
 
 void FileConnection::GetAttr(GetAttrCompleter::Sync& completer) {
-  zx::result result = vnode()->GetAttributes();
-  if (result.is_error()) {
-    completer.Reply(result.status_value(), fio::wire::NodeAttributes());
+  zx::result attrs = vnode()->GetAttributes();
+  if (attrs.is_ok()) {
+    completer.Reply(ZX_OK, attrs->ToIoV1NodeAttributes(*vnode()));
   } else {
-    completer.Reply(ZX_OK, result.value().ToIoV1NodeAttributes());
+    completer.Reply(attrs.error_value(), fio::wire::NodeAttributes());
   }
 }
 

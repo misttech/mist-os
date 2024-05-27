@@ -39,10 +39,14 @@ TEST(PseudoDir, ApiTest) {
   EXPECT_EQ(ZX_OK, dir->Open(&redirect));
   EXPECT_NULL(redirect);
 
-  // get attributes
+  // verify node protocol type
+  EXPECT_EQ(dir->GetProtocols(), fuchsia_io::NodeProtocolKinds::kDirectory);
+
+  // verify node attributes
   zx::result attr = dir->GetAttributes();
   ASSERT_TRUE(attr.is_ok());
-  EXPECT_EQ(V_TYPE_DIR | V_IRUSR, attr->mode);
+  constexpr fs::VnodeAttributes kExpectedAttrs{.content_size = 0, .storage_size = 0};
+  EXPECT_EQ(kExpectedAttrs, *attr);
 
   // lookup entries
   fbl::RefPtr<fs::Vnode> node;

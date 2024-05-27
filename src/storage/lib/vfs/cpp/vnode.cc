@@ -162,7 +162,8 @@ zx_status_t Vnode::Lookup(std::string_view name, fbl::RefPtr<Vnode>* out) {
 }
 
 zx::result<fs::VnodeAttributes> Vnode::GetAttributes() const {
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
+  // Return the empty set of attributes by default.
+  return zx::ok(fs::VnodeAttributes{});
 }
 
 zx::result<> Vnode::UpdateAttributes(const VnodeAttributesUpdate&) {

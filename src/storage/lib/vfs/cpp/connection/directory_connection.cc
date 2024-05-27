@@ -138,7 +138,7 @@ void DirectoryConnection::Sync(SyncCompleter::Sync& completer) {
 void DirectoryConnection::GetAttr(GetAttrCompleter::Sync& completer) {
   zx::result attrs = vnode()->GetAttributes();
   if (attrs.is_ok()) {
-    completer.Reply(ZX_OK, attrs->ToIoV1NodeAttributes());
+    completer.Reply(ZX_OK, attrs->ToIoV1NodeAttributes(*vnode()));
   } else {
     completer.Reply(attrs.error_value(), fio::wire::NodeAttributes());
   }

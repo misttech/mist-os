@@ -176,10 +176,25 @@ source_set("x64") {
   ]
 }
 
+source_set("android") {
+  sources = [
+    "android.cc",
+    "libboot_control.cc",
+  ]
+  public_deps = [
+    ":gpt",
+    ":paver-core",
+    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
+    "//src/lib/uuid",
+  ]
+  deps = [ "//zircon/third_party/ulib/cksum" ]
+}
+
 # Glob together all paver implementations into a single library until we can compose ZBI via
 # packages.
 source_set("paver") {
   public_deps = [
+    ":android",
     ":astro",
     ":luis",
     ":nelson",

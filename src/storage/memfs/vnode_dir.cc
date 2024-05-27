@@ -64,7 +64,6 @@ zx::result<fs::VnodeAttributes> VnodeDir::GetAttributes() const {
       .link_count = link_count_,
       .creation_time = create_time_,
       .modification_time = modify_time_,
-      .mode = V_TYPE_DIR | V_IRUSR,
   });
 }
 

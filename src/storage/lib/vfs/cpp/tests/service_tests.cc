@@ -49,7 +49,8 @@ TEST(Service, ApiTest) {
   EXPECT_OK(svc->Open(&redirect));
   EXPECT_NULL(redirect);
 
-  // get attr
+  // protocols and attributes
+  EXPECT_EQ(fuchsia_io::NodeProtocolKinds::kConnector, svc->GetProtocols());
   zx::result attr = svc->GetAttributes();
   ASSERT_TRUE(attr.is_ok());
   EXPECT_EQ(V_TYPE_FILE, attr->mode);

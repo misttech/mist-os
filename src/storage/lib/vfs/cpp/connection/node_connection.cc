@@ -69,9 +69,12 @@ void NodeConnection::Sync(SyncCompleter::Sync& completer) {
 }
 
 void NodeConnection::GetAttr(GetAttrCompleter::Sync& completer) {
-  zx::result result = vnode()->GetAttributes();
-  completer.Reply(result.status_value(), result.is_ok() ? result.value().ToIoV1NodeAttributes()
-                                                        : fio::wire::NodeAttributes());
+  zx::result attrs = vnode()->GetAttributes();
+  if (attrs.is_ok()) {
+    completer.Reply(ZX_OK, attrs->ToIoV1NodeAttributes(*vnode()));
+  } else {
+    completer.Reply(attrs.error_value(), fio::wire::NodeAttributes());
+  }
 }
 
 void NodeConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync& completer) {

@@ -367,7 +367,7 @@ zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::Init
     auto partitioner = WrapUnique(
         new GptDevicePartitioner(devfs_root.duplicate(), svc_root, std::move(gpt), info));
 
-    if (partitioner->FindPartition(IsFvmPartition).is_error()) {
+    if (partitioner->FindPartition(IsFvmOrAndroidPartition).is_error()) {
       continue;
     }
 

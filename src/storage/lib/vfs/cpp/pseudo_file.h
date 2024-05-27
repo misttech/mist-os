@@ -56,7 +56,6 @@ class PseudoFile : public Vnode {
   // |Vnode| implementation:
   fuchsia_io::NodeProtocolKinds GetProtocols() const final;
   bool ValidateRights(fuchsia_io::Rights rights) const override;
-  zx::result<fs::VnodeAttributes> GetAttributes() const final;
 
  protected:
   PseudoFile(ReadHandler read_handler, WriteHandler write_handler);

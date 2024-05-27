@@ -123,6 +123,20 @@ bool IsValidKernelZbi(Arch arch, cpp20::span<const uint8_t> data) {
   return true;
 }
 
+// Magic for Android `vendor_boot_x` partition.
+// Defined as `VENDOR_BOOT_MAGIC` in AOSP:
+// system/tools/mkbootimg/include/bootimg/bootimg.h
+constexpr std::string_view kAndroidVendorBootMagic = "VNDRBOOT";
+
+bool IsValidAndroidKernel(Arch arch, cpp20::span<const uint8_t> data) {
+  // Check magic
+  if (data.size() < kAndroidVendorBootMagic.length()) {
+    return false;
+  }
+  auto magic = data.subspan(0, kAndroidVendorBootMagic.length());
+  return std::equal(magic.begin(), magic.end(), kAndroidVendorBootMagic.begin());
+}
+
 bool IsValidChromeOSKernel(cpp20::span<const uint8_t> data) {
   // Ensure the data contains the ChromeOS verification block magic
   // signature.
