@@ -14,7 +14,7 @@ use {
         sandbox_util::{DictExt, LaunchTaskOnReceive, RoutableExt},
     },
     ::routing::{
-        capability_source::{ComponentCapability, InternalCapability},
+        capability_source::ComponentCapability,
         component_instance::ComponentInstanceInterface,
         error::{ComponentInstanceError, RoutingError},
     },
@@ -66,6 +66,7 @@ pub fn build_component_sandbox(
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     decl: &cm_rust::ComponentDecl,
     component_input: &ComponentInput,
+    framework_dict: &Dict,
     component_output_dict: &Dict,
     program_input_dict: &Dict,
     program_output: &Router,
@@ -119,6 +120,7 @@ pub fn build_component_sandbox(
             component_input,
             program_input_dict,
             program_output,
+            framework_dict,
             use_,
         );
     }
@@ -167,13 +169,21 @@ pub fn build_component_sandbox(
             children,
             component_input,
             program_output,
+            framework_dict,
             offer,
             &mut target_dict,
         );
     }
 
     for expose in &decl.exposes {
-        extend_dict_with_expose(component, children, program_output, expose, component_output_dict);
+        extend_dict_with_expose(
+            component,
+            children,
+            program_output,
+            framework_dict,
+            expose,
+            component_output_dict,
+        );
     }
 }
 
@@ -435,6 +445,7 @@ pub fn extend_dict_with_offers(
     component_input: &ComponentInput,
     dynamic_offers: &Vec<cm_rust::OfferDecl>,
     program_output: &Router,
+    framework_dict: &Dict,
     target_input: &mut ComponentInput,
 ) {
     for offer in dynamic_offers {
@@ -443,6 +454,7 @@ pub fn extend_dict_with_offers(
             children,
             component_input,
             program_output,
+            framework_dict,
             offer,
             &mut target_input.capabilities(),
         );
@@ -462,6 +474,7 @@ fn extend_dict_with_use(
     component_input: &ComponentInput,
     program_input_dict: &Dict,
     program_output: &Router,
+    framework_dict: &Dict,
     use_: &cm_rust::UseDecl,
 ) {
     let Some(use_protocol) = supported_use(use_) else {
@@ -500,19 +513,13 @@ fn extend_dict_with_use(
                 source_path.iter_segments().join("/"),
             ))
         }
-        cm_rust::UseSource::Framework => {
-            let source_name = use_.source_name().clone();
-            // TODO(https://fxbug.dev/323926925): place a router here that will return an error if
-            // there's no such framework capability.
-            LaunchTaskOnReceive::new_hook_launch_task(
-                component,
-                CapabilitySource::Framework {
-                    capability: InternalCapability::Protocol(source_name),
-                    component: component.into(),
-                },
-            )
-            .into_router()
-        }
+        cm_rust::UseSource::Framework => framework_dict.clone().lazy_get(
+            source_path.to_owned(),
+            RoutingError::capability_from_framework_not_found(
+                &component.moniker,
+                source_path.iter_segments().join("/"),
+            ),
+        ),
         cm_rust::UseSource::Capability(_) => {
             let use_ = use_.clone();
             // TODO(https://fxbug.dev/323926925): place a router here that will return an error if
@@ -616,6 +623,7 @@ fn extend_dict_with_offer(
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     component_input: &ComponentInput,
     program_output: &Router,
+    framework_dict: &Dict,
     offer: &cm_rust::OfferDecl,
     target_dict: &mut Dict,
 ) {
@@ -667,17 +675,13 @@ fn extend_dict_with_offer(
                 );
                 return;
             }
-            let source_name = offer.source_name().clone();
-            // TODO(https://fxbug.dev/323926925): place a router here that will return an error if
-            // there's no such framework capability.
-            LaunchTaskOnReceive::new_hook_launch_task(
-                component,
-                CapabilitySource::Framework {
-                    capability: InternalCapability::Protocol(source_name),
-                    component: component.into(),
-                },
+            framework_dict.clone().lazy_get(
+                source_path.to_owned(),
+                RoutingError::capability_from_framework_not_found(
+                    &component.moniker,
+                    source_path.iter_segments().join("/"),
+                ),
             )
-            .into_router()
         }
         cm_rust::OfferSource::Capability(_) => {
             let offer = offer.clone();
@@ -712,6 +716,7 @@ fn extend_dict_with_expose(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     program_output: &Router,
+    framework_dict: &Dict,
     expose: &cm_rust::ExposeDecl,
     target_dict: &Dict,
 ) {
@@ -755,17 +760,13 @@ fn extend_dict_with_expose(
                 );
                 return;
             }
-            let source_name = expose.source_name().clone();
-            // TODO(https://fxbug.dev/323926925): place a router here that will return an error if
-            // there's no such framework capability.
-            LaunchTaskOnReceive::new_hook_launch_task(
-                component,
-                CapabilitySource::Framework {
-                    capability: InternalCapability::Protocol(source_name),
-                    component: component.into(),
-                },
+            framework_dict.clone().lazy_get(
+                source_path.to_owned(),
+                RoutingError::capability_from_framework_not_found(
+                    &component.moniker,
+                    source_path.iter_segments().join("/"),
+                ),
             )
-            .into_router()
         }
         cm_rust::ExposeSource::Capability(_) => {
             let expose = expose.clone();

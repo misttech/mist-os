@@ -11,7 +11,7 @@ use {
                 extend_dict_with_offers,
             },
         },
-        framework::controller,
+        framework::{build_framework_dictionary, controller},
         model::{
             actions::{shutdown, ActionsManager, DiscoverAction, StopAction},
             component::{
@@ -370,6 +370,9 @@ pub struct ResolvedInstanceState {
     /// The dict containing all capabilities that we declare, as Routers.
     pub program_output_dict: Dict,
 
+    /// The dict containing all framework capabilities scoped to this component.
+    pub framework_dict: Dict,
+
     /// Dictionary of extra capabilities passed to the component when it is started.
     // TODO(b/322564390): Move this into `StartedInstanceState` once stop action releases lock on it
     pub program_input_dict_additions: Option<Dict>,
@@ -462,6 +465,7 @@ impl ResolvedInstanceState {
             component_output_dict: Dict::new(),
             program_input_dict: Dict::new(),
             program_output_dict: Dict::new(),
+            framework_dict: build_framework_dictionary(component),
             program_input_dict_additions: None,
             collection_inputs: Default::default(),
             bedrock_environments: Default::default(),
@@ -484,6 +488,7 @@ impl ResolvedInstanceState {
             &state.children,
             &decl,
             &state.component_input,
+            &state.framework_dict,
             &state.component_output_dict,
             &state.program_input_dict,
             &component.program_output(),
@@ -872,6 +877,7 @@ impl ResolvedInstanceState {
                 &self.component_input,
                 &dynamic_offers,
                 &component.program_output(),
+                &self.framework_dict,
                 &mut child_input,
             );
         }
