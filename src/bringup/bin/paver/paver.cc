@@ -19,6 +19,7 @@
 #include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
 
 #if defined(LEGACY_PAVER)
+#include "src/storage/lib/paver/android.h"
 #include "src/storage/lib/paver/astro.h"
 #include "src/storage/lib/paver/luis.h"
 #include "src/storage/lib/paver/nelson.h"
@@ -40,6 +41,8 @@
 #include "src/storage/lib/paver/violet.h"
 #elif defined(x64)
 #include "src/storage/lib/paver/x64.h"
+#elif defined(android)
+#include "src/storage/lib/paver/android.h"
 #endif
 
 class LifecycleServer final : public fidl::WireServer<fuchsia_process_lifecycle::Lifecycle> {
@@ -93,6 +96,8 @@ int main(int argc, char** argv) {
   abr::ClientFactory::Register(std::make_unique<paver::Vim3AbrClientFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::VioletPartitionerFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::VioletAbrClientFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::AndroidPartitionerFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::AndroidAbrClientFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::X64PartitionerFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::X64AbrClientFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::DefaultPartitionerFactory>());
@@ -117,6 +122,9 @@ int main(int argc, char** argv) {
 #elif defined(x64)
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::X64PartitionerFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::X64AbrClientFactory>());
+#elif defined(android)
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::AndroidPartitionerFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::AndroidAbrClientFactory>());
 #else
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::DefaultPartitionerFactory>());
 #endif

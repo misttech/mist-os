@@ -28,6 +28,10 @@ bool ExtractZbiPayload(cpp20::span<const uint8_t> data, const zbi_header_t** hea
 // for the given architecture.
 bool IsValidKernelZbi(Arch arch, cpp20::span<const uint8_t> data);
 
+// Perform some basic safety checks to ensure the given payload is a valid Android image
+// for the given architecture.
+bool IsValidAndroidKernel(Arch arch, cpp20::span<const uint8_t> data);
+
 // Perform some basic safety checks to ensure the given payload is a valid ChromeOS
 // kernel image.
 bool IsValidChromeOSKernel(cpp20::span<const uint8_t> data);

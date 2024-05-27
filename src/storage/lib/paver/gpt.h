@@ -21,6 +21,10 @@ namespace paver {
 
 using gpt::GptDevice;
 
+// Android specific partition.
+// Paver would use it's presence to detect system that has Android configuration.
+constexpr std::string_view kGptSuperName = "super";
+
 // Useful for when a GPT table is available (e.g. x86 devices). Provides common
 // utility functions.
 class GptDevicePartitioner {
@@ -148,6 +152,15 @@ bool FilterByTypeAndName(const gpt_partition_t& part, const uuid::Uuid& type,
 inline bool IsFvmPartition(const gpt_partition_t& part) {
   return FilterByType(part, GUID_FVM_VALUE) ||
          FilterByTypeAndName(part, GPT_FVM_TYPE_GUID, GPT_FVM_NAME);
+}
+
+inline bool IsAndroidPartition(const gpt_partition_t& part) {
+  // Check for Android specific partition 'super'.
+  return FilterByName(part, kGptSuperName);
+}
+
+inline bool IsFvmOrAndroidPartition(const gpt_partition_t& part) {
+  return IsFvmPartition(part) || IsAndroidPartition(part);
 }
 
 // Returns true if the spec partition is Zircon A/B/R.

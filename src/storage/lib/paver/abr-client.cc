@@ -157,9 +157,10 @@ zx::result<Configuration> QueryBootConfig(const fbl::unique_fd& devfs_root,
     return client_end.take_error();
   }
   fidl::WireSyncClient client{std::move(*client_end)};
-  std::array<fidl::StringView, 2> arguments{
+  std::array<fidl::StringView, 3> arguments{
       fidl::StringView{"zvb.current_slot"},
       fidl::StringView{"zvb.boot-partition-uuid"},
+      fidl::StringView{"androidboot.slot_suffix"},
   };
   auto result = client->GetStrings(fidl::VectorView<fidl::StringView>::FromExternal(arguments));
   if (!result.ok()) {
@@ -181,8 +182,21 @@ zx::result<Configuration> QueryBootConfig(const fbl::unique_fd& devfs_root,
 
     return PartitionUuidToConfiguration(devfs_root, uuid.value());
   }
+  if (!response->values[2].is_null()) {
+    std::string_view prefix_str = response->values[2].get();
+    if (prefix_str.length() == 1) {
+      return CurrentSlotToConfiguration(prefix_str.substr(0, 1));
+    } else if (prefix_str.length() == 2 && prefix_str[0] == '_') {
+      return CurrentSlotToConfiguration(prefix_str.substr(1));
+    }
 
-  ERROR("Kernel cmdline param zvb.current_slot and zvb.boot-partition-uuid not found!\n");
+    ERROR("Invalid prefix string: %.*s \n", (int)prefix_str.length(), prefix_str.data());
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  ERROR(
+      "Kernel cmdline param zvb.current_slot, zvb.boot-partition-uuid "
+      "or androidboot.slot_suffix not found!\n");
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
