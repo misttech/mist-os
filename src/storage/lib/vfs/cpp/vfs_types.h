@@ -200,7 +200,7 @@ struct VnodeAttributes {
   }
 
   // Converts from |VnodeAttributes| to fuchsia.io v1 |NodeAttributes|.
-  fuchsia_io::wire::NodeAttributes ToIoV1NodeAttributes() const;
+  fuchsia_io::wire::NodeAttributes ToIoV1NodeAttributes(const fs::Vnode& vnode) const;
 };
 
 // A request to update pieces of the |VnodeAttributes| via |Vnode::SetAttributes|. Filesystems may
@@ -275,6 +275,14 @@ fuchsia_io::Rights DownscopeRights(fuchsia_io::Rights rights, VnodeProtocol prot
 // strict mapping here to enforce consistency across the Fuchsia VFS libraries.
 zx::result<VnodeProtocol> NegotiateProtocol(fuchsia_io::NodeProtocolKinds supported,
                                             fuchsia_io::NodeProtocolKinds requested);
+
+// Synthesizes a set of POSIX mode bits using a node's supported protocols and abilities.
+// This implementation mirrors that of |zxio_get_posix_mode|.
+//
+// Unlike the ZXIO implementation, this function is *only* used for synthesizing the mode bits
+// reported by the io1 GetAttrs method. Callers should use the io2 GetAttributes method to get
+// an accurate representation of the mode bits.
+uint32_t GetPosixMode(fuchsia_io::NodeProtocolKinds protocols, fuchsia_io::Abilities abilities);
 
 // Encapsulates the state of a node's wire attributes on the stack. Used by connections for sending
 // an OnRepresentation event or responding to a fuchsia.io/Node.GetAttributes call.

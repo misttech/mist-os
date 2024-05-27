@@ -562,8 +562,6 @@ zx::result<fs::VnodeAttributes> VnodeMinfs::GetAttributes() const {
         .link_count = inode_.link_count,
         .creation_time = inode_.create_time,
         .modification_time = inode_.modify_time,
-        .mode =
-            DTYPE_TO_VTYPE(MinfsMagicType(inode_.magic)) | V_IRUSR | V_IWUSR | V_IRGRP | V_IROTH,
     });
   });
 }

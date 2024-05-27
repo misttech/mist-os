@@ -40,11 +40,6 @@ bool PseudoFile::ValidateRights(fuchsia_io::Rights rights) const {
   return true;
 }
 
-zx::result<fs::VnodeAttributes> PseudoFile::GetAttributes() const {
-  return zx::ok(VnodeAttributes{.mode = V_TYPE_FILE | (read_handler_ ? V_IRUSR : 0) |
-                                        (write_handler_ ? V_IWUSR : 0)});
-}
-
 BufferedPseudoFile::BufferedPseudoFile(ReadHandler read_handler, WriteHandler write_handler,
                                        size_t input_buffer_capacity)
     : PseudoFile(std::move(read_handler), std::move(write_handler)),

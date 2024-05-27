@@ -43,12 +43,6 @@ fuchsia_io::NodeProtocolKinds LazyDir::GetProtocols() const {
   return fuchsia_io::NodeProtocolKinds::kDirectory;
 }
 
-zx::result<fs::VnodeAttributes> LazyDir::GetAttributes() const {
-  return zx::ok(VnodeAttributes{
-      .mode = V_TYPE_DIR | V_IRUSR,
-  });
-}
-
 zx_status_t LazyDir::Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out_vnode) {
   LazyEntryVector entries;
   GetContents(&entries);

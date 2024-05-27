@@ -16,12 +16,11 @@ TEST(RemoteDir, ApiTest) {
   const fidl::UnownedClientEnd unowned_client = endpoints.client.borrow();
   auto dir = fbl::MakeRefCounted<fs::RemoteDir>(std::move(endpoints.client));
 
-  // get attributes
+  EXPECT_EQ(fuchsia_io::NodeProtocolKinds::kDirectory, dir->GetProtocols());
   zx::result<fs::VnodeAttributes> attr = dir->GetAttributes();
   ASSERT_TRUE(attr.is_ok());
-  EXPECT_EQ(V_TYPE_DIR | V_IRUSR, attr->mode);
+  EXPECT_EQ(fs::VnodeAttributes(), *attr);
 
-  // get remote properties
   ASSERT_TRUE(dir->IsRemote());
   EXPECT_EQ(dir->client_end(), unowned_client);
 }

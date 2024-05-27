@@ -244,14 +244,16 @@ TEST(PseudoFile, GetattrBuffered) {
   // no read handler, no write handler
   {
     auto file = fbl::MakeRefCounted<fs::BufferedPseudoFile>();
+    EXPECT_EQ(fuchsia_io::NodeProtocolKinds::kFile, file->GetProtocols());
     zx::result attr = file->GetAttributes();
     ASSERT_TRUE(attr.is_ok());
-    EXPECT_EQ(V_TYPE_FILE, attr->mode);
 
     fbl::RefPtr<fs::Vnode> redirect;
     auto result = file->ValidateOptions(VnodeOptions().set_node_reference());
     EXPECT_RESULT_OK(result);
     EXPECT_EQ(ZX_OK, file->Open(&redirect));
+    EXPECT_EQ(fuchsia_io::NodeProtocolKinds::kFile, redirect->GetProtocols());
+
     zx::result open_attr = redirect->GetAttributes();
     ASSERT_TRUE(open_attr.is_ok());
     attr->content_size = 0;
@@ -261,14 +263,15 @@ TEST(PseudoFile, GetattrBuffered) {
   // read handler, no write handler
   {
     auto file = fbl::MakeRefCounted<fs::BufferedPseudoFile>(reader);
+    EXPECT_EQ(fuchsia_io::NodeProtocolKinds::kFile, file->GetProtocols());
     zx::result attr = file->GetAttributes();
     ASSERT_TRUE(attr.is_ok());
-    EXPECT_EQ(V_TYPE_FILE | V_IRUSR, attr->mode);
 
     fbl::RefPtr<fs::Vnode> redirect;
     auto result = file->ValidateOptions(VnodeOptions::ReadOnly());
     EXPECT_RESULT_OK(result);
     EXPECT_EQ(ZX_OK, file->Open(&redirect));
+    EXPECT_EQ(fuchsia_io::NodeProtocolKinds::kFile, redirect->GetProtocols());
     zx::result open_attr = redirect->GetAttributes();
     ASSERT_TRUE(open_attr.is_ok());
     attr->content_size = kHello.size();
@@ -278,14 +281,15 @@ TEST(PseudoFile, GetattrBuffered) {
   // no read handler, write handler
   {
     auto file = fbl::MakeRefCounted<fs::BufferedPseudoFile>(nullptr, &DummyWriter);
+    EXPECT_EQ(fuchsia_io::NodeProtocolKinds::kFile, file->GetProtocols());
     zx::result attr = file->GetAttributes();
     ASSERT_TRUE(attr.is_ok());
-    EXPECT_EQ(V_TYPE_FILE | V_IWUSR, attr->mode);
 
     fbl::RefPtr<fs::Vnode> redirect;
     auto result = file->ValidateOptions(VnodeOptions::WriteOnly());
     EXPECT_RESULT_OK(result);
     EXPECT_EQ(ZX_OK, file->Open(&redirect));
+    EXPECT_EQ(fuchsia_io::NodeProtocolKinds::kFile, redirect->GetProtocols());
     zx::result open_attr = redirect->GetAttributes();
     ASSERT_TRUE(open_attr.is_ok());
     attr->content_size = 0;
@@ -295,14 +299,16 @@ TEST(PseudoFile, GetattrBuffered) {
   // read handler, write handler
   {
     auto file = fbl::MakeRefCounted<fs::BufferedPseudoFile>(reader, &DummyWriter);
+    EXPECT_EQ(fuchsia_io::NodeProtocolKinds::kFile, file->GetProtocols());
     zx::result attr = file->GetAttributes();
     ASSERT_TRUE(attr.is_ok());
-    EXPECT_EQ(V_TYPE_FILE | V_IRUSR | V_IWUSR, attr->mode);
 
     fbl::RefPtr<fs::Vnode> redirect;
     auto result = file->ValidateOptions(VnodeOptions::ReadWrite());
     EXPECT_RESULT_OK(result);
     EXPECT_EQ(ZX_OK, file->Open(&redirect));
+    EXPECT_EQ(fuchsia_io::NodeProtocolKinds::kFile, redirect->GetProtocols());
+
     zx::result open_attr = redirect->GetAttributes();
     ASSERT_TRUE(open_attr.is_ok());
     attr->content_size = kHello.size();
@@ -321,14 +327,15 @@ TEST(PseudoFile, GetattrUnbuffered) {
   // no read handler, no write handler
   {
     auto file = fbl::MakeRefCounted<fs::UnbufferedPseudoFile>();
+    EXPECT_EQ(fuchsia_io::NodeProtocolKinds::kFile, file->GetProtocols());
     zx::result attr = file->GetAttributes();
     ASSERT_TRUE(attr.is_ok());
-    EXPECT_EQ(V_TYPE_FILE, attr->mode);
-
     fbl::RefPtr<fs::Vnode> redirect;
     auto result = file->ValidateOptions(VnodeOptions().set_node_reference());
     EXPECT_RESULT_OK(result);
     EXPECT_EQ(ZX_OK, file->Open(&redirect));
+    EXPECT_EQ(fuchsia_io::NodeProtocolKinds::kFile, redirect->GetProtocols());
+
     zx::result open_attr = redirect->GetAttributes();
     ASSERT_TRUE(open_attr.is_ok());
     EXPECT_EQ(attr, open_attr);
@@ -337,14 +344,15 @@ TEST(PseudoFile, GetattrUnbuffered) {
   // read handler, no write handler
   {
     auto file = fbl::MakeRefCounted<fs::UnbufferedPseudoFile>(reader);
+    EXPECT_EQ(fuchsia_io::NodeProtocolKinds::kFile, file->GetProtocols());
     zx::result attr = file->GetAttributes();
     ASSERT_TRUE(attr.is_ok());
-    EXPECT_EQ(V_TYPE_FILE | V_IRUSR, attr->mode);
 
     fbl::RefPtr<fs::Vnode> redirect;
     auto result = file->ValidateOptions(VnodeOptions::ReadOnly());
     EXPECT_RESULT_OK(result);
     EXPECT_EQ(ZX_OK, file->Open(&redirect));
+    EXPECT_EQ(fuchsia_io::NodeProtocolKinds::kFile, redirect->GetProtocols());
     zx::result open_attr = redirect->GetAttributes();
     ASSERT_TRUE(open_attr.is_ok());
     EXPECT_EQ(attr, open_attr);
@@ -353,14 +361,15 @@ TEST(PseudoFile, GetattrUnbuffered) {
   // no read handler, write handler
   {
     auto file = fbl::MakeRefCounted<fs::UnbufferedPseudoFile>(nullptr, &DummyWriter);
+    EXPECT_EQ(fuchsia_io::NodeProtocolKinds::kFile, file->GetProtocols());
     zx::result attr = file->GetAttributes();
     ASSERT_TRUE(attr.is_ok());
-    EXPECT_EQ(V_TYPE_FILE | V_IWUSR, attr->mode);
 
     fbl::RefPtr<fs::Vnode> redirect;
     auto result = file->ValidateOptions(VnodeOptions::WriteOnly());
     EXPECT_RESULT_OK(result);
     EXPECT_EQ(ZX_OK, file->Open(&redirect));
+    EXPECT_EQ(fuchsia_io::NodeProtocolKinds::kFile, redirect->GetProtocols());
     zx::result open_attr = redirect->GetAttributes();
     ASSERT_TRUE(open_attr.is_ok());
     EXPECT_EQ(attr, open_attr);
@@ -369,14 +378,15 @@ TEST(PseudoFile, GetattrUnbuffered) {
   // read handler, write handler
   {
     auto file = fbl::MakeRefCounted<fs::UnbufferedPseudoFile>(reader, &DummyWriter);
+    EXPECT_EQ(fuchsia_io::NodeProtocolKinds::kFile, file->GetProtocols());
     zx::result attr = file->GetAttributes();
     ASSERT_TRUE(attr.is_ok());
-    EXPECT_EQ(V_TYPE_FILE | V_IRUSR | V_IWUSR, attr->mode);
 
     fbl::RefPtr<fs::Vnode> redirect;
     auto result = file->ValidateOptions(VnodeOptions::ReadWrite());
     EXPECT_RESULT_OK(result);
     EXPECT_EQ(ZX_OK, file->Open(&redirect));
+    EXPECT_EQ(fuchsia_io::NodeProtocolKinds::kFile, redirect->GetProtocols());
     zx::result open_attr = redirect->GetAttributes();
     ASSERT_TRUE(open_attr.is_ok());
     EXPECT_EQ(attr, open_attr);

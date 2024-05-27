@@ -363,7 +363,6 @@ TEST(VmoFile, Getattr) {
         fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), zx_system_get_page_size() * 3u + 117u);
     zx::result attr = file->GetAttributes();
     ASSERT_TRUE(attr.is_ok());
-    EXPECT_EQ(V_TYPE_FILE | V_IRUSR, attr->mode);
     EXPECT_EQ(zx_system_get_page_size() * 3u + 117u, attr->content_size);
     EXPECT_EQ(4u * zx_system_get_page_size(), attr->storage_size);
   }
@@ -376,7 +375,6 @@ TEST(VmoFile, Getattr) {
                                                  zx_system_get_page_size() * 3u + 117u, true);
     zx::result attr = file->GetAttributes();
     ASSERT_TRUE(attr.is_ok());
-    EXPECT_EQ(V_TYPE_FILE | V_IRUSR | V_IWUSR, attr->mode);
     EXPECT_EQ(zx_system_get_page_size() * 3u + 117u, attr->content_size);
     EXPECT_EQ(4u * zx_system_get_page_size(), attr->storage_size);
   }

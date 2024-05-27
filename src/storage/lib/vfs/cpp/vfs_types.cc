@@ -120,24 +120,26 @@ fio::OpenFlags RightsToOpenFlags(fio::Rights rights) {
   return flags;
 }
 
-fio::wire::NodeAttributes VnodeAttributes::ToIoV1NodeAttributes() const {
+fio::wire::NodeAttributes VnodeAttributes::ToIoV1NodeAttributes(const fs::Vnode& vnode) const {
   // Filesystems that don't support hard links typically report a value of 1 for the link count.
   constexpr uint64_t kDefaultLinkCount = 1;
-  // TODO(https://fxbug.dev/324112857): Most filesystems don't support POSIX attributes and have
-  // a hard-coded value for the mode bits. We should consider centralizing how they are calculated
-  // here based off of a node's protocols/abilities, or determine them from the connection which
-  // invokes this function.
+  // TODO(https://fxbug.dev/324112857): Some filesystems now support POSIX attributes, which means
+  // that they won't have any hard-coded values. However, some tests still rely on the previous
+  // mode bits which were reported. For the time being, we pass in |vnode| to this function so that
+  // we can attempt to synthesize a valid set of mode bits for callers that rely on them in io1.
   //
   // This isn't an issue for the ongoing io2 migration as filesystems which do support the POSIX
-  // mode attributes will correctly handle them, but should be considered for the long term as the
-  // way permissions work on Fuchsia is fundamentally different than POSIX.
-  return fio::wire::NodeAttributes{.mode = mode.value_or(0),
-                                   .id = id.value_or(fio::wire::kInoUnknown),
-                                   .content_size = content_size.value_or(0),
-                                   .storage_size = storage_size.value_or(0),
-                                   .link_count = link_count.value_or(kDefaultLinkCount),
-                                   .creation_time = creation_time.value_or(0),
-                                   .modification_time = modification_time.value_or(0)};
+  // mode attributes will correctly handle them. In the long term, we should ensure that nothing
+  // load-bearing relies on these synthesized mode bits by migrating to io2's GetAttributes.
+  return fio::wire::NodeAttributes{
+      .mode = mode.has_value() ? *mode
+                               : internal::GetPosixMode(vnode.GetProtocols(), vnode.GetAbilities()),
+      .id = id.value_or(fio::wire::kInoUnknown),
+      .content_size = content_size.value_or(0),
+      .storage_size = storage_size.value_or(0),
+      .link_count = link_count.value_or(kDefaultLinkCount),
+      .creation_time = creation_time.value_or(0),
+      .modification_time = modification_time.value_or(0)};
 }
 
 namespace internal {
@@ -249,6 +251,34 @@ zx::result<fio::wire::NodeAttributes2> NodeAttributeBuilder::Build(const Vnode& 
       .mutable_attributes = mutable_builder.Build(),
       .immutable_attributes = immutable_builder.Build(),
   });
+}
+
+uint32_t GetPosixMode(fio::NodeProtocolKinds protocols, fio::Abilities abilities) {
+  uint32_t mode = 0;
+  if (protocols & fio::NodeProtocolKinds::kDirectory) {
+    mode |= V_TYPE_DIR;
+    if (abilities & fio::Abilities::kEnumerate) {
+      mode |= V_IRUSR;
+    }
+    if (abilities & fio::Abilities::kModifyDirectory) {
+      mode |= V_IWUSR;
+    }
+    if (abilities & fio::Abilities::kTraverse) {
+      mode |= V_IXUSR;
+    }
+  } else {
+    mode |= V_TYPE_FILE;
+    if (abilities & fio::Abilities::kReadBytes) {
+      mode |= V_IRUSR;
+    }
+    if (abilities & fio::Abilities::kWriteBytes) {
+      mode |= V_IWUSR;
+    }
+    if (abilities & fio::Abilities::kExecute) {
+      mode |= V_IXUSR;
+    }
+  }
+  return mode;
 }
 
 }  // namespace internal

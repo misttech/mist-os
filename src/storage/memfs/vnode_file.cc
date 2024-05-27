@@ -91,7 +91,6 @@ zx::result<fs::VnodeAttributes> VnodeFile::GetAttributes() const {
       .link_count = link_count_,
       .creation_time = create_time_,
       .modification_time = modify_time_,
-      .mode = V_TYPE_FILE | V_IRUSR | V_IWUSR | V_IRGRP | V_IROTH,
   });
 }
 
