@@ -302,7 +302,7 @@ async fn start_component(
             numbered_handles,
             namespace_scope,
             encoded_config,
-            mut program_input_dict_additions,
+            program_input_dict_additions,
             start_reason,
             execution_controller_task,
             logger,
@@ -365,8 +365,8 @@ async fn start_component(
         });
 
         // TODO(b/322564390): Move program_input_dict_additions into `StartedInstanceState`.
-        let component_program_input_dict_additions = &mut state
-            .get_resolved_state_mut()
+        let component_program_input_dict_additions = &state
+            .get_resolved_state()
             .expect("expected component to be resolved")
             .program_input_dict_additions;
         let _ = component_program_input_dict_additions.drain();

@@ -106,7 +106,7 @@ impl RouterExt for Router {
         scope: &ExecutionScope,
         dict: &Dict,
     ) -> Dict {
-        let mut out = Dict::new();
+        let out = Dict::new();
         for (key, value) in dict.enumerate() {
             let value = match value {
                 Capability::Dictionary(dict) => {

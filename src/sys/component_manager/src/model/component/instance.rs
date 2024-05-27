@@ -861,7 +861,7 @@ impl ResolvedInstanceState {
         collection: Option<&CollectionDecl>,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
         dynamic_capabilities: Option<Vec<fdecl::Capability>>,
-        mut child_input: ComponentInput,
+        child_input: ComponentInput,
     ) -> Result<(Arc<ComponentInstance>, ComponentInput), AddChildError> {
         assert!(
             (dynamic_offers.is_none()) || collection.is_some(),
@@ -886,7 +886,7 @@ impl ResolvedInstanceState {
                 &component.program_output(),
                 &self.framework_dict,
                 &self.capability_sourced_capabilities_dict,
-                &mut child_input,
+                &child_input,
             );
         }
 

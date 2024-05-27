@@ -142,7 +142,7 @@ fn translate_handle(cap: Capability, info: &HandleInfo) -> Result<StartupHandle,
 
 fn visit_map(
     map: &DeliveryMap,
-    mut dict: Dict,
+    dict: Dict,
     f: &mut impl FnMut(Capability, &Delivery) -> Result<(), DeliveryError>,
 ) -> Result<(), DeliveryError> {
     for (key, entry) in map {
@@ -275,7 +275,7 @@ mod tests {
         let (sock0, sock1) = zx::Socket::create_stream();
 
         let mut processargs = ProcessArgs::new();
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert(
             "stdin".parse().unwrap(),
             Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle().into_handle())),
@@ -316,14 +316,14 @@ mod tests {
         let mut processargs = ProcessArgs::new();
 
         // Put a socket at "/handles/stdin". This implements a capability bundling pattern.
-        let mut handles = Dict::new();
+        let handles = Dict::new();
         handles
             .insert(
                 "stdin".parse().unwrap(),
                 Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
             )
             .map_err(|e| anyhow!("{e:?}"))?;
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert("handles".parse().unwrap(), Capability::Dictionary(handles))
             .map_err(|e| anyhow!("{e:?}"))?;
 
@@ -355,14 +355,14 @@ mod tests {
 
         let mut processargs = ProcessArgs::new();
 
-        let mut handles = Dict::new();
+        let handles = Dict::new();
         handles
             .insert(
                 "stdin".parse().unwrap(),
                 Capability::OneShotHandle(OneShotHandle::from(ep0.into_handle())),
             )
             .map_err(|e| anyhow!("{e:?}"))?;
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert("handles".parse().unwrap(), Capability::Dictionary(handles))
             .map_err(|e| anyhow!("{e:?}"))?;
 
@@ -400,7 +400,7 @@ mod tests {
 
         // The type of "/handles" is a socket capability but we try to open it as a dict and extract
         // a "stdin" inside. This should fail.
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert(
             "handles".parse().unwrap(),
             Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
@@ -427,7 +427,7 @@ mod tests {
         let (sock0, _sock1) = zx::Socket::create_stream();
 
         let mut processargs = ProcessArgs::new();
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert(
             "stdin".parse().unwrap(),
             Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
@@ -447,7 +447,7 @@ mod tests {
         let (sock0, _sock1) = zx::Socket::create_stream();
 
         let mut processargs = ProcessArgs::new();
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert(
             "stdin".parse().unwrap(),
             Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
@@ -493,7 +493,7 @@ mod tests {
 
         let mut processargs = ProcessArgs::new();
         let dict = {
-            let mut dict = Dict::new();
+            let dict = Dict::new();
             dict.insert("normal".parse().unwrap(), sender.into())
                 .expect("dict entry already exists");
             dict.insert("closed".parse().unwrap(), peer_closed_open.into())
@@ -556,7 +556,7 @@ mod tests {
 
         let mut processargs = ProcessArgs::new();
         let dict = {
-            let mut dict = Dict::new();
+            let dict = Dict::new();
             dict.insert("normal".parse().unwrap(), sender.into())
                 .expect("dict entry already exists");
             dict
@@ -614,7 +614,7 @@ mod tests {
         let dir_proxy = serve_directory(dir, &scope, fio::OpenFlags::DIRECTORY).unwrap();
 
         let mut processargs = ProcessArgs::new();
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert(
             "data".parse().unwrap(),
             Capability::Directory(sandbox::Directory::new(dir_proxy)),
@@ -676,7 +676,7 @@ mod tests {
         let (sock0, _sock1) = zx::Socket::create_stream();
 
         let mut processargs = ProcessArgs::new();
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert(
             "stdin".parse().unwrap(),
             Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),

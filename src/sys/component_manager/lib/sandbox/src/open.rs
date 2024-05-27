@@ -350,7 +350,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_connector_into_open_via_dict() {
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         let (receiver, sender) = Receiver::new();
         dict.insert("echo".parse().unwrap(), Capability::Connector(sender))
             .expect("dict entry already exists");
@@ -371,7 +371,7 @@ mod tests {
     fn test_connector_into_open_via_dict_extra_path() {
         let mut ex = fasync::TestExecutor::new();
 
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         let (receiver, sender) = Receiver::new();
         dict.insert("echo".parse().unwrap(), Capability::Connector(sender))
             .expect("dict entry already exists");

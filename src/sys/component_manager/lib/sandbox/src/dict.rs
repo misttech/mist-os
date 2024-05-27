@@ -86,7 +86,7 @@ impl Dict {
     /// exists at `key`, a `fsandbox::DictionaryError::AlreadyExists` will be
     /// returned.
     pub fn insert(
-        &mut self,
+        &self,
         key: Key,
         capability: Capability,
     ) -> Result<(), fsandbox::DictionaryError> {
@@ -105,7 +105,7 @@ impl Dict {
 
     /// Removes `key` from the entries, returning the capability at `key` if the
     /// key was already in the entries.
-    pub fn remove(&mut self, key: &Key) -> Option<Capability> {
+    pub fn remove(&self, key: &Key) -> Option<Capability> {
         self.lock_entries().remove(key)
     }
 
@@ -121,7 +121,7 @@ impl Dict {
     }
 
     /// Removes all entries from the Dict and returns them as an iterator.
-    pub fn drain(&mut self) -> impl Iterator<Item = (Key, Capability)> {
+    pub fn drain(&self) -> impl Iterator<Item = (Key, Capability)> {
         let entries = {
             let mut entries = self.lock_entries();
             std::mem::replace(&mut *entries, BTreeMap::new())
@@ -537,10 +537,10 @@ mod tests {
     #[fuchsia::test]
     async fn copy() -> Result<()> {
         // Create a Dict with a Unit inside, and copy the Dict.
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert("unit1".parse().unwrap(), Capability::Unit(Unit::default())).unwrap();
 
-        let mut copy = dict.shallow_copy();
+        let copy = dict.shallow_copy();
 
         // Insert a Unit into the copy.
         copy.insert("unit2".parse().unwrap(), Capability::Unit(Unit::default())).unwrap();
@@ -562,7 +562,7 @@ mod tests {
     #[fuchsia::test]
     async fn clone_by_reference() -> Result<()> {
         let dict = Dict::new();
-        let mut dict_clone = dict.clone();
+        let dict_clone = dict.clone();
 
         // Add a Unit into the clone.
         dict_clone.insert(CAP_KEY.clone(), Capability::Unit(Unit::default())).unwrap();
@@ -578,7 +578,7 @@ mod tests {
     /// Tests that a Dict can be cloned via `fuchsia.unknown/Cloneable.Clone2`
     #[fuchsia::test]
     async fn fidl_clone() -> Result<()> {
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert(CAP_KEY.clone(), Capability::Unit(Unit::default())).unwrap();
 
         let client_end: ClientEnd<fsandbox::DictionaryMarker> = dict.into();
@@ -676,7 +676,7 @@ mod tests {
             &[fsandbox::MAX_DICTIONARY_ITEMS_CHUNK, fsandbox::MAX_DICTIONARY_ITEMS_CHUNK, 1];
 
         // Create a Dict with [NUM_ENTRIES] entries that have Unit values.
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         for i in 0..NUM_ENTRIES {
             dict.insert(format!("{}", i).parse().unwrap(), Capability::Unit(Unit::default()))
                 .unwrap();
@@ -715,7 +715,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn try_into_open_error_not_supported() {
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert(CAP_KEY.clone(), Capability::Unit(Unit::default()))
             .expect("dict entry already exists");
         assert_matches!(
@@ -750,7 +750,7 @@ mod tests {
     /// Convert a dict `{ CAP_KEY: open }` to [Open].
     #[fuchsia::test]
     async fn try_into_open_success() {
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         let mock_dir = Arc::new(MockDir(Counter::new(0)));
         dict.insert(CAP_KEY.clone(), Capability::Open(Open::new(mock_dir.clone())))
             .expect("dict entry already exists");
@@ -771,12 +771,12 @@ mod tests {
     /// Convert a dict `{ CAP_KEY: { CAP_KEY: open } }` to [Open].
     #[fuchsia::test]
     async fn try_into_open_success_nested() {
-        let mut inner_dict = Dict::new();
+        let inner_dict = Dict::new();
         let mock_dir = Arc::new(MockDir(Counter::new(0)));
         inner_dict
             .insert(CAP_KEY.clone(), Capability::Open(Open::new(mock_dir.clone())))
             .expect("dict entry already exists");
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert(CAP_KEY.clone(), Capability::Dictionary(inner_dict)).unwrap();
 
         let remote = dict.try_into_directory_entry().expect("convert dict into Open capability");
@@ -823,7 +823,7 @@ mod tests {
             "c" => open.into_remote(),
         };
         let directory = Directory::from(serve_vfs_dir(fs));
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert(CAP_KEY.clone(), Capability::Directory(directory))
             .expect("dict entry already exists");
 

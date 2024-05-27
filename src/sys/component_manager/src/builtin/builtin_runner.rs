@@ -254,9 +254,9 @@ impl ElfRunnerProgram {
                 std::future::ready(Result::<(), anyhow::Error>::Ok(())).boxed()
             }),
         ));
-        let mut output = Dict::new();
+        let output = Dict::new();
         let svc = {
-            let mut svc = Dict::new();
+            let svc = Dict::new();
             svc.insert(
                 fcrunner::ComponentRunnerMarker::PROTOCOL_NAME.parse().unwrap(),
                 elf_runner.into_sender(WeakComponentInstance::invalid()).into(),

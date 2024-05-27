@@ -389,7 +389,7 @@ pub fn build_storage_admin_dictionary(
     component: &Arc<ComponentInstance>,
     decl: &cm_rust::ComponentDecl,
 ) -> Dict {
-    let mut storage_admin_dictionary = Dict::new();
+    let storage_admin_dictionary = Dict::new();
     for storage_decl in decl.capabilities.iter().filter_map(|capability| match capability {
         cm_rust::CapabilityDecl::Storage(storage_decl) => Some(storage_decl.clone()),
         _ => None,

@@ -451,14 +451,14 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn get_capability() {
-        let mut sub_dict = Dict::new();
+        let sub_dict = Dict::new();
         sub_dict
             .insert("bar".parse().unwrap(), Capability::Dictionary(Dict::new()))
             .expect("dict entry already exists");
         let (_, sender) = Receiver::new();
         sub_dict.insert("baz".parse().unwrap(), sender.into()).expect("dict entry already exists");
 
-        let mut test_dict = Dict::new();
+        let test_dict = Dict::new();
         test_dict
             .insert("foo".parse().unwrap(), Capability::Dictionary(sub_dict))
             .expect("dict entry already exists");
@@ -735,7 +735,7 @@ pub mod tests {
     #[fuchsia::test]
     async fn lazy_get() {
         let source = Capability::Data(Data::String("hello".to_string()));
-        let mut dict1 = Dict::new();
+        let dict1 = Dict::new();
         dict1.insert("source".parse().unwrap(), source).expect("dict entry already exists");
 
         let base_router = Router::new_ok(dict1);
@@ -761,17 +761,17 @@ pub mod tests {
     #[fuchsia::test]
     async fn lazy_get_deep() {
         let source = Capability::Data(Data::String("hello".to_string()));
-        let mut dict1 = Dict::new();
+        let dict1 = Dict::new();
         dict1.insert("source".parse().unwrap(), source).expect("dict entry already exists");
-        let mut dict2 = Dict::new();
+        let dict2 = Dict::new();
         dict2
             .insert("dict1".parse().unwrap(), Capability::Dictionary(dict1))
             .expect("dict entry already exists");
-        let mut dict3 = Dict::new();
+        let dict3 = Dict::new();
         dict3
             .insert("dict2".parse().unwrap(), Capability::Dictionary(dict2))
             .expect("dict entry already exists");
-        let mut dict4 = Dict::new();
+        let dict4 = Dict::new();
         dict4
             .insert("dict3".parse().unwrap(), Capability::Dictionary(dict3))
             .expect("dict entry already exists");

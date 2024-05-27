@@ -1069,7 +1069,7 @@ async fn create_child_with_dict() {
     ];
 
     // Create a dictionary with a sender for the `hippo` protocol.
-    let mut dict = sandbox::Dict::new();
+    let dict = sandbox::Dict::new();
 
     let (receiver, sender) = sandbox::Receiver::new();
 

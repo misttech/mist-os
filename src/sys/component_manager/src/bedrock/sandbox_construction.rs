@@ -75,7 +75,7 @@ pub fn build_component_sandbox(
     child_inputs: &mut StructuredDictMap<ComponentInput>,
     collection_inputs: &mut StructuredDictMap<ComponentInput>,
     environments: &mut StructuredDictMap<ComponentEnvironment>,
-    mut declared_dictionaries: Dict,
+    declared_dictionaries: Dict,
 ) {
     for environment_decl in &decl.environments {
         environments
@@ -140,7 +140,7 @@ pub fn build_component_sandbox(
         if !is_supported_offer(offer) {
             continue;
         }
-        let mut target_dict = match offer.target() {
+        let target_dict = match offer.target() {
             cm_rust::OfferTarget::Child(child_ref) => {
                 assert!(child_ref.collection.is_none(), "unexpected dynamic offer target");
                 let child_name = Name::new(child_ref.name.as_str())
@@ -182,7 +182,7 @@ pub fn build_component_sandbox(
             framework_dict,
             capability_sourced_capabilities_dict,
             offer,
-            &mut target_dict,
+            &target_dict,
         );
     }
 
@@ -440,7 +440,7 @@ fn make_dict_extending_router(dict: Dict, source_dict_router: Router) -> Router 
                     .into())
                 }
             }
-            let mut out_dict = dict.shallow_copy();
+            let out_dict = dict.shallow_copy();
             for (source_key, source_value) in source_dict.enumerate() {
                 if let Err(_) = out_dict.insert(source_key.clone(), source_value.clone()) {
                     return Err(RoutingError::BedrockSourceDictionaryCollision.into());
@@ -463,7 +463,7 @@ pub fn extend_dict_with_offers(
     program_output: &Router,
     framework_dict: &Dict,
     capability_sourced_capabilities_dict: &Dict,
-    target_input: &mut ComponentInput,
+    target_input: &ComponentInput,
 ) {
     for offer in dynamic_offers {
         extend_dict_with_offer(
@@ -474,7 +474,7 @@ pub fn extend_dict_with_offers(
             framework_dict,
             capability_sourced_capabilities_dict,
             offer,
-            &mut target_input.capabilities(),
+            &target_input.capabilities(),
         );
     }
 }
@@ -623,7 +623,7 @@ fn extend_dict_with_offer(
     framework_dict: &Dict,
     capability_sourced_capabilities_dict: &Dict,
     offer: &cm_rust::OfferDecl,
-    target_dict: &mut Dict,
+    target_dict: &Dict,
 ) {
     // We only support protocol and dictionary capabilities right now
     if !is_supported_offer(offer) {

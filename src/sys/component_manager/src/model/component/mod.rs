@@ -495,11 +495,11 @@ impl ComponentInstance {
             let fidl_capability = fsandbox::Capability::Dictionary(dictionary_client_end);
             let any: Capability =
                 fidl_capability.try_into().map_err(|_| AddDynamicChildError::InvalidDictionary)?;
-            let mut dict = match any {
+            let dict = match any {
                 Capability::Dictionary(d) => d,
                 _ => return Err(AddDynamicChildError::InvalidDictionary),
             };
-            let mut child_dict_entries = child_input.capabilities();
+            let child_dict_entries = child_input.capabilities();
             for (key, value) in dict.drain() {
                 // The child/collection Dict normally contains Routers created by component manager.
                 // ChildArgs.dict may contain capabilities created by an external client.

@@ -111,7 +111,7 @@ impl StructuredDict for ComponentInput {
 
 impl ComponentInput {
     pub fn new(environment: ComponentEnvironment) -> Self {
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert(PARENT.clone(), Dict::new().into()).ok();
         dict.insert(ENVIRONMENT.clone(), Dict::from(environment).into()).ok();
         Self(dict)
@@ -125,7 +125,7 @@ impl ComponentInput {
         // Note: We call [Dict::copy] on the nested [Dict]s, not the root [Dict], because
         // [Dict::copy] only goes one level deep and we want to copy the contents of the
         // inner sandboxes.
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert(PARENT.clone(), self.capabilities().shallow_copy().into()).ok();
         dict.insert(ENVIRONMENT.clone(), Dict::from(self.environment()).shallow_copy().into()).ok();
         Self(dict)
@@ -171,7 +171,7 @@ pub struct ComponentEnvironment(Dict);
 
 impl Default for ComponentEnvironment {
     fn default() -> Self {
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert(DEBUG.clone(), Dict::new().into()).ok();
         Self(dict)
     }
@@ -201,7 +201,7 @@ impl ComponentEnvironment {
         // Note: We call [Dict::copy] on the nested [Dict]s, not the root [Dict], because
         // [Dict::copy] only goes one level deep and we want to copy the contents of the
         // inner sandboxes.
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert(DEBUG.clone(), self.debug().shallow_copy().into()).ok();
         Self(dict)
     }
@@ -228,19 +228,19 @@ mod tests {
     #[fuchsia::test]
     async fn structured_dict_map() {
         let dict1 = {
-            let mut dict = Dict::new();
+            let dict = Dict::new();
             dict.insert("a".parse().unwrap(), Dict::new().into())
                 .expect("dict entry already exists");
             dict
         };
         let dict2 = {
-            let mut dict = Dict::new();
+            let dict = Dict::new();
             dict.insert("b".parse().unwrap(), Dict::new().into())
                 .expect("dict entry already exists");
             dict
         };
         let dict2_alt = {
-            let mut dict = Dict::new();
+            let dict = Dict::new();
             dict.insert("c".parse().unwrap(), Dict::new().into())
                 .expect("dict entry already exists");
             dict
