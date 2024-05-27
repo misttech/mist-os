@@ -876,19 +876,12 @@ int fcntl(int fd, int cmd, ...) {
       }
       fio::wire::OpenFlags flags;
       zx_status_t status = io->get_flags(&flags);
-      if (status == ZX_ERR_NOT_SUPPORTED) {
-        // We treat this as non-fatal, as it's valid for a remote to
-        // simply not support FCNTL, but we still want to correctly
-        // report the state of the (local) NONBLOCK flag
-        flags = {};
-        status = ZX_OK;
+      if (status != ZX_OK) {
+        return ERROR(status);
       }
       uint32_t fdio_flags = zxio_flags_to_fdio(flags);
       if (io->ioflag() & IOFLAG_NONBLOCK) {
         fdio_flags |= O_NONBLOCK;
-      }
-      if (status != ZX_OK) {
-        return ERROR(status);
       }
       return fdio_flags;
     }
@@ -1034,7 +1027,7 @@ int ftruncate(int fd, off_t len) {
 // allows these multi-path operations to mix absolute / relative paths and cross
 // mount points with ease.
 static int two_path_op_at(int olddirfd, const char* oldpath, int newdirfd, const char* newpath,
-                          two_path_op fdio_t::*op_getter) {
+                          two_path_op fdio_t::* op_getter) {
   fdio_internal::NameBuffer oldname;
   zx::result io_oldparent =
       fdio_internal::opendir_containing_at(olddirfd, oldpath, &oldname, nullptr);
