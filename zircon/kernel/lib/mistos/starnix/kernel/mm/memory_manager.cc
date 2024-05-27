@@ -1149,6 +1149,29 @@ fit::result<Errno, size_t> MemoryManager::unified_write_memory(
   }
 }
 
+fit::result<Errno, ktl::span<uint8_t>> MemoryManager::unified_read_memory_partial(
+    const CurrentTask& current_task, UserAddress addr, ktl::span<uint8_t>& bytes) const {
+  DEBUG_ASSERT(has_same_address_space(current_task->mm()));
+
+  if (ThreadDispatcher::GetCurrent()) {
+    user_in_ptr<const uint8_t> user_ptr =
+        make_user_in_ptr(reinterpret_cast<const uint8_t*>(addr.ptr()));
+
+    if (zx_status_t status = user_ptr.copy_array_from_user(bytes.data(), bytes.size());
+        status != ZX_OK) {
+      return fit::error(errno(from_status_like_fdio(status)));
+    }
+    return fit::ok(bytes);
+  } else {
+    return vmo_read_memory_partial(addr, bytes);
+  }
+}
+
+fit::result<Errno, ktl::span<uint8_t>> MemoryManager::vmo_read_memory_partial(
+    UserAddress addr, ktl::span<uint8_t>& bytes) const {
+  return state.Read()->read_memory_partial(addr, bytes);
+}
+
 fit::result<Errno, size_t> MemoryManager::vmo_write_memory(
     UserAddress addr, const ktl::span<const uint8_t>& bytes) const {
   return state.Read()->write_memory(addr, bytes);
