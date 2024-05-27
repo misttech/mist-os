@@ -11,7 +11,7 @@ use {
             routing::router_ext::RouterExt,
             structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
         },
-        sandbox_util::{DictExt, LaunchTaskOnReceive, RoutableExt},
+        sandbox_util::{DictExt, RoutableExt},
     },
     ::routing::{
         capability_source::ComponentCapability,
@@ -24,9 +24,9 @@ use {
     },
     cm_types::{IterablePath, Name, RelativePath, SeparatedPath},
     errors::{CapabilityProviderError, ComponentProviderError, OpenError, OpenOutgoingDirError},
-    fidl::endpoints,
+    fidl::endpoints::{create_proxy, DiscoverableProtocolMarker},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_sandbox as fsandbox,
-    fidl_fuchsia_io as fio,
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     futures::FutureExt,
     itertools::Itertools,
     moniker::{ChildName, ChildNameBase, MonikerBase},
@@ -67,6 +67,7 @@ pub fn build_component_sandbox(
     decl: &cm_rust::ComponentDecl,
     component_input: &ComponentInput,
     framework_dict: &Dict,
+    capability_sourced_capabilities_dict: &Dict,
     component_output_dict: &Dict,
     program_input_dict: &Dict,
     program_input_dict_additions: &Dict,
@@ -129,6 +130,7 @@ pub fn build_component_sandbox(
             program_input_dict_additions,
             program_output,
             framework_dict,
+            capability_sourced_capabilities_dict,
             use_,
         );
     }
@@ -178,6 +180,7 @@ pub fn build_component_sandbox(
             component_input,
             program_output,
             framework_dict,
+            capability_sourced_capabilities_dict,
             offer,
             &mut target_dict,
         );
@@ -189,6 +192,7 @@ pub fn build_component_sandbox(
             children,
             program_output,
             framework_dict,
+            capability_sourced_capabilities_dict,
             expose,
             component_output_dict,
         );
@@ -313,7 +317,7 @@ fn extend_dict_with_dictionary(
                         let open = component.get_outgoing();
 
                         let (inner_router, server_end) =
-                            endpoints::create_proxy::<fsandbox::RouterMarker>().unwrap();
+                            create_proxy::<fsandbox::RouterMarker>().unwrap();
                         open.open(
                             ExecutionScope::new(),
                             fio::OpenFlags::empty(),
@@ -458,6 +462,7 @@ pub fn extend_dict_with_offers(
     dynamic_offers: &Vec<cm_rust::OfferDecl>,
     program_output: &Router,
     framework_dict: &Dict,
+    capability_sourced_capabilities_dict: &Dict,
     target_input: &mut ComponentInput,
 ) {
     for offer in dynamic_offers {
@@ -467,6 +472,7 @@ pub fn extend_dict_with_offers(
             component_input,
             program_output,
             framework_dict,
+            capability_sourced_capabilities_dict,
             offer,
             &mut target_input.capabilities(),
         );
@@ -488,6 +494,7 @@ fn extend_dict_with_use(
     program_input_dict_additions: &Dict,
     program_output: &Router,
     framework_dict: &Dict,
+    capability_sourced_capabilities_dict: &Dict,
     use_: &cm_rust::UseDecl,
 ) {
     let Some(use_protocol) = supported_use(use_) else {
@@ -536,18 +543,16 @@ fn extend_dict_with_use(
                 source_path.iter_segments().join("/"),
             ),
         ),
-        cm_rust::UseSource::Capability(_) => {
-            let use_ = use_.clone();
-            // TODO(https://fxbug.dev/323926925): place a router here that will return an error if
-            // there's no such capability.
-            LaunchTaskOnReceive::new_hook_launch_task(
-                component,
-                CapabilitySource::Capability {
-                    source_capability: ComponentCapability::Use(use_.clone()),
-                    component: component.into(),
-                },
-            )
-            .into_router()
+        cm_rust::UseSource::Capability(capability_name) => {
+            let err = RoutingError::capability_from_capability_not_found(
+                &component.moniker,
+                capability_name.as_str().to_string(),
+            );
+            if source_path.iter_segments().join("/") == fsys::StorageAdminMarker::PROTOCOL_NAME {
+                capability_sourced_capabilities_dict.clone().lazy_get(capability_name.clone(), err)
+            } else {
+                Router::new_error(err)
+            }
         }
         cm_rust::UseSource::Debug => component_input.environment().debug().lazy_get(
             use_protocol.source_name.clone(),
@@ -616,6 +621,7 @@ fn extend_dict_with_offer(
     component_input: &ComponentInput,
     program_output: &Router,
     framework_dict: &Dict,
+    capability_sourced_capabilities_dict: &Dict,
     offer: &cm_rust::OfferDecl,
     target_dict: &mut Dict,
 ) {
@@ -675,18 +681,16 @@ fn extend_dict_with_offer(
                 ),
             )
         }
-        cm_rust::OfferSource::Capability(_) => {
-            let offer = offer.clone();
-            // TODO(https://fxbug.dev/323926925): place a router here that will return an error if
-            // there's no such capability.
-            LaunchTaskOnReceive::new_hook_launch_task(
-                component,
-                CapabilitySource::Capability {
-                    source_capability: ComponentCapability::Offer(offer.clone()),
-                    component: component.into(),
-                },
-            )
-            .into_router()
+        cm_rust::OfferSource::Capability(capability_name) => {
+            let err = RoutingError::capability_from_capability_not_found(
+                &component.moniker,
+                capability_name.as_str().to_string(),
+            );
+            if source_path.iter_segments().join("/") == fsys::StorageAdminMarker::PROTOCOL_NAME {
+                capability_sourced_capabilities_dict.clone().lazy_get(capability_name.clone(), err)
+            } else {
+                Router::new_error(err)
+            }
         }
         cm_rust::OfferSource::Void => UnitRouter::new(),
         // This is only relevant for services, so this arm is never reached.
@@ -709,6 +713,7 @@ fn extend_dict_with_expose(
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     program_output: &Router,
     framework_dict: &Dict,
+    capability_sourced_capabilities_dict: &Dict,
     expose: &cm_rust::ExposeDecl,
     target_dict: &Dict,
 ) {
@@ -760,18 +765,16 @@ fn extend_dict_with_expose(
                 ),
             )
         }
-        cm_rust::ExposeSource::Capability(_) => {
-            let expose = expose.clone();
-            // TODO(https://fxbug.dev/323926925): place a router here that will return an error if
-            // there's no such capability.
-            LaunchTaskOnReceive::new_hook_launch_task(
-                component,
-                CapabilitySource::Capability {
-                    source_capability: ComponentCapability::Expose(expose.clone()),
-                    component: component.into(),
-                },
-            )
-            .into_router()
+        cm_rust::ExposeSource::Capability(capability_name) => {
+            let err = RoutingError::capability_from_capability_not_found(
+                &component.moniker,
+                capability_name.as_str().to_string(),
+            );
+            if source_path.iter_segments().join("/") == fsys::StorageAdminMarker::PROTOCOL_NAME {
+                capability_sourced_capabilities_dict.clone().lazy_get(capability_name.clone(), err)
+            } else {
+                Router::new_error(err)
+            }
         }
         cm_rust::ExposeSource::Void => UnitRouter::new(),
         // This is only relevant for services, so this arm is never reached.

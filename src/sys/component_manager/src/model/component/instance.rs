@@ -31,6 +31,7 @@ use {
             },
             routing_fns::RouteEntry,
             start::Start,
+            storage::build_storage_admin_dictionary,
             structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
             token::{InstanceToken, InstanceTokenState},
         },
@@ -373,6 +374,9 @@ pub struct ResolvedInstanceState {
     /// The dict containing all framework capabilities scoped to this component.
     pub framework_dict: Dict,
 
+    /// The dict containing all capabilities based on another capability.
+    pub capability_sourced_capabilities_dict: Dict,
+
     /// Dictionary of extra capabilities passed to the component when it is started.
     // TODO(b/322564390): Move this into `StartedInstanceState` once stop action releases lock on it
     pub program_input_dict_additions: Dict,
@@ -466,6 +470,7 @@ impl ResolvedInstanceState {
             program_input_dict: Dict::new(),
             program_output_dict: Dict::new(),
             framework_dict: build_framework_dictionary(component),
+            capability_sourced_capabilities_dict: build_storage_admin_dictionary(component, &decl),
             program_input_dict_additions: Dict::new(),
             collection_inputs: Default::default(),
             bedrock_environments: Default::default(),
@@ -489,6 +494,7 @@ impl ResolvedInstanceState {
             &decl,
             &state.component_input,
             &state.framework_dict,
+            &state.capability_sourced_capabilities_dict,
             &state.component_output_dict,
             &state.program_input_dict,
             &state.program_input_dict_additions,
@@ -879,6 +885,7 @@ impl ResolvedInstanceState {
                 &dynamic_offers,
                 &component.program_output(),
                 &self.framework_dict,
+                &self.capability_sourced_capabilities_dict,
                 &mut child_input,
             );
         }

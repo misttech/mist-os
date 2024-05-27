@@ -7,10 +7,12 @@ use {
     crate::{
         capability::CapabilitySource,
         model::{
-            component::{ComponentInstance, StartReason},
+            component::{ComponentInstance, StartReason, WeakComponentInstance},
             routing::{Route, RouteSource},
             start::Start,
+            storage::admin_protocol::StorageAdmin,
         },
+        sandbox_util::LaunchTaskOnReceive,
     },
     ::routing::{
         capability_source::ComponentCapability, component_instance::ComponentInstanceInterface,
@@ -20,9 +22,11 @@ use {
     component_id_index::InstanceId,
     derivative::Derivative,
     errors::{ModelError, StorageError},
-    fidl::endpoints,
-    fidl_fuchsia_io as fio,
+    fidl::endpoints::{create_proxy, ServerEnd},
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
+    futures::FutureExt,
     moniker::{Moniker, MonikerBase},
+    sandbox::Dict,
     std::{path::PathBuf, sync::Arc},
     vfs::{directory::entry::OpenRequest, ToObjectRequest},
 };
@@ -75,7 +79,7 @@ async fn open_storage_root(
     storage_source_info: &BackingDirectoryInfo,
 ) -> Result<fio::DirectoryProxy, ModelError> {
     let (mut dir_proxy, local_server_end) =
-        endpoints::create_proxy::<fio::DirectoryMarker>().expect("failed to create proxy");
+        create_proxy::<fio::DirectoryMarker>().expect("failed to create proxy");
     let mut full_backing_directory_path = storage_source_info.backing_directory_path.clone();
     full_backing_directory_path.extend(storage_source_info.backing_directory_subdir.clone());
     let path = full_backing_directory_path.to_string();
@@ -377,6 +381,47 @@ fn generate_moniker_based_storage_path(moniker: &Moniker) -> PathBuf {
 /// Components which do not have an instance ID use a generate moniker-based storage path instead.
 fn generate_instance_id_based_storage_path(instance_id: &InstanceId) -> PathBuf {
     instance_id.to_string().into()
+}
+
+/// Builds a dictionary where each key is the name of a storage capability declared in this
+/// component, and the value is a router for a storage admin protocol from that storage capability.
+pub fn build_storage_admin_dictionary(
+    component: &Arc<ComponentInstance>,
+    decl: &cm_rust::ComponentDecl,
+) -> Dict {
+    let mut storage_admin_dictionary = Dict::new();
+    for storage_decl in decl.capabilities.iter().filter_map(|capability| match capability {
+        cm_rust::CapabilityDecl::Storage(storage_decl) => Some(storage_decl.clone()),
+        _ => None,
+    }) {
+        let capability_source = CapabilitySource::Capability {
+            source_capability: ComponentCapability::Storage(storage_decl.clone()),
+            component: component.into(),
+        };
+        let storage_decl = storage_decl.clone();
+        let weak_component = WeakComponentInstance::new(component);
+        storage_admin_dictionary
+            .insert(
+                storage_decl.name.clone(),
+                LaunchTaskOnReceive::new(
+                    component.nonblocking_task_group().as_weak(),
+                    "storage admin protocol",
+                    Some((component.context.policy().clone(), capability_source)),
+                    Arc::new(move |channel, _target| {
+                        let stream = ServerEnd::<fsys::StorageAdminMarker>::new(channel)
+                            .into_stream()
+                            .unwrap();
+                        StorageAdmin::new()
+                            .serve(storage_decl.clone(), weak_component.clone(), stream)
+                            .boxed()
+                    }),
+                )
+                .into_router()
+                .into(),
+            )
+            .unwrap();
+    }
+    storage_admin_dictionary
 }
 
 #[cfg(test)]

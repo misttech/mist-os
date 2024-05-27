@@ -552,7 +552,7 @@ async fn connect_to_storage_admin(
         .await
         .ok_or(fsys::ConnectToStorageAdminError::InstanceNotFound)?;
 
-    let storage_admin = StorageAdmin::new(Arc::downgrade(model));
+    let storage_admin = StorageAdmin::new();
     let task_group = instance.nonblocking_task_group();
 
     let storage_decl = {

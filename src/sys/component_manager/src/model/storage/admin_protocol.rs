@@ -12,53 +12,31 @@
 
 use {
     crate::{
-        capability::{
-            CapabilityProvider, CapabilitySource, DerivedCapability, InternalCapabilityProvider,
-        },
+        capability::CapabilitySource,
         model::{
             component::{ComponentInstance, WeakComponentInstance},
-            model::Model,
             routing::{Route, RouteSource},
             storage::{self, BackingDirectoryInfo},
         },
     },
     ::routing::capability_source::ComponentCapability,
     anyhow::{format_err, Context, Error},
-    async_trait::async_trait,
-    cm_rust::{ExposeDecl, OfferDecl, StorageDecl, UseDecl},
-    cm_types::Name,
+    cm_rust::{StorageDecl, UseDecl},
     component_id_index::InstanceId,
-    errors::ModelError,
-    fidl::{endpoints::ServerEnd, prelude::*},
+    fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_io::{self as fio, DirectoryProxy, DirentType},
     fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
     fuchsia_fs::directory as ffs_dir,
-    fuchsia_zircon as zx,
     futures::{
         stream::{FuturesUnordered, StreamExt},
         Future, TryFutureExt, TryStreamExt,
     },
-    lazy_static::lazy_static,
     moniker::{Moniker, MonikerBase},
     routing::{component_instance::ComponentInstanceInterface, RouteRequest},
-    std::{
-        path::PathBuf,
-        sync::{Arc, Weak},
-    },
+    std::{path::PathBuf, sync::Arc},
     tracing::{debug, error, warn},
 };
-
-lazy_static! {
-    pub static ref STORAGE_ADMIN_PROTOCOL_NAME: Name =
-        fsys::StorageAdminMarker::PROTOCOL_NAME.parse().unwrap();
-}
-
-struct StorageAdminProtocolProvider {
-    storage_decl: StorageDecl,
-    component: WeakComponentInstance,
-    storage_admin: Arc<StorageAdmin>,
-}
 
 #[derive(Debug, PartialEq)]
 enum DirType {
@@ -142,101 +120,11 @@ impl From<StorageStatusError> for fsys::StatusError {
     }
 }
 
-impl StorageAdminProtocolProvider {
-    /// # Arguments
-    /// * `storage_decl`: The declaration in the defining `component`'s
-    ///    manifest.
-    /// * `component`: Reference to the component that defined the storage
-    ///    capability.
-    /// * `storage_admin`: An implementer of the StorageAdmin protocol. If this
-    ///   StorageAdminProtocolProvider is opened, this will be used to actually
-    ///   serve the StorageAdmin protocol.
-    pub fn new(
-        storage_decl: StorageDecl,
-        component: WeakComponentInstance,
-        storage_admin: Arc<StorageAdmin>,
-    ) -> Self {
-        Self { storage_decl, component, storage_admin }
-    }
-}
-
-#[async_trait]
-impl InternalCapabilityProvider for StorageAdminProtocolProvider {
-    async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
-        let server_end = ServerEnd::<fsys::StorageAdminMarker>::new(server_end);
-        if let Err(error) = self
-            .storage_admin
-            .serve(self.storage_decl, self.component, server_end.into_stream().unwrap())
-            .await
-        {
-            warn!(?error, "failed to serve storage admin protocol");
-        }
-    }
-}
-
-pub struct StorageAdminDerivedCapability {
-    host: Arc<StorageAdmin>,
-}
-
-impl StorageAdminDerivedCapability {
-    pub fn new(model: Weak<Model>) -> Self {
-        Self { host: StorageAdmin::new(model) }
-    }
-
-    async fn extract_storage_decl(
-        source_capability: &ComponentCapability,
-        component: WeakComponentInstance,
-    ) -> Result<Option<StorageDecl>, ModelError> {
-        match source_capability {
-            ComponentCapability::Offer(OfferDecl::Protocol(_))
-            | ComponentCapability::Expose(ExposeDecl::Protocol(_))
-            | ComponentCapability::Use(UseDecl::Protocol(_)) => (),
-            _ => return Ok(None),
-        }
-        if source_capability.source_name()
-            != Some(&fsys::StorageAdminMarker::PROTOCOL_NAME.parse().unwrap())
-        {
-            return Ok(None);
-        }
-        let source_capability_name = source_capability.source_capability_name();
-        if source_capability_name.is_none() {
-            return Ok(None);
-        }
-        let source_component = component.upgrade()?;
-        let source_component_state = source_component.lock_resolved_state().await?;
-        let decl = source_component_state.decl();
-        Ok(decl.find_storage_source(source_capability_name.unwrap()).cloned())
-    }
-}
-
-#[async_trait]
-impl DerivedCapability for StorageAdminDerivedCapability {
-    async fn maybe_new_provider(
-        &self,
-        source_capability: &ComponentCapability,
-        scope: WeakComponentInstance,
-    ) -> Option<Box<dyn CapabilityProvider>> {
-        let storage_decl = Self::extract_storage_decl(source_capability, scope.clone()).await;
-        if let Ok(Some(storage_decl)) = storage_decl {
-            return Some(Box::new(StorageAdminProtocolProvider::new(
-                storage_decl,
-                scope,
-                self.host.clone(),
-            )) as Box<dyn CapabilityProvider>);
-        }
-        // The declaration referenced either a nonexistent capability, or a capability that isn't a
-        // storage capability. We can't be the provider for this.
-        None
-    }
-}
-
-pub struct StorageAdmin {
-    model: Weak<Model>,
-}
+pub struct StorageAdmin;
 
 impl StorageAdmin {
-    pub fn new(model: Weak<Model>) -> Arc<Self> {
-        Arc::new(Self { model })
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self)
     }
 
     /// Serves the `fuchsia.sys2/StorageAdmin` protocol over the provided
@@ -300,13 +188,10 @@ impl StorageAdmin {
                     responder,
                 } => {
                     let fut = async {
-                        let model = self.model.upgrade().ok_or(fcomponent::Error::Internal)?;
-                        let moniker = Moniker::parse_str(&relative_moniker)
+                        let relative_moniker = Moniker::parse_str(&relative_moniker)
                             .map_err(|_| fcomponent::Error::InvalidArguments)?;
-                        let moniker = component.moniker.concat(&moniker);
-                        let root_component = model
-                            .root()
-                            .find_and_maybe_resolve(&moniker)
+                        let root_component = component
+                            .find_and_maybe_resolve(&relative_moniker)
                             .await
                             .map_err(|_| fcomponent::Error::InstanceNotFound)?;
                         Ok(root_component)

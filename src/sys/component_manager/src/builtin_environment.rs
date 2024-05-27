@@ -25,7 +25,7 @@ use {
             system_controller::SystemController,
             time::{create_utc_clock, UtcTimeMaintainer},
         },
-        capability::{BuiltinCapability, CapabilitySource, DerivedCapability, FrameworkCapability},
+        capability::{BuiltinCapability, CapabilitySource, FrameworkCapability},
         framework::{
             binder::BinderFrameworkCapability,
             factory::{FactoryCapabilityHost, FactoryFrameworkCapability},
@@ -52,7 +52,6 @@ use {
             },
             model::{Model, ModelParams},
             resolver::{box_arc_resolver, ResolverRegistry},
-            storage::admin_protocol::StorageAdminDerivedCapability,
             structured_dict::ComponentInput,
             token::InstanceRegistry,
         },
@@ -1135,8 +1134,6 @@ impl BuiltinEnvironment {
             Box::new(PkgDirectoryFrameworkCapability::new()),
             Box::new(EventSourceFactoryCapability::new(event_source_factory.clone())),
         ];
-        let derived_capabilities: Vec<Box<dyn DerivedCapability>> =
-            vec![Box::new(StorageAdminDerivedCapability::new(Arc::downgrade(&model)))];
 
         // Set up the builtin runners.
         for runner in builtin_runners {
@@ -1183,11 +1180,7 @@ impl BuiltinEnvironment {
 
         model
             .context()
-            .init_internal_capabilities(
-                builtin_capabilities,
-                framework_capabilities,
-                derived_capabilities,
-            )
+            .init_internal_capabilities(builtin_capabilities, framework_capabilities)
             .await;
 
         // Set up the Component Tree Diagnostics runtime statistics.
