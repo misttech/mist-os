@@ -479,6 +479,13 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
   fit::result<Errno, ktl::span<uint8_t>> vmo_read_memory(UserAddress addr,
                                                          ktl::span<uint8_t>& bytes) const;
 
+  fit::result<Errno, ktl::span<uint8_t>> unified_read_memory_partial(const CurrentTask& current_task,
+                                                             UserAddress addr,
+                                                             ktl::span<uint8_t>& bytes) const;
+
+  fit::result<Errno, ktl::span<uint8_t>> vmo_read_memory_partial(UserAddress addr,
+                                                         ktl::span<uint8_t>& bytes) const;
+
   fit::result<Errno, ktl::span<uint8_t>> unified_read_memory_partial_until_null_byte(
       const CurrentTask& current_task, UserAddress addr, ktl::span<uint8_t>& bytes) const;
 
@@ -498,46 +505,6 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
 
   MemoryManager(zx::vmar root, zx::vmar user_vmar, zx_info_vmar_t user_vmar_info);
 };
-
-/// Holds the number of _elements_ read by the callback to [`read_to_vec`].
-///
-/// Used to make it clear to callers that the callback should return the number
-/// of elements read and not the number of bytes read.
-struct NumberOfElementsRead {
-  size_t n_elements;
-};
-
-/// Performs a read into a `Vec` using the provided read function.
-///
-/// The read function returns the number of elements of type `T` read.
-///
-/// # Safety
-///
-/// The read function must only return `Ok(n)` if at least one element was read and `n` holds
-/// the number of elements of type `T` read starting from the beginning of the slice.
-template <typename T, typename E>
-fit::result<E, fbl::Vector<T>> read_to_vec(
-    size_t max_len, std::function<fit::result<E, NumberOfElementsRead>(ktl::span<T>&)> read_fn) {
-  fbl::AllocChecker ac;
-  auto buffer = fbl::Vector<T>();
-  buffer.reserve(max_len, &ac);
-  if (!ac.check()) {
-    return fit::error(errno(ENOMEM));
-  }
-
-  ktl::span<T> capacity(buffer.data(), max_len);
-  auto read_fn_result = read_fn(capacity);
-  if (read_fn_result.is_error())
-    return read_fn_result.take_error();
-
-  NumberOfElementsRead read_elements{read_fn_result.value()};
-  DEBUG_ASSERT_MSG(read_elements.n_elements <= max_len, "read_elements=%zu, max_len=%zu",
-                   read_elements.n_elements, max_len);
-  // SAFETY: The new length is equal to the number of elements successfully
-  // initialized (since `read_fn` returned successfully).
-  buffer.set_size(read_elements.n_elements);
-  return fit::ok(ktl::move(buffer));
-}
 
 /// Creates a VMO that can be used in an anonymous mapping for the `mmap`
 /// syscall.

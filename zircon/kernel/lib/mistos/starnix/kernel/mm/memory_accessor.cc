@@ -10,6 +10,7 @@
 #include <lib/mistos/starnix_uapi/errors.h>
 
 #include <fbl/alloc_checker.h>
+#include <fbl/string.h>
 #include <fbl/vector.h>
 #include <ktl/algorithm.h>
 
@@ -24,6 +25,18 @@ fit::result<Errno, fbl::Vector<uint8_t>> MemoryAccessorExt::read_memory_to_vec(U
           return read_result.take_error();
         }
         DEBUG_ASSERT(len == read_result.value().size());
+        return fit::ok(NumberOfElementsRead{read_result.value().size()});
+      });
+}
+
+fit::result<Errno, fbl::Vector<uint8_t>> MemoryAccessorExt::read_memory_partial_to_vec(
+    UserAddress addr, size_t max_len) const {
+  return read_to_vec<uint8_t, Errno>(
+      max_len, [&](ktl::span<uint8_t> b) -> fit::result<Errno, NumberOfElementsRead> {
+        auto read_result = this->read_memory_partial(addr, b);
+        if (read_result.is_error()) {
+          return read_result.take_error();
+        }
         return fit::ok(NumberOfElementsRead{read_result.value().size()});
       });
 }
@@ -82,6 +95,19 @@ fit::result<Errno, FsString> MemoryAccessorExt::read_c_string_to_vec(UserCString
     }
 
   } while (true);
+}
+
+fit::result<Errno, FsString> MemoryAccessorExt::read_c_string(UserCString string,
+                                                              ktl::span<uint8_t>& buffer) const {
+  auto buffer_or_error = this->read_memory_partial_until_null_byte(string, buffer);
+  if (buffer_or_error.is_error()) {
+    return buffer_or_error.take_error();
+  }
+  // Make sure the last element holds the null byte.
+  if (buffer_or_error->last(1)[0] == '\0') {
+    return fit::ok(fbl::String((char*)buffer_or_error->data(), buffer_or_error->size() - 1));
+  }
+  return fit::error(errno(ENAMETOOLONG));
 }
 
 }  // namespace starnix

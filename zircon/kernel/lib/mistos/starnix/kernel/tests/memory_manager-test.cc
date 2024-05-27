@@ -451,6 +451,60 @@ TEST(MemoryManager, test_read_c_string_to_vec) {
   ASSERT_EQ(errno(EFAULT), ma.read_c_string_to_vec(UserCString(), max_size).error_value());
 }
 
+TEST(MemoryManager, test_read_c_string) {
+  auto [kernel, current_task] = create_kernel_and_task();
+  auto mm = current_task->mm();
+  auto ma = *current_task;
+
+  size_t page_size = PAGE_SIZE;
+  auto buf_cap = 2u * page_size;
+
+  auto vec = fbl::Vector<uint8_t>();
+  fbl::AllocChecker ac;
+  vec.reserve(buf_cap, &ac);
+  ASSERT(ac.check());
+
+  // We can't just use `spare_capacity_mut` because `Vec::with_capacity`
+  // returns a `Vec` with _at least_ the requested capacity.
+  auto buf = vec.data();
+  auto addr = mm->base_addr + 10u * page_size;
+
+  // Map a page at a fixed address and write an unterminated string at the end of it.
+  ASSERT_EQ(addr, map_memory(*current_task, addr, page_size));
+
+  auto test_str = "foo!";
+  auto test_addr = addr + page_size - 4u;
+
+  ASSERT_FALSE(ma.write_memory(test_addr, {(uint8_t*)test_str, 4}).is_error(),
+               "failed to write test string");
+
+  // Expect error if the string is not terminated.
+  ktl::span span{buf, buf_cap};
+  ASSERT_EQ(errno(ENAMETOOLONG), ma.read_c_string(UserCString(test_addr), span).error_value());
+
+  // Expect success if the string is terminated.
+  ASSERT_FALSE(ma.write_memory(addr + (page_size - 1), {(uint8_t*)"\0", 1}).is_error(),
+               "failed to write nul");
+  ASSERT_EQ(fbl::String("foo"), ma.read_c_string(UserCString(test_addr), span).value());
+
+  // Expect success if the string spans over two mappings.
+  ASSERT_EQ(map_memory(*current_task, addr + page_size, page_size), addr + page_size);
+  // TODO: To be multiple mappings we need to provide a file backing for the next page or the
+  // mappings will be collapsed.
+  // assert_eq!(mm.get_mapping_count(), 2);
+  ASSERT_FALSE(ma.write_memory(addr + (page_size - 1), {(uint8_t*)"bar\0", 4}).is_error(),
+               "failed to write extra chars");
+  ASSERT_EQ("foobar", ma.read_c_string(UserCString(test_addr), span).value());
+
+  // Expect error if the string does not fit in the provided buffer.
+  ktl::span small_span{buf, 2};
+  ASSERT_EQ(errno(ENAMETOOLONG),
+            ma.read_c_string(UserCString(test_addr), small_span).error_value());
+
+  // Expect error if the address is invalid.
+  ASSERT_EQ(errno(EFAULT), ma.read_c_string(UserCString(), span).error_value());
+}
+
 TEST(MemoryManager, test_unmap_returned_mappings) {
   auto [kernel, current_task] = create_kernel_and_task();
   auto mm = current_task->mm();
@@ -689,6 +743,118 @@ TEST(MemoryManager, test_unmap_middle) {
                  mapping.backing_.variant);
     }
   }
+}
+
+TEST(MemoryManager, test_read_write_objects) {
+  auto [kernel, current_task] = create_kernel_and_task();
+  auto mm = current_task->mm();
+  auto addr = map_memory(*current_task, UserAddress(), PAGE_SIZE);
+  auto ma = *current_task;
+  auto item_ref = UserRef<uint32_t>(addr);
+
+  auto items_written = fbl::Vector<uint32_t>();
+  fbl::AllocChecker ac;
+  items_written.push_back(0, &ac);
+  ASSERT(ac.check());
+  items_written.push_back(2, &ac);
+  ASSERT(ac.check());
+  items_written.push_back(3, &ac);
+  ASSERT(ac.check());
+  items_written.push_back(7, &ac);
+  ASSERT(ac.check());
+  items_written.push_back(1, &ac);
+  ASSERT(ac.check());
+
+  ASSERT_FALSE(ma.write_objects(item_ref, items_written.data(), items_written.size()).is_error(),
+               "Failed to write object array.");
+
+  auto items_read = ma.read_objects_to_vec(item_ref, items_written.size());
+  ASSERT_FALSE(items_read.is_error(), "Failed to read empty object array.");
+
+  ASSERT_EQ(items_written.size(), items_read->size());
+  ASSERT_EQ(items_written[0], items_read.value()[0]);
+  ASSERT_EQ(items_written[1], items_read.value()[1]);
+  ASSERT_EQ(items_written[2], items_read.value()[2]);
+  ASSERT_EQ(items_written[3], items_read.value()[3]);
+  ASSERT_EQ(items_written[4], items_read.value()[4]);
+}
+
+TEST(MemoryManager, test_read_write_objects_null) {
+  auto [kernel, current_task] = create_kernel_and_task();
+  auto mm = current_task->mm();
+  auto addr = map_memory(*current_task, UserAddress(), PAGE_SIZE);
+  auto ma = *current_task;
+  auto item_ref = UserRef<uint32_t>(addr);
+
+  auto items_written = fbl::Vector<uint32_t>();
+
+  ASSERT_FALSE(ma.write_objects(item_ref, items_written.data(), items_written.size()).is_error(),
+               "Failed to write empty object array.");
+
+  auto items_read = ma.read_objects_to_vec(item_ref, items_written.size());
+  ASSERT_FALSE(items_read.is_error(), "Failed to read empty object array.");
+
+  ASSERT_EQ(items_written.size(), items_read->size());
+}
+
+TEST(MemoryManager, test_read_object_partial) {
+  struct Items {
+    ktl::array<uint32_t, 4> val;
+  };
+
+  auto [kernel, current_task] = create_kernel_and_task();
+  auto ma = *current_task;
+  auto mm = current_task->mm();
+  auto addr = map_memory(*current_task, UserAddress(), PAGE_SIZE);
+  auto item_ref = UserRef<uint32_t>(addr);
+
+  // Populate some values.
+  auto items_written = fbl::Vector<uint32_t>();
+  fbl::AllocChecker ac;
+  items_written.push_back(75, &ac);
+  ASSERT(ac.check());
+  items_written.push_back(23, &ac);
+  ASSERT(ac.check());
+  items_written.push_back(51, &ac);
+  ASSERT(ac.check());
+  items_written.push_back(98, &ac);
+  ASSERT(ac.check());
+
+  ASSERT_FALSE(ma.write_objects(item_ref, items_written.data(), items_written.size()).is_error(),
+               "Failed to write object array.");
+
+  // Full read of all 4 values.
+  auto items_ref = UserRef<Items>(addr);
+  auto items_read = ma.read_object_partial(items_ref, sizeof(Items));
+  ASSERT_FALSE(items_read.is_error(), "Failed to read object");
+  ASSERT_EQ(items_written[0], items_read.value().val[0]);
+  ASSERT_EQ(items_written[1], items_read.value().val[1]);
+  ASSERT_EQ(items_written[2], items_read.value().val[2]);
+  ASSERT_EQ(items_written[3], items_read.value().val[3]);
+
+  // Partial read of the first two.
+  items_read = ma.read_object_partial(items_ref, 8);
+  ASSERT_FALSE(items_read.is_error(), "Failed to read object");
+  ASSERT_EQ(75, items_read.value().val[0]);
+  ASSERT_EQ(23, items_read.value().val[1]);
+  ASSERT_EQ(0, items_read.value().val[2]);
+  ASSERT_EQ(0, items_read.value().val[3]);
+
+  // The API currently allows reading 0 bytes (this could be re-evaluated) so test that does
+  // the right thing.
+  // Partial read of the first two.
+  items_read = ma.read_object_partial(items_ref, 0);
+  ASSERT_FALSE(items_read.is_error(), "Failed to read object");
+  ASSERT_EQ(0, items_read.value().val[0]);
+  ASSERT_EQ(0, items_read.value().val[1]);
+  ASSERT_EQ(0, items_read.value().val[2]);
+  ASSERT_EQ(0, items_read.value().val[3]);
+
+  // Size bigger than the object.
+  ASSERT_EQ(errno(EINVAL), ma.read_object_partial(items_ref, sizeof(Items) + 8).error_value());
+
+  // Bad pointer.
+  ASSERT_EQ(errno(EFAULT), ma.read_object_partial(UserRef<Items>(1), 16).error_value());
 }
 
 TEST(MemoryManager, test_preserve_name_snapshot) {

@@ -900,6 +900,11 @@ fit::result<Errno, ktl::span<uint8_t>> CurrentTask::read_memory_partial_until_nu
   return task->mm()->unified_read_memory_partial_until_null_byte(*this, addr, bytes);
 }
 
+fit::result<Errno, ktl::span<uint8_t>> CurrentTask::read_memory_partial(
+    UserAddress addr, ktl::span<uint8_t>& bytes) const {
+  return task->mm()->unified_read_memory_partial(*this, addr, bytes);
+}
+
 fit::result<Errno, size_t> CurrentTask::write_memory(UserAddress addr,
                                                      const ktl::span<const uint8_t>& bytes) const {
   return task->mm()->unified_write_memory(*this, addr, bytes);
