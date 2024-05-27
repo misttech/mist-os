@@ -606,6 +606,20 @@ class FuseServer {
     return WriteAckResponse(in_header);
   }
 
+  virtual testing::AssertionResult HandleRmdir(const std::shared_ptr<Node>& dir_node,
+                                               const struct fuse_in_header& in_header,
+                                               const char* name) {
+    const std::shared_ptr dir = std::dynamic_pointer_cast<Directory>(dir_node);
+    if (!dir)
+      return WriteDataFreeResponse(in_header, -ENOTDIR);
+
+    if (dir->RemoveChild(name)) {
+      return WriteAckResponse(in_header);
+    } else {
+      return WriteDataFreeResponse(in_header, -ENOENT);
+    }
+  }
+
   testing::AssertionResult WriteDataFreeResponse(const struct fuse_in_header& in_header,
                                                  int32_t error) {
     fuse_out_header out_header = {
@@ -906,7 +920,7 @@ TEST_F(FuseTest, Unlink) {
   ASSERT_TRUE(Mount());
   std::string witness = GetMountDir() + "/witness";
   ASSERT_TRUE(test_helper::ScopedFD(open(witness.c_str(), O_RDONLY)).is_valid());
-  ASSERT_EQ(unlink(witness.c_str()), 0);
+  ASSERT_EQ(unlink(witness.c_str()), 0) << strerror(errno);
   ASSERT_FALSE(test_helper::ScopedFD(open(witness.c_str(), O_RDONLY)).is_valid());
 }
 
@@ -1032,6 +1046,13 @@ TEST_F(FuseTest, Rename) {
   EXPECT_EQ(errno, ENOENT);
 
   EXPECT_EQ(stat(new_path.c_str(), &stat_buf), 0);
+}
+
+TEST_F(FuseTest, Rmdir) {
+  ASSERT_TRUE(Mount());
+  std::string dir = GetMountDir() + "/dir";
+  ASSERT_EQ(mkdir(dir.c_str(), 0777), 0);
+  EXPECT_EQ(rmdir(dir.c_str()), 0) << strerror(errno);
 }
 
 TEST_F(FuseServerTest, NoReqsUntilInitResponse) {

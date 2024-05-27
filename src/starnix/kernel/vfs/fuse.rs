@@ -1264,14 +1264,19 @@ impl FsNodeOps for Arc<FuseNode> {
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
-        _child: &FsNodeHandle,
+        child: &FsNodeHandle,
     ) -> Result<(), Errno> {
+        let is_dir = child.is_dir();
         self.connection
             .lock()
             .execute_operation(
                 current_task,
                 self.nodeid,
-                FuseOperation::Unlink { name: name.to_owned() },
+                if is_dir {
+                    FuseOperation::Rmdir { name: name.to_owned() }
+                } else {
+                    FuseOperation::Unlink { name: name.to_owned() }
+                },
             )
             .map(|_| ())
     }
@@ -1946,6 +1951,7 @@ enum RunningOperationKind {
     },
     RemoveXAttr,
     Rename,
+    Rmdir,
     Seek,
     SetAttr,
     SetXAttr,
@@ -2001,6 +2007,7 @@ impl RunningOperationKind {
             }
             Self::RemoveXAttr => uapi::fuse_opcode_FUSE_REMOVEXATTR,
             Self::Rename => uapi::fuse_opcode_FUSE_RENAME2,
+            Self::Rmdir => uapi::fuse_opcode_FUSE_RMDIR,
             Self::Seek => uapi::fuse_opcode_FUSE_LSEEK,
             Self::SetAttr => uapi::fuse_opcode_FUSE_SETATTR,
             Self::SetXAttr => uapi::fuse_opcode_FUSE_SETXATTR,
@@ -2089,6 +2096,7 @@ impl RunningOperationKind {
             | Self::Release { .. }
             | Self::RemoveXAttr
             | Self::Rename
+            | Self::Rmdir
             | Self::SetXAttr
             | Self::Unlink => Ok(FuseResponse::None),
             Self::Statfs => {
@@ -2214,6 +2222,9 @@ enum FuseOperation {
         old_name: FsString,
         new_dir: u64,
         new_name: FsString,
+    },
+    Rmdir {
+        name: FsString,
     },
     Seek(uapi::fuse_lseek_in),
     SetAttr(uapi::fuse_setattr_in),
@@ -2374,7 +2385,7 @@ impl FuseOperation {
                 len += Self::write_null_terminated(data, target)?;
                 Ok(len)
             }
-            Self::Unlink { name } => Self::write_null_terminated(data, name),
+            Self::Rmdir { name } | Self::Unlink { name } => Self::write_null_terminated(data, name),
             Self::Write { write_in, content } => {
                 let mut len = data.write_all(write_in.as_bytes())?;
                 len += data.write_all(content)?;
@@ -2428,6 +2439,7 @@ impl FuseOperation {
             Self::ReleaseDir(_) => uapi::fuse_opcode_FUSE_RELEASEDIR,
             Self::RemoveXAttr { .. } => uapi::fuse_opcode_FUSE_REMOVEXATTR,
             Self::Rename { .. } => uapi::fuse_opcode_FUSE_RENAME2,
+            Self::Rmdir { .. } => uapi::fuse_opcode_FUSE_RMDIR,
             Self::Seek(_) => uapi::fuse_opcode_FUSE_LSEEK,
             Self::SetAttr(_) => uapi::fuse_opcode_FUSE_SETATTR,
             Self::SetXAttr { .. } => uapi::fuse_opcode_FUSE_SETXATTR,
@@ -2470,6 +2482,7 @@ impl FuseOperation {
             Self::ReleaseDir(_) => RunningOperationKind::Release { dir: true },
             Self::RemoveXAttr { .. } => RunningOperationKind::RemoveXAttr,
             Self::Rename { .. } => RunningOperationKind::Rename,
+            Self::Rmdir { .. } => RunningOperationKind::Rmdir,
             Self::Seek(_) => RunningOperationKind::Seek,
             Self::SetAttr(_) => RunningOperationKind::SetAttr,
             Self::SetXAttr { .. } => RunningOperationKind::SetXAttr,
