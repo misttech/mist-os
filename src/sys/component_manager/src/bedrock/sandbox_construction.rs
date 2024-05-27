@@ -69,6 +69,7 @@ pub fn build_component_sandbox(
     framework_dict: &Dict,
     component_output_dict: &Dict,
     program_input_dict: &Dict,
+    program_input_dict_additions: &Dict,
     program_output: &Router,
     child_inputs: &mut StructuredDictMap<ComponentInput>,
     collection_inputs: &mut StructuredDictMap<ComponentInput>,
@@ -79,7 +80,13 @@ pub fn build_component_sandbox(
         environments
             .insert(
                 environment_decl.name.clone(),
-                build_environment(component, children, component_input, environment_decl),
+                build_environment(
+                    component,
+                    children,
+                    component_input,
+                    environment_decl,
+                    program_input_dict_additions,
+                ),
             )
             .ok();
     }
@@ -119,6 +126,7 @@ pub fn build_component_sandbox(
             children,
             component_input,
             program_input_dict,
+            program_input_dict_additions,
             program_output,
             framework_dict,
             use_,
@@ -354,6 +362,7 @@ fn build_environment(
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     component_input: &ComponentInput,
     environment_decl: &cm_rust::EnvironmentDecl,
+    program_input_dict_additions: &Dict,
 ) -> ComponentEnvironment {
     let mut environment = ComponentEnvironment::new();
     if environment_decl.extends == fdecl::EnvironmentExtends::Realm {
@@ -366,9 +375,12 @@ fn build_environment(
             basename: debug_protocol.source_name.clone(),
         };
         let router = match &debug_protocol.source {
-            cm_rust::RegistrationSource::Parent => {
-                use_from_parent_router(component_input, source_path, component.as_weak())
-            }
+            cm_rust::RegistrationSource::Parent => use_from_parent_router(
+                component_input,
+                source_path,
+                component.as_weak(),
+                program_input_dict_additions,
+            ),
             cm_rust::RegistrationSource::Self_ => component.program_output().lazy_get(
                 source_path.clone(),
                 RoutingError::use_from_self_not_found(
@@ -473,6 +485,7 @@ fn extend_dict_with_use(
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     component_input: &ComponentInput,
     program_input_dict: &Dict,
+    program_input_dict_additions: &Dict,
     program_output: &Router,
     framework_dict: &Dict,
     use_: &cm_rust::UseDecl,
@@ -483,9 +496,12 @@ fn extend_dict_with_use(
 
     let source_path = use_.source_path();
     let router = match use_.source() {
-        cm_rust::UseSource::Parent => {
-            use_from_parent_router(component_input, source_path.to_owned(), component.as_weak())
-        }
+        cm_rust::UseSource::Parent => use_from_parent_router(
+            component_input,
+            source_path.to_owned(),
+            component.as_weak(),
+            program_input_dict_additions,
+        ),
         cm_rust::UseSource::Self_ => program_output.clone().lazy_get(
             source_path.to_owned(),
             RoutingError::use_from_self_not_found(
@@ -563,6 +579,7 @@ fn use_from_parent_router(
     component_input: &ComponentInput,
     source_path: impl IterablePath + 'static + Debug,
     weak_component: WeakComponentInstance,
+    program_input_dict_additions: &Dict,
 ) -> Router {
     let component_input_capability = component_input.capabilities().lazy_get(
         source_path.clone(),
@@ -572,45 +589,20 @@ fn use_from_parent_router(
         ),
     );
 
+    let program_input_dict_additions = program_input_dict_additions.clone();
+
     Router::new(move |request| {
         let source_path = source_path.clone();
         let component_input_capability = component_input_capability.clone();
-        let Ok(component) = weak_component.upgrade() else {
-            return std::future::ready(Err(RoutingError::from(
-                ComponentInstanceError::InstanceNotFound {
-                    moniker: weak_component.moniker.clone(),
-                },
-            )
-            .into()))
-            .boxed();
+        let router = match program_input_dict_additions.get_capability(&source_path) {
+            // There's an addition to the program input dictionary for this
+            // capability, let's use it.
+            Some(Capability::Connector(s)) => Router::new_ok(s),
+            // There's no addition to the program input dictionary for this
+            // capability, let's use the component input dictionary.
+            _ => component_input_capability,
         };
-        async move {
-            let router = {
-                if let Some(resolved_state) = component.lock_state().await.get_resolved_state() {
-                    let additions = resolved_state.program_input_dict_additions.as_ref();
-                    match additions.and_then(|a| a.get_capability(&source_path)) {
-                        // There's an addition to the program input dictionary for this
-                        // capability, let's use it.
-                        Some(Capability::Connector(s)) => Router::new_ok(s),
-                        // There's no addition to the program input dictionary for this
-                        // capability, let's use the component input dictionary.
-                        _ => component_input_capability,
-                    }
-                } else {
-                    // If the component is not resolved and/or does not have additions to the
-                    // program input dictionary, then route this capability without any
-                    // additions.
-                    //
-                    // NOTE: there's a chance that the component is in the shutdown stage here.
-                    // The stop action clears the program_input_dict_additions, so even if
-                    // additions were set the last time the component was run they won't apply
-                    // after the component has stopped.
-                    component_input_capability
-                }
-            };
-            router.route(request).await
-        }
-        .boxed()
+        async move { router.route(request).await }.boxed()
     })
 }
 

@@ -113,7 +113,7 @@ struct StartContext {
     namespace_scope: ExecutionScope,
     numbered_handles: Vec<fprocess::HandleInfo>,
     encoded_config: Option<fmem::Data>,
-    program_input_dict_additions: Option<Dict>,
+    program_input_dict_additions: Dict,
     start_reason: StartReason,
     execution_controller_task: Option<controller::ExecutionControllerTask>,
     logger: Option<ScopedLogger>,
@@ -260,7 +260,7 @@ async fn do_start(
         namespace_scope,
         numbered_handles,
         encoded_config,
-        program_input_dict_additions,
+        program_input_dict_additions: program_input_dict_additions.unwrap_or_default(),
         start_reason: start_reason.clone(),
         execution_controller_task,
         logger,
@@ -302,7 +302,7 @@ async fn start_component(
             numbered_handles,
             namespace_scope,
             encoded_config,
-            program_input_dict_additions,
+            mut program_input_dict_additions,
             start_reason,
             execution_controller_task,
             logger,
@@ -365,10 +365,14 @@ async fn start_component(
         });
 
         // TODO(b/322564390): Move program_input_dict_additions into `StartedInstanceState`.
-        state
+        let component_program_input_dict_additions = &mut state
             .get_resolved_state_mut()
             .expect("expected component to be resolved")
-            .program_input_dict_additions = program_input_dict_additions;
+            .program_input_dict_additions;
+        let _ = component_program_input_dict_additions.drain();
+        for (key, value) in program_input_dict_additions.drain() {
+            component_program_input_dict_additions.insert(key, value).unwrap();
+        }
     }
 
     // Dispatch Started and DebugStarted events outside of the state lock, but under the

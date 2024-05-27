@@ -375,7 +375,7 @@ pub struct ResolvedInstanceState {
 
     /// Dictionary of extra capabilities passed to the component when it is started.
     // TODO(b/322564390): Move this into `StartedInstanceState` once stop action releases lock on it
-    pub program_input_dict_additions: Option<Dict>,
+    pub program_input_dict_additions: Dict,
 
     /// Dicts containing the capabilities we want to provide to each collection. Each new
     /// dynamic child gets a clone of one of these inputs (which is potentially extended by
@@ -466,7 +466,7 @@ impl ResolvedInstanceState {
             program_input_dict: Dict::new(),
             program_output_dict: Dict::new(),
             framework_dict: build_framework_dictionary(component),
-            program_input_dict_additions: None,
+            program_input_dict_additions: Dict::new(),
             collection_inputs: Default::default(),
             bedrock_environments: Default::default(),
             program_escrow,
@@ -491,6 +491,7 @@ impl ResolvedInstanceState {
             &state.framework_dict,
             &state.component_output_dict,
             &state.program_input_dict,
+            &state.program_input_dict_additions,
             &component.program_output(),
             &mut child_inputs,
             &mut state.collection_inputs,

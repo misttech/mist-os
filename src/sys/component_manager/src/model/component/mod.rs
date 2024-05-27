@@ -666,7 +666,7 @@ impl ComponentInstance {
         {
             let mut state = self.lock_state().await;
             if let Some(resolved_state) = state.get_resolved_state_mut() {
-                resolved_state.program_input_dict_additions = None;
+                let _ = resolved_state.program_input_dict_additions.drain();
             };
         }
 
