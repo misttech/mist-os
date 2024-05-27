@@ -23,13 +23,24 @@ Vnode::Vnode(Memfs& memfs)
 Vnode::~Vnode() { deleted_ino_ctr_.fetch_add(1, std::memory_order_relaxed); }
 
 fs::VnodeAttributesQuery Vnode::SupportedMutableAttributes() const {
-  return fs::VnodeAttributesQuery::kCreationTime | fs::VnodeAttributesQuery::kModificationTime;
+  return fs::VnodeAttributesQuery::kCreationTime | fs::VnodeAttributesQuery::kModificationTime |
+         fs::VnodeAttributesQuery::kMode | fs::VnodeAttributesQuery::kUid |
+         fs::VnodeAttributesQuery::kGid;
 }
 
 zx::result<> Vnode::UpdateAttributes(const fs::VnodeAttributesUpdate& attributes) {
-  // TODO(https://fxbug.dev/340626555): Add support for POSIX mode/uid/gid.
+  // TODO(): Add support for POSIX mode/uid/gid.
   create_time_ = attributes.creation_time.value_or(create_time_);
   modify_time_ = attributes.modification_time.value_or(modify_time_);
+  if (attributes.mode) {
+    mode_ = attributes.mode;
+  }
+  if (attributes.uid) {
+    uid_ = attributes.uid;
+  }
+  if (attributes.gid) {
+    gid_ = attributes.gid;
+  }
   return zx::ok();
 }
 

@@ -188,8 +188,9 @@ struct VnodeAttributes {
   std::optional<uint64_t> modification_time;
 
   // POSIX Compatibility Attributes
-  // TODO(https://fxbug.dev/340626555): Add support for uid/gid.
   std::optional<uint32_t> mode;
+  std::optional<uint32_t> uid;
+  std::optional<uint32_t> gid;
 
   // Compare two |VnodeAttributes| instances for equality.
   bool operator==(const VnodeAttributes& other) const {
@@ -212,7 +213,11 @@ struct VnodeAttributes {
 struct VnodeAttributesUpdate {
   std::optional<uint64_t> creation_time;
   std::optional<uint64_t> modification_time;
-  // TODO(https://fxbug.dev/340626555): Add support for mode/uid/gid.
+
+  // POSIX Compatibility Attributes
+  std::optional<uint32_t> mode;
+  std::optional<uint32_t> uid;
+  std::optional<uint32_t> gid;
 
   // Return a set of flags representing those attributes which we want to update.
   constexpr VnodeAttributesQuery Query() const {
@@ -223,6 +228,17 @@ struct VnodeAttributesUpdate {
     if (modification_time) {
       query |= VnodeAttributesQuery::kModificationTime;
     }
+#if !defined(__Fuchsia__) || FUCHSIA_API_LEVEL_AT_LEAST(18)
+    if (mode) {
+      query |= VnodeAttributesQuery::kMode;
+    }
+    if (uid) {
+      query |= VnodeAttributesQuery::kUid;
+    }
+    if (gid) {
+      query |= VnodeAttributesQuery::kGid;
+    }
+#endif
     return query;
   }
 
@@ -247,6 +263,17 @@ struct VnodeAttributesUpdate {
     if (attrs.has_modification_time()) {
       attr_update.modification_time = attrs.modification_time();
     }
+#if !defined(__Fuchsia__) || FUCHSIA_API_LEVEL_AT_LEAST(18)
+    if (attrs.has_mode()) {
+      attr_update.mode = attrs.mode();
+    }
+    if (attrs.has_uid()) {
+      attr_update.uid = attrs.uid();
+    }
+    if (attrs.has_gid()) {
+      attr_update.gid = attrs.gid();
+    }
+#endif
     return attr_update;
   }
 };

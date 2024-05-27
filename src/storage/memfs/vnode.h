@@ -54,6 +54,9 @@ class Vnode : public fs::PagedVnode {
   // Mutable so we can update the vnode's modified time when attributes are queried.
   // The modification time might need to be synchronized with writes to the paged VMO.
   mutable uint64_t modify_time_ = 0;
+  std::optional<uint32_t> mode_;
+  std::optional<uint32_t> uid_;
+  std::optional<uint32_t> gid_;
 
   void VmoRead(uint64_t offset, uint64_t length) final { ZX_PANIC("Not supported"); }
   void VmoDirty(uint64_t offset, uint64_t length) final { ZX_PANIC("Not supported"); }
