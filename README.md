@@ -15,7 +15,7 @@ _NOTE_: As derived from Fuchsia some scripts/tools are still necessary (plan to 
 
 ```
 # Clone the REPO
-git clone https://bitbucket.org/misttech/mist-os.git
+git clone https://github.com/misttech/mist-os.git
 
 # Jiri Bootstrap:
 curl -s "https://fuchsia.googlesource.com/jiri/+/HEAD/scripts/bootstrap_jiri?format=TEXT" | base64 --decode | bash -s mist-os
@@ -30,6 +30,9 @@ make it
 
 # Build and run qemu
 make it rain
+
+# Build and run some tests
+make test
 ```
 
 ## Repo
