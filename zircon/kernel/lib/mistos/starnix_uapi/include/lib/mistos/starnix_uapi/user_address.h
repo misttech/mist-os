@@ -97,6 +97,26 @@ class UserAddress {
 
 using UserCString = UserAddress;
 
+template <typename T>
+class UserRef {
+ public:
+  UserRef(UserAddress addr) : addr_(addr) {}
+
+  UserAddress addr() { return addr_; }
+
+  UserRef<T> next() { return UserRef(addr() + sizeof(T)); }
+
+  UserRef at(size_t index) { UserRef(addr() + index * sizeof(T)); }
+
+  template <typename S>
+  UserRef<S> cast() {
+    return UserRef<S>(addr_);
+  }
+
+ private:
+  UserAddress addr_;
+};
+
 }  // namespace starnix_uapi
 
 #endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_USER_ADDRESS_H_
