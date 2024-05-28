@@ -35,6 +35,7 @@ source_set("impl") {
     "fs/read_write.cc",
     "fs/stat.cc",
     "kernel/exit.cc",
+    "kernel/fork.cc",
     "kernel/sched/core.cc",
     "kernel/sys.cc",
     "mm/mmap.cc",
