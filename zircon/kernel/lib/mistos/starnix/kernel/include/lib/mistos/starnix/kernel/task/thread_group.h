@@ -13,6 +13,7 @@
 #include <lib/mistos/starnix/kernel/task/thread_group_decl.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/resource_limits.h>
+#include <lib/mistos/util/weak_wrapper.h>
 #include <lib/mistos/zx/process.h>
 
 #include <fbl/canary.h>
@@ -27,7 +28,7 @@ namespace starnix {
 class ThreadGroupMutableState {
  public:
   using BTreeMapTaskContainer = fbl::WAVLTree<pid_t, ktl::unique_ptr<TaskContainer>>;
-  using BTreeMapThreadGroup = fbl::WAVLTree<pid_t, fbl::RefPtr<ThreadGroup>>;
+  using BTreeMapThreadGroup = fbl::WAVLTree<pid_t, util::WeakPtr<ThreadGroup>>;
 
   // The parent thread group.
   //
@@ -146,7 +147,7 @@ class ThreadGroupMutableState {
 ///
 /// Thread groups are destroyed when the last task in the group exits.
 class ThreadGroup : public fbl::RefCounted<ThreadGroup>,
-                    public fbl::WAVLTreeContainable<fbl::RefPtr<ThreadGroup>> {
+                    public fbl::WAVLTreeContainable<util::WeakPtr<ThreadGroup>> {
  public:
   // The kernel to which this thread group belongs.
   fbl::RefPtr<Kernel> kernel;
@@ -216,10 +217,12 @@ class ThreadGroup : public fbl::RefCounted<ThreadGroup>,
   const ThreadGroupMutableState& read() const { return *mutable_state_.Read(); }
   ThreadGroupMutableState& write() { return *mutable_state_.Write(); }
 
-  // C++
  public:
+  // C++
+  ~ThreadGroup();
+
   // WAVL-tree Index
-  uint GetKey() const { return leader; }
+  pid_t GetKey() const { return leader; }
 
  private:
   ThreadGroup(fbl::RefPtr<Kernel> kernel, zx::process process, pid_t leader,

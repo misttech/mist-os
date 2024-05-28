@@ -9,6 +9,7 @@
 #include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/task/forward.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
+#include <lib/mistos/util/weak_wrapper.h>
 
 #include <fbl/canary.h>
 #include <fbl/intrusive_wavl_tree.h>
@@ -26,8 +27,7 @@ struct SessionMutableState {
   /// The references to ProcessGroup is weak to prevent cycles as ProcessGroup have a Arc reference
   /// to their session. It is still expected that these weak references are always valid, as process
   /// groups must unregister themselves before they are deleted.
-  // process_groups: BTreeMap<pid_t, Weak<ProcessGroup>>,
-  fbl::WAVLTree<pid_t, fbl::RefPtr<ProcessGroup>> process_groups_;
+  fbl::WAVLTree<pid_t, util::WeakPtr<ProcessGroup>> process_groups_;
 
  public:
   /// The controlling terminal of the session.
