@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/result.h>
 
