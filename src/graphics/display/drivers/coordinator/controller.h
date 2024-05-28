@@ -65,22 +65,22 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
   //
   // Asynchronous work that manages the state of the display clients and
   // coordinates the display state between clients and engine drivers runs on
-  // `dispatcher`.
+  // `client_dispatcher`.
   //
   // `engine_driver_client` must not be null.
   //
-  // `dispatcher` must be running until `PrepareStop()` is called.
-  // `dispatcher` must be shut down when `Stop()` is called.
+  // `client_dispatcher` must be running until `PrepareStop()` is called.
+  // `client_dispatcher` must be shut down when `Stop()` is called.
   static zx::result<std::unique_ptr<Controller>> Create(
       std::unique_ptr<EngineDriverClient> engine_driver_client,
-      fdf::UnownedSynchronizedDispatcher dispatcher);
+      fdf::UnownedSynchronizedDispatcher client_dispatcher);
 
   // Creates a new coordinator Controller instance. It creates a new Inspector
   // which will be solely owned by the Controller instance.
   //
   // `engine_driver_client` must not be null.
   explicit Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
-                      fdf::UnownedSynchronizedDispatcher dispatcher);
+                      fdf::UnownedSynchronizedDispatcher client_dispatcher);
 
   // Creates a new coordinator Controller instance with an injected `inspector`.
   // The `inspector` and inspect data may be duplicated and shared.
@@ -103,7 +103,7 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
   // References the `Stop()` method in the DFv2 (fdf::DriverBase) driver
   // lifecycle.
   //
-  // Must be called after `dispatcher_` is stopped.
+  // Must be called after `client_dispatcher_` is shut down.
   void Stop();
 
   // fuchsia.hardware.display.controller/DisplayControllerInterface:
@@ -143,9 +143,11 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
 
   bool supports_capture() { return supports_capture_; }
 
-  async_dispatcher_t* async_dispatcher() { return dispatcher_->async_dispatcher(); }
-  bool IsRunningOnDispatcher() {
-    return fdf::Dispatcher::GetCurrent()->get() == dispatcher_->get();
+  fdf::UnownedSynchronizedDispatcher client_dispatcher() const {
+    return client_dispatcher_->borrow();
+  }
+  bool IsRunningOnClientDispatcher() {
+    return fdf::Dispatcher::GetCurrent()->get() == client_dispatcher_->get();
   }
 
   // Thread-safety annotations currently don't deal with pointer aliases. Use this to document
@@ -219,7 +221,7 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
   fuchsia_hardware_display::wire::VirtconMode virtcon_mode_ __TA_GUARDED(mtx()) =
       fuchsia_hardware_display::wire::VirtconMode::kInactive;
 
-  fdf::UnownedSynchronizedDispatcher dispatcher_;
+  fdf::UnownedSynchronizedDispatcher client_dispatcher_;
 
   std::unique_ptr<async_watchdog::Watchdog> watchdog_;
   std::unique_ptr<EngineDriverClient> engine_driver_client_;

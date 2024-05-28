@@ -75,19 +75,21 @@ FakeDisplayStack::FakeDisplayStack(std::shared_ptr<zx_device> mock_root,
   }
 
   zx::result<fdf::SynchronizedDispatcher> create_dispatcher_result =
-      fdf::SynchronizedDispatcher::Create(
-          fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "display-client-loop",
-          [this](fdf_dispatcher_t* dispatcher) { coordinator_dispatcher_is_shut_down_.Signal(); });
+      fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
+                                          "display-client-loop",
+                                          [this](fdf_dispatcher_t* dispatcher) {
+                                            coordinator_client_dispatcher_is_shut_down_.Signal();
+                                          });
   if (create_dispatcher_result.is_error()) {
     ZX_PANIC("Failed to create dispatcher: %s", create_dispatcher_result.status_string());
   }
-  coordinator_dispatcher_ = std::move(create_dispatcher_result).value();
+  coordinator_client_dispatcher_ = std::move(create_dispatcher_result).value();
 
   ddk::DisplayControllerImplProtocolClient display_controller_impl_client(
       display_->display_controller_impl_banjo_protocol());
   auto engine_driver_client = std::make_unique<EngineDriverClient>(display_controller_impl_client);
   zx::result<std::unique_ptr<Controller>> create_controller_result =
-      Controller::Create(std::move(engine_driver_client), coordinator_dispatcher_.borrow());
+      Controller::Create(std::move(engine_driver_client), coordinator_client_dispatcher_.borrow());
   if (create_controller_result.is_error()) {
     ZX_PANIC("Failed to create display coordinator Controller device: %s",
              create_controller_result.status_string());
@@ -188,8 +190,8 @@ void FakeDisplayStack::SyncShutdown() {
 
   coordinator_controller_->PrepareStop();
 
-  coordinator_dispatcher_.ShutdownAsync();
-  coordinator_dispatcher_is_shut_down_.Wait();
+  coordinator_client_dispatcher_.ShutdownAsync();
+  coordinator_client_dispatcher_is_shut_down_.Wait();
 
   coordinator_controller_->Stop();
   coordinator_controller_.reset();

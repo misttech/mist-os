@@ -177,7 +177,7 @@ zx::result<> Controller::AddDisplay(const added_display_args_t& banjo_added_disp
   }
 
   zx::result<> post_task_result =
-      PostTask(std::move(post_task_state), *async_dispatcher(),
+      PostTask(std::move(post_task_state), *client_dispatcher()->async_dispatcher(),
                [this, display_info = std::move(display_info)]() {
                  if (display_info->edid.has_value()) {
                    PopulateDisplayTimings(display_info);
@@ -239,8 +239,8 @@ zx::result<> Controller::RemoveDisplay(DisplayId display_id) {
     zxlogf(ERROR, "No memory when processing hotplug");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
-  zx::result<> post_task_result =
-      PostTask(std::move(post_task_state), *async_dispatcher(), [this, display_id]() {
+  zx::result<> post_task_result = PostTask(
+      std::move(post_task_state), *client_dispatcher()->async_dispatcher(), [this, display_id]() {
         fbl::AutoLock lock(mtx());
         const std::array<DisplayId, 1> removed_display_ids = {
             display_id,
@@ -287,23 +287,24 @@ void Controller::DisplayControllerInterfaceOnCaptureComplete() {
     return;
   }
 
-  zx::result<> post_task_result = PostTask<kDisplayTaskTargetSize>(*async_dispatcher(), [this]() {
-    // Free an image that was previously used by the hardware.
-    if (pending_release_capture_image_id_ != kInvalidDriverCaptureImageId) {
-      ReleaseCaptureImage(pending_release_capture_image_id_);
-      pending_release_capture_image_id_ = kInvalidDriverCaptureImageId;
-    }
+  zx::result<> post_task_result =
+      PostTask<kDisplayTaskTargetSize>(*client_dispatcher()->async_dispatcher(), [this]() {
+        // Free an image that was previously used by the hardware.
+        if (pending_release_capture_image_id_ != kInvalidDriverCaptureImageId) {
+          ReleaseCaptureImage(pending_release_capture_image_id_);
+          pending_release_capture_image_id_ = kInvalidDriverCaptureImageId;
+        }
 
-    fbl::AutoLock lock(mtx());
-    if (virtcon_client_ready_) {
-      ZX_DEBUG_ASSERT(virtcon_client_ != nullptr);
-      virtcon_client_->OnCaptureComplete();
-    }
-    if (primary_client_ready_) {
-      ZX_DEBUG_ASSERT(primary_client_ != nullptr);
-      primary_client_->OnCaptureComplete();
-    }
-  });
+        fbl::AutoLock lock(mtx());
+        if (virtcon_client_ready_) {
+          ZX_DEBUG_ASSERT(virtcon_client_ != nullptr);
+          virtcon_client_->OnCaptureComplete();
+        }
+        if (primary_client_ready_) {
+          ZX_DEBUG_ASSERT(primary_client_ != nullptr);
+          primary_client_->OnCaptureComplete();
+        }
+      });
   if (post_task_result.is_error()) {
     zxlogf(ERROR, "Failed to dispatch capture complete task: %s", post_task_result.status_string());
   }
@@ -793,8 +794,8 @@ zx_status_t Controller::CreateClient(
   }
   HandleClientOwnershipChanges();
 
-  zx::result<> post_task_result =
-      PostTask(std::move(post_task_state), *async_dispatcher(), [this, client_id]() {
+  zx::result<> post_task_result = PostTask(
+      std::move(post_task_state), *client_dispatcher()->async_dispatcher(), [this, client_id]() {
         fbl::AutoLock lock(mtx());
         if (unbinding_) {
           return;
@@ -884,7 +885,7 @@ zx::result<> Controller::Initialize() {
   fbl::AllocChecker alloc_checker;
   watchdog_ = fbl::make_unique_checked<async_watchdog::Watchdog>(
       &alloc_checker, "display-client-loop", kWatchdogWarningIntervalMs, kWatchdogTimeoutMs,
-      dispatcher_->async_dispatcher());
+      client_dispatcher_->async_dispatcher());
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for Watchdog");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -939,11 +940,12 @@ Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
 }
 
 Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
-                       fdf::UnownedSynchronizedDispatcher dispatcher, inspect::Inspector inspector)
+                       fdf::UnownedSynchronizedDispatcher client_dispatcher,
+                       inspect::Inspector inspector)
     : inspector_(std::move(inspector)),
       root_(inspector_.GetRoot().CreateChild("display")),
       vsync_monitor_(root_.CreateChild("vsync_monitor")),
-      dispatcher_(std::move(dispatcher)),
+      client_dispatcher_(std::move(client_dispatcher)),
       engine_driver_client_(std::move(engine_driver_client)) {
   ZX_DEBUG_ASSERT(engine_driver_client_ != nullptr);
 

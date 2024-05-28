@@ -32,21 +32,22 @@ zx::result<> CoordinatorDriver::Start() {
   }
 
   const char kSchedulerRoleName[] = "fuchsia.graphics.display.drivers.display.controller";
-  zx::result<fdf::SynchronizedDispatcher> create_dispatcher_result =
+  zx::result<fdf::SynchronizedDispatcher> create_client_dispatcher_result =
       fdf::SynchronizedDispatcher::Create(
           fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "display-client-loop",
           [](fdf_dispatcher_t* dispatcher) {
-            FDF_LOG(DEBUG, "Display coordinator dispatcher is shut down.");
+            FDF_LOG(DEBUG, "Display coordinator client dispatcher is shut down.");
           },
           kSchedulerRoleName);
-  if (create_dispatcher_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create dispatcher: %s", create_dispatcher_result.status_string());
-    return create_dispatcher_result.take_error();
+  if (create_client_dispatcher_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to create dispatcher: %s",
+            create_client_dispatcher_result.status_string());
+    return create_client_dispatcher_result.take_error();
   }
-  dispatcher_ = std::move(create_dispatcher_result).value();
+  client_dispatcher_ = std::move(create_client_dispatcher_result).value();
 
   zx::result<std::unique_ptr<Controller>> create_controller_result = Controller::Create(
-      std::move(create_engine_driver_client_result).value(), dispatcher_.borrow());
+      std::move(create_engine_driver_client_result).value(), client_dispatcher_.borrow());
   if (create_controller_result.is_error()) {
     FDF_LOG(ERROR, "Failed to create Controller: %s", create_controller_result.status_string());
     return create_controller_result.take_error();

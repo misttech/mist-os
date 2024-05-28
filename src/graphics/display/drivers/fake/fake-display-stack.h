@@ -65,8 +65,8 @@ class FakeDisplayStack {
   // be torn down on `SyncShutdown()`.
   zx_device_t* sysmem_device_;
 
-  fdf::SynchronizedDispatcher coordinator_dispatcher_;
-  libsync::Completion coordinator_dispatcher_is_shut_down_;
+  fdf::SynchronizedDispatcher coordinator_client_dispatcher_;
+  libsync::Completion coordinator_client_dispatcher_is_shut_down_;
 
   std::unique_ptr<fake_display::FakeDisplay> display_;
   std::unique_ptr<Controller> coordinator_controller_;
