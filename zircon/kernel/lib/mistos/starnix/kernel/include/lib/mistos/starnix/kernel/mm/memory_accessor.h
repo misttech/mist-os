@@ -272,7 +272,7 @@ class MemoryAccessorExt : public MemoryAccessor {
 
   template <typename T>
   fit::result<Errno, size_t> write_object(UserRef<T> user, const T& object) const {
-    ktl::span<uint8_t> data{reinterpret_cast<uint8_t*>(&object), sizeof(T)};
+    ktl::span<const uint8_t> data{reinterpret_cast<const uint8_t*>(&object), sizeof(T)};
     return this->write_memory(user.addr(), data);
   }
 
