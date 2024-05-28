@@ -32,7 +32,7 @@ class SegmentManagerTest : public F2fsFakeDevTestFixture {
       for (size_t i = 0; i < fs_->GetSuperblockInfo().GetBlocksPerSeg(); ++i) {
         FileTester::AppendToFile(vnode.get(), buf.data(), buf.size());
       }
-      vnode->SyncFile(0, vnode->GetSize(), 0);
+      vnode->SyncFile(false);
       size_t truncate_size = vnode->GetSize() * (100 - invalidate_ratio) / 100;
       EXPECT_EQ(vnode->Truncate(truncate_size), ZX_OK);
       vnode->Close();

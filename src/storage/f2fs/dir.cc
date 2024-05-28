@@ -75,7 +75,7 @@ fuchsia_io::NodeProtocolKinds Dir::GetProtocols() const {
   return fuchsia_io::NodeProtocolKinds::kDirectory;
 }
 
-block_t Dir::DirBlocks() { return safemath::checked_cast<block_t>(GetBlockCount()); }
+size_t Dir::DirBlocks() { return CheckedDivRoundUp<uint64_t>(GetSize(), kBlockSize); }
 
 void Dir::SetDeType(DirEntry *de, VnodeF2fs *vnode) {
   de->file_type = kTypeByMode[(vnode->GetMode() & S_IFMT) >> kStatShift];

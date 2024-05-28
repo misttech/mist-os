@@ -304,16 +304,16 @@ zx::result<pgoff_t> F2fs::FlushDirtyNodePages(WritebackOperation &operation) {
             return ZX_OK;
           },
           [this](fbl::RefPtr<VnodeF2fs> &vnode) {
+            if (vnode->GetDirtyPageCount()) {
+              return ZX_ERR_NEXT;
+            }
             // Update the node page of every dirty vnode before writeback.
             LockedPage node_page;
             if (zx_status_t ret = node_manager_->GetNodePage(vnode->GetKey(), &node_page);
                 ret != ZX_OK) {
               return ret;
             }
-            if (vnode->GetDirtyPageCount()) {
-              return ZX_ERR_NEXT;
-            }
-            vnode->UpdateInodePage(node_page);
+            vnode->UpdateInodePage(node_page, true);
             return ZX_OK;
           });
       status != ZX_OK) {

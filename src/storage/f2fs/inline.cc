@@ -402,7 +402,7 @@ zx_status_t File::WriteInline(const void *data, size_t len, size_t offset, size_
   inline_page->WaitOnWriteback();
   inline_page->Write(data, InlineDataOffset() + offset, len);
 
-  SetSize(std::max(static_cast<size_t>(GetSize()), offset + len));
+  SetSize(std::max(GetSize(), offset + len));
   SetFlag(InodeInfoFlag::kDataExist);
   inline_page.SetDirty();
 
@@ -422,8 +422,9 @@ zx_status_t File::TruncateInline(size_t len, bool is_recover) {
 
   inline_page->WaitOnWriteback();
 
-  size_t size_diff = (len > GetSize()) ? (len - GetSize()) : (GetSize() - len);
-  size_t offset = InlineDataOffset() + ((len > GetSize()) ? GetSize() : len);
+  size_t size = GetSize();
+  size_t size_diff = (len > size) ? (len - size) : (size - len);
+  size_t offset = InlineDataOffset() + ((len > size) ? size : len);
   inline_page.Zero(offset, offset + size_diff);
 
   // When removing inline data during recovery, file size should not be modified.

@@ -103,7 +103,7 @@ TEST_F(FileTest, NidAndBlkaddrAllocFree) {
     FileTester::AppendToFile(test_file_ptr, buf, kPageSize);
   }
 
-  test_file_ptr->SyncFile(0, safemath::checked_cast<loff_t>(test_file_ptr->GetSize()), false);
+  test_file_ptr->SyncFile(false);
 
   MapTester::CheckNodeLevel(fs_.get(), test_file_ptr, level);
 

@@ -99,8 +99,7 @@ VmoManager::VmoManager(VmoMode mode, size_t content_size, size_t node_size, zx::
       node_size_in_blocks_(address_to_page(node_size)),
       node_size_(node_size),
       vmo_(std::move(vmo)) {
-  ZX_ASSERT(!(node_size % kBlockSize));
-  std::lock_guard lock(mutex_);
+  ZX_DEBUG_ASSERT(!(node_size % kBlockSize));
   if (mode == VmoMode::kPaged) {
     size_t vmo_size = 0;
     size_t vmo_content_size = 0;
@@ -330,6 +329,7 @@ void VmoManager::AllowEviction(fs::PagedVfs &vfs, const size_t start, const size
   fs::SharedLock lock(mutex_);
   size_t actual_end = std::min(end, GetContentSizeUnsafe(true));
   if (start < actual_end) {
+    // This only applies to pages in the given range that are already committed
     ZX_ASSERT(vmo_.op_range(ZX_VMO_OP_DONT_NEED, start, actual_end - start, nullptr, 0) == ZX_OK);
   }
 }

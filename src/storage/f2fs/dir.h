@@ -115,7 +115,7 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
 
  private:
   // helper
-  block_t DirBlocks();
+  size_t DirBlocks();
   void SetDeType(DirEntry *de, VnodeF2fs *vnode);
   bool EarlyMatchName(std::string_view name, f2fs_hash_t namehash, const DirEntry &de);
   zx::result<bool> IsSubdir(Dir *possible_dir);

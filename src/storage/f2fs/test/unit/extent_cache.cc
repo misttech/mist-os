@@ -337,7 +337,7 @@ TEST_F(ExtentCacheTest, RecoveryConsistency) {
     ASSERT_EQ(out_actual, kPageSize);
   }
 
-  ASSERT_EQ(file_->SyncFile(0, safemath::checked_cast<loff_t>(file_->GetSize()), 0), ZX_OK);
+  ASSERT_EQ(file_->SyncFile(false), ZX_OK);
 
   // Checkpoint should not be performed.
   uint64_t curr_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
