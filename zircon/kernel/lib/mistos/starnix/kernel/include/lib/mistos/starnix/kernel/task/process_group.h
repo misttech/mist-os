@@ -59,7 +59,7 @@ class Session;
 /// can also explicitly change its own PGID using the setpgid() system call.
 ///
 /// Process groups are destroyed when the last process in the group exits.
-class ProcessGroup : public fbl::RefCounted<ProcessGroup>,
+class ProcessGroup : public fbl::RefCountedUpgradeable<ProcessGroup>,
                      public fbl::WAVLTreeContainable<util::WeakPtr<ProcessGroup>> {
  public:
   // The session of the process group.

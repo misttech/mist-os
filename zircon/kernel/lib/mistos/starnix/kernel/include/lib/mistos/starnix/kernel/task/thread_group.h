@@ -17,8 +17,8 @@
 #include <lib/mistos/zx/process.h>
 
 #include <fbl/canary.h>
-#include <fbl/recycler.h>
 #include <fbl/ref_counted.h>
+#include <fbl/ref_counted_upgradeable.h>
 #include <fbl/ref_ptr.h>
 #include <ktl/optional.h>
 
@@ -120,6 +120,7 @@ class ThreadGroupMutableState {
 
  private:
   friend class ThreadGroup;
+
   ThreadGroup* base_ = nullptr;
 };
 
@@ -146,7 +147,7 @@ class ThreadGroupMutableState {
 /// `pid` as the `tgid` is called the thread group leader.
 ///
 /// Thread groups are destroyed when the last task in the group exits.
-class ThreadGroup : public fbl::RefCounted<ThreadGroup>,
+class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
                     public fbl::WAVLTreeContainable<util::WeakPtr<ThreadGroup>> {
  public:
   // The kernel to which this thread group belongs.
