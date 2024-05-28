@@ -8,6 +8,7 @@
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix/kernel/task/forward.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
+#include <lib/mistos/util/weak_wrapper.h>
 #include <lib/mistos/zx/process.h>
 
 #include <optional>
@@ -22,17 +23,7 @@
 namespace starnix {
 
 class ProcessGroupMutableState {
- public:
-  using BTree = fbl::WAVLTree<pid_t, fbl::RefPtr<ThreadGroup>>;
-
-  ProcessGroupMutableState(const ProcessGroupMutableState&) = delete;
-  ProcessGroupMutableState& operator=(const ProcessGroupMutableState&) = delete;
-
-  ProcessGroupMutableState();
-
-  bool Initialize();
-
-  BTree& thread_groups() { return thread_groups_; }
+  using BTree = fbl::WAVLTree<pid_t, util::WeakPtr<ThreadGroup>>;
 
  private:
   /// The thread_groups in the process group.
@@ -44,11 +35,32 @@ class ProcessGroupMutableState {
 
   // Whether this process group is orphaned and already notified its members.
   // bool orphaned_ = false;
+
+ private:
+  friend class ProcessGroup;
 };
 
 class Session;
+
+/// A process group is a set of processes that are considered to be a unit for the purposes of job
+/// control and signal delivery. Each process in a process group has the same process group
+/// ID (PGID). The process with the same PID as the PGID is called the process group leader.
+///
+/// When a signal is sent to a process group, it is delivered to all processes in the group,
+/// including the process group leader. This allows a single signal to be used to control all
+/// processes in a group, such as stopping or resuming them all.
+///
+/// Process groups are also used for job control. The foreground and background process groups of a
+/// terminal are used to determine which processes can read from and write to the terminal. The
+/// foreground process group is the only process group that can read from and write to the terminal
+/// at any given time.
+///
+/// When a process forks from its parent, the child process inherits the parent's PGID. A process
+/// can also explicitly change its own PGID using the setpgid() system call.
+///
+/// Process groups are destroyed when the last process in the group exits.
 class ProcessGroup : public fbl::RefCounted<ProcessGroup>,
-                     public fbl::WAVLTreeContainable<fbl::RefPtr<ProcessGroup>> {
+                     public fbl::WAVLTreeContainable<util::WeakPtr<ProcessGroup>> {
  public:
   // The session of the process group.
   fbl::RefPtr<Session> session;
@@ -58,22 +70,16 @@ class ProcessGroup : public fbl::RefCounted<ProcessGroup>,
 
  private:
   /// The mutable state of the ProcessGroup.
-  // mutable_state : OrderedRwLock<ProcessGroupMutableState, ProcessGroupState>,
-  mutable DECLARE_MUTEX(ProcessGroup) pg_mutable_state_rw_lock_;
-  ProcessGroupMutableState mutable_state_ TA_GUARDED(pg_mutable_state_rw_lock_);
+  mutable RwLock<ProcessGroupMutableState> mutable_state_;
 
-  /// impl ProcessGroup
  public:
+  /// impl ProcessGroup
   static fbl::RefPtr<ProcessGroup> New(pid_t pid, ktl::optional<fbl::RefPtr<Session>>);
-
-  Lock<Mutex>* pg_mutable_state_rw_lock() const TA_RET_CAP(pg_mutable_state_rw_lock_) {
-    return &pg_mutable_state_rw_lock_;
-  }
 
   void insert(fbl::RefPtr<ThreadGroup> thread_group);
 
-  // C++
  public:
+  // C++
   ~ProcessGroup();
 
  private:

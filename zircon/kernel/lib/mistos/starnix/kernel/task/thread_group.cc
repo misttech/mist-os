@@ -53,6 +53,8 @@ uint64_t ThreadGroup::get_rlimit(starnix_uapi::Resource resource) const {
   return limits.Lock()->get(resource).rlim_cur;
 }
 
+ThreadGroup::~ThreadGroup() = default;
+
 ThreadGroup::ThreadGroup(fbl::RefPtr<Kernel> _kernel, zx::process _process, pid_t _leader,
                          ktl::optional<fbl::RefPtr<ThreadGroup>> parent,
                          fbl::RefPtr<ProcessGroup> process_group)
