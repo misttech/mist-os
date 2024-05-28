@@ -18,6 +18,8 @@
 #include <memory>
 #include <optional>
 
+#include "lib/fdf/cpp/dispatcher.h"
+#include "lib/sync/cpp/completion.h"
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
@@ -62,6 +64,9 @@ class FakeDisplayStack {
   // All the devices have transferred their ownership to `mock_root_` and will
   // be torn down on `SyncShutdown()`.
   zx_device_t* sysmem_device_;
+
+  fdf::SynchronizedDispatcher coordinator_dispatcher_;
+  libsync::Completion coordinator_dispatcher_is_shut_down_;
 
   std::unique_ptr<fake_display::FakeDisplay> display_;
   std::unique_ptr<Controller> coordinator_controller_;

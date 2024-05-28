@@ -62,21 +62,32 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
  public:
   // Factory method for production use.
   // Creates and initializes a Controller instance.
+  //
+  // Asynchronous work that manages the state of the display clients and
+  // coordinates the display state between clients and engine drivers runs on
+  // `dispatcher`.
+  //
+  // `engine_driver_client` must not be null.
+  //
+  // `dispatcher` must be running until `PrepareStop()` is called.
+  // `dispatcher` must be shut down when `Stop()` is called.
   static zx::result<std::unique_ptr<Controller>> Create(
-      std::unique_ptr<EngineDriverClient> engine_driver_client);
+      std::unique_ptr<EngineDriverClient> engine_driver_client,
+      fdf::UnownedSynchronizedDispatcher dispatcher);
 
   // Creates a new coordinator Controller instance. It creates a new Inspector
   // which will be solely owned by the Controller instance.
   //
   // `engine_driver_client` must not be null.
-  explicit Controller(std::unique_ptr<EngineDriverClient> engine_driver_client);
+  explicit Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
+                      fdf::UnownedSynchronizedDispatcher dispatcher);
 
   // Creates a new coordinator Controller instance with an injected `inspector`.
   // The `inspector` and inspect data may be duplicated and shared.
   //
   // `engine_driver_client` must not be null.
   Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
-             inspect::Inspector inspector);
+             fdf::UnownedSynchronizedDispatcher dispatcher, inspect::Inspector inspector);
 
   Controller(const Controller&) = delete;
   Controller& operator=(const Controller&) = delete;
@@ -85,8 +96,14 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
 
   static void PopulateDisplayMode(const display::DisplayTiming& timing, display_mode_t* mode);
 
-  // These method names reference the DFv2 (fdf::DriverBase) driver lifecycle.
+  // References the `PrepareStop()` method in the DFv2 (fdf::DriverBase) driver
+  // lifecycle.
   void PrepareStop();
+
+  // References the `Stop()` method in the DFv2 (fdf::DriverBase) driver
+  // lifecycle.
+  //
+  // Must be called after `dispatcher_` is stopped.
   void Stop();
 
   // fuchsia.hardware.display.controller/DisplayControllerInterface:
@@ -126,8 +143,11 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
 
   bool supports_capture() { return supports_capture_; }
 
-  async_dispatcher_t* async_dispatcher() { return dispatcher_.async_dispatcher(); }
-  bool IsRunningOnDispatcher() { return fdf::Dispatcher::GetCurrent()->get() == dispatcher_.get(); }
+  async_dispatcher_t* async_dispatcher() { return dispatcher_->async_dispatcher(); }
+  bool IsRunningOnDispatcher() {
+    return fdf::Dispatcher::GetCurrent()->get() == dispatcher_->get();
+  }
+
   // Thread-safety annotations currently don't deal with pointer aliases. Use this to document
   // places where we believe a mutex aliases mtx()
   void AssertMtxAliasHeld(mtx_t* m) __TA_ASSERT(m) { ZX_DEBUG_ASSERT(m == mtx()); }
@@ -137,10 +157,6 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
   // Test helpers
   size_t TEST_imported_images_count() const;
   ConfigStamp TEST_controller_stamp() const;
-  void SetDispatcherForTesting(fdf::SynchronizedDispatcher dispatcher) {
-    dispatcher_ = std::move(dispatcher);
-  }
-  void ShutdownDispatcherForTesting() { dispatcher_.ShutdownAsync(); }
 
   // Typically called by OpenController/OpenVirtconController.  However, this is made public
   // for use by testing services which provide a fake display controller.
@@ -203,8 +219,7 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
   fuchsia_hardware_display::wire::VirtconMode virtcon_mode_ __TA_GUARDED(mtx()) =
       fuchsia_hardware_display::wire::VirtconMode::kInactive;
 
-  fdf::SynchronizedDispatcher dispatcher_;
-  libsync::Completion dispatcher_shutdown_completion_;
+  fdf::UnownedSynchronizedDispatcher dispatcher_;
 
   std::unique_ptr<async_watchdog::Watchdog> watchdog_;
   std::unique_ptr<EngineDriverClient> engine_driver_client_;
