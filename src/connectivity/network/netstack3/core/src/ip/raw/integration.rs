@@ -51,12 +51,17 @@ impl<
 impl<I: RawIpSocketsIpExt, BT: BindingsTypes, L: LockBefore<lock_ordering::AllRawIpSockets<I>>>
     RawIpSocketMapContext<I, BT> for CoreCtx<'_, BT, L>
 {
-    fn with_socket_map<O, F: FnOnce(&RawIpSocketMap<I, Self::WeakDeviceId, BT>) -> O>(
+    type StateCtx<'a> = CoreCtx<'a, BT, lock_ordering::AllRawIpSockets<I>>;
+
+    fn with_socket_map_and_state_ctx<
+        O,
+        F: FnOnce(&RawIpSocketMap<I, Self::WeakDeviceId, BT>, &mut Self::StateCtx<'_>) -> O,
+    >(
         &mut self,
         cb: F,
     ) -> O {
-        let sockets = self.read_lock::<lock_ordering::AllRawIpSockets<I>>();
-        cb(&sockets)
+        let (sockets, mut core_ctx) = self.read_lock_and::<lock_ordering::AllRawIpSockets<I>>();
+        cb(&sockets, &mut core_ctx)
     }
     fn with_socket_map_mut<O, F: FnOnce(&mut RawIpSocketMap<I, Self::WeakDeviceId, BT>) -> O>(
         &mut self,

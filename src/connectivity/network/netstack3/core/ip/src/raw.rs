@@ -322,8 +322,20 @@ impl<I: RawIpSocketsIpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsType
 pub trait RawIpSocketMapContext<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes>:
     DeviceIdContext<AnyDevice>
 {
+    /// The implementation of `RawIpSocketStateContext` available after having
+    /// accessed the system's socket map.
+    type StateCtx<'a>: RawIpSocketStateContext<
+        I,
+        BT,
+        DeviceId = Self::DeviceId,
+        WeakDeviceId = Self::WeakDeviceId,
+    >;
+
     /// Calls the callback with an immutable reference to the socket map.
-    fn with_socket_map<O, F: FnOnce(&RawIpSocketMap<I, Self::WeakDeviceId, BT>) -> O>(
+    fn with_socket_map_and_state_ctx<
+        O,
+        F: FnOnce(&RawIpSocketMap<I, Self::WeakDeviceId, BT>, &mut Self::StateCtx<'_>) -> O,
+    >(
         &mut self,
         cb: F,
     ) -> O;
@@ -369,24 +381,35 @@ where
             RawIpSocketProtocol::Proto(_) => {}
         };
 
-        self.with_socket_map(|socket_map| {
+        self.with_socket_map_and_state_ctx(|socket_map, core_ctx| {
             socket_map.iter_sockets_for_protocol(&protocol).for_each(|socket| {
-                // TODO(https://fxbug.dev/337816586): Check ICMPv6 Filters
-                // before delivering.
-                // TODO(https://fxbug.dev/337818991): Check bound device before
-                // delivering.
-                bindings_ctx.receive_packet(socket, packet, device)
+                if core_ctx.with_locked_state(socket, |state| {
+                    should_deliver_to_socket(packet, device, state)
+                }) {
+                    bindings_ctx.receive_packet(socket, packet, device)
+                }
             })
         })
     }
+}
+
+/// Returns 'True' if the given packet should be delivered to the given socket.
+fn should_deliver_to_socket<I: RawIpSocketsIpExt, D: StrongDeviceIdentifier, B: ByteSlice>(
+    _packet: &I::Packet<B>,
+    device: &D,
+    socket: &RawIpSocketLockedState<I, D::Weak>,
+) -> bool {
+    // TODO(https://fxbug.dev/337816586): Check ICMPv6 Filters.
+    let RawIpSocketLockedState { bound_device, _marker } = socket;
+    bound_device.as_ref().map_or(true, |bound_device| bound_device == device)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
 
-    use alloc::{vec, vec::Vec};
-    use core::{convert::Infallible as Never, marker::PhantomData};
+    use alloc::{rc::Rc, vec, vec::Vec};
+    use core::{cell::RefCell, convert::Infallible as Never, marker::PhantomData};
     use ip_test_macro::ip_test;
     use net_types::ip::{IpVersion, Ipv4, Ipv6};
     use netstack3_base::{
@@ -419,7 +442,11 @@ mod test {
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
     struct FakeCoreCtx<I: RawIpSocketsIpExt, D: FakeStrongDeviceId> {
-        socket_map: RawIpSocketMap<I, D::Weak, FakeBindingsCtx<D>>,
+        // NB: Hold in an `Rc<RefCell<...>>` to switch to runtime borrow
+        // checking. This allows us to borrow the socket map at the same time
+        // as the outer `FakeCoreCtx` is mutably borrowed (Required to implement
+        // `RawIpSocketMapContext::with_socket_map_and_state_ctx`).
+        socket_map: Rc<RefCell<RawIpSocketMap<I, D::Weak, FakeBindingsCtx<D>>>>,
     }
 
     impl<D: FakeStrongDeviceId> RawIpSocketsBindingsTypes for FakeBindingsCtx<D> {
@@ -468,11 +495,17 @@ mod test {
     impl<I: RawIpSocketsIpExt, D: FakeStrongDeviceId> RawIpSocketMapContext<I, FakeBindingsCtx<D>>
         for FakeCoreCtx<I, D>
     {
-        fn with_socket_map<O, F: FnOnce(&RawIpSocketMap<I, D::Weak, FakeBindingsCtx<D>>) -> O>(
+        type StateCtx<'a> = FakeCoreCtx<I, D>;
+        fn with_socket_map_and_state_ctx<
+            O,
+            F: FnOnce(&RawIpSocketMap<I, D::Weak, FakeBindingsCtx<D>>, &mut Self::StateCtx<'_>) -> O,
+        >(
             &mut self,
             cb: F,
         ) -> O {
-            cb(&self.socket_map)
+            let socket_map = self.socket_map.clone();
+            let borrow = socket_map.borrow();
+            cb(&borrow, self)
         }
         fn with_socket_map_mut<
             O,
@@ -481,7 +514,7 @@ mod test {
             &mut self,
             cb: F,
         ) -> O {
-            cb(&mut self.socket_map)
+            cb(&mut self.socket_map.borrow_mut())
         }
     }
 
@@ -631,5 +664,41 @@ mod test {
 
         let FakeExternalSocketState { received_packets } = api.close(sock).into_removed();
         assert_eq!(received_packets.lock().pop(), None);
+    }
+
+    #[ip_test]
+    #[test_case(MultipleDevicesId::A, None, true; "no_bound_device")]
+    #[test_case(MultipleDevicesId::A, Some(MultipleDevicesId::A), true; "bound_same_device")]
+    #[test_case(MultipleDevicesId::A, Some(MultipleDevicesId::B), false; "bound_diff_device")]
+    fn receive_ip_packet_with_bound_device<I: Ip + RawIpSocketsIpExt>(
+        send_dev: MultipleDevicesId,
+        bound_dev: Option<MultipleDevicesId>,
+        should_deliver: bool,
+    ) {
+        const PROTO: IpProto = IpProto::Udp;
+        let mut api = new_raw_ip_socket_api::<I, MultipleDevicesId>();
+        let sock = api.create(RawIpSocketProtocol::new(PROTO.into()), Default::default());
+
+        assert_eq!(api.set_device(&sock, bound_dev.as_ref()), None);
+
+        // Deliver an arbitrary packet on `send_dev`.
+        const IP_BODY: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+        let buf = new_ip_packet_buf::<I>(&IP_BODY, PROTO.into());
+        let mut buf_ref = buf.as_ref();
+        let packet = buf_ref.parse::<I::Packet<_>>().expect("parse should succeed");
+        {
+            let (core_ctx, bindings_ctx) = api.ctx.contexts();
+            core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet, &send_dev);
+        }
+
+        // Verify the packet was/wasn't received, as expected.
+        let FakeExternalSocketState { received_packets } = api.close(sock).into_removed();
+        if should_deliver {
+            let ReceivedIpPacket { data, device } = received_packets.lock().pop().unwrap();
+            assert_eq!(&data[..], buf.as_ref());
+            assert_eq!(device, send_dev);
+        } else {
+            assert_eq!(received_packets.lock().pop(), None);
+        }
     }
 }
