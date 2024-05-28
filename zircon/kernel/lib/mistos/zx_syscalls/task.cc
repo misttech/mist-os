@@ -607,19 +607,23 @@ zx_status_t sys_task_kill(zx_handle_t task_handle) {
       return ZX_ERR_WRONG_TYPE;
   }
 }
+#endif
 
-// zx_status_t zx_job_create
-zx_status_t sys_job_create(zx_handle_t parent_job, uint32_t options, zx_handle_t* out) {
+zx_status_t zx_job_create(zx_handle_t parent_job, uint32_t options, zx_handle_t* out) {
   LTRACEF("parent: %x\n", parent_job);
 
   if (options != 0u)
     return ZX_ERR_INVALID_ARGS;
 
-  auto up = ProcessDispatcher::GetCurrent();
+  ProcessDispatcher* up = nullptr;
+  bool is_user_thread = ThreadDispatcher::GetCurrent() != nullptr;
+  if (is_user_thread) {
+    up = ProcessDispatcher::GetCurrent();
+  }
 
   fbl::RefPtr<JobDispatcher> parent;
   zx_status_t status =
-      up->handle_table().GetDispatcherWithRights(*up, parent_job, ZX_RIGHT_MANAGE_JOB, &parent);
+      handle_table(up).GetDispatcherWithRights(*up, parent_job, ZX_RIGHT_MANAGE_JOB, &parent);
   if (status != ZX_OK) {
     return status;
   }
@@ -628,10 +632,11 @@ zx_status_t sys_job_create(zx_handle_t parent_job, uint32_t options, zx_handle_t
   zx_rights_t rights;
   status = JobDispatcher::Create(options, ktl::move(parent), &handle, &rights);
   if (status == ZX_OK)
-    status = up->MakeAndAddHandle(ktl::move(handle), rights, out);
+    status = MakeAndAddHandle(ktl::move(handle), rights, out);
   return status;
 }
 
+#if 0
 template <typename TPolicy>
 static zx_status_t job_set_policy_basic(zx_handle_t handle, uint32_t options,
                                         user_in_ptr<const void> _policy, uint32_t count) {
