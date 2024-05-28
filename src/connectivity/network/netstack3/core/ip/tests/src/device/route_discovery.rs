@@ -24,26 +24,23 @@ use packet_formats::{
     utils::NonZeroDuration,
 };
 
-use crate::{
-    context::testutil::FakeInstant,
-    device::{
-        ethernet::{EthernetCreationProperties, EthernetLinkDevice},
-        DeviceId, FrameDestination,
-    },
-    ip::{
-        self,
-        device::{
-            IpDeviceBindingsContext, IpDeviceConfigurationUpdate, IpDeviceEvent,
-            Ipv6DeviceConfigurationContext, Ipv6DeviceConfigurationUpdate, Ipv6DiscoveredRoute,
-            Ipv6RouteDiscoveryBindingsContext, Ipv6RouteDiscoveryContext,
-        },
-        AddableEntry, AddableEntryEither, AddableMetric, Entry, IpLayerEvent, Metric,
-        IPV6_DEFAULT_SUBNET,
-    },
+use netstack3_base::{testutil::FakeInstant, FrameDestination};
+use netstack3_core::{
+    device::{DeviceId, EthernetCreationProperties, EthernetLinkDevice},
     testutil::{
         CtxPairExt as _, DispatchedEvent, FakeBindingsCtx, FakeCtx, TestAddrs, TestIpExt as _,
         DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
     },
+};
+use netstack3_ip::{
+    self as ip,
+    device::{
+        IpDeviceBindingsContext, IpDeviceConfigurationUpdate, IpDeviceEvent,
+        Ipv6DeviceConfigurationContext, Ipv6DeviceConfigurationUpdate, Ipv6DiscoveredRoute,
+        Ipv6RouteDiscoveryBindingsContext, Ipv6RouteDiscoveryContext,
+    },
+    AddableEntry, AddableEntryEither, AddableMetric, Entry, IpLayerEvent, Metric,
+    IPV6_DEFAULT_SUBNET,
 };
 
 const ONE_SECOND: NonZeroDuration =

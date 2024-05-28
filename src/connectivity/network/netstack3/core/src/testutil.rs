@@ -6,7 +6,6 @@
 
 #![cfg(any(test, feature = "testutils"))]
 
-#[cfg(test)]
 use alloc::vec;
 use alloc::{borrow::ToOwned, collections::HashMap, sync::Arc, vec::Vec};
 use assert_matches::assert_matches;
@@ -24,27 +23,23 @@ use core::{
 
 use derivative::Derivative;
 use lock_order::wrap::prelude::*;
-#[cfg(test)]
-use net_types::MulticastAddr;
 use net_types::{
     ethernet::Mac,
     ip::{
         AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion,
         Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu, Subnet, SubnetEither,
     },
-    SpecifiedAddr, UnicastAddr, Witness as _,
+    MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
 use netstack3_filter::FilterTimerId;
 use packet::{Buf, BufferMut};
 use zerocopy::ByteSlice;
 
-#[cfg(test)]
-use crate::context::testutil::{FakeNetwork, FakeNetworkLinks, FakeNetworkSpec};
 use crate::{
     context::{
         testutil::{
-            FakeFrameCtx, FakeInstant, FakeTimerCtx, FakeTimerCtxExt, WithFakeFrameContext,
-            WithFakeTimerContext,
+            FakeFrameCtx, FakeInstant, FakeNetwork, FakeNetworkLinks, FakeNetworkSpec,
+            FakeTimerCtx, FakeTimerCtxExt, WithFakeFrameContext, WithFakeTimerContext,
         },
         CtxPair, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes,
         InstantContext, ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext,
@@ -108,8 +103,15 @@ pub mod context {
     pub use crate::context::testutil::*;
 }
 
+/// TCP test utilities.
+pub mod tcp {
+    pub use crate::transport::tcp::buffer::testutil::{
+        ClientBuffers, ProvidedBuffers, WriteBackClientBuffers,
+    };
+}
+
 /// The default interface routing metric for test interfaces.
-pub(crate) const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
+pub const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
 
 /// Context available during the execution of the netstack.
 pub type Ctx<BT> = CtxPair<StackState<BT>, BT>;
@@ -217,7 +219,6 @@ where
 
     /// Joins the multicast group `multicast_addr` for `device`.
     #[netstack3_macros::context_ip_bounds(A::Version, BC, crate)]
-    #[cfg(test)]
     pub fn join_ip_multicast<A: IpAddress>(
         &mut self,
         device: &DeviceId<BC>,
@@ -254,7 +255,6 @@ where
     }
 
     /// Returns whether `device` is in the multicast group `addr`.
-    #[cfg(test)]
     #[netstack3_macros::context_ip_bounds(A::Version, BC, crate)]
     pub fn is_in_ip_multicast<A: IpAddress>(
         &mut self,
@@ -303,7 +303,6 @@ where
     ///
     /// `receive_ip_packet` injects a packet directly at the IP layer for this
     /// context.
-    #[cfg(test)]
     pub fn receive_ip_packet<I: Ip, B: BufferMut>(
         &mut self,
         device: &DeviceId<BC>,
@@ -355,7 +354,7 @@ where
     }
 
     /// Deletes all routes targeting `device`.
-    pub(crate) fn del_device_routes(&mut self, device: &DeviceId<BC>) {
+    pub fn del_device_routes(&mut self, device: &DeviceId<BC>) {
         let (core_ctx, bindings_ctx) = self.contexts();
         ip::testutil::del_device_routes::<Ipv4, _, _>(core_ctx, bindings_ctx, device);
         ip::testutil::del_device_routes::<Ipv6, _, _>(core_ctx, bindings_ctx, device);
@@ -589,8 +588,8 @@ impl FakeBindingsCtx {
         f(&mut *locked)
     }
 
-    #[cfg(test)]
-    pub(crate) fn timer_ctx(&self) -> impl Deref<Target = FakeTimerCtx<TimerId<Self>>> + '_ {
+    /// Gets the fake timer context.
+    pub fn timer_ctx(&self) -> impl Deref<Target = FakeTimerCtx<TimerId<Self>>> + '_ {
         // NB: Helper function is required to satisfy lifetime requirements of
         // borrow.
         fn get_timers<'a>(
@@ -618,7 +617,6 @@ impl FakeBindingsCtx {
     /// # Panics
     ///
     /// Panics if the there are non-Ethernet frames stored.
-    #[cfg(test)]
     pub fn copy_ethernet_frames(
         &mut self,
     ) -> Vec<(EthernetWeakDeviceId<FakeBindingsCtx>, Vec<u8>)> {
@@ -674,14 +672,13 @@ impl FakeBindingsCtx {
         })
     }
 
-    #[cfg(test)]
-    pub(crate) fn take_events(&mut self) -> Vec<DispatchedEvent> {
+    /// Takes all the events stored in the fake context.
+    pub fn take_events(&mut self) -> Vec<DispatchedEvent> {
         self.with_inner_mut(|ctx| ctx.events.take())
     }
 
     /// Takes all the received ICMP replies for a given `conn`.
-    #[cfg(test)]
-    pub(crate) fn take_icmp_replies<I: crate::IpExt>(
+    pub fn take_icmp_replies<I: crate::IpExt>(
         &mut self,
         conn: &IcmpSocketId<I, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>,
     ) -> Vec<Vec<u8>> {
@@ -956,8 +953,7 @@ impl FakeCtxBuilder {
     ///
     /// `add_device_with_config` is like `add_device`, except that it takes an
     /// IPv4 and IPv6 configuration to apply to the device when it is enabled.
-    #[cfg(test)]
-    pub(crate) fn add_device_with_config(
+    pub fn add_device_with_config(
         &mut self,
         mac: UnicastAddr<Mac>,
         ipv4_config: Ipv4DeviceConfigurationUpdate,
@@ -1002,8 +998,7 @@ impl FakeCtxBuilder {
     /// takes an associated IP address and subnet to assign to the device, as
     /// well as IPv4 and IPv6 configurations to apply to the device when it is
     /// enabled.
-    #[cfg(test)]
-    pub(crate) fn add_device_with_ip_and_config<A: IpAddress>(
+    pub fn add_device_with_ip_and_config<A: IpAddress>(
         &mut self,
         mac: UnicastAddr<Mac>,
         ip: A,
@@ -1070,7 +1065,7 @@ impl FakeCtxBuilder {
     /// `build_with_modifications` is equivalent to `build`, except that after
     /// the `StackStateBuilder` is initialized, it is passed to `f` for further
     /// modification before the `Ctx` is constructed.
-    pub(crate) fn build_with_modifications<F: FnOnce(&mut StackStateBuilder)>(
+    pub fn build_with_modifications<F: FnOnce(&mut StackStateBuilder)>(
         self,
         f: F,
     ) -> (FakeCtx, Vec<EthernetDeviceId<FakeBindingsCtx>>) {
@@ -1154,10 +1149,11 @@ impl FakeCtxBuilder {
     }
 }
 
-#[cfg(test)]
-pub(crate) enum FakeCtxNetworkSpec {}
+/// The fake network spec to use in integration tests.
+///
+/// It creates an Ethernet network.
+pub enum FakeCtxNetworkSpec {}
 
-#[cfg(test)]
 impl FakeNetworkSpec for FakeCtxNetworkSpec {
     type Context = FakeCtx;
     type TimerId = TimerId<FakeBindingsCtx>;
@@ -1357,7 +1353,8 @@ impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeBindingsCtx>, I, FakeInsta
     }
 }
 
-pub(crate) const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: MaxEthernetFrameSize =
+/// The mimum implied maximum Ethernet frame size for IPv6.
+pub const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: MaxEthernetFrameSize =
     const_unwrap::const_unwrap_option(MaxEthernetFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU));
 
 impl DeviceIdAndNameMatcher for MonotonicIdentifier {
@@ -1375,8 +1372,7 @@ impl DeviceIdAndNameMatcher for MonotonicIdentifier {
 ///
 /// Two hosts are created with the given names. Packets emitted by one
 /// arrive at the other and vice-versa.
-#[cfg(test)]
-pub(crate) fn new_simple_fake_network<CtxId: Copy + Debug + Hash + Eq>(
+pub fn new_simple_fake_network<CtxId: Copy + Debug + Hash + Eq>(
     a_id: CtxId,
     a: FakeCtx,
     a_device_id: EthernetWeakDeviceId<FakeBindingsCtx>,

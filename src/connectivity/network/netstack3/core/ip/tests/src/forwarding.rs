@@ -10,17 +10,14 @@ use net_types::{
 };
 use test_case::test_case;
 
-use crate::{
-    device::{
-        ethernet::{EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
-        DeviceId,
-    },
+use netstack3_core::{
+    device::{DeviceId, EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
     error::NotFoundError,
-    ip::{
-        AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, Metric, RawMetric,
-    },
     testutil::{CtxPairExt as _, FakeCtx, TestIpExt, DEFAULT_INTERFACE_METRIC},
     StackStateBuilder,
+};
+use netstack3_ip::{
+    AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, Metric, RawMetric,
 };
 
 #[ip_test]

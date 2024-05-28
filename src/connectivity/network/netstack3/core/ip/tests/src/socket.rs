@@ -26,23 +26,22 @@ use packet_formats::{
 };
 use test_case::test_case;
 
-use crate::{
-    device::{DeviceId, EitherDeviceId, EthernetLinkDevice},
-    ip::{
-        self,
-        device::IpDeviceConfigurationContext as DeviceIpDeviceConfigurationContext,
-        socket::{
-            DefaultSendOptions, DeviceIpSocketHandler, IpSockCreationError, IpSockDefinition,
-            IpSockSendError, IpSocketHandler, Mms, MmsError, SendOptions,
-        },
-        AddableEntryEither, AddableMetric, IpDeviceContext, RawMetric, ResolveRouteError,
-    },
-    socket::SocketIpAddr,
+use netstack3_base::{socket::SocketIpAddr, EitherDeviceId};
+use netstack3_core::{
+    device::{DeviceId, EthernetLinkDevice},
     testutil::{
         set_logger_for_test, CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder, TestAddrs,
         TestIpExt,
     },
     IpExt,
+};
+use netstack3_ip::{
+    self as ip, device,
+    socket::{
+        DefaultSendOptions, DeviceIpSocketHandler, IpSockCreationError, IpSockDefinition,
+        IpSockSendError, IpSocketHandler, Mms, MmsError, SendOptions,
+    },
+    AddableEntryEither, AddableMetric, IpDeviceContext, RawMetric, ResolveRouteError,
 };
 
 enum AddressType {
@@ -97,9 +96,9 @@ impl<I: Ip> SendOptions<I> for WithHopLimit {
     }
 }
 
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 fn remove_all_local_addrs<I: IpExt>(ctx: &mut FakeCtx) {
-    let devices = DeviceIpDeviceConfigurationContext::<I, _>::with_devices_and_state(
+    let devices = device::IpDeviceConfigurationContext::<I, _>::with_devices_and_state(
         &mut ctx.core_ctx(),
         |devices, _ctx| devices.collect::<Vec<_>>(),
     );
@@ -202,7 +201,7 @@ fn remove_all_local_addrs<I: IpExt>(ctx: &mut FakeCtx) {
         device_type: DeviceType::Unspecified,
         expected_result: Err(ResolveRouteError::NoSrcAddr.into()),
     }; "new remote to local")]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 fn test_new<I: Ip + IpSocketIpExt + IpExt>(test_case: NewSocketTestCase) {
     let cfg = I::TEST_ADDRS;
     let proto = I::ICMP_IP_PROTO;
@@ -272,7 +271,7 @@ fn test_new<I: Ip + IpSocketIpExt + IpExt>(test_case: NewSocketTestCase) {
 #[test_case(AddressType::Unspecified { can_select: true },
         AddressType::LocallyOwned; "unspecified to local")]
 #[test_case(AddressType::LocallyOwned, AddressType::Remote; "local to remote")]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 fn test_send_local<I: Ip + IpSocketIpExt + IpExt>(
     from_addr_type: AddressType,
     to_addr_type: AddressType,
@@ -362,11 +361,11 @@ fn test_send_local<I: Ip + IpSocketIpExt + IpExt>(
 
     assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
-    assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+    assert_eq!(ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet.get(), 1);
 }
 
 #[ip_test]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 fn test_send<I: Ip + IpSocketIpExt + IpExt>() {
     // Test various edge cases of the
     // IpSocketContext::send_ip_packet` method.
@@ -504,7 +503,7 @@ fn test_send<I: Ip + IpSocketIpExt + IpExt>() {
 }
 
 #[ip_test]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 fn test_send_hop_limits<I: Ip + IpSocketIpExt + IpExt>() {
     set_logger_for_test();
 
@@ -601,7 +600,7 @@ fn test_send_hop_limits<I: Ip + IpSocketIpExt + IpExt>() {
 #[ip_test]
 #[test_case(true; "remove device")]
 #[test_case(false; "dont remove device")]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 fn get_mms_device_removed<I: Ip + IpSocketIpExt + IpExt>(remove_device: bool) {
     set_logger_for_test();
 

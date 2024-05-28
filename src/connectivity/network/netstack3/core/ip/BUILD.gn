@@ -156,5 +156,6 @@ group("tests") {
   deps = [
     ":netstack3-core-ip-test",
     ":netstack3-ip-instrumented_test($host_toolchain)",
+    "tests",
   ]
 }

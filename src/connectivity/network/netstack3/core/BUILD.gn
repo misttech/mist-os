@@ -69,17 +69,7 @@ rustc_library_with_features("netstack3-core") {
     "src/device/state.rs",
     "src/filter/integration.rs",
     "src/ip/device/integration.rs",
-    "src/ip/device/integration_tests/base.rs",
-    "src/ip/device/integration_tests/ndp.rs",
-    "src/ip/device/integration_tests/nud.rs",
-    "src/ip/device/integration_tests/route_discovery.rs",
-    "src/ip/device/integration_tests/slaac.rs",
     "src/ip/integration.rs",
-    "src/ip/integration_tests/base.rs",
-    "src/ip/integration_tests/forwarding.rs",
-    "src/ip/integration_tests/gmp.rs",
-    "src/ip/integration_tests/icmp.rs",
-    "src/ip/integration_tests/socket.rs",
     "src/ip/raw/integration.rs",
     "src/lib.rs",
     "src/lock_ordering.rs",
@@ -174,7 +164,6 @@ rustc_library_with_features("netstack3-core") {
         "filter:netstack3-filter-testutils",
         "ip:netstack3-ip-testutils",
         "sync:netstack3-sync-instrumented",
-        "//third_party/rust_crates:scopeguard",
       ]
 
       # Guard against bad crate variants.

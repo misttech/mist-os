@@ -282,11 +282,6 @@ impl<BT: DeviceLayerTypes> DeviceId<BT> {
     pub fn bindings_id(&self) -> &BT::DeviceIdentifier {
         for_any_device_id!(DeviceId, self, id => id.bindings_id())
     }
-
-    #[cfg(test)]
-    pub(crate) fn unwrap_ethernet(self) -> EthernetDeviceId<BT> {
-        assert_matches::assert_matches!(self, DeviceId::Ethernet(e) => e)
-    }
 }
 
 impl<BT: DeviceLayerTypes> DeviceIdentifier for DeviceId<BT> {
@@ -543,3 +538,25 @@ pub type EthernetDeviceId<BT> = BaseDeviceId<EthernetLinkDevice, BT>;
 pub type EthernetWeakDeviceId<BT> = BaseWeakDeviceId<EthernetLinkDevice, BT>;
 /// The primary Ethernet device reference.
 pub(crate) type EthernetPrimaryDeviceId<BT> = BasePrimaryDeviceId<EthernetLinkDevice, BT>;
+
+#[cfg(any(test, feature = "testutils"))]
+mod testutil {
+    use super::*;
+
+    impl<BT: DeviceLayerTypes> TryFrom<DeviceId<BT>> for EthernetDeviceId<BT> {
+        type Error = DeviceId<BT>;
+        fn try_from(id: DeviceId<BT>) -> Result<EthernetDeviceId<BT>, DeviceId<BT>> {
+            match id {
+                DeviceId::Ethernet(id) => Ok(id),
+                DeviceId::Loopback(_) | DeviceId::PureIp(_) => Err(id),
+            }
+        }
+    }
+
+    impl<BT: DeviceLayerTypes> DeviceId<BT> {
+        /// Extracts an ethernet device from self or panics.
+        pub fn unwrap_ethernet(self) -> EthernetDeviceId<BT> {
+            assert_matches::assert_matches!(self, DeviceId::Ethernet(e) => e)
+        }
+    }
+}

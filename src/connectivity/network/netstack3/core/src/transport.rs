@@ -81,8 +81,7 @@ pub struct TransportStateBuilder {
 
 impl TransportStateBuilder {
     /// Get the builder for the UDP state.
-    #[cfg(test)]
-    pub(crate) fn udp_builder(&mut self) -> &mut UdpStateBuilder {
+    pub fn udp_builder(&mut self) -> &mut UdpStateBuilder {
         &mut self.udp
     }
 
@@ -102,7 +101,7 @@ impl TransportStateBuilder {
 }
 
 /// The state associated with the transport layer.
-pub(crate) struct TransportLayerState<BT: BindingsTypes> {
+pub struct TransportLayerState<BT: BindingsTypes> {
     udpv4: UdpState<Ipv4, WeakDeviceId<BT>, BT>,
     udpv6: UdpState<Ipv6, WeakDeviceId<BT>, BT>,
     tcpv4: TcpState<Ipv4, WeakDeviceId<BT>, BT>,

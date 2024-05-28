@@ -18,31 +18,28 @@ use net_types::{
 };
 use test_case::test_case;
 
-use crate::{
-    context::{testutil::FakeInstant, InstantContext as _},
+use netstack3_base::{testutil::FakeInstant, InstantContext as _};
+use netstack3_core::{
     device::{
-        ethernet::{EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
-        loopback::{LoopbackCreationProperties, LoopbackDevice},
-        DeviceId,
+        DeviceId, EthernetCreationProperties, EthernetLinkDevice, LoopbackCreationProperties,
+        LoopbackDevice, MaxEthernetFrameSize,
     },
-    ip::{
-        device::{
-            AddressRemovedReason, DadTimerId, IpAddressId as _, IpDeviceConfiguration,
-            IpDeviceFlags, IpDeviceStateContext, Ipv6DeviceHandler, Ipv6DeviceTimerId, RsTimerId,
-            SetIpAddressPropertiesError, SlaacConfiguration, UpdateIpConfigurationError,
-        },
-        gmp::MldTimerId,
-        nud::{self, LinkResolutionResult},
-        IpAddressState, IpDeviceConfigurationUpdate, IpDeviceEvent, Ipv4DeviceConfigurationUpdate,
-        Ipv6DeviceConfigurationUpdate, Lifetime,
-    },
-    state::StackStateBuilder,
     testutil::{
         assert_empty, Ctx, CtxPairExt as _, DispatchedEvent, FakeBindingsCtx, FakeCtx,
         TestIpExt as _, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
     },
-    time::TimerIdInner,
-    IpExt, TimerId,
+    IpExt, StackStateBuilder, TimerId,
+};
+use netstack3_ip::{
+    device::{
+        AddressRemovedReason, DadTimerId, IpAddressId as _, IpAddressState, IpDeviceConfiguration,
+        IpDeviceConfigurationUpdate, IpDeviceEvent, IpDeviceFlags, IpDeviceStateContext,
+        Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler,
+        Ipv6DeviceTimerId, Lifetime, RsTimerId, SetIpAddressPropertiesError, SlaacConfiguration,
+        UpdateIpConfigurationError,
+    },
+    gmp::MldTimerId,
+    nud::{self, LinkResolutionResult},
 };
 
 #[test]
@@ -271,13 +268,13 @@ fn enable_disable_ipv6() {
         enable_ipv6_device(ctx, &device_id, ll_addr, expected_prev);
         let timers = vec![
             (
-                TimerId(TimerIdInner::Ipv6Device(
-                    Ipv6DeviceTimerId::Rs(RsTimerId::new(device_id.downgrade())).into(),
-                )),
+                TimerId::from(
+                    Ipv6DeviceTimerId::Rs(RsTimerId::new(device_id.downgrade())).into_common(),
+                ),
                 ..,
             ),
             (
-                TimerId(TimerIdInner::Ipv6Device(
+                TimerId::from(
                     Ipv6DeviceTimerId::Dad(DadTimerId::new(
                         device_id.downgrade(),
                         IpDeviceStateContext::<Ipv6, _>::get_address_id(
@@ -288,15 +285,15 @@ fn enable_disable_ipv6() {
                         .unwrap()
                         .downgrade(),
                     ))
-                    .into(),
-                )),
+                    .into_common(),
+                ),
                 ..,
             ),
             (
-                TimerId(TimerIdInner::Ipv6Device(
+                TimerId::from(
                     Ipv6DeviceTimerId::Mld(MldTimerId::new_delayed_report(device_id.downgrade()))
-                        .into(),
-                )),
+                        .into_common(),
+                ),
                 ..,
             ),
         ];
@@ -623,7 +620,7 @@ fn notify_on_dad_failure_ipv6() {
 }
 
 #[ip_test]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 fn update_ip_device_configuration_err<I: Ip + IpExt>() {
     let mut ctx = FakeCtx::default();
 

@@ -168,25 +168,6 @@ pub mod ip {
 
     pub(crate) use netstack3_ip::*;
 
-    #[cfg(test)]
-    #[path = "device/integration_tests"]
-    mod device_integration_tests {
-        mod base;
-        mod ndp;
-        mod nud;
-        mod route_discovery;
-        mod slaac;
-    }
-
-    #[cfg(test)]
-    mod integration_tests {
-        mod base;
-        mod forwarding;
-        mod gmp;
-        mod icmp;
-        mod socket;
-    }
-
     // Re-exported types.
     pub use device::{
         AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, AddressRemovedReason,

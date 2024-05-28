@@ -102,6 +102,11 @@ impl<D: WeakDeviceIdentifier> Ipv4DeviceTimerId<D> {
         let Self(this) = self;
         this.device_id().upgrade()
     }
+
+    /// Transforms this timer ID into the common [`IpDeviceTimerId`] version.
+    pub fn into_common<S: IpAddressIdSpec>(self) -> IpDeviceTimerId<Ipv4, D, S> {
+        self.into()
+    }
 }
 
 impl<D: WeakDeviceIdentifier, A: IpAddressIdSpec> From<IpDeviceTimerId<Ipv4, D, A>>
@@ -193,6 +198,11 @@ impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> Ipv6DeviceTimerId<D,
             Self::Slaac(id) => id.device_id(),
         }
         .upgrade()
+    }
+
+    /// Transforms this timer ID into the common [`IpDeviceTimerId`] version.
+    pub fn into_common<S: IpAddressIdSpec<WeakV6 = A>>(self) -> IpDeviceTimerId<Ipv6, D, S> {
+        self.into()
     }
 }
 

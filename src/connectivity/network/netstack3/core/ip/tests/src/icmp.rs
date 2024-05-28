@@ -28,17 +28,16 @@ use packet_formats::{
 };
 use test_case::test_case;
 
-use crate::{
-    device::{DeviceId, FrameDestination},
-    ip::icmp::Icmpv4StateBuilder,
-    socket::datagram,
+use netstack3_base::FrameDestination;
+use netstack3_core::{
+    device::DeviceId,
     testutil::{
         new_simple_fake_network, set_logger_for_test, Ctx, CtxPairExt as _, FakeBindingsCtx,
         FakeCtxBuilder, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
     },
-    transport::udp::UdpStateBuilder,
     IpExt, StackStateBuilder,
 };
+use netstack3_ip::{datagram, icmp::Icmpv4StateBuilder};
 
 const REMOTE_ID: u16 = 1;
 
@@ -62,7 +61,7 @@ enum IcmpSendType {
 #[test_case(IcmpConnectionType::Local, IcmpSendType::SendTo, false)]
 #[test_case(IcmpConnectionType::Remote, IcmpSendType::Send, false)]
 #[test_case(IcmpConnectionType::Remote, IcmpSendType::SendTo, false)]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 fn test_icmp_connection<I: Ip + TestIpExt + datagram::IpExt + IpExt>(
     conn_type: IcmpConnectionType,
     send_type: IcmpSendType,
@@ -131,13 +130,13 @@ fn test_icmp_connection<I: Ip + TestIpExt + datagram::IpExt + IpExt>(
     net.run_until_idle();
 
     assert_eq!(
-        net.context(LOCAL_CTX_NAME).core_ctx.inner_icmp_state::<I>().rx_counters.echo_reply.get(),
+        net.context(LOCAL_CTX_NAME).core_ctx.common_icmp::<I>().rx_counters.echo_reply.get(),
         1
     );
     assert_eq!(
         net.context(ctx_name_receiving_req)
             .core_ctx
-            .inner_icmp_state::<I>()
+            .common_icmp::<I>()
             .rx_counters
             .echo_request
             .get(),
@@ -179,7 +178,7 @@ fn test_icmp_connection<I: Ip + TestIpExt + datagram::IpExt + IpExt>(
 ///
 /// The state is initialized to `I::TEST_ADDRS` when testing.
 #[allow(clippy::too_many_arguments)]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 fn test_receive_ip_packet<
     I: TestIpExt + IpExt,
     C: PartialEq + Debug,
@@ -224,28 +223,20 @@ fn test_receive_ip_packet<
         // TODO(https://fxbug.dev/42084333): Redesign iterating through
         // assert_counters once CounterContext is removed.
         let count = match *counter {
-            "send_ipv4_packet" => core_ctx.ipv4.inner.counters().send_ip_packet.get(),
-            "send_ipv6_packet" => core_ctx.ipv6.inner.counters().send_ip_packet.get(),
-            "echo_request" => core_ctx.inner_icmp_state::<I>().rx_counters.echo_request.get(),
-            "timestamp_request" => {
-                core_ctx.inner_icmp_state::<I>().rx_counters.timestamp_request.get()
-            }
+            "send_ipv4_packet" => core_ctx.ipv4().inner.counters().send_ip_packet.get(),
+            "send_ipv6_packet" => core_ctx.ipv6().inner.counters().send_ip_packet.get(),
+            "echo_request" => core_ctx.common_icmp::<I>().rx_counters.echo_request.get(),
+            "timestamp_request" => core_ctx.common_icmp::<I>().rx_counters.timestamp_request.get(),
             "protocol_unreachable" => {
-                core_ctx.inner_icmp_state::<I>().tx_counters.protocol_unreachable.get()
+                core_ctx.common_icmp::<I>().tx_counters.protocol_unreachable.get()
             }
-            "port_unreachable" => {
-                core_ctx.inner_icmp_state::<I>().tx_counters.port_unreachable.get()
-            }
-            "net_unreachable" => core_ctx.inner_icmp_state::<I>().tx_counters.net_unreachable.get(),
-            "ttl_expired" => core_ctx.inner_icmp_state::<I>().tx_counters.ttl_expired.get(),
-            "packet_too_big" => core_ctx.inner_icmp_state::<I>().tx_counters.packet_too_big.get(),
-            "parameter_problem" => {
-                core_ctx.inner_icmp_state::<I>().tx_counters.parameter_problem.get()
-            }
-            "dest_unreachable" => {
-                core_ctx.inner_icmp_state::<I>().tx_counters.dest_unreachable.get()
-            }
-            "error" => core_ctx.inner_icmp_state::<I>().tx_counters.error.get(),
+            "port_unreachable" => core_ctx.common_icmp::<I>().tx_counters.port_unreachable.get(),
+            "net_unreachable" => core_ctx.common_icmp::<I>().tx_counters.net_unreachable.get(),
+            "ttl_expired" => core_ctx.common_icmp::<I>().tx_counters.ttl_expired.get(),
+            "packet_too_big" => core_ctx.common_icmp::<I>().tx_counters.packet_too_big.get(),
+            "parameter_problem" => core_ctx.common_icmp::<I>().tx_counters.parameter_problem.get(),
+            "dest_unreachable" => core_ctx.common_icmp::<I>().tx_counters.dest_unreachable.get(),
+            "error" => core_ctx.common_icmp::<I>().tx_counters.error.get(),
             c => panic!("unrecognized counter: {c}"),
         };
         assert!(count > 0, "counter at zero: {counter}");
@@ -281,7 +272,7 @@ fn test_receive_echo() {
     // Test that, when receiving an echo request, we respond with an echo
     // reply with the appropriate parameters.
 
-    #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+    #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
     fn test<I: TestIpExt + IpExt>(assert_counters: &[&str]) {
         let req = IcmpEchoRequest::new(0, 0);
         let req_body = &[1, 2, 3, 4];
@@ -403,7 +394,7 @@ fn test_port_unreachable() {
     // the same for a stack which has the UDP `send_port_unreachable` option
     // disable, and make sure that we DON'T respond with an ICMP message.
 
-    #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+    #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
     fn test<I: TestIpExt + IpExt, C: PartialEq + Debug>(
         code: C,
         assert_counters: &[&str],
@@ -425,7 +416,7 @@ fn test_port_unreachable() {
             |_| {},
             // Enable the `send_port_unreachable` feature.
             |builder| {
-                let _: &mut UdpStateBuilder =
+                let _builder: &mut _ =
                     builder.transport_builder().udp_builder().send_port_unreachable(true);
             },
             buffer.as_mut(),

@@ -126,7 +126,7 @@ where
     /// This is provided as a convenience method for tests with faked bindings
     /// contexts that have simple implementations for bindings state.
     #[cfg(any(test, feature = "testutils"))]
-    pub(crate) fn add_device_with_default_state(
+    pub fn add_device_with_default_state(
         &mut self,
         properties: D::CreationProperties,
         metric: RawMetric,

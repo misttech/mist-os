@@ -42,37 +42,36 @@ use rand::Rng;
 use tracing::trace;
 use zerocopy::ByteSlice;
 
-use crate::{
-    context::{
-        testutil::{FakeInstant, FakeNetwork, FakeNetworkLinks, StepResult},
-        InstantContext as _, RngContext as _,
-    },
+use netstack3_base::{
+    testutil::{FakeInstant, FakeNetwork, FakeNetworkLinks, StepResult},
+    FrameDestination, InstantContext as _, RngContext as _,
+};
+use netstack3_core::{
     device::{
-        ethernet::{EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
-        DeviceId, EthernetDeviceId, FrameDestination,
-    },
-    ip::{
-        self,
-        device::{
-            get_ipv6_hop_limit, testutil::with_assigned_ipv6_addr_subnets, InnerSlaacTimerId,
-            IpAddressId as _, IpDeviceBindingsContext, IpDeviceConfigurationUpdate,
-            IpDeviceStateContext, Ipv4DeviceConfigurationUpdate, Ipv6AddrConfig, Ipv6AddressFlags,
-            Ipv6AddressState, Ipv6DeviceAddr, Ipv6DeviceConfigurationContext,
-            Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler, Ipv6DeviceTimerId, Lifetime,
-            OpaqueIid, OpaqueIidNonce, SlaacBindingsContext, SlaacConfig, SlaacConfiguration,
-            SlaacContext, SlaacTimerId, StableIidSecret, TemporarySlaacAddressConfiguration,
-            TemporarySlaacConfig, MAX_RTR_SOLICITATION_DELAY, RTR_SOLICITATION_INTERVAL,
-        },
-        icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
-        SendIpPacketMeta,
+        DeviceId, EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice,
+        MaxEthernetFrameSize,
     },
     testutil::{
         assert_empty, new_simple_fake_network, set_logger_for_test, Ctx, CtxPairExt as _,
         DispatchedFrame, FakeBindingsCtx, FakeCtx, FakeCtxBuilder, FakeCtxNetworkSpec, TestIpExt,
         DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE, TEST_ADDRS_V6,
     },
-    time::TimerIdInner,
     BindingsTypes, Instant, TimerId,
+};
+use netstack3_ip::{
+    self as ip,
+    device::{
+        get_ipv6_hop_limit, testutil::with_assigned_ipv6_addr_subnets, InnerSlaacTimerId,
+        IpAddressId as _, IpDeviceBindingsContext, IpDeviceConfigurationUpdate,
+        IpDeviceStateContext, Ipv4DeviceConfigurationUpdate, Ipv6AddrConfig, Ipv6AddressFlags,
+        Ipv6AddressState, Ipv6DeviceAddr, Ipv6DeviceConfigurationContext,
+        Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler, Ipv6DeviceTimerId, Lifetime, OpaqueIid,
+        OpaqueIidNonce, SlaacBindingsContext, SlaacConfig, SlaacConfiguration, SlaacContext,
+        SlaacTimerId, StableIidSecret, TemporarySlaacAddressConfiguration, TemporarySlaacConfig,
+        MAX_RTR_SOLICITATION_DELAY, RTR_SOLICITATION_INTERVAL,
+    },
+    icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
+    SendIpPacketMeta,
 };
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -140,18 +139,6 @@ fn local_ip() -> Ipv6DeviceAddr {
 
 fn remote_ip() -> Ipv6DeviceAddr {
     TEST_ADDRS_V6.remote_non_mapped_unicast()
-}
-
-impl TryFrom<DeviceId<FakeBindingsCtx>> for EthernetDeviceId<FakeBindingsCtx> {
-    type Error = DeviceId<FakeBindingsCtx>;
-    fn try_from(
-        id: DeviceId<FakeBindingsCtx>,
-    ) -> Result<EthernetDeviceId<FakeBindingsCtx>, DeviceId<FakeBindingsCtx>> {
-        match id {
-            DeviceId::Ethernet(id) => Ok(id),
-            DeviceId::Loopback(_) | DeviceId::PureIp(_) => Err(id),
-        }
-    }
 }
 
 fn setup_net() -> (
@@ -279,7 +266,7 @@ fn test_address_resolution() {
 
     let _: StepResult = net.step();
     assert_eq!(
-        net.context("remote").core_ctx.ndp_counters().rx.neighbor_solicitation.get(),
+        net.context("remote").core_ctx.ipv6().icmp.ndp_counters.rx.neighbor_solicitation.get(),
         1,
         "remote received solicitation"
     );
@@ -289,7 +276,7 @@ fn test_address_resolution() {
     let _: StepResult = net.step();
 
     assert_eq!(
-        net.context("local").core_ctx.ndp_counters().rx.neighbor_advertisement.get(),
+        net.context("local").core_ctx.ipv6().icmp.ndp_counters.rx.neighbor_advertisement.get(),
         1,
         "local received advertisement"
     );
@@ -301,7 +288,7 @@ fn test_address_resolution() {
     });
     let _: StepResult = net.step();
     assert_eq!(
-        net.context("remote").core_ctx.inner_icmp_state::<Ipv6>().rx_counters.echo_request.get(),
+        net.context("remote").core_ctx.common_icmp::<Ipv6>().rx_counters.echo_request.get(),
         1
     );
 
@@ -406,7 +393,7 @@ fn dad_timer_id(
     id: EthernetDeviceId<FakeBindingsCtx>,
     addr: Ipv6DeviceAddr,
 ) -> TimerId<FakeBindingsCtx> {
-    TimerId(TimerIdInner::Ipv6Device(
+    TimerId::from(
         Ipv6DeviceTimerId::Dad(ip::device::DadTimerId::new(
             id.downgrade().into(),
             IpDeviceStateContext::<Ipv6, _>::get_address_id(
@@ -417,14 +404,14 @@ fn dad_timer_id(
             .unwrap()
             .downgrade(),
         ))
-        .into(),
-    ))
+        .into_common(),
+    )
 }
 
 fn rs_timer_id(id: EthernetDeviceId<FakeBindingsCtx>) -> TimerId<FakeBindingsCtx> {
-    TimerId(TimerIdInner::Ipv6Device(
-        Ipv6DeviceTimerId::Rs(ip::device::RsTimerId::new(id.downgrade().into())).into(),
-    ))
+    TimerId::from(
+        Ipv6DeviceTimerId::Rs(ip::device::RsTimerId::new(id.downgrade().into())).into_common(),
+    )
 }
 
 #[test]
@@ -914,7 +901,7 @@ fn test_receiving_router_solicitation_validity_check() {
         Some(FrameDestination::Multicast),
         icmpv6_packet_buf,
     );
-    assert_eq!(ctx.core_ctx.ndp_counters().rx.router_solicitation.get(), 0);
+    assert_eq!(ctx.core_ctx.ipv6().icmp.ndp_counters.rx.router_solicitation.get(), 0);
 }
 
 #[test]
@@ -960,7 +947,7 @@ fn test_receiving_router_advertisement_validity_check() {
         Some(FrameDestination::Individual { local: true }),
         icmpv6_packet_buf,
     );
-    assert_eq!(ctx.core_ctx.ndp_counters().rx.router_advertisement.get(), 0);
+    assert_eq!(ctx.core_ctx.ipv6().icmp.ndp_counters.rx.router_advertisement.get(), 0);
 
     // Test receiving NDP RA where source IP is a link local address (should
     // receive).
@@ -972,7 +959,7 @@ fn test_receiving_router_advertisement_validity_check() {
         Some(FrameDestination::Individual { local: true }),
         icmpv6_packet_buf,
     );
-    assert_eq!(ctx.core_ctx.ndp_counters().rx.router_advertisement.get(), 1);
+    assert_eq!(ctx.core_ctx.ipv6().icmp.ndp_counters.rx.router_advertisement.get(), 1);
 }
 
 #[test]
@@ -1092,7 +1079,7 @@ fn test_receiving_router_advertisement_mtu_option() {
         Some(FrameDestination::Multicast),
         icmpv6_packet_buf,
     );
-    assert_eq!(ctx.core_ctx.ndp_counters().rx.router_advertisement.get(), 1);
+    assert_eq!(ctx.core_ctx.ipv6().icmp.ndp_counters.rx.router_advertisement.get(), 1);
     assert_eq!(ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut ctx.core_ctx(), &device), hw_mtu);
 
     // Receive a new RA with an invalid MTU option (value is lower than IPv6
@@ -1108,7 +1095,7 @@ fn test_receiving_router_advertisement_mtu_option() {
         Some(FrameDestination::Multicast),
         icmpv6_packet_buf,
     );
-    assert_eq!(ctx.core_ctx.ndp_counters().rx.router_advertisement.get(), 2);
+    assert_eq!(ctx.core_ctx.ipv6().icmp.ndp_counters.rx.router_advertisement.get(), 2);
     assert_eq!(ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut ctx.core_ctx(), &device), hw_mtu);
 
     // Receive a new RA with a valid MTU option (value is exactly IPv6 min
@@ -1124,7 +1111,7 @@ fn test_receiving_router_advertisement_mtu_option() {
         Some(FrameDestination::Multicast),
         icmpv6_packet_buf,
     );
-    assert_eq!(ctx.core_ctx.ndp_counters().rx.router_advertisement.get(), 3);
+    assert_eq!(ctx.core_ctx.ipv6().icmp.ndp_counters.rx.router_advertisement.get(), 3);
     assert_eq!(
         ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut ctx.core_ctx(), &device),
         Ipv6::MINIMUM_LINK_MTU,
@@ -1982,7 +1969,7 @@ fn test_host_temporary_slaac_and_manual_addresses_conflict() {
     receive_prefix_update(&mut ctx, &device, src_ip, subnet, 9000, 10000);
 
     // Verify that `conflicted_addr` was generated and rejected.
-    assert_eq!(ctx.core_ctx.slaac_counters().generated_slaac_addr_exists.get(), 1);
+    assert_eq!(ctx.core_ctx.ipv6().slaac_counters.generated_slaac_addr_exists.get(), 1);
 
     // Should have gotten a new temporary IP.
     let temporary_slaac_addresses =
@@ -2088,9 +2075,7 @@ fn assert_next_slaac_timer_integration<CC, BC>(
 }
 
 fn new_slaac_timer_id<BT: BindingsTypes>(device_id: &DeviceId<BT>) -> TimerId<BT> {
-    TimerId(TimerIdInner::Ipv6Device(
-        Ipv6DeviceTimerId::Slaac(SlaacTimerId::new(device_id.downgrade())).into(),
-    ))
+    TimerId::from(Ipv6DeviceTimerId::Slaac(SlaacTimerId::new(device_id.downgrade())).into_common())
 }
 
 #[test]

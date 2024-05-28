@@ -45,7 +45,7 @@ pub struct TimerId<BT: BindingsTypes>(pub(crate) TimerIdInner<BT>);
     Debug(bound = "")
 )]
 #[generic_over_ip()]
-pub(crate) enum TimerIdInner<BT: BindingsTypes> {
+pub enum TimerIdInner<BT: BindingsTypes> {
     /// A timer event in the device layer.
     DeviceLayer(DeviceLayerTimerId<BT>),
     /// A timer event in the transport layer.

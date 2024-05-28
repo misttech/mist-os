@@ -23,29 +23,23 @@ use packet_formats::{
     },
 };
 
-use crate::{
-    context::InstantContext as _,
-    device::{
-        ethernet::{EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
-        DeviceId,
-    },
-    ip::{
-        device::{
-            IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv4DeviceTimerId,
-            Ipv6DeviceConfigurationUpdate, Ipv6DeviceTimerId, SlaacConfiguration,
-        },
-        gmp::{
-            IgmpTimerId, MldTimerId, IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
-            MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
-        },
-    },
-    state::StackStateBuilder,
+use netstack3_core::{
+    device::{DeviceId, EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
     testutil::{
         CtxPairExt as _, FakeBindingsCtx, FakeCtx, TestAddrs, TestIpExt as _,
         DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
     },
-    time::TimerIdInner,
-    TimerId,
+    InstantContext as _, StackStateBuilder, TimerId,
+};
+use netstack3_ip::{
+    device::{
+        IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv4DeviceTimerId,
+        Ipv6DeviceConfigurationUpdate, Ipv6DeviceTimerId, SlaacConfiguration,
+    },
+    gmp::{
+        IgmpTimerId, MldTimerId, IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
+        MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
+    },
 };
 
 const V4_HOST_ADDR: SpecifiedAddr<Ipv4Addr> =
@@ -79,9 +73,10 @@ fn test_igmp_enable_disable_integration() {
     // ever join a single group for the duration of the test. Given that,
     // the timer ID in bindings matches the state of the single timer id in
     // the local timer heap in GMP.
-    let timer_id = TimerId(TimerIdInner::Ipv4Device(
-        Ipv4DeviceTimerId::from(IgmpTimerId::new_delayed_report(device_id.downgrade())).into(),
-    ));
+    let timer_id = TimerId::from(
+        Ipv4DeviceTimerId::from(IgmpTimerId::new_delayed_report(device_id.downgrade()))
+            .into_common(),
+    );
     let range = now..=(now + IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL);
     struct TestConfig {
         ip_enabled: bool,
@@ -218,9 +213,9 @@ fn test_mld_enable_disable_integration() {
     // ever join a single group for the duration of the test. Given that,
     // the timer ID in bindings matches the state of the single timer id in
     // the local timer heap in GMP.
-    let snmc_timer_id = TimerId(TimerIdInner::Ipv6Device(
-        Ipv6DeviceTimerId::Mld(MldTimerId::new_delayed_report(device_id.downgrade())).into(),
-    ));
+    let snmc_timer_id = TimerId::from(
+        Ipv6DeviceTimerId::Mld(MldTimerId::new_delayed_report(device_id.downgrade())).into_common(),
+    );
     let range = now..=(now + MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL);
     struct TestConfig {
         ip_enabled: bool,

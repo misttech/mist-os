@@ -1602,7 +1602,7 @@ impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::SlaacCounters> for 
     type Guard<'l> = &'l SlaacCounters where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        &self.slaac_counters()
+        &self.ipv6.slaac_counters
     }
 }
 

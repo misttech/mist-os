@@ -160,7 +160,7 @@ impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::NdpCounters> for St
     type Guard<'l> = &'l NdpCounters where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.ndp_counters()
+        &self.ipv6.icmp.ndp_counters
     }
 }
 
@@ -206,7 +206,7 @@ impl<BT: BindingsTypes, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::Ip
     type Guard<'l> = &'l IpCounters<I> where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.ip_counters()
+        self.inner_ip_state().counters()
     }
 }
 

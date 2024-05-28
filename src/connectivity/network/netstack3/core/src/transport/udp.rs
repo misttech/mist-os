@@ -77,7 +77,7 @@ mod integration_tests;
 
 /// A builder for UDP layer state.
 #[derive(Clone)]
-pub(crate) struct UdpStateBuilder {
+pub struct UdpStateBuilder {
     send_port_unreachable: bool,
 }
 
@@ -104,8 +104,7 @@ impl UdpStateBuilder {
     /// disabled by default.
     ///
     /// [RFC 1122 Section 4.1.3.1]: https://tools.ietf.org/html/rfc1122#section-4.1.3.1
-    #[cfg(test)]
-    pub(crate) fn send_port_unreachable(&mut self, send_port_unreachable: bool) -> &mut Self {
+    pub fn send_port_unreachable(&mut self, send_port_unreachable: bool) -> &mut Self {
         self.send_port_unreachable = send_port_unreachable;
         self
     }

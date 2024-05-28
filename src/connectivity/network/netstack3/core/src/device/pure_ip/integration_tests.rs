@@ -88,7 +88,7 @@ fn receive_frame<I: Ip + TestIpExt + IpExt>() {
         stack_state: &StackState<FakeBindingsCtx>,
         count: u64,
     ) {
-        assert_eq!(stack_state.ip_counters::<I>().receive_ip_packet.get(), count);
+        assert_eq!(stack_state.common_ip::<I>().counters().receive_ip_packet.get(), count);
         assert_eq!(stack_state.device_counters().recv_frame.get(), count);
         match I::VERSION {
             IpVersion::V4 => {

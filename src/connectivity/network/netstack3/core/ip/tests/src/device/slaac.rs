@@ -24,25 +24,22 @@ use packet_formats::{
     utils::NonZeroDuration,
 };
 
-use crate::{
-    context::InstantContext as _,
-    device::{
-        ethernet::{EthernetCreationProperties, EthernetLinkDevice},
-        FrameDestination,
-    },
-    ip::{
-        self,
-        device::{
-            testutil::with_assigned_ipv6_addr_subnets, InnerSlaacTimerId,
-            IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, SlaacConfiguration,
-            StableIidSecret, TemporarySlaacAddressConfiguration, SLAAC_MIN_REGEN_ADVANCE,
-        },
-        icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
-    },
+use netstack3_base::{FrameDestination, InstantContext as _};
+use netstack3_core::{
+    device::{EthernetCreationProperties, EthernetLinkDevice},
     testutil::{
         CtxPairExt as _, FakeCtx, TestAddrs, TestIpExt as _, DEFAULT_INTERFACE_METRIC,
         IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
     },
+};
+use netstack3_ip::{
+    self as ip,
+    device::{
+        testutil::with_assigned_ipv6_addr_subnets, InnerSlaacTimerId, IpDeviceConfigurationUpdate,
+        Ipv6DeviceConfigurationUpdate, SlaacConfiguration, StableIidSecret,
+        TemporarySlaacAddressConfiguration, SLAAC_MIN_REGEN_ADVANCE,
+    },
+    icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
 };
 
 const SECRET_KEY: StableIidSecret = StableIidSecret::ALL_ONES;

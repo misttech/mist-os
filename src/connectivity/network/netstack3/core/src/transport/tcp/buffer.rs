@@ -765,9 +765,12 @@ pub(crate) mod testutil {
         (&*a.lock()) == (&*b.lock())
     }
 
+    /// A fake implementation of client-side TCP buffers.
     #[derive(Clone, Debug, Default)]
     pub struct ClientBuffers {
+        /// Receive buffer shared with core TCP implementation.
         pub receive: Arc<Mutex<RingBuffer>>,
+        /// Send buffer shared with core TCP implementation.
         pub send: Arc<Mutex<Vec<u8>>>,
     }
 
@@ -781,6 +784,7 @@ pub(crate) mod testutil {
     impl Eq for ClientBuffers {}
 
     impl ClientBuffers {
+        /// Creates new a `ClientBuffers` with `buffer_sizes`.
         pub fn new(buffer_sizes: BufferSizes) -> Self {
             let BufferSizes { send, receive } = buffer_sizes;
             Self {
@@ -790,7 +794,9 @@ pub(crate) mod testutil {
         }
     }
 
+    /// A fake implementation of bindings buffers for TCP.
     #[derive(Debug, Clone, Eq, PartialEq)]
+    #[allow(missing_docs)]
     pub enum ProvidedBuffers {
         Buffers(WriteBackClientBuffers),
         NoBuffers,
@@ -829,6 +835,8 @@ pub(crate) mod testutil {
         }
     }
 
+    /// The variant of [`ProvidedBuffers`] that provides observing the data
+    /// sent/received to TCP sockets.
     #[derive(Debug, Default, Clone)]
     pub struct WriteBackClientBuffers(pub Arc<Mutex<Option<ClientBuffers>>>);
 

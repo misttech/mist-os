@@ -101,7 +101,7 @@ fn test_receive_ip_frame<I: Ip + TestIpExt + IpExt>(enable: bool) {
         .device::<EthernetLinkDevice>()
         .receive_frame(RecvEthernetFrameMeta { device_id: eth_device }, Buf::new(bytes, ..));
 
-    assert_eq!(ctx.core_ctx.ip_counters::<I>().receive_ip_packet.get(), expected_received);
+    assert_eq!(ctx.core_ctx.common_ip::<I>().counters().receive_ip_packet.get(), expected_received);
 }
 
 #[test]
@@ -276,8 +276,11 @@ fn test_promiscuous_mode<I: Ip + TestIpExt + IpExt>(
         .device::<EthernetLinkDevice>()
         .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf.clone());
 
-    assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
-    assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(), 0);
+    assert_eq!(ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet.get(), 1);
+    assert_eq!(
+        ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet_other_host.get(),
+        0
+    );
 
     // Accept packet destined for this device if promiscuous mode is on.
     ethernet::set_promiscuous_mode(&mut ctx.core_ctx(), &eth_device, true);
@@ -285,8 +288,11 @@ fn test_promiscuous_mode<I: Ip + TestIpExt + IpExt>(
         .device::<EthernetLinkDevice>()
         .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf);
 
-    assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
-    assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(), 0);
+    assert_eq!(ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet.get(), 2);
+    assert_eq!(
+        ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet_other_host.get(),
+        0
+    );
 
     let buf = Buf::new(Vec::new(), ..)
         .encapsulate(I::PacketBuilder::new(
@@ -313,8 +319,11 @@ fn test_promiscuous_mode<I: Ip + TestIpExt + IpExt>(
         .device::<EthernetLinkDevice>()
         .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf.clone());
 
-    assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
-    assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(), 0);
+    assert_eq!(ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet.get(), 2);
+    assert_eq!(
+        ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet_other_host.get(),
+        0
+    );
 
     // Accept packet not destined for this device if promiscuous mode is on.
     ethernet::set_promiscuous_mode(&mut ctx.core_ctx(), &eth_device, true);
@@ -322,9 +331,9 @@ fn test_promiscuous_mode<I: Ip + TestIpExt + IpExt>(
         .device::<EthernetLinkDevice>()
         .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf);
 
-    assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 3);
+    assert_eq!(ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet.get(), 3);
     assert_eq!(
-        ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
+        ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet_other_host.get(),
         u64::from(is_other_host)
     );
 }
@@ -437,7 +446,10 @@ fn receive_simple_ip_packet_test<A: IpAddress>(
         Some(FrameDestination::Individual { local: true }),
         buf,
     );
-    assert_eq!(ctx.core_ctx.ip_counters::<A::Version>().dispatch_receive_ip_packet.get(), expected);
+    assert_eq!(
+        ctx.core_ctx.common_ip::<A::Version>().counters().dispatch_receive_ip_packet.get(),
+        expected
+    );
 }
 
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
@@ -626,7 +638,7 @@ fn test_ipv6_duplicate_solicited_node_address() {
     let addr_sub1 = AddrSubnet::new(ip1.get(), 64).unwrap();
     let addr_sub2 = AddrSubnet::new(ip2.get(), 64).unwrap();
 
-    assert_eq!(ctx.core_ctx.ip_counters::<Ipv6>().dispatch_receive_ip_packet.get(), 0);
+    assert_eq!(ctx.core_ctx.common_ip::<Ipv6>().counters().dispatch_receive_ip_packet.get(), 0);
 
     // Add ip1 to the device.
     //
