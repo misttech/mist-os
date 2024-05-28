@@ -29,8 +29,11 @@
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
 #include <object/dispatcher.h>
+#include <object/job_dispatcher.h>
 #include <object/process_dispatcher.h>
 #include <object/vm_address_region_dispatcher.h>
+#include <object/vm_object_dispatcher.h>
+#include <vm/vm_object_paged.h>
 
 #include "../kernel_priv.h"
 
@@ -44,8 +47,10 @@ fit::result<Errno, TaskInfo> create_zircon_process(fbl::RefPtr<Kernel> kernel,
                                                    fbl::RefPtr<ProcessGroup> process_group,
                                                    const fbl::String& name) {
   LTRACE;
-  auto shared_or_errorr = create_shared(0, name).map_error(
-      [](auto status) { return errno(from_status_like_fdio(status)); });
+  auto shared_or_errorr =
+      create_process(0, zx::unowned_job(process_group->job), name).map_error([](auto status) {
+        return errno(from_status_like_fdio(status));
+      });
   if (shared_or_errorr.is_error()) {
     return shared_or_errorr.take_error();
   }
@@ -70,6 +75,32 @@ fit::result<zx_status_t, ktl::pair<zx::process, zx::vmar>> create_shared(uint32_
   zx::vmar vmar;
   zx_status_t status = zx::process::create(*zx::unowned_job{zx::job::default_job()}, name.data(),
                                            static_cast<uint32_t>(name.size()), 0, &process, &vmar);
+  if (status != ZX_OK) {
+    return fit::error(status);
+  }
+
+  return fit::ok(ktl::pair(ktl::move(process), ktl::move(vmar)));
+}
+
+fit::result<zx_status_t, zx::job> create_job(uint32_t options) {
+  LTRACE;
+  zx::job job;
+  zx_status_t status = zx::job::create(*zx::unowned_job{zx::job::default_job()}, options, &job);
+  if (status != ZX_OK) {
+    return fit::error(status);
+  }
+
+  return fit::ok(ktl::move(job));
+}
+
+fit::result<zx_status_t, ktl::pair<zx::process, zx::vmar>> create_process(uint32_t options,
+                                                                          zx::unowned_job job,
+                                                                          const fbl::String& name) {
+  LTRACE;
+  zx::process process;
+  zx::vmar vmar;
+  zx_status_t status = zx::process::create(*job, name.data(), static_cast<uint32_t>(name.size()), 0,
+                                           &process, &vmar);
   if (status != ZX_OK) {
     return fit::error(status);
   }
@@ -132,14 +163,34 @@ fit::result<zx_status_t, ExitStatus> run_task(CurrentTask& current_task) {
       // Transfer handles to child process
       auto state = current_task->mm()->state.Write();
 
+      // Transfer VMAR handle to child process
       zx_handle_t new_handle;
       TransferHandle<VmAddressRegionDispatcher>(process.get(), state->user_vmar.get(), &new_handle);
-
       state->user_vmar.reset(new_handle);
+
+      // Transfer VMOs handles to child process
+      for (auto& mapping : state->mappings.iter()) {
+        ktl::visit(MappingBacking::overloaded{
+                       [&process](MappingBackingVmo& backing) {
+                         zx_handle_t new_handle;
+                         // Transfer the Job handle
+                         TransferHandle<VmObjectDispatcher>(
+                             process.get(), backing.vmo()->as_ref().get(), &new_handle);
+                         backing.vmo()->as_ref_mut().reset(new_handle);
+                       },
+                       [](PrivateAnonymous&) {},
+                   },
+                   mapping.second.backing().variant);
+      }
+
+      // Transfer Job handle to child process
+      TransferHandle<JobDispatcher>(
+          process.get(), current_task->thread_group->read().process_group->job.get(), &new_handle);
+      current_task->thread_group->write().process_group->job.reset(new_handle);
     }
 
-    status = process.start(thread.value(), current_task.thread_state.registers.real_registers.rip,
-                           current_task.thread_state.registers.real_registers.rsp, {}, 0);
+    status = process.start(thread.value(), current_task.thread_state.registers->rip,
+                           current_task.thread_state.registers->rsp, {}, 0);
     if (status != ZX_OK) {
       TRACEF("failed to start process %d\n", status);
       return fit::error(status);

@@ -19,7 +19,7 @@ namespace starnix {
 /// Result returned when creating new Zircon threads and processes for tasks.
 struct TaskInfo {
   // The thread that was created for the task.
-  std::optional<zx::thread> thread;
+  ktl::optional<zx::thread> thread;
 
   // The thread group that the task should be added to.
   fbl::RefPtr<ThreadGroup> thread_group;

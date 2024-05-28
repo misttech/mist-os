@@ -7,6 +7,8 @@
 
 #include <zircon/types.h>
 
+#include <linux/errno.h>
+
 namespace starnix {
 
 struct ThreadStartInfo;
@@ -41,16 +43,51 @@ struct zx_thread_state_general_regs_t {
 /// Implements [`std::ops::Deref`] and [`std::ops::DerefMut`] as a way to get at the underlying
 /// [`zx::sys::zx_thread_state_general_regs_t`] that this type wraps.
 struct RegisterState {
-  zx_thread_state_general_regs_t real_registers;
+ private:
+  mutable zx_thread_state_general_regs_t real_registers_;
 
+ public:
   /// A copy of the x64 `rax` register at the time of the `syscall` instruction. This is important
   /// to store, as the return value of a syscall overwrites `rax`, making it impossible to recover
   /// the original syscall number in the case of syscall restart and strace output.
   uint64_t orig_rax;
 
-  static RegisterState From(zx_thread_state_general_regs_t regs) {
-    return RegisterState{regs, regs.rax};
+ public:
+  /// impl RegisterState
+
+  void save_registers_for_restart(uint64_t syscall_number) {
+    // The `rax` register read from the thread's state is clobbered by
+    // zircon with ZX_ERR_BAD_SYSCALL.  Similarly, Linux sets it to ENOSYS
+    // until it has determined the correct return value for the syscall; we
+    // emulate this behavior because ptrace callers expect it.
+    real_registers_.rax = -static_cast<uint64_t>(ENOSYS);
+
+    // `orig_rax` should hold the original value loaded into `rax` by the userspace process.
+    orig_rax = syscall_number;
   }
+
+  /// Sets the register that indicates the single-machine-word return value from a
+  /// function call.
+  void set_return_register(uint64_t return_value) { real_registers_.rax = return_value; }
+
+  /// Sets the register that indicates the current stack pointer.
+  void set_stack_pointer_register(uint64_t sp) { real_registers_.rsp = sp; }
+
+  /// Sets the register that indicates the TLS.
+  void set_thread_pointer_register(uint64_t tp) { real_registers_.fs_base = tp; }
+
+ public:
+  static RegisterState From(zx_thread_state_general_regs_t regs) {
+    return RegisterState(regs, regs.rax);
+  }
+
+ public:
+  RegisterState() = default;
+  zx_thread_state_general_regs_t* operator->() const { return &real_registers_; }
+
+ private:
+  RegisterState(zx_thread_state_general_regs_t regs, uint64_t _orig_rax)
+      : real_registers_(regs), orig_rax(_orig_rax) {}
 };
 
 }  // namespace starnix

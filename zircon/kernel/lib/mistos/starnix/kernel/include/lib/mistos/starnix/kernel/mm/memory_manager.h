@@ -178,6 +178,8 @@ struct MappingBackingVmo {
     return base_ == other.base_ && vmo_ == other.vmo_ && vmo_offset_ == other.vmo_offset_;
   }
 
+  zx::ArcVmo& vmo() { return vmo_; }
+
  private:
   ZXTEST_FRIEND_TEST(MemoryManager, test_unmap_beginning);
   ZXTEST_FRIEND_TEST(MemoryManager, test_unmap_end);
@@ -265,7 +267,7 @@ struct Mapping {
 
   // MappingName& name() { return name_; }
 
-  // MappingBacking& backing() { return backing_; }
+  MappingBacking& backing() { return backing_; }
 
   // MappingFlags flags() const { return flags_; }
 
@@ -479,12 +481,11 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
   fit::result<Errno, ktl::span<uint8_t>> vmo_read_memory(UserAddress addr,
                                                          ktl::span<uint8_t>& bytes) const;
 
-  fit::result<Errno, ktl::span<uint8_t>> unified_read_memory_partial(const CurrentTask& current_task,
-                                                             UserAddress addr,
-                                                             ktl::span<uint8_t>& bytes) const;
+  fit::result<Errno, ktl::span<uint8_t>> unified_read_memory_partial(
+      const CurrentTask& current_task, UserAddress addr, ktl::span<uint8_t>& bytes) const;
 
   fit::result<Errno, ktl::span<uint8_t>> vmo_read_memory_partial(UserAddress addr,
-                                                         ktl::span<uint8_t>& bytes) const;
+                                                                 ktl::span<uint8_t>& bytes) const;
 
   fit::result<Errno, ktl::span<uint8_t>> unified_read_memory_partial_until_null_byte(
       const CurrentTask& current_task, UserAddress addr, ktl::span<uint8_t>& bytes) const;

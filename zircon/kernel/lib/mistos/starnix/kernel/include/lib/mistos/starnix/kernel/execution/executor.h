@@ -9,6 +9,7 @@
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix/kernel/execution/shared.h>
 #include <lib/mistos/starnix/kernel/task/forward.h>
+#include <lib/mistos/zx/job.h>
 #include <zircon/types.h>
 
 #include <fbl/ref_ptr.h>
@@ -36,6 +37,12 @@ fit::result<Errno, TaskInfo> create_zircon_process(fbl::RefPtr<Kernel> kernel,
 /// syscall.
 fit::result<zx_status_t, ktl::pair<zx::process, zx::vmar>> create_shared(uint32_t options,
                                                                          const fbl::String& name);
+
+fit::result<zx_status_t, zx::job> create_job(uint32_t options);
+
+fit::result<zx_status_t, ktl::pair<zx::process, zx::vmar>> create_process(uint32_t options,
+                                                                          zx::unowned_job job,
+                                                                          const fbl::String& name);
 
 using PreRun = std::function<fit::result<Errno>(CurrentTask& init_task)>;
 using TaskComplete = std::function<void()>;
