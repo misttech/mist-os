@@ -25,6 +25,7 @@ class Arc : public fbl::RefCounted<Arc<T>> {
   const T& operator*() const { return value_; }
   const T* operator->() const { return &value_; }
   const T& as_ref() const { return value_; }
+  T& as_ref_mut() { return value_; }
 
  private:
   T value_;
