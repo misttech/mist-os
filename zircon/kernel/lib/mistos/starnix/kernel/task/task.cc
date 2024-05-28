@@ -79,4 +79,24 @@ pid_t Task::get_pid() const { return thread_group->leader; }
 
 pid_t Task::get_tid() const { return id; }
 
+fit::result<Errno, ktl::span<uint8_t>> Task::read_memory(UserAddress addr,
+                                                         ktl::span<uint8_t>& bytes) const {
+  return mm_.value()->vmo_read_memory(addr, bytes);
+}
+
+fit::result<Errno, ktl::span<uint8_t>> Task::read_memory_partial_until_null_byte(
+    UserAddress addr, ktl::span<uint8_t>& bytes) const {
+  return mm_.value()->vmo_read_memory_partial_until_null_byte(addr, bytes);
+}
+
+fit::result<Errno, ktl::span<uint8_t>> Task::read_memory_partial(UserAddress addr,
+                                                                 ktl::span<uint8_t>& bytes) const {
+  return mm_.value()->vmo_read_memory_partial(addr, bytes);
+}
+
+fit::result<Errno, size_t> Task::write_memory(UserAddress addr,
+                                              const ktl::span<const uint8_t>& bytes) const {
+  return mm_.value()->vmo_write_memory(addr, bytes);
+}
+
 }  // namespace starnix

@@ -217,7 +217,7 @@ class MemoryManager;
 /// See also `CurrentTask`, which represents the task corresponding to the thread that is currently
 /// executing.
 
-class Task : public fbl::RefCountedUpgradeable<Task> {
+class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
  public:
   // A unique identifier for this task.
   //
@@ -348,6 +348,21 @@ class Task : public fbl::RefCountedUpgradeable<Task> {
 
   fbl::String command() const { return persistent_info->Lock()->command(); }
 
+ public:
+  // impl MemoryAccessor for Task
+  /// impl MemoryAccessor for CurrentTask
+  fit::result<Errno, ktl::span<uint8_t>> read_memory(UserAddress addr,
+                                                     ktl::span<uint8_t>& bytes) const final;
+
+  fit::result<Errno, ktl::span<uint8_t>> read_memory_partial_until_null_byte(
+      UserAddress addr, ktl::span<uint8_t>& bytes) const final;
+
+  fit::result<Errno, ktl::span<uint8_t>> read_memory_partial(UserAddress addr,
+                                                             ktl::span<uint8_t>& bytes) const final;
+
+  fit::result<Errno, size_t> write_memory(UserAddress addr,
+                                          const ktl::span<const uint8_t>& bytes) const final;
+
   // C++
  public:
   ~Task();
@@ -377,7 +392,7 @@ class TaskContainer : public fbl::WAVLTreeContainable<ktl::unique_ptr<TaskContai
   }
 
   // WAVL-tree Index
-  uint GetKey() const { return (info_->Lock())->tid(); }
+  pid_t GetKey() const { return (info_->Lock())->tid(); }
 
  private:
   TaskContainer(util::WeakPtr<Task> weak, TaskPersistentInfo& info)
