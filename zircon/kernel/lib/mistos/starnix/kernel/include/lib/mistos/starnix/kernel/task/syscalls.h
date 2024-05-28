@@ -11,7 +11,11 @@
 #include <lib/mistos/starnix_syscalls/syscall_result.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 
+#include <linux/sched.h>
+
 namespace starnix {
+
+fit::result<Errno, pid_t> do_clone(const CurrentTask& current_task, struct clone_args);
 
 fit::result<Errno, pid_t> sys_getpid(const CurrentTask& current_task);
 fit::result<Errno, pid_t> sys_gettid(const CurrentTask& current_task);

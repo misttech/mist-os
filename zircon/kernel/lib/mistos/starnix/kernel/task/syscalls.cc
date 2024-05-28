@@ -6,6 +6,7 @@
 #include "lib/mistos/starnix/kernel/task/syscalls.h"
 
 #include <lib/fit/result.h>
+#include <lib/mistos/linux_uapi/arch/x86_64.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/session.h>
@@ -13,8 +14,10 @@
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_syscalls/syscall_result.h>
+#include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/weak_wrapper.h>
+#include <trace.h>
 
 #include <ktl/algorithm.h>
 #include <ktl/optional.h>
@@ -40,6 +43,59 @@ util::WeakPtr<starnix::Task> get_task_or_current(const starnix::CurrentTask& cur
 }  // namespace
 
 namespace starnix {
+
+fit::result<Errno, pid_t> do_clone(const CurrentTask& current_task, struct clone_args args) {
+  // security::check_task_create_access(current_task)?;
+
+  ktl::optional<Signal> child_exit_signal;
+  if (args.exit_signal == 0) {
+    child_exit_signal = {};
+  } else {
+    auto signal_or_error = Signal::try_from(UncheckedSignal::New(args.exit_signal));
+    if (signal_or_error.is_error())
+      return signal_or_error.take_error();
+    child_exit_signal = signal_or_error.value();
+  }
+
+  ///
+  // READ TASK Registers
+
+  ///
+
+  auto new_task_or_error = current_task.clone_task(
+      args.flags, child_exit_signal, UserRef<pid_t>(UserAddress::from((args.parent_tid))),
+      UserRef<pid_t>(UserAddress::from((args.child_tid))));
+  if (new_task_or_error.is_error()) {
+    return new_task_or_error.take_error();
+  }
+  auto new_task = new_task_or_error.value();
+  // Set the result register to 0 for the return value from clone in the
+  // cloned process.
+  new_task.thread_state.registers.set_return_register(0);
+  // let (trace_kind, ptrace_state) = current_task.get_ptrace_core_state_for_clone(args);
+
+  if (args.stack != 0) {
+    // In clone() the `stack` argument points to the top of the stack, while in clone3()
+    // `stack` points to the bottom of the stack. Therefore, in clone3() we need to add
+    // `stack_size` to calculate the stack pointer. Note that in clone() `stack_size` is 0.
+    new_task.thread_state.registers.set_stack_pointer_register(args.stack + args.stack_size);
+  }
+
+  if ((args.flags & static_cast<uint64_t>(CLONE_SETTLS)) != 0) {
+    new_task.thread_state.registers.set_thread_pointer_register(args.tls);
+  }
+
+  auto tid = new_task.task->id;
+  auto task_ref = util::WeakPtr(new_task.task.get());
+  // execute_task(new_task, | _, _ | Ok(()), | _ | {}, ptrace_state);
+
+  if ((args.flags & static_cast<uint64_t>(CLONE_VFORK)) != 0) {
+    // current_task.wait_for_execve(task_ref) ? ;
+    // current_task.ptrace_event(PtraceOptions::TRACEVFORKDONE, tid as u64);
+  }
+
+  return fit::ok(tid);
+}
 
 fit::result<Errno, pid_t> sys_getpid(const CurrentTask& current_task) {
   return fit::ok(current_task->get_pid());

@@ -9,12 +9,11 @@
 #include <lib/mistos/starnix/kernel/task/forward.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/util/weak_wrapper.h>
-#include <lib/mistos/zx/process.h>
+#include <lib/mistos/zx/job.h>
 
 #include <optional>
 #include <utility>
 
-#include <fbl/canary.h>
 #include <fbl/intrusive_wavl_tree.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
@@ -67,6 +66,8 @@ class ProcessGroup : public fbl::RefCountedUpgradeable<ProcessGroup>,
 
   // The leader of the process group.
   pid_t leader;
+
+  zx::job job;
 
  private:
   /// The mutable state of the ProcessGroup.

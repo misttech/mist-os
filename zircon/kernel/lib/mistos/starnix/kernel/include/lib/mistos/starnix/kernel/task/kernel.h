@@ -211,7 +211,7 @@ class Kernel : private fbl::RefCountedUpgradeable<Kernel> {
   using fbl::RefCountedUpgradeable<Kernel>::Adopt;
   using fbl::RefCountedUpgradeable<Kernel>::AddRefMaybeInDestructor;
 
-  ~Kernel() = default;
+  ~Kernel();
 
  private:
   Kernel(fbl::String _cmdline) : cmdline{std::move(_cmdline)} {}

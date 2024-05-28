@@ -24,6 +24,7 @@
 #include <lib/mistos/starnix_uapi/auth.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
+#include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/userloader/start.h>
 #include <lib/mistos/userloader/userloader.h>
 #include <lib/mistos/util/strings/split_string.h>
@@ -54,6 +55,8 @@
 using namespace util;
 
 namespace starnix {
+
+CurrentTask::~CurrentTask() = default;
 
 CurrentTask::CurrentTask(fbl::RefPtr<Task> task) : task(ktl::move(task)) {}
 
@@ -114,6 +117,12 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
   DEBUG_ASSERT(pids->get_task(pid).Lock() == nullptr);
 
   fbl::RefPtr<ProcessGroup> process_group = ProcessGroup::New(pid, {});
+  auto job_or_error =
+      create_job(0).map_error([](auto status) { return errno(from_status_like_fdio(status)); });
+  if (job_or_error.is_error()) {
+    return job_or_error.take_error();
+  }
+  process_group->job = ktl::move(job_or_error.value());
   pids->add_process_group(process_group);
 
   auto task_info = task_info_factory(pid, process_group).value_or(TaskInfo{});
@@ -152,8 +161,9 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
 
 fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
                                                         ktl::optional<Signal> child_exit_signal,
-                                                        user_out_ptr<pid_t> user_parent_tid,
-                                                        user_out_ptr<pid_t> user_child_tid) {
+                                                        UserRef<pid_t> user_parent_tid,
+                                                        UserRef<pid_t> user_child_tid) const {
+  LTRACE;
   const uint64_t IMPLEMENTED_FLAGS =
       (CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD | CLONE_SYSVSEM |
        CLONE_SETTLS | CLONE_PARENT_SETTID | CLONE_CHILD_CLEARTID | CLONE_CHILD_SETTID |
@@ -167,9 +177,9 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
 
   auto clone_files = (flags & CLONE_FILES) != 0;
   auto clone_fs = (flags & CLONE_FS) != 0;
-  // auto clone_parent_settid = (flags & CLONE_PARENT_SETTID) != 0;
-  // auto clone_child_cleartid = (flags & CLONE_CHILD_CLEARTID) != 0;
-  // auto clone_child_settid = (flags & CLONE_CHILD_SETTID) != 0;
+  auto clone_parent_settid = (flags & CLONE_PARENT_SETTID) != 0;
+  auto clone_child_cleartid = (flags & CLONE_CHILD_CLEARTID) != 0;
+  auto clone_child_settid = (flags & CLONE_CHILD_SETTID) != 0;
   auto clone_sysvsem = (flags & CLONE_SYSVSEM) != 0;
   auto clone_ptrace = (flags & CLONE_PTRACE) != 0;
   auto clone_thread = (flags & CLONE_THREAD) != 0;
@@ -240,6 +250,8 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
   // let child_signal_mask;
   // let timerslack_ns;
 
+  LTRACE;
+
   auto task_info_or_error = [&]() -> fit::result<Errno, TaskInfo> {
     // Make sure to drop these locks ASAP to avoid inversion
     auto self = (*this);
@@ -291,6 +303,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
       return create_zircon_process(kernel, (*this)->thread_group, pid, process_group, command);
     }
   }();
+
   if (task_info_or_error.is_error())
     return task_info_or_error.take_error();
 
@@ -334,7 +347,6 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
       auto result = (*this)->thread_group->add(child_task);
       if (result.is_error())
         return result.take_error();
-
     } else {
       auto result = child->thread_group->add(child_task);
       if (result.is_error())
@@ -348,6 +360,23 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
       if (result.is_error())
         return result.take_error();
     }
+
+    if (clone_parent_settid) {
+      auto write_result = this->write_object(user_parent_tid, child->id);
+      if (write_result.is_error())
+        return write_result.take_error();
+    }
+
+    if (clone_child_cleartid) {
+    }
+
+    if (clone_child_settid) {
+      auto write_result = child->write_object(user_child_tid, child->id);
+      if (write_result.is_error())
+        return write_result.take_error();
+    }
+
+    child.thread_state = this->thread_state.snapshot();
   }
 
   /*
@@ -365,8 +394,8 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
 
 starnix::testing::AutoReleasableTask CurrentTask::clone_task_for_test(
     uint64_t flags, ktl::optional<Signal> exit_signal) {
-  auto result = clone_task(flags, exit_signal, make_user_out_ptr<pid_t>(nullptr),
-                           make_user_out_ptr<pid_t>(nullptr));
+  auto result =
+      clone_task(flags, exit_signal, UserRef<pid_t>(UserAddress()), UserRef<pid_t>(UserAddress()));
   ASSERT_MSG(result.is_ok(), "failed to create task in test");
   return starnix::testing::AutoReleasableTask::From(result.value());
 }

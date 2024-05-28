@@ -54,6 +54,12 @@ struct ThreadState {
   /// To use, call set_syscall_restart_func and return ERESTART_RESTARTBLOCK. sys_restart_syscall
   /// will eventually call it.
   // pub syscall_restart_func: Option<Box<SyscallRestartFunc>>,
+
+ public:
+  /// impl ThreadState
+
+  /// Returns a new `ThreadState` with the same `registers` as this one.
+  ThreadState snapshot() const { return ThreadState{this->registers}; }
 };
 
 class TaskBuilder {
@@ -259,6 +265,7 @@ class CurrentTask : public MemoryAccessorExt {
       const fbl::String& initial_name, fbl::RefPtr<FsContext> root_fs,
       TaskInfoFactory&& task_info_factory);
 
+ public:
   /// Clone this task.
   ///
   /// Creates a new task object that shares some state with this task
@@ -270,8 +277,8 @@ class CurrentTask : public MemoryAccessorExt {
   /// bitwise-ORed like clone().
   fit::result<Errno, TaskBuilder> clone_task(uint64_t flags,
                                              ktl::optional<Signal> child_exit_signal,
-                                             user_out_ptr<pid_t> user_parent_tid,
-                                             user_out_ptr<pid_t> user_child_tid);
+                                             UserRef<pid_t> user_parent_tid,
+                                             UserRef<pid_t> user_child_tid) const;
 
  public:
   /// The flags indicates only the flags as in clone3(), and does not use the low 8 bits for the
@@ -297,8 +304,10 @@ class CurrentTask : public MemoryAccessorExt {
   fit::result<Errno, size_t> write_memory(UserAddress addr,
                                           const ktl::span<const uint8_t>& bytes) const final;
 
-  // C++
  public:
+  // C++
+  ~CurrentTask();
+
   Task* operator->() const;
 
  private:

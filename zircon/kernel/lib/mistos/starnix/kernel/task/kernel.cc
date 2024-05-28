@@ -14,6 +14,8 @@
 
 namespace starnix {
 
+Kernel::~Kernel() = default;
+
 fit::result<zx_status_t, fbl::RefPtr<Kernel>> Kernel::New(fbl::String cmdline) {
   fbl::AllocChecker ac;
 
