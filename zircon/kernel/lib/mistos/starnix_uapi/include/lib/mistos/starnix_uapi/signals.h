@@ -6,11 +6,15 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_SIGNALS_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_SIGNALS_H_
 
+#include <lib/fit/result.h>
+#include <lib/mistos/starnix_uapi/errors.h>
 #include <zircon/types.h>
 
 #include <asm/signal.h>
 
 namespace starnix_uapi {
+
+struct UncheckedSignal;
 
 /// The `Signal` struct represents a valid signal.
 struct Signal {
@@ -35,7 +39,11 @@ struct Signal {
   /// Used exclusively for PTRACE_O_TRACESYSGOOD
   void set_ptrace_syscall_bit() { number_ |= 0x80; }
 
-  const uint32_t NUM_SIGNALS = 64;
+  static const uint32_t NUM_SIGNALS = 64;
+
+ public:
+  // impl TryFrom<UncheckedSignal>
+  static fit::result<Errno, Signal> try_from(UncheckedSignal value);
 
  public:
   explicit Signal(uint32_t number) : number_(number) {}
@@ -88,6 +96,10 @@ struct UncheckedSignal {
   }
 
   bool is_zero() { return value_ == 0; }
+
+ public:
+  // C++
+  uint64_t value() { return value_; }
 
  private:
   explicit UncheckedSignal(uint64_t value) : value_(value) {}
