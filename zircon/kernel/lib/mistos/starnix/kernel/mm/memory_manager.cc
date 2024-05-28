@@ -838,10 +838,10 @@ fit::result<Errno, UserAddress> MemoryManager::set_brk(const CurrentTask& curren
 }
 
 fit::result<Errno> MemoryManager::snapshot_to(fbl::RefPtr<MemoryManager>& target) {
-  // return fit::error(errno(1));
   // TODO(https://fxbug.dev/42074633): When SNAPSHOT (or equivalent) is supported on pager-backed
   // VMOs we can remove the hack below (which also won't be performant). For now, as a workaround,
   // we use SNAPSHOT_AT_LEAST_ON_WRITE on both the child and the parent.
+  LTRACE;
 
   struct VmoWrapper : public fbl::SinglyLinkedListable<ktl::unique_ptr<VmoWrapper>> {
     zx::ArcVmo vmo;
