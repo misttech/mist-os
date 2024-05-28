@@ -166,12 +166,24 @@ closed protocol Syscall {
     strict Setsockopt() -> () error int64;
     ///STUB 55
     strict Getsockopt() -> () error int64;
-    ///STUB 56
-    strict Clone() -> () error int64;
-    ///STUB 57
+
+    // #56, SYSCALL_DEFINE5(clone, unsigned long, clone_flags, unsigned long, newsp, int __user *, parent_tidptr, int __user *, child_tidptr, unsigned long, tls)
+    strict Clone(resource struct {
+        clone_flags uint64;
+        newsp uint64;
+        @out
+        parent_tidptr int32;
+        @out
+        child_tidptr int32;
+        tls uint64;
+    }) -> () error int64;
+
+    // #57, SYSCALL_DEFINE0(fork)
     strict Fork() -> () error int64;
-    ///STUB 58
+
+    // #58, SYSCALL_DEFINE0(vfork)
     strict Vfork() -> () error int64;
+    
     ///STUB 59
     strict Execve() -> () error int64;
 
