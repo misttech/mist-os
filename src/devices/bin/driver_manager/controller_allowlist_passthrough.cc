@@ -53,20 +53,8 @@ const std::unordered_map<std::string, std::unordered_set<std::string_view>> kCon
          "test",  // power-manager-integration-test
      }},
     {"Rebind", {kAllowAllUses}},
-    {"UnbindChildren",
-     {
-         "block",               // fshost_integration_tests_fxfs_no_fxblob.cm
-         "driver_runner_test",  // driver-runner-test
-     }},
-    {"ScheduleUnbind",
-     {
-         "bt-emulator",         // bt-host-integration-tests
-         "driver_runner_test",  // driver-runner-test
-         "nand",                // ram-nand-test
-         "No_class_name_but_driver_url_is_fuchsia-boot:///dtr#meta/ddk-lifecycle-test.cm",  // ddk-lifecycle-test
-         "No_class_name_but_driver_url_is_fuchsia-boot:///dtr#meta/fvm.cm",  // paver-test
-         "No_class_name_but_driver_url_is_unbound",  // blobfs-ramdisk-test, and so many others
-     }},
+    {"UnbindChildren", {kAllowAllUses}},
+    {"ScheduleUnbind", {kAllowAllUses}},
     {"GetTopologicalPath", {kAllowAllUses}},
 });
 
