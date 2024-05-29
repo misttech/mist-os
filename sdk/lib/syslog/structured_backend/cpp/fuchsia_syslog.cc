@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <lib/syslog/structured_backend/cpp/fuchsia_syslog.h>
-
 #include <stdlib.h>
 
 namespace {
