@@ -7,6 +7,7 @@ using fuchsia.hardware.display.types;
 using fuchsia.hardware.i2cimpl;
 using fuchsia.images2;
 using fuchsia.sysmem;
+using fuchsia.sysmem2;
 using zx;
 
 type ColorConversion = strict bits : uint32 {
@@ -76,6 +77,8 @@ type Panel = flexible resource union {
     2: mode DisplayMode;
 };
 
+const MAX_COUNT_DISPLAY_PIXEL_FORMATS uint32 = fuchsia.sysmem2.MAX_COUNT_PIXEL_FORMAT_AND_MODIFIERS;
+
 /// A structure containing information a connected display.
 type AddedDisplayArgs = resource struct {
     display_id uint64;
@@ -84,7 +87,7 @@ type AddedDisplayArgs = resource struct {
 
     /// A list of pixel formats supported by the display. The first entry is the
     /// preferred pixel format.
-    pixel_formats vector<fuchsia.images2.PixelFormat>:MAX;
+    pixel_formats vector<fuchsia.images2.PixelFormat>:MAX_COUNT_DISPLAY_PIXEL_FORMATS;
 };
 
 /// This protocol is `open` while under development.

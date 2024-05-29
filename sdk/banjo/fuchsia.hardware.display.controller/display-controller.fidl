@@ -95,6 +95,9 @@ type PanelCapabilitiesSource = strict enum {
     DISPLAY_MODE = 2;
 };
 
+/// Equal to [`fuchsia.sysmem2/MAX_COUNT_PIXEL_FORMAT_AND_MODIFIERS`].
+const MAX_COUNT_DISPLAY_PIXEL_FORMATS uint32 = 64;
+
 /// A structure containing information a connected display.
 type AddedDisplayArgs = resource struct {
     display_id uint64;
@@ -109,7 +112,7 @@ type AddedDisplayArgs = resource struct {
 
     /// A list of pixel formats supported by the display. The first entry is the
     /// preferred pixel format.
-    pixel_format vector<FuchsiaImages2PixelFormatEnumValue>:MAX;
+    pixel_format vector<FuchsiaImages2PixelFormatEnumValue>:MAX_COUNT_DISPLAY_PIXEL_FORMATS;
 };
 
 /// The client will not make any `ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL` calls into the device
