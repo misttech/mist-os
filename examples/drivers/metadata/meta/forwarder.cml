@@ -1,0 +1,26 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        runner: "driver",
+        binary: "driver/forwarder.so",
+        bind: "meta/bind/forwarder.bindbc",
+    },
+    capabilities: [
+        { service: "fuchsia.examples.metadata.Metadata" },
+    ],
+    use: [
+        { service: "fuchsia.examples.metadata.Metadata" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.examples.metadata.Metadata",
+            from: "self",
+        },
+    ],
+}

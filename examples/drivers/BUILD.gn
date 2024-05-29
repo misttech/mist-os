@@ -8,6 +8,7 @@ group("drivers") {
     "bind/fidl_bindlib_codegen",
     "demo-number:component",
     "driver_test_realm/sample-driver",
+    "metadata:drivers",
     "simple/dfv1:pkg",
     "simple/dfv2:pkg",
     "skeleton:pkg",

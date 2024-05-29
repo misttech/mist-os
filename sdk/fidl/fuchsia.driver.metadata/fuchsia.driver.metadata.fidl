@@ -1,0 +1,19 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.driver.metadata;
+
+using zx;
+
+closed protocol Metadata {
+    /// Provide the serialized metadata stored by the driver. Expected usage sees the unserialized
+    /// metadata as some generic FIDL object. The actual type of the unserialzied metadata is
+    /// decided outside of this method.
+    strict GetMetadata() -> (struct {
+        metadata vector<uint8>:MAX;
+    }) error zx.Status;
+};
+
+service Service {
+    metadata client_end:Metadata;
+};

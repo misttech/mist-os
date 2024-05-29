@@ -31,6 +31,8 @@ toc:
       path: /docs/development/drivers/tutorials/bind-libraries-codegen.md
     - title: "FIDL tutorial"
       path: /docs/development/drivers/tutorials/fidl-tutorial.md
+    - title: "Metadata tutorial"
+      path: /docs/development/drivers/tutorials/metadata-tutorial.md
   - title: "Testing"
     section:
     - title: "DriverTestRealm"
