@@ -4,6 +4,7 @@
 
 #include "src/devices/bin/driver_manager/node.h"
 
+#include <fidl/fuchsia.component/cpp/wire_test_base.h>
 #include <fidl/fuchsia.driver.host/cpp/test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -16,7 +17,7 @@
 #include "src/devices/bin/driver_manager/driver_host.h"
 #include "src/devices/bin/driver_manager/tests/driver_manager_test_base.h"
 
-class TestRealm final : public fidl::WireServer<fuchsia_component::Realm> {
+class TestRealm final : public fidl::testing::WireTestBase<fuchsia_component::Realm> {
  public:
   TestRealm(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
@@ -26,9 +27,6 @@ class TestRealm final : public fidl::WireServer<fuchsia_component::Realm> {
     return std::move(client_end);
   }
 
-  void OpenExposedDir(OpenExposedDirRequestView request,
-                      OpenExposedDirCompleter::Sync& completer) override {}
-
   void CreateChild(CreateChildRequestView request, CreateChildCompleter::Sync& completer) override {
   }
 
@@ -37,10 +35,11 @@ class TestRealm final : public fidl::WireServer<fuchsia_component::Realm> {
     completer.ReplySuccess();
   }
 
-  void ListChildren(ListChildrenRequestView request,
-                    ListChildrenCompleter::Sync& completer) override {}
-
  private:
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+    ZX_PANIC("Unimplemented %s", name.c_str());
+  }
+
   async_dispatcher_t* dispatcher_;
 };
 

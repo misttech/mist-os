@@ -2,13 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.component/cpp/wire_test_base.h>
+
 #include "src/devices/bin/driver_manager/driver_host.h"
 #include "src/devices/bin/driver_manager/shutdown/node_removal_tracker.h"
 #include "src/devices/bin/driver_manager/tests/driver_manager_test_base.h"
 
 using namespace driver_manager;
 
-class TestRealm final : public fidl::WireServer<fuchsia_component::Realm> {
+class TestRealm final : public fidl::testing::WireTestBase<fuchsia_component::Realm> {
  public:
   TestRealm(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
@@ -18,24 +20,10 @@ class TestRealm final : public fidl::WireServer<fuchsia_component::Realm> {
     return std::move(client_end);
   }
 
-  void OpenExposedDir(OpenExposedDirRequestView request,
-                      OpenExposedDirCompleter::Sync& completer) override {
-    ZX_ASSERT(false);
-  }
-
-  void CreateChild(CreateChildRequestView request, CreateChildCompleter::Sync& completer) override {
-    ZX_ASSERT(false);
-  }
-
   void DestroyChild(DestroyChildRequestView request,
                     DestroyChildCompleter::Sync& completer) override {
     destroy_completers_[std::string(request->child.name.data(), request->child.name.size())] =
         completer.ToAsync();
-  }
-
-  void ListChildren(ListChildrenRequestView request,
-                    ListChildrenCompleter::Sync& completer) override {
-    ZX_ASSERT(false);
   }
 
   void ReplyDestroyChildRequest(std::string child_moniker) {
@@ -45,6 +33,10 @@ class TestRealm final : public fidl::WireServer<fuchsia_component::Realm> {
   }
 
  private:
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+    ZX_PANIC("Unimplemented %s", name.c_str());
+  }
+
   async_dispatcher_t* dispatcher_;
 
   std::unordered_map<std::string, std::optional<DestroyChildCompleter::Async>> destroy_completers_;

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    cm_rust::FidlIntoNative,
+    cm_rust::{ComponentDecl, FidlIntoNative},
     fidl::endpoints::{
         create_endpoints, create_proxy, create_request_stream, ProtocolMarker, Proxy, ServerEnd,
     },
@@ -17,9 +17,11 @@ use {
     fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
     futures::{
         channel::{mpsc, oneshot},
+        future::BoxFuture,
         FutureExt, SinkExt, StreamExt, TryStreamExt,
     },
     std::sync::{Arc, Mutex},
+    test_case::test_case,
     vfs::{
         directory::entry_container::Directory as _, execution_scope::ExecutionScope,
         file::vmo::read_only, pseudo_directory,
@@ -75,6 +77,8 @@ async fn launch_child_in_a_collection_in_nested_component_manager(
 ) -> RealmInstance {
     let builder = RealmBuilder::new().await.unwrap();
     let child_args = Arc::new(Mutex::new(Some(child_args)));
+    let (child_creation_tx, child_creation_rx) = oneshot::channel::<()>();
+    let child_creation_tx = Arc::new(Mutex::new(Some(child_creation_tx)));
     let realm_user = builder
         .add_local_child(
             "realm_user",
@@ -82,6 +86,7 @@ async fn launch_child_in_a_collection_in_nested_component_manager(
                 let collection_ref = collection_ref.clone();
                 let child_decl = child_decl.clone();
                 let child_args = child_args.clone();
+                let child_creation_tx = child_creation_tx.clone();
                 async move {
                     let realm_proxy =
                         handles.connect_to_protocol::<fcomponent::RealmMarker>().unwrap();
@@ -94,6 +99,7 @@ async fn launch_child_in_a_collection_in_nested_component_manager(
                         .await
                         .unwrap()
                         .unwrap();
+                    child_creation_tx.lock().unwrap().take().unwrap().send(()).unwrap();
                     Ok(())
                 }
                 .boxed()
@@ -107,7 +113,8 @@ async fn launch_child_in_a_collection_in_nested_component_manager(
             Route::new()
                 .capability(Capability::protocol::<fcomponent::RealmMarker>())
                 .from(Ref::framework())
-                .to(&realm_user),
+                .to(&realm_user)
+                .to(Ref::parent()),
         )
         .await
         .unwrap();
@@ -139,13 +146,16 @@ async fn launch_child_in_a_collection_in_nested_component_manager(
         .fidl_into_native(),
     );
     builder.replace_realm_decl(realm_decl).await.unwrap();
-    builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap()
+    let cm_realm_instance =
+        builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
+    child_creation_rx.await.unwrap();
+    cm_realm_instance
 }
 
 /// Represents a local child that was created in a nested realm builder.
 struct SpawnedChild {
     /// The task which executes the local child.
-    _local_child_task: fasync::Task<()>,
+    _local_child_task: Option<fasync::Task<()>>,
     /// The nested component manager instance that is hosting the local child.
     cm_realm_instance: RealmInstance,
     /// When the local child is started it will send its handles over this mpsc.
@@ -158,11 +168,18 @@ struct SpawnedChild {
     cancel_sender: Option<oneshot::Sender<()>>,
 }
 
-/// Spawns a local child and populates the `SpawnedChild` struct.
-async fn spawn_local_child() -> SpawnedChild {
+type CancelSender = oneshot::Sender<()>;
+
+async fn build_local_child() -> (
+    RealmBuilder,
+    ComponentDecl,
+    mpsc::UnboundedReceiver<LocalComponentHandles>,
+    ComponentStatus,
+    CancelSender,
+) {
     let builder = RealmBuilder::new().await.unwrap();
     let (handles_sender, handles_receiver) = mpsc::unbounded();
-    let (cancel_sender, cancel_receiver) = oneshot::channel();
+    let (cancel_sender, cancel_receiver) = oneshot::channel::<()>();
     let component_status = ComponentStatus::default();
     let component_status_clone = component_status.clone();
     let cancel_receiver = Arc::new(Mutex::new(Some(cancel_receiver)));
@@ -187,11 +204,18 @@ async fn spawn_local_child() -> SpawnedChild {
         .await
         .unwrap();
 
+    let child_decl = builder.get_component_decl(&child_ref).await.unwrap();
+    (builder, child_decl, handles_receiver, component_status, cancel_sender)
+}
+
+/// Spawns a local child and populates the `SpawnedChild` struct.
+async fn spawn_local_child_controller_from_create_child() -> SpawnedChild {
+    let (builder, mut child_decl, handles_receiver, component_status, cancel_sender) =
+        build_local_child().await;
     // Add a use for the `fidl.examples.routing.echo.Echo` protocol.
     // It is not statically routed from any other component. `StartChildArgs.dict`
     // must contain an Open capability under the same name for the component
     // to successfully connect to the protocol.
-    let mut child_decl = builder.get_component_decl(&child_ref).await.unwrap();
     child_decl.uses.push(cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
         source: cm_rust::UseSource::Parent,
         source_name: "fidl.examples.routing.echo.Echo".parse().unwrap(),
@@ -205,7 +229,33 @@ async fn spawn_local_child() -> SpawnedChild {
     let (url, local_child_task) = builder.initialize().await.unwrap();
     let (controller_proxy, cm_realm_instance) = spawn_child_with_url(&url).await;
     SpawnedChild {
-        _local_child_task: local_child_task,
+        _local_child_task: Some(local_child_task),
+        cm_realm_instance,
+        handles_receiver,
+        controller_proxy,
+        component_status,
+        cancel_sender: Some(cancel_sender),
+    }
+}
+
+async fn spawn_local_child_controller_from_open_controller() -> SpawnedChild {
+    let (builder, child_decl, handles_receiver, component_status, cancel_sender) =
+        build_local_child().await;
+    builder.replace_realm_decl(child_decl).await.unwrap();
+
+    let (url, local_child_task) = builder.initialize().await.unwrap();
+    let (child_ref, cm_realm_instance) =
+        spawn_child_with_url_with_args(&url, fcomponent::CreateChildArgs::default()).await;
+
+    let realm_proxy = cm_realm_instance
+        .root
+        .connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>()
+        .unwrap();
+    let (controller_proxy, server_end) = create_proxy::<fcomponent::ControllerMarker>().unwrap();
+    realm_proxy.open_controller(&child_ref, server_end).await.unwrap().unwrap();
+
+    SpawnedChild {
+        _local_child_task: Some(local_child_task),
         cm_realm_instance,
         handles_receiver,
         controller_proxy,
@@ -215,6 +265,19 @@ async fn spawn_local_child() -> SpawnedChild {
 }
 
 async fn spawn_child_with_url(url: &str) -> (fcomponent::ControllerProxy, RealmInstance) {
+    let (controller_proxy, server_end) = create_proxy::<fcomponent::ControllerMarker>().unwrap();
+    let (_, cm_realm_instance) = spawn_child_with_url_with_args(
+        url,
+        fcomponent::CreateChildArgs { controller: Some(server_end), ..Default::default() },
+    )
+    .await;
+    (controller_proxy, cm_realm_instance)
+}
+
+async fn spawn_child_with_url_with_args(
+    url: &str,
+    child_args: fcomponent::CreateChildArgs,
+) -> (fcdecl::ChildRef, RealmInstance) {
     let collection_ref = fcdecl::CollectionRef { name: COLLECTION_NAME.to_string() };
     let child_decl = fcdecl::Child {
         name: Some("local_child".into()),
@@ -222,21 +285,24 @@ async fn spawn_child_with_url(url: &str) -> (fcomponent::ControllerProxy, RealmI
         startup: Some(fcdecl::StartupMode::Lazy),
         ..Default::default()
     };
-    let (controller_proxy, server_end) = create_proxy::<fcomponent::ControllerMarker>().unwrap();
-    let child_args =
-        fcomponent::CreateChildArgs { controller: Some(server_end), ..Default::default() };
     let cm_realm_instance = launch_child_in_a_collection_in_nested_component_manager(
         collection_ref,
         child_decl,
         child_args,
     )
     .await;
-    (controller_proxy, cm_realm_instance)
+    let child_ref = fcdecl::ChildRef {
+        name: "local_child".into(),
+        collection: Some(COLLECTION_NAME.to_string()),
+    };
+    (child_ref, cm_realm_instance)
 }
 
+#[test_case(spawn_local_child_controller_from_create_child().boxed())]
+#[test_case(spawn_local_child_controller_from_open_controller().boxed())]
 #[fuchsia::test]
-pub async fn start() {
-    let mut spawned_child = spawn_local_child().await;
+async fn start(spawn_child_future: BoxFuture<'static, SpawnedChild>) {
+    let mut spawned_child = spawn_child_future.await;
     let (_execution_controller_proxy, execution_controller_server_end) =
         create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
     spawned_child
@@ -253,8 +319,8 @@ pub async fn start() {
 }
 
 #[fuchsia::test]
-pub async fn start_with_namespace_entries() {
-    let mut spawned_child = spawn_local_child().await;
+async fn start_with_namespace_entries() {
+    let mut spawned_child = spawn_local_child_controller_from_create_child().await;
     let (ns_client_end, ns_server_end) = create_endpoints::<fio::DirectoryMarker>();
     let (_execution_controller_proxy, execution_controller_server_end) =
         create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
@@ -300,8 +366,8 @@ pub async fn start_with_namespace_entries() {
 }
 
 #[fuchsia::test]
-pub async fn start_with_numbered_handles() {
-    let mut spawned_child = spawn_local_child().await;
+async fn start_with_numbered_handles() {
+    let mut spawned_child = spawn_local_child_controller_from_create_child().await;
     let handle_id = HandleInfo::new(HandleType::User0, 0).as_raw();
     let (s1, s2) = zx::Socket::create_stream();
     let (_execution_controller_proxy, execution_controller_server_end) =
@@ -330,8 +396,8 @@ pub async fn start_with_numbered_handles() {
 }
 
 #[fuchsia::test]
-pub async fn start_with_dict() {
-    let mut spawned_child = spawn_local_child().await;
+async fn start_with_dict() {
+    let mut spawned_child = spawn_local_child_controller_from_create_child().await;
 
     // Connect to `fuchsia.component.sandbox.Factory` exposed by the nested component manager.
     let factory = spawned_child
@@ -407,9 +473,11 @@ pub async fn start_with_dict() {
     assert_eq!(response.unwrap(), "hello".to_string());
 }
 
+#[test_case(spawn_local_child_controller_from_create_child().boxed())]
+#[test_case(spawn_local_child_controller_from_open_controller().boxed())]
 #[fuchsia::test]
-pub async fn channel_is_closed_on_stop() {
-    let mut spawned_child = spawn_local_child().await;
+async fn channel_is_closed_on_stop(spawn_child_future: BoxFuture<'static, SpawnedChild>) {
+    let mut spawned_child = spawn_child_future.await;
     let (execution_controller_proxy, execution_controller_server_end) =
         create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
     spawned_child
@@ -431,9 +499,11 @@ pub async fn channel_is_closed_on_stop() {
     assert!(!spawned_child.component_status.is_running());
 }
 
+#[test_case(spawn_local_child_controller_from_create_child().boxed())]
+#[test_case(spawn_local_child_controller_from_open_controller().boxed())]
 #[fuchsia::test]
-pub async fn on_stop_is_called() {
-    let mut spawned_child = spawn_local_child().await;
+async fn on_stop_is_called(spawn_child_future: BoxFuture<'static, SpawnedChild>) {
+    let mut spawned_child = spawn_child_future.await;
     let (execution_controller_proxy, execution_controller_server_end) =
         create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
     spawned_child
@@ -461,9 +531,11 @@ pub async fn on_stop_is_called() {
     assert!(!spawned_child.component_status.is_running());
 }
 
+#[test_case(spawn_local_child_controller_from_create_child().boxed())]
+#[test_case(spawn_local_child_controller_from_open_controller().boxed())]
 #[fuchsia::test]
-pub async fn wait_for_exit() {
-    let mut spawned_child = spawn_local_child().await;
+async fn wait_for_exit(spawn_child_future: BoxFuture<'static, SpawnedChild>) {
+    let mut spawned_child = spawn_child_future.await;
     let (execution_controller_proxy, execution_controller_server_end) =
         create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
     spawned_child
@@ -492,9 +564,11 @@ pub async fn wait_for_exit() {
         .unwrap();
 }
 
+#[test_case(spawn_local_child_controller_from_create_child().boxed())]
+#[test_case(spawn_local_child_controller_from_open_controller().boxed())]
 #[fuchsia::test]
-pub async fn start_when_already_started() {
-    let mut spawned_child = spawn_local_child().await;
+async fn start_when_already_started(spawn_child_future: BoxFuture<'static, SpawnedChild>) {
+    let mut spawned_child = spawn_child_future.await;
     let (_execution_controller_proxy, execution_controller_server_end) =
         create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
     spawned_child
@@ -524,7 +598,7 @@ pub async fn start_when_already_started() {
 }
 
 #[fuchsia::test]
-pub async fn get_exposed_dictionary() {
+async fn get_exposed_dictionary() {
     let (controller_proxy, instance) = spawn_child_with_url("#meta/echo_server.cm").await;
     let (exposed_dict, server_end) = create_proxy().unwrap();
 
