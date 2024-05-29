@@ -302,7 +302,7 @@ pub struct ProductArgs {
 
     /// the path to the legacy assembly input bundle directory
     #[argh(option)]
-    pub legacy_bundle: Utf8PathBuf,
+    pub legacy_bundle: Option<Utf8PathBuf>,
 
     /// a file containing a ProductPackageConfig with additional packages
     /// to include which are not in the assembly input bundle

@@ -246,10 +246,12 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     }
 
     // Add the legacy bundle.
-    let legacy_bundle_path = legacy_bundle.join("assembly_config.json");
-    builder
-        .add_bundle(&legacy_bundle_path)
-        .context(format!("Adding legacy bundle: {legacy_bundle_path}"))?;
+    if let Some(legacy_bundle) = legacy_bundle {
+        let legacy_bundle_path = legacy_bundle.join("assembly_config.json");
+        builder
+            .add_bundle(&legacy_bundle_path)
+            .context(format!("Adding legacy bundle: {legacy_bundle_path}"))?;
+    }
 
     // Add the bootfs files.
     builder.add_bootfs_files(&configuration.bootfs.files).context("Adding bootfs files")?;
