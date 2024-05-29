@@ -137,12 +137,16 @@ pub async fn pb_create_with_sdk_version(
         };
 
     // We always create a blobs directory even if there is no repository, because tools that read
-    // the product bundle may instantiate a TUF repo in order to iterate over all the blobs, which
-    // inadvertently creates the blobs directory, which dirties the product bundle, causing
-    // hermeticity errors.
+    // the product bundle inadvertently creates the blobs directory, which dirties the product
+    // bundle, causing hermeticity errors.
     let repo_path = &cmd.out_dir;
     let blobs_path = repo_path.join("blobs");
     std::fs::create_dir(&blobs_path).context("Creating blobs directory")?;
+
+    // When RBE is enabled, Bazel will skip empty directory. This will ensure
+    // blobs directory still appear in the output dir.
+    let ensure_file_path = blobs_path.join(".ensure-one-file");
+    std::fs::File::create(&ensure_file_path).context("Creating ensure file")?;
 
     let repositories = if let Some(tuf_keys) = &cmd.tuf_keys {
         let main_metadata_path = repo_path.join("repository");
