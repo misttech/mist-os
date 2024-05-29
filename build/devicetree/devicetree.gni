@@ -283,6 +283,8 @@ template("dts") {
 # verification checks.
 # 2. The target "$target_name.dtb" can be used to get the output devicetree
 # blob using `get_target_output("$target_name.dtb")`.
+# 3. The target "$target_name.assembly_inputs" can be used to include the devicetree
+# into assembly artifacts.
 #
 # Parameters
 #
@@ -316,6 +318,15 @@ template("devicetree") {
 
   golden_dts_target = "_devicetree.$target_name.golden"
 
+  assembly_inputs_target = "$target_name.assembly_inputs"
+
+  _dtb_path = []
+  if (defined(invoker.outputs)) {
+    _dtb_path = invoker.outputs
+  } else {
+    _dtb_path = [ "$target_out_dir/$compiled_dtb_target" ]
+  }
+
   # Compile the dts
   dtb(compiled_dtb_target) {
     forward_variables_from(invoker,
@@ -324,11 +335,7 @@ template("devicetree") {
                              "deps",
                              "public_deps",
                            ])
-    if (defined(invoker.outputs)) {
-      outputs = invoker.outputs
-    } else {
-      outputs = [ "$target_out_dir/$compiled_dtb_target" ]
-    }
+    outputs = _dtb_path
   }
 
   # Decompile the compiled DTS so we can use it for the golden comparison.
@@ -349,6 +356,27 @@ template("devicetree") {
         candidate = dts_outputs[0]
       },
     ]
+  }
+
+  generated_file(assembly_inputs_target) {
+    contents = [
+      {
+        source = rebase_path(_dtb_path[0], root_build_dir)
+        destination = "built/artifacts/obj/devicetree/$compiled_dtb_target"
+      },
+    ]
+    output_conversion = "json"
+    deps = [ ":${compiled_dtb_target}" ]
+
+    outputs = [ "${target_out_dir}/assembly_inputs.json" ]
+
+    metadata = {
+      assembly_inputs = [
+        {
+          path = rebase_path(outputs[0], root_build_dir)
+        },
+      ]
+    }
   }
 
   group(target_name) {
