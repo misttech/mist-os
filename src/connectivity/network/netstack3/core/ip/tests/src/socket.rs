@@ -94,6 +94,10 @@ impl<I: Ip> SendOptions<I> for WithHopLimit {
         let Self(hop_limit) = self;
         *hop_limit
     }
+
+    fn multicast_loop(&self) -> bool {
+        false
+    }
 }
 
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
@@ -516,6 +520,10 @@ fn test_send_hop_limits<I: Ip + IpSocketIpExt + IpExt>() {
         fn hop_limit(&self, destination: &SpecifiedAddr<A>) -> Option<NonZeroU8> {
             let Self(expected_destination) = self;
             (destination == expected_destination).then_some(SET_HOP_LIMIT)
+        }
+
+        fn multicast_loop(&self) -> bool {
+            false
         }
     }
 

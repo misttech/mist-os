@@ -452,6 +452,11 @@ pub struct DatagramSocketOptions<I: IpExt, D: WeakDeviceIdentifier> {
     pub hop_limits: SocketHopLimits<I>,
     /// The selected multicast interface.
     pub multicast_interface: Option<D>,
+
+    /// Whether multicast packet loopback is enabled or not (see
+    /// IP_MULTICAST_LOOP flag). Enabled by default.
+    #[derivative(Default(value = "true"))]
+    pub multicast_loop: bool,
 }
 
 impl<I: IpExt, D: WeakDeviceIdentifier> SendOptions<I> for DatagramSocketOptions<I, D> {
@@ -462,6 +467,10 @@ impl<I: IpExt, D: WeakDeviceIdentifier> SendOptions<I> for DatagramSocketOptions
         } else {
             *unicast
         }
+    }
+
+    fn multicast_loop(&self) -> bool {
+        self.multicast_loop
     }
 }
 
@@ -4978,6 +4987,38 @@ pub fn get_multicast_interface<
     core_ctx.with_socket_state(id, |core_ctx, state| {
         let (options, _device) = get_options_device(core_ctx, state);
         options.socket_options.multicast_interface.clone()
+    })
+}
+
+/// Sets the multicast loopback flag.
+pub fn set_multicast_loop<
+    I: IpExt,
+    CC: DatagramStateContext<I, BC, S>,
+    BC: DatagramStateBindingsContext<I, S>,
+    S: DatagramSocketSpec,
+>(
+    core_ctx: &mut CC,
+    id: &S::SocketId<I, CC::WeakDeviceId>,
+    value: bool,
+) {
+    core_ctx.with_socket_state_mut(id, |core_ctx, state| {
+        get_options_mut(core_ctx, state).socket_options.multicast_loop = value;
+    })
+}
+
+/// Returns the multicast loopback flag.
+pub fn get_multicast_loop<
+    I: IpExt,
+    CC: DatagramStateContext<I, BC, S>,
+    BC: DatagramStateBindingsContext<I, S>,
+    S: DatagramSocketSpec,
+>(
+    core_ctx: &mut CC,
+    id: &S::SocketId<I, CC::WeakDeviceId>,
+) -> bool {
+    core_ctx.with_socket_state(id, |core_ctx, state| {
+        let (options, _device) = get_options_device(core_ctx, state);
+        options.socket_options.multicast_loop
     })
 }
 

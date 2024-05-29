@@ -14,17 +14,11 @@
             matchers: [
                 // IPPROTO_IP_IP_MULTICAST_LOOP
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Stream_IPPROTO_IP_IP_MULTICAST_LOOP",
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Datagram_IPPROTO_IP_IP_MULTICAST_LOOP",
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Stream_IPPROTO_IP_IP_MULTICAST_LOOP",
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Datagram_IPPROTO_IP_IP_MULTICAST_LOOP",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Stream_IPPROTO_IP_IP_MULTICAST_LOOP",
-                "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Datagram_IPPROTO_IP_IP_MULTICAST_LOOP",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv6_Stream_IPPROTO_IP_IP_MULTICAST_LOOP",
-                "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv6_Datagram_IPPROTO_IP_IP_MULTICAST_LOOP",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Stream_IPPROTO_IP_IP_MULTICAST_LOOP",
-                "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Datagram_IPPROTO_IP_IP_MULTICAST_LOOP",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Stream_IPPROTO_IP_IP_MULTICAST_LOOP",
-                "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Datagram_IPPROTO_IP_IP_MULTICAST_LOOP",
 
                 // IPPROTO_IP_IP_TOS
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Stream_IPPROTO_IP_IP_TOS",
@@ -90,15 +84,12 @@
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Stream_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Datagram_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Stream_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Datagram_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Stream_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Datagram_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv6_Stream_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
-                "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv6_Datagram_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Stream_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Datagram_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Stream_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
-                "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Datagram_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
 
                 // IPPROTO_IPV6_IPV6_TCLASS
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Stream_IPPROTO_IPV6_IPV6_TCLASS",

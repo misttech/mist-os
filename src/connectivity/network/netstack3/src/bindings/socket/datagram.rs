@@ -126,6 +126,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
     type SetSocketDeviceError: IntoErrno;
     type SetMulticastMembershipError: IntoErrno;
     type MulticastInterfaceError: IntoErrno;
+    type MulticastLoopError: IntoErrno;
     type SetReuseAddrError: IntoErrno;
     type SetReusePortError: IntoErrno;
     type ShutdownError: IntoErrno;
@@ -260,6 +261,19 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         ip_version: IpVersion,
     ) -> Result<Option<WeakDeviceId<BindingsCtx>>, Self::MulticastInterfaceError>;
 
+    fn set_multicast_loop(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        value: bool,
+        ip_version: IpVersion,
+    ) -> Result<(), Self::MulticastLoopError>;
+
+    fn get_multicast_loop(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        ip_version: IpVersion,
+    ) -> Result<bool, Self::MulticastLoopError>;
+
     fn send<B: BufferMut>(
         ctx: &mut Ctx,
         id: &Self::SocketId,
@@ -318,6 +332,7 @@ where
     type SetSocketDeviceError = SocketError;
     type SetMulticastMembershipError = SetMulticastMembershipError;
     type MulticastInterfaceError = NotDualStackCapableError;
+    type MulticastLoopError = NotDualStackCapableError;
     type SetReuseAddrError = ExpectedUnboundError;
     type SetReusePortError = ExpectedUnboundError;
     type SetIpTransparentError = Never;
@@ -511,6 +526,23 @@ where
         ctx.api().udp().get_multicast_interface(id, ip_version)
     }
 
+    fn set_multicast_loop(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        value: bool,
+        ip_version: IpVersion,
+    ) -> Result<(), Self::MulticastLoopError> {
+        ctx.api().udp().set_multicast_loop(id, value, ip_version)
+    }
+
+    fn get_multicast_loop(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        ip_version: IpVersion,
+    ) -> Result<bool, Self::MulticastLoopError> {
+        ctx.api().udp().get_multicast_loop(id, ip_version)
+    }
+
     fn send<B: BufferMut>(
         ctx: &mut Ctx,
         id: &Self::SocketId,
@@ -596,6 +628,7 @@ where
     type SetSocketDeviceError = SocketError;
     type SetMulticastMembershipError = NotSupportedError;
     type MulticastInterfaceError = NotSupportedError;
+    type MulticastLoopError = NotSupportedError;
     type SetReuseAddrError = NotSupportedError;
     type SetReusePortError = NotSupportedError;
     type SetIpTransparentError = NotSupportedError;
@@ -830,6 +863,23 @@ where
 
     fn get_ip_transparent(_ctx: &mut Ctx, _id: &Self::SocketId) -> bool {
         false
+    }
+
+    fn set_multicast_loop(
+        _ctx: &mut Ctx,
+        _id: &Self::SocketId,
+        _value: bool,
+        _ip_version: IpVersion,
+    ) -> Result<(), Self::MulticastLoopError> {
+        Err(NotSupportedError)
+    }
+
+    fn get_multicast_loop(
+        _ctx: &mut Ctx,
+        _id: &Self::SocketId,
+        _ip_version: IpVersion,
+    ) -> Result<bool, Self::MulticastLoopError> {
+        Err(NotSupportedError)
     }
 
     fn send<B: BufferMut>(
@@ -1427,14 +1477,14 @@ where
                 responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             Request::SetIpv6MulticastLoopback { value, responder } => {
-                // TODO(https://fxbug.dev/42058186): add support for
-                // looping back sent packets.
-                responder
-                    .send((!value).then_some(()).ok_or(fposix::Errno::Enoprotoopt))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                let result = self.set_multicast_loop(Ipv6::VERSION, value);
+                maybe_log_error!("set_ipv6_multicast_loop", &result);
+                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             Request::GetIpv6MulticastLoopback { responder } => {
-                respond_not_supported!("syncudp::GetIpv6MulticastLoopback", responder)
+                let result = self.get_multicast_loop(Ipv6::VERSION);
+                maybe_log_error!("get_ipv6_multicast_loop", &result);
+                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             Request::SetIpTtl { value, responder } => {
                 let result = self.set_unicast_hop_limit(Ipv4::VERSION, value);
@@ -1469,14 +1519,14 @@ where
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             Request::SetIpMulticastLoopback { value, responder } => {
-                // TODO(https://fxbug.dev/42058186): add support for
-                // looping back sent packets.
-                responder
-                    .send((!value).then_some(()).ok_or(fposix::Errno::Enoprotoopt))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                let result = self.set_multicast_loop(Ipv4::VERSION, value);
+                maybe_log_error!("set_ip_multicast_loop", &result);
+                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             Request::GetIpMulticastLoopback { responder } => {
-                respond_not_supported!("syncudp::GetIpMulticastLoopback", responder)
+                let result = self.get_multicast_loop(Ipv4::VERSION);
+                maybe_log_error!("get_ip_multicast_loop", &result);
+                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             Request::SetIpTypeOfService { value: _, responder } => {
                 respond_not_supported!("syncudp::SetIpTypeOfService", responder)
@@ -2051,6 +2101,20 @@ where
         T::set_multicast_hop_limit(ctx, id, hop_limit, ip_version).map_err(IntoErrno::into_errno)
     }
 
+    fn get_unicast_hop_limit(self, ip_version: IpVersion) -> Result<u8, fposix::Errno> {
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
+        T::get_unicast_hop_limit(ctx, id, ip_version)
+            .map(NonZeroU8::get)
+            .map_err(IntoErrno::into_errno)
+    }
+
+    fn get_multicast_hop_limit(self, ip_version: IpVersion) -> Result<u8, fposix::Errno> {
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
+        T::get_multicast_hop_limit(ctx, id, ip_version)
+            .map(NonZeroU8::get)
+            .map_err(IntoErrno::into_errno)
+    }
+
     fn set_multicast_interface_ipv4(
         self,
         interface: Option<NonZeroU64>,
@@ -2140,18 +2204,14 @@ where
             .map_err(IntoErrno::into_errno)
     }
 
-    fn get_unicast_hop_limit(self, ip_version: IpVersion) -> Result<u8, fposix::Errno> {
+    fn set_multicast_loop(self, ip_version: IpVersion, loop_: bool) -> Result<(), fposix::Errno> {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
-        T::get_unicast_hop_limit(ctx, id, ip_version)
-            .map(NonZeroU8::get)
-            .map_err(IntoErrno::into_errno)
+        T::set_multicast_loop(ctx, id, loop_, ip_version).map_err(IntoErrno::into_errno)
     }
 
-    fn get_multicast_hop_limit(self, ip_version: IpVersion) -> Result<u8, fposix::Errno> {
+    fn get_multicast_loop(self, ip_version: IpVersion) -> Result<bool, fposix::Errno> {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
-        T::get_multicast_hop_limit(ctx, id, ip_version)
-            .map(NonZeroU8::get)
-            .map_err(IntoErrno::into_errno)
+        T::get_multicast_loop(ctx, id, ip_version).map_err(IntoErrno::into_errno)
     }
 
     fn set_ip_transparent(self, value: bool) -> Result<(), T::SetIpTransparentError> {

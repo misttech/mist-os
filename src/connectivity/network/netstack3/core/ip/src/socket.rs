@@ -434,6 +434,10 @@ pub trait SendOptions<I: Ip> {
     /// a packet going to the given destination. Otherwise the default value
     /// will be used.
     fn hop_limit(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8>;
+
+    /// Returns true if outgoing multicast packets should be looped back and
+    /// delivered to local receivers who joined the multicast group.
+    fn multicast_loop(&self) -> bool;
 }
 
 /// Empty send options that never overrides default values.
@@ -443,6 +447,10 @@ pub struct DefaultSendOptions;
 impl<I: Ip> SendOptions<I> for DefaultSendOptions {
     fn hop_limit(&self, _destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
         None
+    }
+
+    fn multicast_loop(&self) -> bool {
+        false
     }
 }
 

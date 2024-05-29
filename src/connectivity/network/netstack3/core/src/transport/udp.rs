@@ -2147,6 +2147,53 @@ where
         crate::socket::datagram::set_ip_transparent(self.core_ctx(), id, value)
     }
 
+    pub fn get_multicast_loop(
+        &mut self,
+        id: &UdpApiSocketId<I, C>,
+        ip_version: IpVersion,
+    ) -> Result<bool, NotDualStackCapableError> {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        if ip_version == I::VERSION {
+            return Ok(crate::socket::datagram::get_multicast_loop(core_ctx, id));
+        };
+
+        datagram::with_other_stack_ip_options(core_ctx, bindings_ctx, id, |other_stack| {
+            I::map_ip::<_, Result<IpInvariant<bool>, _>>(
+                WrapOtherStackIpOptions(other_stack),
+                |_v4| Err(NotDualStackCapableError),
+                |WrapOtherStackIpOptions(other_stack)| {
+                    Ok(IpInvariant(other_stack.socket_options.multicast_loop))
+                },
+            )
+        })
+        .map(|IpInvariant(result)| result)
+    }
+
+    pub fn set_multicast_loop(
+        &mut self,
+        id: &UdpApiSocketId<I, C>,
+        value: bool,
+        ip_version: IpVersion,
+    ) -> Result<(), NotDualStackCapableError> {
+        let (core_ctx, bindings_ctx) = self.contexts();
+
+        if ip_version == I::VERSION {
+            crate::socket::datagram::set_multicast_loop(core_ctx, id, value);
+            return Ok(());
+        };
+
+        datagram::with_other_stack_ip_options_mut(core_ctx, bindings_ctx, id, |other_stack| {
+            I::map_ip(
+                (IpInvariant(value), WrapOtherStackIpOptionsMut(other_stack)),
+                |(IpInvariant(_interface), _v4)| Err(NotDualStackCapableError),
+                |(IpInvariant(value), WrapOtherStackIpOptionsMut(other_stack))| {
+                    other_stack.socket_options.multicast_loop = value;
+                    Ok(())
+                },
+            )
+        })
+    }
+
     /// Disconnects a connected UDP socket.
     ///
     /// `disconnect` removes an existing connected socket and replaces it with a
