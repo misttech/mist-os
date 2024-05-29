@@ -19,7 +19,7 @@ use fidl_fuchsia_hardware_light::{Info, LightMarker, LightProxy};
 use fidl_fuchsia_settings_storage::LightGroups;
 use futures::lock::Mutex;
 use settings_storage::fidl_storage::{FidlStorage, FidlStorageConvertible};
-use settings_storage::storage_factory::StorageAccess;
+use settings_storage::storage_factory::{NoneT, StorageAccess};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -33,11 +33,8 @@ pub(crate) const DEVICE_PATH: &str = "/dev/class/light/*";
 
 impl FidlStorageConvertible for LightInfo {
     type Storable = LightGroups;
+    type Loader = NoneT;
     const KEY: &'static str = "light_info";
-
-    fn default_value() -> Self {
-        LightInfo { light_groups: Default::default() }
-    }
 
     #[allow(clippy::redundant_closure)]
     fn to_storable(self) -> Self::Storable {
@@ -87,7 +84,8 @@ pub struct LightController {
 
 impl StorageAccess for LightController {
     type Storage = FidlStorage;
-    const STORAGE_KEYS: &'static [&'static str] = &[LightInfo::KEY];
+    type Data = LightInfo;
+    const STORAGE_KEY: &'static str = LightInfo::KEY;
 }
 
 #[async_trait]
@@ -496,7 +494,6 @@ mod tests {
     use crate::tests::fakes::service_registry::ServiceRegistry;
     use crate::{service, Address, LightController, ServiceContext, SettingType};
     use futures::lock::Mutex;
-    use settings_storage::fidl_storage::FidlStorageConvertible;
     use settings_storage::UpdateState;
     use std::sync::Arc;
 
@@ -558,7 +555,7 @@ mod tests {
                                 // Just respond with the default value as we're not testing storage.
                                 let _ = message_client.reply(service::Payload::Storage(
                                     StoragePayload::Response(StorageResponse::Read(
-                                        LightInfo::default_value().into(),
+                                        LightInfo::default().into(),
                                     )),
                                 ));
                             }
@@ -653,7 +650,7 @@ mod tests {
                                 // Just respond with the default value as we're not testing storage.
                                 let _ = message_client.reply(service::Payload::Storage(
                                     StoragePayload::Response(StorageResponse::Read(
-                                        LightInfo::default_value().into(),
+                                        LightInfo::default().into(),
                                     )),
                                 ));
                             }

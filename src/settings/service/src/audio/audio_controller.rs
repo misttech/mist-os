@@ -277,7 +277,8 @@ pub(crate) struct AudioController {
 
 impl StorageAccess for AudioController {
     type Storage = DeviceStorage;
-    const STORAGE_KEYS: &'static [&'static str] = &[AudioInfo::KEY];
+    type Data = AudioInfo;
+    const STORAGE_KEY: &'static str = AudioInfo::KEY;
 }
 
 #[async_trait]

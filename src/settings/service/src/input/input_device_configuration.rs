@@ -5,7 +5,7 @@
 use crate::input::types::{DeviceStateSource, InputDeviceType};
 use serde::Deserialize;
 
-#[derive(PartialEq, Debug, Clone, Deserialize)]
+#[derive(PartialEq, Debug, Default, Clone, Deserialize)]
 pub struct InputConfiguration {
     /// List of input devices that are present on this product.
     pub devices: Vec<InputDeviceConfiguration>,

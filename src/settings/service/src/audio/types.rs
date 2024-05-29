@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Error;
+use super::audio_default_settings::default_audio_info;
+use crate::audio::{create_default_modified_counters, ModifiedCounters};
+use anyhow::{anyhow, Error};
 use serde::{Deserialize, Serialize};
+use settings_storage::device_storage::DeviceStorageCompatible;
+use settings_storage::storage_factory::NoneT;
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
-
-use crate::audio::{create_default_modified_counters, default_audio_info, ModifiedCounters};
-use settings_storage::device_storage::DeviceStorageCompatible;
 
 const RANGE: RangeInclusive<f32> = 0.0..=1.0;
 
@@ -78,14 +79,17 @@ pub struct AudioInfo {
 }
 
 impl DeviceStorageCompatible for AudioInfo {
+    type Loader = NoneT;
     const KEY: &'static str = "audio_info";
-
-    fn default_value() -> Self {
-        default_audio_info()
-    }
 
     fn try_deserialize_from(value: &str) -> Result<Self, Error> {
         Self::extract(value).or_else(|_| AudioInfoV2::try_deserialize_from(value).map(Self::from))
+    }
+}
+
+impl Default for AudioInfo {
+    fn default() -> Self {
+        default_audio_info()
     }
 }
 
@@ -107,19 +111,20 @@ pub struct AudioInfoV2 {
     pub modified_counters: Option<ModifiedCounters>,
 }
 
-impl DeviceStorageCompatible for AudioInfoV2 {
-    const KEY: &'static str = "audio_info";
+impl AudioInfoV2 {
+    pub(super) fn try_deserialize_from(value: &str) -> Result<Self, Error> {
+        serde_json::from_str(value)
+            .map_err(|e| anyhow!("could not deserialize: {e:?}"))
+            .or_else(|_| AudioInfoV1::try_deserialize_from(value).map(Self::from))
+    }
 
-    fn default_value() -> Self {
+    #[cfg(test)]
+    pub(super) fn default_value() -> Self {
         AudioInfoV2 {
             streams: default_audio_info().streams,
             input: AudioInputInfo { mic_mute: false },
             modified_counters: None,
         }
-    }
-
-    fn try_deserialize_from(value: &str) -> Result<Self, Error> {
-        Self::extract(value).or_else(|_| AudioInfoV1::try_deserialize_from(value).map(Self::from))
     }
 }
 
@@ -138,10 +143,15 @@ pub struct AudioInfoV1 {
     pub modified_timestamps: Option<HashMap<AudioStreamType, String>>,
 }
 
-impl DeviceStorageCompatible for AudioInfoV1 {
-    const KEY: &'static str = "audio_info";
+impl AudioInfoV1 {
+    pub(super) fn try_deserialize_from(value: &str) -> Result<Self, Error> {
+        serde_json::from_str(value)
+            .map_err(|e| anyhow!("could not deserialize: {e:?}"))
+            .or_else(|_| AudioInfoV1::try_deserialize_from(value).map(Self::from))
+    }
 
-    fn default_value() -> Self {
+    #[cfg(test)]
+    pub(super) fn default_value() -> Self {
         AudioInfoV1 {
             streams: default_audio_info().streams,
             input: AudioInputInfo { mic_mute: false },

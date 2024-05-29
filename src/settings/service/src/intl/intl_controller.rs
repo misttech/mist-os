@@ -14,13 +14,31 @@ use fuchsia_trace as ftrace;
 use rust_icu_uenum as uenum;
 use rust_icu_uloc as uloc;
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
-use settings_storage::storage_factory::StorageAccess;
+use settings_storage::fidl_storage::FidlStorageConvertible;
+use settings_storage::storage_factory::{NoneT, StorageAccess};
 use std::collections::HashSet;
 
 impl DeviceStorageCompatible for IntlInfo {
+    type Loader = NoneT;
     const KEY: &'static str = "intl_info";
+}
 
-    fn default_value() -> Self {
+impl FidlStorageConvertible for IntlInfo {
+    type Storable = fidl_fuchsia_settings::IntlSettings;
+    type Loader = NoneT;
+    const KEY: &'static str = "intl";
+
+    fn to_storable(self) -> Self::Storable {
+        self.into()
+    }
+
+    fn from_storable(storable: Self::Storable) -> Self {
+        storable.into()
+    }
+}
+
+impl Default for IntlInfo {
+    fn default() -> Self {
         IntlInfo {
             // `-x-fxdef` is a private use extension and a special marker denoting that the
             // setting is a fallback default, and not actually set through any user action.
@@ -45,7 +63,8 @@ pub struct IntlController {
 
 impl StorageAccess for IntlController {
     type Storage = DeviceStorage;
-    const STORAGE_KEYS: &'static [&'static str] = &[IntlInfo::KEY];
+    type Data = IntlInfo;
+    const STORAGE_KEY: &'static str = <IntlInfo as DeviceStorageCompatible>::KEY;
 }
 
 #[async_trait]

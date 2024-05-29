@@ -11,14 +11,11 @@ use crate::handler::setting_handler::{
 use crate::night_mode::types::NightModeInfo;
 use async_trait::async_trait;
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
-use settings_storage::storage_factory::StorageAccess;
+use settings_storage::storage_factory::{NoneT, StorageAccess};
 
 impl DeviceStorageCompatible for NightModeInfo {
+    type Loader = NoneT;
     const KEY: &'static str = "night_mode_info";
-
-    fn default_value() -> Self {
-        NightModeInfo { night_mode_enabled: None }
-    }
 }
 
 impl From<NightModeInfo> for SettingInfo {
@@ -33,7 +30,8 @@ pub struct NightModeController {
 
 impl StorageAccess for NightModeController {
     type Storage = DeviceStorage;
-    const STORAGE_KEYS: &'static [&'static str] = &[NightModeInfo::KEY];
+    type Data = NightModeInfo;
+    const STORAGE_KEY: &'static str = NightModeInfo::KEY;
 }
 
 #[async_trait]

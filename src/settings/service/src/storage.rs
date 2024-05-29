@@ -79,7 +79,10 @@ pub(crate) mod testing {
     use serde::{Deserialize, Serialize};
     use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
     use settings_storage::stash_logger::StashInspectLogger;
-    use settings_storage::storage_factory::{InitializationState, StorageAccess, StorageFactory};
+    use settings_storage::storage_factory::{
+        DefaultLoader, InitializationState, NoneT, StorageAccess, StorageFactory,
+    };
+    use std::any::Any;
     use std::collections::HashMap;
     use std::sync::Arc;
 
@@ -164,19 +167,21 @@ pub(crate) mod testing {
         async fn initialize_storage_for_key(&self, key: &'static str) {
             match &mut *self.device_storage_cache.lock().await {
                 InitializationState::Initializing(initial_keys, _) => {
-                    let _ = initial_keys.insert(key);
+                    let _ = initial_keys.insert(key, None);
                 }
                 InitializationState::Initialized(_) => panic!("{}", INITIALIZATION_ERROR),
                 _ => unreachable!(),
             }
         }
 
-        async fn initialize_storage_for_keys(&self, keys: &'static [&'static str]) {
+        async fn initialize_storage_for_key_with_loader(
+            &self,
+            key: &'static str,
+            loader: Box<dyn Any + Send + Sync + 'static>,
+        ) {
             match &mut *self.device_storage_cache.lock().await {
                 InitializationState::Initializing(initial_keys, _) => {
-                    for &key in keys {
-                        let _ = initial_keys.insert(key);
-                    }
+                    let _ = initial_keys.insert(key, Some(loader));
                 }
                 InitializationState::Initialized(_) => panic!("{}", INITIALIZATION_ERROR),
                 _ => unreachable!(),
@@ -225,7 +230,22 @@ pub(crate) mod testing {
         where
             T: StorageAccess<Storage = DeviceStorage>,
         {
-            self.initialize_storage_for_keys(T::STORAGE_KEYS).await;
+            self.initialize_storage_for_key(T::STORAGE_KEY).await;
+            Ok(())
+        }
+
+        async fn initialize_with_loader<T>(
+            &self,
+            loader: impl DefaultLoader<Result = T::Data> + Send + Sync + 'static,
+        ) -> Result<(), Error>
+        where
+            T: StorageAccess<Storage = DeviceStorage>,
+        {
+            self.initialize_storage_for_key_with_loader(
+                T::STORAGE_KEY,
+                Box::new(loader) as Box<dyn Any + Send + Sync + 'static>,
+            )
+            .await;
             Ok(())
         }
 
@@ -297,9 +317,11 @@ pub(crate) mod testing {
     }
 
     impl DeviceStorageCompatible for TestStruct {
+        type Loader = NoneT;
         const KEY: &'static str = "testkey";
-
-        fn default_value() -> Self {
+    }
+    impl Default for TestStruct {
+        fn default() -> Self {
             TestStruct { value: VALUE0 }
         }
     }

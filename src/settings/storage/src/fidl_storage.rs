@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::private::Sealed;
+use crate::storage_factory::{DefaultLoader, NoneT};
 use crate::UpdateState;
 use anyhow::{bail, format_err, Context, Error};
 use fidl::Status;
@@ -29,9 +31,11 @@ const MIN_FLUSH_DURATION: Duration = Duration::from_millis(MIN_FLUSH_INTERVAL_MS
 
 pub trait FidlStorageConvertible {
     type Storable: Persistable + Any;
+    type Loader: DefaultDispatcher<Self>
+    where
+        Self: Sized;
     const KEY: &'static str;
 
-    fn default_value() -> Self;
     fn to_storable(self) -> Self::Storable;
     fn from_storable(storable: Self::Storable) -> Self;
 }
@@ -41,6 +45,8 @@ pub trait FidlStorageConvertible {
 pub struct FidlStorage {
     /// Map of [`FidlStorageConvertible`] keys to their typed storage.
     typed_storage_map: HashMap<&'static str, TypedStorage>,
+
+    typed_loader_map: HashMap<&'static str, Box<dyn Any + Send + Sync + 'static>>,
 
     /// If true, reads will be returned from the data in memory rather than reading from storage.
     caching_enabled: bool,
@@ -138,14 +144,15 @@ impl FidlStorage {
         files_generator: G,
     ) -> Result<(Self, Vec<Task<()>>), Error>
     where
-        I: IntoIterator<Item = &'static str>,
+        I: IntoIterator<Item = (&'static str, Option<Box<dyn Any + Send + Sync>>)>,
         G: Fn(&'static str) -> Result<(String, String), Error>,
     {
         let mut typed_storage_map = HashMap::new();
         let iter = iter.into_iter();
         typed_storage_map.reserve(iter.size_hint().0);
+        let mut typed_loader_map = HashMap::new();
         let mut sync_tasks = Vec::with_capacity(iter.size_hint().0);
-        for key in iter {
+        for (key, loader) in iter {
             // Generate a separate file proxy for each key.
             let (flush_sender, flush_receiver) = futures::channel::mpsc::unbounded::<()>();
             let (temp_file_path, file_path) =
@@ -167,12 +174,16 @@ impl FidlStorage {
             ));
             sync_tasks.push(sync_task);
             let _ = typed_storage_map.insert(key, storage);
+            if let Some(loader) = loader {
+                let _ = typed_loader_map.insert(key, loader);
+            }
         }
         Ok((
             FidlStorage {
                 caching_enabled: true,
                 debounce_writes: true,
                 typed_storage_map,
+                typed_loader_map,
                 storage_dir,
             },
             sync_tasks,
@@ -388,16 +399,49 @@ impl FidlStorage {
     where
         T: FidlStorageConvertible,
     {
-        self.get_inner(T::KEY)
-            .await
-            .current_data
-            .as_ref()
-            .map(|data| {
-                <T as FidlStorageConvertible>::from_storable(
-                    unpersist(data).expect("Should not be able to save mismatching types in file"),
-                )
-            })
-            .unwrap_or_else(|| T::default_value())
+        match self.get_inner(T::KEY).await.current_data.as_ref().map(|data| {
+            <T as FidlStorageConvertible>::from_storable(
+                unpersist(data).expect("Should not be able to save mismatching types in file"),
+            )
+        }) {
+            Some(data) => data,
+            None => <T::Loader as DefaultDispatcher<T>>::get_default(self),
+        }
+    }
+}
+
+pub trait DefaultDispatcher<T>: Sealed
+where
+    T: FidlStorageConvertible,
+{
+    fn get_default(_: &FidlStorage) -> T;
+}
+
+impl<T> DefaultDispatcher<T> for NoneT
+where
+    T: FidlStorageConvertible<Loader = Self>,
+    T: Default,
+{
+    fn get_default(_: &FidlStorage) -> T {
+        T::default()
+    }
+}
+
+impl<T, L> DefaultDispatcher<T> for L
+where
+    T: FidlStorageConvertible<Loader = L>,
+    L: DefaultLoader<Result = T> + 'static,
+{
+    fn get_default(storage: &FidlStorage) -> T {
+        match storage.typed_loader_map.get(T::KEY) {
+            Some(loader) => match loader.downcast_ref::<T::Loader>() {
+                Some(loader) => loader.default_value(),
+                None => {
+                    panic!("Mismatch key and loader for key {}", T::KEY);
+                }
+            },
+            None => panic!("Missing loader for {}", T::KEY),
+        }
     }
 }
 
@@ -422,20 +466,28 @@ mod tests {
     const VALUE1: i32 = 33;
     const VALUE2: i32 = 128;
 
-    impl FidlStorageConvertible for TestStruct {
-        type Storable = Self;
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    struct LibTestStruct {
+        value: i32,
+    }
+
+    impl FidlStorageConvertible for LibTestStruct {
+        type Storable = TestStruct;
+        type Loader = NoneT;
         const KEY: &'static str = "testkey";
 
-        fn default_value() -> Self {
-            TestStruct { value: VALUE0 }
-        }
-
         fn to_storable(self) -> Self::Storable {
-            self
+            TestStruct { value: self.value }
         }
 
         fn from_storable(storable: Self::Storable) -> Self {
-            storable
+            Self { value: storable.value }
+        }
+    }
+
+    impl Default for LibTestStruct {
+        fn default() -> Self {
+            Self { value: VALUE0 }
         }
     }
 
@@ -455,22 +507,23 @@ mod tests {
 
     #[fasync::run_until_stalled(test)]
     async fn test_get() {
-        let value_to_get = TestStruct { value: VALUE1 };
+        let value_to_get = LibTestStruct { value: VALUE1 };
         let content = persist(&value_to_get.to_storable()).unwrap();
         let fs = mut_pseudo_directory! {
             "xyz.pfidl" => read_write(content),
         };
         let storage_dir = serve_vfs_dir(fs);
-        let (storage, sync_tasks) =
-            FidlStorage::with_file_proxy(vec![TestStruct::KEY], storage_dir, move |_| {
-                Ok((String::from("xyz_temp.pfidl"), String::from("xyz.pfidl")))
-            })
-            .await
-            .expect("should be able to generate file");
+        let (storage, sync_tasks) = FidlStorage::with_file_proxy(
+            vec![(LibTestStruct::KEY, None)],
+            storage_dir,
+            move |_| Ok((String::from("xyz_temp.pfidl"), String::from("xyz.pfidl"))),
+        )
+        .await
+        .expect("should be able to generate file");
         for task in sync_tasks {
             task.detach();
         }
-        let result = storage.get::<TestStruct>().await;
+        let result = storage.get::<LibTestStruct>().await;
 
         assert_eq!(result.value, VALUE1);
     }
@@ -480,16 +533,17 @@ mod tests {
         let fs = mut_pseudo_directory! {};
         let storage_dir = serve_vfs_dir(fs);
 
-        let (storage, sync_tasks) =
-            FidlStorage::with_file_proxy(vec![TestStruct::KEY], storage_dir, move |_| {
-                Ok((String::from("xyz_temp.pfidl"), String::from("xyz.pfidl")))
-            })
-            .await
-            .expect("file proxy should be created");
+        let (storage, sync_tasks) = FidlStorage::with_file_proxy(
+            vec![(LibTestStruct::KEY, None)],
+            storage_dir,
+            move |_| Ok((String::from("xyz_temp.pfidl"), String::from("xyz.pfidl"))),
+        )
+        .await
+        .expect("file proxy should be created");
         for task in sync_tasks {
             task.detach();
         }
-        let result = storage.get::<TestStruct>().await;
+        let result = storage.get::<LibTestStruct>().await;
 
         assert_eq!(result.value, VALUE0);
     }
@@ -504,7 +558,7 @@ mod tests {
         let storage_dir = serve_vfs_dir(fs);
 
         let storage_fut = FidlStorage::with_file_proxy(
-            vec![TestStruct::KEY],
+            vec![(LibTestStruct::KEY, None)],
             Clone::clone(&storage_dir),
             move |_| Ok((String::from("xyz_temp.pfidl"), String::from("xyz.pfidl"))),
         );
@@ -522,7 +576,7 @@ mod tests {
         futures::pin_mut!(sync_task);
 
         // Write to device storage.
-        let value_to_write = TestStruct { value: written_value };
+        let value_to_write = LibTestStruct { value: written_value };
         let write_future = storage.write(value_to_write);
         futures::pin_mut!(write_future);
 
@@ -569,7 +623,7 @@ mod tests {
             panic!("result is not ready: {result:?}");
         };
 
-        assert_eq!(data, value_to_write);
+        assert_eq!(data, value_to_write.to_storable());
     }
 
     #[fuchsia::test]
@@ -583,7 +637,7 @@ mod tests {
         let storage_dir = serve_vfs_dir(fs);
 
         let storage_fut = FidlStorage::with_file_proxy(
-            vec![TestStruct::KEY],
+            vec![(LibTestStruct::KEY, None)],
             Clone::clone(&storage_dir),
             move |_| Ok((String::from("xyz_temp.pfidl"), String::from("xyz.pfidl"))),
         );
@@ -600,7 +654,7 @@ mod tests {
         futures::pin_mut!(sync_task);
 
         // Write to device storage.
-        let value_to_write = TestStruct { value: written_value };
+        let value_to_write = LibTestStruct { value: written_value };
         let write_future = storage.write(value_to_write);
         futures::pin_mut!(write_future);
 
@@ -647,10 +701,10 @@ mod tests {
             panic!("result is not ready: {result:?}");
         };
 
-        assert_eq!(data, value_to_write);
+        assert_eq!(data, value_to_write.to_storable());
 
         // Write second time to device storage.
-        let value_to_write2 = TestStruct { value: second_value };
+        let value_to_write2 = LibTestStruct { value: second_value };
         let write_future = storage.write(value_to_write2);
         futures::pin_mut!(write_future);
 
@@ -683,7 +737,7 @@ mod tests {
             panic!("result is not ready: {result:?}");
         };
 
-        assert_eq!(data, value_to_write);
+        assert_eq!(data, value_to_write.to_storable());
 
         // Move executor to just before sync interval.
         executor.set_fake_time(Time::from_nanos(MIN_FLUSH_INTERVAL_MS * 1_000_000 - 1));
@@ -716,23 +770,23 @@ mod tests {
             panic!("result is not ready: {result:?}");
         };
 
-        assert_eq!(data, value_to_write2);
+        assert_eq!(data, value_to_write2.to_storable());
     }
 
-    impl FidlStorageConvertible for WrongStruct {
-        type Storable = Self;
+    #[derive(Copy, Clone, Default, Debug)]
+    struct LibWrongStruct;
+
+    impl FidlStorageConvertible for LibWrongStruct {
+        type Storable = WrongStruct;
+        type Loader = NoneT;
         const KEY: &'static str = "WRONG_STRUCT";
 
-        fn default_value() -> Self {
-            Self
-        }
-
         fn to_storable(self) -> Self::Storable {
-            self
+            WrongStruct
         }
 
-        fn from_storable(storable: Self::Storable) -> Self {
-            storable
+        fn from_storable(_: Self::Storable) -> Self {
+            LibWrongStruct
         }
     }
 
@@ -743,23 +797,24 @@ mod tests {
         let fs = mut_pseudo_directory! {};
         let storage_dir = serve_vfs_dir(fs);
 
-        let (storage, sync_tasks) =
-            FidlStorage::with_file_proxy(vec![TestStruct::KEY], storage_dir, move |_| {
-                Ok((String::from("xyz_temp.pfidl"), String::from("xyz.pfidl")))
-            })
-            .await
-            .expect("file proxy should be created");
+        let (storage, sync_tasks) = FidlStorage::with_file_proxy(
+            vec![(LibTestStruct::KEY, None)],
+            storage_dir,
+            move |_| Ok((String::from("xyz_temp.pfidl"), String::from("xyz.pfidl"))),
+        )
+        .await
+        .expect("file proxy should be created");
         for task in sync_tasks {
             task.detach();
         }
 
         // Write successfully to storage once.
-        let result = storage.write(TestStruct { value: VALUE2 }).await;
+        let result = storage.write(LibTestStruct { value: VALUE2 }).await;
         assert!(result.is_ok());
 
         // Write to device storage again with a different type to validate that the type can't
         // be changed.
-        let result = storage.write(WrongStruct).await;
+        let result = storage.write(LibWrongStruct).await;
         assert_matches!(result, Err(e) if e.to_string() == "Invalid data keyed by WRONG_STRUCT");
     }
 
@@ -811,7 +866,7 @@ mod tests {
         let storage_dir = serve_vfs_dir(fs);
 
         let storage_fut = FidlStorage::with_file_proxy(
-            vec![TestStruct::KEY],
+            vec![(LibTestStruct::KEY, None)],
             Clone::clone(&storage_dir),
             move |_| Ok((String::from("xyz_temp.pfidl"), String::from("xyz.pfidl"))),
         );
@@ -825,7 +880,7 @@ mod tests {
         let third_value = VALUE0;
 
         // First write finishes immediately.
-        let value_to_write = TestStruct { value: first_value };
+        let value_to_write = LibTestStruct { value: first_value };
         // Initial cache check is done if no read was ever performed.
         let result = run_to_ready!(executor, storage.write(value_to_write));
         assert_matches!(result, Result::Ok(UpdateState::Updated));
@@ -842,47 +897,47 @@ mod tests {
         let _ = executor.run_until_stalled(&mut sync_task);
 
         // Validate that the file has been synced.
-        assert_file!(executor, storage_dir, "xyz.pfidl", value_to_write);
+        assert_file!(executor, storage_dir, "xyz.pfidl", value_to_write.to_storable());
 
         // Write second time to device storage.
-        let value_to_write2 = TestStruct { value: second_value };
+        let value_to_write2 = LibTestStruct { value: second_value };
         let result = run_to_ready!(executor, storage.write(value_to_write2));
         // Value is marked as updated after the write.
         assert_matches!(result, Result::Ok(UpdateState::Updated));
 
         // Validate the updated values are still returned from the storage cache.
-        let data = run_to_ready!(executor, storage.get::<TestStruct>());
+        let data = run_to_ready!(executor, storage.get::<LibTestStruct>());
         assert_eq!(data, value_to_write2);
 
         // But the data has not been persisted to disk.
-        assert_file!(executor, storage_dir, "xyz.pfidl", value_to_write);
+        assert_file!(executor, storage_dir, "xyz.pfidl", value_to_write.to_storable());
 
         // Now write a third time before advancing the clock.
-        let value_to_write3 = TestStruct { value: third_value };
+        let value_to_write3 = LibTestStruct { value: third_value };
         let result = run_to_ready!(executor, storage.write(value_to_write3));
         // Value is marked as updated after the write.
         assert_matches!(result, Result::Ok(UpdateState::Updated));
 
         // Validate the updated values are still returned from the storage cache.
-        let data = run_to_ready!(executor, storage.get::<TestStruct>());
+        let data = run_to_ready!(executor, storage.get::<LibTestStruct>());
         assert_eq!(data, value_to_write3);
 
         // But the data has still not been persistend to disk.
-        assert_file!(executor, storage_dir, "xyz.pfidl", value_to_write);
+        assert_file!(executor, storage_dir, "xyz.pfidl", value_to_write.to_storable());
 
         // Move clock to just before sync interval.
         executor.set_fake_time(Time::from_nanos(MIN_FLUSH_INTERVAL_MS * 1_000_000 - 1));
         assert!(!executor.wake_expired_timers());
 
         // And validate that the data has still not been synced to disk.
-        assert_file!(executor, storage_dir, "xyz.pfidl", value_to_write);
+        assert_file!(executor, storage_dir, "xyz.pfidl", value_to_write.to_storable());
 
         // Move executor to just after sync interval.
         executor.set_fake_time(Time::from_nanos(MIN_FLUSH_INTERVAL_MS * 1_000_000));
         let _ = executor.run_until_stalled(&mut sync_task);
 
         // Validate that the file has finally been synced.
-        assert_file!(executor, storage_dir, "xyz.pfidl", value_to_write3);
+        assert_file!(executor, storage_dir, "xyz.pfidl", value_to_write3.to_storable());
     }
 
     fn serve_full_vfs_dir(root: Arc<impl Directory>, recovers_after: usize) -> DirectoryProxy {

@@ -250,13 +250,17 @@ pub(crate) fn get_all_setting_types() -> HashSet<SettingType> {
 #[cfg(test)]
 mod testing {
     use settings_storage::device_storage::DeviceStorageCompatible;
+    use settings_storage::storage_factory::NoneT;
 
     use super::{SettingInfo, UnknownInfo};
 
     impl DeviceStorageCompatible for UnknownInfo {
+        type Loader = NoneT;
         const KEY: &'static str = "unknown_info";
+    }
 
-        fn default_value() -> Self {
+    impl Default for UnknownInfo {
+        fn default() -> Self {
             Self(false)
         }
     }

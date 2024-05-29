@@ -18,7 +18,7 @@ use crate::input::types::{
 };
 use crate::input::MediaButtons;
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
-use settings_storage::storage_factory::StorageAccess;
+use settings_storage::storage_factory::{NoneT, StorageAccess};
 
 use anyhow::Error;
 use async_trait::async_trait;
@@ -31,11 +31,8 @@ pub(crate) const DEFAULT_CAMERA_NAME: &str = "camera";
 pub(crate) const DEFAULT_MIC_NAME: &str = "microphone";
 
 impl DeviceStorageCompatible for InputInfoSources {
+    type Loader = NoneT;
     const KEY: &'static str = "input_info";
-
-    fn default_value() -> Self {
-        InputInfoSources { input_device_state: InputState::new() }
-    }
 
     fn try_deserialize_from(value: &str) -> Result<Self, Error> {
         Self::extract(value).or_else(|e| {
@@ -85,7 +82,7 @@ impl From<InputInfo> for SettingInfo {
     }
 }
 
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Default, Debug, Clone, Serialize, Deserialize)]
 pub struct InputInfoSourcesV2 {
     hw_microphone: Microphone,
     sw_microphone: Microphone,
@@ -93,15 +90,8 @@ pub struct InputInfoSourcesV2 {
 }
 
 impl DeviceStorageCompatible for InputInfoSourcesV2 {
+    type Loader = NoneT;
     const KEY: &'static str = "input_info_sources_v2";
-
-    fn default_value() -> Self {
-        InputInfoSourcesV2 {
-            hw_microphone: Microphone { muted: false },
-            sw_microphone: Microphone { muted: false },
-            input_device_state: InputState::new(),
-        }
-    }
 
     fn try_deserialize_from(value: &str) -> Result<Self, Error> {
         Self::extract(value).or_else(|e| {
@@ -121,27 +111,15 @@ impl From<InputInfoSourcesV1> for InputInfoSourcesV2 {
     }
 }
 
-#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(PartialEq, Default, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct InputInfoSourcesV1 {
     pub hw_microphone: Microphone,
     pub sw_microphone: Microphone,
 }
 
-impl InputInfoSourcesV1 {
-    const fn new(hw_microphone: Microphone, sw_microphone: Microphone) -> InputInfoSourcesV1 {
-        Self { hw_microphone, sw_microphone }
-    }
-}
-
 impl DeviceStorageCompatible for InputInfoSourcesV1 {
+    type Loader = NoneT;
     const KEY: &'static str = "input_info_sources_v1";
-
-    fn default_value() -> Self {
-        InputInfoSourcesV1::new(
-            Microphone { muted: false }, /*hw_microphone muted*/
-            Microphone { muted: false }, /*sw_microphone muted*/
-        )
-    }
 }
 
 type InputControllerInnerHandle = Arc<Mutex<InputControllerInner>>;
@@ -376,7 +354,8 @@ pub struct InputController {
 
 impl StorageAccess for InputController {
     type Storage = DeviceStorage;
-    const STORAGE_KEYS: &'static [&'static str] = &[InputInfoSources::KEY];
+    type Data = InputInfoSources;
+    const STORAGE_KEY: &'static str = InputInfoSources::KEY;
 }
 
 impl InputController {
@@ -507,7 +486,7 @@ mod tests {
     #[fuchsia::test]
     fn test_input_migration_v1_to_current() {
         const MUTED_MIC: Microphone = Microphone { muted: true };
-        let mut v1 = InputInfoSourcesV1::default_value();
+        let mut v1 = InputInfoSourcesV1::default();
         v1.sw_microphone = MUTED_MIC;
 
         let serialized_v1 = v1.serialize_to();
@@ -532,7 +511,7 @@ mod tests {
     #[fuchsia::test]
     fn test_input_migration_v1_to_v2() {
         const MUTED_MIC: Microphone = Microphone { muted: true };
-        let mut v1 = InputInfoSourcesV1::default_value();
+        let mut v1 = InputInfoSourcesV1::default();
         v1.sw_microphone = MUTED_MIC;
 
         let serialized_v1 = v1.serialize_to();
@@ -548,7 +527,7 @@ mod tests {
     fn test_input_migration_v2_to_current() {
         const DEFAULT_CAMERA_NAME: &str = "camera";
         const MUTED_MIC: Microphone = Microphone { muted: true };
-        let mut v2 = InputInfoSourcesV2::default_value();
+        let mut v2 = InputInfoSourcesV2::default();
         v2.input_device_state.set_source_state(
             InputDeviceType::CAMERA,
             DEFAULT_CAMERA_NAME.to_string(),
@@ -618,7 +597,7 @@ mod tests {
                                 // Just respond with the default value as we're not testing storage.
                                 let _ = message_client.reply(service::Payload::Storage(
                                     StoragePayload::Response(StorageResponse::Read(
-                                        InputInfoSources::default_value().into(),
+                                        InputInfoSources::default().into(),
                                     )),
                                 ));
                             }

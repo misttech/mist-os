@@ -10,12 +10,12 @@ use crate::handler::setting_handler::{
     controller, ControllerError, IntoHandlerResult, SettingHandlerResult,
 };
 use crate::service_context::ServiceContext;
-use crate::setup::types::{ConfigurationInterfaceFlags, SetupInfo};
+use crate::setup::types::SetupInfo;
 use async_trait::async_trait;
 use fidl_fuchsia_hardware_power_statecontrol::RebootReason;
 use fuchsia_zircon as zx;
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
-use settings_storage::storage_factory::StorageAccess;
+use settings_storage::storage_factory::{NoneT, StorageAccess};
 
 async fn reboot(service_context_handle: &ServiceContext) -> Result<(), ControllerError> {
     let hardware_power_statecontrol_admin = service_context_handle
@@ -48,11 +48,8 @@ async fn reboot(service_context_handle: &ServiceContext) -> Result<(), Controlle
 }
 
 impl DeviceStorageCompatible for SetupInfo {
+    type Loader = NoneT;
     const KEY: &'static str = "setup_info";
-
-    fn default_value() -> Self {
-        SetupInfo { configuration_interfaces: ConfigurationInterfaceFlags::DEFAULT }
-    }
 }
 
 impl From<SetupInfo> for SettingInfo {
@@ -67,7 +64,8 @@ pub struct SetupController {
 
 impl StorageAccess for SetupController {
     type Storage = DeviceStorage;
-    const STORAGE_KEYS: &'static [&'static str] = &[SetupInfo::KEY];
+    type Data = SetupInfo;
+    const STORAGE_KEY: &'static str = SetupInfo::KEY;
 }
 
 #[async_trait]

@@ -19,7 +19,8 @@ const ORIGINAL_VALUE: bool = true;
 struct TestAccess;
 impl StorageAccess for TestAccess {
     type Storage = DeviceStorage;
-    const STORAGE_KEYS: &'static [&'static str] = &[UnknownInfo::KEY];
+    type Data = UnknownInfo;
+    const STORAGE_KEY: &'static str = UnknownInfo::KEY;
 }
 
 async fn create_test_environment() -> (service::message::Delegate, Arc<DeviceStorage>) {

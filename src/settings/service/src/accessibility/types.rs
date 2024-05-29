@@ -5,7 +5,7 @@
 use crate::base::Merge;
 use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(PartialEq, Default, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct AccessibilityInfo {
     pub(crate) audio_description: Option<bool>,
     pub(crate) screen_reader: Option<bool>,

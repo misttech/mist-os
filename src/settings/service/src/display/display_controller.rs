@@ -25,7 +25,7 @@ use fidl_fuchsia_ui_brightness::{
 use fuchsia_trace as ftrace;
 use lazy_static::lazy_static;
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
-use settings_storage::storage_factory::StorageAccess;
+use settings_storage::storage_factory::{NoneT, StorageAccess};
 use settings_storage::UpdateState;
 use std::sync::Mutex;
 
@@ -82,14 +82,17 @@ pub(crate) fn default_display_info() -> DisplayInfo {
 }
 
 impl DeviceStorageCompatible for DisplayInfo {
+    type Loader = NoneT;
     const KEY: &'static str = "display_info";
-
-    fn default_value() -> Self {
-        default_display_info()
-    }
 
     fn try_deserialize_from(value: &str) -> Result<Self, Error> {
         Self::extract(value).or_else(|_| DisplayInfoV5::try_deserialize_from(value).map(Self::from))
+    }
+}
+
+impl Default for DisplayInfo {
+    fn default() -> Self {
+        default_display_info()
     }
 }
 
@@ -217,7 +220,8 @@ where
     T: BrightnessManager,
 {
     type Storage = DeviceStorage;
-    const STORAGE_KEYS: &'static [&'static str] = &[DisplayInfo::KEY];
+    type Data = DisplayInfo;
+    const STORAGE_KEY: &'static str = DisplayInfo::KEY;
 }
 
 #[async_trait]
@@ -314,9 +318,12 @@ impl DisplayInfoV1 {
 }
 
 impl DeviceStorageCompatible for DisplayInfoV1 {
+    type Loader = NoneT;
     const KEY: &'static str = "display_infoV1";
+}
 
-    fn default_value() -> Self {
+impl Default for DisplayInfoV1 {
+    fn default() -> Self {
         DisplayInfoV1::new(
             false,                           /*auto_brightness_enabled*/
             DEFAULT_MANUAL_BRIGHTNESS_VALUE, /*brightness_value*/
@@ -347,19 +354,22 @@ impl DisplayInfoV2 {
 }
 
 impl DeviceStorageCompatible for DisplayInfoV2 {
+    type Loader = NoneT;
     const KEY: &'static str = "display_infoV2";
 
-    fn default_value() -> Self {
+    fn try_deserialize_from(value: &str) -> Result<Self, Error> {
+        Self::extract(value).or_else(|_| DisplayInfoV1::try_deserialize_from(value).map(Self::from))
+    }
+}
+
+impl Default for DisplayInfoV2 {
+    fn default() -> Self {
         DisplayInfoV2::new(
             false,                           /*auto_brightness_enabled*/
             DEFAULT_MANUAL_BRIGHTNESS_VALUE, /*brightness_value*/
             LowLightMode::Disable,           /*low_light_mode*/
             ThemeModeV1::Unknown,            /*theme_mode*/
         )
-    }
-
-    fn try_deserialize_from(value: &str) -> Result<Self, Error> {
-        Self::extract(value).or_else(|_| DisplayInfoV1::try_deserialize_from(value).map(Self::from))
     }
 }
 
@@ -425,9 +435,16 @@ impl DisplayInfoV3 {
 }
 
 impl DeviceStorageCompatible for DisplayInfoV3 {
+    type Loader = NoneT;
     const KEY: &'static str = "display_info";
 
-    fn default_value() -> Self {
+    fn try_deserialize_from(value: &str) -> Result<Self, Error> {
+        Self::extract(value).or_else(|_| DisplayInfoV2::try_deserialize_from(value).map(Self::from))
+    }
+}
+
+impl Default for DisplayInfoV3 {
+    fn default() -> Self {
         DisplayInfoV3::new(
             false,                           /*auto_brightness_enabled*/
             DEFAULT_MANUAL_BRIGHTNESS_VALUE, /*brightness_value*/
@@ -435,10 +452,6 @@ impl DeviceStorageCompatible for DisplayInfoV3 {
             LowLightMode::Disable,           /*low_light_mode*/
             ThemeModeV1::Unknown,            /*theme_mode*/
         )
-    }
-
-    fn try_deserialize_from(value: &str) -> Result<Self, Error> {
-        Self::extract(value).or_else(|_| DisplayInfoV2::try_deserialize_from(value).map(Self::from))
     }
 }
 
@@ -497,9 +510,16 @@ impl From<DisplayInfoV3> for DisplayInfoV4 {
 }
 
 impl DeviceStorageCompatible for DisplayInfoV4 {
+    type Loader = NoneT;
     const KEY: &'static str = "display_info";
 
-    fn default_value() -> Self {
+    fn try_deserialize_from(value: &str) -> Result<Self, Error> {
+        Self::extract(value).or_else(|_| DisplayInfoV3::try_deserialize_from(value).map(Self::from))
+    }
+}
+
+impl Default for DisplayInfoV4 {
+    fn default() -> Self {
         DisplayInfoV4::new(
             false,                           /*auto_brightness_enabled*/
             DEFAULT_MANUAL_BRIGHTNESS_VALUE, /*brightness_value*/
@@ -507,10 +527,6 @@ impl DeviceStorageCompatible for DisplayInfoV4 {
             LowLightMode::Disable,           /*low_light_mode*/
             ThemeType::Unknown,              /*theme_type*/
         )
-    }
-
-    fn try_deserialize_from(value: &str) -> Result<Self, Error> {
-        Self::extract(value).or_else(|_| DisplayInfoV3::try_deserialize_from(value).map(Self::from))
     }
 }
 
@@ -557,9 +573,16 @@ impl From<DisplayInfoV4> for DisplayInfoV5 {
 }
 
 impl DeviceStorageCompatible for DisplayInfoV5 {
+    type Loader = NoneT;
     const KEY: &'static str = "display_info";
 
-    fn default_value() -> Self {
+    fn try_deserialize_from(value: &str) -> Result<Self, Error> {
+        Self::extract(value).or_else(|_| DisplayInfoV4::try_deserialize_from(value).map(Self::from))
+    }
+}
+
+impl Default for DisplayInfoV5 {
+    fn default() -> Self {
         DisplayInfoV5::new(
             false,                                                          /*auto_brightness_enabled*/
             DEFAULT_MANUAL_BRIGHTNESS_VALUE,                                /*brightness_value*/
@@ -567,10 +590,6 @@ impl DeviceStorageCompatible for DisplayInfoV5 {
             LowLightMode::Disable,                                          /*low_light_mode*/
             Some(Theme::new(Some(ThemeType::Unknown), ThemeMode::empty())), /*theme_type*/
         )
-    }
-
-    fn try_deserialize_from(value: &str) -> Result<Self, Error> {
-        Self::extract(value).or_else(|_| DisplayInfoV4::try_deserialize_from(value).map(Self::from))
     }
 }
 
@@ -596,7 +615,7 @@ mod tests {
                 manual_brightness_value: v1.manual_brightness_value,
                 auto_brightness: v1.auto_brightness,
                 low_light_mode: v1.low_light_mode,
-                theme_mode: DisplayInfoV2::default_value().theme_mode,
+                theme_mode: DisplayInfoV2::default().theme_mode,
             }
         );
     }
@@ -619,7 +638,7 @@ mod tests {
             DisplayInfoV3 {
                 manual_brightness_value: v2.manual_brightness_value,
                 auto_brightness: v2.auto_brightness,
-                screen_enabled: DisplayInfoV3::default_value().screen_enabled,
+                screen_enabled: DisplayInfoV3::default().screen_enabled,
                 low_light_mode: v2.low_light_mode,
                 theme_mode: v2.theme_mode,
             }
@@ -699,7 +718,7 @@ mod tests {
                 low_light_mode: v1.low_light_mode,
                 theme: Some(Theme::new(Some(ThemeType::Unknown), ThemeMode::empty())),
                 // screen_enabled was added in v3.
-                screen_enabled: DisplayInfoV3::default_value().screen_enabled,
+                screen_enabled: DisplayInfoV3::default().screen_enabled,
                 auto_brightness_value: DEFAULT_DISPLAY_INFO.auto_brightness_value,
             }
         );
@@ -726,7 +745,7 @@ mod tests {
                 low_light_mode: v2.low_light_mode,
                 theme: Some(Theme::new(Some(ThemeType::Light), ThemeMode::empty())),
                 // screen_enabled was added in v3.
-                screen_enabled: DisplayInfoV3::default_value().screen_enabled,
+                screen_enabled: DisplayInfoV3::default().screen_enabled,
                 auto_brightness_value: DEFAULT_DISPLAY_INFO.auto_brightness_value,
             }
         );
