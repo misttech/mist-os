@@ -233,25 +233,17 @@ template("sdk_fuchsia_package") {
 
       script = "//build/packages/generate_sdk_package_manifest.py"
 
-      inputs = [
-        package_manifest_file,
-        computed_content_checklist_file,
-      ]
+      inputs = [ package_manifest_file ]
       outputs = [
         _sdk_package_file_list,
         _sdk_package_metadata,
       ]
-      deps = [
-        ":${_content_checklist_target}",
-        _full_package_label,
-      ]
+      deps = [ _full_package_label ]
       depfile = _sdk_package_depfile
 
       args = [
         "--manifest",
         rebase_path(package_manifest_file, root_build_dir),
-        "--sdk-package-content-checklist-path",
-        rebase_path(computed_content_checklist_file, root_build_dir),
         "--output",
         rebase_path(_sdk_package_dir, root_build_dir),
         "--api-level",
@@ -283,7 +275,10 @@ template("sdk_fuchsia_package") {
 
       file_list = _sdk_package_file_list
 
-      non_sdk_deps = [ ":${_sdk_manifest_target}" ]
+      non_sdk_deps = [
+        ":${_content_checklist_target}",
+        ":${_sdk_manifest_target}",
+      ]
 
       # Barrier enforced to prevent assembly from adding to `base` set,
       # keeping this target as an SDK-only addition.
