@@ -35,6 +35,8 @@ lazy_static! {
 pub enum SendError {
     #[error("timed out reading a reply from device")]
     Timeout,
+    #[error("Did not write correct number of bytes. Got {:?}. Want {}", written, expected)]
+    ShortWrite { written: usize, expected: usize },
 }
 
 #[derive(Debug, Error)]
@@ -171,7 +173,6 @@ async fn read_with_timeout<T: AsyncRead + Unpin>(
     }
 }
 
-#[allow(clippy::unused_io_amount)] // TODO(https://fxbug.dev/42177040)
 pub async fn send_with_listener<T: AsyncRead + AsyncWrite + Unpin>(
     cmd: Command,
     interface: &mut T,
@@ -180,12 +181,14 @@ pub async fn send_with_listener<T: AsyncRead + AsyncWrite + Unpin>(
     let _lock = SEND_LOCK.lock().await;
     let bytes = Vec::<u8>::try_from(&cmd)?;
     tracing::debug!("Fastboot: writing command {cmd:?}: {}", String::from_utf8_lossy(&bytes));
-    interface.write(&bytes).await?;
+    let written = interface.write(&bytes).await?;
+    if written < bytes.len() {
+        return Err(anyhow!(SendError::ShortWrite { written, expected: bytes.len() }));
+    }
     read(interface, listener).await
 }
 
 #[tracing::instrument(skip(interface))]
-#[allow(clippy::unused_io_amount)] // TODO(https://fxbug.dev/42177040)
 pub async fn send<T: AsyncRead + AsyncWrite + Unpin>(
     cmd: Command,
     interface: &mut T,
@@ -193,11 +196,13 @@ pub async fn send<T: AsyncRead + AsyncWrite + Unpin>(
     let _lock = SEND_LOCK.lock().await;
     let bytes = Vec::<u8>::try_from(&cmd)?;
     tracing::debug!("Fastboot: writing command {cmd:?}: {}", String::from_utf8_lossy(&bytes));
-    interface.write(&bytes).await?;
+    let written = interface.write(&bytes).await?;
+    if written < bytes.len() {
+        return Err(anyhow!(SendError::ShortWrite { written, expected: bytes.len() }));
+    }
     read_and_log_info(interface).await
 }
 
-#[allow(clippy::unused_io_amount)] // TODO(https://fxbug.dev/42177040)
 pub async fn send_with_timeout<T: AsyncRead + AsyncWrite + Unpin>(
     cmd: Command,
     interface: &mut T,
@@ -206,7 +211,10 @@ pub async fn send_with_timeout<T: AsyncRead + AsyncWrite + Unpin>(
     let _lock = SEND_LOCK.lock().await;
     let bytes = Vec::<u8>::try_from(&cmd)?;
     tracing::debug!("Fastboot: writing command {cmd:?}: {}", String::from_utf8_lossy(&bytes));
-    interface.write(&bytes).await?;
+    let written = interface.write(&bytes).await?;
+    if written < bytes.len() {
+        return Err(anyhow!(SendError::ShortWrite { written, expected: bytes.len() }));
+    }
     read_with_timeout(interface, &LogInfoListener {}, timeout).await
 }
 
@@ -263,7 +271,13 @@ pub async fn upload_with_read_timeout<T: AsyncRead + AsyncWrite + Unpin, R: Read
                                 listener.on_error(&err).await?;
                                 bail!(err);
                             }
-                            _ => {
+                            Ok(written) => {
+                                if written < n {
+                                    return Err(anyhow!(SendError::ShortWrite {
+                                        written,
+                                        expected: n
+                                    }));
+                                }
                                 listener.on_progress(n.try_into().unwrap()).await?;
                                 tracing::trace!("fastboot: wrote {} bytes", n);
                             }
