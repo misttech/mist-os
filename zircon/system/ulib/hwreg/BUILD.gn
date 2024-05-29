@@ -33,7 +33,7 @@ library_headers("headers") {
   }
 }
 
-source_set("hwreg") {
+static_library("hwreg") {
   public_deps = [ ":headers" ]
 
   sources = [ "printers.cc" ]
