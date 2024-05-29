@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.spiimpl/cpp/driver/wire.h>
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/async/cpp/executor.h>
+#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fit/function.h>
 #include <lib/fpromise/promise.h>
@@ -25,7 +26,6 @@
 #include <fbl/array.h>
 #include <soc/aml-common/aml-spi.h>
 
-#include "sdk/lib/driver/compat/cpp/device_server.h"
 #include "src/lib/vmo_store/vmo_store.h"
 
 namespace spi {

@@ -7,6 +7,7 @@
 #include <endian.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/fpromise/bridge.h>
@@ -24,7 +25,6 @@
 #include <fbl/alloc_checker.h>
 
 #include "registers.h"
-#include "sdk/lib/driver/compat/cpp/metadata.h"
 
 namespace spi {
 

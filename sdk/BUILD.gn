@@ -784,8 +784,6 @@ sdk_molecule("platform_libs") {
   category = "internal"
   deps = [
     ":version_history",
-    "//sdk/lib/driver/compat/cpp:cpp_sdk",
-    "//sdk/lib/driver/compat/cpp:logging_sdk",
     "//sdk/lib/driver/devicetree/manager:manager_sdk",
     "//sdk/lib/driver/devicetree/testing:board-test-helper_sdk",
     "//sdk/lib/driver/devicetree/visitors:driver-visitor_sdk",

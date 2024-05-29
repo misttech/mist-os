@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/fit/function.h>
@@ -16,7 +17,6 @@
 #include <bind/fuchsia/hardware/spi/cpp/bind.h>
 #include <fbl/alloc_checker.h>
 
-#include "sdk/lib/driver/compat/cpp/metadata.h"
 #include "spi-child.h"
 
 namespace spi {
