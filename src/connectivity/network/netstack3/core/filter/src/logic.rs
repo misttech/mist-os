@@ -62,7 +62,7 @@ pub(crate) struct Interfaces<'a, D> {
 /// The result of packet processing for a given routine.
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-enum RoutineResult<I: IpExt> {
+pub(crate) enum RoutineResult<I: IpExt> {
     /// The packet should stop traversing the rest of the current installed
     /// routine, but continue travsering other routines installed in the hook.
     Accept,
