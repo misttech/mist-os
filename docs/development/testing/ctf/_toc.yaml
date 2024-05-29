@@ -8,8 +8,10 @@
 toc:
 - title: "Overview"
   path: /docs/development/testing/ctf/overview.md
-- title: "Introduction"
-  path:  /docs/development/testing/ctf/compatibility_testing.md
+- title: "Getting started"
+  section:
+  - title: "Introduction"
+    path:  /docs/development/testing/ctf/compatibility_testing.md
 - title: "Contributing"
   section:
   - title: "Contributing Tests"
