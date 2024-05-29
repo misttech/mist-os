@@ -13,6 +13,7 @@ closed protocol Provider {
     /// The server will always invoke listener.OnStateChanged at least once with
     /// the initial state, and after that invoke listener.OnStateChanged
     /// whenever the system's state changes.
+    @available(deprecated=9, note="Instead, use `fuchsia.input.interaction.Notifier`")
     strict WatchState(resource struct {
         listener client_end:Listener;
     });
@@ -25,6 +26,7 @@ closed protocol Listener {
     /// Callback that is invoked whenever the system state changes.
     /// The Listener is expected to acknowledge each call explicitly and will
     /// not receive new state until this acknowledgement is done.
+    @available(deprecated=9, note="Instead, use `fuchsia.input.interaction.Notifier`")
     strict OnStateChanged(struct {
         state State;
         transition_time zx.Time;
