@@ -69,6 +69,37 @@ where
     }
 }
 
+impl<T> FfxContext<T, core::convert::Infallible> for Option<T>
+where
+    Self: anyhow::Context<T, core::convert::Infallible>,
+{
+    fn bug(self) -> Result<T, Error> {
+        self.ok_or_else(|| Error::Unexpected(anyhow::anyhow!("Option is None")))
+    }
+
+    fn bug_context<C: Display + Send + Sync + 'static>(self, context: C) -> Result<T, Error> {
+        self.context(context).map_err(Error::Unexpected)
+    }
+
+    fn with_bug_context<C: Display + Send + Sync + 'static>(
+        self,
+        f: impl FnOnce() -> C,
+    ) -> Result<T, Error> {
+        self.with_context(f).map_err(Error::Unexpected)
+    }
+
+    fn user_message<C: Display + Send + Sync + 'static>(self, context: C) -> Result<T, Error> {
+        self.context(context).map_err(Error::User)
+    }
+
+    fn with_user_message<C: Display + Send + Sync + 'static>(
+        self,
+        f: impl FnOnce() -> C,
+    ) -> Result<T, Error> {
+        self.with_context(f).map_err(Error::User)
+    }
+}
+
 impl ResultExt for Error {
     fn ffx_error<'a>(&'a self) -> Option<&'a FfxError> {
         match self {
