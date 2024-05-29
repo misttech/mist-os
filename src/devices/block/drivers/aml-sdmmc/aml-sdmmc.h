@@ -151,12 +151,11 @@ class AmlSdmmc : public fdf::DriverBase, public fdf::WireServer<fuchsia_hardware
     uint64_t results = 0;
 
     std::string ToString(const uint32_t param_max) const {
-      char string[param_max + 2];
+      std::vector<char> string(param_max + 1);
       for (uint32_t i = 0; i <= param_max; i++) {
         string[i] = (results & (1ULL << i)) ? '|' : '-';
       }
-      string[param_max + 1] = '\0';
-      return string;
+      return std::string(string.data(), string.size());
     }
   };
 

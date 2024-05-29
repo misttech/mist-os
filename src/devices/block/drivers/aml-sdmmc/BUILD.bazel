@@ -38,9 +38,6 @@ fuchsia_cc_driver(
         "aml-sdmmc-export.cc",
         "aml-sdmmc-regs.h",
     ],
-    copts = [
-        "-Wno-vla-cxx-extension",
-    ],
     defines = [
         "ZX_ASSERT_LEVEL=2",
         "_ALL_SOURCE",
