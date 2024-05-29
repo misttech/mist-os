@@ -13,6 +13,7 @@ use linux_uapi::LINUX_REBOOT_CMD_POWER_OFF;
 use starnix_sync::{Locked, Unlocked};
 
 use crate::{
+    arch::ARCH_NAME,
     device::android::bootloader_message_store::BootloaderMessage,
     mm::{read_to_vec, MemoryAccessor, MemoryAccessorExt, NumberOfElementsRead},
     task::CurrentTask,
@@ -60,7 +61,7 @@ pub fn sys_uname(
     if current_task.thread_group.read().personality.contains(PersonalityFlags::UNAME26) {
         init_array(&mut result.release, b"2.6.40-starnix");
     } else {
-        init_array(&mut result.release, b"5.10.107-starnix");
+        init_array(&mut result.release, b"5.10.199-starnix");
     }
 
     let version = current_task.kernel().build_version.get_or_try_init(|| {
@@ -74,7 +75,7 @@ pub fn sys_uname(
     })?;
 
     init_array(&mut result.version, version.as_bytes());
-    init_array(&mut result.machine, b"x86_64");
+    init_array(&mut result.machine, ARCH_NAME);
 
     {
         // Get the UTS namespace from the perspective of this task.
