@@ -532,7 +532,8 @@ pub(crate) fn is_intree_link(
         // skip over any branch spec. The first part is empty. It is +, or +show, or +log, etc.
         if parts.len() > 3 && parts[2].starts_with('+') {
             let filepath = PathBuf::from("/");
-            if parts[3] == "refs" && parts[4] == "heads" {
+            // Include all refs/heads except for "releases", which should be directly linked.
+            if parts[3] == "refs" && parts[4] == "heads" && parts[5] != "releases" {
                 return Ok(Some(filepath.join(parts[6..].join("/"))));
             } else if parts[3] == "HEAD" && parts[4] == docs_folder.to_string_lossy() {
                 return Ok(Some(filepath.join(parts[4..].join("/"))));
@@ -964,8 +965,9 @@ mod tests {
     ("https://fuchsia.googlesource.com/fuchsia", None),
     ("https://fuchsia.googlesource.com/fuchsia/", None),
     // Since this is not to the /docs dir, it should not be an in-tree link.
-    ("https://fuchsia.googlesource.com/fuchsia/+log/d381548c6aef76926e6203a2ad2265dd510d1e9b", None)
-
+    ("https://fuchsia.googlesource.com/fuchsia/+log/d381548c6aef76926e6203a2ad2265dd510d1e9b", None),
+    // Exclude releases
+    ("https://fuchsia.googlesource.com/fuchsia/+/refs/heads/releases/f16", None),
   ];
         for (link_to_check, expected) in test_cases {
             let result = is_intree_link(project, root_dir, &docs_folder, link_to_check)?;
