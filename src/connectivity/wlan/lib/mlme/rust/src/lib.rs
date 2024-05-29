@@ -38,7 +38,9 @@ use {
     },
     std::{cmp, fmt, sync::Arc, time::Duration},
     tracing::info,
-    wlan_ffi_transport::BufferProvider,
+    wlan_ffi_transport::{
+        BufferProvider, EthernetTxEvent, EthernetTxEventSender, WlanRxEvent, WlanRxEventSender,
+    },
     wlan_fidl_ext::{ResponderExt, SendResultExt},
     wlan_trace as wtrace,
 };
@@ -214,18 +216,41 @@ impl DriverEventSink {
     }
 }
 
+impl EthernetTxEventSender for DriverEventSink {
+    fn unbounded_send(&self, event: EthernetTxEvent) -> Result<(), (String, EthernetTxEvent)> {
+        DriverEventSink::unbounded_send(self, DriverEvent::EthernetTxEvent(event)).map_err(|e| {
+            if let (error, DriverEvent::EthernetTxEvent(event)) =
+                (format!("{:?}", e), e.into_inner())
+            {
+                (error, event)
+            } else {
+                unreachable!();
+            }
+        })
+    }
+}
+
+impl WlanRxEventSender for DriverEventSink {
+    fn unbounded_send(&self, event: WlanRxEvent) -> Result<(), (String, WlanRxEvent)> {
+        DriverEventSink::unbounded_send(self, DriverEvent::WlanRxEvent(event)).map_err(|e| {
+            if let (error, DriverEvent::WlanRxEvent(event)) = (format!("{:?}", e), e.into_inner()) {
+                (error, event)
+            } else {
+                unreachable!();
+            }
+        })
+    }
+}
+
 pub enum DriverEvent {
     // Indicates that the device is being removed and our main loop should exit.
     Stop { responder: fidl_softmac::WlanSoftmacIfcBridgeStopBridgedDriverResponder },
-    // TODO(https://fxbug.dev/42119762): We need to keep stats for these events and respond to StatsQueryRequest.
-    // Indicates receipt of a MAC frame from a peer.
-    MacFrameRx { bytes: Vec<u8>, rx_info: fidl_softmac::WlanRxInfo, async_id: trace::Id },
-    // Requests transmission of an ethernet frame over the air.
-    EthFrameTx { bytes: Vec<u8>, async_id: trace::Id },
     // Reports a scan is complete.
     ScanComplete { status: zx::Status, scan_id: u64 },
     // Reports the result of an attempted frame transmission.
     TxResultReport { tx_result: fidl_common::WlanTxResult },
+    EthernetTxEvent(EthernetTxEvent),
+    WlanRxEvent(WlanRxEvent),
 }
 
 impl fmt::Display for DriverEvent {
@@ -235,10 +260,10 @@ impl fmt::Display for DriverEvent {
             "{}",
             match self {
                 DriverEvent::Stop { .. } => "Stop",
-                DriverEvent::MacFrameRx { .. } => "MacFrameRx",
-                DriverEvent::EthFrameTx { .. } => "EthFrameTx",
                 DriverEvent::ScanComplete { .. } => "ScanComplete",
                 DriverEvent::TxResultReport { .. } => "TxResultReport",
+                DriverEvent::EthernetTxEvent(EthernetTxEvent { .. }) => "EthernetTxEvent",
+                DriverEvent::WlanRxEvent(WlanRxEvent { .. }) => "WlanRxEvent",
             }
         )
     }
@@ -255,10 +280,10 @@ impl fmt::Debug for DriverEvent {
             "{}",
             match self {
                 DriverEvent::Stop { .. } => "Stop",
-                DriverEvent::MacFrameRx { .. } => "MacFrameRx",
-                DriverEvent::EthFrameTx { .. } => "EthFrameTx",
                 DriverEvent::ScanComplete { .. } => "ScanComplete",
                 DriverEvent::TxResultReport { .. } => "TxResultReport",
+                DriverEvent::EthernetTxEvent(EthernetTxEvent { .. }) => "EthernetTxEvent",
+                DriverEvent::WlanRxEvent(WlanRxEvent { .. }) => "WlanRxEvent",
             }
         )
     }
@@ -360,19 +385,6 @@ async fn main_loop_impl<T: MlmeImpl>(
                         responder.send().format_send_err_with_context("Stop")?;
                         return Ok(())
                     },
-                    DriverEvent::MacFrameRx { bytes, rx_info, async_id } => {
-                        wtrace::duration!(c"DriverEvent::MacFrameRx");
-                        mlme_impl.handle_mac_frame_rx(&bytes[..], rx_info, async_id).await;
-                    }
-                    DriverEvent::EthFrameTx { bytes, async_id } => {
-                        wtrace::duration!(c"DriverEvent::EthFrameTx");
-                        let _: Result<(), ()> = mlme_impl.handle_eth_frame_tx(&bytes[..], async_id)
-                            .map_err(|e| {
-                                // TODO(https://fxbug.dev/42121991): Keep a counter of these failures.
-                                info!("Failed to handle eth frame: {}", e);
-                                wtrace::async_end_wlansoftmac_tx(async_id, zx::Status::INTERNAL);
-                            });
-                    }
                     DriverEvent::ScanComplete { status, scan_id } => {
                         mlme_impl.handle_scan_complete(status, scan_id).await
                     },
@@ -381,6 +393,21 @@ async fn main_loop_impl<T: MlmeImpl>(
                             minstrel.lock().handle_tx_result_report(&tx_result)
                         }
                     }
+                    DriverEvent::EthernetTxEvent(EthernetTxEvent { bytes, async_id }) => {
+                        wtrace::duration!(c"DriverEvent::EthernetTxEvent");
+                        let _: Result<(), ()> = mlme_impl.handle_eth_frame_tx(&bytes[..], async_id)
+                            .map_err(|e| {
+                                // TODO(https://fxbug.dev/42121991): Keep a counter of these failures.
+                                info!("Failed to handle eth frame: {}", e);
+                                wtrace::async_end_wlansoftmac_tx(async_id, zx::Status::INTERNAL);
+                            });
+                    }
+                    DriverEvent::WlanRxEvent(WlanRxEvent { bytes, rx_info, async_id }) => {
+                        wtrace::duration!(c"DriverEvent::WlanRxEvent");
+                        mlme_impl.handle_mac_frame_rx(&bytes[..], rx_info, async_id).await;
+                    }
+
+
                 },
                 None => bail!("Driver event stream terminated unexpectedly."),
             },

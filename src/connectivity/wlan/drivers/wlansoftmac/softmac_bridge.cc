@@ -100,11 +100,15 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
   async::PostTask(softmac_bridge->rust_dispatcher_.async_dispatcher(),
                   [init_completer = std::move(init_completer),
                    sta_shutdown_handler = std::move(sta_shutdown_handler),
-                   frame_sender =
-                       frame_sender_t{
+                   ethernet_rx =
+                       ethernet_rx_t{
                            .ctx = softmac_bridge.get(),
-                           .wlan_tx = &SoftmacBridge::WlanTx,
-                           .ethernet_rx = &SoftmacBridge::EthernetRx,
+                           .transfer = &SoftmacBridge::EthernetRx,
+                       },
+                   wlan_tx =
+                       wlan_tx_t{
+                           .ctx = softmac_bridge.get(),
+                           .transfer = &SoftmacBridge::WlanTx,
                        },
                    rust_buffer_provider = softmac_bridge->rust_buffer_provider,
                    softmac_bridge_client_end =
@@ -128,7 +132,7 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
                           (*init_completer)(status);
                           delete init_completer;
                         },
-                        frame_sender, rust_buffer_provider, softmac_bridge_client_end));
+                        ethernet_rx, wlan_tx, rust_buffer_provider, softmac_bridge_client_end));
                   });
 
   return fit::success(std::move(softmac_bridge));
@@ -193,13 +197,17 @@ void SoftmacBridge::Start(StartRequest& request, StartCompleter::Sync& completer
   auto softmac_ifc_bridge_client_endpoint = std::move(request.ifc_bridge());
 
   // See the `fuchsia.wlan.mlme/WlanSoftmacBridge.Start` documentation about the FFI
-  // provided by the `frame_processor` field.
-  auto frame_processor =
-      reinterpret_cast<const frame_processor_t*>(  // NOLINT(performance-no-int-to-ptr)
-          request.frame_processor());
+  // provided by the `ethernet_tx` field.
+  auto ethernet_tx = reinterpret_cast<const ethernet_tx_t*>(  // NOLINT(performance-no-int-to-ptr)
+      request.ethernet_tx());
+  // See the `fuchsia.wlan.mlme/WlanSoftmacBridge.Start` documentation about the FFI
+  // provided by the `wlan_rx` field.
+  auto wlan_rx = reinterpret_cast<const wlan_rx_t*>(  // NOLINT(performance-no-int-to-ptr)
+      request.wlan_rx());
 
-  auto softmac_ifc_bridge = SoftmacIfcBridge::New(frame_processor, std::move(endpoints->server),
-                                                  std::move(softmac_ifc_bridge_client_endpoint));
+  auto softmac_ifc_bridge =
+      SoftmacIfcBridge::New(ethernet_tx, wlan_rx, std::move(endpoints->server),
+                            std::move(softmac_ifc_bridge_client_endpoint));
 
   if (softmac_ifc_bridge.is_error()) {
     lerror("Failed to create SoftmacIfcBridge: %s", softmac_ifc_bridge.status_string());
@@ -323,10 +331,10 @@ zx_status_t SoftmacBridge::WlanTx(void* ctx, const uint8_t* payload, size_t payl
   auto self = static_cast<const SoftmacBridge*>(ctx);
 
   WLAN_TRACE_DURATION();
-  auto fidl_request = fidl::Unpersist<fuchsia_wlan_softmac::FrameSenderWlanTxRequest>(
+  auto fidl_request = fidl::Unpersist<fuchsia_wlan_softmac::WlanTxTransferRequest>(
       cpp20::span(payload, payload_size));
   if (!fidl_request.is_ok()) {
-    lerror("Failed to unpersist FrameSender.WlanTxRequest: %s", fidl_request.error_value());
+    lerror("Failed to unpersist WlanTx.Transfer request: %s", fidl_request.error_value());
     return ZX_ERR_INTERNAL;
   }
 
@@ -397,15 +405,15 @@ zx_status_t SoftmacBridge::EthernetRx(void* ctx, const uint8_t* payload, size_t 
   auto self = static_cast<const SoftmacBridge*>(ctx);
 
   WLAN_TRACE_DURATION();
-  auto fidl_request = fidl::Unpersist<fuchsia_wlan_softmac::FrameSenderEthernetRxRequest>(
+  auto fidl_request = fidl::Unpersist<fuchsia_wlan_softmac::EthernetRxTransferRequest>(
       cpp20::span(payload, payload_size));
   if (!fidl_request.is_ok()) {
-    lerror("Failed to unpersist FrameSender.EthernetRx request: %s", fidl_request.error_value());
+    lerror("Failed to unpersist EthernetRx.Transfer request: %s", fidl_request.error_value());
     return ZX_ERR_INTERNAL;
   }
 
   if (!fidl_request->packet_address() || !fidl_request->packet_size()) {
-    lerror("FrameSender.EthernetRx request missing required field(s).");
+    lerror("EthernetRx.Transfer request missing required field(s).");
     return ZX_ERR_INTERNAL;
   }
 

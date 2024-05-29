@@ -10,8 +10,10 @@ use {
     fuchsia_async::LocalExecutor,
     fuchsia_zircon as zx,
     std::{ffi::c_void, sync::Once},
-    wlan_ffi_transport::{BufferProvider, FfiBufferProvider},
-    wlan_mlme::device::{Device, FfiFrameSender},
+    wlan_ffi_transport::{
+        BufferProvider, EthernetRx, FfiBufferProvider, FfiEthernetRx, FfiWlanTx, WlanTx,
+    },
+    wlan_mlme::device::Device,
 };
 
 static LOGGER_ONCE: Once = Once::new();
@@ -57,7 +59,8 @@ static LOGGER_ONCE: Once = Once::new();
 pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
     init_completer: *mut c_void,
     run_init_completer: unsafe extern "C" fn(init_completer: *mut c_void, status: zx::zx_status_t),
-    frame_sender: FfiFrameSender,
+    ethernet_rx: FfiEthernetRx,
+    wlan_tx: FfiWlanTx,
     buffer_provider: FfiBufferProvider,
     wlan_softmac_bridge_client_handle: zx::sys::zx_handle_t,
 ) -> zx::sys::zx_status_t {
@@ -83,7 +86,8 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
         let channel = fidl::AsyncChannel::from_channel(channel);
         fidl_softmac::WlanSoftmacBridgeProxy::new(channel)
     };
-    let device = Device::new(wlan_softmac_bridge_proxy, frame_sender.into());
+    let device =
+        Device::new(wlan_softmac_bridge_proxy, EthernetRx::new(ethernet_rx), WlanTx::new(wlan_tx));
 
     let result = executor.run_singlethreaded(wlansoftmac_rust::start_and_serve(
         move |result: Result<(), zx::Status>| match result {

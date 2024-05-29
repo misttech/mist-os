@@ -18,24 +18,28 @@
 typedef struct {
   void *ctx;
   /**
-   * Sends a WLAN MAC frame to the C++ portion of wlansoftmac.
-   *
-   * # Safety
-   *
-   * Behavior is undefined unless `payload` contains a persisted `FrameSender.WlanTx` request
-   * and `payload_len` is the length of the persisted byte array.
-   */
-  zx_status_t (*wlan_tx)(void *ctx, const uint8_t *payload, uintptr_t payload_len);
-  /**
    * Sends an Ethernet frame to the C++ portion of wlansoftmac.
    *
    * # Safety
    *
-   * Behavior is undefined unless `payload` contains a persisted `FrameSender.EthernetRx` request
+   * Behavior is undefined unless `payload` contains a persisted `EthernetRx.Transfer` request
    * and `payload_len` is the length of the persisted byte array.
    */
-  zx_status_t (*ethernet_rx)(void *ctx, const uint8_t *payload, uintptr_t payload_len);
-} frame_sender_t;
+  zx_status_t (*transfer)(void *ctx, const uint8_t *payload, uintptr_t payload_len);
+} ethernet_rx_t;
+
+typedef struct {
+  void *ctx;
+  /**
+   * Sends a WLAN MAC frame to the C++ portion of wlansoftmac.
+   *
+   * # Safety
+   *
+   * Behavior is undefined unless `payload` contains a persisted `WlanTx.Transfer` request
+   * and `payload_len` is the length of the persisted byte array.
+   */
+  zx_status_t (*transfer)(void *ctx, const uint8_t *payload, uintptr_t payload_len);
+} wlan_tx_t;
 
 /**
  * Type that wraps a pointer to a buffer allocated in the C++ portion of wlansoftmac.
@@ -87,9 +91,13 @@ typedef struct {
 
 typedef struct {
   const void *ctx;
-  void (*wlan_rx)(const void *ctx, const uint8_t *request, uintptr_t request_size);
-  zx_status_t (*ethernet_tx)(const void *ctx, const uint8_t *request, uintptr_t request_size);
-} frame_processor_t;
+  zx_status_t (*transfer)(const void *ctx, const uint8_t *request, uintptr_t request_size);
+} ethernet_tx_t;
+
+typedef struct {
+  const void *ctx;
+  void (*transfer)(const void *ctx, const uint8_t *request, uintptr_t request_size);
+} wlan_rx_t;
 
 /**
  * Start and run a bridged wlansoftmac driver hosting an MLME server and an SME server.
@@ -132,7 +140,7 @@ typedef struct {
  */
 extern "C" zx_status_t start_and_run_bridged_wlansoftmac(
     void *init_completer, void (*run_init_completer)(void *init_completer, zx_status_t status),
-    frame_sender_t frame_sender, wlansoftmac_buffer_provider_ops_t buffer_provider,
+    ethernet_rx_t ethernet_rx, wlan_tx_t wlan_tx, wlansoftmac_buffer_provider_ops_t buffer_provider,
     zx_handle_t wlan_softmac_bridge_client_handle);
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_RUST_DRIVER_C_BINDING_BINDINGS_H_

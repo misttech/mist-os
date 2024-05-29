@@ -4,8 +4,13 @@
 
 mod buffers;
 mod errors;
+mod transport;
 
 pub use buffers::{
     Buffer, BufferProvider, FakeFfiBufferProvider, FfiBuffer, FfiBufferProvider, FinalizedBuffer,
 };
 pub use errors::{Error, InvalidFfiBuffer};
+pub use transport::{
+    EthernetRx, EthernetTx, EthernetTxEvent, EthernetTxEventSender, FfiEthernetRx, FfiEthernetTx,
+    FfiWlanRx, FfiWlanTx, WlanRx, WlanRxEvent, WlanRxEventSender, WlanTx,
+};

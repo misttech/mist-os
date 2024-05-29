@@ -24,13 +24,13 @@ namespace wlan::drivers::wlansoftmac {
 using ::wlan::drivers::fidl_bridge::ForwardResult;
 
 zx::result<std::unique_ptr<SoftmacIfcBridge>> SoftmacIfcBridge::New(
-    const frame_processor_t* frame_processor,
+    const ethernet_tx_t* ethernet_tx, const wlan_rx_t* wlan_rx,
     fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacIfc>&& server_endpoint,
     fidl::ClientEnd<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>&&
         softmac_ifc_bridge_client_endpoint) {
   WLAN_TRACE_DURATION();
   auto softmac_ifc_bridge =
-      std::unique_ptr<SoftmacIfcBridge>(new SoftmacIfcBridge(frame_processor));
+      std::unique_ptr<SoftmacIfcBridge>(new SoftmacIfcBridge(ethernet_tx, wlan_rx));
 
   {
     WLAN_LAMBDA_TRACE_DURATION("WlanSoftmacIfc server binding");
@@ -60,7 +60,7 @@ void SoftmacIfcBridge::Recv(RecvRequest& fdf_request, RecvCompleter::Sync& compl
   WLAN_TRACE_ASYNC_BEGIN_RX(async_id);
   WLAN_TRACE_DURATION();
 
-  fuchsia_wlan_softmac::FrameProcessorWlanRxRequest fidl_request;
+  fuchsia_wlan_softmac::WlanRxTransferRequest fidl_request;
   fidl_request.packet_address(reinterpret_cast<uint64_t>(fdf_request.packet().mac_frame().data()));
   fidl_request.packet_size(reinterpret_cast<uint64_t>(fdf_request.packet().mac_frame().size()));
   fidl_request.packet_info(fdf_request.packet().info());
@@ -68,10 +68,10 @@ void SoftmacIfcBridge::Recv(RecvRequest& fdf_request, RecvCompleter::Sync& compl
 
   auto fidl_request_persisted = ::fidl::Persist(fidl_request);
   if (fidl_request_persisted.is_ok()) {
-    frame_processor_.wlan_rx(frame_processor_.ctx, fidl_request_persisted.value().data(),
-                             fidl_request_persisted.value().size());
+    wlan_rx_.transfer(wlan_rx_.ctx, fidl_request_persisted.value().data(),
+                      fidl_request_persisted.value().size());
   } else {
-    lerror("Failed to persist FrameProcessor.WlanRx fidl_request (FIDL error %s)",
+    lerror("Failed to persist WlanRx.Tranfer fidl_request (FIDL error %s)",
            fidl_request_persisted.error_value());
   }
   completer.Reply();
@@ -80,20 +80,20 @@ void SoftmacIfcBridge::Recv(RecvRequest& fdf_request, RecvCompleter::Sync& compl
 zx::result<> SoftmacIfcBridge::EthernetTx(eth::BorrowedOperation<>* op,
                                           trace_async_id_t async_id) const {
   WLAN_TRACE_DURATION();
-  fuchsia_wlan_softmac::FrameProcessorEthernetTxRequest request;
+  fuchsia_wlan_softmac::EthernetTxTransferRequest request;
   request.packet_address(reinterpret_cast<uint64_t>(op->operation()->data_buffer));
   request.packet_size(reinterpret_cast<uint64_t>(op->operation()->data_size));
   request.async_id(async_id);
 
   auto fidl_request_persisted = ::fidl::Persist(request);
   if (!fidl_request_persisted.is_ok()) {
-    lerror("Failed to persist FrameProcessor.EthernetTx request (FIDL error %s)",
+    lerror("Failed to persist EthernetTx.Transfer request (FIDL error %s)",
            fidl_request_persisted.error_value());
   }
 
-  auto result = zx::make_result(
-      frame_processor_.ethernet_tx(frame_processor_.ctx, fidl_request_persisted.value().data(),
-                                   fidl_request_persisted.value().size()));
+  auto result =
+      zx::make_result(ethernet_tx_.transfer(ethernet_tx_.ctx, fidl_request_persisted.value().data(),
+                                            fidl_request_persisted.value().size()));
   return result;
 }
 

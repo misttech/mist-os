@@ -17,36 +17,31 @@ sys_includes = [ "zircon/types.h" ]
 
 [parse]
 parse_deps = true
-include = ["wlan_mlme", "wlan_ffi_transport"]
+include = ["wlan_ffi_transport"]
 
 [export]
-include = [
-    "FfiFrameProcessor",
-    "FfiFrameProcessorOps",
-]
+include = [ "FfiEthernetTx", "FfiWlanRx" ]
 exclude = [
-    # Unused types
-    "LinkStatus",
-
     # Voided types.
     "FfiBufferCtx",
-    "FfiFrameProcessorCtx",
-    "FfiFrameSenderCtx",
+    "FfiEthernetRxCtx",
+    "FfiEthernetTxCtx",
+    "FfiWlanRxCtx",
+    "FfiWlanTxCtx",
 ]
 
 [export.rename]
-# wlan-ffi-transport types
 "FfiBuffer" = "wlansoftmac_buffer_t"
-"FfiBufferProvider" = "wlansoftmac_buffer_provider_ops_t"
-
-# wlan-mlme types
-"FfiFrameProcessor" = "frame_processor_t"
-"FfiFrameSender" = "frame_sender_t"
-
-# This struct is used for void* context fields for data path operations.
 "FfiBufferCtx" = "void"
-"FfiFrameProcessorCtx" = "void"
-"FfiFrameSenderCtx" = "void"
+"FfiBufferProvider" = "wlansoftmac_buffer_provider_ops_t"
+"FfiEthernetRx" = "ethernet_rx_t"
+"FfiEthernetRxCtx" = "void"
+"FfiEthernetTx" = "ethernet_tx_t"
+"FfiEthernetTxCtx" = "void"
+"FfiWlanRx" = "wlan_rx_t"
+"FfiWlanRxCtx" = "void"
+"FfiWlanTx" = "wlan_tx_t"
+"FfiWlanTxCtx" = "void"
 
 [fn]
 prefix = 'extern "C"'
