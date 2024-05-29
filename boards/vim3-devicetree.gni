@@ -18,10 +18,11 @@
 #   //boards/vim3/BUILD.gn
 
 import("//boards/vim3.gni")
+import("//build/devicetree/args.gni")
 
 board_description = "A generic vim3 device (using devicetree)"
 
 # Board configuration for Product Assembly
-board_configuration_label = "//boards/vim3"
+board_configuration_label = "//boards/vim3:vim3-devicetree"
 
 devicetree_board_driver = true

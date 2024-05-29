@@ -29,7 +29,6 @@ target_cpu = "arm64"
 
 # Board configuration for Product Assembly
 board_configuration_label = "//boards/vim3"
-devicetree_board_driver = true
 
 board_name = "vim3"
 board_description = "A generic vim3 device"
