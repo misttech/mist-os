@@ -160,12 +160,16 @@ pub mod icmp {
 
 /// The Internet Protocol, versions 4 and 6.
 pub mod ip {
-    #[path = "device/integration.rs"]
-    pub(crate) mod device_integration;
-    mod integration;
-    #[path = "raw/integration.rs"]
-    mod raw_integration;
+    #[path = "."]
+    pub(crate) mod integration {
+        mod base;
+        mod device;
+        mod raw;
 
+        pub(crate) use device::{CoreCtxWithIpDeviceConfiguration, IpAddrCtxSpec};
+    }
+
+    // TODO(https://fxbug.dev/342685842): Remove this re-export.
     pub(crate) use netstack3_ip::*;
 
     // Re-exported types.

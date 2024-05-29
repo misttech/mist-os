@@ -54,7 +54,7 @@ use crate::{
             Ipv6DeviceAddr, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationContext,
             Ipv6DeviceContext, Ipv6NetworkLearnedParameters,
         },
-        device_integration::CoreCtxWithIpDeviceConfiguration,
+        integration::CoreCtxWithIpDeviceConfiguration,
         nud::{
             ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler, NudIpHandler, NudUserConfig,
         },

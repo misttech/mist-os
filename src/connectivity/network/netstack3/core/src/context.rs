@@ -184,6 +184,7 @@ mod locked {
 /// Fake implementations of context traits.
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
+    // TODO(https://fxbug.dev/342685842): Remove this re-export.
     pub use netstack3_base::testutil::{
         FakeBindingsCtx, FakeCoreCtx, FakeCryptoRng, FakeEventCtx, FakeFrameCtx, FakeInstant,
         FakeInstantCtx, FakeNetwork, FakeNetworkLinks, FakeNetworkSpec, FakeTimerCtx,

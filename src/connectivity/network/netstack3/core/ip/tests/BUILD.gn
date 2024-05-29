@@ -41,6 +41,9 @@ rustc_test("netstack3_ip_integration_test") {
     "//third_party/rust_crates:zerocopy",
   ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+  if (!is_host) {
+    configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
+  }
 }
 
 fuchsia_unittest_package("netstack3-core-ip-integration-test") {

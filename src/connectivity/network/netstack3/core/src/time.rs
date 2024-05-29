@@ -15,7 +15,7 @@ use crate::{
     device::{DeviceLayerTimerId, WeakDeviceId},
     ip::{
         device::{IpDeviceIpExt, IpDeviceTimerId},
-        device_integration::IpAddrCtxSpec,
+        integration::IpAddrCtxSpec,
         IpLayerTimerId,
     },
     transport::TransportLayerTimerId,

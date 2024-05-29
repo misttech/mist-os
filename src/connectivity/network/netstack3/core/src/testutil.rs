@@ -87,6 +87,8 @@ use crate::{
     BindingsContext, BindingsTypes,
 };
 
+// TODO(https://fxbug.dev/342685842): Remove all re-exports from foreign crates.
+
 pub use netstack3_base::testutil::{
     assert_empty, new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng,
     MonotonicIdentifier, TestAddrs, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
