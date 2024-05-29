@@ -42,12 +42,31 @@ declare_args() {
 
   # Set to `true` to enable verbose logging during IDK subbuilds.
   sdk_sub_build_verbose = false
+
+  # Overrides the set of target CPU architectures for which the build will
+  # provide build-time support in the IDK/SDK. The default (`false`) set is
+  # equivalent to `["arm64", "riscv64", "x64"]`. Other valid values are a list
+  # containing a subset of that list that includes the current `target_cpu.
+  #
+  # This is useful for reducing the overall build time of any build that
+  # includes the IDK/SDK in exchange for reduced coverage of target CPU
+  # architecture support. This includes `fx build final_fuchsia_idk`.
+  #
+  # To override the set of API levels, see
+  #`override_build_time_supported_api_levels`.
+  override_idk_target_cpus = false
 }
 
-# The list of all cpu architectures for the prebuild fuchsia binaries that go
-# into the IDK archive.
-idk_target_cpus = [
+# The list of all cpu architectures for the prebuilt Fuchsia binaries that are
+# included in the IDK.
+idk_target_cpus_default = [
   "arm64",
   "riscv64",
   "x64",
 ]
+idk_target_cpus = idk_target_cpus_default
+
+if (override_idk_target_cpus != false) {
+  idk_target_cpus = []
+  idk_target_cpus = override_idk_target_cpus
+}

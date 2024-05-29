@@ -21,6 +21,21 @@ import("config.gni")
 
 visibility = [ ":*" ]
 
+# Log a message if a non-default set of API levels or CPU architecture will be
+# built as this reduces the compatibility coverage of the build and should not
+# happen in infra. Ensure the messages are only logged once.
+if (!is_host) {
+  if (override_build_time_supported_api_levels != false) {
+    print(
+        "IDK build supported API levels is overridden: ${platform_version.build_time_supported_api_levels}. Compatibility with other levels cannot be checked.")
+  }
+
+  # Ignore default list or an override that exactly matches (including order).
+  if (idk_target_cpus != idk_target_cpus_default) {
+    print("IDK build only covers a subset of target CPUs: ${idk_target_cpus}.")
+  }
+}
+
 # Verify that `override_target_api_level` is actually supported.
 if (override_target_api_level != "PLATFORM") {
   _override_is_supported = false
