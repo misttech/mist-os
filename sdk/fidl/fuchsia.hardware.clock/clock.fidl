@@ -5,34 +5,6 @@ library fuchsia.hardware.clock;
 
 using zx;
 
-const NAME_LEN uint32 = 30;
-
-type FrequencyInfo = struct {
-    name array<uint8, NAME_LEN>;
-    frequency uint64;
-};
-
-/// Used for driver-to-non-driver communication.
-open protocol Device {
-    flexible Measure(struct {
-        clock uint32;
-    }) -> (struct {
-        info FrequencyInfo;
-    });
-    flexible GetCount() -> (struct {
-        count uint32;
-    });
-
-    // For debugging
-    flexible Enable(struct {
-        clock uint32;
-    }) -> () error zx.Status;
-
-    flexible Disable(struct {
-        clock uint32;
-    }) -> () error zx.Status;
-};
-
 /// Used for driver-to-driver communication.
 @discoverable
 open protocol Clock {

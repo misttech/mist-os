@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_CLOCK_DRIVERS_AMLOGIC_CLK_AML_CLK_H_
 #define SRC_DEVICES_CLOCK_DRIVERS_AMLOGIC_CLK_AML_CLK_H_
 
+#include <fidl/fuchsia.hardware.clock.measure/cpp/wire.h>
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fuchsia/hardware/clockimpl/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
@@ -34,8 +35,8 @@ class MesonCpuClock;
 class MesonRateClock;
 
 class AmlClock;
-using DeviceType =
-    ddk::Device<AmlClock, ddk::Unbindable, ddk::Messageable<fuchsia_hardware_clock::Device>::Mixin>;
+using DeviceType = ddk::Device<AmlClock, ddk::Unbindable,
+                               ddk::Messageable<fuchsia_hardware_clock_measure::Measurer>::Mixin>;
 
 class AmlClock : public DeviceType, public ddk::ClockImplProtocol<AmlClock, ddk::base_protocol> {
  public:
@@ -64,10 +65,9 @@ class AmlClock : public DeviceType, public ddk::ClockImplProtocol<AmlClock, ddk:
   // CLK FIDL implementation.
   void Measure(MeasureRequestView request, MeasureCompleter::Sync& completer) override;
   void GetCount(GetCountCompleter::Sync& completer) override;
-  void Enable(EnableRequestView request, EnableCompleter::Sync& completer) override;
-  void Disable(DisableRequestView request, DisableCompleter::Sync& completer) override;
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_clock::Device> metadata,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_clock_measure::Measurer> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
     zxlogf(ERROR, "Unexpected Clock FIDL call: 0x%lx", metadata.method_ordinal);
   }
 
@@ -76,13 +76,6 @@ class AmlClock : public DeviceType, public ddk::ClockImplProtocol<AmlClock, ddk:
   void DdkRelease();
 
   void ShutDown();
-
- protected:
-  // Debug API for forcing a clock to be disabled.
-  // This method will reset the clock's vote count to 0 and disable the clock
-  // hardware.
-  // NOTE: Calling this function may put the driver into an undefined state.
-  zx_status_t ClkDebugForceDisable(uint32_t clk);
 
  private:
   // Toggle clocks enable bit.

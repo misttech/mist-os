@@ -26,6 +26,8 @@
 #include "aml-g12b-blocks.h"
 #include "aml-gxl-blocks.h"
 #include "aml-sm1-blocks.h"
+#include "fidl/fuchsia.hardware.clock.measure/cpp/wire_types.h"
+#include "lib/fidl/cpp/wire/string_view.h"
 
 namespace amlogic_clock {
 
@@ -911,25 +913,6 @@ void AmlClock::ClkToggleHw(const meson_clk_gate_t* gate, bool enable) {
   }
 }
 
-zx_status_t AmlClock::ClkDebugForceDisable(uint32_t clk) {
-  zxlogf(WARNING, "Force Disable Clock %u, note this may put the driver into an undefined state!",
-         clk);
-
-  if (clk >= gate_count_) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  const meson_clk_gate_t* gate = &(gates_[clk]);
-
-  fbl::AutoLock al(&lock_);
-
-  meson_gate_enable_count_[clk] = 0;  // Set clock vote count to 0.
-
-  ClkToggleHw(gate, false);  // Disable the clock hardware.
-
-  return ZX_OK;
-}
-
 zx_status_t AmlClock::ClockImplEnable(uint32_t clk) {
   // Determine which clock type we're trying to control.
   aml_clk_common::aml_clk_type type = aml_clk_common::AmlClkType(clk);
@@ -1168,51 +1151,30 @@ zx_status_t AmlClock::ClkMeasureUtil(uint32_t clk, uint64_t* clk_freq) {
 }
 
 void AmlClock::Measure(MeasureRequestView request, MeasureCompleter::Sync& completer) {
-  fuchsia_hardware_clock::wire::FrequencyInfo info;
+  fuchsia_hardware_clock_measure::wire::FrequencyInfo info;
   if (request->clock >= clk_table_count_) {
-    completer.Close(ZX_ERR_INVALID_ARGS);
+    completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
 
-  size_t max_len = info.name.size();
-  size_t len = strnlen(clk_table_[request->clock], max_len);
-  if (len == max_len) {
-    completer.Close(ZX_ERR_INVALID_ARGS);
+  std::string name = clk_table_[request->clock];
+  if (name.length() >= fuchsia_hardware_clock_measure::wire::kMaxNameLen) {
+    completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
 
-  memcpy(info.name.data(), clk_table_[request->clock], len + 1);
+  info.name = fidl::StringView::FromExternal(name);
   zx_status_t status = ClkMeasureUtil(request->clock, &info.frequency);
   if (status != ZX_OK) {
-    completer.Close(status);
+    completer.ReplyError(status);
     return;
   }
 
-  completer.Reply(info);
+  completer.ReplySuccess(info);
 }
 
 void AmlClock::GetCount(GetCountCompleter::Sync& completer) {
   completer.Reply(static_cast<uint32_t>(clk_table_count_));
-}
-
-void AmlClock::Enable(EnableRequestView request, EnableCompleter::Sync& completer) {
-  zx_status_t result = ClkToggle(request->clock, true);
-
-  if (result == ZX_OK) {
-    completer.ReplySuccess();
-  } else {
-    completer.ReplyError(result);
-  }
-}
-
-void AmlClock::Disable(DisableRequestView request, DisableCompleter::Sync& completer) {
-  zx_status_t result = ClkDebugForceDisable(request->clock);
-
-  if (result == ZX_OK) {
-    completer.ReplySuccess();
-  } else {
-    completer.ReplyError(result);
-  };
 }
 
 void AmlClock::ShutDown() {
