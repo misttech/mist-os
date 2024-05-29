@@ -15,46 +15,46 @@ using zx;
 @transport("Driver")
 open protocol ClockImpl {
     /// Clock Gating Control.
-    strict Enable(struct {
+    flexible Enable(struct {
         id uint32;
     }) -> () error zx.Status;
-    strict Disable(struct {
+    flexible Disable(struct {
         id uint32;
     }) -> () error zx.Status;
-    strict IsEnabled(struct {
+    flexible IsEnabled(struct {
         id uint32;
     }) -> (struct {
         enabled bool;
     }) error zx.Status;
 
     /// Clock Frequency Scaling Control.
-    strict SetRate(struct {
+    flexible SetRate(struct {
         id uint32;
         hz uint64;
     }) -> () error zx.Status;
-    strict QuerySupportedRate(struct {
+    flexible QuerySupportedRate(struct {
         id uint32;
         hz uint64;
     }) -> (struct {
         hz uint64;
     }) error zx.Status;
-    strict GetRate(struct {
+    flexible GetRate(struct {
         id uint32;
     }) -> (struct {
         hz uint64;
     }) error zx.Status;
 
     /// Clock input control.
-    strict SetInput(struct {
+    flexible SetInput(struct {
         id uint32;
         idx uint32;
     }) -> () error zx.Status;
-    strict GetNumInputs(struct {
+    flexible GetNumInputs(struct {
         id uint32;
     }) -> (struct {
         n uint32;
     }) error zx.Status;
-    strict GetInput(struct {
+    flexible GetInput(struct {
         id uint32;
     }) -> (struct {
         index uint32;

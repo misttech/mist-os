@@ -84,6 +84,12 @@ void ClockDevice::GetInput(GetInputCompleter::Sync& completer) {
   }
 }
 
+void ClockDevice::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_clock::Clock> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  zxlogf(ERROR, "Unexpected Clock FIDL call: 0x%lx", metadata.method_ordinal);
+}
+
 zx_status_t ClockDevice::ServeOutgoing(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
   fuchsia_hardware_clock::Service::InstanceHandler handler({
       .clock = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),

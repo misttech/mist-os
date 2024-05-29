@@ -66,6 +66,10 @@ class AmlClock : public DeviceType, public ddk::ClockImplProtocol<AmlClock, ddk:
   void GetCount(GetCountCompleter::Sync& completer) override;
   void Enable(EnableRequestView request, EnableCompleter::Sync& completer) override;
   void Disable(DisableRequestView request, DisableCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_clock::Device> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {
+    zxlogf(ERROR, "Unexpected Clock FIDL call: 0x%lx", metadata.method_ordinal);
+  }
 
   // Device protocol implementation.
   void DdkUnbind(ddk::UnbindTxn txn);
