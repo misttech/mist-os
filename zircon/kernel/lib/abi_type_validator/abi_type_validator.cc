@@ -325,6 +325,7 @@ VALIDATE_FIELD_OFFSET_SIZE(zx_port_packet_t, guest_io, 16, 32);
 VALIDATE_FIELD_OFFSET_SIZE(zx_port_packet_t, guest_vcpu, 16, 32);
 VALIDATE_FIELD_OFFSET_SIZE(zx_port_packet_t, interrupt, 16, 32);
 VALIDATE_FIELD_OFFSET_SIZE(zx_port_packet_t, page_request, 16, 32);
+VALIDATE_FIELD_OFFSET_SIZE(zx_port_packet_t, processor_power_level_transition, 16, 32);
 
 VALIDATE_TYPE_SIZE_ALIGNMENT(zx_packet_user_t, 32, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_packet_user_t, u64, 0, 32);
@@ -400,6 +401,13 @@ VALIDATE_FIELD_OFFSET_SIZE(zx_packet_page_request_t, reserved0, 4, 4);
 VALIDATE_FIELD_OFFSET_SIZE(zx_packet_page_request_t, offset, 8, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_packet_page_request_t, length, 16, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_packet_page_request_t, reserved1, 24, 8);
+
+VALIDATE_TYPE_SIZE_ALIGNMENT(zx_packet_processor_power_level_transition_request_t, 32, 8);
+VALIDATE_FIELD_OFFSET_SIZE(zx_packet_processor_power_level_transition_request_t, target, 0, 8);
+VALIDATE_FIELD_OFFSET_SIZE(zx_packet_processor_power_level_transition_request_t, control_argument,
+                           8, 8);
+VALIDATE_FIELD_OFFSET_SIZE(zx_packet_processor_power_level_transition_request_t, context, 16, 8);
+VALIDATE_FIELD_OFFSET_SIZE(zx_packet_processor_power_level_transition_request_t, reserved, 24, 8);
 
 VALIDATE_TYPE_SIZE_ALIGNMENT(zx_sched_deadline_params_t, 24, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_sched_deadline_params_t, capacity, 0, 8);

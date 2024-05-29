@@ -151,6 +151,7 @@ Symbols:
   - { Name: _zx_syscall_test_widening_unsigned_narrow, Type: Func }
   - { Name: _zx_syscall_test_widening_unsigned_wide, Type: Func }
   - { Name: _zx_syscall_test_wrapper, Type: Func }
+  - { Name: _zx_system_create_processor_power_level_transition_handler, Type: Func }
   - { Name: _zx_system_get_dcache_line_size, Type: Func }
   - { Name: _zx_system_get_event, Type: Func }
   - { Name: _zx_system_get_features, Type: Func }
@@ -356,6 +357,7 @@ Symbols:
   - { Name: zx_syscall_test_widening_unsigned_narrow, Type: Func, Weak: true }
   - { Name: zx_syscall_test_widening_unsigned_wide, Type: Func, Weak: true }
   - { Name: zx_syscall_test_wrapper, Type: Func, Weak: true }
+  - { Name: zx_system_create_processor_power_level_transition_handler, Type: Func, Weak: true }
   - { Name: zx_system_get_dcache_line_size, Type: Func, Weak: true }
   - { Name: zx_system_get_event, Type: Func, Weak: true }
   - { Name: zx_system_get_features, Type: Func, Weak: true }

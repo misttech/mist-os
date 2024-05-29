@@ -30,6 +30,7 @@ typedef uint32_t zx_packet_type_t;
 #define ZX_PKT_TYPE_GUEST_VCPU        ((zx_packet_type_t)0x06u)
 #define ZX_PKT_TYPE_INTERRUPT         ((zx_packet_type_t)0x07u)
 #define ZX_PKT_TYPE_PAGE_REQUEST      ((zx_packet_type_t)0x09u)
+// 0x0A reserved for RPPM, see syscall-next.h
 // 0xffffffff is reserved for internal use.
 
 // For options passed to port_create
@@ -162,6 +163,25 @@ typedef struct zx_packet_page_request {
   uint64_t reserved1;
 } zx_packet_page_request_t;
 
+typedef struct {
+  // The target power domain, matching the provided ID. The ID matches the one
+  // provided for the provided mask when setting the processor's power level
+  // information.
+  uint64_t target;
+
+  // The control argument for the power control interface bound to the
+  // port.
+  uint64_t control_argument;
+
+  // Opaque context ID indication the conditions the transition was requested
+  // int. This value must be provided when acknowledging the transition request.
+  uint64_t context;
+
+  // Padding bits.
+  uint64_t reserved;
+
+} zx_packet_processor_power_level_transition_request_t;
+
 typedef struct zx_port_packet {
   uint64_t key;
   zx_packet_type_t type;
@@ -175,6 +195,7 @@ typedef struct zx_port_packet {
     zx_packet_guest_vcpu_t guest_vcpu;
     zx_packet_interrupt_t interrupt;
     zx_packet_page_request_t page_request;
+    zx_packet_processor_power_level_transition_request_t processor_power_level_transition;
   };
 } zx_port_packet_t;
 

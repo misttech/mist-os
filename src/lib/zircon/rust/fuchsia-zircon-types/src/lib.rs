@@ -661,6 +661,7 @@ pub const ZX_RSRC_FLAG_EXCLUSIVE: zx_rsrc_flags_t = 0x00010000;
 // Topics for CPU performance info syscalls
 pub const ZX_CPU_PERF_SCALE: u32 = 1;
 pub const ZX_CPU_DEFAULT_PERF_SCALE: u32 = 2;
+pub const ZX_PROCESSOR_POWER_DOMAIN_POWER_LEVEL: u32 = 3;
 
 // Cache policy flags.
 pub const ZX_CACHE_POLICY_CACHED: u32 = 0;
@@ -812,6 +813,7 @@ pub enum zx_packet_type_t {
     ZX_PKT_TYPE_GUEST_VCPU = 6,
     ZX_PKT_TYPE_INTERRUPT = 7,
     ZX_PKT_TYPE_PAGE_REQUEST = 9,
+    ZX_PKT_TYPE_PROCESSOR_POWER_LEVEL_TRANSITION_REQUEST = 10,
     #[doc(hidden)]
     __Nonexhaustive,
 }
@@ -2176,6 +2178,22 @@ pub struct zx_processor_power_level_transition_t {
     pub to: u32,
     pub latency: zx_duration_t,
     pub energy: u64,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct zx_packet_processor_power_level_transition_request_t {
+    pub power_domain: u64,
+    pub control_argument: u64,
+    pub context: u64,
+    pub reserved: u64,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct zx_processor_power_level_transition_info_t {
+    pub power_domain: u64,
+    pub context: u64,
 }
 
 #[cfg(test)]

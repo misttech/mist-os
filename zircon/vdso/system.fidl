@@ -490,6 +490,12 @@ closed protocol System {
     /// See [RFC 0123](/docs/contribute/governance/rfcs/0123_cpu_performance_info.md)
     /// for further details on values and update protocols.
     ///
+    /// ### ZX_POWER_DOMAIN_POWER_LEVEL
+    ///
+    /// *count*: Must be one.
+    ///
+    /// *info* type: `zx_power_level_info_t`
+    ///
     /// ## Rights
     ///
     /// *resource* must have resource kind `ZX_RSRC_KIND_SYSTEM`.
@@ -972,6 +978,13 @@ closed protocol System {
     /// absent transformation between levels is assumed to indicate that there
     /// is no energy cost borne by perfoming it.
     ///
+    /// The provided `power_domain_id` provides a unique identifier for requesting
+    /// operations on all CPUs that are part of `cpus` mask. Any power level
+    /// transition handler must understand the association.
+    ///
+    /// This syscall shall have "set or update" semantics, such that any new data
+    /// replaces exisitng one. This applies for `power_domain_id` and `cpus`.
+    ///
     /// ## Rights
     ///
     /// `resource` must be of `ZX_RSRC_KIND_SYSTEM` kind and
@@ -998,7 +1011,102 @@ closed protocol System {
         resource Handle:RESOURCE;
         options uint64;
         cpus CpuSet;
+        power_domain_id uint64;
         power_levels vector<ProcessorPowerLevel>:MAX_POWER_LEVELS;
         transitions vector<ProcessorPowerLevelTransition>:MAX_POWER_LEVEL_TRANSITIONS;
     }) -> () error Status;
+
+    /// ## Summary
+    ///
+    /// Provides the kernel with a handle to a port where the scheduler can request
+    /// power level transitions for individual power domains given a control interface.
+    ///
+    /// This means for a specified interface, the provided control arguments will be provided
+    /// such that the handler can execute the transition according to the power level information
+    /// provided to the kernel.
+    ///
+    /// ## Declaration
+    ///
+    /// ```c
+    /// #include <zircon/syscalls-next.h>
+    ///
+    /// zx_status_t zx_system_create_processor_power_level_transition_handler(
+    ///     zx_handle_t resource,
+    ///     uint64_t options,
+    ///     zx_handle_t* out_port);
+    /// ```
+    ///
+    /// ## Description
+    ///
+    /// Enables energy-aware scheduling by providing the kernel with a mechanism
+    /// for requesting OPP transitions. When the port is attached and the communication
+    /// initiated the kernel will queue `ZX_PKT_TYPE_OPP_TRANSITION`for individual power
+    /// domain transitions. At any point, there will be no more than a single queued transition
+    /// for a power domain.
+    ///
+    /// The other half of this operation, is acknowleding that such operation took place
+    /// through `zx_system_set_performance_info` with `ZX_POWER_DOMAIN_OPP_TRANSITION` as a topic,
+    /// more details in `zx_system_set_performance_info` documentation.
+    ///
+    /// If the created port handle `out_port` is closed, then the kernel will operate without
+    /// the ability to transitoin OPPs, that is, closing the handle is equivalent to "dettaching"
+    /// the port.
+    ///
+    /// `resource` must be of `ZX_RSRC_KIND_SYSTEM` kind and
+    ///            `ZX_RSRC_SYSTEM_CPU_BASE` base.
+    ///
+    /// `options` must be 0.
+    ///
+    /// `control_interface` tells the scheduler that this OPP trasition handler will execute requests
+    ///                     for that interface.
+    ///
+    /// `out_port` must ve a valid pointer. On success provides
+    ///
+    /// ## Rights
+    ///
+    /// `resource` must be handle with at least the following rights:
+    ///
+    /// * `ZX_RIGHT_WRITE`
+    ///
+    /// ## Return value
+    ///
+    /// On success `ZX_OK` will be returned and `out_port` will point to a new handle with the
+    /// following rights:
+    ///
+    /// * `ZX_RIGHT_TRANSFER`
+    /// * `ZX_RIGHT_READ`
+    /// * `ZX_RIGHT_WAIT`
+    ///
+    /// ## Errors
+    ///
+    /// `ZX_ERR_BAD_HANDLE` if `resource` is not a valid handle.
+    ///
+    /// `ZX_ERR_WRONG_TYPE` if `resource` is not handle to a resource object.
+    ///
+    /// `ZX_ERR_ACCESS_DENIED` if `resource` does not have the minimal rights.
+    ///
+    /// `ZX_ERR_INVALID_ARGS` if `options` is not zero, `out_port` is not a valid pointer or
+    ///                       `resource` is not the appropiate kind or base.
+    ///
+    /// `ZX_ERR_NO_MEMORY` if the operation failed due to lack of system memory.
+    ///
+    /// ## See also
+    ///
+    ///  - [`zx_handle_close()`]
+    ///  - [`zx_system_set_performance_info()`]
+    ///  - [`zx_port_create()`]
+    ///  - [`zx_port_write()`]
+    ///
+    /// [`zx_handle_close()`]: handle_close.md
+    /// [`zx_system_set_performance_info()`]: system_set_performance_info.md
+    /// [`zx_port_create()`]: port_create.md
+    /// [`zx_port_read()`]: port_read.md
+    @next
+    strict CreateProcessorPowerLevelTransitionHandler(resource struct {
+        resource Handle:RESOURCE;
+        options uint32;
+        control ProcessorPowerControl;
+    }) -> (resource struct {
+        out_port Handle;
+    }) error Status;
 };
