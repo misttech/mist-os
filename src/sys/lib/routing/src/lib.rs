@@ -109,8 +109,10 @@ impl From<UseDecl> for RouteRequest {
     }
 }
 
-impl From<Vec<&ExposeDecl>> for RouteRequest {
-    fn from(exposes: Vec<&ExposeDecl>) -> Self {
+impl TryFrom<Vec<&ExposeDecl>> for RouteRequest {
+    type Error = RoutingError;
+
+    fn try_from(exposes: Vec<&ExposeDecl>) -> Result<Self, Self::Error> {
         let first_expose = exposes.first().expect("invalid empty expose list");
         let first_type_name = CapabilityTypeName::from(*first_expose);
         assert!(
@@ -124,7 +126,7 @@ impl From<Vec<&ExposeDecl>> for RouteRequest {
         match first_expose {
             ExposeDecl::Protocol(e) => {
                 assert!(exposes.len() == 1, "multiple exposes");
-                Self::ExposeProtocol(e.clone())
+                Ok(Self::ExposeProtocol(e.clone()))
             }
             ExposeDecl::Service(_) => {
                 // Gather the exposes into a bundle. Services can aggregate, in which case
@@ -136,26 +138,28 @@ impl From<Vec<&ExposeDecl>> for RouteRequest {
                         _ => None,
                     })
                     .collect();
-                Self::ExposeService(RouteBundle::from_exposes(exposes))
+                Ok(Self::ExposeService(RouteBundle::from_exposes(exposes)))
             }
             ExposeDecl::Directory(e) => {
                 assert!(exposes.len() == 1, "multiple exposes");
-                Self::ExposeDirectory(e.clone())
+                Ok(Self::ExposeDirectory(e.clone()))
             }
             ExposeDecl::Runner(e) => {
                 assert!(exposes.len() == 1, "multiple exposes");
-                Self::ExposeRunner(e.clone())
+                Ok(Self::ExposeRunner(e.clone()))
             }
             ExposeDecl::Resolver(e) => {
                 assert!(exposes.len() == 1, "multiple exposes");
-                Self::ExposeResolver(e.clone())
+                Ok(Self::ExposeResolver(e.clone()))
             }
             ExposeDecl::Config(e) => {
                 assert!(exposes.len() == 1, "multiple exposes");
-                Self::ExposeConfig(e.clone())
+                Ok(Self::ExposeConfig(e.clone()))
             }
             ExposeDecl::Dictionary(_) => {
-                todo!("https://fxbug.dev/301674053: implement dictionary routing");
+                // TODO(https://fxbug.dev/301674053) implement dictionary routing and make this
+                // method From instead of TryFrom.
+                Err(RoutingError::unsupported_capability_type(CapabilityTypeName::Dictionary))
             }
         }
     }
