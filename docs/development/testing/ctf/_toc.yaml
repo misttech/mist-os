@@ -10,6 +10,8 @@ toc:
   path: /docs/development/testing/ctf/overview.md
 - title: "Getting started"
   section:
+  - title: "User guide"
+    path:  /docs/development/testing/ctf/user_guide.md
   - title: "Introduction"
     path:  /docs/development/testing/ctf/compatibility_testing.md
   - title: "Troubleshooting failures"
