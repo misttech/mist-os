@@ -321,7 +321,6 @@ zx_status_t PlatformDevice::Start() {
   // TODO(b/340283894): Remove.
   static const std::unordered_set<std::string> kLegacyNameAllowlist{
       "ram-nand",          // 00:00:2e
-      "virtual-audio",     // 00:00:2f
       "bt-hci-emulator",   // 00:00:30
       "i2c-0",             // 05:00:2
       "i2c-2",             // 05:00:2:2

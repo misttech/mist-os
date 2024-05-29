@@ -36,7 +36,7 @@ root.sys.cpu-trace
 root.sys.platform.pt
 root.sys.platform.ram-disk
 root.sys.platform.00_00_2e
-root.sys.platform.00_00_2f
+root.sys.platform.virtual-audio
 root.sys.platform.00_00_30
 root.sys.platform.00_00_1b
 root.sys.cpu-trace.perfmon

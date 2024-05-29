@@ -6,7 +6,7 @@
 
 namespace virtual_audio {
 
-const char kCtlNodeName[] = "/dev/sys/platform/00:00:2f/virtual_audio";
+const char kCtlNodeName[] = "/dev/sys/platform/virtual-audio/virtual_audio";
 
 }  // namespace virtual_audio
 
