@@ -21,23 +21,6 @@ PACKAGE_MODE = struct(
     BOOTFS = "bootfs",
 )
 
-# Base source for running ffx assembly product
-_PRODUCT_ASSEMBLY_RUNNER_SH_TEMPLATE = """
-set -e
-mkdir -p $FFX_ISOLATE_DIR
-$FFX \
-    --config "assembly_enabled=true,sdk.root=$SDK_ROOT" \
-    --isolate-dir $FFX_ISOLATE_DIR \
-    assembly \
-    product \
-    --product $PRODUCT_CONFIG_PATH \
-    --board-info $BOARD_CONFIG_PATH \
-    --legacy-bundle $LEGACY_AIB \
-    --input-bundles-dir $PLATFORM_AIB_DIR \
-    {mode_arg} \
-    --outdir $OUTDIR
-"""
-
 # Base source for running ffx assembly create-system
 _CREATE_SYSTEM_RUNNER_SH_TEMPLATE = """
 set -e
@@ -55,7 +38,6 @@ $FFX \
 def _fuchsia_product_assembly_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     ffx_tool = fuchsia_toolchain.ffx_assembly
-    legacy_bundle = ctx.attr.legacy_bundle[FuchsiaProductAssemblyBundleInfo]
     platform_artifacts = ctx.attr.platform_artifacts[FuchsiaProductAssemblyBundleInfo]
     out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
     platform_aibs_file = ctx.actions.declare_file(ctx.label.name + "_platform_assembly_input_bundles.json")
@@ -108,31 +90,45 @@ def _fuchsia_product_assembly_impl(ctx):
     product_config_file = ctx.attr.product_config[FuchsiaProductConfigInfo].product_config
     build_type = ctx.attr.product_config[FuchsiaProductConfigInfo].build_type
 
-    shell_src = _PRODUCT_ASSEMBLY_RUNNER_SH_TEMPLATE.format(
-        mode_arg = "--mode " + ctx.attr.package_mode if ctx.attr.package_mode else "",
-    )
-
     ffx_inputs = get_ffx_assembly_inputs(fuchsia_toolchain)
     ffx_inputs += ctx.files.product_config
     ffx_inputs += board_config_input
-    ffx_inputs += legacy_bundle.files
     ffx_inputs += platform_artifacts.files
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
 
-    shell_env = {
-        "FFX": ffx_tool.path,
-        "SDK_ROOT": ctx.attr._sdk_manifest.label.workspace_root,
-        "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
-        "OUTDIR": out_dir.path,
-        "PRODUCT_CONFIG_PATH": product_config_file.path,
-        "BOARD_CONFIG_PATH": board_config_file_path,
-        "LEGACY_AIB": legacy_bundle.root,
-        "PLATFORM_AIB_DIR": platform_artifacts.root,
-    }
+    mode_arg = "--mode " + ctx.attr.package_mode if ctx.attr.package_mode else ""
 
-    for (key, value) in shell_env.items():
-        if not value:
-            fail("{} was not set".format(key))
+    ffx_invocation = [
+        ffx_tool.path,
+        "--config \"assembly_enabled=true,sdk.root=" + ctx.attr._sdk_manifest.label.workspace_root + "\"",
+        "--isolate-dir",
+        ffx_isolate_dir.path,
+        "assembly",
+        "product",
+        "--product",
+        product_config_file.path,
+        "--board-info",
+        board_config_file_path,
+        "--input-bundles-dir",
+        platform_artifacts.root,
+        "--outdir",
+        out_dir.path,
+    ]
+    if ctx.attr.package_mode:
+        ffx_invocation.extend(["--mode", ctx.attr.package_mode])
+
+    if ctx.attr.legacy_bundle:
+        legacy_bundle = ctx.attr.legacy_bundle[FuchsiaProductAssemblyBundleInfo]
+        ffx_invocation.extend(["--legacy-bundle", legacy_bundle.root])
+        ffx_inputs += legacy_bundle.files
+
+    _ffx_invocation = []
+    _ffx_invocation.extend(ffx_invocation)
+    shell_src = [
+        "set -e",
+        "mkdir -p " + ffx_isolate_dir.path,
+        " ".join(_ffx_invocation),
+    ]
 
     ctx.actions.run_shell(
         inputs = ffx_inputs,
@@ -142,8 +138,7 @@ def _fuchsia_product_assembly_impl(ctx):
             # in outputs.
             ffx_isolate_dir,
         ],
-        command = shell_src,
-        env = shell_env,
+        command = "\n".join(shell_src),
         progress_message = "Product Assembly for %s" % ctx.label.name,
     )
 
@@ -202,7 +197,6 @@ fuchsia_product_assembly = rule(
         "legacy_bundle": attr.label(
             doc = "Legacy AIB for this product.",
             providers = [FuchsiaProductAssemblyBundleInfo],
-            mandatory = True,
         ),
         "platform_artifacts": attr.label(
             doc = "Platform artifacts to use for this product.",
