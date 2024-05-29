@@ -70,9 +70,7 @@ rustc_library_with_features("netstack3-ip") {
 
   _testutils_deps = []
 
-  if (!is_host) {
-    configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
-  }
+  configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
 
   feature_sets = [
     {

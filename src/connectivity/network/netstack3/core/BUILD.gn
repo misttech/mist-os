@@ -33,9 +33,7 @@ _all_core_crates = [
 rustc_library_with_features("netstack3-core") {
   version = "0.1.0"
   edition = "2021"
-  if (!is_host) {
-    configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
-  }
+  configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   sources = [
     "src/api.rs",

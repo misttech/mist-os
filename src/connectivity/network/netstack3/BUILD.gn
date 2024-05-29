@@ -160,18 +160,8 @@ config("compiler_profile") {
   visibility = [ ":*" ]
 }
 
-# TODO(https://fxbug.dev/330735964): remove this config when Netstack3 doesn't
-# OOM on ThinLTO builders.
-config("disable-rbe") {
-  if (rust_rbe_enable) {
-    # --remote-flag=* is a pseudo flag that is intercepted by
-    # build/rbe/rustc_remote_wrapper.py.
-    rustflags = [ "--remote-disable" ]
-  }
-}
-
 config("netstack3_configs") {
-  if (!is_debug) {
+  if (!is_debug && !is_host) {
     configs = [
       # Always optimize speed, even if it increases size.
       "//build/config:optimize_speed",

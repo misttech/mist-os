@@ -71,9 +71,7 @@ rustc_library_with_features("netstack3-base") {
     "//third_party/rust_crates:tracing-subscriber",
   ]
 
-  if (!is_host) {
-    configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
-  }
+  configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
 
   feature_sets = [
     {
