@@ -5,7 +5,7 @@
 use anyhow::{Context, Result};
 use argh::{ArgsInfo, FromArgs};
 use async_net::{Ipv4Addr, TcpListener, TcpStream};
-use fho::{Connector, SimpleWriter};
+use fho::Connector;
 use fidl_fuchsia_developer_remotecontrol as rc;
 use fidl_fuchsia_starnix_container as fstarcontainer;
 use fuchsia_async as fasync;
@@ -24,6 +24,35 @@ use crate::common::*;
 
 const ADB_DEFAULT_PORT: u32 = 5555;
 
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(
+    subcommand,
+    name = "adb",
+    example = "ffx starnix adb proxy",
+    description = "Bridge from host adb to adbd running inside starnix"
+)]
+pub struct StarnixAdbCommand {
+    /// path to the adb client command
+    #[argh(option, default = "String::from(\"adb\")")]
+    adb: String,
+    #[argh(subcommand)]
+    subcommand: AdbSubcommand,
+}
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(subcommand)]
+enum AdbSubcommand {
+    Proxy(AdbProxyArgs),
+}
+
+impl StarnixAdbCommand {
+    pub async fn run(&self, rcs_connector: &Connector<rc::RemoteControlProxy>) -> Result<()> {
+        match &self.subcommand {
+            AdbSubcommand::Proxy(args) => args.run_proxy(&self.adb, rcs_connector).await,
+        }
+    }
+}
+
 async fn serve_adb_connection(mut stream: TcpStream, bridge_socket: fidl::Socket) -> Result<()> {
     let mut bridge = fidl::AsyncSocket::from_socket(bridge_socket);
     let (breader, mut bwriter) = (&mut bridge).split();
@@ -39,32 +68,6 @@ async fn serve_adb_connection(mut stream: TcpStream, bridge_socket: fidl::Socket
     };
 
     copy_result.map(|_| ()).map_err(|e| e.into())
-}
-
-#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
-#[argh(
-    subcommand,
-    name = "adb",
-    example = "ffx starnix adb",
-    description = "Bridge from host adb to adbd running inside starnix"
-)]
-pub struct StarnixAdbCommand {
-    /// the moniker of the container running adbd
-    /// (defaults to looking for a container in the current session)
-    #[argh(option, short = 'm')]
-    pub moniker: Option<String>,
-
-    /// which port to serve the adb server on
-    #[argh(option, short = 'p', default = "find_open_port(5556)")]
-    pub port: u16,
-
-    /// path to the adb client command
-    #[argh(option, default = "String::from(\"adb\")")]
-    pub adb: String,
-
-    /// disable automatically running "adb connect"
-    #[argh(switch)]
-    pub no_autoconnect: bool,
 }
 
 fn find_open_port(start: u16) -> u16 {
@@ -88,86 +91,109 @@ fn find_open_port(start: u16) -> u16 {
     }
 }
 
-pub async fn starnix_adb(
-    command: &StarnixAdbCommand,
-    rcs_connector: &Connector<rc::RemoteControlProxy>,
-    _writer: SimpleWriter,
-) -> Result<()> {
-    let reconnect = || async {
-        let rcs_proxy = connect_to_rcs(rcs_connector).await?;
-        anyhow::Ok((
-            connect_to_contoller(&rcs_proxy, command.moniker.clone()).await?,
-            Arc::new(AtomicBool::new(false)),
-        ))
-    };
-    let mut controller_proxy = reconnect().await?;
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(
+    subcommand,
+    name = "proxy",
+    description = "Bridge from host adb to adbd running inside starnix"
+)]
+struct AdbProxyArgs {
+    /// the moniker of the container running adbd
+    /// (defaults to looking for a container in the current session)
+    #[argh(option, short = 'm')]
+    pub moniker: Option<String>,
 
-    let mut signals = Signals::new(&[SIGINT]).unwrap();
-    let handle = signals.handle();
-    let signal_thread = std::thread::spawn(move || {
-        if let Some(signal) = signals.forever().next() {
-            assert_eq!(signal, SIGINT);
-            eprintln!("Caught interrupt. Shutting down starnix adb bridge...");
-            std::process::exit(0);
-        }
-    });
+    /// which port to serve the adb server on
+    #[argh(option, short = 'p', default = "find_open_port(5556)")]
+    pub port: u16,
 
-    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, command.port))
-        .await
-        .expect("cannot bind to adb address");
-    let listen_address = listener.local_addr().expect("cannot get adb server address");
+    /// disable automatically running "adb connect"
+    #[argh(switch)]
+    pub no_autoconnect: bool,
+}
 
-    if !command.no_autoconnect {
-        // It's necessary to run adb connect on a separate thread so it doesn't block the async
-        // executor running the socket listener.
-        let adb_path = command.adb.clone();
-        std::thread::spawn(move || {
-            let mut adb_command = Command::new(&adb_path);
-            adb_command.arg("connect").arg(listen_address.to_string());
-            match adb_command.status() {
-                Ok(_) => {}
-                Err(io_err) if io_err.kind() == ErrorKind::NotFound => {
-                    panic!("Could not find adb binary named `{adb_path}`. If your adb is not in your $PATH, use the --adb flag to specify where to find it.");
-                }
-                Err(io_err) => {
-                    panic!("Failed to run `${adb_command:?}`: {io_err:?}");
-                }
+impl AdbProxyArgs {
+    async fn run_proxy(
+        &self,
+        adb: &str,
+        rcs_connector: &Connector<rc::RemoteControlProxy>,
+    ) -> Result<()> {
+        let reconnect = || async {
+            let rcs_proxy = connect_to_rcs(rcs_connector).await?;
+            anyhow::Ok((
+                connect_to_contoller(&rcs_proxy, self.moniker.clone()).await?,
+                Arc::new(AtomicBool::new(false)),
+            ))
+        };
+        let mut controller_proxy = reconnect().await?;
+
+        let mut signals = Signals::new(&[SIGINT]).unwrap();
+        let handle = signals.handle();
+        let signal_thread = std::thread::spawn(move || {
+            if let Some(signal) = signals.forever().next() {
+                assert_eq!(signal, SIGINT);
+                eprintln!("Caught interrupt. Shutting down starnix adb bridge...");
+                std::process::exit(0);
             }
         });
-    } else {
-        println!("ADB bridge started. To connect: adb connect {listen_address}");
-    }
 
-    while let Some(stream) = listener.incoming().next().await {
-        if controller_proxy.1.load(Ordering::SeqCst) {
-            controller_proxy = reconnect().await?;
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, self.port))
+            .await
+            .expect("cannot bind to adb address");
+        let listen_address = listener.local_addr().expect("cannot get adb server address");
+
+        if !self.no_autoconnect {
+            // It's necessary to run adb connect on a separate thread so it doesn't block the async
+            // executor running the socket listener.
+            let adb_path = adb.to_string();
+            std::thread::spawn(move || {
+                let mut adb_command = Command::new(&adb_path);
+                adb_command.arg("connect").arg(listen_address.to_string());
+                match adb_command.status() {
+                    Ok(_) => {}
+                    Err(io_err) if io_err.kind() == ErrorKind::NotFound => {
+                        panic!("Could not find adb binary named `{adb_path}`. If your adb is not in your $PATH, use the --adb flag to specify where to find it.");
+                    }
+                    Err(io_err) => {
+                        panic!("Failed to run `${adb_command:?}`: {io_err:?}");
+                    }
+                }
+            });
+        } else {
+            println!("ADB bridge started. To connect: adb connect {listen_address}");
         }
 
-        let stream = stream?;
-        let (sbridge, cbridge) = fidl::Socket::create_stream();
+        while let Some(stream) = listener.incoming().next().await {
+            if controller_proxy.1.load(Ordering::SeqCst) {
+                controller_proxy = reconnect().await?;
+            }
 
-        controller_proxy
-            .0
-            .vsock_connect(fstarcontainer::ControllerVsockConnectRequest {
-                port: Some(ADB_DEFAULT_PORT),
-                bridge_socket: Some(sbridge),
-                ..Default::default()
+            let stream = stream?;
+            let (sbridge, cbridge) = fidl::Socket::create_stream();
+
+            controller_proxy
+                .0
+                .vsock_connect(fstarcontainer::ControllerVsockConnectRequest {
+                    port: Some(ADB_DEFAULT_PORT),
+                    bridge_socket: Some(sbridge),
+                    ..Default::default()
+                })
+                .context("connecting to adbd")?;
+
+            let reconnect_flag = Arc::clone(&controller_proxy.1);
+            fasync::Task::spawn(async move {
+                serve_adb_connection(stream, cbridge)
+                    .await
+                    .unwrap_or_else(|e| println!("serve_adb_connection returned with {:?}", e));
+                reconnect_flag.store(true, std::sync::atomic::Ordering::SeqCst);
             })
-            .context("connecting to adbd")?;
+            .detach();
+        }
 
-        let reconnect_flag = Arc::clone(&controller_proxy.1);
-        fasync::Task::spawn(async move {
-            serve_adb_connection(stream, cbridge)
-                .await
-                .unwrap_or_else(|e| println!("serve_adb_connection returned with {:?}", e));
-            reconnect_flag.store(true, std::sync::atomic::Ordering::SeqCst);
-        })
-        .detach();
+        handle.close();
+        signal_thread.join().expect("signal thread to shutdown without panic");
+        Ok(())
     }
-
-    handle.close();
-    signal_thread.join().expect("signal thread to shutdown without panic");
-    Ok(())
 }
 
 #[cfg(test)]

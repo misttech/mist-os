@@ -47,9 +47,7 @@ impl FfxMain for StarnixTool {
     async fn main(self, writer: Self::Writer) -> Result<()> {
         match &self.cmd.subcommand {
             StarnixSubCommand::Adb(command) => {
-                adb::starnix_adb(command, &self.rcs_connector, writer)
-                    .await
-                    .map_err(|e| Error::User(e))
+                command.run(&self.rcs_connector).await.map_err(|e| Error::User(e))
             }
             #[cfg(feature = "enable_console_tool")]
             StarnixSubCommand::Console(command) => {
