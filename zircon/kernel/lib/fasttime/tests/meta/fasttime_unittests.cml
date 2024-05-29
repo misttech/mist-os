@@ -4,13 +4,14 @@
 {
     include: [ "//src/sys/test_runners/gtest/default.shard.cml" ],
     program: {
-        binary: "bin/fasttime_unittests",
+        binary: "bin/fasttime-unittests",
     },
     use: [
         {
             directory: "boot",
             rights: [ "r*" ],
-            path: "/boot",
+            path: "/boot/kernel",
+            subdir: "kernel",
         },
     ],
 }

@@ -14,10 +14,10 @@
 #include <lib/userabi/vdso-constants.h>
 
 // This defines the struct used by libfasttime and the time syscalls.
-#include <lib/time-values-abi.h>
+#include <lib/fasttime/internal/abi.h>
 
 extern __LOCAL const struct vdso_constants DATA_CONSTANTS;
-extern __LOCAL struct internal::TimeValues DATA_TIME_VALUES;
+extern __LOCAL const fasttime::internal::TimeValues DATA_TIME_VALUES;
 
 extern "C" {
 

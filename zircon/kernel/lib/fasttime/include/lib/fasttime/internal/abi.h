@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_FASTTIME_INCLUDE_LIB_TIME_VALUES_ABI_H_
-#define ZIRCON_KERNEL_LIB_FASTTIME_INCLUDE_LIB_TIME_VALUES_ABI_H_
+#ifndef ZIRCON_KERNEL_LIB_FASTTIME_INCLUDE_LIB_FASTTIME_INTERNAL_ABI_H_
+#define ZIRCON_KERNEL_LIB_FASTTIME_INCLUDE_LIB_FASTTIME_INTERNAL_ABI_H_
 
 // This file describes how the kernel exposes time values to userland.
 // This is a PRIVATE UNSTABLE ABI that may change at any time!
@@ -13,8 +13,11 @@
 #include <zircon/time.h>
 #include <zircon/types.h>
 
-namespace internal {
+namespace fasttime::internal {
 
+// The members of this struct are all marked const to force folks who initialize the structure to
+// explicitly declare values at the time of instantiation. The primary use case for this is the
+// test code. Note that all accesses of this structure should still be done with a const reference.
 struct TimeValues {
   // A version number to check against the version of libfasttime.
   const uint64_t version;
@@ -41,9 +44,9 @@ struct TimeValues {
   const bool use_a73_errata_mitigation;
 };
 
-}  // namespace internal
+}  // namespace fasttime::internal
 
 // PA_VMO_KERNEL_FILE with this name holds the global instance of the TimeValuesVmo.
 static constexpr const char kTimeValuesVmoName[] = "time_values";
 
-#endif  // ZIRCON_KERNEL_LIB_FASTTIME_INCLUDE_LIB_TIME_VALUES_ABI_H_
+#endif  // ZIRCON_KERNEL_LIB_FASTTIME_INCLUDE_LIB_FASTTIME_INTERNAL_ABI_H_
