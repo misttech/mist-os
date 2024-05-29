@@ -834,9 +834,55 @@ class RemoteActionMainParserTests(unittest.TestCase):
         cfg = Path("other.cfg")
         main_args, other = p.parse_known_args([f"--cfg={cfg}", "--", "echo"])
         self.assertEqual(main_args.cfg, cfg)
+        self.assertEqual(other, [])
         action = remote_action.remote_action_from_args(main_args)
+        self.assertEqual(action.config, cfg)
         self.assertEqual(action.local_only_command, ["echo"])
         self.assertEqual(action.options, ["--cfg", str(cfg)])
+
+    def test_platform_merge_override(self):
+        p = self._make_main_parser()
+        cfg = Path("other.cfg")
+        platform_value = "foo=zoo,alice=bob"
+        # Test both styles of flags.
+        test_flag_variants = (
+            [f"--platform={platform_value}"],
+            ["--platform", platform_value],
+        )
+        for flags in test_flag_variants:
+            main_args, remote_options = p.parse_known_args(
+                [f"--cfg={cfg}"] + flags + ["--", "echo"]
+            )
+            self.assertEqual(main_args.cfg, cfg)
+            self.assertEqual(main_args.platform, platform_value)
+            action = remote_action.remote_action_from_args(
+                main_args=main_args,
+                remote_options=remote_options,
+            )
+            self.assertEqual(action.config, cfg)
+            self.assertEqual(action.platform, platform_value)
+            self.assertEqual(action.local_only_command, ["echo"])
+            with mock.patch.object(
+                Path,
+                "read_text",
+                return_value="\n".join(
+                    [
+                        "parameter_this=1",
+                        "parameter_that=do_not_care",
+                        "platform=foo=bar,baz=quux",
+                    ]
+                ),
+            ) as mock_read_cfg:
+                self.assertEqual(
+                    action.options,
+                    [
+                        "--cfg",
+                        str(cfg),
+                        "--platform=alice=bob,baz=quux,foo=zoo",
+                    ],
+                )
+
+            mock_read_cfg.assert_called_once_with()
 
     def test_bindir(self):
         p = self._make_main_parser()

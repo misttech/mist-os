@@ -909,6 +909,7 @@ class RemoteAction(object):
         input_list_paths: Sequence[Path] = None,
         output_files: Sequence[Path] = None,
         output_dirs: Sequence[Path] = None,
+        platform: str = None,
         disable: bool = False,
         verbose: bool = False,
         save_temps: bool = False,
@@ -944,6 +945,7 @@ class RemoteAction(object):
             current working dir.
           output_dirs: directories to be fetched after remote execution, relative to the
             current working dir.
+          platform: rewrapper --platform, containing remote execution parameters
           disable: if true, execute locally.
           verbose: if true, print more information about what is happening.
           compare_with_local: if true, also run locally and compare outputs.
@@ -1011,6 +1013,9 @@ class RemoteAction(object):
         # responsibility to ensure that they produce consistent results
         # (which can be verified with --compare [compare_with_local]).
         self._local_only_command = local_only_command or command
+
+        # platform is handled by specially, by merging with cfg.
+        self._platform = platform
 
         # Detect some known rewrapper options
         (
@@ -1170,6 +1175,14 @@ exec "${{cmd[@]}}"
         if self.exec_strategy:
             yield f"--exec_strategy={self.exec_strategy}"
 
+        if self.platform:
+            # Then merge the value from --cfg and --platform to override
+            # the value from the --cfg.  Yield the rewritten flag.
+            platform_value = cl_utils.values_dict_to_config_value(
+                self.merged_platform
+            )
+            yield f"--platform={platform_value}"
+
         yield from self._options
 
     @property
@@ -1192,6 +1205,43 @@ exec "${{cmd[@]}}"
     @property
     def download_outputs(self) -> bool:
         return self._rewrapper_known_options.download_outputs
+
+    @property
+    def platform(self) -> Optional[str]:
+        return self._platform
+
+    @property
+    def merged_platform(self) -> Dict[str, str]:
+        """Combined platform values from --cfg and --platform."""
+        merged_values: Dict[str, str] = {}
+
+        def take_dict_last_values(key_values: str) -> Dict[str, str]:
+            return {
+                k: cl_utils.last_value_or_default(v, "")
+                for k, v in cl_utils.keyed_flags_to_values_dict(
+                    key_values.split(",")
+                ).items()
+            }
+
+        cfg = self.config
+        if cfg:
+            rewrapper_cfg: Dict[str, str] = cl_utils.read_config_file_lines(
+                cfg.read_text().splitlines()
+            )
+            cfg_platform = rewrapper_cfg.get("platform", "")
+            if cfg_platform:
+                # in case of multiple/conflicting values, take the last one
+                merged_values.update(take_dict_last_values(cfg_platform))
+
+        # TODO(b/342692553): merge RBE_platform environment variable
+
+        cl_platform = self.platform
+        if cl_platform:
+            # override earlier values
+            # in case of multiple/conflicting values, take the last one
+            merged_values.update(take_dict_last_values(cl_platform))
+
+        return merged_values
 
     @property
     def need_download_stub_predicate(self) -> Callable[[Path], bool]:
@@ -2346,6 +2396,11 @@ def inherit_main_arg_parser_flags(
         metavar="DIRS",
         help="Specify additional remote output directories, comma-separated, relative to the current working dir (repeatable, cumulative).  Note: This is different than `rewrapper --output_directories`, which expects exec_root-relative paths.",
     )
+    rewrapper_group.add_argument(
+        "--platform",
+        type=str,
+        help="The rewrapper platform variable specifies remote execution parameters, such as OS type, image, worker constraints, etc.  The value specified in this wrapper is intercepted and merged with the value found in the --cfg.",
+    )
 
     main_group = parser.add_argument_group(
         title="common",
@@ -2504,6 +2559,7 @@ def remote_action_from_args(
         input_list_paths=input_list_paths,
         output_files=output_files,
         output_dirs=output_dirs,
+        platform=main_args.platform,
         disable=main_args.local,
         verbose=main_args.verbose,
         label=main_args.label,

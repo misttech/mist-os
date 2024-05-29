@@ -522,6 +522,55 @@ class FuseExpandedFlagsTests(unittest.TestCase):
         )
 
 
+class ReadConfigFileLinesTests(unittest.TestCase):
+    def test_empty_file(self):
+        self.assertEqual(cl_utils.read_config_file_lines([]), dict())
+
+    def test_ignore_blank_lines(self):
+        self.assertEqual(
+            cl_utils.read_config_file_lines(["", "\t", "\n"]), dict()
+        )
+
+    def test_ignore_comments(self):
+        self.assertEqual(
+            cl_utils.read_config_file_lines(["####", "# comment"]), dict()
+        )
+
+    def test_ignore_non_key_value_pairs(self):
+        self.assertEqual(
+            cl_utils.read_config_file_lines(["value-only"]), dict()
+        )
+
+    def test_key_value(self):
+        self.assertEqual(
+            cl_utils.read_config_file_lines(["key=value"]), {"key": "value"}
+        )
+
+    def test_last_wins(self):
+        self.assertEqual(
+            cl_utils.read_config_file_lines(["key=value-1", "key=value-2"]),
+            {"key": "value-2"},
+        )
+
+
+class ValuesDictToConfigValueTests(unittest.TestCase):
+    def test_empty(self):
+        self.assertEqual(cl_utils.values_dict_to_config_value({}), "")
+
+    def test_one_value(self):
+        self.assertEqual(
+            cl_utils.values_dict_to_config_value({"a": "bb"}), "a=bb"
+        )
+
+    def test_bunch_of_values_must_be_key_sorted(self):
+        self.assertEqual(
+            cl_utils.values_dict_to_config_value(
+                {"a": "yy", "zz": "aa", "pp": "qqq"}
+            ),
+            "a=yy,pp=qqq,zz=aa",
+        )
+
+
 class KeyedFlagsToValuesDictTests(unittest.TestCase):
     def test_empty(self):
         self.assertEqual(
