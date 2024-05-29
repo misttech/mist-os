@@ -840,7 +840,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         self.assertEqual(action.local_only_command, ["echo"])
         self.assertEqual(action.options, ["--cfg", str(cfg)])
 
-    def test_platform_merge_override(self):
+    def test_platform_merge_override_no_env(self):
         p = self._make_main_parser()
         cfg = Path("other.cfg")
         platform_value = "foo=zoo,alice=bob"
@@ -873,16 +873,121 @@ class RemoteActionMainParserTests(unittest.TestCase):
                     ]
                 ),
             ) as mock_read_cfg:
+                with mock.patch.object(
+                    remote_action, "_rewrapper_platform_env", return_value=None
+                ) as mock_env:
+                    self.assertEqual(
+                        action.options,
+                        [
+                            "--cfg",
+                            str(cfg),
+                            "--platform=alice=bob,baz=quux,foo=zoo",
+                        ],
+                    )
+
+            mock_read_cfg.assert_called_once_with()
+            mock_env.assert_called_once_with()
+
+    def test_platform_merge_env_no_flag(self):
+        p = self._make_main_parser()
+        cfg = Path("other.cfg")
+        platform_env = "foo=notfoo,alice=joe"
+        # Test both styles of flags.
+        main_args, remote_options = p.parse_known_args(
+            [f"--cfg={cfg}", "--", "echo"]
+        )
+        self.assertEqual(main_args.cfg, cfg)
+        action = remote_action.remote_action_from_args(
+            main_args=main_args,
+            remote_options=remote_options,
+        )
+        self.assertEqual(action.config, cfg)
+        self.assertEqual(action.local_only_command, ["echo"])
+        with mock.patch.object(
+            Path,
+            "read_text",
+            return_value="\n".join(
+                [
+                    "parameter_this=1",
+                    "parameter_that=do_not_care",
+                    "platform=foo=bar,baz=quux",
+                ]
+            ),
+        ) as mock_read_cfg:
+            with mock.patch.object(
+                remote_action,
+                "_rewrapper_platform_env",
+                return_value=platform_env,
+            ) as mock_env:
                 self.assertEqual(
                     action.options,
                     [
                         "--cfg",
                         str(cfg),
-                        "--platform=alice=bob,baz=quux,foo=zoo",
+                        # no need to rewrite --platform flag
                     ],
                 )
+                self.assertEqual(
+                    action.merged_platform,
+                    # did not use cfg's platform values
+                    {
+                        "alice": "joe",
+                        "foo": "notfoo",
+                    },
+                )
 
-            mock_read_cfg.assert_called_once_with()
+        mock_read_cfg.assert_not_called()  # used env, not cfg
+        mock_env.assert_called_once_with()
+
+    def test_platform_merge_override_with_env(self):
+        p = self._make_main_parser()
+        cfg = Path("other.cfg")
+        platform_value = "foo=zoo,alice=bob"
+        # Test both styles of flags.
+        test_flag_variants = (
+            [f"--platform={platform_value}"],
+            ["--platform", platform_value],
+        )
+        for flags in test_flag_variants:
+            main_args, remote_options = p.parse_known_args(
+                [f"--cfg={cfg}"] + flags + ["--", "echo"]
+            )
+            self.assertEqual(main_args.cfg, cfg)
+            self.assertEqual(main_args.platform, platform_value)
+            action = remote_action.remote_action_from_args(
+                main_args=main_args,
+                remote_options=remote_options,
+            )
+            self.assertEqual(action.config, cfg)
+            self.assertEqual(action.platform, platform_value)
+            self.assertEqual(action.local_only_command, ["echo"])
+            with mock.patch.object(
+                Path,
+                "read_text",
+                return_value="\n".join(
+                    [
+                        "parameter_this=1",
+                        "parameter_that=do_not_care",
+                        "platform=foo=bar,baz=quux",
+                    ]
+                ),
+            ) as mock_read_cfg:
+                with mock.patch.object(
+                    remote_action,
+                    "_rewrapper_platform_env",
+                    return_value="foo=env_foo,baz=env_baz",
+                ) as mock_env:
+                    self.assertEqual(
+                        action.options,
+                        [
+                            "--cfg",
+                            str(cfg),
+                            "--platform=alice=bob,baz=env_baz,foo=zoo",
+                        ],
+                    )
+
+            mock_read_cfg.assert_not_called()  # because env was used
+            mock_env.assert_called_once_with()
 
     def test_bindir(self):
         p = self._make_main_parser()

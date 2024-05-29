@@ -365,6 +365,10 @@ def _rewrapper_log_dir() -> Optional[str]:
     return os.environ.get("RBE_log_dir", None)
 
 
+def _rewrapper_platform_env() -> Optional[str]:
+    return os.environ.get("RBE_platform", None)
+
+
 def _remove_prefix(text: str, prefix: str) -> str:
     # Like string.removeprefix() in Python 3.9+
     return text[len(prefix) :] if text.startswith(prefix) else text
@@ -1212,7 +1216,21 @@ exec "${{cmd[@]}}"
 
     @property
     def merged_platform(self) -> Dict[str, str]:
-        """Combined platform values from --cfg and --platform."""
+        """Combined platform values from --cfg and --platform.
+
+        RBE flag precedence (highest-to-lowest):
+          * command-line flag
+          * RBE_platform environment variable
+          * cfg file contents
+        Dictionary updating is done in order of lowest-to-highest).
+
+        If --platform is not passed explicitly on the command line,
+        there is no need to call this, because rewrapper will already
+        interpret the flag with the aforementioned precedence.
+
+        Returns:
+          Dictionary of platform values, combined from all sources.
+        """
         merged_values: Dict[str, str] = {}
 
         def take_dict_last_values(key_values: str) -> Dict[str, str]:
@@ -1223,17 +1241,20 @@ exec "${{cmd[@]}}"
                 ).items()
             }
 
-        cfg = self.config
-        if cfg:
-            rewrapper_cfg: Dict[str, str] = cl_utils.read_config_file_lines(
-                cfg.read_text().splitlines()
-            )
-            cfg_platform = rewrapper_cfg.get("platform", "")
-            if cfg_platform:
-                # in case of multiple/conflicting values, take the last one
-                merged_values.update(take_dict_last_values(cfg_platform))
-
-        # TODO(b/342692553): merge RBE_platform environment variable
+        platform_env = _rewrapper_platform_env()
+        if platform_env:
+            # env takes precedence over the cfg (not merged)
+            merged_values.update(take_dict_last_values(platform_env))
+        else:
+            cfg = self.config
+            if cfg:
+                rewrapper_cfg: Dict[str, str] = cl_utils.read_config_file_lines(
+                    cfg.read_text().splitlines()
+                )
+                cfg_platform = rewrapper_cfg.get("platform", "")
+                if cfg_platform:
+                    # in case of multiple/conflicting values, take the last one
+                    merged_values.update(take_dict_last_values(cfg_platform))
 
         cl_platform = self.platform
         if cl_platform:
