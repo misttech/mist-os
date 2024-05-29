@@ -973,19 +973,6 @@ mod test {
         assert!(result.is_err());
     }
 
-    struct FakeConfigReader {
-        query_expected: String,
-        value: String,
-    }
-
-    #[async_trait(?Send)]
-    impl ConfigReader for FakeConfigReader {
-        async fn get(&self, q: &str) -> Result<Option<String>> {
-            assert_eq!(q, self.query_expected);
-            Ok(Some(self.value.clone()))
-        }
-    }
-
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_get_target_empty() {
         let tempdir = tempfile::tempdir().expect("Creating tempdir");

@@ -199,23 +199,6 @@ mod test_apply_system_update_impl {
 
     const TEST_DEFAULT_UPDATE_URL: &str = "fuchsia-pkg://fuchsia.test/update";
 
-    struct DoNothingUpdateInstaller;
-    impl UpdateInstaller for DoNothingUpdateInstaller {
-        type UpdateAttempt =
-            futures::stream::Once<future::Ready<Result<State, MonitorUpdateAttemptError>>>;
-
-        fn start_update(
-            &mut self,
-            _update_url: AbsolutePackageUrl,
-            _options: Options,
-            _reboot_controller_server_end: Option<ServerEnd<RebootControllerMarker>>,
-        ) -> BoxFuture<'_, Result<Self::UpdateAttempt, UpdateAttemptError>> {
-            let info = UpdateInfo::builder().download_size(0).build();
-            let state = State::Complete(UpdateInfoAndProgress::done(info));
-            future::ok(futures::stream::once(future::ok(state))).boxed()
-        }
-    }
-
     struct WasCalledUpdateInstaller {
         was_called: bool,
     }

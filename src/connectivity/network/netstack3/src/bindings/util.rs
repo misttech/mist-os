@@ -1398,17 +1398,6 @@ mod tests {
         }
     }
 
-    struct EmptyFakeConversionContext;
-    impl ConversionContext for EmptyFakeConversionContext {
-        fn get_core_id(&self, _binding_id: BindingId) -> Option<DeviceId<BindingsCtx>> {
-            None
-        }
-
-        fn get_binding_id(&self, core_id: DeviceId<BindingsCtx>) -> BindingId {
-            core_id.bindings_id().id
-        }
-    }
-
     fn create_addr_v4(bytes: [u8; 4]) -> (IpAddr, fidl_net::IpAddress) {
         let core = IpAddr::V4(Ipv4Addr::from(bytes));
         let fidl = fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address { addr: bytes });
