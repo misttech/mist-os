@@ -40,7 +40,6 @@
 #include "lib/ddk/debug.h"
 #include "lib/ddk/driver.h"
 #include "macros.h"
-#include "src/devices/sysmem/drivers/sysmem/sysmem_config.h"
 #include "src/devices/sysmem/metrics/metrics.cb.h"
 #include "utils.h"
 
@@ -279,113 +278,40 @@ Device::~Device() {
   DdkUnbindInternal();
 }
 
-zx::result<std::string> Device::GetFromCommandLine(const char* name) {
-  char arg[32];
-  auto status = device_get_variable(parent(), name, arg, sizeof(arg), nullptr);
-  if (status == ZX_ERR_NOT_FOUND) {
-    return zx::error(status);
-  }
-  if (status != ZX_OK) {
-    LOG(ERROR, "device_get_variable() failed - status: %d", status);
-    return zx::error(status);
-  }
-  if (strlen(arg) == 0) {
-    LOG(ERROR, "strlen(arg) == 0");
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-  return zx::ok(std::string(arg, strlen(arg)));
-}
-
-zx::result<bool> Device::GetBoolFromCommandLine(const char* name, bool default_value) {
-  auto result = GetFromCommandLine(name);
-  if (!result.is_ok()) {
-    if (result.error_value() == ZX_ERR_NOT_FOUND) {
-      return zx::ok(default_value);
-    }
-    return zx::error(result.error_value());
-  }
-  std::string str = *result;
-  std::transform(str.begin(), str.end(), str.begin(), ::tolower);
-  if (str == "true" || str == "1") {
-    return zx::ok(true);
-  }
-  if (str == "false" || str == "0") {
-    return zx::ok(false);
-  }
-  return zx::error(ZX_ERR_INVALID_ARGS);
-}
-
-zx_status_t Device::GetContiguousGuardParameters(uint64_t* guard_bytes_out,
+zx_status_t Device::GetContiguousGuardParameters(const std::optional<sysmem_config::Config>& config,
+                                                 uint64_t* guard_bytes_out,
                                                  bool* unused_pages_guarded,
                                                  zx::duration* unused_page_check_cycle_period,
                                                  bool* internal_guard_pages_out,
                                                  bool* crash_on_fail_out) {
   const uint64_t kDefaultGuardBytes = zx_system_get_page_size();
   *guard_bytes_out = kDefaultGuardBytes;
-  *unused_pages_guarded = true;
   *unused_page_check_cycle_period =
       ContiguousPooledMemoryAllocator::kDefaultUnusedPageCheckCyclePeriod;
-  *internal_guard_pages_out = false;
-  *crash_on_fail_out = false;
 
-  // If true, sysmem crashes on a guard page violation.
-  char arg[32];
-  if (ZX_OK == device_get_variable(parent(), "driver.sysmem.contiguous_guard_pages_fatal", arg,
-                                   sizeof(arg), nullptr)) {
-    DRIVER_INFO("Setting contiguous_guard_pages_fatal");
-    *crash_on_fail_out = true;
+  if (!config.has_value()) {
+    *unused_pages_guarded = true;
+    *internal_guard_pages_out = false;
+    *crash_on_fail_out = false;
+    return ZX_OK;
   }
 
-  // If true, sysmem will create guard regions around every allocation.
-  if (ZX_OK == device_get_variable(parent(), "driver.sysmem.contiguous_guard_pages_internal", arg,
-                                   sizeof(arg), nullptr)) {
-    DRIVER_INFO("Setting contiguous_guard_pages_internal");
-    *internal_guard_pages_out = true;
+  *crash_on_fail_out = config->contiguous_guard_pages_fatal();
+  *internal_guard_pages_out = config->contiguous_guard_pages_internal();
+  *unused_pages_guarded = config->contiguous_guard_pages_unused();
+
+  int64_t unused_page_check_cycle_seconds_override =
+      config->contiguous_guard_pages_unused_cycle_seconds_override();
+  if (unused_page_check_cycle_seconds_override > 0) {
+    DRIVER_INFO("Overriding unused page check period to %ld seconds",
+                unused_page_check_cycle_seconds_override);
+    *unused_page_check_cycle_period = zx::sec(unused_page_check_cycle_seconds_override);
   }
 
-  // If true, sysmem will _not_ treat currently-unused pages as guard pages.  We flip the sense on
-  // this one because we want the default to be enabled so we discover any issues with
-  // DMA-write-after-free by default, and because this mechanism doesn't cost any pages.
-  if (ZX_OK == device_get_variable(parent(), "driver.sysmem.contiguous_guard_pages_unused_disabled",
-                                   arg, sizeof(arg), nullptr)) {
-    DRIVER_INFO("Clearing unused_pages_guarded");
-    *unused_pages_guarded = false;
-  }
-
-  const char* kUnusedPageCheckCyclePeriodName =
-      "driver.sysmem.contiguous_guard_pages_unused_cycle_seconds";
-  char unused_page_check_cycle_period_seconds_string[32];
-  auto status = device_get_variable(parent(), kUnusedPageCheckCyclePeriodName,
-                                    unused_page_check_cycle_period_seconds_string,
-                                    sizeof(unused_page_check_cycle_period_seconds_string), nullptr);
-  if (status == ZX_OK && strlen(unused_page_check_cycle_period_seconds_string)) {
-    char* end = nullptr;
-    int64_t potential_cycle_period_seconds =
-        strtoll(unused_page_check_cycle_period_seconds_string, &end, 10);
-    if (*end != '\0') {
-      DRIVER_ERROR("Flag %s has invalid value \"%s\"", kUnusedPageCheckCyclePeriodName,
-                   unused_page_check_cycle_period_seconds_string);
-      return ZX_ERR_INVALID_ARGS;
-    }
-    DRIVER_INFO("Flag %s setting unused page check period to %ld seconds",
-                kUnusedPageCheckCyclePeriodName, potential_cycle_period_seconds);
-    *unused_page_check_cycle_period = zx::sec(potential_cycle_period_seconds);
-  }
-
-  const char* kGuardBytesName = "driver.sysmem.contiguous_guard_page_count";
-  char guard_count[32];
-  status =
-      device_get_variable(parent(), kGuardBytesName, guard_count, sizeof(guard_count), nullptr);
-  if (status == ZX_OK && strlen(guard_count)) {
-    char* end = nullptr;
-    int64_t page_count = strtoll(guard_count, &end, 10);
-    // Check that entire string was used and there isn't garbage at the end.
-    if (*end != '\0') {
-      DRIVER_ERROR("Flag %s has invalid value \"%s\"", kGuardBytesName, guard_count);
-      return ZX_ERR_INVALID_ARGS;
-    }
-    DRIVER_INFO("Flag %s setting guard page count to %ld", kGuardBytesName, page_count);
-    *guard_bytes_out = zx_system_get_page_size() * page_count;
+  int64_t guard_page_count_override = config->contiguous_guard_page_count_override();
+  if (guard_page_count_override > 0) {
+    DRIVER_INFO("Overriding guard page count to %ld", guard_page_count_override);
+    *guard_bytes_out = zx_system_get_page_size() * guard_page_count_override;
   }
 
   return ZX_OK;
@@ -624,30 +550,24 @@ zx_status_t Device::Bind() {
     }
   }
 
-  const char* kDisableDynamicRanges = "driver.sysmem.protected_ranges.disable_dynamic";
-  zx::result<bool> protected_ranges_disable_dynamic =
-      GetBoolFromCommandLine(kDisableDynamicRanges, false);
-  if (protected_ranges_disable_dynamic.is_error()) {
-    return protected_ranges_disable_dynamic.status_value();
-  }
-  cmdline_protected_ranges_disable_dynamic_ = protected_ranges_disable_dynamic.value();
-
   zx_handle_t structured_config_vmo;
   status = device_get_config_vmo(parent_, &structured_config_vmo);
   if (status != ZX_OK) {
     DRIVER_ERROR("Failed to get config vmo: %s", zx_status_get_string(status));
     return status;
   }
+  std::optional<sysmem_config::Config> config;
   if (structured_config_vmo == ZX_HANDLE_INVALID) {
     DRIVER_DEBUG("Skipping config: config vmo handle does not exist");
   } else {
-    auto config = sysmem_config::Config::CreateFromVmo(zx::vmo(structured_config_vmo));
-    if (config.protected_memory_size_override() >= 0) {
-      protected_memory_size = config.protected_memory_size_override();
+    config.emplace(sysmem_config::Config::CreateFromVmo(zx::vmo(structured_config_vmo)));
+    if (config->protected_memory_size_override() >= 0) {
+      protected_memory_size = config->protected_memory_size_override();
     }
-    if (config.protected_memory_size_override() >= 0) {
-      contiguous_memory_size = config.protected_memory_size_override();
+    if (config->protected_memory_size_override() >= 0) {
+      contiguous_memory_size = config->protected_memory_size_override();
     }
+    protected_ranges_disable_dynamic_ = config->protected_ranges_disable_dynamic();
   }
 
   // Negative values are interpreted as a percentage of physical RAM.
@@ -710,7 +630,7 @@ zx_status_t Device::Bind() {
     zx::duration unused_page_check_cycle_period;
     bool internal_guard_regions;
     bool crash_on_guard;
-    if (GetContiguousGuardParameters(&guard_region_size, &unused_pages_guarded,
+    if (GetContiguousGuardParameters(config, &guard_region_size, &unused_pages_guarded,
                                      &unused_page_check_cycle_period, &internal_guard_regions,
                                      &crash_on_guard) == ZX_OK) {
       pooled_allocator->InitGuardRegion(guard_region_size, unused_pages_guarded,
