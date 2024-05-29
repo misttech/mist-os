@@ -10,7 +10,7 @@ use serde::{
 };
 use std::{array::TryFromSliceError, collections::BTreeMap, fmt};
 
-const VERSION_HISTORY_BYTES: &[u8] = include_bytes!(env!("SDK_VERSION_HISTORY"));
+const VERSION_HISTORY_BYTES: &[u8] = version_history_data::VERSION_HISTORY;
 const VERSION_HISTORY_SCHEMA_ID: &str = "https://fuchsia.dev/schema/version_history-22rnd667.json";
 const VERSION_HISTORY_NAME: &str = "Platform version map";
 const VERSION_HISTORY_TYPE: &str = "version_history";
