@@ -3,8 +3,8 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
-
 #include <inttypes.h>
+#include <lib/console.h>
 #include <lib/zbi-format/driver-config.h>
 #include <string.h>
 #include <trace.h>
@@ -18,11 +18,13 @@
 // Defined in start.S.
 extern paddr_t kernel_entry_paddr;
 
-static uint64_t shutdown_args[3] = {0, 0, 0};
-static uint64_t reboot_args[3] = {0, 0, 0};
-static uint64_t reboot_bootloader_args[3] = {0, 0, 0};
-static uint64_t reboot_recovery_args[3] = {0, 0, 0};
-static uint32_t reset_command = PSCI64_SYSTEM_RESET;
+namespace {
+
+uint64_t shutdown_args[3] = {0, 0, 0};
+uint64_t reboot_args[3] = {0, 0, 0};
+uint64_t reboot_bootloader_args[3] = {0, 0, 0};
+uint64_t reboot_recovery_args[3] = {0, 0, 0};
+uint32_t reset_command = PSCI64_SYSTEM_RESET;
 
 zx_status_t psci_status_to_zx_status(uint64_t psci_result);
 zx_status_t psci_status_to_zx_status(uint64_t psci_result) {
@@ -56,24 +58,26 @@ zx_status_t psci_status_to_zx_status(uint64_t psci_result) {
   }
 }
 
-static uint64_t psci_smc_call(uint32_t function, uint64_t arg0, uint64_t arg1, uint64_t arg2) {
+uint64_t psci_smc_call(uint32_t function, uint64_t arg0, uint64_t arg1, uint64_t arg2) {
   return arm_smccc_smc(function, arg0, arg1, arg2, 0, 0, 0, 0).x0;
 }
 
-static uint64_t psci_hvc_call(uint32_t function, uint64_t arg0, uint64_t arg1, uint64_t arg2) {
+uint64_t psci_hvc_call(uint32_t function, uint64_t arg0, uint64_t arg1, uint64_t arg2) {
   return arm_smccc_hvc(function, arg0, arg1, arg2, 0, 0, 0, 0).x0;
 }
 
-typedef uint64_t (*psci_call_proc)(uint32_t function, uint64_t arg0, uint64_t arg1, uint64_t arg2);
+using psci_call_proc = uint64_t (*)(uint32_t, uint64_t, uint64_t, uint64_t);
 
-static psci_call_proc do_psci_call = psci_smc_call;
+psci_call_proc do_psci_call = psci_smc_call;
+
+}  // anonymous namespace
 
 zx_status_t psci_system_off() {
   return psci_status_to_zx_status(
       do_psci_call(PSCI64_SYSTEM_OFF, shutdown_args[0], shutdown_args[1], shutdown_args[2]));
 }
 
-uint32_t psci_get_version() { return (uint32_t)do_psci_call(PSCI64_PSCI_VERSION, 0, 0, 0); }
+uint32_t psci_get_version() { return static_cast<uint32_t>(do_psci_call(PSCI64_PSCI_VERSION, 0, 0, 0)); }
 
 /* powers down the calling cpu - only returns if call fails */
 zx_status_t psci_cpu_off() {
@@ -86,7 +90,7 @@ zx_status_t psci_cpu_on(uint64_t mpid, paddr_t entry, uint64_t context) {
 }
 
 int64_t psci_get_affinity_info(uint64_t mpid) {
-  return (int64_t)do_psci_call(PSCI64_AFFINITY_INFO, mpid, 0, 0);
+  return static_cast<int64_t>(do_psci_call(PSCI64_AFFINITY_INFO, mpid, 0, 0));
 }
 
 zx::result<power_cpu_state> psci_get_cpu_state(uint64_t mpid) {
@@ -104,7 +108,7 @@ zx::result<power_cpu_state> psci_get_cpu_state(uint64_t mpid) {
 }
 
 uint32_t psci_get_feature(uint32_t psci_call) {
-  return (uint32_t)do_psci_call(PSCI64_PSCI_FEATURES, psci_call, 0, 0);
+  return static_cast<uint32_t>(do_psci_call(PSCI64_PSCI_FEATURES, psci_call, 0, 0));
 }
 
 zx_status_t psci_system_reset2_raw(uint32_t reset_type, uint32_t cookie) {
@@ -198,9 +202,9 @@ void PsciInit(const zbi_dcfg_arm_psci_driver_t& config) {
   pdev_register_power(&psci_ops);
 }
 
-#include <lib/console.h>
+namespace {
 
-static int cmd_psci(int argc, const cmd_args* argv, uint32_t flags) {
+int cmd_psci(int argc, const cmd_args* argv, uint32_t flags) {
   if (argc < 2) {
   notenoughargs:
     printf("not enough arguments\n");
@@ -244,3 +248,5 @@ static int cmd_psci(int argc, const cmd_args* argv, uint32_t flags) {
 STATIC_COMMAND_START
 STATIC_COMMAND_MASKED("psci", "execute PSCI command", &cmd_psci, CMD_AVAIL_ALWAYS)
 STATIC_COMMAND_END(psci)
+
+}  // anonymous namespace
