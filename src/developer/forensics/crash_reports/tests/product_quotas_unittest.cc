@@ -148,8 +148,9 @@ TEST_F(ProductQuotasDeathTest, DecrementRemainingQuota) {
 
   EXPECT_TRUE(product_quotas_->HasQuotaRemaining(product));
   product_quotas_->DecrementRemainingQuota(product);
-  ASSERT_DEATH({ product_quotas_->DecrementRemainingQuota(product); },
-               HasSubstr("Check failed: remaining_quotas_[key] > 0"));
+  ASSERT_DEATH(
+      { product_quotas_->DecrementRemainingQuota(product); },
+      HasSubstr("Check failed: remaining_quotas_[key] > 0"));
 }
 
 TEST_F(ProductQuotasTest, NoQuotaRemaining) {

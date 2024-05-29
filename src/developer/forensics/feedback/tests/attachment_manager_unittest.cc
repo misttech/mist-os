@@ -112,8 +112,9 @@ TEST_F(AttachmentManagerTest, Dynamic) {
 }
 
 TEST_F(AttachmentManagerTest, NoProvider) {
-  ASSERT_DEATH({ AttachmentManager manager(dispatcher(), {"unknown.attachment"}); },
-               HasSubstr("Attachment \"unknown.attachment\" collected by 0 providers"));
+  ASSERT_DEATH(
+      { AttachmentManager manager(dispatcher(), {"unknown.attachment"}); },
+      HasSubstr("Attachment \"unknown.attachment\" collected by 0 providers"));
 }
 
 }  // namespace

@@ -221,8 +221,9 @@ void AddCrashServerAnnotations(const std::string& program_name,
                                const std::optional<timekeeper::time_utc>& current_time,
                                AnnotationMap* annotations) {
   // Program.
-  // TODO(https://fxbug.dev/42135356): for historical reasons, we used ptype to benefit from Chrome's
-  // "Process type" handling in the crash server UI. Remove once the UI can fallback on "Program".
+  // TODO(https://fxbug.dev/42135356): for historical reasons, we used ptype to benefit from
+  // Chrome's "Process type" handling in the crash server UI. Remove once the UI can fallback on
+  // "Program".
   annotations->Set("ptype", program_name);
   annotations->Set("program", program_name);
 

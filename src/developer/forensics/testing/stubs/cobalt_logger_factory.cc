@@ -60,8 +60,7 @@ void CobaltLoggerFactoryDelaysCallback::CreateMetricEventLogger(
     CreateMetricEventLoggerCallback callback) {
   logger_binding_ = std::make_unique<::fidl::Binding<fuchsia::metrics::MetricEventLogger>>(
       logger_.get(), std::move(logger));
-  async::PostDelayedTask(
-      dispatcher_, [cb = std::move(callback)]() { cb(fpromise::ok()); }, delay_);
+  async::PostDelayedTask(dispatcher_, [cb = std::move(callback)]() { cb(fpromise::ok()); }, delay_);
 }
 
 }  // namespace stubs

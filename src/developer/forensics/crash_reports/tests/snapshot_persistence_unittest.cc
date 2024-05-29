@@ -333,8 +333,9 @@ TEST_F(SnapshotPersistenceDeathTest, Check_FailMoveFromTmpToTmp) {
   ASSERT_TRUE(AddArchive(kTestUuid, kArchiveValue));
   ASSERT_EQ(persistence_->SnapshotLocation(kTestUuid), ItemLocation::kTmp);
 
-  ASSERT_DEATH({ persistence_->MoveToTmp(kTestUuid); },
-               HasSubstr("MoveToTmp() will only move snapshots from /cache to /tmp"));
+  ASSERT_DEATH(
+      { persistence_->MoveToTmp(kTestUuid); },
+      HasSubstr("MoveToTmp() will only move snapshots from /cache to /tmp"));
 }
 
 TEST_F(SnapshotPersistenceTest, Check_AddOnlyConsiderTmp) {

@@ -626,8 +626,9 @@ TEST_F(AnnotationManagerTest, GetAll) {
 }
 
 TEST_F(AnnotationManagerTest, NoProvider) {
-  ASSERT_DEATH({ AnnotationManager manager(dispatcher(), {"annotation"}); },
-               HasSubstr("Annotation \"annotation\" collected by 0 providers"));
+  ASSERT_DEATH(
+      { AnnotationManager manager(dispatcher(), {"annotation"}); },
+      HasSubstr("Annotation \"annotation\" collected by 0 providers"));
 }
 
 TEST_F(AnnotationManagerTest, MultipleProviders) {

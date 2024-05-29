@@ -142,7 +142,8 @@ std::vector<std::string_view> ParseMessages(const std::string_view log) {
   // 20,000 was selected because log files can be large and this is a large enough allocation to
   // allow the allocator to decommit the memory backing |messages| when the object is destroyed.
   // This is technically dedends implementation details of scudo, but is considered acceptable
-  // due to the prior residual impact of processing the previous boot log (https://fxbug.dev/42071246).
+  // due to the prior residual impact of processing the previous boot log
+  // (https://fxbug.dev/42071246).
   std::vector<std::string_view> messages;
   messages.reserve(20000);
 

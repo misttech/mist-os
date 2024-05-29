@@ -837,8 +837,9 @@ TEST_F(ReportStoreDeathTest, AddDuplicateAnnotation) {
 
   EXPECT_EQ(expected_annotations, annotations);
 
-  ASSERT_DEATH({ report_store_->AddAnnotation(*report_id, "annotation0.cc", "annotation_value1"); },
-               HasSubstr("already exists"));
+  ASSERT_DEATH(
+      { report_store_->AddAnnotation(*report_id, "annotation0.cc", "annotation_value1"); },
+      HasSubstr("already exists"));
 }
 
 TEST_F(ReportStoreTest, Succeed_MoveSnapshotToPersistence) {

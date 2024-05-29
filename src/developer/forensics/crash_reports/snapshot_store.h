@@ -58,8 +58,8 @@ class SnapshotStore {
   //
   // Note: intended primarily for testing.
   //
-  // TODO(https://fxbug.dev/42063091): Consider deleting this function after reports with timed out snapshots
-  // aren't associated with their original snapshot uuids (https://fxbug.dev/42062635).
+  // TODO(https://fxbug.dev/42063091): Consider deleting this function after reports with timed out
+  // snapshots aren't associated with their original snapshot uuids (https://fxbug.dev/42062635).
   size_t Size() const;
 
   // Returns true if data for |uuid| was garbage collected.

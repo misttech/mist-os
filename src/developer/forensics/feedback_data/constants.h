@@ -44,8 +44,8 @@ constexpr StorageSize kCurrentLogBufferSize = StorageSize::Megabytes(4);
 
 // Stream and buffer logs for 5 minutes after a snapshot collected.
 //
-// TODO(https://fxbug.dev/42181644): Set the default value for userdebug to at least 1 hour. Logs will be
-// streamed indefinitely because of hourly snapshots.
+// TODO(https://fxbug.dev/42181644): Set the default value for userdebug to at least 1 hour. Logs
+// will be streamed indefinitely because of hourly snapshots.
 constexpr zx::duration kActiveLoggingPeriod = zx::min(5);
 
 // At most 16KB of logs will be persisted each second.

@@ -291,7 +291,8 @@ TEST_F(DataProviderTest, GetScreenshot_SucceedOnScreenshotReturningSuccess) {
   std::vector<uint8_t> expected_pixels;
   uint64_t fake_png_size = 0;
   fake_png_dup.get_size(&fake_png_size);
-  ASSERT_TRUE(fsl::VectorFromVmo(fsl::SizedVmo(std::move(fake_png_dup), fake_png_size), &expected_pixels));
+  ASSERT_TRUE(
+      fsl::VectorFromVmo(fsl::SizedVmo(std::move(fake_png_dup), fake_png_size), &expected_pixels));
 
   EXPECT_EQ(actual_pixels, expected_pixels);
 }
