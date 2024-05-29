@@ -136,6 +136,11 @@ class PowerSystemIntegration : public gtest::RealLoopFixture {
 };
 
 TEST_F(PowerSystemIntegration, StorageSuspendResumeTest) {
+  // TODO(b/342432339): Remove this.
+  // This is to confirm the theory that this test is running too early and interfering with fusb's
+  // power negotiation.
+  zx::nanosleep(zx::deadline_after(zx::sec(120)));
+
   // To enable changing SAG's power levels, first trigger the "boot complete" logic. This is done by
   // setting both exec state level and app activity level to active.
   test_sagcontrol::SystemActivityGovernorState state;
