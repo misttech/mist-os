@@ -114,7 +114,7 @@ fn remove_all_local_addrs<I: IpExt>(ctx: &mut FakeCtx) {
         let WrapVecAddrSubnet(subnets) = I::map_ip(
             IpInvariant((&mut ctx.core_ctx(), &device)),
             |IpInvariant((core_ctx, device))| {
-                ip::device::with_assigned_ipv4_addr_subnets(core_ctx, device, |addrs| {
+                ip::device::testutil::with_assigned_ipv4_addr_subnets(core_ctx, device, |addrs| {
                     WrapVecAddrSubnet(addrs.collect::<Vec<_>>())
                 })
             },

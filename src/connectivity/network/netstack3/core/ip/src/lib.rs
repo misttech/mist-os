@@ -112,13 +112,12 @@ pub mod device {
         del_ip_addr_inner, get_ipv4_addr_subnet, get_ipv6_hop_limit, is_ip_device_enabled,
         is_ip_forwarding_enabled, join_ip_multicast, join_ip_multicast_with_config,
         leave_ip_multicast, leave_ip_multicast_with_config, receive_igmp_packet,
-        with_assigned_ipv4_addr_subnets, AddressRemovedReason, DelIpAddr, IpAddressId,
-        IpAddressIdSpec, IpAddressIdSpecContext, IpAddressState, IpDeviceAddr,
-        IpDeviceAddressContext, IpDeviceAddressIdContext, IpDeviceBindingsContext,
-        IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt, IpDeviceSendContext,
-        IpDeviceStateContext, IpDeviceTimerId, Ipv4DeviceTimerId, Ipv6DeviceAddr,
-        Ipv6DeviceConfigurationContext, Ipv6DeviceContext, Ipv6DeviceHandler, Ipv6DeviceTimerId,
-        WithIpDeviceConfigurationMutInner, WithIpv6DeviceConfigurationMutInner,
+        AddressRemovedReason, DelIpAddr, IpAddressId, IpAddressIdSpec, IpAddressIdSpecContext,
+        IpAddressState, IpDeviceAddr, IpDeviceAddressContext, IpDeviceAddressIdContext,
+        IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt,
+        IpDeviceSendContext, IpDeviceStateContext, IpDeviceTimerId, Ipv4DeviceTimerId,
+        Ipv6DeviceAddr, Ipv6DeviceConfigurationContext, Ipv6DeviceContext, Ipv6DeviceHandler,
+        Ipv6DeviceTimerId, WithIpDeviceConfigurationMutInner, WithIpv6DeviceConfigurationMutInner,
     };
 
     /// IP device test utilities.
@@ -127,7 +126,9 @@ pub mod device {
         pub use crate::internal::device::slaac::testutil::{
             calculate_slaac_addr_sub, collect_slaac_timers_integration,
         };
-        pub use crate::internal::device::testutil::with_assigned_ipv6_addr_subnets;
+        pub use crate::internal::device::testutil::{
+            with_assigned_ipv4_addr_subnets, with_assigned_ipv6_addr_subnets,
+        };
     }
 }
 
