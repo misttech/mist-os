@@ -6,7 +6,6 @@ use {
     crate::fuchsia::{
         epochs::{Epochs, RefGuard},
         errors::map_to_status,
-        fxblob::blob::FxBlob,
         node::FxNode,
         profile::Recorder,
     },
@@ -166,7 +165,7 @@ pub struct Pager {
     // need to wait for page requests for the specific file being flushed, but we should see if we
     // need to for performance reasons first.
     epochs: Arc<Epochs>,
-    recorder: Mutex<Option<Recorder>>,
+    recorder: Mutex<Option<Box<dyn Recorder>>>,
 }
 
 // FileHolder is used to retain either a strong or a weak reference to a file.  If there are any
@@ -202,25 +201,23 @@ impl Pager {
     }
 
     /// Set the current profile recorder, or set to None to not record.
-    pub fn set_recorder(&self, recorder: Option<Recorder>) {
+    pub fn set_recorder(&self, recorder: Option<Box<dyn Recorder>>) {
         // Drop the old one outside of the lock.
         let _ = std::mem::replace(&mut (*self.recorder.lock().unwrap()), recorder);
     }
 
     /// Borrow the profile recorder. Used to record file opens.
-    pub fn recorder(&self) -> MutexGuard<'_, Option<Recorder>> {
+    pub fn recorder(&self) -> MutexGuard<'_, Option<Box<dyn Recorder>>> {
         self.recorder.lock().unwrap()
     }
 
     /// Record a range into a profile if one is being recorded.
     pub fn record_page_in<P: PagerBacked>(&self, node: Arc<P>, range: Range<u64>) {
-        if let Ok(blob) = node.into_any().downcast::<FxBlob>() {
-            let mut recorder_holder = self.recorder.lock().unwrap();
-            if let Some(recorder) = &mut (*recorder_holder) {
-                // If the message fails to send, so will all the rest.
-                if let Err(_) = recorder.record(&blob.root(), range.start) {
-                    *recorder_holder = None;
-                }
+        let mut recorder_holder = self.recorder.lock().unwrap();
+        if let Some(recorder) = &mut (*recorder_holder) {
+            // If the message fails to send, so will all the rest.
+            if let Err(_) = recorder.record(node, range.start) {
+                *recorder_holder = None;
             }
         }
     }

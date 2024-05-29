@@ -21,7 +21,7 @@ impl BlobDirectory {
         {
             let mut guard = self.volume().pager().recorder();
             if let Some(recorder) = &mut (*guard) {
-                let _ = recorder.record_open(&hash);
+                let _ = recorder.record_open(blob.0.clone());
             }
         }
         let vmo = blob.create_child_vmo()?;
