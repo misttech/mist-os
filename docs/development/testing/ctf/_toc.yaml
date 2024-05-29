@@ -12,6 +12,8 @@ toc:
   section:
   - title: "Introduction"
     path:  /docs/development/testing/ctf/compatibility_testing.md
+  - title: "Troubleshooting failures"
+    path:  /docs/development/testing/ctf/troubleshooting.md
 - title: "Contributing"
   section:
   - title: "Contributing Tests"
