@@ -11,10 +11,6 @@
 #include <lib/mmio-ptr/mmio-ptr.h>
 #include <stdint.h>
 
-// TODO(https://fxbug.dev/42170495): This is only used by old motmot and pl011 uart
-// drivers, which are slated to be replaced. Remove this when they go.
-#define REG32(addr) ((volatile uint32_t*)(uintptr_t)(addr))
-
 // TODO(https://fxbug.dev/42072070): Remaining users should be migrated to more modern
 // facilities such as hwreg or mmio-ptr directly.
 
