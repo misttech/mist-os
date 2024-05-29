@@ -793,7 +793,6 @@ def main() -> int:
     ]
 
     if args.quiet:
-        bazel_common_args += bazel_quiet_args
         bazel_test_args += [
             "--show_result=0",
             "--test_output=errors",
