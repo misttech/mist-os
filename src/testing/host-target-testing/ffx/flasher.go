@@ -54,7 +54,12 @@ func (f *Flasher) Flash(ctx context.Context) (string, error) {
 		args = append(args, "--target", f.target)
 	}
 
+	args = append(args, "--config",
+		"{\"ffx\": {\"fastboot\": {\"inline_target\": true, "+
+			"\"flash\":{\"timeout_rate\":4}}}}",
+	)
 	args = append(args, "target", "flash")
+	args = append(args, "--config", "{\"ffx\": {\"fastboot\": {\"inline_target\": true}}}")
 
 	// Write out the public key's authorized keys.
 	if f.sshPublicKey != nil {
