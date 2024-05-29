@@ -93,6 +93,8 @@ mod modules {
     }
 }
 
+const KNOCK_TARGET_TIMEOUT: Duration = Duration::from_secs(6);
+
 cfg_if! {
     if #[cfg(test)] {
         pub(crate) use self::mock_modules::get_host_tool;
@@ -491,7 +493,12 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             let start = Instant::now();
             let mut connection_errors = Vec::new();
             while start.elapsed().as_secs() <= startup_timeout {
-                let compat_res = ffx_target::knock_target_daemonless(name.clone(), &context).await;
+                let compat_res = ffx_target::knock_target_daemonless(
+                    Some(name.clone()),
+                    &context,
+                    Some(KNOCK_TARGET_TIMEOUT),
+                )
+                .await;
                 if let Ok(compat) = compat_res {
                     eprintln!("\nEmulator is ready.");
                     tracing::debug!(

@@ -106,8 +106,11 @@ async fn try_get_target_info(
     spec: String,
     context: &EnvironmentContext,
 ) -> Result<(Option<String>, Option<String>), KnockError> {
-    let conn = ffx_target::DirectConnection::new(spec, context).await?;
-    let _ = conn.knock_rcs().await?;
+    let addr = ffx_target::resolve_target_address(Some(spec), context).await?;
+    let connector = ffx_target::SshConnector::new(addr, context).await?;
+    let conn = ffx_target::Connection::new(connector)
+        .await
+        .map_err(|e| KnockError::CriticalError(e.into()))?;
     let rcs = conn.rcs_proxy().await?;
     let (pc, bc) = match rcs.identify_host().await {
         Ok(Ok(id_result)) => (id_result.product_config, id_result.board_config),

@@ -165,6 +165,7 @@ pub enum KnockRcsError {
 ///
 /// This can be used to verify whether it is up and running, or as a control flow to ensure that
 /// RCS is up and running before continuing time-sensitive operations.
+// TODO(b/339266778): Use non-FIDL error type.
 pub async fn knock_rcs(rcs_proxy: &RemoteControlProxy) -> Result<(), ffx::TargetConnectionError> {
     knock_rcs_impl(rcs_proxy).await.map_err(|e| match e {
         KnockRcsError::FidlError(e) => {
