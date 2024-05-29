@@ -20,7 +20,7 @@ use packet_formats::ip::IpExt;
 use crate::{
     conntrack,
     context::{FilterBindingsContext, FilterBindingsTypes},
-    logic::FilterTimerId,
+    logic::{nat::NatConfig, FilterTimerId},
     matchers::PacketMatcher,
     state::validation::ValidRoutines,
 };
@@ -78,7 +78,8 @@ pub enum Action<I: IpExt, DeviceClass, RuleInfo> {
     /// packet is redirected by rewriting the destination IP address to one
     /// owned by the ingress interface (if operating on incoming traffic in
     /// INGRESS) or the loopback address (if operating on locally-generated
-    /// traffic in LOCAL_EGRESS).
+    /// traffic in LOCAL_EGRESS). If this rule is installed on INGRESS and no IP
+    /// address is assigned to the incoming interface, the packet is dropped.
     ///
     /// As with all DNAT actions, this action is only valid in the INGRESS and
     /// LOCAL_EGRESS hooks. If a destination port is specified, this action is
@@ -313,14 +314,6 @@ pub struct NatRoutines<I: IpExt, DeviceClass, RuleInfo> {
     pub egress: Hook<I, DeviceClass, RuleInfo>,
 }
 
-/// Data stored in [`conntrack::Connection`] that is only needed by filtering.
-#[derive(Debug, Default)]
-pub struct ConntrackExternalData {}
-
-impl Inspectable for ConntrackExternalData {
-    fn record<I: netstack3_base::Inspector>(&self, _inspector: &mut I) {}
-}
-
 /// IP version-specific filtering routine state.
 #[derive(Derivative, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
@@ -343,8 +336,7 @@ pub struct State<I: IpExt, BT: FilterBindingsTypes> {
     /// that have any references in order to report them in inspect data.
     pub(crate) uninstalled_routines: Vec<UninstalledRoutine<I, BT::DeviceClass, ()>>,
     /// Connection tracking state.
-    #[allow(dead_code)]
-    pub(crate) conntrack: conntrack::Table<I, BT, ConntrackExternalData>,
+    pub(crate) conntrack: conntrack::Table<I, BT, NatConfig>,
 }
 
 impl<I: IpExt, BC: FilterBindingsContext> State<I, BC> {
@@ -393,14 +385,12 @@ impl<I: IpExt, BT: FilterBindingsTypes> Inspectable for State<I, BT> {
 /// important for filtering.
 pub trait FilterIpMetadata<I: IpExt, BT: FilterBindingsTypes> {
     /// Removes the conntrack connection, if it exists.
-    fn take_conntrack_connection(
-        &mut self,
-    ) -> Option<conntrack::Connection<I, BT, ConntrackExternalData>>;
+    fn take_conntrack_connection(&mut self) -> Option<conntrack::Connection<I, BT, NatConfig>>;
 
     /// Puts a new conntrack connection into the metadata struct, returning the
     /// previous value.
     fn replace_conntrack_connection(
         &mut self,
-        conn: conntrack::Connection<I, BT, ConntrackExternalData>,
-    ) -> Option<conntrack::Connection<I, BT, ConntrackExternalData>>;
+        conn: conntrack::Connection<I, BT, NatConfig>,
+    ) -> Option<conntrack::Connection<I, BT, NatConfig>>;
 }

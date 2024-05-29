@@ -26,7 +26,8 @@ use netstack3_base::{
     sync::{Mutex, RwLock},
     AnyDevice, CoreTimerContext, Counter, CounterContext, DeviceIdContext, DeviceIdentifier as _,
     EventContext, FrameDestination, HandleableTimer, Inspectable, Inspector, InstantContext,
-    NestedIntoCoreTimerCtx, StrongDeviceIdentifier, TimerContext, TimerHandler, TracingContext,
+    NestedIntoCoreTimerCtx, RngContext, StrongDeviceIdentifier, TimerContext, TimerHandler,
+    TracingContext,
 };
 use netstack3_filter::{
     self as filter, ConntrackConnection, FilterBindingsContext, FilterBindingsTypes,
@@ -1052,7 +1053,7 @@ impl Ipv4StateBuilder {
     pub fn build<
         CC: CoreTimerContext<IpLayerTimerId, BC>,
         StrongDeviceId: StrongDeviceIdentifier,
-        BC: TimerContext + IpLayerBindingsTypes,
+        BC: TimerContext + RngContext + IpLayerBindingsTypes,
     >(
         self,
         bindings_ctx: &mut BC,
@@ -1078,7 +1079,7 @@ impl Ipv6StateBuilder {
     pub fn build<
         CC: CoreTimerContext<IpLayerTimerId, BC>,
         StrongDeviceId: StrongDeviceIdentifier,
-        BC: TimerContext + IpLayerBindingsTypes,
+        BC: TimerContext + RngContext + IpLayerBindingsTypes,
     >(
         self,
         bindings_ctx: &mut BC,
@@ -1323,8 +1324,11 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateBindingsTypes> IpSta
     }
 }
 
-impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BC: TimerContext + IpStateBindingsTypes>
-    IpStateInner<I, D, BC>
+impl<
+        I: IpLayerIpExt,
+        D: StrongDeviceIdentifier,
+        BC: TimerContext + RngContext + IpStateBindingsTypes,
+    > IpStateInner<I, D, BC>
 {
     /// Creates a new inner IP layer state.
     pub fn new<CC: CoreTimerContext<IpLayerTimerId, BC>>(bindings_ctx: &mut BC) -> Self {

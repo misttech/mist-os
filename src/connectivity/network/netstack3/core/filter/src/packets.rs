@@ -1479,6 +1479,7 @@ pub mod testutil {
             const SUBNET: Subnet<Self::Addr> = net_subnet_v6!("2001:db8::/126");
         }
 
+        #[derive(Clone, Debug, PartialEq)]
         pub struct FakeIpPacket<I: IpExt, T>
         where
             for<'a> &'a T: TransportPacketExt<I>,
@@ -1486,6 +1487,12 @@ pub mod testutil {
             pub src_ip: I::Addr,
             pub dst_ip: I::Addr,
             pub body: T,
+        }
+
+        impl<I: IpExt> FakeIpPacket<I, FakeTcpSegment> {
+            pub(crate) fn reply(&self) -> Self {
+                Self { src_ip: self.dst_ip, dst_ip: self.src_ip, body: self.body.reply() }
+            }
         }
 
         pub trait TransportPacketExt<I: IpExt>: MaybeTransportPacket {
@@ -1529,9 +1536,16 @@ pub mod testutil {
             }
         }
 
+        #[derive(Clone, Debug, PartialEq)]
         pub struct FakeTcpSegment {
             pub src_port: u16,
             pub dst_port: u16,
+        }
+
+        impl FakeTcpSegment {
+            fn reply(&self) -> Self {
+                Self { src_port: self.dst_port, dst_port: self.src_port }
+            }
         }
 
         impl<I: IpExt> TransportPacketExt<I> for &FakeTcpSegment {

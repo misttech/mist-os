@@ -9,7 +9,7 @@ use net_types::{
     NonMappedAddr, SpecifiedAddr,
 };
 use netstack3_base::{
-    AnyDevice, DeviceIdContext, InstantBindingsTypes, TimerBindingsTypes, TimerContext,
+    AnyDevice, DeviceIdContext, InstantBindingsTypes, RngContext, TimerBindingsTypes, TimerContext,
 };
 use packet_formats::ip::IpExt;
 
@@ -26,8 +26,8 @@ pub trait FilterBindingsTypes: InstantBindingsTypes + TimerBindingsTypes {
 }
 
 /// Trait aggregating functionality required from bindings.
-pub trait FilterBindingsContext: TimerContext + FilterBindingsTypes {}
-impl<BC: TimerContext + FilterBindingsTypes> FilterBindingsContext for BC {}
+pub trait FilterBindingsContext: TimerContext + RngContext + FilterBindingsTypes {}
+impl<BC: TimerContext + RngContext + FilterBindingsTypes> FilterBindingsContext for BC {}
 
 /// The IP version-specific execution context for packet filtering.
 ///
@@ -90,16 +90,18 @@ pub(crate) mod testutil {
 
     use net_types::ip::Ip;
     use netstack3_base::{
-        testutil::{FakeInstant, FakeTimerCtx, FakeWeakDeviceId, WithFakeTimerContext},
+        testutil::{
+            FakeCryptoRng, FakeInstant, FakeTimerCtx, FakeWeakDeviceId, WithFakeTimerContext,
+        },
         InstantContext, IntoCoreTimerCtx,
     };
 
     use super::*;
     use crate::{
         conntrack,
-        logic::FilterTimerId,
+        logic::{nat::NatConfig, FilterTimerId},
         matchers::testutil::FakeDeviceId,
-        state::{validation::ValidRoutines, ConntrackExternalData, IpRoutines, Routines},
+        state::{validation::ValidRoutines, IpRoutines, Routines},
     };
 
     #[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
@@ -115,7 +117,7 @@ pub(crate) mod testutil {
 
     #[derive(Default)]
     pub struct FakeNatCtx<I: IpExt> {
-        device_addrs: HashMap<FakeDeviceId, NonMappedAddr<SpecifiedAddr<I::Addr>>>,
+        pub(crate) device_addrs: HashMap<FakeDeviceId, NonMappedAddr<SpecifiedAddr<I::Addr>>>,
     }
 
     impl<I: IpExt> FakeCtx<I> {
@@ -136,9 +138,7 @@ pub(crate) mod testutil {
             }
         }
 
-        pub fn conntrack(
-            &mut self,
-        ) -> &conntrack::Table<I, FakeBindingsCtx<I>, ConntrackExternalData> {
+        pub fn conntrack(&mut self) -> &conntrack::Table<I, FakeBindingsCtx<I>, NatConfig> {
             &self.state.conntrack
         }
     }
@@ -175,11 +175,12 @@ pub(crate) mod testutil {
 
     pub struct FakeBindingsCtx<I: Ip> {
         pub timer_ctx: FakeTimerCtx<FilterTimerId<I>>,
+        pub rng: FakeCryptoRng,
     }
 
     impl<I: Ip> FakeBindingsCtx<I> {
         pub(crate) fn new() -> Self {
-            Self { timer_ctx: Default::default() }
+            Self { timer_ctx: FakeTimerCtx::default(), rng: FakeCryptoRng::default() }
         }
 
         pub(crate) fn sleep(&mut self, time_elapsed: Duration) {
@@ -234,16 +235,22 @@ pub(crate) mod testutil {
             &self,
             f: F,
         ) -> O {
-            let Self { timer_ctx } = self;
-            f(timer_ctx)
+            f(&self.timer_ctx)
         }
 
         fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<FilterTimerId<I>>) -> O>(
             &mut self,
             f: F,
         ) -> O {
-            let Self { timer_ctx } = self;
-            f(timer_ctx)
+            f(&mut self.timer_ctx)
+        }
+    }
+
+    impl<I: Ip> RngContext for FakeBindingsCtx<I> {
+        type Rng<'a> = FakeCryptoRng where Self: 'a;
+
+        fn rng(&mut self) -> Self::Rng<'_> {
+            self.rng.clone()
         }
     }
 }
