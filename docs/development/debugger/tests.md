@@ -120,6 +120,12 @@ the `fx test` command with `zxdb`.
   ...
   ```
 
+  If you'd like to follow along, add this test target to your build graph with `fx set`:
+
+  ```posix-terminal
+  fx set workbench_eng.x64 --with-tests //src/diagnostics/archivist:tests
+  ```
+
 * {C++}
 
   The gTest test runner by default executes test cases serially, so only one
@@ -148,6 +154,12 @@ the `fx test` command with `zxdb`.
   EXPECT_EQ(reply.processes[0].process_koid, kProcessKoid1);
   EXPECT_EQ(reply.processes[0].process_name, kProcessName1);
   ...
+  ```
+
+  If you'd like to follow along, add this test target to your build graph with `fx set`:
+
+  ```posix-terminal
+  fx set workbench_eng.x64 --with-tests //src/developer/debug:tests
   ```
 
 ### 2. Execute tests {:#execute-tests}
