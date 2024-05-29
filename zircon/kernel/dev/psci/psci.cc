@@ -107,6 +107,16 @@ uint32_t psci_get_feature(uint32_t psci_call) {
   return (uint32_t)do_psci_call(PSCI64_PSCI_FEATURES, psci_call, 0, 0);
 }
 
+zx_status_t psci_system_reset2_raw(uint32_t reset_type, uint32_t cookie) {
+  dprintf(INFO, "PSCI SYSTEM_RESET2: %#" PRIx32 " %#" PRIx32 "\n", reset_type, cookie);
+
+  uint64_t psci_status = do_psci_call(PSCI64_SYSTEM_RESET2, reset_type, cookie, 0);
+
+  dprintf(INFO, "PSCI SYSTEM_RESET2 returns %" PRIi64 "\n", static_cast<int64_t>(psci_status));
+
+  return psci_status_to_zx_status(psci_status);
+}
+
 zx_status_t psci_system_reset(power_reboot_flags flags) {
   uint64_t* args = reboot_args;
 
