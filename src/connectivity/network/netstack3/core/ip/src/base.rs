@@ -974,7 +974,7 @@ pub trait IpLayerIngressContext<
     I: IpLayerIpExt + IcmpHandlerIpExt,
     BC: IpLayerBindingsContext<I, Self::DeviceId>,
 >:
-    IpTransportDispatchContext<I, BC, DeviceId = Self::DeviceId_>
+    IpTransportDispatchContext<I, BC, DeviceId: filter::InterfaceProperties<BC::DeviceClass>>
     + IpDeviceStateContext<I, BC>
     + IpDeviceSendContext<I, BC>
     + IcmpErrorHandler<I, BC>
@@ -983,20 +983,16 @@ pub trait IpLayerIngressContext<
     + FilterHandlerProvider<I, BC>
     + RawIpSocketHandler<I, BC>
 {
-    // This is working around the fact that currently, where clauses are only
-    // elaborated for supertraits, and not, for example, bounds on associated types
-    // as we have here.
-    //
-    // See https://github.com/rust-lang/rust/issues/20671#issuecomment-1905186183
-    // for more discussion.
-    type DeviceId_: filter::InterfaceProperties<BC::DeviceClass> + Debug;
 }
 
 impl<
         I: IpLayerIpExt + IcmpHandlerIpExt,
         BC: IpLayerBindingsContext<I, CC::DeviceId>,
-        CC: IpTransportDispatchContext<I, BC>
-            + IpDeviceStateContext<I, BC>
+        CC: IpTransportDispatchContext<
+                I,
+                BC,
+                DeviceId: filter::InterfaceProperties<BC::DeviceClass>,
+            > + IpDeviceStateContext<I, BC>
             + IpDeviceSendContext<I, BC>
             + IcmpErrorHandler<I, BC>
             + IpLayerContext<I, BC>
@@ -1004,36 +1000,26 @@ impl<
             + FilterHandlerProvider<I, BC>
             + RawIpSocketHandler<I, BC>,
     > IpLayerIngressContext<I, BC> for CC
-where
-    Self::DeviceId: filter::InterfaceProperties<BC::DeviceClass>,
 {
-    type DeviceId_ = Self::DeviceId;
 }
 
 /// A marker trait for all the contexts required for IP egress.
 pub(crate) trait IpLayerEgressContext<I, BC>:
-    IpDeviceSendContext<I, BC, DeviceId = Self::DeviceId_> + FilterHandlerProvider<I, BC>
+    IpDeviceSendContext<I, BC, DeviceId: filter::InterfaceProperties<BC::DeviceClass>>
+    + FilterHandlerProvider<I, BC>
 where
     I: IpLayerIpExt,
     BC: FilterBindingsContext,
 {
-    // This is working around the fact that currently, where clauses are only
-    // elaborated for supertraits, and not, for example, bounds on associated types
-    // as we have here.
-    //
-    // See https://github.com/rust-lang/rust/issues/20671#issuecomment-1905186183
-    // for more discussion.
-    type DeviceId_: filter::InterfaceProperties<BC::DeviceClass> + StrongDeviceIdentifier + Debug;
 }
 
 impl<I, BC, CC> IpLayerEgressContext<I, BC> for CC
 where
     I: IpLayerIpExt,
     BC: FilterBindingsContext,
-    CC: IpDeviceSendContext<I, BC> + FilterHandlerProvider<I, BC>,
-    Self::DeviceId: filter::InterfaceProperties<BC::DeviceClass>,
+    CC: IpDeviceSendContext<I, BC, DeviceId: filter::InterfaceProperties<BC::DeviceClass>>
+        + FilterHandlerProvider<I, BC>,
 {
-    type DeviceId_ = Self::DeviceId;
 }
 
 /// A builder for IPv4 state.
