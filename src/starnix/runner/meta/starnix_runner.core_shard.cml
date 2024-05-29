@@ -44,6 +44,13 @@
             to: "#starnix_runner",
         },
         {
+            protocol: [ "fuchsia.net.filter.Control_OnlyForStarnix" ],
+            from: "#network",
+            as: "fuchsia.net.filter.Control",
+            to: "#starnix_runner",
+            source_availability: "unknown",
+        },
+        {
             protocol: [ "fuchsia.net.root.Interfaces_OnlyForStarnix" ],
             from: "#network",
             as: "fuchsia.net.root.Interfaces",
