@@ -11,8 +11,6 @@
 #include <lib/async/cpp/task.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
-#include <lib/fidl/cpp/wire/server.h>
-#include <lib/fidl/cpp/wire/wire_messaging.h>
 #include <lib/fit/defer.h>
 #include <zircon/errors.h>
 #include <zircon/rights.h>
@@ -34,7 +32,6 @@ namespace fdh = fuchsia_driver_host;
 namespace fdd = fuchsia_driver_development;
 namespace fdi = fuchsia_driver_index;
 namespace fio = fuchsia_io;
-namespace fprocess = fuchsia_process;
 namespace frunner = fuchsia_component_runner;
 namespace fcomponent = fuchsia_component;
 namespace fdecl = fuchsia_component_decl;
@@ -279,7 +276,12 @@ void DriverRunner::AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& c
           .parents = fidl::ToNatural(request->parents()).value(),
       },
       dispatcher_, this);
-  completer.Reply(composite_node_spec_manager_.AddSpec(*request, std::move(spec)));
+  composite_node_spec_manager_.AddSpec(
+      *request, std::move(spec),
+      [completer = completer.ToAsync()](
+          fit::result<fuchsia_driver_framework::CompositeNodeSpecError> result) mutable {
+        completer.Reply(result);
+      });
 }
 
 void DriverRunner::handle_unknown_method(

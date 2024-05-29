@@ -114,6 +114,11 @@
     },
     {
         "kind": "enum/member",
+        "name": "fuchsia.driver.framework/CompositeNodeSpecError.DRIVER_INDEX_FAILURE",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
         "name": "fuchsia.driver.framework/CompositeNodeSpecError.EMPTY_NODES",
         "value": "2"
     },

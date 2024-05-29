@@ -47,6 +47,7 @@ type CompositeNodeSpec = table {
 };
 
 /// Error codes for the CompositeNodeManager protocol.
+@available(replaced=20)
 type CompositeNodeSpecError = flexible enum {
     /// An argument of the composite node spec was not provided.
     MISSING_ARGS = 1;
@@ -55,6 +56,20 @@ type CompositeNodeSpecError = flexible enum {
     /// The `name` in the given composite node spec is a duplicate of an already
     /// created composite node spec.
     ALREADY_EXISTS = 3;
+};
+
+/// Error codes for the CompositeNodeManager protocol.
+@available(added=20)
+type CompositeNodeSpecError = flexible enum {
+    /// An argument of the composite node spec was not provided.
+    MISSING_ARGS = 1;
+    /// The given composite node spec's `nodes` is empty.
+    EMPTY_NODES = 2;
+    /// The `name` in the given composite node spec is a duplicate of an already
+    /// created composite node spec.
+    ALREADY_EXISTS = 3;
+    /// The spec failed to be added to the driver index.
+    DRIVER_INDEX_FAILURE = 4;
 };
 
 /// Protocol through which board drivers can create composite node specs.

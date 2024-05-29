@@ -10,11 +10,10 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/fit/defer.h>
 
-#include <zxtest/zxtest.h>
-
 #include <memory>
 #include <utility>
-#include <utility>
+
+#include <zxtest/zxtest.h>
 
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec.h"
 #include "src/devices/bin/driver_manager/node.h"
@@ -82,13 +81,22 @@ class FakeDeviceManagerBridge : public driver_manager::CompositeManagerBridge {
   void BindNodesForCompositeNodeSpec() override {}
   void AddSpecToDriverIndex(fdf::wire::CompositeNodeSpec spec,
                             driver_manager::AddToIndexCallback callback) override {
-    callback(zx::ok());
+    if (add_spec_status_ == ZX_OK) {
+      callback(zx::ok());
+    } else {
+      callback(zx::error(add_spec_status_));
+    }
   }
 
   void RequestRebindFromDriverIndex(std::string spec, std::optional<std::string> driver_url_suffix,
                                     fit::callback<void(zx::result<>)> callback) override {
     callback(zx::ok());
   }
+
+  void set_add_spec_status(zx_status_t status) { add_spec_status_ = status; }
+
+ private:
+  zx_status_t add_spec_status_ = ZX_OK;
 };
 
 class CompositeNodeSpecManagerTest : public zxtest::Test {
@@ -113,16 +121,20 @@ class CompositeNodeSpecManagerTest : public zxtest::Test {
         .parents = parents,
     });
     auto spec_ptr = spec.get();
-    auto result = composite_node_spec_manager_->AddSpec(fidl::ToWire(arena, fdf::CompositeNodeSpec{{
-                                                                                .name = name,
-                                                                                .parents = parents,
-                                                                            }}),
-                                                        std::move(spec));
-    if (result.is_ok()) {
+    std::optional<fit::result<fuchsia_driver_framework::CompositeNodeSpecError>> add_spec_result;
+
+    composite_node_spec_manager_->AddSpec(
+        fidl::ToWire(arena, fdf::CompositeNodeSpec{{
+                                .name = name,
+                                .parents = parents,
+                            }}),
+        std::move(spec), [&add_spec_result](fit::result<fdf::CompositeNodeSpecError> result) {
+          add_spec_result = result;
+        });
+    if (add_spec_result->is_ok()) {
       specs_[name] = spec_ptr;
     }
-
-    return result;
+    return add_spec_result.value();
   }
 
   std::shared_ptr<driver_manager::Node> CreateNode(const char* name) {
@@ -212,6 +224,24 @@ TEST_F(CompositeNodeSpecManagerTest, TestBindSameNodeTwice) {
                                                              spec_name, 0, {"node-0", "node-1"})}),
                                  std::weak_ptr<driver_manager::Node>(node))
                 .status_value());
+}
+
+TEST_F(CompositeNodeSpecManagerTest, FailedDriverIndexCall) {
+  fidl::Arena allocator;
+
+  std::vector<fdf::ParentSpec> parents{
+      MakeParentSpec({fdf::MakeAcceptBindRule(10, 1)}, {fdf::MakeProperty(1, 1)}),
+      MakeParentSpec({fdf::MakeAcceptBindRule(10, 1)}, {fdf::MakeProperty(20, 100)}),
+  };
+
+  bridge_.set_add_spec_status(ZX_ERR_INTERNAL);
+
+  auto spec_name = "test_name";
+
+  auto result = AddSpec(allocator, spec_name, std::move(parents));
+  ASSERT_FALSE(result.is_ok());
+  EXPECT_EQ(fuchsia_driver_framework::CompositeNodeSpecError::kDriverIndexFailure,
+            result.error_value());
 }
 
 TEST_F(CompositeNodeSpecManagerTest, TestMultibindDisabled) {
