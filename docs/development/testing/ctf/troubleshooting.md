@@ -29,7 +29,7 @@ common to each scenario (see [motivation] for more testing scenarios):
 - [`generate_ctf_tests.gni`][generate_ctf_tests] contains a rule
   `template("generate_echo-service-tests")` which merges the incoming
   client package with a server package built on `main`. (see the
-  user guide for details).
+  [user guide] for details).
 
 - The client calls a method on the server called `Echo` which takes
   as input a string and returns as output a string as follows:
@@ -290,6 +290,7 @@ which we need to obtain diagnostics data. A CL was submitted to
 
 [generate_ctf_tests]: https://fuchsia.googlesource.com/fuchsia/+/HEAD/sdk/ctf/build/generate_ctf_tests.gni
 [motivation]: /docs/development/testing/ctf/compatibility_testing.md#motivation
+[user guide]: /docs/development/testing/ctf/user_guide.md
 [version_history]: https://fuchsia.googlesource.com/fuchsia/+/HEAD/sdk/version_history.json
 [disable-cl]: https://fuchsia-review.googlesource.com/c/fuchsia/+/1015705/19/sdk/ctf/build/generate_ctf_tests.gni#40
 
