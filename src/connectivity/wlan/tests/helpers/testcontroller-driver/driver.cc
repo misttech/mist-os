@@ -235,7 +235,11 @@ class WlanFullmacImplToChannelBridge : public fdf::Server<fuchsia_wlan_fullmac::
         ForwardResult<WlanFullmacImplBridge::EapolTx>(completer.ToAsync()));
   }
   void GetIfaceCounterStats(GetIfaceCounterStatsCompleter::Sync& completer) override {}
-  void GetIfaceHistogramStats(GetIfaceHistogramStatsCompleter::Sync& completer) override {}
+  void GetIfaceHistogramStats(GetIfaceHistogramStatsCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->GetIfaceHistogramStats().Then(
+        ForwardResult<WlanFullmacImplBridge::GetIfaceHistogramStats>(completer.ToAsync()));
+  }
   void SetMulticastPromisc(SetMulticastPromiscRequest& request,
                            SetMulticastPromiscCompleter::Sync& completer) override {}
   void SaeHandshakeResp(SaeHandshakeRespRequest& request,
