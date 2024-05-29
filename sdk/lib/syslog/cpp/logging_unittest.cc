@@ -246,22 +246,22 @@ TEST_F(LoggingFixture, SLog) {
   std::string log_id = uuid::Generate();
 
   int line1 = __LINE__ + 1;
-  FX_SLOG(ERROR, nullptr, "some_msg", "String log");
+  FX_SLOG(ERROR, nullptr, FX_KV("some_msg", "String log"));
 
   int line2 = __LINE__ + 1;
-  FX_SLOG(ERROR, nullptr, "some_msg", 42);
+  FX_SLOG(ERROR, nullptr, FX_KV("some_msg", 42));
 
   int line4 = __LINE__ + 1;
-  FX_SLOG(ERROR, "msg", "first", 42, "second", "string");
+  FX_SLOG(ERROR, "msg", FX_KV("first", 42), FX_KV("second", "string"));
 
   int line5 = __LINE__ + 1;
   FX_SLOG(ERROR, "String log");
 
   int line6 = __LINE__ + 1;
-  FX_SLOG(ERROR, nullptr, "float", 0.25f);
+  FX_SLOG(ERROR, nullptr, FX_KV("float", 0.25f));
 
   int line7 = __LINE__ + 1;
-  FX_SLOG(ERROR, "String with quotes", "value", "char is '\"'");
+  FX_SLOG(ERROR, "String with quotes", FX_KV("value", "char is '\"'"));
 
   std::string log = ReadLogs(state);
   EXPECT_THAT(
