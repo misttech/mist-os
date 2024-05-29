@@ -102,5 +102,9 @@
         allow_magma_icds: { type: "bool" },
         allow_goldfish_icd: { type: "bool" },
         allow_lavapipe_icd: { type: "bool" },
+        lavapipe_icd_url: {
+            type: "string",
+            max_size: 120,
+        },
     },
 }

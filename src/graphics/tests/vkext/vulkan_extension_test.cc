@@ -149,10 +149,14 @@ bool VulkanExtensionTest::InitSysmemAllocator() {
   if (status != ZX_OK) {
     RTN_MSG(false, "Fdio_service_connect failed: %d\n", status);
   }
-  sysmem_allocator_->SetDebugClientInfo(
+  status = sysmem_allocator_->SetDebugClientInfo(
       std::move(fuchsia::sysmem2::AllocatorSetDebugClientInfoRequest{}
                     .set_name(fsl::GetCurrentProcessName())
                     .set_id(fsl::GetCurrentProcessKoid())));
+
+  if (status != ZX_OK) {
+    RTN_MSG(false, "SetDebugClientInfo failed: %d\n", status);
+  }
   return true;
 }
 
