@@ -50,12 +50,24 @@ build group the new test belongs to
 Please reach out to Lacewing team if you need help with this one.
 
 ## CQ VS CI vs FYI
+Lacewing test case can be run in Infra in of the following builder types:
+* CQ builder - Builds and tests pending CLs before they get checked in, to make
+  it less likely that breakages will make their way to main (and thus break the
+  CI).
+* CI builder - Builds and tests the code that has been checked in. Any failure
+  in this builder will be reported Fuchsia Build gardeners and need to be
+  triaged ASAP.
+* FYI builder - Build and and tests the code that has been checked in, but
+  unlike CI these builders are not expected to be green at all times.
+
 Use the following approach in deciding whether to run the test case in CQ/CI/FYI:
-* Any test case that can be run using Emulator will be first run in FYI.
-  After 200 consecutive successful runs, test case will be promoted to CQ.
-* Any test case that can be run using hardware (NUC, VIM3 etc) will be run in
-  FYI and will remain in FYI. (We are exploring options on gradually promoting
-  these tests from FYI to CI but at the moment these tests will remain in FYI).
+* Anytime a new Lacewing test needs to be run in infra, always start in FYI.
+* After 200 consecutive successful runs, test case can then be promoted to CQ/CI
+  based on below criteria:
+  * If infra has enough testbed capacity (that is needed to run this test) then
+    it can be promoted to CQ.
+  * If infra has limited testbeds (that is needed to run this test) to run this
+    test then it can be promoted to CI.
 
 Based on this we have created the following:
 * Test case build groups:
@@ -78,11 +90,13 @@ Based on this we have created the following:
         (as it depends on `<BOARD>` also).
     * `[ |_sl4f]` informs whether a test group can be run on certain products.
     * `<BOARD>` informs whether a test group can be run on certain boards.
+* Package groups:
+  * Package group naming scheme: `<PRODUCT>_<BOARD>_<STABILITY>[ |_sl4f]_packages`
 * Builder examples:
-  * `core.x64-debug-pye2e` - CQ builder to run stable emulator and NUC tests
-  * `core.x64-debug-pye2e-users-staging` - FYI builder to run unstable emulator and NUC tests
-  * `core.vim3-debug-pye2e-users-staging` - FYI builder to run unstable VIM3 tests
-  * format: `<PRODUCT>.<BOARD>-debug-pye2e[-users| ]-[ |staging|ci]`, where
+  * `core.x64-debug-lacewing` - CQ builder to run stable emulator and NUC tests
+  * `core.x64-debug-lacewing-users-staging` - FYI builder to run unstable emulator and NUC tests
+  * `core.vim3-debug-lacewing-users-staging` - FYI builder to run unstable VIM3 tests
+  * format: `<PRODUCT>.<BOARD>-[debug|release]-lacewing[-users| ]-[ |staging|ci]`, where
     * for "staging" builders `-users` will be used in the builder name
     * if builder is for "CQ" then no postfix is needed but for other stages,
       postfix is necessary (`-staging` or `-ci`)
