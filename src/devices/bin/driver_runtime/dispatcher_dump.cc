@@ -106,8 +106,10 @@ void Dispatcher::FormatDump(DumpState* state, std::vector<std::string>* dump_out
   if (state->debug_stats.num_total_requests != state->debug_stats.num_inlined_requests) {
     OutputFormattedString(dump_out, "Reasons why requests were not inlined:");
     if (non_inlined_stats.allow_sync_calls > 0) {
-      OutputFormattedString(dump_out, "* The dispatcher has ALLOW_SYNC_CALL set: %lu times",
-                            non_inlined_stats.allow_sync_calls);
+      OutputFormattedString(
+          dump_out,
+          "* Calling from a non-blocking to a blocking (ALLOW_SYNC_CALLS) dispatcher: %lu times",
+          non_inlined_stats.allow_sync_calls);
     }
     if (non_inlined_stats.parallel_dispatch > 0) {
       OutputFormattedString(dump_out,

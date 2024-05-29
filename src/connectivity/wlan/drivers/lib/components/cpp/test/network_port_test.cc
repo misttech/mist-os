@@ -61,7 +61,19 @@ struct NetworkPortTest : public fdf_testing::DriverTestFixture<TestFixtureConfig
       // about the status here. Some tests will have already removed the port which will cause this
       // to fail and other tests should verify that the status is ZX_OK when the removal works.
       libsync::Completion port_removed;
-      port_->RemovePort([&](zx_status_t) { port_removed.Signal(); });
+      // We should call port |Init| and |RemovePort| operations from the same driver context
+      // as the port dispatcher. This can be emulated by the test by posting a task to the port
+      // dispatcher.
+      //
+      // This allows the driver runtime to detect when a driver would be reentrantly calling
+      // to itself, and skip inlining the call.
+      //
+      // For example, |port_->RemovePort| will call the |netdev_ifc->RemovePort|,
+      // which leads to |port_->Removed| being called. Since |RemovePort| and |Removed| both
+      // acquire the port lock, we do not want the sequence of 3 calls to be inlined by
+      // the driver runtime.
+      async::PostTask(fdf_dispatcher_get_async_dispatcher(dispatcher_),
+                      [&] { port_->RemovePort([&](zx_status_t) { port_removed.Signal(); }); });
       port_removed.Wait();
     }
     ASSERT_OK(StopDriver().status_value());
@@ -75,9 +87,11 @@ struct NetworkPortTest : public fdf_testing::DriverTestFixture<TestFixtureConfig
   zx_status_t InitPort(NetworkPort& port, NetworkPort::Role role = NetworkPort::Role::Client) {
     zx_status_t result = ZX_OK;
     libsync::Completion initialized;
-    port.Init(role, dispatcher_, [&](zx_status_t status) {
-      result = status;
-      initialized.Signal();
+    async::PostTask(fdf_dispatcher_get_async_dispatcher(dispatcher_), [&] {
+      port.Init(role, dispatcher_, [&](zx_status_t status) {
+        result = status;
+        initialized.Signal();
+      });
     });
     initialized.Wait();
     return result;
@@ -208,9 +222,11 @@ TEST_F(NetworkPortTest, RemovePortByUser) {
   // PortRemoved should NOT be called for a user initiated port removal.
   EXPECT_CALL(port_ifc_, PortRemoved).Times(0);
   libsync::Completion remove_port_completed;
-  port.RemovePort([&](zx_status_t status) {
-    EXPECT_OK(status);
-    remove_port_completed.Signal();
+  async::PostTask(fdf_dispatcher_get_async_dispatcher(dispatcher_), [&]() {
+    port.RemovePort([&](zx_status_t status) {
+      EXPECT_OK(status);
+      remove_port_completed.Signal();
+    });
   });
   remove_port_called.Wait();
   remove_port_completed.Wait();
@@ -241,11 +257,13 @@ TEST_F(NetworkPortTest, RemovesPortInAddPortCallback) {
   // callback if Init succeeds. This shouldn't be a common use case but could happen if the callback
   // performs other initialization that could fail, leaing to the removal of the port.
   libsync::Completion removed;
-  port.Init(NetworkPort::Role::Client, dispatcher_, [&](zx_status_t status) mutable {
-    EXPECT_OK(status);
-    port.RemovePort([&](zx_status_t status) {
+  async::PostTask(fdf_dispatcher_get_async_dispatcher(dispatcher_), [&]() {
+    port.Init(NetworkPort::Role::Client, dispatcher_, [&](zx_status_t status) mutable {
       EXPECT_OK(status);
-      removed.Signal();
+      port.RemovePort([&](zx_status_t status) {
+        EXPECT_OK(status);
+        removed.Signal();
+      });
     });
   });
   removed.Wait();

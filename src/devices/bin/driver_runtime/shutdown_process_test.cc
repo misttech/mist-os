@@ -58,7 +58,8 @@ TEST_F(ShutdownProcessTest, ShutdownProcessAsyncLoop) {
       });
   ASSERT_OK(channel_read->Begin(dispatcher->get()));
 
-  // The receiving dispatcher is blocking, so the read will be queued on the async loop.
+  // The call is reentrant so the read will be queued on the async loop.
+  ASSERT_OK(fdf_testing_set_default_dispatcher(dispatcher->get()));
   ASSERT_EQ(ZX_OK, fdf_channel_write(remote.get(), 0, nullptr, nullptr, 0, nullptr, 0));
   // This will queue the wait to run |Dispatcher::CompleteShutdown|.
   dispatcher->ShutdownAsync();
@@ -68,4 +69,5 @@ TEST_F(ShutdownProcessTest, ShutdownProcessAsyncLoop) {
   driver_runtime::GetDispatcherCoordinator().default_thread_pool()->loop()->Shutdown();
 
   shutdown_completion.Wait();
+  ASSERT_OK(fdf_testing_set_default_dispatcher(nullptr));
 }

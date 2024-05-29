@@ -486,7 +486,7 @@ class Dispatcher : public async_dispatcher_t,
   // Returns the dispatcher options specified by the user.
   uint32_t options() const { return options_; }
   bool unsynchronized() const { return unsynchronized_; }
-  bool allow_sync_calls() const { return allow_sync_calls_; }
+  bool allow_sync_calls() const { return allow_sync_calls_.load(); }
 
   // Returns the driver which owns this dispatcher.
   const void* owner() const { return owner_; }
@@ -739,7 +739,7 @@ class Dispatcher : public async_dispatcher_t,
   // Dispatcher options set by the user.
   uint32_t options_;
   bool unsynchronized_;
-  bool allow_sync_calls_;
+  std::atomic_bool allow_sync_calls_;
 
   // The driver which owns this dispatcher. May be nullptr if undeterminable.
   const void* const owner_;

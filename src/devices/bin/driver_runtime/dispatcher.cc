@@ -630,7 +630,7 @@ zx_status_t Dispatcher::Seal(uint32_t option) {
     }
 
     // Set our field.
-    allow_sync_calls_ = false;
+    allow_sync_calls_.store(false);
   }
 
   // Tell our thread pool to remove a thread as we no longer have allow_sync_calls_, which caused
@@ -943,9 +943,23 @@ fit::result<Dispatcher::NonInlinedReason> Dispatcher::ShouldInline(
   auto req_type = callback_request->request_type();
 
   if (!unsynchronized_) {
-    // Blocking dispatchers are required to queue all callbacks onto the async loop.
+    // Calling from a non-blocking dispatcher to a blocking dispatcher will lead to
+    // the driver runtime queueing the callback onto the async loop.
     if (allow_sync_calls_) {
-      return fit::error(NonInlinedReason::kAllowSyncCalls);
+      auto sender = driver_context::GetCurrentDispatcher();
+      bool sender_allows_sync = false;
+      // Check if the sender is a blocking or non-blocking dispatcher.
+      // We don't have to check further down the call stack, as we would never allow
+      // a direct non-blocking to blocking transition.
+      if (sender && !sender->unsynchronized()) {
+        // Since we are currently running on the sender's dispatcher, the |allow_sync_calls| value
+        // should not be able to be modified in the meanwhile, as |Seal| requires to be called while
+        // running on the dispatcher.
+        sender_allows_sync = sender->allow_sync_calls();
+      }
+      if (!sender_allows_sync) {
+        return fit::error(NonInlinedReason::kAllowSyncCalls);
+      }
     }
     // Synchronous dispatchers do not allow parallel callbacks. If we are already
     // dispatching a request on another thread, we will have to queue this request for later.
