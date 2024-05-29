@@ -4690,18 +4690,17 @@ checksum = "bbf752f9ee0c3d93a52ae37a2af72e98bb9230b4164737623b0bfc1d84db1eda"
 
 [[package]]
 name = "tuf"
-version = "0.3.0-beta11"
+version = "0.3.0-beta12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d53aed74d79e26e86f273bfbae97a8fab9df4e662fb8cfbdd75f40f8db31b7d"
+checksum = "6bd403d0dc8bf17442863b8b7d8e691fe975f26208df082af3516d238903798e"
 dependencies = [
  "chrono",
  "data-encoding",
- "derp",
  "futures-io",
  "futures-util",
  "http",
  "hyper",
- "itoa 0.4.3",
+ "itoa 1.0.5",
  "log",
  "percent-encoding 2.2.0",
  "ring",

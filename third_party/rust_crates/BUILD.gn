@@ -1073,7 +1073,7 @@ if (current_os == "fuchsia") {
 }
 
 group("tuf") {
-  public_deps = [ ":tuf-v0_3_0-beta11" ]
+  public_deps = [ ":tuf-v0_3_0-beta12" ]
 }
 
 group("typed-builder") {
@@ -12642,7 +12642,7 @@ rust_library("ring-v0_16_20") {
   visibility += [ ":rustls-v0_19_1" ]
   visibility += [ ":sct-v0_6_0" ]
   visibility += [ ":trust-dns-proto-v0_21_2" ]
-  visibility += [ ":tuf-v0_3_0-beta11" ]
+  visibility += [ ":tuf-v0_3_0-beta12" ]
   visibility += [ ":webpki-v0_21_0" ]
 
   applicable_licenses = [ ":ring-v0_16_20.license" ]
@@ -16509,29 +16509,28 @@ rust_library("ttf-parser-v0_10_1") {
   applicable_licenses = [ ":ttf-parser-v0_10_1.license" ]
 }
 
-license("tuf-v0_3_0-beta11.license") {
+license("tuf-v0_3_0-beta12.license") {
   public_package_name = "tuf"
   license_files = [
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta11/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta11/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/LICENSE-MIT",
   ]
 }
 
-rust_library("tuf-v0_3_0-beta11") {
+rust_library("tuf-v0_3_0-beta12") {
   crate_name = "tuf"
-  crate_root = "//third_party/rust_crates/vendor/tuf-0.3.0-beta11/src/lib.rs"
-  output_name = "tuf-626873d1c4c31241"
+  crate_root = "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/lib.rs"
+  output_name = "tuf-90ecc9b52560181b"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":chrono-v0_4_34" ]
   deps += [ ":data-encoding-v2_3_2" ]
-  deps += [ ":derp-v0_0_14" ]
   deps += [ ":futures-io-v0_3_19" ]
   deps += [ ":futures-util-v0_3_19" ]
   deps += [ ":http-v0_2_4" ]
   deps += [ ":hyper-v0_14_19" ]
-  deps += [ ":itoa-v0_4_3" ]
+  deps += [ ":itoa-v1_0_5" ]
   deps += [ ":log-v0_4_20" ]
   deps += [ ":percent-encoding-v2_2_0" ]
   deps += [ ":ring-v0_16_20" ]
@@ -16548,14 +16547,14 @@ rust_library("tuf-v0_3_0-beta11") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=626873d1c4c31241",
-    "-Cextra-filename=-626873d1c4c31241",
+    "-Cmetadata=90ecc9b52560181b",
+    "-Cextra-filename=-90ecc9b52560181b",
     "--cfg=feature=\"hyper\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":tuf-v0_3_0-beta11.license" ]
+  applicable_licenses = [ ":tuf-v0_3_0-beta12.license" ]
 }
 
 license("typed-arena-v1_4_1.license") {

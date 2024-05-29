@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "tuf"
-version = "0.3.0-beta11"
+version = "0.3.0-beta12"
 authors = [
     "heartsucker <heartsucker@autistici.org>",
     "Erick Tryzelaar <etryzelaar@google.com>",
@@ -36,14 +36,11 @@ name = "tuf"
 path = "./src/lib.rs"
 
 [dependencies.chrono]
-version = "0.4"
+version = "0.4.23"
 features = ["serde"]
 
 [dependencies.data-encoding]
 version = "2.0.0-rc.2"
-
-[dependencies.derp]
-version = "0.0.14"
 
 [dependencies.futures-io]
 version = "0.3.1"
@@ -66,7 +63,7 @@ optional = true
 default-features = false
 
 [dependencies.itoa]
-version = "0.4"
+version = "1.0"
 
 [dependencies.log]
 version = "0.4"
@@ -118,4 +115,3 @@ default = [
     "hyper",
     "hyper/tcp",
 ]
-unstable_rsa = []

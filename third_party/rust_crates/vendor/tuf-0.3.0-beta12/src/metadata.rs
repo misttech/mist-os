@@ -420,11 +420,7 @@ where
     /// Construct a new `SignedMetadata` using the included signatures, sorting the signatures by
     /// `KeyId`.
     pub fn build(self) -> SignedMetadata<D, M> {
-        let mut signatures = self
-            .signatures
-            .into_iter()
-            .map(|(_k, v)| v)
-            .collect::<Vec<_>>();
+        let mut signatures = self.signatures.into_values().collect::<Vec<_>>();
         signatures.sort_unstable_by(|a, b| a.key_id().cmp(b.key_id()));
 
         SignedMetadata {
@@ -2470,7 +2466,7 @@ mod test {
         let timestamp_key = Ed25519PrivateKey::from_pkcs8(ED25519_4_PK8).unwrap();
 
         let root = RootMetadataBuilder::new()
-            .expires(Utc.ymd(2017, 1, 1).and_hms(0, 0, 0))
+            .expires(Utc.with_ymd_and_hms(2017, 1, 1, 0, 0, 0).unwrap())
             .root_key(root_key.public().clone())
             .snapshot_key(snapshot_key.public().clone())
             .targets_key(targets_key.public().clone())
@@ -2820,7 +2816,7 @@ mod test {
         .unwrap();
 
         let timestamp = TimestampMetadataBuilder::from_metadata_description(description)
-            .expires(Utc.ymd(2017, 1, 1).and_hms(0, 0, 0))
+            .expires(Utc.with_ymd_and_hms(2017, 1, 1, 0, 0, 0).unwrap())
             .build()
             .unwrap();
 
@@ -2852,7 +2848,7 @@ mod test {
         let description = MetadataDescription::new(1, None, HashMap::new()).unwrap();
 
         let timestamp = TimestampMetadataBuilder::from_metadata_description(description)
-            .expires(Utc.ymd(2017, 1, 1).and_hms(0, 0, 0))
+            .expires(Utc.with_ymd_and_hms(2017, 1, 1, 0, 0, 0).unwrap())
             .build()
             .unwrap();
 
@@ -2925,7 +2921,7 @@ mod test {
     #[test]
     fn serde_snapshot_metadata() {
         let snapshot = SnapshotMetadataBuilder::new()
-            .expires(Utc.ymd(2017, 1, 1).and_hms(0, 0, 0))
+            .expires(Utc.with_ymd_and_hms(2017, 1, 1, 0, 0, 0).unwrap())
             .insert_metadata_description(
                 MetadataPath::new("targets").unwrap(),
                 MetadataDescription::new(
@@ -2964,7 +2960,7 @@ mod test {
     #[test]
     fn serde_snapshot_optional_length_and_hashes() {
         let snapshot = SnapshotMetadataBuilder::new()
-            .expires(Utc.ymd(2017, 1, 1).and_hms(0, 0, 0))
+            .expires(Utc.with_ymd_and_hms(2017, 1, 1, 0, 0, 0).unwrap())
             .insert_metadata_description(
                 MetadataPath::new("targets").unwrap(),
                 MetadataDescription::new(1, None, HashMap::new()).unwrap(),
@@ -2994,7 +2990,7 @@ mod test {
     fn serde_targets_metadata() {
         block_on(async {
             let targets = TargetsMetadataBuilder::new()
-                .expires(Utc.ymd(2017, 1, 1).and_hms(0, 0, 0))
+                .expires(Utc.with_ymd_and_hms(2017, 1, 1, 0, 0, 0).unwrap())
                 .insert_target_from_slice(
                     TargetPath::new("insert-target-from-slice").unwrap(),
                     &b"foo"[..],
@@ -3098,7 +3094,7 @@ mod test {
         .unwrap();
 
         let targets = TargetsMetadataBuilder::new()
-            .expires(Utc.ymd(2017, 1, 1).and_hms(0, 0, 0))
+            .expires(Utc.with_ymd_and_hms(2017, 1, 1, 0, 0, 0).unwrap())
             .delegations(delegations)
             .build()
             .unwrap();
@@ -3142,7 +3138,7 @@ mod test {
     #[test]
     fn serde_signed_metadata() {
         let snapshot = SnapshotMetadataBuilder::new()
-            .expires(Utc.ymd(2017, 1, 1).and_hms(0, 0, 0))
+            .expires(Utc.with_ymd_and_hms(2017, 1, 1, 0, 0, 0).unwrap())
             .insert_metadata_description(
                 MetadataPath::new("targets").unwrap(),
                 MetadataDescription::new(
@@ -3222,7 +3218,7 @@ mod test {
         let timestamp_key = Ed25519PrivateKey::from_pkcs8(ED25519_4_PK8).unwrap();
 
         let root = RootMetadataBuilder::new()
-            .expires(Utc.ymd(2038, 1, 1).and_hms(0, 0, 0))
+            .expires(Utc.with_ymd_and_hms(2038, 1, 1, 0, 0, 0).unwrap())
             .root_key(root_key.public().clone())
             .snapshot_key(snapshot_key.public().clone())
             .targets_key(targets_key.public().clone())
@@ -3235,10 +3231,11 @@ mod test {
 
     fn make_snapshot() -> serde_json::Value {
         let snapshot = SnapshotMetadataBuilder::new()
-            .expires(Utc.ymd(2038, 1, 1).and_hms(0, 0, 0))
+            .expires(Utc.with_ymd_and_hms(2038, 1, 1, 0, 0, 0).unwrap())
             .build()
             .unwrap();
 
+        #[allow(clippy::needless_borrows_for_generic_args)]
         serde_json::to_value(&snapshot).unwrap()
     }
 
@@ -3247,17 +3244,18 @@ mod test {
             MetadataDescription::from_slice(&[][..], 1, &[HashAlgorithm::Sha256]).unwrap();
 
         let timestamp = TimestampMetadataBuilder::from_metadata_description(description)
-            .expires(Utc.ymd(2017, 1, 1).and_hms(0, 0, 0))
+            .expires(Utc.with_ymd_and_hms(2017, 1, 1, 0, 0, 0).unwrap())
             .build()
             .unwrap();
 
+        #[allow(clippy::needless_borrows_for_generic_args)]
         serde_json::to_value(&timestamp).unwrap()
     }
 
     fn make_targets() -> serde_json::Value {
         let targets = TargetsMetadata::new(
             1,
-            Utc.ymd(2038, 1, 1).and_hms(0, 0, 0),
+            Utc.with_ymd_and_hms(2038, 1, 1, 0, 0, 0).unwrap(),
             hashmap!(),
             Delegations::default(),
         )

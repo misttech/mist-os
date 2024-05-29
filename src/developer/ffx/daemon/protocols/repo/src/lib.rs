@@ -436,7 +436,7 @@ async fn add_repository(
         tracing::error!("Unable to create repository: {:#?}", err);
 
         match err {
-            repository::Error::Tuf(tuf::Error::ExpiredMetadata(_)) => {
+            repository::Error::Tuf(tuf::Error::ExpiredMetadata { .. }) => {
                 ffx::RepositoryError::ExpiredRepositoryMetadata
             }
             _ => ffx::RepositoryError::IoError,
