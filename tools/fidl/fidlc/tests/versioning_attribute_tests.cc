@@ -376,11 +376,60 @@ TEST(VersioningAttributeTests, BadLibraryReplaced) {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
+TEST(VersioningAttributeTests, BadLibraryRenamed) {
+  TestLibrary library(R"FIDL(
+@available(added=1, removed=2, renamed="foo")
+library example;
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(ErrCannotBeRenamed, Element::Kind::kLibrary);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningAttributeTests, BadDeclRenamed) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0211.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  library.ExpectFail(ErrCannotBeRenamed, Element::Kind::kStruct);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningAttributeTests, BadComposeRenamed) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+protocol Foo {
+    @available(replaced=2, renamed="Baz")
+    compose Bar;
+};
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(ErrCannotBeRenamed, Element::Kind::kProtocolCompose);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
 TEST(VersioningAttributeTests, BadNoteWithoutDeprecation) {
   TestLibrary library;
   library.AddFile("bad/fi-0148.test.fidl");
   library.SelectVersion("test", "HEAD");
   library.ExpectFail(ErrNoteWithoutDeprecation);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningAttributeTests, BadRenamedWithoutReplaced) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0212.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  library.ExpectFail(ErrRenamedWithoutReplacedOrRemoved);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningAttributeTests, BadRenamedToSameName) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0213.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  library.ExpectFail(ErrRenamedToSameName, "bar");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

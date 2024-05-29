@@ -118,6 +118,37 @@ void AvailabilityStep::CompileAvailability(Element* element) {
   }
 }
 
+static bool CanBeRenamed(Element::Kind kind) {
+  switch (kind) {
+    case Element::Kind::kAlias:
+    case Element::Kind::kBits:
+    case Element::Kind::kBuiltin:
+    case Element::Kind::kConst:
+    case Element::Kind::kEnum:
+    case Element::Kind::kLibrary:
+    case Element::Kind::kNewType:
+    case Element::Kind::kOverlay:
+    case Element::Kind::kProtocol:
+    case Element::Kind::kProtocolCompose:
+    case Element::Kind::kResource:
+    case Element::Kind::kService:
+    case Element::Kind::kStruct:
+    case Element::Kind::kTable:
+    case Element::Kind::kUnion:
+      return false;
+    case Element::Kind::kBitsMember:
+    case Element::Kind::kEnumMember:
+    case Element::Kind::kOverlayMember:
+    case Element::Kind::kProtocolMethod:
+    case Element::Kind::kResourceProperty:
+    case Element::Kind::kServiceMember:
+    case Element::Kind::kStructMember:
+    case Element::Kind::kTableMember:
+    case Element::Kind::kUnionMember:
+      return true;
+  }
+}
+
 void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attribute* attribute) {
   CompileStep::CompileAttributeEarly(compiler(), attribute);
 
@@ -129,6 +160,7 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
   const auto deprecated = attribute->GetArg("deprecated");
   const auto removed = attribute->GetArg("removed");
   const auto replaced = attribute->GetArg("replaced");
+  const auto renamed = attribute->GetArg("renamed");
   const auto note = attribute->GetArg("note");
   const auto legacy = attribute->GetArg("legacy");
 
@@ -161,6 +193,20 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
   }
   if (removed && replaced) {
     ok &= reporter()->Fail(ErrRemovedAndReplaced, attribute->span);
+  }
+  if (renamed) {
+    if (!CanBeRenamed(element->kind)) {
+      ok &= reporter()->Fail(ErrCannotBeRenamed, renamed->span, element->kind);
+    }
+    if (!replaced && !removed) {
+      ok &= reporter()->Fail(ErrRenamedWithoutReplacedOrRemoved, renamed->span);
+    }
+    if (renamed->value->IsResolved()) {
+      auto new_name = renamed->value->Value().AsString().value();
+      if (new_name == element->GetName()) {
+        ok &= reporter()->Fail(ErrRenamedToSameName, renamed->span, new_name);
+      }
+    }
   }
   if (!ok) {
     element->availability.Fail();

@@ -1340,6 +1340,13 @@ TEST(ErrcatGoodTests, Good0205b) {
   ASSERT_COMPILED(library);
 }
 
+TEST(ErrcatGoodTests, Good0205c) {
+  TestLibrary library;
+  library.AddFile("good/fi-0205-c.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  ASSERT_COMPILED(library);
+}
+
 TEST(ErrcatGoodTests, Good0206a) {
   TestLibrary library;
   library.AddFile("good/fi-0206-a.test.fidl");
@@ -1388,9 +1395,65 @@ TEST(ErrcatGoodTests, Good0209c) {
 }
 
 TEST(ErrcatGoodTests, Good0210) {
-TestLibrary library;
-library.AddFile("good/fi-0210.test.fidl");
-ASSERT_COMPILED(library);
+  TestLibrary library;
+  library.AddFile("good/fi-0210.test.fidl");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ErrcatGoodTests, Good0211) {
+  TestLibrary library;
+  library.AddFile("good/fi-0211.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ErrcatGoodTests, Good0212a) {
+  TestLibrary library;
+  library.AddFile("good/fi-0212-a.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ErrcatGoodTests, Good0212b) {
+  TestLibrary library;
+  library.AddFile("good/fi-0212-b.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ErrcatGoodTests, Good0213a) {
+  TestLibrary library;
+  library.AddFile("good/fi-0213-a.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ErrcatGoodTests, Good0213b) {
+  TestLibrary library;
+  library.AddFile("good/fi-0213-b.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ErrcatGoodTests, Good0214a) {
+  TestLibrary library;
+  library.AddFile("good/fi-0214-a.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ErrcatGoodTests, Good0214b) {
+  TestLibrary library;
+  library.AddFile("good/fi-0214-b.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ErrcatGoodTests, Good0215) {
+  TestLibrary library;
+  library.AddFile("good/fi-0215.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  ASSERT_COMPILED(library);
 }
 
 }  // namespace

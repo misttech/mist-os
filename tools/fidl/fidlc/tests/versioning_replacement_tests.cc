@@ -48,7 +48,7 @@ type Foo = struct {};
 type Foo = resource struct {};
 )FIDL");
   library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrRemovedWithReplacement, "struct 'Foo'", V2, "example.fidl:9:6");
+  library.ExpectFail(ErrInvalidRemoved, "struct 'Foo'", V2, "example.fidl:9:6");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -78,7 +78,7 @@ library example;
 type Foo = struct {};
 )FIDL");
   library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrReplacedWithoutReplacement, "struct 'Foo'", V2);
+  library.ExpectFail(ErrInvalidReplaced, "struct 'Foo'", V2);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -110,7 +110,7 @@ type Foo = table {
 };
 )FIDL");
   library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrRemovedWithReplacement, "table member 'bar'", V2, "example.fidl:9:8");
+  library.ExpectFail(ErrInvalidRemoved, "table member 'bar'", V2, "example.fidl:9:8");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -143,7 +143,7 @@ type Foo = table {
 };
 )FIDL");
   library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrReplacedWithoutReplacement, "table member 'bar'", V2);
+  library.ExpectFail(ErrInvalidReplaced, "table member 'bar'", V2);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -166,8 +166,7 @@ TEST_P(VersioningReplacementTest, BadMethodRemoved) {
   TestLibrary library;
   library.SelectVersion("test", GetParam());
   library.AddFile("bad/fi-0205.test.fidl");
-  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'Bar'", V2,
-                     "bad/fi-0205.test.fidl:11:14");
+  library.ExpectFail(ErrInvalidRemoved, "protocol method 'Bar'", V2, "bad/fi-0205.test.fidl:11:14");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -193,7 +192,7 @@ TEST_P(VersioningReplacementTest, BadMethodReplaced) {
   TestLibrary library;
   library.AddFile("bad/fi-0206.test.fidl");
   library.SelectVersion("test", GetParam());
-  library.ExpectFail(ErrReplacedWithoutReplacement, "protocol method 'Bar'", V2);
+  library.ExpectFail(ErrInvalidReplaced, "protocol method 'Bar'", V2);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -216,8 +215,7 @@ protocol Base {
 };
 )FIDL");
   library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'Method'", V2,
-                     "example.fidl:15:3");
+  library.ExpectFail(ErrInvalidRemoved, "protocol method 'Method'", V2, "example.fidl:15:3");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -264,8 +262,7 @@ protocol Base {
 };
 )FIDL");
   library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'Method'", V2,
-                     "example.fidl:15:3");
+  library.ExpectFail(ErrInvalidRemoved, "protocol method 'Method'", V2, "example.fidl:15:3");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -312,8 +309,7 @@ protocol Base {
 };
 )FIDL");
   library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'Method'", V2,
-                     "example.fidl:10:3");
+  library.ExpectFail(ErrInvalidRemoved, "protocol method 'Method'", V2, "example.fidl:10:3");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -361,8 +357,7 @@ protocol Base {
 };
 )FIDL");
   library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'Method'", V2,
-                     "example.fidl:10:3");
+  library.ExpectFail(ErrInvalidRemoved, "protocol method 'Method'", V2, "example.fidl:10:3");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -415,8 +410,7 @@ protocol Bar {
 };
 )FIDL");
   library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'Method'", V2,
-                     "example.fidl:20:3");
+  library.ExpectFail(ErrInvalidRemoved, "protocol method 'Method'", V2, "example.fidl:20:3");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -474,8 +468,7 @@ protocol Bar {
 };
 )FIDL");
   library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'Method'", V2,
-                     "example.fidl:21:3");
+  library.ExpectFail(ErrInvalidRemoved, "protocol method 'Method'", V2, "example.fidl:21:3");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -530,7 +523,7 @@ protocol Base {
 };
 )FIDL");
   library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'Method'", V2, "example.fidl:9:3");
+  library.ExpectFail(ErrInvalidRemoved, "protocol method 'Method'", V2, "example.fidl:9:3");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -557,8 +550,7 @@ protocol Base {
 };
 )FIDL");
   library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'Method'", V2,
-                     "example.fidl:19:3");
+  library.ExpectFail(ErrInvalidRemoved, "protocol method 'Method'", V2, "example.fidl:19:3");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -624,9 +616,9 @@ protocol BC {
 };
 )FIDL");
   library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'B'", V2, "example.fidl:28:3");
-  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'A'", V2, "example.fidl:14:3");
-  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'C'", V2, "example.fidl:30:3");
+  library.ExpectFail(ErrInvalidRemoved, "protocol method 'B'", V2, "example.fidl:28:3");
+  library.ExpectFail(ErrInvalidRemoved, "protocol method 'A'", V2, "example.fidl:14:3");
+  library.ExpectFail(ErrInvalidRemoved, "protocol method 'C'", V2, "example.fidl:30:3");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -818,6 +810,81 @@ service Service {
   EXPECT_EQ(library.LookupService("Service")->members.size(), num_members);
 }
 
+TEST_P(VersioningReplacementTest, GoodAllMembersReplacedAndRenamed) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Bits = bits {
+    @available(replaced=2, renamed="NEW")
+    OLD = 1;
+    @available(added=2)
+    NEW = 1;
+};
+
+type Enum = enum {
+    @available(replaced=2, renamed="NEW")
+    OLD = 1;
+    @available(added=2)
+    NEW = 1;
+};
+
+type Struct = struct {
+    @available(replaced=2, renamed="new")
+    old uint32;
+    @available(added=2)
+    new uint32;
+};
+
+type Table = table {
+    @available(replaced=2, renamed="new")
+    1: old uint32;
+    @available(added=2)
+    1: new uint32;
+};
+
+type Union = union {
+    @available(replaced=2, renamed="new")
+    1: old uint32;
+    @available(added=2)
+    1: new uint32;
+};
+
+protocol Protocol {
+    @available(replaced=2, renamed="New")
+    Old();
+    @available(added=2)
+    New();
+};
+
+service Service {
+    @available(replaced=2, renamed="new")
+    old client_end:Protocol;
+    @available(added=2)
+    new client_end:Protocol;
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  ASSERT_COMPILED(library);
+
+  EXPECT_EQ(library.LookupBits("Bits")->members.size(), 1u);
+  EXPECT_EQ(library.LookupEnum("Enum")->members.size(), 1u);
+  EXPECT_EQ(library.LookupStruct("Struct")->members.size(), 1u);
+  EXPECT_EQ(library.LookupTable("Table")->members.size(), 1u);
+  EXPECT_EQ(library.LookupUnion("Union")->members.size(), 1u);
+  EXPECT_EQ(library.LookupProtocol("Protocol")->methods.size(), 1u);
+  EXPECT_EQ(library.LookupService("Service")->members.size(), 1u);
+
+  bool old = GetParam() == V1;
+  EXPECT_EQ(library.LookupBits("Bits")->members[0].GetName(), old ? "OLD" : "NEW");
+  EXPECT_EQ(library.LookupEnum("Enum")->members[0].GetName(), old ? "OLD" : "NEW");
+  EXPECT_EQ(library.LookupStruct("Struct")->members[0].GetName(), old ? "old" : "new");
+  EXPECT_EQ(library.LookupTable("Table")->members[0].GetName(), old ? "old" : "new");
+  EXPECT_EQ(library.LookupUnion("Union")->members[0].GetName(), old ? "old" : "new");
+  EXPECT_EQ(library.LookupProtocol("Protocol")->methods[0].GetName(), old ? "Old" : "New");
+  EXPECT_EQ(library.LookupService("Service")->members[0].GetName(), old ? "old" : "new");
+}
+
 TEST_P(VersioningReplacementTest, BadRemovedNamedToAnonymous) {
   TestLibrary library(R"FIDL(
 @available(added=1)
@@ -832,7 +899,7 @@ type Bar = struct {
 };
 )FIDL");
   library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrRemovedWithReplacement, "struct 'Foo'", V2, "example.fidl:10:9");
+  library.ExpectFail(ErrInvalidRemoved, "struct 'Foo'", V2, "example.fidl:10:9");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -960,6 +1027,99 @@ type Bar = struct {
   library.SelectVersion("example", GetParam());
   ASSERT_COMPILED(library);
   EXPECT_EQ(library.HasStruct("Foo"), GetParam() == V1);
+}
+
+TEST_P(VersioningReplacementTest, GoodMemberRemovedAndRenamed) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = table {
+    @available(removed=2, renamed="old_bar")
+    1: bar string;
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  ASSERT_COMPILED(library);
+  auto foo = library.LookupTable("Foo");
+  EXPECT_EQ(foo->members.size(), GetParam() == V1 ? 1u : 0u);
+  // TODO(https://fxbug.dev/42085274): Assert "old_bar" exists when targeting both 1 and >1.
+  if (GetParam() == V1) {
+    EXPECT_EQ(foo->members[0].GetName(), "bar");
+  }
+}
+
+TEST_P(VersioningReplacementTest, GoodMemberRemovedAndRenamedNameReused) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = table {
+    @available(removed=2, renamed="old_bar")
+    1: bar string;
+    @available(added=2)
+    2: bar uint32;
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  ASSERT_COMPILED(library);
+  auto foo = library.LookupTable("Foo");
+  EXPECT_EQ(foo->members.size(), 1u);
+  // TODO(https://fxbug.dev/42085274): Assert "old_bar" exists when targeting both 1 and >1.
+  EXPECT_EQ(foo->members[0].type_ctor->type->kind,
+            GetParam() == V1 ? Type::Kind::kString : Type::Kind::kPrimitive);
+}
+
+TEST_P(VersioningReplacementTest, BadMemberRemovedAndRenamedNameAlreadyUsedExisting) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = table {
+    @available(removed=2, renamed="old_bar")
+    1: bar string;
+    2: old_bar uint32;
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrInvalidRemovedAndRenamed, "table member 'bar'", V2, "old_bar",
+                     "example.fidl:8:8");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, BadMemberRemovedAndRenamedNameAlreadyUsedNew) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = table {
+    @available(removed=2, renamed="old_bar")
+    1: bar string;
+    @available(added=2)
+    2: old_bar uint32;
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrInvalidRemovedAndRenamed, "table member 'bar'", V2, "old_bar",
+                     "example.fidl:9:8");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, BadMethodRemovedAndRenamed) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0214.test.fidl");
+  library.SelectVersion("test", GetParam());
+  library.ExpectFail(ErrInvalidRemovedAndRenamed, "protocol method 'OldName'", V2, "NewName",
+                     "bad/fi-0214.test.fidl:12:14");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, BadMethodReplacedAndRenamed) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0215.test.fidl");
+  library.SelectVersion("test", GetParam());
+  library.ExpectFail(ErrInvalidReplacedAndRenamed, "protocol method 'OldName'", V2, "NewName");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace

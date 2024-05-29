@@ -13,6 +13,15 @@ namespace {
 Version Start(const Element* element) { return element->availability.range().pair().first; }
 Version End(const Element* element) { return element->availability.range().pair().second; }
 
+std::optional<std::string_view> GetRenamed(const Element* element) {
+  if (auto available = element->attributes->Get("available")) {
+    if (auto renamed = available->GetArg("renamed")) {
+      return renamed->value->Value().AsString();
+    }
+  }
+  return std::nullopt;
+}
+
 // A wrapper around Element used to special case composed methods.
 class Member {
  public:
@@ -74,14 +83,14 @@ void ReplacementStep::CheckDecls() {
     if (auto it = removed.find(key); it != removed.end()) {
       const Decl* old = it->second;
       auto span = old->attributes->Get("available")->GetArg("removed")->span;
-      reporter()->Fail(ErrRemovedWithReplacement, span, old, key.second, decl->GetNameSource());
+      reporter()->Fail(ErrInvalidRemoved, span, old, key.second, decl->GetNameSource());
     }
     replaced.erase(key);
   }
   // Step 3: Report errors for replaced decls where Step 2 found no replacement.
   for (auto& [key, decl] : replaced) {
     auto span = decl->attributes->Get("available")->GetArg("replaced")->span;
-    reporter()->Fail(ErrReplacedWithoutReplacement, span, decl, key.second);
+    reporter()->Fail(ErrInvalidReplaced, span, decl, key.second);
   }
 }
 
@@ -105,10 +114,11 @@ void ReplacementStep::CheckMembers() {
     // Step 1: Populate maps for removed and replaced members.
     std::map<std::string_view, Member> removed, replaced;
     ForEachMember(old_decl, [&](Member member) {
+      auto end_name = GetRenamed(member.element()).value_or(member.element()->GetName());
       if (member.ending() == Availability::Ending::kRemoved) {
-        removed.try_emplace(member.element()->GetName(), member);
+        removed.try_emplace(end_name, member);
       } else if (member.ending() == Availability::Ending::kReplaced) {
-        replaced.try_emplace(member.element()->GetName(), member);
+        replaced.try_emplace(end_name, member);
       }
     });
     // Step 2: Do a second pass to match up replacement members.
@@ -116,16 +126,26 @@ void ReplacementStep::CheckMembers() {
       auto name = member.element()->GetName();
       if (auto it = removed.find(name); it != removed.end()) {
         Member old = it->second;
-        auto span = old.attributes()->Get("available")->GetArg("removed")->span;
-        reporter()->Fail(ErrRemovedWithReplacement, span, old.element(), version,
-                         member.element()->GetNameSource());
+        auto span = old.attributes()->Get("available")->span;
+        if (auto renamed = GetRenamed(old.element())) {
+          reporter()->Fail(ErrInvalidRemovedAndRenamed, span, old.element(), version,
+                           renamed.value(), member.element()->GetNameSource());
+        } else {
+          reporter()->Fail(ErrInvalidRemoved, span, old.element(), version,
+                           member.element()->GetNameSource());
+        }
       }
       replaced.erase(name);
     });
     // Step 3: Report errors for replaced members where Step 2 found no replacement.
     for (auto& [name, member] : replaced) {
-      auto span = member.attributes()->Get("available")->GetArg("replaced")->span;
-      reporter()->Fail(ErrReplacedWithoutReplacement, span, member.element(), version);
+      auto span = member.attributes()->Get("available")->span;
+      if (auto renamed = GetRenamed(member.element())) {
+        reporter()->Fail(ErrInvalidReplacedAndRenamed, span, member.element(), version,
+                         renamed.value());
+      } else {
+        reporter()->Fail(ErrInvalidReplaced, span, member.element(), version);
+      }
     }
   }
 }

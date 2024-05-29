@@ -180,7 +180,7 @@ closed protocol Codec {
     /// If the driver cannot successfully configure the codec to stop, it will close the codec
     /// protocol channel, in which case the client may obtain a new codec protocol channel and retry.
     strict Stop() -> (struct {
-        @available(removed=20)
+        @available(replaced=20, renamed="stop_time")
         start_time zx.Time;
 
         @available(added=20)

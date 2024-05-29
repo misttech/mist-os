@@ -292,9 +292,9 @@ constexpr ErrorDef<146> ErrInvalidGeneratedName("generated name must be a valid 
 constexpr ErrorDef<147> ErrAvailableMissingArguments(
     "at least one argument is required: 'added', 'deprecated', or 'removed'");
 constexpr ErrorDef<148> ErrNoteWithoutDeprecation(
-    "the argument 'note' cannot be used without 'deprecated'");
+    "the @available  argument 'note' cannot be used without 'deprecated'");
 constexpr ErrorDef<149> ErrPlatformNotOnLibrary(
-    "the argument 'platform' can only be used on the library's @available attribute");
+    "the @available argument 'platform' can only be used on the library's @available attribute");
 constexpr ErrorDef<150> ErrLibraryAvailabilityMissingAdded(
     "missing 'added' argument on the library's @available attribute");
 constexpr ErrorDef<151, std::string_view> ErrMissingLibraryAvailability(
@@ -401,10 +401,10 @@ constexpr ErrorDef<203> ErrRemovedAndReplaced(
 constexpr ErrorDef<204> ErrLibraryReplaced(
     "the @available argument 'replaced' cannot be used on the library "
     "declaration; used 'removed' instead");
-constexpr ErrorDef<205, const Element *, Version, SourceSpan> ErrRemovedWithReplacement(
+constexpr ErrorDef<205, const Element *, Version, SourceSpan> ErrInvalidRemoved(
     "{0} is marked removed={1}, but there is a replacement marked added={1} at {2}; "
     "either change removed={1} to replaced={1}, or delete the replacement");
-constexpr ErrorDef<206, const Element *, Version> ErrReplacedWithoutReplacement(
+constexpr ErrorDef<206, const Element *, Version> ErrInvalidReplaced(
     "{0} is marked replaced={1}, but there is no replacement marked added={1}; "
     "either change replaced={1} to removed={1}, or define a replacement");
 constexpr ErrorDef<207, uint32_t, char, uint32_t> ErrTypeShapeIntegerOverflow(
@@ -416,6 +416,20 @@ constexpr ErrorDef<209> ErrReservedNotAllowed(
     "FIDL no longer supports reserved table or union fields; use @available instead");
 constexpr ErrorDef<210, std::string_view> ErrInvalidDiscoverableLocation(
     "invalid @discoverable location '{0}'; must be comma separated 'platform' and/or 'external'");
+constexpr ErrorDef<211, Element::Kind> ErrCannotBeRenamed(
+    "the @available argument 'renamed' cannot be used on a {0}; it can only be "
+    "used on members of a declaration");
+constexpr ErrorDef<212> ErrRenamedWithoutReplacedOrRemoved(
+    "the @available argument 'renamed' cannot be used without 'replaced' or 'removed'");
+constexpr ErrorDef<213, std::string_view> ErrRenamedToSameName(
+    "renaming to '{0}' has no effect because the element is already named '{0}'; "
+    "either remove the 'renamed' argument or choose a different name");
+constexpr ErrorDef<214, const Element *, Version, std::string_view, SourceSpan>
+    ErrInvalidRemovedAndRenamed(
+        "{0} is marked removed={1}, renamed=\"{2}\" but the name '{2}' is already used at {3}");
+constexpr ErrorDef<215, const Element *, Version, std::string_view> ErrInvalidReplacedAndRenamed(
+    "{0} is marked replaced={1}, renamed=\"{2}\" but there is no replacement "
+    "'{2}' marked added={1}; please define it");
 
 // To add a new error:
 //
@@ -633,12 +647,17 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0202 */ &ErrTransitionalNotAllowed,
     /* fi-0203 */ &ErrRemovedAndReplaced,
     /* fi-0204 */ &ErrLibraryReplaced,
-    /* fi-0205 */ &ErrRemovedWithReplacement,
-    /* fi-0206 */ &ErrReplacedWithoutReplacement,
+    /* fi-0205 */ &ErrInvalidRemoved,
+    /* fi-0206 */ &ErrInvalidReplaced,
     /* fi-0207 */ &ErrTypeShapeIntegerOverflow,
     /* fi-0208 */ &ErrReservedPlatform,
     /* fi-0209 */ &ErrReservedNotAllowed,
     /* fi-0210 */ &ErrInvalidDiscoverableLocation,
+    /* fi-0211 */ &ErrCannotBeRenamed,
+    /* fi-0212 */ &ErrRenamedWithoutReplacedOrRemoved,
+    /* fi-0213 */ &ErrRenamedToSameName,
+    /* fi-0214 */ &ErrInvalidRemovedAndRenamed,
+    /* fi-0215 */ &ErrInvalidReplacedAndRenamed,
 };
 
 // In reporter.h we assert that reported error IDs are <= kNumDiagnosticDefs.
