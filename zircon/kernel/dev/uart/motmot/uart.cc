@@ -8,6 +8,7 @@
 #include <lib/arch/intrin.h>
 #include <lib/cbuf.h>
 #include <lib/debuglog.h>
+#include <lib/mmio-ptr/mmio-ptr.h>
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
@@ -57,18 +58,11 @@
 #define UART_UFLT_CONF  (0x40)
 #define USI_OPTION      (0xc8)
 #define UART_FIFO_DEPTH (0xdc)
-
 // clang-format on
 
-#define UARTREG(base, reg) (*REG32((base) + (reg)))
-#define UARTREG_RMW(base, reg, mask, val)                        \
-  do {                                                           \
-    UARTREG(base, reg) = (UARTREG(base, reg) & ~(mask)) | (val); \
-  } while (0)
+namespace {
 
 const size_t RXBUF_SIZE = 256;
-
-namespace {
 
 // values read from zbi
 vaddr_t uart_base = 0;
@@ -88,46 +82,57 @@ AutounsignalEvent uart_dputc_event{true};
 // is needed for the printf and panic code paths, and printing and panicking must be safe while
 // holding (almost) any lock.
 DECLARE_SINGLETON_SPINLOCK_WITH_TYPE(uart_spinlock, MonitoredSpinLock);
-}  // namespace
 
-static inline void uartreg_and_eq(uintptr_t base, ptrdiff_t reg, uint32_t flags) {
-  volatile uint32_t* ptr = reinterpret_cast<volatile uint32_t*>(base + reg);
-  *ptr = *ptr & flags;
+inline void uartreg_and_eq(uintptr_t base, ptrdiff_t reg, uint32_t flags) {
+  volatile MMIO_PTR uint32_t* ptr = reinterpret_cast<volatile MMIO_PTR uint32_t*>(base + reg);
+  MmioWrite32(MmioRead32(ptr) & flags, ptr);
 }
 
-static inline void uartreg_or_eq(uintptr_t base, ptrdiff_t reg, uint32_t flags) {
-  volatile uint32_t* ptr = reinterpret_cast<volatile uint32_t*>(base + reg);
-  *ptr = *ptr | flags;
+inline void uartreg_or_eq(uintptr_t base, ptrdiff_t reg, uint32_t flags) {
+  volatile MMIO_PTR uint32_t* ptr = reinterpret_cast<volatile MMIO_PTR uint32_t*>(base + reg);
+  MmioWrite32(MmioRead32(ptr) | flags, ptr);
+}
+
+inline uint32_t uartreg_read(uintptr_t base, ptrdiff_t reg) {
+  volatile MMIO_PTR uint32_t* ptr = reinterpret_cast<volatile MMIO_PTR uint32_t*>(base + reg);
+
+  return MmioRead32(ptr);
+}
+
+inline void uartreg_write(uintptr_t base, ptrdiff_t reg, uint32_t val) {
+  volatile MMIO_PTR uint32_t* ptr = reinterpret_cast<volatile MMIO_PTR uint32_t*>(base + reg);
+
+  MmioWrite32(val, ptr);
 }
 
 // The UINTM register is contended from both IRQ and threaded mode, so protect
 // accesses via the uart_spinlock.
-static inline void motmot_uart_mask_tx() TA_REQ(uart_spinlock::Get()) {
+inline void motmot_uart_mask_tx() TA_REQ(uart_spinlock::Get()) {
   uartreg_or_eq(uart_base, UART_UINTM, (1 << 2));  // txd
 }
-static inline void motmot_uart_unmask_tx() TA_REQ(uart_spinlock::Get()) {
+inline void motmot_uart_unmask_tx() TA_REQ(uart_spinlock::Get()) {
   uartreg_and_eq(uart_base, UART_UINTM, ~(1 << 2));  // txd
 }
-static inline void motmot_uart_mask_rx() TA_REQ(uart_spinlock::Get()) {
+inline void motmot_uart_mask_rx() TA_REQ(uart_spinlock::Get()) {
   uartreg_or_eq(uart_base, UART_UINTM, (1 << 0));  // rxd
 }
-static inline void motmot_uart_unmask_rx() TA_REQ(uart_spinlock::Get()) {
+inline void motmot_uart_unmask_rx() TA_REQ(uart_spinlock::Get()) {
   uartreg_and_eq(uart_base, UART_UINTM, ~(1 << 0));  // rxd
 }
 
-static void motmot_uart_irq(void* arg) {
+void motmot_uart_irq(void* arg) {
   // read interrupt status
-  uint32_t isr = UARTREG(uart_base, UART_UINTP);
+  uint32_t isr = uartreg_read(uart_base, UART_UINTP);
 
-  LTRACEF("irq UINTP %#x UINTS %#x ", isr, UARTREG(uart_base, UART_UINTS));
-  LTRACEF("UTRSTAT %#x\n", UARTREG(uart_base, UART_UTRSTAT));
+  LTRACEF("irq UINTP %#x UINTS %#x ", isr, uartreg_read(uart_base, UART_UINTS));
+  LTRACEF("UTRSTAT %#x\n", uartreg_read(uart_base, UART_UTRSTAT));
 
   uint32_t pending_ack = 0;  // accumulate pending writes to UINTP at the end
 
   if (isr & (1 << 0)) {  // rxd
     // while fifo is not empty, read chars out of it
-    while ((UARTREG(uart_base, UART_UFSTAT) & (0x1ff)) != 0) {  // uart fifo level
-      LTRACEF("fstat %#x\n", UARTREG(uart_base, UART_UFSTAT));
+    while ((uartreg_read(uart_base, UART_UFSTAT) & (0x1ff)) != 0) {  // uart fifo level
+      LTRACEF("fstat %#x\n", uartreg_read(uart_base, UART_UFSTAT));
       // if we're out of rx buffer, mask the irq instead of handling it
       {
         // This critical section is paired with the one in |motmot_uart_getc|
@@ -169,7 +174,7 @@ static void motmot_uart_irq(void* arg) {
       // at the boundary between it and the next character, so only discard fifo reads
       // for framing and parity errors.
       bool discard_char = false;
-      uint32_t err = UARTREG(uart_base, UART_UERSTAT);
+      uint32_t err = uartreg_read(uart_base, UART_UERSTAT);
       if (unlikely(err & 0b1111)) {
         if (err & (1 << 0)) {  // overrun error
           // not much we can do except log and move on
@@ -190,7 +195,7 @@ static void motmot_uart_irq(void* arg) {
         }
       }
 
-      char c = static_cast<char>(UARTREG(uart_base, UART_URXH));
+      char c = static_cast<char>(uartreg_read(uart_base, UART_URXH));
       if (!discard_char) {
         LTRACEF("%#hhx in cbuf\n", c);
         uart_rx_buf.WriteChar(c);
@@ -216,11 +221,11 @@ static void motmot_uart_irq(void* arg) {
 
   // ack any pending irqs
   if (pending_ack) {
-    UARTREG(uart_base, UART_UINTP) = pending_ack;
+    uartreg_write(uart_base, UART_UINTP, pending_ack);
   }
 }
 
-static int motmot_uart_getc(bool wait) {
+int motmot_uart_getc(bool wait) {
   // RX irq based
   zx::result<char> result = uart_rx_buf.ReadChar(wait);
   if (result.is_ok()) {
@@ -236,35 +241,35 @@ static int motmot_uart_getc(bool wait) {
 }
 
 // panic-time getc/putc
-static void motmot_uart_pputc(char c) {
+void motmot_uart_pputc(char c) {
   if (c == '\n') {
     motmot_uart_pputc('\r');
   }
 
   // spin while fifo is full
-  while (UARTREG(uart_base, UART_UFSTAT) & (1 << 24))  // tx fifo full
+  while (uartreg_read(uart_base, UART_UFSTAT) & (1 << 24))  // tx fifo full
     ;
-  UARTREG(uart_base, UART_UTXH) = c;
+  uartreg_write(uart_base, UART_UTXH, c);
 }
 
-static int motmot_uart_pgetc() {
+int motmot_uart_pgetc() {
   for (;;) {
-    if ((UARTREG(uart_base, UART_UFSTAT) & (0x1ff)) != 0) {  // rx fifo count
+    if ((uartreg_read(uart_base, UART_UFSTAT) & (0x1ff)) != 0) {  // rx fifo count
       // read and discard character if framing or parity error is queued
-      uint32_t err = UARTREG(uart_base, UART_UERSTAT);
+      uint32_t err = uartreg_read(uart_base, UART_UERSTAT);
       if (err & 0b0110) {  // framing and parity error
-        volatile uint32_t discard [[maybe_unused]] = UARTREG(uart_base, UART_URXH);
+        volatile uint32_t discard [[maybe_unused]] = uartreg_read(uart_base, UART_URXH);
         continue;
       }
 
-      return UARTREG(uart_base, UART_URXH);
+      return uartreg_read(uart_base, UART_URXH);
     } else {
       return -1;
     }
   }
 }
 
-static void motmot_uart_dputs(const char* str, size_t len, bool block) {
+void motmot_uart_dputs(const char* str, size_t len, bool block) {
   bool copied_CR = false;
 
   if (!uart_tx_irq_enabled) {
@@ -281,7 +286,7 @@ static void motmot_uart_dputs(const char* str, size_t len, bool block) {
     // reacquiring the spinlock every cycle.
     Guard<MonitoredSpinLock, IrqSave> guard{uart_spinlock::Get(), SOURCE_TAG};
 
-    uint32_t ufstat = UARTREG(uart_base, UART_UFSTAT);
+    uint32_t ufstat = uartreg_read(uart_base, UART_UFSTAT);
     if (ufstat & (1 << 24)) {  // tx fifo full
       // Is the FIFO completely full? if so, block or spin at the end of the loop
       wait = true;
@@ -303,10 +308,10 @@ static void motmot_uart_dputs(const char* str, size_t len, bool block) {
     for (size_t i = 0; i < to_write; i++) {
       if (!copied_CR && *str == '\n') {
         copied_CR = true;
-        UARTREG(uart_base, UART_UTXH) = '\r';
+        uartreg_write(uart_base, UART_UTXH, '\r');
       } else {
         copied_CR = false;
-        UARTREG(uart_base, UART_UTXH) = *str++;
+        uartreg_write(uart_base, UART_UTXH, *str++);
         len--;
       }
     }
@@ -333,12 +338,14 @@ static void motmot_uart_dputs(const char* str, size_t len, bool block) {
   }
 }
 
-static const struct pdev_uart_ops uart_ops = {
+const struct pdev_uart_ops uart_ops = {
     .getc = motmot_uart_getc,
     .pputc = motmot_uart_pputc,
     .pgetc = motmot_uart_pgetc,
     .dputs = motmot_uart_dputs,
 };
+
+}  // anonymous namespace
 
 void MotmotUartInitEarly(const zbi_dcfg_simple_t& config) {
   ASSERT(config.mmio_phys != 0);
@@ -355,7 +362,7 @@ void MotmotUartInitEarly(const zbi_dcfg_simple_t& config) {
   uart_irq = config.irq;
 
   // read the tx and rx fifo size, useful later
-  uint32_t fifo_depth = UARTREG(uart_base, UART_FIFO_DEPTH);
+  uint32_t fifo_depth = uartreg_read(uart_base, UART_FIFO_DEPTH);
   uart_tx_fifo_size = BITS_SHIFT(fifo_depth, 24, 16);
   uart_rx_fifo_size = BITS(fifo_depth, 8, 0);
 
@@ -368,26 +375,29 @@ void MotmotUartInitEarly(const zbi_dcfg_simple_t& config) {
   }
 
   // setup line settings
-  UARTREG(uart_base, UART_ULCON) = (3 << 0);  // no parity, one stop bit, 8 bit
-  UARTREG(uart_base, UART_UMCON) = 0;         // no auto flow control
+  uartreg_write(uart_base, UART_ULCON, (3 << 0));  // no parity, one stop bit, 8 bit
+  uartreg_write(uart_base, UART_UMCON, 0);         // no auto flow control
 
   // force the clock to be enabled
-  UARTREG_RMW(uart_base, USI_OPTION, (3 << 1), (1 << 1));
+  auto option = uartreg_read(uart_base, USI_OPTION);
+  option &= ~(3 << 1);  // clear USI_HWACG field
+  option |= (1 << 1);   // set CLKREQ_ON
+  uartreg_write(uart_base, USI_OPTION, option);
 
   // mask all irqs
-  UARTREG(uart_base, UART_UINTM) = 0xf;  // mask CTS, TX, error, RX
+  uartreg_write(uart_base, UART_UINTM, 0xf);  // mask CTS, TX, error, RX
 
   // clear all irqs
-  UARTREG(uart_base, UART_UINTP) = 0xf;  // clear CTX, TX, error, RX
+  uartreg_write(uart_base, UART_UINTP, 0xf);  // clear CTX, TX, error, RX
 
   // disable fifos, set tx/rx threshold to minimum
-  UARTREG(uart_base, UART_UFCON) = 0;
+  uartreg_write(uart_base, UART_UFCON, 0);
 
   // reset rx fifo
   uartreg_or_eq(uart_base, UART_UFCON, (1 << 1));
 
   // wait for it to clear
-  while (UARTREG(uart_base, UART_UFCON) & (1 << 1))
+  while (uartreg_read(uart_base, UART_UFCON) & (1 << 1))
     ;
 
   // enable fifos
@@ -395,14 +405,14 @@ void MotmotUartInitEarly(const zbi_dcfg_simple_t& config) {
 
   // enable the transmitter and receiver, along with interrupt modes
   // clang-format off
-  UARTREG(uart_base, UART_UCON) =
+  uartreg_write(uart_base, UART_UCON,
       (3 << 12)    // default rx timeout interval
       | (0 << 11)  // disable rx timeout when rx fifo empty
       | (1 << 8)   // level trigger
       | (1 << 7)   // rx timeout enable
       | (1 << 6)   // rx interrupt enable
       | (1 << 2)   // tx enable interrupt/polling mode
-      | (1 << 0); // rx enable interrupt/polling mode
+      | (1 << 0)); // rx enable interrupt/polling mode
   // clang-format on
 
   pdev_register_uart(&uart_ops);
@@ -437,11 +447,11 @@ void MotmotUartInitLate() {
     uart_tx_irq_enabled = true;
   }
 
-  LTRACEF("UART: FIFO_DEPTH %#x\n", UARTREG(uart_base, UART_FIFO_DEPTH));
-  LTRACEF("UCON %#x\n", UARTREG(uart_base, UART_UCON));
-  LTRACEF("UFCON %#x\n", UARTREG(uart_base, UART_UFCON));
-  LTRACEF("UMCON %#x\n", UARTREG(uart_base, UART_UMCON));
-  LTRACEF("UERSTAT %#x\n", UARTREG(uart_base, UART_UERSTAT));
+  LTRACEF("UART: FIFO_DEPTH %#x\n", uartreg_read(uart_base, UART_FIFO_DEPTH));
+  LTRACEF("UCON %#x\n", uartreg_read(uart_base, UART_UCON));
+  LTRACEF("UFCON %#x\n", uartreg_read(uart_base, UART_UFCON));
+  LTRACEF("UMCON %#x\n", uartreg_read(uart_base, UART_UMCON));
+  LTRACEF("UERSTAT %#x\n", uartreg_read(uart_base, UART_UERSTAT));
 
   printf("UART: rx fifo len %u tx fifo len %u\n", uart_rx_fifo_size, uart_tx_fifo_size);
 }
