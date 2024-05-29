@@ -149,8 +149,10 @@ void lk_main(paddr_t handoff_paddr) {
   kernel_init();
   lk_primary_cpu_init_level(LK_INIT_LEVEL_KERNEL, LK_INIT_LEVEL_THREADING - 1);
 
-  // create a thread to complete system initialization
+  // Mark the current CPU as being active, then create a thread to complete
+  // system initialization
   dprintf(SPEW, "creating bootstrap completion thread\n");
+  Scheduler::SetCurrCpuActive(true);
   Thread* t = Thread::Create("bootstrap2", &bootstrap2, NULL, DEFAULT_PRIORITY);
   t->Detach();
   t->Resume();

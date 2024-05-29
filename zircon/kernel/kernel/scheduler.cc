@@ -60,6 +60,10 @@ KCOUNTER(counter_preempt_past, "scheduler.preempt_past")
 // earlier than its eligible_time.
 KCOUNTER(counter_deadline_past, "scheduler.deadline_past")
 
+// Counts the number of times we had to run FindTargetCpu again because our
+// selected Target became in-active after we chose it.
+KCOUNTER(counter_find_target_cpu_retries, "scheduler.find_target_cpu.retries")
+
 namespace {
 
 // The minimum possible weight and its reciprocal.
@@ -1013,14 +1017,22 @@ Thread* Scheduler::EvaluateNextThread(SchedTime now, Thread* current_thread, boo
         // Lock the target scheduler and finish the thread's transition to its
         // new CPU.  The After stage of migration will be run the next time the
         // thread becomes scheduled.
-        const cpu_num_t target_cpu = FindTargetCpu(next_thread, FindTargetCpuReason::Migrating);
-        Scheduler* const target = Get(target_cpu);
-        Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
-        MarkHasOwnedThreadAccess(*next_thread);
-        DEBUG_ASSERT(next_thread->scheduler_queue_state().transient_state ==
-                     TransientState::Migrating);
-        target->FinishTransition(now, next_thread);
-        cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu);
+        while (true) {
+          const cpu_num_t target_cpu = FindTargetCpu(next_thread, FindTargetCpuReason::Migrating);
+          Scheduler* const target = Get(target_cpu);
+          Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
+
+          if (target->IsCpuActive()) {
+            MarkHasOwnedThreadAccess(*next_thread);
+            DEBUG_ASSERT(next_thread->scheduler_queue_state().transient_state ==
+                         TransientState::Migrating);
+            target->FinishTransition(now, next_thread);
+            cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu);
+            break;
+          }
+
+          counter_find_target_cpu_retries.Add(1u);
+        }
       });
     }
   }
@@ -1036,17 +1048,11 @@ Thread* Scheduler::EvaluateNextThread(SchedTime now, Thread* current_thread, boo
 cpu_num_t Scheduler::FindTargetCpu(Thread* thread, FindTargetCpuReason reason) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "find_target");
 
-  const cpu_num_t current_cpu = arch_curr_cpu_num();
-  const cpu_mask_t current_cpu_mask = cpu_num_to_mask(current_cpu);
-  const cpu_mask_t active_mask = mp_get_active_mask();
-
   // Determine the set of CPUs the thread is allowed to run on.
-  //
-  // Threads may be created and resumed before the thread init level. Work around
-  // an empty active mask by assuming the current cpu is scheduleable.
+  const cpu_num_t current_cpu = arch_curr_cpu_num();
+  const cpu_mask_t active_mask = mp_get_active_mask();
   const SchedulerState& thread_state = const_cast<const Thread*>(thread)->scheduler_state();
-  const cpu_mask_t available_mask =
-      active_mask != 0 ? thread_state.GetEffectiveCpuMask(active_mask) : current_cpu_mask;
+  const cpu_mask_t available_mask = thread_state.GetEffectiveCpuMask(active_mask);
   DEBUG_ASSERT_MSG(available_mask != 0,
                    "thread=%s affinity=%#x soft_affinity=%#x active=%#x "
                    "idle=%#x arch_ints_disabled=%d",
@@ -1699,12 +1705,21 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
       // this CPU.
       current_thread->CallMigrateFnLocked(Thread::MigrateStage::Before);
 
-      const cpu_num_t target_cpu = FindTargetCpu(current_thread, FindTargetCpuReason::Migrating);
-      DEBUG_ASSERT((target_cpu != INVALID_CPU) && (target_cpu != this_cpu_));
-      Scheduler* const target = Get(target_cpu);
-      {
-        Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
-        target->FinishTransition(now, current_thread);
+      cpu_num_t target_cpu;
+      while (true) {
+        target_cpu = FindTargetCpu(current_thread, FindTargetCpuReason::Migrating);
+        DEBUG_ASSERT((target_cpu != INVALID_CPU) && (target_cpu != this_cpu_));
+        Scheduler* const target = Get(target_cpu);
+
+        {
+          Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
+          if (target->IsCpuActive()) {
+            target->FinishTransition(now, current_thread);
+            break;
+          }
+        }
+
+        counter_find_target_cpu_retries.Add(1u);
       }
 
       // Fire off an IPI to the CPU we just moved the thread to.
@@ -2065,6 +2080,8 @@ void Scheduler::Insert(SchedTime now, Thread* thread, Placement placement) {
 
   DEBUG_ASSERT(thread->state() == THREAD_READY);
   DEBUG_ASSERT(!thread->IsIdle());
+  DEBUG_ASSERT(IsCpuActive());  // We should never be inserting a thread into an inactive CPU's
+                                // queues.
 
   SchedulerQueueState& queue_state = thread->scheduler_queue_state();
   SchedulerState& state = thread->scheduler_state();
@@ -2324,19 +2341,28 @@ void Scheduler::Unblock(Thread* thread) {
   thread->canary().Assert();
 
   const SchedTime now = CurrentTime();
-  const cpu_num_t target_cpu = FindTargetCpu(thread, FindTargetCpuReason::Unblocking);
-  Scheduler* const target = Get(target_cpu);
+  cpu_num_t target_cpu;
+  while (true) {
+    target_cpu = FindTargetCpu(thread, FindTargetCpuReason::Unblocking);
+    Scheduler* const target = Get(target_cpu);
 
-  TraceWakeup(thread, target_cpu);
-  {
-    Guard<MonitoredSpinLock, NoIrqSave> queue_guard_{&target->queue_lock_, SOURCE_TAG};
-    // TODO(johngro): What if the CPU is now offline?  Do we need to retry?
-    // This thread is now owned by this scheduler.
-    thread->scheduler_state().curr_cpu_ = target_cpu;
-    thread->set_ready();
-    target->AssertInScheduler(*thread);
-    target->Insert(now, thread);
-    thread->UpdateRuntimeStats(thread->state());
+    {
+      Guard<MonitoredSpinLock, NoIrqSave> queue_guard_{&target->queue_lock_, SOURCE_TAG};
+      // If the target scheduler is still active, go ahead and join its queue.
+      // Otherwise, it must have been de-activated sometime during
+      // `FindTargetCpu`, and we should try again.
+      if (target->IsCpuActive()) {
+        TraceWakeup(thread, target_cpu);
+        thread->scheduler_state().curr_cpu_ = target_cpu;
+        thread->set_ready();
+        target->AssertInScheduler(*thread);
+        target->Insert(now, thread);
+        thread->UpdateRuntimeStats(thread->state());
+        break;
+      }
+    }
+
+    counter_find_target_cpu_retries.Add(1u);
   }
 
   trace.End();
@@ -2357,19 +2383,25 @@ void Scheduler::Unblock(Thread::UnblockList list) {
     DEBUG_ASSERT(!thread->IsIdle());
     thread->get_lock().AssertAcquired();
 
-    const cpu_num_t target_cpu = FindTargetCpu(thread, FindTargetCpuReason::Unblocking);
-    Scheduler* const target = Get(target_cpu);
+    cpu_num_t target_cpu;
+    while (true) {
+      target_cpu = FindTargetCpu(thread, FindTargetCpuReason::Unblocking);
+      Scheduler* const target = Get(target_cpu);
 
-    TraceWakeup(thread, target_cpu);
-    thread->UpdateRuntimeStats(thread->state());
-    {
-      Guard<MonitoredSpinLock, NoIrqSave> queue_guard_{&target->queue_lock_, SOURCE_TAG};
-      // TODO(johngro): What if the CPU is now offline?  Do we need to retry?
-      // This thread is now owned by this scheduler.
-      thread->scheduler_state().curr_cpu_ = target_cpu;
-      thread->set_ready();
-      target->AssertInScheduler(*thread);
-      target->Insert(now, thread);
+      {
+        Guard<MonitoredSpinLock, NoIrqSave> queue_guard_{&target->queue_lock_, SOURCE_TAG};
+        if (target->IsCpuActive()) {
+          TraceWakeup(thread, target_cpu);
+          thread->UpdateRuntimeStats(thread->state());
+          thread->scheduler_state().curr_cpu_ = target_cpu;
+          thread->set_ready();
+          target->AssertInScheduler(*thread);
+          target->Insert(now, thread);
+          break;
+        }
+      }
+
+      counter_find_target_cpu_retries.Add(1u);
     }
 
     cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu);
@@ -2543,14 +2575,22 @@ void Scheduler::Migrate(Thread* thread) {
         thread->CallMigrateFnLocked(Thread::MigrateStage::Before);
 
         // Find a new CPU for this thread and add it to the queue.
-        const cpu_num_t target_cpu = FindTargetCpu(thread, FindTargetCpuReason::Migrating);
-        Scheduler* target = Get(target_cpu);
-        Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&target->queue_lock_, SOURCE_TAG};
-        MarkHasOwnedThreadAccess(*thread);
-        target->FinishTransition(CurrentTime(), thread);
+        while (true) {
+          const cpu_num_t target_cpu = FindTargetCpu(thread, FindTargetCpuReason::Migrating);
+          Scheduler* target = Get(target_cpu);
+          Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&target->queue_lock_, SOURCE_TAG};
 
-        // Reschedule both CPUs to handle the run queue changes.
-        cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu) | thread_cpu_mask;
+          if (target->IsCpuActive()) {
+            MarkHasOwnedThreadAccess(*thread);
+            target->FinishTransition(CurrentTime(), thread);
+
+            // Reschedule both CPUs to handle the run queue changes.
+            cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu) | thread_cpu_mask;
+            break;
+          }
+
+          counter_find_target_cpu_retries.Add(1u);
+        }
       }
     }
   }
@@ -2587,9 +2627,16 @@ void Scheduler::MigrateUnpinnedThreads() {
   Scheduler* const current = Get(current_cpu);
   current->cpu_deactivating_.store(true, ktl::memory_order_release);
 
-  // Flag this CPU as being inactive.  This will prevent this CPU from being
-  // selected as a target for scheduling threads.
-  mp_set_curr_cpu_active(false);
+  // Flag this CPU as being inactive.  This will prevent new threads from being
+  // added to this CPU's scheduler's run queues while we migrate the existing
+  // threads off this scheduler.
+  //
+  // Note that this does _not_ prevent FindTargetCpu from _selecting_ a given
+  // scheduler as potential target for thread placement, but it _does_ guarantee
+  // that by the time we attempt to actually add the thread to the chosen
+  // scheduler's queue, we will have had a chance to check the flag once again,
+  // this time safely from with the chosen scheduler's queue lock.
+  Scheduler::SetCurrCpuActive(false);
 
   // Call all migrate functions for threads last run on the current CPU who are
   // not currently READY.  The next time these threads unblock or wake up, the
@@ -2670,21 +2717,31 @@ void Scheduler::MigrateUnpinnedThreads() {
     // this CPU.
     thread->CallMigrateFnLocked(Thread::MigrateStage::Before);
 
-    // Now, pick a CPU (other than this one) for the thread to go to, then put
-    // it there.
-    const cpu_num_t target_cpu = FindTargetCpu(thread, FindTargetCpuReason::Migrating);
-    Scheduler* const target = Get(target_cpu);
-    DEBUG_ASSERT(target != current);
-    Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
+    while (true) {
+      // Now, pick a CPU (other than this one) for the thread to go to, then put
+      // it there.
+      const cpu_num_t target_cpu = FindTargetCpu(thread, FindTargetCpuReason::Migrating);
+      Scheduler* const target = Get(target_cpu);
+      DEBUG_ASSERT(target != current);
 
-    // Finish the transition and add the thread to the new target queue.  The
-    // After stage of the migration function will be called on the new CPU the
-    // next time the thread becomes scheduled.
-    MarkHasOwnedThreadAccess(*thread);
-    target->FinishTransition(now, thread);
+      // Lock our target scheduler  and the check to be sure that our target CPU
+      // is still active.  If not, drop the scheduler lock and try again to pick
+      // a new CPU.
+      Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
+      if (target->IsCpuActive()) {
+        // Finish the transition and add the thread to the new target queue.  The
+        // After stage of the migration function will be called on the new CPU the
+        // next time the thread becomes scheduled.
+        MarkHasOwnedThreadAccess(*thread);
+        target->FinishTransition(now, thread);
 
-    // Arrange a reschedule on our target scheduler.
-    cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu);
+        // Arrange a reschedule on our target scheduler.
+        cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu);
+        break;
+      }
+
+      counter_find_target_cpu_retries.Add(1u);
+    }
   }
 
   trace.End();

@@ -492,7 +492,7 @@ bool migrate_unpinned_threads_test() {
   auto migrate_body = []() __NO_RETURN {
     Scheduler::TrampolineLockHandoff();
     Scheduler::MigrateUnpinnedThreads();
-    mp_set_curr_cpu_active(true);
+    Scheduler::SetCurrCpuActive(true);
     arch_enable_ints();
     Thread::Current::Exit(0);
   };
