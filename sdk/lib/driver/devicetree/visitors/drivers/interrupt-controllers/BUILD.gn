@@ -3,6 +3,9 @@
 # found in the LICENSE file.
 
 group("tests") {
-  deps = [ "arm-gicv2:tests" ]
+  deps = [
+    "arm-gic:tests",
+    "arm-gicv2:tests",
+  ]
   testonly = true
 }
