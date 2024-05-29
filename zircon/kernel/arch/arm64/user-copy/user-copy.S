@@ -23,7 +23,7 @@ saved_lr .req x17
 .balign 64 // Align to cache line.  This code fits in one cache line.
 .function _arm64_user_copy, global
 
-  adr temp, .Lfault_from_user
+  adr_global temp, .Lfault_from_user
   and temp, temp, fault_return_mask
 
   mov saved_fault_return_ptr, fault_return_ptr
