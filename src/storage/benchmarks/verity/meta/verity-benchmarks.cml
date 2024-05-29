@@ -71,6 +71,13 @@
             to: "#kernel",
         },
         {
+            directory: "boot",
+            from: "parent",
+            as: "boot-kernel",
+            to: [ "#kernel" ],
+            subdir: "kernel",
+        },
+        {
             directory: "dev-class-block",
             from: "parent",
             to: "#test_fxfs",

@@ -43,6 +43,11 @@
             to: "#starnix_runner",
         },
         {
+            directory: "boot-kernel",
+            from: "parent",
+            to: [ "#starnix_runner" ],
+        },
+        {
             from: "self",
             to: "#starnix_runner",
             config: "fuchsia.starnix.runner.EnableDataCollection",

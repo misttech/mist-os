@@ -250,6 +250,14 @@
             to: [ "#system-tests" ],
             rights: [ "rx*" ],
         },
+        {
+            directory: "boot",
+            from: "parent",
+            as: "boot-kernel",
+            to: [ "#system-tests" ],
+            rights: [ "r*" ],
+            subdir: "kernel",
+        },
 
         // Tests of the media system change their behavior based on board
         // TODO(https://fxbug.dev/42164198): Remove when specialized test realms are ready.

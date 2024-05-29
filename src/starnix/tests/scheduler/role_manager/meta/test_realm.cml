@@ -28,6 +28,11 @@
             from: "parent",
             to: "#kernel",
         },
+        {
+            directory: "boot-kernel",
+            from: "parent",
+            to: "#kernel",
+        },
     ],
     expose: [
         {
