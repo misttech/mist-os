@@ -487,10 +487,12 @@ impl ResolvedInstanceState {
             &state.program_output_dict,
             &declared_dictionaries,
         );
+        let child_outgoing_dictionary_routers =
+            state.get_child_component_output_dictionary_routers();
         let mut child_inputs = Default::default();
         build_component_sandbox(
             &component.moniker,
-            &state.children,
+            child_outgoing_dictionary_routers,
             &decl,
             &state.component_input,
             &state.framework_dict,
@@ -877,10 +879,12 @@ impl ResolvedInstanceState {
         let child_name =
             ChildName::try_new(child.name.as_str(), collection.map(|c| c.name.as_str()))?;
 
+        let child_outgoing_dictionary_routers =
+            self.get_child_component_output_dictionary_routers();
         if !dynamic_offers.is_empty() {
             extend_dict_with_offers(
                 &component.moniker,
-                &self.children,
+                &child_outgoing_dictionary_routers,
                 &self.component_input,
                 &dynamic_offers,
                 &component.program_output(),
@@ -1080,6 +1084,10 @@ impl ResolvedInstanceState {
                 .await
                 .expect("failed to discover child");
         }
+    }
+
+    fn get_child_component_output_dictionary_routers(&self) -> HashMap<ChildName, Router> {
+        self.children.iter().map(|(name, child)| (name.clone(), child.component_output())).collect()
     }
 }
 
