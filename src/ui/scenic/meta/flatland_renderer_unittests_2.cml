@@ -1,4 +1,4 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
@@ -15,8 +15,7 @@
         binary: "bin/flatland_renderer_unittests",
 
         // Only run some tests so that this test component can run within the test timeout.
-        // In particular, run all the tests that aren't run by the other sharded components.
-        args: [ "--gtest_filter=-*DisplayTest*:*VulkanRendererTest*" ],
+        args: [ "--gtest_filter=*DisplayTest*" ],
     },
     children: [
         {
