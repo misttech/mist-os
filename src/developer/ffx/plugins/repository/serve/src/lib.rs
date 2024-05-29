@@ -94,7 +94,7 @@ fn start_signal_monitoring(
     tracing::debug!("Starting monitoring for SIGHUP, SIGINT, SIGTERM");
     let mut signals = Signals::new(&[SIGHUP, SIGINT, SIGTERM]).unwrap();
     // Can't use async here, as signals.forever() is blocking.
-    let _signal_handle_thread = std::thread::spawn(move || {
+    std::thread::spawn(move || {
         if let Some(signal) = signals.forever().next() {
             match signal {
                 SIGINT | SIGHUP | SIGTERM => {
@@ -325,6 +325,9 @@ $ ffx doctor --restart-daemon"#,
     let (server_stop_tx, mut server_stop_rx) = futures::channel::mpsc::channel::<()>(1);
     let (loop_stop_tx, mut loop_stop_rx) = futures::channel::mpsc::channel::<()>(1);
 
+    // Register signal handler.
+    start_signal_monitoring(loop_stop_tx.clone(), server_stop_tx.clone());
+
     if !cmd.no_device {
         // Resolving the default target is typically fast
         // or does not succeed, in which case we return
@@ -409,9 +412,6 @@ $ ffx doctor --restart-daemon"#,
         }
     })
     .detach();
-
-    // Register signal handler.
-    start_signal_monitoring(loop_stop_tx, server_stop_tx);
 
     // Wait for the server to shut down.
     server_task.await;
