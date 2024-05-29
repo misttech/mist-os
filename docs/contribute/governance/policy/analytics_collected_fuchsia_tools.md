@@ -19,8 +19,8 @@ collection including the following:
   version).
 - Usage of and interactions with features and whether certain features are
   enabled.
-- Whether a tool is invoked in a bot environment (e.g. a CI environment) and
-  whether a tool is invoked by other Fuchsia related tools.
+- Information on how a tool is invoked. (e.g. whether invoked in an CI
+  environment, invoker information, etc.)
 - The event of analytics being enabled or disabled.
 - Success, failure, exceptions, errors, and timing of a task performed by a tool.
 - Crashes of a tool.
