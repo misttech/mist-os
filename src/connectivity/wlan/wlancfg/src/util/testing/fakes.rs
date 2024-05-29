@@ -6,7 +6,6 @@
 use {
     crate::{
         client::{
-            connection_selection::EWMA_SMOOTHING_FACTOR,
             roaming::{local_roam_manager::LocalRoamManagerApi, roam_monitor::RoamMonitorApi},
             scan, types as client_types,
         },
@@ -14,6 +13,7 @@ use {
             Credential, NetworkConfig, NetworkConfigError, NetworkIdentifier, PastConnectionData,
             PastConnectionList, SavedNetworksManagerApi,
         },
+        telemetry::EWMA_SMOOTHING_FACTOR_FOR_METRICS,
         util::pseudo_energy::EwmaSignalData,
     },
     async_trait::async_trait,
@@ -296,7 +296,7 @@ impl LocalRoamManagerApi for FakeLocalRoamManager {
         _roam_sender: mpsc::UnboundedSender<client_types::ScannedCandidate>,
     ) -> Box<dyn RoamMonitorApi> {
         let signal_data =
-            EwmaSignalData::new(signal.rssi_dbm, signal.snr_db, EWMA_SMOOTHING_FACTOR);
+            EwmaSignalData::new(signal.rssi_dbm, signal.snr_db, EWMA_SMOOTHING_FACTOR_FOR_METRICS);
         Box::new(FakeRoamMonitor {
             stats_sender: self.stats_sender.clone(),
             signal_data: Some(signal_data),
@@ -355,7 +355,11 @@ pub fn random_connection_data() -> PastConnectionData {
         disconnect_time,
         uptime,
         client_types::DisconnectReason::DisconnectDetectedFromSme,
-        EwmaSignalData::new(rng.gen_range(-90..-20), rng.gen_range(10..50), EWMA_SMOOTHING_FACTOR),
+        EwmaSignalData::new(
+            rng.gen_range(-90..-20),
+            rng.gen_range(10..50),
+            EWMA_SMOOTHING_FACTOR_FOR_METRICS,
+        ),
         rng.gen::<u8>().into(),
     )
 }

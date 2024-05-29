@@ -42,11 +42,6 @@ pub mod network_selection;
 pub mod scoring_functions;
 
 pub const CONNECTION_SELECTION_REQUEST_BUFFER_SIZE: usize = 100;
-
-/// Number of previous RSSI measurements to exponentially weigh into average.
-/// TODO(https://fxbug.dev/42165706): Tune smoothing factor.
-pub(crate) const EWMA_SMOOTHING_FACTOR: usize = 10;
-
 const INSPECT_EVENT_LIMIT_FOR_CONNECTION_SELECTIONS: usize = 10;
 
 const RECENT_DISCONNECT_WINDOW: zx::Duration = zx::Duration::from_seconds(60 * 15);

@@ -67,6 +67,9 @@ pub const AVERAGE_SCORE_DELTA_MINIMUM_DURATION: zx::Duration = zx::Duration::fro
 pub const COBALT_REASON_CODE_MAX: u16 = 1000;
 // Time between cobalt error reports to prevent cluttering up the syslog.
 pub const MINUTES_BETWEEN_COBALT_SYSLOG_WARNINGS: i64 = 60;
+/// Number of previous RSSI measurements to exponentially weigh into average.
+/// TODO(https://fxbug.dev/42165706): Tune smoothing factor.
+pub const EWMA_SMOOTHING_FACTOR_FOR_METRICS: usize = 10;
 
 #[derive(Clone, Debug, PartialEq)]
 // Connection score and the time at which it was calculated.
@@ -273,6 +276,8 @@ pub enum TelemetryEvent {
     },
     OnSignalReport {
         ind: fidl_internal::SignalReportIndication,
+    },
+    OnSignalVelocityUpdate {
         rssi_velocity: f64,
     },
     OnChannelSwitched {
@@ -1312,13 +1317,16 @@ impl Telemetry {
                 };
                 self.last_checked_connection_state = now;
             }
-            TelemetryEvent::OnSignalReport { ind, rssi_velocity } => {
+            TelemetryEvent::OnSignalReport { ind } => {
                 if let ConnectionState::Connected(state) = &mut self.connection_state {
                     state.ap_state.tracked.signal.rssi_dbm = ind.rssi_dbm;
                     state.ap_state.tracked.signal.snr_db = ind.snr_db;
                     state.last_signal_report = now;
-                    self.stats_logger.log_signal_report_metrics(ind.rssi_dbm, rssi_velocity).await;
+                    self.stats_logger.log_signal_report_metrics(ind.rssi_dbm).await;
                 }
+            }
+            TelemetryEvent::OnSignalVelocityUpdate { rssi_velocity } => {
+                self.stats_logger.log_signal_velocity_metrics(rssi_velocity).await;
             }
             TelemetryEvent::OnChannelSwitched { info } => {
                 if let ConnectionState::Connected(state) = &mut self.connection_state {
@@ -2943,7 +2951,7 @@ impl StatsLogger {
         ));
     }
 
-    async fn log_signal_report_metrics(&mut self, rssi: i8, rssi_velocity: f64) {
+    async fn log_signal_report_metrics(&mut self, rssi: i8) {
         // The range of the RSSI histogram is -128 to 0 with bucket size 1. The buckets are:
         //     bucket 0: reserved for underflow, although not possible with i8
         //     bucket 1: -128
@@ -2957,7 +2965,9 @@ impl StatsLogger {
             .entry(index)
             .or_insert(fidl_fuchsia_metrics::HistogramBucket { index, count: 0 });
         entry.count = entry.count + 1;
+    }
 
+    async fn log_signal_velocity_metrics(&mut self, rssi_velocity: f64) {
         // Add the count to the RSSI velocity histogram, which will be periodically logged.
         // The histogram range is -10 to 10, and index 0 is reserved for values below -10. For
         // example, RSSI velocity -10 should map to index 1 and velocity 0 should map to index 11.
@@ -4031,9 +4041,7 @@ mod tests {
 
         // Send a signal, which resets timing information for determining driver unresponsiveness
         let ind = fidl_internal::SignalReportIndication { rssi_dbm: -40, snr_db: 30 };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::OnSignalReport { ind, rssi_velocity: 1.0 });
+        test_helper.telemetry_sender.send(TelemetryEvent::OnSignalReport { ind });
 
         test_helper.advance_by(UNRESPONSIVE_FLAG_MIN_DURATION, test_fut.as_mut());
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
@@ -5680,7 +5688,51 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_log_rssi_and_velocity_hourly() {
+    fn test_log_rssi_hourly() {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        // RSSI velocity is only logged if in the connected state.
+        test_helper.send_connected_event(random_bss_description!(Wpa2));
+
+        // Send some RSSI velocities
+        let ind_1 = fidl_internal::SignalReportIndication { rssi_dbm: -50, snr_db: 30 };
+        let ind_2 = fidl_internal::SignalReportIndication { rssi_dbm: -61, snr_db: 40 };
+        test_helper.telemetry_sender.send(TelemetryEvent::OnSignalReport { ind: ind_1 });
+        test_helper.telemetry_sender.send(TelemetryEvent::OnSignalReport { ind: ind_1 });
+        test_helper.telemetry_sender.send(TelemetryEvent::OnSignalReport { ind: ind_2 });
+
+        // After an hour has passed, the RSSI should be logged to cobalt
+        test_helper.advance_by(1.hour(), test_fut.as_mut());
+        test_helper.drain_cobalt_events(&mut test_fut);
+
+        let metrics = test_helper.get_logged_metrics(metrics::CONNECTION_RSSI_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_variant!(&metrics[0].payload, MetricEventPayload::Histogram(buckets) => {
+            assert_eq!(buckets.len(), 2);
+            assert!(buckets.contains(&fidl_fuchsia_metrics::HistogramBucket{index: 79, count: 2}));
+            assert!(buckets.contains(&fidl_fuchsia_metrics::HistogramBucket{index: 68, count: 1}));
+        });
+        test_helper.clear_cobalt_events();
+
+        // Send another different RSSI
+        let ind_3 = fidl_internal::SignalReportIndication { rssi_dbm: -75, snr_db: 30 };
+        test_helper.telemetry_sender.send(TelemetryEvent::OnSignalReport { ind: ind_3 });
+        test_helper.advance_by(1.hour(), test_fut.as_mut());
+
+        // Check that the previously logged values are not logged again, and the new value is
+        // logged.
+        test_helper.drain_cobalt_events(&mut test_fut);
+
+        let metrics = test_helper.get_logged_metrics(metrics::CONNECTION_RSSI_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        let buckets =
+            assert_variant!(&metrics[0].payload, MetricEventPayload::Histogram(buckets) => buckets);
+        assert_eq!(buckets.len(), 1);
+        assert!(buckets.contains(&fidl_fuchsia_metrics::HistogramBucket { index: 54, count: 1 }));
+    }
+
+    #[fuchsia::test]
+    fn test_log_rssi_velocity_hourly() {
         let (mut test_helper, mut test_fut) = setup_test();
 
         // RSSI velocity is only logged if in the connected state.
@@ -5689,17 +5741,15 @@ mod tests {
         // Send some RSSI velocities
         let rssi_velocity_1 = -2.0;
         let rssi_velocity_2 = 2.0;
-        let ind_1 = fidl_internal::SignalReportIndication { rssi_dbm: -50, snr_db: 30 };
-        let ind_2 = fidl_internal::SignalReportIndication { rssi_dbm: -61, snr_db: 40 };
         test_helper
             .telemetry_sender
-            .send(TelemetryEvent::OnSignalReport { ind: ind_1, rssi_velocity: rssi_velocity_1 });
+            .send(TelemetryEvent::OnSignalVelocityUpdate { rssi_velocity: rssi_velocity_1 });
         test_helper
             .telemetry_sender
-            .send(TelemetryEvent::OnSignalReport { ind: ind_1, rssi_velocity: rssi_velocity_2 });
+            .send(TelemetryEvent::OnSignalVelocityUpdate { rssi_velocity: rssi_velocity_2 });
         test_helper
             .telemetry_sender
-            .send(TelemetryEvent::OnSignalReport { ind: ind_2, rssi_velocity: rssi_velocity_2 });
+            .send(TelemetryEvent::OnSignalVelocityUpdate { rssi_velocity: rssi_velocity_2 });
 
         // After an hour has passed, the RSSI velocity should be logged to cobalt
         test_helper.advance_by(1.hour(), test_fut.as_mut());
@@ -5713,34 +5763,18 @@ mod tests {
             assert!(buckets.contains(&fidl_fuchsia_metrics::HistogramBucket{index: 9, count: 1}));
             assert!(buckets.contains(&fidl_fuchsia_metrics::HistogramBucket{index: 13, count: 2}));
         });
-
-        let metrics = test_helper.get_logged_metrics(metrics::CONNECTION_RSSI_METRIC_ID);
-        assert_eq!(metrics.len(), 1);
-        assert_variant!(&metrics[0].payload, MetricEventPayload::Histogram(buckets) => {
-            assert_eq!(buckets.len(), 2);
-            assert!(buckets.contains(&fidl_fuchsia_metrics::HistogramBucket{index: 79, count: 2}));
-            assert!(buckets.contains(&fidl_fuchsia_metrics::HistogramBucket{index: 68, count: 1}));
-        });
         test_helper.clear_cobalt_events();
 
         // Send another different RSSI velocity
         let rssi_velocity_3 = 3.0;
-        let ind_3 = fidl_internal::SignalReportIndication { rssi_dbm: -75, snr_db: 30 };
         test_helper
             .telemetry_sender
-            .send(TelemetryEvent::OnSignalReport { ind: ind_3, rssi_velocity: rssi_velocity_3 });
+            .send(TelemetryEvent::OnSignalVelocityUpdate { rssi_velocity: rssi_velocity_3 });
         test_helper.advance_by(1.hour(), test_fut.as_mut());
 
         // Check that the previously logged values are not logged again, and the new value is
         // logged.
         test_helper.drain_cobalt_events(&mut test_fut);
-
-        let metrics = test_helper.get_logged_metrics(metrics::CONNECTION_RSSI_METRIC_ID);
-        assert_eq!(metrics.len(), 1);
-        let buckets =
-            assert_variant!(&metrics[0].payload, MetricEventPayload::Histogram(buckets) => buckets);
-        assert_eq!(buckets.len(), 1);
-        assert!(buckets.contains(&fidl_fuchsia_metrics::HistogramBucket { index: 54, count: 1 }));
 
         let metrics = test_helper.get_logged_metrics(metrics::RSSI_VELOCITY_METRIC_ID);
         assert_eq!(metrics.len(), 1);
@@ -5754,39 +5788,24 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_log_rssi_and_velocity_histogram_bounds() {
+    fn test_log_rssi_histogram_bounds() {
         let (mut test_helper, mut test_fut) = setup_test();
 
-        // RSSI velocity is only logged if in the connected state.
+        // RSSI is only logged if in the connected state.
         test_helper.send_connected_event(random_bss_description!(Wpa2));
 
-        // Send some RSSI velocities in the underflow and overflow buckets
-        // -128 is the lowest bucket and nothing can be in the underflow bucket because -129
-        // can't be expressed by i8.
         let ind_min = fidl_internal::SignalReportIndication { rssi_dbm: -128, snr_db: 30 };
         // 0 is the highest histogram bucket and 1 and above are in the overflow bucket.
         let ind_max = fidl_internal::SignalReportIndication { rssi_dbm: 0, snr_db: 30 };
         let ind_overflow_1 = fidl_internal::SignalReportIndication { rssi_dbm: 1, snr_db: 30 };
         let ind_overflow_2 = fidl_internal::SignalReportIndication { rssi_dbm: 127, snr_db: 30 };
         // Send the telemetry events. -10 is the min velocity bucket and 10 is the max.
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::OnSignalReport { ind: ind_min, rssi_velocity: -11.0 });
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::OnSignalReport { ind: ind_min, rssi_velocity: -15.0 });
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::OnSignalReport { ind: ind_min, rssi_velocity: 11.0 });
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::OnSignalReport { ind: ind_max, rssi_velocity: 20.0 });
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::OnSignalReport { ind: ind_overflow_1, rssi_velocity: -10.0 });
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::OnSignalReport { ind: ind_overflow_2, rssi_velocity: 10.0 });
+        test_helper.telemetry_sender.send(TelemetryEvent::OnSignalReport { ind: ind_min });
+        test_helper.telemetry_sender.send(TelemetryEvent::OnSignalReport { ind: ind_min });
+        test_helper.telemetry_sender.send(TelemetryEvent::OnSignalReport { ind: ind_min });
+        test_helper.telemetry_sender.send(TelemetryEvent::OnSignalReport { ind: ind_max });
+        test_helper.telemetry_sender.send(TelemetryEvent::OnSignalReport { ind: ind_overflow_1 });
+        test_helper.telemetry_sender.send(TelemetryEvent::OnSignalReport { ind: ind_overflow_2 });
         test_helper.advance_by(1.hour(), test_fut.as_mut());
 
         // Check that the min, max, underflow, and overflow buckets are used correctly.
@@ -5799,6 +5818,38 @@ mod tests {
         assert!(buckets.contains(&fidl_fuchsia_metrics::HistogramBucket { index: 1, count: 3 }));
         assert!(buckets.contains(&fidl_fuchsia_metrics::HistogramBucket { index: 129, count: 1 }));
         assert!(buckets.contains(&fidl_fuchsia_metrics::HistogramBucket { index: 130, count: 2 }));
+    }
+
+    #[fuchsia::test]
+    fn test_log_rssi_velocity_histogram_bounds() {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        // RSSI velocity is only logged if in the connected state.
+        test_helper.send_connected_event(random_bss_description!(Wpa2));
+
+        // Send the telemetry events. -10 is the min velocity bucket and 10 is the max.
+        test_helper
+            .telemetry_sender
+            .send(TelemetryEvent::OnSignalVelocityUpdate { rssi_velocity: -11.0 });
+        test_helper
+            .telemetry_sender
+            .send(TelemetryEvent::OnSignalVelocityUpdate { rssi_velocity: -15.0 });
+        test_helper
+            .telemetry_sender
+            .send(TelemetryEvent::OnSignalVelocityUpdate { rssi_velocity: 11.0 });
+        test_helper
+            .telemetry_sender
+            .send(TelemetryEvent::OnSignalVelocityUpdate { rssi_velocity: 20.0 });
+        test_helper
+            .telemetry_sender
+            .send(TelemetryEvent::OnSignalVelocityUpdate { rssi_velocity: -10.0 });
+        test_helper
+            .telemetry_sender
+            .send(TelemetryEvent::OnSignalVelocityUpdate { rssi_velocity: 10.0 });
+        test_helper.advance_by(1.hour(), test_fut.as_mut());
+
+        // Check that the min, max, underflow, and overflow buckets are used correctly.
+        test_helper.drain_cobalt_events(&mut test_fut);
 
         // Check RSSI velocity values
         let metrics = test_helper.get_logged_metrics(metrics::RSSI_VELOCITY_METRIC_ID);

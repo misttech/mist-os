@@ -5,17 +5,15 @@
 use {
     crate::{
         client::{
-            connection_selection::{
-                scoring_functions::score_current_connection_signal_data, EWMA_SMOOTHING_FACTOR,
-            },
-            roaming::local_roam_manager::LocalRoamManagerApi,
-            types,
+            connection_selection::scoring_functions::score_current_connection_signal_data,
+            roaming::local_roam_manager::LocalRoamManagerApi, types,
         },
         config_management::{PastConnectionData, SavedNetworksManagerApi},
         mode_management::{Defect, IfaceFailure},
         telemetry::{
             DisconnectInfo, TelemetryEvent, TelemetrySender, TimestampedConnectionScore,
-            AVERAGE_SCORE_DELTA_MINIMUM_DURATION, METRICS_SHORT_CONNECT_DURATION,
+            AVERAGE_SCORE_DELTA_MINIMUM_DURATION, EWMA_SMOOTHING_FACTOR_FOR_METRICS,
+            METRICS_SHORT_CONNECT_DURATION,
         },
         util::{
             historical_list::HistoricalList,
@@ -23,7 +21,7 @@ use {
                 ClientListenerMessageSender, ClientNetworkState, ClientStateUpdate,
                 Message::NotifyListeners,
             },
-            pseudo_energy::EwmaSignalData,
+            pseudo_energy::{EwmaSignalData, RssiVelocity},
             state_machine::{self, ExitReason, IntoStateExt},
         },
     },
@@ -556,11 +554,12 @@ async fn connected_state(
     let mut connect_start_time = fasync::Time::now();
 
     // Track the EWMA signal and velocity for metrics
-    let signal_data = EwmaSignalData::new(
+    let mut signal_data = EwmaSignalData::new(
         options.ap_state.tracked.signal.rssi_dbm,
         options.ap_state.tracked.signal.snr_db,
-        EWMA_SMOOTHING_FACTOR,
+        EWMA_SMOOTHING_FACTOR_FOR_METRICS,
     );
+    let mut rssi_velocity = RssiVelocity::new(options.ap_state.tracked.signal.rssi_dbm);
     let initial_score = score_current_connection_signal_data(signal_data, 0.0);
 
     // Used to receive roam requests. The sender is cloned to send to the RoamManager.
@@ -641,10 +640,24 @@ async fn connected_state(
                             options.ap_state.tracked.signal.snr_db = ind.snr_db;
                             avg_rssi.add(DecibelMilliWatt(ind.rssi_dbm));
 
-                            let score = roam_monitor.handle_connection_stats(ind);
-                            if let Ok(score) = score {
-                                options.past_connection_scores.add(TimestampedConnectionScore::new(score, fasync::Time::now()));
-                            }
+                            // Update running signal data
+                            signal_data
+                            .update_with_new_measurement(ind.rssi_dbm, ind.snr_db);
+                            // Update with smoothed signal, to reduce noise.
+                            rssi_velocity.update(signal_data.ewma_rssi.get());
+
+                            // Add connection score entry for metrics.
+                            let score = score_current_connection_signal_data(signal_data, rssi_velocity.get());
+                            options.past_connection_scores.add(TimestampedConnectionScore::new(score, fasync::Time::now()));
+
+                            // Send signal report metrics
+                            common_options.telemetry_sender.send(TelemetryEvent::OnSignalReport {
+                                ind
+                            });
+
+                            // Send indication to roam_monitor
+                            let _ = roam_monitor.handle_connection_stats(ind);
+
                             false
                         }
                         fidl_sme::ConnectTransactionEvent::OnChannelSwitched { info } => {
@@ -1308,7 +1321,7 @@ mod tests {
                 signal_data_at_disconnect: EwmaSignalData::new(
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
-                    EWMA_SMOOTHING_FACTOR,
+                    EWMA_SMOOTHING_FACTOR_FOR_METRICS,
                 ),
                 // TODO: record average phy rate over connection once available
                 average_tx_rate: 0,
@@ -1929,7 +1942,7 @@ mod tests {
                 signal_data_at_disconnect: EwmaSignalData::new(
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
-                    EWMA_SMOOTHING_FACTOR,
+                    EWMA_SMOOTHING_FACTOR_FOR_METRICS,
                 ),
                 // TODO: record average phy rate over connection once available
                 average_tx_rate: 0,
@@ -2010,7 +2023,7 @@ mod tests {
                 signal_data_at_disconnect: EwmaSignalData::new(
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
-                    EWMA_SMOOTHING_FACTOR,
+                    EWMA_SMOOTHING_FACTOR_FOR_METRICS,
                 ),
                 // TODO: record average phy rate over connection once available
                 average_tx_rate: 0,
@@ -2209,7 +2222,7 @@ mod tests {
                 signal_data_at_disconnect: EwmaSignalData::new(
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
-                    EWMA_SMOOTHING_FACTOR,
+                    EWMA_SMOOTHING_FACTOR_FOR_METRICS,
                 ),
                 average_tx_rate: 0,
             },
@@ -2450,7 +2463,7 @@ mod tests {
                 signal_data_at_disconnect: EwmaSignalData::new(
                     first_bss_desc.rssi_dbm,
                     first_bss_desc.snr_db,
-                    EWMA_SMOOTHING_FACTOR,
+                    EWMA_SMOOTHING_FACTOR_FOR_METRICS,
                 ),
                 // TODO: record average phy rate over connection once available
                 average_tx_rate: 0,
@@ -2730,7 +2743,7 @@ mod tests {
         // The tracked signal data uses the RSS/SNR data from the time of connection and the first
         // stats are sent after updated with the first signal report data.
         let mut expected_signal_data =
-            EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR);
+            EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR_FOR_METRICS);
         expected_signal_data.update_with_new_measurement(rssi_1, snr_1);
 
         // Verify that connection stats are sent out

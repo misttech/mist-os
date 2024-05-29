@@ -142,6 +142,11 @@ pub struct Signal {
     pub snr_db: i8,
 }
 
+impl From<fidl_internal::SignalReportIndication> for Signal {
+    fn from(ind: fidl_internal::SignalReportIndication) -> Signal {
+        Signal { rssi_dbm: ind.rssi_dbm, snr_db: ind.snr_db }
+    }
+}
 /// BSS information tracked by the client state machine.
 ///
 /// While connected to an AP, some important BSS configuration may change, such as the channel and
