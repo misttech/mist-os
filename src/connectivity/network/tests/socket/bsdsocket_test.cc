@@ -195,11 +195,6 @@ class SocketOptionTestBase : public testing::Test {
   void TearDown() override { EXPECT_EQ(close(sock_.release()), 0) << strerror(errno); }
 
   bool IsOptionLevelSupportedByDomain(int level) const {
-    if (kIsFuchsia) {
-      // TODO(https://gvisor.dev/issues/6389): Remove once Fuchsia returns an error
-      // when setting/getting IPv6 options on an IPv4 socket.
-      return true;
-    }
     // IPv6 options are only supported on AF_INET6 sockets.
     return sock_domain_.which() == SocketDomain::Which::IPv6 || level != IPPROTO_IPV6;
   }

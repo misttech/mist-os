@@ -81,19 +81,15 @@
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Datagram_IPPROTO_IP_IP_RECVTTL",
 
                 // IPPROTO_IPV6_IPV6_MULTICAST_LOOP
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Stream_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Datagram_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Stream_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Stream_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
-                "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Datagram_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv6_Stream_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Stream_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Datagram_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Stream_IPPROTO_IPV6_IPV6_MULTICAST_LOOP",
 
                 // IPPROTO_IPV6_IPV6_TCLASS
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Stream_IPPROTO_IPV6_IPV6_TCLASS",
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Datagram_IPPROTO_IPV6_IPV6_TCLASS",
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Stream_IPPROTO_IPV6_IPV6_TCLASS",
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Datagram_IPPROTO_IPV6_IPV6_TCLASS",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Stream_IPPROTO_IPV6_IPV6_TCLASS",
@@ -110,8 +106,6 @@
                 "IntSocketOptionTests/IntSocketOptionTest.SetInvalid/IPv6_Datagram_IPPROTO_IPV6_IPV6_TCLASS",
 
                 // IPPROTO_IPV6_IPV6_RECVTCLASS
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Stream_IPPROTO_IPV6_IPV6_RECVTCLASS",
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Datagram_IPPROTO_IPV6_IPV6_RECVTCLASS",
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Stream_IPPROTO_IPV6_IPV6_RECVTCLASS",
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Datagram_IPPROTO_IPV6_IPV6_RECVTCLASS",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Stream_IPPROTO_IPV6_IPV6_RECVTCLASS",
@@ -124,7 +118,6 @@
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Datagram_IPPROTO_IPV6_IPV6_RECVTCLASS",
 
                 // IPPROTO_IPV6_IPV6_UNICAST_HOPS
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Stream_IPPROTO_IPV6_IPV6_UNICAST_HOPS",
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Datagram_IPPROTO_IPV6_IPV6_UNICAST_HOPS",
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Stream_IPPROTO_IPV6_IPV6_UNICAST_HOPS",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Stream_IPPROTO_IPV6_IPV6_UNICAST_HOPS",
@@ -149,8 +142,6 @@
                 "DatagramIntSocketOptionTests/IntSocketOptionTest.SetInvalid/IPv4_Datagram_IPPROTO_IPV6_IPV6_MULTICAST_HOPS",
 
                 // IPPROTO_IPV6_IPV6_RECVHOPLIMIT
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Stream_IPPROTO_IPV6_IPV6_RECVHOPLIMIT",
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Datagram_IPPROTO_IPV6_IPV6_RECVHOPLIMIT",
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Stream_IPPROTO_IPV6_IPV6_RECVHOPLIMIT",
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Datagram_IPPROTO_IPV6_IPV6_RECVHOPLIMIT",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Stream_IPPROTO_IPV6_IPV6_RECVHOPLIMIT",
@@ -166,14 +157,7 @@
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Stream_IPPROTO_IPV6_IPV6_RECVPKTINFO",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv6_Stream_IPPROTO_IPV6_IPV6_RECVPKTINFO",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Stream_IPPROTO_IPV6_IPV6_RECVPKTINFO",
-
-                // NB: Netstack3 disallows getting/setting the
-                // `IPV6_RECVPKTINFO` option on IPv4 sockets. This conforms with
-                // Linux, but diverges from Netstack2 (gVisor).
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Datagram_IPPROTO_IPV6_IPV6_RECVPKTINFO",
-                "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Datagram_IPPROTO_IPV6_IPV6_RECVPKTINFO",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Datagram_IPPROTO_IPV6_IPV6_RECVPKTINFO",
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Stream_IPPROTO_IPV6_IPV6_RECVPKTINFO",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Stream_IPPROTO_IPV6_IPV6_RECVPKTINFO",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Stream_IPPROTO_IPV6_IPV6_RECVPKTINFO",
 
