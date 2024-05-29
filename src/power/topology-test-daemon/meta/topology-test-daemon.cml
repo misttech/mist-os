@@ -1,0 +1,38 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        runner: "elf",
+        binary: "bin/topology_test_daemon",
+    },
+    capabilities: [
+        {
+            protocol: [
+                "fuchsia.power.topology.test.SystemActivityControl",
+                "fuchsia.power.topology.test.TopologyControl",
+            ],
+        },
+    ],
+    use: [
+        {
+            protocol: [
+                "fuchsia.power.broker.Topology",
+                "fuchsia.power.system.ActivityGovernor",
+            ],
+        },
+    ],
+    expose: [
+        {
+            protocol: [
+                "fuchsia.power.topology.test.SystemActivityControl",
+                "fuchsia.power.topology.test.TopologyControl",
+            ],
+            from: "self",
+        },
+    ],
+}

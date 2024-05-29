@@ -1,0 +1,98 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+// Draft Prototype of Protocols to be used by Power Topology Testing, such as a test tool to allow
+// users to create power topology and even hold a wake lease to the system activity governor. The
+// protocols are not fully baked yet until the tool also lands.
+@available(added=HEAD)
+library fuchsia.power.topology.test;
+using fuchsia.power.broker;
+
+// Limitations on vector length for the sake of bounding request size.
+const MAX_ELEMENTS uint16 = 256;
+
+const MAX_ELEMENT_NAME_LEN uint16 = fuchsia.power.broker.MAX_ELEMENT_NAME_LEN;
+const MAX_VALID_POWER_LEVELS uint16 = fuchsia.power.broker.MAX_VALID_POWER_LEVELS;
+
+alias PowerLevel = fuchsia.power.broker.PowerLevel;
+alias DependencyType = fuchsia.power.broker.DependencyType;
+
+// Limit the number of dependencies to the number of valid power levels.
+const MAX_DEPENDENCIES uint16 = MAX_VALID_POWER_LEVELS;
+
+alias ElementName = string:MAX_ELEMENT_NAME_LEN;
+
+/// Errors associated with TopologyControl.Create method.
+type CreateTopologyGraphError = strict enum : uint32 {
+    /// Indicates that the request failed due to an internal error.
+    INTERNAL = 1;
+    /// Indicates that the element topology provided in Create command is
+    /// invalid.
+    INVALID_TOPOLOGY = 2;
+};
+
+/// Errors associated with TopologyControl.AcquireLease and
+/// TopologyControl.DropLease methods.
+type LeaseControlError = strict enum : uint32 {
+    /// Indicates that the request failed due to an internal error.
+    INTERNAL = 1;
+    /// Indicates that an invalid power element name was provided in
+    /// AcquireLease or DropLease.
+    INVALID_ELEMENT = 2;
+};
+
+/// Errors associated with SystemActivityControl methods.
+type SystemActivityControlError = strict enum : uint32 {
+    /// Indicates that the request failed due to an internal error.
+    INTERNAL = 1;
+};
+
+/// Power Dependency information in Element. Used by a client to construct power topology.
+type LevelDependency = struct {
+    dependency_type DependencyType;
+    dependent_level PowerLevel;
+    requires_element ElementName;
+    requires_level PowerLevel;
+};
+
+/// Passed to TopologyControl.Create to construct power topology.
+type Element = struct {
+    element_name ElementName;
+    initial_current_level PowerLevel;
+    valid_levels vector<PowerLevel>:MAX_VALID_POWER_LEVELS;
+    dependencies vector<LevelDependency>:MAX_DEPENDENCIES;
+};
+
+/// The primary initial protocol used by a client tool to communiate with the topology-test-daemon.
+/// The client can create the whole topology, and then acquire or drop lease according to element
+/// names.
+@discoverable
+open protocol TopologyControl {
+    // Create a new topology graph. Replaces any previously created topology.
+    strict Create(struct {
+        /// List of elements to create.
+        elements vector<Element>:MAX_ELEMENTS;
+    }) -> () error CreateTopologyGraphError;
+
+    // Acquire a new lease. If an old lease exists, it will be dropped after the
+    // the new lease is created.
+    strict AcquireLease(struct {
+        element_name ElementName;
+        /// Power level of this element to be raised to.
+        level PowerLevel;
+    }) -> () error LeaseControlError;
+
+    // Drop a previously acquired lease.
+    strict DropLease(struct {
+        element_name ElementName;
+    }) -> () error LeaseControlError;
+};
+
+/// The protocol used by a client to hold or drop the lease to the System Activity Governor.
+@discoverable
+open protocol SystemActivityControl {
+    /// Called by a client to hold a lease to the System Activity Governor.
+    strict StartApplicationActivity() -> () error SystemActivityControlError;
+    /// Called by a client to drop the lease to the System Activity Governor.
+    strict StopApplicationActivity() -> () error SystemActivityControlError;
+};
