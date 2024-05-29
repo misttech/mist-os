@@ -60,6 +60,8 @@ class FakeVendorServer final : public ::fidl::Server<fuchsia_hardware_bluetooth:
     completer.Reply(fit::success(std::move(hci_client_end)));
   }
 
+  void OpenHciTransport(OpenHciTransportCompleter::Sync& completer) override {}
+
   void handle_unknown_method(
       ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
       ::fidl::UnknownMethodCompleter::Sync& completer) override {

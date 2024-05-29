@@ -185,4 +185,5 @@ open protocol Hci {
 /// Wrap the protocol in a service that will be exposed to the child driver.
 service HciService {
     hci client_end:Hci;
+    hci_transport client_end:HciTransport;
 };

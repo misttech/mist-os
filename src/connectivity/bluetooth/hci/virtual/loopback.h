@@ -28,6 +28,7 @@ class LoopbackDevice : public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
   void EncodeCommand(EncodeCommandRequestView request,
                      EncodeCommandCompleter::Sync& completer) override;
   void OpenHci(OpenHciCompleter::Sync& completer) override;
+  void OpenHciTransport(OpenHciTransportCompleter::Sync& completer) override {}
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
