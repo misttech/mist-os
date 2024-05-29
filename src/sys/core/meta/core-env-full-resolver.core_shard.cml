@@ -2,6 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
+    children: [
+        {
+            name: "full-resolver",
+            url: "fuchsia-pkg://fuchsia.com/full-resolver#meta/full-resolver.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.pkg.PackageResolver",
+            from: "#pkg-resolver",
+            to: "#full-resolver",
+        },
+    ],
     environments: [
         {
             name: "core-env",

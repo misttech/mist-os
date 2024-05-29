@@ -100,10 +100,6 @@
             url: "fuchsia-pkg://fuchsia.com/ssh-key-manager#meta/ssh-key-manager.cm",
         },
         {
-            name: "full-resolver",
-            url: "fuchsia-pkg://fuchsia.com/full-resolver#meta/full-resolver.cm",
-        },
-        {
             name: "network",
             url: "fuchsia-pkg://fuchsia.com/network#meta/network.cm",
             startup: "eager",
@@ -244,11 +240,6 @@
             storage: "data",
             from: "self",
             to: [ "#network" ],
-        },
-        {
-            protocol: "fuchsia.pkg.PackageResolver",
-            from: "#pkg-resolver",
-            to: "#full-resolver",
         },
         {
             protocol: [ "fuchsia.pkg.PackageCache" ],

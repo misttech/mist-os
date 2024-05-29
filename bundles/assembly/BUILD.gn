@@ -1576,7 +1576,6 @@ assembly_input_bundle("common_standard") {
   base_packages = [
     # The SWD stack artifacts that enable OTAs
     "//src/sys/pkg/bin/system-updater",
-    "//src/sys/full-resolver:full-resolver-pkg",
 
     # Cobalt
     "//src/cobalt/bin/app:cobalt",
@@ -1801,7 +1800,10 @@ assembly_input_bundle("standard_userdebug") {
 #
 assembly_input_bundle("standard_eng") {
   testonly = true
-  base_packages = []
+  base_packages = [
+    # Used to resolve ephemeral components.
+    "//src/sys/full-resolver:full-resolver-pkg",
+  ]
   cache_packages = [
     # Backend for ffx process command.
     "//src/developer/process_explorer:process_explorer_package",
