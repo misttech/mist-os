@@ -82,7 +82,7 @@ void TestDevice::SetupDevmgr() {
 
   ASSERT_EQ(driver_integration_test::IsolatedDevmgr::Create(&args, &devmgr_), ZX_OK);
   ASSERT_EQ(device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(),
-                                                 "sys/platform/00:00:2d/ramctl")
+                                                 "sys/platform/ram-disk/ramctl")
                 .status_value(),
             ZX_OK);
 }

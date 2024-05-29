@@ -1886,7 +1886,7 @@ class PaverServiceBlockTest : public PaverServiceTest {
     fake_svc_.ForwardServiceTo(fidl::DiscoverableProtocolName<fuchsia_fshost::BlockWatcher>,
                                devmgr_.fshost_svc_dir());
 
-    ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/00:00:2d/ramctl")
+    ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/ram-disk/ramctl")
                   .status_value());
     paver_->set_devfs_root(devmgr_.devfs_root().duplicate());
     paver_->set_svc_root(std::move(fake_svc_.svc_chan()));
@@ -1974,7 +1974,7 @@ class PaverServiceGptDeviceTest : public PaverServiceTest {
     fake_svc_.ForwardServiceTo(fidl::DiscoverableProtocolName<fuchsia_fshost::BlockWatcher>,
                                devmgr_.fshost_svc_dir());
 
-    ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/00:00:2d/ramctl")
+    ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/ram-disk/ramctl")
                   .status_value());
     ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform").status_value());
     paver_->set_dispatcher(loop_.dispatcher());
@@ -2112,7 +2112,7 @@ TEST_F(PaverServiceLuisTest, FindGPTDevicesIgnoreFvmPartitions) {
   ASSERT_OK(gpt_devices);
   ASSERT_EQ(gpt_devices.value().size(), 1);
   ASSERT_EQ(gpt_devices.value()[0].topological_path,
-            std::string("/dev/sys/platform/00:00:2d/ramctl/ramdisk-0/block"));
+            std::string("/dev/sys/platform/ram-disk/ramctl/ramdisk-0/block"));
 }
 
 TEST_F(PaverServiceLuisTest, WriteOpaqueVolume) {

@@ -16,7 +16,7 @@ namespace storage {
 
 zx::result<> WaitForRamctl(zx::duration time) {
   if (zx::result channel =
-          device_watcher::RecursiveWaitForFile("/dev/sys/platform/00:00:2d/ramctl", time);
+          device_watcher::RecursiveWaitForFile("/dev/sys/platform/ram-disk/ramctl", time);
       channel.is_error()) {
     FX_PLOGS(ERROR, channel.error_value()) << "Failed to wait for for ramctl";
     return channel.take_error();

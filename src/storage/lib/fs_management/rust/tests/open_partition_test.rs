@@ -19,6 +19,6 @@ async fn find_partition_test() {
     let controller = find_partition(matcher, Duration::from_seconds(10)).await.unwrap();
     assert_eq!(
         &controller.get_topological_path().await.unwrap().unwrap(),
-        "/dev/sys/platform/00:00:2d/ramctl/ramdisk-0/block",
+        "/dev/sys/platform/ram-disk/ramctl/ramdisk-0/block",
     );
 }

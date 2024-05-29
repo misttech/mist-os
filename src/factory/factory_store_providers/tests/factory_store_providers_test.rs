@@ -18,7 +18,7 @@ use {
 
 static DATA_FILE_PATH: &'static str = "/pkg/data";
 const FACTORY_DEVICE_CONFIG: &'static str = "/pkg/data/factory_ext4.img";
-const RAMDISK_DEV_BLOCK_PATH: &'static str = "sys/platform/00:00:2d/ramctl/ramdisk-0/block";
+const RAMDISK_DEV_BLOCK_PATH: &'static str = "sys/platform/ram-disk/ramctl/ramdisk-0/block";
 
 macro_rules! connect_to_factory_store_provider {
     ($t:ty) => {{

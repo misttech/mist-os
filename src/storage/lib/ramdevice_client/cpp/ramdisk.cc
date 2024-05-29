@@ -42,7 +42,7 @@
 #include <ramdevice-client/ramdisk.h>
 
 constexpr char kRamctlDevPath[] = "/dev";
-constexpr char kRamctlPath[] = "sys/platform/00:00:2d/ramctl";
+constexpr char kRamctlPath[] = "sys/platform/ram-disk/ramctl";
 constexpr char kBlockExtension[] = "block";
 constexpr zx::duration kDeviceWaitTime = zx::sec(10);
 

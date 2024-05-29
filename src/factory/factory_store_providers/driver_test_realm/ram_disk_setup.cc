@@ -63,7 +63,7 @@ int main() {
     return 1;
   }
 
-  zx::result channel = device_watcher::RecursiveWaitForFile("/dev/sys/platform/00:00:2d/ramctl");
+  zx::result channel = device_watcher::RecursiveWaitForFile("/dev/sys/platform/ram-disk/ramctl");
   if (channel.is_error()) {
     FX_SLOG(ERROR, "Failed to wait for ramctl", FX_KV("status", channel.status_value()));
   }

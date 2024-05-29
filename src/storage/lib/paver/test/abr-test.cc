@@ -117,7 +117,7 @@ class CurrentSlotUuidTest : public zxtest::Test {
     args.disable_block_watcher = true;
 
     ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr_));
-    ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/00:00:2d/ramctl")
+    ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/ram-disk/ramctl")
                   .status_value());
     ASSERT_NO_FATAL_FAILURE(
         BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, kDiskBlocks, kBlockSize, &disk_));
@@ -147,7 +147,7 @@ class CurrentSlotUuidTest : public zxtest::Test {
     ASSERT_TRUE(result->is_ok(), "%s", zx_status_get_string(result->error_value()));
 
     ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(),
-                                   "sys/platform/00:00:2d/ramctl/ramdisk-0/block/part-000/block")
+                                   "sys/platform/ram-disk/ramctl/ramdisk-0/block/part-000/block")
                   .status_value());
   }
 

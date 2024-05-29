@@ -189,7 +189,7 @@ fn dev_class_block() -> fio::DirectoryProxy {
     .expect("failed to open /dev/class/block")
 }
 
-const RAMDISK_PREFIX: &'static str = "/dev/sys/platform/00:00:2d/ramctl";
+const RAMDISK_PREFIX: &'static str = "/dev/sys/platform/ram-disk/ramctl";
 
 /// During the setup step, formats a device with fvm, creating a single partition named
 /// [`partition_label`]. If [`device_path`] is `None`, finds a device which already had fvm, erase

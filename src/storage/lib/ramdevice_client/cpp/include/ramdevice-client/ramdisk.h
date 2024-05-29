@@ -15,9 +15,9 @@ __BEGIN_CDECLS
 // A client library for creating, configuring and manipulating ramdisks.
 //
 // When creating a ramdisk always wait for the ramctl device to be ready to avoid racing with
-// device start up. The ramctl device is normally located at "sys/platform/00:00:2d/ramctl".
+// device start up. The ramctl device is normally located at "sys/platform/ram-disk/ramctl".
 // ```
-// ASSERT_EQ(ZX_OK, device_watcher::RecursiveWaitForFile("/dev/sys/platform/00:00:2d/ramctl",
+// ASSERT_EQ(ZX_OK, device_watcher::RecursiveWaitForFile("/dev/sys/platform/ram-disk/ramctl",
 //   zx::sec(60)).status_value());
 // ```
 // Then a ram device can be created and opened.

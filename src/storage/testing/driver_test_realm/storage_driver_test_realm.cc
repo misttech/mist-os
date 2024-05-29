@@ -35,7 +35,7 @@ int main() {
   // Wait for ramctl and nand-ctl to be bound. Errors may be logged if the drivers are in the
   // process of binding while the DriverTestRealm is shutting down which can trip the high-severity
   // log checker in tests.
-  zx::result ramctl = device_watcher::RecursiveWaitForFile("/dev/sys/platform/00:00:2d/ramctl");
+  zx::result ramctl = device_watcher::RecursiveWaitForFile("/dev/sys/platform/ram-disk/ramctl");
   if (ramctl.is_error()) {
     FX_SLOG(ERROR, "Failed to wait for ramctl", FX_KV("status", ramctl.status_value()));
   }

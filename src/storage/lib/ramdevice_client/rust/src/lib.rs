@@ -18,7 +18,7 @@ use {
 
 const GUID_LEN: usize = 16;
 const DEV_PATH: &str = "/dev";
-const RAMCTL_PATH: &str = "sys/platform/00:00:2d/ramctl";
+const RAMCTL_PATH: &str = "sys/platform/ram-disk/ramctl";
 const BLOCK_EXTENSION: &str = "block";
 
 /// A type to help construct a [`RamdeviceClient`] optionally from a VMO.

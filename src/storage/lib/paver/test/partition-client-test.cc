@@ -368,7 +368,7 @@ class FixedOffsetBlockPartitionClientTest : public zxtest::Test {
 
     ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr_));
 
-    ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/00:00:2d/ramctl")
+    ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/ram-disk/ramctl")
                   .status_value());
     ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform").status_value());
 

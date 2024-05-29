@@ -34,7 +34,7 @@ root.sys
 root.sys.platform
 root.sys.cpu-trace
 root.sys.platform.pt
-root.sys.platform.00_00_2d
+root.sys.platform.ram-disk
 root.sys.platform.00_00_2e
 root.sys.platform.00_00_2f
 root.sys.platform.00_00_30
