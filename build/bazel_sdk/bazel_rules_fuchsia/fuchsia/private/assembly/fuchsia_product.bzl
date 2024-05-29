@@ -97,8 +97,9 @@ def _fuchsia_product_assembly_impl(ctx):
         # Locate the file that is the board_configuration.json, and pass the
         # path to that file as an argument to assembly.
         for file in board_config.config_directory:
-            if not board_config_file_path and file.path.endswith("board_configuration.json"):
+            if file.path.endswith("board_configuration.json") or file.path.endswith("board_config.json"):
                 board_config_file_path = file.path
+                break
 
         if not board_config_file_path:
             fail("Unable to locate 'board_configuration.json' in BoardConfigDirectoryInfo")
