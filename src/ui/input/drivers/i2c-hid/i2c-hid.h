@@ -6,7 +6,8 @@
 #define SRC_UI_INPUT_DRIVERS_I2C_HID_I2C_HID_H_
 
 #include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
-#include <fuchsia/hardware/hidbus/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.hidbus/cpp/wire.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <threads.h>
 
@@ -14,6 +15,7 @@
 #include <optional>
 
 #include <ddktl/device.h>
+#include <ddktl/protocol/empty-protocol.h>
 #include <fbl/condition_variable.h>
 #include <fbl/mutex.h>
 
@@ -49,27 +51,47 @@ struct I2cHidDesc {
 class I2cHidbus;
 using DeviceType = ddk::Device<I2cHidbus, ddk::Initializable, ddk::Unbindable>;
 
-class I2cHidbus : public DeviceType, public ddk::HidbusProtocol<I2cHidbus, ddk::base_protocol> {
+class I2cHidbus : public DeviceType,
+                  public ddk::EmptyProtocol<ZX_PROTOCOL_HIDBUS>,
+                  public fidl::WireServer<fuchsia_hardware_hidbus::Hidbus> {
  public:
   explicit I2cHidbus(zx_device_t* device, acpi::Client client)
-      : DeviceType(device), acpi_client_(std::move(client)) {}
+      : DeviceType(device),
+        outgoing_(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
+        acpi_client_(std::move(client)) {}
   ~I2cHidbus() = default;
 
   // Methods required by the ddk mixins.
-  zx_status_t HidbusStart(const hidbus_ifc_protocol_t* ifc);
-  zx_status_t HidbusQuery(uint32_t options, hid_info_t* info);
-  void HidbusStop();
-  zx_status_t HidbusGetDescriptor(hid_description_type_t desc_type, uint8_t* out_data_buffer,
-                                  size_t data_size, size_t* out_data_actual);
-  zx_status_t HidbusGetReport(uint8_t rpt_type, uint8_t rpt_id, uint8_t* data, size_t len,
-                              size_t* out_len);
-  zx_status_t HidbusSetReport(uint8_t rpt_type, uint8_t rpt_id, const uint8_t* data, size_t len);
-
+  // fuchsia_hardware_hidbus methods.
+  void Query(QueryCompleter::Sync& completer) override;
+  void Start(StartCompleter::Sync& completer) override;
+  void Stop(StopCompleter::Sync& completer) override;
+  void GetDescriptor(fuchsia_hardware_hidbus::wire::HidbusGetDescriptorRequest* request,
+                     GetDescriptorCompleter::Sync& completer) override;
+  void SetDescriptor(fuchsia_hardware_hidbus::wire::HidbusSetDescriptorRequest* request,
+                     SetDescriptorCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void GetReport(fuchsia_hardware_hidbus::wire::HidbusGetReportRequest* request,
+                 GetReportCompleter::Sync& completer) override;
+  void SetReport(fuchsia_hardware_hidbus::wire::HidbusSetReportRequest* request,
+                 SetReportCompleter::Sync& completer) override;
   // TODO(https://fxbug.dev/42109818): implement the rest of the HID protocol
-  zx_status_t HidbusGetIdle(uint8_t rpt_id, uint8_t* duration) { return ZX_ERR_NOT_SUPPORTED; }
-  zx_status_t HidbusSetIdle(uint8_t rpt_id, uint8_t duration) { return ZX_ERR_NOT_SUPPORTED; }
-  zx_status_t HidbusGetProtocol(uint8_t* protocol) { return ZX_ERR_NOT_SUPPORTED; }
-  zx_status_t HidbusSetProtocol(uint8_t protocol) { return ZX_OK; }
+  void GetIdle(fuchsia_hardware_hidbus::wire::HidbusGetIdleRequest* request,
+               GetIdleCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void SetIdle(fuchsia_hardware_hidbus::wire::HidbusSetIdleRequest* request,
+               SetIdleCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void GetProtocol(GetProtocolCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void SetProtocol(fuchsia_hardware_hidbus::wire::HidbusSetProtocolRequest* request,
+                   SetProtocolCompleter::Sync& completer) override {
+    completer.ReplySuccess();
+  }
 
   void DdkInit(ddk::InitTxn txn);
   void DdkUnbind(ddk::UnbindTxn txn);
@@ -83,8 +105,19 @@ class I2cHidbus : public DeviceType, public ddk::HidbusProtocol<I2cHidbus, ddk::
 
   zx_status_t Reset(bool force) __TA_EXCLUDES(i2c_lock_);
 
+  // For testing
+  std::optional<fidl::ServerBinding<fuchsia_hardware_hidbus::Hidbus>>& binding() {
+    return binding_;
+  }
+
  private:
   void Shutdown();
+  void Stop();
+
+  component::OutgoingDirectory outgoing_;
+  std::optional<fidl::ServerBinding<fuchsia_hardware_hidbus::Hidbus>> binding_;
+  async_dispatcher_t* dispatcher_;
+  std::atomic_bool started_ = false;
 
   I2cHidDesc hiddesc_ = {};
 
@@ -103,9 +136,6 @@ class I2cHidbus : public DeviceType, public ddk::HidbusProtocol<I2cHidbus, ddk::
   // driver will poll periodically.
   int WorkerThreadIrq();
   int WorkerThreadNoIrq();
-
-  fbl::Mutex ifc_lock_;
-  ddk::HidbusIfcProtocolClient ifc_ __TA_GUARDED(ifc_lock_);
 
   fbl::Mutex i2c_lock_;
   ddk::I2cChannel i2c_ __TA_GUARDED(i2c_lock_);
