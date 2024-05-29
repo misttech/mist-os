@@ -1,0 +1,38 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "syslog/client.shard.cml" ],
+    program: {
+        runner: "elf",
+        binary: "bin/dynamic_dictionary_provider",
+    },
+    capabilities: [
+        {
+            dictionary: "bundle",
+
+            // Derive the contents of this dictionary from a Dictionary provided by the program
+            // at runtime.
+            //
+            // The program hosts a [fuchsia.component.sandbox.Router] protcool at `/svc`, which
+            // returns the [fuchsia.component.sandbox.Dictionary].
+            //
+            // For more information on how this works, see:
+            // https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities/dictionary
+            extends: "program/svc/fuchsia.component.sandbox.Router",
+        },
+    ],
+    use: [
+        // Needed to create a Dictionary at runtime
+        {
+            protocol: "fuchsia.component.sandbox.Factory",
+            from: "framework",
+        },
+    ],
+    expose: [
+        {
+            dictionary: "bundle",
+            from: "self",
+        },
+    ],
+}
