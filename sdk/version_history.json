@@ -69,7 +69,7 @@
             },
             "20": {
                 "abi_revision": "0xDB83211C067E1052",
-                "status": "in-development"
+                "status": "supported"
             }
         },
         "special_api_levels": {
