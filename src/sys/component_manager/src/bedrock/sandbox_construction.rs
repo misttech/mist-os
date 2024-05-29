@@ -29,7 +29,7 @@ use {
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     futures::FutureExt,
     itertools::Itertools,
-    moniker::{ChildName, ChildNameBase, MonikerBase},
+    moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     router_error::RouterError,
     sandbox::Routable,
     sandbox::{Capability, Dict, Request, Router, Unit},
@@ -62,7 +62,7 @@ pub fn build_program_output_dictionary(
 /// Once a component has been resolved and its manifest becomes known, this function produces the
 /// various dicts the component needs based on the contents of its manifest.
 pub fn build_component_sandbox(
-    component: &Arc<ComponentInstance>,
+    moniker: &Moniker,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     decl: &cm_rust::ComponentDecl,
     component_input: &ComponentInput,
@@ -82,11 +82,12 @@ pub fn build_component_sandbox(
             .insert(
                 environment_decl.name.clone(),
                 build_environment(
-                    component,
+                    moniker,
                     children,
                     component_input,
                     environment_decl,
                     program_input_dict_additions,
+                    program_output,
                 ),
             )
             .ok();
@@ -123,7 +124,7 @@ pub fn build_component_sandbox(
 
     for use_ in &decl.uses {
         extend_dict_with_use(
-            component,
+            moniker,
             children,
             component_input,
             program_input_dict,
@@ -175,7 +176,7 @@ pub fn build_component_sandbox(
             }
         };
         extend_dict_with_offer(
-            component,
+            moniker,
             children,
             component_input,
             program_output,
@@ -188,7 +189,7 @@ pub fn build_component_sandbox(
 
     for expose in &decl.exposes {
         extend_dict_with_expose(
-            component,
+            moniker,
             children,
             program_output,
             framework_dict,
@@ -362,11 +363,12 @@ fn extend_dict_with_dictionary(
 }
 
 fn build_environment(
-    component: &Arc<ComponentInstance>,
+    moniker: &Moniker,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     component_input: &ComponentInput,
     environment_decl: &cm_rust::EnvironmentDecl,
     program_input_dict_additions: &Dict,
+    program_output: &Router,
 ) -> ComponentEnvironment {
     let mut environment = ComponentEnvironment::new();
     if environment_decl.extends == fdecl::EnvironmentExtends::Realm {
@@ -382,13 +384,13 @@ fn build_environment(
             cm_rust::RegistrationSource::Parent => use_from_parent_router(
                 component_input,
                 source_path,
-                component.as_weak(),
+                moniker,
                 program_input_dict_additions,
             ),
-            cm_rust::RegistrationSource::Self_ => component.program_output().lazy_get(
+            cm_rust::RegistrationSource::Self_ => program_output.clone().lazy_get(
                 source_path.clone(),
                 RoutingError::use_from_self_not_found(
-                    &component.moniker,
+                    moniker,
                     source_path.iter_segments().join("/"),
                 ),
             ),
@@ -456,7 +458,7 @@ fn make_dict_extending_router(dict: Dict, source_dict_router: Router) -> Router 
 /// Extends the given dict based on offer declarations. All offer declarations in `offers` are
 /// assumed to target `target_dict`.
 pub fn extend_dict_with_offers(
-    component: &Arc<ComponentInstance>,
+    moniker: &Moniker,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     component_input: &ComponentInput,
     dynamic_offers: &Vec<cm_rust::OfferDecl>,
@@ -467,7 +469,7 @@ pub fn extend_dict_with_offers(
 ) {
     for offer in dynamic_offers {
         extend_dict_with_offer(
-            component,
+            moniker,
             children,
             component_input,
             program_output,
@@ -487,7 +489,7 @@ fn supported_use(use_: &cm_rust::UseDecl) -> Option<&cm_rust::UseProtocolDecl> {
 }
 
 fn extend_dict_with_use(
-    component: &Arc<ComponentInstance>,
+    moniker: &Moniker,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     component_input: &ComponentInput,
     program_input_dict: &Dict,
@@ -506,20 +508,17 @@ fn extend_dict_with_use(
         cm_rust::UseSource::Parent => use_from_parent_router(
             component_input,
             source_path.to_owned(),
-            component.as_weak(),
+            moniker,
             program_input_dict_additions,
         ),
         cm_rust::UseSource::Self_ => program_output.clone().lazy_get(
             source_path.to_owned(),
-            RoutingError::use_from_self_not_found(
-                &component.moniker,
-                source_path.iter_segments().join("/"),
-            ),
+            RoutingError::use_from_self_not_found(moniker, source_path.iter_segments().join("/")),
         ),
         cm_rust::UseSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid child name");
             let Some(child) = children.get(&child_name) else {
-                panic!("use declaration in manifest for component {} has a source of a nonexistent child {}, this should be prevented by manifest validation", component.moniker, child_name);
+                panic!("use declaration in manifest for component {} has a source of a nonexistent child {}, this should be prevented by manifest validation", moniker, child_name);
             };
             child.component_output().lazy_get(
                 source_path.to_owned(),
@@ -532,20 +531,20 @@ fn extend_dict_with_use(
         }
         cm_rust::UseSource::Framework if use_.is_from_dictionary() => {
             Router::new_error(RoutingError::capability_from_framework_not_found(
-                &component.moniker,
+                moniker,
                 source_path.iter_segments().join("/"),
             ))
         }
         cm_rust::UseSource::Framework => framework_dict.clone().lazy_get(
             source_path.to_owned(),
             RoutingError::capability_from_framework_not_found(
-                &component.moniker,
+                moniker,
                 source_path.iter_segments().join("/"),
             ),
         ),
         cm_rust::UseSource::Capability(capability_name) => {
             let err = RoutingError::capability_from_capability_not_found(
-                &component.moniker,
+                moniker,
                 capability_name.as_str().to_string(),
             );
             if source_path.iter_segments().join("/") == fsys::StorageAdminMarker::PROTOCOL_NAME {
@@ -557,7 +556,7 @@ fn extend_dict_with_use(
         cm_rust::UseSource::Debug => component_input.environment().debug().lazy_get(
             use_protocol.source_name.clone(),
             RoutingError::use_from_environment_not_found(
-                &component.moniker,
+                moniker,
                 "protocol",
                 &use_protocol.source_name,
             ),
@@ -583,15 +582,12 @@ fn extend_dict_with_use(
 fn use_from_parent_router(
     component_input: &ComponentInput,
     source_path: impl IterablePath + 'static + Debug,
-    weak_component: WeakComponentInstance,
+    moniker: &Moniker,
     program_input_dict_additions: &Dict,
 ) -> Router {
     let component_input_capability = component_input.capabilities().lazy_get(
         source_path.clone(),
-        RoutingError::use_from_parent_not_found(
-            &weak_component.moniker,
-            source_path.iter_segments().join("/"),
-        ),
+        RoutingError::use_from_parent_not_found(moniker, source_path.iter_segments().join("/")),
     );
 
     let program_input_dict_additions = program_input_dict_additions.clone();
@@ -616,7 +612,7 @@ fn is_supported_offer(offer: &cm_rust::OfferDecl) -> bool {
 }
 
 fn extend_dict_with_offer(
-    component: &Arc<ComponentInstance>,
+    moniker: &Moniker,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     component_input: &ComponentInput,
     program_output: &Router,
@@ -643,16 +639,13 @@ fn extend_dict_with_offer(
         cm_rust::OfferSource::Parent => component_input.capabilities().lazy_get(
             source_path.to_owned(),
             RoutingError::offer_from_parent_not_found(
-                &component.moniker,
+                moniker,
                 source_path.iter_segments().join("/"),
             ),
         ),
         cm_rust::OfferSource::Self_ => program_output.clone().lazy_get(
             source_path.to_owned(),
-            RoutingError::offer_from_self_not_found(
-                &component.moniker,
-                source_path.iter_segments().join("/"),
-            ),
+            RoutingError::offer_from_self_not_found(moniker, source_path.iter_segments().join("/")),
         ),
         cm_rust::OfferSource::Child(child_ref) => {
             let child_name: ChildName = child_ref.clone().try_into().expect("invalid child ref");
@@ -676,14 +669,14 @@ fn extend_dict_with_offer(
             framework_dict.clone().lazy_get(
                 source_path.to_owned(),
                 RoutingError::capability_from_framework_not_found(
-                    &component.moniker,
+                    moniker,
                     source_path.iter_segments().join("/"),
                 ),
             )
         }
         cm_rust::OfferSource::Capability(capability_name) => {
             let err = RoutingError::capability_from_capability_not_found(
-                &component.moniker,
+                moniker,
                 capability_name.as_str().to_string(),
             );
             if source_path.iter_segments().join("/") == fsys::StorageAdminMarker::PROTOCOL_NAME {
@@ -709,7 +702,7 @@ pub fn is_supported_expose(expose: &cm_rust::ExposeDecl) -> bool {
 }
 
 fn extend_dict_with_expose(
-    component: &Arc<ComponentInstance>,
+    moniker: &Moniker,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     program_output: &Router,
     framework_dict: &Dict,
@@ -731,7 +724,7 @@ fn extend_dict_with_expose(
         cm_rust::ExposeSource::Self_ => program_output.clone().lazy_get(
             source_path.to_owned(),
             RoutingError::expose_from_self_not_found(
-                &component.moniker,
+                moniker,
                 source_path.iter_segments().join("/"),
             ),
         ),
@@ -760,14 +753,14 @@ fn extend_dict_with_expose(
             framework_dict.clone().lazy_get(
                 source_path.to_owned(),
                 RoutingError::capability_from_framework_not_found(
-                    &component.moniker,
+                    moniker,
                     source_path.iter_segments().join("/"),
                 ),
             )
         }
         cm_rust::ExposeSource::Capability(capability_name) => {
             let err = RoutingError::capability_from_capability_not_found(
-                &component.moniker,
+                moniker,
                 capability_name.as_str().to_string(),
             );
             if source_path.iter_segments().join("/") == fsys::StorageAdminMarker::PROTOCOL_NAME {

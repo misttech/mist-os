@@ -489,7 +489,7 @@ impl ResolvedInstanceState {
         );
         let mut child_inputs = Default::default();
         build_component_sandbox(
-            component,
+            &component.moniker,
             &state.children,
             &decl,
             &state.component_input,
@@ -879,7 +879,7 @@ impl ResolvedInstanceState {
 
         if !dynamic_offers.is_empty() {
             extend_dict_with_offers(
-                component,
+                &component.moniker,
                 &self.children,
                 &self.component_input,
                 &dynamic_offers,
