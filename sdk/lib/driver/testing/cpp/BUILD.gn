@@ -54,15 +54,12 @@ sdk_source_set("cpp") {
   ]
 }
 
-sdk_source_set("base_fixture") {
-  category = "internal"
-  sdk_name = "driver_testing_cpp_base_fixture"
-  include_base = "//sdk"
-  public_configs = [ "//sdk/config" ]
+source_set("base_fixture") {
+  public_configs = [ ":includes" ]
 
   sources = [
-    "fixtures/base_fixture.h",
-    "fixtures/internal/fixture_internals.h",
+    "include/lib/driver/testing/cpp/fixtures/base_fixture.h",
+    "include/lib/driver/testing/cpp/fixtures/internal/fixture_internals.h",
   ]
   public_deps = [
     ":cpp",
@@ -70,18 +67,17 @@ sdk_source_set("base_fixture") {
   ]
 }
 
-sdk_source_set("gtest_fixture") {
-  category = "internal"
-  sdk_name = "driver_testing_cpp_gtest_fixture"
-  include_base = "//sdk"
+source_set("gtest_fixture") {
+  public_configs = [ ":includes" ]
 
-  public_configs = [ "//sdk/config" ]
-
-  sources = [ "fixtures/gtest_fixture.h" ]
-  public_deps = [ ":base_fixture" ]
-
-  non_sdk_public_deps = [
+  sources = [ "include/lib/driver/testing/cpp/fixtures/gtest_fixture.h" ]
+  public_deps = [
+    ":base_fixture",
     "//sdk/lib/driver/compat/cpp",
     "//third_party/googletest:gtest_no_testonly",
   ]
+}
+
+config("includes") {
+  include_dirs = [ "include" ]
 }

@@ -66,7 +66,7 @@ class DriverWrapper {
   struct HasGetDriverRegistration : public ::std::false_type {};
   template <typename T>
   struct HasGetDriverRegistration<T, std::void_t<decltype(T::GetDriverRegistration)>>
-      : public std::true_type {};
+      : public std::true_type{};
   template <typename T>
   constexpr static auto HasGetDriverRegistrationV = HasGetDriverRegistration<T>::value;
 
@@ -177,24 +177,24 @@ class DriverWrapper {
 
 // Helper macros to validate the incoming configuration.
 
-#define SETUP_HAS_USING(name)                                                    \
-  template <typename T, typename = void>                                         \
-  struct Has##name : public ::std::false_type {};                                \
-                                                                                 \
-  template <typename T>                                                          \
-  struct Has##name<T, std::void_t<typename T::name>> : public std::true_type {}; \
-                                                                                 \
-  template <typename T>                                                          \
+#define SETUP_HAS_USING(name)                                                   \
+  template <typename T, typename = void>                                        \
+  struct Has##name : public ::std::false_type {};                               \
+                                                                                \
+  template <typename T>                                                         \
+  struct Has##name<T, std::void_t<typename T::name>> : public std::true_type{}; \
+                                                                                \
+  template <typename T>                                                         \
   constexpr inline auto Has##name##V = Has##name<T>::value;
 
-#define SETUP_HAS_CONSTEXPR(name)                                                    \
-  template <typename T, typename = void>                                             \
-  struct Has##name : public ::std::false_type {};                                    \
-                                                                                     \
-  template <typename T>                                                              \
-  struct Has##name<T, std::void_t<decltype(T::k##name)>> : public std::true_type {}; \
-                                                                                     \
-  template <typename T>                                                              \
+#define SETUP_HAS_CONSTEXPR(name)                                                   \
+  template <typename T, typename = void>                                            \
+  struct Has##name : public ::std::false_type {};                                   \
+                                                                                    \
+  template <typename T>                                                             \
+  struct Has##name<T, std::void_t<decltype(T::k##name)>> : public std::true_type{}; \
+                                                                                    \
+  template <typename T>                                                             \
   constexpr inline auto Has##name##V = Has##name<T>::value;
 
 SETUP_HAS_USING(DriverType)
