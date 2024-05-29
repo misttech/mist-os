@@ -135,8 +135,11 @@ class DebugAgentLegacyLauncher : public fidl::Server<fuchsia_debugger::DebugAgen
     clients_.insert({client_handle, std::move(client)});
   }
 
+  // Unsupported methods for the legacy launcher.
   void GetAttachedProcesses(GetAttachedProcessesRequest& request,
                             GetAttachedProcessesCompleter::Sync& completer) override {}
+
+  void AttachTo(AttachToRequest& request, AttachToCompleter::Sync& completer) override {}
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_debugger::DebugAgent> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override {

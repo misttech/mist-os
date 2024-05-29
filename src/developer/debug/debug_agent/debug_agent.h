@@ -119,7 +119,11 @@ class DebugAgent : public RemoteAPI,
                 std::string log) override;
 
   void AddObserver(DebugAgentObserver* observer) { observers_.AddObserver(observer); }
-  void RemoveObserver(DebugAgentObserver* observer) { observers_.RemoveObserver(observer); }
+
+  // Note this is a potential exit point. If there are no more observers after |observer| has been
+  // removed, and no debug_ipc client is connected, the message loop will be shut down and this
+  // agent will exit.
+  void RemoveObserver(DebugAgentObserver* observer);
 
  private:
   FRIEND_TEST(DebugAgentTests, Kill);

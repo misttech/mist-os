@@ -342,6 +342,7 @@ test("unit_tests") {
     sources += [
       "automation_instruction_executor_unittest.cc",
       "breakpoint_unittest.cc",
+      "debug_agent_server_unittest.cc",
       "debug_agent_unittest.cc",
       "debugged_process_unittest.cc",
       "debugged_thread_breakpoint_unittest.cc",
