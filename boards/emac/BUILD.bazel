@@ -15,6 +15,7 @@ fuchsia_board_input_bundle(
     bootfs_driver_packages = [
         "//src/devices/board/drivers/vim3-devicetree",
     ],
+    power_manager_config = "//src/power/power-manager/node_config:base_node_config.json5",
 )
 
 fuchsia_board_input_bundle(
