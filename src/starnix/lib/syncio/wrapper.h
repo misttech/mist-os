@@ -9,6 +9,7 @@
 #include <lib/zxio/bsdsocket.h>
 #include <lib/zxio/fault_catcher.h>
 #include <lib/zxio/posix_mode.h>
+#include <lib/zxio/types.h>
 #include <lib/zxio/zxio.h>
 #include <netinet/in.h>
 #include <sys/time.h>

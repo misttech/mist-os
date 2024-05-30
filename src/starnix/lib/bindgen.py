@@ -159,6 +159,7 @@ class Bindgen:
                 text = regexp.sub(replacement, text)
 
             source_file.seek(0)
+            source_file.truncate()
             source_file.write(text)
 
     def run(self, input_file, rust_file):

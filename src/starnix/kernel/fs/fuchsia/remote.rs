@@ -46,7 +46,12 @@ use starnix_uapi::{
 };
 use std::sync::Arc;
 use syncio::{
-    zxio::{zxio_get_posix_mode, ZXIO_NODE_PROTOCOL_FILE, ZXIO_NODE_PROTOCOL_SYMLINK},
+    zxio::{
+        zxio_get_posix_mode, ZXIO_NODE_PROTOCOL_FILE, ZXIO_NODE_PROTOCOL_SYMLINK,
+        ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET, ZXIO_OBJECT_TYPE_DIR, ZXIO_OBJECT_TYPE_FILE,
+        ZXIO_OBJECT_TYPE_NONE, ZXIO_OBJECT_TYPE_PACKET_SOCKET, ZXIO_OBJECT_TYPE_RAW_SOCKET,
+        ZXIO_OBJECT_TYPE_STREAM_SOCKET, ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET,
+    },
     zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, CreationMode,
     DirentIterator, OpenOptions, XattrSetMode, Zxio, ZxioDirent, ZXIO_ROOT_HASH_LENGTH,
 };
@@ -300,21 +305,29 @@ pub fn new_remote_file(
             content_size: true,
             storage_size: true,
             link_count: true,
+            object_type: true,
             ..Default::default()
         })
         .map_err(|status| from_status_like_fdio!(status))?;
-    let mode = get_mode(&attrs);
-    let ops: Box<dyn FileOps> = match handle_type {
-        zx::ObjectType::CHANNEL | zx::ObjectType::VMO | zx::ObjectType::DEBUGLOG => {
-            if mode.is_dir() {
-                Box::new(RemoteDirectoryObject::new(zxio))
-            } else {
-                Box::new(RemoteFileObject::new(Arc::new(zxio)))
-            }
+    let ops: Box<dyn FileOps> = match (handle_type, attrs.object_type) {
+        (zx::ObjectType::SOCKET, _) => Box::new(RemotePipeObject::new(zxio)),
+        (_, ZXIO_OBJECT_TYPE_DIR) => Box::new(RemoteDirectoryObject::new(zxio)),
+        (zx::ObjectType::VMO, _)
+        | (zx::ObjectType::DEBUGLOG, _)
+        | (_, ZXIO_OBJECT_TYPE_FILE)
+        | (_, ZXIO_OBJECT_TYPE_NONE) => Box::new(RemoteFileObject::new(zxio)),
+        (_, ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET)
+        | (_, ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET)
+        | (_, ZXIO_OBJECT_TYPE_STREAM_SOCKET)
+        | (_, ZXIO_OBJECT_TYPE_RAW_SOCKET)
+        | (_, ZXIO_OBJECT_TYPE_PACKET_SOCKET) => {
+            // TODO(https://fxbug.dev/342434176): Build the correct file ops for the
+            // correct type of socket.
+            return error!(ENOTSUP);
         }
-        zx::ObjectType::SOCKET => Box::new(RemotePipeObject::new(Arc::new(zxio))),
-        _ => return error!(ENOSYS),
+        _ => return error!(ENOTSUP),
     };
+    let mode = get_mode(&attrs);
     let file_handle = Anon::new_file_extended(current_task, ops, flags, |id| {
         let mut info = FsNodeInfo::new(id, mode, FsCred::root());
         update_info_from_attrs(&mut info, &attrs);
@@ -1405,9 +1418,9 @@ pub struct RemoteFileObject {
 }
 
 impl RemoteFileObject {
-    fn new(zxio: Arc<Zxio>) -> RemoteFileObject {
+    fn new(zxio: impl Into<Arc<Zxio>>) -> RemoteFileObject {
         RemoteFileObject {
-            zxio,
+            zxio: zxio.into(),
             read_only_vmo: Default::default(),
             read_exec_vmo: Default::default(),
         }
@@ -1520,8 +1533,8 @@ struct RemotePipeObject {
 }
 
 impl RemotePipeObject {
-    fn new(zxio: Arc<Zxio>) -> Self {
-        Self { zxio }
+    fn new(zxio: impl Into<Arc<Zxio>>) -> Self {
+        Self { zxio: zxio.into() }
     }
 }
 
