@@ -518,9 +518,7 @@ pub mod persist {
         }
     }
 
-    pub(crate) struct Handler<
-        C: controller::Create + super::controller::Handle + Send + Sync + 'static,
-    > {
+    pub(crate) struct Handler<C> {
         _data: PhantomData<C>,
     }
 

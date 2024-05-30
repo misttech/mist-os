@@ -23,9 +23,8 @@ use fidl_fuchsia_ui_brightness::{
     ControlMarker as BrightnessControlMarker, ControlProxy as BrightnessControlProxy,
 };
 use fuchsia_trace as ftrace;
-use lazy_static::lazy_static;
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
-use settings_storage::storage_factory::{NoneT, StorageAccess};
+use settings_storage::storage_factory::{DefaultLoader, NoneT, StorageAccess};
 use settings_storage::UpdateState;
 use std::sync::Mutex;
 
@@ -42,57 +41,54 @@ pub(crate) const DEFAULT_DISPLAY_INFO: DisplayInfo = DisplayInfo::new(
     None,                            /*theme*/
 );
 
-lazy_static! {
-    /// Reference to a display configuration.
-    pub(crate) static ref DISPLAY_CONFIGURATION: Mutex<DefaultSetting<DisplayConfiguration, &'static str>> =
-        Mutex::new(DefaultSetting::new(
-            None,
-            "/config/data/display_configuration.json",
-        ));
-}
-
 /// Returns a default display [`DisplayInfo`] that is derived from
 /// [`DEFAULT_DISPLAY_INFO`] with any fields specified in the
 /// display configuration set.
-///
-/// [`DEFAULT_DISPLAY_INFO`]: static@DEFAULT_DISPLAY_INFO
-pub(crate) fn default_display_info() -> DisplayInfo {
-    let mut default_display_info = DEFAULT_DISPLAY_INFO;
+pub struct DisplayInfoLoader {
+    display_configuration: Mutex<DefaultSetting<DisplayConfiguration, &'static str>>,
+}
 
-    if let Ok(Some(display_configuration)) =
-        DISPLAY_CONFIGURATION.lock().unwrap().get_cached_value()
-    {
-        default_display_info.theme = Some(Theme {
-            theme_type: Some(match display_configuration.theme.theme_type {
-                ConfigurationThemeType::Light => ThemeType::Light,
-            }),
-            theme_mode: if display_configuration
-                .theme
-                .theme_mode
-                .contains(&ConfigurationThemeMode::Auto)
-            {
-                ThemeMode::AUTO
-            } else {
-                ThemeMode::empty()
-            },
-        });
+impl DisplayInfoLoader {
+    pub(crate) fn new(default_setting: DefaultSetting<DisplayConfiguration, &'static str>) -> Self {
+        Self { display_configuration: Mutex::new(default_setting) }
     }
+}
 
-    default_display_info
+impl DefaultLoader for DisplayInfoLoader {
+    type Result = DisplayInfo;
+
+    fn default_value(&self) -> Self::Result {
+        let mut default_display_info = DEFAULT_DISPLAY_INFO;
+
+        if let Ok(Some(display_configuration)) =
+            self.display_configuration.lock().unwrap().get_cached_value()
+        {
+            default_display_info.theme = Some(Theme {
+                theme_type: Some(match display_configuration.theme.theme_type {
+                    ConfigurationThemeType::Light => ThemeType::Light,
+                }),
+                theme_mode: if display_configuration
+                    .theme
+                    .theme_mode
+                    .contains(&ConfigurationThemeMode::Auto)
+                {
+                    ThemeMode::AUTO
+                } else {
+                    ThemeMode::empty()
+                },
+            });
+        }
+
+        default_display_info
+    }
 }
 
 impl DeviceStorageCompatible for DisplayInfo {
-    type Loader = NoneT;
+    type Loader = DisplayInfoLoader;
     const KEY: &'static str = "display_info";
 
     fn try_deserialize_from(value: &str) -> Result<Self, Error> {
         Self::extract(value).or_else(|_| DisplayInfoV5::try_deserialize_from(value).map(Self::from))
-    }
-}
-
-impl Default for DisplayInfo {
-    fn default() -> Self {
-        default_display_info()
     }
 }
 

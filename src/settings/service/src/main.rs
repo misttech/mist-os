@@ -13,6 +13,7 @@ use futures::lock::Mutex;
 use settings::base::get_default_interfaces;
 use settings::config::base::get_default_agent_types;
 use settings::config::default_settings::DefaultSetting;
+use settings::display::build_display_default_settings;
 use settings::handler::setting_proxy_inspect_info::SettingProxyInspectInfo;
 use settings::inspect::listener_logger::ListenerInspectLogger;
 use settings::AgentConfiguration;
@@ -59,6 +60,7 @@ fn main() -> Result<(), Error> {
             .load_default_value()
             .expect("invalid service flag configuration")
             .expect("no default service flags");
+    let display_configuration = build_display_default_settings();
 
     // Temporary solution for FEMU to have an agent config without camera agent.
     let agent_config = "/config/data/agent_configuration.json";
@@ -97,6 +99,7 @@ fn main() -> Result<(), Error> {
 
     EnvironmentBuilder::new(Arc::new(storage_factory))
         .configuration(configuration)
+        .display_configuration(display_configuration)
         .setting_proxy_inspect_info(
             setting_proxy_inspect_info.node(),
             Arc::new(Mutex::new(listener_inspect_logger)),

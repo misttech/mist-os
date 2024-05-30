@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use display::display_controller::DisplayInfoLoader;
 #[cfg(test)]
 use tracing as _; // Make it easier to debug tests by always building with tracing
 
@@ -40,6 +41,7 @@ use crate::agent::{AgentCreator, Lifespan};
 use crate::audio::audio_controller::AudioController;
 use crate::base::{Dependency, Entity, SettingType};
 use crate::config::base::{AgentType, ControllerFlag};
+use crate::config::default_settings::DefaultSetting;
 use crate::display::display_controller::{DisplayController, ExternalBrightnessControl};
 use crate::do_not_disturb::do_not_disturb_controller::DoNotDisturbController;
 use crate::factory_reset::factory_reset_controller::FactoryResetController;
@@ -67,7 +69,7 @@ use settings_storage::storage_factory::{FidlStorageFactory, StorageFactory};
 mod accessibility;
 mod audio;
 mod clock;
-mod display;
+pub mod display;
 mod do_not_disturb;
 mod event;
 mod factory_reset;
@@ -228,6 +230,7 @@ pub struct EnvironmentBuilder<
     storage_dir: Option<DirectoryProxy>,
     store_proxy: Option<StoreProxy>,
     fidl_storage_factory: Option<Arc<FidlStorageFactory>>,
+    display_configuration: Option<DefaultSetting<DisplayConfiguration, &'static str>>,
 }
 
 impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
@@ -250,6 +253,7 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
             storage_dir: None,
             store_proxy: None,
             fidl_storage_factory: None,
+            display_configuration: None,
         }
     }
 
@@ -271,6 +275,14 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
     /// [EnvironmentBuilder::policies], and [EnvironmentBuilder::flags].
     pub fn configuration(mut self, configuration: ServiceConfiguration) -> Self {
         self.configuration = Some(configuration);
+        self
+    }
+
+    pub fn display_configuration(
+        mut self,
+        display_configuration: DefaultSetting<DisplayConfiguration, &'static str>,
+    ) -> Self {
+        self.display_configuration = Some(display_configuration);
         self
     }
 
@@ -447,6 +459,7 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
             Arc::clone(&self.storage_factory),
             Arc::clone(&fidl_storage_factory),
             &flags,
+            self.display_configuration.map(DisplayInfoLoader::new),
             &mut handler_factory,
         )
         .await;
@@ -537,6 +550,7 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
         device_storage_factory: Arc<T>,
         fidl_storage_factory: Arc<F>,
         controller_flags: &HashSet<ControllerFlag>,
+        display_loader: Option<DisplayInfoLoader>,
         factory_handle: &mut SettingHandlerFactoryImpl,
     ) where
         F: StorageFactory<Storage = FidlStorage>,
@@ -566,7 +580,9 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
         // Display
         if components.contains(&SettingType::Display) {
             device_storage_factory
-                .initialize::<DisplayController>()
+                .initialize_with_loader::<DisplayController>(
+                    display_loader.expect("Display storage requires display loader"),
+                )
                 .await
                 .expect("storage should still be initializing");
             factory_handle.register(

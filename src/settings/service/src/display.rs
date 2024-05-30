@@ -6,3 +6,5 @@ pub mod display_configuration;
 pub mod display_controller;
 mod display_fidl_handler;
 pub mod types;
+
+pub use display_configuration::build_display_default_settings;
