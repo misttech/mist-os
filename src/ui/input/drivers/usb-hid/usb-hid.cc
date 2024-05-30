@@ -55,16 +55,14 @@ void UsbHidbus::UsbInterruptCallback(usb_request_t* req) {
       requeue = false;
       break;
     case ZX_OK:
-      if (start_) {
-        binding_.ForEachBinding([&](const auto& binding) {
-          auto result = fidl::WireSendEvent(binding)->OnReportReceived(
-              fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(buffer),
-                                                      req->response.actual),
-              zx_clock_get_monotonic());
-          if (!result.ok()) {
-            zxlogf(ERROR, "OnReportReceived failed %s", result.error().FormatDescription().c_str());
-          }
-        });
+      if (started_ && binding_) {
+        auto result = fidl::WireSendEvent(*binding_)->OnReportReceived(
+            fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(buffer),
+                                                    req->response.actual),
+            zx_clock_get_monotonic());
+        if (!result.ok()) {
+          zxlogf(ERROR, "OnReportReceived failed %s", result.error().FormatDescription().c_str());
+        }
       }
       break;
     default:
@@ -91,8 +89,13 @@ void UsbHidbus::UsbInterruptCallback(usb_request_t* req) {
 void UsbHidbus::Query(QueryCompleter::Sync& completer) { completer.ReplySuccess(info_); }
 
 void UsbHidbus::Start(StartCompleter::Sync& completer) {
-  start_++;
+  if (started_) {
+    zxlogf(ERROR, "Already started");
+    completer.ReplyError(ZX_ERR_ALREADY_BOUND);
+    return;
+  }
 
+  started_ = true;
   if (!req_queued_) {
     req_queued_ = true;
     usb_request_complete_callback_t complete = {
@@ -107,10 +110,12 @@ void UsbHidbus::Start(StartCompleter::Sync& completer) {
   completer.ReplySuccess();
 }
 
-void UsbHidbus::Stop(StopCompleter::Sync& completer) {
-  start_--;
-  // TODO(tkilbourn) when start reaches 0, set flag to stop requeueing the interrupt request when we
-  // start using this callback
+void UsbHidbus::Stop(StopCompleter::Sync& completer) { Stop(); }
+
+void UsbHidbus::Stop() {
+  started_ = false;
+  // TODO(tkilbourn) set flag to stop requeueing the interrupt request when we start using this
+  // callback
 }
 
 zx_status_t UsbHidbus::UsbHidControlIn(uint8_t req_type, uint8_t request, uint16_t value,
@@ -394,8 +399,18 @@ zx_status_t UsbHidbus::Bind(ddk::UsbProtocolClient usbhid) {
   }
 
   auto result = outgoing_.AddService<fhidbus::Service>(fhidbus::Service::InstanceHandler({
-      .device = binding_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                       fidl::kIgnoreBindingClosure),
+      .device =
+          [this](fidl::ServerEnd<fhidbus::Hidbus> server_end) {
+            if (binding_) {
+              server_end.Close(ZX_ERR_ALREADY_BOUND);
+              return;
+            }
+            binding_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                             std::move(server_end), this, [this](fidl::UnbindInfo info) {
+                               Stop();
+                               binding_.reset();
+                             });
+          },
   }));
   if (result.is_error()) {
     zxlogf(ERROR, "Failed to add Hidbus protocol: %s", result.status_string());
