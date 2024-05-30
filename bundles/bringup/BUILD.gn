@@ -28,13 +28,4 @@ group("boot_tests") {
     "//zircon/system/ulib/c:boot_tests",
     "//zircon/system/utest/core:boot_tests",
   ]
-
-  if (is_mistos) {
-    deps -= [
-      "//src/bringup/lib:boot_tests",
-      "//src/lib:boot_tests",
-      "//zircon/system/ulib/c:boot_tests",
-      "//zircon/system/utest/core:boot_tests",
-    ]
-  }
 }
