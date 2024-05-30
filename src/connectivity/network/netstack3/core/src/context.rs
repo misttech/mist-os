@@ -43,12 +43,11 @@ use crate::{
 };
 
 pub use netstack3_base::{
-    BuildableCoreContext, ContextPair, ContextProvider, CoreEventContext, CoreTimerContext,
-    CounterContext, CtxPair, DeferredResourceRemovalContext, EventContext, HandleableTimer,
-    InstantBindingsTypes, InstantContext, NestedIntoCoreTimerCtx, ReceivableFrameMeta,
-    RecvFrameContext, ReferenceNotifiers, ReferenceNotifiersExt, ResourceCounterContext,
-    RngContext, SendFrameContext, SendableFrameMeta, TimerBindingsTypes, TimerContext,
-    TimerHandler, TracingContext,
+    BuildableCoreContext, ContextPair, ContextProvider, CoreTimerContext, CounterContext, CtxPair,
+    DeferredResourceRemovalContext, EventContext, HandleableTimer, InstantBindingsTypes,
+    InstantContext, ReceivableFrameMeta, ReferenceNotifiers, ReferenceNotifiersExt,
+    ResourceCounterContext, RngContext, TimerBindingsTypes, TimerContext, TimerHandler,
+    TracingContext,
 };
 
 // Enable all blanket implementations on CoreCtx.
@@ -72,7 +71,7 @@ impl<BC: BindingsContext, L> crate::transport::udp::UseUdpIpTransportContextBlan
     for CoreCtx<'_, BC, L>
 {
 }
-impl<BC: BindingsContext, L> crate::device::ethernet::UseArpFrameMetadataBlanket
+impl<BC: BindingsContext, L> crate::device::marker::UseArpFrameMetadataBlanket
     for CoreCtx<'_, BC, L>
 {
 }

@@ -6,16 +6,12 @@
 
 use explicit::UnreachableExt as _;
 
-use crate::{
-    context::CounterContext,
-    device::WeakDeviceIdentifier,
-    transport::tcp::{
-        socket::{self as tcp_socket, TcpBindingsTypes},
-        TcpCounters,
-    },
-};
+use netstack3_base::{CounterContext, Uninstantiable, UninstantiableWrapper, WeakDeviceIdentifier};
 
-pub use netstack3_base::{Uninstantiable, UninstantiableWrapper};
+use crate::transport::tcp::{
+    socket::{self as tcp_socket, TcpBindingsTypes},
+    TcpCounters,
+};
 
 impl<
         I: tcp_socket::DualStackIpExt,

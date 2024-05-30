@@ -19,6 +19,7 @@ use net_types::{
     },
     map_ip_twice, MulticastAddr, SpecifiedAddr, Witness as _,
 };
+use netstack3_base::{AnyDevice, DeviceIdContext, RecvIpFrameMeta};
 use packet::{BufferMut, Serializer};
 use packet_formats::ethernet::EthernetIpExt;
 
@@ -28,22 +29,22 @@ use crate::{
         ReferenceNotifiersExt as _, ResourceCounterContext,
     },
     device::{
-        arp::ArpCounters,
-        config::DeviceConfigurationContext,
-        ethernet::{self, EthernetIpLinkDeviceDynamicStateContext, EthernetLinkDevice},
+        ethernet::{
+            self, EthernetDeviceCounters, EthernetDeviceId,
+            EthernetIpLinkDeviceDynamicStateContext, EthernetLinkDevice, EthernetPrimaryDeviceId,
+            EthernetWeakDeviceId,
+        },
+        for_any_device_id,
         loopback::{self, LoopbackDevice, LoopbackDeviceId, LoopbackPrimaryDeviceId},
-        pure_ip::{self, PureIpDeviceId},
-        queue::tx::TransmitQueueHandler,
-        socket,
-        state::{DeviceStateSpec, IpLinkDeviceState, IpLinkDeviceStateInner},
-        AnyDevice, BaseDeviceId, DeviceCollectionContext, DeviceCounters, DeviceId,
-        DeviceIdContext, DeviceLayerState, Devices, DevicesIter, EthernetDeviceCounters,
-        EthernetDeviceId, EthernetPrimaryDeviceId, EthernetWeakDeviceId, Ipv6DeviceLinkLayerAddr,
-        OriginTracker, OriginTrackerContext, PureIpDeviceCounters, RecvIpFrameMeta, WeakDeviceId,
+        pure_ip::{self, PureIpDeviceCounters, PureIpDeviceId},
+        queue::TransmitQueueHandler,
+        socket, ArpCounters, BaseDeviceId, DeviceCollectionContext, DeviceConfigurationContext,
+        DeviceCounters, DeviceId, DeviceLayerState, DeviceStateSpec, Devices, DevicesIter,
+        IpLinkDeviceState, IpLinkDeviceStateInner, Ipv6DeviceLinkLayerAddr, OriginTracker,
+        OriginTrackerContext, WeakDeviceId,
     },
     error::{ExistsError, NotFoundError},
     filter::{IpPacket, ProofOfEgressCheck},
-    for_any_device_id,
     ip::{
         device::{
             AddressIdIter, AssignedAddress as _, DualStackIpDeviceState, IpDeviceAddressContext,
@@ -301,16 +302,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         cb: F,
     ) -> O {
         let (devices, locked) = self.read_lock_and::<crate::lock_ordering::DeviceLayerState>();
-        let Devices { ethernet, pure_ip, loopback } = &*devices;
-
-        cb(
-            DevicesIter {
-                ethernet: ethernet.values(),
-                pure_ip: pure_ip.values(),
-                loopback: loopback.iter(),
-            },
-            locked,
-        )
+        cb(devices.iter(), locked)
     }
 
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
@@ -588,16 +580,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         cb: F,
     ) -> O {
         let (devices, locked) = self.read_lock_and::<crate::lock_ordering::DeviceLayerState>();
-        let Devices { ethernet, pure_ip, loopback } = &*devices;
-
-        cb(
-            DevicesIter {
-                ethernet: ethernet.values(),
-                pure_ip: pure_ip.values(),
-                loopback: loopback.iter(),
-            },
-            locked,
-        )
+        cb(devices.iter(), locked)
     }
 
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
@@ -876,12 +859,8 @@ pub(crate) fn with_device_state_and_core_ctx<
     id: &BaseDeviceId<D, BT>,
     cb: F,
 ) -> O {
-    let state = id.device_state();
-    // Make sure that the pointer belongs to this `sync_ctx`.
-    assert_eq!(
-        *core_ctx.unlocked_access::<crate::lock_ordering::DeviceLayerStateOrigin>(),
-        state.origin
-    );
+    let state =
+        id.device_state(core_ctx.unlocked_access::<crate::lock_ordering::DeviceLayerStateOrigin>());
     cb(core_ctx.adopt(state))
 }
 
@@ -926,9 +905,13 @@ fn get_mtu<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceLayerS
     device: &DeviceId<BC>,
 ) -> Mtu {
     match device {
-        DeviceId::Ethernet(id) => self::ethernet::get_mtu(core_ctx, &id),
-        DeviceId::Loopback(id) => self::loopback::integration::get_mtu(core_ctx, id),
-        DeviceId::PureIp(id) => self::pure_ip::get_mtu(core_ctx, &id),
+        DeviceId::Ethernet(id) => ethernet::get_mtu(core_ctx, &id),
+        DeviceId::Loopback(id) => {
+            crate::device::integration::with_device_state(core_ctx, id, |mut state| {
+                state.cast_with(|s| &s.link.mtu).copied()
+            })
+        }
+        DeviceId::PureIp(id) => pure_ip::get_mtu(core_ctx, &id),
     }
 }
 
@@ -943,7 +926,7 @@ fn join_link_multicast_group<
     multicast_addr: MulticastAddr<A>,
 ) {
     match device_id {
-        DeviceId::Ethernet(id) => self::ethernet::join_link_multicast(
+        DeviceId::Ethernet(id) => ethernet::join_link_multicast(
             core_ctx,
             bindings_ctx,
             &id,
@@ -964,7 +947,7 @@ fn leave_link_multicast_group<
     multicast_addr: MulticastAddr<A>,
 ) {
     match device_id {
-        DeviceId::Ethernet(id) => self::ethernet::leave_link_multicast(
+        DeviceId::Ethernet(id) => ethernet::leave_link_multicast(
             core_ctx,
             bindings_ctx,
             &id,
@@ -1134,7 +1117,7 @@ impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::EthernetDeviceCou
     type Guard<'l> = &'l EthernetDeviceCounters where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.ethernet_device_counters()
+        &self.device.ethernet_counters
     }
 }
 
@@ -1151,7 +1134,7 @@ impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::PureIpDeviceCount
     type Guard<'l> = &'l PureIpDeviceCounters where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.pure_ip_device_counters()
+        &self.device.pure_ip_counters
     }
 }
 
@@ -1212,7 +1195,7 @@ impl<'a, BC: BindingsContext, L>
         cb: F,
     ) -> O {
         with_device_state(self, device_id, |state| {
-            cb(state.unlocked_access::<crate::lock_ordering::EthernetDeviceCounters>())
+            cb(state.unlocked_access::<crate::lock_ordering::LoopbackDeviceCounters>())
         })
     }
 }
@@ -1242,7 +1225,7 @@ impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::DeviceCounters> for
     type Guard<'l> = &'l DeviceCounters where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.device_counters()
+        &self.device.counters
     }
 }
 
@@ -1285,7 +1268,7 @@ impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::ArpCounters> for St
     type Guard<'l> = &'l ArpCounters where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.arp_counters()
+        &self.device.arp_counters
     }
 }
 

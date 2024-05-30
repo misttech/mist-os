@@ -20,12 +20,15 @@ use test_case::test_case;
 use crate::{
     context::testutil::FakeInstant,
     device::{
-        ethernet::{EthernetCreationProperties, MaxEthernetFrameSize},
-        loopback::{LoopbackCreationProperties, LoopbackDevice},
-        queue::tx::TransmitQueueConfiguration,
-        DeviceId, DeviceProvider, EthernetDeviceId, EthernetLinkDevice, LoopbackDeviceId,
+        ethernet::{
+            EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, MaxEthernetFrameSize,
+        },
+        for_any_device_id,
+        loopback::{LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId},
+        queue::TransmitQueueConfiguration,
+        DeviceId, DeviceProvider,
     },
-    error, for_any_device_id,
+    error,
     ip::device::{
         AddIpAddrSubnetError, IpDeviceConfigurationUpdate, Ipv4AddrConfig,
         Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfigurationUpdate,

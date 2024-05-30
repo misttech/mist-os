@@ -9,7 +9,7 @@ use alloc::collections::VecDeque;
 use derivative::Derivative;
 use packet::{GrowBufferMut, ParseBuffer, Serializer};
 
-use crate::device::queue::{
+use crate::internal::queue::{
     DequeueResult, EnqueueResult, ReceiveQueueFullError, TransmitQueueFrameError,
     MAX_RX_QUEUED_LEN, MAX_TX_QUEUED_LEN,
 };

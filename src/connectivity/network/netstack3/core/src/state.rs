@@ -9,10 +9,7 @@ use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
 use crate::{
     api::CoreApi,
     context::{BuildableCoreContext, ContextProvider, CoreTimerContext, CtxPair},
-    device::{
-        arp::ArpCounters, DeviceCounters, DeviceId, DeviceLayerState, EthernetDeviceCounters,
-        PureIpDeviceCounters, WeakDeviceId,
-    },
+    device::{DeviceId, DeviceLayerState, WeakDeviceId},
     ip::{
         self, icmp::IcmpState, nud::NudCounters, IpLayerIpExt, IpLayerTimerId, IpStateInner,
         Ipv4State, Ipv6State,
@@ -51,7 +48,7 @@ impl StackStateBuilder {
             transport: self.transport.build_with_ctx(bindings_ctx),
             ipv4: self.ipv4.build::<StackState<BC>, _, _>(bindings_ctx),
             ipv6: self.ipv6.build::<StackState<BC>, _, _>(bindings_ctx),
-            device: DeviceLayerState::new(),
+            device: Default::default(),
         }
     }
 }
@@ -86,22 +83,6 @@ impl<BT: BindingsTypes> StackState<BT> {
             |IpInvariant(state)| state.device.nud_counters::<Ipv4>(),
             |IpInvariant(state)| state.device.nud_counters::<Ipv6>(),
         )
-    }
-
-    pub(crate) fn device_counters(&self) -> &DeviceCounters {
-        &self.device.counters()
-    }
-
-    pub(crate) fn ethernet_device_counters(&self) -> &EthernetDeviceCounters {
-        &self.device.ethernet_counters()
-    }
-
-    pub(crate) fn pure_ip_device_counters(&self) -> &PureIpDeviceCounters {
-        &self.device.pure_ip_counters()
-    }
-
-    pub(crate) fn arp_counters(&self) -> &ArpCounters {
-        &self.device.arp_counters()
     }
 
     pub(crate) fn udp_counters<I: Ip>(&self) -> &UdpCounters<I> {

@@ -9,19 +9,18 @@ use core::fmt::Debug;
 
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::ip::{Ipv4, Ipv6};
-
-use crate::{
-    context::{CoreTimerContext, TimerContext},
-    device::{
-        socket::HeldDeviceSockets, Device, DeviceCounters, DeviceIdContext, DeviceLayerTypes,
-        OriginTracker, WeakDeviceIdentifier,
-    },
-    inspect::Inspectable,
-    ip::{
-        device::{DualStackIpDeviceState, IpAddressIdSpec, IpDeviceTimerId},
-        RawMetric,
-    },
+use netstack3_base::{
     sync::{RwLock, WeakRc},
+    CoreTimerContext, Device, DeviceIdContext, Inspectable, TimerContext, WeakDeviceIdentifier,
+};
+use netstack3_ip::{
+    device::{DualStackIpDeviceState, IpAddressIdSpec, IpDeviceTimerId},
+    RawMetric,
+};
+
+use crate::internal::{
+    base::{DeviceCounters, DeviceLayerTypes, OriginTracker},
+    socket::HeldDeviceSockets,
 };
 
 /// Provides the specifications for device state held by [`BaseDeviceId`] in
@@ -74,18 +73,20 @@ pub(crate) struct BaseDeviceState<T: DeviceStateSpec, BT: DeviceLayerTypes> {
 /// A convenience wrapper around `IpLinkDeviceStateInner` that uses
 /// `DeviceStateSpec` to extract the link state type and make type signatures
 /// shorter.
-pub(crate) type IpLinkDeviceState<T, BT> =
-    IpLinkDeviceStateInner<<T as DeviceStateSpec>::Link<BT>, BT>;
+pub type IpLinkDeviceState<T, BT> = IpLinkDeviceStateInner<<T as DeviceStateSpec>::Link<BT>, BT>;
 
 /// State for a link-device that is also an IP device.
 ///
 /// `D` is the link-specific state.
-pub(crate) struct IpLinkDeviceStateInner<T, BT: DeviceLayerTypes> {
+pub struct IpLinkDeviceStateInner<T, BT: DeviceLayerTypes> {
+    /// The device's IP state.
     pub ip: DualStackIpDeviceState<BT>,
+    /// The device's link state.
     pub link: T,
-    pub(super) origin: OriginTracker,
+    pub(crate) origin: OriginTracker,
     pub(super) sockets: RwLock<HeldDeviceSockets<BT>>,
-    pub(super) counters: DeviceCounters,
+    /// Common device counters.
+    pub counters: DeviceCounters,
 }
 
 impl<T, BC: DeviceLayerTypes + TimerContext> IpLinkDeviceStateInner<T, BC> {

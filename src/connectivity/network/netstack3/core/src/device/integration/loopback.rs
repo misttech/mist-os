@@ -12,30 +12,24 @@ use lock_order::{
     relation::LockBefore,
     wrap::prelude::*,
 };
-use net_types::ip::Mtu;
+use netstack3_base::DeviceIdContext;
 use packet::Buf;
 
 use crate::{
     device::{
         self,
+        ethernet::EthernetDeviceCounters,
         loopback::{
             LoopbackDevice, LoopbackDeviceId, LoopbackRxQueueMeta, LoopbackTxQueueMeta,
             LoopbackWeakDeviceId,
         },
         queue::{
-            rx::{
-                ReceiveDequeContext, ReceiveQueueContext, ReceiveQueueHandler, ReceiveQueueState,
-                ReceiveQueueTypes,
-            },
-            tx::{
-                BufVecU8Allocator, TransmitDequeueContext, TransmitQueueCommon,
-                TransmitQueueContext, TransmitQueueState,
-            },
-            DequeueState, ReceiveQueueFullError,
+            BufVecU8Allocator, DequeueState, ReceiveDequeContext, ReceiveQueueContext,
+            ReceiveQueueFullError, ReceiveQueueHandler, ReceiveQueueState, ReceiveQueueTypes,
+            TransmitDequeueContext, TransmitQueueCommon, TransmitQueueContext, TransmitQueueState,
         },
         socket::{ParseSentFrameError, SentFrame},
-        state::IpLinkDeviceState,
-        DeviceIdContext, DeviceLayerTypes, DeviceSendFrameError, EthernetDeviceCounters,
+        DeviceLayerTypes, DeviceSendFrameError, IpLinkDeviceState,
     },
     BindingsContext, BindingsTypes, CoreCtx,
 };
@@ -43,16 +37,6 @@ use crate::{
 impl<BT: BindingsTypes, L> DeviceIdContext<LoopbackDevice> for CoreCtx<'_, BT, L> {
     type DeviceId = LoopbackDeviceId<BT>;
     type WeakDeviceId = LoopbackWeakDeviceId<BT>;
-}
-
-/// Gets the MTU associated with this device.
-pub(crate) fn get_mtu<BC: BindingsContext, L>(
-    core_ctx: &mut CoreCtx<'_, BC, L>,
-    device_id: &LoopbackDeviceId<BC>,
-) -> Mtu {
-    device::integration::with_device_state(core_ctx, device_id, |mut state| {
-        state.cast_with(|s| &s.link.mtu).copied()
-    })
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
@@ -195,7 +179,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxDequeue>
 }
 
 impl<BT: DeviceLayerTypes> UnlockedAccessMarkerFor<IpLinkDeviceState<LoopbackDevice, BT>>
-    for crate::lock_ordering::EthernetDeviceCounters
+    for crate::lock_ordering::LoopbackDeviceCounters
 {
     type Data = EthernetDeviceCounters;
 

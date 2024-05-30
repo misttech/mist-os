@@ -15,14 +15,16 @@ use net_types::{
     ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr},
     MulticastAddr, SpecifiedAddr,
 };
+use netstack3_base::{
+    AnyDevice, CounterContext, DeviceIdContext, TokenBucket, UninstantiableWrapper,
+    WeakDeviceIdentifier,
+};
 use packet::BufferMut;
 use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
 use tracing::trace;
 
 use crate::{
-    context::CounterContext,
-    data_structures::token_bucket::TokenBucket,
-    device::{AnyDevice, DeviceId, DeviceIdContext, WeakDeviceId, WeakDeviceIdentifier},
+    device::{DeviceId, WeakDeviceId},
     ip::{
         self,
         device::{self, IpDeviceBindingsContext, IpDeviceIpExt},
@@ -41,7 +43,6 @@ use crate::{
     routes::ResolvedRoute,
     socket::{datagram, SocketIpAddr},
     transport::{tcp::socket::TcpIpTransportContext, udp::UdpIpTransportContext},
-    uninstantiable::UninstantiableWrapper,
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 

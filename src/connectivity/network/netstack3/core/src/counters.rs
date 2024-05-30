@@ -8,7 +8,7 @@ use net_types::ip::{Ip, Ipv4, Ipv6};
 
 use crate::{
     context::{ContextPair, CounterContext},
-    device::{arp::ArpCounters, DeviceCounters, EthernetDeviceCounters},
+    device::{ethernet::EthernetDeviceCounters, ArpCounters, DeviceCounters},
     inspect::Inspector,
     ip::{
         icmp::{
@@ -23,8 +23,6 @@ use crate::{
         udp::{UdpCounters, UdpCountersInner},
     },
 };
-
-pub use netstack3_base::Counter;
 
 /// An API struct for accessing all stack counters.
 pub struct CountersApi<C>(C);
@@ -137,53 +135,6 @@ where
             });
         });
     }
-}
-
-pub(crate) fn inspect_device_counters(inspector: &mut impl Inspector, counters: &DeviceCounters) {
-    let DeviceCounters {
-        recv_frame,
-        recv_ipv4_delivered,
-        recv_ipv6_delivered,
-        recv_parse_error,
-        send_dropped_no_queue,
-        send_frame,
-        send_ipv4_frame,
-        send_ipv6_frame,
-        send_queue_full,
-        send_serialize_error,
-        send_total_frames,
-    } = counters;
-    inspector.record_child("Rx", |inspector| {
-        inspector.record_counter("TotalFrames", recv_frame);
-        inspector.record_counter("Malformed", recv_parse_error);
-        inspector.record_counter("Ipv4Delivered", recv_ipv4_delivered);
-        inspector.record_counter("Ipv6Delivered", recv_ipv6_delivered);
-    });
-    inspector.record_child("Tx", |inspector| {
-        inspector.record_counter("TotalFrames", send_total_frames);
-        inspector.record_counter("Sent", send_frame);
-        inspector.record_counter("SendIpv4Frame", send_ipv4_frame);
-        inspector.record_counter("SendIpv6Frame", send_ipv6_frame);
-        inspector.record_counter("NoQueue", send_dropped_no_queue);
-        inspector.record_counter("QueueFull", send_queue_full);
-        inspector.record_counter("SerializeError", send_serialize_error);
-    });
-}
-
-pub(crate) fn inspect_ethernet_device_counters(
-    inspector: &mut impl Inspector,
-    counters: &EthernetDeviceCounters,
-) {
-    let EthernetDeviceCounters {
-        recv_ethernet_other_dest,
-        recv_no_ethertype,
-        recv_unsupported_ethertype,
-    } = counters;
-    inspector.record_child("Rx", |inspector| {
-        inspector.record_counter("NonLocalDstAddr", recv_ethernet_other_dest);
-        inspector.record_counter("NoEthertype", recv_no_ethertype);
-        inspector.record_counter("UnsupportedEthertype", recv_unsupported_ethertype);
-    });
 }
 
 fn inspect_nud_counters<I: Ip>(inspector: &mut impl Inspector, counters: &NudCounters<I>) {

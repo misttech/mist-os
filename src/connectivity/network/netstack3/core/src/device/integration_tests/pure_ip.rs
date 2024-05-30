@@ -89,13 +89,13 @@ fn receive_frame<I: Ip + TestIpExt + IpExt>() {
         count: u64,
     ) {
         assert_eq!(stack_state.common_ip::<I>().counters().receive_ip_packet.get(), count);
-        assert_eq!(stack_state.device_counters().recv_frame.get(), count);
+        assert_eq!(stack_state.device().counters.recv_frame.get(), count);
         match I::VERSION {
             IpVersion::V4 => {
-                assert_eq!(stack_state.device_counters().recv_ipv4_delivered.get(), count)
+                assert_eq!(stack_state.device().counters.recv_ipv4_delivered.get(), count)
             }
             IpVersion::V6 => {
-                assert_eq!(stack_state.device_counters().recv_ipv6_delivered.get(), count)
+                assert_eq!(stack_state.device().counters.recv_ipv6_delivered.get(), count)
             }
         }
     }
@@ -129,14 +129,14 @@ fn send_frame<I: Ip + TestIpExt + IpExt>(tx_queue_config: TransmitQueueConfigura
         stack_state: &StackState<FakeBindingsCtx>,
         count: u64,
     ) {
-        assert_eq!(stack_state.device_counters().send_total_frames.get(), count);
-        assert_eq!(stack_state.device_counters().send_frame.get(), count);
+        assert_eq!(stack_state.device().counters.send_total_frames.get(), count);
+        assert_eq!(stack_state.device().counters.send_frame.get(), count);
         match I::VERSION {
             IpVersion::V4 => {
-                assert_eq!(stack_state.device_counters().send_ipv4_frame.get(), count)
+                assert_eq!(stack_state.device().counters.send_ipv4_frame.get(), count)
             }
             IpVersion::V6 => {
-                assert_eq!(stack_state.device_counters().send_ipv6_frame.get(), count)
+                assert_eq!(stack_state.device().counters.send_ipv6_frame.get(), count)
             }
         }
     }

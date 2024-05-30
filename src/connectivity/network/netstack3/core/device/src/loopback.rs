@@ -13,37 +13,30 @@ use net_types::{
     ip::{Ip, IpAddress, Ipv4, Ipv6, Mtu},
     SpecifiedAddr,
 };
+use netstack3_base::{
+    sync::Mutex, CoreTimerContext, Device, DeviceIdContext, FrameDestination, RecvFrameContext,
+    RecvIpFrameMeta, ResourceCounterContext, SendableFrameMeta, TimerContext, WeakDeviceIdentifier,
+};
 use packet::{Buf, Buffer as _, BufferMut, Serializer};
 use packet_formats::ethernet::{
     EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
 };
 use tracing::trace;
 
-use crate::{
-    context::{
-        CoreTimerContext, RecvFrameContext, ResourceCounterContext, SendableFrameMeta, TimerContext,
+use crate::internal::{
+    base::{DeviceCounters, DeviceLayerTypes, DeviceReceiveFrameSpec, EthernetDeviceCounters},
+    id::{BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId},
+    queue::{
+        rx::{ReceiveDequeFrameContext, ReceiveQueue, ReceiveQueueState, ReceiveQueueTypes},
+        tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState},
+        DequeueState, TransmitQueueFrameError,
     },
-    device::{
-        id::{BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId},
-        queue::{
-            rx::{ReceiveDequeFrameContext, ReceiveQueue, ReceiveQueueState, ReceiveQueueTypes},
-            tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState},
-            DequeueState, TransmitQueueFrameError,
-        },
-        socket::{
-            DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, EthernetHeaderParams,
-            ReceivedFrame,
-        },
-        state::{DeviceStateSpec, IpLinkDeviceState},
-        Device, DeviceCounters, DeviceIdContext, DeviceLayerTypes, DeviceReceiveFrameSpec,
-        EthernetDeviceCounters, FrameDestination, RecvIpFrameMeta, WeakDeviceIdentifier,
+    socket::{
+        DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, EthernetHeaderParams,
+        ReceivedFrame,
     },
-    sync::Mutex,
+    state::{DeviceStateSpec, IpLinkDeviceState},
 };
-
-pub(super) mod integration;
-#[cfg(test)]
-mod integration_tests;
 
 /// The MAC address corresponding to the loopback interface.
 const LOOPBACK_MAC: Mac = Mac::UNSPECIFIED;
@@ -64,7 +57,7 @@ pub type LoopbackWeakDeviceId<BT> = BaseWeakDeviceId<LoopbackDevice, BT>;
 pub type LoopbackDeviceId<BT> = BaseDeviceId<LoopbackDevice, BT>;
 
 /// The primary reference for a loopback device.
-pub(crate) type LoopbackPrimaryDeviceId<BT> = BasePrimaryDeviceId<LoopbackDevice, BT>;
+pub type LoopbackPrimaryDeviceId<BT> = BasePrimaryDeviceId<LoopbackDevice, BT>;
 
 /// Loopback device domain.
 #[derive(Copy, Clone)]
@@ -108,13 +101,19 @@ pub struct LoopbackCreationProperties {
 
 /// State for a loopback device.
 pub struct LoopbackDeviceState {
-    counters: EthernetDeviceCounters,
-    mtu: Mtu,
-    rx_queue: ReceiveQueue<LoopbackRxQueueMeta, Buf<Vec<u8>>>,
-    tx_queue: TransmitQueue<LoopbackTxQueueMeta, Buf<Vec<u8>>, BufVecU8Allocator>,
+    /// Loopback device counters.
+    pub counters: EthernetDeviceCounters,
+    /// The MTU this device was created with (immutable).
+    pub mtu: Mtu,
+    /// Loopback device receive queue.
+    pub rx_queue: ReceiveQueue<LoopbackRxQueueMeta, Buf<Vec<u8>>>,
+    /// Loopback device transmit queue.
+    pub tx_queue: TransmitQueue<LoopbackTxQueueMeta, Buf<Vec<u8>>, BufVecU8Allocator>,
 }
 
+/// Metadata associated with a frame in the Loopback TX queue.
 pub struct LoopbackTxQueueMeta;
+/// Metadata associated with a frame in the Loopback RX queue.
 pub struct LoopbackRxQueueMeta;
 impl From<LoopbackTxQueueMeta> for LoopbackRxQueueMeta {
     fn from(LoopbackTxQueueMeta: LoopbackTxQueueMeta) -> Self {
@@ -273,7 +272,8 @@ where
     }
 }
 
-pub(super) fn send_ip_frame<CC, BC, A, S>(
+/// Sends an IP frame `packet` over `device_id`.
+pub fn send_ip_frame<CC, BC, A, S>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,

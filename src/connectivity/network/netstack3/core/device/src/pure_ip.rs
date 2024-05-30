@@ -6,36 +6,33 @@
 
 use alloc::vec::Vec;
 use core::{convert::Infallible as Never, fmt::Debug};
+
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6, Mtu};
+use netstack3_base::{
+    sync::{Mutex, RwLock},
+    CoreTimerContext, Device, DeviceIdContext, ReceivableFrameMeta, RecvFrameContext,
+    RecvIpFrameMeta, ResourceCounterContext, SendableFrameMeta, TimerContext, WeakDeviceIdentifier,
+};
 use packet::{Buf, BufferMut, Serializer};
 use tracing::warn;
 
-use crate::{
-    context::{
-        CoreTimerContext, ReceivableFrameMeta, RecvFrameContext, ResourceCounterContext,
-        SendableFrameMeta, TimerContext,
+use crate::internal::{
+    base::{
+        DeviceCounters, DeviceLayerTypes, DeviceReceiveFrameSpec, DeviceSendFrameError,
+        PureIpDeviceCounters,
     },
-    device::{
-        queue::{
-            tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState},
-            DequeueState, TransmitQueueFrameError,
-        },
-        socket::{
-            DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, Frame, IpFrame,
-            ReceivedFrame,
-        },
-        state::{DeviceStateSpec, IpLinkDeviceState},
-        BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, Device, DeviceCounters,
-        DeviceIdContext, DeviceLayerTypes, DeviceReceiveFrameSpec, DeviceSendFrameError,
-        PureIpDeviceCounters, RecvIpFrameMeta, WeakDeviceIdentifier,
+    id::{BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId},
+    queue::{
+        tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState},
+        DequeueState, TransmitQueueFrameError,
     },
-    sync::{Mutex, RwLock},
+    socket::{
+        DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, Frame, IpFrame,
+        ReceivedFrame,
+    },
+    state::{DeviceStateSpec, IpLinkDeviceState},
 };
-
-mod integration;
-#[cfg(test)]
-mod integration_tests;
 
 /// A weak device ID identifying a pure IP device.
 ///
@@ -53,7 +50,7 @@ pub type PureIpWeakDeviceId<BT> = BaseWeakDeviceId<PureIpDevice, BT>;
 pub type PureIpDeviceId<BT> = BaseDeviceId<PureIpDevice, BT>;
 
 /// The primary reference for a pure IP device.
-pub(crate) type PureIpPrimaryDeviceId<BT> = BasePrimaryDeviceId<PureIpDevice, BT>;
+pub type PureIpPrimaryDeviceId<BT> = BasePrimaryDeviceId<PureIpDevice, BT>;
 
 /// A marker type identifying a pure IP device.
 #[derive(Copy, Clone)]
@@ -69,7 +66,7 @@ pub struct PureIpDeviceCreationProperties {
 /// Metadata for IP packets held in the TX queue.
 pub struct PureIpDeviceTxQueueFrameMetadata {
     /// The IP version of the sent packet.
-    ip_version: IpVersion,
+    pub ip_version: IpVersion,
 }
 
 /// Metadata for sending IP packets from a device socket.
@@ -84,13 +81,13 @@ pub struct PureIpDeviceState {
     /// The device's dynamic state.
     dynamic_state: RwLock<DynamicPureIpDeviceState>,
     /// The device's transmit queue.
-    tx_queue: TransmitQueue<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>, BufVecU8Allocator>,
+    pub tx_queue: TransmitQueue<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>, BufVecU8Allocator>,
     /// Counters specific to pure IP devices.
-    counters: PureIpDeviceCounters,
+    pub counters: PureIpDeviceCounters,
 }
 
 /// Dynamic state for a pure IP device.
-pub(crate) struct DynamicPureIpDeviceState {
+pub struct DynamicPureIpDeviceState {
     /// The MTU of the device.
     pub(crate) mtu: Mtu,
 }
@@ -135,7 +132,7 @@ impl DeviceReceiveFrameSpec for PureIpDevice {
 }
 
 /// Provides access to a pure IP device's state.
-pub(crate) trait PureIpDeviceStateContext: DeviceIdContext<PureIpDevice> {
+pub trait PureIpDeviceStateContext: DeviceIdContext<PureIpDevice> {
     /// Calls the function with an immutable reference to the pure IP device's
     /// dynamic state.
     fn with_pure_ip_state<O, F: FnOnce(&DynamicPureIpDeviceState) -> O>(
@@ -229,7 +226,7 @@ where
 }
 
 /// Enqueues the given IP packet on the TX queue for the given [`PureIpDevice`].
-pub(super) fn send_ip_frame<CC, BC, I, S>(
+pub fn send_ip_frame<CC, BC, I, S>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
@@ -277,15 +274,12 @@ where
 }
 
 /// Gets the MTU of the given [`PureIpDevice`].
-pub(super) fn get_mtu<CC: PureIpDeviceStateContext>(
-    core_ctx: &mut CC,
-    device_id: &CC::DeviceId,
-) -> Mtu {
+pub fn get_mtu<CC: PureIpDeviceStateContext>(core_ctx: &mut CC, device_id: &CC::DeviceId) -> Mtu {
     core_ctx.with_pure_ip_state(device_id, |DynamicPureIpDeviceState { mtu }| *mtu)
 }
 
 /// Updates the MTU of the given [`PureIpDevice`].
-pub(super) fn set_mtu<CC: PureIpDeviceStateContext>(
+pub fn set_mtu<CC: PureIpDeviceStateContext>(
     core_ctx: &mut CC,
     device_id: &CC::DeviceId,
     new_mtu: Mtu,

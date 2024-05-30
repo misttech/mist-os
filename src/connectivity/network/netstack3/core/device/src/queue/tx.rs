@@ -8,30 +8,30 @@ use alloc::vec::Vec;
 use core::convert::Infallible as Never;
 
 use derivative::Derivative;
+use netstack3_base::{sync::Mutex, Device, DeviceIdContext};
 use packet::{
     new_buf_vec, Buf, BufferAlloc, ContiguousBuffer, GrowBufferMut, NoReuseBufferProvider,
     ReusableBuffer, Serializer,
 };
 
-use crate::{
-    device::{
-        queue::{fifo, DequeueState, EnqueueResult, TransmitQueueFrameError},
-        socket::{DeviceSocketHandler, ParseSentFrameError, SentFrame},
-        Device, DeviceIdContext, DeviceSendFrameError,
-    },
-    sync::Mutex,
+use crate::internal::{
+    base::DeviceSendFrameError,
+    queue::{fifo, DequeueState, EnqueueResult, TransmitQueueFrameError},
+    socket::{DeviceSocketHandler, ParseSentFrameError, SentFrame},
 };
 
+/// State associated with a device transmit queue.
 #[derive(Derivative)]
 #[derivative(Default(bound = "Allocator: Default"))]
-pub(crate) struct TransmitQueueState<Meta, Buffer, Allocator> {
+pub struct TransmitQueueState<Meta, Buffer, Allocator> {
     pub(super) allocator: Allocator,
     pub(super) queue: Option<fifo::Queue<Meta, Buffer>>,
 }
 
+/// Holds queue and dequeue state for the transmit queue.
 #[derive(Derivative)]
 #[derivative(Default(bound = "Allocator: Default"))]
-pub(crate) struct TransmitQueue<Meta, Buffer, Allocator> {
+pub struct TransmitQueue<Meta, Buffer, Allocator> {
     /// The state for dequeued packets that will be handled.
     ///
     /// See `queue` for lock ordering.
@@ -54,9 +54,13 @@ pub trait TransmitQueueBindingsContext<DeviceId> {
     fn wake_tx_task(&mut self, device_id: &DeviceId);
 }
 
+/// Basic definitions for a transmit queue.
 pub trait TransmitQueueCommon<D: Device, C>: DeviceIdContext<D> {
+    /// The metadata associated with every packet in the queue.
     type Meta;
+    /// An allocator of [`Self::Buffer`].
     type Allocator;
+    /// The buffer type stored in the queue.
     type Buffer: GrowBufferMut + ContiguousBuffer;
 
     /// Parses an outgoing frame for packet socket delivery.
@@ -91,7 +95,9 @@ pub trait TransmitQueueContext<D: Device, BC>: TransmitQueueCommon<D, BC> {
     ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>>;
 }
 
+/// The core execution context for dequeueing TX frames from the transmit queue.
 pub trait TransmitDequeueContext<D: Device, BC>: TransmitQueueCommon<D, BC> {
+    /// The inner context providing dequeuing.
     type TransmitQueueCtx<'a>: TransmitQueueContext<
             D,
             BC,
@@ -120,7 +126,7 @@ pub enum TransmitQueueConfiguration {
 }
 
 /// An implementation of a transmit queue that stores egress frames.
-pub(crate) trait TransmitQueueHandler<D: Device, BC>: TransmitQueueCommon<D, BC> {
+pub trait TransmitQueueHandler<D: Device, BC>: TransmitQueueCommon<D, BC> {
     /// Queues a frame for transmission.
     fn queue_tx_frame<S>(
         &mut self,
@@ -228,6 +234,7 @@ where
     }
 }
 
+/// An allocator of [`Buf<Vec<u8>>`] .
 #[derive(Default)]
 pub struct BufVecU8Allocator;
 
@@ -247,19 +254,15 @@ mod tests {
 
     use net_declare::net_mac;
     use net_types::ethernet::Mac;
+    use netstack3_base::{
+        testutil::{FakeBindingsCtx, FakeCoreCtx, FakeLinkDevice, FakeLinkDeviceId},
+        ContextPair, CtxPair, WorkQueueReport,
+    };
     use test_case::test_case;
 
-    use crate::{
-        context::{
-            testutil::{FakeBindingsCtx, FakeCoreCtx},
-            CtxPair,
-        },
-        device::{
-            link::testutil::{FakeLinkDevice, FakeLinkDeviceId},
-            queue::{api::TransmitQueueApi, MAX_BATCH_SIZE, MAX_TX_QUEUED_LEN},
-            socket::{EthernetFrame, Frame},
-        },
-        types::WorkQueueReport,
+    use crate::internal::{
+        queue::{api::TransmitQueueApi, MAX_BATCH_SIZE, MAX_TX_QUEUED_LEN},
+        socket::{EthernetFrame, Frame},
     };
 
     #[derive(Default)]
@@ -310,13 +313,13 @@ mod tests {
     }
 
     /// A trait providing a shortcut to instantiate a [`TransmitQueueApi`] from a context.
-    trait TransmitQueueApiExt: crate::context::ContextPair + Sized {
+    trait TransmitQueueApiExt: ContextPair + Sized {
         fn transmit_queue_api<D>(&mut self) -> TransmitQueueApi<D, &mut Self> {
             TransmitQueueApi::new(self)
         }
     }
 
-    impl<O> TransmitQueueApiExt for O where O: crate::context::ContextPair + Sized {}
+    impl<O> TransmitQueueApiExt for O where O: ContextPair + Sized {}
 
     impl TransmitQueueContext<FakeLinkDevice, FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         fn with_transmit_queue_mut<

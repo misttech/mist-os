@@ -10,19 +10,19 @@ use core::hash::Hash;
 use core::num::NonZeroU64;
 
 use derivative::Derivative;
-
-use crate::{
-    device::{
-        ethernet::EthernetLinkDevice,
-        loopback::{LoopbackDevice, LoopbackDeviceId, LoopbackWeakDeviceId},
-        pure_ip::{PureIpDevice, PureIpDeviceId, PureIpWeakDeviceId},
-        state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceState, WeakCookie},
-        Device, DeviceClassMatcher as _, DeviceIdAndNameMatcher as _, DeviceLayerTypes,
-    },
+use netstack3_base::{
     sync::{DynDebugReferences, PrimaryRc, StrongRc},
+    Device, DeviceIdentifier, StrongDeviceIdentifier, WeakDeviceIdentifier,
 };
+use netstack3_filter as filter;
 
-pub(crate) use netstack3_base::{DeviceIdentifier, StrongDeviceIdentifier, WeakDeviceIdentifier};
+use crate::internal::{
+    base::{DeviceClassMatcher as _, DeviceIdAndNameMatcher as _, DeviceLayerTypes, OriginTracker},
+    ethernet::EthernetLinkDevice,
+    loopback::{LoopbackDevice, LoopbackDeviceId, LoopbackWeakDeviceId},
+    pure_ip::{PureIpDevice, PureIpDeviceId, PureIpWeakDeviceId},
+    state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceState, WeakCookie},
+};
 
 /// A weak ID identifying a device.
 ///
@@ -186,7 +186,7 @@ macro_rules! for_any_device_id {
         }
     };
 }
-use crate::for_any_device_id;
+pub(crate) use crate::for_any_device_id;
 
 /// Provides the [`Device`] type for each device domain.
 pub trait DeviceProvider {
@@ -307,7 +307,7 @@ impl<BT: DeviceLayerTypes> Debug for DeviceId<BT> {
     }
 }
 
-impl<BT: DeviceLayerTypes> crate::filter::InterfaceProperties<BT::DeviceClass> for DeviceId<BT> {
+impl<BT: DeviceLayerTypes> filter::InterfaceProperties<BT::DeviceClass> for DeviceId<BT> {
     fn id_matches(&self, id: &NonZeroU64) -> bool {
         self.bindings_id().id_matches(id)
     }
@@ -469,7 +469,12 @@ impl<T: DeviceStateSpec, BT: DeviceLayerTypes> StrongDeviceIdentifier for BaseDe
 }
 
 impl<T: DeviceStateSpec, BT: DeviceLayerTypes> BaseDeviceId<T, BT> {
-    pub(crate) fn device_state(&self) -> &IpLinkDeviceState<T, BT> {
+    /// Returns a reference to the device state.
+    ///
+    /// Requires an OriginTracker to ensure this is being access from the proper
+    /// context and disallow usage in bindings.
+    pub fn device_state(&self, tracker: &OriginTracker) -> &IpLinkDeviceState<T, BT> {
+        debug_assert_eq!(tracker, &self.rc.ip.origin);
         &self.rc.ip
     }
 
@@ -505,8 +510,9 @@ impl<T: DeviceStateSpec, BT: DeviceLayerTypes> Debug for BasePrimaryDeviceId<T, 
 }
 
 impl<T: DeviceStateSpec, BT: DeviceLayerTypes> BasePrimaryDeviceId<T, BT> {
+    /// Returns a strong clone of this primary ID.
     #[cfg_attr(feature = "instrumented", track_caller)]
-    pub(crate) fn clone_strong(&self) -> BaseDeviceId<T, BT> {
+    pub fn clone_strong(&self) -> BaseDeviceId<T, BT> {
         let Self { rc } = self;
         BaseDeviceId { rc: PrimaryRc::clone_strong(rc) }
     }
@@ -537,7 +543,7 @@ pub type EthernetDeviceId<BT> = BaseDeviceId<EthernetLinkDevice, BT>;
 /// A weak device ID identifying an ethernet device.
 pub type EthernetWeakDeviceId<BT> = BaseWeakDeviceId<EthernetLinkDevice, BT>;
 /// The primary Ethernet device reference.
-pub(crate) type EthernetPrimaryDeviceId<BT> = BasePrimaryDeviceId<EthernetLinkDevice, BT>;
+pub type EthernetPrimaryDeviceId<BT> = BasePrimaryDeviceId<EthernetLinkDevice, BT>;
 
 #[cfg(any(test, feature = "testutils"))]
 mod testutil {

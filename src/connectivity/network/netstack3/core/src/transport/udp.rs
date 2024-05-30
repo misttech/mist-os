@@ -22,6 +22,13 @@ use net_types::{
     ip::{GenericOverIp, Ip, IpInvariant, IpMarked, IpVersion, IpVersionMarker, Ipv4, Ipv6},
     MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
 };
+use netstack3_base::{
+    sync::{RwLock, StrongRc},
+    trace_duration, AnyDevice, BidirectionalConverter, ContextPair, Counter, CounterContext,
+    DeviceIdContext, Inspector, InspectorDeviceExt, InstantContext, LocalAddressError,
+    ReferenceNotifiers, RemoveResourceResultWithContext, RngContext, SocketError,
+    StrongDeviceIdentifier, TracingContext, WeakDeviceIdentifier, ZonedAddressError,
+};
 use packet::{BufferMut, Nested, ParsablePacket, Serializer};
 use packet_formats::{
     ip::{IpProto, IpProtoExt},
@@ -32,15 +39,7 @@ use tracing::{debug, trace};
 
 use crate::{
     algorithm::{self, PortAllocImpl},
-    context::{
-        ContextPair, CounterContext, InstantContext, ReferenceNotifiers, RngContext, TracingContext,
-    },
-    convert::BidirectionalConverter,
-    counters::Counter,
     data_structures::socketmap::{IterShadows as _, SocketMap, Tagged},
-    device::{AnyDevice, DeviceIdContext, StrongDeviceIdentifier, WeakDeviceIdentifier},
-    error::{LocalAddressError, SocketError, ZonedAddressError},
-    inspect::{Inspector, InspectorDeviceExt},
     ip::{
         socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError},
         HopLimits, IpTransportContext, MulticastMembershipHandler, TransparentLocalDelivery,
@@ -68,8 +67,6 @@ use crate::{
         SetDualStackEnabledError, ShutdownType, SocketAddrType, SocketIpAddr, SocketMapAddrSpec,
         SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
     },
-    sync::{RemoveResourceResultWithContext, RwLock, StrongRc},
-    trace_duration,
 };
 
 #[cfg(test)]
@@ -2629,6 +2626,13 @@ mod tests {
         ip::{IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr},
         AddrAndZone, LinkLocalAddr, MulticastAddr, Scope as _, ScopeableAddress as _, ZonedAddr,
     };
+    use netstack3_base::{
+        testutil::{
+            FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,
+            MultipleDevicesId,
+        },
+        UninstantiableWrapper,
+    };
     use packet::Buf;
     use test_case::test_case;
 
@@ -2637,10 +2641,6 @@ mod tests {
         context::{
             testutil::{FakeBindingsCtx, FakeCoreCtx},
             CtxPair,
-        },
-        device::testutil::{
-            FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,
-            MultipleDevicesId,
         },
         error::RemoteAddressError,
         ip::{
@@ -2651,7 +2651,6 @@ mod tests {
         },
         socket::{datagram::MulticastInterfaceSelector, SocketIpAddrExt as _, StrictlyZonedAddr},
         testutil::{set_logger_for_test, TestIpExt as _},
-        uninstantiable::UninstantiableWrapper,
     };
 
     /// A packet received on a socket.

@@ -13,7 +13,7 @@ use lock_order::{
 
 use crate::{
     device::{
-        self,
+        self, for_any_device_id,
         socket::{
             AllSockets, AnyDeviceSockets, DeviceSocketAccessor, DeviceSocketContext,
             DeviceSocketContextTypes, DeviceSocketId, DeviceSockets, HeldSockets,
@@ -21,7 +21,7 @@ use crate::{
         },
         DeviceId, WeakDeviceId,
     },
-    for_any_device_id, BindingsContext, BindingsTypes, CoreCtx, StackState,
+    BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 
 impl<BT: BindingsTypes, L> DeviceSocketContextTypes<BT> for CoreCtx<'_, BT, L> {

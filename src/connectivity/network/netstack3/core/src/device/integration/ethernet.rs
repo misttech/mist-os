@@ -17,6 +17,7 @@ use net_types::{
     ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
     SpecifiedAddr, UnicastAddr, Witness,
 };
+use netstack3_base::DeviceIdContext;
 use packet::{Buf, BufferMut, InnerPacketBuilder as _, Serializer};
 use packet_formats::{
     ethernet::EtherType,
@@ -32,23 +33,18 @@ use crate::{
     context::{CoreTimerContext, CounterContext},
     device::{
         self,
-        arp::{ArpConfigContext, ArpContext, ArpNudCtx, ArpSenderContext, ArpState},
         ethernet::{
-            self, DynamicEthernetDeviceState, EthernetIpLinkDeviceDynamicStateContext,
-            EthernetIpLinkDeviceStaticStateContext, EthernetLinkDevice, EthernetTimerId,
-            StaticEthernetDeviceState,
+            self, DynamicEthernetDeviceState, EthernetDeviceCounters, EthernetDeviceId,
+            EthernetIpLinkDeviceDynamicStateContext, EthernetIpLinkDeviceStaticStateContext,
+            EthernetLinkDevice, EthernetTimerId, EthernetWeakDeviceId, StaticEthernetDeviceState,
         },
         queue::{
-            tx::{
-                BufVecU8Allocator, TransmitDequeueContext, TransmitQueueCommon,
-                TransmitQueueContext, TransmitQueueState,
-            },
-            DequeueState,
+            BufVecU8Allocator, DequeueState, TransmitDequeueContext, TransmitQueueCommon,
+            TransmitQueueContext, TransmitQueueState,
         },
         socket::{ParseSentFrameError, SentFrame},
-        state::IpLinkDeviceState,
-        DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTimerId, DeviceSendFrameError,
-        EthernetDeviceCounters, EthernetDeviceId, EthernetWeakDeviceId,
+        ArpConfigContext, ArpContext, ArpNudCtx, ArpSenderContext, ArpState,
+        DeviceLayerEventDispatcher, DeviceLayerTimerId, DeviceSendFrameError, IpLinkDeviceState,
     },
     ip::{
         icmp::NdpCounters,

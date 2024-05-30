@@ -22,6 +22,10 @@ use net_types::{
     ip::{AddrSubnet, Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu},
     LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
+use netstack3_base::{
+    sync::WeakRc, AnyDevice, CoreEventContext, CoreTimerContext, CounterContext, DeviceIdContext,
+    ExistsError, NotFoundError, RemoveResourceResultWithContext,
+};
 use packet::{EmptyBuf, Serializer};
 use packet_formats::icmp::{
     ndp::{NeighborSolicitation, RouterSolicitation},
@@ -29,9 +33,7 @@ use packet_formats::icmp::{
 };
 
 use crate::{
-    context::{CoreEventContext, CoreTimerContext, CounterContext},
-    device::{AnyDevice, DeviceId, DeviceIdContext, WeakDeviceId},
-    error::{ExistsError, NotFoundError},
+    device::{DeviceId, WeakDeviceId},
     filter::FilterImpl,
     ip::{
         self,
@@ -61,7 +63,6 @@ use crate::{
         AddableMetric, AddressStatus, FilterHandlerProvider, IpLayerIpExt, IpStateContext,
         Ipv4PresentAddressStatus, RawMetric, DEFAULT_TTL,
     },
-    sync::{RemoveResourceResultWithContext, WeakRc},
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 

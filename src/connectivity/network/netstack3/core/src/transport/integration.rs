@@ -8,10 +8,12 @@ use lock_order::{
     wrap::prelude::*,
 };
 use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
+use netstack3_base::{
+    CoreTimerContext, CounterContext, Uninstantiable, UninstantiableWrapper, WeakDeviceIdentifier,
+};
 
 use crate::{
-    context::{CoreTimerContext, CounterContext},
-    device::{WeakDeviceId, WeakDeviceIdentifier},
+    device::WeakDeviceId,
     socket::{datagram, MaybeDualStack},
     transport::{
         tcp::{
@@ -24,7 +26,6 @@ use crate::{
         udp::{self, UdpCounters, UdpSocketId, UdpSocketSet, UdpSocketState},
         TransportLayerTimerId,
     },
-    uninstantiable::{Uninstantiable, UninstantiableWrapper},
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 

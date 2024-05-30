@@ -11,6 +11,16 @@ use net_types::{
     ip::{Ipv4, Ipv4Addr},
     SpecifiedAddr, UnicastAddr, Witness as _,
 };
+use netstack3_base::{
+    CoreTimerContext, Counter, CounterContext, DeviceIdContext, EventContext, FrameDestination,
+    InstantBindingsTypes, LinkDevice, SendFrameContext, TimerContext, TracingContext,
+    WeakDeviceIdentifier,
+};
+use netstack3_ip::nud::{
+    self, ConfirmationFlags, DynamicNeighborUpdateSource, LinkResolutionContext, NudBindingsTypes,
+    NudConfigContext, NudContext, NudHandler, NudSenderContext, NudState, NudTimerId,
+    NudUserConfig,
+};
 use packet::{BufferMut, InnerPacketBuilder, Serializer};
 use packet_formats::{
     arp::{ArpOp, ArpPacket, ArpPacketBuilder, HType},
@@ -18,20 +28,6 @@ use packet_formats::{
 };
 use ref_cast::RefCast;
 use tracing::{debug, trace, warn};
-
-use crate::{
-    context::{
-        CoreTimerContext, CounterContext, EventContext, InstantBindingsTypes, SendFrameContext,
-        TimerContext, TracingContext,
-    },
-    counters::Counter,
-    device::{link::LinkDevice, DeviceIdContext, FrameDestination, WeakDeviceIdentifier},
-    ip::nud::{
-        self, ConfirmationFlags, DynamicNeighborUpdateSource, LinkResolutionContext,
-        NudBindingsTypes, NudConfigContext, NudContext, NudHandler, NudSenderContext, NudState,
-        NudTimerId, NudUserConfig,
-    },
-};
 
 /// A link device whose addressing scheme is supported by ARP.
 ///
@@ -139,8 +135,9 @@ pub trait ArpContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceId>>:
     + SendFrameContext<BC, ArpFrameMetadata<D, Self::DeviceId>>
     + CounterContext<ArpCounters>
 {
+    /// The inner configuration context.
     type ConfigCtx<'a>: ArpConfigContext;
-
+    /// The inner sender context.
     type ArpSenderCtx<'a>: ArpSenderContext<D, BC, DeviceId = Self::DeviceId>;
 
     /// Calls the function with a mutable reference to ARP state and the
@@ -190,6 +187,9 @@ pub trait ArpContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceId>>:
 /// An execution context for the ARP protocol that allows accessing
 /// configuration parameters.
 pub trait ArpConfigContext {
+    /// The retransmit timeout for ARP frames.
+    ///
+    /// Provided implementation always return the default RFC period.
     fn retransmit_timeout(&mut self) -> NonZeroDuration {
         NonZeroDuration::new(DEFAULT_ARP_REQUEST_PERIOD).unwrap()
     }
@@ -558,7 +558,7 @@ fn handle_packet<
 // TODO(https://fxbug.dev/42075782): allow this default to be overridden.
 //
 // [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
-const DEFAULT_ARP_REQUEST_PERIOD: Duration = crate::ip::nud::RETRANS_TIMER_DEFAULT.get();
+const DEFAULT_ARP_REQUEST_PERIOD: Duration = nud::RETRANS_TIMER_DEFAULT.get();
 
 fn send_arp_request<
     D: ArpDevice,
@@ -617,6 +617,7 @@ pub struct ArpState<D: ArpDevice, BT: NudBindingsTypes<D>> {
 }
 
 impl<D: ArpDevice, BC: NudBindingsTypes<D> + TimerContext> ArpState<D, BC> {
+    /// Creates a new `ArpState` for `device_id`.
     pub fn new<
         DeviceId: WeakDeviceIdentifier,
         CC: CoreTimerContext<ArpTimerId<D, DeviceId>, BC>,
@@ -634,7 +635,22 @@ mod tests {
     use core::iter;
 
     use net_types::ethernet::Mac;
-    use netstack3_base::IntoCoreTimerCtx;
+    use netstack3_base::{
+        socket::SocketIpAddr,
+        testutil::{
+            assert_empty, FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeInstant,
+            FakeLinkDeviceId, FakeNetworkSpec, FakeWeakDeviceId, WithFakeFrameContext,
+        },
+        CtxPair, InstantContext as _, IntoCoreTimerCtx, TimerHandler,
+    };
+    use netstack3_ip::nud::{
+        testutil::{
+            assert_dynamic_neighbor_state, assert_dynamic_neighbor_with_addr,
+            assert_neighbor_unknown,
+        },
+        DelegateNudContext, DynamicNeighborState, NudCounters, NudIcmpContext, Reachable, Stale,
+        UseDelegateNudContext,
+    };
     use packet::{Buf, ParseBuffer};
     use packet_formats::{
         arp::{peek_arp_types, ArpHardwareType, ArpNetworkType},
@@ -643,29 +659,7 @@ mod tests {
     use test_case::test_case;
 
     use super::*;
-    use crate::{
-        context::{
-            testutil::{
-                FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeNetworkSpec, WithFakeFrameContext,
-            },
-            CtxPair, InstantContext as _, TimerHandler,
-        },
-        device::{
-            ethernet::EthernetLinkDevice,
-            link::testutil::FakeLinkDeviceId,
-            testutil::{FakeDeviceId, FakeWeakDeviceId},
-        },
-        ip::nud::{
-            testutil::{
-                assert_dynamic_neighbor_state, assert_dynamic_neighbor_with_addr,
-                assert_neighbor_unknown,
-            },
-            DelegateNudContext, DynamicNeighborState, NudCounters, NudIcmpContext, Reachable,
-            Stale, UseDelegateNudContext,
-        },
-        socket::SocketIpAddr,
-        testutil::assert_empty,
-    };
+    use crate::internal::ethernet::EthernetLinkDevice;
 
     const TEST_LOCAL_IPV4: Ipv4Addr = Ipv4Addr::new([1, 2, 3, 4]);
     const TEST_REMOTE_IPV4: Ipv4Addr = Ipv4Addr::new([5, 6, 7, 8]);

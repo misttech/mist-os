@@ -16,7 +16,6 @@ use core::{
     ffi::CStr,
     fmt::Debug,
     hash::Hash,
-    num::NonZeroU64,
     ops::{Deref, DerefMut},
     time::Duration,
 };
@@ -31,6 +30,7 @@ use net_types::{
     },
     MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
+use netstack3_base::{FrameDestination, LinkDevice, RemoveResourceResult};
 use netstack3_filter::FilterTimerId;
 use packet::{Buf, BufferMut};
 use zerocopy::ByteSlice;
@@ -46,15 +46,14 @@ use crate::{
         TimerHandler, TracingContext, UnlockedCoreCtx,
     },
     device::{
-        ethernet::MaxEthernetFrameSize,
-        ethernet::{EthernetCreationProperties, EthernetLinkDevice},
-        link::LinkDevice,
-        loopback::LoopbackDeviceId,
-        DeviceClassMatcher, DeviceId, DeviceIdAndNameMatcher, DeviceLayerEventDispatcher,
-        DeviceLayerStateTypes, DeviceLayerTypes, DeviceSendFrameError, EthernetDeviceId,
-        EthernetWeakDeviceId, LoopbackCreationProperties, LoopbackDevice, PureIpDeviceId,
-        PureIpWeakDeviceId, ReceiveQueueBindingsContext, TransmitQueueBindingsContext,
-        WeakDeviceId,
+        ethernet::{
+            EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
+        },
+        loopback::{LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId},
+        pure_ip::{PureIpDeviceId, PureIpWeakDeviceId},
+        queue::{ReceiveQueueBindingsContext, TransmitQueueBindingsContext},
+        DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceLayerTypes,
+        DeviceSendFrameError, WeakDeviceId,
     },
     filter::FilterBindingsTypes,
     ip::{
@@ -93,6 +92,8 @@ pub use netstack3_base::testutil::{
     assert_empty, new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng,
     MonotonicIdentifier, TestAddrs, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
 };
+
+pub use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 
 /// NDP test utilities.
 pub mod ndp {
@@ -308,7 +309,7 @@ where
     pub fn receive_ip_packet<I: Ip, B: BufferMut>(
         &mut self,
         device: &DeviceId<BC>,
-        frame_dst: Option<crate::device::FrameDestination>,
+        frame_dst: Option<FrameDestination>,
         buffer: B,
     ) {
         let (core_ctx, bindings_ctx) = self.contexts();
@@ -325,7 +326,7 @@ where
     /// Add a route directly to the forwarding table.
     pub fn add_route(
         &mut self,
-        entry: AddableEntryEither<crate::device::DeviceId<BC>>,
+        entry: AddableEntryEither<DeviceId<BC>>,
     ) -> Result<(), AddRouteError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         match entry {
@@ -365,15 +366,14 @@ where
     /// Removes all of the routes through the device, then removes the device.
     pub fn clear_routes_and_remove_ethernet_device(
         &mut self,
-        ethernet_device: crate::device::EthernetDeviceId<BC>,
+        ethernet_device: EthernetDeviceId<BC>,
     ) {
         let device_id = ethernet_device.into();
         self.del_device_routes(&device_id);
-        let ethernet_device =
-            assert_matches!(device_id, crate::device::DeviceId::Ethernet(id) => id);
+        let ethernet_device = assert_matches!(device_id, DeviceId::Ethernet(id) => id);
         match self.core_api().device().remove_device(ethernet_device) {
-            crate::sync::RemoveResourceResult::Removed(_external_state) => {}
-            crate::sync::RemoveResourceResult::Deferred(_reference_receiver) => {
+            RemoveResourceResult::Removed(_external_state) => {}
+            RemoveResourceResult::Deferred(_reference_receiver) => {
                 panic!("failed to remove ethernet device")
             }
         }
@@ -704,12 +704,6 @@ impl FakeBindingsCtx {
 
 impl FilterBindingsTypes for FakeBindingsCtx {
     type DeviceClass = ();
-}
-
-impl DeviceClassMatcher<()> for () {
-    fn device_class_matches(&self, (): &()) -> bool {
-        unimplemented!()
-    }
 }
 
 impl WithFakeTimerContext<TimerId<FakeBindingsCtx>> for FakeBindingsCtx {
@@ -1352,20 +1346,6 @@ impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeBindingsCtx>, I, FakeInsta
     ) -> DispatchedEvent {
         let e = e.map_device(|d| d.downgrade());
         I::map_ip(e, |e| DispatchedEvent::NeighborIpv4(e), |e| DispatchedEvent::NeighborIpv6(e))
-    }
-}
-
-/// The mimum implied maximum Ethernet frame size for IPv6.
-pub const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: MaxEthernetFrameSize =
-    const_unwrap::const_unwrap_option(MaxEthernetFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU));
-
-impl DeviceIdAndNameMatcher for MonotonicIdentifier {
-    fn id_matches(&self, _id: &NonZeroU64) -> bool {
-        unimplemented!()
-    }
-
-    fn name_matches(&self, _name: &str) -> bool {
-        unimplemented!()
     }
 }
 

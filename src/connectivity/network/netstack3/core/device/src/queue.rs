@@ -4,14 +4,16 @@
 
 //! Device queues.
 
+use alloc::collections::VecDeque;
+
+use netstack3_base::WorkQueueReport;
+
+use crate::internal::base::DeviceSendFrameError;
+
 pub(crate) mod api;
 mod fifo;
 pub(crate) mod rx;
 pub(crate) mod tx;
-
-use alloc::collections::VecDeque;
-
-use crate::{device::DeviceSendFrameError, types::WorkQueueReport};
 
 /// The maximum number of elements that can be in the RX queue.
 const MAX_RX_QUEUED_LEN: usize = 10000;
@@ -19,11 +21,12 @@ const MAX_RX_QUEUED_LEN: usize = 10000;
 const MAX_TX_QUEUED_LEN: usize = 10000;
 const MAX_BATCH_SIZE: usize = 100;
 
+/// Error returned when the receive queue is full.
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) struct ReceiveQueueFullError<T>(pub T);
+pub struct ReceiveQueueFullError<T>(pub T);
 
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum TransmitQueueFrameError<S> {
+pub enum TransmitQueueFrameError<S> {
     NoQueue(DeviceSendFrameError<()>),
     QueueFull(S),
     SerializeError(S),
@@ -50,7 +53,7 @@ enum EnqueueResult {
     QueuePreviouslyWasOccupied,
 }
 
-#[cfg_attr(test, derive(Debug))]
+#[derive(Debug)]
 enum DequeueResult {
     MoreStillQueued,
     NoMoreLeft,

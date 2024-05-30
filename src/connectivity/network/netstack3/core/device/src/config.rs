@@ -5,11 +5,8 @@
 //! Device link layer configuration types.
 
 use net_types::ip::Ip;
-
-use crate::{
-    device::{Device, DeviceIdContext},
-    ip::nud::{NudUserConfig, NudUserConfigUpdate},
-};
+use netstack3_base::{Device, DeviceIdContext};
+use netstack3_ip::nud::{NudUserConfig, NudUserConfigUpdate};
 
 /// Device ARP configuration.
 #[derive(Clone, Debug)]

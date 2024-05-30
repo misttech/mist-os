@@ -43,74 +43,58 @@ pub mod testutil;
 pub(crate) mod algorithm {
     pub(crate) use netstack3_base::{simple_randomized_port_alloc, PortAllocImpl};
 }
-pub(crate) mod convert {
-    pub(crate) use netstack3_base::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};
-}
 
 pub(crate) mod data_structures {
-    pub(crate) mod ref_counted_hash_map {
-        pub(crate) use netstack3_base::ref_counted_hash_map::{
-            InsertResult, RefCountedHashSet, RemoveResult,
-        };
-    }
     pub(crate) mod socketmap {
         pub(crate) use netstack3_base::socketmap::{IterShadows, SocketMap, Tagged};
-    }
-    pub(crate) mod token_bucket {
-        pub(crate) use netstack3_base::TokenBucket;
     }
 }
 
 /// The device layer.
 pub mod device {
-    pub(crate) mod api;
-    pub(crate) mod arp;
-    pub(crate) mod base;
-    pub(crate) mod config;
-    pub(crate) mod ethernet;
-    pub(crate) mod id;
-    pub(crate) mod integration;
-    pub(crate) mod loopback;
-    pub(crate) mod pure_ip;
-    pub(crate) mod queue;
-    pub(crate) mod socket;
-    mod state;
+    pub(crate) mod integration {
+        mod base;
+        mod ethernet;
+        mod loopback;
+        mod pure_ip;
+        mod socket;
 
-    pub(crate) mod link {
-        pub(crate) use netstack3_base::LinkDevice;
-        #[cfg(test)]
-        pub(crate) mod testutil {
-            pub(crate) use netstack3_base::testutil::{FakeLinkDevice, FakeLinkDeviceId};
-        }
+        pub(crate) use base::{
+            with_device_state, with_device_state_and_core_ctx, with_ip_device_state,
+            with_ip_device_state_and_core_ctx,
+        };
     }
 
-    #[cfg(test)]
-    mod integration_tests;
+    // TODO(https://fxbug.dev/342685842): Remove this re-export.
+    pub(crate) use netstack3_device::*;
 
-    pub(crate) use base::*;
-    pub(crate) use id::*;
+    #[cfg(test)]
+    mod integration_tests {
+        mod base;
+        mod ethernet;
+        mod loopback;
+        mod pure_ip;
+        mod socket;
+    }
 
     // Re-exported types.
-    pub use base::{
-        DeviceClassMatcher, DeviceIdAndNameMatcher, DeviceLayerEventDispatcher,
-        DeviceLayerStateTypes, DeviceSendFrameError,
-    };
-    pub use config::{
-        ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration, DeviceConfigurationUpdate,
-        DeviceConfigurationUpdateError, NdpConfiguration, NdpConfigurationUpdate,
-    };
     pub use ethernet::{
-        EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize, RecvEthernetFrameMeta,
+        EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
+        MaxEthernetFrameSize, RecvEthernetFrameMeta,
     };
-    pub use id::{DeviceId, DeviceProvider, EthernetDeviceId, EthernetWeakDeviceId, WeakDeviceId};
     pub use loopback::{LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId};
+    pub use netstack3_device::{
+        ArpConfiguration, ArpConfigurationUpdate, DeviceClassMatcher, DeviceConfiguration,
+        DeviceConfigurationUpdate, DeviceConfigurationUpdateError, DeviceId,
+        DeviceIdAndNameMatcher, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceProvider,
+        DeviceSendFrameError, NdpConfiguration, NdpConfigurationUpdate, WeakDeviceId,
+    };
     pub use pure_ip::{
         PureIpDevice, PureIpDeviceCreationProperties, PureIpDeviceId,
         PureIpDeviceReceiveFrameMetadata, PureIpHeaderParams, PureIpWeakDeviceId,
     };
     pub use queue::{
-        rx::ReceiveQueueBindingsContext,
-        tx::{TransmitQueueBindingsContext, TransmitQueueConfiguration},
+        ReceiveQueueBindingsContext, TransmitQueueBindingsContext, TransmitQueueConfiguration,
     };
 }
 
@@ -294,5 +278,5 @@ pub use state::{StackState, StackStateBuilder};
 pub use time::{Instant, TimerId};
 
 // Re-export useful macros.
-pub(crate) use netstack3_base::trace_duration;
+pub use netstack3_device::for_any_device_id;
 pub use netstack3_macros::context_ip_bounds;

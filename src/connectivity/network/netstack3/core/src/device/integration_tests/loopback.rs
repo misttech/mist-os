@@ -16,9 +16,8 @@ use packet_formats::ethernet::{EthernetFrame, EthernetFrameLengthCheck};
 
 use crate::{
     device::{
-        loopback::{self, LoopbackRxQueueMeta},
-        queue::rx::ReceiveQueueContext,
-        LoopbackCreationProperties, LoopbackDevice,
+        loopback::{self, LoopbackCreationProperties, LoopbackDevice, LoopbackRxQueueMeta},
+        queue::ReceiveQueueContext,
     },
     error::NotFoundError,
     ip::{self, device::IpAddressId as _},

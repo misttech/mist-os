@@ -10,24 +10,18 @@ use core::{fmt::Debug, hash::Hash, num::NonZeroU16};
 use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::{ethernet::Mac, ip::IpVersion};
+use netstack3_base::{
+    sync::{Mutex, PrimaryRc, RwLock, StrongRc},
+    AnyDevice, ContextPair, Device, DeviceIdContext, FrameDestination, SendFrameContext,
+    StrongDeviceIdentifier as _, WeakDeviceIdentifier as _,
+};
 use packet::{BufferMut, ParsablePacket as _, Serializer};
 use packet_formats::{
     error::ParseError,
     ethernet::{EtherType, EthernetFrameLengthCheck},
 };
 
-use crate::{
-    context::{ContextPair, SendFrameContext},
-    device::{
-        AnyDevice, Device, DeviceIdContext, DeviceLayerTypes, FrameDestination,
-        StrongDeviceIdentifier as _, WeakDeviceId, WeakDeviceIdentifier as _,
-    },
-    sync::{Mutex, PrimaryRc, RwLock, StrongRc},
-};
-
-mod integration;
-#[cfg(test)]
-mod integration_tests;
+use crate::internal::{base::DeviceLayerTypes, id::WeakDeviceId};
 
 /// A selector for frames based on link-layer protocol number.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
@@ -156,24 +150,28 @@ pub struct Sockets<Id: StrongSocketId> {
     all_sockets: Mutex<AllSockets<Id>>,
 }
 
+/// The set of sockets associated with a device.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 pub struct AnyDeviceSockets<Id>(HashSet<Id>);
 
+/// A collection of all device sockets in the system.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 pub struct AllSockets<Id: StrongSocketId>(HashMap<Id, Id::Primary>);
 
+/// State held by a device socket.
 #[derive(Debug)]
 pub struct SocketState<S, D> {
     /// State provided by bindings that is held in core.
-    external_state: S,
+    pub external_state: S,
     /// The socket's target device and protocol.
     // TODO(https://fxbug.dev/42077026): Consider splitting up the state here to
     // improve performance.
     target: Mutex<Target<D>>,
 }
 
+/// A device socket's binding information.
 #[derive(Debug, Derivative)]
 #[derivative(Default(bound = ""))]
 pub struct Target<D> {
@@ -290,8 +288,8 @@ pub trait DeviceSocketAccessor<BT: DeviceSocketTypes>: SocketStateAccessor<BT> {
         cb: F,
     ) -> R;
 
-    // Executes the provided callback with mutable access to device-specific
-    // socket state.
+    /// Executes the provided callback with mutable access to device-specific
+    /// socket state.
     fn with_device_sockets_mut<
         F: FnOnce(&mut DeviceSockets<Self::SocketId>, &mut Self::DeviceSocketCoreCtx<'_>) -> R,
         R,
@@ -383,7 +381,8 @@ fn update_device_and_protocol<CC: DeviceSocketContext<BT>, BT: DeviceSocketTypes
 pub struct DeviceSocketApi<C>(C);
 
 impl<C> DeviceSocketApi<C> {
-    pub(crate) fn new(ctx: C) -> Self {
+    /// Creates a new `DeviceSocketApi` for `ctx`.
+    pub fn new(ctx: C) -> Self {
         Self(ctx)
     }
 }
@@ -629,9 +628,7 @@ pub struct ParseSentFrameError;
 
 impl SentFrame<&[u8]> {
     /// Tries to parse the given frame as an Ethernet frame.
-    pub(crate) fn try_parse_as_ethernet(
-        mut buf: &[u8],
-    ) -> Result<SentFrame<&[u8]>, ParseSentFrameError> {
+    pub fn try_parse_as_ethernet(mut buf: &[u8]) -> Result<SentFrame<&[u8]>, ParseSentFrameError> {
         packet_formats::ethernet::EthernetFrame::parse(&mut buf, EthernetFrameLengthCheck::NoCheck)
             .map_err(|_: ParseError| ParseSentFrameError)
             .map(|frame| SentFrame::Ethernet(frame.into()))
@@ -815,13 +812,16 @@ impl<Id: StrongSocketId> OrderedLockAccess<AllSockets<Id>> for Sockets<Id> {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testutils"))]
 mod testutil {
-    use crate::context::testutil::FakeBindingsCtx;
-    use crate::device::DeviceLayerStateTypes;
-    use crate::testutil::MonotonicIdentifier;
+    use core::num::NonZeroU64;
+
+    use netstack3_base::testutil::{FakeBindingsCtx, MonotonicIdentifier};
 
     use super::*;
+    use crate::internal::base::{
+        DeviceClassMatcher, DeviceIdAndNameMatcher, DeviceLayerStateTypes,
+    };
 
     impl<TimerId, Event: Debug, State> DeviceSocketTypes
         for FakeBindingsCtx<TimerId, Event, State, ()>
@@ -836,6 +836,22 @@ mod testutil {
         type LoopbackDeviceState = ();
         type PureIpDeviceState = ();
         type DeviceIdentifier = MonotonicIdentifier;
+    }
+
+    impl DeviceClassMatcher<()> for () {
+        fn device_class_matches(&self, (): &()) -> bool {
+            unimplemented!()
+        }
+    }
+
+    impl DeviceIdAndNameMatcher for MonotonicIdentifier {
+        fn id_matches(&self, _id: &NonZeroU64) -> bool {
+            unimplemented!()
+        }
+
+        fn name_matches(&self, _name: &str) -> bool {
+            unimplemented!()
+        }
     }
 
     impl<TimerId, Event: Debug, State, DeviceId> DeviceSocketBindingsContext<DeviceId>
@@ -860,18 +876,14 @@ mod tests {
 
     use const_unwrap::const_unwrap_option;
     use derivative::Derivative;
+    use netstack3_base::{
+        testutil::{
+            FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId,
+        },
+        ContextProvider, CtxPair, DeviceIdentifier,
+    };
     use packet::ParsablePacket;
     use test_case::test_case;
-
-    use crate::{
-        context::{ContextProvider, CtxPair},
-        device::{
-            testutil::{
-                FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId,
-            },
-            DeviceIdentifier,
-        },
-    };
 
     use super::*;
 
@@ -916,7 +928,7 @@ mod tests {
         raw: Vec<u8>,
     }
 
-    type FakeCoreCtx<D> = crate::context::testutil::FakeCoreCtx<FakeSockets<D>, (), D>;
+    type FakeCoreCtx<D> = netstack3_base::testutil::FakeCoreCtx<FakeSockets<D>, (), D>;
     type FakeCtx<D> = CtxPair<FakeCoreCtx<D>, FakeBindingsCtx<D>>;
     #[derive(Debug, Derivative)]
     #[derivative(Default(bound = ""))]

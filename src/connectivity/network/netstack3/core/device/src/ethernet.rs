@@ -14,6 +14,20 @@ use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, IpMarked, Ipv4, Ipv6, Mtu},
     BroadcastAddress, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
 };
+use netstack3_base::{
+    ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult},
+    sync::{Mutex, RwLock},
+    trace_duration, CoreTimerContext, Device, DeviceIdContext, FrameDestination, HandleableTimer,
+    LinkDevice, NestedIntoCoreTimerCtx, ReceivableFrameMeta, RecvFrameContext, RecvIpFrameMeta,
+    ResourceCounterContext, RngContext, SendableFrameMeta, TimerContext, TimerHandler,
+    TracingContext, WeakDeviceIdentifier,
+};
+use netstack3_ip::{
+    nud::{
+        LinkResolutionContext, NudBindingsTypes, NudHandler, NudState, NudTimerId, NudUserConfig,
+    },
+    IpTypesIpExt, WrapBroadcastMarker,
+};
 use packet::{Buf, BufferMut, Nested, Serializer};
 use packet_formats::{
     arp::{peek_arp_types, ArpHardwareType, ArpNetworkType},
@@ -24,58 +38,32 @@ use packet_formats::{
 };
 use tracing::trace;
 
-use crate::{
-    context::{
-        CoreTimerContext, HandleableTimer, NestedIntoCoreTimerCtx, ReceivableFrameMeta,
-        RecvFrameContext, ResourceCounterContext, RngContext, SendableFrameMeta, TimerContext,
-        TimerHandler,
+use crate::internal::{
+    arp::{ArpFrameMetadata, ArpPacketHandler, ArpState, ArpTimerId},
+    base::{DeviceCounters, DeviceLayerTypes, DeviceReceiveFrameSpec, EthernetDeviceCounters},
+    id::EthernetDeviceId,
+    queue::{
+        tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState},
+        DequeueState, TransmitQueueFrameError,
     },
-    data_structures::ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult},
-    device::{
-        arp::{ArpFrameMetadata, ArpPacketHandler, ArpState, ArpTimerId},
-        link::LinkDevice,
-        queue::{
-            tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState},
-            DequeueState, TransmitQueueFrameError,
-        },
-        socket::{
-            DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, EthernetHeaderParams,
-            ReceivedFrame,
-        },
-        state::{DeviceStateSpec, IpLinkDeviceState},
-        Device, DeviceCounters, DeviceIdContext, DeviceLayerTypes, DeviceReceiveFrameSpec,
-        EthernetDeviceCounters, EthernetDeviceId, FrameDestination, RecvIpFrameMeta,
-        WeakDeviceIdentifier,
+    socket::{
+        DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, EthernetHeaderParams,
+        ReceivedFrame,
     },
-    ip::{
-        nud::{
-            LinkResolutionContext, NudBindingsTypes, NudHandler, NudState, NudTimerId,
-            NudUserConfig,
-        },
-        IpTypesIpExt,
-    },
-    routes::WrapBroadcastMarker,
-    sync::{Mutex, RwLock},
-    trace_duration, TracingContext,
+    state::{DeviceStateSpec, IpLinkDeviceState},
 };
-
-pub(super) mod integration;
-#[cfg(test)]
-mod integration_tests;
 
 const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
 
 /// The execution context for an Ethernet device provided by bindings.
-pub(crate) trait EthernetIpLinkDeviceBindingsContext:
+pub trait EthernetIpLinkDeviceBindingsContext:
     RngContext + TimerContext + DeviceLayerTypes
 {
 }
 impl<BC: RngContext + TimerContext + DeviceLayerTypes> EthernetIpLinkDeviceBindingsContext for BC {}
 
 /// Provides access to an ethernet device's static state.
-pub(crate) trait EthernetIpLinkDeviceStaticStateContext:
-    DeviceIdContext<EthernetLinkDevice>
-{
+pub trait EthernetIpLinkDeviceStaticStateContext: DeviceIdContext<EthernetLinkDevice> {
     /// Calls the function with an immutable reference to the ethernet device's
     /// static state.
     fn with_static_ethernet_device_state<O, F: FnOnce(&StaticEthernetDeviceState) -> O>(
@@ -86,7 +74,7 @@ pub(crate) trait EthernetIpLinkDeviceStaticStateContext:
 }
 
 /// Provides access to an ethernet device's dynamic state.
-pub(crate) trait EthernetIpLinkDeviceDynamicStateContext<BC: EthernetIpLinkDeviceBindingsContext>:
+pub trait EthernetIpLinkDeviceDynamicStateContext<BC: EthernetIpLinkDeviceBindingsContext>:
     EthernetIpLinkDeviceStaticStateContext
 {
     /// Calls the function with the ethernet device's static state and immutable
@@ -112,7 +100,8 @@ pub(crate) trait EthernetIpLinkDeviceDynamicStateContext<BC: EthernetIpLinkDevic
     ) -> O;
 }
 
-fn send_as_ethernet_frame_to_dst<S, BC, CC>(
+/// Send an Ethernet frame `body` directly to `dst_mac` with `ether_type`.
+pub fn send_as_ethernet_frame_to_dst<S, BC, CC>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
@@ -200,7 +189,7 @@ impl MaxEthernetFrameSize {
     /// The minimum ethernet frame size.
     ///
     /// We don't care about FCS, so the minimum frame size for us is 64 - 4.
-    pub(crate) const MIN: MaxEthernetFrameSize =
+    pub const MIN: MaxEthernetFrameSize =
         MaxEthernetFrameSize(const_unwrap_option(NonZeroU32::new(60)));
 
     /// Creates from the maximum size of ethernet header and ethernet payload,
@@ -248,7 +237,8 @@ pub struct EthernetCreationProperties {
     pub max_frame_size: MaxEthernetFrameSize,
 }
 
-pub(crate) struct DynamicEthernetDeviceState {
+/// Ethernet device state that can change at runtime.
+pub struct DynamicEthernetDeviceState {
     /// The value this netstack assumes as the device's maximum frame size.
     max_frame_size: MaxEthernetFrameSize,
 
@@ -267,7 +257,8 @@ impl DynamicEthernetDeviceState {
     }
 }
 
-pub(crate) struct StaticEthernetDeviceState {
+/// Ethernet device state that is fixed after creation.
+pub struct StaticEthernetDeviceState {
     /// Mac address of the device this state is for.
     mac: UnicastAddr<Mac>,
 
@@ -278,23 +269,16 @@ pub(crate) struct StaticEthernetDeviceState {
 /// The state associated with an Ethernet device.
 pub struct EthernetDeviceState<BT: NudBindingsTypes<EthernetLinkDevice>> {
     /// Ethernet device counters.
-    counters: EthernetDeviceCounters,
-
-    /// IPv4 ARP state.
+    pub counters: EthernetDeviceCounters,
+    /// Immutable Ethernet device state.
+    pub static_state: StaticEthernetDeviceState,
+    /// Ethernet device transmit queue.
+    pub tx_queue: TransmitQueue<(), Buf<Vec<u8>>, BufVecU8Allocator>,
     ipv4_arp: Mutex<ArpState<EthernetLinkDevice, BT>>,
-
-    /// IPv6 NUD state.
     ipv6_nud: Mutex<NudState<Ipv6, EthernetLinkDevice, BT>>,
-
     ipv4_nud_config: RwLock<IpMarked<Ipv4, NudUserConfig>>,
-
     ipv6_nud_config: RwLock<IpMarked<Ipv6, NudUserConfig>>,
-
-    static_state: StaticEthernetDeviceState,
-
     dynamic_state: RwLock<DynamicEthernetDeviceState>,
-
-    tx_queue: TransmitQueue<(), Buf<Vec<u8>>, BufVecU8Allocator>,
 }
 
 impl<BT: DeviceLayerTypes, I: Ip> OrderedLockAccess<IpMarked<I, NudUserConfig>>
@@ -385,6 +369,7 @@ fn deliver_as(
 /// `D` is the type of device ID that identifies different Ethernet devices.
 #[derive(Clone, Eq, PartialEq, Debug, Hash, GenericOverIp)]
 #[generic_over_ip()]
+#[allow(missing_docs)]
 pub enum EthernetTimerId<D: WeakDeviceIdentifier> {
     Arp(ArpTimerId<EthernetLinkDevice, D>),
     Nudv6(NudTimerId<Ipv6, EthernetLinkDevice, D>),
@@ -419,7 +404,7 @@ where
 /// serializer. It computes the routing information, serializes
 /// the serializer, and sends the resulting buffer in a new Ethernet
 /// frame.
-pub(super) fn send_ip_frame<BC, CC, A, S>(
+pub fn send_ip_frame<BC, CC, A, S>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
@@ -629,10 +614,7 @@ where
 }
 
 /// Set the promiscuous mode flag on `device_id`.
-// NB: We don't currently have a need to expose this function so it's defined as
-// testonly.
-#[cfg(test)]
-pub(super) fn set_promiscuous_mode<
+pub fn set_promiscuous_mode<
     BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
@@ -660,7 +642,7 @@ pub(super) fn set_promiscuous_mode<
 /// `join_link_multicast` is different from [`join_ip_multicast`] as
 /// `join_link_multicast` joins an L2 multicast group, whereas
 /// `join_ip_multicast` joins an L3 multicast group.
-pub(super) fn join_link_multicast<
+pub fn join_link_multicast<
     BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
@@ -707,7 +689,7 @@ pub(super) fn join_link_multicast<
 /// # Panics
 ///
 /// If `device_id` is not in the multicast group `multicast_addr`.
-pub(super) fn leave_link_multicast<
+pub fn leave_link_multicast<
     BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
@@ -741,7 +723,7 @@ pub(super) fn leave_link_multicast<
 }
 
 /// Get the MTU associated with this device.
-pub(super) fn get_mtu<
+pub fn get_mtu<
     BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
@@ -820,7 +802,8 @@ where
     }
 }
 
-pub(super) fn get_mac<
+/// Gets `device_id`'s MAC address.
+pub fn get_mac<
     'a,
     BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
@@ -831,7 +814,8 @@ pub(super) fn get_mac<
     core_ctx.with_static_ethernet_device_state(device_id, |state| state.mac)
 }
 
-pub(super) fn set_mtu<
+/// Sets `device_id`'s MTU.
+pub fn set_mtu<
     BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
@@ -899,29 +883,36 @@ impl DeviceStateSpec for EthernetLinkDevice {
     const DEBUG_TYPE: &'static str = "Ethernet";
 }
 
+#[cfg(any(test, feature = "testutils"))]
+pub(crate) mod testutil {
+    use super::*;
+
+    /// The mimum implied maximum Ethernet frame size for IPv6.
+    pub const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: MaxEthernetFrameSize =
+        const_unwrap::const_unwrap_option(MaxEthernetFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU));
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::vec;
 
     use net_types::ip::{Ipv4Addr, Ipv6Addr};
-    use netstack3_base::IntoCoreTimerCtx;
+    use netstack3_base::{
+        testutil::{FakeDeviceId, FakeInstant, FakeWeakDeviceId, TEST_ADDRS_V4},
+        CounterContext, CtxPair, IntoCoreTimerCtx,
+    };
+    use netstack3_ip::nud::{
+        self, DelegateNudContext, DynamicNeighborUpdateSource, NeighborApi, UseDelegateNudContext,
+    };
     use packet_formats::testutil::parse_ethernet_frame;
 
     use super::*;
-    use crate::{
-        context::{testutil::FakeInstant, CounterContext, CtxPair},
-        device::{
-            arp::{ArpConfigContext, ArpContext, ArpCounters, ArpNudCtx, ArpSenderContext},
-            queue::tx::{TransmitQueueBindingsContext, TransmitQueueCommon, TransmitQueueContext},
-            socket::{Frame, ParseSentFrameError, SentFrame},
-            testutil::{FakeDeviceId, FakeWeakDeviceId},
-            DeviceSendFrameError,
-        },
-        ip::nud::{
-            self, DelegateNudContext, DynamicNeighborUpdateSource, NeighborApi,
-            UseDelegateNudContext,
-        },
-        testutil::{IPV6_MIN_IMPLIED_MAX_FRAME_SIZE, TEST_ADDRS_V4},
+    use crate::internal::{
+        arp::{ArpConfigContext, ArpContext, ArpCounters, ArpNudCtx, ArpSenderContext},
+        base::DeviceSendFrameError,
+        ethernet::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+        queue::tx::{TransmitQueueBindingsContext, TransmitQueueCommon, TransmitQueueContext},
+        socket::{Frame, ParseSentFrameError, SentFrame},
     };
 
     struct FakeEthernetCtx {
@@ -948,7 +939,7 @@ mod tests {
         }
     }
 
-    type FakeBindingsCtx = crate::context::testutil::FakeBindingsCtx<
+    type FakeBindingsCtx = netstack3_base::testutil::FakeBindingsCtx<
         EthernetTimerId<FakeWeakDeviceId<FakeDeviceId>>,
         nud::Event<Mac, FakeDeviceId, Ipv4, FakeInstant>,
         (),
@@ -956,7 +947,7 @@ mod tests {
     >;
 
     type FakeInnerCtx =
-        crate::context::testutil::FakeCoreCtx<FakeEthernetCtx, FakeDeviceId, FakeDeviceId>;
+        netstack3_base::testutil::FakeCoreCtx<FakeEthernetCtx, FakeDeviceId, FakeDeviceId>;
 
     struct FakeCoreCtx {
         arp_state: ArpState<EthernetLinkDevice, FakeBindingsCtx>,

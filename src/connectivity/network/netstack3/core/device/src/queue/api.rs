@@ -6,32 +6,31 @@
 
 use core::marker::PhantomData;
 
-use crate::{
-    context::ContextPair,
-    device::{
-        queue::{
-            fifo,
-            rx::{
-                ReceiveDequeContext, ReceiveDequeFrameContext as _, ReceiveQueueBindingsContext,
-                ReceiveQueueContext as _, ReceiveQueueState,
-            },
-            tx::{
-                self, TransmitDequeueContext, TransmitQueueBindingsContext, TransmitQueueCommon,
-                TransmitQueueConfiguration, TransmitQueueContext as _, TransmitQueueState,
-            },
-            DequeueResult, DequeueState, MAX_BATCH_SIZE,
+use netstack3_base::{ContextPair, Device, DeviceIdContext, WorkQueueReport};
+
+use crate::internal::{
+    base::DeviceSendFrameError,
+    queue::{
+        fifo,
+        rx::{
+            ReceiveDequeContext, ReceiveDequeFrameContext as _, ReceiveQueueBindingsContext,
+            ReceiveQueueContext as _, ReceiveQueueState,
         },
-        socket::DeviceSocketHandler,
-        Device, DeviceIdContext, DeviceSendFrameError,
+        tx::{
+            self, TransmitDequeueContext, TransmitQueueBindingsContext, TransmitQueueCommon,
+            TransmitQueueConfiguration, TransmitQueueContext as _, TransmitQueueState,
+        },
+        DequeueResult, DequeueState, MAX_BATCH_SIZE,
     },
-    types::WorkQueueReport,
+    socket::DeviceSocketHandler,
 };
 
 /// An API to interact with device `D` transmit queues.
 pub struct TransmitQueueApi<D, C>(C, PhantomData<D>);
 
 impl<D, C> TransmitQueueApi<D, C> {
-    pub(crate) fn new(ctx: C) -> Self {
+    /// Creates a new [`TransmitQueueApi`] from `ctx`.
+    pub fn new(ctx: C) -> Self {
         Self(ctx, PhantomData)
     }
 }
@@ -175,7 +174,8 @@ where
 pub struct ReceiveQueueApi<D, C>(C, PhantomData<D>);
 
 impl<D, C> ReceiveQueueApi<D, C> {
-    pub(crate) fn new(ctx: C) -> Self {
+    /// Creates a new [`ReceiveQueueApi`] from `ctx`.
+    pub fn new(ctx: C) -> Self {
         Self(ctx, PhantomData)
     }
 }

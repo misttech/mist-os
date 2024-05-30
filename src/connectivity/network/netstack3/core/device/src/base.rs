@@ -14,36 +14,26 @@ use net_types::{
     ethernet::Mac,
     ip::{Ip, IpVersion, Ipv4, Ipv6},
 };
+use netstack3_base::{
+    sync::RwLock, Counter, Device, DeviceIdContext, HandleableTimer, Inspectable, Inspector,
+    InstantContext, ReferenceNotifiers, TimerBindingsTypes, TimerHandler,
+};
+use netstack3_filter::FilterBindingsTypes;
+use netstack3_ip::nud::{LinkResolutionContext, NudCounters};
 use packet::Buf;
 
-use crate::{
-    context::{
-        HandleableTimer, InstantContext, ReferenceNotifiers, TimerBindingsTypes, TimerHandler,
+use crate::internal::{
+    arp::ArpCounters,
+    ethernet::{EthernetLinkDevice, EthernetTimerId},
+    id::{
+        BaseDeviceId, BasePrimaryDeviceId, DeviceId, EthernetDeviceId, EthernetPrimaryDeviceId,
+        EthernetWeakDeviceId,
     },
-    counters::Counter,
-    device::{
-        arp::ArpCounters,
-        ethernet::{EthernetLinkDevice, EthernetTimerId},
-        id::{
-            BaseDeviceId, BasePrimaryDeviceId, DeviceId, EthernetDeviceId, EthernetPrimaryDeviceId,
-            EthernetWeakDeviceId,
-        },
-        loopback::{LoopbackDeviceId, LoopbackPrimaryDeviceId},
-        pure_ip::{PureIpDeviceId, PureIpPrimaryDeviceId},
-        queue::{rx::ReceiveQueueBindingsContext, tx::TransmitQueueBindingsContext},
-        socket::{self, HeldSockets},
-        state::DeviceStateSpec,
-    },
-    filter::FilterBindingsTypes,
-    inspect::Inspectable,
-    ip::nud::{LinkResolutionContext, NudCounters},
-    sync::RwLock,
-    Inspector,
-};
-
-pub(crate) use netstack3_base::{
-    AnyDevice, Device, DeviceIdAnyCompatContext, DeviceIdContext, EitherDeviceId, FrameDestination,
-    RecvIpFrameMeta,
+    loopback::{LoopbackDeviceId, LoopbackPrimaryDeviceId},
+    pure_ip::{PureIpDeviceId, PureIpPrimaryDeviceId},
+    queue::{rx::ReceiveQueueBindingsContext, tx::TransmitQueueBindingsContext},
+    socket::{self, HeldSockets},
+    state::DeviceStateSpec,
 };
 
 /// Iterator over devices.
@@ -72,6 +62,8 @@ impl<'s, BT: DeviceLayerTypes> Iterator for DevicesIter<'s, BT> {
     }
 }
 
+/// Supported link layer address types for IPv6.
+#[allow(missing_docs)]
 pub enum Ipv6DeviceLinkLayerAddr {
     Mac(Mac),
     // Add other link-layer address types as needed.
@@ -94,7 +86,7 @@ impl AsRef<[u8]> for Ipv6DeviceLinkLayerAddr {
     Hash(bound = ""),
     Debug(bound = "")
 )]
-pub(crate) struct DeviceLayerTimerId<BT: DeviceLayerTypes>(DeviceLayerTimerIdInner<BT>);
+pub struct DeviceLayerTimerId<BT: DeviceLayerTypes>(DeviceLayerTimerIdInner<BT>);
 
 #[derive(Derivative)]
 #[derivative(
@@ -104,8 +96,8 @@ pub(crate) struct DeviceLayerTimerId<BT: DeviceLayerTypes>(DeviceLayerTimerIdInn
     Hash(bound = ""),
     Debug(bound = "")
 )]
+#[allow(missing_docs)]
 enum DeviceLayerTimerIdInner<BT: DeviceLayerTypes> {
-    /// A timer event for an Ethernet device.
     Ethernet(EthernetTimerId<EthernetWeakDeviceId<BT>>),
 }
 
@@ -130,46 +122,57 @@ where
     }
 }
 
+/// The collection of devices within [`DeviceLayerState`].
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 pub struct Devices<BT: DeviceLayerTypes> {
-    pub(super) ethernet: HashMap<EthernetDeviceId<BT>, EthernetPrimaryDeviceId<BT>>,
-    pub(super) pure_ip: HashMap<PureIpDeviceId<BT>, PureIpPrimaryDeviceId<BT>>,
-    pub(super) loopback: Option<LoopbackPrimaryDeviceId<BT>>,
+    /// Collection of Ethernet devices.
+    pub ethernet: HashMap<EthernetDeviceId<BT>, EthernetPrimaryDeviceId<BT>>,
+    /// Collection of PureIP devices.
+    pub pure_ip: HashMap<PureIpDeviceId<BT>, PureIpPrimaryDeviceId<BT>>,
+    /// The loopback device, if installed.
+    pub loopback: Option<LoopbackPrimaryDeviceId<BT>>,
+}
+
+impl<BT: DeviceLayerTypes> Devices<BT> {
+    /// Gets an iterator over available devices.
+    pub fn iter(&self) -> DevicesIter<'_, BT> {
+        let Self { ethernet, pure_ip, loopback } = self;
+        DevicesIter {
+            ethernet: ethernet.values(),
+            pure_ip: pure_ip.values(),
+            loopback: loopback.iter(),
+        }
+    }
 }
 
 /// The state associated with the device layer.
+#[derive(Derivative)]
+#[derivative(Default(bound = ""))]
 pub struct DeviceLayerState<BT: DeviceLayerTypes> {
-    pub(super) devices: RwLock<Devices<BT>>,
-    pub(super) origin: OriginTracker,
-    pub(super) shared_sockets: HeldSockets<BT>,
-    pub(super) counters: DeviceCounters,
-    pub(super) ethernet_counters: EthernetDeviceCounters,
-    pub(super) pure_ip_counters: PureIpDeviceCounters,
-    pub(super) nud_v4_counters: NudCounters<Ipv4>,
-    pub(super) nud_v6_counters: NudCounters<Ipv6>,
-    pub(super) arp_counters: ArpCounters,
+    devices: RwLock<Devices<BT>>,
+    /// Device layer origin tracker.
+    pub origin: OriginTracker,
+    /// Collection of all device sockets.
+    pub shared_sockets: HeldSockets<BT>,
+    /// Common device counters.
+    pub counters: DeviceCounters,
+    /// Ethernet counters.
+    pub ethernet_counters: EthernetDeviceCounters,
+    /// PureIp counters.
+    pub pure_ip_counters: PureIpDeviceCounters,
+    /// IPv4 NUD counters.
+    pub nud_v4_counters: NudCounters<Ipv4>,
+    /// IPv6 NUD counters.
+    pub nud_v6_counters: NudCounters<Ipv6>,
+    /// ARP counters.
+    pub arp_counters: ArpCounters,
 }
 
 impl<BT: DeviceLayerTypes> DeviceLayerState<BT> {
-    pub(crate) fn counters(&self) -> &DeviceCounters {
-        &self.counters
-    }
-
-    pub(crate) fn ethernet_counters(&self) -> &EthernetDeviceCounters {
-        &self.ethernet_counters
-    }
-
-    pub(crate) fn pure_ip_counters(&self) -> &PureIpDeviceCounters {
-        &self.pure_ip_counters
-    }
-
-    pub(crate) fn nud_counters<I: Ip>(&self) -> &NudCounters<I> {
+    /// Helper to access NUD counters for an IP version.
+    pub fn nud_counters<I: Ip>(&self) -> &NudCounters<I> {
         I::map_ip((), |()| &self.nud_v4_counters, |()| &self.nud_v6_counters)
-    }
-
-    pub(crate) fn arp_counters(&self) -> &ArpCounters {
-        &self.arp_counters
     }
 }
 
@@ -195,7 +198,13 @@ pub struct EthernetDeviceCounters {
 impl Inspectable for EthernetDeviceCounters {
     fn record<I: Inspector>(&self, inspector: &mut I) {
         inspector.record_child("Ethernet", |inspector| {
-            crate::counters::inspect_ethernet_device_counters(inspector, self)
+            let Self { recv_ethernet_other_dest, recv_no_ethertype, recv_unsupported_ethertype } =
+                self;
+            inspector.record_child("Rx", |inspector| {
+                inspector.record_counter("NonLocalDstAddr", recv_ethernet_other_dest);
+                inspector.record_counter("NoEthertype", recv_no_ethertype);
+                inspector.record_counter("UnsupportedEthertype", recv_unsupported_ethertype);
+            });
         })
     }
 }
@@ -238,7 +247,34 @@ pub struct DeviceCounters {
 
 impl Inspectable for DeviceCounters {
     fn record<I: Inspector>(&self, inspector: &mut I) {
-        crate::counters::inspect_device_counters(inspector, self)
+        let Self {
+            recv_frame,
+            recv_ipv4_delivered,
+            recv_ipv6_delivered,
+            recv_parse_error,
+            send_dropped_no_queue,
+            send_frame,
+            send_ipv4_frame,
+            send_ipv6_frame,
+            send_queue_full,
+            send_serialize_error,
+            send_total_frames,
+        } = self;
+        inspector.record_child("Rx", |inspector| {
+            inspector.record_counter("TotalFrames", recv_frame);
+            inspector.record_counter("Malformed", recv_parse_error);
+            inspector.record_counter("Ipv4Delivered", recv_ipv4_delivered);
+            inspector.record_counter("Ipv6Delivered", recv_ipv6_delivered);
+        });
+        inspector.record_child("Tx", |inspector| {
+            inspector.record_counter("TotalFrames", send_total_frames);
+            inspector.record_counter("Sent", send_frame);
+            inspector.record_counter("SendIpv4Frame", send_ipv4_frame);
+            inspector.record_counter("SendIpv6Frame", send_ipv6_frame);
+            inspector.record_counter("NoQueue", send_dropped_no_queue);
+            inspector.record_counter("QueueFull", send_queue_full);
+            inspector.record_counter("SerializeError", send_serialize_error);
+        });
     }
 }
 /// Light-weight tracker for recording the source of some instance.
@@ -253,6 +289,12 @@ impl Inspectable for DeviceCounters {
 // the device module and apply to more places.
 #[derive(Clone, Debug, PartialEq)]
 pub struct OriginTracker(#[cfg(debug_assertions)] u64);
+
+impl Default for OriginTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl OriginTracker {
     /// Creates a new `OriginTracker` that isn't derived from any other
@@ -304,25 +346,6 @@ pub trait DeviceCollectionContext<D: Device + DeviceStateSpec, BT: DeviceLayerTy
 pub trait DeviceReceiveFrameSpec {
     /// The frame metadata for ingress frames, where `D` is a device identifier.
     type FrameMetadata<D>;
-}
-
-impl<BC: DeviceLayerTypes + socket::DeviceSocketBindingsContext<DeviceId<BC>>>
-    DeviceLayerState<BC>
-{
-    /// Creates a new [`DeviceLayerState`] instance.
-    pub(crate) fn new() -> Self {
-        Self {
-            devices: Default::default(),
-            origin: OriginTracker::new(),
-            shared_sockets: Default::default(),
-            counters: Default::default(),
-            ethernet_counters: EthernetDeviceCounters::default(),
-            pure_ip_counters: PureIpDeviceCounters::default(),
-            nud_v4_counters: Default::default(),
-            nud_v6_counters: Default::default(),
-            arp_counters: Default::default(),
-        }
-    }
 }
 
 /// Provides associated types used in the device layer.
@@ -424,15 +447,6 @@ pub trait DeviceLayerEventDispatcher:
 pub enum DeviceSendFrameError<T> {
     /// The device is not ready to send frames.
     DeviceNotReady(T),
-}
-
-#[cfg(test)]
-pub(crate) mod testutil {
-    #[cfg(test)]
-    pub(crate) use netstack3_base::testutil::{
-        FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,
-        MultipleDevicesId,
-    };
 }
 
 #[cfg(test)]

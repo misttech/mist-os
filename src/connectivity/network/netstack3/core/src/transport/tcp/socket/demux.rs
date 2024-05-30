@@ -10,6 +10,10 @@ use core::{fmt::Debug, num::NonZeroU16};
 
 use assert_matches::assert_matches;
 use net_types::SpecifiedAddr;
+use netstack3_base::{
+    trace_duration, BidirectionalConverter as _, CounterContext, CtxPair, EitherDeviceId,
+    NotFoundError, StrongDeviceIdentifier as _, WeakDeviceIdentifier,
+};
 use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder as _, Serializer};
 use packet_formats::{
     error::ParseError,
@@ -23,10 +27,6 @@ use thiserror::Error;
 use tracing::{debug, error, warn};
 
 use crate::{
-    context::{CounterContext, CtxPair},
-    convert::BidirectionalConverter as _,
-    device::{EitherDeviceId, StrongDeviceIdentifier as _, WeakDeviceIdentifier},
-    error::NotFoundError,
     filter::TransportPacketSerializer,
     ip::{
         socket::MmsError, IpSockCreationError, IpTransportContext, TransparentLocalDelivery,
@@ -36,7 +36,6 @@ use crate::{
         AddrIsMappedError, AddrVec, AddrVecIter, ConnAddr, ConnIpAddr, InsertError, ListenerAddr,
         ListenerIpAddr, SocketIpAddr, SocketIpAddrExt as _,
     },
-    trace_duration,
     transport::tcp::{
         self,
         buffer::SendPayload,

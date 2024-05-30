@@ -12,26 +12,23 @@ use lock_order::{
     wrap::LockedWrapperApi,
 };
 use net_types::ip::Ip;
+use netstack3_base::DeviceIdContext;
 use packet::Buf;
 
 use crate::{
     device::{
-        config::DeviceConfigurationContext,
         pure_ip::{
             DynamicPureIpDeviceState, PureIpDevice, PureIpDeviceCounters, PureIpDeviceId,
             PureIpDeviceStateContext, PureIpDeviceTxQueueFrameMetadata, PureIpPrimaryDeviceId,
             PureIpWeakDeviceId,
         },
         queue::{
-            tx::{
-                BufVecU8Allocator, TransmitDequeueContext, TransmitQueueCommon,
-                TransmitQueueContext, TransmitQueueState,
-            },
-            DequeueState,
+            BufVecU8Allocator, DequeueState, TransmitDequeueContext, TransmitQueueCommon,
+            TransmitQueueContext, TransmitQueueState,
         },
         socket::{IpFrame, ParseSentFrameError, SentFrame},
-        state::IpLinkDeviceState,
-        DeviceCollectionContext, DeviceIdContext, DeviceLayerEventDispatcher, DeviceSendFrameError,
+        DeviceCollectionContext, DeviceConfigurationContext, DeviceLayerEventDispatcher,
+        DeviceSendFrameError, IpLinkDeviceState,
     },
     neighbor::NudUserConfig,
     BindingsContext, BindingsTypes, CoreCtx,

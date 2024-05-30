@@ -6,36 +6,30 @@
 
 use core::fmt::Debug;
 
-#[cfg(test)]
-use assert_matches::assert_matches;
 use derivative::Derivative;
+use netstack3_base::{sync::Mutex, Device, DeviceIdContext};
 use packet::BufferMut;
 
-use crate::{
-    device::{
-        queue::{fifo, DequeueState, EnqueueResult, ReceiveQueueFullError},
-        Device, DeviceIdContext,
-    },
-    sync::Mutex,
-};
+use crate::internal::queue::{fifo, DequeueState, EnqueueResult, ReceiveQueueFullError};
 
 /// The state used to hold a queue of received frames to be handled at a later
 /// time.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
-pub(crate) struct ReceiveQueueState<Meta, Buffer> {
+pub struct ReceiveQueueState<Meta, Buffer> {
     pub(super) queue: fifo::Queue<Meta, Buffer>,
 }
 
+#[cfg(any(test, feature = "testutils"))]
 impl<Meta, Buffer> ReceiveQueueState<Meta, Buffer> {
-    #[cfg(test)]
-    pub(crate) fn take_frames(&mut self) -> impl Iterator<Item = (Meta, Buffer)> + '_ {
+    /// Takes all the pending frames from the receive queue.
+    pub fn take_frames(&mut self) -> impl Iterator<Item = (Meta, Buffer)> {
         let Self { queue } = self;
         let mut vec = Default::default();
-        assert_matches!(
+        assert_matches::assert_matches!(
             queue.dequeue_into(&mut vec, usize::MAX),
-            crate::device::queue::DequeueResult::NoMoreLeft
+            crate::internal::queue::DequeueResult::NoMoreLeft
         );
         vec.into_iter()
     }
@@ -52,9 +46,10 @@ pub trait ReceiveQueueBindingsContext<DeviceId> {
     fn wake_rx_task(&mut self, device_id: &DeviceId);
 }
 
+/// Holds queue and dequeue state for the receive queue.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct ReceiveQueue<Meta, Buffer> {
+pub struct ReceiveQueue<Meta, Buffer> {
     /// The state for dequeued frames that will be handled.
     ///
     /// See `queue` for lock ordering.
@@ -66,6 +61,7 @@ pub(crate) struct ReceiveQueue<Meta, Buffer> {
     pub(crate) queue: Mutex<ReceiveQueueState<Meta, Buffer>>,
 }
 
+/// Defines opaque types for frames in the receive queue.
 pub trait ReceiveQueueTypes<D: Device, BC>: DeviceIdContext<D> {
     /// Metadata associated with an RX frame.
     type Meta;
@@ -95,7 +91,9 @@ pub trait ReceiveDequeFrameContext<D: Device, BC>: ReceiveQueueTypes<D, BC> {
     );
 }
 
+/// The core execution context for dequeuing frames from the receive queue.
 pub trait ReceiveDequeContext<D: Device, BC>: ReceiveQueueTypes<D, BC> {
+    /// The inner dequeueing context.
     type ReceiveQueueCtx<'a>: ReceiveQueueContext<
             D,
             BC,
@@ -122,7 +120,7 @@ pub trait ReceiveDequeContext<D: Device, BC>: ReceiveQueueTypes<D, BC> {
 }
 
 /// An implementation of a receive queue, with a buffer.
-pub(crate) trait ReceiveQueueHandler<D: Device, BC>: ReceiveQueueTypes<D, BC> {
+pub trait ReceiveQueueHandler<D: Device, BC>: ReceiveQueueTypes<D, BC> {
     /// Queues a frame for reception.
     ///
     /// # Errors
@@ -165,19 +163,13 @@ mod tests {
 
     use alloc::{vec, vec::Vec};
 
+    use netstack3_base::{
+        testutil::{FakeBindingsCtx, FakeCoreCtx, FakeLinkDevice, FakeLinkDeviceId},
+        ContextPair, CtxPair, WorkQueueReport,
+    };
     use packet::Buf;
 
-    use crate::{
-        context::{
-            testutil::{FakeBindingsCtx, FakeCoreCtx},
-            CtxPair,
-        },
-        device::{
-            link::testutil::{FakeLinkDevice, FakeLinkDeviceId},
-            queue::{api::ReceiveQueueApi, MAX_BATCH_SIZE, MAX_RX_QUEUED_LEN},
-        },
-        types::WorkQueueReport,
-    };
+    use crate::internal::queue::{api::ReceiveQueueApi, MAX_BATCH_SIZE, MAX_RX_QUEUED_LEN};
 
     #[derive(Default)]
     struct FakeRxQueueState {
@@ -245,13 +237,13 @@ mod tests {
     }
 
     /// A trait providing a shortcut to instantiate a [`TransmitQueueApi`] from a context.
-    trait ReceiveQueueApiExt: crate::context::ContextPair + Sized {
+    trait ReceiveQueueApiExt: ContextPair + Sized {
         fn receive_queue_api<D>(&mut self) -> ReceiveQueueApi<D, &mut Self> {
             ReceiveQueueApi::new(self)
         }
     }
 
-    impl<O> ReceiveQueueApiExt for O where O: crate::context::ContextPair + Sized {}
+    impl<O> ReceiveQueueApiExt for O where O: ContextPair + Sized {}
 
     #[test]
     fn queue_and_dequeue() {

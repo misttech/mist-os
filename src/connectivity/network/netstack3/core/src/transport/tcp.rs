@@ -19,6 +19,7 @@ use core::{
 
 use const_unwrap::const_unwrap_option;
 use net_types::ip::{GenericOverIp, Ip, IpMarked, IpVersion};
+use netstack3_base::{Counter, WeakDeviceIdentifier};
 use packet_formats::{
     icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode},
     utils::NonZeroDuration,
@@ -26,8 +27,6 @@ use packet_formats::{
 use rand::Rng;
 
 use crate::{
-    counters::Counter,
-    device::WeakDeviceIdentifier,
     ip::{
         icmp::{IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode},
         socket::Mms,

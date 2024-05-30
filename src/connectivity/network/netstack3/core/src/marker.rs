@@ -8,15 +8,16 @@
 //! exposing the internal traits directly.
 
 use net_types::ip::{Ipv4, Ipv6};
+use netstack3_base::{
+    AnyDevice, CounterContext, DeviceIdContext, InstantBindingsTypes, ReferenceNotifiers,
+    RngContext, TimerBindingsTypes, TracingContext,
+};
 
 use crate::{
-    context::{
-        CounterContext, InstantBindingsTypes, ReferenceNotifiers, RngContext, TimerBindingsTypes,
-        TracingContext,
-    },
     device::{
-        self, AnyDevice, DeviceId, DeviceIdContext, DeviceLayerTypes, EthernetDeviceId,
-        EthernetLinkDevice, EthernetWeakDeviceId, WeakDeviceId,
+        self,
+        ethernet::{EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId},
+        DeviceId, DeviceLayerTypes, WeakDeviceId,
     },
     filter::{FilterBindingsContext, FilterBindingsTypes},
     ip::{

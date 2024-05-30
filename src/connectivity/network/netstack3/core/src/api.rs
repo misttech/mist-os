@@ -10,9 +10,9 @@ use crate::{
     context::{ContextPair as _, ContextProvider, CoreCtx, CtxPair, TimerHandler as _},
     counters::CountersApi,
     device::{
-        api::{DeviceAnyApi, DeviceApi},
-        queue::api::{ReceiveQueueApi, TransmitQueueApi},
+        queue::{ReceiveQueueApi, TransmitQueueApi},
         socket::DeviceSocketApi,
+        DeviceAnyApi, DeviceApi,
     },
     filter::FilterApi,
     ip::{

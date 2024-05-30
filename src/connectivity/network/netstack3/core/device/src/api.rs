@@ -8,39 +8,40 @@ use alloc::fmt::Debug;
 use core::marker::PhantomData;
 
 use net_types::ip::{Ipv4, Ipv6};
+use netstack3_base::{
+    AnyDevice, ContextPair, CoreTimerContext, Device, DeviceIdAnyCompatContext, DeviceIdContext,
+    Inspector, RecvFrameContext, ReferenceNotifiers, ReferenceNotifiersExt as _,
+    RemoveResourceResultWithContext, ResourceCounterContext, TimerContext,
+};
+use netstack3_ip::{
+    self as ip,
+    device::{
+        IpAddressIdSpecContext, IpDeviceBindingsContext, IpDeviceConfigurationContext,
+        IpDeviceTimerId, Ipv6DeviceConfigurationContext,
+    },
+    RawMetric,
+};
 use packet::BufferMut;
 use tracing::debug;
 
-use crate::{
-    context::{
-        ContextPair, CoreTimerContext, RecvFrameContext, ReferenceNotifiers,
-        ReferenceNotifiersExt as _, ResourceCounterContext, TimerContext,
-    },
-    device::{
-        config::{
-            ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration,
-            DeviceConfigurationContext, DeviceConfigurationUpdate, DeviceConfigurationUpdateError,
-            NdpConfiguration, NdpConfigurationUpdate,
-        },
-        ethernet::EthernetLinkDevice,
-        loopback::LoopbackDevice,
-        pure_ip::PureIpDevice,
-        state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceStateInner},
-        AnyDevice, BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, Device,
-        DeviceCollectionContext, DeviceCounters, DeviceId, DeviceIdAnyCompatContext,
-        DeviceIdContext, DeviceLayerStateTypes, DeviceLayerTypes, DeviceProvider,
+use crate::internal::{
+    base::{
+        DeviceCollectionContext, DeviceCounters, DeviceLayerStateTypes, DeviceLayerTypes,
         DeviceReceiveFrameSpec, OriginTrackerContext,
     },
-    for_any_device_id,
-    ip::{
-        device::{
-            IpAddressIdSpecContext, IpDeviceBindingsContext, IpDeviceConfigurationContext,
-            IpDeviceTimerId, Ipv6DeviceConfigurationContext,
-        },
-        RawMetric,
+    config::{
+        ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration, DeviceConfigurationContext,
+        DeviceConfigurationUpdate, DeviceConfigurationUpdateError, NdpConfiguration,
+        NdpConfigurationUpdate,
     },
-    sync::RemoveResourceResultWithContext,
-    Inspector,
+    ethernet::EthernetLinkDevice,
+    id::{
+        for_any_device_id, BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, DeviceId,
+        DeviceProvider,
+    },
+    loopback::LoopbackDevice,
+    pure_ip::PureIpDevice,
+    state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceStateInner},
 };
 
 /// Pending device configuration update.
@@ -57,7 +58,8 @@ pub struct PendingDeviceConfigurationUpdate<'a, D>(DeviceConfigurationUpdate, &'
 pub struct DeviceApi<D, C>(C, PhantomData<D>);
 
 impl<D, C> DeviceApi<D, C> {
-    pub(crate) fn new(ctx: C) -> Self {
+    /// Creates a new [`DeviceApi`] from `ctx`.
+    pub fn new(ctx: C) -> Self {
         Self(ctx, PhantomData)
     }
 }
@@ -170,8 +172,8 @@ where
         let (core_ctx, bindings_ctx) = self.contexts();
         {
             let device = device.clone().into();
-            crate::ip::device::clear_ipv4_device_state(core_ctx, bindings_ctx, &device);
-            crate::ip::device::clear_ipv6_device_state(core_ctx, bindings_ctx, &device);
+            ip::device::clear_ipv4_device_state(core_ctx, bindings_ctx, &device);
+            ip::device::clear_ipv6_device_state(core_ctx, bindings_ctx, &device);
         };
 
         tracing::debug!("removing {device:?}");
@@ -300,7 +302,8 @@ where
 pub struct DeviceAnyApi<C>(C);
 
 impl<C> DeviceAnyApi<C> {
-    pub(crate) fn new(ctx: C) -> Self {
+    /// Creates a new [`DeviceAnyApi`] from `ctx`.
+    pub fn new(ctx: C) -> Self {
         Self(ctx)
     }
 }

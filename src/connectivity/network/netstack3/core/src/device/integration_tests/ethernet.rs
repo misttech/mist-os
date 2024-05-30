@@ -12,6 +12,7 @@ use net_types::{
     ip::{AddrSubnet, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv6, Ipv6Addr},
     MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
 };
+use netstack3_base::FrameDestination;
 use packet::{Buf, Serializer as _};
 use packet_formats::{
     ethernet::{EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG},
@@ -27,8 +28,8 @@ use test_case::test_case;
 
 use crate::{
     device::{
-        ethernet::{self, RecvEthernetFrameMeta},
-        DeviceId, EthernetCreationProperties, EthernetLinkDevice, FrameDestination,
+        ethernet::{self, EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta},
+        DeviceId,
     },
     error::NotFoundError,
     ip::{
@@ -685,7 +686,7 @@ fn test_add_ip_addr_subnet_link_local() {
         DEFAULT_INTERFACE_METRIC,
     );
     let device = eth_device.clone().into();
-    let eth_device = eth_device.device_state();
+    let eth_device = eth_device.device_state(&ctx.core_ctx.device().origin);
 
     // Enable the device and configure it to generate a link-local address.
     let _: Ipv6DeviceConfigurationUpdate = ctx

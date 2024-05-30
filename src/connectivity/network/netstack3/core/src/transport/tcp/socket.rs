@@ -40,6 +40,13 @@ use net_types::{
     },
     AddrAndPortFormatter, AddrAndZone, SpecifiedAddr, ZonedAddr,
 };
+use netstack3_base::{
+    AnyDevice, BidirectionalConverter as _, ContextPair, CoreTimerContext, CounterContext, CtxPair,
+    DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId, HandleableTimer,
+    InstantBindingsTypes, OwnedOrRefsBidirectionalConverter, ReferenceNotifiersExt as _,
+    RngContext, StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext, TracingContext,
+    WeakDeviceIdentifier,
+};
 use packet_formats::ip::IpProto;
 use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
@@ -47,17 +54,7 @@ use tracing::{debug, error, trace};
 
 use crate::{
     algorithm::{self, PortAllocImpl},
-    context::{
-        ContextPair, CoreTimerContext, CounterContext, CtxPair, DeferredResourceRemovalContext,
-        HandleableTimer, InstantBindingsTypes, ReferenceNotifiersExt as _, RngContext,
-        TimerBindingsTypes, TimerContext, TracingContext,
-    },
-    convert::{BidirectionalConverter as _, OwnedOrRefsBidirectionalConverter},
     data_structures::socketmap::{IterShadows as _, SocketMap},
-    device::{
-        AnyDevice, DeviceIdContext, EitherDeviceId, StrongDeviceIdentifier as _,
-        WeakDeviceIdentifier,
-    },
     error::{ExistsError, LocalAddressError, ZonedAddressError},
     inspect::{Inspector, InspectorDeviceExt},
     ip::{
@@ -5018,6 +5015,10 @@ mod tests {
         ip::{Ip, Ipv4, Ipv6, Ipv6SourceAddr, Mtu},
         LinkLocalAddr,
     };
+    use netstack3_base::{
+        testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
+        LinkDevice, StrongDeviceIdentifier, Uninstantiable, UninstantiableWrapper,
+    };
     use packet::{Buf, BufferMut, ParseBuffer as _};
     use packet_formats::{
         icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode},
@@ -5035,12 +5036,6 @@ mod tests {
             },
             ContextProvider, InstantContext, ReferenceNotifiers,
         },
-        device::{
-            link::LinkDevice,
-            socket::DeviceSocketTypes,
-            testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
-            DeviceLayerStateTypes, StrongDeviceIdentifier,
-        },
         filter::{FilterBindingsTypes, TransportPacketSerializer},
         ip::{
             device::IpDeviceStateIpExt,
@@ -5054,10 +5049,7 @@ mod tests {
             HopLimits, IpTransportContext,
         },
         sync::{DynDebugReferences, Mutex},
-        testutil::{
-            new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng, MonotonicIdentifier,
-            TestIpExt,
-        },
+        testutil::{new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng, TestIpExt},
         transport::tcp::{
             buffer::{
                 testutil::{
@@ -5068,7 +5060,6 @@ mod tests {
             state::{TimeWait, MSL},
             ConnectionError, Mms, DEFAULT_FIN_WAIT2_TIMEOUT,
         },
-        uninstantiable::{Uninstantiable, UninstantiableWrapper},
         Instant as _,
     };
 
@@ -5341,17 +5332,6 @@ mod tests {
         fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
             self.timers.scheduled_instant(timer)
         }
-    }
-
-    impl<D: FakeStrongDeviceId> DeviceSocketTypes for TcpBindingsCtx<D> {
-        type SocketState = ();
-    }
-
-    impl<D: FakeStrongDeviceId> DeviceLayerStateTypes for TcpBindingsCtx<D> {
-        type LoopbackDeviceState = ();
-        type EthernetDeviceState = ();
-        type PureIpDeviceState = ();
-        type DeviceIdentifier = MonotonicIdentifier;
     }
 
     impl<D: FakeStrongDeviceId> TracingContext for TcpBindingsCtx<D> {
