@@ -106,14 +106,14 @@ async fn handle_controller<T: Test + 'static>(
     match request {
         ControllerRequest::Setup { responder, device_label, device_path, seed } => {
             let res = test.setup(device_label, device_path, seed).await.map_err(|e| {
-                tracing::error!("{}", e);
+                tracing::error!("{:?}", e);
                 zx::Status::INTERNAL.into_raw()
             });
             responder.send(res)?;
         }
         ControllerRequest::Test { responder, device_label, device_path, seed, duration } => {
             let test_fut = test.test(device_label, device_path, seed).map_err(|e| {
-                tracing::error!("{}", e);
+                tracing::error!("{:?}", e);
                 zx::Status::INTERNAL.into_raw()
             });
             if duration != 0 {
@@ -138,7 +138,7 @@ async fn handle_controller<T: Test + 'static>(
         ControllerRequest::Verify { responder, device_label, device_path, seed } => {
             let res = test.verify(device_label, device_path, seed).await.map_err(|e| {
                 // The test tries failing on purpose, so only print errors as warnings.
-                tracing::warn!("{}", e);
+                tracing::warn!("{:?}", e);
                 zx::Status::BAD_STATE.into_raw()
             });
             responder.send(res)?;

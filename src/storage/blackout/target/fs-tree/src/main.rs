@@ -9,20 +9,26 @@ use {
         static_tree::{DirectoryEntry, EntryDistribution},
         Test, TestServer,
     },
-    fidl::endpoints::Proxy as _,
-    fidl_fuchsia_device::ControllerProxy,
+    fidl::endpoints::{create_proxy, Proxy as _},
+    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
     fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions},
+    fidl_fuchsia_hardware_block_volume::VolumeManagerMarker,
     fidl_fuchsia_io as fio,
     fs_management::{
-        filesystem::{Filesystem, ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem},
-        CryptClientFn, Fxfs, Minfs,
+        filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem},
+        format::DiskFormat,
+        Fxfs, Minfs,
     },
-    fuchsia_component::client::connect_to_protocol,
+    fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path},
     fuchsia_zircon as zx,
     rand::{rngs::StdRng, Rng, SeedableRng},
     std::sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
+    },
+    storage_isolated_driver_manager::{
+        create_random_guid, find_block_device, into_guid, wait_for_block_device,
+        BlockDeviceMatcher, Guid,
     },
 };
 
@@ -38,19 +44,31 @@ const METADATA_KEY: [u8; 32] = [
     0x8e, 0xea, 0xd8, 0x05, 0xc4, 0xc9, 0x0b, 0xa8, 0xd8, 0x85, 0x87, 0x50, 0x75, 0x40, 0x1c, 0x4c,
 ];
 
+/// This type guid is only used if the test has to create the gpt partition itself. Otherwise, only
+/// the label is used to find the partition.
+const BLACKOUT_TYPE_GUID: &Guid = &[
+    0x68, 0x45, 0x23, 0x01, 0xab, 0x89, 0xef, 0xcd, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+];
+
+const GPT_PARTITION_SIZE: u64 = 60 * 1024 * 1024;
+
 async fn find_partition_helper(
     device_path: Option<String>,
     device_label: String,
 ) -> Result<ControllerProxy> {
-    let device_dir = match device_path {
-        Some(path) => {
-            let device_dir =
-                fuchsia_fs::directory::open_in_namespace(&path, fio::OpenFlags::empty())?;
-            Some(device_dir)
-        }
-        None => None,
+    let mut partition_path = if let Some(path) = device_path {
+        tracing::info!("fs-tree blackout using provided path for load gen");
+        path.into()
+    } else {
+        tracing::info!("fs-tree blackout finding gpt for load gen");
+        find_block_device(&[BlockDeviceMatcher::Name(&device_label)])
+            .await
+            .context("finding block device")?
     };
-    blackout_target::find_partition(&device_label, device_dir.as_ref()).await
+    partition_path.push("device_controller");
+    tracing::info!(?partition_path, "found partition to use");
+    connect_to_protocol_at_path::<ControllerMarker>(partition_path.to_str().unwrap())
+        .context("connecting to provided path")
 }
 
 #[derive(Copy, Clone)]
@@ -115,16 +133,7 @@ impl FsTree {
     }
 
     async fn verify_fxfs(&self, controller: ControllerProxy) -> Result<()> {
-        self.setup_crypt_service().await?;
-        let crypt_client_fn = Some(Arc::new(|| {
-            connect_to_protocol::<CryptMarker>()
-                .unwrap()
-                .into_channel()
-                .unwrap()
-                .into_zx_channel()
-                .into()
-        }) as CryptClientFn);
-        let mut fxfs = Filesystem::new(controller, Fxfs { crypt_client_fn, ..Default::default() });
+        let mut fxfs = Fxfs::new(controller);
         fxfs.fsck().await?;
         Ok(())
     }
@@ -161,22 +170,81 @@ impl Test for FsTree {
         device_path: Option<String>,
         _seed: u64,
     ) -> Result<()> {
-        let device_dir = match device_path {
-            Some(path) => {
-                let device_dir =
-                    fuchsia_fs::directory::open_in_namespace(&path, fio::OpenFlags::empty())?;
-                Some(device_dir)
-            }
-            None => None,
+        tracing::info!(device_label, device_path, "setting up fs-tree blackout test");
+        let mut partition_path = if let Some(path) = device_path {
+            tracing::info!("fs-tree blackout test using provided path");
+            path.into()
+        } else if let Ok(path) = find_block_device(&[BlockDeviceMatcher::Name(&device_label)]).await
+        {
+            tracing::info!("fs-tree blackout test found existing partition");
+            path
+        } else {
+            tracing::info!("fs-tree blackout test setting up gpt");
+            let mut gpt_block_path =
+                find_block_device(&[BlockDeviceMatcher::ContentsMatch(DiskFormat::Gpt)])
+                    .await
+                    .context("finding gpt device failed")?;
+            gpt_block_path.push("device_controller");
+            let gpt_block_controller =
+                connect_to_protocol_at_path::<ControllerMarker>(gpt_block_path.to_str().unwrap())
+                    .context("connecting to block controller")?;
+            let gpt_path = gpt_block_controller
+                .get_topological_path()
+                .await
+                .context("get_topo fidl error")?
+                .map_err(zx::Status::from_raw)
+                .context("get_topo failed")?;
+            let gpt_controller = connect_to_protocol_at_path::<ControllerMarker>(&format!(
+                "{}/gpt/device_controller",
+                gpt_path
+            ))
+            .context("connecting to gpt controller")?;
+
+            let (volume_manager, server) = create_proxy::<VolumeManagerMarker>().unwrap();
+            gpt_controller
+                .connect_to_device_fidl(server.into_channel())
+                .context("connecting to gpt fidl")?;
+            let slice_size = {
+                let (status, info) =
+                    volume_manager.get_info().await.context("get_info fidl error")?;
+                zx::ok(status).context("get_info returned error")?;
+                info.unwrap().slice_size
+            };
+            let slice_count = GPT_PARTITION_SIZE / slice_size;
+            let instance_guid = into_guid(create_random_guid());
+            let status = volume_manager
+                .allocate_partition(
+                    slice_count,
+                    &into_guid(BLACKOUT_TYPE_GUID.clone()),
+                    &instance_guid,
+                    &device_label,
+                    0,
+                )
+                .await
+                .context("allocating test partition fidl error")?;
+            zx::ok(status).context("allocating test partition returned error")?;
+
+            wait_for_block_device(&[
+                BlockDeviceMatcher::Name(&device_label),
+                BlockDeviceMatcher::TypeGuid(&BLACKOUT_TYPE_GUID),
+            ])
+            .await
+            .context("waiting for new gpt partition")?
         };
+        partition_path.push("device_controller");
+        tracing::info!(?partition_path, "found partition to use");
         let partition_controller =
-            blackout_target::set_up_partition(&device_label, device_dir.as_ref(), true).await?;
+            connect_to_protocol_at_path::<ControllerMarker>(partition_path.to_str().unwrap())
+                .context("connecting to provided path")?;
 
         match DATA_FILESYSTEM_FORMAT {
-            "fxfs" => self.setup_fxfs(partition_controller).await,
-            "minfs" => self.setup_minfs(partition_controller).await,
+            "fxfs" => self.setup_fxfs(partition_controller).await?,
+            "minfs" => self.setup_minfs(partition_controller).await?,
             _ => panic!("Unsupported filesystem"),
         }
+
+        tracing::info!("setup complete");
+        Ok(())
     }
 
     async fn test(
@@ -185,7 +253,10 @@ impl Test for FsTree {
         device_path: Option<String>,
         seed: u64,
     ) -> Result<()> {
-        let partition_controller = find_partition_helper(device_path, device_label).await?;
+        tracing::info!(device_label, device_path, "fs-tree blackout test running load gen");
+        let partition_controller = find_partition_helper(device_path, device_label)
+            .await
+            .context("test failed to find partition")?;
         let fs = match DATA_FILESYSTEM_FORMAT {
             "fxfs" => self.serve_fxfs(partition_controller).await?,
             "minfs" => self.serve_minfs(partition_controller).await?,
@@ -195,21 +266,21 @@ impl Test for FsTree {
         tracing::info!("generating load");
         let mut rng = StdRng::seed_from_u64(seed);
         loop {
-            tracing::info!("generating tree");
+            tracing::debug!("generating tree");
             let dist = EntryDistribution::new(6);
             let tree: DirectoryEntry = rng.sample(&dist);
-            tracing::info!("generated tree: {:?}", tree);
+            tracing::debug!("generated tree: {:?}", tree);
             let tree_name = tree.get_name();
-            tracing::info!("writing tree");
+            tracing::debug!("writing tree");
             tree.write_tree_at(fs.root()).await.context("failed to write directory tree")?;
             // now try renaming the tree root
             let tree_name2 = format!("{}-renamed", tree_name);
-            tracing::info!("moving tree");
+            tracing::debug!("moving tree");
             fuchsia_fs::directory::rename(fs.root(), &tree_name, &tree_name2)
                 .await
                 .context("failed to rename directory tree")?;
             // then try deleting the entire thing.
-            tracing::info!("deleting tree");
+            tracing::debug!("deleting tree");
             fuchsia_fs::directory::remove_dir_recursive(fs.root(), &tree_name2)
                 .await
                 .context("failed to delete directory tree")?;
@@ -222,12 +293,23 @@ impl Test for FsTree {
         device_path: Option<String>,
         _seed: u64,
     ) -> Result<()> {
-        let partition_controller = find_partition_helper(device_path, device_label).await?;
+        tracing::info!(
+            device_label,
+            device_path,
+            "fs-tree blackout test verifying disk consistency"
+        );
+        let partition_controller = find_partition_helper(device_path, device_label)
+            .await
+            .context("verify failed to find partition")?;
+
         match DATA_FILESYSTEM_FORMAT {
-            "fxfs" => self.verify_fxfs(partition_controller).await,
-            "minfs" => self.verify_minfs(partition_controller).await,
+            "fxfs" => self.verify_fxfs(partition_controller).await?,
+            "minfs" => self.verify_minfs(partition_controller).await?,
             _ => panic!("Unsupported filesystem"),
         }
+
+        tracing::info!("verification complete");
+        Ok(())
     }
 }
 
