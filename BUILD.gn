@@ -134,6 +134,10 @@ declare_args() {
   # Platform builders should populate this list in their product.gni file.
   # The result will be built and uploaded to CIPD by infra.
   assembly_board_configs = []
+
+  # Platform builders can add targets to this list so that they get built with
+  # the //:default target
+  additional_default_targets = []
 }
 
 if (host_os == "mac") {
@@ -1655,6 +1659,9 @@ group("default") {
       "//build/images:default-images",
     ]
   }
+
+  # Add any additional targets from the product.
+  deps += additional_default_targets
 }
 
 ###
