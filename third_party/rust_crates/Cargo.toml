@@ -267,7 +267,7 @@ rust_icu_uenum = { version = "5.0.0", default-features = false, features = ["ren
 rust_icu_uloc = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
 rust_icu_unorm2 = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
 rust_icu_ustring = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env"] }
-tokio = { version = "=1.25.2", default-features = false }
+tokio = { version = "=1.32.1", default-features = false }
 trust-dns-proto = { version = "0.22.0", default-features = false, features = ["testing"] }
 trust-dns-resolver = { version = "0.22.0", default-features = false, features = ["testing"] }
 ttf-parser = "0.10.1"
@@ -316,7 +316,7 @@ termios = "0.3.2"
 tinyjson = "2.5.0"
 # TODO(https://fxbug.dev/106164) Enable the "rt" and "net" features here once gnaw
 # supports target-specific feature resolution
-tokio = { version = "=1.25.2", default-features = false }
+tokio = { version = "=1.32.1", default-features = false }
 tokio-stream = "0.1.14"
 zip = { version = "0.5.5", default-features = false, features = ["deflate"] }
 
@@ -342,6 +342,7 @@ walkdir = { path = "ask2patch/walkdir" }
 ### Empty Forks: empty forks kept only for satisfying cargo's resolution
 android-tzdata = { path = "empty/android-tzdata" }
 android_system_properties = { path = "empty/android_system_properties" }
+backtrace = { path = "empty/backtrace" }
 cc = { path = "empty/cc" }
 crossterm_winapi = { path = "empty/crossterm_winapi" }
 ctor = { path = "empty/ctor" }
@@ -447,6 +448,7 @@ require_licenses = true
 require_feature_reviews = [
   "bitflags",
   "bstr",
+  "tokio",
 ]
 
 [gn.package.aes."0.8.4"]
@@ -870,7 +872,26 @@ group_visibility = { import = "//third_party/rust_crates/private_visibility.gni"
 # TODO(https://fxbug.dev/106164) This manual configuration enables the "rt", "net"
 # "fs" and "sync" features on non-Fuchsia targets. It should be removed
 # once gnaw supports target-specific features.
-[gn.package.tokio."1.25.2".platform."cfg(not(target_os = \"fuchsia\"))"]
+[gn.package.tokio."1.32.1"]
+reviewed_features = [
+  "bytes",
+  "default",
+  "fs",
+  "io-util",
+  "libc",
+  "mio",
+  "net",
+  "num_cpus",
+  "process",
+  "rt",
+  "rt-multi-thread",
+  "singal-hook-registry",
+  "socket2",
+  "sync",
+  "time",
+]
+
+[gn.package.tokio."1.32.1".platform."cfg(not(target_os = \"fuchsia\"))"]
 deps = [
   ":bytes-v1_0_1",
   ":libc-v0_2_149",
@@ -878,20 +899,20 @@ deps = [
   ":mio-v0_8_9",
   ":num_cpus-v1_13_0",
   ":signal-hook-registry-v1_4_1",
-  ":socket2-v0_4_4",
+  ":socket2-v0_5_5",
 ]
 rustflags = [
-  "--cfg=feature=\\\"libc\\\"",
+  "--cfg=feature=\\\"bytes\\\"",
   "--cfg=feature=\\\"fs\\\"",
+  "--cfg=feature=\\\"io-util\\\"",
+  "--cfg=feature=\\\"libc\\\"",
   "--cfg=feature=\\\"mio\\\"",
   "--cfg=feature=\\\"net\\\"",
   "--cfg=feature=\\\"num_cpus\\\"",
   "--cfg=feature=\\\"process\\\"",
-  "--cfg=feature=\\\"io-util\\\"",
-  "--cfg=feature=\\\"bytes\\\"",
-  "--cfg=feature=\\\"signal-hook-registry\\\"",
-  "--cfg=feature=\\\"rt\\\"",
   "--cfg=feature=\\\"rt-multi-thread\\\"",
+  "--cfg=feature=\\\"rt\\\"",
+  "--cfg=feature=\\\"signal-hook-registry\\\"",
   "--cfg=feature=\\\"socket2\\\"",
   "--cfg=feature=\\\"sync\\\"",
   "--cfg=feature=\\\"time\\\"",

@@ -321,6 +321,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
+name = "backtrace"
+version = "0.3.61"
+
+[[package]]
 name = "base16ct"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4498,13 +4502,12 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.25.2"
+version = "1.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54875d2a04a2b9808a07d51405a7ef769b4afb483fa34b496d776c767698b395"
+checksum = "777d57dcc6bb4cf084e3212e1858447222aa451f21b5e2452497d9100da65b91"
 dependencies = [
- "autocfg 1.1.0",
+ "backtrace",
  "pin-project-lite",
- "windows-sys 0.42.0",
 ]
 
 [[package]]
