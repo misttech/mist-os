@@ -77,6 +77,12 @@ _RETRIABLE_REWRAPPER_STATUSES = {
 }
 
 
+def init_from_main_once() -> int:
+    # Support parallel downloads using forkserver method.
+    multiprocessing.set_start_method("forkserver")
+    return 0
+
+
 def msg(text: str):
     print(f"[{_SCRIPT_BASENAME}] {text}")
 
@@ -2245,7 +2251,7 @@ def download_input_stub_paths_batch(
     downloader: remotetool.RemoteTool,
     stub_paths: Sequence[Path],
     working_dir_abs: Path,
-    parallel: bool = False,  # TODO(b/42085186): default True to parallelize
+    parallel: bool = True,
     verbose: bool = False,
 ) -> Dict[Path, cl_utils.SubprocessResult]:
     """Downloads artifacts from a collection of stubs in parallel."""
@@ -2282,7 +2288,7 @@ def download_output_stub_infos_batch(
     downloader: remotetool.RemoteTool,
     stub_infos: Sequence[DownloadStubInfo],
     working_dir_abs: Path,
-    parallel: bool = False,  # TODO(b/42085186): default True to parallelize
+    parallel: bool = True,
     verbose: bool = False,
 ) -> Dict[Path, cl_utils.SubprocessResult]:
     """Downloads artifacts from a collection of stubs in parallel."""
@@ -2742,4 +2748,5 @@ def main(argv: Sequence[str]) -> int:
 
 
 if __name__ == "__main__":
+    init_from_main_once()
     sys.exit(main(sys.argv[1:]))

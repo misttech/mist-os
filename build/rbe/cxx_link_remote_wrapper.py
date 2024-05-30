@@ -644,4 +644,5 @@ def main(argv: Sequence[str]) -> int:
 
 
 if __name__ == "__main__":
+    remote_action.init_from_main_once()
     sys.exit(main(sys.argv[1:]))
