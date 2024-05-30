@@ -48,8 +48,6 @@ class CodecClient {
   // a lock_ in it.
   CodecClient(async::Loop* loop, thrd_t loop_thread,
               fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> sysmem);
-  CodecClient(async::Loop* loop, thrd_t loop_thread,
-              fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem);
   ~CodecClient();
 
   // Separate from Start() because we don't wan this class to handle the Codec
