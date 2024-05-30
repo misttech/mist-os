@@ -74,9 +74,26 @@ type ConfigStamp = struct {
     value uint64;
 };
 
+// An E-EDID can contain up to 256 data blocks, each of which contains 128
+// bytes. So it can contain up to 256 * 128 = 32768 bytes of data.
+const MAX_COUNT_EDID_BYTES uint32 = 32768;
+
+/// The raw bytes of Extended Display Identification Data (EDID) of a display
+/// device.
+// TODO(https://fxbug.dev/314126957): This is a workaround to a limitation of
+// banjo union that a vector cannot be a union field. This is not needed when
+// the library is migrated to FIDL.
+type EdidBytes = struct {
+    bytes vector<uint8>:MAX_COUNT_EDID_BYTES;
+};
+
 /// The capabilities of a display panel.
 type Panel = strict resource union {
-    /// The i2c bus to use to read this display's EDID.
+    /// Connection to the display's implementation of the E-DDC standard.
+    ///
+    /// E-DDC (Enhanced Display Data Channel) is a VESA standard that describes
+    /// exposing display information over an I2C bus. The information is encoded
+    /// using the VESA E-EDID or DisplayID standards.
     1: i2c client_end:fuchsia.hardware.i2cimpl.I2cImpl;
 
     /// Hard-coded display configuration.
@@ -84,6 +101,13 @@ type Panel = strict resource union {
     /// Can be used when the device does not implement EDID,
     /// or when the driver needs to override the EDID contents.
     2: mode DisplayMode;
+
+    /// Display capabilities encoded using the E-EDID standard.
+    ///
+    /// E-EDID (Enhanced Extended Display Identification Data) is a VESA
+    /// standard that describes display capabilities as a series of 128-byte
+    /// data blocks.
+    3: edid_bytes EdidBytes;
 };
 
 type PanelCapabilitiesSource = strict enum {
@@ -93,6 +117,10 @@ type PanelCapabilitiesSource = strict enum {
 
     /// The panel provides a DisplayMode struct to express its capabilities.
     DISPLAY_MODE = 2;
+
+    /// The panel provides the raw bytes of its Extended Display
+    /// Identification Data (EDID) to communicate its capabilities.
+    EDID_BYTES = 3;
 };
 
 /// Equal to [`fuchsia.sysmem2/MAX_COUNT_PIXEL_FORMAT_AND_MODIFIERS`].
@@ -106,6 +134,9 @@ type AddedDisplayArgs = resource struct {
     /// valid I2c client. The rest fields in `panel` are ignored.
     ///
     /// If `panel_capabilities_source` is `DISPLAY_MODE`, `panel.display_mode`
+    /// must be valid. The rest fields in `panel` are ignored.
+    ///
+    /// If `panel_capabilities_source` is `EDID_BYTES`, `panel.edid_bytes`
     /// must be valid. The rest fields in `panel` are ignored.
     panel_capabilities_source PanelCapabilitiesSource;
     panel Panel;

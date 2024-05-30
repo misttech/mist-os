@@ -65,9 +65,17 @@ type DisplayConfig = struct {
     layer vector<fuchsia.hardware.display.types.Layer>:MAX;
 };
 
+// An E-EDID can contain up to 256 data blocks, each of which contains 128
+// bytes. So it can contain up to 256 * 128 = 32768 bytes of data.
+const MAX_COUNT_EDID_BYTES uint32 = 32768;
+
 /// The capabilities of a display panel.
 type Panel = flexible resource union {
-    /// The I2C bus to use to read this display's EDID.
+    /// Connection to the display's implementation of the E-DDC standard.
+    ///
+    /// E-DDC (Enhanced Display Data Channel) is a VESA standard that describes
+    /// exposing display information over an I2C bus. The information is encoded
+    /// using the VESA E-EDID or DisplayID standards.
     1: i2c client_end:fuchsia.hardware.i2cimpl.Device;
 
     /// Hard-coded display configuration.
@@ -75,6 +83,13 @@ type Panel = flexible resource union {
     /// Can be used when the device does not implement EDID,
     /// or when the driver needs to override the EDID contents.
     2: mode DisplayMode;
+
+    /// Display capabilities encoded using the E-EDID standard.
+    ///
+    /// E-EDID (Enhanced Extended Display Identification Data) is a VESA
+    /// standard that describes display capabilities as a series of 128-byte
+    /// data blocks.
+    3: edid_bytes vector<uint8>:MAX_COUNT_EDID_BYTES;
 };
 
 const MAX_COUNT_DISPLAY_PIXEL_FORMATS uint32 = fuchsia.sysmem2.MAX_COUNT_PIXEL_FORMAT_AND_MODIFIERS;
