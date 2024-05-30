@@ -110,7 +110,6 @@ rustc_library_with_features("netstack3-core") {
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/lib/explicit",
     "//src/lib/const-unwrap",
-    "//src/lib/dense-map",
     "//src/lib/network/packet",
     "//src/lib/replace-with",
     "//third_party/rust_crates:assert_matches",

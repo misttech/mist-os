@@ -5,7 +5,6 @@
 //! Implementations of traits defined in foreign modules for the types defined
 //! in the device socket module.
 
-use dense_map::EntryKey;
 use lock_order::{
     lock::{DelegatedOrderedLockAccess, LockLevelFor},
     relation::LockBefore,
@@ -17,18 +16,26 @@ use crate::{
         self,
         socket::{
             AllSockets, AnyDeviceSockets, DeviceSocketAccessor, DeviceSocketContext,
-            DeviceSocketContextTypes, DeviceSockets, HeldSockets, PrimaryId, SocketState,
-            SocketStateAccessor, StrongId, Target,
+            DeviceSocketContextTypes, DeviceSocketId, DeviceSockets, HeldSockets,
+            PrimaryDeviceSocketId, SocketStateAccessor, Target,
         },
         DeviceId, WeakDeviceId,
     },
-    for_any_device_id,
-    sync::{Mutex, PrimaryRc},
-    BindingsContext, BindingsTypes, CoreCtx, StackState,
+    for_any_device_id, BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 
-impl<BC: BindingsContext, L> DeviceSocketContextTypes for CoreCtx<'_, BC, L> {
-    type SocketId = StrongId<BC::SocketState, WeakDeviceId<BC>>;
+impl<BT: BindingsTypes, L> DeviceSocketContextTypes<BT> for CoreCtx<'_, BT, L> {
+    type SocketId = DeviceSocketId<BT::SocketState, WeakDeviceId<BT>>;
+    fn new_primary(
+        external_state: BT::SocketState,
+    ) -> PrimaryDeviceSocketId<BT::SocketState, WeakDeviceId<BT>> {
+        PrimaryDeviceSocketId::new(external_state)
+    }
+    fn unwrap_primary(
+        primary: PrimaryDeviceSocketId<BT::SocketState, WeakDeviceId<BT>>,
+    ) -> BT::SocketState {
+        primary.unwrap().external_state
+    }
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
@@ -36,30 +43,12 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
 {
     type SocketTablesCoreCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::AnyDeviceSockets>;
 
-    fn create_socket(&mut self, state: BC::SocketState) -> Self::SocketId {
-        let mut sockets = self.lock();
-        let AllSockets(sockets) = &mut *sockets;
-        let entry = sockets.push_with(|index| {
-            PrimaryId(PrimaryRc::new(SocketState {
-                all_sockets_index: index,
-                external_state: state,
-                target: Mutex::new(Target::default()),
-            }))
-        });
-        let PrimaryId(primary) = &entry.get();
-        StrongId(PrimaryRc::clone_strong(primary))
-    }
-
-    fn remove_socket(&mut self, socket: Self::SocketId) {
-        let mut state = self.lock();
-        let AllSockets(sockets) = &mut *state;
-
-        let PrimaryId(primary) = sockets.remove(socket.get_key_index()).expect("unknown socket ID");
-        // Make sure to drop the strong ID before trying to unwrap the primary
-        // ID.
-        drop(socket);
-
-        let _: SocketState<_, _> = PrimaryRc::unwrap(primary);
+    fn with_all_device_sockets_mut<F: FnOnce(&mut AllSockets<Self::SocketId>) -> R, R>(
+        &mut self,
+        cb: F,
+    ) -> R {
+        let mut locked = self.lock::<crate::lock_ordering::AllDeviceSockets>();
+        cb(&mut locked)
     }
 
     fn with_any_device_sockets<
@@ -91,11 +80,13 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocketState>
 {
     fn with_socket_state<F: FnOnce(&BC::SocketState, &Target<Self::WeakDeviceId>) -> R, R>(
         &mut self,
-        StrongId(strong): &Self::SocketId,
+        id: &Self::SocketId,
         cb: F,
     ) -> R {
-        let SocketState { external_state, target, all_sockets_index: _ } = &**strong;
-        cb(external_state, &*target.lock())
+        let external_state = id.socket_state();
+        let mut locked = self.adopt(id);
+        let guard = locked.lock_with::<crate::lock_ordering::DeviceSocketState, _>(|c| c.right());
+        cb(external_state, &*guard)
     }
 
     fn with_socket_state_mut<
@@ -103,11 +94,14 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocketState>
         R,
     >(
         &mut self,
-        StrongId(primary): &Self::SocketId,
+        id: &Self::SocketId,
         cb: F,
     ) -> R {
-        let SocketState { external_state, target, all_sockets_index: _ } = &**primary;
-        cb(external_state, &mut *target.lock())
+        let external_state = id.socket_state();
+        let mut locked = self.adopt(id);
+        let mut guard =
+            locked.lock_with::<crate::lock_ordering::DeviceSocketState, _>(|c| c.right());
+        cb(external_state, &mut *guard)
     }
 }
 
@@ -168,7 +162,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSockets>>
 }
 
 impl<BT: BindingsTypes>
-    DelegatedOrderedLockAccess<AnyDeviceSockets<StrongId<BT::SocketState, WeakDeviceId<BT>>>>
+    DelegatedOrderedLockAccess<AnyDeviceSockets<DeviceSocketId<BT::SocketState, WeakDeviceId<BT>>>>
     for StackState<BT>
 {
     type Inner = HeldSockets<BT>;
@@ -178,7 +172,7 @@ impl<BT: BindingsTypes>
 }
 
 impl<BT: BindingsTypes>
-    DelegatedOrderedLockAccess<AllSockets<PrimaryId<BT::SocketState, WeakDeviceId<BT>>>>
+    DelegatedOrderedLockAccess<AllSockets<DeviceSocketId<BT::SocketState, WeakDeviceId<BT>>>>
     for StackState<BT>
 {
     type Inner = HeldSockets<BT>;
@@ -188,9 +182,15 @@ impl<BT: BindingsTypes>
 }
 
 impl<BT: BindingsTypes> LockLevelFor<StackState<BT>> for crate::lock_ordering::AnyDeviceSockets {
-    type Data = AnyDeviceSockets<StrongId<BT::SocketState, WeakDeviceId<BT>>>;
+    type Data = AnyDeviceSockets<DeviceSocketId<BT::SocketState, WeakDeviceId<BT>>>;
 }
 
 impl<BT: BindingsTypes> LockLevelFor<StackState<BT>> for crate::lock_ordering::AllDeviceSockets {
-    type Data = AllSockets<PrimaryId<BT::SocketState, WeakDeviceId<BT>>>;
+    type Data = AllSockets<DeviceSocketId<BT::SocketState, WeakDeviceId<BT>>>;
+}
+
+impl<BT: BindingsTypes> LockLevelFor<DeviceSocketId<BT::SocketState, WeakDeviceId<BT>>>
+    for crate::lock_ordering::DeviceSocketState
+{
+    type Data = Target<WeakDeviceId<BT>>;
 }
