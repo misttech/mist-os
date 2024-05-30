@@ -17,7 +17,7 @@ namespace {
 
 class LogSettingsFixture : public ::testing::Test {
  public:
-  LogSettingsFixture() : old_severity_(GetMinLogLevel()), old_stderr_(dup(STDERR_FILENO)) {}
+  LogSettingsFixture() : old_severity_(GetMinLogSeverity()), old_stderr_(dup(STDERR_FILENO)) {}
   ~LogSettingsFixture() {
     SetLogSettings({.min_log_level = old_severity_});
     dup2(old_stderr_.get(), STDERR_FILENO);

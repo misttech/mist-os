@@ -81,7 +81,11 @@ void SetLogTags(const std::initializer_list<std::string>& tags) {
   // Global tags aren't supported on host.
 }
 
-fuchsia_logging::LogSeverity GetMinLogLevel() { return g_log_settings.min_log_level; }
+fuchsia_logging::LogSeverity GetMinLogSeverity() {
+  return syslog_runtime::g_log_settings.min_log_level;
+}
+
+fuchsia_logging::LogSeverity GetMinLogLevel() { return GetMinLogSeverity(); }
 
 void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, NullSafeStringView file,
                  unsigned int line, NullSafeStringView msg, NullSafeStringView condition) {

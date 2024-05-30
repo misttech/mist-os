@@ -17,6 +17,8 @@ void SetLogSettings(const fuchsia_logging::LogSettings& settings,
 
 fuchsia_logging::LogSeverity GetMinLogLevel();
 
+fuchsia_logging::LogSeverity GetMinLogSeverity();
+
 }  // namespace syslog_runtime
 
 #endif  // LIB_SYSLOG_CPP_LOGGING_BACKEND_H_

@@ -58,7 +58,7 @@ void AdvanceClock(uint32_t seconds) { mock_time += std::chrono::seconds(seconds)
 
 class LoggingFixture : public ::testing::Test {
  public:
-  LoggingFixture() : old_severity_(GetMinLogLevel()), old_stderr_(dup(STDERR_FILENO)) {}
+  LoggingFixture() : old_severity_(GetMinLogSeverity()), old_stderr_(dup(STDERR_FILENO)) {}
   ~LoggingFixture() {
     SetLogSettings({.min_log_level = old_severity_, .wait_for_initial_interest = true});
   }

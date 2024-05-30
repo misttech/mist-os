@@ -68,8 +68,11 @@ void SetLogSettings(const LogSettings& settings, const std::initializer_list<std
 // Sets the log tags without modifying the settings. This is ignored on host.
 void SetTags(const std::initializer_list<std::string>& tags);
 
-// Gets the minimum log level for the current process. Never returns a value
+// Gets the minimum log severity for the current process. Never returns a value
 // higher than LOG_FATAL.
+LogSeverity GetMinLogSeverity();
+
+// This method is deprecated. Use GetMinLogSeverity() instead.
 LogSeverity GetMinLogLevel();
 
 }  // namespace fuchsia_logging

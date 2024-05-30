@@ -19,4 +19,6 @@ void SetTags(const std::initializer_list<std::string>& tags) {
 
 LogSeverity GetMinLogLevel() { return syslog_runtime::GetMinLogLevel(); }
 
+LogSeverity GetMinLogSeverity() { return syslog_runtime::GetMinLogSeverity(); }
+
 }  // namespace fuchsia_logging
