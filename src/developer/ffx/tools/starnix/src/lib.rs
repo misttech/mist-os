@@ -4,7 +4,9 @@
 
 use argh::{ArgsInfo, FromArgs};
 use async_trait::async_trait;
+use ffx_config::EnvironmentContext;
 use fho::{Connector, Error, FfxMain, FfxTool, Result, SimpleWriter};
+use fidl_fuchsia_developer_ffx::TargetInfo;
 use fidl_fuchsia_developer_remotecontrol as rc;
 
 pub mod common;
@@ -37,8 +39,9 @@ pub struct StarnixCommand {
 pub struct StarnixTool {
     #[command]
     cmd: StarnixCommand,
-
     rcs_connector: Connector<rc::RemoteControlProxy>,
+    target_info: TargetInfo,
+    context: EnvironmentContext,
 }
 
 #[async_trait(?Send)]
@@ -47,7 +50,7 @@ impl FfxMain for StarnixTool {
     async fn main(self, writer: Self::Writer) -> Result<()> {
         match &self.cmd.subcommand {
             StarnixSubCommand::Adb(command) => {
-                command.run(&self.rcs_connector).await.map_err(|e| Error::User(e))
+                command.run(&self.context, &self.rcs_connector, &self.target_info).await
             }
             #[cfg(feature = "enable_console_tool")]
             StarnixSubCommand::Console(command) => {
