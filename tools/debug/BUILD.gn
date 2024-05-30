@@ -7,6 +7,7 @@ group("tools") {
 
   public_deps = [
     "//tools/debug/bloatalyzer",
+    "//tools/debug/buildidtool",
     "//tools/debug/covargs",
     "//tools/debug/generate_breakpad",
     "//tools/debug/sourcerer",
@@ -20,6 +21,7 @@ group("tests") {
   deps = [
     "//tools/debug/bloaty:bloaty_tests",
     "//tools/debug/breakpad:breakpad_tests",
+    "//tools/debug/buildidtool:tests",
     "//tools/debug/covargs:tests",
     "//tools/debug/debugsyms:tests($host_toolchain)",
     "//tools/debug/elflib:elflib_tests($host_toolchain)",
