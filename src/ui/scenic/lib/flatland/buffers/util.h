@@ -9,24 +9,32 @@
 
 namespace flatland {
 
-extern const fuchsia::sysmem::BufferUsage kNoneUsage;
+fuchsia::sysmem2::BufferUsage get_none_usage();
 
 struct SysmemTokens {
   // Token for setting client side constraints.
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr local_token;
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr local_token;
 
   // Token for setting server side constraints.
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr dup_token;
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr dup_token;
 
-  static SysmemTokens Create(fuchsia::sysmem::Allocator_Sync* sysmem_allocator) {
-    fuchsia::sysmem::BufferCollectionTokenSyncPtr local_token;
-    zx_status_t status = sysmem_allocator->AllocateSharedCollection(local_token.NewRequest());
+  static SysmemTokens Create(fuchsia::sysmem2::Allocator_Sync* sysmem_allocator) {
+    fuchsia::sysmem2::BufferCollectionTokenSyncPtr local_token;
+    fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
+    allocate_shared_request.set_token_request(local_token.NewRequest());
+    zx_status_t status =
+        sysmem_allocator->AllocateSharedCollection(std::move(allocate_shared_request));
     FX_DCHECK(status == ZX_OK);
-    fuchsia::sysmem::BufferCollectionTokenSyncPtr dup_token;
-    status = local_token->Duplicate(std::numeric_limits<uint32_t>::max(), dup_token.NewRequest());
+    fuchsia::sysmem2::BufferCollectionTokenSyncPtr dup_token;
+    fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest dup_request;
+    dup_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
+    dup_request.set_token_request(dup_token.NewRequest());
+    status = local_token->Duplicate(std::move(dup_request));
     FX_DCHECK(status == ZX_OK);
-    status = local_token->Sync();
+    fuchsia::sysmem2::Node_Sync_Result sync_result;
+    status = local_token->Sync(&sync_result);
     FX_DCHECK(status == ZX_OK);
+    FX_DCHECK(sync_result.is_response());
     return {std::move(local_token), std::move(dup_token)};
   }
 };
@@ -36,29 +44,31 @@ struct SysmemTokens {
 // RAM and Inaccessible domains for buffer allocation, which caused failure in
 // sysmem allocation. So here we add RAM domain support to clients in order
 // to get buffer allocated correctly.
-const std::pair<fuchsia::sysmem::BufferUsage, fuchsia::sysmem::BufferMemoryConstraints>
+const std::pair<fuchsia::sysmem2::BufferUsage, fuchsia::sysmem2::BufferMemoryConstraints>
 GetUsageAndMemoryConstraintsForCpuWriteOften();
 
 // Sets the client constraints on a sysmem buffer collection, including the number of images,
 // the dimensionality (width, height) of those images, the usage and memory constraints. This
 // is a blocking function that will wait until the constraints have been fully set.
 void SetClientConstraintsAndWaitForAllocated(
-    fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
-    fuchsia::sysmem::BufferCollectionTokenSyncPtr token, uint32_t image_count = 1,
-    uint32_t width = 64, uint32_t height = 32, fuchsia::sysmem::BufferUsage usage = kNoneUsage,
-    const std::vector<uint64_t>& additional_format_modifiers = {},
-    std::optional<fuchsia::sysmem::BufferMemoryConstraints> memory_constraints = std::nullopt);
+    fuchsia::sysmem2::Allocator_Sync* sysmem_allocator,
+    fuchsia::sysmem2::BufferCollectionTokenSyncPtr token, uint32_t image_count = 1,
+    uint32_t width = 64, uint32_t height = 32,
+    fuchsia::sysmem2::BufferUsage usage = fidl::Clone(get_none_usage()),
+    const std::vector<fuchsia::images2::PixelFormatModifier>& additional_format_modifiers = {},
+    std::optional<fuchsia::sysmem2::BufferMemoryConstraints> memory_constraints = std::nullopt);
 
 // Sets the constraints on a client buffer collection pointer and returns that pointer back to
 // the caller, *without* waiting for the constraint setting to finish. It is up to the caller
 // to wait until constraints are set.
-fuchsia::sysmem::BufferCollectionSyncPtr CreateBufferCollectionSyncPtrAndSetConstraints(
-    fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
-    fuchsia::sysmem::BufferCollectionTokenSyncPtr token, uint32_t image_count = 1,
-    uint32_t width = 64, uint32_t height = 32, fuchsia::sysmem::BufferUsage usage = kNoneUsage,
-    fuchsia::sysmem::PixelFormatType format = fuchsia::sysmem::PixelFormatType::BGRA32,
-    std::optional<fuchsia::sysmem::BufferMemoryConstraints> memory_constraints = std::nullopt,
-    std::optional<uint64_t> pixel_format_modifier = std::nullopt);
+fuchsia::sysmem2::BufferCollectionSyncPtr CreateBufferCollectionSyncPtrAndSetConstraints(
+    fuchsia::sysmem2::Allocator_Sync* sysmem_allocator,
+    fuchsia::sysmem2::BufferCollectionTokenSyncPtr token, uint32_t image_count = 1,
+    uint32_t width = 64, uint32_t height = 32,
+    fuchsia::sysmem2::BufferUsage usage = fidl::Clone(get_none_usage()),
+    fuchsia::images2::PixelFormat format = fuchsia::images2::PixelFormat::B8G8R8A8,
+    std::optional<fuchsia::sysmem2::BufferMemoryConstraints> memory_constraints = std::nullopt,
+    std::optional<fuchsia::images2::PixelFormatModifier> pixel_format_modifier = std::nullopt);
 
 enum class HostPointerAccessMode : uint32_t {
   kReadOnly = 0b01,
@@ -71,8 +81,8 @@ enum class HostPointerAccessMode : uint32_t {
 // number of bytes. If an out of bounds vmo_idx is provided, the callback function will call the
 // user callback with mapped_ptr equal to nullptr. Once the callback function returns, the host
 // pointer is unmapped and so cannot continue to be used outside of the scope of the callback.
-void MapHostPointer(const fuchsia::sysmem::BufferCollectionInfo_2& collection_info,
-                    uint32_t vmo_idx, HostPointerAccessMode host_pointer_access_mode,
+void MapHostPointer(const fuchsia::sysmem2::BufferCollectionInfo& collection_info, uint32_t vmo_idx,
+                    HostPointerAccessMode host_pointer_access_mode,
                     std::function<void(uint8_t* mapped_ptr, uint32_t num_bytes)> callback);
 
 // Maps a given vmo's bytes into host memory that can be accessed via a callback function. The

@@ -24,7 +24,7 @@ enum class BufferCollectionUsage { kClientImage, kRenderTarget, kReadback };
 // Struct representing the data needed to extract an image from a buffer collection.
 // All pixel information is stored within the Vmo of the collection so this struct
 // only needs information regarding which collection and which vmo to point to, and
-// the overall size of the image. Only supports fuchsia::sysmem::PixelFormatType::BGRA32
+// the overall size of the image. Only supports fuchsia::images2::PixelFormat::B8G8R8A8
 // as the image format type.
 struct ImageMetadata {
   // The unique id of the buffer collection this image is backed by.
@@ -96,8 +96,8 @@ class BufferCollectionImporter {
   // |size| may be optionally set to indicate the intended size usage so that it may be specified
   // when setting constraints in |token|, i.e. for kRenderTarget allocations.
   virtual bool ImportBufferCollection(
-      GlobalBufferCollectionId collection_id, fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
-      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
+      GlobalBufferCollectionId collection_id, fuchsia::sysmem2::Allocator_Sync* sysmem_allocator,
+      fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token,
       BufferCollectionUsage usage, std::optional<fuchsia::math::SizeU> size) = 0;
 
   // Releases the buffer collection from the service. It may be called while there are associated

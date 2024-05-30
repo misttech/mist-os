@@ -64,25 +64,33 @@ MATCHER_P(FidlEquals, value,
   return fidl::Equals(arg, value);
 }
 
-fuchsia::sysmem::BufferCollectionTokenPtr DuplicateToken(
-    fuchsia::sysmem::BufferCollectionTokenSyncPtr& token) {
-  std::vector<fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>> dup_tokens;
-  const auto status = token->DuplicateSync({ZX_RIGHT_SAME_RIGHTS}, &dup_tokens);
+fuchsia::sysmem2::BufferCollectionTokenPtr DuplicateToken(
+    fuchsia::sysmem2::BufferCollectionTokenSyncPtr& token) {
+  fuchsia::sysmem2::BufferCollectionTokenDuplicateSyncRequest dup_sync_request;
+  dup_sync_request.set_rights_attenuation_masks({ZX_RIGHT_SAME_RIGHTS});
+  fuchsia::sysmem2::BufferCollectionToken_DuplicateSync_Result dup_sync_result;
+  const auto status = token->DuplicateSync(std::move(dup_sync_request), &dup_sync_result);
   FX_CHECK(status == ZX_OK);
-  FX_CHECK(dup_tokens.size() == 1u);
-  return dup_tokens.at(0).Bind();
+  FX_CHECK(dup_sync_result.is_response());
+  FX_CHECK(dup_sync_result.response().tokens().size() == 1u);
+  return dup_sync_result.response().mutable_tokens()->at(0).Bind();
 }
 
-void SetConstraintsAndClose(fuchsia::sysmem::AllocatorSyncPtr& sysmem_allocator,
-                            fuchsia::sysmem::BufferCollectionTokenSyncPtr token,
-                            fuchsia::sysmem::BufferCollectionConstraints constraints) {
-  fuchsia::sysmem::BufferCollectionSyncPtr collection;
-  ASSERT_EQ(sysmem_allocator->BindSharedCollection(std::move(token), collection.NewRequest()),
-            ZX_OK);
-  ASSERT_EQ(collection->SetConstraints(true, constraints), ZX_OK);
+void SetConstraintsAndClose(fuchsia::sysmem2::AllocatorSyncPtr& sysmem_allocator,
+                            fuchsia::sysmem2::BufferCollectionTokenSyncPtr token,
+                            fuchsia::sysmem2::BufferCollectionConstraints constraints) {
+  fuchsia::sysmem2::BufferCollectionSyncPtr collection;
+  fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.set_token(std::move(token));
+  bind_shared_request.set_buffer_collection_request(collection.NewRequest());
+  ASSERT_EQ(sysmem_allocator->BindSharedCollection(std::move(bind_shared_request)), ZX_OK);
+
+  fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  set_constraints_request.set_constraints(std::move(constraints));
+  ASSERT_EQ(collection->SetConstraints(std::move(set_constraints_request)), ZX_OK);
   // If SetConstraints() fails there's a race where Sysmem may drop the channel. Don't assert on the
   // success of Close().
-  collection->Close();
+  collection->Release();
 }
 
 bool RunWithTimeoutOrUntil(fit::function<bool()> condition, zx::duration timeout,
@@ -143,21 +151,25 @@ class DisplayCompositorTest : public DisplayCompositorTestBase {
     DisplayCompositorTestBase::TearDown();
   }
 
-  fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> CreateToken() {
-    fuchsia::sysmem::BufferCollectionTokenSyncPtr token;
-    zx_status_t status = sysmem_allocator_->AllocateSharedCollection(token.NewRequest());
+  fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> CreateToken() {
+    fuchsia::sysmem2::BufferCollectionTokenSyncPtr token;
+    fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
+    allocate_shared_request.set_token_request(token.NewRequest());
+    zx_status_t status =
+        sysmem_allocator_->AllocateSharedCollection(std::move(allocate_shared_request));
     FX_DCHECK(status == ZX_OK);
-    status = token->Sync();
+    fuchsia::sysmem2::Node_Sync_Result sync_result;
+    status = token->Sync(&sync_result);
     FX_DCHECK(status == ZX_OK);
+    FX_DCHECK(sync_result.is_response());
     return token;
   }
 
   void SetDisplaySupported(allocation::GlobalBufferCollectionId id, bool is_supported) {
     std::scoped_lock lock(display_compositor_->lock_);
     display_compositor_->buffer_collection_supports_display_[id] = is_supported;
-    display_compositor_->buffer_collection_pixel_format_[id] = fuchsia::sysmem::PixelFormat{
-        .type = fuchsia::sysmem::PixelFormatType::BGRA32,
-    };
+    display_compositor_->buffer_collection_pixel_format_modifier_[id] =
+        fuchsia::images2::PixelFormatModifier::LINEAR;
   }
 
   void ForceRendererOnlyMode(bool force_renderer_only) {
@@ -189,7 +201,7 @@ class DisplayCompositorTest : public DisplayCompositorTestBase {
 
   // Only for use on the main thread. Establish a new connection when on the MockDisplayCoordinator
   // thread.
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
 
   void HardwareFrameCorrectnessWithRotationTester(
       glm::mat3 transform_matrix, ImageFlip image_flip,
@@ -226,10 +238,11 @@ TEST_F(DisplayCompositorTest, ImportAndReleaseBufferCollectionTest) {
                          WithResponse({}));
           }));
   // Save token to avoid early token failure.
-  fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_ref;
+  fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token_ref;
   EXPECT_CALL(*renderer_, ImportBufferCollection(kGlobalBufferCollectionId, _, _, _, _))
-      .WillOnce([&token_ref](allocation::GlobalBufferCollectionId, fuchsia::sysmem::Allocator_Sync*,
-                             fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
+      .WillOnce([&token_ref](allocation::GlobalBufferCollectionId,
+                             fuchsia::sysmem2::Allocator_Sync*,
+                             fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token,
                              BufferCollectionUsage, std::optional<fuchsia::math::SizeU>) {
         token_ref = std::move(token);
         return true;
@@ -269,39 +282,35 @@ TEST_F(DisplayCompositorTest,
        SysmemNegotiationTest_WhenDisplayConstraintsCompatible_TheyShouldBeIncluded) {
   // Create two tokens: one for acting as the "client" and inspecting allocation results with, and
   // one to send to the display compositor.
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr client_token = CreateToken().BindSync();
-  fuchsia::sysmem::BufferCollectionTokenPtr compositor_token = DuplicateToken(client_token);
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr client_token = CreateToken().BindSync();
+  fuchsia::sysmem2::BufferCollectionTokenPtr compositor_token = DuplicateToken(client_token);
 
   // Set "client" constraints.
-  fuchsia::sysmem::BufferCollectionSyncPtr client_collection;
-  ASSERT_EQ(sysmem_allocator_->BindSharedCollection(std::move(client_token),
-                                                    client_collection.NewRequest()),
-            ZX_OK);
-  ASSERT_EQ(client_collection->SetConstraints(
-                true,
-                fuchsia::sysmem::BufferCollectionConstraints{
-                    .usage{.cpu = fuchsia::sysmem::cpuUsageWrite},
-                    .min_buffer_count = 1,
-                    .max_buffer_count = 3,
-                    .has_buffer_memory_constraints = true,
-                    .buffer_memory_constraints{
-                        .min_size_bytes = 1,
-                        .max_size_bytes = 20,
-                    },
-                    .image_format_constraints_count = 1,
-                    .image_format_constraints{
-                        {{.pixel_format{.type = fuchsia::sysmem::PixelFormatType::BGRA32},
-                          .color_spaces_count = 1,
-                          .color_space{{{.type = fuchsia::sysmem::ColorSpaceType::SRGB}}},
-                          .min_coded_width = 1,
-                          .min_coded_height = 1}}}}),
-            ZX_OK);
+  fuchsia::sysmem2::BufferCollectionSyncPtr client_collection;
+  fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.set_token(std::move(client_token));
+  bind_shared_request.set_buffer_collection_request(client_collection.NewRequest());
+  ASSERT_EQ(sysmem_allocator_->BindSharedCollection(std::move(bind_shared_request)), ZX_OK);
+
+  fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  auto& constraints = *set_constraints_request.mutable_constraints();
+  constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_WRITE);
+  constraints.set_min_buffer_count(1);
+  constraints.set_max_buffer_count(3);
+  auto& bmc = *constraints.mutable_buffer_memory_constraints();
+  bmc.set_min_size_bytes(1);
+  bmc.set_max_size_bytes(20);
+  auto& ifc = constraints.mutable_image_format_constraints()->emplace_back();
+  ifc.set_pixel_format(fuchsia::images2::PixelFormat::B8G8R8A8);
+  ifc.mutable_color_spaces()->emplace_back(fuchsia::images2::ColorSpace::SRGB);
+  ifc.set_min_size(fuchsia::math::SizeU{.width = 1, .height = 1});
+  ASSERT_EQ(client_collection->SetConstraints(std::move(set_constraints_request)), ZX_OK);
 
   const auto kGlobalBufferCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
       allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
 
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr display_token;
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr display_token;
   EXPECT_CALL(*mock_display_coordinator_,
               ImportBufferCollection(FidlEquals(kDisplayBufferCollectionId), _, _))
       .Times(1)
@@ -309,7 +318,9 @@ TEST_F(DisplayCompositorTest,
           [&display_token](fuchsia::hardware::display::BufferCollectionId,
                            fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
                            MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
-            display_token = token.BindSync();
+            display_token =
+                fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>(token.TakeChannel())
+                    .BindSync();
             callback(
                 fuchsia::hardware::display::Coordinator_ImportBufferCollection_Result::WithResponse(
                     {}));
@@ -324,13 +335,13 @@ TEST_F(DisplayCompositorTest,
               fuchsia::hardware::display::BufferCollectionId collection_id,
               fuchsia::hardware::display::types::ImageBufferUsage image_buffer_usage,
               MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
+            fuchsia::sysmem2::BufferCollectionConstraints constraints;
+            constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_WRITE);
+            constraints.set_min_buffer_count(2);
+            constraints.set_max_buffer_count(3);
             auto sysmem_allocator = utils::CreateSysmemAllocatorSyncPtr("MockDisplayCoordinator");
             SetConstraintsAndClose(sysmem_allocator, std::move(display_token),
-                                   fuchsia::sysmem::BufferCollectionConstraints{
-                                       .usage{.cpu = fuchsia::sysmem::cpuUsageWrite},
-                                       .min_buffer_count = 2,
-                                       .max_buffer_count = 3,
-                                   });
+                                   std::move(constraints));
             callback(fuchsia::hardware::display::Coordinator_SetBufferCollectionConstraints_Result::
                          WithResponse({}));
           }));
@@ -351,30 +362,28 @@ TEST_F(DisplayCompositorTest,
 
   // Set renderer constraints.
   EXPECT_CALL(*renderer_, ImportBufferCollection(kGlobalBufferCollectionId, _, _, _, _))
-      .WillOnce([this](allocation::GlobalBufferCollectionId, fuchsia::sysmem::Allocator_Sync*,
-                       fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> renderer_token,
-                       BufferCollectionUsage, std::optional<fuchsia::math::SizeU>) {
-        SetConstraintsAndClose(sysmem_allocator_, renderer_token.BindSync(),
-                               fuchsia::sysmem::BufferCollectionConstraints{
-                                   .usage{.cpu = fuchsia::sysmem::cpuUsageWrite},
-                                   .min_buffer_count = 1,
-                                   .max_buffer_count = 2,
-                               });
-        return true;
-      });
+      .WillOnce(
+          [this](allocation::GlobalBufferCollectionId, fuchsia::sysmem2::Allocator_Sync*,
+                 fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> renderer_token,
+                 BufferCollectionUsage, std::optional<fuchsia::math::SizeU>) {
+            fuchsia::sysmem2::BufferCollectionConstraints constraints;
+            constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_WRITE);
+            constraints.set_min_buffer_count(1);
+            constraints.set_max_buffer_count(2);
+            SetConstraintsAndClose(sysmem_allocator_, renderer_token.BindSync(),
+                                   std::move(constraints));
+            return true;
+          });
 
   ASSERT_TRUE(display_compositor_->ImportBufferCollection(
       kGlobalBufferCollectionId, sysmem_allocator_.get(), std::move(compositor_token),
       BufferCollectionUsage::kClientImage, std::nullopt));
 
   {
-    fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info{};
-    zx_status_t allocation_status = ZX_OK;
-    ASSERT_EQ(
-        client_collection->WaitForBuffersAllocated(&allocation_status, &buffer_collection_info),
-        ZX_OK);
-    EXPECT_EQ(allocation_status, ZX_OK);
-    EXPECT_EQ(buffer_collection_info.buffer_count, 2u);
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+    ASSERT_EQ(client_collection->WaitForAllBuffersAllocated(&wait_result), ZX_OK);
+    EXPECT_TRUE(wait_result.is_response());
+    EXPECT_EQ(wait_result.response().buffer_collection_info().buffers().size(), 2u);
   }
 
   // ImportBufferImage() to confirm that the allocation was handled correctly.
@@ -403,39 +412,35 @@ TEST_F(DisplayCompositorTest,
        SysmemNegotiationTest_WhenDisplayConstraintsIncompatible_TheyShouldBeExcluded) {
   // Create two tokens: one for acting as the "client" and inspecting allocation results with, and
   // one to send to the display compositor.
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr client_token = CreateToken().BindSync();
-  fuchsia::sysmem::BufferCollectionTokenPtr compositor_token = DuplicateToken(client_token);
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr client_token = CreateToken().BindSync();
+  fuchsia::sysmem2::BufferCollectionTokenPtr compositor_token = DuplicateToken(client_token);
 
   // Set "client" constraints.
-  fuchsia::sysmem::BufferCollectionSyncPtr client_collection;
-  ASSERT_EQ(sysmem_allocator_->BindSharedCollection(std::move(client_token),
-                                                    client_collection.NewRequest()),
-            ZX_OK);
-  ASSERT_EQ(client_collection->SetConstraints(
-                true,
-                fuchsia::sysmem::BufferCollectionConstraints{
-                    .usage{.cpu = fuchsia::sysmem::cpuUsageWrite},
-                    .min_buffer_count = 1,
-                    .max_buffer_count = 2,
-                    .has_buffer_memory_constraints = true,
-                    .buffer_memory_constraints{
-                        .min_size_bytes = 1,
-                        .max_size_bytes = 20,
-                    },
-                    .image_format_constraints_count = 1,
-                    .image_format_constraints{
-                        {{.pixel_format{.type = fuchsia::sysmem::PixelFormatType::BGRA32},
-                          .color_spaces_count = 1,
-                          .color_space{{{.type = fuchsia::sysmem::ColorSpaceType::SRGB}}},
-                          .min_coded_width = 1,
-                          .min_coded_height = 1}}}}),
-            ZX_OK);
+  fuchsia::sysmem2::BufferCollectionSyncPtr client_collection;
+  fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.set_token(std::move(client_token));
+  bind_shared_request.set_buffer_collection_request(client_collection.NewRequest());
+  ASSERT_EQ(sysmem_allocator_->BindSharedCollection(std::move(bind_shared_request)), ZX_OK);
+
+  fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  auto& constraints = *set_constraints_request.mutable_constraints();
+  constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_WRITE);
+  constraints.set_min_buffer_count(1);
+  constraints.set_max_buffer_count(2);
+  auto& bmc = *constraints.mutable_buffer_memory_constraints();
+  bmc.set_min_size_bytes(1);
+  bmc.set_max_size_bytes(20);
+  auto& ifc = constraints.mutable_image_format_constraints()->emplace_back();
+  ifc.set_pixel_format(fuchsia::images2::PixelFormat::B8G8R8A8);
+  ifc.mutable_color_spaces()->emplace_back(fuchsia::images2::ColorSpace::SRGB);
+  ifc.set_min_size(fuchsia::math::SizeU{.width = 1, .height = 1});
+  ASSERT_EQ(client_collection->SetConstraints(std::move(set_constraints_request)), ZX_OK);
 
   const auto kGlobalBufferCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
       allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
 
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr display_token;
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr display_token;
   EXPECT_CALL(*mock_display_coordinator_,
               ImportBufferCollection(FidlEquals(kDisplayBufferCollectionId), _, _))
       .Times(1)
@@ -443,14 +448,16 @@ TEST_F(DisplayCompositorTest,
           [&display_token](fuchsia::hardware::display::BufferCollectionId,
                            fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
                            MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
-            display_token = token.BindSync();
+            display_token =
+                fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>(token.TakeChannel())
+                    .BindSync();
             callback(
                 fuchsia::hardware::display::Coordinator_ImportBufferCollection_Result::WithResponse(
                     {}));
           }));
 
   // Set display constraints.
-  fuchsia::sysmem::BufferCollectionSyncPtr display_collection;
+  fuchsia::sysmem2::BufferCollectionSyncPtr display_collection;
   EXPECT_CALL(*mock_display_coordinator_,
               SetBufferCollectionConstraints(FidlEquals(kDisplayBufferCollectionId), _, _))
       .Times(1)
@@ -459,13 +466,13 @@ TEST_F(DisplayCompositorTest,
               fuchsia::hardware::display::BufferCollectionId collection_id,
               fuchsia::hardware::display::types::ImageBufferUsage image_buffer_usage,
               MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
+            fuchsia::sysmem2::BufferCollectionConstraints constraints;
+            constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_WRITE);
+            constraints.set_min_buffer_count(1);
+            constraints.set_max_buffer_count(1);
             auto sysmem_allocator = utils::CreateSysmemAllocatorSyncPtr("MockDisplayCoordinator");
             SetConstraintsAndClose(sysmem_allocator, std::move(display_token),
-                                   fuchsia::sysmem::BufferCollectionConstraints{
-                                       .usage{.cpu = fuchsia::sysmem::cpuUsageWrite},
-                                       .min_buffer_count = 1,
-                                       .max_buffer_count = 1,
-                                   });
+                                   std::move(constraints));
             callback(fuchsia::hardware::display::Coordinator_SetBufferCollectionConstraints_Result::
                          WithResponse({}));
           }));
@@ -477,30 +484,28 @@ TEST_F(DisplayCompositorTest,
 
   // Set renderer constraints.
   EXPECT_CALL(*renderer_, ImportBufferCollection(kGlobalBufferCollectionId, _, _, _, _))
-      .WillOnce([this](allocation::GlobalBufferCollectionId, fuchsia::sysmem::Allocator_Sync*,
-                       fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> renderer_token,
-                       BufferCollectionUsage, std::optional<fuchsia::math::SizeU>) {
-        SetConstraintsAndClose(sysmem_allocator_, renderer_token.BindSync(),
-                               fuchsia::sysmem::BufferCollectionConstraints{
-                                   .usage{.cpu = fuchsia::sysmem::cpuUsageWrite},
-                                   .min_buffer_count = 2,
-                                   .max_buffer_count = 2,
-                               });
-        return true;
-      });
+      .WillOnce(
+          [this](allocation::GlobalBufferCollectionId, fuchsia::sysmem2::Allocator_Sync*,
+                 fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> renderer_token,
+                 BufferCollectionUsage, std::optional<fuchsia::math::SizeU>) {
+            fuchsia::sysmem2::BufferCollectionConstraints constraints;
+            constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_WRITE);
+            constraints.set_min_buffer_count(2);
+            constraints.set_max_buffer_count(2);
+            SetConstraintsAndClose(sysmem_allocator_, renderer_token.BindSync(),
+                                   std::move(constraints));
+            return true;
+          });
 
   ASSERT_TRUE(display_compositor_->ImportBufferCollection(
       kGlobalBufferCollectionId, sysmem_allocator_.get(), std::move(compositor_token),
       BufferCollectionUsage::kClientImage, std::nullopt));
 
   {
-    fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info{};
-    zx_status_t allocation_status = ZX_OK;
-    ASSERT_EQ(
-        client_collection->WaitForBuffersAllocated(&allocation_status, &buffer_collection_info),
-        ZX_OK);
-    EXPECT_EQ(allocation_status, ZX_OK);
-    EXPECT_EQ(buffer_collection_info.buffer_count, 2u);
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+    ASSERT_EQ(client_collection->WaitForAllBuffersAllocated(&wait_result), ZX_OK);
+    EXPECT_TRUE(wait_result.is_response());
+    EXPECT_EQ(wait_result.response().buffer_collection_info().buffers().size(), 2u);
   }
 
   // ImportBufferImage() to confirm that the allocation was handled correctly.
@@ -522,32 +527,27 @@ TEST_F(DisplayCompositorTest, SysmemNegotiationTest_InRendererOnlyMode_DisplaySh
 
   // Create two tokens: one for acting as the "client" and inspecting allocation results with, and
   // one to send to the display compositor.
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr client_token = CreateToken().BindSync();
-  fuchsia::sysmem::BufferCollectionTokenPtr compositor_token = DuplicateToken(client_token);
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr client_token = CreateToken().BindSync();
+  fuchsia::sysmem2::BufferCollectionTokenPtr compositor_token = DuplicateToken(client_token);
 
   // Set "client" constraints.
-  fuchsia::sysmem::BufferCollectionSyncPtr client_collection;
-  ASSERT_EQ(sysmem_allocator_->BindSharedCollection(std::move(client_token),
-                                                    client_collection.NewRequest()),
-            ZX_OK);
+  fuchsia::sysmem2::BufferCollectionSyncPtr client_collection;
+  fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.set_token(std::move(client_token));
+  bind_shared_request.set_buffer_collection_request(client_collection.NewRequest());
+  ASSERT_EQ(sysmem_allocator_->BindSharedCollection(std::move(bind_shared_request)), ZX_OK);
 
-  ASSERT_EQ(client_collection->SetConstraints(
-                true,
-                fuchsia::sysmem::BufferCollectionConstraints{
-                    .usage{.cpu = fuchsia::sysmem::cpuUsageWrite},
-                    .has_buffer_memory_constraints = true,
-                    .buffer_memory_constraints{
-                        .min_size_bytes = 1,
-                        .max_size_bytes = 20,
-                    },
-                    .image_format_constraints_count = 1,
-                    .image_format_constraints{
-                        {{.pixel_format{.type = fuchsia::sysmem::PixelFormatType::BGRA32},
-                          .color_spaces_count = 1,
-                          .color_space{{{.type = fuchsia::sysmem::ColorSpaceType::SRGB}}},
-                          .min_coded_width = 1,
-                          .min_coded_height = 1}}}}),
-            ZX_OK);
+  fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  auto& constraints = *set_constraints_request.mutable_constraints();
+  constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_WRITE);
+  auto& bmc = *constraints.mutable_buffer_memory_constraints();
+  bmc.set_min_size_bytes(1);
+  bmc.set_max_size_bytes(20);
+  auto& ifc = constraints.mutable_image_format_constraints()->emplace_back();
+  ifc.set_pixel_format(fuchsia::images2::PixelFormat::B8G8R8A8);
+  ifc.mutable_color_spaces()->emplace_back(fuchsia::images2::ColorSpace::SRGB);
+  ifc.set_min_size(fuchsia::math::SizeU{.width = 1, .height = 1});
+  ASSERT_EQ(client_collection->SetConstraints(std::move(set_constraints_request)), ZX_OK);
 
   const auto kGlobalBufferCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
@@ -561,17 +561,18 @@ TEST_F(DisplayCompositorTest, SysmemNegotiationTest_InRendererOnlyMode_DisplaySh
 
   // Set renderer constraints.
   EXPECT_CALL(*renderer_, ImportBufferCollection(kGlobalBufferCollectionId, _, _, _, _))
-      .WillOnce([this](allocation::GlobalBufferCollectionId, fuchsia::sysmem::Allocator_Sync*,
-                       fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> renderer_token,
-                       BufferCollectionUsage, std::optional<fuchsia::math::SizeU>) {
-        SetConstraintsAndClose(sysmem_allocator_, renderer_token.BindSync(),
-                               fuchsia::sysmem::BufferCollectionConstraints{
-                                   .usage{.cpu = fuchsia::sysmem::cpuUsageWrite},
-                                   .min_buffer_count = 2,
-                                   .max_buffer_count = 2,
-                               });
-        return true;
-      });
+      .WillOnce(
+          [this](allocation::GlobalBufferCollectionId, fuchsia::sysmem2::Allocator_Sync*,
+                 fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> renderer_token,
+                 BufferCollectionUsage, std::optional<fuchsia::math::SizeU>) {
+            fuchsia::sysmem2::BufferCollectionConstraints constraints;
+            constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_WRITE);
+            constraints.set_min_buffer_count(2);
+            constraints.set_max_buffer_count(2);
+            SetConstraintsAndClose(sysmem_allocator_, renderer_token.BindSync(),
+                                   std::move(constraints));
+            return true;
+          });
 
   // Import BufferCollection and image to trigger constraint setting and handling of allocations.
   ASSERT_TRUE(display_compositor_->ImportBufferCollection(
@@ -579,13 +580,10 @@ TEST_F(DisplayCompositorTest, SysmemNegotiationTest_InRendererOnlyMode_DisplaySh
       BufferCollectionUsage::kClientImage, std::nullopt));
 
   {
-    fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info{};
-    zx_status_t allocation_status = ZX_OK;
-    ASSERT_EQ(
-        client_collection->WaitForBuffersAllocated(&allocation_status, &buffer_collection_info),
-        ZX_OK);
-    EXPECT_EQ(allocation_status, ZX_OK);
-    EXPECT_EQ(buffer_collection_info.buffer_count, 2u);
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+    ASSERT_EQ(client_collection->WaitForAllBuffersAllocated(&wait_result), ZX_OK);
+    EXPECT_TRUE(wait_result.is_response());
+    EXPECT_EQ(wait_result.response().buffer_collection_info().buffers().size(), 2u);
   }
 
   // ImportBufferImage() to confirm that the allocation was handled correctly.
@@ -607,21 +605,26 @@ TEST_F(DisplayCompositorTest, ClientDropSysmemToken) {
   const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
       allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
 
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr dup_token;
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr dup_token;
   // Let client drop token.
   {
     auto token = CreateToken();
     auto sync_token = token.BindSync();
-    sync_token->Duplicate(ZX_RIGHT_SAME_RIGHTS, dup_token.NewRequest());
-    sync_token->Sync();
+    fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest dup_request;
+    dup_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
+    dup_request.set_token_request(dup_token.NewRequest());
+    sync_token->Duplicate(std::move(dup_request));
+
+    fuchsia::sysmem2::Node_Sync_Result sync_result;
+    sync_token->Sync(&sync_result);
   }
 
   // Save token to avoid early token failure in Renderer import.
-  fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_ref;
+  fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token_ref;
   ON_CALL(*renderer_, ImportBufferCollection(kGlobalBufferCollectionId, _, _, _, _))
       .WillByDefault(
-          [&token_ref](allocation::GlobalBufferCollectionId, fuchsia::sysmem::Allocator_Sync*,
-                       fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
+          [&token_ref](allocation::GlobalBufferCollectionId, fuchsia::sysmem2::Allocator_Sync*,
+                       fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token,
                        BufferCollectionUsage, std::optional<fuchsia::math::SizeU>) {
             token_ref = std::move(token);
             return true;
@@ -669,10 +672,11 @@ TEST_F(DisplayCompositorTest, ImageIsValidAfterReleaseBufferCollection) {
                          WithResponse({}));
           }));
   // Save token to avoid early token failure.
-  fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_ref;
+  fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token_ref;
   EXPECT_CALL(*renderer_, ImportBufferCollection(kGlobalBufferCollectionId, _, _, _, _))
-      .WillOnce([&token_ref](allocation::GlobalBufferCollectionId, fuchsia::sysmem::Allocator_Sync*,
-                             fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
+      .WillOnce([&token_ref](allocation::GlobalBufferCollectionId,
+                             fuchsia::sysmem2::Allocator_Sync*,
+                             fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token,
                              BufferCollectionUsage, std::optional<fuchsia::math::SizeU>) {
         token_ref = std::move(token);
         return true;
@@ -762,10 +766,11 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
                          WithResponse({}));
           }));
   // Save token to avoid early token failure.
-  fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_ref;
+  fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token_ref;
   EXPECT_CALL(*renderer_, ImportBufferCollection(kGlobalBufferCollectionId, _, _, _, _))
-      .WillOnce([&token_ref](allocation::GlobalBufferCollectionId, fuchsia::sysmem::Allocator_Sync*,
-                             fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
+      .WillOnce([&token_ref](allocation::GlobalBufferCollectionId,
+                             fuchsia::sysmem2::Allocator_Sync*,
+                             fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token,
                              BufferCollectionUsage, std::optional<fuchsia::math::SizeU>) {
         token_ref = std::move(token);
         return true;
@@ -1046,10 +1051,11 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
                          WithResponse({}));
           }));
   // Save token to avoid early token failure.
-  fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_ref;
+  fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token_ref;
   EXPECT_CALL(*renderer_, ImportBufferCollection(kGlobalBufferCollectionId, _, _, _, _))
-      .WillOnce([&token_ref](allocation::GlobalBufferCollectionId, fuchsia::sysmem::Allocator_Sync*,
-                             fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
+      .WillOnce([&token_ref](allocation::GlobalBufferCollectionId,
+                             fuchsia::sysmem2::Allocator_Sync*,
+                             fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token,
                              BufferCollectionUsage, std::optional<fuchsia::math::SizeU>) {
         token_ref = std::move(token);
         return true;
@@ -1256,10 +1262,11 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
                          WithResponse({}));
           }));
   // Save token to avoid early token failure.
-  fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_ref;
+  fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token_ref;
   EXPECT_CALL(*renderer_, ImportBufferCollection(kGlobalBufferCollectionId, _, _, _, _))
-      .WillOnce([&token_ref](allocation::GlobalBufferCollectionId, fuchsia::sysmem::Allocator_Sync*,
-                             fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
+      .WillOnce([&token_ref](allocation::GlobalBufferCollectionId,
+                             fuchsia::sysmem2::Allocator_Sync*,
+                             fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token,
                              BufferCollectionUsage, std::optional<fuchsia::math::SizeU>) {
         token_ref = std::move(token);
         return true;
@@ -1586,10 +1593,11 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
                          WithResponse({}));
           }));
   // Save token to avoid early token failure.
-  fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_ref;
+  fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token_ref;
   EXPECT_CALL(*renderer_, ImportBufferCollection(kGlobalBufferCollectionId, _, _, _, _))
-      .WillOnce([&token_ref](allocation::GlobalBufferCollectionId, fuchsia::sysmem::Allocator_Sync*,
-                             fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
+      .WillOnce([&token_ref](allocation::GlobalBufferCollectionId,
+                             fuchsia::sysmem2::Allocator_Sync*,
+                             fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token,
                              BufferCollectionUsage, std::optional<fuchsia::math::SizeU>) {
         token_ref = std::move(token);
         return true;
@@ -1714,10 +1722,11 @@ TEST_F(DisplayCompositorTest, RendererOnly_ImportAndReleaseBufferCollectionTest)
               ImportBufferCollection(FidlEquals(kDisplayBufferCollectionId), _, _))
       .Times(0);
   // Save token to avoid early token failure.
-  fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_ref;
+  fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token_ref;
   EXPECT_CALL(*renderer_, ImportBufferCollection(kGlobalBufferCollectionId, _, _, _, _))
-      .WillOnce([&token_ref](allocation::GlobalBufferCollectionId, fuchsia::sysmem::Allocator_Sync*,
-                             fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
+      .WillOnce([&token_ref](allocation::GlobalBufferCollectionId,
+                             fuchsia::sysmem2::Allocator_Sync*,
+                             fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token,
                              BufferCollectionUsage, std::optional<fuchsia::math::SizeU>) {
         token_ref = std::move(token);
         return true;

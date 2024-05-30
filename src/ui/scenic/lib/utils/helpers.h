@@ -12,11 +12,6 @@
 namespace utils {
 
 using SysmemTokens = struct {
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr local_token;
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr dup_token;
-};
-
-using Sysmem2Tokens = struct {
   fuchsia::sysmem2::BufferCollectionTokenSyncPtr local_token;
   fuchsia::sysmem2::BufferCollectionTokenSyncPtr dup_token;
 };
@@ -54,22 +49,16 @@ std::vector<zx::event> CopyEventArray(const std::vector<zx::event>& events);
 bool IsEventSignalled(const zx::event& event, zx_signals_t signal);
 
 // Create sysmem allocator.
-fuchsia::sysmem::AllocatorSyncPtr CreateSysmemAllocatorSyncPtr(
+fuchsia::sysmem2::AllocatorSyncPtr CreateSysmemAllocatorSyncPtr(
     const std::string& debug_name_suffix = std::string());
 
 // Create local and dup tokens for sysmem.
-SysmemTokens CreateSysmemTokens(fuchsia::sysmem::Allocator_Sync* sysmem_allocator);
-Sysmem2Tokens CreateSysmemTokens(fuchsia::sysmem2::Allocator_Sync* sysmem_allocator);
+SysmemTokens CreateSysmemTokens(fuchsia::sysmem2::Allocator_Sync* sysmem_allocator);
 
 // Creates default constraints for |buffer_collection|
-fuchsia::sysmem::BufferCollectionConstraints CreateDefaultConstraints(uint32_t buffer_count,
-                                                                      uint32_t kWidth,
-                                                                      uint32_t kHeight);
-
-// Transitional: same as above, but returns a sysmem2 BufferCollectionConstraints.
-fuchsia::sysmem2::BufferCollectionConstraints CreateDefaultConstraints2(uint32_t buffer_count,
-                                                                        uint32_t kWidth,
-                                                                        uint32_t kHeight);
+fuchsia::sysmem2::BufferCollectionConstraints CreateDefaultConstraints(uint32_t buffer_count,
+                                                                       uint32_t kWidth,
+                                                                       uint32_t kHeight);
 
 // Accounts for floating point rounding errors.
 bool RectFContainsPoint(const fuchsia::math::RectF& rect, float x, float y);
@@ -94,19 +83,29 @@ std::string GetArrayString(const std::string& name, const std::array<float, Dim>
 
 float GetOrientationAngle(fuchsia::ui::composition::Orientation orientation);
 
+uint32_t GetBytesPerPixel(const fuchsia::sysmem2::SingleBufferSettings& settings);
 uint32_t GetBytesPerPixel(const fuchsia::sysmem::SingleBufferSettings& settings);
 
+uint32_t GetBytesPerPixel(const fuchsia::sysmem2::ImageFormatConstraints& image_format_constraints);
 uint32_t GetBytesPerPixel(const fuchsia::sysmem::ImageFormatConstraints& image_format_constraints);
 
+uint32_t GetBytesPerRow(const fuchsia::sysmem2::SingleBufferSettings& settings,
+                        uint32_t image_width);
 uint32_t GetBytesPerRow(const fuchsia::sysmem::SingleBufferSettings& settings,
                         uint32_t image_width);
 
+uint32_t GetBytesPerRow(const fuchsia::sysmem2::ImageFormatConstraints& image_format_constraints,
+                        uint32_t image_width);
 uint32_t GetBytesPerRow(const fuchsia::sysmem::ImageFormatConstraints& image_format_constraints,
                         uint32_t image_width);
 
+uint32_t GetPixelsPerRow(const fuchsia::sysmem2::SingleBufferSettings& settings,
+                         uint32_t image_width);
 uint32_t GetPixelsPerRow(const fuchsia::sysmem::SingleBufferSettings& settings,
                          uint32_t image_width);
 
+uint32_t GetPixelsPerRow(const fuchsia::sysmem2::ImageFormatConstraints& image_format_constraints,
+                         uint32_t image_width);
 uint32_t GetPixelsPerRow(const fuchsia::sysmem::ImageFormatConstraints& image_format_constraints,
                          uint32_t image_width);
 

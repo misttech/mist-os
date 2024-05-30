@@ -23,8 +23,8 @@ const std::vector<uint8_t> kTransparent = {0, 0, 0, 0};
 
 bool CpuRenderer::ImportBufferCollection(
     allocation::GlobalBufferCollectionId collection_id,
-    fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
-    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
+    fuchsia::sysmem2::Allocator_Sync* sysmem_allocator,
+    fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token,
     BufferCollectionUsage usage, std::optional<fuchsia::math::SizeU> size) {
   FX_DCHECK(collection_id != allocation::kInvalidId);
   FX_DCHECK(token.is_valid());
@@ -35,22 +35,22 @@ bool CpuRenderer::ImportBufferCollection(
     FX_LOGS(ERROR) << "Duplicate GlobalBufferCollectionID: " << collection_id;
     return false;
   }
-  std::optional<fuchsia::sysmem::ImageFormatConstraints> image_constraints;
-  image_constraints->pixel_format.format_modifier.value = fuchsia::sysmem::FORMAT_MODIFIER_LINEAR;
+  std::optional<fuchsia::sysmem2::ImageFormatConstraints> image_constraints;
   if (size.has_value()) {
-    image_constraints = std::make_optional<fuchsia::sysmem::ImageFormatConstraints>();
-    image_constraints->pixel_format.type = fuchsia::sysmem::PixelFormatType::BGRA32;
-    image_constraints->color_spaces_count = 1;
-    image_constraints->color_space[0] =
-        fuchsia::sysmem::ColorSpace{.type = fuchsia::sysmem::ColorSpaceType::SRGB};
-    image_constraints->required_min_coded_width = size->width;
-    image_constraints->required_min_coded_height = size->height;
-    image_constraints->required_max_coded_width = size->width;
-    image_constraints->required_max_coded_height = size->height;
+    image_constraints = std::make_optional<fuchsia::sysmem2::ImageFormatConstraints>();
+    image_constraints->set_pixel_format(fuchsia::images2::PixelFormat::B8G8R8A8);
+    image_constraints->set_pixel_format_modifier(fuchsia::images2::PixelFormatModifier::LINEAR);
+    image_constraints->mutable_color_spaces()->emplace_back(fuchsia::images2::ColorSpace::SRGB);
+    image_constraints->set_required_min_size(
+        fuchsia::math::SizeU{.width = size->width, .height = size->height});
+    image_constraints->set_required_max_size(
+        fuchsia::math::SizeU{.width = size->width, .height = size->height});
   }
-  auto result = BufferCollectionInfo::New(
-      sysmem_allocator, std::move(token), image_constraints,
-      fuchsia::sysmem::BufferUsage{.cpu = fuchsia::sysmem::cpuUsageRead}, usage);
+  fuchsia::sysmem2::BufferUsage buffer_usage;
+  buffer_usage.set_cpu(fuchsia::sysmem2::CPU_USAGE_READ);
+  auto result =
+      BufferCollectionInfo::New(sysmem_allocator, std::move(token), std::move(image_constraints),
+                                std::move(buffer_usage), usage);
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Unable to register collection.";
     return false;
@@ -113,8 +113,8 @@ bool CpuRenderer::ImportBufferImage(const allocation::ImageMetadata& metadata,
   }
 
   const auto& sysmem_info = collection.GetSysmemInfo();
-  const auto vmo_count = sysmem_info.buffer_count;
-  auto image_constraints = sysmem_info.settings.image_format_constraints;
+  const auto vmo_count = sysmem_info.buffers().size();
+  auto& image_constraints = sysmem_info.settings().image_format_constraints();
 
   if (metadata.vmo_index >= vmo_count) {
     FX_LOGS(ERROR) << "ImportBufferImage failed, vmo_index " << metadata.vmo_index
@@ -122,27 +122,27 @@ bool CpuRenderer::ImportBufferImage(const allocation::ImageMetadata& metadata,
     return false;
   }
 
-  if (metadata.width < image_constraints.min_coded_width ||
-      metadata.width > image_constraints.max_coded_width) {
+  if (metadata.width < image_constraints.min_size().width ||
+      metadata.width > image_constraints.max_size().width) {
     FX_LOGS(ERROR) << "ImportBufferImage failed, width " << metadata.width
-                   << " is not within valid range [" << image_constraints.min_coded_width << ","
-                   << image_constraints.max_coded_width << "]";
+                   << " is not within valid range [" << image_constraints.min_size().width << ","
+                   << image_constraints.max_size().width << "]";
     return false;
   }
 
-  if (metadata.height < image_constraints.min_coded_height ||
-      metadata.height > image_constraints.max_coded_height) {
+  if (metadata.height < image_constraints.min_size().height ||
+      metadata.height > image_constraints.max_size().height) {
     FX_LOGS(ERROR) << "ImportBufferImage failed, height " << metadata.height
-                   << " is not within valid range [" << image_constraints.min_coded_height << ","
-                   << image_constraints.max_coded_height << "]";
+                   << " is not within valid range [" << image_constraints.min_size().height << ","
+                   << image_constraints.max_size().height << "]";
     return false;
   }
 
-  const zx::vmo& vmo = sysmem_info.buffers[metadata.vmo_index].vmo;
+  const zx::vmo& vmo = sysmem_info.buffers()[metadata.vmo_index].vmo();
   zx::vmo dup;
   zx_status_t status = vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
   FX_DCHECK(status == ZX_OK);
-  image_map_[metadata.identifier] = std::make_pair(std::move(dup), image_constraints);
+  image_map_[metadata.identifier] = std::make_pair(std::move(dup), fidl::Clone(image_constraints));
 
   return true;
 }
@@ -173,21 +173,21 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
 
     const auto& image_map_itr_ = image_map_.find(image_id);
     FX_DCHECK(image_map_itr_ != image_map_.end());
-    auto image_constraints = image_map_itr_->second.second;
+    const auto& image_constraints = image_map_itr_->second.second;
 
     // Make sure the image conforms to the constraints of the collection.
-    FX_DCHECK(image.width <= image_constraints.max_coded_width);
-    FX_DCHECK(image.height <= image_constraints.max_coded_height);
+    FX_DCHECK(image.width <= image_constraints.max_size().width);
+    FX_DCHECK(image.height <= image_constraints.max_size().height);
 
     auto render_target_id = render_target.identifier;
     FX_DCHECK(render_target_id != allocation::kInvalidId);
     const auto& render_target_map_itr_ = image_map_.find(render_target_id);
     FX_DCHECK(render_target_map_itr_ != image_map_.end());
-    auto render_target_constraints = render_target_map_itr_->second.second;
+    const auto& render_target_constraints = render_target_map_itr_->second.second;
 
     // The image and render_target should be BGRA32 or R8G8B8A8.
-    fuchsia::sysmem::PixelFormatType image_type = image_constraints.pixel_format.type;
-    fuchsia::sysmem::PixelFormatType render_type = render_target_constraints.pixel_format.type;
+    fuchsia::images2::PixelFormat image_type = image_constraints.pixel_format();
+    fuchsia::images2::PixelFormat render_type = render_target_constraints.pixel_format();
     FX_DCHECK(utils::Pixel::IsFormatSupported(image_type));
     FX_DCHECK(utils::Pixel::IsFormatSupported(render_type));
 

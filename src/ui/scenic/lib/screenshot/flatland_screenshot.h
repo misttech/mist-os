@@ -47,7 +47,7 @@ class FlatlandScreenshot : public fuchsia::ui::composition::Screenshot {
   void GetNextFrame();
 
   std::unique_ptr<screen_capture::ScreenCapture> screen_capturer_;
-  fuchsia::sysmem::AllocatorPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorPtr sysmem_allocator_;
   std::shared_ptr<Allocator> flatland_allocator_;
 
   fuchsia::math::SizeU display_size_;
@@ -56,7 +56,7 @@ class FlatlandScreenshot : public fuchsia::ui::composition::Screenshot {
   int display_rotation_ = 0;
 
   // The buffer collection where the display gets rendered into.
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info_{};
+  fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info_;
 
   fidl::Client<fuchsia_ui_compression_internal::ImageCompressor> client_;
 

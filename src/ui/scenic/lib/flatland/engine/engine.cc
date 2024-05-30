@@ -126,7 +126,7 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
         .dimensions = glm::uvec2{hw_display->width_in_px(), hw_display->height_in_px()},
         .formats = display.display()->pixel_formats()};
 
-    fuchsia::sysmem::BufferCollectionInfo_2 render_target_info;
+    fuchsia::sysmem2::BufferCollectionInfo render_target_info;
     flatland_compositor_->AddDisplay(hw_display, display_info,
                                      /*num_vmos*/ kNumDisplayFramebuffers, &render_target_info);
   }

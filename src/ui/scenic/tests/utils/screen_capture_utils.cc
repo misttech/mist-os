@@ -57,11 +57,11 @@ void GenerateImageForFlatlandInstance(uint32_t buffer_collection_index,
 // This method writes to a sysmem buffer, taking into account any potential stride width
 // differences. The method also flushes the cache if the buffer is in RAM domain.
 void WriteToSysmemBuffer(const std::vector<uint8_t>& write_values,
-                         fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info,
+                         fuchsia::sysmem2::BufferCollectionInfo& buffer_collection_info,
                          uint32_t buffer_collection_idx, uint32_t kBytesPerPixel,
                          uint32_t image_width, uint32_t image_height) {
-  FX_DCHECK(kBytesPerPixel == utils::GetBytesPerPixel(buffer_collection_info.settings));
-  uint32_t pixels_per_row = utils::GetPixelsPerRow(buffer_collection_info.settings, image_width);
+  FX_DCHECK(kBytesPerPixel == utils::GetBytesPerPixel(buffer_collection_info.settings()));
+  uint32_t pixels_per_row = utils::GetPixelsPerRow(buffer_collection_info.settings(), image_width);
 
   MapHostPointer(buffer_collection_info, buffer_collection_idx,
                  flatland::HostPointerAccessMode::kReadWrite,
@@ -86,34 +86,43 @@ void WriteToSysmemBuffer(const std::vector<uint8_t>& write_values,
                  });
 
   // Flush the cache if we are operating in RAM.
-  if (buffer_collection_info.settings.buffer_settings.coherency_domain ==
-      fuchsia::sysmem::CoherencyDomain::RAM) {
-    EXPECT_EQ(ZX_OK, buffer_collection_info.buffers[buffer_collection_idx].vmo.op_range(
-                         ZX_VMO_OP_CACHE_CLEAN, 0,
-                         buffer_collection_info.settings.buffer_settings.size_bytes, nullptr, 0));
+  if (buffer_collection_info.settings().buffer_settings().coherency_domain() ==
+      fuchsia::sysmem2::CoherencyDomain::RAM) {
+    EXPECT_EQ(ZX_OK,
+              buffer_collection_info.buffers()[buffer_collection_idx].vmo().op_range(
+                  ZX_VMO_OP_CACHE_CLEAN, 0,
+                  buffer_collection_info.settings().buffer_settings().size_bytes(), nullptr, 0));
   }
 }
 
-fuchsia::sysmem::BufferCollectionInfo_2 CreateBufferCollectionInfo2WithConstraints(
-    fuchsia::sysmem::BufferCollectionConstraints constraints,
+fuchsia::sysmem2::BufferCollectionInfo CreateBufferCollectionInfoWithConstraints(
+    fuchsia::sysmem2::BufferCollectionConstraints constraints,
     allocation::BufferCollectionExportToken export_token,
     fuchsia::ui::composition::Allocator_Sync* flatland_allocator,
-    fuchsia::sysmem::Allocator_Sync* sysmem_allocator, RegisterBufferCollectionUsages usage) {
+    fuchsia::sysmem2::Allocator_Sync* sysmem_allocator, RegisterBufferCollectionUsages usage) {
   RegisterBufferCollectionArgs rbc_args = {};
   zx_status_t status;
   // Create Sysmem tokens.
   auto [local_token, dup_token] = utils::CreateSysmemTokens(sysmem_allocator);
 
   rbc_args.set_export_token(std::move(export_token));
-  rbc_args.set_buffer_collection_token(std::move(dup_token));
+  rbc_args.set_buffer_collection_token(
+      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
+          dup_token.Unbind().TakeChannel()));
   rbc_args.set_usages(usage);
 
-  fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
-  status = sysmem_allocator->BindSharedCollection(std::move(local_token),
-                                                  buffer_collection.NewRequest());
+  fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
+  fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.set_token(std::move(local_token));
+  bind_shared_request.set_buffer_collection_request(buffer_collection.NewRequest());
+  status = sysmem_allocator->BindSharedCollection(std::move(bind_shared_request));
   FX_DCHECK(status == ZX_OK);
 
-  status = buffer_collection->SetConstraints(true, constraints);
+  uint32_t constraints_min_buffer_count = constraints.min_buffer_count();
+
+  fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_reuqest;
+  set_constraints_reuqest.set_constraints(std::move(constraints));
+  status = buffer_collection->SetConstraints(std::move(set_constraints_reuqest));
   FX_DCHECK(status == ZX_OK);
 
   fuchsia::ui::composition::Allocator_RegisterBufferCollection_Result result;
@@ -121,20 +130,22 @@ fuchsia::sysmem::BufferCollectionInfo_2 CreateBufferCollectionInfo2WithConstrain
   FX_DCHECK(!result.is_err());
 
   // Wait for allocation.
-  zx_status_t allocation_status = ZX_OK;
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info{};
-  status = buffer_collection->WaitForBuffersAllocated(&allocation_status, &buffer_collection_info);
+  fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+  status = buffer_collection->WaitForAllBuffersAllocated(&wait_result);
   FX_DCHECK(ZX_OK == status);
-  FX_DCHECK(ZX_OK == allocation_status);
-  FX_DCHECK(constraints.min_buffer_count == buffer_collection_info.buffer_count);
+  FX_DCHECK(!wait_result.is_framework_err());
+  FX_DCHECK(!wait_result.is_err());
+  FX_DCHECK(wait_result.is_response());
+  auto buffer_collection_info = std::move(*wait_result.response().mutable_buffer_collection_info());
+  FX_DCHECK(constraints_min_buffer_count == buffer_collection_info.buffers().size());
 
-  EXPECT_EQ(ZX_OK, buffer_collection->Close());
+  EXPECT_EQ(ZX_OK, buffer_collection->Release());
   return buffer_collection_info;
 }
 
 // This function returns a linear buffer of pixels of size width * height.
 std::vector<uint8_t> ExtractScreenCapture(
-    uint32_t buffer_id, fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info,
+    uint32_t buffer_id, fuchsia::sysmem2::BufferCollectionInfo& buffer_collection_info,
     uint32_t kBytesPerPixel, uint32_t render_target_width, uint32_t render_target_height) {
   // Copy ScreenCapture output for inspection. Note that the stride of the buffer may be different
   // than the width of the image, if the width of the image is not a multiple of 64.
@@ -143,13 +154,14 @@ std::vector<uint8_t> ExtractScreenCapture(
   // which is not a multiple of 64. The next multiple would be 2432, which would mean the buffer
   // is actually a 608x1024 "pixel" buffer, since 2432/4=608. We must account for that 8 byte
   // padding when copying the bytes over to be inspected.
-  EXPECT_EQ(ZX_OK, buffer_collection_info.buffers[buffer_id].vmo.op_range(
-                       ZX_VMO_OP_CACHE_CLEAN_INVALIDATE, 0,
-                       buffer_collection_info.settings.buffer_settings.size_bytes, nullptr, 0));
+  EXPECT_EQ(ZX_OK,
+            buffer_collection_info.buffers()[buffer_id].vmo().op_range(
+                ZX_VMO_OP_CACHE_CLEAN_INVALIDATE, 0,
+                buffer_collection_info.settings().buffer_settings().size_bytes(), nullptr, 0));
 
-  FX_DCHECK(kBytesPerPixel == utils::GetBytesPerPixel(buffer_collection_info.settings));
+  FX_DCHECK(kBytesPerPixel == utils::GetBytesPerPixel(buffer_collection_info.settings()));
   uint32_t pixels_per_row =
-      utils::GetPixelsPerRow(buffer_collection_info.settings, render_target_width);
+      utils::GetPixelsPerRow(buffer_collection_info.settings(), render_target_width);
   std::vector<uint8_t> read_values;
   read_values.resize(static_cast<size_t>(render_target_width) * render_target_height *
                      kBytesPerPixel);

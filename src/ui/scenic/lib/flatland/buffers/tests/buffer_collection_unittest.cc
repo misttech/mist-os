@@ -24,10 +24,13 @@ class BufferCollectionTest : public ::testing::Test {
     ::testing::Test::SetUp();
     // Create the SysmemAllocator.
     zx_status_t status = fdio_service_connect(
-        "/svc/fuchsia.sysmem.Allocator", sysmem_allocator_.NewRequest().TakeChannel().release());
+        "/svc/fuchsia.sysmem2.Allocator", sysmem_allocator_.NewRequest().TakeChannel().release());
     EXPECT_EQ(status, ZX_OK);
-    sysmem_allocator_->SetDebugClientInfo(fsl::GetCurrentProcessName() + " BufferCollectionTest",
-                                          fsl::GetCurrentProcessKoid());
+
+    fuchsia::sysmem2::AllocatorSetDebugClientInfoRequest set_debug_request;
+    set_debug_request.set_name(fsl::GetCurrentProcessName() + " BufferCollectionTest");
+    set_debug_request.set_id(fsl::GetCurrentProcessKoid());
+    sysmem_allocator_->SetDebugClientInfo(std::move(set_debug_request));
   }
 
   void TearDown() override {
@@ -35,7 +38,7 @@ class BufferCollectionTest : public ::testing::Test {
     ::testing::Test::TearDown();
   }
 
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
 };
 
 // Test the creation of a buffer collection that doesn't have any additional vulkan
@@ -54,11 +57,11 @@ TEST_F(BufferCollectionTest, CreateCollectionTest) {
 // out the dummy token inside the call to WaitUntilAllocated() that this is enough to ensure
 // that we can still allocate the buffer collection.
 TEST_F(BufferCollectionTest, AllocationWithoutExtraConstraints) {
-  fuchsia::sysmem::BufferUsage buffer_usage =
-      fuchsia::sysmem::BufferUsage{.cpu = kCpuUsageWriteOften};
+  fuchsia::sysmem2::BufferUsage buffer_usage;
+  buffer_usage.set_cpu(fuchsia::sysmem2::CPU_USAGE_WRITE_OFTEN);
   auto tokens = SysmemTokens::Create(sysmem_allocator_.get());
   auto result = BufferCollectionInfo::New(sysmem_allocator_.get(), std::move(tokens.dup_token),
-                                          std::nullopt, buffer_usage);
+                                          std::nullopt, std::move(buffer_usage));
   EXPECT_TRUE(result.is_ok());
 
   auto collection = std::move(result.value());
@@ -69,47 +72,46 @@ TEST_F(BufferCollectionTest, AllocationWithoutExtraConstraints) {
   {
     const uint32_t kWidth = 32;
     const uint32_t kHeight = 64;
-    fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
-    zx_status_t status = sysmem_allocator_->BindSharedCollection(std::move(tokens.local_token),
-                                                                 buffer_collection.NewRequest());
-    buffer_collection->SetName(100u, "FlatlandAllocationWithoutExtraConstraints");
+    fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
+
+    fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+    bind_shared_request.set_token(std::move(tokens.local_token));
+    bind_shared_request.set_buffer_collection_request(buffer_collection.NewRequest());
+    zx_status_t status = sysmem_allocator_->BindSharedCollection(std::move(bind_shared_request));
+
+    fuchsia::sysmem2::NodeSetNameRequest set_name_request;
+    set_name_request.set_priority(100u);
+    set_name_request.set_name("FlatlandAllocationWithoutExtraConstraints");
+    buffer_collection->SetName(std::move(set_name_request));
+
     EXPECT_EQ(status, ZX_OK);
-    fuchsia::sysmem::BufferCollectionConstraints constraints;
-    constraints.has_buffer_memory_constraints = true;
-    constraints.buffer_memory_constraints.cpu_domain_supported = true;
-    constraints.buffer_memory_constraints.ram_domain_supported = true;
-    constraints.usage.cpu = kCpuUsageWriteOften;
-    constraints.min_buffer_count = 1;
+    fuchsia::sysmem2::BufferCollectionConstraints constraints;
+    auto& bmc = *constraints.mutable_buffer_memory_constraints();
+    bmc.set_cpu_domain_supported(true);
+    bmc.set_ram_domain_supported(true);
+    constraints.mutable_usage()->set_cpu(kCpuUsageWriteOften);
+    constraints.set_min_buffer_count(1);
 
-    constraints.image_format_constraints_count = 1;
-    auto& image_constraints = constraints.image_format_constraints[0];
-    image_constraints.color_spaces_count = 1;
-    image_constraints.color_space[0] =
-        fuchsia::sysmem::ColorSpace{.type = fuchsia::sysmem::ColorSpaceType::SRGB};
-    image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::BGRA32;
-    image_constraints.pixel_format.has_format_modifier = true;
-    image_constraints.pixel_format.format_modifier.value = fuchsia::sysmem::FORMAT_MODIFIER_LINEAR;
+    auto& image_constraints = constraints.mutable_image_format_constraints()->emplace_back();
+    image_constraints.mutable_color_spaces()->emplace_back(fuchsia::images2::ColorSpace::SRGB);
+    image_constraints.set_pixel_format(fuchsia::images2::PixelFormat::B8G8R8A8);
+    image_constraints.set_pixel_format_modifier(fuchsia::images2::PixelFormatModifier::LINEAR);
 
-    image_constraints.required_min_coded_width = kWidth;
-    image_constraints.required_min_coded_height = kHeight;
-    image_constraints.required_max_coded_width = kWidth;
-    image_constraints.required_max_coded_height = kHeight;
-    image_constraints.max_coded_width = kWidth * 4;
-    image_constraints.max_coded_height = kHeight;
-    image_constraints.max_bytes_per_row = 0xffffffff;
+    image_constraints.set_min_size(fuchsia::math::SizeU{kWidth, kHeight});
+    image_constraints.set_max_size(fuchsia::math::SizeU{kWidth, kHeight});
 
-    status = buffer_collection->SetConstraints(true, constraints);
+    fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+    set_constraints_request.set_constraints(std::move(constraints));
+    status = buffer_collection->SetConstraints(std::move(set_constraints_request));
     EXPECT_EQ(status, ZX_OK);
 
     // Have the client wait for allocation.
-    zx_status_t allocation_status = ZX_OK;
-    fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info = {};
-    status =
-        buffer_collection->WaitForBuffersAllocated(&allocation_status, &buffer_collection_info);
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+    status = buffer_collection->WaitForAllBuffersAllocated(&wait_result);
     EXPECT_EQ(status, ZX_OK);
-    EXPECT_EQ(allocation_status, ZX_OK);
+    EXPECT_TRUE(wait_result.is_response());
 
-    status = buffer_collection->Close();
+    status = buffer_collection->Release();
     EXPECT_EQ(status, ZX_OK);
   }
 
@@ -160,52 +162,56 @@ TEST_F(BufferCollectionTest, IncompatibleConstraintsTest) {
   // constraints. We set it to have a max of zero buffers and to not use
   // vulkan sampling, which the server side will specify is necessary.
   {
-    fuchsia::sysmem::BufferCollectionSyncPtr client_collection;
-    zx_status_t status = sysmem_allocator_->BindSharedCollection(std::move(tokens.local_token),
-                                                                 client_collection.NewRequest());
+    fuchsia::sysmem2::BufferCollectionSyncPtr client_collection;
+
+    fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+    bind_shared_request.set_token(std::move(tokens.local_token));
+    bind_shared_request.set_buffer_collection_request(client_collection.NewRequest());
+    zx_status_t status = sysmem_allocator_->BindSharedCollection(std::move(bind_shared_request));
     EXPECT_EQ(status, ZX_OK);
-    client_collection->SetName(100u, "FlatlandIncompatibleConstraintsTest");
-    fuchsia::sysmem::BufferCollectionConstraints constraints;
-    constraints.has_buffer_memory_constraints = true;
-    constraints.buffer_memory_constraints.cpu_domain_supported = true;
-    constraints.buffer_memory_constraints.ram_domain_supported = true;
-    constraints.usage.cpu = kCpuUsageWriteOften;
+
+    fuchsia::sysmem2::NodeSetNameRequest set_name_request;
+    set_name_request.set_priority(100u);
+    set_name_request.set_name("FlatlandIncompatibleConstraintsTest");
+    client_collection->SetName(std::move(set_name_request));
+
+    fuchsia::sysmem2::BufferCollectionConstraints constraints;
+    auto& bmc = *constraints.mutable_buffer_memory_constraints();
+    bmc.set_cpu_domain_supported(true);
+    bmc.set_ram_domain_supported(true);
+    constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_WRITE_OFTEN);
 
     // Need at least one buffer normally.
-    constraints.min_buffer_count = 0;
-    constraints.max_buffer_count = 0;
+    constraints.set_min_buffer_count(0);
+    constraints.set_max_buffer_count(0);
 
-    constraints.usage.vulkan = !fuchsia::sysmem::vulkanUsageSampled;
+    // TODO: Is setting 0 here the intent? (the "!" was preserved during sysmem2 migration)
+    constraints.mutable_usage()->set_vulkan(!fuchsia::sysmem2::VULKAN_IMAGE_USAGE_SAMPLED);
 
-    constraints.image_format_constraints_count = 1;
-    auto& image_constraints = constraints.image_format_constraints[0];
-    image_constraints.color_spaces_count = 0;
+    auto& image_constraints = constraints.mutable_image_format_constraints()->emplace_back();
 
-    image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::R8G8B8A8;
-    image_constraints.pixel_format.has_format_modifier = true;
-    image_constraints.pixel_format.format_modifier.value = fuchsia::sysmem::FORMAT_MODIFIER_LINEAR;
+    image_constraints.set_pixel_format(fuchsia::images2::PixelFormat::R8G8B8A8);
+    image_constraints.set_pixel_format_modifier(fuchsia::images2::PixelFormatModifier::LINEAR);
 
     // The renderer requires that the the buffer can at least have a
     // width/height of 1, which is not possible here.
-    image_constraints.required_min_coded_width = 0;
-    image_constraints.required_min_coded_height = 0;
-    image_constraints.required_max_coded_width = 0;
-    image_constraints.required_max_coded_height = 0;
-    image_constraints.max_coded_width = 0;
-    image_constraints.max_coded_height = 0;
-    image_constraints.max_bytes_per_row = 0x0;
-    status = client_collection->SetConstraints(true, constraints);
+    image_constraints.set_required_min_size(fuchsia::math::SizeU{0, 0});
+    image_constraints.set_required_max_size(::fuchsia::math::SizeU{0, 0});
+    image_constraints.set_max_size(fuchsia::math::SizeU{.width = 0, .height = 0});
+    image_constraints.set_max_bytes_per_row(0x0);
+
+    fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+    set_constraints_request.set_constraints(std::move(constraints));
+    status = client_collection->SetConstraints(std::move(set_constraints_request));
     EXPECT_EQ(status, ZX_OK);
 
     // Have the client wait for allocation.
-    zx_status_t allocation_status = ZX_OK;
-    fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info = {};
-    status =
-        client_collection->WaitForBuffersAllocated(&allocation_status, &buffer_collection_info);
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+    status = client_collection->WaitForAllBuffersAllocated(&wait_result);
 
     // Sysmem reports the error here through |status|.
     EXPECT_NE(status, ZX_OK);
-    EXPECT_EQ(allocation_status, ZX_OK);
+    EXPECT_FALSE(wait_result.is_response());
   }
 
   // This should fail as sysmem won't be able to allocate anything.

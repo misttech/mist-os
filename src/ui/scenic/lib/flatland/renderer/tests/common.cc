@@ -51,10 +51,12 @@ CreateEscherAndPrewarmedRenderer(bool use_protected_memory) {
 void RendererTest::SetUp() {
   escher::test::TestWithVkValidationLayer::SetUp();
   // Create the SysmemAllocator.
-  zx_status_t status = fdio_service_connect("/svc/fuchsia.sysmem.Allocator",
+  zx_status_t status = fdio_service_connect("/svc/fuchsia.sysmem2.Allocator",
                                             sysmem_allocator_.NewRequest().TakeChannel().release());
-  sysmem_allocator_->SetDebugClientInfo(fsl::GetCurrentProcessName() + " RendererTest",
-                                        fsl::GetCurrentProcessKoid());
+  fuchsia::sysmem2::AllocatorSetDebugClientInfoRequest set_debug_request;
+  set_debug_request.set_name(fsl::GetCurrentProcessName() + " RendererTest");
+  set_debug_request.set_id(fsl::GetCurrentProcessKoid());
+  sysmem_allocator_->SetDebugClientInfo(std::move(set_debug_request));
 }
 
 void RendererTest::TearDown() {

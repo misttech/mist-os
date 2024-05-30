@@ -56,10 +56,12 @@ class DisplayCompositorSmokeTest : public DisplayCompositorTestBase {
 
     // Create the SysmemAllocator.
     zx_status_t status = fdio_service_connect(
-        "/svc/fuchsia.sysmem.Allocator", sysmem_allocator_.NewRequest().TakeChannel().release());
+        "/svc/fuchsia.sysmem2.Allocator", sysmem_allocator_.NewRequest().TakeChannel().release());
     EXPECT_EQ(status, ZX_OK);
-    sysmem_allocator_->SetDebugClientInfo(
-        fsl::GetCurrentProcessName() + " DisplayCompositorSmokeTest", fsl::GetCurrentProcessKoid());
+    fuchsia::sysmem2::AllocatorSetDebugClientInfoRequest set_debug_request;
+    set_debug_request.set_name(fsl::GetCurrentProcessName() + " DisplayCompositorSmokeTest");
+    set_debug_request.set_id(fsl::GetCurrentProcessKoid());
+    sysmem_allocator_->SetDebugClientInfo(std::move(set_debug_request));
 
     executor_ = std::make_unique<async::Executor>(dispatcher());
 
@@ -97,7 +99,7 @@ class DisplayCompositorSmokeTest : public DisplayCompositorTestBase {
   static constexpr fuchsia_images2::PixelFormat kPixelFormat =
       fuchsia_images2::PixelFormat::kB8G8R8A8;
 
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
   std::unique_ptr<async::Executor> executor_;
   std::unique_ptr<scenic_impl::display::DisplayManager> display_manager_;
 
@@ -116,10 +118,10 @@ class DisplayCompositorSmokeTest : public DisplayCompositorTestBase {
 
   // Sets up the buffer collection information for collections that will be imported
   // into the engine.
-  fuchsia::sysmem::BufferCollectionSyncPtr SetupClientTextures(
+  fuchsia::sysmem2::BufferCollectionSyncPtr SetupClientTextures(
       DisplayCompositor* display_compositor, allocation::GlobalBufferCollectionId collection_id,
-      fuchsia::sysmem::PixelFormatType pixel_type, uint32_t width, uint32_t height,
-      uint32_t num_vmos, fuchsia::sysmem::BufferCollectionInfo_2* collection_info) {
+      fuchsia::images2::PixelFormat pixel_type, uint32_t width, uint32_t height, uint32_t num_vmos,
+      fuchsia::sysmem2::BufferCollectionInfo* collection_info) {
     // Setup the buffer collection that will be used for the flatland rectangle's texture.
     auto texture_tokens = SysmemTokens::Create(sysmem_allocator_.get());
 
@@ -129,18 +131,21 @@ class DisplayCompositorSmokeTest : public DisplayCompositorTestBase {
     EXPECT_TRUE(result);
 
     auto [buffer_usage, memory_constraints] = GetUsageAndMemoryConstraintsForCpuWriteOften();
-    fuchsia::sysmem::BufferCollectionSyncPtr texture_collection =
+    fuchsia::sysmem2::BufferCollectionSyncPtr texture_collection =
         CreateBufferCollectionSyncPtrAndSetConstraints(
             sysmem_allocator_.get(), std::move(texture_tokens.local_token), num_vmos, width, height,
-            buffer_usage, pixel_type, memory_constraints,
-            std::make_optional(fuchsia::sysmem::FORMAT_MODIFIER_LINEAR));
+            fidl::Clone(buffer_usage), pixel_type, fidl::Clone(memory_constraints),
+            std::make_optional(fuchsia::images2::PixelFormatModifier::LINEAR));
 
     // Have the client wait for buffers allocated so it can populate its information
     // struct with the vmo data.
-    zx_status_t allocation_status = ZX_OK;
-    auto status = texture_collection->WaitForBuffersAllocated(&allocation_status, collection_info);
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+    auto status = texture_collection->WaitForAllBuffersAllocated(&wait_result);
     EXPECT_EQ(status, ZX_OK);
-    EXPECT_EQ(allocation_status, ZX_OK);
+    EXPECT_TRUE(!wait_result.is_framework_err());
+    EXPECT_TRUE(!wait_result.is_err());
+    EXPECT_TRUE(wait_result.is_response());
+    *collection_info = std::move(*wait_result.response().mutable_buffer_collection_info());
 
     return texture_collection;
   }
@@ -148,7 +153,7 @@ class DisplayCompositorSmokeTest : public DisplayCompositorTestBase {
 
 class DisplayCompositorParameterizedSmokeTest
     : public DisplayCompositorSmokeTest,
-      public ::testing::WithParamInterface<fuchsia::sysmem::PixelFormatType> {};
+      public ::testing::WithParamInterface<fuchsia::images2::PixelFormat> {};
 
 namespace {
 
@@ -176,7 +181,7 @@ VK_TEST_P(DisplayCompositorParameterizedSmokeTest, FullscreenRectangleTest) {
   // must also have a fullscreen texture to match.
   const uint32_t kRectWidth = display->width_in_px(), kTextureWidth = display->width_in_px();
   const uint32_t kRectHeight = display->height_in_px(), kTextureHeight = display->height_in_px();
-  fuchsia::sysmem::BufferCollectionInfo_2 texture_collection_info;
+  fuchsia::sysmem2::BufferCollectionInfo texture_collection_info;
   auto texture_collection =
       SetupClientTextures(display_compositor.get(), kTextureCollectionId, GetParam(), kTextureWidth,
                           kTextureHeight, 1, &texture_collection_info);
@@ -228,10 +233,11 @@ VK_TEST_P(DisplayCompositorParameterizedSmokeTest, FullscreenRectangleTest) {
       {}, [](const scheduling::Timestamps&) {});
 }
 
-// TODO(https://fxbug.dev/42154038): Add YUV formats when they are supported by fake or real display.
+// TODO(https://fxbug.dev/42154038): Add YUV formats when they are supported by fake or real
+// display.
 INSTANTIATE_TEST_SUITE_P(PixelFormats, DisplayCompositorParameterizedSmokeTest,
-                         ::testing::Values(fuchsia::sysmem::PixelFormatType::BGRA32,
-                                           fuchsia::sysmem::PixelFormatType::R8G8B8A8));
+                         ::testing::Values(fuchsia::images2::PixelFormat::B8G8R8A8,
+                                           fuchsia::images2::PixelFormat::R8G8B8A8));
 
 }  // namespace
 

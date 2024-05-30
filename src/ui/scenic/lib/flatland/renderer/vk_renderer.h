@@ -35,8 +35,8 @@ class VkRenderer final : public Renderer {
   // |BufferCollectionImporter|
   // Only called from the main thread.
   bool ImportBufferCollection(GlobalBufferCollectionId collection_id,
-                              fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
-                              fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
+                              fuchsia::sysmem2::Allocator_Sync* sysmem_allocator,
+                              fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token,
                               BufferCollectionUsage usage,
                               std::optional<fuchsia::math::SizeU> size) override;
 
@@ -95,7 +95,7 @@ class VkRenderer final : public Renderer {
   // Wrapper struct to contain the sysmem collection handle, the vulkan
   // buffer collection.
   struct CollectionData {
-    fuchsia::sysmem::BufferCollectionSyncPtr collection;
+    fuchsia::sysmem2::BufferCollectionSyncPtr collection;
     vk::BufferCollectionFUCHSIA vk_collection;
 
     // Bit to track whether we've confirmed the allocation's completion.
@@ -105,7 +105,7 @@ class VkRenderer final : public Renderer {
   // Creates a vk::BufferCollectionFUCHSIA with the proper constraints set.
   // Returns std::nullopt on failure.
   std::optional<vk::BufferCollectionFUCHSIA> SetConstraintsAndCreateVulkanBufferCollection(
-      fuchsia::sysmem::BufferCollectionTokenSyncPtr token, BufferCollectionUsage usage,
+      fuchsia::sysmem2::BufferCollectionTokenSyncPtr token, BufferCollectionUsage usage,
       std::optional<fuchsia::math::SizeU> size);
 
   // Finds the relevant vulkan buffer collection, checks that it is allocated, and returns it.

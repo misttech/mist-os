@@ -18,18 +18,18 @@
 
 namespace screen_capture {
 
-using BufferCount = uint32_t;
+using BufferCount = uint64_t;
 
 class ScreenCaptureBufferCollectionImporter : public allocation::BufferCollectionImporter {
  public:
-  ScreenCaptureBufferCollectionImporter(fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator,
+  ScreenCaptureBufferCollectionImporter(fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator,
                                         std::shared_ptr<flatland::Renderer> renderer);
   ~ScreenCaptureBufferCollectionImporter() override;
 
   // |BufferCollectionImporter|
   bool ImportBufferCollection(allocation::GlobalBufferCollectionId collection_id,
-                              fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
-                              fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
+                              fuchsia::sysmem2::Allocator_Sync* sysmem_allocator,
+                              fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token,
                               allocation::BufferCollectionUsage usage,
                               std::optional<fuchsia::math::SizeU> size) override;
 
@@ -58,7 +58,7 @@ class ScreenCaptureBufferCollectionImporter : public allocation::BufferCollectio
                                      uint32_t buffer_count);
 
   // Allocator used to allocate readback images.
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
 
   std::shared_ptr<flatland::Renderer> renderer_;
 
@@ -66,7 +66,8 @@ class ScreenCaptureBufferCollectionImporter : public allocation::BufferCollectio
   // |buffer_collection_buffer_counts_| is lazily populated after buffers are allocated, during a
   // call to GetBufferCollectionBufferCount() or ImportBufferImage(). If the
   // |GlobalBufferCollectionId| key exists in one map, it does not exist in the other.
-  std::unordered_map<allocation::GlobalBufferCollectionId, fuchsia::sysmem::BufferCollectionSyncPtr>
+  std::unordered_map<allocation::GlobalBufferCollectionId,
+                     fuchsia::sysmem2::BufferCollectionSyncPtr>
       buffer_collection_sync_ptrs_;
   std::unordered_map<allocation::GlobalBufferCollectionId, BufferCount>
       buffer_collection_buffer_counts_;

@@ -21,7 +21,7 @@ using DisplayEventId = fuchsia::hardware::display::EventId;
 bool ImportBufferCollection(
     allocation::GlobalBufferCollectionId buffer_collection_id,
     const fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
-    fuchsia::sysmem::BufferCollectionTokenSyncPtr token,
+    fuchsia::sysmem2::BufferCollectionTokenSyncPtr token,
     const fuchsia::hardware::display::types::ImageBufferUsage& image_buffer_usage);
 
 // Imports a zx::event to the provided display controller. The return value is an ID to

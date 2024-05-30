@@ -155,23 +155,26 @@ struct GlobalIdPair {
   }
 
 // Identical to PRESENT_WITH_ARGS, but supplies an empty PresentArgs to the Present() call.
-#define PRESENT(flatland, expect_success) \
-  { PRESENT_WITH_ARGS(flatland, PresentArgs(), expect_success); }
+#define PRESENT(flatland, expect_success)                       \
+  {                                                             \
+    PRESENT_WITH_ARGS(flatland, PresentArgs(), expect_success); \
+  }
 
 #define REGISTER_BUFFER_COLLECTION(allocator, export_token, token, expect_success)               \
   if (expect_success) {                                                                          \
     EXPECT_CALL(*mock_buffer_collection_importer_,                                               \
                 ImportBufferCollection(fsl::GetKoid(export_token.value.get()), _, _, _, _))      \
         .WillOnce(testing::Invoke(                                                               \
-            [](allocation::GlobalBufferCollectionId, fuchsia::sysmem::Allocator_Sync*,           \
-               fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,                    \
+            [](allocation::GlobalBufferCollectionId, fuchsia::sysmem2::Allocator_Sync*,          \
+               fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>,                   \
                allocation::BufferCollectionUsage,                                                \
                std::optional<fuchsia::math::SizeU>) { return true; }));                          \
   }                                                                                              \
   bool processed_callback = false;                                                               \
   fuchsia::ui::composition::RegisterBufferCollectionArgs args;                                   \
   args.set_export_token(std::move(export_token));                                                \
-  args.set_buffer_collection_token(token);                                                       \
+  args.set_buffer_collection_token(                                                              \
+      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(token.TakeChannel()));       \
   allocator->RegisterBufferCollection(                                                           \
       std::move(args), [&processed_callback](Allocator_RegisterBufferCollection_Result result) { \
         EXPECT_EQ(!expect_success, result.is_err());                                             \
@@ -323,12 +326,17 @@ class FlatlandTest : public LoggingEventLoop, public ::testing::Test {
         uber_struct_system_->AllocateQueueForSession(session_id));
   }
 
-  fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> CreateToken() {
-    fuchsia::sysmem::BufferCollectionTokenSyncPtr token;
-    zx_status_t status = sysmem_allocator_->AllocateSharedCollection(token.NewRequest());
+  fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> CreateToken() {
+    fuchsia::sysmem2::BufferCollectionTokenSyncPtr token;
+    fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
+    allocate_shared_request.set_token_request(token.NewRequest());
+    zx_status_t status =
+        sysmem_allocator_->AllocateSharedCollection(std::move(allocate_shared_request));
     EXPECT_EQ(status, ZX_OK);
-    status = token->Sync();
+    fuchsia::sysmem2::Node_Sync_Result sync_result;
+    status = token->Sync(&sync_result);
     EXPECT_EQ(status, ZX_OK);
+    EXPECT_TRUE(sync_result.is_response());
     return token;
   }
 
@@ -538,7 +546,7 @@ class FlatlandTest : public LoggingEventLoop, public ::testing::Test {
   std::map<scheduling::SchedulingIdPair, std::vector<zx::event>> pending_release_fences_;
   std::map<scheduling::SchedulingIdPair, zx::time> requested_presentation_times_;
   std::unordered_map<scheduling::SessionId, scheduling::PresentId> pending_instance_updates_;
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
 };
 
 }  // namespace
@@ -4698,7 +4706,9 @@ TEST_F(FlatlandTest, ReleaseBufferCollectionCompletesAfterFlatlandDestruction1) 
     // Present, apply updates, and signal fences so that we can verify that the image is released.
     EXPECT_CALL(*mock_buffer_collection_importer_, ReleaseBufferImage(global_image_id.value))
         .Times(1);
-    { PRESENT_WITH_ARGS(flatland, PresentArgs{}, true); }
+    {
+      PRESENT_WITH_ARGS(flatland, PresentArgs{}, true);
+    }
     RunLoopUntilIdle();
 
     // |flatland| is about to fall out of scope.  Ensure that no image is released, because it
@@ -4743,7 +4753,9 @@ TEST_F(FlatlandTest, ReleaseBufferCollectionCompletesAfterFlatlandDestruction2) 
         .Times(0);
     PresentArgs args;
     args.skip_session_update_and_release_fences = true;
-    { PRESENT_WITH_ARGS(flatland, std::move(args), true); }
+    {
+      PRESENT_WITH_ARGS(flatland, std::move(args), true);
+    }
 
     // |flatland| is about to fall out of scope.  Ensure that the images is released.
     EXPECT_CALL(*mock_buffer_collection_importer_, ReleaseBufferImage(global_image_id.value))
@@ -4783,7 +4795,9 @@ TEST_F(FlatlandTest, ReleaseBufferCollectionCompletesAfterFlatlandDestruction3) 
         .Times(0);
     PresentArgs args;
     args.skip_session_update_and_release_fences = true;
-    { PRESENT_WITH_ARGS(flatland, std::move(args), true); }
+    {
+      PRESENT_WITH_ARGS(flatland, std::move(args), true);
+    }
 
     // |flatland| is about to fall out of scope.  Ensure that the image is released.
     EXPECT_CALL(*mock_buffer_collection_importer_, ReleaseBufferImage(global_image_id.value))

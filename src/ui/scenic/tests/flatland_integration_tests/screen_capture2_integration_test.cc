@@ -142,16 +142,16 @@ class ScreenCapture2IntegrationTest : public LoggingEventLoop, public ::testing:
     };
   }
 
-  fuchsia::sysmem::BufferCollectionInfo_2 ConfigureScreenCapture(
-      fuchsia::sysmem::BufferCollectionConstraints constraints, const uint32_t render_target_width,
+  fuchsia::sysmem2::BufferCollectionInfo ConfigureScreenCapture(
+      fuchsia::sysmem2::BufferCollectionConstraints constraints, const uint32_t render_target_width,
       const uint32_t render_target_height) {
     // Create buffer collection to render into for GetNextFrame().
     allocation::BufferCollectionImportExportTokens scr_ref_pair =
         allocation::BufferCollectionImportExportTokens::New();
 
-    fuchsia::sysmem::BufferCollectionInfo_2 sc_buffer_collection_info =
-        CreateBufferCollectionInfo2WithConstraints(
-            constraints, std::move(scr_ref_pair.export_token), flatland_allocator_.get(),
+    fuchsia::sysmem2::BufferCollectionInfo sc_buffer_collection_info =
+        CreateBufferCollectionInfoWithConstraints(
+            std::move(constraints), std::move(scr_ref_pair.export_token), flatland_allocator_.get(),
             sysmem_allocator_.get(), RegisterBufferCollectionUsages::SCREENSHOT);
 
     // Configure ScreenCapture client.
@@ -179,7 +179,7 @@ class ScreenCapture2IntegrationTest : public LoggingEventLoop, public ::testing:
 
   RealmRoot realm_;
 
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
   fuchsia::ui::composition::AllocatorSyncPtr flatland_allocator_;
   fuchsia::ui::composition::FlatlandDisplayPtr flatland_display_;
   fuchsia::ui::composition::FlatlandPtr root_session_;
@@ -202,8 +202,8 @@ TEST_F(ScreenCapture2IntegrationTest, SingleColorCapture) {
   allocation::BufferCollectionImportExportTokens ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
 
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info =
-      CreateBufferCollectionInfo2WithConstraints(
+  fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info =
+      CreateBufferCollectionInfoWithConstraints(
           utils::CreateDefaultConstraints(/*buffer_count=*/1, image_width, image_height),
           std::move(ref_pair.export_token), flatland_allocator_.get(), sysmem_allocator_.get(),
           RegisterBufferCollectionUsages::DEFAULT);
@@ -219,7 +219,7 @@ TEST_F(ScreenCapture2IntegrationTest, SingleColorCapture) {
                                    {0, 0}, 2, 2);
   BlockingPresent(this, child_session_);
 
-  fuchsia::sysmem::BufferCollectionInfo_2 sc_buffer_collection_info = ConfigureScreenCapture(
+  fuchsia::sysmem2::BufferCollectionInfo sc_buffer_collection_info = ConfigureScreenCapture(
       utils::CreateDefaultConstraints(/*buffer_count=*/1, image_width, image_height),
       render_target_width, render_target_height);
 
@@ -270,7 +270,7 @@ TEST_F(ScreenCapture2IntegrationTest, FilledRectCapture) {
   child_session_->AddChild(kChildRootTransform, kTransformId);
   BlockingPresent(this, child_session_);
 
-  fuchsia::sysmem::BufferCollectionInfo_2 sc_buffer_collection_info = ConfigureScreenCapture(
+  fuchsia::sysmem2::BufferCollectionInfo sc_buffer_collection_info = ConfigureScreenCapture(
       utils::CreateDefaultConstraints(/*buffer_count=*/1, image_width, image_height),
       render_target_width, render_target_height);
 
@@ -322,7 +322,7 @@ TEST_F(ScreenCapture2IntegrationTest, OnCpuWorkDoneCapture) {
   child_session_->AddChild(kChildRootTransform, kTransformId);
   BlockingPresent(this, child_session_);
 
-  fuchsia::sysmem::BufferCollectionInfo_2 sc_buffer_collection_info = ConfigureScreenCapture(
+  fuchsia::sysmem2::BufferCollectionInfo sc_buffer_collection_info = ConfigureScreenCapture(
       utils::CreateDefaultConstraints(/*buffer_count=*/1, image_width, image_height),
       render_target_width, render_target_height);
 
@@ -415,13 +415,13 @@ TEST_F(ScreenCapture2IntegrationTest, ClientReleaseBufferCapture) {
   allocation::BufferCollectionImportExportTokens ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
 
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info =
-      CreateBufferCollectionInfo2WithConstraints(
+  fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info =
+      CreateBufferCollectionInfoWithConstraints(
           utils::CreateDefaultConstraints(/*buffer_count=*/1, image_width, image_height),
           std::move(ref_pair.export_token), flatland_allocator_.get(), sysmem_allocator_.get(),
           RegisterBufferCollectionUsages::DEFAULT);
 
-  fuchsia::sysmem::BufferCollectionInfo_2 sc_buffer_collection_info = ConfigureScreenCapture(
+  fuchsia::sysmem2::BufferCollectionInfo sc_buffer_collection_info = ConfigureScreenCapture(
       utils::CreateDefaultConstraints(/*buffer_count=*/1, image_width, image_height),
       render_target_width, render_target_height);
 

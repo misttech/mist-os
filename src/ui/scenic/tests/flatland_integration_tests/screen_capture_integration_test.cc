@@ -173,7 +173,7 @@ class ScreenCaptureIntegrationTest : public LoggingEventLoop, public ::testing::
 
   RealmRoot realm_;
 
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
   fuchsia::ui::composition::AllocatorSyncPtr flatland_allocator_;
   fuchsia::ui::composition::FlatlandDisplayPtr flatland_display_;
   fuchsia::ui::composition::FlatlandPtr root_session_;
@@ -197,8 +197,8 @@ TEST_F(ScreenCaptureIntegrationTest, EmptyScreenshot) {
   allocation::BufferCollectionImportExportTokens scr_ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
 
-  fuchsia::sysmem::BufferCollectionInfo_2 sc_buffer_collection_info =
-      CreateBufferCollectionInfo2WithConstraints(
+  fuchsia::sysmem2::BufferCollectionInfo sc_buffer_collection_info =
+      CreateBufferCollectionInfoWithConstraints(
           utils::CreateDefaultConstraints(/*buffer_count=*/1, render_target_width,
                                           render_target_height),
           std::move(scr_ref_pair.export_token), flatland_allocator_.get(), sysmem_allocator_.get(),
@@ -207,7 +207,7 @@ TEST_F(ScreenCaptureIntegrationTest, EmptyScreenshot) {
   // Configure buffers in ScreenCapture client.
   ScreenCaptureConfig sc_args;
   sc_args.set_import_token(std::move(scr_ref_pair.import_token));
-  sc_args.set_buffer_count(sc_buffer_collection_info.buffer_count);
+  sc_args.set_buffer_count(static_cast<uint32_t>(sc_buffer_collection_info.buffers().size()));
   sc_args.set_size({render_target_width, render_target_height});
 
   bool alloc_result = false;
@@ -244,8 +244,8 @@ TEST_F(ScreenCaptureIntegrationTest, SingleColorUnrotatedScreenshot) {
   allocation::BufferCollectionImportExportTokens ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
 
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info =
-      CreateBufferCollectionInfo2WithConstraints(
+  fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info =
+      CreateBufferCollectionInfoWithConstraints(
           utils::CreateDefaultConstraints(/*buffer_count=*/1, image_width, image_height),
           std::move(ref_pair.export_token), flatland_allocator_.get(), sysmem_allocator_.get(),
           RegisterBufferCollectionUsages::DEFAULT);
@@ -269,8 +269,8 @@ TEST_F(ScreenCaptureIntegrationTest, SingleColorUnrotatedScreenshot) {
   allocation::BufferCollectionImportExportTokens scr_ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
 
-  fuchsia::sysmem::BufferCollectionInfo_2 sc_buffer_collection_info =
-      CreateBufferCollectionInfo2WithConstraints(
+  fuchsia::sysmem2::BufferCollectionInfo sc_buffer_collection_info =
+      CreateBufferCollectionInfoWithConstraints(
           utils::CreateDefaultConstraints(/*buffer_count=*/1, render_target_width,
                                           render_target_height),
           std::move(scr_ref_pair.export_token), flatland_allocator_.get(), sysmem_allocator_.get(),
@@ -279,7 +279,7 @@ TEST_F(ScreenCaptureIntegrationTest, SingleColorUnrotatedScreenshot) {
   // Configure buffers in ScreenCapture client.
   ScreenCaptureConfig sc_args;
   sc_args.set_import_token(std::move(scr_ref_pair.import_token));
-  sc_args.set_buffer_count(sc_buffer_collection_info.buffer_count);
+  sc_args.set_buffer_count(static_cast<uint32_t>(sc_buffer_collection_info.buffers().size()));
   sc_args.set_size({render_target_width, render_target_height});
 
   bool alloc_result = false;
@@ -332,8 +332,8 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor180DegreeRotationScreenshot) {
   allocation::BufferCollectionImportExportTokens ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
 
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info =
-      CreateBufferCollectionInfo2WithConstraints(
+  fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info =
+      CreateBufferCollectionInfoWithConstraints(
           utils::CreateDefaultConstraints(/*buffer_count=*/1, image_width, image_height),
           std::move(ref_pair.export_token), flatland_allocator_.get(), sysmem_allocator_.get(),
           RegisterBufferCollectionUsages::DEFAULT);
@@ -363,8 +363,8 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor180DegreeRotationScreenshot) {
   allocation::BufferCollectionImportExportTokens scr_ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
 
-  fuchsia::sysmem::BufferCollectionInfo_2 sc_buffer_collection_info =
-      CreateBufferCollectionInfo2WithConstraints(
+  fuchsia::sysmem2::BufferCollectionInfo sc_buffer_collection_info =
+      CreateBufferCollectionInfoWithConstraints(
           utils::CreateDefaultConstraints(/*buffer_count=*/1, render_target_width,
                                           render_target_height),
           std::move(scr_ref_pair.export_token), flatland_allocator_.get(), sysmem_allocator_.get(),
@@ -373,7 +373,7 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor180DegreeRotationScreenshot) {
   // Configure buffers in ScreenCapture client.
   ScreenCaptureConfig sc_args;
   sc_args.set_import_token(std::move(scr_ref_pair.import_token));
-  sc_args.set_buffer_count(sc_buffer_collection_info.buffer_count);
+  sc_args.set_buffer_count(static_cast<uint32_t>(sc_buffer_collection_info.buffers().size()));
   sc_args.set_size({render_target_width, render_target_height});
   sc_args.set_rotation(fuchsia::ui::composition::Rotation::CW_180_DEGREES);
 
@@ -410,7 +410,8 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor180DegreeRotationScreenshot) {
   }
 
   EXPECT_EQ(num_green, pixel_color_count);
-  // TODO(https://fxbug.dev/42067818): Switch to exact comparisons after Astro precision issues are resolved.
+  // TODO(https://fxbug.dev/42067818): Switch to exact comparisons after Astro precision issues are
+  // resolved.
   EXPECT_NEAR(num_red, pixel_color_count, display_width_);
 }
 
@@ -441,8 +442,8 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor90DegreeRotationScreenshot) {
   allocation::BufferCollectionImportExportTokens ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
 
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info =
-      CreateBufferCollectionInfo2WithConstraints(
+  fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info =
+      CreateBufferCollectionInfoWithConstraints(
           utils::CreateDefaultConstraints(/*buffer_count=*/1, image_width, image_height),
           std::move(ref_pair.export_token), flatland_allocator_.get(), sysmem_allocator_.get(),
           RegisterBufferCollectionUsages::DEFAULT);
@@ -501,8 +502,8 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor90DegreeRotationScreenshot) {
   allocation::BufferCollectionImportExportTokens scr_ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
 
-  fuchsia::sysmem::BufferCollectionInfo_2 sc_buffer_collection_info =
-      CreateBufferCollectionInfo2WithConstraints(
+  fuchsia::sysmem2::BufferCollectionInfo sc_buffer_collection_info =
+      CreateBufferCollectionInfoWithConstraints(
           utils::CreateDefaultConstraints(/*buffer_count=*/1, render_target_width,
                                           render_target_height),
           std::move(scr_ref_pair.export_token), flatland_allocator_.get(), sysmem_allocator_.get(),
@@ -511,7 +512,7 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor90DegreeRotationScreenshot) {
   // Configure buffers in ScreenCapture client.
   ScreenCaptureConfig sc_args;
   sc_args.set_import_token(std::move(scr_ref_pair.import_token));
-  sc_args.set_buffer_count(sc_buffer_collection_info.buffer_count);
+  sc_args.set_buffer_count(static_cast<uint32_t>(sc_buffer_collection_info.buffers().size()));
   sc_args.set_size({render_target_width, render_target_height});
   sc_args.set_rotation(fuchsia::ui::composition::Rotation::CW_90_DEGREES);
 
@@ -566,7 +567,8 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor90DegreeRotationScreenshot) {
     }
   }
 
-  // TODO(https://fxbug.dev/42067818): Switch to exact comparisons after Astro precision issues are resolved.
+  // TODO(https://fxbug.dev/42067818): Switch to exact comparisons after Astro precision issues are
+  // resolved.
   EXPECT_NEAR(top_left_correct, pixel_color_count, display_width_);
   EXPECT_NEAR(top_right_correct, pixel_color_count, display_width_);
   EXPECT_NEAR(bottom_left_correct, pixel_color_count, display_width_);
@@ -600,8 +602,8 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor270DegreeRotationScreenshot) {
   allocation::BufferCollectionImportExportTokens ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
 
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info =
-      CreateBufferCollectionInfo2WithConstraints(
+  fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info =
+      CreateBufferCollectionInfoWithConstraints(
           utils::CreateDefaultConstraints(/*buffer_count=*/1, image_width, image_height),
           std::move(ref_pair.export_token), flatland_allocator_.get(), sysmem_allocator_.get(),
           RegisterBufferCollectionUsages::DEFAULT);
@@ -660,8 +662,8 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor270DegreeRotationScreenshot) {
   allocation::BufferCollectionImportExportTokens scr_ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
 
-  fuchsia::sysmem::BufferCollectionInfo_2 sc_buffer_collection_info =
-      CreateBufferCollectionInfo2WithConstraints(
+  fuchsia::sysmem2::BufferCollectionInfo sc_buffer_collection_info =
+      CreateBufferCollectionInfoWithConstraints(
           utils::CreateDefaultConstraints(/*buffer_count=*/1, render_target_width,
                                           render_target_height),
           std::move(scr_ref_pair.export_token), flatland_allocator_.get(), sysmem_allocator_.get(),
@@ -670,7 +672,7 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor270DegreeRotationScreenshot) {
   // Configure buffers in ScreenCapture client.
   ScreenCaptureConfig sc_args;
   sc_args.set_import_token(std::move(scr_ref_pair.import_token));
-  sc_args.set_buffer_count(sc_buffer_collection_info.buffer_count);
+  sc_args.set_buffer_count(static_cast<uint32_t>(sc_buffer_collection_info.buffers().size()));
   sc_args.set_size({render_target_width, render_target_height});
   sc_args.set_rotation(fuchsia::ui::composition::Rotation::CW_270_DEGREES);
 
@@ -725,7 +727,8 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor270DegreeRotationScreenshot) {
     }
   }
 
-  // TODO(https://fxbug.dev/42067818): Switch to exact comparisons after Astro precision issues are resolved.
+  // TODO(https://fxbug.dev/42067818): Switch to exact comparisons after Astro precision issues are
+  // resolved.
   EXPECT_NEAR(top_left_correct, pixel_color_count, display_width_);
   EXPECT_NEAR(top_right_correct, pixel_color_count, display_width_);
   EXPECT_NEAR(bottom_left_correct, pixel_color_count, display_width_);
@@ -759,8 +762,8 @@ TEST_F(ScreenCaptureIntegrationTest, FilledRectScreenshot) {
   allocation::BufferCollectionImportExportTokens scr_ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
 
-  fuchsia::sysmem::BufferCollectionInfo_2 sc_buffer_collection_info =
-      CreateBufferCollectionInfo2WithConstraints(
+  fuchsia::sysmem2::BufferCollectionInfo sc_buffer_collection_info =
+      CreateBufferCollectionInfoWithConstraints(
           utils::CreateDefaultConstraints(/*buffer_count=*/1, render_target_width,
                                           render_target_height),
           std::move(scr_ref_pair.export_token), flatland_allocator_.get(), sysmem_allocator_.get(),
@@ -770,7 +773,7 @@ TEST_F(ScreenCaptureIntegrationTest, FilledRectScreenshot) {
   ScreenCaptureConfig sc_args;
   sc_args.set_import_token(std::move(scr_ref_pair.import_token));
   sc_args.set_size({render_target_width, render_target_height});
-  sc_args.set_buffer_count(sc_buffer_collection_info.buffer_count);
+  sc_args.set_buffer_count(static_cast<uint32_t>(sc_buffer_collection_info.buffers().size()));
 
   bool alloc_result = false;
   screen_capture_->Configure(std::move(sc_args),
@@ -830,8 +833,8 @@ TEST_F(ScreenCaptureIntegrationTest, ChangeFilledRectScreenshots) {
   allocation::BufferCollectionImportExportTokens scr_ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
 
-  fuchsia::sysmem::BufferCollectionInfo_2 sc_buffer_collection_info =
-      CreateBufferCollectionInfo2WithConstraints(
+  fuchsia::sysmem2::BufferCollectionInfo sc_buffer_collection_info =
+      CreateBufferCollectionInfoWithConstraints(
           utils::CreateDefaultConstraints(/*buffer_count=*/2, render_target_width,
                                           render_target_height),
           std::move(scr_ref_pair.export_token), flatland_allocator_.get(), sysmem_allocator_.get(),
@@ -841,7 +844,7 @@ TEST_F(ScreenCaptureIntegrationTest, ChangeFilledRectScreenshots) {
   ScreenCaptureConfig sc_args;
   sc_args.set_import_token(std::move(scr_ref_pair.import_token));
   sc_args.set_size({render_target_width, render_target_height});
-  sc_args.set_buffer_count(sc_buffer_collection_info.buffer_count);
+  sc_args.set_buffer_count(static_cast<uint32_t>(sc_buffer_collection_info.buffers().size()));
 
   bool alloc_result = false;
   screen_capture_->Configure(std::move(sc_args),

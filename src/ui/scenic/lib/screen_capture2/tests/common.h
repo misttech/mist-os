@@ -20,11 +20,11 @@ std::shared_ptr<allocation::Allocator> CreateAllocator(
     std::shared_ptr<screen_capture::ScreenCaptureBufferCollectionImporter> importer,
     sys::ComponentContext* app_context);
 
-void CreateBufferCollectionInfo2WithConstraints(
-    fuchsia::sysmem::BufferCollectionConstraints constraints,
+void CreateBufferCollectionInfoWithConstraints(
+    fuchsia::sysmem2::BufferCollectionConstraints constraints,
     allocation::BufferCollectionExportToken export_token,
     std::shared_ptr<allocation::Allocator> flatland_allocator,
-    fuchsia::sysmem::Allocator_Sync* sysmem_allocator);
+    fuchsia::sysmem2::Allocator_Sync* sysmem_allocator);
 
 }  // namespace test
 }  // namespace screen_capture2

@@ -77,16 +77,17 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   DisplayCompositor(
       async_dispatcher_t* main_dispatcher,
       std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> display_coordinator,
-      const std::shared_ptr<Renderer>& renderer, fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator,
-      bool enable_display_composition, uint32_t max_display_layers);
+      const std::shared_ptr<Renderer>& renderer,
+      fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator, bool enable_display_composition,
+      uint32_t max_display_layers);
 
   ~DisplayCompositor() override;
 
   // |BufferCollectionImporter|
   // Only called from the main thread.
   bool ImportBufferCollection(allocation::GlobalBufferCollectionId collection_id,
-                              fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
-                              fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
+                              fuchsia::sysmem2::Allocator_Sync* sysmem_allocator,
+                              fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token,
                               BufferCollectionUsage usage,
                               std::optional<fuchsia::math::SizeU> size) override
       FXL_LOCKS_EXCLUDED(lock_);
@@ -131,7 +132,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // anchor to the Flatland hierarchy. Only called from the main thread.
   void AddDisplay(scenic_impl::display::Display* display, DisplayInfo info,
                   uint32_t num_render_targets,
-                  fuchsia::sysmem::BufferCollectionInfo_2* out_collection_info)
+                  fuchsia::sysmem2::BufferCollectionInfo* out_collection_info)
       FXL_LOCKS_EXCLUDED(lock_);
 
   // Values needed to adjust the color of the framebuffer as a postprocessing effect.
@@ -198,8 +199,8 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   std::vector<allocation::ImageMetadata> AllocateDisplayRenderTargets(
       bool use_protected_memory, uint32_t num_render_targets, const fuchsia::math::SizeU& size,
-      fuchsia_images2::PixelFormat pixel_format,
-      fuchsia::sysmem::BufferCollectionInfo_2* out_collection_info) FXL_LOCKS_EXCLUDED(lock_);
+      fuchsia::images2::PixelFormat pixel_format,
+      fuchsia::sysmem2::BufferCollectionInfo* out_collection_info) FXL_LOCKS_EXCLUDED(lock_);
 
   // Generates a new FrameEventData struct to be used with a render target on a display.
   FrameEventData NewFrameEventData() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
@@ -215,7 +216,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   fuchsia::hardware::display::LayerId CreateDisplayLayer() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Moves a token out of |display_buffer_collection_ptrs_| and returns it.
-  fuchsia::sysmem::BufferCollectionSyncPtr TakeDisplayBufferCollectionPtr(
+  fuchsia::sysmem2::BufferCollectionSyncPtr TakeDisplayBufferCollectionPtr(
       allocation::GlobalBufferCollectionId collection_id) FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Used when we're forced to fall back to GPU rendering.
@@ -263,7 +264,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   bool ImportBufferCollectionToDisplayCoordinator(
       allocation::GlobalBufferCollectionId identifier,
-      fuchsia::sysmem::BufferCollectionTokenSyncPtr token,
+      fuchsia::sysmem2::BufferCollectionTokenSyncPtr token,
       const fuchsia::hardware::display::types::ImageBufferUsage& image_buffer_usage)
       FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
@@ -290,7 +291,8 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // display constraints set. This is used as a bridge between ImportBufferCollection() and
   // ImportBufferImage() calls, so that we can check if the existing allocation is
   // display-compatible.
-  std::unordered_map<allocation::GlobalBufferCollectionId, fuchsia::sysmem::BufferCollectionSyncPtr>
+  std::unordered_map<allocation::GlobalBufferCollectionId,
+                     fuchsia::sysmem2::BufferCollectionSyncPtr>
       display_buffer_collection_ptrs_ FXL_GUARDED_BY(lock_);
 
   // Maps a buffer collection ID to a boolean indicating if it can be imported into display.
@@ -302,8 +304,8 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   // Maps a buffer collection ID to a collection pixel format struct.
   // TODO(https://fxbug.dev/42150686): Delete after we don't need the pixel format anymore.
-  std::unordered_map<allocation::GlobalBufferCollectionId, fuchsia::sysmem::PixelFormat>
-      buffer_collection_pixel_format_ FXL_GUARDED_BY(lock_);
+  std::unordered_map<allocation::GlobalBufferCollectionId, fuchsia::images2::PixelFormatModifier>
+      buffer_collection_pixel_format_modifier_ FXL_GUARDED_BY(lock_);
 
   /// The below members are either thread-safe or only manipulated from the main thread and
   /// therefore don't need locks.
@@ -343,7 +345,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   std::optional<fuchsia::hardware::display::types::ConfigStamp> last_presented_config_stamp_ =
       std::nullopt;
 
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
 
   // Whether to attempt display composition at all. If false we always fall back to GPU-compositing.
   // Constant except for in tests.

@@ -79,7 +79,7 @@ class ScreenCapture2ManagerTest : public gtest::TestLoopFixture {
 
     std::shared_ptr<Allocator> flatland_allocator =
         CreateAllocator(importer_, context_provider_.context());
-    CreateBufferCollectionInfo2WithConstraints(
+    CreateBufferCollectionInfoWithConstraints(
         utils::CreateDefaultConstraints(buffer_count, image_width, image_height),
         std::move(ref_pair.export_token), flatland_allocator, sysmem_allocator_.get());
 
@@ -102,7 +102,7 @@ class ScreenCapture2ManagerTest : public gtest::TestLoopFixture {
   std::shared_ptr<screen_capture::ScreenCaptureBufferCollectionImporter> importer_;
   std::unique_ptr<ScreenCapture2Manager> manager_;
 
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
   sys::testing::ComponentContextProvider context_provider_;
 };
 

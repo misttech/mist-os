@@ -25,53 +25,75 @@ const vk::Format kSupportedImageFormats[] = {vk::Format::eR8G8B8A8Srgb, vk::Form
 
 // Creates a new BufferCollectionTokenGroup from |token|. Then creates |num_tokens| number of
 // children from |token_group|, calls AllChildrenPresent() and closes |token_group|.
-std::optional<std::vector<fuchsia::sysmem::BufferCollectionTokenHandle>> CreateChildTokens(
-    const fuchsia::sysmem::BufferCollectionTokenSyncPtr& token, uint32_t num_tokens) {
-  fuchsia::sysmem::BufferCollectionTokenGroupSyncPtr token_group;
-  zx_status_t status = token->CreateBufferCollectionTokenGroup(token_group.NewRequest());
+std::optional<std::vector<fuchsia::sysmem2::BufferCollectionTokenHandle>> CreateChildTokens(
+    const fuchsia::sysmem2::BufferCollectionTokenSyncPtr& token, uint32_t num_tokens) {
+  fuchsia::sysmem2::BufferCollectionTokenGroupSyncPtr token_group;
+
+  fuchsia::sysmem2::BufferCollectionTokenCreateBufferCollectionTokenGroupRequest
+      create_group_request;
+  create_group_request.set_group_request(token_group.NewRequest());
+  zx_status_t status = token->CreateBufferCollectionTokenGroup(std::move(create_group_request));
   if (status != ZX_OK) {
     FX_LOGS(WARNING) << "Cannot create buffer collection token group: "
                      << zx_status_get_string(status);
     return std::nullopt;
   }
-  status = token_group->Sync();
+
+  fuchsia::sysmem2::Node_Sync_Result sync_result;
+  status = token_group->Sync(&sync_result);
   if (status != ZX_OK) {
     FX_LOGS(WARNING) << "Cannot sync token group: " << zx_status_get_string(status);
     return std::nullopt;
   }
 
   std::vector<zx_rights_t> children_request_rights(num_tokens, ZX_RIGHT_SAME_RIGHTS);
-  std::vector<fuchsia::sysmem::BufferCollectionTokenHandle> out_tokens;
-  status = token_group->CreateChildrenSync(children_request_rights, &out_tokens);
-  if (status != ZX_OK) {
+  fuchsia::sysmem2::BufferCollectionTokenGroupCreateChildrenSyncRequest create_children_request;
+  create_children_request.set_rights_attenuation_masks(std::move(children_request_rights));
+  fuchsia::sysmem2::BufferCollectionTokenGroup_CreateChildrenSync_Result create_children_result;
+  status =
+      token_group->CreateChildrenSync(std::move(create_children_request), &create_children_result);
+  if (status != ZX_OK || create_children_result.is_framework_err()) {
     FX_LOGS(WARNING) << "Cannot create buffer collection token group children: "
-                     << zx_status_get_string(status);
+                     << zx_status_get_string(status)
+                     << " is_framework_err: " << create_children_result.is_framework_err();
     return std::nullopt;
   }
+  auto out_tokens = std::move(*create_children_result.response().mutable_tokens());
+
   status = token_group->AllChildrenPresent();
   if (status != ZX_OK) {
     FX_LOGS(WARNING) << "Could not call AllChildrenPresent: " << zx_status_get_string(status);
     return std::nullopt;
   }
-  token_group->Close();
+  token_group->Release();
 
   return std::move(out_tokens);
 }
 
 // Consumes |token| to create a BufferCollectionSyncPtr and sets empty constraints on it.
-std::optional<fuchsia::sysmem::BufferCollectionSyncPtr>
+std::optional<fuchsia::sysmem2::BufferCollectionSyncPtr>
 CreateBufferCollectionSyncPtrAndSetEmptyConstraints(
-    fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
-    fuchsia::sysmem::BufferCollectionTokenSyncPtr token) {
-  fuchsia::sysmem::BufferCollectionSyncPtr local_buffer_collection;
-  sysmem_allocator->BindSharedCollection(std::move(token), local_buffer_collection.NewRequest());
-  auto status = local_buffer_collection->Sync();
+    fuchsia::sysmem2::Allocator_Sync* sysmem_allocator,
+    fuchsia::sysmem2::BufferCollectionTokenSyncPtr token) {
+  fuchsia::sysmem2::BufferCollectionSyncPtr local_buffer_collection;
+  fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.set_token(std::move(token));
+  bind_shared_request.set_buffer_collection_request(local_buffer_collection.NewRequest());
+  auto status = sysmem_allocator->BindSharedCollection(std::move(bind_shared_request));
+  if (status != ZX_OK) {
+    FX_LOGS(WARNING) << __func__ << " failed, could not BindSharedCollection: " << status;
+    return std::nullopt;
+  }
+
+  fuchsia::sysmem2::Node_Sync_Result sync_result;
+  status = local_buffer_collection->Sync(&sync_result);
   if (status != ZX_OK) {
     FX_LOGS(WARNING) << __func__ << " failed, could not bind buffer collection: " << status;
     return std::nullopt;
   }
-  status = local_buffer_collection->SetConstraints(false,
-                                                   fuchsia::sysmem::BufferCollectionConstraints());
+
+  status = local_buffer_collection->SetConstraints(
+      fuchsia::sysmem2::BufferCollectionSetConstraintsRequest{});
   if (status != ZX_OK) {
     FX_LOGS(WARNING) << __func__ << " failed, could not set constraints: " << status;
     return std::nullopt;
@@ -82,7 +104,7 @@ CreateBufferCollectionSyncPtrAndSetEmptyConstraints(
 namespace screen_capture {
 
 ScreenCaptureBufferCollectionImporter::ScreenCaptureBufferCollectionImporter(
-    fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator,
+    fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator,
     std::shared_ptr<flatland::Renderer> renderer)
     : sysmem_allocator_(std::move(sysmem_allocator)), renderer_(std::move(renderer)) {}
 
@@ -95,8 +117,8 @@ ScreenCaptureBufferCollectionImporter::~ScreenCaptureBufferCollectionImporter() 
 
 bool ScreenCaptureBufferCollectionImporter::ImportBufferCollection(
     allocation::GlobalBufferCollectionId collection_id,
-    fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
-    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
+    fuchsia::sysmem2::Allocator_Sync* sysmem_allocator,
+    fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token,
     BufferCollectionUsage usage, std::optional<fuchsia::math::SizeU> size) {
   TRACE_DURATION("gfx", "ScreenCaptureBufferCollectionImporter::ImportBufferCollection");
   // Expect only RenderTarget usage.
@@ -122,7 +144,7 @@ bool ScreenCaptureBufferCollectionImporter::ImportBufferCollection(
   // . * token_group
   // . . * out_tokens[0] / render_target_token
   // . . * out_tokens[1] / readback_token
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr local_token = token.BindSync();
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr local_token = token.BindSync();
   auto child_tokens = CreateChildTokens(local_token, 2);
   if (!child_tokens.has_value()) {
     return false;
@@ -268,8 +290,7 @@ std::optional<BufferCount> ScreenCaptureBufferCollectionImporter::GetBufferColle
   // |collection_id_sync_ptrs_|.
   if (buffer_collection_buffer_counts_.find(collection_id) ==
       buffer_collection_buffer_counts_.end()) {
-    fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
-    zx_status_t allocation_status = ZX_OK;
+    fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
 
     if (buffer_collection_sync_ptrs_.find(collection_id) == buffer_collection_sync_ptrs_.end()) {
       FX_LOGS(WARNING) << "Collection with id " << collection_id << " does not exist.";
@@ -278,24 +299,48 @@ std::optional<BufferCount> ScreenCaptureBufferCollectionImporter::GetBufferColle
 
     buffer_collection = std::move(buffer_collection_sync_ptrs_[collection_id]);
 
-    buffer_collection->CheckBuffersAllocated(&allocation_status);
-    if (allocation_status != ZX_OK) {
-      FX_LOGS(WARNING) << __func__ << " failed, no buffers allocated: " << allocation_status;
+    fuchsia::sysmem2::BufferCollection_CheckAllBuffersAllocated_Result check_allocated_result;
+    zx_status_t status = buffer_collection->CheckAllBuffersAllocated(&check_allocated_result);
+    if (status != ZX_OK) {
+      FX_LOGS(WARNING) << __func__ << " failed, no buffers allocated - status: " << status;
+      return std::nullopt;
+    }
+    if (check_allocated_result.is_framework_err()) {
+      FX_LOGS(WARNING) << __func__ << " failed, no buffers allocated - framework_err: "
+                       << fidl::ToUnderlying(check_allocated_result.framework_err());
+      return std::nullopt;
+    }
+    if (check_allocated_result.is_err()) {
+      ZX_DEBUG_ASSERT(check_allocated_result.is_err());
+      FX_LOGS(WARNING) << __func__ << " failed, no buffers allocated - err: "
+                       << static_cast<uint32_t>(check_allocated_result.err());
       return std::nullopt;
     }
 
-    fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info = {};
-    buffer_collection->WaitForBuffersAllocated(&allocation_status, &buffer_collection_info);
-    if (allocation_status != ZX_OK) {
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+    status = buffer_collection->WaitForAllBuffersAllocated(&wait_result);
+    if (status != ZX_OK) {
       FX_LOGS(WARNING) << __func__
-                       << " failed, waiting on no buffers allocated: " << allocation_status;
+                       << " failed, waiting on no buffers allocated - status: " << status;
       return std::nullopt;
     }
+    if (wait_result.is_framework_err()) {
+      FX_LOGS(WARNING) << __func__ << " failed, waiting on no buffers allocated - framework_err: "
+                       << fidl::ToUnderlying(wait_result.framework_err());
+      return std::nullopt;
+    }
+    if (wait_result.is_err()) {
+      FX_LOGS(WARNING) << __func__ << " failed, waiting on no buffers allocated - err: "
+                       << static_cast<uint32_t>(wait_result.framework_err());
+      return std::nullopt;
+    }
+    auto buffer_collection_info =
+        std::move(*wait_result.response().mutable_buffer_collection_info());
 
     buffer_collection_sync_ptrs_.erase(collection_id);
-    buffer_collection->Close();
+    buffer_collection->Release();
 
-    buffer_collection_buffer_counts_[collection_id] = buffer_collection_info.buffer_count;
+    buffer_collection_buffer_counts_[collection_id] = buffer_collection_info.buffers().size();
   }
 
   return buffer_collection_buffer_counts_[collection_id];
@@ -318,27 +363,33 @@ bool ScreenCaptureBufferCollectionImporter::ResetRenderTargetsForReadback(
         renderer->ReleaseBufferCollection(collection_id, BufferCollectionUsage::kReadback);
       });
 
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr fallback_render_target_sync_token;
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr fallback_render_target_sync_token;
+  fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
+  allocate_shared_request.set_token_request(fallback_render_target_sync_token.NewRequest());
   zx_status_t status =
-      sysmem_allocator_->AllocateSharedCollection(fallback_render_target_sync_token.NewRequest());
+      sysmem_allocator_->AllocateSharedCollection(std::move(allocate_shared_request));
   if (status != ZX_OK) {
     FX_LOGS(WARNING) << "Cannot allocate fallback render target sync token: "
                      << zx_status_get_string(status);
     return false;
   }
 
-  fuchsia::sysmem::BufferCollectionTokenHandle fallback_render_target_token;
-  status = fallback_render_target_sync_token->Duplicate(std::numeric_limits<uint32_t>::max(),
-                                                        fallback_render_target_token.NewRequest());
+  fuchsia::sysmem2::BufferCollectionTokenHandle fallback_render_target_token;
+  fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest dup_request;
+  dup_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
+  dup_request.set_token_request(fallback_render_target_token.NewRequest());
+  status = fallback_render_target_sync_token->Duplicate(std::move(dup_request));
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "Cannot duplicate fallback render target sync token: "
                    << zx_status_get_string(status);
     return false;
   }
 
-  fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
-  status = sysmem_allocator_->BindSharedCollection(std::move(fallback_render_target_sync_token),
-                                                   buffer_collection.NewRequest());
+  fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
+  fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.set_token(std::move(fallback_render_target_sync_token));
+  bind_shared_request.set_buffer_collection_request(buffer_collection.NewRequest());
+  status = sysmem_allocator_->BindSharedCollection(std::move(bind_shared_request));
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "Cannot bind fallback render target sync token: "
                    << zx_status_get_string(status);
@@ -353,27 +404,38 @@ bool ScreenCaptureBufferCollectionImporter::ResetRenderTargetsForReadback(
     return false;
   }
 
-  fuchsia::sysmem::BufferCollectionConstraints constraints;
-  constraints.min_buffer_count = buffer_count;
-  constraints.usage.vulkan = fuchsia::sysmem::noneUsage;
-  status = buffer_collection->SetConstraints(true, constraints);
+  fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  auto& constraints = *set_constraints_request.mutable_constraints();
+  constraints.set_min_buffer_count(buffer_count);
+  constraints.mutable_usage()->set_none(fuchsia::sysmem2::NONE_USAGE);
+  status = buffer_collection->SetConstraints(std::move(set_constraints_request));
   if (status != ZX_OK) {
     FX_LOGS(WARNING) << "Cannot set constraints on fallback render target collection: "
                      << zx_status_get_string(status);
     return false;
   }
 
-  zx_status_t allocation_status = ZX_OK;
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info = {};
-  status = buffer_collection->WaitForBuffersAllocated(&allocation_status, &buffer_collection_info);
-  if (status != ZX_OK || allocation_status != ZX_OK) {
-    FX_LOGS(WARNING) << "Could not wait on allocation for fallback render target collection: "
-                     << zx_status_get_string(status)
-                     << " ;alloc: " << zx_status_get_string(allocation_status);
+  fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+  status = buffer_collection->WaitForAllBuffersAllocated(&wait_result);
+  if (status != ZX_OK) {
+    FX_LOGS(WARNING)
+        << "Could not wait on allocation for fallback render target collection - status: "
+        << zx_status_get_string(status);
+    return false;
+  }
+  if (wait_result.is_framework_err()) {
+    FX_LOGS(WARNING)
+        << "Could not wait on allocation for fallback render target collection - framework_err: "
+        << fidl::ToUnderlying(wait_result.framework_err());
+    return false;
+  }
+  if (wait_result.is_err()) {
+    FX_LOGS(WARNING) << "Could not wait on allocation for fallback render target collection - err: "
+                     << static_cast<uint32_t>(wait_result.err());
     return false;
   }
 
-  status = buffer_collection->Close();
+  status = buffer_collection->Release();
   if (status != ZX_OK) {
     FX_LOGS(WARNING) << "Could not close fallback render target collection: "
                      << zx_status_get_string(status);
