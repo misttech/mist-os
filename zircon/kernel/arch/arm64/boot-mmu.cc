@@ -9,6 +9,8 @@
 #include <sys/types.h>
 
 #include <arch/arm64/mmu.h>
+#include <arch/defines.h>
+#include <fbl/algorithm.h>
 #include <vm/physmap.h>
 
 // Early boot time page table creation code, called from start.S while running in physical address
@@ -16,7 +18,36 @@
 // basic code.
 namespace {
 
-constexpr size_t kNumBootPageTables = 32;
+// 1GB pages
+const uintptr_t l1_large_page_size = 1UL << MMU_LX_X(MMU_KERNEL_PAGE_SIZE_SHIFT, 1);
+const uintptr_t l1_large_page_size_mask = l1_large_page_size - 1;
+
+// 2MB pages
+const uintptr_t l2_large_page_size = 1UL << MMU_LX_X(MMU_KERNEL_PAGE_SIZE_SHIFT, 2);
+const uintptr_t l2_large_page_size_mask = l2_large_page_size - 1;
+
+// Uart range might not be contained in the 1G peripheral range.
+// The peripheral ranges will:
+// (1) Use a PTE from the L1 page allocated for the kernel mappings, hence
+//     no L1 page allocation is needed.
+// (2) The UART virtual range is below the kernel address, and within the same
+//     GB, since it will always be the first periphmap range mapped.
+constexpr size_t kPeripheralBootPages = 1;
+
+// Just one L1 allocation for physmap.
+constexpr size_t kPhysmapBootPages = 1;
+
+// Boot pages needed for the kernel mapping.
+constexpr size_t kKernelBootPages =
+    // L1 page for kernel mapping.
+    1 +
+    // L2 pages for kernel mapping.
+    fbl::round_up<size_t>(KERNEL_IMAGE_MAX_SIZE, l1_large_page_size) / l1_large_page_size +
+    // L3 pages for kernel mapping.
+    fbl::round_up<size_t>(KERNEL_IMAGE_MAX_SIZE, l2_large_page_size) / l2_large_page_size;
+
+constexpr size_t kNumBootPageTables = kKernelBootPages + kPhysmapBootPages + kPeripheralBootPages;
+
 alignas(PAGE_SIZE) uint64_t boot_page_tables[MMU_KERNEL_PAGE_TABLE_ENTRIES * kNumBootPageTables];
 
 // Will track the physical address of the page table array above. Starts off initialized to the
@@ -27,14 +58,6 @@ size_t boot_page_table_offset;
 // this code only works on a 4K page granule, 48 bits of kernel address space
 static_assert(MMU_KERNEL_PAGE_SIZE_SHIFT == 12);
 static_assert(MMU_KERNEL_SIZE_SHIFT == 48);
-
-// 1GB pages
-const uintptr_t l1_large_page_size = 1UL << MMU_LX_X(MMU_KERNEL_PAGE_SIZE_SHIFT, 1);
-const uintptr_t l1_large_page_size_mask = l1_large_page_size - 1;
-
-// 2MB pages
-const uintptr_t l2_large_page_size = 1UL << MMU_LX_X(MMU_KERNEL_PAGE_SIZE_SHIFT, 2);
-const uintptr_t l2_large_page_size_mask = l2_large_page_size - 1;
 
 size_t vaddr_to_l0_index(uintptr_t addr) {
   return (addr >> MMU_KERNEL_TOP_SHIFT) & (MMU_KERNEL_PAGE_TABLE_ENTRIES_TOP - 1);
@@ -67,7 +90,6 @@ inline zx_status_t _arm64_boot_map(pte_t* kernel_table0, const vaddr_t vaddr, co
     switch (kernel_table0[index0] & MMU_PTE_DESCRIPTOR_MASK) {
       default: {  // invalid/unused entry
         paddr_t pa = alloc_func();
-
         kernel_table0[index0] = (pa & MMU_PTE_OUTPUT_ADDR_MASK) | MMU_PTE_L012_DESCRIPTOR_TABLE;
         __FALLTHROUGH;
       }
@@ -96,7 +118,6 @@ inline zx_status_t _arm64_boot_map(pte_t* kernel_table0, const vaddr_t vaddr, co
         }
 
         paddr_t pa = alloc_func();
-
         kernel_table1[index1] = (pa & MMU_PTE_OUTPUT_ADDR_MASK) | MMU_PTE_L012_DESCRIPTOR_TABLE;
         __FALLTHROUGH;
       }
@@ -152,7 +173,6 @@ __NO_SAFESTACK
 paddr_t boot_page_table_alloc() {
   ASSERT(boot_page_table_offset < sizeof(boot_page_tables));
   boot_page_table_offset += PAGE_SIZE;
-
   paddr_t new_table = boot_page_tables_pa;
   boot_page_tables_pa += PAGE_SIZE;
   return new_table;
@@ -208,7 +228,6 @@ zx_status_t arm64_boot_map_v(const vaddr_t vaddr, const paddr_t paddr, const siz
   auto alloc = []() -> paddr_t {
     // allocate a page out of the boot allocator, asking for a physical address
     paddr_t pa = boot_page_table_alloc();
-
     // zero the memory using the physmap
     void* ptr = paddr_to_physmap(pa);
     memset(ptr, 0, MMU_KERNEL_PAGE_TABLE_ENTRIES * sizeof(pte_t));

@@ -277,6 +277,9 @@ if (is_kernel) {
       "//build/config/zircon:data_sections",
     ]
 
+    # Provides checks for maximum supported kernel sizes.
+    configs += [ ":kernel_image_max_size" ]
+
     # TODO(https://fxbug.dev/42101573): This dependency is conditional because when built
     # with GCC the kernel uses function scoped statics requiring dynamic
     # initialization. Once https://fxbug.dev/42101573 is fixed, this dependency can be
@@ -408,6 +411,31 @@ if (is_kernel) {
       "//zircon/kernel/lib/persistent-debuglog/*",
     ]
     defines = [ "PERSISTENT_RAM_ALLOCATION_GRANULARITY=$persistent_ram_allocation_granularity" ]
+  }
+
+  # In architechtures where it is necessary, determined the number of boot pages to be preallocated
+  # from BSS to map the kernel in the higher address space for enabling the MMU when booting.
+  # See `start.S` of the relevant architectures for more information.
+  config("kernel_image_max_size") {
+    if (target_cpu == "arm64" || target_cpu == "riscv64") {
+      if (toolchain_variant.tags + [ "coverage" ] - [ "coverage" ] !=
+          toolchain_variant.tags) {
+        # 25 MB upperbound for coverage builds.
+        kernel_image_max_size = 26214400
+      } else {
+        # 14 MB upperbound for non coverage builds.
+        kernel_image_max_size = 14680064
+      }
+    } else if (target_cpu == "x64") {
+      # x64 hard coded to support up to 64 MB.
+      kernel_image_max_size = 67108864
+    }
+
+    visibility = [
+      ":*",
+      "//zircon/kernel/phys:*",
+    ]
+    defines = [ "KERNEL_IMAGE_MAX_SIZE=$kernel_image_max_size" ]
   }
 
   config("jtrace_config") {

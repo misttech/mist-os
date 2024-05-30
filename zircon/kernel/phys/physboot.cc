@@ -105,6 +105,13 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs, const ArchPatchInfo& pat
 
   debugf("%s: Examining ZBI...\n", gSymbolize->name());
   BootZbi::InputZbi kernel_zbi(kernel_bytes);
+
+  if (kernel_bytes.size_bytes() > KERNEL_IMAGE_MAX_SIZE) {
+    ZX_PANIC(
+        "physboot: Attempting to load kernel of size %#zx. Max supported kernel size is %#zx (\"KERNEL_IMAGE_MAX_SIZE\").\n",
+        kernel_bytes.size_bytes(), static_cast<size_t>(KERNEL_IMAGE_MAX_SIZE));
+  }
+
   ChainBoot boot;
   if (auto result = boot.Init(kernel_zbi); result.is_error()) {
     printf("physboot: Cannot read STORAGE_KERNEL item ZBI: ");
