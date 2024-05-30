@@ -56,7 +56,6 @@
 //!       of the "weak host model" vs "strong host model" discussion.
 
 mod integration;
-pub(crate) mod udp;
 
 use derivative::Derivative;
 use net_types::ip::{Ip, Ipv4, Ipv6};
@@ -75,6 +74,11 @@ use crate::{
 // TODO(https://fxbug.dev/342685842): Remove this re-export.
 pub(crate) mod tcp {
     pub(crate) use netstack3_tcp::*;
+}
+
+// TODO(https://fxbug.dev/342685842): Remove this re-export.
+pub(crate) mod udp {
+    pub(crate) use netstack3_udp::*;
 }
 
 /// A builder for transport layer state.

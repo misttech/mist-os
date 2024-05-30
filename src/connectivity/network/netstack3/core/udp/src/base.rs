@@ -17,17 +17,44 @@ use core::{
 
 use derivative::Derivative;
 use either::Either;
-use lock_order::lock::DelegatedOrderedLockAccess;
+use lock_order::lock::{DelegatedOrderedLockAccess, OrderedLockAccess, OrderedLockRef};
 use net_types::{
     ip::{GenericOverIp, Ip, IpInvariant, IpMarked, IpVersion, IpVersionMarker, Ipv4, Ipv6},
     MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
 };
 use netstack3_base::{
+    socket::{
+        AddrEntry, AddrIsMappedError, AddrVec, Bound, ConnAddr, ConnInfoAddr, ConnIpAddr,
+        FoundSockets, IncompatibleError, InsertError, Inserter, ListenerAddr, ListenerAddrInfo,
+        ListenerIpAddr, MaybeDualStack, NotDualStackCapableError, RemoveResult,
+        SetDualStackEnabledError, ShutdownType, SocketAddrType, SocketIpAddr, SocketMapAddrSpec,
+        SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
+    },
+    socketmap::{IterShadows as _, SocketMap, Tagged},
     sync::{RwLock, StrongRc},
     trace_duration, AnyDevice, BidirectionalConverter, ContextPair, Counter, CounterContext,
     DeviceIdContext, Inspector, InspectorDeviceExt, InstantContext, LocalAddressError,
-    ReferenceNotifiers, RemoveResourceResultWithContext, RngContext, SocketError,
+    PortAllocImpl, ReferenceNotifiers, RemoveResourceResultWithContext, RngContext, SocketError,
     StrongDeviceIdentifier, TracingContext, WeakDeviceIdentifier, ZonedAddressError,
+};
+use netstack3_ip::{
+    datagram::{
+        self, BoundSocketState as DatagramBoundSocketState,
+        BoundSocketStateType as DatagramBoundSocketStateType, BoundSockets as DatagramBoundSockets,
+        ConnectError, DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec,
+        DatagramSocketOptions, DatagramSocketSet, DatagramSocketSpec,
+        DatagramSpecBoundStateContext, DatagramSpecStateContext, DatagramStateContext,
+        DualStackConnState, DualStackConverter, DualStackDatagramBoundStateContext,
+        DualStackDatagramSpecBoundStateContext, DualStackIpExt, EitherIpSocket, ExpectedConnError,
+        ExpectedUnboundError, InUseError, IpExt, IpOptions, MulticastMembershipInterfaceSelector,
+        NonDualStackConverter, NonDualStackDatagramBoundStateContext,
+        NonDualStackDatagramSpecBoundStateContext, SendError as DatagramSendError,
+        SetMulticastMembershipError, SocketHopLimits, SocketInfo,
+        SocketState as DatagramSocketState, WrapOtherStackIpOptions, WrapOtherStackIpOptionsMut,
+    },
+    socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError},
+    HopLimits, IpTransportContext, MulticastMembershipHandler, TransparentLocalDelivery,
+    TransportIpContext, TransportReceiveError,
 };
 use packet::{BufferMut, Nested, ParsablePacket, Serializer};
 use packet_formats::{
@@ -36,41 +63,6 @@ use packet_formats::{
 };
 use thiserror::Error;
 use tracing::{debug, trace};
-
-use crate::{
-    algorithm::{self, PortAllocImpl},
-    data_structures::socketmap::{IterShadows as _, SocketMap, Tagged},
-    ip::{
-        socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError},
-        HopLimits, IpTransportContext, MulticastMembershipHandler, TransparentLocalDelivery,
-        TransportIpContext, TransportReceiveError,
-    },
-    socket::{
-        datagram::{
-            self, BoundSocketState as DatagramBoundSocketState,
-            BoundSocketStateType as DatagramBoundSocketStateType,
-            BoundSockets as DatagramBoundSockets, ConnectError, DatagramBoundStateContext,
-            DatagramFlowId, DatagramSocketMapSpec, DatagramSocketOptions, DatagramSocketSet,
-            DatagramSocketSpec, DatagramSpecBoundStateContext, DatagramSpecStateContext,
-            DatagramStateContext, DualStackConnState, DualStackConverter,
-            DualStackDatagramBoundStateContext, DualStackDatagramSpecBoundStateContext,
-            DualStackIpExt, EitherIpSocket, ExpectedConnError, ExpectedUnboundError, InUseError,
-            IpExt, IpOptions, MulticastMembershipInterfaceSelector, NonDualStackConverter,
-            NonDualStackDatagramBoundStateContext, NonDualStackDatagramSpecBoundStateContext,
-            SendError as DatagramSendError, SetMulticastMembershipError, SocketHopLimits,
-            SocketInfo, SocketState as DatagramSocketState, WrapOtherStackIpOptions,
-            WrapOtherStackIpOptionsMut,
-        },
-        AddrEntry, AddrIsMappedError, AddrVec, Bound, ConnAddr, ConnInfoAddr, ConnIpAddr,
-        FoundSockets, IncompatibleError, InsertError, Inserter, ListenerAddr, ListenerAddrInfo,
-        ListenerIpAddr, MaybeDualStack, NotDualStackCapableError, RemoveResult,
-        SetDualStackEnabledError, ShutdownType, SocketAddrType, SocketIpAddr, SocketMapAddrSpec,
-        SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
-    },
-};
-
-#[cfg(test)]
-mod integration_tests;
 
 /// A builder for UDP layer state.
 #[derive(Clone)]
@@ -106,7 +98,8 @@ impl UdpStateBuilder {
         self
     }
 
-    pub(crate) fn build<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes>(
+    /// Builds a new [`UdpState`] for IP version `I`.
+    pub fn build<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes>(
         self,
     ) -> UdpState<I, D, BT> {
         UdpState {
@@ -121,6 +114,7 @@ impl UdpStateBuilder {
 pub(crate) type UdpBoundSocketMap<I, D, BT> =
     DatagramBoundSockets<I, D, UdpAddrSpec, UdpSocketMapStateSpec<I, D, BT>>;
 
+/// UDP bound sockets, i.e., the UDP demux.
 #[derive(Derivative, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 #[derivative(Default(bound = ""))]
@@ -131,11 +125,29 @@ pub struct BoundSockets<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes>
 /// A collection of UDP sockets.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct Sockets<I: Ip + IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> {
-    pub(crate) bound: RwLock<BoundSockets<I, D, BT>>,
+pub struct Sockets<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> {
+    bound: RwLock<BoundSockets<I, D, BT>>,
     // Destroy all_sockets last so the strong references in the demux are
     // dropped before the primary references in the set.
-    pub(crate) all_sockets: RwLock<UdpSocketSet<I, D, BT>>,
+    all_sockets: RwLock<UdpSocketSet<I, D, BT>>,
+}
+
+impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes>
+    OrderedLockAccess<BoundSockets<I, D, BT>> for Sockets<I, D, BT>
+{
+    type Lock = RwLock<BoundSockets<I, D, BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.bound)
+    }
+}
+
+impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes>
+    OrderedLockAccess<UdpSocketSet<I, D, BT>> for Sockets<I, D, BT>
+{
+    type Lock = RwLock<UdpSocketSet<I, D, BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.all_sockets)
+    }
 }
 
 /// The state associated with the UDP protocol.
@@ -143,10 +155,13 @@ pub(crate) struct Sockets<I: Ip + IpExt, D: WeakDeviceIdentifier, BT: UdpBinding
 /// `D` is the device ID type.
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
-pub(crate) struct UdpState<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> {
-    pub(crate) sockets: Sockets<I, D, BT>,
-    pub(crate) send_port_unreachable: bool,
-    pub(crate) counters: UdpCounters<I>,
+pub struct UdpState<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> {
+    /// System's UDP sockets.
+    pub sockets: Sockets<I, D, BT>,
+    /// Whether or not the stack is configured to send UDP port unreachable.
+    pub send_port_unreachable: bool,
+    /// Stack-wide UDP counters.
+    pub counters: UdpCounters<I>,
 }
 
 impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> Default for UdpState<I, D, BT> {
@@ -580,7 +595,7 @@ impl<BT: UdpBindingsTypes> DatagramSocketSpec for Udp<BT> {
     }
 
     fn try_alloc_listen_identifier<I: IpExt, D: WeakDeviceIdentifier>(
-        rng: &mut impl crate::RngContext,
+        rng: &mut impl RngContext,
         is_available: impl Fn(NonZeroU16) -> Result<(), InUseError>,
     ) -> Option<NonZeroU16> {
         try_alloc_listen_port::<I, D, BT>(rng, is_available)
@@ -604,7 +619,7 @@ impl<BT: UdpBindingsTypes> DatagramSocketSpec for Udp<BT> {
         flow: datagram::DatagramFlowId<I::Addr, UdpRemotePort>,
     ) -> Option<NonZeroU16> {
         let mut rng = bindings_ctx.rng();
-        algorithm::simple_randomized_port_alloc(&mut rng, &flow, &UdpPortAlloc(bound), &())
+        netstack3_base::simple_randomized_port_alloc(&mut rng, &flow, &UdpPortAlloc(bound), &())
             .map(|p| NonZeroU16::new(p).expect("ephemeral ports should be non-zero"))
     }
 }
@@ -1057,8 +1072,10 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> WeakUdpSocketId<I,
     }
 }
 
-pub(crate) type UdpSocketSet<I, D, BT> = DatagramSocketSet<I, D, Udp<BT>>;
-pub(crate) type UdpSocketState<I, D, BT> = DatagramSocketState<I, D, Udp<BT>>;
+/// A set containing all UDP sockets.
+pub type UdpSocketSet<I, D, BT> = DatagramSocketSet<I, D, Udp<BT>>;
+/// A UDP socket's state.
+pub type UdpSocketState<I, D, BT> = DatagramSocketState<I, D, Udp<BT>>;
 
 /// The bindings context handling received UDP frames.
 pub trait UdpReceiveBindingsContext<I: IpExt, D: StrongDeviceIdentifier>: UdpBindingsTypes {
@@ -1122,6 +1139,7 @@ pub trait BoundStateContext<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>>
         + MulticastMembershipHandler<I, BC>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>;
 
+    /// The inner dual stack context.
     type DualStackContext: DualStackDatagramBoundStateContext<
         I,
         BC,
@@ -1129,6 +1147,7 @@ pub trait BoundStateContext<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>>
         DeviceId = Self::DeviceId,
         WeakDeviceId = Self::WeakDeviceId,
     >;
+    /// The inner non dual stack context.
     type NonDualStackContext: NonDualStackDatagramBoundStateContext<
         I,
         BC,
@@ -1167,6 +1186,7 @@ pub trait BoundStateContext<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>>
     ) -> O;
 }
 
+/// Core context abstracting state access to UDP state.
 pub trait StateContext<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
@@ -1286,13 +1306,13 @@ pub trait DualStackBoundStateContext<I: IpExt, BC: UdpBindingsContext<I, Self::D
 }
 
 /// An execution context for UDP non-dual-stack operations.
-pub(crate) trait NonDualStackBoundStateContext<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>>:
+pub trait NonDualStackBoundStateContext<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
 }
 
 /// An implementation of [`IpTransportContext`] for UDP.
-pub(crate) enum UdpIpTransportContext {}
+pub enum UdpIpTransportContext {}
 
 #[derive(Clone)]
 struct OriginalDestination<I: IpExt> {
@@ -1569,8 +1589,7 @@ fn try_dual_stack_deliver<
 // For some reason rustc insists that this trait is not used, but it's required
 // to mark types that want the blanket impl. This should be lifted when this
 // type is pulled into the UDP crate and the trait is exported.
-#[allow(unused)]
-pub(crate) trait UseUdpIpTransportContextBlanket {}
+pub trait UseUdpIpTransportContextBlanket {}
 
 impl<
         I: IpExt,
@@ -1656,7 +1675,8 @@ pub enum SendToError {
 pub struct UdpApi<I: Ip, C>(C, IpVersionMarker<I>);
 
 impl<I: Ip, C> UdpApi<I, C> {
-    pub(crate) fn new(ctx: C) -> Self {
+    /// Creates a new `UdpApi` from `ctx`.
+    pub fn new(ctx: C) -> Self {
         Self(ctx, IpVersionMarker::new())
     }
 }
@@ -1917,7 +1937,7 @@ where
     ) -> Result<(), NotDualStackCapableError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         if ip_version == I::VERSION {
-            return Ok(crate::socket::datagram::update_ip_hop_limit(
+            return Ok(datagram::update_ip_hop_limit(
                 core_ctx,
                 bindings_ctx,
                 id,
@@ -1960,7 +1980,7 @@ where
     ) -> Result<(), NotDualStackCapableError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         if ip_version == I::VERSION {
-            return Ok(crate::socket::datagram::update_ip_hop_limit(
+            return Ok(datagram::update_ip_hop_limit(
                 core_ctx,
                 bindings_ctx,
                 id,
@@ -2002,9 +2022,7 @@ where
     ) -> Result<NonZeroU8, NotDualStackCapableError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         if ip_version == I::VERSION {
-            return Ok(
-                crate::socket::datagram::get_ip_hop_limits(core_ctx, bindings_ctx, id).unicast
-            );
+            return Ok(datagram::get_ip_hop_limits(core_ctx, bindings_ctx, id).unicast);
         }
         datagram::with_other_stack_ip_options_and_default_hop_limits(
             core_ctx,
@@ -2050,9 +2068,7 @@ where
     ) -> Result<NonZeroU8, NotDualStackCapableError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         if ip_version == I::VERSION {
-            return Ok(
-                crate::socket::datagram::get_ip_hop_limits(core_ctx, bindings_ctx, id).multicast
-            );
+            return Ok(datagram::get_ip_hop_limits(core_ctx, bindings_ctx, id).multicast);
         }
         datagram::with_other_stack_ip_options_and_default_hop_limits(
             core_ctx,
@@ -2083,6 +2099,7 @@ where
         .map(|IpInvariant(multicast)| multicast)
     }
 
+    /// Returns the configured multicast interface for the socket.
     pub fn get_multicast_interface(
         &mut self,
         id: &UdpApiSocketId<I, C>,
@@ -2093,7 +2110,7 @@ where
     > {
         let (core_ctx, bindings_ctx) = self.contexts();
         if ip_version == I::VERSION {
-            return Ok(crate::socket::datagram::get_multicast_interface(core_ctx, id));
+            return Ok(datagram::get_multicast_interface(core_ctx, id));
         };
 
         datagram::with_other_stack_ip_options(core_ctx, bindings_ctx, id, |other_stack| {
@@ -2108,6 +2125,7 @@ where
         .map(|IpInvariant(result)| result)
     }
 
+    /// Sets the multicast interface to `interface` for a socket.
     pub fn set_multicast_interface(
         &mut self,
         id: &UdpApiSocketId<I, C>,
@@ -2117,7 +2135,7 @@ where
         let (core_ctx, bindings_ctx) = self.contexts();
 
         if ip_version == I::VERSION {
-            crate::socket::datagram::set_multicast_interface(core_ctx, id, interface);
+            datagram::set_multicast_interface(core_ctx, id, interface);
             return Ok(());
         };
 
@@ -2136,14 +2154,15 @@ where
 
     /// Gets the transparent option.
     pub fn get_transparent(&mut self, id: &UdpApiSocketId<I, C>) -> bool {
-        crate::socket::datagram::get_ip_transparent(self.core_ctx(), id)
+        datagram::get_ip_transparent(self.core_ctx(), id)
     }
 
     /// Sets the transparent option.
     pub fn set_transparent(&mut self, id: &UdpApiSocketId<I, C>, value: bool) {
-        crate::socket::datagram::set_ip_transparent(self.core_ctx(), id, value)
+        datagram::set_ip_transparent(self.core_ctx(), id, value)
     }
 
+    /// Gets the loopback multicast option.
     pub fn get_multicast_loop(
         &mut self,
         id: &UdpApiSocketId<I, C>,
@@ -2151,7 +2170,7 @@ where
     ) -> Result<bool, NotDualStackCapableError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         if ip_version == I::VERSION {
-            return Ok(crate::socket::datagram::get_multicast_loop(core_ctx, id));
+            return Ok(datagram::get_multicast_loop(core_ctx, id));
         };
 
         datagram::with_other_stack_ip_options(core_ctx, bindings_ctx, id, |other_stack| {
@@ -2166,6 +2185,7 @@ where
         .map(|IpInvariant(result)| result)
     }
 
+    /// Sets the loopback multicast option.
     pub fn set_multicast_loop(
         &mut self,
         id: &UdpApiSocketId<I, C>,
@@ -2175,7 +2195,7 @@ where
         let (core_ctx, bindings_ctx) = self.contexts();
 
         if ip_version == I::VERSION {
-            crate::socket::datagram::set_multicast_loop(core_ctx, id, value);
+            datagram::set_multicast_loop(core_ctx, id, value);
             return Ok(());
         };
 
@@ -2628,31 +2648,24 @@ mod tests {
     };
     use netstack3_base::{
         socket::{SocketIpAddrExt as _, StrictlyZonedAddr},
+        sync::PrimaryRc,
         testutil::{
-            FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,
-            MultipleDevicesId,
+            set_logger_for_test, FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeReferencyDeviceId,
+            FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId, TestIpExt as _,
         },
-        UninstantiableWrapper,
+        CtxPair, RemoteAddressError, UninstantiableWrapper,
+    };
+    use netstack3_ip::{
+        datagram::MulticastInterfaceSelector,
+        device::IpDeviceStateIpExt,
+        socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
+        testutil::DualStackSendIpPacketMeta,
+        ResolveRouteError, SendIpPacketMeta,
     };
     use packet::Buf;
     use test_case::test_case;
 
     use super::*;
-    use crate::{
-        context::{
-            testutil::{FakeBindingsCtx, FakeCoreCtx},
-            CtxPair,
-        },
-        error::RemoteAddressError,
-        ip::{
-            datagram::MulticastInterfaceSelector,
-            device::IpDeviceStateIpExt,
-            socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
-            testutil::DualStackSendIpPacketMeta,
-            ResolveRouteError, SendIpPacketMeta,
-        },
-        testutil::{set_logger_for_test, TestIpExt as _},
-    };
 
     /// A packet received on a socket.
     #[derive(Debug, Derivative, PartialEq)]
@@ -3181,7 +3194,7 @@ mod tests {
         I::get_other_ip_address(2)
     }
 
-    trait TestIpExt: crate::testutil::TestIpExt + IpExt + IpDeviceStateIpExt {
+    trait TestIpExt: netstack3_base::testutil::TestIpExt + IpExt + IpDeviceStateIpExt {
         type UdpDualStackBoundStateContext<D: FakeStrongDeviceId + 'static>:
             DualStackDatagramBoundStateContext<Self, FakeUdpBindingsCtx<D>, Udp<FakeUdpBindingsCtx<D>>, DeviceId=D, WeakDeviceId=D::Weak>;
         type UdpNonDualStackBoundStateContext<D: FakeStrongDeviceId + 'static>:
@@ -6989,7 +7002,7 @@ mod tests {
 
         let mut create_socket = || {
             let primary = datagram::testutil::create_primary_id(());
-            let id = UdpSocketId(crate::sync::PrimaryRc::clone_strong(&primary));
+            let id = UdpSocketId(PrimaryRc::clone_strong(&primary));
             primary_ids.push(primary);
             id
         };
@@ -7051,7 +7064,7 @@ mod tests {
 
         let mut create_socket = || {
             let primary = datagram::testutil::create_primary_id(());
-            let id = UdpSocketId(crate::sync::PrimaryRc::clone_strong(&primary));
+            let id = UdpSocketId(PrimaryRc::clone_strong(&primary));
             primary_ids.push(primary);
             id
         };

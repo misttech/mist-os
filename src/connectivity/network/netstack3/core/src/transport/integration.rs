@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use lock_order::{
-    lock::{DelegatedOrderedLockAccess, LockLevelFor, RwLockFor, UnlockedAccess},
+    lock::{DelegatedOrderedLockAccess, LockLevelFor, UnlockedAccess},
     relation::LockBefore,
     wrap::prelude::*,
 };
@@ -588,33 +588,33 @@ impl<I: datagram::IpExt, D: WeakDeviceIdentifier, BT: BindingsTypes>
     type Data = UdpSocketState<I, D, BT>;
 }
 
-impl<I: datagram::IpExt, BT: BindingsTypes> RwLockFor<crate::lock_ordering::UdpBoundMap<I>>
-    for StackState<BT>
+impl<I: datagram::IpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
+    for crate::lock_ordering::UdpBoundMap<I>
 {
     type Data = udp::BoundSockets<I, WeakDeviceId<BT>, BT>;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Self::Data> where Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Self::Data> where Self: 'l;
+}
 
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.transport.udp_state::<I>().sockets.bound.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.transport.udp_state::<I>().sockets.bound.write()
+impl<I: datagram::IpExt, BT: BindingsTypes>
+    DelegatedOrderedLockAccess<udp::BoundSockets<I, WeakDeviceId<BT>, BT>> for StackState<BT>
+{
+    type Inner = udp::Sockets<I, WeakDeviceId<BT>, BT>;
+    fn delegate_ordered_lock_access(&self) -> &Self::Inner {
+        &self.transport.udp_state::<I>().sockets
     }
 }
 
-impl<I: datagram::IpExt, BT: BindingsTypes> RwLockFor<crate::lock_ordering::UdpAllSocketsSet<I>>
-    for StackState<BT>
+impl<I: datagram::IpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
+    for crate::lock_ordering::UdpAllSocketsSet<I>
 {
     type Data = UdpSocketSet<I, WeakDeviceId<BT>, BT>;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Self::Data> where Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Self::Data> where Self: 'l;
+}
 
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.transport.udp_state::<I>().sockets.all_sockets.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.transport.udp_state::<I>().sockets.all_sockets.write()
+impl<I: datagram::IpExt, BT: BindingsTypes>
+    DelegatedOrderedLockAccess<UdpSocketSet<I, WeakDeviceId<BT>, BT>> for StackState<BT>
+{
+    type Inner = udp::Sockets<I, WeakDeviceId<BT>, BT>;
+    fn delegate_ordered_lock_access(&self) -> &Self::Inner {
+        &self.transport.udp_state::<I>().sockets
     }
 }
 

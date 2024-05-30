@@ -691,8 +691,8 @@ impl FakeBindingsCtx {
         .unwrap_or_else(Vec::default)
     }
 
-    #[cfg(test)]
-    pub(crate) fn take_udp_received<I: crate::IpExt>(
+    /// Takes all received UDP frames from the fake bindings context.
+    pub fn take_udp_received<I: crate::IpExt>(
         &mut self,
         conn: &UdpSocketId<I, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>,
     ) -> Vec<Vec<u8>> {

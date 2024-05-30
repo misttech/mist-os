@@ -22,9 +22,6 @@
 // this module.
 extern crate fakealloc as alloc;
 
-// TODO(https://github.com/dtolnay/thiserror/pull/64): remove this module.
-extern crate fakestd as std;
-
 mod api;
 mod context;
 mod counters;
@@ -38,16 +35,6 @@ mod transport;
 pub mod benchmarks;
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil;
-
-pub(crate) mod algorithm {
-    pub(crate) use netstack3_base::{simple_randomized_port_alloc, PortAllocImpl};
-}
-
-pub(crate) mod data_structures {
-    pub(crate) mod socketmap {
-        pub(crate) use netstack3_base::socketmap::{IterShadows, SocketMap, Tagged};
-    }
-}
 
 /// The device layer.
 pub mod device {
@@ -184,14 +171,9 @@ pub mod routes {
 
 /// Common types for dealing with sockets.
 pub mod socket {
+    // TODO(https://fxbug.dev/342685842): Remove these re-exports.
+    pub(crate) use netstack3_base::socket::{MaybeDualStack, SocketIpAddr};
     pub(crate) use netstack3_ip::datagram;
-
-    pub(crate) use netstack3_base::socket::{
-        AddrEntry, AddrVec, Bound, ConnAddr, ConnInfoAddr, ConnIpAddr, FoundSockets,
-        IncompatibleError, InsertError, Inserter, ListenerAddr, ListenerAddrInfo, ListenerIpAddr,
-        MaybeDualStack, RemoveResult, SocketAddrType, SocketIpAddr, SocketMapAddrSpec,
-        SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
-    };
 
     pub use datagram::{
         ConnInfo, ConnectError, ExpectedConnError, ExpectedUnboundError, ListenerInfo,
@@ -240,7 +222,7 @@ pub mod types {
 
 /// Methods for dealing with UDP sockets.
 pub mod udp {
-    pub use crate::transport::udp::{
+    pub use netstack3_udp::{
         SendError, SendToError, UdpBindingsTypes, UdpReceiveBindingsContext, UdpRemotePort,
         UdpSocketId,
     };

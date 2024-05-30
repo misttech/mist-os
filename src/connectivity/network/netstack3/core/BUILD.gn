@@ -35,6 +35,11 @@ _all_core_crates = [
   "tcp:netstack3-tcp-instrumented",
   "tcp:netstack3-tcp-loom",
   "tcp:netstack3-tcp-testutils",
+  "udp:netstack3-udp",
+  "udp:netstack3-udp-benchmarks",
+  "udp:netstack3-udp-instrumented",
+  "udp:netstack3-udp-loom",
+  "udp:netstack3-udp-testutils",
   "sync:netstack3-sync",
   "sync:netstack3-sync-instrumented",
   "sync:netstack3-sync-loom",
@@ -68,19 +73,8 @@ rustc_library_with_features("netstack3-core") {
     "src/time.rs",
     "src/transport.rs",
     "src/transport/integration.rs",
-    "src/transport/udp.rs",
-    "src/transport/udp/integration_tests.rs",
   ]
   deps = [
-    # TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11):
-    # remove this module.
-    "//src/lib/fakealloc",
-
-    # TODO(https://github.com/rust-lang/rust/issues/62502): remove this module.
-    "fakestd",
-
-    # Placeholder comment so the auto formatter does not move one of these
-    # dependencies above "fakestd".
     "lock-order",
     "macros:netstack3-macros",
     "//src/connectivity/lib/net-types",
@@ -88,20 +82,13 @@ rustc_library_with_features("netstack3-core") {
     "//src/lib/network/packet",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:derivative",
-    "//third_party/rust_crates:either",
-    "//third_party/rust_crates:smallvec",
-    "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
+
+    # TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11):
+    # remove this module.
+    "//src/lib/fakealloc",
   ]
   _testutil_deps = [ "//third_party/rust_crates:zerocopy" ]
-  test_deps = [
-    "//src/connectivity/lib/ip-test-macro",
-    "//src/connectivity/lib/net-declare",
-    "//src/lib/const-unwrap",
-    "//third_party/rust_crates:itertools",
-    "//third_party/rust_crates:test-case",
-  ]
-  test_deps += _testutil_deps
 
   feature_sets = [
     {
@@ -113,6 +100,7 @@ rustc_library_with_features("netstack3-core") {
         "ip:netstack3-ip",
         "sync:netstack3-sync",
         "tcp:netstack3-tcp",
+        "udp:netstack3-udp",
       ]
     },
 
@@ -130,28 +118,21 @@ rustc_library_with_features("netstack3-core") {
         "ip:netstack3-ip-instrumented",
         "sync:netstack3-sync-instrumented",
         "tcp:netstack3-tcp-instrumented",
+        "udp:netstack3-udp-instrumented",
       ]
-      test_deps += [
+      test_deps = [
         "base:netstack3-base-testutils",
         "device:netstack3-device-testutils",
         "filter:netstack3-filter-testutils",
         "ip:netstack3-ip-testutils",
         "sync:netstack3-sync-instrumented",
         "tcp:netstack3-tcp-testutils",
+        "udp:netstack3-udp-testutils",
       ]
+      test_deps += _testutil_deps
 
       # Guard against bad crate variants.
       assert_no_deps = _all_core_crates - non_test_deps
-
-      # TODO(https://fxbug.dev/42086491): Split up large tests.
-      # Compiling the tests OOMs on RBE with these variants.
-      if (is_coverage || is_asan || is_hwasan || is_fuzzer ||
-          optimize == "sanitizer" || target_cpu == "arm64") {
-        test_disable_rbe = true
-
-        # This is known to take over 17GB memory locally for coverage.
-        pool = "//build/config:highmem($default_toolchain)"
-      }
     },
 
     # A variant of the netstack3-core library that exposes test utilities.
@@ -170,6 +151,7 @@ rustc_library_with_features("netstack3-core") {
         "ip:netstack3-ip-testutils",
         "sync:netstack3-sync-instrumented",
         "tcp:netstack3-tcp-testutils",
+        "udp:netstack3-udp-testutils",
       ]
 
       deps += _core_deps
@@ -193,6 +175,7 @@ rustc_library_with_features("netstack3-core") {
         "ip:netstack3-ip-benchmarks",
         "sync:netstack3-sync",
         "tcp:netstack3-tcp-benchmarks",
+        "udp:netstack3-udp-benchmarks",
       ]
       deps += _core_deps
       deps += [ "//third_party/rust_crates:criterion" ]
@@ -223,6 +206,7 @@ rustc_library_with_features("netstack3-core") {
           "ip:netstack3-ip-loom",
           "sync:netstack3-sync-loom",
           "tcp:netstack3-tcp-loom",
+          "udp:netstack3-udp-loom",
         ]
         deps += _core_deps
         deps += _testutil_deps
@@ -318,5 +302,6 @@ group("tests") {
     "sync:tests",
     "tcp:tests",
     "tests($host_toolchain)",
+    "udp:tests",
   ]
 }
