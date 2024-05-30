@@ -45,6 +45,15 @@ with specific boards, due to driver and hardware challenges.
 
 From //build/images/args.gni:126
 
+### additional_default_targets
+
+Platform builders can add targets to this list so that they get built with
+the //:default target
+
+**Current value (from the default):** `[]`
+
+From //BUILD.gn:140
+
 ### all_cpu_kernel_boot_tests
 
 Cause //zircon/kernel:boot_tests to generate the phys boot tests
