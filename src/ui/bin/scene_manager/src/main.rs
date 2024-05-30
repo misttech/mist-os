@@ -179,6 +179,7 @@ async fn inner_main() -> Result<(), Error> {
         display_rotation,
         display_pixel_density,
         viewing_distance,
+        idle_threshold_ms,
     } = Config::take_from_startup_handle();
 
     let display_pixel_density = match display_pixel_density.trim().parse::<f32>() {
@@ -261,9 +262,8 @@ async fn inner_main() -> Result<(), Error> {
     };
 
     // Create Activity Manager.
-    const DEFAULT_IDLE_THRESHOLD_MS: i64 = 100;
     let activity_manager =
-        ActivityManager::new(zx::Duration::from_millis(DEFAULT_IDLE_THRESHOLD_MS));
+        ActivityManager::new(zx::Duration::from_millis(idle_threshold_ms as i64));
 
     // Create and register a ColorTransformManager.
     let color_converter = connect_to_protocol::<color::ConverterMarker>()?;

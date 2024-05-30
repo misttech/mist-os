@@ -83,6 +83,9 @@ class UITestRealm {
     //
     // Must result in integer logical display dimensions.
     float device_pixel_ratio = kDefaultDevicePixelRatio;
+
+    // Idle threshold milliseconds for the activity service.
+    int idle_threshold_ms = 5000;
   };
 
   explicit UITestRealm(Config config);
