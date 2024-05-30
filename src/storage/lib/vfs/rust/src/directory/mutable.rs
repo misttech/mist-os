@@ -6,9 +6,4 @@
 //! entries can be modified by the clients, such as renamed, deleted, linked, or new entries can be
 //! created.
 
-pub mod entry_constructor;
-
-pub mod simple;
-pub use simple::simple;
-
 pub mod connection;

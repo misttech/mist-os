@@ -44,19 +44,10 @@ pub fn pseudo_directory(input: proc_macro::TokenStream) -> proc_macro::TokenStre
     // `proc_macro2::TokenStream`.  `proc_macro::TokenStream` can not be easily constructed from an
     // `str` when not connected to the compiler, while `proc_macro2::TokenStream` does provide for
     // this functionality.
-    pseudo_directory_impl(false, input.into()).into()
+    pseudo_directory_impl(input.into()).into()
 }
 
-#[proc_macro]
-pub fn mut_pseudo_directory(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    // In order to be able to unit tests the macro implementation we switch to
-    // `proc_macro2::TokenStream`.  `proc_macro::TokenStream` can not be easily constructed from an
-    // `str` when not connected to the compiler, while `proc_macro2::TokenStream` does provide for
-    // this functionality.
-    pseudo_directory_impl(true, input.into()).into()
-}
-
-fn pseudo_directory_impl(mutable: bool, input: TokenStream) -> TokenStream {
+fn pseudo_directory_impl(input: TokenStream) -> TokenStream {
     let parsed = match syn::parse2::<PseudoDirectory>(input) {
         Ok(tree) => tree,
         Err(err) => {
@@ -68,18 +59,13 @@ fn pseudo_directory_impl(mutable: bool, input: TokenStream) -> TokenStream {
     let span = Span::call_site();
 
     let directory_mod: Path = parse_quote!(::vfs::directory);
-    let specific_directory_type: Path = if mutable {
-        parse_quote!(#directory_mod::mutable::simple)
-    } else {
-        parse_quote!(#directory_mod::immutable::simple)
-    };
     let macro_mod: Path = parse_quote!(::vfs::pseudo_directory);
 
     let (dir_var, constructor, result) = match parsed.assign_to {
         Some(ident) => (
             ident.clone(),
             quote! {
-                #ident = #specific_directory_type();
+                #ident = #directory_mod::immutable::simple();
             },
             quote! { #ident.clone() },
         ),
@@ -89,7 +75,7 @@ fn pseudo_directory_impl(mutable: bool, input: TokenStream) -> TokenStream {
             (
                 ident.clone(),
                 quote! {
-                    let #ident = #specific_directory_type();
+                    let #ident = #directory_mod::immutable::simple();
                 },
                 quote! { #ident },
             )

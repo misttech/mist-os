@@ -92,5 +92,4 @@ impl ImmutableConnection {
 
 impl DerivedConnection for ImmutableConnection {
     type Directory = dyn entry_container::Directory;
-    const MUTABLE: bool = false;
 }

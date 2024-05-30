@@ -15,7 +15,6 @@ use crate::{
         entry_container::{Directory, DirectoryWatcher},
         helper::{AlreadyExists, DirectlyMutable, NotDirectory},
         immutable::connection::ImmutableConnection,
-        mutable::{connection::MutableConnection, entry_constructor::NewEntryType},
         traversal_position::TraversalPosition,
         watchers::{
             event_producers::{SingleNameEventProducer, StaticVecEventProducer},
@@ -36,13 +35,9 @@ use {
     fidl_fuchsia_io as fio,
     fuchsia_zircon_status::Status,
     std::{
-        collections::{
-            btree_map::{self, Entry},
-            BTreeMap,
-        },
+        collections::{btree_map::Entry, BTreeMap},
         iter,
         marker::PhantomData,
-        ops::DerefMut,
         sync::{Arc, Mutex},
     },
 };
@@ -50,10 +45,7 @@ use {
 /// An implementation of a "simple" pseudo directory.  This directory holds a set of entries,
 /// allowing the server to add or remove entries via the
 /// [`crate::directory::helper::DirectlyMutable::add_entry()`] and
-/// [`crate::directory::helper::DirectlyMutable::remove_entry`] methods, and, depending on the
-/// connection been used (see [`ImmutableConnection`] or [`MutableConnection`])
-/// it may also allow the clients to modify the entries as well.  This is a common implementation
-/// for [`mod@crate::directory::immutable::simple`] and [`mod@crate::directory::mutable::simple`].
+/// [`crate::directory::helper::DirectlyMutable::remove_entry`] methods.
 pub struct Simple<Connection> {
     inner: Mutex<Inner>,
 
@@ -86,12 +78,10 @@ where
 
     fn get_or_insert_entry(
         self: Arc<Self>,
-        scope: ExecutionScope,
         flags: fio::OpenFlags,
         name: &str,
-        path: &Path,
     ) -> Result<Arc<dyn DirectoryEntry>, Status> {
-        let mut this = self.inner.lock().unwrap();
+        let this = self.inner.lock().unwrap();
 
         match this.entries.get(name) {
             Some(entry) => {
@@ -105,20 +95,7 @@ where
                 if !flags.intersects(fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT) {
                     return Err(Status::NOT_FOUND);
                 }
-                let entry_type = NewEntryType::from_flags(flags, path.is_dir())?;
-                let entry = create_entry(
-                    Connection::MUTABLE,
-                    scope.clone(),
-                    self.clone(),
-                    entry_type,
-                    name,
-                    path,
-                )?;
-
-                this.watchers.send_event(&mut SingleNameEventProducer::added(name));
-                let name: Name = name.to_string().try_into()?;
-                let _ = this.entries.insert(name, entry.clone());
-                Ok(entry)
+                return Err(Status::NOT_SUPPORTED);
             }
         }
     }
@@ -126,12 +103,10 @@ where
     // Attempts to find or create a directory entry given the specified protocols.
     fn get_or_insert_entry_from_protocols(
         self: Arc<Self>,
-        scope: ExecutionScope,
         protocols: &fio::ConnectionProtocols,
         name: &str,
-        path: &Path,
     ) -> Result<Arc<dyn DirectoryEntry>, Status> {
-        let mut this = self.inner.lock().unwrap();
+        let this = self.inner.lock().unwrap();
 
         match this.entries.get(name) {
             Some(entry) => {
@@ -141,31 +116,17 @@ where
                 Ok(entry.clone())
             }
             None => {
-                let entry = if let fio::ConnectionProtocols::Node(fio::NodeOptions {
-                    protocols: Some(node_protocols),
-                    ..
+                if let fio::ConnectionProtocols::Node(fio::NodeOptions {
+                    protocols: Some(_), ..
                 }) = protocols
                 {
                     if protocols.creation_mode() == CreationMode::Never {
                         return Err(Status::NOT_FOUND);
                     }
-                    let entry_type = NewEntryType::from_protocols(node_protocols)?;
-                    create_entry(
-                        Connection::MUTABLE,
-                        scope.clone(),
-                        self.clone(),
-                        entry_type,
-                        name,
-                        path,
-                    )?
+                    return Err(Status::NOT_SUPPORTED);
                 } else {
                     return Err(Status::INVALID_ARGS);
                 };
-
-                this.watchers.send_event(&mut SingleNameEventProducer::added(name));
-                let name: Name = name.to_string().try_into()?;
-                let _ = this.entries.insert(name, entry.clone());
-                Ok(entry)
             }
         }
     }
@@ -239,11 +200,7 @@ impl<Connection: DerivedConnection + 'static> Node for Simple<Connection> {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         Ok(fio::NodeAttributes {
             mode: fio::MODE_TYPE_DIRECTORY
-                | rights_to_posix_mode_bits(
-                    /*r*/ true,
-                    /*w*/ Connection::MUTABLE,
-                    /*x*/ true,
-                ),
+                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ true),
             id: self.inode,
             content_size: 0,
             storage_size: 0,
@@ -293,21 +250,7 @@ where
             (path_ref, Some(name)) => (name, path_ref),
             (_, None) => {
                 flags.to_object_request(server_end).handle(|object_request| {
-                    if Connection::MUTABLE {
-                        object_request.spawn_connection(
-                            scope,
-                            self,
-                            flags,
-                            MutableConnection::create,
-                        )
-                    } else {
-                        object_request.spawn_connection(
-                            scope,
-                            self,
-                            flags,
-                            ImmutableConnection::create,
-                        )
-                    }
+                    object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
                 });
                 return;
             }
@@ -325,7 +268,7 @@ where
         let res = if !path_ref.is_empty() {
             self.get_entry(name)
         } else {
-            self.get_or_insert_entry(scope.clone(), flags, name, path_ref)
+            self.get_or_insert_entry(flags, name)
         };
         let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
         match res {
@@ -358,21 +301,12 @@ where
             (path_ref, Some(name)) => (name, path_ref),
             (_, None) => {
                 object_request.take().handle(|object_request| {
-                    if Connection::MUTABLE {
-                        object_request.spawn_connection(
-                            scope,
-                            self,
-                            protocols,
-                            MutableConnection::create,
-                        )
-                    } else {
-                        object_request.spawn_connection(
-                            scope,
-                            self,
-                            protocols,
-                            ImmutableConnection::create,
-                        )
-                    }
+                    object_request.spawn_connection(
+                        scope,
+                        self,
+                        protocols,
+                        ImmutableConnection::create,
+                    )
                 });
                 return Ok(());
             }
@@ -382,7 +316,7 @@ where
         let ref_copy = self.clone();
 
         let entry = if path_ref.is_empty() {
-            self.get_or_insert_entry_from_protocols(scope.clone(), &protocols, name, path_ref)
+            self.get_or_insert_entry_from_protocols(&protocols, name)
         } else {
             self.get_entry(name)
         };
@@ -535,107 +469,6 @@ where
             }
         }
     }
-
-    fn rename_from(
-        &self,
-        src: String,
-        to: Box<dyn FnOnce(Arc<dyn DirectoryEntry>) -> Result<(), Status>>,
-    ) -> Result<(), Status> {
-        let src: Name = src.try_into()?;
-
-        let mut this = self.inner.lock().unwrap();
-
-        let Inner { entries, watchers, .. } = this.deref_mut();
-
-        let map_entry = match entries.entry(src.clone()) {
-            btree_map::Entry::Vacant(_) => return Err(Status::NOT_FOUND),
-            btree_map::Entry::Occupied(map_entry) => map_entry,
-        };
-
-        to(map_entry.get().clone())?;
-
-        watchers.send_event(&mut SingleNameEventProducer::removed(&src));
-
-        let _ = map_entry.remove();
-        Ok(())
-    }
-
-    fn rename_to(
-        &self,
-        dst: String,
-        from: Box<dyn FnOnce() -> Result<Arc<dyn DirectoryEntry>, Status>>,
-    ) -> Result<(), Status> {
-        let dst: Name = dst.try_into()?;
-
-        let mut this = self.inner.lock().unwrap();
-
-        let entry = from()?;
-
-        this.watchers.send_event(&mut SingleNameEventProducer::added(&dst));
-
-        let _ = this.entries.insert(dst, entry);
-        Ok(())
-    }
-
-    fn rename_within(&self, src: String, dst: String) -> Result<(), Status> {
-        let src: Name = src.try_into()?;
-        let dst: Name = dst.try_into()?;
-
-        let mut this = self.inner.lock().unwrap();
-
-        // If src doesn't exist, don't do the other stuff.
-        if !this.entries.contains_key(&src) {
-            return Err(Status::NOT_FOUND);
-        }
-        // I assume we should send these events even when `src == dst`.  In practice, a
-        // particular client may not be aware that the names match, but may still rely on the fact
-        // that the events occur.
-        //
-        // Watcher protocol expects to produce messages that list only one type of event.  So
-        // we will send two independent event messages, each with one name.
-        this.watchers.send_event(&mut SingleNameEventProducer::removed(&src));
-        this.watchers.send_event(&mut SingleNameEventProducer::added(&dst));
-
-        // We acquire the lock first, as in case `src != dst`, we want to make sure that the
-        // recipients of these events can not see the directory in the state before the update.  I
-        // assume that `src == dst` is unlikely case, and for the sake of reduction of code
-        // duplication we can lock and then immediately unlock.
-        //
-        // It also provides sequencing for the watchers, as they will always receive `removed`
-        // followed by `added`, and there will be no interleaving event in-between.  I think it is
-        // not super important, as the watchers should probably be prepared to deal with all kinds
-        // of sequences anyways.
-        if src == dst {
-            return Ok(());
-        }
-
-        let entry = match this.entries.remove(&src) {
-            // This is truly surprising since this was checked previously, but
-            // we leave this in place instead of doing `unwrap` on the chance
-            // the earlier check is carelessly removed.
-            None => return Err(Status::NOT_FOUND),
-            Some(entry) => entry,
-        };
-
-        let _ = this.entries.insert(dst, entry);
-        Ok(())
-    }
-}
-
-fn create_entry(
-    mutable: bool,
-    scope: ExecutionScope,
-    parent: Arc<dyn DirectoryEntry>,
-    entry_type: NewEntryType,
-    name: &str,
-    path: &Path,
-) -> Result<Arc<dyn DirectoryEntry>, Status> {
-    if mutable {
-        let entry_constructor = scope.entry_constructor().ok_or(Status::NOT_SUPPORTED)?;
-        entry_constructor.create_entry(parent, entry_type, name, path)
-    } else {
-        Err(Status::NOT_SUPPORTED)
-    }
 }
 
 #[cfg(test)]
@@ -646,7 +479,7 @@ mod tests {
 
     #[test]
     fn add_entry_success() {
-        let dir = crate::directory::mutable::simple();
+        let dir = crate::directory::immutable::simple();
         assert_eq!(
             dir.add_entry("path_without_separators", file::read_only(b"test")),
             Ok(()),
@@ -656,7 +489,7 @@ mod tests {
 
     #[test]
     fn add_entry_error_name_with_path_separator() {
-        let dir = crate::directory::mutable::simple();
+        let dir = crate::directory::immutable::simple();
         let status = dir
             .add_entry("path/with/separators", file::read_only(b"test"))
             .expect_err("add entry with path separator should fail");
@@ -665,7 +498,7 @@ mod tests {
 
     #[test]
     fn add_entry_error_name_too_long() {
-        let dir = crate::directory::mutable::simple();
+        let dir = crate::directory::immutable::simple();
         let status = dir
             .add_entry("a".repeat(10000), file::read_only(b"test"))
             .expect_err("add entry whose name is too long should fail");
@@ -674,14 +507,14 @@ mod tests {
 
     #[fuchsia::test]
     async fn not_found_handler() {
-        let dir = crate::directory::mutable::simple();
+        let dir = crate::directory::immutable::simple();
         let path_mutex = Arc::new(Mutex::new(None));
         let path_mutex_clone = path_mutex.clone();
         dir.clone().set_not_found_handler(Box::new(move |path| {
             *path_mutex_clone.lock().unwrap() = Some(path.to_string());
         }));
 
-        let sub_dir = crate::directory::mutable::simple();
+        let sub_dir = crate::directory::immutable::simple();
         let path_mutex_clone = path_mutex.clone();
         sub_dir.clone().set_not_found_handler(Box::new(move |path| {
             *path_mutex_clone.lock().unwrap() = Some(path.to_string());

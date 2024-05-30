@@ -7,7 +7,6 @@
 use crate::{
     directory::{
         entry::DirectoryEntry, entry_container::Directory, helper::DirectlyMutable, immutable,
-        mutable::entry_constructor::EntryConstructor,
     },
     execution_scope::ExecutionScope,
     path::Path,
@@ -141,7 +140,6 @@ where
         server,
         get_client: Box::new(move |proxy| Box::pin(get_client(proxy))),
         coordinator: None,
-        entry_constructor: None,
     }
 }
 
@@ -176,7 +174,6 @@ where
         dyn FnOnce(Marker::Proxy) -> Pin<Box<dyn Future<Output = ()> + 'test_refs>> + 'test_refs,
     >,
     coordinator: Option<Box<dyn FnOnce(TestController<'_>) + 'test_refs>>,
-    entry_constructor: Option<Arc<dyn EntryConstructor + Send + Sync>>,
 }
 
 /// A helper that holds all the parameters necessary to run an async client-only test.
@@ -212,8 +209,6 @@ where
         self
     }
 
-    field_setter!(entry_constructor, Arc<dyn EntryConstructor + Send + Sync>);
-
     /// Runs the test based on the parameters specified in the [`test_server_client`] and other
     /// method calls.
     pub fn run(self) {
@@ -222,17 +217,11 @@ where
         let (client_proxy, server_end) =
             create_proxy::<Marker>().expect("Failed to create connection endpoints");
 
-        let scope_builder = ExecutionScope::build();
-        let scope_builder = match self.entry_constructor {
-            Some(entry_constructor) => scope_builder.entry_constructor(entry_constructor),
-            None => scope_builder,
-        };
-
         let root = immutable::simple();
         root.add_entry("server", self.server).unwrap();
 
         root.open(
-            scope_builder.new(),
+            ExecutionScope::new(),
             self.flags,
             Path::validate_and_split("server").unwrap(),
             server_end.into_channel().into(),

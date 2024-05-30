@@ -39,9 +39,6 @@ pub enum ConnectionState {
 /// `BaseConnection` to be able to interact with it.
 pub trait DerivedConnection: Send + Sync {
     type Directory: Directory + ?Sized;
-
-    /// Whether these connections support mutable connections.
-    const MUTABLE: bool;
 }
 
 /// Handles functionality shared between mutable and immutable FIDL connections to a directory.  A

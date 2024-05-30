@@ -48,8 +48,6 @@ pub mod pseudo_directory;
 /// all the specified entries in it, by calling
 /// [`crate::directory::helper::DirectlyMutable::add_entry`].
 ///
-/// See [`mut_pseudo_directory!`] if you want the directory to be modifiable by the clients.
-///
 /// Note: Names specified as literals (both `str` and `[u8]`) are compared during compilation time,
 /// so you should get a nice error message, if you specify the same entry name twice.  As entry
 /// names can be specified as expressions, you can easily work around this check - you will still
@@ -105,12 +103,6 @@ pub mod pseudo_directory;
 /// };
 /// ```
 pub use vfs_macros::pseudo_directory;
-
-/// This macro is identical to [`pseudo_directory!`], except that it constructs instances of
-/// [`directory::mutable::simple()`], allowing the clients connected over the FIDL connection to
-/// modify this directory.  Clients operations are still checked against specific connection
-/// permissions as specified in the `fuchsia.io` interface.
-pub use vfs_macros::mut_pseudo_directory;
 
 pub use crate::common::CreationMode;
 pub use object_request::{ObjectRequest, ObjectRequestRef, ToObjectRequest};

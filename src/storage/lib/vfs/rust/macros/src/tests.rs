@@ -8,35 +8,18 @@ use {indoc::indoc, proc_macro2::TokenStream, std::str::FromStr};
 
 fn check_pseudo_directory_impl(input: &str, expected_immutable: &str) {
     let input = TokenStream::from_str(input).unwrap();
-    {
-        let output = pseudo_directory_impl(false, input.clone());
-        assert!(
-            output.to_string() == expected_immutable,
-            "Generated code for the immutable case does not match the expected one.\n\
-             Expected:\n\
-             {}
-             Actual:\n\
-             {}
-            ",
-            expected_immutable,
-            output
-        );
-    }
-    {
-        let output = pseudo_directory_impl(true, input);
-        let expected_mutable = expected_immutable.replace(" immutable ", " mutable ");
-        assert!(
-            output.to_string() == expected_mutable,
-            "Generated code for the mutable case does not match the expected one.\n\
-             Expected:\n\
-             {}
-             Actual:\n\
-             {}
-            ",
-            expected_mutable,
-            output
-        );
-    }
+    let output = pseudo_directory_impl(input.clone());
+    assert!(
+        output.to_string() == expected_immutable,
+        "Generated code for the immutable case does not match the expected one.\n\
+        Expected:\n\
+        {}
+        Actual:\n\
+        {}
+        ",
+        expected_immutable,
+        output
+    );
 }
 
 #[test]
