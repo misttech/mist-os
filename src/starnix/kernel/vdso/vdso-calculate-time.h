@@ -36,10 +36,17 @@ constexpr int64_t kUtcInvalid = 0;
 // [3]: https://clang.llvm.org/docs/ClangCommandLineReference.html#cmdoption-clang-fvisibility
 __attribute__((__visibility__("hidden"))) extern "C" vvar_data vvar;
 
+// Defined by vdso.ld.
+//
+// This declaration is explicitly annotated as hidden for the same reason as vvar is above.
+// The type of this variable is irrelevant and arbitrarily chosen to be char, as only the
+// address of the variable is used.
+__attribute__((__visibility__("hidden"))) extern "C" char time_values;
+
 // Returns monotonic time in nanoseconds.
-// This should be equivalent to calling zx_clock_get_monotonic, however the result may
-// differ slightly.
-// TODO(https://fxbug.dev/301234275): Change the computation to always match Zircon computation
+// This is equivalent to calling zx_clock_get_monotonic, so long as the ticks are userspace
+// accessible. If they are not, then this will return ZX_TIME_INFINITE_PAST, and the caller must
+// invoke a full clock_gettime syscall.
 int64_t calculate_monotonic_time_nsec();
 
 // Returns utc time in nanoseconds

@@ -9,8 +9,6 @@
 #include "src/starnix/kernel/vdso/vdso-common.h"
 #include "src/starnix/kernel/vdso/vdso-platform.h"
 
-uint64_t get_raw_ticks() { return __rdtsc(); }
-
 int syscall(intptr_t syscall_number, intptr_t arg1, intptr_t arg2, intptr_t arg3) {
   int ret;
   __asm__ volatile("syscall;"

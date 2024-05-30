@@ -412,10 +412,6 @@ rustc_library("starnix_core") {
     "//third_party/rust_crates:zerocopy",
   ]
 
-  if (current_cpu == "arm64") {
-    deps += [ ":vdso-helpers-arm" ]
-  }
-
   test_deps = [
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-fs",
@@ -682,17 +678,11 @@ config("vdso_config") {
 source_set("vdso-calculate-utc") {
   sources = [ "vdso/vdso-calculate-utc.cc" ]
   deps = [
+    "//zircon/kernel/lib/fasttime:headers",
     "//zircon/system/public",
     "//zircon/system/ulib/affine",
   ]
   configs += [ ":vdso_config" ]
-}
-
-if (current_cpu == "arm64") {
-  static_library("vdso-helpers-arm") {
-    sources = [ "vdso/get_raw_ticks_arm.cc" ]
-    deps = [ "//zircon/system/public" ]
-  }
 }
 
 loadable_module("vdso") {
@@ -702,13 +692,10 @@ loadable_module("vdso") {
   ]
   deps = [
     ":vdso-calculate-utc",
+    "//zircon/kernel/lib/fasttime:headers",
     "//zircon/system/public",
     "//zircon/system/ulib/affine",
   ]
-
-  if (current_cpu == "arm64") {
-    deps += [ ":vdso-helpers-arm" ]
-  }
 
   output_name = "libvdso"
   configs += [ ":vdso_config" ]

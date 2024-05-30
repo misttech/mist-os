@@ -9,6 +9,7 @@ use crate::{
     },
     security,
     task::CurrentTask,
+    vdso::vdso_loader::ZX_TIME_VALUES_VMO,
     vfs::{FileHandle, FileWriteGuardMode, FileWriteGuardRef},
 };
 use fuchsia_zircon::{
@@ -491,7 +492,21 @@ pub fn load_executable(
     let vvar_size = vvar_vmo.get_size().map_err(|_| errno!(EINVAL))?;
     const VVAR_PROT_FLAGS: ProtectionFlags = ProtectionFlags::READ;
 
-    // Create a private clone of the starnix kernel vDSO
+    // Map the time values VMO used by libfasttime. We map this right behind the vvar so that
+    // userspace sees this as one big vvar block in memory.
+    let time_values_size = ZX_TIME_VALUES_VMO.get_size().map_err(|_| errno!(EINVAL))?;
+    let time_values_map_result = current_task.mm().map_vmo(
+        DesiredAddress::Any,
+        ZX_TIME_VALUES_VMO.clone(),
+        0,
+        (time_values_size as usize) + (vvar_size as usize) + (vdso_size as usize),
+        VVAR_PROT_FLAGS,
+        MappingOptions::empty(),
+        MappingName::Vvar,
+        FileWriteGuardRef(None),
+    )?;
+
+    // Create a private clone of the starnix kernel vDSO.
     let vdso_clone = vdso_vmo
         .create_child(zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE, 0, vdso_size)
         .map_err(|status| from_status_like_fdio!(status))?;
@@ -500,19 +515,19 @@ pub fn load_executable(
         .replace_as_executable(&VMEX_RESOURCE)
         .map_err(|status| from_status_like_fdio!(status))?;
 
-    // Memory map the vvar vmo, mapping a space the size of (size of vvar + size of vDSO)
+    // Overwrite the second part of the vvar mapping with starnix's vvar.
     let vvar_map_result = current_task.mm().map_vmo(
-        DesiredAddress::Any,
+        DesiredAddress::FixedOverwrite(time_values_map_result + time_values_size),
         vvar_vmo,
         0,
-        (vvar_size as usize) + (vdso_size as usize),
+        vvar_size as usize,
         VVAR_PROT_FLAGS,
         MappingOptions::empty(),
         MappingName::Vvar,
         FileWriteGuardRef(None),
     )?;
 
-    // Overwrite the second part of the vvar mapping to contain the vDSO clone
+    // Overwrite the third part of the vvar mapping to contain the vDSO clone.
     let vdso_base = current_task.mm().map_vmo(
         DesiredAddress::FixedOverwrite(vvar_map_result + vvar_size),
         Arc::new(vdso_executable),

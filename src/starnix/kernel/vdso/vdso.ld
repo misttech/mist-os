@@ -1,4 +1,7 @@
 SECTIONS {
+  /* Points to the time values (accessible to the vDSO)
+     to be one page (4096) above the vvar */
+  time_values = . - 0x2000;
   /* Points the variable vvar (accessible to the vDSO)
      to be one page (4096) above the vDSO */
   vvar = . - 0x1000;

@@ -24,17 +24,6 @@ extern "C" {
 // This struct can be written to by the Starnix kernel, but is read only from the vDSO code's
 // perspective.
 struct vvar_data {
-  // Offset for converting from the raw system timer to zx_ticks_t
-  StdAtomicI64 raw_ticks_to_ticks_offset;
-
-  // Ratio which relates ticks (zx_ticks_get) to clock monotonic (zx_clock_get_monotonic).
-  // Specifically...
-  //
-  // ClockMono(ticks) = (ticks * N) / D
-  //
-  StdAtomicU32 ticks_to_mono_numerator;
-  StdAtomicU32 ticks_to_mono_denominator;
-
   // Implements a seqlock
   StdAtomicU64 seq_num;
 
