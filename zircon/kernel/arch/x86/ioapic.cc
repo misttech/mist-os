@@ -38,10 +38,10 @@
 #define IO_APIC_ID_ID(v) (((v) >> 24) & 0xf)
 // Macros for extracting data from REG_VER
 #define IO_APIC_VER_MAX_REDIR_ENTRY(v) (((v) >> 16) & 0xff)
-#define IO_APIC_VER_VERSION(v) ((v)&0xff)
+#define IO_APIC_VER_VERSION(v) ((v) & 0xff)
 // Macros for writing REG_RTE entries
 #define IO_APIC_RTE_DST(v) (((uint64_t)(v)) << 56)
-#define IO_APIC_RTE_EXTENDED_DST_ID(v) (((uint64_t)((v)&0xf)) << 48)
+#define IO_APIC_RTE_EXTENDED_DST_ID(v) (((uint64_t)((v) & 0xf)) << 48)
 #define IO_APIC_RTE_MASKED (1ULL << 16)
 #define IO_APIC_RTE_TRIGGER_MODE(tm) (((uint64_t)(tm)) << 15)
 #define IO_APIC_RTE_POLARITY(p) (((uint64_t)(p)) << 13)
@@ -54,7 +54,7 @@
 #define IO_APIC_RTE_DELIVERY_STATUS (1ULL << 12)
 #define IO_APIC_RTE_GET_POLARITY(r) ((enum interrupt_polarity)(((r) >> 13) & 0x1))
 #define IO_APIC_RTE_GET_TRIGGER_MODE(r) ((enum interrupt_trigger_mode)(((r) >> 15) & 0x1))
-#define IO_APIC_RTE_GET_VECTOR(r) ((uint8_t)((r)&0xFF))
+#define IO_APIC_RTE_GET_VECTOR(r) ((uint8_t)((r) & 0xFF))
 
 // Technically this can be larger, but the spec as of the 100-Series doesn't
 // guarantee where the additional redirections will be.
@@ -126,18 +126,28 @@ void apic_io_init(struct io_apic_descriptor* io_apic_descs, size_t num_io_apic_d
   // Allocate windows to their control pages
   for (size_t i = 0; i < num_io_apics; ++i) {
     struct io_apic* apic = &io_apics[i];
-    paddr_t paddr = apic->desc.paddr;
-    void* vaddr = paddr_to_physmap(paddr);
-    paddr_t paddr_page_base = ROUNDDOWN(paddr, PAGE_SIZE);
+    const paddr_t paddr = apic->desc.paddr;
+    void* vaddr = nullptr;
+    const paddr_t paddr_page_base = ROUNDDOWN(paddr, PAGE_SIZE);
+    // An IO APIC cannot cross a page boundary.
+    ASSERT(paddr + IO_APIC_WINDOW_SIZE <= paddr_page_base + PAGE_SIZE);
 
-    // Make sure that user mode cannot ever gain access to these registers using
-    // zx_vmo_alloc_physical and the root resource.
-    root_resource_filter_add_deny_region(paddr_page_base, PAGE_SIZE, ZX_RSRC_KIND_MMIO);
+    // Check if a previous IO APIC shared the same page as this one so we can re-use the mapping.
+    for (size_t j = 0; j < i; j++) {
+      if (ROUNDDOWN(io_apics[j].desc.paddr, PAGE_SIZE) == paddr_page_base) {
+        // The vaddr stored in the io_apics is to the MMIO base, round it back down to the page base
+        vaddr = reinterpret_cast<void*>(
+            ROUNDDOWN(reinterpret_cast<uintptr_t>(io_apics[j].vaddr), PAGE_SIZE));
+        break;
+      }
+    }
 
-    // If the window isn't mapped yet (multiple IO APICs can be in the
-    // same page), map it in.
+    // If we did not find a previous mapping, create one.
     if (vaddr == nullptr) {
-      ASSERT(paddr + IO_APIC_WINDOW_SIZE <= paddr_page_base + PAGE_SIZE);
+      // Make sure that user mode cannot ever gain access to these registers using
+      // zx_vmo_alloc_physical and the root resource.
+      root_resource_filter_add_deny_region(paddr_page_base, PAGE_SIZE, ZX_RSRC_KIND_MMIO);
+
       zx_status_t res = VmAspace::kernel_aspace()->AllocPhysical(
           "ioapic",
           PAGE_SIZE,        // size
@@ -148,8 +158,9 @@ void apic_io_init(struct io_apic_descriptor* io_apic_descs, size_t num_io_apic_d
           ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE |
               ARCH_MMU_FLAG_UNCACHED_DEVICE);  // arch mmu flags
       ASSERT(res == ZX_OK);
-      vaddr = (void*)((uintptr_t)vaddr + paddr - paddr_page_base);
     }
+    // Offset from the base of the mapped in page to the actual IO APIC base.
+    vaddr = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(vaddr) + paddr - paddr_page_base);
 
     // Populate the rest of the descriptor
     apic->vaddr = vaddr;
