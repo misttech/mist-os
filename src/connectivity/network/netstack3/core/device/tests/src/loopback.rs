@@ -11,21 +11,20 @@ use net_types::{
     ip::{AddrSubnet, Ip, Ipv4, Ipv6, Mtu},
     SpecifiedAddr,
 };
-use packet::{Buf, ParseBuffer as _};
-use packet_formats::ethernet::{EthernetFrame, EthernetFrameLengthCheck};
-
-use crate::{
-    device::{
-        loopback::{self, LoopbackCreationProperties, LoopbackDevice, LoopbackRxQueueMeta},
-        queue::ReceiveQueueContext,
-    },
+use netstack3_core::{
     error::NotFoundError,
-    ip::{self, device::IpAddressId as _},
     testutil::{
         CtxPairExt as _, FakeBindingsCtx, FakeCtx, TestAddrs, TestIpExt, DEFAULT_INTERFACE_METRIC,
     },
     IpExt,
 };
+use netstack3_device::{
+    loopback::{self, LoopbackCreationProperties, LoopbackDevice, LoopbackRxQueueMeta},
+    queue::ReceiveQueueContext,
+};
+use netstack3_ip::{self as ip, device::IpAddressId as _};
+use packet::{Buf, ParseBuffer as _};
+use packet_formats::ethernet::{EthernetFrame, EthernetFrameLengthCheck};
 
 const MTU: Mtu = Mtu::new(66);
 
@@ -46,7 +45,7 @@ fn loopback_mtu() {
     assert_eq!(ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut ctx.core_ctx(), &device), MTU);
 }
 
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 #[ip_test]
 fn test_loopback_add_remove_addrs<I: Ip + TestIpExt + IpExt>() {
     let mut ctx = FakeCtx::default();

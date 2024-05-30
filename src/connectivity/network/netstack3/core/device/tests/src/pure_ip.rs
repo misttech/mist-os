@@ -10,18 +10,7 @@ use net_types::{
     ip::{AddrSubnet, Ip, IpAddress as _, IpVersion, Ipv4, Ipv6, Mtu},
     Witness, ZonedAddr,
 };
-use packet::{Buf, Serializer as _};
-use packet_formats::ip::{IpPacketBuilder, IpProto};
-use test_case::test_case;
-
-use crate::{
-    device::{
-        pure_ip::{
-            self, PureIpDevice, PureIpDeviceCreationProperties, PureIpDeviceReceiveFrameMetadata,
-        },
-        DeviceId, TransmitQueueConfiguration,
-    },
-    ip::IpLayerIpExt,
+use netstack3_core::{
     sync::RemoveResourceResult,
     testutil::{
         CtxPairExt as _, FakeBindingsCtx, FakeCtx, PureIpDeviceAndIpVersion, TestIpExt,
@@ -30,6 +19,16 @@ use crate::{
     types::WorkQueueReport,
     IpExt, StackState,
 };
+use netstack3_device::{
+    pure_ip::{
+        self, PureIpDevice, PureIpDeviceCreationProperties, PureIpDeviceReceiveFrameMetadata,
+    },
+    queue::TransmitQueueConfiguration,
+    DeviceId,
+};
+use packet::{Buf, Serializer as _};
+use packet_formats::ip::{IpPacketBuilder, IpProto};
+use test_case::test_case;
 
 const MTU: Mtu = Mtu::new(1234);
 const TTL: u8 = 64;
@@ -84,10 +83,7 @@ fn receive_frame<I: Ip + TestIpExt + IpExt>() {
     );
     ctx.test_api().enable_device(&device.clone().into());
 
-    fn check_frame_counters<I: IpLayerIpExt>(
-        stack_state: &StackState<FakeBindingsCtx>,
-        count: u64,
-    ) {
+    fn check_frame_counters<I: IpExt>(stack_state: &StackState<FakeBindingsCtx>, count: u64) {
         assert_eq!(stack_state.common_ip::<I>().counters().receive_ip_packet.get(), count);
         assert_eq!(stack_state.device().counters.recv_frame.get(), count);
         match I::VERSION {
@@ -125,10 +121,7 @@ fn send_frame<I: Ip + TestIpExt + IpExt>(tx_queue_config: TransmitQueueConfigura
     };
     ctx.core_api().transmit_queue::<PureIpDevice>().set_configuration(&device, tx_queue_config);
 
-    fn check_frame_counters<I: IpLayerIpExt>(
-        stack_state: &StackState<FakeBindingsCtx>,
-        count: u64,
-    ) {
+    fn check_frame_counters<I: IpExt>(stack_state: &StackState<FakeBindingsCtx>, count: u64) {
         assert_eq!(stack_state.device().counters.send_total_frames.get(), count);
         assert_eq!(stack_state.device().counters.send_frame.get(), count);
         match I::VERSION {
@@ -184,7 +177,7 @@ fn send_frame<I: Ip + TestIpExt + IpExt>(tx_queue_config: TransmitQueueConfigura
     assert_eq!(packet, default_ip_packet::<I>().into_inner());
 }
 
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 #[ip_test]
 // Verify that a socket can listen on an IP address that is assigned to a
 // pure IP device.

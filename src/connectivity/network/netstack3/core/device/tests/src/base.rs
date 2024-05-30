@@ -15,21 +15,16 @@ use net_types::{
     ip::{AddrSubnet, Ip, Ipv4, Ipv6, Mtu},
     SpecifiedAddr, UnicastAddr, Witness as _,
 };
-use test_case::test_case;
-
-use crate::{
-    context::testutil::FakeInstant,
+use netstack3_base::{testutil::FakeInstant, WorkQueueReport};
+use netstack3_core::{
     device::{
-        ethernet::{
-            EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, MaxEthernetFrameSize,
-        },
-        for_any_device_id,
-        loopback::{LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId},
-        queue::TransmitQueueConfiguration,
-        DeviceId, DeviceProvider,
+        DeviceId, DeviceProvider, EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice,
+        LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId, MaxEthernetFrameSize,
+        TransmitQueueConfiguration,
     },
-    error,
-    ip::device::{
+    error::NotFoundError,
+    for_any_device_id,
+    ip::{
         AddIpAddrSubnetError, IpDeviceConfigurationUpdate, Ipv4AddrConfig,
         Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfigurationUpdate,
         Lifetime, SlaacConfiguration,
@@ -38,9 +33,9 @@ use crate::{
         CtxPairExt as _, FakeBindingsCtx, FakeCtx, TestIpExt, DEFAULT_INTERFACE_METRIC,
         IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
     },
-    types::WorkQueueReport,
     IpExt,
 };
+use test_case::test_case;
 
 #[test]
 fn test_no_default_routes() {
@@ -237,7 +232,7 @@ fn tx_queue(
     )
 }
 
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 fn test_add_remove_ip_addresses<I: Ip + TestIpExt + IpExt>(
     addr_config: Option<I::ManualAddressConfig<FakeInstant>>,
 ) {
@@ -297,10 +292,7 @@ fn test_add_remove_ip_addresses<I: Ip + TestIpExt + IpExt>(
     assert_eq!(check_contains_addr(&mut ctx), false);
 
     // Del IP again (not found).
-    assert_matches!(
-        ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip),
-        Err(error::NotFoundError)
-    );
+    assert_matches!(ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip), Err(NotFoundError));
 
     assert_eq!(check_contains_addr(&mut ctx), false);
 }

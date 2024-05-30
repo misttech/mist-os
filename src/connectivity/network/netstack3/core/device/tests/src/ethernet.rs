@@ -13,6 +13,21 @@ use net_types::{
     MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
 };
 use netstack3_base::FrameDestination;
+use netstack3_core::{
+    device::{DeviceId, EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta},
+    error::NotFoundError,
+    ip::{
+        AddIpAddrSubnetError, IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+        SlaacConfiguration,
+    },
+    testutil::{
+        new_rng, CtxPairExt as _, FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeCtxBuilder, TestIpExt,
+        DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE, TEST_ADDRS_V4,
+    },
+    IpExt,
+};
+use netstack3_device::ethernet;
+use netstack3_ip::device::{IpAddressId as _, IpDeviceStateContext};
 use packet::{Buf, Serializer as _};
 use packet_formats::{
     ethernet::{EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG},
@@ -26,38 +41,18 @@ use packet_formats::{
 use rand::Rng;
 use test_case::test_case;
 
-use crate::{
-    device::{
-        ethernet::{self, EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta},
-        DeviceId,
-    },
-    error::NotFoundError,
-    ip::{
-        self,
-        device::{
-            AddIpAddrSubnetError, IpAddressId as _, IpDeviceConfigurationUpdate,
-            Ipv6DeviceConfigurationUpdate, SlaacConfiguration,
-        },
-    },
-    testutil::{
-        new_rng, CtxPairExt as _, FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeCtxBuilder, TestIpExt,
-        DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE, TEST_ADDRS_V4,
-    },
-    IpExt,
-};
-
 fn contains_addr<A: IpAddress>(
     core_ctx: &FakeCoreCtx,
     device: &DeviceId<FakeBindingsCtx>,
     addr: SpecifiedAddr<A>,
 ) -> bool {
     match addr.into() {
-        IpAddr::V4(addr) => ip::device::IpDeviceStateContext::<Ipv4, _>::with_address_ids(
+        IpAddr::V4(addr) => IpDeviceStateContext::<Ipv4, _>::with_address_ids(
             &mut core_ctx.context(),
             device,
             |mut addrs, _core_ctx| addrs.any(|a| a.addr().addr() == addr.get()),
         ),
-        IpAddr::V6(addr) => ip::device::IpDeviceStateContext::<Ipv6, _>::with_address_ids(
+        IpAddr::V6(addr) => IpDeviceStateContext::<Ipv6, _>::with_address_ids(
             &mut core_ctx.context(),
             device,
             |mut addrs, _core_ctx| addrs.any(|a| a.addr().addr() == addr.get()),
@@ -123,8 +118,8 @@ fn initialize_once() {
 }
 
 #[ip_test]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
-#[netstack3_macros::context_ip_bounds(I::OtherVersion, FakeBindingsCtx, crate)]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
+#[netstack3_macros::context_ip_bounds(I::OtherVersion, FakeBindingsCtx)]
 fn test_set_ip_routing<I: Ip + TestIpExt + IpExt>()
 where
     I::OtherVersion: IpExt,
@@ -339,7 +334,7 @@ fn test_promiscuous_mode<I: Ip + TestIpExt + IpExt>(
     );
 }
 
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 #[ip_test]
 fn test_add_remove_ip_addresses<I: Ip + TestIpExt + IpExt>() {
     let config = I::TEST_ADDRS;
@@ -453,7 +448,7 @@ fn receive_simple_ip_packet_test<A: IpAddress>(
     );
 }
 
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 #[ip_test]
 fn test_multiple_ip_addresses<I: Ip + TestIpExt + IpExt>() {
     let config = I::TEST_ADDRS;
@@ -521,7 +516,7 @@ fn test_multiple_ip_addresses<I: Ip + TestIpExt + IpExt>() {
 /// leave it after calling `leave_ip_multicast` the same number of times as
 /// `join_ip_multicast`.
 #[ip_test]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 fn test_ip_join_leave_multicast_addr_ref_count<I: Ip + TestIpExt + IpExt>() {
     let config = I::TEST_ADDRS;
     let mut ctx = FakeCtx::default();
@@ -576,7 +571,7 @@ fn test_ip_join_leave_multicast_addr_ref_count<I: Ip + TestIpExt + IpExt>() {
 /// This method should always panic as leaving an unjoined multicast group
 /// is a panic condition.
 #[ip_test]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 #[should_panic(expected = "attempted to leave IP multicast group we were not a member of:")]
 fn test_ip_leave_unjoined_multicast<I: Ip + TestIpExt + IpExt>() {
     let config = I::TEST_ADDRS;

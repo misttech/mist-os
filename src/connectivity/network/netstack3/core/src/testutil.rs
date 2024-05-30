@@ -239,7 +239,6 @@ where
     }
 
     /// Leaves the multicast group `multicast_addr` for `device`.
-    #[cfg(test)]
     #[netstack3_macros::context_ip_bounds(A::Version, BC, crate)]
     pub fn leave_ip_multicast<A: IpAddress>(
         &mut self,
@@ -498,8 +497,10 @@ pub struct FakeBindingsCtxState {
         HashMap<UdpSocketId<Ipv4, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>, Vec<Vec<u8>>>,
     udpv6_received:
         HashMap<UdpSocketId<Ipv6, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>, Vec<Vec<u8>>>,
-    pub(crate) rx_available: Vec<LoopbackDeviceId<FakeBindingsCtx>>,
-    pub(crate) tx_available: Vec<DeviceId<FakeBindingsCtx>>,
+    /// IDs with rx queue signaled available.
+    pub rx_available: Vec<LoopbackDeviceId<FakeBindingsCtx>>,
+    /// IDs with tx queue signaled available.
+    pub tx_available: Vec<DeviceId<FakeBindingsCtx>>,
 }
 
 impl FakeBindingsCtxState {
@@ -602,7 +603,8 @@ impl FakeBindingsCtx {
         Wrapper(self.0.lock(), get_timers, ())
     }
 
-    pub(crate) fn state_mut(&mut self) -> impl DerefMut<Target = FakeBindingsCtxState> + '_ {
+    /// Returns a mutable reference guard to [`FakeBindingsCtxState`].
+    pub fn state_mut(&mut self) -> impl DerefMut<Target = FakeBindingsCtxState> + '_ {
         // NB: Helper functions are required to satisfy lifetime requirements of
         // borrow.
         fn get_state<'a>(i: &'a InnerFakeBindingsCtx) -> &'a FakeBindingsCtxState {
@@ -1311,9 +1313,10 @@ pub enum DispatchedEvent {
 /// A tuple of device ID and IP version.
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""))]
+#[allow(missing_docs)]
 pub struct PureIpDeviceAndIpVersion<BT: DeviceLayerTypes> {
-    pub(crate) device: PureIpWeakDeviceId<BT>,
-    pub(crate) version: IpVersion,
+    pub device: PureIpWeakDeviceId<BT>,
+    pub version: IpVersion,
 }
 
 /// A frame that's been dispatched to Bindings to be sent out the device driver.

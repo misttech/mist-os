@@ -52,6 +52,7 @@ pub(crate) mod data_structures {
 
 /// The device layer.
 pub mod device {
+    #[path = "."]
     pub(crate) mod integration {
         mod base;
         mod ethernet;
@@ -67,15 +68,6 @@ pub mod device {
 
     // TODO(https://fxbug.dev/342685842): Remove this re-export.
     pub(crate) use netstack3_device::*;
-
-    #[cfg(test)]
-    mod integration_tests {
-        mod base;
-        mod ethernet;
-        mod loopback;
-        mod pure_ip;
-        mod socket;
-    }
 
     // Re-exported types.
     pub use ethernet::{

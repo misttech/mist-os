@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    device::{socket::TargetDevice, DeviceId},
+use netstack3_core::{
+    device::DeviceId,
+    device_socket::TargetDevice,
     sync::Mutex,
     testutil::{CtxPairExt as _, FakeCtxBuilder, TEST_ADDRS_V4},
 };
