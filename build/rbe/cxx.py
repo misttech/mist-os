@@ -26,6 +26,7 @@ def _cxx_command_scanner() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Detects C++ compilation attributes (clang, gcc)",
         argument_default=[],
+        allow_abbrev=False,
         add_help=False,
     )
     parser.add_argument(
