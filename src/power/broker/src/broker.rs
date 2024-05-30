@@ -1037,6 +1037,12 @@ impl Catalog {
         tracing::debug!("create_lease_and_claims({element_id}@{level})");
         // TODO: Add lease validation and control.
         let lease = Lease::new(&element_id, level);
+        if let Ok(elem_inspect) = self.topology.inspect_for_element(element_id) {
+            elem_inspect
+                .borrow_mut()
+                .meta()
+                .set(format!("lease_{}", lease.id.clone()), format!("level_{}", level));
+        }
         self.leases.insert(lease.id.clone(), lease.clone());
         let element_level = ElementLevel { element_id: element_id.clone(), level: level.clone() };
         let (active_dependencies, passive_dependencies) =
@@ -1070,6 +1076,9 @@ impl Catalog {
         tracing::debug!("drop(lease:{lease_id})");
         let lease = self.leases.remove(lease_id).ok_or(anyhow!("{lease_id} not found"))?;
         self.lease_status.remove(lease_id);
+        if let Ok(elem_inspect) = self.topology.inspect_for_element(&lease.element_id) {
+            elem_inspect.borrow_mut().meta().remove(format!("lease_{}", lease.id.clone()).as_str());
+        }
         tracing::debug!("dropping lease({:?})", &lease);
         // Pending claims should be dropped immediately.
         let pending_active_claims = self.active_claims.pending.for_lease(&lease.id);
@@ -2291,6 +2300,7 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: BinaryPowerLevel::Off.into_primitive() as u64,
                                     required_level: BinaryPowerLevel::On.into_primitive() as u64,
+                                    format!("lease_{}", lease.id.clone()) => "level_1",
                                 },
                                 relationships: {
                                     parent1.to_string() => {
@@ -3081,6 +3091,7 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: BinaryPowerLevel::Off.into_primitive() as u64,
                                     required_level: BinaryPowerLevel::On.into_primitive() as u64,
+                                    format!("lease_{}", lease_b_id.clone()) => "level_1",
                                 },
                                 relationships: {
                                     element_a.to_string() => {
@@ -3095,6 +3106,7 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: BinaryPowerLevel::Off.into_primitive() as u64,
                                     required_level: BinaryPowerLevel::On.into_primitive() as u64,
+                                    format!("lease_{}", lease_c_id.clone()) => "level_1",
                                 },
                                 relationships: {
                                     element_a.to_string() => {
