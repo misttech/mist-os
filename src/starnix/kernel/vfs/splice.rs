@@ -6,9 +6,7 @@ use crate::{
     mm::{MemoryAccessorExt, PAGE_SIZE},
     task::CurrentTask,
     vfs::{
-        buffers::{
-            UserBuffersInputBuffer, UserBuffersOutputBuffer, VecInputBuffer, VecOutputBuffer,
-        },
+        buffers::{VecInputBuffer, VecOutputBuffer},
         pipe::{Pipe, PipeFileObject, PipeOperands},
         FdNumber, FileHandle,
     },
@@ -282,13 +280,12 @@ pub fn vmsplice(
     let mut bytes_transferred = 0;
 
     if should_write {
-        let mut in_data = UserBuffersInputBuffer::unified_new(current_task, iovec.clone())?;
-        bytes_transferred += pipe.vmsplice_from(current_task, &file, &mut in_data, non_blocking)?;
+        bytes_transferred +=
+            pipe.vmsplice_from(current_task, &file, iovec.clone(), non_blocking)?;
     }
 
     if should_read {
-        let mut out_data = UserBuffersOutputBuffer::unified_new(current_task, iovec)?;
-        bytes_transferred += pipe.vmsplice_to(current_task, &file, &mut out_data, non_blocking)?;
+        bytes_transferred += pipe.vmsplice_to(current_task, &file, iovec, non_blocking)?;
     }
 
     Ok(bytes_transferred)
