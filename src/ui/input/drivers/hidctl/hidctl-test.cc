@@ -52,7 +52,8 @@ TEST(HidctlTest, DdkLifecycleWorkerThreadExit) {
   // This should cause the worker thread to exit and call DdkAsyncRemove() on the device.
   remote.reset();
 
-  child->WaitUntilAsyncRemoveCalled();
+  mock_ddk::GetDriverRuntime()->PerformBlockingWork(
+      [&child]() { child->WaitUntilAsyncRemoveCalled(); });
   child->UnbindOp();
   child->WaitUntilUnbindReplyCalled();
   mock_ddk::ReleaseFlaggedDevices(fake_parent.get());

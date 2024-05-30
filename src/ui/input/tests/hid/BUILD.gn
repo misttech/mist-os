@@ -39,6 +39,13 @@ fuchsia_test_package("hidctl-integration-test") {
     "//src/ui/input/drivers/hid-input-report",
     "//src/ui/input/drivers/hidctl",
   ]
+
+  # Raising log severity to accomodate failing to get Banjo.
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 fuchsia_test_package("hid-driver-test-package") {
@@ -49,6 +56,13 @@ fuchsia_test_package("hid-driver-test-package") {
     "//src/ui/input/drivers/hid-input-report:hid-input-report-v2",
     "//src/ui/input/drivers/hidctl",
   ]
+
+  # Raising log severity to accomodate failing to get Banjo.
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 group("tests") {

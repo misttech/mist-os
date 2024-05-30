@@ -22,6 +22,8 @@
 
 namespace hidctl {
 
+namespace fhidbus = fuchsia_hardware_hidbus;
+
 zx_status_t HidCtl::Create(void* ctx, zx_device_t* parent) {
   auto dev = std::unique_ptr<HidCtl>(new HidCtl(parent));
   zx_status_t status = dev->DdkAdd(ddk::DeviceAddArgs("hidctl").set_flags(DEVICE_ADD_NON_BINDABLE));
@@ -48,10 +50,17 @@ void HidCtl::MakeHidDevice(MakeHidDeviceRequestView request,
   uint8_t* report_desc_data = new uint8_t[request->rpt_desc.count()];
   memcpy(report_desc_data, request->rpt_desc.data(), request->rpt_desc.count());
   fbl::Array<const uint8_t> report_desc(report_desc_data, request->rpt_desc.count());
-  auto hiddev = std::unique_ptr<hidctl::HidDevice>(
-      new hidctl::HidDevice(zxdev(), request->config, std::move(report_desc), std::move(local)));
+  auto hiddev = std::make_unique<hidctl::HidDevice>(zxdev(), request->config,
+                                                    std::move(report_desc), std::move(local));
 
-  status = hiddev->DdkAdd("hidctl-dev");
+  auto client_end = hiddev->ServeOutgoing();
+
+  std::array offers = {
+      fhidbus::Service::Name,
+  };
+  status = hiddev->DdkAdd(ddk::DeviceAddArgs("hidctl-dev")
+                              .set_fidl_service_offers(offers)
+                              .set_outgoing_dir(client_end->TakeChannel()));
   if (status != ZX_OK) {
     zxlogf(ERROR, "hidctl: could not add hid device: %d", status);
     completer.Close(status);
@@ -70,33 +79,22 @@ HidCtl::HidCtl(zx_device_t* device) : DeviceType(device) {}
 
 void HidCtl::DdkRelease() { delete this; }
 
-int hid_device_thread(void* arg) {
-  HidDevice* device = reinterpret_cast<HidDevice*>(arg);
-  return device->Thread();
-}
-
-#define HID_SHUTDOWN ZX_USER_SIGNAL_7
-
 HidDevice::HidDevice(zx_device_t* device, const fuchsia_hardware_hidctl::wire::HidCtlConfig& config,
                      fbl::Array<const uint8_t> report_desc, zx::socket data)
     : ddk::Device<HidDevice, ddk::Initializable, ddk::Unbindable>(device),
-      boot_device_(config.boot_device),
-      dev_class_(config.dev_class),
+      outgoing_(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
+      boot_protocol_(config.boot_device
+                         ? static_cast<fhidbus::wire::HidBootProtocol>(config.dev_class)
+                         : fhidbus::wire::HidBootProtocol::kNone),
       report_desc_(std::move(report_desc)),
       data_(std::move(data)) {
   ZX_DEBUG_ASSERT(data_.is_valid());
 }
 
-HidDevice::~HidDevice() {
-  int ret = thrd_join(thread_, nullptr);
-  ZX_DEBUG_ASSERT(ret == thrd_success);
-}
-
 void HidDevice::DdkInit(ddk::InitTxn txn) {
-  int ret = thrd_create_with_name(&thread_, hid_device_thread, reinterpret_cast<void*>(this),
-                                  "hidctl-thread");
-  ZX_DEBUG_ASSERT(ret == thrd_success);
-  txn.Reply(ZX_OK);
+  wait_handler_.set_object(data_.get());
+  wait_handler_.set_trigger(ZX_SOCKET_READABLE | ZX_SOCKET_PEER_CLOSED);
+  txn.Reply(wait_handler_.Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher()));
 }
 
 void HidDevice::DdkRelease() {
@@ -112,155 +110,165 @@ void HidDevice::DdkUnbind(ddk::UnbindTxn txn) {
     zx_status_t status = data_.set_disposition(0, ZX_SOCKET_DISPOSITION_WRITE_DISABLED);
     ZX_DEBUG_ASSERT(status == ZX_OK);
     // Signal the thread to shutdown
-    status = data_.signal(0, HID_SHUTDOWN);
-    ZX_DEBUG_ASSERT(status == ZX_OK);
-    // The thread will reply to the unbind txn when it exits the loop.
-    unbind_txn_ = std::move(txn);
-  } else {
-    // The thread has already shut down, can reply immediately.
-    txn.Reply();
+    wait_handler_.Cancel();
   }
+
+  txn.Reply();
 }
 
-zx_status_t HidDevice::HidbusQuery(uint32_t options, hid_info_t* info) {
+zx::result<fidl::ClientEnd<fuchsia_io::Directory>> HidDevice::ServeOutgoing() {
+  zx::result<> result = outgoing_.AddService<fhidbus::Service>(fhidbus::Service::InstanceHandler({
+      .device =
+          [this](fidl::ServerEnd<fhidbus::Hidbus> server_end) {
+            if (binding_) {
+              server_end.Close(ZX_ERR_ALREADY_BOUND);
+              return;
+            }
+            binding_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                             std::move(server_end), this, [this](fidl::UnbindInfo info) {
+                               Stop();
+                               binding_.reset();
+                             });
+          },
+  }));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add Hidbus protocol: %s", result.status_string());
+    return result.take_error();
+  }
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  result = outgoing_.Serve(std::move(server));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to service the outgoing directory");
+    return result.take_error();
+  }
+
+  return zx::ok(std::move(client));
+}
+
+void HidDevice::Query(QueryCompleter::Sync& completer) {
   zxlogf(DEBUG, "hidctl: query");
 
-  info->dev_num = 0;
-  info->device_class = dev_class_;
-  info->boot_device = boot_device_;
-  return ZX_OK;
+  fidl::Arena<> arena;
+  completer.ReplySuccess(fhidbus::wire::HidInfo::Builder(arena)
+                             .dev_num(0)
+                             .boot_protocol(boot_protocol_)
+                             .product_id(0)
+                             .vendor_id(0)
+                             .polling_rate(0)
+                             .version(0)
+                             .Build());
 }
 
-zx_status_t HidDevice::HidbusStart(const hidbus_ifc_protocol_t* ifc) {
+void HidDevice::Start(StartCompleter::Sync& completer) {
   zxlogf(DEBUG, "hidctl: start");
 
-  fbl::AutoLock lock(&lock_);
-  if (client_.is_valid()) {
-    return ZX_ERR_ALREADY_BOUND;
+  if (started_) {
+    zxlogf(ERROR, "Already started");
+    completer.ReplyError(ZX_ERR_ALREADY_BOUND);
+    return;
   }
-  client_ = ddk::HidbusIfcProtocolClient(ifc);
-  return ZX_OK;
+
+  started_ = true;
+  completer.ReplySuccess();
 }
 
-void HidDevice::HidbusStop() {
+void HidDevice::Stop(StopCompleter::Sync& completer) {
   zxlogf(DEBUG, "hidctl: stop");
 
-  fbl::AutoLock lock(&lock_);
-  client_.clear();
+  Stop();
 }
 
-zx_status_t HidDevice::HidbusGetDescriptor(hid_description_type_t desc_type,
-                                           uint8_t* out_data_buffer, size_t data_size,
-                                           size_t* out_data_actual) {
-  zxlogf(DEBUG, "hidctl: get descriptor %u", desc_type);
+void HidDevice::Stop() { started_ = false; }
 
-  if (out_data_buffer == nullptr || out_data_actual == nullptr) {
-    return ZX_ERR_INVALID_ARGS;
+void HidDevice::GetDescriptor(fhidbus::wire::HidbusGetDescriptorRequest* request,
+                              GetDescriptorCompleter::Sync& completer) {
+  zxlogf(DEBUG, "hidctl: get descriptor %" PRIu8, static_cast<uint8_t>(request->desc_type));
+
+  if (request->desc_type != fhidbus::wire::HidDescriptorType::kReport) {
+    completer.ReplyError(ZX_ERR_NOT_FOUND);
+    return;
   }
 
-  if (desc_type != HID_DESCRIPTION_TYPE_REPORT) {
-    return ZX_ERR_NOT_FOUND;
-  }
-
-  if (data_size < report_desc_.size()) {
-    return ZX_ERR_BUFFER_TOO_SMALL;
-  }
-  memcpy(out_data_buffer, report_desc_.data(), report_desc_.size());
-  *out_data_actual = report_desc_.size();
-  return ZX_OK;
+  completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(
+      const_cast<uint8_t*>(report_desc_.data()), report_desc_.size()));
 }
 
-zx_status_t HidDevice::HidbusGetReport(uint8_t rpt_type, uint8_t rpt_id, uint8_t* data, size_t len,
-                                       size_t* out_len) {
-  zxlogf(DEBUG, "hidctl: get report type=%u id=%u", rpt_type, rpt_id);
+void HidDevice::SetDescriptor(fhidbus::wire::HidbusSetDescriptorRequest* request,
+                              SetDescriptorCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
 
-  if (out_len == nullptr) {
-    return ZX_ERR_INVALID_ARGS;
-  }
+void HidDevice::GetReport(fhidbus::wire::HidbusGetReportRequest* request,
+                          GetReportCompleter::Sync& completer) {
+  zxlogf(DEBUG, "hidctl: get report type=%" PRIu8 " id=%" PRIu8,
+         static_cast<uint8_t>(request->rpt_type), request->rpt_id);
 
   // TODO: send get report message over socket
-  return ZX_ERR_NOT_SUPPORTED;
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
-zx_status_t HidDevice::HidbusSetReport(uint8_t rpt_type, uint8_t rpt_id, const uint8_t* data,
-                                       size_t len) {
-  zxlogf(DEBUG, "hidctl: set report type=%u id=%u", rpt_type, rpt_id);
+void HidDevice::SetReport(fhidbus::wire::HidbusSetReportRequest* request,
+                          SetReportCompleter::Sync& completer) {
+  zxlogf(DEBUG, "hidctl: set report type=%" PRIu8 " id=%" PRIu8,
+         static_cast<uint8_t>(request->rpt_type), request->rpt_id);
 
   // TODO: send set report message over socket
-  return ZX_ERR_NOT_SUPPORTED;
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
-zx_status_t HidDevice::HidbusGetIdle(uint8_t rpt_id, uint8_t* duration) {
+void HidDevice::GetIdle(fhidbus::wire::HidbusGetIdleRequest* request,
+                        GetIdleCompleter::Sync& completer) {
   zxlogf(DEBUG, "hidctl: get idle");
 
   // TODO: send get idle message over socket
-  return ZX_ERR_NOT_SUPPORTED;
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
-zx_status_t HidDevice::HidbusSetIdle(uint8_t rpt_id, uint8_t duration) {
+void HidDevice::SetIdle(fhidbus::wire::HidbusSetIdleRequest* request,
+                        SetIdleCompleter::Sync& completer) {
   zxlogf(DEBUG, "hidctl: set idle");
 
   // TODO: send set idle message over socket
-  return ZX_OK;
+  completer.ReplySuccess();
 }
 
-zx_status_t HidDevice::HidbusGetProtocol(uint8_t* protocol) {
+void HidDevice::GetProtocol(GetProtocolCompleter::Sync& completer) {
   zxlogf(DEBUG, "hidctl: get protocol");
 
   // TODO: send get protocol message over socket
-  return ZX_ERR_NOT_SUPPORTED;
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
-zx_status_t HidDevice::HidbusSetProtocol(uint8_t protocol) {
+void HidDevice::SetProtocol(fhidbus::wire::HidbusSetProtocolRequest* request,
+                            SetProtocolCompleter::Sync& completer) {
   zxlogf(DEBUG, "hidctl: set protocol");
 
   // TODO: send set protocol message over socket
-  return ZX_OK;
+  completer.ReplySuccess();
 }
 
-int HidDevice::Thread() {
-  zxlogf(DEBUG, "hidctl: starting main thread");
-  zx_signals_t pending;
-  std::unique_ptr<uint8_t[]> buf(new uint8_t[mtu_]);
+void HidDevice::HandleData(async_dispatcher_t* dispatcher, async::WaitBase* wait,
+                           zx_status_t status, const zx_packet_signal_t* signal) {
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "hidctl: error waiting on data: %d", status);
+    DdkAsyncRemove();
+    return;
+  }
 
-  zx_status_t status = ZX_OK;
-  const zx_signals_t wait = ZX_SOCKET_READABLE | ZX_SOCKET_PEER_CLOSED | HID_SHUTDOWN;
-  while (true) {
-    status = data_.wait_one(wait, zx::time::infinite(), &pending);
+  if (signal->trigger & ZX_SOCKET_READABLE) {
+    status = Recv(buf_.data(), mtu_);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "hidctl: error waiting on data: %d", status);
-      break;
-    }
-
-    if (pending & ZX_SOCKET_READABLE) {
-      status = Recv(buf.get(), mtu_);
-      if (status != ZX_OK) {
-        break;
-      }
-    }
-    if (pending & ZX_SOCKET_PEER_CLOSED) {
-      zxlogf(DEBUG, "hidctl: socket closed (peer)");
-      break;
-    }
-    if (pending & HID_SHUTDOWN) {
-      zxlogf(DEBUG, "hidctl: socket closed (self)");
-      break;
-    }
-  }
-
-  zxlogf(INFO, "hidctl: device destroyed");
-  {
-    fbl::AutoLock lock(&lock_);
-    data_.reset();
-    // Check if the device has a pending unbind txn to reply to.
-    if (unbind_txn_) {
-      unbind_txn_->Reply();
-    } else {
-      // Request the device unbinding process to begin.
       DdkAsyncRemove();
+      return;
     }
   }
-  return static_cast<int>(status);
+  if (signal->trigger & ZX_SOCKET_PEER_CLOSED) {
+    zxlogf(DEBUG, "hidctl: socket closed (peer)");
+    DdkAsyncRemove();
+    return;
+  }
+
+  wait_handler_.Begin(dispatcher);
 }
 
 zx_status_t HidDevice::Recv(uint8_t* buffer, uint32_t capacity) {
@@ -282,8 +290,12 @@ zx_status_t HidDevice::Recv(uint8_t* buffer, uint32_t capacity) {
       zxlogf(DEBUG, "hidctl: received %zu bytes", actual);
       hexdump8_ex(buffer, actual, 0);
     }
-    if (client_.is_valid()) {
-      client_.IoQueue(buffer, actual, zx_clock_get_monotonic());
+    if (started_ && binding_) {
+      auto result = fidl::WireSendEvent(*binding_)->OnReportReceived(
+          fidl::VectorView<uint8_t>::FromExternal(buffer, actual), zx_clock_get_monotonic());
+      if (!result.ok()) {
+        zxlogf(ERROR, "OnReportReceived failed %s", result.error().FormatDescription().c_str());
+      }
     }
   }
   return ZX_OK;

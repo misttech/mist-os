@@ -25,9 +25,11 @@ fuchsia_driver("hidctl-driver") {
   sources = [ "hidctl.cc" ]
   deps = [
     ":hidctl_bind",
-    "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_cpp",
     "//sdk/fidl/fuchsia.hardware.hidctl:fuchsia.hardware.hidctl_cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
@@ -52,7 +54,7 @@ executable("hidctl-test") {
   ]
   deps = [
     ":hidctl_bind",
-    "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_cpp",
     "//sdk/fidl/fuchsia.hardware.hidctl:fuchsia.hardware.hidctl_cpp",
     "//src/devices/testing/mock-ddk",
     "//src/lib/ddk",
