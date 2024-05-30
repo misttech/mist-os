@@ -124,6 +124,7 @@ impl Registry {
         let path = match &schema.value_source {
             Some(fcdecl::ConfigValueSource::PackagePath(path)) => Some(path),
             // If we are routing from capabilities we don't need to do anything else.
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Some(fcdecl::ConfigValueSource::Capabilities(_)) => {
                 if !config_value_replacements.is_empty() {
                     return Err(anyhow::anyhow!(

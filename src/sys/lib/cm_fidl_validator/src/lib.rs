@@ -287,7 +287,10 @@ struct ValidationContext<'a> {
     all_runners: HashSet<&'a str>,
     all_resolvers: HashSet<&'a str>,
     all_dictionaries: HashMap<&'a str, Option<&'a fdecl::Ref>>,
+
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     all_configs: HashSet<&'a str>,
+
     all_environment_names: HashSet<&'a str>,
     dynamic_children: Vec<(&'a str, &'a str)>,
     strong_dependencies: DirectedGraph<DependencyNode<'a>>,
@@ -539,6 +542,7 @@ impl<'a> ValidationContext<'a> {
 
         match config.value_source {
             None => self.errors.push(Error::missing_field(DeclType::ConfigSchema, "value_source")),
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Some(fdecl::ConfigValueSource::Capabilities(_)) => {
                 if !optional_use_keys.is_empty() {
                     self.errors
@@ -879,7 +883,7 @@ impl<'a> ValidationContext<'a> {
         &mut self,
         program: &fdecl::Program,
         use_runner_name: Option<&String>,
-        use_runner_source: Option<&fdecl::Ref>,
+        _use_runner_source: Option<&fdecl::Ref>,
     ) {
         match &program.runner {
             Some(_) =>
@@ -887,7 +891,7 @@ impl<'a> ValidationContext<'a> {
                 #[cfg(fuchsia_api_level_at_least = "HEAD")]
                 if use_runner_name.is_some() {
                     if use_runner_name != program.runner.as_ref()
-                        || use_runner_source
+                        || _use_runner_source
                             != Some(&fdecl::Ref::Environment(fdecl::EnvironmentRef))
                     {
                         self.errors.push(Error::ConflictingRunners);
@@ -1347,6 +1351,8 @@ impl<'a> ValidationContext<'a> {
                 );
             }
         }
+
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
         match protocol.delivery {
             Some(delivery) => match cm_types::DeliveryType::try_from(delivery) {
                 Ok(_) => {}
@@ -2758,9 +2764,13 @@ impl<'a> ValidationContext<'a> {
     fn resolver_checker(&self) -> &dyn Container {
         &self.all_resolvers
     }
+
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn dictionary_checker(&self) -> &dyn Container {
         &self.all_dictionaries
     }
+
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn config_checker(&self) -> &dyn Container {
         &self.all_configs
     }

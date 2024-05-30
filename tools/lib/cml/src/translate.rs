@@ -283,6 +283,7 @@ fn translate_use(
                 out_uses.push(fdecl::Use::Service(fdecl::UseService {
                     source: Some(source.clone()),
                     source_name: Some(source_name.clone().into()),
+                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
                     source_dictionary: source_dictionary.clone(),
                     target_path: Some(target_path.into()),
                     dependency_type: Some(
@@ -304,6 +305,7 @@ fn translate_use(
                 out_uses.push(fdecl::Use::Protocol(fdecl::UseProtocol {
                     source: Some(source.clone()),
                     source_name: Some(source_name.clone().into()),
+                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
                     source_dictionary: source_dictionary.clone(),
                     target_path: Some(target_path.into()),
                     dependency_type: Some(
@@ -323,6 +325,7 @@ fn translate_use(
             out_uses.push(fdecl::Use::Directory(fdecl::UseDirectory {
                 source: Some(source),
                 source_name: Some(n.clone().into()),
+                #[cfg(fuchsia_api_level_at_least = "HEAD")]
                 source_dictionary,
                 target_path: Some(target_path.into()),
                 rights: Some(rights),
@@ -399,6 +402,7 @@ fn translate_use(
         } else if let Some(n) = &use_.runner {
             let (source, source_dictionary) =
                 extract_use_source(&options, use_, all_capability_names, all_children)?;
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             out_uses.push(fdecl::Use::Runner(fdecl::UseRunner {
                 source: Some(source),
                 source_name: Some(n.clone().into()),
@@ -477,6 +481,7 @@ fn translate_expose(
                     out_exposes.push(fdecl::Expose::Service(fdecl::ExposeService {
                         source: Some(source),
                         source_name: Some(source_name.clone().into()),
+                        #[cfg(fuchsia_api_level_at_least = "HEAD")]
                         source_dictionary,
                         target_name: Some(target_name.clone().into()),
                         target: Some(target.clone()),
@@ -506,6 +511,7 @@ fn translate_expose(
                 out_exposes.push(fdecl::Expose::Protocol(fdecl::ExposeProtocol {
                     source: Some(source),
                     source_name: Some(source_name.clone().into()),
+                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
                     source_dictionary,
                     target_name: Some(target_name.clone().into()),
                     target: Some(target.clone()),
@@ -535,6 +541,7 @@ fn translate_expose(
                 out_exposes.push(fdecl::Expose::Directory(fdecl::ExposeDirectory {
                     source: Some(source),
                     source_name: Some(source_name.clone().into()),
+                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
                     source_dictionary,
                     target_name: Some(target_name.clone().into()),
                     target: Some(target.clone()),
@@ -554,6 +561,7 @@ fn translate_expose(
                 out_exposes.push(fdecl::Expose::Runner(fdecl::ExposeRunner {
                     source: Some(source.clone()),
                     source_name: Some(source_name.clone().into()),
+                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
                     source_dictionary: source_dictionary.clone(),
                     target: Some(target.clone()),
                     target_name: Some(target_name.clone().into()),
@@ -570,6 +578,7 @@ fn translate_expose(
                 out_exposes.push(fdecl::Expose::Resolver(fdecl::ExposeResolver {
                     source: Some(source.clone()),
                     source_name: Some(source_name.clone().into()),
+                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
                     source_dictionary: source_dictionary.clone(),
                     target: Some(target.clone()),
                     target_name: Some(target_name.clone().into()),
@@ -831,6 +840,7 @@ fn translate_offer(
                 out_offers.push(fdecl::Offer::Service(fdecl::OfferService {
                     source: Some(source),
                     source_name: Some(source_name.into()),
+                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
                     source_dictionary,
                     target: Some(target),
                     target_name: Some(target_name.into()),
@@ -861,6 +871,7 @@ fn translate_offer(
                 out_offers.push(fdecl::Offer::Protocol(fdecl::OfferProtocol {
                     source: Some(source),
                     source_name: Some(source_name.into()),
+                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
                     source_dictionary,
                     target: Some(target),
                     target_name: Some(target_name.into()),
@@ -894,6 +905,7 @@ fn translate_offer(
                 out_offers.push(fdecl::Offer::Directory(fdecl::OfferDirectory {
                     source: Some(source),
                     source_name: Some(source_name.into()),
+                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
                     source_dictionary,
                     target: Some(target),
                     target_name: Some(target_name.into()),
@@ -948,6 +960,7 @@ fn translate_offer(
                 out_offers.push(fdecl::Offer::Runner(fdecl::OfferRunner {
                     source: Some(source),
                     source_name: Some(source_name.into()),
+                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
                     source_dictionary,
                     target: Some(target),
                     target_name: Some(target_name.into()),
@@ -967,6 +980,7 @@ fn translate_offer(
                 out_offers.push(fdecl::Offer::Resolver(fdecl::OfferResolver {
                     source: Some(source),
                     source_name: Some(source_name.into()),
+                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
                     source_dictionary,
                     target: Some(target),
                     target_name: Some(target_name.into()),
@@ -1870,6 +1884,7 @@ pub fn translate_capabilities(
                 out_capabilities.push(fdecl::Capability::Protocol(fdecl::Protocol {
                     name: Some(n.clone().into()),
                     source_path,
+                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
                     delivery: capability.delivery.map(Into::into),
                     ..Default::default()
                 }));
@@ -2062,6 +2077,7 @@ pub fn any_ref_to_decl(
         AnyRef::Debug => fdecl::Ref::Debug(fdecl::DebugRef {}),
         AnyRef::Parent => fdecl::Ref::Parent(fdecl::ParentRef {}),
         AnyRef::Self_ => fdecl::Ref::Self_(fdecl::SelfRef {}),
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
         AnyRef::Program => fdecl::Ref::Program(fdecl::ProgramRef {}),
         AnyRef::Void => fdecl::Ref::VoidType(fdecl::VoidRef {}),
         AnyRef::Dictionary(d) => {
@@ -2085,6 +2101,7 @@ fn dictionary_ref_to_source(d: &DictionaryRef) -> (fdecl::Ref, Option<String>) {
         }
         RootDictionaryRef::Parent => fdecl::Ref::Parent(fdecl::ParentRef {}),
         RootDictionaryRef::Self_ => fdecl::Ref::Self_(fdecl::SelfRef {}),
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
         RootDictionaryRef::Program => fdecl::Ref::Program(fdecl::ProgramRef {}),
     };
     (root, Some(d.path.to_string()))
@@ -3123,6 +3140,7 @@ mod tests {
                                 name: "logger".into(),
                                 collection: None,
                             })),
+                            #[cfg(fuchsia_api_level_at_least = "HEAD")]
                             source_dictionary: Some("in/dict".into()),
                             source_name: Some("fuchsia.sys2.DictionaryProto".to_string()),
                             target_path: Some("/svc/fuchsia.sys2.DictionaryProto".to_string()),
@@ -3389,6 +3407,7 @@ mod tests {
                                 name: "logger".to_string(),
                                 collection: None,
                             })),
+                            #[cfg(fuchsia_api_level_at_least = "HEAD")]
                             source_dictionary: Some("in/dict".into()),
                             source_name: Some("D".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
@@ -4203,6 +4222,7 @@ mod tests {
                     fdecl::Offer::Protocol (
                         fdecl::OfferProtocol {
                             source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            #[cfg(fuchsia_api_level_at_least = "HEAD")]
                             source_dictionary: Some("in/dict".into()),
                             source_name: Some("fuchsia.sys2.FromDict".to_string()),
                             target: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
@@ -4660,6 +4680,7 @@ mod tests {
                     fdecl::Offer::Protocol (
                         fdecl::OfferProtocol {
                             source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            #[cfg(fuchsia_api_level_at_least = "HEAD")]
                             source_dictionary: Some("dict/1".into()),
                             source_name: Some("A".into()),
                             target: Some(fdecl::Ref::Capability(fdecl::CapabilityRef {
@@ -4690,6 +4711,7 @@ mod tests {
                     fdecl::Offer::Service (
                         fdecl::OfferService {
                             source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            #[cfg(fuchsia_api_level_at_least = "HEAD")]
                             source_dictionary: Some("dict/2".into()),
                             source_name: Some("B".into()),
                             target: Some(fdecl::Ref::Capability(fdecl::CapabilityRef {

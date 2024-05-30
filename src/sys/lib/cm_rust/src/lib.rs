@@ -296,11 +296,14 @@ fidl_translations_symmetrical_enums!(
 
 pub use cm_types::DeliveryType;
 
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 impl FidlIntoNative<DeliveryType> for fdecl::DeliveryType {
     fn fidl_into_native(self) -> DeliveryType {
         self.try_into().unwrap()
     }
 }
+
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 impl NativeIntoFidl<fdecl::DeliveryType> for DeliveryType {
     fn native_into_fidl(self) -> fdecl::DeliveryType {
         self.into()
@@ -1093,6 +1096,7 @@ pub struct ProtocolDecl {
     pub name: Name,
     pub source_path: Option<Path>,
     #[fidl_decl(default)]
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     pub delivery: DeliveryType,
 }
 
@@ -1299,6 +1303,7 @@ pub enum ConfigChecksum {
     Sha256([u8; 32]),
 }
 
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 #[derive(FidlDecl, Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[fidl_decl(fidl_table = "fdecl::ConfigSourceCapabilities")]
@@ -1309,6 +1314,7 @@ pub struct ConfigSourceCapabilities {}
 #[fidl_decl(fidl_union = "fdecl::ConfigValueSource")]
 pub enum ConfigValueSource {
     PackagePath(String),
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     Capabilities(ConfigSourceCapabilities),
 }
 
@@ -2569,6 +2575,8 @@ pub enum DictionarySource {
     Parent,
     Self_,
     Child(ChildRef),
+
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     Program,
 }
 
@@ -2578,6 +2586,8 @@ impl FidlIntoNative<DictionarySource> for fdecl::Ref {
             Self::Parent(_) => DictionarySource::Parent,
             Self::Self_(_) => DictionarySource::Self_,
             Self::Child(c) => DictionarySource::Child(c.fidl_into_native()),
+
+            // ProgramRef is only available at HEAD
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Self::Program(_) => DictionarySource::Program,
             _ => panic!("invalid DictionarySource variant"),
@@ -2591,6 +2601,8 @@ impl NativeIntoFidl<fdecl::Ref> for DictionarySource {
             Self::Parent => fdecl::Ref::Parent(fdecl::ParentRef {}),
             Self::Self_ => fdecl::Ref::Self_(fdecl::SelfRef {}),
             Self::Child(c) => fdecl::Ref::Child(c.native_into_fidl()),
+
+            // ProgramRef is only available at HEAD
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Self::Program => fdecl::Ref::Program(fdecl::ProgramRef {}),
         }

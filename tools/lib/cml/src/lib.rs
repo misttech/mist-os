@@ -616,6 +616,7 @@ pub enum AnyRef<'a> {
     /// A reference to this component. Parsed as `self`.
     Self_,
     /// A reference to this component's program. Parsed as `program`.
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     Program,
     /// An intentionally omitted reference.
     Void,
@@ -635,6 +636,7 @@ impl fmt::Display for AnyRef<'_> {
             Self::Framework => write!(f, "framework"),
             Self::Debug => write!(f, "debug"),
             Self::Self_ => write!(f, "self"),
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             Self::Program => write!(f, "program"),
             Self::Void => write!(f, "void"),
             Self::Dictionary(d) => write!(f, "{}", d),
@@ -876,6 +878,7 @@ pub enum RootDictionaryRef {
     /// A reference to this component.
     Self_,
     /// A reference to this component's program.
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     Program,
 }
 

@@ -707,7 +707,13 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                 }
                 match &d.root {
                     RootDictionaryRef::Self_ | RootDictionaryRef::Named(_) => {}
-                    RootDictionaryRef::Parent | RootDictionaryRef::Program => {
+                    RootDictionaryRef::Parent => {
+                        return Err(Error::validate(
+                            "`expose` dictionary path must begin with `self` or `#<child-name>`",
+                        ));
+                    }
+                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                    RootDictionaryRef::Program => {
                         return Err(Error::validate(
                             "`expose` dictionary path must begin with `self` or `#<child-name>`",
                         ));
@@ -807,6 +813,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                     RootDictionaryRef::Self_
                     | RootDictionaryRef::Named(_)
                     | RootDictionaryRef::Parent => {}
+                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
                     RootDictionaryRef::Program => {
                         return Err(Error::validate(
                             "`offer` dictionary path must begin with `self`, `parent`, or \
@@ -1118,6 +1125,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             AnyRef::Named(n) => {
                 sources.push(DependencyNode::Named(n));
             }
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             AnyRef::Program => {
                 sources.push(DependencyNode::Self_);
             }
@@ -1773,6 +1781,7 @@ impl<'a> DependencyNode<'a> {
             RootDictionaryRef::Named(name) => Some(DependencyNode::Named(name)),
             RootDictionaryRef::Self_ => Some(DependencyNode::Self_),
             RootDictionaryRef::Parent => None,
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             RootDictionaryRef::Program => Some(DependencyNode::Self_),
         }
     }
