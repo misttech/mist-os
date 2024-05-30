@@ -14,7 +14,7 @@ import sys
 import time
 
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger("subbuild.py")
 
@@ -67,63 +67,80 @@ def write_file_if_changed(path: Path, content: str) -> bool:
     return True
 
 
-def command_args_to_string(args: List, env=None) -> str:
+def command_args_to_string(
+    args: List, env: Optional[Dict[str, str]], cwd: Optional[Path | str]
+) -> str:
     elements = []
+    if cwd:
+        elements.append(f"cd {shlex.quote(str(cwd))} &&")
     if env:
-        elements += [
-            "%s=%s" % (name, shlex.quote(value))
-            for name, value in sorted(env.items())
-        ]
+        for key, value in env.items():
+            if key not in os.environ or value != os.environ[key]:
+                elements += [
+                    "%s=%s" % (name, shlex.quote(value))
+                    for name, value in sorted(env.items())
+                ]
     elements += [shlex.quote(str(a)) for a in args]
     return " ".join(elements)
 
 
-def run_command(args: List, cwd=None, env=None):
+def run_command(
+    args: List,
+    env: Optional[Dict[str, str]] = None,
+    cwd: Optional[Path | str] = None,
+    capture_output: bool = False,
+):
     """Run a command.
 
     Args:
         args: A list of strings or Path items (each one of them will be
             converted to a string for convenience).
-        cwd: If not None, path to the directory where to run the command.
-        env: If not None, a dictionary of environment variables to use.
+        **kwargs: other arguments passed to subprocess
     Returns:
         a subprocess.run() result value.
     """
-    logger.info("RUN: " + command_args_to_string(args, env))
+    logger.info("RUN: " + command_args_to_string(args, env, cwd))
     start_time = time.time()
-    if env is not None:
-        new_vars = env
-        env = os.environ.copy()
-        for name, value in new_vars.items():
-            env[name] = value
-    result = subprocess.run([str(a) for a in args], cwd=cwd, env=env)
+    result = subprocess.run(
+        [str(a) for a in args],
+        env=env,
+        cwd=cwd,
+        capture_output=capture_output,
+        text=True,
+    )
     end_time = time.time()
     logger.info("DURATION: %.1fs" % (end_time - start_time))
     return result
 
 
-def run_checked_command(args: List, cwd=None, env=None):
+def run_checked_command(
+    args: List,
+    env: Optional[Dict[str, str]] = None,
+    cwd: Optional[Path | str] = None,
+):
     """Run a command, return True if succeeds, False otherwise.
 
     Args:
         args: A list of strings or Path items (each one of them will be
             converted to a string for convenience).
-        cwd: If not None, path to the directory where to run the command.
-        env: If not None, a dictionary of environment variables to use.
+        **kwargs: other arguments passed to subrpcoes
     Returns:
-        True on success. In case of failure, print the command line and return False.
+        True on success. In case of failure, print the command line and
+        stdout + stderr, then return False.
     """
     try:
-        ret = run_command(args, cwd, env)
+        ret = run_command(args, env=env, cwd=cwd, capture_output=True)
         if ret.returncode == 0:
-            return False
+            return True
     except KeyboardInterrupt:
         # If the user interrupts a long-running command, do not print anything.
-        return True
+        return False
 
-    args_str = command_args_to_string(args, env)
-    logger.error(f"When running command: {args_str}\n")
-    return True
+    args_str = command_args_to_string(args, env, cwd)
+    logger.error(
+        f"When running command: {args_str}\n{ret.stdout}\n{ret.stderr}\n"
+    )
+    return False
 
 
 def main():
@@ -298,14 +315,14 @@ def main():
         write_file_if_changed(build_dir / "args.gn", args_gn_content)
         or not (build_dir / "build.ninja").exists()
     ):
-        if run_checked_command(
+        if not run_checked_command(
             [
                 gn_path,
                 "--root=%s" % fuchsia_dir.resolve(),
                 "--root-pattern=//:developer_universe_packages",
                 "gen",
                 build_dir,
-            ]
+            ],
         ):
             return 1
 
@@ -318,7 +335,7 @@ def main():
     ninja_status = status_prefix + ninja_status
     ninja_env = {"NINJA_STATUS": ninja_status}
 
-    if run_checked_command(
+    if not run_checked_command(
         [
             *ninja_cmd_prefix,
             "-C",
@@ -329,7 +346,7 @@ def main():
             args.max_load_average,
             sdk_label_to_ninja_target(args.sdk_collection_label),
         ],
-        env=ninja_env,
+        env=os.environ | ninja_env,
     ):
         return 1
 
