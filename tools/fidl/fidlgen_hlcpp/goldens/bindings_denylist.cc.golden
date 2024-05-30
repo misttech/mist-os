@@ -192,6 +192,7 @@ void DenyEachBinding_OnlyDenyDart_Result::Decode(::fidl::Decoder* _decoder, Deny
 
   switch (value->tag_) {
     case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_)::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Response();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
@@ -447,6 +448,7 @@ void DenyEachBinding_OnlyDenyGo_Result::Decode(::fidl::Decoder* _decoder, DenyEa
 
   switch (value->tag_) {
     case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_)::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Response();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
@@ -702,6 +704,7 @@ void DenyEachBinding_OnlyDenyLibfuzzer_Result::Decode(::fidl::Decoder* _decoder,
 
   switch (value->tag_) {
     case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_)::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Response();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
@@ -957,6 +960,7 @@ void DenyEachBinding_OnlyDenyRust_Result::Decode(::fidl::Decoder* _decoder, Deny
 
   switch (value->tag_) {
     case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_)::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Response();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
@@ -1212,6 +1216,7 @@ void DenyEachBinding_OnlyDenySyzkaller_Result::Decode(::fidl::Decoder* _decoder,
 
   switch (value->tag_) {
     case ::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_)::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Response();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;

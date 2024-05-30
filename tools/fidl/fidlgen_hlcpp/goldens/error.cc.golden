@@ -192,6 +192,7 @@ void Example_foo_Result::Decode(::fidl::Decoder* _decoder, Example_foo_Result* v
 
   switch (value->tag_) {
     case ::test::error::Example_foo_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_)::test::error::Example_foo_Response();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;

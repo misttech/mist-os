@@ -373,6 +373,7 @@ void {{ .Name }}::Decode(::fidl::Decoder* _decoder, {{ .Name }}* value, size_t o
   {{- range .Members }}
     case {{ .TagName }}: {
       {{- if .Type.NeedsDtor }}
+      value->{{ .StorageName }}.~decltype(value->{{ .StorageName }})();
       new (&value->{{ .StorageName }}) {{ .Type }}();
       {{- end }}
       ::fidl::Decode(_decoder, &value->{{ .StorageName }}, value_offset);

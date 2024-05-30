@@ -503,11 +503,13 @@ void Expression::Decode(::fidl::Decoder* _decoder, Expression* value, size_t off
       break;
     }
     case ::test::anonymous::Expression::Tag::kBinOp: {
+      value->bin_op_.~decltype(value->bin_op_)();
       new (&value->bin_op_)::test::anonymous::OverrideTest();
       ::fidl::Decode(_decoder, &value->bin_op_, value_offset);
       break;
     }
     case ::test::anonymous::Expression::Tag::kFunctionApplication: {
+      value->function_application_.~decltype(value->function_application_)();
       new (&value->function_application_)::test::anonymous::FunctionApplication();
       ::fidl::Decode(_decoder, &value->function_application_, value_offset);
       break;
@@ -1127,11 +1129,13 @@ void SomeProtocol_SomeMethod_Result::Decode(::fidl::Decoder* _decoder, SomeProto
 
   switch (value->tag_) {
     case ::test::anonymous::SomeProtocol_SomeMethod_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_)::test::anonymous::SomeProtocol_SomeMethod_Response();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
     }
     case ::test::anonymous::SomeProtocol_SomeMethod_Result::Tag::kErr: {
+      value->err_.~decltype(value->err_)();
       new (&value->err_)::test::anonymous::SomeProtocol_SomeMethod_Error();
       ::fidl::Decode(_decoder, &value->err_, value_offset);
       break;

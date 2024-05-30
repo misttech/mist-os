@@ -198,11 +198,13 @@ void PizzaOrPasta::Decode(::fidl::Decoder* _decoder, PizzaOrPasta* value, size_t
 
   switch (value->tag_) {
     case ::test::union_::PizzaOrPasta::Tag::kPizza: {
+      value->pizza_.~decltype(value->pizza_)();
       new (&value->pizza_) ::test::union_::Pizza();
       ::fidl::Decode(_decoder, &value->pizza_, value_offset);
       break;
     }
     case ::test::union_::PizzaOrPasta::Tag::kPasta: {
+      value->pasta_.~decltype(value->pasta_)();
       new (&value->pasta_) ::test::union_::Pasta();
       ::fidl::Decode(_decoder, &value->pasta_, value_offset);
       break;
@@ -408,11 +410,13 @@ void ExplicitPizzaOrPasta::Decode(::fidl::Decoder* _decoder, ExplicitPizzaOrPast
 
   switch (value->tag_) {
     case ::test::union_::ExplicitPizzaOrPasta::Tag::kPizza: {
+      value->pizza_.~decltype(value->pizza_)();
       new (&value->pizza_) ::test::union_::Pizza();
       ::fidl::Decode(_decoder, &value->pizza_, value_offset);
       break;
     }
     case ::test::union_::ExplicitPizzaOrPasta::Tag::kPasta: {
+      value->pasta_.~decltype(value->pasta_)();
       new (&value->pasta_) ::test::union_::Pasta();
       ::fidl::Decode(_decoder, &value->pasta_, value_offset);
       break;
@@ -631,11 +635,13 @@ void FlexiblePizzaOrPasta::Decode(::fidl::Decoder* _decoder, FlexiblePizzaOrPast
 
   switch (value->tag_) {
     case ::test::union_::FlexiblePizzaOrPasta::Tag::kPizza: {
+      value->pizza_.~decltype(value->pizza_)();
       new (&value->pizza_) ::test::union_::Pizza();
       ::fidl::Decode(_decoder, &value->pizza_, value_offset);
       break;
     }
     case ::test::union_::FlexiblePizzaOrPasta::Tag::kPasta: {
+      value->pasta_.~decltype(value->pasta_)();
       new (&value->pasta_) ::test::union_::Pasta();
       ::fidl::Decode(_decoder, &value->pasta_, value_offset);
       break;
@@ -856,11 +862,13 @@ void StrictPizzaOrPasta::Decode(::fidl::Decoder* _decoder, StrictPizzaOrPasta* v
 
   switch (value->tag_) {
     case ::test::union_::StrictPizzaOrPasta::Tag::kPizza: {
+      value->pizza_.~decltype(value->pizza_)();
       new (&value->pizza_) ::test::union_::Pizza();
       ::fidl::Decode(_decoder, &value->pizza_, value_offset);
       break;
     }
     case ::test::union_::StrictPizzaOrPasta::Tag::kPasta: {
+      value->pasta_.~decltype(value->pasta_)();
       new (&value->pasta_) ::test::union_::Pasta();
       ::fidl::Decode(_decoder, &value->pasta_, value_offset);
       break;
@@ -1104,11 +1112,13 @@ void Union::Decode(::fidl::Decoder* _decoder, Union* value, size_t offset) {
       break;
     }
     case ::test::union_::Union::Tag::kStringNeedsConstructor: {
+      value->StringNeedsConstructor_.~decltype(value->StringNeedsConstructor_)();
       new (&value->StringNeedsConstructor_) ::std::string();
       ::fidl::Decode(_decoder, &value->StringNeedsConstructor_, value_offset);
       break;
     }
     case ::test::union_::Union::Tag::kVectorStringAlsoNeedsConstructor: {
+      value->VectorStringAlsoNeedsConstructor_.~decltype(value->VectorStringAlsoNeedsConstructor_)();
       new (&value->VectorStringAlsoNeedsConstructor_) ::std::vector<::std::string>();
       ::fidl::Decode(_decoder, &value->VectorStringAlsoNeedsConstructor_, value_offset);
       break;
@@ -1378,11 +1388,13 @@ void FlexibleUnion::Decode(::fidl::Decoder* _decoder, FlexibleUnion* value, size
       break;
     }
     case ::test::union_::FlexibleUnion::Tag::kStringNeedsConstructor: {
+      value->StringNeedsConstructor_.~decltype(value->StringNeedsConstructor_)();
       new (&value->StringNeedsConstructor_) ::std::string();
       ::fidl::Decode(_decoder, &value->StringNeedsConstructor_, value_offset);
       break;
     }
     case ::test::union_::FlexibleUnion::Tag::kVectorStringAlsoNeedsConstructor: {
+      value->VectorStringAlsoNeedsConstructor_.~decltype(value->VectorStringAlsoNeedsConstructor_)();
       new (&value->VectorStringAlsoNeedsConstructor_) ::std::vector<::std::string>();
       ::fidl::Decode(_decoder, &value->VectorStringAlsoNeedsConstructor_, value_offset);
       break;
@@ -1654,11 +1666,13 @@ void StrictUnion::Decode(::fidl::Decoder* _decoder, StrictUnion* value, size_t o
       break;
     }
     case ::test::union_::StrictUnion::Tag::kStringNeedsConstructor: {
+      value->StringNeedsConstructor_.~decltype(value->StringNeedsConstructor_)();
       new (&value->StringNeedsConstructor_) ::std::string();
       ::fidl::Decode(_decoder, &value->StringNeedsConstructor_, value_offset);
       break;
     }
     case ::test::union_::StrictUnion::Tag::kVectorStringAlsoNeedsConstructor: {
+      value->VectorStringAlsoNeedsConstructor_.~decltype(value->VectorStringAlsoNeedsConstructor_)();
       new (&value->VectorStringAlsoNeedsConstructor_) ::std::vector<::std::string>();
       ::fidl::Decode(_decoder, &value->VectorStringAlsoNeedsConstructor_, value_offset);
       break;
@@ -2028,6 +2042,7 @@ void ExplicitUnion::Decode(::fidl::Decoder* _decoder, ExplicitUnion* value, size
       break;
     }
     case ::test::union_::ExplicitUnion::Tag::kStringNeedsConstructor: {
+      value->StringNeedsConstructor_.~decltype(value->StringNeedsConstructor_)();
       new (&value->StringNeedsConstructor_) ::std::string();
       ::fidl::Decode(_decoder, &value->StringNeedsConstructor_, value_offset);
       break;
@@ -2470,6 +2485,7 @@ void FlexibleFoo::Decode(::fidl::Decoder* _decoder, FlexibleFoo* value, size_t o
 
   switch (value->tag_) {
     case ::test::union_::FlexibleFoo::Tag::kS: {
+      value->s_.~decltype(value->s_)();
       new (&value->s_) ::std::string();
       ::fidl::Decode(_decoder, &value->s_, value_offset);
       break;
@@ -2690,6 +2706,7 @@ void StrictFoo::Decode(::fidl::Decoder* _decoder, StrictFoo* value, size_t offse
 
   switch (value->tag_) {
     case ::test::union_::StrictFoo::Tag::kS: {
+      value->s_.~decltype(value->s_)();
       new (&value->s_) ::std::string();
       ::fidl::Decode(_decoder, &value->s_, value_offset);
       break;
@@ -2912,6 +2929,7 @@ void ExplicitFoo::Decode(::fidl::Decoder* _decoder, ExplicitFoo* value, size_t o
       break;
     }
     case ::test::union_::ExplicitFoo::Tag::kS: {
+      value->s_.~decltype(value->s_)();
       new (&value->s_) ::std::string();
       ::fidl::Decode(_decoder, &value->s_, value_offset);
       break;
@@ -3132,6 +3150,7 @@ void ExplicitStrictFoo::Decode(::fidl::Decoder* _decoder, ExplicitStrictFoo* val
       break;
     }
     case ::test::union_::ExplicitStrictFoo::Tag::kS: {
+      value->s_.~decltype(value->s_)();
       new (&value->s_) ::std::string();
       ::fidl::Decode(_decoder, &value->s_, value_offset);
       break;
@@ -3614,11 +3633,13 @@ void NewerSimpleUnion::Decode(::fidl::Decoder* _decoder, NewerSimpleUnion* value
       break;
     }
     case ::test::union_::NewerSimpleUnion::Tag::kS: {
+      value->s_.~decltype(value->s_)();
       new (&value->s_) ::std::string();
       ::fidl::Decode(_decoder, &value->s_, value_offset);
       break;
     }
     case ::test::union_::NewerSimpleUnion::Tag::kV: {
+      value->v_.~decltype(value->v_)();
       new (&value->v_) ::std::vector<::std::string>();
       ::fidl::Decode(_decoder, &value->v_, value_offset);
       break;
@@ -3892,6 +3913,7 @@ void StrictSimpleUnion::Decode(::fidl::Decoder* _decoder, StrictSimpleUnion* val
       break;
     }
     case ::test::union_::StrictSimpleUnion::Tag::kS: {
+      value->s_.~decltype(value->s_)();
       new (&value->s_) ::std::string();
       ::fidl::Decode(_decoder, &value->s_, value_offset);
       break;
@@ -4113,6 +4135,7 @@ void UnionContainingEmptyStruct::Decode(::fidl::Decoder* _decoder, UnionContaini
 
   switch (value->tag_) {
     case ::test::union_::UnionContainingEmptyStruct::Tag::kEmpty: {
+      value->empty_.~decltype(value->empty_)();
       new (&value->empty_) ::test::union_::Empty();
       ::fidl::Decode(_decoder, &value->empty_, value_offset);
       break;
@@ -4282,6 +4305,7 @@ void StrictBoundedUnion::Decode(::fidl::Decoder* _decoder, StrictBoundedUnion* v
 
   switch (value->tag_) {
     case ::test::union_::StrictBoundedUnion::Tag::kV: {
+      value->v_.~decltype(value->v_)();
       new (&value->v_) ::std::vector<uint8_t>();
       ::fidl::Decode(_decoder, &value->v_, value_offset);
       break;

@@ -348,6 +348,7 @@ void WithErrorSyntax_ResponseAsStruct_Result::Decode(::fidl::Decoder* _decoder, 
 
   switch (value->tag_) {
     case ::test::protocols::WithErrorSyntax_ResponseAsStruct_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_) ::test::protocols::WithErrorSyntax_ResponseAsStruct_Response();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
@@ -581,6 +582,7 @@ void WithErrorSyntax_ErrorAsPrimitive_Result::Decode(::fidl::Decoder* _decoder, 
 
   switch (value->tag_) {
     case ::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_) ::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Response();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
@@ -816,11 +818,13 @@ void WithErrorSyntax_ErrorAsEnum_Result::Decode(::fidl::Decoder* _decoder, WithE
 
   switch (value->tag_) {
     case ::test::protocols::WithErrorSyntax_ErrorAsEnum_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_) ::test::protocols::WithErrorSyntax_ErrorAsEnum_Response();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
     }
     case ::test::protocols::WithErrorSyntax_ErrorAsEnum_Result::Tag::kErr: {
+      value->err_.~decltype(value->err_)();
       new (&value->err_) ::test::protocols::ErrorEnum();
       ::fidl::Decode(_decoder, &value->err_, value_offset);
       break;
@@ -1063,6 +1067,7 @@ void WithErrorSyntax_HandleInResult_Result::Decode(::fidl::Decoder* _decoder, Wi
 
   switch (value->tag_) {
     case ::test::protocols::WithErrorSyntax_HandleInResult_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_) ::test::protocols::WithErrorSyntax_HandleInResult_Response();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;

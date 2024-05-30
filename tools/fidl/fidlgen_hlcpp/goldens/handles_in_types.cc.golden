@@ -256,6 +256,7 @@ void UnionWithHandle::Decode(::fidl::Decoder* _decoder, UnionWithHandle* value, 
 
   switch (value->tag_) {
     case ::test::handlesintypes::UnionWithHandle::Tag::kH: {
+      value->h_.~decltype(value->h_)();
       new (&value->h_)::zx::vmo();
       ::fidl::Decode(_decoder, &value->h_, value_offset);
       break;

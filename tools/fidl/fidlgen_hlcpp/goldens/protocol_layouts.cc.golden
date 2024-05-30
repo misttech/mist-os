@@ -441,6 +441,7 @@ void MainProtocol_TwoWayImportWithError_Result::Decode(::fidl::Decoder* _decoder
 
   switch (value->tag_) {
     case ::test::protocollayouts::MainProtocol_TwoWayImportWithError_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_) ::test::protocollayouts::imported::ImportUnionPayload();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
@@ -646,6 +647,7 @@ void MainProtocol_TwoWayLocalWithError_Result::Decode(::fidl::Decoder* _decoder,
 
   switch (value->tag_) {
     case ::test::protocollayouts::MainProtocol_TwoWayLocalWithError_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_) ::test::protocollayouts::LocalUnionPayload();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
@@ -1577,6 +1579,7 @@ void MainProtocol_TwoWayAnonWithError_Result::Decode(::fidl::Decoder* _decoder, 
 
   switch (value->tag_) {
     case ::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_) ::test::protocollayouts::MainProtocol_TwoWayAnonWithError_Response();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
