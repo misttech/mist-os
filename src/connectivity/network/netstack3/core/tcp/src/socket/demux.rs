@@ -11,8 +11,17 @@ use core::{fmt::Debug, num::NonZeroU16};
 use assert_matches::assert_matches;
 use net_types::SpecifiedAddr;
 use netstack3_base::{
+    socket::{
+        AddrIsMappedError, AddrVec, AddrVecIter, ConnAddr, ConnIpAddr, InsertError, ListenerAddr,
+        ListenerIpAddr, SocketIpAddr, SocketIpAddrExt as _,
+    },
     trace_duration, BidirectionalConverter as _, CounterContext, CtxPair, EitherDeviceId,
     NotFoundError, StrongDeviceIdentifier as _, WeakDeviceIdentifier,
+};
+use netstack3_filter::TransportPacketSerializer;
+use netstack3_ip::{
+    socket::{IpSockCreationError, MmsError},
+    IpTransportContext, TransparentLocalDelivery, TransportIpContext, TransportReceiveError,
 };
 use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder as _, Serializer};
 use packet_formats::{
@@ -26,32 +35,20 @@ use packet_formats::{
 use thiserror::Error;
 use tracing::{debug, error, warn};
 
-use crate::{
-    filter::TransportPacketSerializer,
-    ip::{
-        socket::MmsError, IpSockCreationError, IpTransportContext, TransparentLocalDelivery,
-        TransportIpContext, TransportReceiveError,
-    },
+use crate::internal::{
+    base::{BufferSizes, ConnectionError, Control, Mss, SocketOptions, TcpCounters},
+    buffer::SendPayload,
+    segment::{Options, Segment},
+    seqnum::{SeqNum, UnscaledWindowSize},
     socket::{
-        AddrIsMappedError, AddrVec, AddrVecIter, ConnAddr, ConnIpAddr, InsertError, ListenerAddr,
-        ListenerIpAddr, SocketIpAddr, SocketIpAddrExt as _,
+        self, isn::IsnGenerator, AsThisStack as _, BoundSocketState, Connection, DemuxState,
+        DeviceIpSocketHandler, DualStackDemuxIdConverter as _, DualStackIpExt, EitherStack,
+        HandshakeStatus, Listener, ListenerAddrState, ListenerSharingState, MaybeDualStack,
+        MaybeListener, PrimaryRc, TcpApi, TcpBindingsContext, TcpBindingsTypes, TcpContext,
+        TcpDemuxContext, TcpDualStackContext, TcpIpTransportContext, TcpPortSpec, TcpSocketId,
+        TcpSocketSetEntry, TcpSocketState, TcpSocketStateInner,
     },
-    transport::tcp::{
-        self,
-        buffer::SendPayload,
-        segment::{Options, Segment},
-        seqnum::{SeqNum, UnscaledWindowSize},
-        socket::{
-            isn::IsnGenerator, AsThisStack as _, BoundSocketState, Connection, DemuxState,
-            DeviceIpSocketHandler, DualStackDemuxIdConverter as _, DualStackIpExt, EitherStack,
-            HandshakeStatus, Listener, ListenerAddrState, ListenerSharingState, MaybeDualStack,
-            MaybeListener, PrimaryRc, TcpApi, TcpBindingsContext, TcpBindingsTypes, TcpContext,
-            TcpDemuxContext, TcpDualStackContext, TcpIpTransportContext, TcpPortSpec, TcpSocketId,
-            TcpSocketSetEntry, TcpSocketState, TcpSocketStateInner,
-        },
-        state::{BufferProvider, Closed, DataAcked, Initial, State, TimeWait},
-        BufferSizes, ConnectionError, Control, Mss, SocketOptions, TcpCounters,
-    },
+    state::{BufferProvider, Closed, DataAcked, Initial, State, TimeWait},
 };
 
 impl<BT: TcpBindingsTypes> BufferProvider<BT::ReceiveBuffer, BT::SendBuffer> for BT {
@@ -385,7 +382,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
         // there is no TCB, and therefore, no connection.
         if let Some(seg) = (Closed { reason: None::<Option<ConnectionError>> }.on_segment(incoming))
         {
-            tcp::socket::send_tcp_segment::<WireI, WireI, _, _, _>(
+            socket::send_tcp_segment::<WireI, WireI, _, _, _>(
                 core_ctx,
                 bindings_ctx,
                 None,
@@ -685,7 +682,7 @@ where
     }
 
     if let Some(seg) = reply {
-        tcp::socket::send_tcp_segment(
+        socket::send_tcp_segment(
             core_ctx,
             bindings_ctx,
             Some(conn_id),
@@ -696,7 +693,7 @@ where
     }
 
     // Send any enqueued data, if there is any.
-    tcp::socket::do_send_inner(conn_id, conn, &conn_addr, timer, core_ctx, bindings_ctx);
+    socket::do_send_inner(conn_id, conn, &conn_addr, timer, core_ctx, bindings_ctx);
 
     // Enqueue the connection to the associated listener
     // socket's accept queue.
@@ -797,7 +794,7 @@ where
             // attribution per flow it should effectively become
             // impossible so we go for code simplicity here.
             if let Some(to_destroy) = to_destroy {
-                tcp::socket::destroy_socket(core_ctx, bindings_ctx, to_destroy);
+                socket::destroy_socket(core_ctx, bindings_ctx, to_destroy);
             }
             core_ctx.increment(|counters| &counters.passive_connection_openings);
             true
@@ -1055,7 +1052,7 @@ where
 
     // We can send a reply now if we got here.
     if let Some(seg) = reply {
-        tcp::socket::send_tcp_segment(
+        socket::send_tcp_segment(
             core_ctx,
             bindings_ctx,
             Some(&listener_id),
@@ -1140,12 +1137,12 @@ mod test {
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use net_types::ip::{Ip, Ipv4, Ipv6};
+    use netstack3_base::testutil::TestIpExt;
     use packet::ParseBuffer as _;
     use test_case::test_case;
 
-    use crate::{testutil::TestIpExt, transport::tcp::Mss};
-
     use super::*;
+    use crate::internal::base::Mss;
 
     const SEQ: SeqNum = SeqNum::new(12345);
     const ACK: SeqNum = SeqNum::new(67890);

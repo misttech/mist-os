@@ -18,21 +18,21 @@ use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use explicit::ResultExt as _;
+use netstack3_base::Instant;
+use netstack3_ip::icmp::IcmpErrorCode;
 use packet_formats::utils::NonZeroDuration;
 use replace_with::{replace_with, replace_with_and};
 
-use crate::{
-    ip::icmp::IcmpErrorCode,
-    transport::tcp::{
-        buffer::{Assembler, BufferLimits, IntoBuffers, ReceiveBuffer, SendBuffer, SendPayload},
-        congestion::CongestionControl,
-        rtt::Estimator,
-        segment::{Options, Payload, Segment},
-        seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize},
+use crate::internal::{
+    base::{
         BufferSizes, ConnectionError, Control, KeepAlive, Mss, OptionalBufferSizes, SocketOptions,
         TcpCountersInner,
     },
-    Instant,
+    buffer::{Assembler, BufferLimits, IntoBuffers, ReceiveBuffer, SendBuffer, SendPayload},
+    congestion::CongestionControl,
+    rtt::Estimator,
+    segment::{Options, Payload, Segment},
+    seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize},
 };
 
 /// Per RFC 793 (https://tools.ietf.org/html/rfc793#page-81):
@@ -2906,21 +2906,21 @@ mod test {
 
     use assert_matches::assert_matches;
     use net_types::ip::Ipv4;
+    use netstack3_base::{
+        testutil::{FakeInstant, FakeInstantCtx},
+        InstantContext as _,
+    };
     use test_case::test_case;
 
     use super::*;
-    use crate::{
-        context::{
-            testutil::{FakeInstant, FakeInstantCtx},
-            InstantContext as _,
-        },
-        transport::tcp::{
-            buffer::{Buffer, RingBuffer},
+    use crate::internal::{
+        base::{
             testutil::{
                 DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE, DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE,
             },
             DEFAULT_FIN_WAIT2_TIMEOUT,
         },
+        buffer::{Buffer, RingBuffer},
     };
 
     const ISS_1: SeqNum = SeqNum::new(100);

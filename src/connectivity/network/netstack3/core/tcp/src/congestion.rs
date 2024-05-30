@@ -18,12 +18,11 @@ use core::{
     time::Duration,
 };
 
-use crate::{
-    transport::tcp::{
-        seqnum::{SeqNum, WindowSize},
-        Mss,
-    },
-    Instant,
+use netstack3_base::Instant;
+
+use crate::internal::{
+    base::Mss,
+    seqnum::{SeqNum, WindowSize},
 };
 
 // Per RFC 5681 (https://www.rfc-editor.org/rfc/rfc5681#section-3.2):
@@ -299,11 +298,10 @@ impl FastRecovery {
 
 #[cfg(test)]
 mod test {
+    use netstack3_base::testutil::FakeInstant;
 
     use super::*;
-    use crate::{
-        context::testutil::FakeInstant, transport::tcp::testutil::DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-    };
+    use crate::internal::base::testutil::DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE;
 
     #[test]
     fn no_recovery_before_reaching_threshold() {

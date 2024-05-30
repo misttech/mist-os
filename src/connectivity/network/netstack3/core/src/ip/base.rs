@@ -42,7 +42,7 @@ use crate::{
     },
     routes::ResolvedRoute,
     socket::{datagram, SocketIpAddr},
-    transport::{tcp::socket::TcpIpTransportContext, udp::UdpIpTransportContext},
+    transport::{tcp::TcpIpTransportContext, udp::UdpIpTransportContext},
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 

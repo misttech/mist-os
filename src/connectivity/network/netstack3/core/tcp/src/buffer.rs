@@ -16,11 +16,11 @@ use core::{
 use either::Either;
 use packet::InnerPacketBuilder;
 
-use crate::transport::tcp::{
+use crate::internal::{
+    base::BufferSizes,
     segment::Payload,
     seqnum::{SeqNum, WindowSize},
     state::Takeable,
-    BufferSizes,
 };
 
 /// Common super trait for both sending and receiving buffer.
@@ -663,8 +663,9 @@ pub(crate) mod testutil {
 
     use alloc::sync::Arc;
 
-    use crate::sync::Mutex;
-    use crate::transport::tcp::socket::ListenerNotifier;
+    use netstack3_base::sync::Mutex;
+
+    use crate::internal::socket::accept_queue::ListenerNotifier;
 
     impl RingBuffer {
         /// Enqueues as much of `data` as possible to the end of the buffer.
@@ -701,6 +702,7 @@ pub(crate) mod testutil {
         }
     }
 
+    /// An implementation of [`SendBuffer`] for tests.
     #[derive(Debug, Default)]
     pub struct TestSendBuffer {
         fake_stream: Arc<Mutex<Vec<u8>>>,
@@ -708,6 +710,8 @@ pub(crate) mod testutil {
     }
 
     impl TestSendBuffer {
+        /// Creates a new `TestSendBuffer` with a backing shared vec and a
+        /// helper ring buffer.
         pub fn new(fake_stream: Arc<Mutex<Vec<u8>>>, ring: RingBuffer) -> TestSendBuffer {
             Self { fake_stream, ring }
         }
@@ -884,8 +888,7 @@ mod test {
     use test_case::test_case;
 
     use super::*;
-
-    use crate::transport::tcp::seqnum::WindowSize;
+    use crate::internal::seqnum::WindowSize;
 
     const TEST_BYTES: &'static [u8] = "Hello World!".as_bytes();
 

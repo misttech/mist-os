@@ -33,7 +33,6 @@ mod marker;
 mod state;
 mod time;
 mod transport;
-mod uninstantiable;
 
 #[cfg(any(test, benchmark))]
 pub mod benchmarks;
@@ -120,7 +119,6 @@ pub mod filter {
     };
     pub(crate) use netstack3_filter::{
         FilterContext, FilterImpl, FilterIpContext, IpPacket, NatContext, State,
-        TransportPacketSerializer,
     };
 }
 
@@ -189,14 +187,10 @@ pub mod socket {
     pub(crate) use netstack3_ip::datagram;
 
     pub(crate) use netstack3_base::socket::{
-        AddrEntry, AddrVec, AddrVecIter, Bound, BoundSocketMap, ConnAddr, ConnInfoAddr, ConnIpAddr,
-        DualStackIpExt, DualStackListenerIpAddr, DualStackLocalIp, DualStackRemoteIp, EitherStack,
-        FoundSockets, IncompatibleError, InsertError, Inserter, ListenerAddr, ListenerAddrInfo,
-        ListenerIpAddr, MaybeDualStack, RemoveResult, SocketAddrType, SocketDeviceUpdate,
-        SocketDeviceUpdateNotAllowedError, SocketIpAddr, SocketIpAddrExt, SocketIpExt,
-        SocketMapAddrSpec, SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec,
-        SocketMapConflictPolicy, SocketMapStateSpec, SocketMapUpdateSharingPolicy,
-        SocketZonedAddrExt, UpdateSharingError,
+        AddrEntry, AddrVec, Bound, ConnAddr, ConnInfoAddr, ConnIpAddr, FoundSockets,
+        IncompatibleError, InsertError, Inserter, ListenerAddr, ListenerAddrInfo, ListenerIpAddr,
+        MaybeDualStack, RemoveResult, SocketAddrType, SocketIpAddr, SocketMapAddrSpec,
+        SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
     };
 
     pub use datagram::{
@@ -230,18 +224,12 @@ pub mod sync {
 
 /// Methods for dealing with TCP sockets.
 pub mod tcp {
-    pub use crate::transport::tcp::{
-        buffer::{
-            Buffer, BufferLimits, IntoBuffers, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload,
-        },
-        segment::Payload,
-        socket::{
-            AcceptError, BindError, BoundInfo, ConnectError, ConnectionInfo, ListenError,
-            ListenerNotifier, NoConnection, SetDeviceError, SetReuseAddrError, SocketAddr,
-            SocketInfo, TcpBindingsTypes, TcpSocketId, UnboundInfo,
-        },
-        state::Takeable,
-        BufferSizes, ConnectionError, SocketOptions, DEFAULT_FIN_WAIT2_TIMEOUT,
+    pub use netstack3_tcp::{
+        AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
+        ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
+        Payload, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload, SetDeviceError,
+        SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, Takeable, TcpBindingsTypes,
+        TcpSocketId, UnboundInfo, DEFAULT_FIN_WAIT2_TIMEOUT,
     };
 }
 

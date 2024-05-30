@@ -6,10 +6,11 @@
 
 use core::hash::{Hash, Hasher};
 
+use netstack3_base::Instant;
 use rand::Rng;
 use siphasher::sip128::SipHasher24;
 
-use crate::{transport::tcp::seqnum::SeqNum, Instant};
+use crate::internal::seqnum::SeqNum;
 
 /// A generator of TCP initial sequence numbers.
 #[derive(Default)]

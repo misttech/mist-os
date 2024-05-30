@@ -20,10 +20,9 @@
 
 use core::{num::NonZeroU32, time::Duration};
 
-use crate::{
-    transport::tcp::{congestion::CongestionControlParams, Mss},
-    Instant,
-};
+use netstack3_base::Instant;
+
+use crate::internal::{base::Mss, congestion::CongestionControlParams};
 
 /// Per RFC 8312 (https://tools.ietf.org/html/rfc8312#section-4.5):
 ///  Parameter beta_cubic SHOULD be set to 0.7.
@@ -244,13 +243,11 @@ impl<I: Instant, const FAST_CONVERGENCE: bool> Cubic<I, FAST_CONVERGENCE> {
 
 #[cfg(test)]
 mod tests {
+    use netstack3_base::{testutil::FakeInstantCtx, InstantContext as _};
     use test_case::test_case;
 
     use super::*;
-    use crate::{
-        context::{testutil::FakeInstantCtx, InstantContext as _},
-        transport::tcp::testutil::DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-    };
+    use crate::internal::base::testutil::DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE;
 
     impl<I: Instant, const FAST_CONVERGENCE: bool> Cubic<I, FAST_CONVERGENCE> {
         // Helper function in test that takes a u32 instead of a NonZeroU32

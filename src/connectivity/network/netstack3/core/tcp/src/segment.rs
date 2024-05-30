@@ -12,10 +12,10 @@ use core::{
 
 use packet_formats::tcp::options::TcpOption;
 
-use crate::transport::tcp::{
+use crate::internal::{
+    base::{Control, Mss},
     buffer::SendPayload,
     seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize},
-    Control, Mss,
 };
 
 /// A TCP segment.

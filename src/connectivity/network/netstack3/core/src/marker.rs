@@ -38,7 +38,7 @@ use crate::{
     socket,
     transport::{
         self,
-        tcp::socket::{TcpBindingsContext, TcpBindingsTypes, TcpContext},
+        tcp::{TcpBindingsContext, TcpBindingsTypes, TcpContext},
         udp::{UdpBindingsContext, UdpBindingsTypes, UdpCounters},
     },
     TimerId,
@@ -50,7 +50,7 @@ pub trait IpExt:
     + IpDeviceIpExt
     + ip::icmp::IcmpIpExt
     + ip::device::IpDeviceIpExt
-    + transport::tcp::socket::DualStackIpExt
+    + transport::tcp::DualStackIpExt
     + socket::datagram::DualStackIpExt
     + ip::raw::RawIpSocketsIpExt
 {
@@ -61,7 +61,7 @@ impl<O> IpExt for O where
         + IpDeviceIpExt
         + ip::icmp::IcmpIpExt
         + ip::device::IpDeviceIpExt
-        + transport::tcp::socket::DualStackIpExt
+        + transport::tcp::DualStackIpExt
         + socket::datagram::DualStackIpExt
         + ip::raw::RawIpSocketsIpExt
 {

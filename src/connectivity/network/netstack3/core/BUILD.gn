@@ -30,6 +30,11 @@ _all_core_crates = [
   "device:netstack3-device-instrumented",
   "device:netstack3-device-loom",
   "device:netstack3-device-testutils",
+  "tcp:netstack3-tcp",
+  "tcp:netstack3-tcp-benchmarks",
+  "tcp:netstack3-tcp-instrumented",
+  "tcp:netstack3-tcp-loom",
+  "tcp:netstack3-tcp-testutils",
   "sync:netstack3-sync",
   "sync:netstack3-sync-instrumented",
   "sync:netstack3-sync-loom",
@@ -63,21 +68,8 @@ rustc_library_with_features("netstack3-core") {
     "src/time.rs",
     "src/transport.rs",
     "src/transport/integration.rs",
-    "src/transport/tcp.rs",
-    "src/transport/tcp/buffer.rs",
-    "src/transport/tcp/congestion.rs",
-    "src/transport/tcp/congestion/cubic.rs",
-    "src/transport/tcp/rtt.rs",
-    "src/transport/tcp/segment.rs",
-    "src/transport/tcp/seqnum.rs",
-    "src/transport/tcp/socket.rs",
-    "src/transport/tcp/socket/accept_queue.rs",
-    "src/transport/tcp/socket/demux.rs",
-    "src/transport/tcp/socket/isn.rs",
-    "src/transport/tcp/state.rs",
     "src/transport/udp.rs",
     "src/transport/udp/integration_tests.rs",
-    "src/uninstantiable.rs",
   ]
   deps = [
     # TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11):
@@ -93,15 +85,10 @@ rustc_library_with_features("netstack3-core") {
     "macros:netstack3-macros",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
-    "//src/connectivity/network/lib/explicit",
-    "//src/lib/const-unwrap",
     "//src/lib/network/packet",
-    "//src/lib/replace-with",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:either",
-    "//third_party/rust_crates:rand",
-    "//third_party/rust_crates:siphasher",
     "//third_party/rust_crates:smallvec",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
@@ -110,9 +97,8 @@ rustc_library_with_features("netstack3-core") {
   test_deps = [
     "//src/connectivity/lib/ip-test-macro",
     "//src/connectivity/lib/net-declare",
-    "//src/lib/proptest-support",
+    "//src/lib/const-unwrap",
     "//third_party/rust_crates:itertools",
-    "//third_party/rust_crates:proptest",
     "//third_party/rust_crates:test-case",
   ]
   test_deps += _testutil_deps
@@ -126,6 +112,7 @@ rustc_library_with_features("netstack3-core") {
         "filter:netstack3-filter",
         "ip:netstack3-ip",
         "sync:netstack3-sync",
+        "tcp:netstack3-tcp",
       ]
     },
 
@@ -142,6 +129,7 @@ rustc_library_with_features("netstack3-core") {
         "filter:netstack3-filter-instrumented",
         "ip:netstack3-ip-instrumented",
         "sync:netstack3-sync-instrumented",
+        "tcp:netstack3-tcp-instrumented",
       ]
       test_deps += [
         "base:netstack3-base-testutils",
@@ -149,6 +137,7 @@ rustc_library_with_features("netstack3-core") {
         "filter:netstack3-filter-testutils",
         "ip:netstack3-ip-testutils",
         "sync:netstack3-sync-instrumented",
+        "tcp:netstack3-tcp-testutils",
       ]
 
       # Guard against bad crate variants.
@@ -180,6 +169,7 @@ rustc_library_with_features("netstack3-core") {
         "filter:netstack3-filter-testutils",
         "ip:netstack3-ip-testutils",
         "sync:netstack3-sync-instrumented",
+        "tcp:netstack3-tcp-testutils",
       ]
 
       deps += _core_deps
@@ -202,6 +192,7 @@ rustc_library_with_features("netstack3-core") {
         "filter:netstack3-filter-benchmarks",
         "ip:netstack3-ip-benchmarks",
         "sync:netstack3-sync",
+        "tcp:netstack3-tcp-benchmarks",
       ]
       deps += _core_deps
       deps += [ "//third_party/rust_crates:criterion" ]
@@ -231,6 +222,7 @@ rustc_library_with_features("netstack3-core") {
           "filter:netstack3-filter-loom",
           "ip:netstack3-ip-loom",
           "sync:netstack3-sync-loom",
+          "tcp:netstack3-tcp-loom",
         ]
         deps += _core_deps
         deps += _testutil_deps
@@ -324,6 +316,7 @@ group("tests") {
     "lock-order:tests",
     "macros:tests",
     "sync:tests",
+    "tcp:tests",
     "tests($host_toolchain)",
   ]
 }

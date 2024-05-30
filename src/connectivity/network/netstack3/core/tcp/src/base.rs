@@ -4,14 +4,6 @@
 
 //! The Transmission Control Protocol (TCP).
 
-pub mod buffer;
-mod congestion;
-mod rtt;
-pub mod segment;
-mod seqnum;
-pub mod socket;
-pub mod state;
-
 use core::{
     num::{NonZeroU16, NonZeroU8},
     time::Duration,
@@ -20,33 +12,29 @@ use core::{
 use const_unwrap::const_unwrap_option;
 use net_types::ip::{GenericOverIp, Ip, IpMarked, IpVersion};
 use netstack3_base::{Counter, WeakDeviceIdentifier};
+use netstack3_ip::{
+    icmp::{IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode},
+    socket::Mms,
+    IpExt,
+};
 use packet_formats::{
     icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode},
     utils::NonZeroDuration,
 };
 use rand::Rng;
 
-use crate::{
-    ip::{
-        icmp::{IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode},
-        socket::Mms,
-        IpExt,
-    },
-    transport::tcp::{
-        seqnum::{UnscaledWindowSize, WindowSize},
-        socket::{isn::IsnGenerator, DualStackIpExt, Sockets},
-        state::DEFAULT_MAX_SYN_RETRIES,
-    },
+use crate::internal::{
+    seqnum::{UnscaledWindowSize, WindowSize},
+    socket::{isn::IsnGenerator, DualStackIpExt, Sockets, TcpBindingsTypes},
+    state::DEFAULT_MAX_SYN_RETRIES,
 };
-
-use self::socket::TcpBindingsTypes;
 
 /// Default lifetime for a orphaned connection in FIN_WAIT2.
 pub const DEFAULT_FIN_WAIT2_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Control flags that can alter the state of a TCP control block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Control {
+pub(crate) enum Control {
     /// Corresponds to the SYN bit in a TCP segment.
     SYN,
     /// Corresponds to the FIN bit in a TCP segment.
@@ -58,7 +46,7 @@ enum Control {
 impl Control {
     /// Returns whether the control flag consumes one byte from the sequence
     /// number space.
-    fn has_sequence_no(self) -> bool {
+    pub(crate) fn has_sequence_no(self) -> bool {
         match self {
             Control::SYN | Control::FIN => true,
             Control::RST => false,
@@ -92,7 +80,7 @@ pub enum ConnectionError {
 impl ConnectionError {
     // Notes: the following mappings are guided by the packetimpact test here:
     // https://cs.opensource.google/gvisor/gvisor/+/master:test/packetimpact/tests/tcp_network_unreachable_test.go;drc=611e6e1247a0691f5fd198f411c68b3bc79d90af
-    fn try_from_icmp_error(err: IcmpErrorCode) -> Option<Self> {
+    pub(crate) fn try_from_icmp_error(err: IcmpErrorCode) -> Option<Self> {
         match err {
             IcmpErrorCode::V4(Icmpv4ErrorCode::DestUnreachable(code)) => match code {
                 Icmpv4DestUnreachableCode::DestNetworkUnreachable => {
@@ -175,16 +163,21 @@ impl ConnectionError {
     }
 }
 
+/// Stack wide state supporting TCP.
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
-pub(crate) struct TcpState<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
-    pub(crate) isn_generator: IsnGenerator<BT::Instant>,
-    pub(crate) sockets: Sockets<I, D, BT>,
-    pub(crate) counters: TcpCounters<I>,
+pub struct TcpState<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
+    /// The initial sequence number generator.
+    pub isn_generator: IsnGenerator<BT::Instant>,
+    /// TCP sockets state.
+    pub sockets: Sockets<I, D, BT>,
+    /// TCP counters.
+    pub counters: TcpCounters<I>,
 }
 
 impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> TcpState<I, D, BT> {
-    pub(crate) fn new(now: BT::Instant, rng: &mut impl Rng) -> Self {
+    /// Creates a new TCP stack state.
+    pub fn new(now: BT::Instant, rng: &mut impl Rng) -> Self {
         Self {
             isn_generator: IsnGenerator::new(now, rng),
             sockets: Sockets::new(),
@@ -197,18 +190,18 @@ const TCP_HEADER_LEN: u32 = packet_formats::tcp::HDR_PREFIX_LEN as u32;
 
 /// Maximum segment size, that is the maximum TCP payload one segment can carry.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord)]
-pub(crate) struct Mss(NonZeroU16);
+pub(crate) struct Mss(pub(crate) NonZeroU16);
 
 impl Mss {
     /// Creates MSS from the maximum message size of the IP layer.
-    fn from_mms<I: IpExt>(mms: Mms) -> Option<Self> {
+    pub(crate) fn from_mms<I: IpExt>(mms: Mms) -> Option<Self> {
         NonZeroU16::new(
             u16::try_from(mms.get().get().saturating_sub(TCP_HEADER_LEN)).unwrap_or(u16::MAX),
         )
         .map(Self)
     }
 
-    const fn default<I: Ip>() -> Self {
+    pub(crate) const fn default<I: Ip>() -> Self {
         // Per RFC 9293 Section 3.7.1:
         //  If an MSS Option is not received at connection setup, TCP
         //  implementations MUST assume a default send MSS of 536 (576 - 40) for
@@ -220,7 +213,7 @@ impl Mss {
     }
 
     /// Gets the numeric value of the MSS.
-    const fn get(&self) -> NonZeroU16 {
+    pub(crate) const fn get(&self) -> NonZeroU16 {
         let Self(mss) = *self;
         mss
     }
@@ -245,10 +238,7 @@ pub struct BufferSizes {
 #[cfg(any(test, feature = "testutils"))]
 impl Default for BufferSizes {
     fn default() -> Self {
-        BufferSizes {
-            send: seqnum::WindowSize::DEFAULT.into(),
-            receive: seqnum::WindowSize::DEFAULT.into(),
-        }
+        BufferSizes { send: WindowSize::DEFAULT.into(), receive: WindowSize::DEFAULT.into() }
     }
 }
 
@@ -259,17 +249,17 @@ pub(crate) struct OptionalBufferSizes {
 }
 
 impl BufferSizes {
-    fn into_optional(&self) -> OptionalBufferSizes {
+    pub(crate) fn into_optional(&self) -> OptionalBufferSizes {
         let Self { send, receive } = self;
         OptionalBufferSizes { send: Some(*send), receive: Some(*receive) }
     }
 
-    fn rwnd(&self) -> WindowSize {
+    pub(crate) fn rwnd(&self) -> WindowSize {
         let Self { send: _, receive } = *self;
         WindowSize::new(receive).unwrap_or(WindowSize::MAX)
     }
 
-    fn rwnd_unscaled(&self) -> UnscaledWindowSize {
+    pub(crate) fn rwnd_unscaled(&self) -> UnscaledWindowSize {
         let Self { send: _, receive } = *self;
         UnscaledWindowSize::from(u16::try_from(receive).unwrap_or(u16::MAX))
     }
@@ -438,7 +428,7 @@ pub struct TcpCountersInner {
 }
 
 #[cfg(test)]
-mod testutil {
+pub(crate) mod testutil {
     use super::Mss;
     /// Per RFC 879 section 1 (https://tools.ietf.org/html/rfc879#section-1):
     ///
@@ -446,8 +436,8 @@ mod testutil {
     /// FORTY.
     ///   The default IP Maximum Datagram Size is 576.
     ///   The default TCP Maximum Segment Size is 536.
-    pub(super) const DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE: usize = 536;
-    pub(super) const DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE: Mss =
+    pub(crate) const DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE: usize = 536;
+    pub(crate) const DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE: Mss =
         Mss(const_unwrap::const_unwrap_option(core::num::NonZeroU16::new(
             DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE as u16,
         )));

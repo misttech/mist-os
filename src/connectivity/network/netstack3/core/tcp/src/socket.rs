@@ -17,7 +17,7 @@
 //! [`State::Listen`] an incoming SYN and keep track of whether the connection
 //! is established.
 
-mod accept_queue;
+pub(crate) mod accept_queue;
 pub(crate) mod demux;
 pub(crate) mod isn;
 
@@ -41,30 +41,6 @@ use net_types::{
     AddrAndPortFormatter, AddrAndZone, SpecifiedAddr, ZonedAddr,
 };
 use netstack3_base::{
-    AnyDevice, BidirectionalConverter as _, ContextPair, CoreTimerContext, CounterContext, CtxPair,
-    DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId, HandleableTimer,
-    InstantBindingsTypes, OwnedOrRefsBidirectionalConverter, ReferenceNotifiersExt as _,
-    RngContext, StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext, TracingContext,
-    WeakDeviceIdentifier,
-};
-use packet_formats::ip::IpProto;
-use smallvec::{smallvec, SmallVec};
-use thiserror::Error;
-use tracing::{debug, error, trace};
-
-use crate::{
-    algorithm::{self, PortAllocImpl},
-    data_structures::socketmap::{IterShadows as _, SocketMap},
-    error::{ExistsError, LocalAddressError, ZonedAddressError},
-    inspect::{Inspector, InspectorDeviceExt},
-    ip::{
-        self,
-        icmp::IcmpErrorCode,
-        socket::{
-            DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreationError, IpSocketHandler,
-        },
-        IpExt, IpSockCreateAndSendError, TransportIpContext,
-    },
     socket::{
         self, AddrIsMappedError, AddrVec, Bound, ConnAddr, ConnIpAddr, DualStackListenerIpAddr,
         DualStackLocalIp, DualStackRemoteIp, EitherStack, IncompatibleError, InsertError, Inserter,
@@ -75,36 +51,66 @@ use crate::{
         SocketMapStateSpec, SocketMapUpdateSharingPolicy, SocketZonedAddrExt as _,
         UpdateSharingError,
     },
-    sync::{RemoveResourceResult, RwLock},
-    transport::tcp::{
-        buffer::{IntoBuffers, ReceiveBuffer, SendBuffer, SendPayload},
-        segment::Segment,
-        seqnum::SeqNum,
-        socket::{accept_queue::AcceptQueue, demux::tcp_serialize_segment, isn::IsnGenerator},
-        state::{CloseError, CloseReason, Closed, Initial, State, Takeable},
-        BufferSizes, ConnectionError, Control, Mss, OptionalBufferSizes, SocketOptions,
-        TcpCounters,
-    },
+    socketmap::{IterShadows as _, SocketMap},
+    sync::RwLock,
+    ExistsError, Inspector, InspectorDeviceExt, LocalAddressError, PortAllocImpl,
+    RemoveResourceResult, ZonedAddressError,
 };
+use netstack3_base::{
+    AnyDevice, BidirectionalConverter as _, ContextPair, CoreTimerContext, CounterContext, CtxPair,
+    DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId, HandleableTimer, Instant,
+    InstantBindingsTypes, OwnedOrRefsBidirectionalConverter, ReferenceNotifiersExt as _,
+    RngContext, StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext, TracingContext,
+    WeakDeviceIdentifier,
+};
+use netstack3_ip::{
+    self as ip,
+    icmp::IcmpErrorCode,
+    socket::{
+        DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError,
+        IpSockCreationError, IpSocketHandler,
+    },
+    IpExt, TransportIpContext,
+};
+use packet_formats::ip::IpProto;
+use smallvec::{smallvec, SmallVec};
+use thiserror::Error;
+use tracing::{debug, error, trace};
 
-pub use accept_queue::ListenerNotifier;
+use crate::internal::{
+    base::{
+        BufferSizes, ConnectionError, Control, Mss, OptionalBufferSizes, SocketOptions, TcpCounters,
+    },
+    buffer::{IntoBuffers, ReceiveBuffer, SendBuffer, SendPayload},
+    segment::Segment,
+    seqnum::SeqNum,
+    socket::{
+        accept_queue::{AcceptQueue, ListenerNotifier},
+        demux::tcp_serialize_segment,
+        isn::IsnGenerator,
+    },
+    state::{CloseError, CloseReason, Closed, Initial, State, Takeable},
+};
 
 /// A marker trait for dual-stack socket features.
 ///
 /// This trait acts as a marker for [`DualStackBaseIpExt`] for both `Self` and
 /// `Self::OtherVersion`.
 pub trait DualStackIpExt:
-    DualStackBaseIpExt + crate::socket::DualStackIpExt<OtherVersion: DualStackBaseIpExt>
+    DualStackBaseIpExt + netstack3_base::socket::DualStackIpExt<OtherVersion: DualStackBaseIpExt>
 {
 }
 
 impl<I> DualStackIpExt for I where
-    I: DualStackBaseIpExt + crate::socket::DualStackIpExt<OtherVersion: DualStackBaseIpExt>
+    I: DualStackBaseIpExt
+        + netstack3_base::socket::DualStackIpExt<OtherVersion: DualStackBaseIpExt>
 {
 }
 
 /// A dual stack IP extension trait for TCP.
-pub trait DualStackBaseIpExt: crate::socket::DualStackIpExt + SocketIpExt + ip::IpExt {
+pub trait DualStackBaseIpExt:
+    netstack3_base::socket::DualStackIpExt + SocketIpExt + ip::IpExt
+{
     /// For `Ipv4`, this is [`EitherStack<TcpSocketId<Ipv4, _, _>, TcpSocketId<Ipv6, _, _>>`],
     /// and for `Ipv6` it is just `TcpSocketId<Ipv6>`.
     type DemuxSocketId<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>: SpecSocketId;
@@ -258,8 +264,9 @@ impl DualStackBaseIpExt for Ipv4 {
 #[derive(Derivative, Debug, Clone, Copy, PartialEq, Eq)]
 #[derivative(Default)]
 pub struct Ipv6Options {
+    /// True if this socket has dual stack enabled.
     #[derivative(Default(value = "true"))]
-    pub(crate) dual_stack_enabled: bool,
+    pub dual_stack_enabled: bool,
 }
 
 impl DualStackBaseIpExt for Ipv6 {
@@ -390,16 +397,16 @@ impl DualStackBaseIpExt for Ipv6 {
     Debug(bound = "")
 )]
 #[allow(missing_docs)]
-pub enum TimerId<D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
+pub enum TcpTimerId<D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
     V4(WeakTcpSocketId<Ipv4, D, BT>),
     V6(WeakTcpSocketId<Ipv6, D, BT>),
 }
 
 impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>
-    From<WeakTcpSocketId<I, D, BT>> for TimerId<D, BT>
+    From<WeakTcpSocketId<I, D, BT>> for TcpTimerId<D, BT>
 {
     fn from(f: WeakTcpSocketId<I, D, BT>) -> Self {
-        I::map_ip(f, TimerId::V4, TimerId::V6)
+        I::map_ip(f, TcpTimerId::V4, TcpTimerId::V6)
     }
 }
 
@@ -485,9 +492,11 @@ impl<BC> TcpBindingsContext for BC where
 {
 }
 
+/// The core execution context abstracting demux state access for TCP.
 pub trait TcpDemuxContext<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>:
     TcpCoreTimerContext<I, D, BT>
 {
+    /// The inner IP transport context.
     type IpTransportCtx<'a>: TransportIpContext<I, BT, DeviceId = D::Strong, WeakDeviceId = D>
         + DeviceIpSocketHandler<I, BT>
         + TcpCoreTimerContext<I, D, BT>
@@ -746,7 +755,7 @@ pub struct Ipv6SocketIdToIpv4DemuxIdConverter;
 /// This trait allows us to work around the life-time issue when we need to
 /// convert an IPv6 socket ID into an IPv4 demux ID without holding on the
 /// a dual-stack CoreContext.
-pub trait DualStackDemuxIdConverter<I: DualStackIpExt> {
+pub trait DualStackDemuxIdConverter<I: DualStackIpExt>: 'static + Clone + Copy {
     /// Turns a [`TcpSocketId`] into the demuxer ID of the other stack.
     fn convert<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         &self,
@@ -765,8 +774,7 @@ impl DualStackDemuxIdConverter<Ipv6> for Ipv6SocketIdToIpv4DemuxIdConverter {
 
 /// A provider of dualstack socket functionality required by TCP sockets.
 pub trait TcpDualStackContext<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
-    type Converter: DualStackDemuxIdConverter<I> + Clone + Copy;
-
+    /// The inner IP transport context,
     type DualStackIpTransportCtx<'a>: TransportIpContext<I, BT, DeviceId = D::Strong, WeakDeviceId = D>
         + DeviceIpSocketHandler<I, BT>
         + TcpCoreTimerContext<I, D, BT>
@@ -775,7 +783,8 @@ pub trait TcpDualStackContext<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: Tc
         + TcpCoreTimerContext<I::OtherVersion, D, BT>
         + CounterContext<TcpCounters<I>>;
 
-    fn other_demux_id_converter(&self) -> Self::Converter;
+    /// Gets a converter to get the demux socket ID for the other stack.
+    fn other_demux_id_converter(&self) -> impl DualStackDemuxIdConverter<I>;
 
     /// Turns a [`TcpSocketId`] into the demuxer ID of the other stack.
     fn into_other_demux_socket_id(
@@ -868,7 +877,7 @@ impl SocketMapAddrSpec for TcpPortSpec {
 }
 
 /// An implementation of [`IpTransportContext`] for TCP.
-pub(crate) enum TcpIpTransportContext {}
+pub enum TcpIpTransportContext {}
 
 /// This trait is only used as a marker for the identifier that
 /// [`TcpSocketSpec`] keeps in the socket map. This is effectively only
@@ -1429,9 +1438,9 @@ pub struct Unbound<D, Extra> {
 }
 
 type ReferenceState<I, D, BT> = RwLock<TcpSocketState<I, D, BT>>;
-type PrimaryRc<I, D, BT> = crate::sync::PrimaryRc<ReferenceState<I, D, BT>>;
-type StrongRc<I, D, BT> = crate::sync::StrongRc<ReferenceState<I, D, BT>>;
-type WeakRc<I, D, BT> = crate::sync::WeakRc<ReferenceState<I, D, BT>>;
+type PrimaryRc<I, D, BT> = netstack3_base::sync::PrimaryRc<ReferenceState<I, D, BT>>;
+type StrongRc<I, D, BT> = netstack3_base::sync::StrongRc<ReferenceState<I, D, BT>>;
+type WeakRc<I, D, BT> = netstack3_base::sync::WeakRc<ReferenceState<I, D, BT>>;
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
@@ -1512,28 +1521,48 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> Drop
 
 type BoundSocketMap<I, D, BT> = socket::BoundSocketMap<I, D, TcpPortSpec, TcpSocketSpec<I, D, BT>>;
 
+/// TCP demux state.
 pub struct DemuxState<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
     socketmap: BoundSocketMap<I, D, BT>,
 }
 
 /// Holds all the TCP socket states.
-pub(crate) struct Sockets<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
-    pub(crate) demux: RwLock<DemuxState<I, D, BT>>,
+pub struct Sockets<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
+    demux: RwLock<DemuxState<I, D, BT>>,
     // Destroy all_sockets last so the strong references in the demux are
     // dropped before the primary references in the set.
-    pub(crate) all_sockets: RwLock<TcpSocketSet<I, D, BT>>,
+    all_sockets: RwLock<TcpSocketSet<I, D, BT>>,
 }
 
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>
+    OrderedLockAccess<DemuxState<I, D, BT>> for Sockets<I, D, BT>
+{
+    type Lock = RwLock<DemuxState<I, D, BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.demux)
+    }
+}
+
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>
+    OrderedLockAccess<TcpSocketSet<I, D, BT>> for Sockets<I, D, BT>
+{
+    type Lock = RwLock<TcpSocketSet<I, D, BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.all_sockets)
+    }
+}
+
+/// The state held by a TCP socket.
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
 pub struct TcpSocketState<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
-    pub(crate) socket_state: TcpSocketStateInner<I, D, BT>,
+    socket_state: TcpSocketStateInner<I, D, BT>,
     // The following only contains IP version specific options, `socket_state`
     // may still hold generic IP options (inside of the `IpSock`).
     // TODO(https://issues.fuchsia.dev/324279602): We are planning to move the
     // options outside of the `IpSock` struct. Once that's happening, we need to
     // change here.
-    pub(crate) ip_options: I::DualStackIpOptions,
+    ip_options: I::DualStackIpOptions,
 }
 
 #[derive(Derivative)]
@@ -1916,7 +1945,7 @@ where
     let weak_device = device.map(|d| d.as_weak().into_owned());
     let port = match port {
         None => {
-            match algorithm::simple_randomized_port_alloc(
+            match netstack3_base::simple_randomized_port_alloc(
                 &mut bindings_ctx.rng(),
                 &local_ip,
                 &TcpPortAlloc(socketmap),
@@ -2039,7 +2068,8 @@ where
 pub struct TcpApi<I: Ip, C>(C, IpVersionMarker<I>);
 
 impl<I: Ip, C> TcpApi<I, C> {
-    pub(crate) fn new(ctx: C) -> Self {
+    /// Creates a new `TcpApi` from `ctx`.
+    pub fn new(ctx: C) -> Self {
         Self(ctx, IpVersionMarker::new())
     }
 }
@@ -2264,7 +2294,7 @@ where
                                     );
                                     let port = match port {
                                         Some(port) => port,
-                                        None => match algorithm::simple_randomized_port_alloc(
+                                        None => match netstack3_base::simple_randomized_port_alloc(
                                             &mut bindings_ctx.rng(),
                                             &(),
                                             &port_alloc,
@@ -4442,13 +4472,8 @@ enum ReceiveBufferSize {}
 
 trait AccessBufferSize {
     fn set_unconnected_size(sizes: &mut BufferSizes, new_size: usize);
-    fn set_connected_size<
-        Instant: crate::Instant + 'static,
-        S: SendBuffer,
-        R: ReceiveBuffer,
-        P: Debug,
-    >(
-        state: &mut State<Instant, R, S, P>,
+    fn set_connected_size<Inst: Instant + 'static, S: SendBuffer, R: ReceiveBuffer, P: Debug>(
+        state: &mut State<Inst, R, S, P>,
         new_size: usize,
     );
     fn get_buffer_size(sizes: &OptionalBufferSizes) -> Option<usize>;
@@ -4460,13 +4485,8 @@ impl AccessBufferSize for SendBufferSize {
         *send = new_size
     }
 
-    fn set_connected_size<
-        Instant: crate::Instant + 'static,
-        S: SendBuffer,
-        R: ReceiveBuffer,
-        P: Debug,
-    >(
-        state: &mut State<Instant, R, S, P>,
+    fn set_connected_size<Inst: Instant + 'static, S: SendBuffer, R: ReceiveBuffer, P: Debug>(
+        state: &mut State<Inst, R, S, P>,
         new_size: usize,
     ) {
         state.set_send_buffer_size(new_size)
@@ -4484,13 +4504,8 @@ impl AccessBufferSize for ReceiveBufferSize {
         *receive = new_size
     }
 
-    fn set_connected_size<
-        Instant: crate::Instant + 'static,
-        S: SendBuffer,
-        R: ReceiveBuffer,
-        P: Debug,
-    >(
-        state: &mut State<Instant, R, S, P>,
+    fn set_connected_size<Inst: Instant + 'static, S: SendBuffer, R: ReceiveBuffer, P: Debug>(
+        state: &mut State<Inst, R, S, P>,
         new_size: usize,
     ) {
         state.set_receive_buffer_size(new_size)
@@ -4725,7 +4740,7 @@ where
         })?;
 
     let device_mms =
-        core_ctx.get_mms(bindings_ctx, &ip_sock).map_err(|_err: crate::ip::socket::MmsError| {
+        core_ctx.get_mms(bindings_ctx, &ip_sock).map_err(|_err: ip::socket::MmsError| {
             // We either cannot find the route, or the device for
             // the route cannot handle the smallest TCP/IP packet.
             ConnectError::NoRoute
@@ -4737,7 +4752,7 @@ where
         // optimized by checking if the IP socket has resolved to local
         // delivery, but excluding a single port should be enough here and
         // avoids adding more dependencies.
-        || match algorithm::simple_randomized_port_alloc(
+        || match netstack3_base::simple_randomized_port_alloc(
             &mut bindings_ctx.rng(),
             &Some(*ip_sock.local_ip()),
             &TcpPortAlloc(socketmap),
@@ -4919,7 +4934,7 @@ impl<A: IpAddress, D: Clone> From<ConnAddr<ConnIpAddr<A, NonZeroU16, NonZeroU16>
     }
 }
 
-impl<CC, BC> HandleableTimer<CC, BC> for TimerId<CC::WeakDeviceId, BC>
+impl<CC, BC> HandleableTimer<CC, BC> for TcpTimerId<CC::WeakDeviceId, BC>
 where
     BC: TcpBindingsContext,
     CC: TcpContext<Ipv4, BC>
@@ -4930,8 +4945,8 @@ where
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
         let ctx_pair = CtxPair { core_ctx, bindings_ctx };
         match self {
-            TimerId::V4(conn_id) => TcpApi::new(ctx_pair).handle_timer(conn_id),
-            TimerId::V6(conn_id) => TcpApi::new(ctx_pair).handle_timer(conn_id),
+            TcpTimerId::V4(conn_id) => TcpApi::new(ctx_pair).handle_timer(conn_id),
+            TcpTimerId::V6(conn_id) => TcpApi::new(ctx_pair).handle_timer(conn_id),
         }
     }
 }
@@ -5016,8 +5031,29 @@ mod tests {
         LinkLocalAddr,
     };
     use netstack3_base::{
+        sync::{DynDebugReferences, Mutex},
+        testutil::{
+            new_rng, run_with_many_seeds, set_logger_for_test, FakeCoreCtx, FakeCryptoRng,
+            FakeInstant, FakeNetwork, FakeNetworkSpec, FakeTimerCtx, InstantAndData,
+            PendingFrameData, StepResult, TestIpExt, WithFakeFrameContext, WithFakeTimerContext,
+        },
+        ContextProvider, Instant as _, InstantContext, ReferenceNotifiers,
+    };
+    use netstack3_base::{
         testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
         LinkDevice, StrongDeviceIdentifier, Uninstantiable, UninstantiableWrapper,
+    };
+    use netstack3_filter::TransportPacketSerializer;
+    use netstack3_ip::{
+        device::IpDeviceStateIpExt,
+        icmp::{IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode},
+        nud::{testutil::FakeLinkResolutionNotifier, LinkResolutionContext},
+        socket::{
+            testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
+            IpSockSendError, Mms, MmsError, SendOptions,
+        },
+        testutil::DualStackSendIpPacketMeta,
+        HopLimits, IpTransportContext,
     };
     use packet::{Buf, BufferMut, ParseBuffer as _};
     use packet_formats::{
@@ -5027,43 +5063,15 @@ mod tests {
     use rand::Rng as _;
     use test_case::test_case;
 
-    use crate::{
-        context::{
-            testutil::{
-                FakeCoreCtx, FakeInstant, FakeNetwork, FakeNetworkSpec, FakeTimerCtx,
-                InstantAndData, PendingFrameData, StepResult, WithFakeFrameContext,
-                WithFakeTimerContext,
-            },
-            ContextProvider, InstantContext, ReferenceNotifiers,
-        },
-        filter::TransportPacketSerializer,
-        ip::{
-            device::IpDeviceStateIpExt,
-            icmp::{IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode},
-            nud::{testutil::FakeLinkResolutionNotifier, LinkResolutionContext},
-            socket::{
-                testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
-                IpSockSendError, MmsError, SendOptions,
-            },
-            testutil::DualStackSendIpPacketMeta,
-            HopLimits, IpTransportContext,
-        },
-        sync::{DynDebugReferences, Mutex},
-        testutil::{new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng, TestIpExt},
-        transport::tcp::{
-            buffer::{
-                testutil::{
-                    ClientBuffers, ProvidedBuffers, TestSendBuffer, WriteBackClientBuffers,
-                },
-                RingBuffer,
-            },
-            state::{TimeWait, MSL},
-            ConnectionError, Mms, DEFAULT_FIN_WAIT2_TIMEOUT,
-        },
-        Instant as _,
-    };
-
     use super::*;
+    use crate::internal::{
+        base::{ConnectionError, DEFAULT_FIN_WAIT2_TIMEOUT},
+        buffer::{
+            testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer, WriteBackClientBuffers},
+            RingBuffer,
+        },
+        state::{TimeWait, MSL},
+    };
 
     trait TcpTestIpExt: DualStackIpExt + TestIpExt + IpDeviceStateIpExt + DualStackIpExt {
         type SingleStackConverter: OwnedOrRefsBidirectionalConverter<
@@ -5123,13 +5131,13 @@ mod tests {
     /// abstracting away the bindings types, even though they're always
     /// [`TcpBindingsCtx`].
     trait TcpTestBindingsTypes<D: StrongDeviceIdentifier>:
-        TcpBindingsTypes<DispatchId = TimerId<D::Weak, Self>> + Sized
+        TcpBindingsTypes<DispatchId = TcpTimerId<D::Weak, Self>> + Sized
     {
     }
 
     impl<D, BT> TcpTestBindingsTypes<D> for BT
     where
-        BT: TcpBindingsTypes<DispatchId = TimerId<D::Weak, Self>> + Sized,
+        BT: TcpBindingsTypes<DispatchId = TcpTimerId<D::Weak, Self>> + Sized,
         D: StrongDeviceIdentifier,
     {
     }
@@ -5203,7 +5211,7 @@ mod tests {
     struct FakeTcpNetworkSpec<D: FakeStrongDeviceId>(PhantomData<D>, Never);
     impl<D: FakeStrongDeviceId> FakeNetworkSpec for FakeTcpNetworkSpec<D> {
         type Context = TcpCtx<D>;
-        type TimerId = TimerId<D::Weak, TcpBindingsCtx<D>>;
+        type TimerId = TcpTimerId<D::Weak, TcpBindingsCtx<D>>;
         type SendMeta = DualStackSendIpPacketMeta<D>;
         type RecvMeta = DualStackSendIpPacketMeta<D>;
         fn handle_frame(ctx: &mut Self::Context, meta: Self::RecvMeta, buffer: Buf<Vec<u8>>) {
@@ -5237,8 +5245,8 @@ mod tests {
         }
         fn handle_timer(ctx: &mut Self::Context, timer: Self::TimerId) {
             match timer {
-                TimerId::V4(id) => ctx.tcp_api().handle_timer(id),
-                TimerId::V6(id) => ctx.tcp_api().handle_timer(id),
+                TcpTimerId::V4(id) => ctx.tcp_api().handle_timer(id),
+                TcpTimerId::V6(id) => ctx.tcp_api().handle_timer(id),
             }
         }
         fn process_queues(_ctx: &mut Self::Context) -> bool {
@@ -5249,12 +5257,12 @@ mod tests {
         }
     }
 
-    impl<D: FakeStrongDeviceId> WithFakeTimerContext<TimerId<D::Weak, TcpBindingsCtx<D>>>
+    impl<D: FakeStrongDeviceId> WithFakeTimerContext<TcpTimerId<D::Weak, TcpBindingsCtx<D>>>
         for TcpCtx<D>
     {
         fn with_fake_timer_ctx<
             O,
-            F: FnOnce(&FakeTimerCtx<TimerId<D::Weak, TcpBindingsCtx<D>>>) -> O,
+            F: FnOnce(&FakeTimerCtx<TcpTimerId<D::Weak, TcpBindingsCtx<D>>>) -> O,
         >(
             &self,
             f: F,
@@ -5265,7 +5273,7 @@ mod tests {
 
         fn with_fake_timer_ctx_mut<
             O,
-            F: FnOnce(&mut FakeTimerCtx<TimerId<D::Weak, TcpBindingsCtx<D>>>) -> O,
+            F: FnOnce(&mut FakeTimerCtx<TcpTimerId<D::Weak, TcpBindingsCtx<D>>>) -> O,
         >(
             &mut self,
             f: F,
@@ -5279,7 +5287,7 @@ mod tests {
     #[derivative(Default(bound = ""))]
     struct TcpBindingsCtx<D: FakeStrongDeviceId> {
         rng: FakeCryptoRng,
-        timers: FakeTimerCtx<TimerId<D::Weak, Self>>,
+        timers: FakeTimerCtx<TcpTimerId<D::Weak, Self>>,
     }
 
     impl<D: FakeStrongDeviceId> ContextProvider for TcpBindingsCtx<D> {
@@ -5295,8 +5303,9 @@ mod tests {
 
     /// Delegate implementation to internal thing.
     impl<D: FakeStrongDeviceId> TimerBindingsTypes for TcpBindingsCtx<D> {
-        type DispatchId = <FakeTimerCtx<TimerId<D::Weak, Self>> as TimerBindingsTypes>::DispatchId;
-        type Timer = <FakeTimerCtx<TimerId<D::Weak, Self>> as TimerBindingsTypes>::Timer;
+        type DispatchId =
+            <FakeTimerCtx<TcpTimerId<D::Weak, Self>> as TimerBindingsTypes>::DispatchId;
+        type Timer = <FakeTimerCtx<TcpTimerId<D::Weak, Self>> as TimerBindingsTypes>::Timer;
     }
 
     /// Delegate implementation to internal thing.
@@ -5698,9 +5707,8 @@ mod tests {
     impl<D: FakeStrongDeviceId, BT: TcpTestBindingsTypes<D>>
         TcpDualStackContext<Ipv6, FakeWeakDeviceId<D>, BT> for TcpCoreCtx<D, BT>
     {
-        type Converter = Ipv6SocketIdToIpv4DemuxIdConverter;
         type DualStackIpTransportCtx<'a> = Self;
-        fn other_demux_id_converter(&self) -> Ipv6SocketIdToIpv4DemuxIdConverter {
+        fn other_demux_id_converter(&self) -> impl DualStackDemuxIdConverter<Ipv6> {
             Ipv6SocketIdToIpv4DemuxIdConverter
         }
         fn dual_stack_enabled(&self, ip_options: &Ipv6Options) -> bool {

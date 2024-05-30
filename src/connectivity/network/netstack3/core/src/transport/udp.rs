@@ -192,7 +192,7 @@ fn iter_receiving_addrs<I: Ip + IpExt, D: WeakDeviceIdentifier>(
     addr: ConnIpAddr<I::Addr, NonZeroU16, UdpRemotePort>,
     device: D,
 ) -> impl Iterator<Item = AddrVec<I, D, UdpAddrSpec>> {
-    crate::socket::AddrVecIter::with_device(addr.into(), device)
+    netstack3_base::socket::AddrVecIter::with_device(addr.into(), device)
 }
 
 fn check_posix_sharing<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes>(
@@ -2627,6 +2627,7 @@ mod tests {
         AddrAndZone, LinkLocalAddr, MulticastAddr, Scope as _, ScopeableAddress as _, ZonedAddr,
     };
     use netstack3_base::{
+        socket::{SocketIpAddrExt as _, StrictlyZonedAddr},
         testutil::{
             FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,
             MultipleDevicesId,
@@ -2644,12 +2645,12 @@ mod tests {
         },
         error::RemoteAddressError,
         ip::{
+            datagram::MulticastInterfaceSelector,
             device::IpDeviceStateIpExt,
             socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
             testutil::DualStackSendIpPacketMeta,
             ResolveRouteError, SendIpPacketMeta,
         },
-        socket::{datagram::MulticastInterfaceSelector, SocketIpAddrExt as _, StrictlyZonedAddr},
         testutil::{set_logger_for_test, TestIpExt as _},
     };
 

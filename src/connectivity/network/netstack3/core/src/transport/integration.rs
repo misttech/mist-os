@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use lock_order::{
-    lock::{LockLevelFor, RwLockFor, UnlockedAccess},
+    lock::{DelegatedOrderedLockAccess, LockLevelFor, RwLockFor, UnlockedAccess},
     relation::LockBefore,
     wrap::prelude::*,
 };
@@ -17,11 +17,8 @@ use crate::{
     socket::{datagram, MaybeDualStack},
     transport::{
         tcp::{
-            self,
-            socket::{
-                isn::IsnGenerator, TcpSocketId, TcpSocketSet, TcpSocketState, WeakTcpSocketId,
-            },
-            TcpCounters,
+            self, IsnGenerator, TcpContext, TcpCounters, TcpDemuxContext, TcpDualStackContext,
+            TcpSocketId, TcpSocketSet, TcpSocketState, WeakTcpSocketId,
         },
         udp::{self, UdpCounters, UdpSocketId, UdpSocketSet, UdpSocketState},
         TransportLayerTimerId,
@@ -31,7 +28,7 @@ use crate::{
 
 impl<I, BC, L> CoreTimerContext<WeakTcpSocketId<I, WeakDeviceId<BC>, BC>, BC> for CoreCtx<'_, BC, L>
 where
-    I: tcp::socket::DualStackIpExt,
+    I: tcp::DualStackIpExt,
     BC: BindingsContext,
 {
     fn convert_timer(dispatch_id: WeakTcpSocketId<I, WeakDeviceId<BC>, BC>) -> BC::DispatchId {
@@ -40,21 +37,21 @@ where
 }
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
-impl<I, L, BC> tcp::socket::TcpDemuxContext<I, WeakDeviceId<BC>, BC> for CoreCtx<'_, BC, L>
+impl<I, L, BC> TcpDemuxContext<I, WeakDeviceId<BC>, BC> for CoreCtx<'_, BC, L>
 where
     I: Ip,
     BC: BindingsContext,
     L: LockBefore<crate::lock_ordering::TcpDemux<I>>,
 {
     type IpTransportCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::TcpDemux<I>>;
-    fn with_demux<O, F: FnOnce(&tcp::socket::DemuxState<I, WeakDeviceId<BC>, BC>) -> O>(
+    fn with_demux<O, F: FnOnce(&tcp::DemuxState<I, WeakDeviceId<BC>, BC>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
         cb(&self.read_lock::<crate::lock_ordering::TcpDemux<I>>())
     }
 
-    fn with_demux_mut<O, F: FnOnce(&mut tcp::socket::DemuxState<I, WeakDeviceId<BC>, BC>) -> O>(
+    fn with_demux_mut<O, F: FnOnce(&mut tcp::DemuxState<I, WeakDeviceId<BC>, BC>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
@@ -63,10 +60,7 @@ where
 
     fn with_demux_mut_and_ip_transport_ctx<
         O,
-        F: FnOnce(
-            &mut tcp::socket::DemuxState<I, WeakDeviceId<BC>, BC>,
-            &mut Self::IpTransportCtx<'_>,
-        ) -> O,
+        F: FnOnce(&mut tcp::DemuxState<I, WeakDeviceId<BC>, BC>, &mut Self::IpTransportCtx<'_>) -> O,
     >(
         &mut self,
         cb: F,
@@ -77,7 +71,7 @@ where
     }
 }
 
-impl<L, BC> tcp::socket::TcpContext<Ipv4, BC> for CoreCtx<'_, BC, L>
+impl<L, BC> TcpContext<Ipv4, BC> for CoreCtx<'_, BC, L>
 where
     BC: BindingsContext,
     L: LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv4>>,
@@ -163,7 +157,7 @@ where
     }
 }
 
-impl<L, BC> tcp::socket::TcpContext<Ipv6, BC> for CoreCtx<'_, BC, L>
+impl<L, BC> TcpContext<Ipv6, BC> for CoreCtx<'_, BC, L>
 where
     BC: BindingsContext,
     L: LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv6>>,
@@ -250,27 +244,26 @@ where
 }
 
 impl<L: LockBefore<crate::lock_ordering::TcpDemux<Ipv4>>, BC: BindingsContext>
-    tcp::socket::TcpDualStackContext<Ipv6, WeakDeviceId<BC>, BC> for CoreCtx<'_, BC, L>
+    TcpDualStackContext<Ipv6, WeakDeviceId<BC>, BC> for CoreCtx<'_, BC, L>
 {
-    type Converter = tcp::socket::Ipv6SocketIdToIpv4DemuxIdConverter;
     type DualStackIpTransportCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::TcpDemux<Ipv6>>;
-    fn other_demux_id_converter(&self) -> Self::Converter {
-        tcp::socket::Ipv6SocketIdToIpv4DemuxIdConverter
+    fn other_demux_id_converter(&self) -> impl tcp::DualStackDemuxIdConverter<Ipv6> {
+        tcp::Ipv6SocketIdToIpv4DemuxIdConverter
     }
 
-    fn dual_stack_enabled(&self, ip_options: &tcp::socket::Ipv6Options) -> bool {
+    fn dual_stack_enabled(&self, ip_options: &tcp::Ipv6Options) -> bool {
         ip_options.dual_stack_enabled
     }
 
-    fn set_dual_stack_enabled(&self, ip_options: &mut tcp::socket::Ipv6Options, value: bool) {
+    fn set_dual_stack_enabled(&self, ip_options: &mut tcp::Ipv6Options, value: bool) {
         ip_options.dual_stack_enabled = value;
     }
 
     fn with_both_demux_mut<
         O,
         F: FnOnce(
-            &mut tcp::socket::DemuxState<Ipv6, WeakDeviceId<BC>, BC>,
-            &mut tcp::socket::DemuxState<Ipv4, WeakDeviceId<BC>, BC>,
+            &mut tcp::DemuxState<Ipv6, WeakDeviceId<BC>, BC>,
+            &mut tcp::DemuxState<Ipv4, WeakDeviceId<BC>, BC>,
         ) -> O,
     >(
         &mut self,
@@ -285,8 +278,8 @@ impl<L: LockBefore<crate::lock_ordering::TcpDemux<Ipv4>>, BC: BindingsContext>
     fn with_both_demux_mut_and_ip_transport_ctx<
         O,
         F: FnOnce(
-            &mut tcp::socket::DemuxState<Ipv6, WeakDeviceId<BC>, BC>,
-            &mut tcp::socket::DemuxState<Ipv4, WeakDeviceId<BC>, BC>,
+            &mut tcp::DemuxState<Ipv6, WeakDeviceId<BC>, BC>,
+            &mut tcp::DemuxState<Ipv4, WeakDeviceId<BC>, BC>,
             &mut Self::DualStackIpTransportCtx<'_>,
         ) -> O,
     >(
@@ -542,58 +535,43 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>
 {
 }
 
-impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: BindingsContext>
-    RwLockFor<crate::lock_ordering::TcpAllSocketsSet<I>> for StackState<BC>
+impl<I: tcp::DualStackIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
+    for crate::lock_ordering::TcpAllSocketsSet<I>
 {
-    type Data = tcp::socket::TcpSocketSet<I, WeakDeviceId<BC>, BC>;
+    type Data = TcpSocketSet<I, WeakDeviceId<BT>, BT>;
+}
 
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Self::Data>
-        where
-            Self: 'l ;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Self::Data>
-        where
-            Self: 'l ;
-
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.transport.tcp_state::<I>().sockets.all_sockets.read()
-    }
-
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.transport.tcp_state::<I>().sockets.all_sockets.write()
+impl<I: tcp::DualStackIpExt, BT: BindingsTypes>
+    DelegatedOrderedLockAccess<TcpSocketSet<I, WeakDeviceId<BT>, BT>> for StackState<BT>
+{
+    type Inner = tcp::Sockets<I, WeakDeviceId<BT>, BT>;
+    fn delegate_ordered_lock_access(&self) -> &Self::Inner {
+        &self.transport.tcp_state::<I>().sockets
     }
 }
 
-impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: BindingsContext>
-    RwLockFor<crate::lock_ordering::TcpDemux<I>> for StackState<BC>
+impl<I: tcp::DualStackIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
+    for crate::lock_ordering::TcpDemux<I>
 {
-    type Data = tcp::socket::DemuxState<I, WeakDeviceId<BC>, BC>;
+    type Data = tcp::DemuxState<I, WeakDeviceId<BT>, BT>;
+}
 
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Self::Data>
-        where
-            Self: 'l ;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Self::Data>
-        where
-            Self: 'l ;
-
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.transport.tcp_state::<I>().sockets.demux.read()
-    }
-
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.transport.tcp_state::<I>().sockets.demux.write()
+impl<I: tcp::DualStackIpExt, BT: BindingsTypes>
+    DelegatedOrderedLockAccess<tcp::DemuxState<I, WeakDeviceId<BT>, BT>> for StackState<BT>
+{
+    type Inner = tcp::Sockets<I, WeakDeviceId<BT>, BT>;
+    fn delegate_ordered_lock_access(&self) -> &Self::Inner {
+        &self.transport.tcp_state::<I>().sockets
     }
 }
 
-impl<
-        I: crate::transport::tcp::socket::DualStackIpExt,
-        D: WeakDeviceIdentifier,
-        BT: BindingsTypes,
-    > LockLevelFor<TcpSocketId<I, D, BT>> for crate::lock_ordering::TcpSocketState<I>
+impl<I: crate::transport::tcp::DualStackIpExt, D: WeakDeviceIdentifier, BT: BindingsTypes>
+    LockLevelFor<TcpSocketId<I, D, BT>> for crate::lock_ordering::TcpSocketState<I>
 {
     type Data = TcpSocketState<I, D, BT>;
 }
 
-impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: BindingsContext>
+impl<I: crate::transport::tcp::DualStackIpExt, BC: BindingsContext>
     UnlockedAccess<crate::lock_ordering::TcpIsnGenerator<I>> for StackState<BC>
 {
     type Data = IsnGenerator<BC::Instant>;

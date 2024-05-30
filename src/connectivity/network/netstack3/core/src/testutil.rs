@@ -73,12 +73,8 @@ use crate::{
     time::{TimerId, TimerIdInner},
     transport::{
         tcp::{
-            buffer::{
-                testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer},
-                RingBuffer,
-            },
-            socket::TcpBindingsTypes,
-            BufferSizes,
+            testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer},
+            BufferSizes, RingBuffer, TcpBindingsTypes,
         },
         udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId},
     },
@@ -108,7 +104,7 @@ pub mod context {
 
 /// TCP test utilities.
 pub mod tcp {
-    pub use crate::transport::tcp::buffer::testutil::{
+    pub use crate::transport::tcp::testutil::{
         ClientBuffers, ProvidedBuffers, WriteBackClientBuffers,
     };
 }

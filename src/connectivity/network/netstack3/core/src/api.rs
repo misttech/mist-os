@@ -23,7 +23,7 @@ use crate::{
         RoutesAnyApi, RoutesApi,
     },
     time::TimerId,
-    transport::{tcp::socket::TcpApi, udp::UdpApi},
+    transport::{tcp::TcpApi, udp::UdpApi},
     BindingsTypes,
 };
 

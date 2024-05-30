@@ -265,7 +265,7 @@ mod tests {
     use test_case::test_case;
 
     use super::*;
-    use crate::transport::tcp::segment::MAX_PAYLOAD_AND_CONTROL_LEN;
+    use crate::internal::segment::MAX_PAYLOAD_AND_CONTROL_LEN;
 
     fn arb_seqnum() -> impl Strategy<Value = SeqNum> {
         any::<u32>().prop_map(SeqNum::from)
