@@ -5,9 +5,6 @@
 #include "src/connectivity/overnet/usb/overnet_usb.h"
 
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <zircon/errors.h>

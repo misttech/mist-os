@@ -30,7 +30,6 @@
 #include <variant>
 
 #include <bind/fuchsia/google/platform/usb/cpp/bind.h>
-#include <ddktl/device.h>
 #include <fbl/mutex.h>
 #include <usb/request-cpp.h>
 #include <usb/usb-request.h>
