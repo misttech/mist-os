@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.sysmem/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 #include <lib/magma/magma_sysmem.h>
 #include <lib/magma/platform/platform_handle.h>
@@ -12,6 +14,9 @@
 
 #include <gtest/gtest.h>
 
+const uint32_t kTooManySeparateSysmemImageFormatConstraints =
+    1 + std::max(fuchsia_sysmem::kMaxCountBufferCollectionConstraintsImageFormatConstraints,
+                 fuchsia_sysmem2::kMaxCountBufferCollectionConstraintsImageFormatConstraints);
 class TestPlatformSysmemConnection {
  public:
   static void TestCreateBuffer() {
@@ -376,7 +381,8 @@ class TestPlatformSysmemConnection {
     EXPECT_EQ(MAGMA_STATUS_OK,
               connection->CreateBufferConstraints(&buffer_constraints, &constraints).get());
 
-    for (uint32_t i = 0; i < 64; i++) {
+    // There are too many and they can't be merged so expected to fail below during SetConstraints.
+    for (uint32_t i = 0; i < kTooManySeparateSysmemImageFormatConstraints; i++) {
       // Create a set of basic 512x512 RGBA image constraints.
       magma_image_format_constraints_t image_constraints{};
       image_constraints.image_format = MAGMA_FORMAT_R8G8B8A8;
@@ -413,7 +419,8 @@ class TestPlatformSysmemConnection {
 
     constexpr uint32_t kImageWidth = 16;
     constexpr uint32_t kImageHeight = 16;
-    for (uint32_t i = 0; i <= 64; i++) {
+    // There are too many but they can be merged so SetConstraints is expected to succeed below.
+    for (uint32_t i = 0; i <= kTooManySeparateSysmemImageFormatConstraints; i++) {
       magma_image_format_constraints_t image_constraints{};
       image_constraints.image_format = MAGMA_FORMAT_R8G8B8A8;
       image_constraints.has_format_modifier = false;

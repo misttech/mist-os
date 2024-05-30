@@ -86,6 +86,16 @@ typedef struct magma_buffer_format_additional_constraints {
   uint32_t min_buffer_count_for_shared_slack;
 } magma_buffer_format_additional_constraints_t;
 
+#if __Fuchsia_API_level__ >= 19
+///
+/// \brief Import and take ownership of a sysmem connection
+/// \param handle A channel connected to `fuchsia.sysmem2.Allocator`.
+/// \param connection_out The returned sysmem connection
+///
+MAGMA_EXPORT magma_status_t
+magma_sysmem2_connection_import(magma_handle_t handle, magma_sysmem_connection_t* connection_out);
+#endif
+
 ///
 /// \brief Import and take ownership of a sysmem connection
 /// \param handle A channel connected to `fuchsia.sysmem.Allocator`.

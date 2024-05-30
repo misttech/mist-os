@@ -63,6 +63,7 @@ Symbols:
   - { Name: magma_semaphore_export, Type: Func }
   - { Name: magma_semaphore_reset, Type: Func }
   - { Name: magma_semaphore_signal, Type: Func }
+  - { Name: magma_sysmem2_connection_import, Type: Func }
   - { Name: magma_sysmem_connection_allocate_buffer, Type: Func }
   - { Name: magma_sysmem_connection_create_buffer_constraints, Type: Func }
   - { Name: magma_sysmem_connection_import, Type: Func }

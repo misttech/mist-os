@@ -102,6 +102,8 @@ source_set("magma_platform_tests") {
     "test_platform_trace.cc",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//sdk/lib/fdio",
     "//src/graphics/magma/lib/magma/platform:connection_client",
     "//src/graphics/magma/lib/magma/platform:event",

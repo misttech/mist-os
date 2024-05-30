@@ -16,7 +16,7 @@ extern "C" {
 
 // LINT.IfChange(version)
 // This version should be incremented whenever the Magma API changes.
-#define MAGMA_API_VERSION 4
+#define MAGMA_API_VERSION 5
 // LINT.ThenChange()
 
 // LINT.IfChange

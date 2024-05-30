@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.images2/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <lib/fpromise/result.h>
 #include <lib/magma/magma_common_defs.h>
 #include <lib/magma/platform/platform_sysmem_connection.h>
@@ -636,7 +637,9 @@ class ZirconPlatformSysmemConnection : public PlatformSysmemConnection {
     auto result = collection->WaitForBuffersAllocated();
 
     // Ignore failure - this just prevents unnecessary logged errors.
-    { [[maybe_unused]] fidl::Status result = collection->Close(); }
+    {
+      [[maybe_unused]] fidl::Status result = collection->Close();
+    }
 
     if (result.status() != ZX_OK) {
       return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Failed wait for allocation: %d",
@@ -663,7 +666,21 @@ std::unique_ptr<PlatformSysmemConnection> PlatformSysmemConnection::Import(uint3
   zx::channel channel = zx::channel(handle);
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator(
       fidl::ClientEnd<fuchsia_sysmem::Allocator>(std::move(channel)));
+#if __Fuchsia_API_level__ >= 20
+  auto allocator_v2 = fidl::CreateEndpoints<fuchsia_sysmem2::Allocator>();
+  auto connect_result =
+      sysmem_allocator->ConnectToSysmem2Allocator(std::move(allocator_v2->server));
+  if (!connect_result.ok()) {
+    DMESSAGE("sending ConnectToSysmem2Allocator failed: %s",
+             connect_result.FormatDescription().c_str());
+    // keep going; in this case we're probably translating a bad sysmem(1) allocator channel into a
+    // bad sysmem2 allocator channel; other failures soon are likely, due to the bad channel
+  }
+  // ~sysmem_allocator; instead use the just-created
+  return PlatformSysmemConnection::Import2(allocator_v2->client.TakeChannel().release());
+#else
   return std::make_unique<ZirconPlatformSysmemConnection>(std::move(sysmem_allocator));
+#endif
 }
 
 bool ZirconPlatformBufferDescription::GetFormatIndex(PlatformBufferConstraints* constraints,
