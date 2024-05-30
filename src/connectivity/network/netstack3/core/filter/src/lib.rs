@@ -34,8 +34,8 @@ pub use matchers::{
     PortMatcher, TransportProtocolMatcher,
 };
 pub use packets::{
-    ForwardedPacket, IcmpMessage, IpPacket, NestedWithInnerIpPacket, TransportPacketSerializer,
-    TxPacket,
+    ForwardedPacket, IcmpMessage, IpPacket, MaybeTransportPacket, MaybeTransportPacketMut,
+    NestedWithInnerIpPacket, TransportPacketSerializer, TxPacket,
 };
 pub use state::{
     validation::{ValidRoutines, ValidationError},

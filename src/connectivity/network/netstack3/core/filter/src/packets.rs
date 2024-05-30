@@ -456,6 +456,14 @@ impl<I: IpExt, B: BufferMut> Serializer for ForwardedPacket<I, B> {
         body.serialize(outer, provider)
             .map_err(|(err, body)| (err, Self { src_addr, dst_addr, protocol, meta, body }))
     }
+
+    fn serialize_new_buf<BB: packet::ReusableBuffer, A: packet::BufferAlloc<BB>>(
+        &self,
+        outer: packet::PacketConstraints,
+        alloc: A,
+    ) -> Result<BB, packet::SerializeError<A::Error>> {
+        self.body.serialize_new_buf(outer, alloc)
+    }
 }
 
 impl<I: IpExt, B: BufferMut> IpPacket<I> for ForwardedPacket<I, B> {
@@ -670,6 +678,15 @@ where
     ) -> Result<G, (packet::SerializeError<P::Error>, Self)> {
         let Self(nested) = self;
         nested.serialize(outer, provider).map_err(|(err, nested)| (err, Self(nested)))
+    }
+
+    fn serialize_new_buf<BB: packet::ReusableBuffer, A: packet::BufferAlloc<BB>>(
+        &self,
+        outer: packet::PacketConstraints,
+        alloc: A,
+    ) -> Result<BB, packet::SerializeError<A::Error>> {
+        let Self(nested) = self;
+        nested.serialize_new_buf(outer, alloc)
     }
 }
 

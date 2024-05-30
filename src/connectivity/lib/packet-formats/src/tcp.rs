@@ -731,7 +731,7 @@ type OptionSequenceBuilder<'a, I> =
 pub struct TcpOptionsTooLongError;
 
 /// A builder for TCP segments with options
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TcpSegmentBuilderWithOptions<A: IpAddress, O> {
     prefix_builder: TcpSegmentBuilder<A>,
     options: O,

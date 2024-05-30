@@ -18,9 +18,9 @@ use net_types::ip::{IpAddress, Ipv4, Ipv4Addr, Ipv6Addr};
 use packet::records::options::OptionSequenceBuilder;
 use packet::records::options::OptionsRaw;
 use packet::{
-    BufferProvider, BufferView, BufferViewMut, EmptyBuf, FragmentedBytesMut, FromRaw,
+    BufferAlloc, BufferProvider, BufferView, BufferViewMut, EmptyBuf, FragmentedBytesMut, FromRaw,
     GrowBufferMut, InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints,
-    ParsablePacket, ParseMetadata, SerializeError, SerializeTarget, Serializer,
+    ParsablePacket, ParseMetadata, ReusableBuffer, SerializeError, SerializeTarget, Serializer,
 };
 use tracing::debug;
 use zerocopy::{
@@ -440,6 +440,20 @@ impl<B: ByteSlice> Ipv4Packet<B> {
                     Nat64Serializer::Other(serializer) => serializer
                         .serialize(outer, provider)
                         .map_err(|(err, ser)| (err, Nat64Serializer::Other(ser))),
+                }
+            }
+
+            fn serialize_new_buf<B: ReusableBuffer, A: BufferAlloc<B>>(
+                &self,
+                outer: PacketConstraints,
+                alloc: A,
+            ) -> Result<B, SerializeError<A::Error>> {
+                match self {
+                    Nat64Serializer::Tcp(serializer) => serializer.serialize_new_buf(outer, alloc),
+                    Nat64Serializer::Udp(serializer) => serializer.serialize_new_buf(outer, alloc),
+                    Nat64Serializer::Other(serializer) => {
+                        serializer.serialize_new_buf(outer, alloc)
+                    }
                 }
             }
         }
