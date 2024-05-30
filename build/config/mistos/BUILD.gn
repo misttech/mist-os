@@ -160,6 +160,14 @@ config("shared_library_config") {
   ldflags = cflags
 }
 
+config("fdio_config") {
+  # This config is only a marker that is used to signal that a given executable
+  # should link with fdio. With fdio now getting built in this very build, there
+  # need to be a proper dependency.
+  # See the override of the `executable` template in
+  # //build/config/BUILDCONFIG.gni where that build edge is added.
+}
+
 config("executable_config") {
 }
 
@@ -233,7 +241,7 @@ config("integer-paranoia") {
 # clang_libunwind is only available on fuchsia.
 # See the definition in //build/config/clang/clang.gni.
 if (is_mistos) {
-  # TODO(fxbug.dev/57729): Get this information from runtime.json instead.
+  # TODO(https://fxbug.dev/42135607): Get this information from runtime.json instead.
   _clang_libunwind = exec_script("$clang_prefix/clang++",
                                  [
                                    "--target=$current_target_tuple",
@@ -268,4 +276,27 @@ group("maybe_scudo_default_options") {
 }
 
 sanitizer_default_options("scudo_default_options") {
+}
+
+# TODO(https://fxbug.dev/42180987): This works around a toolchain issue in LTO builds
+# where code generation results in a dependency on a Zircon vDSO call but
+# doesn't link -lzircon to supply it at link time.  This is added to deps of
+# the few targets where this has caused link failures to just explicitly link
+# it in.  As soon as the toolchain issues are resolved, this and the deps on it
+# will all be removed.
+group("uses-outline-atomics-fxbug98632") {
+  visibility = [
+    "${icu_root}:*",
+    "//src/developer/debug/debug_agent/test_data:*",
+    "//src/developer/debug/e2e_tests/inferiors:*",
+    "//src/graphics/examples/vkproto:*",
+    "//src/graphics/examples/vkproto/cmd-buf-benchmark:*",
+    "//third_party/ffmpeg:*",
+    "//third_party/icu/default:*",
+    "//third_party/icu/latest:*",
+    "//third_party/icu/stable:*",
+  ]
+  if (current_cpu == "arm64" && is_mistos) {
+    deps = [ "//src/zircon/lib/zircon" ]
+  }
 }

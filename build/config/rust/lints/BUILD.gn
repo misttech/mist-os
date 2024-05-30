@@ -95,6 +95,7 @@ config("allow_unused_results") {
     "//src/session/*",
     "//src/settings/service:*",
     "//src/starnix/*",
+    "//src/starnix_lite/*",
     "//src/storage/*",
     "//src/sys/*",
     "//src/testing/*",

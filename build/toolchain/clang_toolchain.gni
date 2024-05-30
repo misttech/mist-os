@@ -345,13 +345,15 @@ template("clang_toolchain") {
         strip = "${prefix}/llvm-strip"
       } else {
         strip = "${prefix}/llvm-objcopy"
-        if (output_breakpad_syms && invoker.toolchain_os == "fuchsia") {
+        if (output_breakpad_syms && (invoker.toolchain_os == "fuchsia" ||
+                                     invoker.toolchain_os == "mistos")) {
           dump_syms = breakpad_dump_syms
 
           # The breakpad module name for executables and loadable modules.
           breakpad_name = "<_>"
         }
-        if (output_gsym && invoker.toolchain_os == "fuchsia") {
+        if (output_gsym && (invoker.toolchain_os == "fuchsia" ||
+                            invoker.toolchain_os == "mistos")) {
           # TODO(https://fxbug.dev/42136235): enable for other targets.
           gsymutil = "${prefix}/llvm-gsymutil"
         }
@@ -635,7 +637,8 @@ template("clang_toolchain") {
         command_suffix += " && { " + "test ! -s \"$buildid_stampfile\" && " +
                           "touch \"$outfile.sym\" || " + "{{REMOTE_DUMP_SYMS_PREFIX}}$log_it --log \"$breakpad_outfile\" -- $dump_syms -r {{BREAKPAD_NAME}}-o Fuchsia \"{{UNSTRIPPED_OUTFILE}}\"" + " ;}"
       }
-      if (output_gsym && invoker.toolchain_os == "fuchsia") {
+      if (output_gsym && (invoker.toolchain_os == "fuchsia" ||
+                          invoker.toolchain_os == "mistos")) {
         gsym_outfile = "${outfile}.gsym"
         outputs += [ "$gsym_outfile" ]
         command_suffix += " && $gsymutil --convert=\"{{UNSTRIPPED_OUTFILE}}\" --out-file=\"$gsym_outfile\""
@@ -680,7 +683,8 @@ template("clang_toolchain") {
 
         ld_location_env = ""
         link_map_args = ""
-        if (invoker.toolchain_os == "fuchsia") {
+        if (invoker.toolchain_os == "fuchsia" ||
+            invoker.toolchain_os == "mistos") {
           # On Fuchsia, lld is directly used to perform linking
           link_map_args = "-C link-args=--Map=\"{{UNSTRIPPED_OUTFILE}}.map\""
         } else if (invoker.toolchain_cpu == "wasm32") {
@@ -784,7 +788,8 @@ template("clang_toolchain") {
         # Expand BREAKPAD_NAME, if present, which is unused for dynamic libraries.
         command = string_replace(command, "{{BREAKPAD_NAME}}", "")
 
-        if (invoker.toolchain_os == "fuchsia") {
+        if (invoker.toolchain_os == "fuchsia" ||
+            invoker.toolchain_os == "mistos") {
           # On Fuchsia, lld is directly used to perform linking
           command = string_replace(
                   command,
@@ -849,7 +854,8 @@ template("clang_toolchain") {
         # As a special case, on Fuchsia, replace --strip-all with --strip-sections.
         # It is stronger, and thus generates smaller binaries, but also creates
         # crashes for host binaries (e.g. https://fxbug.dev/42126969).
-        if (invoker.toolchain_os == "fuchsia") {
+        if (invoker.toolchain_os == "fuchsia" ||
+            invoker.toolchain_os == "mistos") {
           command =
               string_replace(command, " --strip-all ", " --strip-sections ")
         }

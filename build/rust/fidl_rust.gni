@@ -145,7 +145,7 @@ template("fidl_rust") {
       # the warning.
       configs += [ "//build/config/rust/lints:allow_unused_crate_dependencies" ]
 
-      if (is_fuchsia) {
+      if (is_fuchsia || is_mistos) {
         deps += [ "//src/lib/zircon/rust:fuchsia-zircon" ]
       }
 

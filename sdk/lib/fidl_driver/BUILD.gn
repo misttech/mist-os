@@ -35,7 +35,7 @@ sdk_source_set("fidl_driver") {
     "//sdk/lib/fidl/cpp/wire",
   ]
 
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     public += [
       "include/lib/fidl_driver/cpp/internal/server_details.h",
       "include/lib/fidl_driver/cpp/internal/wire_client_details.h",
@@ -67,7 +67,7 @@ sdk_source_set("fidl_driver_natural") {
     "//src/lib/fidl/cpp:natural_ostream",
   ]
 
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     public += [
       "include/lib/fidl_driver/cpp/internal/endpoint_conversions.h",
       "include/lib/fidl_driver/cpp/internal/natural_client_details.h",

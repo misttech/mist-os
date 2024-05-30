@@ -52,7 +52,7 @@ config("lto-clang") {
     configs += [ "//build/config/riscv64:lto-workarounds" ]
   }
 
-  if (!is_fuchsia || is_kernel) {
+  if (!(is_fuchsia || is_mistos) || is_kernel) {
     configs += [ ":lto-whole-program-devirtualization" ]
   }
 
@@ -61,7 +61,7 @@ config("lto-clang") {
   # TODO(https://fxbug.dev/42061844): Temporarily disable branch funneling on lto. Branch
   # funneling likely generates bad code involving return values not propagated
   # correctly to other functions. Once this is resolved, come back and remove this.
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     disable_branch_funneling = "-wholeprogramdevirt-branch-funnel-threshold=0"
     cflags += [
       "-mllvm",
@@ -117,7 +117,7 @@ config("lto-rust") {
 config("no-lto") {
   cflags = [ "-fno-lto" ]
 
-  if (!is_fuchsia) {
+  if (!(is_fuchsia || is_mistos)) {
     cflags += [ "-fno-whole-program-vtables" ]
   }
 
@@ -188,7 +188,7 @@ config("thinlto-rust") {
 
   rust_linkarg = "-Clink-args="
 
-  if (!is_fuchsia) {
+  if (!(is_fuchsia || is_mistos)) {
     # On non-Fuchsia platforms, rustc calls clang, which calls lld.
     rust_linkarg += "-Wl,"
   }

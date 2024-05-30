@@ -24,7 +24,7 @@ variant("asan") {
   ]
 
   # TODO(phosek): use runtime.json instead of invoking Clang.
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     extension = ".so"
   } else if (is_mac) {
     extension = "_osx_dynamic.dylib"
@@ -52,7 +52,7 @@ variant("asan") {
             root_build_dir)
     rustflags += [ "-Clink-arg=${libclang_rt_asan}" ]
   }
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     rustflags += [ "-Clink-arg=-dynamic-linker=asan/ld.so.1" ]
   }
 
@@ -184,7 +184,7 @@ variant("lsan") {
   # on allocations and such, not just on errors.
   configs = [ "//build/config:frame_pointers" ]
 
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     # The LSan runtime is statically linked but depends on libzircon.
     libs = [ "zircon" ]
   }
@@ -206,7 +206,7 @@ variant("ubsan") {
     common_flags = [ "-fsanitize=undefined" ]
   }
 
-  if (is_fuchsia && _prebuilt_runtime) {
+  if ((is_fuchsia || is_mistos) && _prebuilt_runtime) {
     dynamic_linker_flags =
         "-dynamic-linker=${toolchain_variant.libprefix}ld.so.1"
     ldflags = [ "-Wl,$dynamic_linker_flags" ]

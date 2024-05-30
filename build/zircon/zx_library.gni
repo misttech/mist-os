@@ -345,7 +345,7 @@ template("zx_library") {
       lib_libs = invoker.libs
     }
 
-    if (!is_fuchsia) {
+    if (!(is_fuchsia || is_mistos)) {
       lib_public_deps += [ "//zircon/system/public" ]
     }
 

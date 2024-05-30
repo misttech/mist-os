@@ -20,7 +20,7 @@ fidl_rust_deps = [
   "//third_party/rust_crates:tracing",
 ]
 
-if (is_fuchsia) {
+if (is_fuchsia || is_mistos) {
   fidl_rust_deps += [ "//src/lib/zircon/rust:fuchsia-zircon" ]
 }
 

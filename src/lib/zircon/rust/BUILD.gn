@@ -46,7 +46,7 @@ common_sources = [
   "src/vmo.rs",
 ]
 
-if (is_fuchsia) {
+if (is_fuchsia || is_mistos) {
   rustc_library("fuchsia-zircon") {
     version = "0.3.3"
     edition = "2021"

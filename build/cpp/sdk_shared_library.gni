@@ -217,7 +217,11 @@ template("sdk_shared_library") {
       configs = []
     }
     if (libcxx_linkage == "static") {
-      configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
+      if (is_fuchsia) {
+        configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
+      } else if (is_mistos) {
+        configs += [ "//build/config/mistos:static_cpp_standard_library" ]
+      }
     } else if (!is_internal) {
       # Adding this linker flag keeps us honest about not committing to a
       # specific C++ ABI. If this flag is causing your library to not
@@ -229,14 +233,18 @@ template("sdk_shared_library") {
       #
       # NOTE: This flag is not necessary for internal SDK libraries since they
       # are not intended to be consumed by SDK users.
-      configs += [ "//build/config/fuchsia:no_cpp_standard_library" ]
+      if (is_fuchsia) {
+        configs += [ "//build/config/fuchsia:no_cpp_standard_library" ]
+      } else if (is_mistos) {
+        configs += [ "//build/config/mistos:no_cpp_standard_library" ]
+      }
     }
 
     metadata = {
       if (defined(invoker.metadata)) {
         forward_variables_from(invoker.metadata, "*")
       }
-      if (is_fuchsia) {
+      if (is_fuchsia || is_mistos) {
         # Used by sdk_verify_runtime_deps() template.
         sdk_runtime_deps = [
           {

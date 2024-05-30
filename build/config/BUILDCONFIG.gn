@@ -465,6 +465,10 @@ if (zircon_toolchain == false) {
       "//build/config:auto_var_init",
       "//build/config:icf",
       "//build/config:thread_safety_annotations",
+      "//build/config/mistos:dynamic_rust_standard_library",
+      "//build/config/mistos:large_rust_stack",
+      "//build/config/rust:panic_abort",
+      "//build/config/rust:v0_symbol_mangling",
 
       # TODO(mcgrathr): Perhaps restrict this to only affected code.
       # For now, safest to do it everywhere.
@@ -510,6 +514,8 @@ if (zircon_toolchain == false) {
   }
 
   if (current_os == "mistos") {
+    default_executable_configs += [ "//build/config/mistos:fdio_config" ]
+
     default_executable_deps +=
         [ "//build/config/mistos:maybe_scudo_default_options" ]
   }
@@ -2468,6 +2474,7 @@ template("_fuchsia_binary") {
       if (is_mistos) {
         _static_pie_label = "//build/config/mistos:static-pie-config"
       }
+
       if ((target_type == "executable" || target_type == "test") &&
           configs + [ _static_pie_label ] - [ _static_pie_label ] == configs) {
         deps += [ "//zircon/public/sysroot:crt1_deps" ]
@@ -2490,8 +2497,14 @@ template("_fuchsia_binary") {
       should_add_shared_cpp_runtime = true
       if (defined(configs)) {
         # Do not add runtime dependencies if compiling statically.
+        _static_cpp_standard_library =
+            "//build/config/fuchsia:static_cpp_standard_library"
+        if (is_mistos) {
+          _static_cpp_standard_library =
+              "//build/config/mistos:static_cpp_standard_library"
+        }
         static_cpp_configs = [
-          "//build/config/fuchsia:static_cpp_standard_library",
+          _static_cpp_standard_library,
           "//build/config/zircon:static-libc++",
         ]
         if (configs + static_cpp_configs - static_cpp_configs != configs) {
@@ -2510,8 +2523,13 @@ template("_fuchsia_binary") {
       if (defined(crate_root)) {
         # TODO(https://fxbug.dev/42135447): Handle this for (non-rlib) static libraries.
         should_add_shared_rust_runtime = false
-        dynamic_rust_config =
-            [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
+        if (is_fuchsia) {
+          dynamic_rust_config =
+              [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
+        } else if (is_mistos) {
+          dynamic_rust_config =
+              [ "//build/config/mistos:dynamic_rust_standard_library" ]
+        }
         if (defined(configs) &&
             configs + dynamic_rust_config - dynamic_rust_config != configs) {
           should_add_shared_rust_runtime = true
@@ -3286,7 +3304,8 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
               if (current_os != "mac" && current_os != "win") {
                 elf_build_id = rebased_output_file + ".build-id.stamp"
               }
-              if (output_breakpad_syms && current_os == "fuchsia") {
+              if (output_breakpad_syms &&
+                  (current_os == "fuchsia" || current_os == "mistos")) {
                 breakpad = rebased_output_file + ".sym"
               }
             },
@@ -3446,6 +3465,9 @@ template("executable") {
     deps += default_executable_deps
 
     fdio_config = "//build/config/fuchsia:fdio_config"
+    if (is_mistos) {
+      fdio_config = "//build/config/mistos:fdio_config"
+    }
     if (configs + [ fdio_config ] - [ fdio_config ] != configs) {
       deps += [ "//sdk/lib/fdio" ]
     }
@@ -3501,7 +3523,8 @@ template("executable") {
             elf_build_id =
                 rebase_path("$output_file.build-id.stamp", root_build_dir)
           }
-          if (output_breakpad_syms && current_os == "fuchsia") {
+          if (output_breakpad_syms &&
+              (current_os == "fuchsia" || current_os == "mistos")) {
             breakpad = rebase_path("$output_file.sym", root_build_dir)
           }
         },
@@ -3662,7 +3685,8 @@ template("loadable_module") {
             elf_build_id =
                 rebase_path("$output_file.build-id.stamp", root_build_dir)
           }
-          if (output_breakpad_syms && current_os == "fuchsia") {
+          if (output_breakpad_syms &&
+              (current_os == "fuchsia" || current_os == "mistos")) {
             breakpad = rebase_path("$output_file.sym", root_build_dir)
           }
         },

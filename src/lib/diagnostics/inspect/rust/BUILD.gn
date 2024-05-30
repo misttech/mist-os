@@ -74,7 +74,7 @@ rustc_library("fuchsia-inspect") {
     "src/writer/utils.rs",
   ]
 
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     deps += [
       "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_rust",
       "//src/lib/fidl/rust/fidl",

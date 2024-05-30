@@ -14,7 +14,7 @@ config("fdio_includes") {
   include_dirs = [ "include" ]
 }
 
-if (is_fuchsia) {
+if (is_fuchsia || is_mistos) {
   zx_library("fdio-spawn-actions") {
     configs += [ "//build/config:all_source" ]
     sdk = "source"
@@ -73,7 +73,7 @@ if (is_fuzzer) {
     public_deps = [ ":fdio(${toolchain_variant.base}${suffix})" ]
     public_configs = [ ":fdio_includes" ]
   }
-} else if (is_fuchsia) {
+} else if (is_fuchsia || is_mistos) {
   zx_library("fdio") {
     configs += [ "//build/config:all_source" ]
     sdk = "shared"
