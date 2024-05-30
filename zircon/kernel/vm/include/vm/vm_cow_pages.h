@@ -834,9 +834,8 @@ class VmCowPages final : public VmHierarchyBase,
   zx_status_t ReplaceReferenceWithPageLocked(VmPageOrMarkerRef page_or_mark, uint64_t offset,
                                              LazyPageRequest* page_request) TA_REQ(lock());
 
-  static zx_status_t AllocateCopyPage(uint32_t pmm_alloc_flags, paddr_t parent_paddr,
-                                      list_node_t* alloc_list, LazyPageRequest* request,
-                                      vm_page_t** clone);
+  zx_status_t AllocateCopyPage(paddr_t parent_paddr, list_node_t* alloc_list,
+                               LazyPageRequest* request, vm_page_t** clone);
 
   static zx_status_t CacheAllocPage(uint alloc_flags, vm_page_t** p, paddr_t* pa);
   static void CacheFree(list_node_t* list);

@@ -186,10 +186,9 @@ class BatchPQRemove {
 };
 
 // Allocates a new page and populates it with the data at |parent_paddr|.
-zx_status_t VmCowPages::AllocateCopyPage(uint32_t pmm_alloc_flags, paddr_t parent_paddr,
-                                         list_node_t* alloc_list, LazyPageRequest* request,
-                                         vm_page_t** clone) {
-  DEBUG_ASSERT(request || !(pmm_alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT));
+zx_status_t VmCowPages::AllocateCopyPage(paddr_t parent_paddr, list_node_t* alloc_list,
+                                         LazyPageRequest* request, vm_page_t** clone) {
+  DEBUG_ASSERT(request || !(pmm_alloc_flags_ & PMM_ALLOC_FLAG_CAN_WAIT));
 
   vm_page_t* p_clone = nullptr;
   if (alloc_list) {
@@ -200,7 +199,7 @@ zx_status_t VmCowPages::AllocateCopyPage(uint32_t pmm_alloc_flags, paddr_t paren
   if (p_clone) {
     pa_clone = p_clone->paddr();
   } else {
-    zx_status_t status = CacheAllocPage(pmm_alloc_flags, &p_clone, &pa_clone);
+    zx_status_t status = CacheAllocPage(pmm_alloc_flags_, &p_clone, &pa_clone);
     if (status != ZX_OK) {
       DEBUG_ASSERT(!p_clone);
       if (status == ZX_ERR_SHOULD_WAIT) {
@@ -1895,8 +1894,7 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
       // Otherwise we need to fork the page.  The page has no writable mappings so we don't need to
       // remove write or unmap before copying the contents.
       vm_page_t* cover_page;
-      alloc_status =
-          AllocateCopyPage(pmm_alloc_flags_, page_paddr, alloc_list, page_request, &cover_page);
+      alloc_status = AllocateCopyPage(page_paddr, alloc_list, page_request, &cover_page);
       if (alloc_status != ZX_OK) {
         break;
       }
@@ -2456,8 +2454,8 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
   DEBUG_ASSERT(!(target_->pmm_alloc_flags_ & PMM_ALLOC_FLAG_LOANED));
 
   vm_page_t* out_page = nullptr;
-  zx_status_t status = AllocateCopyPage(target_->pmm_alloc_flags_, source->paddr(), alloc_list_,
-                                        page_request, &out_page);
+  zx_status_t status =
+      target_->AllocateCopyPage(source->paddr(), alloc_list_, page_request, &out_page);
   if (status != ZX_OK) {
     return zx::error(status);
   }
@@ -3549,8 +3547,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
         // Allocate a new page, it will be zeroed in the process.
         vm_page_t* p;
         // Do not pass our freed_list here as this takes an |alloc_list| list to allocate from.
-        zx_status_t status =
-            AllocateCopyPage(pmm_alloc_flags_, vm_get_zero_page_paddr(), nullptr, page_request, &p);
+        zx_status_t status = AllocateCopyPage(vm_get_zero_page_paddr(), nullptr, page_request, &p);
         if (status != ZX_OK) {
           return status;
         }
@@ -4842,8 +4839,7 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(uint64_t offset, uint64_t len,
     // that `ZeroPages` uses and insert markers, or generalizing the concept of intervals and using
     // those instead.
     vm_page_t* p;
-    status =
-        AllocateCopyPage(pmm_alloc_flags_, vm_get_zero_page_paddr(), nullptr, page_request, &p);
+    status = AllocateCopyPage(vm_get_zero_page_paddr(), nullptr, page_request, &p);
     if (status != ZX_OK) {
       break;
     }
