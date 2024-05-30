@@ -139,6 +139,10 @@ template("devicetree_fragment") {
 #   * deps
 #     - Optional: Usual GN meaning.
 #
+#   * dtcflags
+#     - Optional: Flags to be passed to dtc compiler.
+#     - Type: List(flags).
+#
 #  * outputs
 #     - Optional: The singleton list containing the output blob path. This value
 #       can be accessed as `get_target_outputs(target_name)`.
@@ -220,6 +224,10 @@ template("dtb") {
       "-d",
       rebase_path(depfile, root_build_dir),
     ]
+
+    if (defined(invoker.dtcflags)) {
+      args += invoker.dtcflags
+    }
   }
 }
 
@@ -233,6 +241,10 @@ template("dtb") {
 #
 #   * deps
 #     - Optional: Usual GN meaning.
+#
+#   * dtcflags
+#     - Optional: Flags to be passed to dtc compiler.
+#     - Type: List(flags).
 #
 #  * outputs
 #     - Optional: The singleton list containing the output dts path. This value
@@ -273,6 +285,10 @@ template("dts") {
       "-o",
       rebase_path(outputs[0], root_build_dir),
     ]
+
+    if (defined(invoker.dtcflags)) {
+      args += invoker.dtcflags
+    }
   }
 }
 
@@ -305,6 +321,10 @@ template("dts") {
 #     - Type: list(label)
 #     - Default: []
 #
+#   * dtcflags
+#     - Optional: Flags to be passed to dtc compiler.
+#     - Type: List(flags).
+#
 #  * outputs
 #     - Optional: The singleton list containing the output blob path. This value
 #       can be accessed as `get_target_outputs(target_name)`.
@@ -334,6 +354,7 @@ template("devicetree") {
                              "sources",
                              "deps",
                              "public_deps",
+                             "dtcflags",
                            ])
     outputs = _dtb_path
   }
@@ -342,6 +363,7 @@ template("devicetree") {
   # We use the decompiled DTS instead of the original DTS as all includes and
   # C headers are resolved in the final dtb.
   dts(decompiled_dts_target) {
+    forward_variables_from(invoker, [ "dtcflags" ])
     deps = [ ":$compiled_dtb_target" ]
     sources = get_target_outputs(":$compiled_dtb_target")
   }
