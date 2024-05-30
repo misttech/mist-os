@@ -59,7 +59,7 @@ use {
     },
     hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
     maplit::btreemap,
-    moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
+    moniker::{ChildName, Moniker},
     router_error::{DowncastErrorForTest, RouterError},
     routing::component_instance::ComponentInstanceInterface,
     routing_test_helpers::{

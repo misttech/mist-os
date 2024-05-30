@@ -100,7 +100,7 @@ use {
     fuchsia_zircon::{self as zx, Clock, Resource},
     futures::{future::BoxFuture, FutureExt, StreamExt},
     hooks::EventType,
-    moniker::{Moniker, MonikerBase},
+    moniker::Moniker,
     std::sync::Arc,
     tracing::{info, warn},
     vfs::{directory::entry::OpenRequest, path::Path, ToObjectRequest},

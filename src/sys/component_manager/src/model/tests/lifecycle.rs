@@ -39,7 +39,7 @@ use {
     fuchsia_async as fasync, fuchsia_sync as fsync, fuchsia_zircon as zx,
     futures::{channel::mpsc, future::pending, join, lock::Mutex, prelude::*},
     hooks::{Event, EventType, Hook, HooksRegistration},
-    moniker::{ChildName, Moniker, MonikerBase},
+    moniker::{ChildName, Moniker},
     std::{
         collections::HashSet,
         sync::{Arc, Weak},

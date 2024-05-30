@@ -21,7 +21,7 @@ use {
     cm_types::{IterablePath, Name},
     errors::ActionError,
     futures::future::select_all,
-    moniker::{ChildName, ChildNameBase},
+    moniker::ChildName,
     std::collections::{HashMap, HashSet},
     std::fmt,
     std::iter,

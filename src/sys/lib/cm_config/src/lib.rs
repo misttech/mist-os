@@ -13,7 +13,7 @@ use {
         self as component_internal, BuiltinBootResolver, CapabilityPolicyAllowlists,
         DebugRegistrationPolicyAllowlists, LogDestination, RealmBuilderResolverAndRunner,
     },
-    moniker::{ChildName, ChildNameBase, ExtendedMoniker, Moniker, MonikerBase, MonikerError},
+    moniker::{ChildName, ExtendedMoniker, Moniker, MonikerError},
     std::{
         collections::{HashMap, HashSet},
         sync::Arc,

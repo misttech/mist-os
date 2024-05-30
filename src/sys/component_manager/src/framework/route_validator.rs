@@ -23,7 +23,7 @@ use {
     fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     futures::{future::join_all, TryStreamExt},
     lazy_static::lazy_static,
-    moniker::{ExtendedMoniker, Moniker, MonikerBase},
+    moniker::{ExtendedMoniker, Moniker},
     std::{
         cmp::Ordering,
         sync::{Arc, Weak},

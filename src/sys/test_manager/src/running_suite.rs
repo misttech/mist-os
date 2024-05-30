@@ -44,7 +44,7 @@ use {
         prelude::*,
         FutureExt,
     },
-    moniker::{ChildName, Moniker, MonikerBase},
+    moniker::{ChildName, Moniker},
     resolver::AllowedPackages,
     std::{
         collections::HashSet,

@@ -54,7 +54,7 @@ use {
         StopOutcomeWithEscrow,
     },
     manager::ComponentManagerInstance,
-    moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
+    moniker::{ChildName, Moniker},
     router_error::{Explain, RouterError},
     sandbox::{Capability, Dict, Open, Request, Routable, Router},
     std::{
@@ -1357,7 +1357,7 @@ pub mod testing {
     use crate::model::events::stream::EventStream;
     use fuchsia_zircon as zx;
     use hooks::EventType;
-    use moniker::{Moniker, MonikerBase};
+    use moniker::Moniker;
 
     pub async fn wait_until_event_get_timestamp(
         event_stream: &mut EventStream,

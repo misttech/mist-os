@@ -65,7 +65,7 @@ use {
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::future::BoxFuture,
     hooks::{CapabilityReceiver, EventPayload},
-    moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
+    moniker::{ChildName, Moniker},
     sandbox::{
         Capability, CapabilityTrait, Dict, Open, Request, Routable, Router, WeakComponentToken,
     },

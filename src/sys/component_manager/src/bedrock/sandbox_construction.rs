@@ -29,7 +29,7 @@ use {
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     futures::FutureExt,
     itertools::Itertools,
-    moniker::{ChildName, ChildNameBase, Moniker},
+    moniker::{ChildName, Moniker},
     router_error::RouterError,
     sandbox::Routable,
     sandbox::{Capability, Dict, Request, Router, Unit},

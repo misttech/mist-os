@@ -546,7 +546,7 @@ impl DirectoryEntry for CFDirectory {
 mod test {
     use super::*;
     use futures::StreamExt;
-    use moniker::{Moniker, MonikerBase};
+    use moniker::Moniker;
     use std::collections::HashMap;
 
     // TODO(https://fxbug.dev/330828033): component_debug has functions like this in its test_utils module

@@ -24,7 +24,7 @@ use {
     hooks::{Event, EventPayload, EventType, HasEventType, Hook, HooksRegistration},
     injectable_time::{MonotonicTime, TimeSource},
     lazy_static::lazy_static,
-    moniker::{ExtendedMoniker, Moniker, MonikerBase},
+    moniker::{ExtendedMoniker, Moniker},
     std::{
         collections::{BTreeMap, VecDeque},
         fmt::Debug,

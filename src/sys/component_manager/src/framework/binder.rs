@@ -129,7 +129,7 @@ mod tests {
         fidl_fuchsia_io as fio, fuchsia_zircon as zx,
         futures::{lock::Mutex, StreamExt},
         hooks::EventType,
-        moniker::{Moniker, MonikerBase},
+        moniker::Moniker,
         std::sync::Arc,
         vfs::{
             directory::entry::OpenRequest, execution_scope::ExecutionScope, path::Path as VfsPath,

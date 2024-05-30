@@ -28,7 +28,7 @@ use {
     futures::StreamExt,
     lazy_static::lazy_static,
     measure_tape_for_instance::Measurable,
-    moniker::{Moniker, MonikerBase},
+    moniker::Moniker,
     router_error::Explain,
     routing::{
         component_instance::{ComponentInstanceInterface, ResolvedInstanceInterface},

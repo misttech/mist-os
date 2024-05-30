@@ -175,7 +175,7 @@ mod tests {
         errors::{ActionError, ModelError, ResolveActionError},
         fidl_fuchsia_component as fcomponent,
         maplit::hashmap,
-        moniker::{Moniker, MonikerBase},
+        moniker::Moniker,
         std::collections::{HashMap, HashSet},
     };
 

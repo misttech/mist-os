@@ -18,7 +18,7 @@ use {
     fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys,
     fuchsia_url::AbsoluteComponentUrl,
     futures::AsyncReadExt,
-    moniker::{ChildNameBase, Moniker, MonikerBase},
+    moniker::Moniker,
     std::io::Read,
 };
 

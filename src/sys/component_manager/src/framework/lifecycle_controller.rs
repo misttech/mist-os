@@ -21,7 +21,7 @@ use {
     fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     futures::prelude::*,
     lazy_static::lazy_static,
-    moniker::{ChildName, Moniker, MonikerBase, MonikerError},
+    moniker::{ChildName, Moniker, MonikerError},
     std::sync::{Arc, Weak},
     tracing::warn,
 };

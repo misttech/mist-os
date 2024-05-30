@@ -676,7 +676,6 @@ mod tests {
         fuchsia_component::server::{ServiceFs, ServiceObjLocal},
         fuchsia_zircon::{self as zx, Task},
         futures::{channel::mpsc, join, lock::Mutex, StreamExt},
-        moniker::MonikerBase,
         runner::component::Controllable,
         std::task::Poll,
     };

@@ -10,7 +10,6 @@ use {
     cm_config::RuntimeConfig,
     cm_rust::{EnvironmentDecl, RegistrationSource, ResolverRegistration},
     fidl_fuchsia_component_internal as component_internal,
-    moniker::ChildNameBase,
     routing::{
         component_instance::{
             ComponentInstanceInterface, ExtendedInstanceInterface, WeakExtendedInstanceInterface,

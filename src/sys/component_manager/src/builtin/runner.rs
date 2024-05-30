@@ -99,7 +99,7 @@ mod tests {
         cm_rust_testing::*,
         fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio,
         futures::prelude::*,
-        moniker::{Moniker, MonikerBase},
+        moniker::Moniker,
         vfs::{execution_scope::ExecutionScope, path::Path, ToObjectRequest},
     };
 

@@ -16,7 +16,7 @@ use {
     fuchsia_component::client,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route, ScopedInstance},
     futures::{channel::mpsc, FutureExt, SinkExt, StreamExt},
-    moniker::{ChildName, ChildNameBase},
+    moniker::ChildName,
     test_case::test_case,
     tracing::*,
 };

@@ -16,7 +16,6 @@ use {
     errors::{ActionError, DestroyActionError},
     futures::{future::join_all, Future},
     hooks::EventPayload,
-    moniker::MonikerBase,
     std::{
         pin::{pin, Pin},
         sync::Arc,

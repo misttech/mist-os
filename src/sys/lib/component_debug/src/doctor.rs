@@ -129,10 +129,7 @@ fn new_table(title: &str) -> Table {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*, fidl::endpoints::create_proxy_and_stream, futures::TryStreamExt,
-        moniker::MonikerBase,
-    };
+    use {super::*, fidl::endpoints::create_proxy_and_stream, futures::TryStreamExt};
 
     fn route_validator(
         expected_moniker: &'static str,

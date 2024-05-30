@@ -15,7 +15,7 @@ use fidl_fuchsia_component as fcomponent;
 use fuchsia_zircon as zx;
 use futures::TryStreamExt;
 use lazy_static::lazy_static;
-use moniker::{ExtendedMoniker, Moniker, MonikerBase};
+use moniker::{ExtendedMoniker, Moniker};
 use routing::{capability_source::InternalCapability, error::RoutingError, policy::PolicyError};
 use tracing::warn;
 use vfs::directory::entry::OpenRequest;

@@ -358,7 +358,7 @@ mod tests {
     use fuchsia_fs::directory::open_channel_in_namespace;
     use fuchsia_runtime::{HandleInfo, HandleType};
     use futures::channel::{self, oneshot};
-    use moniker::{Moniker, MonikerBase};
+    use moniker::Moniker;
     use sandbox::Directory;
     use serve_processargs::NamespaceBuilder;
     use vfs::{path::Path as VfsPath, ToObjectRequest};

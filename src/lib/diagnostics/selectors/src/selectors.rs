@@ -12,9 +12,7 @@ use fidl_fuchsia_diagnostics::{
     ComponentSelector, Interest, LogInterestSelector, PropertySelector, Selector, SelectorArgument,
     Severity, StringSelector, StringSelectorUnknown, SubtreeSelector, TreeSelector,
 };
-use moniker::{
-    ChildName, ExtendedMoniker, Moniker, MonikerBase, EXTENDED_MONIKER_COMPONENT_MANAGER_STR,
-};
+use moniker::{ChildName, ExtendedMoniker, Moniker, EXTENDED_MONIKER_COMPONENT_MANAGER_STR};
 use std::borrow::{Borrow, Cow};
 use std::fs;
 use std::io::{BufRead, BufReader};

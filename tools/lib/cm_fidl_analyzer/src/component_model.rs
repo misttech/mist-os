@@ -24,7 +24,7 @@ use {
     fuchsia_url::AbsoluteComponentUrl,
     fuchsia_zircon_status as zx_status,
     futures::FutureExt,
-    moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
+    moniker::{ChildName, Moniker},
     router_error::Explain,
     routing::{
         capability_source::{CapabilitySource, ComponentCapability},
@@ -1321,7 +1321,7 @@ mod tests {
         config_encoder::ConfigFields,
         fidl_fuchsia_component_internal as component_internal,
         maplit::hashmap,
-        moniker::{ChildName, Moniker, MonikerBase},
+        moniker::{ChildName, Moniker},
         routing::{
             component_instance::{
                 ComponentInstanceInterface, ExtendedInstanceInterface,

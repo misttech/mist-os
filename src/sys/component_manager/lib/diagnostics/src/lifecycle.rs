@@ -115,7 +115,7 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
     use fuchsia_inspect::DiagnosticsHierarchyGetter;
     use itertools::Itertools;
-    use moniker::{ChildName, ChildNameBase, MonikerBase};
+    use moniker::ChildName;
 
     #[fuchsia::test]
     async fn early_doesnt_track_more_than_limit() {

@@ -176,7 +176,7 @@ fn add_report(report: RouteReport, table: &mut Table) {
 mod test {
     use {
         super::*, assert_matches::assert_matches, fidl::endpoints, fuchsia_async as fasync,
-        futures::TryStreamExt, moniker::MonikerBase,
+        futures::TryStreamExt,
     };
 
     fn route_validator(

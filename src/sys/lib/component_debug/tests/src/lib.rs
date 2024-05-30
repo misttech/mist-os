@@ -13,7 +13,7 @@ use {
     },
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys,
     fuchsia_component::client::connect_to_protocol,
-    moniker::{Moniker, MonikerBase},
+    moniker::Moniker,
     std::str::FromStr,
 };
 

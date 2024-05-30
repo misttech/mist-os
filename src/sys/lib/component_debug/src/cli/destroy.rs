@@ -9,7 +9,6 @@ use {
     },
     anyhow::{format_err, Result},
     fidl_fuchsia_sys2 as fsys,
-    moniker::{ChildNameBase, MonikerBase},
 };
 
 pub async fn destroy_cmd<W: std::io::Write>(

@@ -9,50 +9,14 @@ use {
     std::fmt,
 };
 
-pub trait ChildNameBase: Eq + PartialOrd + Clone + fmt::Display {
-    fn parse<T: AsRef<str>>(rep: T) -> Result<Self, MonikerError>
-    where
-        Self: Sized;
-
-    fn name(&self) -> &LongName;
-
-    fn collection(&self) -> Option<&Name>;
-}
-
-/// An child moniker locally identifies a child component instance using the name assigned by
-/// its parent and its collection (if present). It is a building block for more complex monikers.
-///
-/// The child moniker does not distinguish between instances.
+/// A [ChildName] locally identifies a child component instance using the name assigned by
+/// its parent and its collection (if present). It is the building block of [Moniker].
 ///
 /// Display notation: "[collection:]name".
 #[derive(Eq, PartialEq, Clone, Hash)]
 pub struct ChildName {
     pub name: LongName,
     pub collection: Option<Name>,
-}
-
-impl ChildNameBase for ChildName {
-    /// Parses a `ChildName` from a string.
-    ///
-    /// Input strings should be of the format `[collection:]name`, e.g. `foo` or `biz:foo`.
-    fn parse<T: AsRef<str>>(rep: T) -> Result<Self, MonikerError> {
-        let rep = rep.as_ref();
-        let parts: Vec<&str> = rep.split(":").collect();
-        let (coll, name) = match parts.len() {
-            1 => (None, parts[0]),
-            2 => (Some(parts[0]), parts[1]),
-            _ => return Err(MonikerError::invalid_moniker(rep)),
-        };
-        ChildName::try_new(name, coll)
-    }
-
-    fn name(&self) -> &LongName {
-        &self.name
-    }
-
-    fn collection(&self) -> Option<&Name> {
-        self.collection.as_ref()
-    }
 }
 
 impl ChildName {
@@ -75,12 +39,26 @@ impl ChildName {
         Ok(Self { name, collection })
     }
 
-    fn format(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(coll) = &self.collection {
-            write!(f, "{}:{}", coll, self.name)
-        } else {
-            write!(f, "{}", self.name)
-        }
+    /// Parses a `ChildName` from a string.
+    ///
+    /// Input strings should be of the format `[collection:]name`, e.g. `foo` or `biz:foo`.
+    pub fn parse<T: AsRef<str>>(rep: T) -> Result<Self, MonikerError> {
+        let rep = rep.as_ref();
+        let parts: Vec<&str> = rep.split(":").collect();
+        let (coll, name) = match parts.len() {
+            1 => (None, parts[0]),
+            2 => (Some(parts[0]), parts[1]),
+            _ => return Err(MonikerError::invalid_moniker(rep)),
+        };
+        ChildName::try_new(name, coll)
+    }
+
+    pub fn name(&self) -> &LongName {
+        &self.name
+    }
+
+    pub fn collection(&self) -> Option<&Name> {
+        self.collection.as_ref()
     }
 }
 
@@ -112,13 +90,17 @@ impl PartialOrd for ChildName {
 
 impl fmt::Display for ChildName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.format(f)
+        if let Some(coll) = &self.collection {
+            write!(f, "{}:{}", coll, self.name)
+        } else {
+            write!(f, "{}", self.name)
+        }
     }
 }
 
 impl fmt::Debug for ChildName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.format(f)
+        write!(f, "{self}")
     }
 }
 

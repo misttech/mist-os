@@ -3,31 +3,40 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        child_name::{ChildName, ChildNameBase},
-        error::MonikerError,
-    },
+    crate::{child_name::ChildName, error::MonikerError},
     core::cmp::{self, Ordering, PartialEq},
     std::{fmt, hash::Hash},
 };
 
-/// MonikerBase is the parent trait for Moniker. It will be combined with Moniker in a future
-/// change.
+/// [Moniker] describes the identity of a component instance in terms of its path relative to the
+/// root of the component instance tree.
 ///
-/// MonikerBase describes the identity of a component instance in terms of its path
-/// relative to the root of the component instance tree.
-pub trait MonikerBase: Default + Eq + PartialEq + fmt::Debug + Clone + Hash + fmt::Display {
-    type Part: ChildNameBase;
+/// Display notation: ".", "name1", "name1/name2", ...
+#[derive(Eq, PartialEq, Clone, Hash, Default)]
+pub struct Moniker {
+    path: Vec<ChildName>,
+}
 
-    fn new(path: Vec<Self::Part>) -> Self;
+impl Moniker {
+    pub fn new(path: Vec<ChildName>) -> Self {
+        Self { path }
+    }
 
-    fn parse<T: AsRef<str>>(path: &[T]) -> Result<Self, MonikerError> {
-        let path: Result<Vec<Self::Part>, MonikerError> =
-            path.iter().map(|x| Self::Part::parse(x)).collect();
+    pub fn path(&self) -> &Vec<ChildName> {
+        &self.path
+    }
+
+    pub fn path_mut(&mut self) -> &mut Vec<ChildName> {
+        &mut self.path
+    }
+
+    pub fn parse<T: AsRef<str>>(path: &[T]) -> Result<Self, MonikerError> {
+        let path: Result<Vec<ChildName>, MonikerError> =
+            path.iter().map(ChildName::parse).collect();
         Ok(Self::new(path?))
     }
 
-    fn parse_str(input: &str) -> Result<Self, MonikerError> {
+    pub fn parse_str(input: &str) -> Result<Self, MonikerError> {
         if input.is_empty() {
             return Err(MonikerError::invalid_moniker(input));
         }
@@ -44,24 +53,20 @@ pub trait MonikerBase: Default + Eq + PartialEq + fmt::Debug + Clone + Hash + fm
             },
         };
         let path =
-            stripped.split('/').map(Self::Part::parse).collect::<Result<_, MonikerError>>()?;
+            stripped.split('/').map(ChildName::parse).collect::<Result<_, MonikerError>>()?;
         Ok(Self::new(path))
     }
 
     /// Concatenates other onto the end of this moniker.
-    fn concat<T: MonikerBase<Part = Self::Part>>(&self, other: &T) -> Self {
+    pub fn concat(&self, other: &Moniker) -> Self {
         let mut path = self.path().clone();
         let mut other_path = other.path().clone();
         path.append(&mut other_path);
         Self::new(path)
     }
 
-    fn path(&self) -> &Vec<Self::Part>;
-
-    fn path_mut(&mut self) -> &mut Vec<Self::Part>;
-
     /// Indicates whether this moniker is prefixed by prefix.
-    fn has_prefix<S: MonikerBase<Part = Self::Part>>(&self, prefix: &S) -> bool {
+    pub fn has_prefix(&self, prefix: &Moniker) -> bool {
         if self.path().len() < prefix.path().len() {
             return false;
         }
@@ -69,19 +74,19 @@ pub trait MonikerBase: Default + Eq + PartialEq + fmt::Debug + Clone + Hash + fm
         prefix.path().iter().enumerate().all(|item| *item.1 == self.path()[item.0])
     }
 
-    fn root() -> Self {
+    pub fn root() -> Self {
         Self::new(vec![])
     }
 
-    fn leaf(&self) -> Option<&Self::Part> {
+    pub fn leaf(&self) -> Option<&ChildName> {
         self.path().last()
     }
 
-    fn is_root(&self) -> bool {
+    pub fn is_root(&self) -> bool {
         self.path().is_empty()
     }
 
-    fn parent(&self) -> Option<Self> {
+    pub fn parent(&self) -> Option<Self> {
         if self.is_root() {
             None
         } else {
@@ -90,17 +95,14 @@ pub trait MonikerBase: Default + Eq + PartialEq + fmt::Debug + Clone + Hash + fm
         }
     }
 
-    fn child(&self, child: Self::Part) -> Self {
+    pub fn child(&self, child: ChildName) -> Self {
         let mut path = self.path().clone();
         path.push(child);
         Self::new(path)
     }
 
     /// Strips the moniker parts in prefix from the beginning of this moniker.
-    fn strip_prefix<T: MonikerBase<Part = Self::Part>>(
-        &self,
-        prefix: &T,
-    ) -> Result<Self, MonikerError> {
+    pub fn strip_prefix(&self, prefix: &Moniker) -> Result<Self, MonikerError> {
         if !self.has_prefix(prefix) {
             return Err(MonikerError::MonikerDoesNotHavePrefix {
                 moniker: self.to_string(),
@@ -112,63 +114,6 @@ pub trait MonikerBase: Default + Eq + PartialEq + fmt::Debug + Clone + Hash + fm
         let mut path = self.path().clone();
         path.drain(0..prefix_len);
         Ok(Self::new(path))
-    }
-
-    fn compare(&self, other: &Self) -> cmp::Ordering {
-        let min_size = cmp::min(self.path().len(), other.path().len());
-        for i in 0..min_size {
-            if self.path()[i] < other.path()[i] {
-                return cmp::Ordering::Less;
-            } else if self.path()[i] > other.path()[i] {
-                return cmp::Ordering::Greater;
-            }
-        }
-        if self.path().len() > other.path().len() {
-            return cmp::Ordering::Greater;
-        } else if self.path().len() < other.path().len() {
-            return cmp::Ordering::Less;
-        }
-
-        return cmp::Ordering::Equal;
-    }
-
-    fn format(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.path().is_empty() {
-            write!(f, ".")?;
-        } else {
-            write!(f, "{}", self.path()[0])?;
-            for segment in self.path()[1..].iter() {
-                write!(f, "/{}", segment)?;
-            }
-        }
-        Ok(())
-    }
-}
-
-/// Moniker describes the identity of a component instance
-/// in terms of its path relative to the root of the component instance
-/// tree. The constituent parts of a Moniker do not include the
-/// instance ID of the child.
-///
-/// Display notation: ".", "name1", "name1/name2", ...
-#[derive(Eq, PartialEq, Clone, Hash, Default)]
-pub struct Moniker {
-    path: Vec<ChildName>,
-}
-
-impl MonikerBase for Moniker {
-    type Part = ChildName;
-
-    fn new(path: Vec<Self::Part>) -> Self {
-        Self { path }
-    }
-
-    fn path(&self) -> &Vec<Self::Part> {
-        &self.path
-    }
-
-    fn path_mut(&mut self) -> &mut Vec<Self::Part> {
-        &mut self.path
     }
 }
 
@@ -197,7 +142,21 @@ impl std::str::FromStr for Moniker {
 
 impl cmp::Ord for Moniker {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        self.compare(other)
+        let min_size = cmp::min(self.path().len(), other.path().len());
+        for i in 0..min_size {
+            if self.path()[i] < other.path()[i] {
+                return cmp::Ordering::Less;
+            } else if self.path()[i] > other.path()[i] {
+                return cmp::Ordering::Greater;
+            }
+        }
+        if self.path().len() > other.path().len() {
+            return cmp::Ordering::Greater;
+        } else if self.path().len() < other.path().len() {
+            return cmp::Ordering::Less;
+        }
+
+        cmp::Ordering::Equal
     }
 }
 
@@ -209,13 +168,21 @@ impl PartialOrd for Moniker {
 
 impl fmt::Display for Moniker {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.format(f)
+        if self.path().is_empty() {
+            write!(f, ".")?;
+        } else {
+            write!(f, "{}", self.path()[0])?;
+            for segment in self.path()[1..].iter() {
+                write!(f, "/{}", segment)?;
+            }
+        }
+        Ok(())
     }
 }
 
 impl fmt::Debug for Moniker {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.format(f)
+        write!(f, "{self}")
     }
 }
 

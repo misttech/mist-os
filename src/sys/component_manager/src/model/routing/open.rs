@@ -25,7 +25,7 @@ use {
     ::routing::component_instance::ComponentInstanceInterface,
     errors::{CapabilityProviderError, ModelError, OpenError},
     fidl_fuchsia_io as fio,
-    moniker::{ExtendedMoniker, MonikerBase},
+    moniker::ExtendedMoniker,
     std::sync::Arc,
     vfs::{directory::entry::OpenRequest, remote::remote_dir},
 };

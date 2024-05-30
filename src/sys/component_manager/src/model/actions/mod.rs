@@ -231,9 +231,7 @@ impl ActionsManager {
 #[cfg(test)]
 pub(crate) mod test_utils {
     use {
-        super::*,
-        crate::model::component::instance::InstanceState,
-        moniker::{ChildName, MonikerBase},
+        super::*, crate::model::component::instance::InstanceState, moniker::ChildName,
         routing::component_instance::ComponentInstanceInterface,
     };
 

@@ -25,7 +25,7 @@ use {
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::prelude::*,
     lazy_static::lazy_static,
-    moniker::{ChildName, ChildNameBase, Moniker},
+    moniker::{ChildName, Moniker},
     std::{
         cmp,
         sync::{Arc, Weak},
@@ -374,7 +374,6 @@ mod tests {
         fuchsia_component::client,
         futures::lock::Mutex,
         hooks::EventType,
-        moniker::MonikerBase,
         routing_test_helpers::component_decl_with_exposed_binder,
         std::collections::HashSet,
     };

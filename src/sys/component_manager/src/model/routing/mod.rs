@@ -24,7 +24,6 @@ use {
     errors::ModelError,
     fidl::endpoints::create_proxy,
     fidl_fuchsia_io as fio,
-    moniker::MonikerBase,
     router_error::{Explain, RouterError},
     std::{collections::BTreeMap, sync::Arc},
     tracing::{info, warn},

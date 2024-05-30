@@ -7,7 +7,7 @@ use {
     anyhow::{format_err, Result},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys,
     fuchsia_url::AbsoluteComponentUrl,
-    moniker::{ChildNameBase, Moniker, MonikerBase},
+    moniker::Moniker,
 };
 
 pub async fn create_cmd<W: std::io::Write>(

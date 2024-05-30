@@ -32,7 +32,7 @@ use {
         stream::{FuturesUnordered, StreamExt},
         Future, TryFutureExt, TryStreamExt,
     },
-    moniker::{Moniker, MonikerBase},
+    moniker::Moniker,
     routing::{component_instance::ComponentInstanceInterface, RouteRequest},
     std::{path::PathBuf, sync::Arc},
     tracing::{debug, error, warn},

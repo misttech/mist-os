@@ -12,7 +12,7 @@ use {
     cm_rust_testing::*,
     component_id_index::InstanceId,
     fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status,
-    moniker::{ExtendedMoniker, Moniker, MonikerBase},
+    moniker::{ExtendedMoniker, Moniker},
     std::{collections::HashSet, marker::PhantomData},
 };
 

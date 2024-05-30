@@ -214,7 +214,6 @@ mod tests {
         hooks::Hooks,
         lazy_static::lazy_static,
         moniker::Moniker,
-        moniker::MonikerBase,
         routing::environment::{DebugRegistry, RunnerRegistry},
         routing::resolving::ComponentResolutionContext,
         serde_json::json,

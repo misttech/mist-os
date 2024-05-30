@@ -24,7 +24,7 @@ use {
     fidl::endpoints::ProtocolMarker,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx,
-    moniker::{ExtendedMoniker, Moniker, MonikerBase},
+    moniker::{ExtendedMoniker, Moniker},
     routing::{
         capability_source::{
             AggregateCapability, AggregateMember, CapabilitySource, ComponentCapability,

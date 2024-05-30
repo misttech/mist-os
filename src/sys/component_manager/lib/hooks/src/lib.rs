@@ -442,7 +442,7 @@ impl Hooks {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, moniker::MonikerBase};
+    use super::*;
 
     // This test verifies that the payload of the CapabilityRequested event will be transferred.
     #[fuchsia::test]

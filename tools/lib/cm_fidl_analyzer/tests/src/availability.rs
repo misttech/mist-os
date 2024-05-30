@@ -7,7 +7,7 @@ mod tests {
         crate::routing::RoutingTestBuilderForAnalyzer,
         cm_rust::{Availability, ExposeSource},
         cm_rust_testing::*,
-        moniker::{Moniker, MonikerBase},
+        moniker::Moniker,
         routing_test_helpers::{
             availability::CommonAvailabilityTest, CheckUse, ExpectedResult, RoutingTestModel,
             RoutingTestModelBuilder, ServiceInstance,

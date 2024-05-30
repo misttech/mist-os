@@ -16,7 +16,7 @@ use {
     futures::{stream, stream::Peekable, Stream, StreamExt},
     hooks::{CapabilityReceiver, EventPayload, EventType, HasEventType},
     measure_tape_for_events::Measurable,
-    moniker::{ChildNameBase, ExtendedMoniker, Moniker, MonikerBase},
+    moniker::{ExtendedMoniker, Moniker},
     std::{pin::Pin, sync::Arc, task::Poll},
     tracing::{error, warn},
 };
@@ -484,7 +484,6 @@ mod tests {
     use moniker::ChildName;
     use moniker::ExtendedMoniker;
     use moniker::Moniker;
-    use moniker::MonikerBase;
 
     // Route: /root(coll)
     // Event: /root

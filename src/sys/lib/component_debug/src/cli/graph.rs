@@ -6,7 +6,6 @@ use {
     crate::realm::{get_all_instances, Instance},
     anyhow::Result,
     fidl_fuchsia_sys2 as fsys,
-    moniker::MonikerBase,
     std::{collections::HashSet, fmt::Write, str::FromStr},
     url::Url,
 };

@@ -7,7 +7,7 @@ use {
     errors::ModelError,
     futures::{executor::block_on, lock::Mutex, prelude::*},
     hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
-    moniker::{ChildNameBase, Moniker, MonikerBase},
+    moniker::Moniker,
     std::{
         cmp::Eq,
         collections::HashMap,

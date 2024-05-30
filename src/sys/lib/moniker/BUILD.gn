@@ -42,3 +42,8 @@ rustc_library("moniker") {
 fuchsia_unittest_package("moniker-tests") {
   deps = [ ":moniker_test" ]
 }
+
+group("tests") {
+  testonly = true
+  deps = [ ":moniker-tests" ]
+}

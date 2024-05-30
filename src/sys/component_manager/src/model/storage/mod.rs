@@ -25,7 +25,7 @@ use {
     fidl::endpoints::{create_proxy, ServerEnd},
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     futures::FutureExt,
-    moniker::{Moniker, MonikerBase},
+    moniker::Moniker,
     sandbox::Dict,
     std::{path::PathBuf, sync::Arc},
     vfs::{directory::entry::OpenRequest, ToObjectRequest},
