@@ -47,10 +47,13 @@ template("ffx") {
       # See https://fxbug.dev/42062387 for context.
       pool = "//build/config:highmem($default_toolchain)"
 
+      # Requires RBE machine with more memory.
+      configs += [ "//build/config:big_rbe_machine" ]
+
       # Since remote workers tend to be slightly slower than the local
       # machine, and ffx is frequently on critical path, race local against
-      # remote execution, which stll lets it remotely cache.
-      configs += [ "//build/config/rust:rbe_strategy_racing" ]
+      # remote execution, which still lets it remotely cache.
+      # configs += [ "//build/config/rust:rbe_strategy_racing" ]
 
       # Use up to 16 threads for codegen
       configs += [ "//build/config/rust:codegen_units_16" ]
