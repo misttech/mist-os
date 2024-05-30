@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// This file includes basic VFS file/directory connection tests. For comprehensive behavioral tests,
+// see the fuchsia.io Conformance Test Suite in //src/storage/conformance.
+
 #include <fidl/fuchsia.io/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -49,6 +52,10 @@ class FileOrDirectory : public fs::Vnode {
         .id = 1234,
         .modification_time = modification_time_,
     });
+  }
+
+  bool ValidateRights(fio::Rights rights) const final {
+    return (rights & fio::Rights::kExecute) == fio::Rights();
   }
 
   zx::result<> UpdateAttributes(const fs::VnodeAttributesUpdate& attributes) final {
@@ -108,6 +115,32 @@ zx::result<fio::wire::NodeInfoDeprecated> GetOnOpenResponse(
   return zx::ok(std::move(response.info.value()));
 }
 
+// Helper method to monitor the OnRepresentation event. Used by the tests below to decode the
+// fuchsia.io/Node.OnRepresentation event, or to check for the correct epitaph on errors.
+zx::result<fio::Representation> GetOnRepresentation(fidl::UnownedClientEnd<fio::Node> channel) {
+  struct EventHandler final : public fidl::testing::WireSyncEventHandlerTestBase<fio::Node> {
+   public:
+    void OnRepresentation(fidl::WireEvent<fio::Node::OnRepresentation>* event) override {
+      ZX_ASSERT(event);
+      representation = fidl::ToNatural(std::move(*event));
+    }
+
+    void NotImplemented_(const std::string& name) override {
+      ADD_FAILURE("unexpected %s", name.c_str());
+    }
+
+    std::optional<fio::Representation> representation = std::nullopt;
+  };
+
+  EventHandler event_handler;
+  const fidl::Status result = event_handler.HandleOneEvent(channel);
+  if (!result.ok()) {
+    return zx::error(result.status());
+  }
+  ZX_ASSERT(event_handler.representation);
+  return zx::ok(std::move(*event_handler.representation));
+}
+
 class VfsTestSetup : public zxtest::Test {
  public:
   // Setup file structure with one directory and one file. Note: On creation directories and files
@@ -128,10 +161,12 @@ class VfsTestSetup : public zxtest::Test {
     return vfs_.ServeDirectory(root_, std::move(server_end));
   }
 
+  void SetReadonly() { vfs_.SetReadonly(true); }
+
  protected:
   void SetUp() override { loop_.StartThread(); }
 
-  void TearDown() override { loop_.Shutdown(); }
+  void TearDown() override { loop_.RunUntilIdle(); }
 
  private:
   async::Loop loop_;
@@ -458,6 +493,52 @@ TEST_F(ConnectionTest, NegotiateProtocol) {
   }
 }
 
+TEST_F(ConnectionTest, NegotiateProtocolOpen2) {
+  // Create connection to vfs
+  auto root = fidl::Endpoints<fio::Directory>::Create();
+  ASSERT_OK(ConnectClient(std::move(root.server)));
+
+  {
+    // Connect to polymorphic node as a directory.
+    zx::result dc = fidl::CreateEndpoints<fio::Node>();
+    ASSERT_OK(dc.status_value());
+    fio::NodeProtocols node_protocols;
+    node_protocols.directory() = fio::DirectoryProtocolOptions{};
+    fio::NodeOptions options;
+    options.flags() = fio::NodeFlags::kGetRepresentation;
+    options.protocols() = std::move(node_protocols);
+    fio::ConnectionProtocols protocols = fio::ConnectionProtocols::WithNode(std::move(options));
+    fidl::Arena arena;
+    auto wire_obj = fidl::ToWire(arena, std::move(protocols));
+    ASSERT_OK(fidl::WireCall(root.client)
+                  ->Open2(fidl::StringView("file_or_dir"), wire_obj, dc->server.TakeChannel())
+                  .status());
+    zx::result<fio::Representation> dir_info = GetOnRepresentation(dc->client);
+    ASSERT_OK(dir_info);
+    ASSERT_EQ(dir_info->Which(), fio::Representation::Tag::kDirectory);
+  }
+
+  {
+    // Connect to polymorphic node as a file.
+    zx::result fc = fidl::CreateEndpoints<fio::Node>();
+    ASSERT_OK(fc.status_value());
+    fio::NodeProtocols node_protocols;
+    node_protocols.file() = fio::FileProtocolFlags{};
+    fio::NodeOptions options;
+    options.flags() = fio::NodeFlags::kGetRepresentation;
+    options.protocols() = std::move(node_protocols);
+    fio::ConnectionProtocols protocols = fio::ConnectionProtocols::WithNode(std::move(options));
+    fidl::Arena arena;
+    auto wire_obj = fidl::ToWire(arena, std::move(protocols));
+    ASSERT_OK(fidl::WireCall(root.client)
+                  ->Open2(fidl::StringView("file_or_dir"), wire_obj, fc->server.TakeChannel())
+                  .status());
+    zx::result<fio::Representation> file_info = GetOnRepresentation(fc->client);
+    ASSERT_OK(file_info);
+    ASSERT_EQ(file_info->Which(), fio::Representation::Tag::kFile);
+  }
+}
+
 TEST_F(ConnectionTest, PrevalidateFlagsOpenFailure) {
   // Create connection to vfs
   auto root = fidl::Endpoints<fio::Directory>::Create();
@@ -475,6 +556,83 @@ TEST_F(ConnectionTest, PrevalidateFlagsOpenFailure) {
           ->Open(kInvalidFlagCombo, {}, fidl::StringView("file_or_dir"), std::move(dc->server))
           .status());
   ASSERT_EQ(GetOnOpenResponse(dc->client).status_value(), ZX_ERR_INVALID_ARGS);
+}
+
+TEST_F(ConnectionTest, ValidateRights) {
+  // Create connection to vfs
+  auto root = fidl::Endpoints<fio::Directory>::Create();
+  ASSERT_OK(ConnectClient(std::move(root.server)));
+  // The test Vnode should disallow execute rights.
+  {
+    zx::result fc = fidl::CreateEndpoints<fio::Node>();
+    ASSERT_OK(fc.status_value());
+    fio::NodeProtocols node_protocols;
+    node_protocols.file() = fio::FileProtocolFlags{};
+    fio::NodeOptions options;
+    options.flags() = fio::NodeFlags::kGetRepresentation;
+    options.protocols() = std::move(node_protocols);
+    options.rights() = fio::Rights::kExecute;
+    fio::ConnectionProtocols protocols = fio::ConnectionProtocols::WithNode(std::move(options));
+    fidl::Arena arena;
+    auto wire_obj = fidl::ToWire(arena, std::move(protocols));
+    ASSERT_OK(fidl::WireCall(root.client)
+                  ->Open2(fidl::StringView("file_or_dir"), wire_obj, fc->server.TakeChannel())
+                  .status());
+    zx::result<fio::Representation> file_info = GetOnRepresentation(fc->client);
+    ASSERT_EQ(file_info.status_value(), ZX_ERR_ACCESS_DENIED);
+  }
+}
+
+TEST_F(ConnectionTest, ValidateRightsReadonly) {
+  // Set the filesystem as read-only before creating a root connection.
+  SetReadonly();
+  auto root = fidl::Endpoints<fio::Directory>::Create();
+  ASSERT_OK(ConnectClient(std::move(root.server)));
+
+  {
+    // If the filesystem is read only, we shouldn't be able to open files as writable.
+    zx::result fc = fidl::CreateEndpoints<fio::Node>();
+    ASSERT_OK(fc.status_value());
+    fio::NodeProtocols node_protocols;
+    node_protocols.file() = fio::FileProtocolFlags{};
+    fio::NodeOptions options;
+    options.flags() = fio::NodeFlags::kGetRepresentation;
+    options.protocols() = std::move(node_protocols);
+    options.rights() = fio::Rights::kWriteBytes;
+    fio::ConnectionProtocols protocols = fio::ConnectionProtocols::WithNode(std::move(options));
+    fidl::Arena arena;
+    auto wire_obj = fidl::ToWire(arena, std::move(protocols));
+    ASSERT_OK(fidl::WireCall(root.client)
+                  ->Open2(fidl::StringView("file_or_dir"), wire_obj, fc->server.TakeChannel())
+                  .status());
+    zx::result<fio::Representation> file_info = GetOnRepresentation(fc->client);
+    ASSERT_EQ(file_info.status_value(), ZX_ERR_ACCESS_DENIED);
+  }
+  {
+    // If the filesystem is read only, we shouldn't be granted mutable rights for directories.
+    zx::result fc = fidl::CreateEndpoints<fio::Node>();
+    ASSERT_OK(fc.status_value());
+    fio::NodeProtocols node_protocols;
+    node_protocols.directory() = fio::DirectoryProtocolOptions{};
+    node_protocols.directory()->optional_rights() = fio::Rights::kModifyDirectory;
+    fio::NodeOptions options;
+    options.flags() = fio::NodeFlags::kGetRepresentation;
+    options.protocols() = std::move(node_protocols);
+    options.rights() = fio::Rights::kGetAttributes;
+    fio::ConnectionProtocols protocols = fio::ConnectionProtocols::WithNode(std::move(options));
+    fidl::Arena arena;
+    auto wire_obj = fidl::ToWire(arena, std::move(protocols));
+    ASSERT_OK(fidl::WireCall(root.client)
+                  ->Open2(fidl::StringView("file_or_dir"), wire_obj, fc->server.TakeChannel())
+                  .status());
+    zx::result<fio::Representation> dir_info = GetOnRepresentation(fc->client);
+    ASSERT_OK(dir_info);
+    ASSERT_EQ(dir_info->Which(), fio::Representation::Tag::kDirectory);
+    auto connection_info = fidl::WireCall(fc->client)->GetConnectionInfo();
+    ASSERT_OK(connection_info);
+    ASSERT_TRUE(connection_info.value().has_rights());
+    ASSERT_EQ(connection_info.value().rights(), fio::Rights::kGetAttributes);
+  }
 }
 
 // A vnode which maintains a counter of number of |Open| calls that have not been balanced out with

@@ -150,6 +150,7 @@ async fn test_node_clone() {
                     node: Some(fio::NodeProtocolFlags::default()),
                     ..Default::default()
                 }),
+                rights: Some(fio::Rights::GET_ATTRIBUTES | fio::Rights::READ_BYTES),
                 ..Default::default()
             },
         )
@@ -161,7 +162,10 @@ async fn test_node_clone() {
 
     assert_matches!(
         proxy2.get_connection_info().await.expect("get_connection_info failed"),
-        fio::ConnectionInfo { rights: Some(fio::Operations::GET_ATTRIBUTES), .. }
+        fio::ConnectionInfo {
+            rights: Some(fio::Rights::GET_ATTRIBUTES | fio::Rights::READ_BYTES),
+            ..
+        }
     );
 }
 

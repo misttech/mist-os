@@ -233,7 +233,13 @@ impl RemoteFs {
                     (remote_node, attrs.id, false)
                 }
                 Err(status) => return Err(from_status_like_fdio!(status)),
-                Ok(zxio) => (RemoteNode { zxio: Arc::new(zxio), rights }, attrs.id, true),
+                Ok(zxio) => (
+                    RemoteNode { zxio: Arc::new(zxio), rights },
+                    attrs.id,
+                    // Only use Open2 if the filesystem supports POSIX attributes. All unit tests
+                    // currently use fxfs, which does support POSIX attributes.
+                    cfg!(any(feature = "posix_attributes", test)),
+                ),
             };
 
         if !rights.contains(fio::OpenFlags::RIGHT_WRITABLE) {

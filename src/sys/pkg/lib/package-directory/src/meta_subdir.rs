@@ -16,12 +16,9 @@ use {
         execution_scope::ExecutionScope,
         immutable_attributes,
         path::Path as VfsPath,
-        ObjectRequestRef, ToObjectRequest,
+        ObjectRequestRef, ProtocolsExt as _, ToObjectRequest,
     },
 };
-
-#[cfg(feature = "supports_open2")]
-use vfs::ProtocolsExt as _;
 
 pub(crate) struct MetaSubdir<S: crate::NonMetaStorage> {
     root_dir: Arc<RootDir<S>>,
@@ -141,18 +138,6 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
         let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
     }
 
-    #[cfg(not(feature = "supports_open2"))]
-    fn open2(
-        self: Arc<Self>,
-        _scope: ExecutionScope,
-        _path: VfsPath,
-        _protocols: fio::ConnectionProtocols,
-        _object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), zx::Status> {
-        Err(zx::Status::NOT_SUPPORTED)
-    }
-
-    #[cfg(feature = "supports_open2")]
     fn open2(
         self: Arc<Self>,
         scope: ExecutionScope,
@@ -456,7 +441,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_self() {
         let (_env, sub_dir) = TestEnv::new().await;
@@ -480,7 +464,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_file() {
         let (_env, sub_dir) = TestEnv::new().await;
@@ -501,7 +484,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_directory() {
         let (_env, sub_dir) = TestEnv::new().await;
@@ -529,7 +511,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_open_modes() {
         let (_env, sub_dir) = TestEnv::new().await;
@@ -553,7 +534,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_rights() {
         let (_env, sub_dir) = TestEnv::new().await;
@@ -576,7 +556,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_file_protocols() {
         let (_env, sub_dir) = TestEnv::new().await;

@@ -76,6 +76,7 @@ class TestHarness : public fidl::Server<fio_test::Io1Harness> {
     fio_test::Io1Config config;
 
     // Supported options
+    config.supports_open2(true);
     config.supports_get_backing_memory(true);
     config.supports_get_token(true);
     config.supports_create(true);

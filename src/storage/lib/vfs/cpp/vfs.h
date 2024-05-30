@@ -50,6 +50,7 @@ struct VdirCookie {
 class Vfs {
  public:
   class OpenResult;
+  class Open2Result;
 
   Vfs();
   virtual ~Vfs() = default;
@@ -62,6 +63,11 @@ class Vfs {
   OpenResult Open(fbl::RefPtr<Vnode> vn, std::string_view path, VnodeConnectionOptions options,
                   fuchsia_io::Rights connection_rights) __TA_EXCLUDES(vfs_lock_);
 
+  // Traverse the path to the target node, and create or open it.
+  zx::result<Open2Result> Open2(fbl::RefPtr<Vnode> vndir, std::string_view path,
+                                const fuchsia_io::wire::ConnectionProtocols& protocols,
+                                fuchsia_io::Rights connection_rights) __TA_EXCLUDES(vfs_lock_);
+
   // Implements Unlink for a pre-validated and trimmed name.
   virtual zx_status_t Unlink(fbl::RefPtr<Vnode> vn, std::string_view name, bool must_be_dir)
       __TA_EXCLUDES(vfs_lock_);
@@ -73,6 +79,12 @@ class Vfs {
 
   // Sets whether this file system is read-only.
   void SetReadonly(bool value) __TA_EXCLUDES(vfs_lock_);
+
+  // Query if this file system is read-only.
+  bool IsReadonly() const __TA_EXCLUDES(vfs_lock_) {
+    std::lock_guard lock(vfs_lock_);
+    return readonly_;
+  }
 
  protected:
   // Whether this file system is read-only.
@@ -158,6 +170,80 @@ class Vfs::OpenResult {
   using Variants = std::variant<Error, Remote, Ok>;
 
   Variants variants_;
+};
+
+// Holds a (possibly opened) Vnode, ensuring that the open count is managed correctly.
+class Vfs::Open2Result {
+ public:
+  // Cannot allow copy as this will result in the open count being incorrect.
+  Open2Result(const Open2Result&) = delete;
+  Open2Result& operator=(const Open2Result&) = delete;
+  Open2Result(Open2Result&&) = default;
+  Open2Result& operator=(Open2Result&&) = default;
+
+  // Handles opening |vnode| if required based on the specified |protocol|. The |vnode| will be
+  // closed when this object is destroyed, if required, unless |TakeVnode()| is called.
+  static zx::result<Open2Result> OpenVnode(fbl::RefPtr<fs::Vnode> vnode, VnodeProtocol protocol) {
+    // We don't open the node for node reference connections.
+    if (protocol == VnodeProtocol::kNode) {
+      return Open2Result::Local(std::move(vnode), protocol);
+    }
+    if (zx_status_t status = fs::OpenVnode(&vnode); status != ZX_OK) {
+      return zx::error(status);
+    }
+    if (vnode->IsRemote()) {
+      // Opening the node redirected us to a remote, forward the request to it.
+      return Open2Result::Remote(std::move(vnode), ".");
+    }
+    return Open2Result::Local(std::move(vnode), protocol);
+  }
+
+  // Creates a new |Open2Result| from a remote |vnode|. This object keeps an unowned copy of |path|,
+  // so the underlying string must outlive this object.
+  static zx::result<Open2Result> Remote(fbl::RefPtr<fs::Vnode> vnode, std::string_view path) {
+    ZX_DEBUG_ASSERT(vnode->IsRemote());
+    return zx::ok(Open2Result(std::move(vnode), path));
+  }
+
+  // Creates a new |Open2Result| from a local node. |vnode| is assumed to already have been opened,
+  // and unless |TakeVnode()| is called, will be closed when this object is destroyed.
+  static zx::result<Open2Result> Local(fbl::RefPtr<fs::Vnode> vnode, VnodeProtocol protocol) {
+    ZX_DEBUG_ASSERT(!vnode->IsRemote());
+    return zx::ok(Open2Result(std::move(vnode), protocol));
+  }
+
+  // Ensure we roll back the vnode open count when required. There are only two cases where we do
+  // not open a vnode: 1) remote nodes, and 2) node-reference connections
+  ~Open2Result() {
+    if (vnode_ && !vnode_->IsRemote() && protocol_ && *protocol_ != VnodeProtocol::kNode) {
+      vnode_->Close();
+    }
+  }
+
+  // Take the vnode out of this object. The caller is responsible for closing the node if required.
+  fbl::RefPtr<fs::Vnode> TakeVnode() { return std::exchange(vnode_, nullptr); }
+  const fbl::RefPtr<fs::Vnode>& vnode() const { return vnode_; }
+
+  // The protocol which was negotiated for this node if we resolved it locally. The vnode must not
+  // be a remote, as the remote server is responsible for performing protocol negotiation.
+  fs::VnodeProtocol protocol() const {
+    ZX_DEBUG_ASSERT(!vnode_->IsRemote());
+    return *protocol_;
+  }
+
+  // Remainder of the path to forward if this is a remote node.
+  std::string_view path() const { return path_; }
+
+ private:
+  Open2Result() = delete;
+  Open2Result(fbl::RefPtr<fs::Vnode> vnode, fs::VnodeProtocol protocol)
+      : vnode_(std::move(vnode)), protocol_(protocol) {}
+  Open2Result(fbl::RefPtr<fs::Vnode> vnode, std::string_view path)
+      : vnode_(std::move(vnode)), path_(path) {}
+
+  fbl::RefPtr<fs::Vnode> vnode_;
+  std::optional<fs::VnodeProtocol> protocol_;
+  std::string_view path_;
 };
 
 }  // namespace fs

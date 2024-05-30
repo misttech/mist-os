@@ -32,8 +32,9 @@ class RemoteDir : public Vnode {
   // |Vnode| implementation:
   fuchsia_io::NodeProtocolKinds GetProtocols() const final;
   bool IsRemote() const final;
-  zx_status_t OpenRemote(fuchsia_io::OpenFlags, fuchsia_io::ModeType, fidl::StringView,
-                         fidl::ServerEnd<fuchsia_io::Node>) const final;
+  void OpenRemote(fuchsia_io::OpenFlags, fuchsia_io::ModeType, fidl::StringView,
+                  fidl::ServerEnd<fuchsia_io::Node>) const final;
+  void OpenRemote(fuchsia_io::wire::Directory2Open2Request request) const final;
 
  protected:
   friend fbl::internal::MakeRefCountedHelper<RemoteDir>;

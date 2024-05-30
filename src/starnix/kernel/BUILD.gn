@@ -8,6 +8,7 @@ import("//build/rust/rustc_macro.gni")
 import("//build/rust/rustc_test.gni")
 import("//src/starnix/kernel/starnix.gni")
 import("//src/starnix/lib/gzip/gzip.gni")
+import("//src/storage/fshost/generated_fshost_config.gni")
 import("//tools/protobuf/rust_proto_library.gni")
 import("args.gni")
 
@@ -436,6 +437,9 @@ rustc_library("starnix_core") {
   }
   if (starnix_enable_alternate_anon_allocs) {
     features += [ "alternate_anon_allocs" ]
+  }
+  if (data_filesystem_format == "fxfs") {
+    features += [ "posix_attributes" ]
   }
   inputs = [
     "//src/starnix/lib/selinux/testdata/micro_policies/hooks_tests_policy.pp",

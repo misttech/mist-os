@@ -110,21 +110,27 @@ void NodeConnection::QueryFilesystem(QueryFilesystemCompleter::Sync& completer) 
 }
 
 zx::result<> NodeConnection::WithRepresentation(
-    fit::callback<void(fuchsia_io::wire::Representation)> handler,
-    std::optional<fuchsia_io::NodeAttributesQuery> query) const {
-  // TODO(https://fxbug.dev/324112857): Handle |query|.
+    fit::callback<zx::result<>(fio::wire::Representation)> handler,
+    std::optional<fio::NodeAttributesQuery> query) const {
+  using NodeRepresentation = fio::wire::ConnectorInfo;
+  fidl::WireTableFrame<NodeRepresentation> representation_frame;
+  auto builder = NodeRepresentation::ExternalBuilder(
+      fidl::ObjectView<fidl::WireTableFrame<NodeRepresentation>>::FromExternal(
+          &representation_frame));
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
+  NodeAttributeBuilder attributes_builder;
+  zx::result<fio::wire::NodeAttributes2> attributes;
   if (query) {
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
+    attributes = attributes_builder.Build(*vnode(), *query);
+    if (attributes.is_error()) {
+      return attributes.take_error();
+    }
+    builder.attributes(fidl::ObjectView<fio::wire::NodeAttributes2>::FromExternal(&(*attributes)));
   }
-  fidl::WireTableFrame<fuchsia_io::wire::ConnectorInfo> info_frame;
-  auto info_builder = fuchsia_io::wire::ConnectorInfo::ExternalBuilder(
-      fidl::ObjectView<fidl::WireTableFrame<fuchsia_io::wire::ConnectorInfo>>::FromExternal(
-          &info_frame));
-  auto info = info_builder.Build();
-  auto representation = fuchsia_io::wire::Representation::WithConnector(
-      fidl::ObjectView<fuchsia_io::wire::ConnectorInfo>::FromExternal(&info));
-  handler(std::move(representation));
-  return zx::ok();
+#endif
+  auto representation = builder.Build();
+  return handler(fuchsia_io::wire::Representation::WithConnector(
+      fidl::ObjectView<NodeRepresentation>::FromExternal(&representation)));
 }
 
 zx::result<> NodeConnection::WithNodeInfoDeprecated(

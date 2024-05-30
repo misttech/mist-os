@@ -198,7 +198,30 @@ zx::result<VnodeProtocol> NegotiateProtocol(fio::NodeProtocolKinds supported,
   return zx::error(ZX_ERR_WRONG_TYPE);
 }
 
-// Helper function to reduce verbosity in |NodeAttributes::Build| impl below. Returns an external
+fio::NodeProtocolKinds GetProtocols(const fio::wire::ConnectionProtocols& protocols) {
+  if (protocols.is_connector()) {
+    return fio::NodeProtocolKinds::kConnector;
+  }
+  if (!protocols.node().has_protocols()) {
+    return fio::NodeProtocolKinds::kMask ^ fio::NodeProtocolKinds::kConnector;
+  }
+  fio::NodeProtocolKinds allowed_protocols = {};
+  const fio::wire::NodeProtocols& node_protocols = protocols.node().protocols();
+  if (node_protocols.has_directory()) {
+    allowed_protocols |= fio::NodeProtocolKinds::kDirectory;
+  }
+  if (node_protocols.has_file()) {
+    allowed_protocols |= fio::NodeProtocolKinds::kFile;
+  }
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  if (node_protocols.has_symlink()) {
+    allowed_protocols |= fio::NodeProtocolKinds::kSymlink;
+  }
+#endif
+  return allowed_protocols;
+}
+
+// Helper function to reduce verbosity in |NodeAttributes:Build| impl below. Returns an external
 // (non-owning) |fidl::ObjectView| to |obj|.
 template <typename T>
 fidl::ObjectView<T> ExternalView(T& obj) {

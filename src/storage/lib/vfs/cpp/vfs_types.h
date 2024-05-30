@@ -59,9 +59,15 @@ constexpr fuchsia_io::Rights All() { return fuchsia_io::Rights::kMask; }
 
 }  // namespace Rights
 
+// All io1 OpenFlags that correspond to connection rights.
 constexpr fuchsia_io::OpenFlags kAllIo1Rights = fuchsia_io::OpenFlags::kRightReadable |
                                                 fuchsia_io::OpenFlags::kRightWritable |
                                                 fuchsia_io::OpenFlags::kRightExecutable;
+
+// All io2 Rights that allow a connection to modify the filesystem.
+constexpr fuchsia_io::Rights kAllMutableIo2Rights = fuchsia_io::Rights::kWriteBytes |
+                                                    fuchsia_io::Rights::kModifyDirectory |
+                                                    fuchsia_io::Rights::kUpdateAttributes;
 
 // Specifies the type of object when creating new nodes.
 enum class CreationType : uint8_t {
@@ -77,7 +83,7 @@ enum class VnodeProtocol : uint8_t {
   kService = uint64_t{fuchsia_io::NodeProtocolKinds::kConnector},
   kDirectory = uint64_t{fuchsia_io::NodeProtocolKinds::kDirectory},
   kFile = uint64_t{fuchsia_io::NodeProtocolKinds::kFile},
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+#if !defined(__Fuchsia__) || FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   kSymlink = uint64_t{fuchsia_io::NodeProtocolKinds::kSymlink},
 #endif
 };
@@ -141,7 +147,7 @@ struct VnodeConnectionOptions {
   // Translates the io1 flags passed by the client into an equivalent set of io2 protocols.
   constexpr fuchsia_io::NodeProtocolKinds protocols() const {
     constexpr fuchsia_io::NodeProtocolKinds kSupportedIo1Protocols =
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+#if !defined(__Fuchsia__) || FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
         // Symlinks are not supported via io1.
         fuchsia_io::NodeProtocolKinds::kMask ^ fuchsia_io::NodeProtocolKinds::kSymlink;
 #else
@@ -310,6 +316,8 @@ zx::result<VnodeProtocol> NegotiateProtocol(fuchsia_io::NodeProtocolKinds suppor
 // reported by the io1 GetAttrs method. Callers should use the io2 GetAttributes method to get
 // an accurate representation of the mode bits.
 uint32_t GetPosixMode(fuchsia_io::NodeProtocolKinds protocols, fuchsia_io::Abilities abilities);
+
+fuchsia_io::NodeProtocolKinds GetProtocols(const fuchsia_io::wire::ConnectionProtocols& protocols);
 
 // Encapsulates the state of a node's wire attributes on the stack. Used by connections for sending
 // an OnRepresentation event or responding to a fuchsia.io/Node.GetAttributes call.

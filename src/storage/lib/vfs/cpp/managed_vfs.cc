@@ -94,11 +94,11 @@ void ManagedVfs::FinishShutdown(async_dispatcher_t*, async::TaskBase*,
   // |this| can be deleted at this point!
 }
 
-zx_status_t ManagedVfs::RegisterConnection(std::unique_ptr<internal::Connection> connection,
-                                           zx::channel channel) {
+zx::result<> ManagedVfs::RegisterConnection(std::unique_ptr<internal::Connection> connection,
+                                            zx::channel& channel) {
   std::lock_guard lock(lock_);
   if (is_shutting_down_.load()) {
-    return ZX_ERR_CANCELED;
+    return zx::error(ZX_ERR_CANCELED);
   }
   connections_.push_back(std::move(connection));
   connections_.back().Bind(std::move(channel), [this](internal::Connection* connection) {
@@ -122,7 +122,7 @@ zx_status_t ManagedVfs::RegisterConnection(std::unique_ptr<internal::Connection>
 
     // |closer| will call the callback here if it's the last connection to be closed.
   });
-  return ZX_OK;
+  return zx::ok();
 }
 
 bool ManagedVfs::IsTerminating() const { return is_shutting_down_.load(); }

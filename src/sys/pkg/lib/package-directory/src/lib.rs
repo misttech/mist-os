@@ -12,11 +12,9 @@ use {
     vfs::{
         common::send_on_open_with_error,
         directory::{entry::EntryInfo, entry_container::Directory},
+        ObjectRequestRef,
     },
 };
-
-#[cfg(feature = "supports_open2")]
-use vfs::ObjectRequestRef;
 
 mod meta_as_dir;
 mod meta_as_file;
@@ -89,8 +87,6 @@ pub trait NonMetaStorage: Send + Sync + 'static {
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(), fuchsia_fs::node::OpenError>;
 
-    #[cfg(feature = "supports_open2")]
-    // TODO(https://fxbug.dev/324112857): Remove feature gate when Blobfs supports `open2`.
     fn open2(
         &self,
         _blob: &fuchsia_hash::Hash,
@@ -112,7 +108,6 @@ impl NonMetaStorage for blobfs::Client {
             .map_err(fuchsia_fs::node::OpenError::SendOpenRequest)
     }
 
-    #[cfg(feature = "supports_open2")]
     fn open2(
         &self,
         blob: &fuchsia_hash::Hash,
@@ -137,7 +132,6 @@ impl NonMetaStorage for fio::DirectoryProxy {
             .map_err(fuchsia_fs::node::OpenError::SendOpenRequest)
     }
 
-    #[cfg(feature = "supports_open2")]
     fn open2(
         &self,
         blob: &fuchsia_hash::Hash,

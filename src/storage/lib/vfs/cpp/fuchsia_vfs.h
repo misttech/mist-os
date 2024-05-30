@@ -30,6 +30,7 @@ namespace fs {
 
 namespace internal {
 class Connection;
+class DirectoryConnection;
 }  // namespace internal
 
 // An internal version of fuchsia_io::wire::FilesystemInfo with a simpler API and default
@@ -103,6 +104,15 @@ class FuchsiaVfs : public Vfs {
   zx_status_t Serve(const fbl::RefPtr<Vnode>& vnode, zx::channel server_end,
                     VnodeConnectionOptions options) __TA_EXCLUDES(vfs_lock_);
 
+  // Serve |vnode| using |protocol| and specified |rights|. On success, consumes |object_request|,
+  // otherwise leaves the channel open. Callers are required to send an epitaph on failure.
+  //
+  // *NOTE*: |rights| and |node_options| are ignored for services. |protocols| may be left absent if
+  // no additional flags or OnRepresentation event is required.
+  zx::result<> Serve2(Open2Result open_result, fuchsia_io::Rights rights,
+                      zx::channel& object_request,
+                      const fuchsia_io::wire::ConnectionProtocols* protocols);
+
   // Serves a Vnode over the specified channel (used for creating new filesystems); the Vnode must
   // be a directory.
   zx_status_t ServeDirectory(fbl::RefPtr<Vnode> vn,
@@ -129,9 +139,9 @@ class FuchsiaVfs : public Vfs {
                         VnodeConnectionOptions options) __TA_EXCLUDES(vfs_lock_);
 
   // Starts FIDL message dispatching on |channel|, at the same time starts to manage the lifetime of
-  // |connection|. On error registering a connection, callers must close the associated vnode.
-  virtual zx_status_t RegisterConnection(std::unique_ptr<internal::Connection> connection,
-                                         zx::channel channel) = 0;
+  // |connection|. Consumes |channel| on success. On error, callers must close the associated vnode.
+  virtual zx::result<> RegisterConnection(std::unique_ptr<internal::Connection> connection,
+                                          zx::channel& channel) = 0;
 
  private:
   zx_status_t TokenToVnode(zx::event token, fbl::RefPtr<Vnode>* out) __TA_REQUIRES(vfs_lock_);

@@ -49,11 +49,8 @@ void OpenAt(FuchsiaVfs* vfs, const fbl::RefPtr<Vnode>& parent,
         } else if constexpr (std::is_same_v<ResultT, OpenResult::Remote>) {
           const fbl::RefPtr<const Vnode> vn = result.vnode;
           const std::string_view path = result.path;
-
-          // Ignore errors since there is nothing we can do if this fails.
-          [[maybe_unused]] const zx_status_t status =
-              vn->OpenRemote(options.ToIoV1Flags(), {}, fidl::StringView::FromExternal(path),
-                             std::move(server_end));
+          vn->OpenRemote(options.ToIoV1Flags(), {}, fidl::StringView::FromExternal(path),
+                         std::move(server_end));
         } else if constexpr (std::is_same_v<ResultT, OpenResult::Ok>) {
           // TODO(https://fxbug.dev/42051879): Remove this when web_engine with SDK 13.20230626.3.1
           // or later is rolled. The important commit is in the private integration repo, but the
@@ -73,6 +70,71 @@ void OpenAt(FuchsiaVfs* vfs, const fbl::RefPtr<Vnode>& parent,
               vfs->Serve(result.vnode, server_end.TakeChannel(), options);
         }
       });
+}
+
+// Get optional rights from |node_options| if present.
+fuchsia_io::Rights* GetOptionalRights(const fio::wire::ConnectionProtocols& protocols) {
+  if (!protocols.is_node() || !protocols.node().has_protocols()) {
+    return nullptr;
+  }
+  const fio::wire::NodeProtocols& node_protocols = protocols.node().protocols();
+  if (!node_protocols.has_directory() || !node_protocols.directory().has_optional_rights()) {
+    return nullptr;
+  }
+  return &node_protocols.directory().optional_rights();
+}
+
+// Calculate the resulting rights for a given Open2 request. |parent_rights| are the rights on the
+// current connection handling the request. Returns resulting set of rights to use, as well as the
+// rights which can be expanded if the directory protocol is negotiated for this connection.
+//
+// *WARNING*: Use caution when changing this function as it has implications for security.
+zx::result<std::tuple<fio::Rights, fio::Rights>> ValidateRequestRights(
+    const fio::wire::ConnectionProtocols& protocols, fuchsia_io::Rights parent_rights) {
+  if (protocols.is_node()) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
+    // If the request will query attributes, ensure this connection allows it.
+    if (protocols.node().has_attributes() && !(parent_rights & fio::Rights::kGetAttributes)) {
+      return zx::error(ZX_ERR_ACCESS_DENIED);
+    }
+#endif
+    // If the request will create a new object, ensure this connection allows it.
+    CreationMode mode = protocols.node().has_mode()
+                            ? internal::CreationModeFromFidl(protocols.node().mode())
+                            : CreationMode::kNever;
+    if (mode != CreationMode::kNever && !(parent_rights & fio::Rights::kModifyDirectory)) {
+      return zx::error(ZX_ERR_ACCESS_DENIED);
+    }
+  }
+  fio::Rights requested_rights = protocols.is_node() && protocols.node().has_rights()
+                                     ? protocols.node().rights()
+                                     : fio::Rights();
+  // If the requested rights exceed those of the parent connection, reject the request.
+  if (requested_rights - parent_rights) {
+    return zx::error(ZX_ERR_ACCESS_DENIED);
+  }
+  fio::Rights optional_rights = {};
+  if (fio::Rights* requested_optional_rights = GetOptionalRights(protocols)) {
+    optional_rights = *requested_optional_rights;
+  }
+  // *CAUTION*: The resulting connection rights must *never* exceed those of |parent_rights|.
+  return zx::ok(std::tuple{requested_rights & parent_rights, optional_rights & parent_rights});
+}
+
+// Forwards |request| to a remote node. Before forwarding, |request| is modified in-place to point
+// to the updated remote path, and any optional rights not present on this connection are removed.
+//
+// *WARNING*: Use caution when changing this function as it has implications for security.
+void ForwardRequestToRemote(fio::wire::Directory2Open2Request* request,
+                            Vfs::Open2Result open_result, fio::Rights parent_rights) {
+  ZX_DEBUG_ASSERT(open_result.vnode()->IsRemote());
+  // Update the request path to point only to the remaining segment.
+  request->path = fidl::StringView::FromExternal(open_result.path());
+  if (fio::Rights* optional_rights = GetOptionalRights(request->protocols)) {
+    // Remove optional rights from the request that the parent lacks.
+    *optional_rights &= parent_rights;
+  }
+  open_result.TakeVnode()->OpenRemote(std::move(*request));
 }
 
 }  // namespace
@@ -206,6 +268,11 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
     if (open_options->rights - rights()) {
       return ZX_ERR_ACCESS_DENIED;
     }
+    // If the request attempts to create a file, ensure this connection allows it.
+    if (internal::CreationModeFromFidl(open_options->flags) != CreationMode::kNever &&
+        !(rights() & fio::Rights::kModifyDirectory)) {
+      return ZX_ERR_ACCESS_DENIED;
+    }
     OpenAt(vfs(), vnode(), std::move(request->object), path, *open_options, rights());
     return ZX_OK;
   }();
@@ -216,6 +283,60 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
       // Ignore errors since there is nothing we can do if this fails.
       [[maybe_unused]] auto result = fidl::WireSendEvent(request->object)->OnOpen(status, {});
     }
+  }
+}
+
+void DirectoryConnection::Open2(fuchsia_io::wire::Directory2Open2Request* request,
+                                Open2Completer::Sync& completer) {
+  FS_PRETTY_TRACE_DEBUG("[DirectoryConnection::Open2] our rights: ", rights(), ", path: '",
+                        request->path, "', protocols: ", request->protocols);
+
+  // TODO(https://fxbug.dev/324080764): This operation should require the TRAVERSE right.
+
+  // Attempt to open/create the target vnode, and serve a connection to it.
+  zx::result handled = [&]() -> zx::result<> {
+    std::string_view path(request->path.data(), request->path.size());
+    // Calculate the set of rights the connection should have.
+    zx::result resulting_rights = ValidateRequestRights(request->protocols, this->rights());
+    if (resulting_rights.is_error()) {
+      return resulting_rights.take_error();
+    }
+    auto [rights, optional_rights] = *resulting_rights;
+    // The rights for the new connection must never exceed those of this connection.
+    ZX_DEBUG_ASSERT((rights - this->rights()) == fio::Rights());
+    ZX_DEBUG_ASSERT((optional_rights - this->rights()) == fio::Rights());
+    // Handle opening (or creating) the vnode.
+    zx::result open_result = vfs()->Open2(vnode(), path, request->protocols, rights);
+    if (open_result.is_error()) {
+      FS_PRETTY_TRACE_DEBUG("[DirectoryConnection::Open2] Vfs::Open2 failed: ",
+                            open_result.status_string());
+      return open_result.take_error();
+    }
+    // If we encountered a remote node, forward the remainder of the request there.
+    if (open_result->vnode()->IsRemote()) {
+      ForwardRequestToRemote(request, *std::move(open_result), /*parent_rights*/ this->rights());
+      return zx::ok();
+    }
+    // Expand optional rights if we negotiated the directory protocol.
+    if (open_result->protocol() == fs::VnodeProtocol::kDirectory && optional_rights) {
+      if (vfs()->IsReadonly()) {
+        // Ensure that we don't grant the ability to modify the filesystem if it's read only.
+        optional_rights &= ~fs::kAllMutableIo2Rights;
+      }
+      rights |= optional_rights;
+    }
+    // Serve a new connection to the vnode.
+    return vfs()->Serve2(*std::move(open_result), rights, request->object_request,
+                         &request->protocols);
+  }();
+
+  // On any errors above, the object request channel should remain usable, so that we can close it
+  // with the corresponding error epitaph.
+  if (handled.is_error()) {
+    FS_PRETTY_TRACE_DEBUG("[DirectoryConnection::Open2] Error: ", handled.status_string());
+    ZX_ASSERT(request->object_request.is_valid());
+    fidl::ServerEnd<fio::Node>{std::move(request->object_request)}.Close(handled.error_value());
+    return;
   }
 }
 
@@ -353,21 +474,27 @@ void DirectoryConnection::AdvisoryLock(AdvisoryLockRequestView request,
 }
 
 zx::result<> DirectoryConnection::WithRepresentation(
-    fit::callback<void(fuchsia_io::wire::Representation)> handler,
+    fit::callback<zx::result<>(fuchsia_io::wire::Representation)> handler,
     std::optional<fuchsia_io::NodeAttributesQuery> query) const {
-  // TODO(https://fxbug.dev/324112857): Handle |query|.
+  using DirectoryRepresentation = fio::wire::DirectoryInfo;
+  fidl::WireTableFrame<DirectoryRepresentation> representation_frame;
+  auto builder = DirectoryRepresentation::ExternalBuilder(
+      fidl::ObjectView<fidl::WireTableFrame<DirectoryRepresentation>>::FromExternal(
+          &representation_frame));
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
+  NodeAttributeBuilder attributes_builder;
+  zx::result<fio::wire::NodeAttributes2> attributes;
   if (query) {
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
+    attributes = attributes_builder.Build(*vnode(), *query);
+    if (attributes.is_error()) {
+      return attributes.take_error();
+    }
+    builder.attributes(fidl::ObjectView<fio::wire::NodeAttributes2>::FromExternal(&(*attributes)));
   }
-  fidl::WireTableFrame<fuchsia_io::wire::DirectoryInfo> frame;
-  auto builder = fuchsia_io::wire::DirectoryInfo::ExternalBuilder(
-      fidl::ObjectView<fidl::WireTableFrame<fuchsia_io::wire::DirectoryInfo>>::FromExternal(
-          &frame));
-  auto info = builder.Build();
-  auto representation = fuchsia_io::wire::Representation::WithDirectory(
-      fidl::ObjectView<fuchsia_io::wire::DirectoryInfo>::FromExternal(&info));
-  handler(std::move(representation));
-  return zx::ok();
+#endif
+  auto representation = builder.Build();
+  return handler(fuchsia_io::wire::Representation::WithDirectory(
+      fidl::ObjectView<DirectoryRepresentation>::FromExternal(&representation)));
 }
 
 zx::result<> DirectoryConnection::WithNodeInfoDeprecated(

@@ -77,7 +77,6 @@ impl package_directory::NonMetaStorage for BootfsThenBlobfs {
         }
     }
 
-    #[cfg(feature = "supports_open2")]
     fn open2(
         &self,
         blob: &fuchsia_hash::Hash,

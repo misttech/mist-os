@@ -63,8 +63,8 @@ class ManagedVfs : public FuchsiaVfs {
   void FinishShutdown(async_dispatcher_t*, async::TaskBase*, zx_status_t status)
       __TA_EXCLUDES(lock_);
 
-  zx_status_t RegisterConnection(std::unique_ptr<internal::Connection> connection,
-                                 zx::channel channel) final __TA_EXCLUDES(lock_);
+  zx::result<> RegisterConnection(std::unique_ptr<internal::Connection> connection,
+                                  zx::channel& channel) final __TA_EXCLUDES(lock_);
 
   // Called when all connections to the VFS are closed.
   virtual void OnNoConnections() {}

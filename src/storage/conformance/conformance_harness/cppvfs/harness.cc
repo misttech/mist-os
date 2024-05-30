@@ -58,6 +58,7 @@ class TestHarness : public fio_test::Io1Harness {
     config.supports_get_token = true;
     config.supported_attributes =
         fio::NodeAttributesQuery::CONTENT_SIZE | fio::NodeAttributesQuery::STORAGE_SIZE;
+    config.supports_open2 = true;
     // TODO(https://fxbug.dev/324112857): Support append mode when adding open2 support.
 
     callback(config);

@@ -48,8 +48,9 @@ class SynchronousVfs : public FuchsiaVfs {
   // from within the closure.
   void Shutdown(ShutdownCallback handler) override;
 
-  zx_status_t RegisterConnection(std::unique_ptr<internal::Connection> connection,
-                                 zx::channel channel) final;
+  // On success, consumes |channel|.
+  zx::result<> RegisterConnection(std::unique_ptr<internal::Connection> connection,
+                                  zx::channel& channel) final;
 
   struct Connections {
     std::mutex lock;

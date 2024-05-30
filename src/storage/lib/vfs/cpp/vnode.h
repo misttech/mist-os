@@ -109,8 +109,7 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // for a particular request if the validation passes.
   virtual bool ValidateRights(fuchsia_io::Rights rights) const;
 
-  // Ensures that it is valid to access the vnode with given connection options. The vnode should
-  // only be opened for a particular request if the validation returns |zx::ok(...)|.
+  // Ensures that it is valid to access the vnode with given io1 connection options.
   zx::result<> ValidateOptions(VnodeConnectionOptions options) const;
 
   // Opens the vnode. This is a callback to signal that a new connection is about to be created and
@@ -148,10 +147,13 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
 
 #ifdef __Fuchsia__
   // Serves a custom FIDL protocol over the specified |channel|, when the node protocol is
-  // |VnodeProtocol::kConnector|.
+  // |VnodeProtocol::kService|.
   //
   // The default implementation returns |ZX_ERR_NOT_SUPPORTED|.
   // Subclasses may override this behavior to serve custom protocols over the channel.
+  //
+  // TODO(b/324112857): This function should only consume |channel| on success so that we can close
+  // the channel with an epitaph on failure.
   virtual zx_status_t ConnectService(zx::channel channel);
 
   virtual zx_status_t WatchDir(FuchsiaVfs* vfs, fuchsia_io::wire::WatchMask mask, uint32_t options,
@@ -192,10 +194,14 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // Returns the name of the device backing the filesystem, if one exists.
   virtual zx::result<std::string> GetDevicePath() const;
 
-  // Implements fuchsia.io/Openable.Open by forwarding requests to the remote end. Supported iff
-  // `IsRemote()`.
-  virtual zx_status_t OpenRemote(fuchsia_io::OpenFlags, fuchsia_io::ModeType, fidl::StringView,
-                                 fidl::ServerEnd<fuchsia_io::Node>) const;
+  // If |IsRemote()| returns true, requests to open this Vnode using fuchsia.io/Openable.Open will
+  // be forwarded to this function.
+  virtual void OpenRemote(fuchsia_io::OpenFlags, fuchsia_io::ModeType, fidl::StringView,
+                          fidl::ServerEnd<fuchsia_io::Node>) const;
+
+  // If |IsRemote()| returns true, requests to open this Vnode using fuchsia.io/Directory.Open2 will
+  // be forwarded to this function.
+  virtual void OpenRemote(fuchsia_io::wire::Directory2Open2Request request) const;
 
   // Instead of adding a |file_lock::FileLock| member variable to |Vnode|,
   // maintain a map from |this| to the lock objects. This is done, because

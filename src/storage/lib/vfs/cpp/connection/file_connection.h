@@ -41,8 +41,9 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
 
   void BindImpl(zx::channel channel, OnUnbound on_unbound) final;
   zx::result<> Unbind() final;
-  zx::result<> WithRepresentation(fit::callback<void(fuchsia_io::wire::Representation)> handler,
-                                  std::optional<fuchsia_io::NodeAttributesQuery> query) const final;
+  zx::result<> WithRepresentation(
+      fit::callback<zx::result<>(fuchsia_io::wire::Representation)> handler,
+      std::optional<fuchsia_io::NodeAttributesQuery> query) const final;
   zx::result<> WithNodeInfoDeprecated(
       fit::callback<void(fuchsia_io::wire::NodeInfoDeprecated)> handler) const final;
 

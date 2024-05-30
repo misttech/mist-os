@@ -70,6 +70,7 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
     fuchsia::io::test::Io1Config config;
 
     // Supported options
+    config.supports_open2 = true;
     config.supports_create = true;
     config.supports_rename = true;
     config.supports_link = true;

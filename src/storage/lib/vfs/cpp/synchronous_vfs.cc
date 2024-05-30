@@ -51,8 +51,8 @@ void SynchronousVfs::CloseAllConnectionsForVnode(const Vnode& node,
   }
 }
 
-zx_status_t SynchronousVfs::RegisterConnection(std::unique_ptr<internal::Connection> connection,
-                                               zx::channel channel) {
+zx::result<> SynchronousVfs::RegisterConnection(std::unique_ptr<internal::Connection> connection,
+                                                zx::channel& channel) {
   ZX_DEBUG_ASSERT(connections_ != nullptr);
   // Release the lock before doing additional work on the connection.
   internal::Connection& added = [&]() -> internal::Connection& {
@@ -84,7 +84,7 @@ zx_status_t SynchronousVfs::RegisterConnection(std::unique_ptr<internal::Connect
     }
   };
   added.Bind(std::move(channel), std::move(on_unbound));
-  return ZX_OK;
+  return zx::ok();
 }
 
 bool SynchronousVfs::IsTerminating() const { return connections_ == nullptr; }

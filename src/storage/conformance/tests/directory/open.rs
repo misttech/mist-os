@@ -529,7 +529,7 @@ async fn open2_invalid() {
 async fn open2_create_dot_fails_with_already_exists() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2 {
+    if !(harness.config.supports_open2 && harness.config.supports_create) {
         return;
     }
 
@@ -751,7 +751,7 @@ async fn open2_file_append() {
 async fn open2_file_truncate_invalid() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2 {
+    if !(harness.config.supports_open2 && harness.config.supports_append) {
         return;
     }
 
@@ -780,7 +780,7 @@ async fn open2_file_truncate_invalid() {
 async fn open2_file_truncate() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2 {
+    if !(harness.config.supports_open2 && harness.config.supports_append) {
         return;
     }
 
@@ -954,7 +954,7 @@ async fn open2_request_attributes_rights_failure() {
     let proxy = test_dir
         .open2_node::<fio::DirectoryMarker>(
             ".",
-            fio::NodeOptions { rights: Some(fio::Operations::empty()), ..Default::default() },
+            fio::NodeOptions { rights: Some(fio::Rights::empty()), ..Default::default() },
         )
         .await
         .unwrap();
@@ -962,6 +962,7 @@ async fn open2_request_attributes_rights_failure() {
     // Now open again and request attributes. It should fail.
     let options = fio::NodeOptions {
         attributes: Some(fio::NodeAttributesQuery::PROTOCOLS),
+        flags: Some(fio::NodeFlags::GET_REPRESENTATION),
         ..Default::default()
     };
     assert_matches!(

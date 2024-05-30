@@ -4,7 +4,7 @@
 
 #include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
 
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/zx/event.h>
 #include <lib/zx/process.h>
 #include <stdlib.h>
@@ -26,6 +26,7 @@
 #include "src/storage/lib/vfs/cpp/connection/node_connection.h"
 #include "src/storage/lib/vfs/cpp/connection/remote_file_connection.h"
 #include "src/storage/lib/vfs/cpp/connection/stream_file_connection.h"
+#include "src/storage/lib/vfs/cpp/debug.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fio = fuchsia_io;
@@ -43,15 +44,15 @@ zx::result<zx_koid_t> GetObjectKoid(const zx::object_base& object) {
   return zx::ok(info.koid);
 }
 
-uint32_t ToStreamOptions(const VnodeConnectionOptions& options) {
+uint32_t ToStreamOptions(fuchsia_io::Rights rights, bool append) {
   uint32_t stream_options = 0u;
-  if (options.rights & fuchsia_io::Rights::kReadBytes) {
+  if (rights & fuchsia_io::Rights::kReadBytes) {
     stream_options |= ZX_STREAM_MODE_READ;
   }
-  if (options.rights & fuchsia_io::Rights::kWriteBytes) {
+  if (rights & fuchsia_io::Rights::kWriteBytes) {
     stream_options |= ZX_STREAM_MODE_WRITE;
   }
-  if (options.flags & fuchsia_io::OpenFlags::kAppend) {
+  if (append) {
     stream_options |= ZX_STREAM_MODE_APPEND;
   }
   return stream_options;
@@ -309,7 +310,7 @@ zx_status_t FuchsiaVfs::Link(zx::event token, fbl::RefPtr<Vnode> oldparent, std:
 zx_status_t FuchsiaVfs::Serve(const fbl::RefPtr<Vnode>& vnode, zx::channel server_end,
                               VnodeConnectionOptions options) {
   zx_status_t status = ServeImpl(vnode, std::move(server_end), options);
-  if (status != ZX_OK && !(options.flags & fio::OpenFlags::kNodeReference)) {
+  if (status != ZX_OK && !(options.flags & fuchsia_io::OpenFlags::kNodeReference)) {
     vnode->Close();
   }
   return status;
@@ -343,10 +344,10 @@ zx_status_t FuchsiaVfs::ServeImpl(const fbl::RefPtr<Vnode>& vnode, zx::channel s
       if (koid.is_error()) {
         return koid.error_value();
       }
-      zx::result<zx::stream> stream = vnode->CreateStream(ToStreamOptions(options));
+      bool append = static_cast<bool>(options.flags & fio::OpenFlags::kAppend);
       // Truncate was handled when the Vnode was opened, only append mode applies to this
       // connection. |ToStreamOptions| should handle setting the stream to append mode.
-      bool append = static_cast<bool>(options.flags & fio::OpenFlags::kAppend);
+      zx::result<zx::stream> stream = vnode->CreateStream(ToStreamOptions(options.rights, append));
       if (stream.is_ok()) {
         connection = std::make_unique<internal::StreamFileConnection>(
             this, vnode, options.rights, append, std::move(*stream), *koid);
@@ -401,7 +402,7 @@ zx_status_t FuchsiaVfs::ServeImpl(const fbl::RefPtr<Vnode>& vnode, zx::channel s
     }
   }
 
-  return RegisterConnection(std::move(connection), node.TakeChannel());
+  return RegisterConnection(std::move(connection), node.channel()).status_value();
 }
 
 zx_status_t FuchsiaVfs::ServeDirectory(fbl::RefPtr<fs::Vnode> vn,
@@ -419,6 +420,102 @@ zx_status_t FuchsiaVfs::ServeDirectory(fbl::RefPtr<fs::Vnode> vn,
   }
 
   return Serve(vn, server_end.TakeChannel(), options);
+}
+
+zx::result<> FuchsiaVfs::Serve2(Vfs::Open2Result open_result, fuchsia_io::Rights rights,
+                                zx::channel& object_request,
+                                const fuchsia_io::wire::ConnectionProtocols* protocols) {
+  const fio::wire::NodeOptions* node_options =
+      protocols && protocols->is_node() ? &protocols->node() : nullptr;
+  const fbl::RefPtr<fs::Vnode>& vnode = open_result.vnode();
+  std::unique_ptr<internal::Connection> connection;
+  // Downscope the rights granted to the connection to only include those for this protocol.
+  rights = internal::DownscopeRights(rights, open_result.protocol());
+  switch (open_result.protocol()) {
+    case fs::VnodeProtocol::kDirectory: {
+      zx::result koid = GetObjectKoid(object_request);
+      if (koid.is_error()) {
+        return koid.take_error();
+      }
+      connection = std::make_unique<internal::DirectoryConnection>(this, vnode, rights, *koid);
+      break;
+    }
+    case VnodeProtocol::kFile: {
+      zx::result koid = GetObjectKoid(object_request);
+      if (koid.is_error()) {
+        return koid.take_error();
+      }
+      const fio::FileProtocolFlags* file_flags =
+          node_options && node_options->has_protocols() && node_options->protocols().has_file()
+              ? &node_options->protocols().file()
+              : nullptr;
+      bool append = file_flags && (*file_flags & fio::FileProtocolFlags::kAppend);
+      // Truncate was handled when the Vnode was opened, only append mode applies to this
+      // connection. |ToStreamOptions| should handle setting the stream to append mode.
+      zx::result<zx::stream> stream = vnode->CreateStream(ToStreamOptions(rights, append));
+      if (stream.is_ok()) {
+        connection = std::make_unique<internal::StreamFileConnection>(this, vnode, rights, append,
+                                                                      std::move(*stream), *koid);
+        break;
+      }
+      if (stream.error_value() != ZX_ERR_NOT_SUPPORTED) {
+        return stream.take_error();
+      }
+      connection =
+          std::make_unique<internal::RemoteFileConnection>(this, vnode, rights, append, *koid);
+      break;
+    }
+    case VnodeProtocol::kNode: {
+      connection = std::make_unique<internal::NodeConnection>(this, vnode, rights);
+      break;
+    }
+    case fs::VnodeProtocol::kService: {
+      ZX_ASSERT(!protocols || protocols->is_connector());
+      // TODO(b/324112857): There's nothing we can do if this fails since |Vnode::ConnectService|
+      // consumes the channel. We should change it so that on failure, the channel is not consumed.
+      // We should then close the channel with an epitaph using the error.
+      [[maybe_unused]] zx_status_t status = vnode->ConnectService(std::move(object_request));
+      return zx::ok();
+    }
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+    case VnodeProtocol::kSymlink: {
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+    }
+#endif
+  }
+  ZX_DEBUG_ASSERT(connection != nullptr);
+  // Send an OnRepresentation event if the request requires one.
+  if (node_options && node_options->has_flags() &&
+      (node_options->flags() & fuchsia_io::NodeFlags::kGetRepresentation)) {
+    std::optional<fio::NodeAttributesQuery> attribute_query = std::nullopt;
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
+    if (node_options->has_attributes()) {
+      attribute_query = node_options->attributes();
+    }
+#endif
+    zx::result get_representation = connection->WithRepresentation(
+        [&](fio::wire::Representation representation) -> zx::result<> {
+          return zx::make_result(
+              fidl::WireSendEvent(fidl::UnownedServerEnd<fio::Node>{object_request.borrow()})
+                  ->OnRepresentation(std::move(representation))
+                  .status());
+        },
+        attribute_query);
+    if (get_representation.is_error()) {
+      return get_representation.take_error();
+    }
+  }
+
+  // Register the connection with the VFS. On success, the connection will be bound to the channel
+  // and will start serving requests.
+  zx::result result = RegisterConnection(std::move(connection), object_request);
+  if (result.is_ok()) {
+    // On success, the connection is responsible for closing the vnode via a fuchsia.io/Node.Close
+    // request is processed, or when the client end of |object_request| is closed.
+    open_result.TakeVnode();
+  }
+  return result;
 }
 
 }  // namespace fs
