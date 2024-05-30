@@ -439,6 +439,12 @@ a reserved resource and may not be used outside of the kernel.
 If set to "none", the kernel debug serial port will be disabled and will not
 be reserved, allowing the default serial port to be used outside the kernel.
 
+The configuration string format is as follows:
+  For MMIO UART:
+      "kernel.serial=UART_MODEL,MMIO_ADDR,IRQ,FLAGS"
+  For PIO UART:
+      "kernel.serial=UART_MODEL,IOPORT,IRQ"
+
 ### kernel.vdso.always_use_next=\<bool>
 
 **Default:** `false`

@@ -13,7 +13,7 @@ using namespace internal;
 template <>
 std::optional<zbi_dcfg_simple_t> ParseConfig<zbi_dcfg_simple_t>(std::string_view string) {
   zbi_dcfg_simple_t config{};
-  if (ParseInts(string, &config.mmio_phys, &config.irq)) {
+  if (ParseInts(string, &config.mmio_phys, &config.irq, &config.flags) > 1) {
     return config;
   }
   return {};
@@ -27,7 +27,7 @@ void UnparseConfig(const zbi_dcfg_simple_t& config, FILE* out) {
 template <>
 std::optional<zbi_dcfg_simple_pio_t> ParseConfig<zbi_dcfg_simple_pio_t>(std::string_view string) {
   zbi_dcfg_simple_pio_t config{};
-  if (ParseInts(string, &config.base, &config.irq)) {
+  if (ParseInts(string, &config.base, &config.irq) == 2) {
     return config;
   }
   return {};

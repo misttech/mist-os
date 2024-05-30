@@ -530,7 +530,7 @@ VALIDATE_FIELD_OFFSET_SIZE(zx_vcpu_state_t, rflags, 128, 8);
 VALIDATE_TYPE_SIZE_ALIGNMENT(zbi_dcfg_simple_t, 16, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zbi_dcfg_simple_t, mmio_phys, 0, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zbi_dcfg_simple_t, irq, 8, 4);
-VALIDATE_FIELD_OFFSET_SIZE(zbi_dcfg_simple_t, reserved, 12, 4);
+VALIDATE_FIELD_OFFSET_SIZE(zbi_dcfg_simple_t, flags, 12, 4);
 
 VALIDATE_TYPE_SIZE_ALIGNMENT(zbi_dcfg_simple_pio_t, 8, 4);
 VALIDATE_FIELD_OFFSET_SIZE(zbi_dcfg_simple_pio_t, base, 0, 2);

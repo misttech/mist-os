@@ -87,8 +87,25 @@ typedef uint32_t zbi_kernel_driver_t;
 typedef struct {
   uint64_t mmio_phys;
   uint32_t irq;
-  uint32_t reserved;
+  uint32_t flags;
 } zbi_dcfg_simple_t;
+
+typedef uint32_t zbi_kernel_driver_irq_flags_t;
+
+// When no flag is set, implies no information was obtained, and the
+// kernel will apply default configuration as it sees fit.
+#define ZBI_KERNEL_DRIVER_IRQ_FLAGS_EDGE_TRIGGERED ((zbi_kernel_driver_irq_flags_t)(1u << 0))
+#define ZBI_KERNEL_DRIVER_IRQ_FLAGS_LEVEL_TRIGGERED ((zbi_kernel_driver_irq_flags_t)(1u << 1))
+
+// Interpretation depends on whether is edge or level triggered.
+// When `LEVEL_TRIGGERED` refers to `ACTIVE_LOW`.
+// When `EDGE_TRIGGERED` refers to `HIGH_TO_LOW`.
+#define ZBI_KERNEL_DRIVER_IRQ_FLAGS_POLARITY_LOW ((zbi_kernel_driver_irq_flags_t)(1u << 2))
+
+// Interpretation depends on whether is edge or level triggered.
+// When `LEVEL_TRIGGERED` refers to `ACTIVE_HIGH`.
+// When `EDGE_TRIGGERED` refers to `LOW_TO_HIGH`.
+#define ZBI_KERNEL_DRIVER_IRQ_FLAGS_POLARITY_HIGH ((zbi_kernel_driver_irq_flags_t)(1u << 3))
 
 // Used by ZBI_KERNEL_DRIVER_I8250_PIO_UART.
 typedef struct {

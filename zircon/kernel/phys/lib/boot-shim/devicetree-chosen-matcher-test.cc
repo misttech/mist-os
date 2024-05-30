@@ -9,6 +9,7 @@
 #include <lib/boot-shim/testing/devicetree-test-fixture.h>
 #include <lib/fit/defer.h>
 #include <lib/uart/amlogic.h>
+#include <lib/zbi-format/driver-config.h>
 #include <lib/zbitl/image.h>
 
 namespace {
@@ -124,6 +125,7 @@ void CheckChosenMatcher(const ChosenItemType& matcher, const ExpectedChosen& exp
           EXPECT_EQ(uart.config().mmio_phys, expected.uart_config.mmio_phys);
           // The bootstrap phase does not decode interrupt.
           EXPECT_EQ(uart.config().irq, expected.uart_config.irq);
+          EXPECT_EQ(uart.config().flags, expected.uart_config.flags);
         } else {
           FAIL("Unexpected driver: %s", fbl::TypeInfo<decltype(uart)>::Name());
         }
@@ -147,6 +149,8 @@ TEST_F(ChosenNodeMatcherTest, Chosen) {
                              {
                                  .mmio_phys = 0x9000000,
                                  .irq = 33,
+                                 .flags = ZBI_KERNEL_DRIVER_IRQ_FLAGS_LEVEL_TRIGGERED |
+                                          ZBI_KERNEL_DRIVER_IRQ_FLAGS_POLARITY_HIGH,
                              },
                          .uart_absolute_path = "/some-interrupt-controller/pl011uart@9000000",
                      });
@@ -168,6 +172,8 @@ TEST_F(ChosenNodeMatcherTest, ChosenWithRegOffset) {
                              {
                                  .mmio_phys = 0x9000123,
                                  .irq = 33,
+                                 .flags = ZBI_KERNEL_DRIVER_IRQ_FLAGS_LEVEL_TRIGGERED |
+                                          ZBI_KERNEL_DRIVER_IRQ_FLAGS_POLARITY_HIGH,
                              },
                          .uart_absolute_path = "/some-interrupt-controller/pl011uart@9000000",
                      });
@@ -189,6 +195,8 @@ TEST_F(ChosenNodeMatcherTest, ChosenWithAddressTranslation) {
                              {
                                  .mmio_phys = 0x9030000,
                                  .irq = 33,
+                                 .flags = ZBI_KERNEL_DRIVER_IRQ_FLAGS_LEVEL_TRIGGERED |
+                                          ZBI_KERNEL_DRIVER_IRQ_FLAGS_POLARITY_HIGH,
                              },
                          .uart_absolute_path = "/some-interrupt-controller@0/pl011uart@9000000",
                      });
@@ -209,6 +217,7 @@ TEST_F(ChosenNodeMatcherTest, ChosenWithUnknownInterruptController) {
                              {
                                  .mmio_phys = 0x9000000,
                                  .irq = 0,
+                                 .flags = 0,
                              },
                          .uart_absolute_path = "/some-interrupt-controller/pl011uart@9000000",
                      });
@@ -234,6 +243,8 @@ TEST_F(ChosenNodeMatcherTest, CrosvmArm) {
                              {
                                  .mmio_phys = 0x3F8,
                                  .irq = 32,
+                                 .flags = ZBI_KERNEL_DRIVER_IRQ_FLAGS_EDGE_TRIGGERED |
+                                          ZBI_KERNEL_DRIVER_IRQ_FLAGS_POLARITY_HIGH,
                              },
                          .uart_absolute_path = "/U6_16550A@3f8",
                      });
@@ -252,18 +263,21 @@ TEST_F(ChosenNodeMatcherTest, QemuArm) {
 
   ASSERT_TRUE(devicetree::Match(fdt, chosen_matcher));
 
-  CheckChosenMatcher(chosen_matcher, {
-                                         .ramdisk_start = kQemuRamdiskStart,
-                                         .ramdisk_end = kQemuRamdiskEnd,
-                                         .cmdline = kQemuCmdline,
-                                         .uart_config_name = uart::pl011::Driver::config_name(),
-                                         .uart_config =
-                                             {
-                                                 .mmio_phys = uart::pl011::kQemuConfig.mmio_phys,
-                                                 .irq = 33,
-                                             },
-                                         .uart_absolute_path = "/pl011@9000000",
-                                     });
+  CheckChosenMatcher(chosen_matcher,
+                     {
+                         .ramdisk_start = kQemuRamdiskStart,
+                         .ramdisk_end = kQemuRamdiskEnd,
+                         .cmdline = kQemuCmdline,
+                         .uart_config_name = uart::pl011::Driver::config_name(),
+                         .uart_config =
+                             {
+                                 .mmio_phys = uart::pl011::kQemuConfig.mmio_phys,
+                                 .irq = 33,
+                                 .flags = ZBI_KERNEL_DRIVER_IRQ_FLAGS_LEVEL_TRIGGERED |
+                                          ZBI_KERNEL_DRIVER_IRQ_FLAGS_POLARITY_HIGH,
+                             },
+                         .uart_absolute_path = "/pl011@9000000",
+                     });
 }
 
 TEST_F(ChosenNodeMatcherTest, QemuRiscv) {
@@ -287,6 +301,7 @@ TEST_F(ChosenNodeMatcherTest, QemuRiscv) {
                              {
                                  .mmio_phys = 0x10000000,
                                  .irq = 10,
+                                 .flags = 0,
                              },
                          .uart_absolute_path = "/soc/serial@10000000",
                      });
@@ -312,6 +327,7 @@ TEST_F(ChosenNodeMatcherTest, VisionFive2) {
                              {
                                  .mmio_phys = 0x10000000,
                                  .irq = 32,
+                                 .flags = 0,
                              },
                          .uart_absolute_path = "/soc/serial@10000000",
                      });
@@ -330,18 +346,21 @@ TEST_F(ChosenNodeMatcherTest, KhadasVim3) {
 
   ASSERT_TRUE(devicetree::Match(fdt, chosen_matcher));
 
-  CheckChosenMatcher(chosen_matcher, {
-                                         .ramdisk_start = 0x7fe4d000,
-                                         .ramdisk_end = 0x7ffff5d7,
-                                         .cmdline = kCmdline,
-                                         .uart_config_name = uart::amlogic::Driver::config_name(),
-                                         .uart_config =
-                                             {
-                                                 .mmio_phys = 0xff803000,
-                                                 .irq = 225,
-                                             },
-                                         .uart_absolute_path = "/soc/bus@ff800000/serial@3000",
-                                     });
+  CheckChosenMatcher(chosen_matcher,
+                     {
+                         .ramdisk_start = 0x7fe4d000,
+                         .ramdisk_end = 0x7ffff5d7,
+                         .cmdline = kCmdline,
+                         .uart_config_name = uart::amlogic::Driver::config_name(),
+                         .uart_config =
+                             {
+                                 .mmio_phys = 0xff803000,
+                                 .irq = 225,
+                                 .flags = ZBI_KERNEL_DRIVER_IRQ_FLAGS_EDGE_TRIGGERED |
+                                          ZBI_KERNEL_DRIVER_IRQ_FLAGS_POLARITY_HIGH,
+                             },
+                         .uart_absolute_path = "/soc/bus@ff800000/serial@3000",
+                     });
 }
 
 }  // namespace

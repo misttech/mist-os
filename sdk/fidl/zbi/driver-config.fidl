@@ -78,7 +78,24 @@ type KernelDriver = enum : uint32 {
 type DcfgSimple = struct {
     mmio_phys uint64;
     irq uint32;
-    reserved uint32;
+    flags uint32;
+};
+
+type KernelDriverIrqFlags = bits : uint32 {
+    /// When no flag is set, implies no information was obtained, and the
+    /// kernel will apply default configuration as it sees fit.
+    EDGE_TRIGGERED = 0x00000001;
+    LEVEL_TRIGGERED = 0x00000002;
+
+    /// Interpretation depends on whether is edge or level triggered.
+    /// When `LEVEL_TRIGGERED` refers to `ACTIVE_LOW`.
+    /// When `EDGE_TRIGGERED` refers to `HIGH_TO_LOW`.
+    POLARITY_LOW = 0x00000004;
+
+    /// Interpretation depends on whether is edge or level triggered.
+    /// When `LEVEL_TRIGGERED` refers to `ACTIVE_HIGH`.
+    /// When `EDGE_TRIGGERED` refers to `LOW_TO_HIGH`.
+    POLARITY_HIGH = 0x00000008;
 };
 
 /// Used by ZBI_KERNEL_DRIVER_I8250_PIO_UART.

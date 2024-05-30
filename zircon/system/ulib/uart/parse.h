@@ -5,10 +5,14 @@
 #ifndef ZIRCON_SYSTEM_ULIB_UART_PARSE_H_
 #define ZIRCON_SYSTEM_ULIB_UART_PARSE_H_
 
+#include <lib/zx/result.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <array>
 #include <string_view>
+
+#include "zircon/errors.h"
 
 namespace uart::internal {
 
@@ -17,14 +21,13 @@ namespace uart::internal {
 //
 // Input integers may be decimal (42), hexadecimal (0x2a) or octal (052).
 //
-// The integral values are parsed into a variadic list of pointers. `true` is
-// is returned on success; `false` is returned if the string could not be
-// parsed.
+// Returns the number of elements parsed from the string.
 template <typename... Uint>
-inline bool ParseInts(std::string_view string, Uint*... args) {
-  auto next = [&](auto* arg) -> bool {
+size_t ParseInts(std::string_view string, Uint*... args) {
+  auto next = [&](auto* arg) -> size_t {
     if (string.size() < 2 || string.front() != ',') {
-      return false;
+      string.remove_prefix(string.size());
+      return 0;
     }
     string.remove_prefix(1);  // Remove the leading comma.
 
@@ -54,27 +57,27 @@ inline bool ParseInts(std::string_view string, Uint*... args) {
       end = string.size();
     } else if (end == 0) {
       // The comma was followed by a non-numerical character.
-      return false;
+      return 0;
     }
     // Since leading zeros were removed, any string of digits that doesn't fit
     // in this buffer would be an integer that overflows the type anyway.
-    char buf[32];
+    std::array<char, 32> buf;
     if (end < sizeof(buf)) {
-      buf[string.substr(0, end).copy(buf, sizeof(buf) - 1)] = '\0';
+      buf[string.substr(0, end).copy(buf.data(), sizeof(buf) - 1)] = '\0';
       string.remove_prefix(end);
       char* p = nullptr;
-      uint64_t value = strtoul(buf, &p, base);
+      uint64_t value = strtoul(buf.data(), &p, base);
       if (p == &buf[end]) {
         if (negative) {
           value = -value;
         }
         *arg = static_cast<std::decay_t<decltype(*arg)>>(value);
-        return true;
+        return 1;
       }
     }
-    return false;
+    return 0;
   };
-  return (next(args) && ... && string.empty());
+  return (next(args) + ... + 0);
 }
 
 template <typename... Uint>

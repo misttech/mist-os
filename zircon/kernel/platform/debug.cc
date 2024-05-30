@@ -18,6 +18,7 @@
 #include <stdint.h>
 #include <zircon/errors.h>
 #include <zircon/time.h>
+#include <zircon/types.h>
 
 #include <cassert>
 #include <type_traits>
@@ -48,10 +49,14 @@ bool use_new_serial = false;
 bool is_tx_irq_enabled = false;
 bool is_serial_enabled = false;
 
+// Forward declare class with capability annotation to avoid formatter doing
+// the wrong thing.
+class TA_SCOPED_CAP NullGuard;
+
 // TODO(https://fxbug.dev/42073424): Switch to lockdep::NullGuard once fbl::NullLock
 // and NullGuard are both annotated, and the existing use cases are
 // TA compliant.
-class TA_SCOPED_CAP NullGuard {
+class NullGuard {
  public:
   template <typename Lockable>
   NullGuard(Lockable* lock, const char*) TA_ACQ(lock) {}
@@ -140,6 +145,37 @@ void UartPoll(Timer* uart_timer, zx_time_t now, void* arg) {
       }
     });
   }
+}
+
+struct IrqConfig {
+  interrupt_trigger_mode trigger;
+  interrupt_polarity polarity;
+};
+
+ktl::optional<IrqConfig> GetIrqConfigFromFlags(uint32_t uart_flags) {
+  if (uart_flags == 0) {
+    return ktl::nullopt;
+  }
+
+  if ((uart_flags & (ZBI_KERNEL_DRIVER_IRQ_FLAGS_LEVEL_TRIGGERED |
+                     ZBI_KERNEL_DRIVER_IRQ_FLAGS_EDGE_TRIGGERED)) == 0) {
+    return ktl::nullopt;
+  }
+
+  if ((uart_flags & (ZBI_KERNEL_DRIVER_IRQ_FLAGS_POLARITY_HIGH |
+                     ZBI_KERNEL_DRIVER_IRQ_FLAGS_POLARITY_LOW)) == 0) {
+    return ktl::nullopt;
+  }
+
+  // In order to configure the IRQ all information, trigger and polarity must be provided.
+  // Otherwise the step must be omitted and let defaults take over.
+  IrqConfig config = {};
+  config.trigger = uart_flags & ZBI_KERNEL_DRIVER_IRQ_FLAGS_LEVEL_TRIGGERED ? IRQ_TRIGGER_MODE_LEVEL
+                                                                            : IRQ_TRIGGER_MODE_EDGE;
+  config.polarity = uart_flags & ZBI_KERNEL_DRIVER_IRQ_FLAGS_POLARITY_HIGH
+                        ? IRQ_POLARITY_ACTIVE_HIGH
+                        : IRQ_POLARITY_ACTIVE_LOW;
+  return config;
 }
 
 }  // namespace
@@ -246,6 +282,16 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
         auto* typed_driver = static_cast<ktl::decay_t<decltype(driver)>*>(driver_ptr);
         typed_driver->Interrupt(tx_irq_handler, rx_irq_handler);
       };
+
+      if constexpr (ktl::is_same_v<cfg_type, zbi_dcfg_simple_t>) {
+        // Configure the interrupt if available.
+        auto irq_config = GetIrqConfigFromFlags(driver.uart().config().flags);
+        if (irq_config) {
+          zx_status_t irq_config_result =
+              configure_interrupt(*uart_irq, irq_config->trigger, irq_config->polarity);
+          DEBUG_ASSERT(irq_config_result == ZX_OK);
+        }
+      }
 
       // Register IRQ Handler.
       zx_status_t irq_register_result =

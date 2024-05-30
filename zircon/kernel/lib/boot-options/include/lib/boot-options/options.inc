@@ -372,6 +372,12 @@ a reserved resource and may not be used outside of the kernel.
 
 If set to "none", the kernel debug serial port will be disabled and will not
 be reserved, allowing the default serial port to be used outside the kernel.
+
+The configuration string format is as follows:
+  For MMIO UART:
+      "kernel.serial=UART_MODEL,MMIO_ADDR,IRQ,FLAGS"
+  For PIO UART:
+      "kernel.serial=UART_MODEL,IOPORT,IRQ"
 )""")
 
 DEFINE_OPTION("kernel.vdso.always_use_next", bool, always_use_next_vdso, {false}, R"""(
@@ -653,7 +659,8 @@ arm device. Individual configurations may wish to tune this higher (or lower)
 as needed.
 )""")
 
-DEFINE_OPTION("kernel.page-scanner.lru-action", ScannerLruAction, lru_action, {ScannerLruAction::kNone}, R"""(
+DEFINE_OPTION("kernel.page-scanner.lru-action", ScannerLruAction, lru_action,
+              {ScannerLruAction::kNone}, R"""(
 Sets any reclamation action to take on old pages in the LRU queue. These actions occur regardless of
 memory pressure. If the `none` action is specified then pages will not be reclaimed just because
 they are old.
@@ -674,7 +681,8 @@ if the kernel is not built with debugging assertions enabled, or if a compressio
 strategy are not set.
 )""")
 
-DEFINE_OPTION("kernel.compression.strategy", CompressionStrategy, compression_strategy, {CompressionStrategy::kNone}, R"""(
+DEFINE_OPTION("kernel.compression.strategy", CompressionStrategy, compression_strategy,
+              {CompressionStrategy::kNone}, R"""(
 Supported compression strategies are:
 - `none`
 - `lz4`
@@ -684,7 +692,8 @@ If `none` is set then `kernel.compression.storage-strategy` must also be `none`.
 effectively disables compression.
 )""")
 
-DEFINE_OPTION("kernel.compression.storage-strategy", CompressionStorageStrategy, compression_storage_strategy, {CompressionStorageStrategy::kNone}, R"""(
+DEFINE_OPTION("kernel.compression.storage-strategy", CompressionStorageStrategy,
+              compression_storage_strategy, {CompressionStorageStrategy::kNone}, R"""(
 Supported compression storage strategies are:
 - `none`
 - `tri_page`
@@ -703,31 +712,36 @@ its original size, and a value of 0 meaning that page would need to compress to 
 Valid values are between 1 and 100, inclusive.
 )""")
 
-DEFINE_OPTION("kernel.compression.lz4.acceleration", uint32_t, compression_lz4_acceleration, {11}, R"""(
+DEFINE_OPTION("kernel.compression.lz4.acceleration", uint32_t, compression_lz4_acceleration, {11},
+              R"""(
 This option controls the acceleration factor provided to the LZ4 compression implementation. Refer
 to the current LZ4 implementation for how this value will be interpreted.
 )""")
 
-DEFINE_OPTION("kernel.compression.at_memory_pressure", bool, compression_at_memory_pressure, {false}, R"""(
+DEFINE_OPTION("kernel.compression.at_memory_pressure", bool, compression_at_memory_pressure,
+              {false}, R"""(
 This option controls whether page compression should be performed in response to memory pressure.
 
 For this option to have any effect kernel.page-scanner.enable-eviction needs to be enabled and both
 kernel.compression.strategy and kernel.compression.storage-strategy need to be set.
 )""")
 
-DEFINE_OPTION("kernel.compression.reclaim_anonymous", bool, compression_reclaim_anonymous, {false}, R"""(
+DEFINE_OPTION("kernel.compression.reclaim_anonymous", bool, compression_reclaim_anonymous, {false},
+              R"""(
 This option controls whether anonymous pages are placed in the reclaimable page queues and have
 associated age information. Enabling this adds a small overhead to anonymous pages for age tracking,
 but is required for options like "kernel.compression.at_memory_pressure" to have any effect.
 )""")
 
-DEFINE_OPTION("kernel.compression.reclaim_zero_forks", bool, compression_reclaim_zero_forks, {false}, R"""(
+DEFINE_OPTION("kernel.compression.reclaim_zero_forks", bool, compression_reclaim_zero_forks,
+              {false}, R"""(
 This option is similar to "kernel.compression.reclaim_anonymous" but applies to the zero forks of
 anonymous pages. Enabling this makes the "kernel.page-scanner.zero-page-scans-per-second" option
 have no effect, and it is an error to enable this without enabling "kernel.compression.reclaim_anonymous".
 )""")
 
-DEFINE_OPTION("kernel.pmm-checker.action", CheckFailAction, pmm_checker_action, {CheckFailAction::kOops}, R"""(
+DEFINE_OPTION("kernel.pmm-checker.action", CheckFailAction, pmm_checker_action,
+              {CheckFailAction::kOops}, R"""(
 This option specifies which action is taken when the PMM checker detects
 corruption.  Values must be one of:
  * `oops`
@@ -825,7 +839,8 @@ that well behaved programs will not hit the limit, but low enough to terminate m
 before they impact the system.
 )""")
 
-DEFINE_OPTION("kernel.experimental.serial_migration", bool, experimental_serial_migration, {false}, R"""(
+DEFINE_OPTION("kernel.experimental.serial_migration", bool, experimental_serial_migration, {false},
+              R"""(
 **TODO(https://fxbug.dev/42170495)**
 
 Temporary flag to assist on serial driver migration from kernel's implementation to
@@ -836,7 +851,8 @@ DEFINE_OPTION("kernel.select", SmallString, select, {"zircon"}, R"""(
 The name of the kernel package to boot from the STORAGE_KERNEL item in the ZBI.
 )""")
 
-DEFINE_OPTION("kernel.scheduler.prefer-little-cpus", bool, scheduler_prefer_little_cpus, {false}, R"""(
+DEFINE_OPTION("kernel.scheduler.prefer-little-cpus", bool, scheduler_prefer_little_cpus, {false},
+              R"""(
 When searching for a CPU on which to place a task, prefer little cores over big cores.  Enabling
 this option trades off improved performance in favor of reduced power consumption.
 
