@@ -41,8 +41,7 @@ type DisplayMode = struct {
     v_front_porch uint32;
     v_sync_pulse uint32;
     v_blanking uint32;
-    /// A bitmask of MODE_FLAG_* values
-    flags uint32;
+    flags ModeFlag;
 };
 
 type DisplayConfig = struct {
