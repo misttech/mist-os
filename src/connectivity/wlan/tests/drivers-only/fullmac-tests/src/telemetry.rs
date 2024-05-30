@@ -8,6 +8,48 @@ use {
 };
 
 #[fuchsia::test]
+async fn test_get_iface_counter_stats() {
+    let (mut fullmac_driver, generic_sme_proxy) =
+        FullmacDriverFixture::create_and_get_generic_sme(FullmacDriverConfig {
+            ..Default::default()
+        })
+        .await;
+    let telemetry_proxy = sme_helpers::get_telemetry(&generic_sme_proxy).await;
+    let telemetry_fut = telemetry_proxy.get_counter_stats();
+
+    let driver_counter_stats = fidl_fullmac::WlanFullmacIfaceCounterStats {
+        rx_unicast_total: rand::thread_rng().gen(),
+        rx_unicast_drop: rand::thread_rng().gen(),
+        rx_multicast: rand::thread_rng().gen(),
+        tx_total: rand::thread_rng().gen(),
+        tx_drop: rand::thread_rng().gen(),
+    };
+
+    let driver_fut = async {
+        assert_variant!(fullmac_driver.request_stream.next().await,
+            fidl_fullmac::WlanFullmacImplBridgeRequest::GetIfaceCounterStats { responder } => {
+                responder.send(Ok(&driver_counter_stats))
+                    .expect("Could not respond to GetIfaceHistogramStats");
+        });
+    };
+
+    let (sme_counter_stats_result, _) = futures::join!(telemetry_fut, driver_fut);
+    let sme_counter_stats =
+        sme_counter_stats_result.expect("SME Error getting counter stats").unwrap();
+
+    assert_eq!(
+        sme_counter_stats,
+        fidl_stats::IfaceCounterStats {
+            rx_unicast_total: driver_counter_stats.rx_unicast_total,
+            rx_unicast_drop: driver_counter_stats.rx_unicast_drop,
+            rx_multicast: driver_counter_stats.rx_multicast,
+            tx_total: driver_counter_stats.tx_total,
+            tx_drop: driver_counter_stats.tx_drop,
+        }
+    );
+}
+
+#[fuchsia::test]
 async fn test_get_iface_histogram_stats() {
     let (mut fullmac_driver, generic_sme_proxy) =
         FullmacDriverFixture::create_and_get_generic_sme(FullmacDriverConfig {
@@ -15,7 +57,6 @@ async fn test_get_iface_histogram_stats() {
         })
         .await;
     let telemetry_proxy = sme_helpers::get_telemetry(&generic_sme_proxy).await;
-
     let telemetry_fut = telemetry_proxy.get_histogram_stats();
 
     // This contains every combination of hist scope and antenna frequency.
