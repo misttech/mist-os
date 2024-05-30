@@ -3223,6 +3223,182 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn test_drop_passive_lease_before_active_claim_satisifed() {
+        // Tests that if a lease has a passive claim that has been satisfied by
+        // an active claim, and then the lease is dropped *before* the active claim
+        // was satisfied, that the passive claim should not be enforced, even though
+        // it would have, had the lease not been dropped prematurely.
+        //
+        // A has an active dependency on B.
+        // C has a passive dependency on B.
+        //
+        //  A     B     C
+        // ON => ON <- ON
+        let inspect = fuchsia_inspect::component::inspector();
+        let inspect_node = inspect.root().create_child("test");
+        let mut broker = Broker::new(inspect_node);
+        let token_b_active = DependencyToken::create();
+        let token_b_passive = DependencyToken::create();
+        let element_b = broker
+            .add_element(
+                "B",
+                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
+                vec![],
+                vec![token_b_active
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![token_b_passive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+            )
+            .expect("add_element failed");
+        let element_a = broker
+            .add_element(
+                "A",
+                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Active,
+                    dependent_level: BinaryPowerLevel::On.into_primitive(),
+                    requires_token: token_b_active
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level: BinaryPowerLevel::On.into_primitive(),
+                }],
+                vec![],
+                vec![],
+            )
+            .expect("add_element failed");
+        let element_c = broker
+            .add_element(
+                "C",
+                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Passive,
+                    dependent_level: BinaryPowerLevel::On.into_primitive(),
+                    requires_token: token_b_passive
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level: BinaryPowerLevel::On.into_primitive(),
+                }],
+                vec![],
+                vec![],
+            )
+            .expect("add_element failed");
+
+        // Initial required level for A, B & C should be OFF.
+        // Set A, B & C's current level to OFF.
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_c),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        broker.update_current_level(&element_a, BinaryPowerLevel::Off.into_primitive());
+        broker.update_current_level(&element_b, BinaryPowerLevel::Off.into_primitive());
+        broker.update_current_level(&element_c, BinaryPowerLevel::Off.into_primitive());
+
+        // Lease C.
+        // All required levels should be OFF, as B is not on and passive.
+        // Lease C should be pending and contingent.
+        let lease_c = broker
+            .acquire_lease(&element_c, BinaryPowerLevel::On.into_primitive())
+            .expect("acquire failed");
+        let lease_c_id = lease_c.id.clone();
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_c),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_c.id), true);
+
+        // Lease A.
+        // B's required level should be ON.
+        // A and C's required levels should be OFF.
+        // Lease A should be pending and non-contingent.
+        // Lease C should be pending and non-contingent.
+        let lease_a = broker
+            .acquire_lease(&element_a, BinaryPowerLevel::On.into_primitive())
+            .expect("acquire failed");
+        let lease_a_id = lease_a.id.clone();
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::On.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_c),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(broker.get_lease_status(&lease_a.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_a.id), false);
+        assert_eq!(broker.is_lease_contingent(&lease_c.id), false);
+
+        // Drop Lease on A.
+        // All required levels should be OFF as there is no longer an active claim.
+        // Lease C should be pending and contingent.
+        broker.drop_lease(&lease_a.id).expect("drop_lease failed");
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_c),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_c.id), true);
+
+        // Drop Lease on C.
+        // All required levels should remain OFF.
+        broker.drop_lease(&lease_c.id).expect("drop_lease failed");
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_c),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+
+        // Leases A & C should be cleaned up.
+        assert_lease_cleaned_up(&broker.catalog, &lease_a_id);
+        assert_lease_cleaned_up(&broker.catalog, &lease_c_id);
+    }
+
+    #[fuchsia::test]
     async fn test_lease_passive_immediate() {
         // Tests that a lease with a passive claim is immediately satisfied if
         // there are already leases with active claims that would satisfy its
