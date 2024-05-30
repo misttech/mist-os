@@ -46,7 +46,7 @@ async fn read_counter_from_dictionary(dictionary: ClientEnd<fsandbox::Dictionary
     let capability = dictionary.get("counter").await.unwrap().unwrap();
     match capability {
         fsandbox::Capability::Data(data) => match data {
-            fsandbox::DataCapability::Uint64(counter) => counter,
+            fsandbox::Data::Uint64(counter) => counter,
             data @ _ => panic!("unexpected {data:?}"),
         },
         capability @ _ => panic!("unexpected {capability:?}"),
@@ -84,7 +84,7 @@ async fn escrow_counter_then_stop(counter: u64) {
 
     // Add the counter into the dictionary.
     dictionary
-        .insert("counter", fsandbox::Capability::Data(fsandbox::DataCapability::Uint64(counter)))
+        .insert("counter", fsandbox::Capability::Data(fsandbox::Data::Uint64(counter)))
         .await
         .unwrap()
         .unwrap();

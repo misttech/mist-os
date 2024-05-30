@@ -641,7 +641,7 @@ mod tests {
             items.remove(0),
             fsandbox::DictionaryItem {
                 key,
-                value: fsandbox::Capability::Data(fsandbox::DataCapability::Int64(num))
+                value: fsandbox::Capability::Data(fsandbox::Data::Int64(num))
             }
             if key == "cap1"
             && num == 1
@@ -650,7 +650,7 @@ mod tests {
             items.remove(0),
             fsandbox::DictionaryItem {
                 key,
-                value: fsandbox::Capability::Data(fsandbox::DataCapability::Int64(num))
+                value: fsandbox::Capability::Data(fsandbox::Data::Int64(num))
             }
             if key == "cap2"
             && num == 2

@@ -339,7 +339,7 @@ key-value maps that may hold data or capabilities.
 
   ```rust
   let bytes = vec![...];
-  let data = fidl_fuchsia_component_sandbox::DataCapability::Bytes(bytes);
+  let data = fidl_fuchsia_component_sandbox::Data::Bytes(bytes);
   let dictionary = dictionary.into_proxy().unwrap();
   dictionary
       .insert(
@@ -371,7 +371,7 @@ key-value maps that may hold data or capabilities.
       let capability = dictionary.get("my_data").await??;
       match capability {
           fidl_fuchsia_component_sandbox::Capability::Data(
-              fidl_fuchsia_component_sandbox::DataCapability::Bytes(data)
+              fidl_fuchsia_component_sandbox::Data::Bytes(data)
           ) => {
               // Do something with the data...
           },
@@ -382,7 +382,7 @@ key-value maps that may hold data or capabilities.
 
 The `Dictionary` object supports a variety of item data types. If your
 component's state is less than `fuchsia.component.sandbox/MAX_DATA_LENGTH`,
-you may consider storing the `fuchsia.component.sandbox/DataCapability` item,
+you may consider storing the `fuchsia.component.sandbox/Data` item,
 which can hold a byte vector.
 
 ## I want to wait for a channel to be readable
