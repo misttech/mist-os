@@ -39,8 +39,8 @@ use crate::{
             DequeueState, TransmitQueueFrameError,
         },
         socket::{
-            DeviceSocketBindingsContext, DeviceSocketHandler, DeviceSocketMetadata,
-            DeviceSocketSendTypes, EthernetHeaderParams, ReceivedFrame,
+            DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, EthernetHeaderParams,
+            ReceivedFrame,
         },
         state::{DeviceStateSpec, IpLinkDeviceState},
         Device, DeviceCounters, DeviceIdContext, DeviceLayerTypes, DeviceReceiveFrameSpec,
@@ -428,9 +428,7 @@ pub(super) fn send_ip_frame<BC, CC, A, S>(
     broadcast: Option<<A::Version as IpTypesIpExt>::BroadcastMarker>,
 ) -> Result<(), S>
 where
-    BC: EthernetIpLinkDeviceBindingsContext
-        + DeviceSocketBindingsContext<CC::DeviceId>
-        + LinkResolutionContext<EthernetLinkDevice>,
+    BC: EthernetIpLinkDeviceBindingsContext + LinkResolutionContext<EthernetLinkDevice>,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
         + NudHandler<A::Version, EthernetLinkDevice, BC>
         + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
@@ -511,9 +509,7 @@ impl DeviceReceiveFrameSpec for EthernetLinkDevice {
 
 impl<CC, BC> ReceivableFrameMeta<CC, BC> for RecvEthernetFrameMeta<CC::DeviceId>
 where
-    BC: EthernetIpLinkDeviceBindingsContext
-        + DeviceSocketBindingsContext<CC::DeviceId>
-        + TracingContext,
+    BC: EthernetIpLinkDeviceBindingsContext + TracingContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
         + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, Ipv4>, BC>
         + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, Ipv6>, BC>
@@ -765,7 +761,7 @@ pub(super) fn get_mtu<
 pub trait UseArpFrameMetadataBlanket {}
 
 impl<
-        BC: EthernetIpLinkDeviceBindingsContext + DeviceSocketBindingsContext<CC::DeviceId>,
+        BC: EthernetIpLinkDeviceBindingsContext,
         CC: EthernetIpLinkDeviceDynamicStateContext<BC>
             + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
             + ResourceCounterContext<CC::DeviceId, DeviceCounters>

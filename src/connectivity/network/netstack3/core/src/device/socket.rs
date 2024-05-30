@@ -195,12 +195,10 @@ pub trait DeviceSocketContextTypes {
 }
 
 /// Core context for accessing socket state.
-pub trait DeviceSocketContext<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
-    DeviceSocketAccessor<BC>
-{
+pub trait DeviceSocketContext<BT: DeviceSocketTypes>: DeviceSocketAccessor<BT> {
     /// The core context available in callbacks to methods on this context.
     type SocketTablesCoreCtx<'a>: DeviceSocketAccessor<
-        BC,
+        BT,
         DeviceId = Self::DeviceId,
         WeakDeviceId = Self::WeakDeviceId,
         SocketId = Self::SocketId,
@@ -210,7 +208,7 @@ pub trait DeviceSocketContext<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
     ///
     /// The ID returned by this method must be removed by calling
     /// [`DeviceSocketContext::remove_socket`] once it is no longer in use.
-    fn create_socket(&mut self, state: BC::SocketState) -> Self::SocketId;
+    fn create_socket(&mut self, state: BT::SocketState) -> Self::SocketId;
 
     /// Removes a socket.
     ///
@@ -239,18 +237,18 @@ pub trait DeviceSocketContext<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
 }
 
 /// Core context for accessing the state of an individual socket.
-pub trait SocketStateAccessor<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
+pub trait SocketStateAccessor<BT: DeviceSocketTypes>:
     DeviceSocketContextTypes + DeviceIdContext<AnyDevice>
 {
     /// Provides read-only access to the state of a socket.
-    fn with_socket_state<F: FnOnce(&BC::SocketState, &Target<Self::WeakDeviceId>) -> R, R>(
+    fn with_socket_state<F: FnOnce(&BT::SocketState, &Target<Self::WeakDeviceId>) -> R, R>(
         &mut self,
         socket: &Self::SocketId,
         cb: F,
     ) -> R;
 
     /// Provides mutable access to the state of a socket.
-    fn with_socket_state_mut<F: FnOnce(&BC::SocketState, &mut Target<Self::WeakDeviceId>) -> R, R>(
+    fn with_socket_state_mut<F: FnOnce(&BT::SocketState, &mut Target<Self::WeakDeviceId>) -> R, R>(
         &mut self,
         socket: &Self::SocketId,
         cb: F,
@@ -258,12 +256,10 @@ pub trait SocketStateAccessor<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
 }
 
 /// Core context for accessing the socket state for a device.
-pub trait DeviceSocketAccessor<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
-    SocketStateAccessor<BC>
-{
+pub trait DeviceSocketAccessor<BT: DeviceSocketTypes>: SocketStateAccessor<BT> {
     /// Core context available in callbacks to methods on this context.
     type DeviceSocketCoreCtx<'a>: SocketStateAccessor<
-        BC,
+        BT,
         SocketId = Self::SocketId,
         DeviceId = Self::DeviceId,
         WeakDeviceId = Self::WeakDeviceId,
@@ -304,10 +300,7 @@ enum MaybeUpdate<T> {
     NewValue(T),
 }
 
-fn update_device_and_protocol<
-    CC: DeviceSocketContext<BC>,
-    BC: DeviceSocketBindingsContext<CC::DeviceId>,
->(
+fn update_device_and_protocol<CC: DeviceSocketContext<BT>, BT: DeviceSocketTypes>(
     core_ctx: &mut CC,
     socket: &CC::SocketId,
     new_device: TargetDevice<&CC::DeviceId>,
@@ -321,7 +314,7 @@ fn update_device_and_protocol<
         // delivered to the socket from either device.
         let old_device = core_ctx.with_socket_state_mut(
             socket,
-            |_: &BC::SocketState, Target { protocol, device }| {
+            |_: &BT::SocketState, Target { protocol, device }| {
                 match protocol_update {
                     MaybeUpdate::NewValue(p) => *protocol = Some(p),
                     MaybeUpdate::NoChange => (),

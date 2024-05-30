@@ -37,10 +37,9 @@ use crate::{
         socket,
         state::{DeviceStateSpec, IpLinkDeviceState, IpLinkDeviceStateInner},
         AnyDevice, BaseDeviceId, DeviceCollectionContext, DeviceCounters, DeviceId,
-        DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerState, Devices, DevicesIter,
-        EthernetDeviceCounters, EthernetDeviceId, EthernetPrimaryDeviceId, EthernetWeakDeviceId,
-        Ipv6DeviceLinkLayerAddr, OriginTracker, OriginTrackerContext, PureIpDeviceCounters,
-        RecvIpFrameMeta, WeakDeviceId,
+        DeviceIdContext, DeviceLayerState, Devices, DevicesIter, EthernetDeviceCounters,
+        EthernetDeviceId, EthernetPrimaryDeviceId, EthernetWeakDeviceId, Ipv6DeviceLinkLayerAddr,
+        OriginTracker, OriginTrackerContext, PureIpDeviceCounters, RecvIpFrameMeta, WeakDeviceId,
     },
     error::{ExistsError, NotFoundError},
     filter::{IpPacket, ProofOfEgressCheck},
@@ -832,20 +831,6 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
 impl<BT: BindingsTypes, L> DeviceIdContext<EthernetLinkDevice> for CoreCtx<'_, BT, L> {
     type DeviceId = EthernetDeviceId<BT>;
     type WeakDeviceId = EthernetWeakDeviceId<BT>;
-}
-
-impl<BC: socket::DeviceSocketBindingsContext<DeviceId<BC>> + DeviceLayerEventDispatcher>
-    socket::DeviceSocketBindingsContext<EthernetDeviceId<BC>> for BC
-{
-    fn receive_frame(
-        &self,
-        state: &Self::SocketState,
-        device: &EthernetDeviceId<BC>,
-        frame: socket::Frame<&[u8]>,
-        whole_frame: &[u8],
-    ) {
-        self.receive_frame(state, &device.clone().into(), frame, whole_frame)
-    }
 }
 
 impl<BT: BindingsTypes> DelegatedOrderedLockAccess<Devices<BT>> for StackState<BT> {
