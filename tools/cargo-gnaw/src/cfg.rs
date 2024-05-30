@@ -158,6 +158,10 @@ pub fn cfg_to_gn_conditional(cfg: &str) -> Result<String> {
         Ok(String::from("false"))
     } else if cfg.starts_with("target_vendor") {
         Ok(String::from("false"))
+    } else if cfg.starts_with("tokio_taskdump") {
+        Ok(String::from("false"))
+    } else if cfg.starts_with("tokio_unstable") {
+        Ok(String::from("false"))
     } else if cfg.starts_with("tracing_unstable") {
         Ok(String::from("false"))
     } else if cfg.starts_with("docsrs") {
