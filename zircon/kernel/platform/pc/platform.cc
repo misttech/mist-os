@@ -228,9 +228,6 @@ void platform_early_init(void) {
   platform_init_console();
 #endif
 
-  /* initialize the ACPI parser */
-  PlatformInitAcpi(gPhysHandoff->acpi_rsdp.value_or(0));
-
   /* initialize the boot memory reservation system */
   boot_reserve_init();
 

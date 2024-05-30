@@ -21,6 +21,8 @@
 #include <arch/x86/bootstrap16.h>
 #include <kernel/percpu.h>
 #include <ktl/optional.h>
+#include <lk/init.h>
+#include <phys/handoff.h>
 
 #include <ktl/enforce.h>
 
@@ -66,6 +68,12 @@ void PlatformInitAcpi(zx_paddr_t acpi_rsdp) {
   g_parser.Initialize(result.value());
   global_acpi_parser = &g_parser.Get();
 }
+
+static void platform_init_acpi(uint level) {
+  PlatformInitAcpi(gPhysHandoff->acpi_rsdp.value_or(0));
+}
+
+LK_INIT_HOOK(platform_init_acpi, platform_init_acpi, LK_INIT_LEVEL_VM)
 
 zx_status_t PlatformSuspend(uint8_t target_s_state, uint8_t sleep_type_a, uint8_t sleep_type_b) {
   // Acquire resources for suspend and resume.
