@@ -135,7 +135,7 @@ mod tests {
         let updated_mic_mute_val = !v1.input.mic_mute;
         v1.input.mic_mute = updated_mic_mute_val;
 
-        let serialized_v1 = serde_json::to_string(&v1).unwrap();
+        let serialized_v1 = serde_json::to_string(&v1).expect("default should serialize");
 
         let v2 = AudioInfoV2::try_deserialize_from(&serialized_v1)
             .expect("deserialization should succeed");
@@ -155,7 +155,7 @@ mod tests {
         let updated_mic_mute_val = !v2.input.mic_mute;
         v2.input.mic_mute = updated_mic_mute_val;
 
-        let serialized_v2 = serde_json::to_string(&v2).unwrap();
+        let serialized_v2 = serde_json::to_string(&v2).expect("default should serialize");
 
         let current = AudioInfo::try_deserialize_from(&serialized_v2)
             .expect("deserialization should succeed");
@@ -175,7 +175,7 @@ mod tests {
         let updated_mic_mute_val = !v1.input.mic_mute;
         v1.input.mic_mute = updated_mic_mute_val;
 
-        let serialized_v1 = serde_json::to_string(&v1).unwrap();
+        let serialized_v1 = serde_json::to_string(&v1).expect("default should serialize");
 
         let current = AudioInfo::try_deserialize_from(&serialized_v1)
             .expect("deserialization should succeed");
