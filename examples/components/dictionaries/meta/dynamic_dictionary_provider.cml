@@ -7,18 +7,11 @@
         runner: "elf",
         binary: "bin/dynamic_dictionary_provider",
     },
+
+    // [START body]
     capabilities: [
         {
             dictionary: "bundle",
-
-            // Derive the contents of this dictionary from a Dictionary provided by the program
-            // at runtime.
-            //
-            // The program hosts a [fuchsia.component.sandbox.Router] protcool at `/svc`, which
-            // returns the [fuchsia.component.sandbox.Dictionary].
-            //
-            // For more information on how this works, see:
-            // https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities/dictionary
             extends: "program/svc/fuchsia.component.sandbox.Router",
         },
     ],
@@ -36,3 +29,5 @@
         },
     ],
 }
+
+// [END body]

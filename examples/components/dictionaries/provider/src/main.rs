@@ -17,6 +17,8 @@ enum IncomingRequest {
 #[fuchsia::main]
 async fn main() {
     info!("Started");
+
+    // [START init]
     let factory = client::connect_to_protocol::<fsandbox::FactoryMarker>().unwrap();
 
     // Create a dictionary
@@ -38,22 +40,28 @@ async fn main() {
         .unwrap();
         receiver_tasks.spawn(async move { handle_echo_receiver(i, receiver_stream).await });
     }
+    // [END init]
 
     info!("Populated the dictionary");
 
+    // [START serve]
     let mut fs = ServiceFs::new_local();
     fs.dir("svc").add_fidl_service(IncomingRequest::Router);
     fs.take_and_serve_directory_handle().unwrap();
     fs.for_each_concurrent(None, move |request: IncomingRequest| {
+        // [START outer_clone]
         let dict = Clone::clone(&dict);
+        // [END outer_clone]
         async move {
             match request {
                 IncomingRequest::Router(mut stream) => {
                     while let Ok(Some(request)) = stream.try_next().await {
                         match request {
                             fsandbox::RouterRequest::Route { payload: _, responder } => {
+                                // [START inner_clone]
                                 let client_end = dict.clone().await.unwrap();
                                 let capability = fsandbox::Capability::Dictionary(client_end);
+                                // [END inner_clone]
                                 let _ = responder.send(Ok(capability));
                             }
                             fsandbox::RouterRequest::_UnknownMethod { ordinal, .. } => {
@@ -66,8 +74,10 @@ async fn main() {
         }
     })
     .await;
+    // [END serve]
 }
 
+// [START receiver]
 async fn handle_echo_receiver(index: u32, mut receiver_stream: fsandbox::ReceiverRequestStream) {
     let mut task_group = fasync::TaskGroup::new();
     while let Some(request) = receiver_stream.try_next().await.unwrap() {
@@ -97,3 +107,4 @@ async fn run_echo_server(index: u32, mut stream: EchoRequestStream) {
         }
     }
 }
+// [END receiver]

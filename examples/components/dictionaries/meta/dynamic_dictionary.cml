@@ -16,6 +16,8 @@
             url: "#meta/dynamic-dictionary-provider.cm",
         },
     ],
+
+    // [START retrieval]
     use: [
         {
             protocol: [
@@ -26,4 +28,6 @@
             from: "#provider/bundle",
         },
     ],
+
+    // [END retrieval]
 }

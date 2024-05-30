@@ -14,6 +14,7 @@ async fn use_runtime_populated_dictionary() {
     // Connect to all 3 protocols that we expect to be present in the dynamically
     // backed dictionary. (The protocols were already extracted from the dictionary by this
     // component's CML file.)
+    // [START connect]
     for i in 1..=3 {
         info!("Connecting to Echo protocol {i} of 3");
         let echo = client::connect_to_protocol_at_path::<EchoMarker>(&format!(
@@ -23,4 +24,5 @@ async fn use_runtime_populated_dictionary() {
         let res = echo.echo_string(Some(&format!("hello"))).await;
         assert_matches!(res, Ok(Some(s)) if s == format!("hello {i}"));
     }
+    // [END connect]
 }
