@@ -8,7 +8,8 @@
 #include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/driver/devfs/cpp/connector.h>
-#include <zircon/device/bt-hci.h>
+
+#include "bt-hci.h"
 
 namespace bt_hci_virtual {
 

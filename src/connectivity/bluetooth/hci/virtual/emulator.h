@@ -103,10 +103,6 @@ class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framewo
   // child of EmulatorDevice device node
   zx_status_t AddHciDeviceChildNode();
 
-  // Helper function for fuchsia.hardware.bluetooth.Vendor.EncodeCommand
-  void EncodeSetAclPriorityCommand(
-      fuchsia_hardware_bluetooth::wire::VendorSetAclPriorityParams params, void* out_buffer);
-
   // Helper function used to initialize BR/EDR and LE peers
   void AddPeer(std::unique_ptr<EmulatedPeer> peer);
 

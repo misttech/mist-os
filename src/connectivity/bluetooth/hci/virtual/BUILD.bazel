@@ -1,0 +1,77 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_cc_driver",
+    "fuchsia_component_manifest",
+    "fuchsia_driver_bind_bytecode",
+    "fuchsia_driver_component",
+    "fuchsia_test_package",
+)
+
+package(default_visibility = ["//visibility:public"])
+
+fuchsia_driver_bind_bytecode(
+    name = "bt-hci-virtual-bind",
+    output = "bt-hci-virtual.bindbc",
+    rules = "bt-hci-virtual.bind",
+    deps = [
+        "@fuchsia_sdk//bind/fuchsia.platform",
+    ],
+)
+
+fuchsia_cc_driver(
+    name = "bt-hci-virtual",
+    testonly = True,
+    srcs = [
+        "bt-hci.h",
+        "controller.cc",
+        "controller.h",
+        "emulated_peer.cc",
+        "emulated_peer.h",
+        "emulator.cc",
+        "emulator.h",
+        "loopback.cc",
+        "loopback.h",
+    ],
+    output_name = "bt-hci-virtual",
+    deps = [
+        "//src/connectivity/bluetooth/core/bt-host/common",
+        "//src/connectivity/bluetooth/core/bt-host/fidl:helpers",
+        "//src/connectivity/bluetooth/core/bt-host/testing:fake_controller",
+        "//third_party/pigweed/backends/pw_async_fuchsia:dispatcher",
+        "//third_party/pigweed/backends/pw_log:printf",
+        "//third_party/pigweed/backends/pw_random:zircon_random_generator",
+        "@fuchsia_sdk//fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+        "@fuchsia_sdk//pkg/async-loop-cpp",
+        "@fuchsia_sdk//pkg/driver_component_cpp",
+        "@fuchsia_sdk//pkg/driver_devfs_cpp",
+        "@fuchsia_sdk//pkg/driver_runtime",
+        "@internal_sdk//fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
+    ],
+)
+
+fuchsia_component_manifest(
+    name = "manifest",
+    src = "meta/driver.cml",
+)
+
+fuchsia_driver_component(
+    name = "component",
+    testonly = True,
+    bind_bytecode = ":bt-hci-virtual-bind",
+    driver_lib = ":bt-hci-virtual",
+    manifest = ":manifest",
+)
+
+fuchsia_test_package(
+    name = "pkg",
+    package_name = "virtual",
+    testonly = True,
+    components = [":component"],
+    fuchsia_api_level = "HEAD",
+    package_repository_name = "fuchsia.com",
+    visibility = ["//visibility:public"],
+)

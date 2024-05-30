@@ -12,7 +12,6 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/random.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_controller.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_peer.h"
-#include "src/connectivity/bluetooth/hci/vendor/broadcom/packets.h"
 #include "src/connectivity/bluetooth/hci/virtual/emulated_peer.h"
 
 namespace fhbt = fuchsia_hardware_bluetooth;
@@ -233,20 +232,7 @@ void EmulatorDevice::WatchLegacyAdvertisingStates(
 
 void EmulatorDevice::EncodeCommand(EncodeCommandRequestView request,
                                    EncodeCommandCompleter::Sync& completer) {
-  uint8_t data_buffer[bt_hci_broadcom::kBcmSetAclPriorityCmdSize];
-  switch (request->Which()) {
-    case fhbt::wire::VendorCommand::Tag::kSetAclPriority: {
-      EncodeSetAclPriorityCommand(request->set_acl_priority(), data_buffer);
-      auto encoded_cmd = fidl::VectorView<uint8_t>::FromExternal(
-          data_buffer, bt_hci_broadcom::kBcmSetAclPriorityCmdSize);
-      completer.ReplySuccess(encoded_cmd);
-      return;
-    }
-    default: {
-      completer.ReplyError(ZX_ERR_INVALID_ARGS);
-      return;
-    }
-  }
+  completer.ReplyError(ZX_ERR_INVALID_ARGS);
 }
 
 void EmulatorDevice::OpenHci(OpenHciCompleter::Sync& completer) {
@@ -413,34 +399,6 @@ zx_status_t EmulatorDevice::AddHciDeviceChildNode() {
                             fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
   return ZX_OK;
-}
-
-void EmulatorDevice::EncodeSetAclPriorityCommand(fhbt::wire::VendorSetAclPriorityParams params,
-                                                 void* out_buffer) {
-  if (!params.has_connection_handle() || !params.has_priority() || !params.has_direction()) {
-    FDF_LOG(ERROR,
-            "The command cannot be encoded because the following fields are missing: %s %s %s",
-            params.has_connection_handle() ? "" : "connection_handle",
-            params.has_priority() ? "" : "priority", params.has_direction() ? "" : "direction");
-    return;
-  }
-  bt_hci_broadcom::BcmSetAclPriorityCmd command = {
-      .header =
-          {
-              .opcode = htole16(bt_hci_broadcom::kBcmSetAclPriorityCmdOpCode),
-              .parameter_total_size = sizeof(bt_hci_broadcom::BcmSetAclPriorityCmd) -
-                                      sizeof(bt_hci_broadcom::HciCommandHeader),
-          },
-      .connection_handle = htole16(params.connection_handle()),
-      .priority = (params.priority() == fhbt::VendorAclPriority::kNormal)
-                      ? bt_hci_broadcom::kBcmAclPriorityNormal
-                      : bt_hci_broadcom::kBcmAclPriorityHigh,
-      .direction = (params.direction() == fhbt::VendorAclDirection::kSource)
-                       ? bt_hci_broadcom::kBcmAclDirectionSource
-                       : bt_hci_broadcom::kBcmAclDirectionSink,
-  };
-
-  memcpy(out_buffer, &command, sizeof(command));
 }
 
 void EmulatorDevice::AddPeer(std::unique_ptr<EmulatedPeer> peer) {

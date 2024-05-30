@@ -10,8 +10,6 @@
 
 #include <vector>
 
-#include <fbl/macros.h>
-
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_controller.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_peer.h"
 
@@ -85,8 +83,6 @@ class EmulatedPeer : public fidl::Server<fuchsia_hardware_bluetooth::Peer> {
   std::vector<fuchsia_hardware_bluetooth::ConnectionState> connection_states_;
   std::queue<WatchConnectionStatesCompleter::Async> connection_states_completers_
       __TA_GUARDED(connection_states_lock_);
-
-  DISALLOW_COPY_ASSIGN_AND_MOVE(EmulatedPeer);
 };
 
 }  // namespace bt_hci_virtual
