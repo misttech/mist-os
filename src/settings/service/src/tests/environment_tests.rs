@@ -12,6 +12,7 @@ use crate::ingress::fidl;
 use crate::ingress::registration;
 use crate::job::source::Error;
 use crate::job::{self, Job};
+use crate::light::build_light_default_settings;
 use crate::message::base::{Audience, MessengerType};
 use crate::migration::MIGRATION_FILE_NAME;
 use crate::service::Payload;
@@ -207,6 +208,7 @@ async fn migration_error_does_not_cause_early_exit() {
         .fidl_interfaces(&[fidl::Interface::Light])
         .store_proxy(store_proxy)
         .storage_dir(directory)
+        .light_configuration(build_light_default_settings())
         .spawn_nested(ENV_NAME)
         .await
         .expect("environment should be built");

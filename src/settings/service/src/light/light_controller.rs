@@ -88,15 +88,10 @@ impl StorageAccess for LightController {
     const STORAGE_KEY: &'static str = LightInfo::KEY;
 }
 
-#[async_trait]
-impl data_controller::Create for LightController {
-    async fn create(client: ClientProxy) -> Result<Self, ControllerError> {
-        let light_hardware_config = DefaultSetting::<LightHardwareConfiguration, &str>::new(
-            None,
-            "/config/data/light_hardware_config.json",
-        )
-        .load_default_value()
-        .map_err(|_| {
+impl data_controller::CreateWithAsync for LightController {
+    type Data = Arc<std::sync::Mutex<DefaultSetting<LightHardwareConfiguration, &'static str>>>;
+    async fn create_with(client: ClientProxy, data: Self::Data) -> Result<Self, ControllerError> {
+        let light_hardware_config = data.lock().unwrap().load_default_value().map_err(|_| {
             ControllerError::InitFailure("Invalid default light hardware config".into())
         })?;
 

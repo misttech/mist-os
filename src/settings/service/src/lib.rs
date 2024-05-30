@@ -2,10 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use display::display_controller::DisplayInfoLoader;
-#[cfg(test)]
-use tracing as _; // Make it easier to debug tests by always building with tracing
-
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
@@ -13,6 +9,7 @@ use std::sync::Arc;
 #[cfg(test)]
 use anyhow::format_err;
 use anyhow::{Context, Error};
+use display::display_controller::DisplayInfoLoader;
 use fidl_fuchsia_io::DirectoryProxy;
 use fidl_fuchsia_stash::StoreProxy;
 use fuchsia_async as fasync;
@@ -27,6 +24,9 @@ use fuchsia_zircon::{Duration, DurationNum};
 use futures::{lock::Mutex, StreamExt};
 use settings_storage::device_storage::DeviceStorage;
 use settings_storage::fidl_storage::FidlStorage;
+use settings_storage::storage_factory::{FidlStorageFactory, StorageFactory};
+#[cfg(test)]
+use tracing as _; // Make it easier to debug tests by always building with tracing
 
 pub use display::display_configuration::DisplayConfiguration;
 pub use handler::setting_proxy_inspect_info::SettingProxyInspectInfo;
@@ -64,7 +64,6 @@ use crate::service::message::Delegate;
 use crate::service_context::GenerateService;
 use crate::service_context::ServiceContext;
 use crate::setup::setup_controller::SetupController;
-use settings_storage::storage_factory::{FidlStorageFactory, StorageFactory};
 
 mod accessibility;
 mod audio;
@@ -77,7 +76,7 @@ mod input;
 mod intl;
 mod job;
 mod keyboard;
-mod light;
+pub mod light;
 mod night_mode;
 mod privacy;
 mod service;
@@ -231,6 +230,7 @@ pub struct EnvironmentBuilder<
     store_proxy: Option<StoreProxy>,
     fidl_storage_factory: Option<Arc<FidlStorageFactory>>,
     display_configuration: Option<DefaultSetting<DisplayConfiguration, &'static str>>,
+    light_configuration: Option<DefaultSetting<LightHardwareConfiguration, &'static str>>,
 }
 
 impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
@@ -254,6 +254,7 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
             store_proxy: None,
             fidl_storage_factory: None,
             display_configuration: None,
+            light_configuration: None,
         }
     }
 
@@ -283,6 +284,14 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
         display_configuration: DefaultSetting<DisplayConfiguration, &'static str>,
     ) -> Self {
         self.display_configuration = Some(display_configuration);
+        self
+    }
+
+    pub fn light_configuration(
+        mut self,
+        light_configuration: DefaultSetting<LightHardwareConfiguration, &'static str>,
+    ) -> Self {
+        self.light_configuration = Some(light_configuration);
         self
     }
 
@@ -460,6 +469,7 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
             Arc::clone(&fidl_storage_factory),
             &flags,
             self.display_configuration.map(DisplayInfoLoader::new),
+            self.light_configuration,
             &mut handler_factory,
         )
         .await;
@@ -551,6 +561,7 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
         fidl_storage_factory: Arc<F>,
         controller_flags: &HashSet<ControllerFlag>,
         display_loader: Option<DisplayInfoLoader>,
+        light_configuration: Option<DefaultSetting<LightHardwareConfiguration, &'static str>>,
         factory_handle: &mut SettingHandlerFactoryImpl,
     ) where
         F: StorageFactory<Storage = FidlStorage>,
@@ -599,12 +610,22 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
 
         // Light
         if components.contains(&SettingType::Light) {
+            let light_configuration = Arc::new(std::sync::Mutex::new(
+                light_configuration.expect("Light controller requires a light configuration"),
+            ));
             fidl_storage_factory
                 .initialize::<LightController>()
                 .await
                 .expect("storage should still be initializing");
-            factory_handle
-                .register(SettingType::Light, Box::new(DataHandler::<LightController>::spawn));
+            factory_handle.register(
+                SettingType::Light,
+                Box::new(move |context| {
+                    DataHandler::<LightController>::spawn_with_async(
+                        context,
+                        Arc::clone(&light_configuration),
+                    )
+                }),
+            );
         }
 
         // Input
