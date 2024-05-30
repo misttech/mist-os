@@ -164,41 +164,6 @@ __EXPORT zx_status_t device_get_fragment_metadata(zx_device_t* dev, const char* 
   return dev->GetMetadata(type, buf, buflen, actual);
 }
 
-__EXPORT zx_status_t device_get_variable(zx_device_t* device, const char* name, char* out,
-                                         size_t out_size, size_t* size_actual) {
-  if (device == nullptr) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  if (!strncmp(name, compat::kDfv2Variable, sizeof(compat::kDfv2Variable))) {
-    if (size_actual) {
-      *size_actual = 2;
-    }
-    if (out_size < 2) {
-      return ZX_ERR_BUFFER_TOO_SMALL;
-    }
-    out[0] = '1';
-    out[1] = 0;
-    return ZX_OK;
-  }
-
-  if (strncmp(name, "driver.", strlen("driver.")) == 0) {
-    auto variable = device->driver()->GetVariable(name);
-    if (variable.is_error()) {
-      return variable.status_value();
-    }
-    if (size_actual) {
-      *size_actual = variable->size();
-    }
-    if (out_size < variable->size()) {
-      return ZX_ERR_BUFFER_TOO_SMALL;
-    }
-    strcpy(out, variable->c_str());
-    return ZX_OK;
-  }
-  return ZX_ERR_NOT_FOUND;
-}
-
 __EXPORT zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const char* service_name,
                                                    const char* protocol_name, zx_handle_t request) {
   return device->ConnectFragmentFidl("default", service_name, protocol_name, zx::channel(request));

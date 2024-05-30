@@ -180,11 +180,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   // device calls device_get_config_vmo
   void SetConfigVmo(zx::vmo config_vmo);
 
-  // Variables are often set for the parent of a device, to be available when the device
-  // calls device_get_variable.
-  // Passing in nullptr for |data| will unset the variable.
-  void SetVariable(const char* name, const char* data);
-
   // device_get_protocol is usually called by child devices to get their parent protocols.
   // You can add protocols here to your device or your parent device.
   // if you want to add a protocol to a fragment, add the fragment's name as 'name'.
@@ -319,11 +314,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   // device_get_config_vmo calls GetConfigVmo:
   zx::vmo& GetConfigVmo() { return config_vmo_; }
   friend zx_status_t device_get_config_vmo(zx_device_t* device, zx_handle_t* config_vmo);
-
-  // device_get_varaible calls GetVariable:
-  zx_status_t GetVariable(const char* name, char* out, size_t size, size_t* size_actual);
-  friend zx_status_t device_get_variable(zx_device_t* device, const char* name, char* out,
-                                         size_t size, size_t* size_actual);
 
   // Default constructor for making deprecated root parent without dispatcher integration.
   // TODO(https://fxbug.dev/42075363): Remove when all tests migrated.

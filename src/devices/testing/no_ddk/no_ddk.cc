@@ -116,11 +116,6 @@ zx_handle_t get_smc_resource(zx_device_t* parent) { return ZX_HANDLE_INVALID; }
 __EXPORT
 zx_handle_t get_power_resource(zx_device_t* parent) { return ZX_HANDLE_INVALID; }
 
-__EXPORT zx_status_t device_get_variable(zx_device_t* device, const char* name, char* out,
-                                         size_t out_size, size_t* size_actual) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 __EXPORT zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const char* service_name,
                                                    const char* protocol_name, zx_handle_t request) {
   return ZX_ERR_NOT_SUPPORTED;

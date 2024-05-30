@@ -252,17 +252,6 @@ __EXPORT __WEAK zx_status_t load_firmware_from_driver(zx_driver_t* drv, zx_devic
   return device->LoadFirmware(path, fw, size);
 }
 
-__EXPORT zx_status_t device_get_variable(zx_device_t* device, const char* name, char* out,
-                                         size_t out_size, size_t* size_actual) {
-  std::lock_guard guard(libdriver_lock);
-  if (!device) {
-    zxlogf(ERROR, "Error: %s passed a null device\n", __func__);
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  return device->GetVariable(name, out, out_size, size_actual);
-}
-
 __EXPORT
 zx_handle_t get_mmio_resource(zx_device_t* parent) { return ZX_HANDLE_INVALID; }
 
