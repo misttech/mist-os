@@ -5036,14 +5036,14 @@ mod tests {
             },
             ContextProvider, InstantContext, ReferenceNotifiers,
         },
-        filter::{FilterBindingsTypes, TransportPacketSerializer},
+        filter::TransportPacketSerializer,
         ip::{
             device::IpDeviceStateIpExt,
             icmp::{IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode},
             nud::{testutil::FakeLinkResolutionNotifier, LinkResolutionContext},
             socket::{
                 testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
-                IpSockSendError, IpSocketBindingsContext, MmsError, SendOptions,
+                IpSockSendError, MmsError, SendOptions,
             },
             testutil::DualStackSendIpPacketMeta,
             HopLimits, IpTransportContext,
@@ -5340,10 +5340,6 @@ mod tests {
         fn duration(&self, _: &'static CStr) {}
     }
 
-    impl<D: FakeStrongDeviceId> FilterBindingsTypes for TcpBindingsCtx<D> {
-        type DeviceClass = ();
-    }
-
     impl<D: FakeStrongDeviceId> ReferenceNotifiers for TcpBindingsCtx<D> {
         type ReferenceReceiver<T: 'static> = Never;
 
@@ -5400,7 +5396,7 @@ mod tests {
     where
         I: TcpTestIpExt,
         D: FakeStrongDeviceId,
-        BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext,
+        BC: TcpTestBindingsTypes<D>,
     {
         fn get_mms(
             &mut self,
@@ -5416,7 +5412,7 @@ mod tests {
     where
         I: TcpTestIpExt,
         D: FakeStrongDeviceId,
-        BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext,
+        BC: TcpTestBindingsTypes<D>,
         FakeDualStackIpSocketCtx<D>: TransportIpContext<I, BC, DeviceId = Self::DeviceId>,
     {
         type DevicesWithAddrIter<'a> = <FakeDualStackIpSocketCtx<D> as TransportIpContext<I, BC>>::DevicesWithAddrIter<'a>
@@ -5496,7 +5492,7 @@ mod tests {
     impl<D, BC> TcpDemuxContext<Ipv4, D::Weak, BC> for TcpCoreCtx<D, BC>
     where
         D: FakeStrongDeviceId,
-        BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext,
+        BC: TcpTestBindingsTypes<D>,
     {
         type IpTransportCtx<'a> = Self;
         fn with_demux<O, F: FnOnce(&DemuxState<Ipv4, D::Weak, BC>) -> O>(&mut self, cb: F) -> O {
@@ -5526,7 +5522,7 @@ mod tests {
     impl<D, BC> TcpDemuxContext<Ipv6, D::Weak, BC> for TcpCoreCtx<D, BC>
     where
         D: FakeStrongDeviceId,
-        BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext,
+        BC: TcpTestBindingsTypes<D>,
     {
         type IpTransportCtx<'a> = Self;
         fn with_demux<O, F: FnOnce(&DemuxState<Ipv6, D::Weak, BC>) -> O>(&mut self, cb: F) -> O {
@@ -5564,8 +5560,8 @@ mod tests {
         }
     }
 
-    impl<D: FakeStrongDeviceId, BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext>
-        TcpContext<Ipv6, BC> for TcpCoreCtx<D, BC>
+    impl<D: FakeStrongDeviceId, BC: TcpTestBindingsTypes<D>> TcpContext<Ipv6, BC>
+        for TcpCoreCtx<D, BC>
     {
         type ThisStackIpTransportAndDemuxCtx<'a> = Self;
         type SingleStackIpTransportAndDemuxCtx<'a> = UninstantiableWrapper<Self>;
@@ -5631,8 +5627,8 @@ mod tests {
         }
     }
 
-    impl<D: FakeStrongDeviceId, BC: TcpTestBindingsTypes<D> + IpSocketBindingsContext>
-        TcpContext<Ipv4, BC> for TcpCoreCtx<D, BC>
+    impl<D: FakeStrongDeviceId, BC: TcpTestBindingsTypes<D>> TcpContext<Ipv4, BC>
+        for TcpCoreCtx<D, BC>
     {
         type ThisStackIpTransportAndDemuxCtx<'a> = Self;
         type SingleStackIpTransportAndDemuxCtx<'a> = Self;
@@ -5699,7 +5695,7 @@ mod tests {
         }
     }
 
-    impl<D: FakeStrongDeviceId, BT: TcpTestBindingsTypes<D> + IpSocketBindingsContext>
+    impl<D: FakeStrongDeviceId, BT: TcpTestBindingsTypes<D>>
         TcpDualStackContext<Ipv6, FakeWeakDeviceId<D>, BT> for TcpCoreCtx<D, BT>
     {
         type Converter = Ipv6SocketIdToIpv4DemuxIdConverter;
