@@ -28,6 +28,7 @@
 #include <arch/x86/mmu_mem_types.h>
 #include <kernel/mp.h>
 #include <vm/arch_vm_aspace.h>
+#include <vm/bootreserve.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
 #include <vm/vm.h>
@@ -81,6 +82,8 @@ volatile uint8_t kasan_zero_page[PAGE_SIZE] __ALIGNED(PAGE_SIZE);
 
 /* a big pile of page tables needed to map 64GB of memory into kernel space using 2MB pages */
 volatile pt_entry_t linear_map_pdp[(64ULL * GB) / (2 * MB)] __ALIGNED(PAGE_SIZE);
+
+static constexpr uint64_t kNumKernelPageTables = (sizeof(linear_map_pdp) / PAGE_SIZE) + 4;
 
 /* which of the above variables is the top level page table */
 #define KERNEL_PT pml4
@@ -633,7 +636,8 @@ zx_status_t X86PageTableMmu::InitKernel(void* ctx,
   phys_ = kernel_pt_phys;
   virt_ = (pt_entry_t*)X86_PHYS_TO_VIRT(phys_);
   ctx_ = ctx;
-  pages_ = 1;
+  // These are all the page tables mapped in by start.S into the kernel aspace.
+  pages_ = kNumKernelPageTables;
   use_global_mappings_ = true;
   return ZX_OK;
 }
@@ -1069,7 +1073,35 @@ void x86_mmu_init() {
              g_max_vaddr_width, kX86VAddrBits);
 }
 
-void x86_mmu_feature_init() {
+// Takes an address, which must be the virtual address of one of the page tables in the kernels
+// data segment, and moves it from the WIRED to the MMU state.
+static void unwire_boot_mmu_page(uintptr_t addr) {
+  // Convert to a phys address.
+  paddr_t paddr = addr - reinterpret_cast<vaddr_t>(__executable_start) + KERNEL_LOAD_OFFSET;
+
+  // Lookup the page.
+  vm_page_t* page = paddr_to_vm_page(paddr);
+  ASSERT(page);
+
+  // Expect it to be wired.
+  ASSERT(page->state() == vm_page_state::WIRED);
+
+  // Unwire and mark it as an MMU page.
+  boot_reserve_unwire_page(page);
+  page->set_state(vm_page_state::MMU);
+}
+
+void x86_mmu_prevm_init() {
+  // Unwire and mark as in use by the MMU all the page tables that might be part of the kernel
+  // aspace as created by start.S.
+  unwire_boot_mmu_page(reinterpret_cast<uintptr_t>(pml4));
+  unwire_boot_mmu_page(reinterpret_cast<uintptr_t>(pdp));
+  unwire_boot_mmu_page(reinterpret_cast<uintptr_t>(pte));
+  unwire_boot_mmu_page(reinterpret_cast<uintptr_t>(pdp_high));
+  for (size_t i = 0; i < sizeof(linear_map_pdp) / sizeof(pt_entry_t); i += NO_OF_PT_ENTRIES) {
+    unwire_boot_mmu_page(reinterpret_cast<uintptr_t>(&linear_map_pdp[i]));
+  }
+
   // Use of PCID is detected late and on the boot cpu is this happens after x86_mmu_percpu_init
   // and so we enable it again here. For other CPUs, and when coming in and out of suspend, it
   // will happen correctly in x86_mmu_percpu_init.

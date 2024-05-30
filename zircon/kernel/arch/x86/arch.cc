@@ -103,7 +103,7 @@ void arch_early_init(void) {
 void arch_prevm_init(void) {
   x86_cpu_feature_init();
   // Perform some MMU initialization that is dependent on having done the previous feature init.
-  x86_mmu_feature_init();
+  x86_mmu_prevm_init();
 }
 
 void arch_init(void) {
