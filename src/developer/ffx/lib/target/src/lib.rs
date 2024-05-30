@@ -15,8 +15,8 @@ use fidl_fuchsia_developer_ffx::{
 };
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 use fidl_fuchsia_net as net;
-use fuchsia_async::Timer;
-use futures::{select, Future, FutureExt, StreamExt, TryStreamExt};
+use fuchsia_async::{TimeoutExt, Timer};
+use futures::{future::join_all, select, Future, FutureExt, StreamExt, TryStreamExt};
 use itertools::Itertools;
 use netext::IsLocalAddr;
 use std::cmp::Ordering;
@@ -37,6 +37,7 @@ mod query;
 mod ssh_connector;
 
 const SSH_PORT_DEFAULT: u16 = 22;
+const DEFAULT_SSH_TIMEOUT_MS: u64 = 10000;
 
 pub use connection::Connection;
 pub use connection::ConnectionError;
@@ -223,6 +224,131 @@ pub async fn resolve_target_query(
             | DiscoverySources::EMULATOR,
     )
     .await
+}
+
+pub async fn resolve_target_query_to_info(
+    query: TargetInfoQuery,
+    ctx: &EnvironmentContext,
+) -> Result<Vec<ffx::TargetInfo>> {
+    let handles = resolve_target_query(query, ctx).await?;
+    let targets =
+        join_all(handles.into_iter().map(|t| async { get_handle_info(t, ctx).await })).await;
+    targets.into_iter().collect::<Result<Vec<ffx::TargetInfo>>>()
+}
+
+async fn get_handle_info(
+    handle: TargetHandle,
+    context: &EnvironmentContext,
+) -> Result<ffx::TargetInfo> {
+    let (target_state, addresses) = match handle.state {
+        TargetState::Unknown => (ffx::TargetState::Unknown, None),
+        TargetState::Product(target_addrs) => (ffx::TargetState::Product, Some(target_addrs)),
+        TargetState::Fastboot(_) => (ffx::TargetState::Fastboot, None),
+        TargetState::Zedboot => (ffx::TargetState::Zedboot, None),
+    };
+    let RetrievedTargetInfo { rcs_state, product_config, board_config, ssh_address } =
+        if let Some(ref target_addrs) = addresses {
+            RetrievedTargetInfo::get(context, target_addrs).await?
+        } else {
+            RetrievedTargetInfo::default()
+        };
+    let addresses =
+        addresses.map(|ta| ta.into_iter().map(|x| x.into()).collect::<Vec<ffx::TargetAddrInfo>>());
+    Ok(ffx::TargetInfo {
+        nodename: handle.node_name,
+        addresses,
+        rcs_state: Some(rcs_state),
+        target_state: Some(target_state),
+        board_config,
+        product_config,
+        ssh_address: ssh_address.map(|a| TargetAddr::from(a).into()),
+        ..Default::default()
+    })
+}
+
+async fn try_get_target_info(
+    addr: addr::TargetAddr,
+    context: &EnvironmentContext,
+) -> Result<(Option<String>, Option<String>), KnockError> {
+    let connector =
+        SshConnector::new(addr.into(), context).await.context("making ssh connector")?;
+    let conn = Connection::new(connector).await.context("making direct connection")?;
+    let rcs = conn.rcs_proxy().await.context("getting RCS proxy")?;
+    let (pc, bc) = match rcs.identify_host().await {
+        Ok(Ok(id_result)) => (id_result.product_config, id_result.board_config),
+        _ => (None, None),
+    };
+    Ok((pc, bc))
+}
+
+struct RetrievedTargetInfo {
+    rcs_state: ffx::RemoteControlState,
+    product_config: Option<String>,
+    board_config: Option<String>,
+    ssh_address: Option<SocketAddr>,
+}
+
+impl Default for RetrievedTargetInfo {
+    fn default() -> Self {
+        Self {
+            rcs_state: ffx::RemoteControlState::Unknown,
+            product_config: None,
+            board_config: None,
+            ssh_address: None,
+        }
+    }
+}
+
+impl RetrievedTargetInfo {
+    async fn get(context: &EnvironmentContext, addrs: &[addr::TargetAddr]) -> Result<Self> {
+        let ssh_timeout: u64 =
+            ffx_config::get("target.host_pipe_ssh_timeout").await.unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
+        let ssh_timeout = Duration::from_millis(ssh_timeout);
+        for addr in addrs {
+            tracing::debug!("Trying to make a connection to {addr:?}");
+
+            // If the port is 0, we treat that as the default ssh port.
+            let mut addr = *addr;
+            if addr.port() == 0 {
+                addr.set_port(SSH_PORT_DEFAULT);
+            }
+
+            match try_get_target_info(addr, context)
+                .on_timeout(ssh_timeout, || {
+                    Err(KnockError::NonCriticalError(anyhow::anyhow!("knock_rcs() timed out")))
+                })
+                .await
+            {
+                Ok((product_config, board_config)) => {
+                    return Ok(Self {
+                        rcs_state: ffx::RemoteControlState::Up,
+                        product_config,
+                        board_config,
+                        ssh_address: Some(addr.into()),
+                    });
+                }
+                Err(KnockError::NonCriticalError(e)) => {
+                    tracing::debug!("Could not connect to {addr:?}: {e:?}");
+                    continue;
+                }
+                e => {
+                    tracing::debug!("Got error {e:?} when trying to connect to {addr:?}");
+                    return Ok(Self {
+                        rcs_state: ffx::RemoteControlState::Unknown,
+                        product_config: None,
+                        board_config: None,
+                        ssh_address: None,
+                    });
+                }
+            }
+        }
+        Ok(Self {
+            rcs_state: ffx::RemoteControlState::Down,
+            product_config: None,
+            board_config: None,
+            ssh_address: None,
+        })
+    }
 }
 
 pub async fn resolve_target_query_with(
