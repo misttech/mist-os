@@ -5,7 +5,9 @@
 #include "src/developer/forensics/exceptions/handler/wake_lease.h"
 
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
+#include <fidl/fuchsia.power.broker/cpp/test_base.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/test_base.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/wire/channel.h>
@@ -15,6 +17,7 @@
 
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 #include <gtest/gtest.h>
@@ -28,6 +31,7 @@
 namespace forensics::exceptions::handler {
 namespace {
 
+using ::fidl::testing::TestBase;
 using ::testing::HasSubstr;
 
 namespace fpb = fuchsia_power_broker;
@@ -42,6 +46,8 @@ class WakeLeaseTest : public UnitTestFixture {
   template <typename Impl>
   static std::optional<std::tuple<fidl::ClientEnd<fps::ActivityGovernor>, std::unique_ptr<Impl>>>
   CreateSag(async_dispatcher_t* dispatcher) {
+    static_assert(std::is_base_of_v<TestBase<fps::ActivityGovernor>, Impl>);
+
     auto endpoints = fidl::CreateEndpoints<fps::ActivityGovernor>();
     if (!endpoints.is_ok()) {
       return std::nullopt;
@@ -54,6 +60,8 @@ class WakeLeaseTest : public UnitTestFixture {
   template <typename Impl>
   static std::optional<std::tuple<fidl::ClientEnd<fpb::Topology>, std::unique_ptr<Impl>>>
   CreateTopology(async_dispatcher_t* dispatcher) {
+    static_assert(std::is_base_of_v<TestBase<fpb::Topology>, Impl>);
+
     auto endpoints = fidl::CreateEndpoints<fpb::Topology>();
     if (!endpoints.is_ok()) {
       return std::nullopt;
