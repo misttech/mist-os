@@ -55,8 +55,15 @@
     ],
     expose: [
         {
-            protocol: [ "fuchsia.component.Realm" ],
+            protocol: [
+                "fuchsia.component.Introspector",
+                "fuchsia.component.Realm",
+            ],
             from: "framework",
+        },
+        {
+            protocol: "fuchsia.memory.attribution.Provider",
+            from: "#starnix_runner",
         },
     ],
     environments: [

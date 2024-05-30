@@ -123,7 +123,10 @@ impl FrameworkCapability for IntrospectorFrameworkCapability {
                 Moniker::parse_str("/core/memory_monitor").unwrap();
             /// Moniker for integration tests.
             static ref RECEIVER: Moniker =
-                Moniker::parse_str("receiver").unwrap();
+                Moniker::parse_str("/receiver").unwrap();
+            static ref TEST_REALMS: Moniker =
+                Moniker::parse_str("/core/testing").unwrap();
+            static ref STARNIX_TESTS: Name = "starnix-tests".parse().unwrap();
         };
         // TODO(https://fxbug.dev/318904493): Temporary workaround to prevent other components from
         // using `Introspector` while improvements to framework capability allowlists are under way.
@@ -133,10 +136,22 @@ impl FrameworkCapability for IntrospectorFrameworkCapability {
         // In the `introspector-integration-test`, the capability is minted at some test specific
         // realm, then exposed from `/`.
         //
+        // In starnix tests, the capability is minted at some realm inside
+        // `/core/testing/starnix-tests`, then used by some realm inside
+        // `/core/testing/starnix-tests`.
+        //
         // All other cases are disallowed.
+        let is_starnix_test_realm = |moniker: &Moniker| match moniker.strip_prefix(&*TEST_REALMS) {
+            Ok(mut rest) => match rest.next() {
+                Some(realm) => realm.collection() == Some(&*STARNIX_TESTS),
+                None => false,
+            },
+            Err(_) => false,
+        };
         if target.moniker != *MEMORY_MONITOR
             && target.moniker != *RECEIVER
             && !target.moniker.is_root()
+            && !(is_starnix_test_realm(&target.moniker) && is_starnix_test_realm(&scope.moniker))
         {
             return Box::new(AccessDeniedCapabilityProvider {
                 target,

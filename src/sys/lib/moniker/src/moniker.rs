@@ -101,6 +101,14 @@ impl Moniker {
         Self::new(path)
     }
 
+    pub fn next(&mut self) -> Option<ChildName> {
+        let path = self.path_mut();
+        if path.is_empty() {
+            return None;
+        }
+        Some(path.remove(0))
+    }
+
     /// Strips the moniker parts in prefix from the beginning of this moniker.
     pub fn strip_prefix(&self, prefix: &Moniker) -> Result<Self, MonikerError> {
         if !self.has_prefix(prefix) {
@@ -239,6 +247,21 @@ mod tests {
         let relative: Moniker = vec![].try_into().unwrap();
         let descendant = scope_root.concat(&relative);
         assert_eq!("a:test1/b:test2", format!("{}", descendant));
+    }
+
+    #[test]
+    fn moniker_next() {
+        let mut root = Moniker::root();
+        assert_eq!(None, root.next());
+
+        let mut m = Moniker::new(vec![
+            ChildName::try_new("a", None).unwrap(),
+            ChildName::try_new("b", None).unwrap(),
+        ]);
+        assert_eq!("a", format!("{}", m.next().unwrap()));
+        assert_eq!("b", format!("{}", m.next().unwrap()));
+        assert_eq!(None, m.next());
+        assert_eq!(None, m.next());
     }
 
     #[test]

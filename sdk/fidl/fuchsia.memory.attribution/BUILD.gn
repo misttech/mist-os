@@ -17,6 +17,7 @@ fidl("fuchsia.memory.attribution") {
     "//src/developer/memory/*",
     "//src/performance/memory/*",
     "//src/starnix/runner/*",
+    "//src/starnix/tests/memory_attribution/*",
     "//src/sys/component_manager/*",
     "//src/sys/lib/elf_runner/*",
   ]

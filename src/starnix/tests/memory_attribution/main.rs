@@ -4,6 +4,7 @@
 
 use diagnostics_reader::{ArchiveReader, Logs};
 use fidl_fuchsia_component as fcomponent;
+use fidl_fuchsia_memory_attribution as fattribution;
 use fuchsia_component_test::{RealmBuilder, RealmBuilderParams, ScopedInstanceFactory};
 use futures::StreamExt;
 use moniker::Moniker;
@@ -31,6 +32,31 @@ async fn mmap_anonymous() {
     let factory = ScopedInstanceFactory::new(PROGRAM_COLLECTION).with_realm_proxy(realm_proxy);
     let program = factory.new_instance(PROGRAM_URL).await.unwrap();
 
+    // Connect to the attribution protocol of the starnix runner.
+    let attribution_provider =
+        realm.root.connect_to_protocol_at_exposed_dir::<fattribution::ProviderMarker>().unwrap();
+    let introspector =
+        realm.root.connect_to_protocol_at_exposed_dir::<fcomponent::IntrospectorMarker>().unwrap();
+    let mut attribution = attribution_testing::attribute_memory(
+        "starnix_runner".to_string(),
+        attribution_provider,
+        introspector,
+    );
+
+    // Stream memory attribution data until the container shows up in the reporting.
+    let mut tree: attribution_testing::Principal;
+    loop {
+        tree = attribution.next().await.unwrap();
+        if tree.children.len() == 1 {
+            break;
+        }
+    }
+    // Starnix runner should report a single container, backed by a job.
+    assert_eq!(tree.children.len(), 1);
+    assert_eq!(tree.children[0].name, "debian_container");
+    assert_eq!(tree.children[0].children.len(), 0);
+    assert_eq!(tree.children[0].resources.len(), 1);
+
     // Wait for magic log from the program.
     let mut reader = ArchiveReader::new();
     let selector: Moniker = realm.root.moniker().parse().unwrap();
@@ -49,4 +75,8 @@ async fn mmap_anonymous() {
     // using the `fuchsia.memory.attribution.Provider` protocol.
 
     drop(program);
+
+    // TODO(https://fxbug.dev/342023365): When CF has an API to stop a static component
+    // use that to stop the container and verify that the starnix runner reports that the
+    // container is removed.
 }
