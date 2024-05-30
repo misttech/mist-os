@@ -30,7 +30,7 @@ use packet_formats::icmp::{
 
 use crate::{
     context::{CoreEventContext, CoreTimerContext, CounterContext},
-    device::{AnyDevice, DeviceId, DeviceIdContext, DeviceIdentifier, WeakDeviceId},
+    device::{AnyDevice, DeviceId, DeviceIdContext, WeakDeviceId},
     error::{ExistsError, NotFoundError},
     filter::FilterImpl,
     ip::{
@@ -42,16 +42,15 @@ use crate::{
             DadAddressStateRef, DadContext, DadEvent, DadHandler, DadStateRef, DadTimerId,
             DefaultHopLimit, DelIpAddr, DualStackIpDeviceState, IpAddressId, IpAddressIdSpec,
             IpAddressIdSpecContext, IpAddressState, IpDeviceAddr, IpDeviceAddresses,
-            IpDeviceBindingsContext, IpDeviceConfiguration, IpDeviceEvent, IpDeviceFlags,
-            IpDeviceIpExt, IpDeviceMulticastGroups, IpDeviceStateBindingsTypes,
-            IpDeviceStateContext, IpDeviceStateIpExt, IpDeviceTimerId, Ipv4AddressEntry,
-            Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressEntry,
-            Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState, Ipv6DeviceAddr,
-            Ipv6DeviceConfiguration, Ipv6DeviceTimerId, Ipv6DiscoveredRoute,
-            Ipv6DiscoveredRoutesContext, Ipv6NetworkLearnedParameters, Ipv6RouteDiscoveryContext,
-            Ipv6RouteDiscoveryState, RsContext, RsHandler, RsState, SlaacAddressEntry,
-            SlaacAddressEntryMut, SlaacAddresses, SlaacAddrsMutAndConfig, SlaacConfig,
-            SlaacContext, SlaacCounters, SlaacState,
+            IpDeviceConfiguration, IpDeviceEvent, IpDeviceFlags, IpDeviceIpExt,
+            IpDeviceMulticastGroups, IpDeviceStateBindingsTypes, IpDeviceStateContext,
+            IpDeviceStateIpExt, IpDeviceTimerId, Ipv4AddressEntry, Ipv4AddressState,
+            Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressEntry, Ipv6AddressFlags,
+            Ipv6AddressState, Ipv6DadState, Ipv6DeviceAddr, Ipv6DeviceConfiguration,
+            Ipv6DeviceTimerId, Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext,
+            Ipv6NetworkLearnedParameters, Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState,
+            RsContext, RsHandler, RsState, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses,
+            SlaacAddrsMutAndConfig, SlaacConfig, SlaacContext, SlaacCounters, SlaacState,
         },
         gmp::{
             self, GmpHandler, GmpQueryHandler, GmpStateRef, IgmpContext, IgmpGroupState, IgmpState,
@@ -60,7 +59,7 @@ use crate::{
         nud::{self, ConfirmationFlags, NudCounters, NudIpHandler},
         socket::SasCandidate,
         AddableMetric, AddressStatus, FilterHandlerProvider, IpLayerIpExt, IpStateContext,
-        Ipv4PresentAddressStatus, Ipv6PresentAddressStatus, RawMetric, DEFAULT_TTL,
+        Ipv4PresentAddressStatus, RawMetric, DEFAULT_TTL,
     },
     sync::{RemoveResourceResultWithContext, WeakRc},
     BindingsContext, BindingsTypes, CoreCtx, StackState,
@@ -369,11 +368,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
         dst_ip: SpecifiedAddr<Ipv4Addr>,
         device_id: &Self::DeviceId,
     ) -> AddressStatus<Ipv4PresentAddressStatus> {
-        if dst_ip.is_limited_broadcast() {
-            return AddressStatus::Present(Ipv4PresentAddressStatus::LimitedBroadcast);
-        }
-
-        assignment_state_v4(self, device_id, dst_ip)
+        AddressStatus::from_context_addr_v4(self, device_id, dst_ip)
     }
 }
 
@@ -396,7 +391,12 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         device::IpDeviceConfigurationContext::<Ipv4, _>::with_devices_and_state(
             self,
             |devices, state| {
-                cb(FilterPresentWithDevices::new(devices, state, assignment_state_v4, addr))
+                cb(FilterPresentWithDevices::new(
+                    devices,
+                    state,
+                    AddressStatus::from_context_addr_v4,
+                    addr,
+                ))
             },
         )
     }
@@ -470,7 +470,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
         addr: SpecifiedAddr<Ipv6Addr>,
         device_id: &Self::DeviceId,
     ) -> AddressStatus<<Ipv6 as IpLayerIpExt>::AddressStatus> {
-        assignment_state_v6(self, device_id, addr)
+        AddressStatus::from_context_addr_v6(self, device_id, addr)
     }
 }
 
@@ -493,7 +493,12 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         device::IpDeviceConfigurationContext::<Ipv6, _>::with_devices_and_state(
             self,
             |devices, state| {
-                cb(FilterPresentWithDevices::new(devices, state, assignment_state_v6, addr))
+                cb(FilterPresentWithDevices::new(
+                    devices,
+                    state,
+                    AddressStatus::from_context_addr_v6,
+                    addr,
+                ))
             },
         )
     }
@@ -522,73 +527,6 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
     }
 }
 
-fn assignment_state_v4<
-    BC: IpDeviceStateBindingsTypes,
-    CC: IpDeviceStateContext<Ipv4, BC> + GmpQueryHandler<Ipv4, BC>,
->(
-    core_ctx: &mut CC,
-    device: &CC::DeviceId,
-    addr: SpecifiedAddr<Ipv4Addr>,
-) -> AddressStatus<Ipv4PresentAddressStatus> {
-    if MulticastAddr::new(addr.get())
-        .is_some_and(|addr| GmpQueryHandler::gmp_is_in_group(core_ctx, device, addr))
-    {
-        return AddressStatus::Present(Ipv4PresentAddressStatus::Multicast);
-    }
-
-    core_ctx.with_address_ids(device, |mut addrs, _core_ctx| {
-        addrs
-            .find_map(|addr_id| {
-                let dev_addr = addr_id.addr_sub();
-                let (dev_addr, subnet) = dev_addr.addr_subnet();
-
-                if dev_addr == addr {
-                    Some(AddressStatus::Present(Ipv4PresentAddressStatus::Unicast))
-                } else if addr.get() == subnet.broadcast() {
-                    Some(AddressStatus::Present(Ipv4PresentAddressStatus::SubnetBroadcast))
-                } else if device.is_loopback() && subnet.contains(addr.as_ref()) {
-                    Some(AddressStatus::Present(Ipv4PresentAddressStatus::LoopbackSubnet))
-                } else {
-                    None
-                }
-            })
-            .unwrap_or(AddressStatus::Unassigned)
-    })
-}
-
-fn assignment_state_v6<
-    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
-    CC: device::Ipv6DeviceContext<BC> + GmpQueryHandler<Ipv6, BC>,
->(
-    core_ctx: &mut CC,
-    device: &CC::DeviceId,
-    addr: SpecifiedAddr<Ipv6Addr>,
-) -> AddressStatus<Ipv6PresentAddressStatus> {
-    if MulticastAddr::new(addr.get())
-        .is_some_and(|addr| GmpQueryHandler::gmp_is_in_group(core_ctx, device, addr))
-    {
-        return AddressStatus::Present(Ipv6PresentAddressStatus::Multicast);
-    }
-
-    let addr_id = match core_ctx.get_address_id(device, addr) {
-        Ok(o) => o,
-        Err(NotFoundError) => return AddressStatus::Unassigned,
-    };
-
-    let assigned = core_ctx.with_ip_address_state(
-        device,
-        &addr_id,
-        |Ipv6AddressState { flags: Ipv6AddressFlags { deprecated: _, assigned }, config: _ }| {
-            *assigned
-        },
-    );
-
-    if assigned {
-        AddressStatus::Present(Ipv6PresentAddressStatus::UnicastAssigned)
-    } else {
-        AddressStatus::Present(Ipv6PresentAddressStatus::UnicastTentative)
-    }
-}
 pub struct CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC: BindingsContext> {
     pub config: Config,
     pub core_ctx: CoreCtx<'a, BC, L>,

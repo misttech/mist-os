@@ -26,8 +26,8 @@ use netstack3_base::{
     sync::{Mutex, RwLock},
     AnyDevice, CoreTimerContext, Counter, CounterContext, DeviceIdContext, DeviceIdentifier as _,
     EventContext, FrameDestination, HandleableTimer, Inspectable, Inspector, InstantContext,
-    NestedIntoCoreTimerCtx, RngContext, StrongDeviceIdentifier, TimerContext, TimerHandler,
-    TracingContext,
+    NestedIntoCoreTimerCtx, NotFoundError, RngContext, StrongDeviceIdentifier, TimerContext,
+    TimerHandler, TracingContext,
 };
 use netstack3_filter::{
     self as filter, ConntrackConnection, FilterBindingsContext, FilterBindingsTypes,
@@ -46,10 +46,16 @@ use tracing::{debug, error, trace};
 
 use crate::internal::{
     device::{
-        self, slaac::SlaacCounters, state::IpDeviceStateIpExt, IpDeviceAddr,
-        IpDeviceBindingsContext, IpDeviceIpExt, IpDeviceSendContext,
+        self,
+        slaac::SlaacCounters,
+        state::{
+            IpDeviceStateBindingsTypes, IpDeviceStateIpExt, Ipv6AddressFlags, Ipv6AddressState,
+        },
+        IpAddressId as _, IpDeviceAddr, IpDeviceBindingsContext, IpDeviceIpExt,
+        IpDeviceSendContext,
     },
     forwarding::{ForwardingTable, IpForwardingDeviceContext},
+    gmp::GmpQueryHandler,
     icmp::{
         IcmpBindingsTypes, IcmpErrorHandler, IcmpHandlerIpExt, IcmpIpExt, Icmpv4Error,
         Icmpv4ErrorKind, Icmpv4State, Icmpv4StateBuilder, Icmpv6ErrorKind, Icmpv6State,
@@ -440,6 +446,85 @@ impl<S> AddressStatus<S> {
         match self {
             Self::Present(s) => Some(s),
             Self::Unassigned => None,
+        }
+    }
+}
+
+impl AddressStatus<Ipv4PresentAddressStatus> {
+    /// Creates an IPv4 `AddressStatus` for `addr` on `device`.
+    pub fn from_context_addr_v4<
+        BC: IpDeviceStateBindingsTypes,
+        CC: device::IpDeviceStateContext<Ipv4, BC> + GmpQueryHandler<Ipv4, BC>,
+    >(
+        core_ctx: &mut CC,
+        device: &CC::DeviceId,
+        addr: SpecifiedAddr<Ipv4Addr>,
+    ) -> AddressStatus<Ipv4PresentAddressStatus> {
+        if addr.is_limited_broadcast() {
+            return AddressStatus::Present(Ipv4PresentAddressStatus::LimitedBroadcast);
+        }
+
+        if MulticastAddr::new(addr.get())
+            .is_some_and(|addr| GmpQueryHandler::gmp_is_in_group(core_ctx, device, addr))
+        {
+            return AddressStatus::Present(Ipv4PresentAddressStatus::Multicast);
+        }
+
+        core_ctx.with_address_ids(device, |mut addrs, _core_ctx| {
+            addrs
+                .find_map(|addr_id| {
+                    let dev_addr = addr_id.addr_sub();
+                    let (dev_addr, subnet) = dev_addr.addr_subnet();
+
+                    if dev_addr == addr {
+                        Some(AddressStatus::Present(Ipv4PresentAddressStatus::Unicast))
+                    } else if addr.get() == subnet.broadcast() {
+                        Some(AddressStatus::Present(Ipv4PresentAddressStatus::SubnetBroadcast))
+                    } else if device.is_loopback() && subnet.contains(addr.as_ref()) {
+                        Some(AddressStatus::Present(Ipv4PresentAddressStatus::LoopbackSubnet))
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or(AddressStatus::Unassigned)
+        })
+    }
+}
+
+impl AddressStatus<Ipv6PresentAddressStatus> {
+    /// /// Creates an IPv6 `AddressStatus` for `addr` on `device`.
+    pub fn from_context_addr_v6<
+        BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
+        CC: device::Ipv6DeviceContext<BC> + GmpQueryHandler<Ipv6, BC>,
+    >(
+        core_ctx: &mut CC,
+        device: &CC::DeviceId,
+        addr: SpecifiedAddr<Ipv6Addr>,
+    ) -> AddressStatus<Ipv6PresentAddressStatus> {
+        if MulticastAddr::new(addr.get())
+            .is_some_and(|addr| GmpQueryHandler::gmp_is_in_group(core_ctx, device, addr))
+        {
+            return AddressStatus::Present(Ipv6PresentAddressStatus::Multicast);
+        }
+
+        let addr_id = match core_ctx.get_address_id(device, addr) {
+            Ok(o) => o,
+            Err(NotFoundError) => return AddressStatus::Unassigned,
+        };
+
+        let assigned = core_ctx.with_ip_address_state(
+            device,
+            &addr_id,
+            |Ipv6AddressState {
+                 flags: Ipv6AddressFlags { deprecated: _, assigned },
+                 config: _,
+             }| { *assigned },
+        );
+
+        if assigned {
+            AddressStatus::Present(Ipv6PresentAddressStatus::UnicastAssigned)
+        } else {
+            AddressStatus::Present(Ipv6PresentAddressStatus::UnicastTentative)
         }
     }
 }
