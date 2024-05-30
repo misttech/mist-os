@@ -91,6 +91,12 @@ import("//build/rust/rustc_test.gni")
 #     built in-tree which are also published to crates.io. This would be passed to rustc as
 #     '--cfg feature="XXX"'
 #
+#   check_cfgs (optional)
+#     A list of valid configurations for the target.
+#     Passed to rustc as '--check-cfg=cfg(###)'.
+#     Not specifying or using an empty list disables configuration checking.
+#     See https://doc.rust-lang.org/nightly/rustc/check-cfg.html for the syntax.
+#
 #   rustenv (optional)
 #     A list of environment variables that will be set when running the rust
 #     compiler. These can be accessed at compile time with
@@ -248,20 +254,21 @@ template("rustc_library") {
                            [
                              "applicable_licenses",
                              "assert_no_deps",
+                             "check_cfgs",
+                             "configs",
                              "disable_clippy",
-                             "quiet_clippy",
+                             "disable_rbe",
                              "edition",
                              "enforce_source_listing",
                              "features",
                              "inputs",
                              "pool",
+                             "public_deps",
+                             "quiet_clippy",
                              "rustenv",
                              "sources",
                              "testonly",
                              "visibility",
-                             "disable_rbe",
-                             "configs",
-                             "public_deps",
                            ])
 
     # Avoid walking into data_deps when checking component manifest expected includes.

@@ -43,6 +43,12 @@ import("//build/toolchain/rbe.gni")
 #     built in-tree which are also published to crates.io. This would be passed to rustc as
 #     '--cfg feature="XXX"'
 #
+#   check_cfgs (optional)
+#     A list of valid configurations for the target.
+#     Passed to rustc as '--check-cfg=cfg(###)'.
+#     Not specifying or using an empty list disables configuration checking.
+#     See https://doc.rust-lang.org/nightly/rustc/check-cfg.html for the syntax.
+#
 #   rustenv (optional)
 #     A list of environment variables that will be set when running the rust
 #     compiler. These can be accessed at compile time with
@@ -139,6 +145,11 @@ template("rustc_artifact") {
   if (defined(invoker.features)) {
     foreach(i, invoker.features) {
       _rustflags += [ "--cfg=feature=\"${i}\"" ]
+    }
+  }
+  if (defined(invoker.check_cfgs)) {
+    foreach(i, invoker.check_cfgs) {
+      _rustflags += [ "--check-cfg=cfg(${i})" ]
     }
   }
   if (defined(invoker.rustflags)) {

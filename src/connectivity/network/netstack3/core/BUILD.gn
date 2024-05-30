@@ -35,6 +35,7 @@ rustc_library_with_features("netstack3-core") {
   edition = "2021"
   configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+  check_cfgs = [ "benchmark" ]
   sources = [
     "src/api.rs",
     "src/benchmarks.rs",

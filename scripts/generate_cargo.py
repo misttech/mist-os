@@ -199,6 +199,15 @@ def get_features(rustflags):
     return features
 
 
+def get_check_cfgs(rustflags):
+    check_cfg = []
+    check_cfg_pat = re.compile(r"--check-cfg=(.*)$")
+    for flag in rustflags:
+        if match := check_cfg_pat.match(flag):
+            check_cfg.append(match.group(1))
+    return check_cfg
+
+
 def get_cfgs(rustflags):
     cfgs = []
     cfg_pat = re.compile(r"--cfg=([^=]*)=(.*)$")
@@ -256,6 +265,7 @@ def write_toml_file(
 
     features = get_features(metadata["rustflags"])
     extra_configs = get_cfgs(metadata["rustflags"])
+    check_cfgs = get_check_cfgs(metadata["rustflags"])
 
     crate_type = "rlib"
     package_name = lookup_gn_pkg_name(
@@ -460,6 +470,17 @@ def write_toml_file(
             # https://users.rust-lang.org/t/features-and-dependencies-cannot-have-the-same-name/47746/2
             if feature not in dep_crate_names:
                 fout.write("%s = []\n" % feature)
+    if not for_workspace:
+        if check_cfgs:
+            fout.write("\n[lints.rust]\n")
+            fout.write('unexpected_cfgs = { level = "warn", check-cfg = [')
+            for check_cfg in check_cfgs:
+                fout.write("'%s'," % check_cfg)
+            fout.write("] }\n")
+        else:
+            # Disable check-cfg in cargo if not available to avoid the noise.
+            fout.write("\n[lints.rust]\n")
+            fout.write('unexpected_cfgs = { level = "allow" }\n')
 
 
 def main():
