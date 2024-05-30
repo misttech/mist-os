@@ -913,35 +913,11 @@ impl PipeFileObject {
         data: &mut dyn OutputBuffer,
         non_blocking: bool,
     ) -> Result<usize, Errno> {
-        let data_len = data.available();
         let mut pipe = self.lock_pipe_for_reading(current_task, self_file, non_blocking)?;
-        let mut available = std::cmp::min(data_len, pipe.messages.len());
 
-        let mut bytes_transferred = 0;
-        while let Some(mut message) = pipe.messages.read_message() {
-            let requested = std::cmp::min(available, message.data.len());
-            let actual = match data.write(&message.data.bytes()[0..requested]) {
-                Ok(actual) => actual,
-                Err(e) => {
-                    pipe.messages.write_front(message);
-                    return Err(e);
-                }
-            };
-            assert_eq!(actual, requested);
-            if let Some(data) = message.data.split_off(actual) {
-                // Some data is left in the message. Push it back.
-                pipe.messages.write_front(data.into());
-            }
-            bytes_transferred += actual;
-            available -= actual;
-            if available == 0 {
-                break;
-            }
-        }
-        if bytes_transferred > 0 {
-            pipe.notify_read();
-        }
-        Ok(bytes_transferred)
+        let len = std::cmp::min(data.available(), pipe.messages.len());
+        let mut buffer = SpliceInputBuffer { pipe: &mut pipe, len, available: len };
+        data.write_buffer(&mut buffer)
     }
 
     /// Obtain the pipe objects from the given file handles, if they are both pipes.
