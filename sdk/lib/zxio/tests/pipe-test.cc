@@ -18,6 +18,11 @@ TEST(Pipe, Create) {
   ASSERT_OK(zxio_create(socket0.release(), &storage));
   zxio_t* io = &storage.io;
 
+  zxio_node_attributes_t attr = {.has = {.object_type = true}};
+  ASSERT_OK(zxio_attr_get(io, &attr));
+  EXPECT_EQ(ZXIO_OBJECT_TYPE_PIPE, attr.object_type);
+  ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED, zxio_attr_set(io, &attr));
+
   ASSERT_OK(zxio_close(io, /*should_wait=*/true));
 }
 

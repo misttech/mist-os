@@ -272,6 +272,10 @@ typedef struct zxio_node_attr {
   uint8_t* fsverity_root_hash;
   bool fsverity_enabled;
 
+  // The type of the zxio object if known. If the type is unknown or non
+  // standard, the value will be ZXIO_OBJECT_TYPE_NONE.
+  zxio_object_type_t object_type;
+
   // Presence indicator for these fields.
   //
   // If a particular field is absent, it should be set to zero/none,
@@ -296,6 +300,7 @@ typedef struct zxio_node_attr {
     bool fsverity_options;
     bool fsverity_root_hash;
     bool fsverity_enabled;
+    bool object_type;
 
 #ifdef __cplusplus
     constexpr bool operator==(const zxio_node_attr_has_t& other) const {
@@ -372,6 +377,9 @@ typedef struct zxio_node_attr {
       }
     }
     if (has.fsverity_enabled && (fsverity_enabled != other.fsverity_enabled)) {
+      return false;
+    }
+    if (has.object_type && (object_type != other.object_type)) {
       return false;
     }
     return true;

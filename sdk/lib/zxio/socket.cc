@@ -141,6 +141,14 @@ socklen_t fidl_to_sockaddr(const fuchsia_net::wire::SocketAddress& fidl, void* a
   }
 }
 
+template <zxio_object_type_t kObjectType>
+zx_status_t AttrGet(zxio_t* zxio, zxio_node_attributes_t* inout_attr) {
+  if (inout_attr->has.object_type) {
+    ZXIO_NODE_ATTR_SET(*inout_attr, object_type, kObjectType);
+  }
+  return ZX_OK;
+}
+
 // https://github.com/torvalds/linux/blob/f2850dd5ee0/include/net/tcp.h#L1012
 constexpr socklen_t kTcpCANameMax = 16;
 constexpr const char kCcCubic[kTcpCANameMax] = "cubic";
@@ -2254,6 +2262,7 @@ static SynchronousDatagramSocket::Storage& zxio_synchronous_datagram_socket(zxio
 
 static constexpr zxio_ops_t zxio_synchronous_datagram_socket_ops = []() {
   zxio_ops_t ops = zxio_default_socket_ops;
+  ops.attr_get = AttrGet<ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET>;
   ops.close = [](zxio_t* io, const bool should_wait) {
     SynchronousDatagramSocket::Storage& zs = zxio_synchronous_datagram_socket(io);
     zx_status_t status = ZX_OK;
@@ -2788,6 +2797,7 @@ struct datagram_socket
 
 static constexpr zxio_ops_t zxio_datagram_socket_ops = []() {
   zxio_ops_t ops = zxio_default_socket_ops;
+  ops.attr_get = AttrGet<ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET>;
   ops.close = [](zxio_t* io, const bool should_wait) {
     zxio_datagram_socket_t& zs = zxio_datagram_socket(io);
     zx_status_t status = ZX_OK;
@@ -3179,6 +3189,7 @@ struct stream_socket : public socket_with_zx_socket<fidl::WireSyncClient<fsocket
 
 static constexpr zxio_ops_t zxio_stream_socket_ops = []() {
   zxio_ops_t ops = zxio_default_socket_ops;
+  ops.attr_get = AttrGet<ZXIO_OBJECT_TYPE_STREAM_SOCKET>;
   ops.close = [](zxio_t* io, const bool should_wait) {
     zxio_stream_socket_t& zs = zxio_stream_socket(io);
     zx_status_t status = ZX_OK;
@@ -3401,6 +3412,7 @@ static RawSocket::Storage& zxio_raw_socket(zxio_t* io) {
 
 static constexpr zxio_ops_t zxio_raw_socket_ops = []() {
   zxio_ops_t ops = zxio_default_socket_ops;
+  ops.attr_get = AttrGet<ZXIO_OBJECT_TYPE_RAW_SOCKET>;
   ops.close = [](zxio_t* io, const bool should_wait) {
     RawSocket::Storage& zs = zxio_raw_socket(io);
     zx_status_t status = ZX_OK;
@@ -3606,6 +3618,7 @@ static PacketSocket::Storage& zxio_packet_socket(zxio_t* io) {
 
 static constexpr zxio_ops_t zxio_packet_socket_ops = []() {
   zxio_ops_t ops = zxio_default_socket_ops;
+  ops.attr_get = AttrGet<ZXIO_OBJECT_TYPE_PACKET_SOCKET>;
   ops.close = [](zxio_t* io, const bool should_wait) {
     PacketSocket::Storage& zs = zxio_packet_socket(io);
     zx_status_t status = ZX_OK;

@@ -102,6 +102,14 @@ TEST_F(SynchronousDatagramSocketTest, CreateWithType) {
   ASSERT_OK(zxio_close(&storage()->io, /*should_wait=*/true));
 }
 
+TEST_F(SynchronousDatagramSocketTest, Attr) {
+  Init();
+
+  zxio_node_attributes_t attr = {.has = {.object_type = true}};
+  ASSERT_OK(zxio_attr_get(zxio(), &attr));
+  EXPECT_EQ(ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET, attr.object_type);
+}
+
 class StreamSocketTest : public zxtest::Test {
  public:
   void SetUp() final {
@@ -169,6 +177,14 @@ TEST_F(StreamSocketTest, CreateWithType) {
                                   &info(), /*is_connected=*/false,
                                   TakeClientEnd().TakeChannel().release()));
   ASSERT_OK(zxio_close(&storage()->io, /*should_wait=*/true));
+}
+
+TEST_F(StreamSocketTest, Attr) {
+  Init();
+
+  zxio_node_attributes_t attr = {.has = {.object_type = true}};
+  ASSERT_OK(zxio_attr_get(zxio(), &attr));
+  EXPECT_EQ(ZXIO_OBJECT_TYPE_STREAM_SOCKET, attr.object_type);
 }
 
 class DatagramSocketTest : public zxtest::Test {
@@ -240,6 +256,14 @@ TEST_F(DatagramSocketTest, CreateWithType) {
                                   TakeSocket().release(), &info(), &prelude_size(),
                                   TakeClientEnd().TakeChannel().release()));
   ASSERT_OK(zxio_close(&storage()->io, /*should_wait=*/true));
+}
+
+TEST_F(DatagramSocketTest, Attr) {
+  Init();
+
+  zxio_node_attributes_t attr = {.has = {.object_type = true}};
+  ASSERT_OK(zxio_attr_get(zxio(), &attr));
+  EXPECT_EQ(ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET, attr.object_type);
 }
 
 TEST_F(DatagramSocketTest, WaitBegin) {
@@ -780,6 +804,14 @@ TEST_F(RawSocketTest, CreateWithType) {
   ASSERT_OK(zxio_close(&storage()->io, /*should_wait=*/true));
 }
 
+TEST_F(RawSocketTest, Attr) {
+  Init();
+
+  zxio_node_attributes_t attr = {.has = {.object_type = true}};
+  ASSERT_OK(zxio_attr_get(zxio(), &attr));
+  EXPECT_EQ(ZXIO_OBJECT_TYPE_RAW_SOCKET, attr.object_type);
+}
+
 class PacketSocketTest : public zxtest::Test {
  public:
   void SetUp() final {
@@ -841,6 +873,14 @@ TEST_F(PacketSocketTest, CreateWithType) {
                                   TakeEventClient().release(),
                                   TakeClientEnd().TakeChannel().release()));
   ASSERT_OK(zxio_close(&storage()->io, /*should_wait=*/true));
+}
+
+TEST_F(PacketSocketTest, Attr) {
+  Init();
+
+  zxio_node_attributes_t attr = {.has = {.object_type = true}};
+  ASSERT_OK(zxio_attr_get(zxio(), &attr));
+  EXPECT_EQ(ZXIO_OBJECT_TYPE_PACKET_SOCKET, attr.object_type);
 }
 
 }  // namespace

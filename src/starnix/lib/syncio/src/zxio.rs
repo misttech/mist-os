@@ -570,8 +570,10 @@ pub struct zxio_node_attr {
     pub fsverity_options: zxio_verification_options_t,
     pub fsverity_root_hash: *mut u8,
     pub fsverity_enabled: bool,
+    pub __bindgen_padding_1: [u8; 3usize],
+    pub object_type: zxio_object_type_t,
     pub has: zxio_node_attr_zxio_node_attr_has_t,
-    pub __bindgen_padding_1: [u8; 6usize],
+    pub __bindgen_padding_2: [u8; 6usize],
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
@@ -593,6 +595,7 @@ pub struct zxio_node_attr_zxio_node_attr_has_t {
     pub fsverity_options: bool,
     pub fsverity_root_hash: bool,
     pub fsverity_enabled: bool,
+    pub object_type: bool,
 }
 impl Default for zxio_node_attr {
     fn default() -> Self {
