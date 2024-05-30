@@ -169,7 +169,8 @@ zx_status_t x86_bootstrap16_acquire(uintptr_t entry64, void** bootstrap_aperture
   // at the time you have to load it.
   const uint64_t phys_bootstrap_pml4 = bootstrap_phys_addr + 2UL * PAGE_SIZE;
   const uint64_t bootstrap_aspace_pml4 = bootstrap_aspace->arch_aspace().pt_phys();
-  void* const phys_bootstrap_pml4_virt = paddr_to_physmap(phys_bootstrap_pml4);
+  void* const phys_bootstrap_pml4_virt =
+      reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(bootstrap_virt_addr) + 2UL * PAGE_SIZE);
   const void* const bootstrap_aspace_pml4_virt = paddr_to_physmap(bootstrap_aspace_pml4);
   LTRACEF("phys_bootstrap_pml4 %p (%#lx), bootstrap_aspace_pml4 %p (%#lx)\n",
           phys_bootstrap_pml4_virt, phys_bootstrap_pml4, bootstrap_aspace_pml4_virt,
