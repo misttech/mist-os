@@ -240,7 +240,7 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
     # to support legacy users.
     def process_metrics(
         self, model: trace_model.Model | None = None
-    ) -> list[trace_metrics.TestCaseResult]:
+    ) -> Sequence[trace_metrics.TestCaseResult]:
         """Coverts CSV samples into aggregate metrics."""
         with open(self._power_samples_path, "r") as f:
             reader = csv.reader(f)
@@ -365,7 +365,7 @@ class PowerSampler:
 
     # DEPRECATED: Use .metric_processor().process_metrics() instead.
     # TODO(b/320778225): Remove once downstream users are refactored.
-    def to_fuchsiaperf_results(self) -> list[trace_metrics.TestCaseResult]:
+    def to_fuchsiaperf_results(self) -> Sequence[trace_metrics.TestCaseResult]:
         """Returns power metrics TestCaseResults"""
         assert self._state == _PowerSamplerState.STOPPED
         return self.metrics_processor().process_metrics(
