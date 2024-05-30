@@ -251,11 +251,14 @@ mod tests {
         playback_fidl::PlaybackSourceConfig::FixedValuesConfig(fixed_values_config)
     }
 
-    async fn setup_playback(source_config: playback_fidl::PlaybackSourceConfig) {
-        let playback_proxy =
-            fuchsia_component::client::connect_to_protocol::<playback_fidl::PlaybackMarker>()
-                .unwrap();
+    async fn connect_playback() -> playback_fidl::PlaybackProxy {
+        fuchsia_component::client::connect_to_protocol::<playback_fidl::PlaybackMarker>().unwrap()
+    }
 
+    async fn setup_playback(
+        playback_proxy: &playback_fidl::PlaybackProxy,
+        source_config: playback_fidl::PlaybackSourceConfig,
+    ) {
         let _ = playback_proxy.configure_playback(&source_config).await;
     }
 
@@ -277,16 +280,17 @@ mod tests {
         proxy
     }
 
-    async fn setup() -> ManagerProxy {
-        setup_playback(get_playback_config()).await;
+    async fn setup() -> (ManagerProxy, playback_fidl::PlaybackProxy) {
+        let playback_proxy = connect_playback().await;
+        setup_playback(&playback_proxy, get_playback_config()).await;
 
-        let proxy = setup_manager().await;
+        let manager_proxy = setup_manager().await;
         // When the SensorManager starts, it gets the initial list of sensors before handling any
         // requests. These tests do not call SensorManager::run, so the sensor list can be
         // populated by calling get_sensors_list.
-        let _ = proxy.get_sensors_list().await;
+        let _ = manager_proxy.get_sensors_list().await;
 
-        proxy
+        (manager_proxy, playback_proxy)
     }
 
     #[fuchsia::test]
@@ -297,8 +301,12 @@ mod tests {
             sensor_events: None,
             ..Default::default()
         };
-        setup_playback(playback_fidl::PlaybackSourceConfig::FixedValuesConfig(fixed_values_config))
-            .await;
+        let playback_proxy = connect_playback().await;
+        setup_playback(
+            &playback_proxy,
+            playback_fidl::PlaybackSourceConfig::FixedValuesConfig(fixed_values_config),
+        )
+        .await;
 
         let proxy = setup_manager().await;
 
@@ -311,19 +319,23 @@ mod tests {
             sensor_events: Some(Vec::new()),
             ..Default::default()
         };
-        setup_playback(playback_fidl::PlaybackSourceConfig::FixedValuesConfig(fixed_values_config))
-            .await;
+        setup_playback(
+            &playback_proxy,
+            playback_fidl::PlaybackSourceConfig::FixedValuesConfig(fixed_values_config),
+        )
+        .await;
+        let fidl_sensors = proxy.get_sensors_list().await.unwrap();
         assert!(fidl_sensors.is_empty());
 
         // Playback is configured with the default sensor.
-        setup_playback(get_playback_config()).await;
+        setup_playback(&playback_proxy, get_playback_config()).await;
         let fidl_sensors = proxy.get_sensors_list().await.unwrap();
         assert!(fidl_sensors.contains(&get_test_sensor()));
     }
 
     #[fuchsia::test]
     async fn test_activate_sensor() {
-        let proxy = setup().await;
+        let (proxy, _playback_proxy) = setup().await;
         let id = get_test_sensor().sensor_id.expect("sensor_id");
 
         assert!(proxy.activate(id).await.unwrap().is_ok());
@@ -336,7 +348,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_deactivate_sensor() {
-        let proxy = setup().await;
+        let (proxy, _playback_proxy) = setup().await;
         let _ = proxy.get_sensors_list().await;
         let id = get_test_sensor().sensor_id.expect("sensor_id");
 
@@ -353,7 +365,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_configure_sensor_rates() {
-        let proxy = setup().await;
+        let (proxy, _playback_proxy) = setup().await;
         let _ = proxy.get_sensors_list().await;
         let id = get_test_sensor().sensor_id.expect("sensor_id");
 
@@ -376,7 +388,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_sensor_event_stream() {
-        let proxy = setup().await;
+        let (proxy, _playback_proxy) = setup().await;
         let id = get_test_sensor().sensor_id.unwrap();
         let _ = proxy.activate(id).await;
 

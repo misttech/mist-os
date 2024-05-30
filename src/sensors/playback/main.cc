@@ -21,6 +21,7 @@ int main(int argc, char* argv[]) {
 
   async::Loop fidl_loop(&kAsyncLoopConfigAttachToCurrentThread);
   async_dispatcher_t* fidl_dispatcher = fidl_loop.dispatcher();
+  async::Executor cleanup_executor(fidl_dispatcher);
 
   component::OutgoingDirectory outgoing(fidl_dispatcher);
 
@@ -41,11 +42,12 @@ int main(int argc, char* argv[]) {
   }
 
   result = outgoing.AddUnmanagedProtocol<fuchsia_hardware_sensors::Playback>(
-      [fidl_dispatcher,
+      [fidl_dispatcher, &cleanup_executor,
        &controller](fidl::ServerEnd<fuchsia_hardware_sensors::Playback> server_end) {
         FX_LOGS(INFO) << "Incoming connection for "
                       << fidl::DiscoverableProtocolName<fuchsia_hardware_sensors::Playback>;
-        PlaybackImpl::BindSelfManagedServer(fidl_dispatcher, controller, std::move(server_end));
+        PlaybackImpl::BindSelfManagedServer(fidl_dispatcher, cleanup_executor, controller,
+                                            std::move(server_end));
       });
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Failed to add Playback protocol: " << result.status_string();
@@ -53,10 +55,12 @@ int main(int argc, char* argv[]) {
   }
 
   result = outgoing.AddUnmanagedProtocol<fuchsia_hardware_sensors::Driver>(
-      [fidl_dispatcher, &controller](fidl::ServerEnd<fuchsia_hardware_sensors::Driver> server_end) {
+      [fidl_dispatcher, &cleanup_executor,
+       &controller](fidl::ServerEnd<fuchsia_hardware_sensors::Driver> server_end) {
         FX_LOGS(INFO) << "Incoming connection for "
                       << fidl::DiscoverableProtocolName<fuchsia_hardware_sensors::Driver>;
-        DriverImpl::BindSelfManagedServer(fidl_dispatcher, controller, std::move(server_end));
+        DriverImpl::BindSelfManagedServer(fidl_dispatcher, cleanup_executor, controller,
+                                          std::move(server_end));
       });
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Failed to add Driver protocol: " << result.status_string();

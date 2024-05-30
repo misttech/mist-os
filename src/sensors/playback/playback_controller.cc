@@ -62,8 +62,15 @@ promise<void, ConfigurePlaybackError> PlaybackController::ConfigurePlayback(
 
 promise<std::vector<SensorInfo>> PlaybackController::GetSensorsList() {
   bridge<std::vector<SensorInfo>> bridge;
-  Schedule([this, completer = std::move(bridge.completer)]() mutable {
+  Schedule([this, completer = std::move(bridge.completer)]() mutable -> promise<void> {
+    // TODO(b/343048375): Disconnect the client if no playback configuration is present.
+    FX_LOGS(WARNING)
+        << "GetSensorsList: Driver API call made while playback configuration is unset."
+        << " In the future this will result in the Driver client being disconnected "
+        << "with epitaph ZX_ERR_BAD_STATE.";
+
     completer.complete_ok(sensor_list_);
+    return fpromise::make_ok_promise();
   });
   return bridge.consumer.promise();
 }
@@ -72,8 +79,13 @@ promise<void, ActivateSensorError> PlaybackController::ActivateSensor(SensorId s
   bridge<void, ActivateSensorError> bridge;
   Schedule(fpromise::make_promise(
       [this, sensor_id, completer = std::move(bridge.completer)]() mutable -> promise<void> {
+        if (playback_mode_ == PlaybackMode::kNone) {
+          FX_LOGS(ERROR) << "ActivateSensor: Driver API call made while playback configuration is "
+                         << "unset, disconnecting Driver client with epitaph ZX_ERR_BAD_STATE.";
+          return DisconnectDriverClient(ZX_ERR_BAD_STATE);
+        }
+
         if (sensor_playback_state_.count(sensor_id) == 0) {
-          FX_LOGS(ERROR) << "ActivateSensor error, invalid sensor ID.";
           completer.complete_error(ActivateSensorError::kInvalidSensorId);
           return fpromise::make_ok_promise();
         }
@@ -89,6 +101,12 @@ promise<void, DeactivateSensorError> PlaybackController::DeactivateSensor(Sensor
   bridge<void, DeactivateSensorError> bridge;
   Schedule(fpromise::make_promise(
       [this, sensor_id, completer = std::move(bridge.completer)]() mutable -> promise<void> {
+        if (playback_mode_ == PlaybackMode::kNone) {
+          FX_LOGS(ERROR) << "DeactivateSensor: Driver API call made while playback configuration is"
+                         << " unset, disconnecting Driver client with epitaph ZX_ERR_BAD_STATE.";
+          return DisconnectDriverClient(ZX_ERR_BAD_STATE);
+        }
+
         if (sensor_playback_state_.count(sensor_id) == 0) {
           FX_LOGS(ERROR) << "DeactivateSensor error, invalid sensor ID.";
           completer.complete_error(DeactivateSensorError::kInvalidSensorId);
@@ -105,16 +123,23 @@ promise<void, DeactivateSensorError> PlaybackController::DeactivateSensor(Sensor
 promise<void, ConfigureSensorRateError> PlaybackController::ConfigureSensorRate(
     SensorId sensor_id, SensorRateConfig rate_config) {
   bridge<void, ConfigureSensorRateError> bridge;
-  Schedule([this, sensor_id, rate_config, completer = std::move(bridge.completer)]() mutable {
+  Schedule([this, sensor_id, rate_config,
+            completer = std::move(bridge.completer)]() mutable -> promise<void> {
+    if (playback_mode_ == PlaybackMode::kNone) {
+      FX_LOGS(ERROR) << "ConfigureSensorRate: Driver API call made while playback configuration is "
+                     << "unset, disconnecting Driver client with epitaph ZX_ERR_BAD_STATE.";
+      return DisconnectDriverClient(ZX_ERR_BAD_STATE);
+    }
+
     if (!rate_config.sampling_period_ns() || !rate_config.max_reporting_latency_ns()) {
       FX_LOGS(ERROR) << "ConfigureSensorRate: Fields missing from rate config.";
       completer.complete_error(ConfigureSensorRateError::kInvalidConfig);
-      return;
+      return fpromise::make_ok_promise();
     }
     if (sensor_playback_state_.count(sensor_id) == 0) {
       FX_LOGS(ERROR) << "ConfigureSensorRate: Invalid sensor ID.";
       completer.complete_error(ConfigureSensorRateError::kInvalidSensorId);
-      return;
+      return fpromise::make_ok_promise();
     }
 
     FX_LOGS(INFO) << "ConfigureSensorRate: Setting sampling period to "
@@ -125,6 +150,18 @@ promise<void, ConfigureSensorRateError> PlaybackController::ConfigureSensorRate(
         zx::duration(*rate_config.sampling_period_ns());
     sensor_playback_state_[sensor_id].max_reporting_latency =
         zx::duration(*rate_config.max_reporting_latency_ns());
+    completer.complete_ok();
+    return fpromise::make_ok_promise();
+  });
+  return bridge.consumer.promise();
+}
+
+promise<void> PlaybackController::SetDisconnectDriverClientCallback(
+    std::function<promise<void>(zx_status_t)> disconnect_callback) {
+  bridge<void> bridge;
+  Schedule([this, disconnect_callback = std::move(disconnect_callback),
+            completer = std::move(bridge.completer)]() mutable {
+    disconnect_driver_client_callback_ = std::move(disconnect_callback);
     completer.complete_ok();
   });
   return bridge.consumer.promise();
@@ -141,6 +178,57 @@ promise<void> PlaybackController::SetEventCallback(
   return bridge.consumer.promise();
 }
 
+void PlaybackController::DriverClientDisconnected(fit::callback<void()> unbind_callback) {
+  Schedule([this, unbind_callback = std::move(unbind_callback)]() mutable -> promise<void> {
+    disconnect_driver_client_callback_ = nullptr;
+    event_callback_ = nullptr;
+    if (playback_state_ == PlaybackState::kRunning) {
+      FX_LOGS(INFO) << "Stopping playback due to driver client disconnect.";
+      playback_state_ = PlaybackState::kStopped;
+      return StopScheduledPlayback().and_then(
+          [unbind_callback = std::move(unbind_callback)]() mutable { unbind_callback(); });
+    }
+
+    unbind_callback();
+    return fpromise::make_ok_promise();
+  });
+}
+
+void PlaybackController::PlaybackClientDisconnected(fit::callback<void()> unbind_callback) {
+  Schedule([this,
+            unbind_callback = std::move(unbind_callback)]() mutable -> fpromise::promise<void> {
+    if (playback_state_ == PlaybackState::kRunning) {
+      FX_LOGS(INFO) << "Stopping playback, disconnecting driver client, and clearing playback "
+                    << "configuration due to playback client disconnection.";
+      playback_state_ = PlaybackState::kStopped;
+      return StopScheduledPlayback()
+          .and_then(DisconnectDriverClient(ZX_ERR_BAD_STATE))
+          .and_then(ClearPlaybackConfig())
+          .and_then(
+              [unbind_callback = std::move(unbind_callback)]() mutable { unbind_callback(); });
+    }
+    if (disconnect_driver_client_callback_) {
+      FX_LOGS(INFO) << "Disconnecting driver client and clearing playback configuration due to "
+                    << "playback client disconnect. ";
+    }
+    return DisconnectDriverClient(ZX_ERR_BAD_STATE)
+        .and_then(ClearPlaybackConfig())
+        .and_then([unbind_callback = std::move(unbind_callback)]() mutable { unbind_callback(); });
+  });
+}
+
+promise<void> PlaybackController::DisconnectDriverClient(zx_status_t epitaph) {
+  return fpromise::make_promise([this, epitaph]() -> promise<void> {
+    event_callback_ = nullptr;
+    if (disconnect_driver_client_callback_) {
+      std::function<promise<void>(zx_status_t)> callback = disconnect_driver_client_callback_;
+      disconnect_driver_client_callback_ = nullptr;
+      return callback(epitaph);
+    }
+    return fpromise::make_ok_promise();
+  });
+}
+
 void PlaybackController::AdoptSensorList(const std::vector<SensorInfo>& sensor_list) {
   sensor_list_ = sensor_list;
   for (const SensorInfo& info : sensor_list_) {
@@ -150,12 +238,13 @@ void PlaybackController::AdoptSensorList(const std::vector<SensorInfo>& sensor_l
 
 promise<void> PlaybackController::ClearPlaybackConfig() {
   return fpromise::make_promise([this]() {
+    FX_LOGS(INFO) << "Clearing playback configuration.";
     sensor_list_.clear();
 
     playback_state_ = PlaybackState::kStopped;
     sensor_playback_state_.clear();
     enabled_sensor_count_ = 0;
-    playback_mode_ = PlaybackMode::kFixedValuesMode;
+    playback_mode_ = PlaybackMode::kNone;
   });
 }
 
@@ -239,6 +328,8 @@ promise<void> PlaybackController::ScheduleSensorEvents(SensorId sensor_id) {
     switch (playback_mode_) {
       case PlaybackMode::kFixedValuesMode:
         return ScheduleFixedEvent(sensor_id, /*first_event=*/true);
+      case PlaybackMode::kNone:
+        ZX_ASSERT_MSG(false, "Events scheduled when no playback mode was set.");
     }
   });
 }

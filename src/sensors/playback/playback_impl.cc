@@ -15,6 +15,8 @@ using fuchsia_hardware_sensors::Playback;
 using fuchsia_hardware_sensors::PlaybackSourceConfig;
 }  // namespace
 
+bool PlaybackImpl::client_connected_ = false;
+
 PlaybackImpl::PlaybackImpl(async_dispatcher_t* dispatcher, PlaybackController& controller)
     : ActorBase(dispatcher, scope_), controller_(controller) {}
 
@@ -40,12 +42,14 @@ void PlaybackImpl::handle_unknown_method(fidl::UnknownMethodMetadata<Playback> m
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
-void PlaybackImpl::OnUnbound(fidl::UnbindInfo info, fidl::ServerEnd<Playback> server_end) {
+void PlaybackImpl::OnUnbound(fidl::UnbindInfo info, fidl::ServerEnd<Playback> server_end,
+                             fit::callback<void()> unbind_callback) {
   // |is_user_initiated| returns true if the server code called |Close| on a
   // completer, or |Unbind| / |Close| on the |binding_ref_|, to proactively
   // teardown the connection. These cases are usually part of normal server
   // shutdown, so logging is unnecessary.
   if (info.is_user_initiated()) {
+    unbind_callback();
     return;
   }
   if (info.is_peer_closed()) {
@@ -55,6 +59,7 @@ void PlaybackImpl::OnUnbound(fidl::UnbindInfo info, fidl::ServerEnd<Playback> se
     // Treat other unbind causes as errors.
     FX_LOGS(ERROR) << "Server error: " << info;
   }
+  controller_.PlaybackClientDisconnected(std::move(unbind_callback));
 }
 
 }  // namespace sensors::playback
