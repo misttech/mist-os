@@ -460,7 +460,7 @@ fn test_send<I: Ip + IpSocketIpExt + IpExt>() {
         Some(Ipv6::MINIMUM_LINK_MTU.into()),
         &socket_options,
     );
-    assert_matches!(res, Ok(()));
+    assert_eq!(res, Ok(()));
     check_sent_frame(&mut bindings_ctx);
 
     // Send a packet on the socket while imposing an MTU which will not
@@ -473,7 +473,7 @@ fn test_send<I: Ip + IpSocketIpExt + IpExt>() {
         Some(1), // mtu
         &socket_options,
     );
-    assert_matches!(res, Err((_, IpSockSendError::Mtu)));
+    assert_eq!(res, Err(IpSockSendError::Mtu));
 
     assert_matches!(bindings_ctx.take_ethernet_frames()[..], []);
     // Try sending a packet which will be larger than the device's MTU,
@@ -486,7 +486,7 @@ fn test_send<I: Ip + IpSocketIpExt + IpExt>() {
         None,
         &socket_options,
     );
-    assert_matches!(res, Err((_, IpSockSendError::Mtu)));
+    assert_eq!(res, Err(IpSockSendError::Mtu));
 
     // Make sure that sending on an unroutable socket fails.
     ip::testutil::del_routes_to_subnet::<I, _, _>(
@@ -503,7 +503,7 @@ fn test_send<I: Ip + IpSocketIpExt + IpExt>() {
         None,
         &socket_options,
     );
-    assert_matches!(res, Err((_, IpSockSendError::Unroutable(ResolveRouteError::Unreachable))));
+    assert_eq!(res, Err(IpSockSendError::Unroutable(ResolveRouteError::Unreachable)));
 }
 
 #[ip_test]

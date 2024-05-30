@@ -4967,7 +4967,7 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
             let body = tcp_serialize_segment(segment, conn_addr);
             core_ctx
                 .send_ip_packet(bindings_ctx, ip_sock, body, None, &DefaultSendOptions)
-                .map_err(|(_serializer, err)| IpSockCreateAndSendError::Send(err))
+                .map_err(|err| IpSockCreateAndSendError::Send(err))
         }
         None => {
             let ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) } = conn_addr;
@@ -5483,7 +5483,7 @@ mod tests {
             body: S,
             mtu: Option<u32>,
             options: &O,
-        ) -> Result<(), (S, IpSockSendError)>
+        ) -> Result<(), IpSockSendError>
         where
             S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,

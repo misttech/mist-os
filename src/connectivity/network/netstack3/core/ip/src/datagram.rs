@@ -3669,7 +3669,7 @@ pub fn send_conn<
                 DatagramBoundStateContext::with_transport_context(core_ctx, |core_ctx| {
                     core_ctx
                         .send_ip_packet(bindings_ctx, &socket, packet, None, options)
-                        .map_err(|(_serializer, send_error)| SendError::IpSock(send_error))
+                        .map_err(|send_error| SendError::IpSock(send_error))
                 })
             }
             Operation::SendToOtherStack((SendParams { socket, ip, options }, dual_stack)) => {
@@ -3680,7 +3680,7 @@ pub fn send_conn<
                     |core_ctx| {
                         core_ctx
                             .send_ip_packet(bindings_ctx, &socket, packet, None, options)
-                            .map_err(|(_serializer, send_error)| SendError::IpSock(send_error))
+                            .map_err(|send_error| SendError::IpSock(send_error))
                     },
                 )
             }
