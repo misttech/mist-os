@@ -12,6 +12,10 @@ group("tests") {
   deps = [ ":operation-test" ]
 }
 
+config("enable-dfv2-compat-logging") {
+  defines = [ "DFV2_COMPAT_LOGGING" ]
+}
+
 zx_library("dev-operation") {
   sdk = "source"
   sdk_name = "dev-operation"
@@ -30,6 +34,27 @@ zx_library("dev-operation") {
     "//src/lib/ddk",
     "//zircon/system/ulib/zx",
   ]
+}
+
+zx_library("dev-operation-dfv2-compat-logging") {
+  sdk = "source"
+  sdk_name = "dev-operation"
+  sdk_headers = [
+    "lib/operation/operation.h",
+    "lib/operation/helpers/algorithm.h",
+    "lib/operation/helpers/alloc_checker.h",
+    "lib/operation/helpers/intrusive_container_node_utils.h",
+    "lib/operation/helpers/intrusive_container_utils.h",
+    "lib/operation/helpers/intrusive_double_list.h",
+    "lib/operation/helpers/intrusive_pointer_traits.h",
+    "lib/operation/helpers/macros.h",
+  ]
+  sources = [ "alloc_checker.cc" ]
+  deps = [
+    "//sdk/lib/driver/compat/cpp:logging",
+    "//zircon/system/ulib/zx",
+  ]
+  public_configs = [ ":enable-dfv2-compat-logging" ]
 }
 
 test("operation-test-bin") {
