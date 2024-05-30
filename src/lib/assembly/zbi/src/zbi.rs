@@ -166,13 +166,25 @@ impl ZbiBuilder {
         let zbi_args = self.build_zbi_args(
             &bootfs_manifest_path,
             None::<Utf8PathBuf>,
-            platform_id_path,
-            board_info_path,
+            platform_id_path.clone(),
+            board_info_path.clone(),
             output,
         )?;
         debug!("ZBI command args: {:?}", zbi_args);
 
-        self.tool.run(&zbi_args)
+        self.tool.run(&zbi_args)?;
+
+        // Cleanup temporary files
+        if let Some(platform_id_path) = platform_id_path {
+            std::fs::remove_file(&platform_id_path)
+                .with_context(|| format!("Removing temporary file: {platform_id_path}"))?;
+        }
+        if let Some(board_info_path) = board_info_path {
+            std::fs::remove_file(&board_info_path)
+                .with_context(|| format!("Removing temporary file: {board_info_path}"))?;
+        }
+
+        Ok(())
     }
 
     fn write_bootfs_manifest(
