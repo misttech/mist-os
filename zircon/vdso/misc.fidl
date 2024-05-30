@@ -99,10 +99,14 @@ closed protocol Misc {
     ///
     /// The returned value may be highly variable. Factors that can affect it include:
     ///
-    /// - Changes in processor frequency
-    /// - Migration between processors
+    /// - System sleep/wake (post implementation of
+    ///   [RFC-0230](https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0230_suspend_to_idle))
     /// - Reset of the processor cycle counter
     /// - Reordering of instructions (if required, use a memory barrier)
+    ///
+    /// All Fuchsia systems use an invariant-rate ticks clock, which means that the
+    /// number of ticks per second is constant regardless of changes in processor
+    /// speed or migration between processors.
     ///
     /// ## See also
     ///
