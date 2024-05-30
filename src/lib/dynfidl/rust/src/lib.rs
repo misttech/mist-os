@@ -19,6 +19,16 @@ impl Default for Structure {
 }
 
 impl Structure {
+    fn alignment(&self) -> usize {
+        let mut alignment = 1;
+        for field in &self.fields {
+            if field.alignment() > alignment {
+                alignment = field.alignment();
+            }
+        }
+        alignment
+    }
+
     /// Add a field and its value to this dynamic struct definition.
     pub fn field(mut self, field: Field) -> Self {
         self.fields.push(field);
@@ -45,6 +55,13 @@ impl Structure {
 
     /// Encode this struct without any header.
     pub fn encode(&self, buf: &mut Vec<u8>) {
+        self.encode_inline(buf);
+        // Externally, the structure is aligned on an 8-byte boundary, and may therefore contain
+        // final padding to meet that requirement.
+        buf.pad_to(8);
+    }
+
+    pub fn encode_inline(&self, buf: &mut Vec<u8>) {
         // encode the struct's fields:
         if self.fields.is_empty() {
             // A structure can be:
@@ -62,11 +79,8 @@ impl Structure {
             for field in &self.fields {
                 field.encode_out_of_line(buf);
             }
+            buf.pad_to(self.alignment());
         }
-
-        // Externally, the structure is aligned on an 8-byte boundary, and may therefore contain
-        // final padding to meet that requirement.
-        buf.pad_to(8);
     }
 }
 
@@ -74,6 +88,7 @@ impl Structure {
 pub enum Field {
     Basic(BasicField),
     Vector(VectorField),
+    Struct(Structure),
 }
 
 impl Field {
@@ -81,6 +96,7 @@ impl Field {
         match self {
             Self::Basic(b) => b.alignment(),
             Self::Vector(l) => l.alignment(),
+            Self::Struct(s) => s.alignment(),
         }
     }
 
@@ -89,6 +105,7 @@ impl Field {
         match self {
             Self::Basic(b) => b.encode_inline(buf),
             Self::Vector(l) => l.encode_inline(buf),
+            Self::Struct(s) => s.encode_inline(buf),
         }
     }
 
@@ -100,6 +117,7 @@ impl Field {
                 buf.pad_to(8);
                 l.encode_out_of_line(buf);
             }
+            Self::Struct(_) => (),
         }
     }
 }
