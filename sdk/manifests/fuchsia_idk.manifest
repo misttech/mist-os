@@ -414,6 +414,7 @@ loadable_module://pkg/vulkan_layers
 package://packages/cmd-buf-benchmark-test
 package://packages/heapdump-collector
 package://packages/magma_conformance_tests
+package://packages/realm_builder_server
 package://packages/vkcopy-test
 package://packages/vkext-test
 package://packages/vkloop-test

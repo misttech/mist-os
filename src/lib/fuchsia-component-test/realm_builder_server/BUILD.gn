@@ -93,5 +93,5 @@ sdk_fuchsia_package("realm_builder_server_sdk") {
   package_label = ":pkg"
   category = "partner"
   expected_files_exact = [ "meta/realm_builder_server.cm" ]
-  api_level_added = 15
+  api_level_added = 18
 }
