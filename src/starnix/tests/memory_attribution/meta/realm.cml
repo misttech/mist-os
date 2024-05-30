@@ -15,7 +15,6 @@
         {
             name: "debian_container",
             url: "debian#meta/debian_container.cm",
-            startup: "eager",
             environment: "#starnix_runner_env",
         },
     ],

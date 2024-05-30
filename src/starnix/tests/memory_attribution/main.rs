@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assert_matches::assert_matches;
 use diagnostics_reader::{ArchiveReader, Logs};
 use fidl_fuchsia_component as fcomponent;
+use fidl_fuchsia_component_decl as fdecl;
 use fidl_fuchsia_memory_attribution as fattribution;
 use fuchsia_component_test::{RealmBuilder, RealmBuilderParams, ScopedInstanceFactory};
 use futures::StreamExt;
@@ -23,12 +25,28 @@ async fn mmap_anonymous() {
     .expect("created");
     let realm = builder.build().await.expect("build test realm");
 
-    // Start the container.
-    let _execution = realm.root.start().await.expect("start test realm");
-
-    // Use the container to start the Starnix program.
+    // Start the container and obtain its execution controller.
+    let (container_controller, server_end) =
+        fidl::endpoints::create_proxy::<fcomponent::ControllerMarker>().unwrap();
     let realm_proxy =
         realm.root.connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>().unwrap();
+    realm_proxy
+        .open_controller(
+            &fdecl::ChildRef { name: "debian_container".to_string(), collection: None },
+            server_end,
+        )
+        .await
+        .unwrap()
+        .expect("open_controller");
+    let (container_execution, server_end) =
+        fidl::endpoints::create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
+    container_controller
+        .start(fcomponent::StartChildArgs::default(), server_end)
+        .await
+        .unwrap()
+        .expect("start debian container");
+
+    // Use the container to start the Starnix program.
     let factory = ScopedInstanceFactory::new(PROGRAM_COLLECTION).with_realm_proxy(realm_proxy);
     let program = factory.new_instance(PROGRAM_URL).await.unwrap();
 
@@ -76,7 +94,15 @@ async fn mmap_anonymous() {
 
     drop(program);
 
-    // TODO(https://fxbug.dev/342023365): When CF has an API to stop a static component
-    // use that to stop the container and verify that the starnix runner reports that the
+    // Stop the container and verify that the starnix runner reports that the
     // container is removed.
+    container_execution.stop().unwrap();
+    let event = container_execution.take_event_stream().next().await.unwrap().unwrap();
+    assert_matches!(event, fcomponent::ExecutionControllerEvent::OnStop { .. });
+    loop {
+        tree = attribution.next().await.unwrap();
+        if tree.children.is_empty() {
+            break;
+        }
+    }
 }
