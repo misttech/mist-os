@@ -41,7 +41,6 @@ devicetree_visitor_collection("all-driver-visitors") {
     "//sdk/lib/driver/devicetree/visitors/drivers/i2c-controllers/i2c-bus-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/input/touchscreen/focaltech:focaltech-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/interrupt-controllers/arm-gic",
-    "//sdk/lib/driver/devicetree/visitors/drivers/interrupt-controllers/arm-gicv2",
     "//sdk/lib/driver/devicetree/visitors/drivers/mali-gpu:mali-gpu-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/mmc/sdmmc:sdmmc-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/power/power-domain:power-domain-visitor",
