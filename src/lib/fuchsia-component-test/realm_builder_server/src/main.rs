@@ -558,6 +558,7 @@ impl Realm {
 
                     responder.send(Ok(()))?;
                 }
+                #[cfg(fuchsia_api_level_at_least = "20")]
                 ftest::RealmRequest::AddCapability { capability, responder } => {
                     if self.realm_has_been_built.load(Ordering::Relaxed) {
                         responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
@@ -1158,6 +1159,7 @@ impl RealmNode2 {
             .ok_or_else(|| RealmBuilderError::NoSuchChild(child_name.into()))
     }
 
+    #[cfg(fuchsia_api_level_at_least = "20")]
     async fn add_capability(
         &self,
         capability: fcdecl::Capability,
@@ -1216,23 +1218,37 @@ impl RealmNode2 {
                     }
                 }
 
+                fn check_for_parent_target_error(
+                    availability: &Option<fcdecl::Availability>,
+                ) -> Result<(), RealmBuilderError> {
+                    match availability {
+                        Some(fcdecl::Availability::Required) | None => Ok(()),
+                        _ => {
+                            return Err(RealmBuilderError::CapabilityInvalid(anyhow::format_err!(
+                                "capability availability cannot be \"SameAsTarget\" or \"Optional\" when the target is the parent",
+                            )));
+                        }
+                    }
+                }
+
                 if is_parent_ref(target) {
                     match &capability {
                         ftest::Capability::Protocol(ftest::Protocol { availability, .. })
                         | ftest::Capability::Directory(ftest::Directory { availability, .. })
                         | ftest::Capability::Storage(ftest::Storage { availability, .. })
-                        | ftest::Capability::Service(ftest::Service { availability, .. })
-                        | ftest::Capability::Config(ftest::Config { availability, .. })
-                        | ftest::Capability::Dictionary(ftest::Dictionary {
+                        | ftest::Capability::Service(ftest::Service { availability, .. }) => {
+                            check_for_parent_target_error(availability)?;
+                        }
+                        #[cfg(fuchsia_api_level_at_least = "20")]
+                        ftest::Capability::Config(ftest::Config { availability, .. }) => {
+                            check_for_parent_target_error(availability)?;
+                        }
+                        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                        ftest::Capability::Dictionary(ftest::Dictionary {
                             availability, ..
-                        }) => match availability {
-                            Some(fcdecl::Availability::Required) | None => (),
-                            _ => {
-                                return Err(RealmBuilderError::CapabilityInvalid(anyhow::format_err!(
-                                        "capability availability cannot be \"SameAsTarget\" or \"Optional\" when the target is the parent",
-                                    )));
-                            }
-                        },
+                        }) => {
+                            check_for_parent_target_error(availability)?;
+                        }
                         _ => {
                             return Err(RealmBuilderError::CapabilityInvalid(anyhow::format_err!(
                                 "unknown capability type",
@@ -1623,6 +1639,7 @@ fn create_offer_decl(
                 availability: cm_rust::Availability::Required,
             })
         }
+        #[cfg(fuchsia_api_level_at_least = "20")]
         ftest::Capability::Config(config) => {
             let availability = match source {
                 cm_rust::OfferSource::Void => cm_rust::Availability::Optional,

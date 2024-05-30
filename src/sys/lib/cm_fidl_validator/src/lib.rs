@@ -14,7 +14,7 @@ use {
     fidl_fuchsia_component_decl as fdecl,
     itertools::Itertools,
     std::{
-        collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+        collections::{BTreeSet, HashMap, HashSet},
         fmt,
         path::Path,
     },
@@ -416,6 +416,7 @@ impl<'a> ValidationContext<'a> {
         }
 
         // Validate "config"
+        #[cfg(fuchsia_api_level_at_least = "20")]
         self.validate_config(decl.config.as_ref(), decl.uses.as_ref());
 
         // Check that there are no strong cyclical dependencies
@@ -443,11 +444,14 @@ impl<'a> ValidationContext<'a> {
 
     // Validates a config schema. Checks that each field's layout matches the expected constraints
     // and properties.
+    #[cfg(fuchsia_api_level_at_least = "20")]
     fn validate_config(
         &mut self,
         config: Option<&fdecl::ConfigSchema>,
         uses: Option<&Vec<fdecl::Use>>,
     ) {
+        use std::collections::BTreeMap;
+
         // Get all of the `use` configs that are optional without a default.
         let optional_use_keys: BTreeMap<String, fdecl::ConfigType> =
             uses.map_or(BTreeMap::new(), |u| {
@@ -548,6 +552,7 @@ impl<'a> ValidationContext<'a> {
         };
     }
 
+    #[cfg(fuchsia_api_level_at_least = "20")]
     fn validate_config_type(&mut self, type_: &fdecl::ConfigType, accept_vectors: bool) {
         match &type_.layout {
             fdecl::ConfigTypeLayout::Bool
