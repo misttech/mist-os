@@ -39,17 +39,16 @@ impl Migration for V1653667210LightMigrationTeardown {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage_migrations::tests::serve_vfs_dir;
+    use crate::storage_migrations::tests::open_tempdir;
     use assert_matches::assert_matches;
     use fidl_fuchsia_stash::{StoreAccessorRequest, StoreMarker, StoreRequest, Value};
     use fuchsia_async as fasync;
     use futures::StreamExt;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
-    use vfs::mut_pseudo_directory;
 
     // Ensure the teardown deletes and commits the deletion of data from stash.
-    #[fasync::run_until_stalled(test)]
+    #[fuchsia::test]
     async fn v1653667208_light_migration_teardown_test() {
         let (store_proxy, server_end) =
             create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
@@ -94,8 +93,8 @@ mod tests {
         });
 
         let migration = V1653667210LightMigrationTeardown(store_proxy);
-        let fs = mut_pseudo_directory! {};
-        let (directory, _vmo_map) = serve_vfs_dir(fs);
+        let fs = tempfile::tempdir().expect("failed to create tempdir");
+        let directory = open_tempdir(&fs);
         let file_generator = FileGenerator::new(0, migration.id(), Clone::clone(&directory));
         assert_matches!(migration.migrate(file_generator).await, Ok(()));
 
@@ -106,7 +105,7 @@ mod tests {
     }
 
     // Ensure we report an unrecoverable error if we're unable to delete the data from stash.
-    #[fasync::run_until_stalled(test)]
+    #[fuchsia::test]
     async fn v1653667208_light_migration_teardown_commit_fails() {
         let (store_proxy, server_end) =
             create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
@@ -144,8 +143,8 @@ mod tests {
         });
 
         let migration = V1653667210LightMigrationTeardown(store_proxy);
-        let fs = mut_pseudo_directory! {};
-        let (directory, _vmo_map) = serve_vfs_dir(fs);
+        let fs = tempfile::tempdir().expect("failed to create tempdir");
+        let directory = open_tempdir(&fs);
         let file_generator = FileGenerator::new(0, migration.id(), Clone::clone(&directory));
         let result = migration.migrate(file_generator).await;
         assert_matches!(result, Err(MigrationError::Unrecoverable(_)));

@@ -428,21 +428,13 @@ pub(crate) struct LastMigration {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fidl::endpoints::{create_proxy, ServerEnd};
-    use fidl::Vmo;
+    use fidl_fuchsia_io as fio;
     use fidl_fuchsia_io::DirectoryMarker;
     use fuchsia_async as fasync;
     use futures::future::BoxFuture;
-    use futures::lock::Mutex;
     use futures::FutureExt;
-    use std::collections::HashMap;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
-    use vfs::directory::entry_container::Directory;
-    use vfs::directory::mutable::simple::tree_constructor;
-    use vfs::execution_scope::ExecutionScope;
-    use vfs::file::vmo::read_write;
-    use vfs::mut_pseudo_directory;
 
     #[async_trait]
     impl<T> Migration for (u64, T)
@@ -491,28 +483,19 @@ mod tests {
         let _migration_manager = builder.build();
     }
 
-    fn serve_vfs_dir(
-        root: Arc<impl Directory>,
-    ) -> (DirectoryProxy, Arc<Mutex<HashMap<String, Vmo>>>) {
-        let vmo_map = Arc::new(Mutex::new(HashMap::new()));
-        let fs_scope = ExecutionScope::build()
-            .entry_constructor(tree_constructor(move |_, _| Ok(read_write(b""))))
-            .new();
-        let (client, server) = create_proxy::<DirectoryMarker>().unwrap();
-        root.open(
-            fs_scope,
-            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-            vfs::path::Path::dot(),
-            ServerEnd::new(server.into_channel()),
-        );
-        (client, vmo_map)
+    fn open_tempdir(tempdir: &tempfile::TempDir) -> fio::DirectoryProxy {
+        fuchsia_fs::directory::open_in_namespace(
+            tempdir.path().to_str().expect("tempdir path is not valid UTF-8"),
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        )
+        .expect("failed to open connection to tempdir")
     }
 
     // Test for initial migration
-    #[fasync::run_until_stalled(test)]
+    #[fuchsia::test]
     async fn if_no_migration_file_runs_initial_migration() {
-        let fs = mut_pseudo_directory! {};
-        let (directory, _vmo_map) = serve_vfs_dir(fs);
+        let tempdir = tempfile::tempdir().expect("failed to create tempdir");
+        let directory = open_tempdir(&tempdir);
         let mut builder = MigrationManagerBuilder::new();
         let migration_ran = Arc::new(AtomicBool::new(false));
 
@@ -555,10 +538,10 @@ mod tests {
     }
 
     // Test for initial migration
-    #[fasync::run_until_stalled(test)]
+    #[fuchsia::test]
     async fn if_no_migration_file_and_no_data_uses_defaults() {
-        let fs = mut_pseudo_directory! {};
-        let (directory, _vmo_map) = serve_vfs_dir(fs);
+        let tempdir = tempfile::tempdir().expect("failed to create tempdir");
+        let directory = open_tempdir(&tempdir);
         let mut builder = MigrationManagerBuilder::new();
         let migration_ran = Arc::new(AtomicBool::new(false));
 
@@ -600,10 +583,10 @@ mod tests {
         assert_eq!(migration_number, ID);
     }
 
-    #[fasync::run_until_stalled(test)]
+    #[fuchsia::test]
     async fn if_no_migration_file_and_no_migrations_no_update() {
-        let fs = mut_pseudo_directory! {};
-        let (directory, _vmo_map) = serve_vfs_dir(fs);
+        let tempdir = tempfile::tempdir().expect("failed to create tempdir");
+        let directory = open_tempdir(&tempdir);
         let mut builder = MigrationManagerBuilder::new();
         builder.set_migration_dir(Clone::clone(&directory));
         let migration_manager = builder.build();
@@ -622,10 +605,10 @@ mod tests {
         );
     }
 
-    #[fasync::run_until_stalled(test)]
+    #[fuchsia::test]
     async fn if_no_migration_file_but_data_runs_migrations() {
-        let fs = mut_pseudo_directory! {};
-        let (directory, _vmo_map) = serve_vfs_dir(fs);
+        let tempdir = tempfile::tempdir().expect("failed to create tempdir");
+        let directory = open_tempdir(&tempdir);
         let mut builder = MigrationManagerBuilder::new();
         let migration_1_ran = Arc::new(AtomicBool::new(false));
         let migration_2_ran = Arc::new(AtomicBool::new(false));
@@ -675,13 +658,14 @@ mod tests {
         assert!(migration_2_ran.load(Ordering::SeqCst));
     }
 
-    #[fasync::run_until_stalled(test)]
+    #[fuchsia::test]
     async fn if_migration_file_and_up_to_date_no_migrations_run() {
-        let fs = mut_pseudo_directory! {
-            MIGRATION_FILE_NAME => read_write(ID.to_string()),
-            DATA_FILE_NAME => read_write(b""),
-        };
-        let (directory, _vmo_map) = serve_vfs_dir(fs);
+        let tempdir = tempfile::tempdir().expect("failed to create tempdir");
+        std::fs::write(&tempdir.path().join(MIGRATION_FILE_NAME), ID.to_string())
+            .expect("failed to write migration file");
+        std::fs::write(&tempdir.path().join(DATA_FILE_NAME), "")
+            .expect("failed to write data file");
+        let directory = open_tempdir(&tempdir);
         let mut builder = MigrationManagerBuilder::new();
         let migration_ran = Arc::new(AtomicBool::new(false));
 
@@ -712,12 +696,12 @@ mod tests {
         assert!(!migration_ran.load(Ordering::SeqCst));
     }
 
-    #[fasync::run_until_stalled(test)]
+    #[fuchsia::test]
     async fn migration_file_exists_but_missing_data() {
-        let fs = mut_pseudo_directory! {
-            MIGRATION_FILE_NAME => read_write(ID.to_string()),
-        };
-        let (directory, _vmo_map) = serve_vfs_dir(fs);
+        let tempdir = tempfile::tempdir().expect("failed to create tempdir");
+        std::fs::write(&tempdir.path().join(MIGRATION_FILE_NAME), ID.to_string())
+            .expect("failed to write migration file");
+        let directory = open_tempdir(&tempdir);
         let mut builder = MigrationManagerBuilder::new();
         let initial_migration_ran = Arc::new(AtomicBool::new(false));
 
@@ -769,13 +753,14 @@ mod tests {
     }
 
     // Tests that a migration newer than the latest one tracked in the migration file can run.
-    #[fasync::run_until_stalled(test)]
+    #[fuchsia::test]
     async fn migration_file_exists_and_newer_migrations_should_update() {
-        let fs = mut_pseudo_directory! {
-            MIGRATION_FILE_NAME => read_write(ID.to_string()),
-            DATA_FILE_NAME => read_write(b""),
-        };
-        let (directory, _vmo_map) = serve_vfs_dir(fs);
+        let tempdir = tempfile::tempdir().expect("failed to create tempdir");
+        std::fs::write(&tempdir.path().join(MIGRATION_FILE_NAME), ID.to_string())
+            .expect("failed to write migration file");
+        std::fs::write(&tempdir.path().join(DATA_FILE_NAME), "")
+            .expect("failed to write data file");
+        let directory = open_tempdir(&tempdir);
         let mut builder = MigrationManagerBuilder::new();
         let migration_ran = Arc::new(AtomicBool::new(false));
 
@@ -851,16 +836,16 @@ mod tests {
         assert_eq!(data, NEW_CONTENTS);
     }
 
-    #[fasync::run_until_stalled(test)]
+    #[fuchsia::test]
     async fn migration_file_unknown_id_uses_light_migration() {
         const LIGHT_MIGRATION: u64 = 1653667210;
         const UNKNOWN_ID: u64 = u64::MAX;
-        let unknown_id_str = UNKNOWN_ID.to_string();
-        let fs = mut_pseudo_directory! {
-            MIGRATION_FILE_NAME => read_write(unknown_id_str),
-            DATA_FILE_NAME => read_write(b""),
-        };
-        let (directory, _vmo_map) = serve_vfs_dir(fs);
+        let tempdir = tempfile::tempdir().expect("failed to create tempdir");
+        std::fs::write(&tempdir.path().join(MIGRATION_FILE_NAME), UNKNOWN_ID.to_string())
+            .expect("failed to write migration file");
+        std::fs::write(&tempdir.path().join(DATA_FILE_NAME), "")
+            .expect("failed to write data file");
+        let directory = open_tempdir(&tempdir);
         let mut builder = MigrationManagerBuilder::new();
         let migration_ran = Arc::new(AtomicBool::new(false));
 

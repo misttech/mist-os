@@ -10,12 +10,8 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
 #[cfg(test)]
-use ::fidl::endpoints::{create_proxy, ServerEnd};
-#[cfg(test)]
 use anyhow::format_err;
 use anyhow::{Context, Error};
-#[cfg(test)]
-use fidl_fuchsia_io::DirectoryMarker;
 use fidl_fuchsia_io::DirectoryProxy;
 use fidl_fuchsia_stash::StoreProxy;
 use fuchsia_async as fasync;
@@ -37,16 +33,6 @@ pub use input::input_device_configuration::InputConfiguration;
 pub use light::light_hardware_configuration::LightHardwareConfiguration;
 use serde::Deserialize;
 pub use service::{Address, Payload};
-#[cfg(test)]
-use vfs::directory::entry_container::Directory;
-#[cfg(test)]
-use vfs::directory::mutable::simple::tree_constructor;
-#[cfg(test)]
-use vfs::execution_scope::ExecutionScope;
-#[cfg(test)]
-use vfs::file::vmo::read_write;
-#[cfg(test)]
-use vfs::mut_pseudo_directory;
 
 use crate::accessibility::accessibility_controller::AccessibilityController;
 use crate::agent::authority::Authority;
@@ -210,17 +196,12 @@ impl Environment {
 
 #[cfg(test)]
 fn init_storage_dir() -> DirectoryProxy {
-    let fs_scope = ExecutionScope::build()
-        .entry_constructor(tree_constructor(move |_, _| Ok(read_write(b""))))
-        .new();
-    let (directory, server) = create_proxy::<DirectoryMarker>().unwrap();
-    mut_pseudo_directory! {}.open(
-        fs_scope,
+    let tempdir = tempfile::tempdir().expect("failed to create tempdir");
+    fuchsia_fs::directory::open_in_namespace(
+        tempdir.path().to_str().expect("tempdir path is not valid UTF-8"),
         OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-        vfs::path::Path::dot(),
-        ServerEnd::new(server.into_channel()),
-    );
-    directory
+    )
+    .expect("failed to open connection to tempdir")
 }
 
 #[cfg(not(test))]

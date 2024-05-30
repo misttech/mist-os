@@ -450,17 +450,14 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fasync::TestExecutor;
-    use fidl::endpoints::{create_proxy, ServerEnd};
-    use fidl_fuchsia_io::DirectoryMarker;
+    use fidl::endpoints::ControlHandle;
+    use fidl::epitaph::ChannelEpitaphExt;
+    use fidl_fuchsia_io as fio;
     use fidl_test_storage::{TestStruct, WrongStruct};
     use fuchsia_async as fasync;
+    use futures::TryStreamExt;
     use std::task::Poll;
     use test_case::test_case;
-    use vfs::directory::entry_container::Directory;
-    use vfs::directory::mutable::simple::tree_constructor;
-    use vfs::execution_scope::ExecutionScope;
-    use vfs::file::vmo::read_write;
-    use vfs::mut_pseudo_directory;
 
     const VALUE0: i32 = 3;
     const VALUE1: i32 = 33;
@@ -491,28 +488,22 @@ mod tests {
         }
     }
 
-    fn serve_vfs_dir(root: Arc<impl Directory>) -> DirectoryProxy {
-        let fs_scope = ExecutionScope::build()
-            .entry_constructor(tree_constructor(move |_, _| Ok(read_write(b""))))
-            .new();
-        let (client, server) = create_proxy::<DirectoryMarker>().unwrap();
-        root.open(
-            fs_scope,
-            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-            vfs::path::Path::dot(),
-            ServerEnd::new(server.into_channel()),
-        );
-        client
+    fn open_tempdir(tempdir: &tempfile::TempDir) -> fio::DirectoryProxy {
+        fuchsia_fs::directory::open_in_namespace(
+            tempdir.path().to_str().expect("tempdir path is not valid UTF-8"),
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        )
+        .expect("failed to open connection to tempdir")
     }
 
-    #[fasync::run_until_stalled(test)]
+    #[fuchsia::test]
     async fn test_get() {
         let value_to_get = LibTestStruct { value: VALUE1 };
+        let tempdir = tempfile::tempdir().expect("failed to create tempdir");
         let content = persist(&value_to_get.to_storable()).unwrap();
-        let fs = mut_pseudo_directory! {
-            "xyz.pfidl" => read_write(content),
-        };
-        let storage_dir = serve_vfs_dir(fs);
+        std::fs::write(&tempdir.path().join("xyz.pfidl"), content).expect("failed to write file");
+        let storage_dir = open_tempdir(&tempdir);
+
         let (storage, sync_tasks) = FidlStorage::with_file_proxy(
             vec![(LibTestStruct::KEY, None)],
             storage_dir,
@@ -528,10 +519,10 @@ mod tests {
         assert_eq!(result.value, VALUE1);
     }
 
-    #[fasync::run_until_stalled(test)]
+    #[fuchsia::test]
     async fn test_get_default() {
-        let fs = mut_pseudo_directory! {};
-        let storage_dir = serve_vfs_dir(fs);
+        let tempdir = tempfile::tempdir().expect("failed to create tempdir");
+        let storage_dir = open_tempdir(&tempdir);
 
         let (storage, sync_tasks) = FidlStorage::with_file_proxy(
             vec![(LibTestStruct::KEY, None)],
@@ -548,14 +539,190 @@ mod tests {
         assert_eq!(result.value, VALUE0);
     }
 
+    /// Proxies directory request to a real directory while allowing for some of the requests to be
+    /// intercepted.
+    struct DirectoryInterceptor {
+        real_dir: fio::DirectoryProxy,
+        inner: std::sync::Mutex<DirectoryInterceptorInner>,
+    }
+
+    struct DirectoryInterceptorInner {
+        sync_notifier: Option<futures::channel::mpsc::UnboundedSender<()>>,
+        open_interceptor: Box<dyn Fn(&str, bool) -> Option<Status>>,
+    }
+
+    impl DirectoryInterceptor {
+        fn new(real_dir: fio::DirectoryProxy) -> (Arc<Self>, fio::DirectoryProxy) {
+            let (proxy, requests) =
+                fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+            let this = Arc::new(Self {
+                real_dir,
+                inner: std::sync::Mutex::new(DirectoryInterceptorInner {
+                    sync_notifier: None,
+                    open_interceptor: Box::new(|_, _| None),
+                }),
+            });
+            fasync::Task::local(this.clone().run(requests)).detach();
+            (this.clone(), proxy)
+        }
+
+        /// Returns a receiver that will be notified after each Sync request to the real directory
+        /// has completed.
+        fn install_sync_notifier(&self) -> futures::channel::mpsc::UnboundedReceiver<()> {
+            let (sender, receiver) = futures::channel::mpsc::unbounded();
+            self.inner.lock().unwrap().sync_notifier = Some(sender);
+            receiver
+        }
+
+        /// Sets a callback to be called on every Open request. If the callback returns an error,
+        /// then the request will be failed with that error instead of being forwarded to the real
+        /// directory.
+        fn set_open_interceptor(&self, interceptor: Box<dyn Fn(&str, bool) -> Option<Status>>) {
+            self.inner.lock().unwrap().open_interceptor = interceptor;
+        }
+
+        async fn run(self: Arc<Self>, mut requests: fio::DirectoryRequestStream) {
+            while let Ok(Some(request)) = requests.try_next().await {
+                match request {
+                    fio::DirectoryRequest::Open {
+                        flags,
+                        mode,
+                        path,
+                        object,
+                        control_handle: _,
+                    } => {
+                        match (self.inner.lock().unwrap().open_interceptor)(
+                            &path,
+                            flags.contains(fio::OpenFlags::CREATE),
+                        ) {
+                            Some(status) => {
+                                let (_, control_handle) =
+                                    object.into_stream_and_control_handle().unwrap();
+                                control_handle
+                                    .send_on_open_(status.into_raw(), None)
+                                    .expect("failed to send OnOpen event");
+                                control_handle.shutdown_with_epitaph(status);
+                            }
+                            None => {
+                                self.real_dir
+                                    .open(flags, mode, &path, object)
+                                    .expect("failed to forward Open request");
+                            }
+                        }
+                    }
+                    fio::DirectoryRequest::Open2 {
+                        path,
+                        protocols,
+                        object_request,
+                        control_handle: _,
+                    } => {
+                        let create = if let fio::ConnectionProtocols::Node(protocols) = &protocols {
+                            if let Some(mode) = protocols.mode {
+                                mode == fio::CreationMode::AllowExisting
+                                    || mode == fio::CreationMode::Always
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        };
+                        match (self.inner.lock().unwrap().open_interceptor)(&path, create) {
+                            Some(status) => {
+                                object_request
+                                    .close_with_epitaph(status)
+                                    .expect("failed to send epitaph");
+                            }
+                            None => {
+                                self.real_dir
+                                    .open2(&path, &protocols, object_request)
+                                    .expect("failed to forward Open2 request");
+                            }
+                        }
+                    }
+                    fio::DirectoryRequest::Sync { responder } => {
+                        let response =
+                            self.real_dir.sync().await.expect("failed to forward Sync request");
+                        responder.send(response).expect("failed to respond to Sync request");
+                        if let Some(sender) = &self.inner.lock().unwrap().sync_notifier {
+                            sender.unbounded_send(()).unwrap();
+                        }
+                    }
+                    fio::DirectoryRequest::Rename { src, dst_parent_token, dst, responder } => {
+                        let response = self
+                            .real_dir
+                            .rename(&src, dst_parent_token, &dst)
+                            .await
+                            .expect("failed to forward Rename request");
+                        responder.send(response).expect("failed to respond to Rename request");
+                    }
+                    fio::DirectoryRequest::GetToken { responder } => {
+                        let response = self
+                            .real_dir
+                            .get_token()
+                            .await
+                            .expect("failed to forward GetToken request");
+                        responder
+                            .send(response.0, response.1)
+                            .expect("failed to respond to GetToken request");
+                    }
+                    request @ _ => unimplemented!("request: {:?}", request),
+                }
+            }
+        }
+    }
+
+    /// Repeatedly polls `fut` until it returns `Poll::Ready`. When using a `TestExecutor` with fake
+    /// time, only `run_until_stalled` can be used but `run_until_stalled` is incompatible with
+    /// external filesystems. This function bridges the gap by continuously polling the future until
+    /// the filesystem responds.
+    fn run_until_ready<F>(executor: &mut TestExecutor, fut: F) -> F::Output
+    where
+        F: std::future::Future,
+    {
+        let mut fut = std::pin::pin!(fut);
+        loop {
+            match executor.run_until_stalled(&mut fut) {
+                Poll::Ready(result) => return result,
+                Poll::Pending => std::thread::yield_now(),
+            }
+        }
+    }
+
+    /// Asserts that a file doesn't exist.
+    fn assert_file_not_found(
+        executor: &mut TestExecutor,
+        directory: &fio::DirectoryProxy,
+        file_name: &str,
+    ) {
+        let open_fut =
+            fuchsia_fs::directory::open_file(directory, file_name, OpenFlags::RIGHT_READABLE);
+        let result = run_until_ready(executor, open_fut);
+        assert_matches!(result, Result::Err(e) if e.is_not_found_error());
+    }
+
+    /// Verifies the contents of a file.
+    fn assert_file_contents(
+        executor: &mut TestExecutor,
+        directory: &fio::DirectoryProxy,
+        file_name: &str,
+        expected_contents: TestStruct,
+    ) {
+        let read_fut = fuchsia_fs::directory::read_file(directory, file_name);
+        let data = run_until_ready(executor, read_fut).expect("reading file");
+        let data = fidl::unpersist::<TestStruct>(&data).expect("failed to read file as TestStruct");
+        assert_eq!(data, expected_contents);
+    }
+
     #[fuchsia::test]
     fn test_first_write_syncs_immediately() {
         let written_value = VALUE1;
         let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(Time::from_nanos(0));
 
-        let fs = mut_pseudo_directory! {};
-        let storage_dir = serve_vfs_dir(fs);
+        let tempdir = tempfile::tempdir().expect("failed to create tempdir");
+        let storage_dir = open_tempdir(&tempdir);
+        let (interceptor, storage_dir) = DirectoryInterceptor::new(storage_dir);
+        let mut sync_receiver = interceptor.install_sync_notifier();
 
         let storage_fut = FidlStorage::with_file_proxy(
             vec![(LibTestStruct::KEY, None)],
@@ -564,16 +731,12 @@ mod tests {
         );
         futures::pin_mut!(storage_fut);
 
-        let (storage, sync_tasks) =
+        let (storage, _sync_tasks) =
             if let Poll::Ready(storage) = executor.run_until_stalled(&mut storage_fut) {
                 storage.expect("file proxy should be created")
             } else {
                 panic!("storage creation stalled");
             };
-
-        assert_eq!(sync_tasks.len(), 1);
-        let sync_task = sync_tasks.into_iter().next().unwrap();
-        futures::pin_mut!(sync_task);
 
         // Write to device storage.
         let value_to_write = LibTestStruct { value: written_value };
@@ -582,48 +745,23 @@ mod tests {
 
         // Initial cache check is done if no read was ever performed.
         assert_matches!(
-            executor.run_until_stalled(&mut write_future),
-            Poll::Ready(Result::Ok(UpdateState::Updated))
+            run_until_ready(&mut executor, &mut write_future),
+            Result::Ok(UpdateState::Updated)
         );
 
         // Storage is not yet ready.
-        let open_fut =
-            fuchsia_fs::directory::open_file(&storage_dir, "xyz.pfidl", OpenFlags::RIGHT_READABLE);
-        futures::pin_mut!(open_fut);
+        assert_file_not_found(&mut executor, &storage_dir, "xyz.pfidl");
 
-        let result = executor.run_until_stalled(&mut open_fut);
-        assert_matches!(
-            result,
-            Poll::Ready(Result::Err(OpenError::OpenError(zx::Status::NOT_FOUND)))
-        );
-
-        // Wake the zero timer.
-        let _ = executor.run_until_stalled(&mut sync_task);
-
-        // Validate that the file has been synced.
-        let open_fut =
-            fuchsia_fs::directory::open_file(&storage_dir, "xyz.pfidl", OpenFlags::RIGHT_READABLE);
-        futures::pin_mut!(open_fut);
-
-        let result = executor.run_until_stalled(&mut open_fut);
-        let file = if let Poll::Ready(Result::Ok(file)) = result {
-            file
-        } else {
-            panic!("result is not ready: {result:?}");
-        };
+        // Wait for the sync task to complete.
+        run_until_ready(&mut executor, sync_receiver.next()).expect("directory never synced");
 
         // Validate the value matches what was set.
-        let read_fut = fuchsia_fs::file::read_fidl::<TestStruct>(&file);
-        futures::pin_mut!(read_fut);
-
-        let result = executor.run_until_stalled(&mut read_fut);
-        let data = if let Poll::Ready(Result::Ok(data)) = result {
-            data
-        } else {
-            panic!("result is not ready: {result:?}");
-        };
-
-        assert_eq!(data, value_to_write.to_storable());
+        assert_file_contents(
+            &mut executor,
+            &storage_dir,
+            "xyz.pfidl",
+            value_to_write.to_storable(),
+        );
     }
 
     #[fuchsia::test]
@@ -633,8 +771,10 @@ mod tests {
         let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(Time::from_nanos(0));
 
-        let fs = mut_pseudo_directory! {};
-        let storage_dir = serve_vfs_dir(fs);
+        let tempdir = tempfile::tempdir().expect("failed to create tempdir");
+        let storage_dir = open_tempdir(&tempdir);
+        let (interceptor, storage_dir) = DirectoryInterceptor::new(storage_dir);
+        let mut sync_receiver = interceptor.install_sync_notifier();
 
         let storage_fut = FidlStorage::with_file_proxy(
             vec![(LibTestStruct::KEY, None)],
@@ -643,15 +783,12 @@ mod tests {
         );
         futures::pin_mut!(storage_fut);
 
-        let (storage, sync_tasks) =
+        let (storage, _sync_tasks) =
             if let Poll::Ready(storage) = executor.run_until_stalled(&mut storage_fut) {
                 storage.expect("file proxy should be created")
             } else {
                 panic!("storage creation stalled");
             };
-
-        let sync_task = sync_tasks.into_iter().next().unwrap();
-        futures::pin_mut!(sync_task);
 
         // Write to device storage.
         let value_to_write = LibTestStruct { value: written_value };
@@ -660,48 +797,23 @@ mod tests {
 
         // Initial cache check is done if no read was ever performed.
         assert_matches!(
-            executor.run_until_stalled(&mut write_future),
-            Poll::Ready(Result::Ok(UpdateState::Updated))
+            run_until_ready(&mut executor, &mut write_future),
+            Result::Ok(UpdateState::Updated)
         );
 
         // Storage is not yet ready.
-        let open_fut =
-            fuchsia_fs::directory::open_file(&storage_dir, "xyz.pfidl", OpenFlags::RIGHT_READABLE);
-        futures::pin_mut!(open_fut);
+        assert_file_not_found(&mut executor, &storage_dir, "xyz.pfidl");
 
-        let result = executor.run_until_stalled(&mut open_fut);
-        assert_matches!(
-            result,
-            Poll::Ready(Result::Err(OpenError::OpenError(zx::Status::NOT_FOUND)))
-        );
-
-        // Move executor past the sync interval.
-        let _ = executor.run_until_stalled(&mut sync_task);
+        // Wait for the sync task to complete.
+        run_until_ready(&mut executor, &mut sync_receiver.next()).expect("directory never synced");
 
         // Validate that the file has been synced.
-        let open_fut =
-            fuchsia_fs::directory::open_file(&storage_dir, "xyz.pfidl", OpenFlags::RIGHT_READABLE);
-        futures::pin_mut!(open_fut);
-
-        let result = executor.run_until_stalled(&mut open_fut);
-        let file = if let Poll::Ready(Result::Ok(file)) = result {
-            file
-        } else {
-            panic!("result is not ready: {result:?}");
-        };
-
-        // Validate the value matches what was set.
-        let read_fut = fuchsia_fs::file::read_fidl::<TestStruct>(&file);
-        futures::pin_mut!(read_fut);
-
-        let result = executor.run_until_stalled(&mut read_fut);
-        let data = if let Poll::Ready(Result::Ok(data)) = result {
-            data
-        } else {
-            panic!("result is not ready: {result:?}");
-        };
-
-        assert_eq!(data, value_to_write.to_storable());
+        assert_file_contents(
+            &mut executor,
+            &storage_dir,
+            "xyz.pfidl",
+            value_to_write.to_storable(),
+        );
 
         // Write second time to device storage.
         let value_to_write2 = LibTestStruct { value: second_value };
@@ -710,34 +822,17 @@ mod tests {
 
         // Initial cache check is done if no read was ever performed.
         assert_matches!(
-            executor.run_until_stalled(&mut write_future),
-            Poll::Ready(Result::Ok(UpdateState::Updated))
+            run_until_ready(&mut executor, &mut write_future),
+            Result::Ok(UpdateState::Updated)
         );
 
-        // Storage is not yet ready.
-        let open_fut =
-            fuchsia_fs::directory::open_file(&storage_dir, "xyz.pfidl", OpenFlags::RIGHT_READABLE);
-        futures::pin_mut!(open_fut);
-
-        // Should still equal old value.
-        let result = executor.run_until_stalled(&mut open_fut);
-        let file = if let Poll::Ready(Result::Ok(file)) = result {
-            file
-        } else {
-            panic!("result is not ready: {result:?}");
-        };
-
-        let read_fut = fuchsia_fs::file::read_fidl::<TestStruct>(&file);
-        futures::pin_mut!(read_fut);
-
-        let result = executor.run_until_stalled(&mut read_fut);
-        let data = if let Poll::Ready(Result::Ok(data)) = result {
-            data
-        } else {
-            panic!("result is not ready: {result:?}");
-        };
-
-        assert_eq!(data, value_to_write.to_storable());
+        // Storage is not yet ready, should still equal old value.
+        assert_file_contents(
+            &mut executor,
+            &storage_dir,
+            "xyz.pfidl",
+            value_to_write.to_storable(),
+        );
 
         // Move executor to just before sync interval.
         executor.set_fake_time(Time::from_nanos(MIN_FLUSH_INTERVAL_MS * 1_000_000 - 1));
@@ -745,32 +840,16 @@ mod tests {
 
         // Move executor to just after sync interval. It should run now.
         executor.set_fake_time(Time::from_nanos(MIN_FLUSH_INTERVAL_MS * 1_000_000));
-        let _ = executor.run_until_stalled(&mut sync_task);
+        run_until_ready(&mut executor, &mut sync_receiver.next()).expect("directory never synced");
 
         // Validate that the file has been synced.
-        let open_fut =
-            fuchsia_fs::directory::open_file(&storage_dir, "xyz.pfidl", OpenFlags::RIGHT_READABLE);
-        futures::pin_mut!(open_fut);
 
-        let result = executor.run_until_stalled(&mut open_fut);
-        let file = if let Poll::Ready(Result::Ok(file)) = result {
-            file
-        } else {
-            panic!("result is not ready: {result:?}");
-        };
-
-        // Validate the value matches what was set.
-        let read_fut = fuchsia_fs::file::read_fidl::<TestStruct>(&file);
-        futures::pin_mut!(read_fut);
-
-        let result = executor.run_until_stalled(&mut read_fut);
-        let data = if let Poll::Ready(Result::Ok(data)) = result {
-            data
-        } else {
-            panic!("result is not ready: {result:?}");
-        };
-
-        assert_eq!(data, value_to_write2.to_storable());
+        assert_file_contents(
+            &mut executor,
+            &storage_dir,
+            "xyz.pfidl",
+            value_to_write2.to_storable(),
+        );
     }
 
     #[derive(Copy, Clone, Default, Debug)]
@@ -792,10 +871,10 @@ mod tests {
 
     // Test that attempting to write two kinds of structs to a storage instance that only supports
     // one results in a failure.
-    #[fasync::run_until_stalled(test)]
+    #[fuchsia::test]
     async fn test_write_with_mismatch_type_returns_error() {
-        let fs = mut_pseudo_directory! {};
-        let storage_dir = serve_vfs_dir(fs);
+        let tempdir = tempfile::tempdir().expect("failed to create tempdir");
+        let storage_dir = open_tempdir(&tempdir);
 
         let (storage, sync_tasks) = FidlStorage::with_file_proxy(
             vec![(LibTestStruct::KEY, None)],
@@ -818,41 +897,6 @@ mod tests {
         assert_matches!(result, Err(e) if e.to_string() == "Invalid data keyed by WRONG_STRUCT");
     }
 
-    macro_rules! run_to_ready {
-        ($executor:expr, $fut:expr $(, $msg:expr $(,)?)? $(,)?) => {
-            {
-                let fut = $fut;
-                futures::pin_mut!(fut);
-                match $executor.run_until_stalled(&mut fut) {
-                    Poll::Ready(result) => result,
-                    Poll::Pending => run_to_ready!(@msg $($msg)?),
-                }
-            }
-        };
-        (@msg $msg:expr) => {
-            panic!($msg)
-        };
-        (@msg) => {
-            panic!("expected ready")
-        }
-    }
-
-    macro_rules! assert_file {
-        ($executor:expr, $storage_dir:expr, $file_name:literal, $expected_contents:expr) => {
-            let open_fut = fuchsia_fs::directory::open_file(
-                &$storage_dir,
-                $file_name,
-                OpenFlags::RIGHT_READABLE,
-            );
-            let file = run_to_ready!($executor, open_fut).expect("opening file");
-
-            // Validate the value matches what was set.
-            let read_fut = fuchsia_fs::file::read_fidl::<TestStruct>(&file);
-            let data = run_to_ready!($executor, read_fut).expect("reading file");
-            assert_eq!(data, $expected_contents);
-        };
-    }
-
     // Test that multiple writes to FidlStorage will cause a write each time, but will only
     // sync to the fs at an interval.
     #[fuchsia::test]
@@ -862,18 +906,18 @@ mod tests {
         let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(Time::from_nanos(0));
 
-        let fs = mut_pseudo_directory! {};
-        let storage_dir = serve_vfs_dir(fs);
+        let tempdir = tempfile::tempdir().expect("failed to create tempdir");
+        let storage_dir = open_tempdir(&tempdir);
+        let (interceptor, storage_dir) = DirectoryInterceptor::new(storage_dir);
+        let mut sync_receiver = interceptor.install_sync_notifier();
 
         let storage_fut = FidlStorage::with_file_proxy(
             vec![(LibTestStruct::KEY, None)],
             Clone::clone(&storage_dir),
             move |_| Ok((String::from("xyz_temp.pfidl"), String::from("xyz.pfidl"))),
         );
-        let (storage, sync_tasks) =
-            run_to_ready!(executor, storage_fut, "storage creation stalled")
-                .expect("file proxy should be created");
-        let mut sync_task = sync_tasks.into_iter().next().unwrap();
+        let (storage, _sync_tasks) =
+            run_until_ready(&mut executor, storage_fut).expect("file proxy should be created");
 
         let first_value = VALUE1;
         let second_value = VALUE2;
@@ -882,86 +926,84 @@ mod tests {
         // First write finishes immediately.
         let value_to_write = LibTestStruct { value: first_value };
         // Initial cache check is done if no read was ever performed.
-        let result = run_to_ready!(executor, storage.write(value_to_write));
+        let result = run_until_ready(&mut executor, storage.write(value_to_write));
         assert_matches!(result, Result::Ok(UpdateState::Updated));
 
         // Storage is not yet ready.
-        let result = run_to_ready!(
-            executor,
-            fuchsia_fs::directory::open_file(&storage_dir, "xyz.pfidl", OpenFlags::RIGHT_READABLE)
-        );
-        assert_matches!(result, Result::Err(OpenError::OpenError(zx::Status::NOT_FOUND)));
+        assert_file_not_found(&mut executor, &storage_dir, "xyz.pfidl");
 
         // Wake the initial time without advancing the clock. Confirms that the first write is
         // "immediate".
-        let _ = executor.run_until_stalled(&mut sync_task);
+        run_until_ready(&mut executor, sync_receiver.next()).expect("directory never synced");
 
         // Validate that the file has been synced.
-        assert_file!(executor, storage_dir, "xyz.pfidl", value_to_write.to_storable());
+        assert_file_contents(
+            &mut executor,
+            &storage_dir,
+            "xyz.pfidl",
+            value_to_write.to_storable(),
+        );
 
         // Write second time to device storage.
         let value_to_write2 = LibTestStruct { value: second_value };
-        let result = run_to_ready!(executor, storage.write(value_to_write2));
+        let result = run_until_ready(&mut executor, storage.write(value_to_write2));
         // Value is marked as updated after the write.
         assert_matches!(result, Result::Ok(UpdateState::Updated));
 
         // Validate the updated values are still returned from the storage cache.
-        let data = run_to_ready!(executor, storage.get::<LibTestStruct>());
+        let data = run_until_ready(&mut executor, storage.get::<LibTestStruct>());
         assert_eq!(data, value_to_write2);
 
         // But the data has not been persisted to disk.
-        assert_file!(executor, storage_dir, "xyz.pfidl", value_to_write.to_storable());
+        assert_file_contents(
+            &mut executor,
+            &storage_dir,
+            "xyz.pfidl",
+            value_to_write.to_storable(),
+        );
 
         // Now write a third time before advancing the clock.
         let value_to_write3 = LibTestStruct { value: third_value };
-        let result = run_to_ready!(executor, storage.write(value_to_write3));
+        let result = run_until_ready(&mut executor, storage.write(value_to_write3));
         // Value is marked as updated after the write.
         assert_matches!(result, Result::Ok(UpdateState::Updated));
 
         // Validate the updated values are still returned from the storage cache.
-        let data = run_to_ready!(executor, storage.get::<LibTestStruct>());
+
+        let data = run_until_ready(&mut executor, storage.get::<LibTestStruct>());
         assert_eq!(data, value_to_write3);
 
-        // But the data has still not been persistend to disk.
-        assert_file!(executor, storage_dir, "xyz.pfidl", value_to_write.to_storable());
+        // But the data has still not been persisted to disk.
+        assert_file_contents(
+            &mut executor,
+            &storage_dir,
+            "xyz.pfidl",
+            value_to_write.to_storable(),
+        );
 
         // Move clock to just before sync interval.
         executor.set_fake_time(Time::from_nanos(MIN_FLUSH_INTERVAL_MS * 1_000_000 - 1));
         assert!(!executor.wake_expired_timers());
 
         // And validate that the data has still not been synced to disk.
-        assert_file!(executor, storage_dir, "xyz.pfidl", value_to_write.to_storable());
+        assert_file_contents(
+            &mut executor,
+            &storage_dir,
+            "xyz.pfidl",
+            value_to_write.to_storable(),
+        );
 
         // Move executor to just after sync interval.
         executor.set_fake_time(Time::from_nanos(MIN_FLUSH_INTERVAL_MS * 1_000_000));
-        let _ = executor.run_until_stalled(&mut sync_task);
+        run_until_ready(&mut executor, sync_receiver.next()).expect("directory never synced");
 
         // Validate that the file has finally been synced.
-        assert_file!(executor, storage_dir, "xyz.pfidl", value_to_write3.to_storable());
-    }
-
-    fn serve_full_vfs_dir(root: Arc<impl Directory>, recovers_after: usize) -> DirectoryProxy {
-        let attempts = std::sync::Mutex::new(0);
-        let fs_scope = ExecutionScope::build()
-            .entry_constructor(tree_constructor(move |_, file_name| {
-                let mut attempts_guard = attempts.lock().unwrap();
-                if file_name == "abc_tmp.pfidl" && *attempts_guard < recovers_after {
-                    *attempts_guard += 1;
-                    println!("Force failing attempt {}", *attempts_guard);
-                    Err(fidl::Status::NO_SPACE)
-                } else {
-                    Ok(read_write(""))
-                }
-            }))
-            .new();
-        let (client, server) = create_proxy::<DirectoryMarker>().unwrap();
-        root.open(
-            fs_scope,
-            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-            vfs::path::Path::dot(),
-            ServerEnd::new(server.into_channel()),
+        assert_file_contents(
+            &mut executor,
+            &storage_dir,
+            "xyz.pfidl",
+            value_to_write3.to_storable(),
         );
-        client
     }
 
     // Tests that syncing can recover after a failed write. The test cases list the number of failed
@@ -985,9 +1027,20 @@ mod tests {
         let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(Time::from_nanos(0));
 
-        let fs = mut_pseudo_directory! {};
-        // This served directory will allow writes after `retry_count` failed attempts.
-        let storage_dir = serve_full_vfs_dir(fs, retry_count);
+        let tempdir = tempfile::tempdir().expect("failed to create tempdir");
+        let storage_dir = open_tempdir(&tempdir);
+        let (interceptor, storage_dir) = DirectoryInterceptor::new(storage_dir);
+        let attempts = std::sync::Mutex::new(0);
+        interceptor.set_open_interceptor(Box::new(move |path, create| {
+            let mut attempts_guard = attempts.lock().unwrap();
+            if path == "abc_tmp.pfidl" && create && *attempts_guard < retry_count {
+                *attempts_guard += 1;
+                Some(Status::NO_SPACE)
+            } else {
+                None
+            }
+        }));
+        let mut sync_receiver = interceptor.install_sync_notifier();
 
         let expected_data = vec![1];
         let cached_storage = Arc::new(Mutex::new(CachedStorage {
@@ -1022,24 +1075,8 @@ mod tests {
             assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
 
             // Check that files don't exist.
-            let result = run_to_ready!(
-                executor,
-                fuchsia_fs::directory::open_file(
-                    &storage_dir,
-                    "abc_tmp.pfidl",
-                    OpenFlags::RIGHT_READABLE
-                )
-            );
-            assert_matches!(result, Result::Err(OpenError::OpenError(zx::Status::NOT_FOUND)));
-            let result = run_to_ready!(
-                executor,
-                fuchsia_fs::directory::open_file(
-                    &storage_dir,
-                    "abc.pfidl",
-                    OpenFlags::RIGHT_READABLE
-                )
-            );
-            assert_matches!(result, Result::Err(OpenError::OpenError(zx::Status::NOT_FOUND)));
+            assert_file_not_found(&mut executor, &storage_dir, "abc_tmp.pfidl");
+            assert_file_not_found(&mut executor, &storage_dir, "abc.pfidl");
 
             clock_nanos += new_duration;
         }
@@ -1049,38 +1086,22 @@ mod tests {
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
 
         // Check that files don't exist.
-        let result = run_to_ready!(
-            executor,
-            fuchsia_fs::directory::open_file(
-                &storage_dir,
-                "abc_tmp.pfidl",
-                OpenFlags::RIGHT_READABLE
-            )
-        );
-        assert_matches!(result, Result::Err(OpenError::OpenError(zx::Status::NOT_FOUND)));
-        let result = run_to_ready!(
-            executor,
-            fuchsia_fs::directory::open_file(&storage_dir, "abc.pfidl", OpenFlags::RIGHT_READABLE)
-        );
-        assert_matches!(result, Result::Err(OpenError::OpenError(zx::Status::NOT_FOUND)));
+        assert_file_not_found(&mut executor, &storage_dir, "abc_tmp.pfidl");
+        assert_file_not_found(&mut executor, &storage_dir, "abc.pfidl");
 
         // Now pass the timer where we can read the result.
         clock_nanos += 1;
         executor.set_fake_time(Time::from_nanos(clock_nanos));
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
+        run_until_ready(&mut executor, sync_receiver.next()).expect("directory never synced");
 
-        // Check that the file now has data.
-        let open_fut =
-            fuchsia_fs::directory::open_file(&storage_dir, "abc.pfidl", OpenFlags::RIGHT_READABLE);
-        let file = run_to_ready!(executor, open_fut).expect("opening file");
-
-        // Validate the value matches what was in the cache.
-        let read_fut = fuchsia_fs::file::read(&file);
-        let data = run_to_ready!(executor, read_fut).expect("reading file");
+        // Check that the file now matches what was in the cache.
+        let read_fut = fuchsia_fs::directory::read_file(&storage_dir, "abc.pfidl");
+        let data = run_until_ready(&mut executor, read_fut).expect("reading file");
         assert_eq!(data, expected_data);
 
         drop(sender);
         // Ensure the task can properly exit.
-        assert_eq!(executor.run_until_stalled(&mut task), Poll::Ready(()));
+        run_until_ready(&mut executor, task);
     }
 }

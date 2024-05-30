@@ -21,23 +21,15 @@ use crate::tests::fakes::service_registry::ServiceRegistry;
 use crate::tests::message_utils::verify_payload;
 use crate::tests::scaffold::workload::channel;
 use crate::{service, Environment, EnvironmentBuilder};
-use ::fidl::endpoints::{create_proxy, create_proxy_and_stream, ServerEnd};
-use ::fidl::Vmo;
+use ::fidl::endpoints::create_proxy_and_stream;
 use assert_matches::assert_matches;
-use fidl_fuchsia_io::{DirectoryMarker, DirectoryProxy, OpenFlags};
+use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_stash::StoreMarker;
 use fuchsia_async as fasync;
 use futures::future::BoxFuture;
-use futures::lock::Mutex;
 use futures::FutureExt;
 use futures::StreamExt;
-use std::collections::HashMap;
 use std::sync::Arc;
-use vfs::directory::entry_container::Directory;
-use vfs::directory::mutable::simple::tree_constructor;
-use vfs::execution_scope::ExecutionScope;
-use vfs::file::vmo::read_write;
-use vfs::mut_pseudo_directory;
 
 const ENV_NAME: &str = "settings_service_environment_test";
 const TEST_PAYLOAD: &str = "test_payload";
@@ -180,29 +172,17 @@ async fn test_job_sourcing() {
     assert_matches!(job_state_rx.next().await, Some(channel::State::Execute));
 }
 
-fn serve_vfs_dir(root: Arc<impl Directory>) -> (DirectoryProxy, Arc<Mutex<HashMap<String, Vmo>>>) {
-    let vmo_map = Arc::new(Mutex::new(HashMap::new()));
-    let fs_scope = ExecutionScope::build()
-        .entry_constructor(tree_constructor(move |_, _| Ok(read_write(b""))))
-        .new();
-    let (client, server) = create_proxy::<DirectoryMarker>().unwrap();
-    root.open(
-        fs_scope,
-        OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-        vfs::path::Path::dot(),
-        ServerEnd::new(server.into_channel()),
-    );
-    (client, vmo_map)
-}
-
-#[fuchsia::test(allow_stalls = false)]
+#[fuchsia::test]
 async fn migration_error_does_not_cause_early_exit() {
     const UNKNOWN_ID: u64 = u64::MAX;
-    let unknown_id_str = UNKNOWN_ID.to_string();
-    let fs = mut_pseudo_directory! {
-        MIGRATION_FILE_NAME => read_write(unknown_id_str),
-    };
-    let (directory, _vmo_map) = serve_vfs_dir(fs);
+    let fs = tempfile::tempdir().expect("failed to create tempdir");
+    std::fs::write(fs.path().join(MIGRATION_FILE_NAME), UNKNOWN_ID.to_string())
+        .expect("failed to write migration file");
+    let directory = fuchsia_fs::directory::open_in_namespace(
+        fs.path().to_str().expect("tempdir path is not valid UTF-8"),
+        OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
+    )
+    .expect("failed to open connection to tempdir");
     let (store_proxy, mut request_stream) =
         create_proxy_and_stream::<StoreMarker>().expect("can create");
     fasync::Task::spawn(async move {
