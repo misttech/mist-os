@@ -25,6 +25,7 @@
 #include <arch/x86/descriptor.h>
 #include <arch/x86/feature.h>
 #include <arch/x86/hypervisor/invalidate.h>
+#include <arch/x86/hypervisor/vmx_state.h>
 #include <arch/x86/mmu_mem_types.h>
 #include <kernel/mp.h>
 #include <vm/arch_vm_aspace.h>
@@ -529,9 +530,9 @@ bool X86PageTableEpt::supports_page_size(PageTableLevel level) {
   DEBUG_ASSERT(level != PageTableLevel::PT_L);
   switch (level) {
     case PageTableLevel::PD_L:
-      return true;
+      return vmx_ept_supports_large_pages();
     case PageTableLevel::PDP_L:
-      return supports_huge_pages;
+      return false;
     case PageTableLevel::PML4_L:
       return false;
     default:

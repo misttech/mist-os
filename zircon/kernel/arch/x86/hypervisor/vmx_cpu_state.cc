@@ -21,6 +21,9 @@ namespace {
 DECLARE_SINGLETON_MUTEX(GuestMutex);
 size_t num_guests TA_GUARDED(GuestMutex::Get()) = 0;
 fbl::Array<VmxPage> vmxon_pages TA_GUARDED(GuestMutex::Get());
+// This starts at an assumption of false and is only made true if every CPU supports ept large
+// pages.
+ktl::atomic<bool> ept_supports_large_pages = false;
 
 void vmxon(zx_paddr_t pa) {
   uint8_t err;
@@ -44,9 +47,14 @@ void vmxoff() {
   ASSERT(!err);
 }
 
+struct vmxon_task_state {
+  fbl::Array<VmxPage>* pages;
+  ktl::atomic<bool>* large_page_support;
+};
+
 zx::result<> vmxon_task(void* context, cpu_num_t cpu_num) {
-  auto pages = static_cast<fbl::Array<VmxPage>*>(context);
-  VmxPage& page = (*pages)[cpu_num];
+  vmxon_task_state* state = static_cast<vmxon_task_state*>(context);
+  VmxPage& page = (*state->pages)[cpu_num];
 
   // Check that we have instruction information when we VM exit on IO.
   VmxInfo vmx_info;
@@ -76,8 +84,11 @@ zx::result<> vmxon_task(void* context, cpu_num_t cpu_num) {
 
   // Check that use of large pages is supported.
   if (!ept_info.large_pages) {
-    // Warning only.
-    dprintf(CRITICAL, "hypervisor: EPT large pages not supported\n");
+    // Informational only, will hurt performance.
+    dprintf(INFO, "hypervisor: EPT large pages not supported\n");
+    // As we will migrate between CPUs if *any* cpu does not support large pages we must globally
+    // disabled.
+    state->large_page_support->store(false);
   }
 
   // Check that the INVEPT instruction is supported.
@@ -233,12 +244,16 @@ zx::result<> alloc_vmx_state() {
       }
     }
 
+    ktl::atomic<bool> large_page_support = true;
+    vmxon_task_state state = {.pages = &pages, .large_page_support = &large_page_support};
+
     // Enable VMX for all online CPUs.
-    cpu_mask_t cpu_mask = percpu_exec(vmxon_task, &pages);
+    cpu_mask_t cpu_mask = hypervisor::percpu_exec(vmxon_task, &state);
     if (cpu_mask != mp_get_online_mask()) {
       mp_sync_exec(MP_IPI_TARGET_MASK, cpu_mask, vmxoff_task, nullptr);
       return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
+    ept_supports_large_pages.store(large_page_support.load());
 
     vmxon_pages = ktl::move(pages);
   }
@@ -260,3 +275,5 @@ bool cr_is_invalid(uint64_t cr_value, uint32_t fixed0_msr, uint32_t fixed1_msr) 
   uint64_t fixed1 = read_msr(fixed1_msr);
   return ~(cr_value | ~fixed0) != 0 || ~(~cr_value | fixed1) != 0;
 }
+
+bool vmx_ept_supports_large_pages() { return ept_supports_large_pages; }
