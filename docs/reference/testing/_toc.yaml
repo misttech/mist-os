@@ -19,3 +19,5 @@ toc:
   path: /docs/reference/testing/test-output-format.md
 - title: "tests.json format"
   path: /docs/reference/testing/tests-json-format.md
+- title: "Lacewing test framework"
+  path: /docs/reference/testing/lacewing.md
