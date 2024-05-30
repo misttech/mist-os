@@ -2729,6 +2729,36 @@ These take precedence over `profile_source_files`.
 
 From //build/config/profile/config.gni:15
 
+### driver_sysmem_contiguous_guard_page_count_override
+
+**Current value (from the default):** `-1`
+
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:37
+
+### driver_sysmem_contiguous_guard_pages_fatal
+
+**Current value (from the default):** `false`
+
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:33
+
+### driver_sysmem_contiguous_guard_pages_internal
+
+**Current value (from the default):** `false`
+
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:34
+
+### driver_sysmem_contiguous_guard_pages_unused
+
+**Current value (from the default):** `true`
+
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:35
+
+### driver_sysmem_contiguous_guard_pages_unused_cycle_seconds_override
+
+**Current value (from the default):** `-1`
+
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:36
+
 ### driver_sysmem_contiguous_memory_size_override
 
 **Current value (from the default):** `-1`
@@ -2740,6 +2770,12 @@ From //src/devices/sysmem/drivers/sysmem/BUILD.gn:32
 **Current value (from the default):** `-1`
 
 From //src/devices/sysmem/drivers/sysmem/BUILD.gn:31
+
+### driver_sysmem_protected_ranges_disable_dynamic
+
+**Current value (from the default):** `false`
+
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:38
 
 ### dwarf_version
 
@@ -5307,9 +5343,29 @@ This is useful for reducing the overall build time of any build that
 includes the IDK/SDK in exchange for reduced coverage of API level support.
 This includes `fx build final_fuchsia_idk` and products built in-tree.
 
+To override the set of target CPUs, see `override_idk_target_cpus`.
+
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:48
+From //build/config/fuchsia/platform_version.gni:50
+
+### override_idk_target_cpus
+
+Overrides the set of target CPU architectures for which the build will
+provide build-time support in the IDK/SDK. The default (`false`) set is
+equivalent to `["arm64", "riscv64", "x64"]`. Other valid values are a list
+containing a subset of that list that includes the current `target_cpu.
+
+This is useful for reducing the overall build time of any build that
+includes the IDK/SDK in exchange for reduced coverage of target CPU
+architecture support. This includes `fx build final_fuchsia_idk`.
+
+To override the set of API levels, see
+`override_build_time_supported_api_levels`.
+
+**Current value (from the default):** `false`
+
+From //build/sdk/config.gni:57
 
 ### override_target_api_level
 
