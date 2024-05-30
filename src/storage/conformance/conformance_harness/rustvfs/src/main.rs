@@ -18,8 +18,7 @@ use {
         directory::{
             entry_container::Directory,
             helper::DirectlyMutable,
-            mutable::{connection::MutableConnection, simple},
-            simple::Simple,
+            immutable::{simple, Simple},
         },
         execution_scope::ExecutionScope,
         file::vmo,
@@ -46,10 +45,7 @@ fn new_executable_file() -> Result<Arc<vmo::VmoFile>, Error> {
     Ok(exec_file)
 }
 
-fn add_entry(
-    entry: io_test::DirectoryEntry,
-    dest: &Arc<Simple<MutableConnection>>,
-) -> Result<(), Error> {
+fn add_entry(entry: io_test::DirectoryEntry, dest: &Arc<Simple>) -> Result<(), Error> {
     match entry {
         io_test::DirectoryEntry::Directory(io_test::Directory { name, entries, .. }) => {
             let new_dir = simple();
@@ -84,13 +80,9 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
             Io1HarnessRequest::GetConfig { responder } => {
                 let config = Io1Config {
                     // Supported options:
-                    supports_create: true,
                     supports_executable_file: true,
                     supports_get_backing_memory: true,
                     supports_remote_dir: true,
-                    supports_rename: true,
-                    supports_get_token: true,
-                    supports_unlink: true,
                     supports_open2: true,
                     supports_directory_watchers: true,
                     supports_append: true,
@@ -103,6 +95,10 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                     // Unsupported options:
                     supports_link: false, // Link is not supported using a pseudo filesystem.
                     supports_link_into: false,
+                    supports_rename: false,
+                    supports_get_token: false,
+                    supports_create: false,
+                    supports_unlink: false,
                 };
                 responder.send(&config)?;
                 continue;
@@ -123,13 +119,12 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
             }
         };
 
-        let scope = ExecutionScope::build()
-            .entry_constructor(simple::tree_constructor(|_parent, _filename| {
-                Ok(vmo::read_write(""))
-            }))
-            .new();
-
-        dir.open(scope, flags, Path::dot(), directory_request.into_channel().into());
+        dir.open(
+            ExecutionScope::new(),
+            flags,
+            Path::dot(),
+            directory_request.into_channel().into(),
+        );
     }
 
     Ok(())
