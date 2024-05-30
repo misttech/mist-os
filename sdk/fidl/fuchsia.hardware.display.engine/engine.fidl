@@ -32,7 +32,7 @@ type ModeFlag = strict bits : uint32 {
 /// TODO(https://fxbug.dev/42085013): Replace this type with something more similar
 /// to //src/graphics/display/lib/api-types-cpp/display-timing.h.
 type DisplayMode = struct {
-    pixel_clock_khz uint32;
+    pixel_clock_hz int64;
     h_addressable uint32;
     h_front_porch uint32;
     h_sync_pulse uint32;
