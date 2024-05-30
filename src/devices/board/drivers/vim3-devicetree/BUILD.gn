@@ -47,6 +47,9 @@ devicetree("vim3") {
   sources = [ "dts/vim3.dts" ]
   deps = [ ":vim3-power-config" ]
   golden = "dts/vim3.golden.dts"
+
+  # Suppressing warnings for dsi-display and hdmi-display which both use the same mmio region by design.
+  dtcflags = [ "-Wno-unique_unit_address" ]
 }
 
 driver_bind_rules("vim3-devicetree-bind") {
