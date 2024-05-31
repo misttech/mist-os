@@ -72,7 +72,7 @@ pub mod display;
 mod do_not_disturb;
 mod event;
 mod factory_reset;
-mod input;
+pub mod input;
 mod intl;
 mod job;
 mod keyboard;
@@ -230,6 +230,7 @@ pub struct EnvironmentBuilder<
     store_proxy: Option<StoreProxy>,
     fidl_storage_factory: Option<Arc<FidlStorageFactory>>,
     display_configuration: Option<DefaultSetting<DisplayConfiguration, &'static str>>,
+    input_configuration: Option<DefaultSetting<InputConfiguration, &'static str>>,
     light_configuration: Option<DefaultSetting<LightHardwareConfiguration, &'static str>>,
 }
 
@@ -254,6 +255,7 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
             store_proxy: None,
             fidl_storage_factory: None,
             display_configuration: None,
+            input_configuration: None,
             light_configuration: None,
         }
     }
@@ -284,6 +286,14 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
         display_configuration: DefaultSetting<DisplayConfiguration, &'static str>,
     ) -> Self {
         self.display_configuration = Some(display_configuration);
+        self
+    }
+
+    pub fn input_configuration(
+        mut self,
+        input_configuration: DefaultSetting<InputConfiguration, &'static str>,
+    ) -> Self {
+        self.input_configuration = Some(input_configuration);
         self
     }
 
@@ -469,6 +479,7 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
             Arc::clone(&fidl_storage_factory),
             &flags,
             self.display_configuration.map(DisplayInfoLoader::new),
+            self.input_configuration,
             self.light_configuration,
             &mut handler_factory,
         )
@@ -561,6 +572,7 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
         fidl_storage_factory: Arc<F>,
         controller_flags: &HashSet<ControllerFlag>,
         display_loader: Option<DisplayInfoLoader>,
+        input_configuration: Option<DefaultSetting<InputConfiguration, &'static str>>,
         light_configuration: Option<DefaultSetting<LightHardwareConfiguration, &'static str>>,
         factory_handle: &mut SettingHandlerFactoryImpl,
     ) where
@@ -630,12 +642,22 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
 
         // Input
         if components.contains(&SettingType::Input) {
+            let input_configuration = Arc::new(std::sync::Mutex::new(
+                input_configuration.expect("Input controller requires an input configuration"),
+            ));
             device_storage_factory
                 .initialize::<InputController>()
                 .await
                 .expect("storage should still be initializing");
-            factory_handle
-                .register(SettingType::Input, Box::new(DataHandler::<InputController>::spawn));
+            factory_handle.register(
+                SettingType::Input,
+                Box::new(move |context| {
+                    DataHandler::<InputController>::spawn_with(
+                        context,
+                        Arc::clone(&input_configuration),
+                    )
+                }),
+            );
         }
 
         // Intl

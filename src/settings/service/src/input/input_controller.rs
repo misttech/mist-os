@@ -360,7 +360,7 @@ impl StorageAccess for InputController {
 
 impl InputController {
     /// Alternate constructor that allows specifying a configuration.
-    pub(crate) async fn create_with_config(
+    pub(crate) fn create_with_config(
         client: ClientProxy,
         input_device_config: InputConfiguration,
     ) -> Result<Self, ControllerError> {
@@ -381,16 +381,11 @@ impl InputController {
     }
 }
 
-#[async_trait]
-impl data_controller::Create for InputController {
-    async fn create(client: ClientProxy) -> Result<Self, ControllerError> {
-        if let Ok(Some(config)) = DefaultSetting::<InputConfiguration, &str>::new(
-            Some(InputConfiguration { devices: Vec::new() }),
-            "/config/data/input_device_config.json",
-        )
-        .load_default_value()
-        {
-            InputController::create_with_config(client, config).await
+impl data_controller::CreateWith for InputController {
+    type Data = Arc<std::sync::Mutex<DefaultSetting<InputConfiguration, &'static str>>>;
+    fn create_with(client: ClientProxy, data: Self::Data) -> Result<Self, ControllerError> {
+        if let Ok(Some(config)) = data.lock().unwrap().load_default_value() {
+            InputController::create_with_config(client, config)
         } else {
             Err(ControllerError::InitFailure("Invalid default input device config".into()))
         }
@@ -632,7 +627,6 @@ mod tests {
                 }],
             },
         )
-        .await
         .expect("Should have controller");
 
         // Restore should pass.
@@ -653,12 +647,19 @@ mod tests {
 
     #[fasync::run_until_stalled(test)]
     async fn test_controller_creation_with_default_config() {
-        use crate::handler::setting_handler::persist::controller::Create;
+        use crate::handler::setting_handler::persist::controller::CreateWith;
 
         let message_hub = service::MessageHub::create_hub();
         let client_proxy = create_proxy(message_hub).await;
-        let _controller =
-            InputController::create(client_proxy).await.expect("Should have controller");
+        let default_setting = DefaultSetting::new(
+            Some(InputConfiguration::default()),
+            "/config/data/input_device_config.json",
+        );
+        let _controller = InputController::create_with(
+            client_proxy,
+            Arc::new(std::sync::Mutex::new(default_setting)),
+        )
+        .expect("Should have controller");
     }
 
     async fn create_proxy(message_hub: service::message::Delegate) -> ClientProxy {

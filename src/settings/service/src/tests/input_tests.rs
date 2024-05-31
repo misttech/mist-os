@@ -21,7 +21,7 @@ use crate::tests::fakes::input_device_registry_service::InputDeviceRegistryServi
 use crate::tests::fakes::service_registry::ServiceRegistry;
 use crate::tests::helpers::move_executor_forward;
 use crate::tests::input_test_environment::{TestInputEnvironment, TestInputEnvironmentBuilder};
-use crate::tests::test_failure_utils::create_test_env_with_failures;
+use crate::tests::test_failure_utils::create_test_env_with_failures_and_config;
 use assert_matches::assert_matches;
 use fidl::Error::ClientChannelClosed;
 use fidl_fuchsia_settings::{
@@ -37,6 +37,8 @@ use futures::stream::StreamExt;
 use futures::task::Poll;
 use std::collections::HashMap;
 use std::sync::Arc;
+
+use super::input_test_environment::default_settings;
 
 const DEFAULT_MIC_STATE: bool = false;
 const DEFAULT_CAMERA_STATE: bool = false;
@@ -141,10 +143,16 @@ fn default_mic_cam_config_cam_sw_disabled() -> InputConfiguration {
 async fn create_input_test_env_with_failures(
     storage_factory: Arc<InMemoryStorageFactory>,
 ) -> InputProxy {
-    create_test_env_with_failures(storage_factory, ENV_NAME, Interface::Input, SettingType::Input)
-        .await
-        .connect_to_protocol::<InputMarker>()
-        .unwrap()
+    create_test_env_with_failures_and_config(
+        storage_factory,
+        ENV_NAME,
+        Interface::Input,
+        SettingType::Input,
+        |builder| builder.input_configuration(default_settings()),
+    )
+    .await
+    .connect_to_protocol::<InputMarker>()
+    .unwrap()
 }
 
 // Creates an environment with an executor for moving forward execution and

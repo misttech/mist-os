@@ -15,6 +15,7 @@ use settings::config::base::get_default_agent_types;
 use settings::config::default_settings::DefaultSetting;
 use settings::display::build_display_default_settings;
 use settings::handler::setting_proxy_inspect_info::SettingProxyInspectInfo;
+use settings::input::build_input_default_settings;
 use settings::inspect::listener_logger::ListenerInspectLogger;
 use settings::light::build_light_default_settings;
 use settings::AgentConfiguration;
@@ -47,6 +48,8 @@ fn main() -> Result<(), Error> {
 
     let default_enabled_interfaces_configuration =
         EnabledInterfacesConfiguration::with_interfaces(get_default_interfaces());
+
+    let input_configuration = build_input_default_settings();
 
     let light_configuration = build_light_default_settings();
 
@@ -103,6 +106,7 @@ fn main() -> Result<(), Error> {
     EnvironmentBuilder::new(Arc::new(storage_factory))
         .configuration(configuration)
         .display_configuration(display_configuration)
+        .input_configuration(input_configuration)
         .light_configuration(light_configuration)
         .setting_proxy_inspect_info(
             setting_proxy_inspect_info.node(),

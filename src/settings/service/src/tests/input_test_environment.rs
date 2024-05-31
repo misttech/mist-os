@@ -5,10 +5,12 @@
 use crate::agent::AgentCreator;
 use crate::base::SettingType;
 use crate::config::base::AgentType;
+use crate::config::default_settings::DefaultSetting;
 use crate::handler::base::{Context, GenerateHandler};
 use crate::handler::setting_handler::persist::ClientProxy;
 use crate::handler::setting_handler::{BoxedController, ClientImpl};
 use crate::ingress::fidl::Interface;
+use crate::input::build_input_default_settings;
 use crate::input::input_controller::InputController;
 use crate::input::input_device_configuration::InputConfiguration;
 use crate::input::types::InputInfoSources;
@@ -94,6 +96,7 @@ impl TestInputEnvironmentBuilder {
         service_registry.lock().await.register_service(camera3_service_handle.clone());
 
         let mut environment_builder = EnvironmentBuilder::new(Arc::clone(&storage_factory))
+            .input_configuration(default_settings())
             .service(Box::new(ServiceRegistry::serve(service_registry)))
             .agents(self.agents.into_iter().map(AgentCreator::from).collect::<Vec<_>>())
             .fidl_interfaces(&[Interface::Input]);
@@ -114,8 +117,7 @@ impl TestInputEnvironmentBuilder {
                             Box::pin(async move {
                                 let proxy = ClientProxy::new(proxy, setting_type).await;
                                 let controller_result =
-                                    InputController::create_with_config(proxy, config.clone())
-                                        .await;
+                                    InputController::create_with_config(proxy, config.clone());
 
                                 controller_result
                                     .map(|controller| Box::new(controller) as BoxedController)
@@ -144,4 +146,8 @@ impl TestInputEnvironmentBuilder {
             delegate,
         }
     }
+}
+
+pub(super) fn default_settings() -> DefaultSetting<InputConfiguration, &'static str> {
+    build_input_default_settings()
 }
