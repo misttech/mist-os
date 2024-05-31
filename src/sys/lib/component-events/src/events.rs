@@ -23,6 +23,7 @@ lazy_static! {
 pub fn event_name(event_type: &fcomponent::EventType) -> String {
     match event_type {
         fcomponent::EventType::CapabilityRequested => "capability_requested",
+        fcomponent::EventType::DirectoryReady => unreachable!("This isn't used anymore"),
         fcomponent::EventType::Discovered => "discovered",
         fcomponent::EventType::Destroyed => "destroyed",
         fcomponent::EventType::Resolved => "resolved",

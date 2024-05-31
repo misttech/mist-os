@@ -128,6 +128,7 @@ impl From<fcomponent::EventType> for EventType {
     fn from(fidl_event_type: fcomponent::EventType) -> Self {
         match fidl_event_type {
             fcomponent::EventType::CapabilityRequested => EventType::CapabilityRequested,
+            fcomponent::EventType::DirectoryReady => unreachable!("This isn't used anymore"),
             fcomponent::EventType::Discovered => EventType::Discovered,
             fcomponent::EventType::Destroyed => EventType::Destroyed,
             fcomponent::EventType::Resolved => EventType::Resolved,
