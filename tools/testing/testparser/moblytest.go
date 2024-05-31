@@ -86,7 +86,7 @@ func parseMoblyTest(lines [][]byte) []runtests.TestCaseResult {
 			}
 
 			fmt.Fprintf(os.Stderr, "Error unmarshaling YAML: %s\n", err)
-			return res
+			break
 		}
 
 		// Skip records that are not test cases.
