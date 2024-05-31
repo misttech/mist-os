@@ -226,10 +226,10 @@ impl RealmCapabilityHost {
                     );
                     return fcomponent::Error::InstanceCannotResolve;
                 })?;
-                // TODO(https://fxbug.dev/42161419): open_exposed does not have a rights input
-                // parameter, so this makes use of the POSIX_[WRITABLE|EXECUTABLE] flags to open a
-                // connection with those rights if available from the parent directory connection
-                // but without failing if not available.
+                // open_exposed does not have a rights input parameter, so this
+                // makes use of the  POSIX_[WRITABLE|EXECUTABLE] flags to open
+                // a connection with those rights if available from the parent
+                // directory connection but without failing if not available.
                 let flags = OPEN_FLAGS_MAX_POSSIBLE_RIGHTS | fio::OpenFlags::DIRECTORY;
                 let mut object_request = flags.to_object_request(exposed_dir);
                 child
