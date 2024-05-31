@@ -315,6 +315,10 @@ impl Interpreter {
                 }
             })
             .await;
+
+            self.run("def cat(path) {open $path | read}")
+                .await
+                .expect("Definition of `cat` builtin failed");
         };
 
         let Either::Left(_) = futures::future::select(pin!(fut), executor_fut).await else {
@@ -911,5 +915,29 @@ mod test {
                     .is_err());
             })
             .await
+    }
+
+    #[fuchsia::test]
+    async fn cat() {
+        async fn test(path: &str) {
+            Test::test(path)
+                .with_fidl()
+                .with_standard_test_dirs()
+                .check_async(|value| async move {
+                    let Value::OutOfLine(PlaygroundValue::Iterator(mut i)) = value else {
+                        panic!();
+                    };
+                    let mut bytes = Vec::new();
+                    while let Some(byte) = i.next().await.unwrap() {
+                        let Value::U8(byte) = byte else { panic!() };
+                        bytes.push(byte);
+                    }
+
+                    assert_eq!(crate::test::NEILS_PHILOSOPHY, bytes.as_slice());
+                })
+                .await
+        }
+        test("cat /test/neils_philosophy").await;
+        test("cat /test/foo/relative_symlink").await;
     }
 }
