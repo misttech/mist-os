@@ -36,6 +36,7 @@ if (is_host) {
       "testdata/libc.elf.stripped",
       "testdata/libc.yaml",
       "testdata/libc.yaml.section-only",
+      "testdata/pe-no-id.exe",
       "testdata/pe-x64.efi",
       "testdata/pe-x64.yaml",
     ]

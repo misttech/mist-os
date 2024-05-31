@@ -38,6 +38,22 @@ func TestPeBuildIDs(t *testing.T) {
 	testPeBuildIDFile(t, "pe-x64.efi", "ab21b543f82d5cc94c4c44205044422e00000001")
 }
 
+func TestPeNoBuildIDs(t *testing.T) {
+	testfile := filepath.Join(*testDataDir, "pe-no-id.exe")
+	f, err := os.Open(testfile)
+	if err != nil {
+		t.Fatal("from os.Open: ", err)
+	}
+	defer f.Close()
+	buildIDs, err := GetBuildIDs(testfile, f)
+	if err != nil {
+		t.Fatal("from PeGetBuildIDs: ", err)
+	}
+	if len(buildIDs) != 0 {
+		t.Fatal("expected no build IDs but got ", buildIDs)
+	}
+}
+
 // TODO: Go's debug/pe doesn't handle arm64 binaries
 func disabledTestArmPeBuildIDs(t *testing.T) {
 	testPeBuildIDFile(t, "pe-aa64.efi", "def")
