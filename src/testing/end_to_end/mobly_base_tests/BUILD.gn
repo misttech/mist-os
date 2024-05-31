@@ -26,6 +26,7 @@ if (is_host) {
     # TODO(https://fxbug.dev/339343263): Enable mypy checks once the mypy flake is fixed.
     enable_mypy = false
     library_name = "fuchsia_base_test"
+    source_root = "fuchsia_base_test"
     sources = [
       "__init__.py",
       "fuchsia_base_test.py",
@@ -50,6 +51,7 @@ if (is_host) {
     # Add "_lib" suffix to avoid import collision in the PYZ file when
     # `fuchsia_power_base_test` is used as the source in both Python lib and test
     library_name = "fuchsia_power_base_test_lib"
+    source_root = "fuchsia_power_base_test"
     sources = [
       "__init__.py",
       "fuchsia_power_base_test.py",
@@ -62,7 +64,7 @@ if (is_host) {
 
   python_library("test_case_revive") {
     testonly = true
-    library_name = "test_case_revive"
+    source_root = "test_case_revive"
     sources = [
       "__init__.py",
       "test_case_revive.py",
