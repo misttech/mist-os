@@ -12,6 +12,7 @@
 #include "src/developer/debug/debug_agent/debug_agent.h"
 #include "src/developer/debug/debug_agent/debugged_process.h"
 #include "src/developer/debug/debug_agent/debugged_thread.h"
+#include "src/developer/debug/debug_agent/process_info_iterator.h"
 #include "src/developer/debug/debug_agent/system_interface.h"
 #include "src/developer/debug/ipc/filter_utils.h"
 #include "src/developer/debug/ipc/records.h"
@@ -274,7 +275,14 @@ void DebugAgentServer::GetProcessInfo(GetProcessInfoRequest& request,
     return;
   }
 
-  // TODO(jruthe): Bind this to an actual iterator.
+  // At this point it is invalid to have either filtered out all of the attached processes (or be
+  // attached to nothing). The first GetNext call on the iterator will produce this error, which is
+  // more appropriate than for this method.
+  fidl::BindServer(
+      dispatcher_,
+      fidl::ServerEnd<fuchsia_debugger::ProcessInfoIterator>(std::move(request.iterator())),
+      std::make_unique<ProcessInfoIterator>(debug_agent_, result.take_value(),
+                                            std::move(request.options().interest())));
 
   completer.Reply(fit::success());
 }
