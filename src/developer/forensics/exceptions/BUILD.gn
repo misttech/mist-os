@@ -9,6 +9,7 @@ visibility = [ "//src/developer/forensics/exceptions/*" ]
 ###############################################################################
 source_set("constants") {
   sources = [ "constants.h" ]
+  visibility += [ "//src/developer/forensics/testing/stubs/*" ]
 }
 
 source_set("lib") {
