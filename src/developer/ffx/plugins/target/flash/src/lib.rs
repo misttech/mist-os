@@ -108,6 +108,12 @@ async fn preprocess_flash_cmd<W: Write>(
         }
     };
 
+    if cmd.manifest_path.is_some() {
+        if !std::path::Path::exists(cmd.manifest_path.clone().unwrap().as_path()) {
+            ffx_bail!("Manifest path: {} does not exist", cmd.manifest_path.unwrap().display())
+        }
+    }
+
     if cmd.product_bundle.is_none() && cmd.manifest_path.is_none() && cmd.manifest.is_none() {
         let product_path: String = ffx_config::get("product.path").await?;
         writeln!(
@@ -316,6 +322,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_nonexistent_file_throws_err() {
+        let _env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let writer = Vec::new();
         assert!(preprocess_flash_cmd(
             writer,
@@ -330,6 +337,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_clean_quotes() {
+        let _env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let pb_tmp_file = NamedTempFile::new().expect("tmp access failed");
         let pb_tmp_file_name = pb_tmp_file.path().to_string_lossy().to_string();
         let wrapped_pb_tmp_file_name = format!("\"{}\"", pb_tmp_file_name);
@@ -353,6 +361,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_nonexistent_ssh_file_throws_err() {
+        let _env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
         let writer = Vec::new();
@@ -370,6 +379,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_specify_manifest_twice_throws_error() {
+        let _env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
         let mut w = Vec::new();
