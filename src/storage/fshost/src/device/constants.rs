@@ -9,6 +9,7 @@ pub const LEGACY_DATA_PARTITION_LABEL: &str = "minfs";
 pub const FVM_PARTITION_LABEL: &str = "fvm";
 pub const FUCHSIA_FVM_PARTITION_LABEL: &str = "fuchsia-fvm";
 pub const FTL_PARTITION_LABEL: &str = "ftl";
+pub const SUPER_PARTITION_LABEL: &str = "super";
 
 // -- Partition type GUIDs --
 pub const BLOBFS_TYPE_GUID: [u8; 16] = [

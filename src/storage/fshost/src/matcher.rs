@@ -9,7 +9,7 @@ use {
                 BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL,
                 FTL_PARTITION_LABEL, FUCHSIA_FVM_PARTITION_LABEL, FVM_DRIVER_PATH,
                 FVM_PARTITION_LABEL, GPT_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL, MBR_DRIVER_PATH,
-                NAND_BROKER_DRIVER_PATH,
+                NAND_BROKER_DRIVER_PATH, SUPER_PARTITION_LABEL,
             },
             Device,
         },
@@ -220,9 +220,12 @@ impl Matcher for FxblobMatcher {
             Ok(label) => {
                 // There are a few different labels used depending on the device. If we don't see
                 // any of them, this isn't the right partition.
+                // TODO(https://fxbug.dev/344018917): Use another mechanism to keep
+                // track of partition labels.
                 if !(label == FVM_PARTITION_LABEL
                     || label == FUCHSIA_FVM_PARTITION_LABEL
-                    || label == FTL_PARTITION_LABEL)
+                    || label == FTL_PARTITION_LABEL
+                    || label == SUPER_PARTITION_LABEL)
                 {
                     return false;
                 }
