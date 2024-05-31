@@ -854,6 +854,7 @@ protocol Protocol {
     @available(replaced=2, renamed="New")
     Old();
     @available(added=2)
+    @selector("Old")
     New();
 };
 
@@ -1119,6 +1120,244 @@ TEST_P(VersioningReplacementTest, BadMethodReplacedAndRenamed) {
   library.AddFile("bad/fi-0215.test.fidl");
   library.SelectVersion("test", GetParam());
   library.ExpectFail(ErrInvalidReplacedAndRenamed, "protocol method 'OldName'", V2, "NewName");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, BadBitsMemberRemovedAbi) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = bits {
+    @available(removed=2)
+    A = 1;
+    @available(added=2)
+    B = 1;
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrInvalidRemovedAbi, "bits member 'A'", V2, AbiKind::kValue, 1,
+                     "example.fidl:9:5", "B");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, BadBitsMemberReplacedAbi) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = bits {
+    @available(replaced=2)
+    A = 1;
+    @available(added=2)
+    A = 2;
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrInvalidReplacedAbi, "bits member 'A'", V2, AbiKind::kValue, 1, 2,
+                     "example.fidl:9:5");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, BadEnumMemberRemovedAbi) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = enum {
+    @available(removed=2)
+    A = 1;
+    @available(added=2)
+    B = 1;
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrInvalidRemovedAbi, "enum member 'A'", V2, AbiKind::kValue, 1,
+                     "example.fidl:9:5", "B");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, BadEnumMemberReplacedAbi) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = enum {
+    @available(replaced=2)
+    A = 1;
+    @available(added=2)
+    A = 2;
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrInvalidReplacedAbi, "enum member 'A'", V2, AbiKind::kValue, 1, 2,
+                     "example.fidl:9:5");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, BadStructMemberRemovedAbi) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = struct {
+    @available(removed=2)
+    bar uint32;
+    @available(added=2)
+    baz uint32;
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrInvalidRemovedAbi, "struct member 'bar'", V2, AbiKind::kOffset, 0,
+                     "example.fidl:9:5", "baz");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, BadStructMemberReplacedAbi) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = struct {
+    @available(replaced=2)
+    bar uint32;
+    gap uint32;
+    @available(added=2)
+    bar uint32;
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrInvalidReplacedAbi, "struct member 'bar'", V2, AbiKind::kOffset, 0, 4,
+                     "example.fidl:10:5");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, BadTableMemberRemovedAbi) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = table {
+    @available(removed=2)
+    1: bar uint32;
+    @available(added=2)
+    1: baz uint32;
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrInvalidRemovedAbi, "table member 'bar'", V2, AbiKind::kOrdinal, 1,
+                     "example.fidl:9:8", "baz");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, BadTableMemberReplacedAbi) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = table {
+    @available(replaced=2)
+    1: bar uint32;
+    @available(added=2)
+    2: bar uint32;
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrInvalidReplacedAbi, "table member 'bar'", V2, AbiKind::kOrdinal, 1, 2,
+                     "example.fidl:9:8");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, BadUnionMemberRemovedAbi) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = union {
+    @available(removed=2)
+    1: bar uint32;
+    @available(added=2)
+    1: baz uint32;
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrInvalidRemovedAbi, "union member 'bar'", V2, AbiKind::kOrdinal, 1,
+                     "example.fidl:9:8", "baz");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, BadUnionMemberReplacedAbi) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = union {
+    @available(replaced=2)
+    1: bar uint32;
+    @available(added=2)
+    2: bar uint32;
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrInvalidReplacedAbi, "union member 'bar'", V2, AbiKind::kOrdinal, 1, 2,
+                     "example.fidl:9:8");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, BadOverlayMemberRemovedAbi) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = strict overlay {
+    @available(removed=2)
+    1: bar uint32;
+    @available(added=2)
+    1: baz uint32;
+};
+)FIDL");
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrInvalidRemovedAbi, "overlay member 'bar'", V2, AbiKind::kOrdinal, 1,
+                     "example.fidl:9:8", "baz");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, BadOverlayMemberReplacedAbi) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = strict overlay {
+    @available(replaced=2)
+    1: bar uint32;
+    @available(added=2)
+    2: bar uint32;
+};
+)FIDL");
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrInvalidReplacedAbi, "overlay member 'bar'", V2, AbiKind::kOrdinal, 1, 2,
+                     "example.fidl:9:8");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, BadMethodRemovedAbi) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0216.test.fidl");
+  library.SelectVersion("test", GetParam());
+  library.ExpectFail(ErrInvalidRemovedAbi, "protocol method 'Bar'", V2, AbiKind::kSelector,
+                     "test.bad.fi0216/Foo.Bar", "bad/fi-0216.test.fidl:13:14", "Qux");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, BadMethodReplacedAbi) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0217.test.fidl");
+  library.SelectVersion("test", GetParam());
+  library.ExpectFail(ErrInvalidReplacedAbi, "protocol method 'Bar'", V2, AbiKind::kSelector,
+                     "test.bad.fi0217/Foo.Bar", "test.bad.fi0217/Foo.NotBar",
+                     "bad/fi-0217.test.fidl:13:14");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

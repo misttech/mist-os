@@ -39,6 +39,21 @@ struct Library;
 struct RawIdentifier;
 struct RawOrdinal64;
 
+// Kinds of values that can determine an element's identity for ABI purposes.
+enum class AbiKind : uint8_t {
+  // Bits/enum members
+  kValue,
+  // Struct members
+  kOffset,
+  // Table/union/overlay members
+  kOrdinal,
+  // Protocol methods
+  kSelector,
+};
+
+// A variant that can represent all AbiKind values.
+using AbiValue = std::variant<uint64_t, int64_t, std::string_view>;
+
 struct Element {
   enum class Kind : uint8_t {
     kAlias,
@@ -90,6 +105,11 @@ struct Element {
   // Returns the source where GetName() comes from, to use in error messages.
   // Its contents are different from GetName() is the case of anonymous layouts.
   SourceSpan GetNameSource() const;
+
+  // Returns the element's ABI kind, if it has one.
+  std::optional<AbiKind> abi_kind() const;
+  // Returns the element's ABI value, if it has one.
+  std::optional<AbiValue> abi_value() const;
 
   Kind kind;
   std::unique_ptr<AttributeList> attributes;
@@ -692,6 +712,7 @@ struct Protocol final : public Decl {
     bool has_error;
 
     // Set during compilation
+    std::string selector;
     uint64_t ordinal = 0;
     const Union* result_union = nullptr;
     const TypeConstructor* result_success_type_ctor = nullptr;

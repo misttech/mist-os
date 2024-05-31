@@ -253,12 +253,6 @@ void BufferCollectionToken::CombinedTokenServer::SyncV2(SyncV2Completer::Sync& c
   parent_.SyncImpl(ConnectionVersion::kVersion2, completer);
 }
 
-void BufferCollectionToken::CombinedTokenServer::DeprecatedSyncV1(
-    DeprecatedSyncV1Completer::Sync& completer) {
-  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
-  parent_.SyncImpl(ConnectionVersion::kVersion1, completer);
-}
-
 // Clean token close without causing LogicalBufferCollection failure.
 void BufferCollectionToken::CombinedTokenServer::CloseV1(CloseV1Completer::Sync& completer) {
   parent_.last_seen_version_ = ConnectionVersion::kVersion1;
@@ -268,12 +262,6 @@ void BufferCollectionToken::CombinedTokenServer::CloseV1(CloseV1Completer::Sync&
 void BufferCollectionToken::CombinedTokenServer::ReleaseV2(ReleaseV2Completer::Sync& completer) {
   parent_.last_seen_version_ = ConnectionVersion::kVersion2;
   parent_.TokenReleaseImpl(ConnectionVersion::kVersion2, completer);
-}
-
-void BufferCollectionToken::CombinedTokenServer::DeprecatedCloseV1(
-    DeprecatedCloseV1Completer::Sync& completer) {
-  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
-  parent_.TokenReleaseImpl(ConnectionVersion::kVersion1, completer);
 }
 
 void BufferCollectionToken::OnServerKoid() {
@@ -315,12 +303,6 @@ void BufferCollectionToken::CombinedTokenServer::SetNameV2(SetNameV2Request& req
   parent_.SetNameImplV2(request, completer);
 }
 
-void BufferCollectionToken::CombinedTokenServer::DeprecatedSetNameV1(
-    DeprecatedSetNameV1Request& request, DeprecatedSetNameV1Completer::Sync& completer) {
-  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
-  parent_.SetNameImplV1(request, completer);
-}
-
 void BufferCollectionToken::CombinedTokenServer::SetDebugClientInfoV1(
     SetDebugClientInfoV1Request& request, SetDebugClientInfoV1Completer::Sync& completer) {
   parent_.last_seen_version_ = ConnectionVersion::kVersion1;
@@ -331,13 +313,6 @@ void BufferCollectionToken::CombinedTokenServer::SetDebugClientInfoV2(
     SetDebugClientInfoV2Request& request, SetDebugClientInfoV2Completer::Sync& completer) {
   parent_.last_seen_version_ = ConnectionVersion::kVersion2;
   parent_.SetDebugClientInfoImplV2(request, completer);
-}
-
-void BufferCollectionToken::CombinedTokenServer::DeprecatedSetDebugClientInfoV1(
-    DeprecatedSetDebugClientInfoV1Request& request,
-    DeprecatedSetDebugClientInfoV1Completer::Sync& completer) {
-  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
-  parent_.SetDebugClientInfoImplV1(request, completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::SetDebugTimeoutLogDeadlineV1(
@@ -352,13 +327,6 @@ void BufferCollectionToken::CombinedTokenServer::SetDebugTimeoutLogDeadlineV2(
     SetDebugTimeoutLogDeadlineV2Completer::Sync& completer) {
   parent_.last_seen_version_ = ConnectionVersion::kVersion2;
   parent_.SetDebugTimeoutLogDeadlineImplV2(request, completer);
-}
-
-void BufferCollectionToken::CombinedTokenServer::DeprecatedSetDebugTimeoutLogDeadlineV1(
-    DeprecatedSetDebugTimeoutLogDeadlineV1Request& request,
-    DeprecatedSetDebugTimeoutLogDeadlineV1Completer::Sync& completer) {
-  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
-  parent_.SetDebugTimeoutLogDeadlineImplV1(request, completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::SetDispensableV1(

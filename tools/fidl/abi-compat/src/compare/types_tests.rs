@@ -393,21 +393,21 @@ fn array() {
     assert!(compare_fidl_type(
         "Arrays",
         "
-        type Arrays = struct {
+        type Arrays = table {
             @available(replaced=2)
-            size_changed array<uint32, 10>;
+            1: size_changed array<uint32, 10>;
             @available(added=2)
-            size_changed array<uint32, 20>;
+            1: size_changed array<uint32, 20>;
 
             @available(replaced=2)
-            member_incompatible array<uint32, 10>;
+            2: member_incompatible array<uint32, 10>;
             @available(added=2)
-            member_incompatible array<float32, 10>;
+            2: member_incompatible array<float32, 10>;
 
             @available(replaced=2)
-            member_soft_change array<flexible enum { M = 1; }, 10>;
+            3: member_soft_change array<flexible enum { M = 1; }, 10>;
             @available(added=2)
-            member_soft_change array<flexible enum { M = 1; N = 2; }, 10>;
+            3: member_soft_change array<flexible enum { M = 1; N = 2; }, 10>;
         };
     "
     )
@@ -459,7 +459,7 @@ fn structs() {
         "
         type NumMembers = struct {
             one int32;
-            @available(removed=2)
+            @available(replaced=2, renamed=\"four\")
             two int16;
             @available(removed=2)
             three int16;

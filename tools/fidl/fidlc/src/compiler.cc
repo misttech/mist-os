@@ -67,9 +67,9 @@ bool Compiler::Compile() {
     return false;
   if (!CompileStep(this).Run())
     return false;
-  if (!ReplacementStep(this).Run())
-    return false;
   if (!TypeShapeStep(this).Run())
+    return false;
+  if (!ReplacementStep(this).Run())
     return false;
   if (!VerifyHandleTransportStep(this).Run())
     return false;

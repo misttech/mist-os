@@ -10,6 +10,7 @@
 
 #include "tools/fidl/fidlc/src/flat_ast.h"
 #include "tools/fidl/fidlc/src/names.h"
+#include "tools/fidl/fidlc/src/replacement_step.h"
 #include "tools/fidl/fidlc/src/source_span.h"
 
 namespace fidlc {
@@ -172,6 +173,23 @@ std::string Display(const VersionSet& s) {
   ZX_ASSERT_MSG(x.pair().second != Version::kPosInf,
                 "first range must have finite end if there are two");
   return Display(x) + " and " + Display(maybe_y.value());
+}
+
+std::string Display(AbiKind k) {
+  switch (k) {
+    case AbiKind::kOffset:
+      return "offset";
+    case AbiKind::kOrdinal:
+      return "ordinal";
+    case AbiKind::kValue:
+      return "value";
+    case AbiKind::kSelector:
+      return "selector";
+  }
+}
+
+std::string Display(AbiValue v) {
+  return std::visit([](auto&& value) { return Display(value); }, v);
 }
 
 }  // namespace internal

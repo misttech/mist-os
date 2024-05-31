@@ -5,7 +5,9 @@
 #ifndef TOOLS_FIDL_FIDLC_SRC_PROPERTIES_H_
 #define TOOLS_FIDL_FIDLC_SRC_PROPERTIES_H_
 
-#include <stdint.h>
+#include <cstdint>
+#include <string_view>
+#include <variant>
 
 namespace fidlc {
 

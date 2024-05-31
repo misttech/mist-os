@@ -143,6 +143,49 @@ SourceSpan Element::GetNameSource() const {
   }
 }
 
+std::optional<AbiKind> Element::abi_kind() const {
+  switch (kind) {
+    case Element::Kind::kBitsMember:
+    case Element::Kind::kEnumMember:
+      return AbiKind::kValue;
+    case Element::Kind::kStructMember:
+      return AbiKind::kOffset;
+    case Element::Kind::kTableMember:
+    case Element::Kind::kUnionMember:
+    case Element::Kind::kOverlayMember:
+      return AbiKind::kOrdinal;
+    case Element::Kind::kProtocolMethod:
+      return AbiKind::kSelector;
+    default:
+      return std::nullopt;
+  }
+}
+
+std::optional<AbiValue> Element::abi_value() const {
+  switch (kind) {
+    case Element::Kind::kBitsMember:
+      return static_cast<const Bits::Member*>(this)->value->Value().AsUnsigned().value();
+    case Element::Kind::kEnumMember: {
+      auto& value = static_cast<const Enum::Member*>(this)->value->Value();
+      if (auto number = value.AsUnsigned())
+        return number.value();
+      return value.AsSigned().value();
+    }
+    case Element::Kind::kProtocolMethod:
+      return std::string_view(static_cast<const Protocol::Method*>(this)->selector);
+    case Element::Kind::kStructMember:
+      return static_cast<uint64_t>(static_cast<const Struct::Member*>(this)->field_shape.offset);
+    case Element::Kind::kTableMember:
+      return static_cast<const Table::Member*>(this)->ordinal->value;
+    case Element::Kind::kUnionMember:
+      return static_cast<const Union::Member*>(this)->ordinal->value;
+    case Element::Kind::kOverlayMember:
+      return static_cast<const Overlay::Member*>(this)->ordinal->value;
+    default:
+      return std::nullopt;
+  }
+}
+
 bool Builtin::IsInternal() const {
   switch (id) {
     case Identity::kBool:

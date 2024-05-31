@@ -39,7 +39,7 @@ class Member {
 
   const Element* element() { return element_; }
   Availability::Ending ending() { return source_->availability.ending(); }
-  const AttributeList* attributes() { return source_->attributes.get(); }
+  const Attribute* available() { return source_->attributes->Get("available"); }
 
  private:
   const Element* element_;
@@ -112,39 +112,56 @@ void ReplacementStep::CheckMembers() {
     Version version = End(old_decl);
     ZX_ASSERT(Start(new_decl) == version);
     // Step 1: Populate maps for removed and replaced members.
-    std::map<std::string_view, Member> removed, replaced;
+    std::map<std::string_view, Member> name_removed;
+    std::map<AbiValue, Member> value_removed;
+    std::map<std::pair<std::string_view, AbiValue>, Member> name_and_value_replaced;
+    std::map<std::string_view, Member> name_replacements;
     ForEachMember(old_decl, [&](Member member) {
       auto end_name = GetRenamed(member.element()).value_or(member.element()->GetName());
       if (member.ending() == Availability::Ending::kRemoved) {
-        removed.try_emplace(end_name, member);
+        name_removed.try_emplace(end_name, member);
+        if (auto value = member.element()->abi_value())
+          value_removed.try_emplace(value.value(), member);
       } else if (member.ending() == Availability::Ending::kReplaced) {
-        replaced.try_emplace(end_name, member);
+        auto value = member.element()->abi_value().value_or(0);
+        name_and_value_replaced.try_emplace({end_name, value}, member);
       }
     });
     // Step 2: Do a second pass to match up replacement members.
     ForEachMember(new_decl, [&](Member member) {
       auto name = member.element()->GetName();
-      if (auto it = removed.find(name); it != removed.end()) {
+      auto value = member.element()->abi_value().value_or(0);
+      if (auto it = name_removed.find(name); it != name_removed.end()) {
         Member old = it->second;
-        auto span = old.attributes()->Get("available")->span;
         if (auto renamed = GetRenamed(old.element())) {
-          reporter()->Fail(ErrInvalidRemovedAndRenamed, span, old.element(), version,
-                           renamed.value(), member.element()->GetNameSource());
+          reporter()->Fail(ErrInvalidRemovedAndRenamed, old.available()->span, old.element(),
+                           version, renamed.value(), member.element()->GetNameSource());
         } else {
-          reporter()->Fail(ErrInvalidRemoved, span, old.element(), version,
+          reporter()->Fail(ErrInvalidRemoved, old.available()->span, old.element(), version,
                            member.element()->GetNameSource());
         }
+      } else if (auto it = value_removed.find(value); it != value_removed.end()) {
+        Member old = it->second;
+        reporter()->Fail(ErrInvalidRemovedAbi, old.available()->span, old.element(), version,
+                         member.element()->abi_kind().value(), value,
+                         member.element()->GetNameSource(), name);
       }
-      replaced.erase(name);
+      if (!name_and_value_replaced.erase({name, value}))
+        name_replacements.try_emplace(name, member);
     });
     // Step 3: Report errors for replaced members where Step 2 found no replacement.
-    for (auto& [name, member] : replaced) {
-      auto span = member.attributes()->Get("available")->span;
-      if (auto renamed = GetRenamed(member.element())) {
-        reporter()->Fail(ErrInvalidReplacedAndRenamed, span, member.element(), version,
-                         renamed.value());
+    for (auto& [name_and_value, member] : name_and_value_replaced) {
+      if (auto it = name_replacements.find(name_and_value.first); it != name_replacements.end()) {
+        auto old = it->second;
+        reporter()->Fail(ErrInvalidReplacedAbi, member.available()->span, member.element(), version,
+                         member.element()->abi_kind().value(),
+                         member.element()->abi_value().value(), old.element()->abi_value().value(),
+                         old.element()->GetNameSource());
+      } else if (auto renamed = GetRenamed(member.element())) {
+        reporter()->Fail(ErrInvalidReplacedAndRenamed, member.available()->span, member.element(),
+                         version, renamed.value());
       } else {
-        reporter()->Fail(ErrInvalidReplaced, span, member.element(), version);
+        reporter()->Fail(ErrInvalidReplaced, member.available()->span, member.element(), version);
       }
     }
   }

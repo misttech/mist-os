@@ -430,6 +430,16 @@ constexpr ErrorDef<214, const Element *, Version, std::string_view, SourceSpan>
 constexpr ErrorDef<215, const Element *, Version, std::string_view> ErrInvalidReplacedAndRenamed(
     "{0} is marked replaced={1}, renamed=\"{2}\" but there is no replacement "
     "'{2}' marked added={1}; please define it");
+constexpr ErrorDef<216, const Element *, Version, AbiKind, AbiValue, SourceSpan, std::string_view>
+    ErrInvalidRemovedAbi(
+        "{0} is marked removed={1}, but its {2} ({t3}) is reused at {4}; use "
+        "replaced={1}, renamed=\"{5}\" instead of removed={1} if you intend to "
+        "replace the ABI, otherwise choose a different {2}");
+constexpr ErrorDef<217, const Element *, Version, AbiKind, AbiValue, AbiValue, SourceSpan>
+    ErrInvalidReplacedAbi(
+        "{0} is marked replaced={1}, but its {2} ({3}) does not match the "
+        "replacement's {2} ({4}) at {5}; use removed={1} if you intend to "
+        "remove the ABI, otherwise use the same {2}");
 
 // To add a new error:
 //
@@ -658,6 +668,8 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0213 */ &ErrRenamedToSameName,
     /* fi-0214 */ &ErrInvalidRemovedAndRenamed,
     /* fi-0215 */ &ErrInvalidReplacedAndRenamed,
+    /* fi-0216 */ &ErrInvalidRemovedAbi,
+    /* fi-0217 */ &ErrInvalidReplacedAbi,
 };
 
 // In reporter.h we assert that reported error IDs are <= kNumDiagnosticDefs.

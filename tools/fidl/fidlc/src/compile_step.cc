@@ -1028,14 +1028,13 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
 
 void CompileStep::ValidateSelectorAndCalcOrdinal(const Name& protocol_name,
                                                  Protocol::Method* method) {
-  std::string selector;
   std::string_view method_name = method->name.data();
   if (auto attr = method->attributes->Get("selector")) {
     if (auto arg = attr->GetArg(AttributeArg::kDefaultAnonymousName)) {
       if (auto& constant = arg->value; constant && constant->IsResolved()) {
         auto value = constant->Value().AsString().value();
         if (IsValidFullyQualifiedMethodIdentifier(value)) {
-          selector = value;
+          method->selector = value;
         } else if (IsValidIdentifierComponent(value)) {
           method_name = value;
         } else {
@@ -1046,19 +1045,19 @@ void CompileStep::ValidateSelectorAndCalcOrdinal(const Name& protocol_name,
     }
   }
   // TODO(https://fxbug.dev/42157659): Remove.
-  if (selector.empty() && library()->name == "fuchsia.io") {
+  if (method->selector.empty() && library()->name == "fuchsia.io") {
     reporter()->Fail(ErrFuchsiaIoExplicitOrdinals, method->name);
     return;
   }
-  if (selector.empty()) {
-    selector.append(protocol_name.library()->name);
-    selector.push_back('/');
-    selector.append(protocol_name.decl_name());
-    selector.push_back('.');
-    selector.append(method_name);
-    ZX_ASSERT(IsValidFullyQualifiedMethodIdentifier(selector));
+  if (method->selector.empty()) {
+    method->selector.append(protocol_name.library()->name);
+    method->selector.push_back('/');
+    method->selector.append(protocol_name.decl_name());
+    method->selector.push_back('.');
+    method->selector.append(method_name);
+    ZX_ASSERT(IsValidFullyQualifiedMethodIdentifier(method->selector));
   }
-  method->ordinal = method_hasher()(selector);
+  method->ordinal = method_hasher()(method->selector);
   if (method->ordinal == 0)
     reporter()->Fail(ErrGeneratedZeroValueOrdinal, method->name);
 }

@@ -198,3 +198,5 @@ fi-0212.test.fidl
 fi-0213.test.fidl
 fi-0214.test.fidl
 fi-0215.test.fidl
+fi-0216.test.fidl
+fi-0217.test.fidl

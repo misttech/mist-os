@@ -428,4 +428,8 @@ This document lists all errors emitted by the [FIDL compiler][docs-fidlc],
 
 <<error-catalog/_fi-0215.md>>
 
+<<error-catalog/_fi-0216.md>>
+
+<<error-catalog/_fi-0217.md>>
+
 [docs-fidlc]: ../language/fidlc.md

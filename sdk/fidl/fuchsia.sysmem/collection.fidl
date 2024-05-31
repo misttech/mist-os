@@ -309,54 +309,26 @@ closed protocol BufferCollectionToken {
     // See Node for non-deprecated equivalents.  Re-building existing code will
     // use the Node equivalents instead.  These ordinals will eventually not be
     // recognized by sysmem.
-    @available(added=7, deprecated=8, replaced=9)
+    @available(removed=9, renamed="DeprecatedSync")
     strict Sync() -> ();
-    // Still handled, for clients that haven't been re-built yet.
-    @available(added=9)
-    @selector("Sync")
-    strict DeprecatedSync() -> ();
 
-    @available(added=7, deprecated=8, replaced=9)
+    @available(removed=9, renamed="DeprecatedClose")
     strict Close();
-    // Still handled, for clients that haven't been re-built yet.
-    @available(added=9)
-    @selector("Close")
-    strict DeprecatedClose();
 
-    @available(added=7, deprecated=8, replaced=9)
+    @available(removed=9, renamed="DeprecatedSetName")
     strict SetName(struct {
         priority uint32;
         name string:64;
     });
-    // Still handled, for clients that haven't been re-built yet.
-    @available(added=9)
-    @selector("SetName")
-    strict DeprecatedSetName(struct {
-        priority uint32;
-        name string:64;
-    });
 
-    @available(added=7, deprecated=8, replaced=9)
+    @available(removed=9, renamed="DeprecatedSetDebugClientInfo")
     strict SetDebugClientInfo(struct {
         name string:64;
         id uint64;
     });
-    // Still handled, for clients that haven't been re-built yet.
-    @available(added=9)
-    @selector("SetDebugClientInfo")
-    strict DeprecatedSetDebugClientInfo(struct {
-        name string:64;
-        id uint64;
-    });
 
-    @available(added=7, deprecated=8, replaced=9)
+    @available(removed=9, renamed="DeprecatedSetDebugTimeoutLogDeadline")
     strict SetDebugTimeoutLogDeadline(struct {
-        deadline zx.Time;
-    });
-    // Still handled, for clients that haven't been re-built yet.
-    @available(added=9)
-    @selector("SetDebugTimeoutLogDeadline")
-    strict DeprecatedSetDebugTimeoutLogDeadline(struct {
         deadline zx.Time;
     });
 
@@ -554,38 +526,20 @@ closed protocol BufferCollection {
     // See Node for non-deprecated equivalents.  Re-building existing code will
     // use the Node equivalents instead.  These ordinals will eventually not be
     // recognized by sysmem.
-    @available(added=7, deprecated=8, replaced=9)
+    @available(removed=9, renamed="DeprecatedSync")
     strict Sync() -> ();
-    @available(added=9)
-    @selector("Sync")
-    strict DeprecatedSync() -> ();
 
-    @available(added=7, deprecated=8, replaced=9)
+    @available(removed=9, renamed="DeprecatedClose")
     strict Close();
-    @available(added=9)
-    @selector("Close")
-    strict DeprecatedClose();
 
-    @available(added=7, deprecated=8, replaced=9)
+    @available(removed=9, renamed="DeprecatedSetName")
     strict SetName(struct {
         priority uint32;
         name string:64;
     });
-    @available(added=9)
-    @selector("SetName")
-    strict DeprecatedSetName(struct {
-        priority uint32;
-        name string:64;
-    });
 
-    @available(added=7, deprecated=8, replaced=9)
+    @available(removed=9, renamed="DeprecatedSetDebugClientInfo")
     strict SetDebugClientInfo(struct {
-        name string:64;
-        id uint64;
-    });
-    @available(added=9)
-    @selector("SetDebugClientInfo")
-    strict DeprecatedSetDebugClientInfo(struct {
         name string:64;
         id uint64;
     });
@@ -655,30 +609,30 @@ closed protocol BufferCollection {
         status zx.Status;
     });
 
-    @available(added=7, deprecated=8, removed=9)
+    @available(deprecated=8, removed=9)
     strict AllocateSingleBuffer(struct {
         buffer_index uint64;
     });
-    @available(added=7, deprecated=8, removed=9)
+    @available(deprecated=8, removed=9)
     strict CloseSingleBuffer(struct {
         buffer_index uint64;
     });
-    @available(added=7, deprecated=8, removed=9)
+    @available(deprecated=8, removed=9)
     strict WaitForSingleBufferAllocated(struct {
         buffer_index uint64;
     }) -> (resource struct {
         status zx.Status;
         buffer_info SingleBufferInfo;
     });
-    @available(added=7, deprecated=8, removed=9)
+    @available(deprecated=8, removed=9)
     strict CheckSingleBufferAllocated(struct {
         buffer_index uint64;
     });
-    @available(added=7, deprecated=9, removed=HEAD, legacy=true)
+    @available(deprecated=9, removed=HEAD, legacy=true)
     strict SetConstraintsAuxBuffers(struct {
         constraints BufferCollectionConstraintsAuxBuffers;
     });
-    @available(added=7, deprecated=9, removed=HEAD, legacy=true)
+    @available(deprecated=9, removed=HEAD, legacy=true)
     strict GetAuxBuffers() -> (resource struct {
         status zx.Status;
         buffer_collection_info_aux_buffers BufferCollectionInfo_2;

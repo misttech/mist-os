@@ -154,36 +154,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.sysmem/BufferCollection.DeprecatedClose",
-        "strictness": "strict",
-        "ordinal": "5236632455805377022",
-        "direction": "one_way"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.sysmem/BufferCollection.DeprecatedSetDebugClientInfo",
-        "strictness": "strict",
-        "ordinal": "4165266880401051333",
-        "direction": "one_way",
-        "request": "fuchsia.sysmem/BufferCollectionDeprecatedSetDebugClientInfoRequest"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.sysmem/BufferCollection.DeprecatedSetName",
-        "strictness": "strict",
-        "ordinal": "8585280573121685968",
-        "direction": "one_way",
-        "request": "fuchsia.sysmem/BufferCollectionDeprecatedSetNameRequest"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.sysmem/BufferCollection.DeprecatedSync",
-        "strictness": "strict",
-        "ordinal": "667093201286854750",
-        "direction": "two_way"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.sysmem/BufferCollection.GetAuxBuffers",
         "strictness": "strict",
         "ordinal": "7812808981908462165",
@@ -402,38 +372,6 @@
     },
     {
         "kind": "struct/member",
-        "name": "fuchsia.sysmem/BufferCollectionDeprecatedSetDebugClientInfoRequest.id",
-        "ordinal": "2",
-        "type": "uint64"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sysmem/BufferCollectionDeprecatedSetDebugClientInfoRequest.name",
-        "ordinal": "1",
-        "type": "string:64"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.sysmem/BufferCollectionDeprecatedSetDebugClientInfoRequest"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sysmem/BufferCollectionDeprecatedSetNameRequest.name",
-        "ordinal": "2",
-        "type": "string:64"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sysmem/BufferCollectionDeprecatedSetNameRequest.priority",
-        "ordinal": "1",
-        "type": "uint32"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.sysmem/BufferCollectionDeprecatedSetNameRequest"
-    },
-    {
-        "kind": "struct/member",
         "name": "fuchsia.sysmem/BufferCollectionGetAuxBuffersResponse.buffer_collection_info_aux_buffers",
         "ordinal": "2",
         "type": "fuchsia.sysmem/BufferCollectionInfo_2"
@@ -545,44 +483,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.sysmem/BufferCollectionToken.DeprecatedClose",
-        "strictness": "strict",
-        "ordinal": "1287775990545719670",
-        "direction": "one_way"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.sysmem/BufferCollectionToken.DeprecatedSetDebugClientInfo",
-        "strictness": "strict",
-        "ordinal": "7099778850607716224",
-        "direction": "one_way",
-        "request": "fuchsia.sysmem/BufferCollectionTokenDeprecatedSetDebugClientInfoRequest"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.sysmem/BufferCollectionToken.DeprecatedSetDebugTimeoutLogDeadline",
-        "strictness": "strict",
-        "ordinal": "5688369387176735056",
-        "direction": "one_way",
-        "request": "fuchsia.sysmem/BufferCollectionTokenDeprecatedSetDebugTimeoutLogDeadlineRequest"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.sysmem/BufferCollectionToken.DeprecatedSetName",
-        "strictness": "strict",
-        "ordinal": "2411227692732065937",
-        "direction": "one_way",
-        "request": "fuchsia.sysmem/BufferCollectionTokenDeprecatedSetNameRequest"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.sysmem/BufferCollectionToken.DeprecatedSync",
-        "strictness": "strict",
-        "ordinal": "1626954807884778704",
-        "direction": "two_way"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.sysmem/BufferCollectionToken.Duplicate",
         "strictness": "strict",
         "ordinal": "3431604093557895826",
@@ -677,48 +577,6 @@
         "kind": "struct",
         "name": "fuchsia.sysmem/BufferCollectionTokenCreateBufferCollectionTokenGroupRequest",
         "resourceness": "resource"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sysmem/BufferCollectionTokenDeprecatedSetDebugClientInfoRequest.id",
-        "ordinal": "2",
-        "type": "uint64"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sysmem/BufferCollectionTokenDeprecatedSetDebugClientInfoRequest.name",
-        "ordinal": "1",
-        "type": "string:64"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.sysmem/BufferCollectionTokenDeprecatedSetDebugClientInfoRequest"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sysmem/BufferCollectionTokenDeprecatedSetDebugTimeoutLogDeadlineRequest.deadline",
-        "ordinal": "1",
-        "type": "int64"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.sysmem/BufferCollectionTokenDeprecatedSetDebugTimeoutLogDeadlineRequest"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sysmem/BufferCollectionTokenDeprecatedSetNameRequest.name",
-        "ordinal": "2",
-        "type": "string:64"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sysmem/BufferCollectionTokenDeprecatedSetNameRequest.priority",
-        "ordinal": "1",
-        "type": "uint32"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.sysmem/BufferCollectionTokenDeprecatedSetNameRequest"
     },
     {
         "kind": "struct/member",
