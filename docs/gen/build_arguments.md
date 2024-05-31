@@ -3167,6 +3167,14 @@ memory usage overheads, but will not exhaust due to fragmentation.
 
 From //zircon/kernel/params.gni:116
 
+### enforce_abi_compat
+
+Enforce ABI compatibility checks for stable API levels.
+
+**Current value (from the default):** `false`
+
+From //tools/fidl/abi-compat/BUILD.gn:14
+
 ### escher_test_for_glsl_spirv_mismatch
 
 If true, this enables the |SpirvNotChangedTest| to check if the precompiled
@@ -8452,6 +8460,24 @@ Controls whether to use -Oz when `optimize` is set to `"size"`.
 **Current value (from the default):** `false`
 
 From //build/config/compiler.gni:43
+
+### use_prebuilt_buildidtool
+
+Use the prebuilt buildidtool binary rather than one built locally.
+**NOTE:** Setting this to `false` uses the `toolchain_deps` mechanism in
+GN, which can slow down Ninja significantly.  Also, to circular deps the
+$host_toolchain has no `toolchain_deps` and so doesn't ensure the
+buildidtool is built before it's needed.  This may make builds unreliable,
+but it should be possible to iterate on incremental builds and get the new
+tool in place eventually.  This should only be used during active
+development of buildidtool itself.
+
+Note, this never applies to Go builds because of the circularity of using
+buildidtool in the build of buildidtool.
+
+**Current value (from the default):** `true`
+
+From //build/toolchain/buildidtool.gni:17
 
 ### use_prebuilt_ffmpeg
 
