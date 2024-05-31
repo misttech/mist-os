@@ -12,10 +12,11 @@ executable("goldfish_test_bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.goldfish:fuchsia.hardware.goldfish_cpp",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl",
+    "//src/devices/bind/fuchsia.goldfish.platform.sysmem.heap:fuchsia.goldfish.platform.sysmem.heap_cpp",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/zircon-internal",
