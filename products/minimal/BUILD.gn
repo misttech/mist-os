@@ -142,3 +142,13 @@ generated_file("board_assembly_artifacts") {
     assembly_inputs_barrier = []
   }
 }
+
+group("devicetree") {
+  deps = []
+  if (current_cpu == "arm64") {
+    deps += [
+      # Include the vim3 devicetree blob. This is used in RTC driver repo.
+      "//src/devices/board/drivers/vim3-devicetree:vim3.assembly_inputs",
+    ]
+  }
+}
