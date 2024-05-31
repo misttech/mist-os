@@ -15,7 +15,7 @@ use fidl_fuchsia_developer_ffx::{
 };
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 use fidl_fuchsia_net as net;
-use fuchsia_async::{TimeoutExt, Timer};
+use fuchsia_async::TimeoutExt;
 use futures::{future::join_all, select, Future, FutureExt, StreamExt, TryStreamExt};
 use itertools::Itertools;
 use netext::IsLocalAddr;
@@ -409,7 +409,7 @@ async fn resolve_target_query_with_sources(
     // the whole thing to be an Err.  We could stop the race early in case of
     // failure by using the same technique, I suppose.
     let target_events: Result<Vec<TargetEvent>> = {
-        let timer = Timer::new(delay).fuse();
+        let timer = fuchsia_async::Timer::new(delay).fuse();
         let found_target_event = async_utils::event::Event::new();
         let found_it = found_target_event.wait().fuse();
         let results: Vec<Result<_>> = stream
@@ -541,6 +541,66 @@ impl From<ConnectionError> for KnockError {
 /// and no longer loop.
 pub async fn knock_target(target: &TargetProxy) -> Result<(), KnockError> {
     knock_target_with_timeout(target, DEFAULT_RCS_KNOCK_TIMEOUT).await
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum WaitFor {
+    DeviceOnline,
+    DeviceOffline,
+}
+
+const OPEN_TARGET_TIMEOUT: Duration = Duration::from_millis(1000);
+const DOWN_REPOLL_DELAY_MS: u64 = 500;
+
+pub async fn wait_for_device(
+    wait_timeout: Option<Duration>,
+    target_spec: Option<String>,
+    target_collection: &TargetCollectionProxy,
+    behavior: WaitFor,
+) -> Result<(), ffx_command::Error> {
+    let target_spec_clone = target_spec.clone();
+    let knock_fut = async {
+        loop {
+            break match knock_target_by_name(
+                &target_spec_clone,
+                target_collection,
+                OPEN_TARGET_TIMEOUT,
+                DEFAULT_RCS_KNOCK_TIMEOUT,
+            )
+            .await
+            {
+                Err(KnockError::CriticalError(e)) => Err(ffx_command::Error::Unexpected(e)),
+                Err(KnockError::NonCriticalError(e)) => {
+                    if let WaitFor::DeviceOffline = behavior {
+                        Ok(())
+                    } else {
+                        tracing::debug!("unable to knock target: {e:?}");
+                        continue;
+                    }
+                }
+                Ok(()) => {
+                    if let WaitFor::DeviceOffline = behavior {
+                        async_io::Timer::after(Duration::from_millis(DOWN_REPOLL_DELAY_MS)).await;
+                        continue;
+                    } else {
+                        Ok(())
+                    }
+                }
+            };
+        }
+    };
+    let timer = if wait_timeout.is_some() {
+        async_io::Timer::after(wait_timeout.unwrap())
+    } else {
+        async_io::Timer::never()
+    };
+    futures_lite::FutureExt::or(knock_fut, async {
+        timer.await;
+        Err(ffx_command::Error::User(
+            FfxError::DaemonError { err: DaemonError::Timeout, target: target_spec }.into(),
+        ))
+    })
+    .await
 }
 
 /// Attempts to "knock" a target to determine if it is up and connectable via RCS, within
