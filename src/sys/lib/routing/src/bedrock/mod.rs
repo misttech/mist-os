@@ -3,3 +3,4 @@
 // found in the LICENSE file.
 
 pub mod dict_ext;
+pub mod with_availability;

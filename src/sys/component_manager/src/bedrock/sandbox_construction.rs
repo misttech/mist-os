@@ -17,7 +17,7 @@ use {
         capability_source::ComponentCapability,
         component_instance::ComponentInstanceInterface,
         error::{ComponentInstanceError, RoutingError},
-        DictExt,
+        DictExt, WithAvailability,
     },
     async_trait::async_trait,
     cm_rust::{

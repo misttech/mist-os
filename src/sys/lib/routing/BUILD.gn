@@ -59,6 +59,7 @@ rustc_library("routing") {
     "src/availability.rs",
     "src/bedrock/dict_ext.rs",
     "src/bedrock/mod.rs",
+    "src/bedrock/with_availability.rs",
     "src/capability_source.rs",
     "src/collection.rs",
     "src/component_instance.rs",
@@ -77,6 +78,7 @@ rustc_library("routing") {
   ]
 
   test_deps = [
+    "//src/lib/fuchsia",
     "//src/sys/lib/cm_rust/testing",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:test-case",
