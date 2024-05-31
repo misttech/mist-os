@@ -10,6 +10,7 @@ pub use crate::util::check_url;
 
 use {
     crate::{error::*, util::*},
+    cm_types::{IterablePath, RelativePath},
     directed_graph::DirectedGraph,
     fidl_fuchsia_component_decl as fdecl,
     itertools::Itertools,
@@ -1053,11 +1054,13 @@ impl<'a> ValidationContext<'a> {
             _ => {}
         }
 
-        if let (Some(fdecl::Ref::Self_(_)), Some(name)) = (source, source_name) {
-            if !(capability_checker)(self).contains(name) && source_dictionary.is_none() {
-                self.errors.push(Error::invalid_capability(decl, "source", name));
-            }
-        }
+        self.validate_route_from_self(
+            decl,
+            source,
+            source_name,
+            source_dictionary,
+            capability_checker,
+        );
     }
 
     fn validate_use_source(
@@ -1532,6 +1535,13 @@ impl<'a> ValidationContext<'a> {
             dictionary.source_dictionary.as_ref(),
             dictionary.source.as_ref(),
         ) {
+            self.validate_route_from_self(
+                decl,
+                Some(source),
+                Some(name),
+                Some(source_dictionary),
+                Self::dictionary_checker,
+            );
             let source =
                 self.source_dependency_from_ref(None, Some(source_dictionary), Some(source));
             let target = Some(DependencyNode::Capability(name));
@@ -1960,11 +1970,13 @@ impl<'a> ValidationContext<'a> {
             }
         }
 
-        if let (Some(fdecl::Ref::Self_(_)), Some(name)) = (source, source_name) {
-            if !(capability_checker)(self).contains(name) && source_dictionary.is_none() {
-                self.errors.push(Error::invalid_capability(decl, "source", name));
-            }
-        }
+        self.validate_route_from_self(
+            decl,
+            source,
+            source_name,
+            source_dictionary,
+            capability_checker,
+        );
     }
 
     fn validate_expose_source(
@@ -2318,11 +2330,13 @@ impl<'a> ValidationContext<'a> {
             }
         }
 
-        if let (Some(fdecl::Ref::Self_(_)), Some(name)) = (source, source_name) {
-            if !(capability_checker)(self).contains(name) && source_dictionary.is_none() {
-                self.errors.push(Error::invalid_capability(decl, "source", name));
-            }
-        }
+        self.validate_route_from_self(
+            decl,
+            source,
+            source_name,
+            source_dictionary,
+            capability_checker,
+        );
     }
 
     fn validate_offer_source(
@@ -2663,6 +2677,39 @@ impl<'a> ValidationContext<'a> {
                         "target_name",
                         target_name as &str,
                     ));
+                }
+            }
+        }
+    }
+
+    fn validate_route_from_self(
+        &mut self,
+        decl: DeclType,
+        source: Option<&fdecl::Ref>,
+        source_name: Option<&String>,
+        source_dictionary: Option<&String>,
+        capability_checker: impl Fn(&Self) -> &dyn Container,
+    ) {
+        let (Some(fdecl::Ref::Self_(_)), Some(name)) = (source, source_name) else {
+            return;
+        };
+        match source_dictionary {
+            Some(source_dictionary) => {
+                if let Ok(path) = RelativePath::new(source_dictionary) {
+                    if let Some(first_segment) = path.iter_segments().next().map(|s| s.as_str()) {
+                        if !self.all_dictionaries.contains_key(first_segment) {
+                            self.errors.push(Error::invalid_capability(
+                                decl,
+                                "source",
+                                first_segment,
+                            ));
+                        }
+                    }
+                }
+            }
+            None => {
+                if !(capability_checker)(self).contains(name) {
+                    self.errors.push(Error::invalid_capability(decl, "source", name));
                 }
             }
         }
@@ -3756,6 +3803,14 @@ mod tests {
                         }),
                         ..Default::default()
                     }),
+                    fdecl::Use::Protocol(fdecl::UseProtocol {
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        source_name: Some("fuchsia.some.library.SomeProtocol".into()),
+                        source_dictionary: Some("dict/inner".into()),
+                        target_path: Some("/svc/baz".into()),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        ..Default::default()
+                    }),
                 ]);
                 decl
             },
@@ -3771,6 +3826,7 @@ mod tests {
                 Error::invalid_capability(DeclType::UseDirectory, "source", "dir"),
                 Error::invalid_capability(DeclType::UseRunner, "source", "source_elf"),
                 Error::invalid_capability(DeclType::UseConfiguration, "source", "source_config"),
+                Error::invalid_capability(DeclType::UseProtocol, "source", "dict"),
             ])),
         },
         test_validate_use_from_child_offer_to_child_strong_cycle => {
@@ -6073,6 +6129,14 @@ mod tests {
                         target_name: Some("config".to_string()),
                         ..Default::default()
                     }),
+                    fdecl::Expose::Protocol(fdecl::ExposeProtocol {
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        source_name: Some("fuchsia.some.library.SomeProtocol".to_string()),
+                        source_dictionary: Some("dict/inner".to_string()),
+                        target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                        target_name: Some("baz".to_string()),
+                        ..Default::default()
+                    }),
                 ]);
                 decl
             },
@@ -6090,6 +6154,7 @@ mod tests {
                 Error::invalid_capability(DeclType::ExposeResolver, "source", "source_pkg"),
                 Error::invalid_capability(DeclType::ExposeDictionary, "source", "source_dict"),
                 Error::invalid_capability(DeclType::ExposeConfig, "source", "source_config"),
+                Error::invalid_capability(DeclType::ExposeProtocol, "source", "dict"),
             ])),
         },
 
@@ -7717,6 +7782,18 @@ mod tests {
                         target_name: Some("config".into()),
                         ..Default::default()
                     }),
+                    fdecl::Offer::Protocol(fdecl::OfferProtocol {
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        source_name: Some("fuchsia.some.library.SomeProtocol".into()),
+                        source_dictionary: Some("dict/inner".into()),
+                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "child".into(),
+                            collection: None
+                        })),
+                        target_name: Some("baz".into()),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        ..Default::default()
+                    }),
                 ]);
                 decl
             },
@@ -7735,6 +7812,7 @@ mod tests {
                 Error::invalid_capability(DeclType::OfferDictionary, "source", "source_dict"),
                 Error::invalid_capability(DeclType::OfferStorage, "source", "source_storage"),
                 Error::invalid_capability(DeclType::OfferConfig, "source", "source_config"),
+                Error::invalid_capability(DeclType::OfferProtocol, "source", "dict"),
             ])),
         },
         test_validate_offers_long_dependency_cycle => {
@@ -9200,6 +9278,23 @@ mod tests {
                 Error::duplicate_field(DeclType::Runner, "name", "runner"),
                 Error::duplicate_field(DeclType::Resolver, "name", "resolver"),
                 Error::duplicate_field(DeclType::Dictionary, "name", "dictionary"),
+            ])),
+        },
+        test_validate_capabilities_dictionary_extends_self_missing => {
+            input = {
+                let mut decl = new_component_decl();
+                decl.capabilities = Some(vec![
+                    fdecl::Capability::Dictionary(fdecl::Dictionary {
+                        name: Some("dict".into()),
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
+                        source_dictionary: Some("other_dict/inner".into()),
+                        ..Default::default()
+                    }),
+                ]);
+                decl
+            },
+            result = Err(ErrorList::new(vec![
+                Error::invalid_capability(DeclType::Dictionary, "source", "other_dict"),
             ])),
         },
 

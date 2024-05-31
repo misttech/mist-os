@@ -416,6 +416,14 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
 
             // The dictionary capability may depend on a dictionary it extends.
             if let Some(extends) = capability.extends.as_ref() {
+                RouteFromSelfChecker {
+                    capability_name: Some(OneOrMany::One(name)),
+                    from: OneOrMany::One(extends.into()),
+                    container: &self.all_dictionaries,
+                    all_dictionaries: &self.all_dictionaries,
+                    typename: "dictionary",
+                }
+                .validate("extended")?;
                 let target = DependencyNode::Named(name);
                 let names = vec![extends.path.iter_segments().next().unwrap()];
                 for source in self.expand_source_dependencies(names, &extends.into()) {
@@ -1544,6 +1552,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             capability_name: input.service(),
             from: input.from_(),
             container: &self.all_services,
+            all_dictionaries: &self.all_dictionaries,
             typename: "service",
         }
     }
@@ -1556,6 +1565,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             capability_name: input.protocol(),
             from: input.from_(),
             container: &self.all_protocols,
+            all_dictionaries: &self.all_dictionaries,
             typename: "protocol",
         }
     }
@@ -1568,6 +1578,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             capability_name: input.directory(),
             from: input.from_(),
             container: &self.all_directories,
+            all_dictionaries: &self.all_dictionaries,
             typename: "directory",
         }
     }
@@ -1580,6 +1591,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             capability_name: input.storage(),
             from: input.from_(),
             container: &self.all_storages,
+            all_dictionaries: &self.all_dictionaries,
             typename: "storage",
         }
     }
@@ -1592,6 +1604,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             capability_name: input.runner(),
             from: input.from_(),
             container: &self.all_runners,
+            all_dictionaries: &self.all_dictionaries,
             typename: "runner",
         }
     }
@@ -1604,6 +1617,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             capability_name: input.resolver(),
             from: input.from_(),
             container: &self.all_resolvers,
+            all_dictionaries: &self.all_dictionaries,
             typename: "resolver",
         }
     }
@@ -1616,6 +1630,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             capability_name: input.dictionary(),
             from: input.from_(),
             container: &self.all_dictionaries,
+            all_dictionaries: &self.all_dictionaries,
             typename: "dictionary",
         }
     }
@@ -1628,6 +1643,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             capability_name: input.config(),
             from: input.from_(),
             container: &self.all_configs,
+            all_dictionaries: &self.all_dictionaries,
             typename: "config",
         }
     }
@@ -1644,20 +1660,38 @@ struct RouteFromSelfChecker<'a> {
     /// A [Container] which is used to check for the existence of a capability definition.
     container: &'a dyn Container,
 
+    /// Reference to [ValidationContext::all_dictionaries].
+    all_dictionaries: &'a HashMap<&'a Name, Option<&'a DictionaryRef>>,
+
     /// The string name for the capability's type.
     typename: &'static str,
 }
 
 impl<'a> RouteFromSelfChecker<'a> {
     fn validate(self, operand: &'static str) -> Result<(), Error> {
-        let Self { capability_name, from, container, typename } = self;
-        if let Some(capability) = capability_name {
-            for capability in capability {
-                if from.iter().any(|r| *r == AnyRef::Self_) && !container.contains(capability) {
-                    return Err(Error::validate(format!(
-                        "{typename} \"{capability}\" is {operand} from self, so it must be \
-                        declared as a \"{typename}\" in \"capabilities\"",
-                    )));
+        let Self { capability_name, from, container, all_dictionaries, typename } = self;
+        let Some(capability) = capability_name else {
+            return Ok(());
+        };
+        for capability in capability {
+            for from in &from {
+                match from {
+                    AnyRef::Self_ if !container.contains(capability) => {
+                        return Err(Error::validate(format!(
+                            "{typename} \"{capability}\" is {operand} from self, so it \
+                            must be declared as a \"{typename}\" in \"capabilities\"",
+                        )));
+                    }
+                    AnyRef::Dictionary(DictionaryRef { root: RootDictionaryRef::Self_, path }) => {
+                        let first_segment = path.iter_segments().next().unwrap();
+                        if !all_dictionaries.contains_key(first_segment) {
+                            return Err(Error::validate(format!(
+                                "{typename} \"{capability}\" is {operand} from \"self/{path}\", so \
+                                \"{first_segment}\" must be declared as a \"dictionary\" in \"capabilities\"",
+                            )));
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
@@ -2901,6 +2935,17 @@ mod tests {
             }),
             Err(Error::Validate { err, .. }) if &err == "config \"foo_config\" is used from self, so it must be declared as a \"config\" in \"capabilities\""
         ),
+        test_cml_use_from_self_missing_dictionary(
+            json!({
+                "use": [
+                    {
+                        "protocol": "foo_protocol",
+                        "from": "self/dict/inner",
+                    },
+                ],
+            }),
+            Err(Error::Validate { err, .. }) if &err == "protocol \"foo_protocol\" is used from \"self/dict/inner\", so \"dict\" must be declared as a \"dictionary\" in \"capabilities\""
+        ),
         test_cml_use_event_stream_duplicate(
             json!({
                 "use": [
@@ -3632,6 +3677,17 @@ mod tests {
                 ],
             }),
             Err(Error::Validate { err, .. }) if &err == "resolver \"pkg_resolver\" is exposed from self, so it must be declared as a \"resolver\" in \"capabilities\""
+        ),
+        test_cml_expose_from_self_missing_dictionary(
+            json!({
+                "expose": [
+                    {
+                        "protocol": "foo_protocol",
+                        "from": "self/dict/inner",
+                    },
+                ],
+            }),
+            Err(Error::Validate { err, .. }) if &err == "protocol \"foo_protocol\" is exposed from \"self/dict/inner\", so \"dict\" must be declared as a \"dictionary\" in \"capabilities\""
         ),
         test_cml_expose_from_dictionary_invalid(
             json!({
@@ -4557,6 +4613,24 @@ mod tests {
                 }),
             Err(Error::Validate { err, .. }) if &err == "storage \"cache\" is offered from self, so it must be declared as a \"storage\" in \"capabilities\""
         ),
+        test_cml_offer_from_self_missing_dictionary(
+            json!({
+                "offer": [
+                    {
+                        "protocol": "foo_protocol",
+                        "from": "self/dict/inner",
+                        "to": [ "#modular" ],
+                    },
+                ],
+                "children": [
+                    {
+                        "name": "modular",
+                        "url": "fuchsia-pkg://fuchsia.com/modular#meta/modular.cm"
+                    },
+                ],
+            }),
+            Err(Error::Validate { err, .. }) if &err == "protocol \"foo_protocol\" is offered from \"self/dict/inner\", so \"dict\" must be declared as a \"dictionary\" in \"capabilities\""
+        ),
         test_cml_offer_dependency_on_wrong_type(
             json!({
                     "offer": [ {
@@ -5305,17 +5379,6 @@ mod tests {
             }),
             Err(Error::Validate { err, .. }) if &err == "identifier \"pkg_resolver\" is defined twice, once in \"resolvers\" and once in \"runners\""
         ),
-        test_cml_capabilities_dictionary_invalid_extends(
-            json!({
-                "capabilities": [
-                    {
-                        "dictionary": "dict",
-                        "extends": "bad",
-                    },
-                ]
-            }),
-            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"bad\", expected a path to a dictionary no more than 4095 characters in length"
-        ),
 
         // environments
         test_cml_environments(
@@ -5941,31 +6004,6 @@ mod tests {
                 ]
             }),
             Err(Error::Parse { err, .. }) if &err == "invalid length 257, expected one or an array of \"framework\", \"self\", \"#<child-name>\", or a dictionary path"
-        ),
-        test_cml_dictionary_ref(
-            json!({
-                "use": [
-                    {
-                        "protocol": "a",
-                        "from": "parent/a",
-                    },
-                    {
-                        "protocol": "b",
-                        "from": "#child/a/b",
-                    },
-                    {
-                        "protocol": "c",
-                        "from": "self/a/b/c",
-                    },
-                ],
-                "children": [
-                    {
-                        "name": "child",
-                        "url": "fuchsia-pkg://child",
-                    },
-                ],
-            }),
-            Ok(())
         ),
         test_cml_dictionary_ref_invalid_root(
             json!({
@@ -7080,6 +7118,36 @@ mod tests {
     }}
 
     test_validate_cml_with_feature! { FeatureSet::from(vec![Feature::Dictionaries]), {
+        test_cml_dictionary_ref(
+            json!({
+                "use": [
+                    {
+                        "protocol": "a",
+                        "from": "parent/a",
+                    },
+                    {
+                        "protocol": "b",
+                        "from": "#child/a/b",
+                    },
+                    {
+                        "protocol": "c",
+                        "from": "self/a/b/c",
+                    },
+                ],
+                "capabilities": [
+                    {
+                        "dictionary": "a",
+                    },
+                ],
+                "children": [
+                    {
+                        "name": "child",
+                        "url": "fuchsia-pkg://child",
+                    },
+                ],
+            }),
+            Ok(())
+        ),
         test_cml_expose_dictionary_from_self(
             json!({
                 "expose": [
@@ -7357,6 +7425,28 @@ mod tests {
             }) if &err ==
                 "Strong dependency cycles were found. Break the cycle by removing a \
                 dependency or marking an offer as weak. Cycles: {{#a -> self -> #dict -> #a}}"
+        ),
+        test_cml_capabilities_dictionary_invalid_extends(
+            json!({
+                "capabilities": [
+                    {
+                        "dictionary": "dict",
+                        "extends": "bad",
+                    },
+                ]
+            }),
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"bad\", expected a path to a dictionary no more than 4095 characters in length"
+        ),
+        test_cml_capabilities_dictionary_extends_self_missing(
+            json!({
+                "capabilities": [
+                    {
+                        "dictionary": "dict",
+                        "extends": "self/other_dict/inner",
+                    },
+                ]
+            }),
+            Err(Error::Validate { err, .. }) if &err == "dictionary \"dict\" is extended from \"self/other_dict/inner\", so \"other_dict\" must be declared as a \"dictionary\" in \"capabilities\""
         ),
     }}
 
