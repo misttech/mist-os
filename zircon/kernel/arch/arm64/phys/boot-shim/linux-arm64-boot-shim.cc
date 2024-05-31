@@ -46,21 +46,7 @@
 
 namespace {
 
-using PlatformIdItem = boot_shim::SingleOptionalItem<zbi_platform_id_t, ZBI_TYPE_PLATFORM_ID>;
-using BoardInfoItem = boot_shim::SingleOptionalItem<zbi_board_info_t, ZBI_TYPE_DRV_BOARD_INFO>;
-
 constexpr const char* kShimName = "linux-arm64-boot-shim";
-
-// TODO(https://fxbug.dev/295031359): Once assembly generates this items, remove the hardcoded pair.
-constexpr zbi_platform_id_t kQemuPlatformId = {
-    .vid = 1,  // fuchsia.platform.BIND_PLATFORM_DEV_VID.QEMU
-    .pid = 1,  // fuchsia.platform.BIND_PLATFORM_DEV_PID.QEMU
-    .board_name = "qemu-arm64",
-};
-
-constexpr zbi_board_info_t kQemuBoardInfo = {
-    .revision = 0x1,
-};
 
 }  // namespace
 
@@ -75,7 +61,7 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   // Memory has been initialized, we can finish up parsing the rest of the items from the boot shim.
   boot_shim::DevicetreeBootShim<
       boot_shim::UartItem<>, boot_shim::PoolMemConfigItem, boot_shim::ArmDevicetreePsciItem,
-      boot_shim::ArmDevicetreeGicItem, boot_shim::DevicetreeDtbItem, PlatformIdItem, BoardInfoItem,
+      boot_shim::ArmDevicetreeGicItem, boot_shim::DevicetreeDtbItem,
       boot_shim::ArmDevicetreeCpuTopologyItem, boot_shim::ArmDevicetreeTimerItem>
       shim(kShimName, gDevicetreeBoot.fdt);
   shim.set_mmio_observer([&](boot_shim::DevicetreeMmioRange mmio_range) {
@@ -103,8 +89,6 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   shim.Get<boot_shim::DevicetreeDtbItem>().set_payload(
       {reinterpret_cast<const ktl::byte*>(gDevicetreeBoot.fdt.fdt().data()),
        gDevicetreeBoot.fdt.size_bytes()});
-  shim.Get<PlatformIdItem>().set_payload(kQemuPlatformId);
-  shim.Get<BoardInfoItem>().set_payload(kQemuBoardInfo);
 
   // Mark the UART MMIO range as peripheral range.
   uart::internal::Visit(

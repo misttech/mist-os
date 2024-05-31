@@ -35,21 +35,7 @@
 
 namespace {
 
-using PlatformIdItem = boot_shim::SingleOptionalItem<zbi_platform_id_t, ZBI_TYPE_PLATFORM_ID>;
-using BoardInfoItem = boot_shim::SingleOptionalItem<zbi_board_info_t, ZBI_TYPE_DRV_BOARD_INFO>;
-
 constexpr const char* kShimName = "linux-riscv64-boot-shim";
-
-// TODO(https://fxbug.dev/295031359): Once assembly generates this items, remove the hardcoded pair.
-constexpr zbi_platform_id_t kQemuPlatformId = {
-    .vid = 1,  // fuchsia.platform.BIND_PLATFORM_DEV_VID.QEMU
-    .pid = 1,  // fuchsia.platform.BIND_PLATFORM_DEV_PID.QEMU
-    .board_name = "qemu-riscv64",
-};
-
-constexpr zbi_board_info_t kQemuBoardInfo = {
-    .revision = 0x1,
-};
 
 struct BootHartIdGetter {
   static uint64_t Get() {
@@ -74,11 +60,10 @@ void PhysMain(void* fdt, arch::EarlyTicks ticks) {
   MainSymbolize symbolize(kShimName);
 
   // Memory has been initialized, we can finish up parsing the rest of the items from the boot shim.
-  boot_shim::DevicetreeBootShim<boot_shim::UartItem<>, boot_shim::PoolMemConfigItem,
-                                boot_shim::RiscvDevicetreePlicItem,
-                                boot_shim::RiscvDevicetreeTimerItem,
-                                boot_shim::RiscvDevicetreeCpuTopologyItem<BootHartIdGetter>,
-                                boot_shim::DevicetreeDtbItem, PlatformIdItem, BoardInfoItem>
+  boot_shim::DevicetreeBootShim<
+      boot_shim::UartItem<>, boot_shim::PoolMemConfigItem, boot_shim::RiscvDevicetreePlicItem,
+      boot_shim::RiscvDevicetreeTimerItem,
+      boot_shim::RiscvDevicetreeCpuTopologyItem<BootHartIdGetter>, boot_shim::DevicetreeDtbItem>
       shim(kShimName, gDevicetreeBoot.fdt);
   shim.set_allocator([](size_t size, size_t align, fbl::AllocChecker& ac) -> void* {
     return new (ktl::align_val_t{align}, gPhysNew<memalloc::Type::kPhysScratch>, ac) uint8_t[size];
@@ -87,9 +72,6 @@ void PhysMain(void* fdt, arch::EarlyTicks ticks) {
   shim.Get<boot_shim::UartItem<>>().Init(GetUartDriver().uart());
   shim.Get<boot_shim::PoolMemConfigItem>().Init(Allocation::GetPool());
   shim.Get<boot_shim::DevicetreeDtbItem>().set_payload(ktl::as_bytes(gDevicetreeBoot.fdt.fdt()));
-
-  shim.Get<PlatformIdItem>().set_payload(kQemuPlatformId);
-  shim.Get<BoardInfoItem>().set_payload(kQemuBoardInfo);
 
   // Fill DevicetreeItems.
   ZX_ASSERT(shim.Init());

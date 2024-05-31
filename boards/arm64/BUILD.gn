@@ -18,6 +18,13 @@ board_configuration("arm64") {
     "//boards/emulation/virtio",
   ]
 
+  hardware_info = {
+    name = "qemu-arm64"
+    product_id = 1
+    vendor_id = 1
+    revision = 1
+  }
+
   filesystems = {
     vbmeta = {
       key = "//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"
