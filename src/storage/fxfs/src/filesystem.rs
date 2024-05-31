@@ -181,8 +181,8 @@ pub struct SyncOptions<'a> {
     /// mutations may still be buffered in memory after this call returns.
     pub flush_device: bool,
 
-    // A precondition that is evaluated whilst a lock is held that determines whether or not the
-    // sync needs to proceed.
+    /// A precondition that is evaluated whilst a lock is held that determines whether or not the
+    /// sync needs to proceed.
     pub precondition: Option<Box<dyn FnOnce() -> bool + 'a + Send>>,
 }
 

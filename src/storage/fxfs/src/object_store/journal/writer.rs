@@ -93,7 +93,7 @@ impl JournalWriter {
         }
     }
 
-    /// Returns true if there are complete blocks ready for flushing.
+    /// Returns the number of bytes that are ready to be flushed.
     pub fn flushable_bytes(&self) -> usize {
         self.buf.len() - self.buf.len() % self.block_size
     }

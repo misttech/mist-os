@@ -482,13 +482,13 @@ impl<'a> Fsck<'a> {
         result: &mut FsckResult,
     ) -> Result<(), Error> {
         let allocator = filesystem.allocator();
-        let objects_pending_deletion = allocator.objects_pending_deletion();
         let layer_set = allocator.tree().layer_set();
         let mut merger = layer_set.merger();
-        let mut stored_allocations =
-            CoalescingIterator::new(allocator.filter(merger.seek(Bound::Unbounded).await?).await?)
-                .await
-                .expect("filter failed");
+        let mut stored_allocations = CoalescingIterator::new(
+            allocator.filter(merger.seek(Bound::Unbounded).await?, true).await?,
+        )
+        .await
+        .expect("filter failed");
         let mut observed_allocations =
             CoalescingIterator::new(self.allocations.seek(Bound::Unbounded).await?).await?;
         let mut observed_owner_allocated_bytes = BTreeMap::new();
@@ -519,14 +519,10 @@ impl<'a> Fsck<'a> {
                 previous_allocation_end = r.end;
             }
 
-            if !objects_pending_deletion.contains(&owner_object_id) {
-                *observed_owner_allocated_bytes.entry(owner_object_id).or_insert(0) +=
-                    (r.end - r.start) as i64;
-            }
+            *observed_owner_allocated_bytes.entry(owner_object_id).or_insert(0) +=
+                (r.end - r.start) as i64;
             if !store_object_ids.contains(&owner_object_id) {
-                if filesystem.object_manager().store(owner_object_id).is_none()
-                    && !objects_pending_deletion.contains(&owner_object_id)
-                {
+                if filesystem.object_manager().store(owner_object_id).is_none() {
                     self.error(FsckError::AllocationForNonexistentOwner(allocation.into()))?;
                 }
                 stored_allocations.advance().await?;

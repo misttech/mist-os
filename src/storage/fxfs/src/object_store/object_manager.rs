@@ -625,20 +625,21 @@ impl ObjectManager {
         let inner = self.inner.read().unwrap();
         let required = inner.required_reservation();
         ensure!(required >= inner.borrowed_metadata_space, FxfsError::Inconsistent);
+        let allocator = inner.allocator.as_ref().cloned().unwrap();
         self.metadata_reservation
             .set(
-                inner
-                    .allocator
-                    .as_ref()
-                    .cloned()
-                    .unwrap()
+                allocator
+                    .clone()
                     .reserve(None, inner.required_reservation() - inner.borrowed_metadata_space)
                     .with_context(|| {
                         format!(
-                            "Failed to reserve {} - {} = {} bytes",
+                            "Failed to reserve {} - {} = {} bytes, free={}, \
+                             owner_bytes={}",
                             inner.required_reservation(),
                             inner.borrowed_metadata_space,
-                            inner.required_reservation() - inner.borrowed_metadata_space
+                            inner.required_reservation() - inner.borrowed_metadata_space,
+                            allocator.get_disk_bytes() - allocator.get_used_bytes(),
+                            allocator.owner_bytes_debug(),
                         )
                     })?,
             )
