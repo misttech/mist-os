@@ -3149,6 +3149,7 @@ where
         id: &TcpApiSocketId<I, C>,
         shutdown: ShutdownType,
     ) -> Result<bool, NoConnection> {
+        debug!("shutdown [{shutdown:?}] for {id:?}");
         let (core_ctx, bindings_ctx) = self.contexts();
         let (shutdown_send, shutdown_receive) = shutdown.to_send_receive();
         let (result, pending) =
