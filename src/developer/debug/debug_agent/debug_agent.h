@@ -51,7 +51,8 @@ class DebugAgent : public RemoteAPI,
   SystemInterface& system_interface() { return *system_interface_; }
   const std::map<uint32_t, Breakpoint>& breakpoints() { return breakpoints_; }
 
-  bool is_connected() const { return !!buffered_stream_ && buffered_stream_->IsValid(); }
+  // Reflects the state of a debug_ipc connection.
+  bool is_connected() const { return buffered_stream_ && buffered_stream_->IsValid(); }
 
   // Wire |stream| up to |adapter_| and then pass it to |Connect|.
   void TakeAndConnectRemoteAPIStream(std::unique_ptr<debug::BufferedStream> stream);
@@ -124,6 +125,10 @@ class DebugAgent : public RemoteAPI,
   // removed, and no debug_ipc client is connected, the message loop will be shut down and this
   // agent will exit.
   void RemoveObserver(DebugAgentObserver* observer);
+
+  const std::map<zx_koid_t, std::unique_ptr<DebuggedProcess>>& GetAllProcesses() const {
+    return procs_;
+  }
 
  private:
   FRIEND_TEST(DebugAgentTests, Kill);

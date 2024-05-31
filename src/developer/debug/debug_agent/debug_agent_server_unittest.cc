@@ -33,6 +33,10 @@ class DebugAgentServerTest : public debug::TestWithLoop {
     return server_.AttachToKoids(koids);
   }
 
+  auto GetMatchingProcesses(std::optional<fuchsia_debugger::Filter> filter) {
+    return server_.GetMatchingProcesses(std::move(filter));
+  }
+
   debug_ipc::StatusReply GetAgentStatus() {
     debug_ipc::StatusReply reply;
     harness_.debug_agent()->OnStatus({}, &reply);
@@ -171,6 +175,56 @@ TEST_F(DebugAgentServerTest, AddFilterErrors) {
   result = AddFilter(f);
   EXPECT_TRUE(result.has_error());
   EXPECT_EQ(result.err(), fuchsia_debugger::FilterError::kUnknownType);
+}
+
+TEST_F(DebugAgentServerTest, GetMatchingProcesses) {
+  auto agent = GetDebugAgent();
+
+  // Not passing a filter will return all attached processes. There aren't any of those yet, so the
+  // return value is empty.
+  auto result = GetMatchingProcesses(std::nullopt);
+  EXPECT_TRUE(result.ok());
+  EXPECT_TRUE(result.value().empty());
+
+  // If provided, the filter must be valid.
+  result = GetMatchingProcesses({{{.pattern = ""}}});
+  EXPECT_TRUE(result.has_error());
+  EXPECT_EQ(result.err(), fuchsia_debugger::FilterError::kNoPattern);
+
+  result = GetMatchingProcesses({{{.pattern = "some/pattern"}}});
+  EXPECT_TRUE(result.has_error());
+  EXPECT_EQ(result.err(), fuchsia_debugger::FilterError::kUnknownType);
+
+  constexpr char kFullRootMoniker[] = "/moniker/generated/root:test";
+
+  // This filter is intended to match |kFullRootMoniker| and all child components.
+  fuchsia_debugger::Filter f1;
+  f1.pattern("root:test");
+  f1.type(fuchsia_debugger::FilterType::kMonikerSuffix);
+  f1.options({{.recursive = true}});
+
+  AddFilter(f1);
+
+  // Create the subfilter.
+  harness()->system_interface()->mock_component_manager().InjectComponentEvent(
+      FakeEventType::kDiscovered, kFullRootMoniker,
+      "fuchsia-pkg://devhost/root_package#meta/root_component.cm");
+
+  // Koid of job4 from MockSystemInterface.
+  constexpr zx_koid_t kJob4Koid = 32;
+  // Inject a process starting event for the ELF process running under some child component of the
+  // root component above.
+  constexpr zx_koid_t kProcessKoid = 33;
+  auto handle = std::make_unique<MockProcessHandle>(kProcessKoid);
+  // Set the job koid so that we can look up the corresponding component information.
+  handle->set_job_koid(kJob4Koid);
+  agent->OnProcessStarting(std::move(handle));
+
+  // We are now attached to something. Omitting the filter should give us back a process.
+  result = GetMatchingProcesses(std::nullopt);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(result.value().size(), 1u);
+  EXPECT_EQ(result.value()[0]->koid(), kProcessKoid);
 }
 
 }  // namespace debug_agent

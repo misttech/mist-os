@@ -15,6 +15,7 @@
 namespace debug_agent {
 
 class DebugAgent;
+class DebuggedProcess;
 
 class DebugAgentServer : public fidl::Server<fuchsia_debugger::DebugAgent>,
                          public DebugAgentObserver {
@@ -30,6 +31,8 @@ class DebugAgentServer : public fidl::Server<fuchsia_debugger::DebugAgent>,
                             GetAttachedProcessesCompleter::Sync& completer) override;
   void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override;
   void AttachTo(AttachToRequest& request, AttachToCompleter::Sync& completer) override;
+  void GetProcessInfo(GetProcessInfoRequest& request,
+                      GetProcessInfoCompleter::Sync& completer) override;
 
   void OnUnboundFn(DebugAgentServer* impl, fidl::UnbindInfo info,
                    fidl::ServerEnd<fuchsia_debugger::DebugAgent> server_end);
@@ -54,6 +57,15 @@ class DebugAgentServer : public fidl::Server<fuchsia_debugger::DebugAgent>,
   // Attempt to attach to all given koids, some may fail, which is not reported as an error. The
   // number of successful attaches is returned.
   uint32_t AttachToKoids(const std::vector<zx_koid_t>& koids) const;
+
+  using GetMatchingProcessesResult =
+      debug::Result<std::vector<DebuggedProcess*>, fuchsia_debugger::FilterError>;
+
+  // If given, returns all attached processes that match the given filter. This will NOT add the
+  // filter to DebugAgent's filters and will NOT issue any attach commands to DebugAgent. Otherwise,
+  // returns all currently attached processes.
+  GetMatchingProcessesResult GetMatchingProcesses(
+      std::optional<fuchsia_debugger::Filter> filter) const;
 
   fxl::WeakPtr<DebugAgent> debug_agent_;
   async_dispatcher_t* dispatcher_;

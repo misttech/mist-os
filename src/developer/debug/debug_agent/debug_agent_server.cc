@@ -8,9 +8,13 @@
 
 #include <utility>
 
+#include "src/developer/debug/debug_agent/component_manager.h"
 #include "src/developer/debug/debug_agent/debug_agent.h"
+#include "src/developer/debug/debug_agent/debugged_process.h"
+#include "src/developer/debug/debug_agent/debugged_thread.h"
+#include "src/developer/debug/debug_agent/system_interface.h"
+#include "src/developer/debug/ipc/filter_utils.h"
 #include "src/developer/debug/ipc/records.h"
-#include "src/developer/debug/shared/message_loop_fuchsia.h"
 
 namespace debug_agent {
 
@@ -114,7 +118,7 @@ void DebugAgentServer::GetAttachedProcesses(GetAttachedProcessesRequest& request
 
   // Create and bind the iterator.
   fidl::BindServer(
-      debug::MessageLoopFuchsia::Current()->dispatcher(),
+      dispatcher_,
       fidl::ServerEnd<fuchsia_debugger::AttachedProcessIterator>(std::move(request.iterator())),
       std::make_unique<AttachedProcessIterator>(debug_agent_->GetWeakPtr()), nullptr);
 }
@@ -224,6 +228,55 @@ void DebugAgentServer::OnNotification(const debug_ipc::NotifyProcessStarting& no
   }
 
   AttachToKoids({notify.koid});
+}
+
+DebugAgentServer::GetMatchingProcessesResult DebugAgentServer::GetMatchingProcesses(
+    std::optional<fuchsia_debugger::Filter> filter) const {
+  FX_DCHECK(debug_agent_);
+
+  std::vector<DebuggedProcess*> processes;
+  const auto& attached_processes = debug_agent_->GetAllProcesses();
+
+  if (filter) {
+    auto result = ToDebugIpcFilter(*filter);
+    if (result.has_error()) {
+      return result.err();
+    }
+
+    const auto& component_manager = debug_agent_->system_interface().GetComponentManager();
+
+    for (const auto& [_koid, process] : attached_processes) {
+      const auto& components = component_manager.FindComponentInfo(process->process_handle());
+
+      if (debug_ipc::FilterMatches(result.value(), process->process_handle().GetName(),
+                                   components)) {
+        processes.push_back(process.get());
+      }
+    }
+  } else {
+    for (const auto& [_koid, process] : attached_processes) {
+      processes.push_back(process.get());
+    }
+  }
+
+  return processes;
+}
+
+void DebugAgentServer::GetProcessInfo(GetProcessInfoRequest& request,
+                                      GetProcessInfoCompleter::Sync& completer) {
+  FX_DCHECK(debug_agent_);
+
+  std::vector<DebuggedProcess*> processes;
+
+  auto result = GetMatchingProcesses(request.options().filter());
+  if (result.has_error()) {
+    completer.Reply(fit::error(result.err()));
+    return;
+  }
+
+  // TODO(jruthe): Bind this to an actual iterator.
+
+  completer.Reply(fit::success());
 }
 
 void DebugAgentServer::OnUnboundFn(DebugAgentServer* impl, fidl::UnbindInfo info,
