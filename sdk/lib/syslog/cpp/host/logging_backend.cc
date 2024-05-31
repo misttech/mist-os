@@ -85,8 +85,6 @@ fuchsia_logging::LogSeverity GetMinLogSeverity() {
   return syslog_runtime::g_log_settings.min_log_level;
 }
 
-fuchsia_logging::LogSeverity GetMinLogLevel() { return GetMinLogSeverity(); }
-
 void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, NullSafeStringView file,
                  unsigned int line, NullSafeStringView msg, NullSafeStringView condition) {
   BeginRecordLegacy(buffer, severity, file, line, msg, condition);

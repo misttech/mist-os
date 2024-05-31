@@ -438,6 +438,4 @@ fuchsia_logging::LogSeverity GetMinLogSeverity() {
   return lock->min_severity();
 }
 
-fuchsia_logging::LogSeverity GetMinLogLevel() { return GetMinLogSeverity(); }
-
 }  // namespace syslog_runtime

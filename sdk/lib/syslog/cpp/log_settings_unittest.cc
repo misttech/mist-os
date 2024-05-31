@@ -38,7 +38,7 @@ TEST_F(LogSettingsFixture, SetAndGet) {
   LogSettings new_settings;
   new_settings.min_log_level = -20;
   SetLogSettings(new_settings);
-  EXPECT_EQ(new_settings.min_log_level, GetMinLogLevel());
+  EXPECT_EQ(new_settings.min_log_level, GetMinLogSeverity());
 }
 
 TEST_F(LogSettingsFixture, SetValidLogFile) {

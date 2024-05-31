@@ -72,9 +72,6 @@ void SetTags(const std::initializer_list<std::string>& tags);
 // higher than LOG_FATAL.
 LogSeverity GetMinLogSeverity();
 
-// This method is deprecated. Use GetMinLogSeverity() instead.
-LogSeverity GetMinLogLevel();
-
 }  // namespace fuchsia_logging
 
 #endif  // LIB_SYSLOG_CPP_LOG_SETTINGS_H_

@@ -15,8 +15,6 @@ void SetLogSettings(const fuchsia_logging::LogSettings& settings);
 void SetLogSettings(const fuchsia_logging::LogSettings& settings,
                     const std::initializer_list<std::string>& tags);
 
-fuchsia_logging::LogSeverity GetMinLogLevel();
-
 fuchsia_logging::LogSeverity GetMinLogSeverity();
 
 }  // namespace syslog_runtime
