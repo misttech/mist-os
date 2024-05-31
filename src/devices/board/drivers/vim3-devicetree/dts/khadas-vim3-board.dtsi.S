@@ -198,7 +198,7 @@
 
 	power_button: gpio-buttons {
 		compatible = "fuchsia,gpio-buttons";
-		gpios = <&gpio 97 0>;
+		gpios = <&gpio 92 0>;
 		gpio-names = "POWER";
 	};
 
