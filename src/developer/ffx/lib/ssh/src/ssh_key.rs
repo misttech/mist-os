@@ -138,7 +138,7 @@ impl SshKeyFiles {
         // initialize to the first path in the list, then iterate through the list to select
         // the first file that exists.
         let authorized_keys_files: Vec<PathBuf> =
-            query(ConfigQuery { name: Some("ssh.pub"), ctx, ..Default::default() }).get().await?;
+            query(ConfigQuery { name: Some("ssh.pub"), ctx, ..Default::default() }).get()?;
         if authorized_keys_files.is_empty() {
             return Err(SshKeyError {
                 kind: SshKeyErrorKind::BadConfiguration,
@@ -154,7 +154,7 @@ impl SshKeyFiles {
         }
 
         let key_files: Vec<PathBuf> =
-            query(ConfigQuery { name: Some("ssh.priv"), ctx, ..Default::default() }).get().await?;
+            query(ConfigQuery { name: Some("ssh.priv"), ctx, ..Default::default() }).get()?;
         if key_files.is_empty() {
             return Err(SshKeyError {
                 kind: SshKeyErrorKind::BadConfiguration,

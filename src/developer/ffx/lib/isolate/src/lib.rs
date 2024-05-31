@@ -129,8 +129,8 @@ impl Isolate {
         // TODO(slgrady): we should propagate _all_ log values,
         // except possibly log.dir (which may be set above from
         // FUCHSIA_TEST_OUTDIR)
-        let log_level = env_context.query("log.level").get().await?;
-        let log_target_levels = env_context.query("log.target_levels").get().await?;
+        let log_level = env_context.query("log.level").get()?;
+        let log_target_levels = env_context.query("log.target_levels").get()?;
 
         std::fs::create_dir_all(&log_dir)?;
         let metrics_path = tmpdir.path().join("metrics_home/.fuchsia/metrics");
@@ -247,7 +247,7 @@ impl Isolate {
 
         let sdk_root = context.get_sdk_root().await.ok();
         let subtool_search_paths =
-            context.query("ffx.subtool-search-paths").get().await.unwrap_or_default();
+            context.query("ffx.subtool-search-paths").get().unwrap_or_default();
 
         Self::new_with_search(
             name,

@@ -102,7 +102,7 @@ async fn apply_command_line_options(
                 emu_config.host.acceleration = AccelerationMode::None;
                 if check_kvm {
                     let path: String =
-                        ctx.get(KVM_PATH).await.context("getting KVM path from ffx config")?;
+                        ctx.get(KVM_PATH).context("getting KVM path from ffx config")?;
                     match std::fs::OpenOptions::new().write(true).open(&path) {
                         Err(e) => match e.kind() {
                             std::io::ErrorKind::PermissionDenied => {
@@ -211,7 +211,7 @@ async fn apply_command_line_options(
     // Any generated values or values from ffx_config.
     emu_config.runtime.mac_address = generate_mac_address(&cmd.name().await?);
     let upscript: String =
-        ctx.get(EMU_UPSCRIPT_FILE).await.context("Getting upscript path from ffx config")?;
+        ctx.get(EMU_UPSCRIPT_FILE).context("Getting upscript path from ffx config")?;
     if !upscript.is_empty() {
         emu_config.runtime.upscript = Some(PathBuf::from(upscript));
     }

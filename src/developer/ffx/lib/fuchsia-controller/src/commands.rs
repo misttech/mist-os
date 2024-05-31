@@ -338,7 +338,7 @@ impl LibraryCommand {
                 responder.send(status).unwrap();
             }
             Self::ConfigGetString { env_ctx, responder, config_key, mut out_buf } => {
-                let result: String = match env_ctx.context.get(&config_key).await {
+                let result: String = match env_ctx.context.get(&config_key) {
                     Ok(r) => r,
                     Err(e) => {
                         env_ctx.write_err(e);

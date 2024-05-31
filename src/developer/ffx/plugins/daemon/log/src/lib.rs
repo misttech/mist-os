@@ -32,10 +32,10 @@ impl FfxMain for DaemonLogTool {
     type Writer = fho::SimpleWriter;
 
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        if !self.ctx.get("log.enabled").await.bug()? {
+        if !self.ctx.get("log.enabled").bug()? {
             ffx_bail!("Logging is not enabled.");
         }
-        let mut log_path: PathBuf = self.ctx.get("log.dir").await.bug()?;
+        let mut log_path: PathBuf = self.ctx.get("log.dir").bug()?;
         log_path.push("ffx.daemon.log");
         let mut log_file = LogFile::new(&log_path);
 

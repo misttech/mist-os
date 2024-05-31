@@ -276,16 +276,16 @@ pub async fn log_file_with_info(
     name: &PathBuf,
     log_dir_handling: LogDirHandling,
 ) -> Result<(File, PathBuf)> {
-    let mut log_path: PathBuf = ctx.query(LOG_DIR).get().await?;
+    let mut log_path: PathBuf = ctx.query(LOG_DIR).get()?;
     create_dir_all(&log_path)?;
     log_path.push(name);
 
     let mut f: Option<File> = None;
     if let LogDirHandling::WithDirWithRotate = log_dir_handling {
-        let log_rotations: Option<u64> = ctx.query(LOG_ROTATIONS).get().await?;
+        let log_rotations: Option<u64> = ctx.query(LOG_ROTATIONS).get()?;
         let log_rotations = log_rotations.unwrap_or(0);
         if log_rotations > 0 {
-            let log_rotate_size: Option<u64> = ctx.query(LOG_ROTATE_SIZE).get().await?;
+            let log_rotate_size: Option<u64> = ctx.query(LOG_ROTATE_SIZE).get()?;
             // rotate_file() returns Some(f) if it uses an existing file
             f = rotate_file(log_rotate_size, log_rotations, &log_path)?;
         }
@@ -313,7 +313,7 @@ fn open_log_file(path: &Path) -> Result<std::fs::File> {
 }
 
 pub async fn is_enabled(ctx: &EnvironmentContext) -> bool {
-    ctx.query(LOG_ENABLED).get().await.unwrap_or(false)
+    ctx.query(LOG_ENABLED).get().unwrap_or(false)
 }
 
 pub async fn debugging_on(ctx: &EnvironmentContext) -> bool {
@@ -324,7 +324,6 @@ pub async fn debugging_on(ctx: &EnvironmentContext) -> bool {
 async fn filter_level(ctx: &EnvironmentContext) -> LevelFilter {
     ctx.query(LOG_LEVEL)
         .get::<String>()
-        .await
         .ok()
         .map(|str|
             // Ideally we could log here, but there may be no log sink, so print a warning to
@@ -407,7 +406,7 @@ async fn target_levels(ctx: &EnvironmentContext) -> Vec<(String, LevelFilter)> {
     // Parse the targets from the config. Ideally we'd log errors, but since there might be no log
     // sink, filter out any unexpected values.
 
-    if let Ok(targets) = ctx.query(LOG_TARGET_LEVELS).get::<serde_json::Value>().await {
+    if let Ok(targets) = ctx.query(LOG_TARGET_LEVELS).get::<serde_json::Value>() {
         if let serde_json::Value::Object(o) = targets {
             return o
                 .into_iter()
@@ -427,7 +426,7 @@ async fn target_levels(ctx: &EnvironmentContext) -> Vec<(String, LevelFilter)> {
 }
 
 async fn include_spans(ctx: &EnvironmentContext) -> bool {
-    ctx.query(LOG_INCLUDE_SPANS).get().await.unwrap_or(false)
+    ctx.query(LOG_INCLUDE_SPANS).get().unwrap_or(false)
 }
 
 pub(crate) async fn configure_subscribers(

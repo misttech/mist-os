@@ -181,7 +181,7 @@ impl Injector for Injection {
     // the spawning only happens one thread at a time.
     #[tracing::instrument]
     async fn daemon_factory(&self) -> Result<DaemonProxy, FfxInjectorError> {
-        let autostart = self.env_context.query(CONFIG_DAEMON_AUTOSTART).get().await.unwrap_or(true);
+        let autostart = self.env_context.query(CONFIG_DAEMON_AUTOSTART).get().unwrap_or(true);
         downcast_injector_error(
             self.daemon_once
                 .get_or_try_init(|first_connection| {
@@ -278,7 +278,7 @@ impl Injector for Injection {
     }
 
     async fn is_experiment(&self, key: &str) -> bool {
-        self.env_context.get(key).await.unwrap_or(false)
+        self.env_context.get(key).unwrap_or(false)
     }
 
     async fn build_info(&self) -> Result<VersionInfo> {
