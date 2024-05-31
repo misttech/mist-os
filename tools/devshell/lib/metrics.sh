@@ -38,7 +38,6 @@ _METRICS_TRACK_COMMAND_OPS=(
     "shell bt-cli"
     "shell bt-hci-emulator"
     "shell bt-hci-tool"
-    "shell bt-intel-tool"
     "shell bt-le-central"
     "shell bt-le-peripheral"
     "shell bt-pairing-tool"

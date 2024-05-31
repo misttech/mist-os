@@ -1142,10 +1142,6 @@ assembly_input_bundle("core_realm_eng") {
       components = [ "bt-hci-tool" ]
     },
     {
-      package = "bt-intel-tool"
-      components = [ "bt-intel-tool" ]
-    },
-    {
       package = "bt-avdtp-tool"
       components = [ "bt-avdtp-tool" ]
     },
