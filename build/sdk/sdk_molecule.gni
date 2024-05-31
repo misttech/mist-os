@@ -66,7 +66,7 @@ template("sdk_molecule") {
     output_name = invoker.output_name
   }
 
-  labels = {
+  targets = {
     manifest = "${target_name}.manifest"
     validate = "${target_name}.validate"
   }
@@ -77,7 +77,7 @@ template("sdk_molecule") {
   }
 
   # Builds a manifest representing members of the group.
-  python_action(labels.manifest) {
+  python_action(targets.manifest) {
     forward_variables_from(invoker,
                            [
                              "assert_no_deps",
@@ -105,7 +105,7 @@ template("sdk_molecule") {
   }
 
   # Verifies that the manifest is valid.
-  validate_json(labels.validate) {
+  validate_json(targets.validate) {
     forward_variables_from(invoker,
                            [
                              "testonly",
@@ -118,7 +118,7 @@ template("sdk_molecule") {
 
     use_valico = true
 
-    deps = [ ":${labels.manifest}" ]
+    deps = [ ":${targets.manifest}" ]
   }
 
   group(target_name) {
@@ -128,7 +128,7 @@ template("sdk_molecule") {
                              "testonly",
                              "visibility",
                            ])
-    public_deps = [ ":${labels.manifest}" ]
-    deps = [ ":${labels.validate}" ]
+    public_deps = [ ":${targets.manifest}" ]
+    deps = [ ":${targets.validate}" ]
   }
 }
