@@ -18,6 +18,8 @@ pub mod resolving;
 pub mod rights;
 pub mod walk_state;
 
+mod bedrock;
+
 use fuchsia_zircon_status as zx;
 use {
     crate::{
@@ -54,6 +56,8 @@ use {
     std::sync::Arc,
     tracing::warn,
 };
+
+pub use bedrock::dict_ext::DictExt;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

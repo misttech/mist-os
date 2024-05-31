@@ -35,7 +35,7 @@ use {
             structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
             token::{InstanceToken, InstanceTokenState},
         },
-        sandbox_util::{DictExt, RoutableExt},
+        sandbox_util::RoutableExt,
     },
     ::routing::{
         capability_source::ComponentCapability,
@@ -43,6 +43,7 @@ use {
             ComponentInstanceInterface, ResolvedInstanceInterface, ResolvedInstanceInterfaceExt,
         },
         resolving::{ComponentAddress, ComponentResolutionContext},
+        DictExt,
     },
     async_trait::async_trait,
     async_utils::async_once::Once,

@@ -5,9 +5,8 @@ use {
     crate::{
         capability::CapabilityProvider,
         model::{component::WeakComponentInstance, routing::router_ext::WeakComponentTokenExt},
-        sandbox_util::DictExt,
     },
-    ::routing::error::RoutingError,
+    ::routing::{error::RoutingError, DictExt},
     async_trait::async_trait,
     clonable_error::ClonableError,
     cm_rust::Availability,

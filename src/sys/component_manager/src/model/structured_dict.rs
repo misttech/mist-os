@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::sandbox_util::DictExt,
     cm_types::{IterablePath, Name},
     fidl_fuchsia_component_sandbox as fsandbox,
     lazy_static::lazy_static,
+    routing::DictExt,
     sandbox::{Capability, Dict},
     std::{fmt, marker::PhantomData},
 };

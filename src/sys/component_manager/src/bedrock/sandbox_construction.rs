@@ -11,12 +11,13 @@ use {
             routing::router_ext::RouterExt,
             structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
         },
-        sandbox_util::{DictExt, RoutableExt},
+        sandbox_util::RoutableExt,
     },
     ::routing::{
         capability_source::ComponentCapability,
         component_instance::ComponentInstanceInterface,
         error::{ComponentInstanceError, RoutingError},
+        DictExt,
     },
     async_trait::async_trait,
     cm_rust::{

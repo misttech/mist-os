@@ -10,11 +10,10 @@ use {
             routing::router_ext::{RouterExt, WeakComponentTokenExt},
             routing::{self, route_and_open_capability_with_reporting},
         },
-        sandbox_util::DictExt,
     },
     ::routing::{
         component_instance::ComponentInstanceInterface, mapper::NoopRouteMapper, rights::Rights,
-        route_to_storage_decl, verify_instance_in_component_id_index, RouteRequest,
+        route_to_storage_decl, verify_instance_in_component_id_index, DictExt, RouteRequest,
     },
     cm_rust::{ComponentDecl, UseDecl, UseEventStreamDecl, UseStorageDecl},
     errors::CreateNamespaceError,

@@ -28,7 +28,6 @@ use {
                 routing_test_helpers::*, test_helpers::*,
             },
         },
-        sandbox_util::DictExt,
     },
     ::routing::{
         capability_source::{
@@ -36,6 +35,7 @@ use {
         },
         error::ComponentInstanceError,
         resolving::ResolverError,
+        DictExt,
     },
     assert_matches::assert_matches,
     async_trait::async_trait,
