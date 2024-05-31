@@ -10,7 +10,7 @@ import("//build/rust/rustc_test.gni")
 import("//build/testing/host_test_data.gni")
 
 if (is_host) {
-  runtime_compat_deps = [
+  abi_compat_deps = [
     "//src/lib/flyweights",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
@@ -20,7 +20,7 @@ if (is_host) {
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
   ]
-  runtime_compat_sources = [
+  abi_compat_sources = [
     "src/compare/handle.rs",
     "src/compare/mod.rs",
     "src/compare/path.rs",
@@ -31,27 +31,27 @@ if (is_host) {
     "src/ir.rs",
     "src/main.rs",
   ]
-  rustc_binary("runtime_compat") {
-    name = "runtime_compat"
+  rustc_binary("abi_compat") {
+    name = "abi_compat"
     edition = "2021"
-    deps = runtime_compat_deps
-    sources = runtime_compat_sources
+    deps = abi_compat_deps
+    sources = abi_compat_sources
   }
 
-  host_test_data("runtime_compat_test_data") {
+  host_test_data("abi_compat_test_data") {
     sources = [ "$root_out_dir/fidlc" ]
     deps = [ "//tools/fidl/fidlc" ]
   }
 
-  rustc_test("runtime_compat_test") {
+  rustc_test("abi_compat_test") {
     edition = "2021"
-    deps = runtime_compat_deps + [ "//third_party/rust_crates:tempfile" ]
-    sources = runtime_compat_sources + [
+    deps = abi_compat_deps + [ "//third_party/rust_crates:tempfile" ]
+    sources = abi_compat_sources + [
                 "src/compare/test.rs",
                 "src/compare/types_tests.rs",
               ]
     source_root = "src/main.rs"
-    data_deps = [ ":runtime_compat_test_data" ]
+    data_deps = [ ":abi_compat_test_data" ]
   }
 
   reports = []
@@ -60,8 +60,8 @@ if (is_host) {
     reports += [ ":${label}" ]
 
     compiled_action(label) {
-      tool = ":runtime_compat"
-      tool_output_name = "runtime_compat"
+      tool = ":abi_compat"
+      tool_output_name = "abi_compat"
       mnemonic = "ABI"
 
       platform_ir = "${root_build_dir}/platform-ir-HEAD.json"
@@ -99,11 +99,11 @@ if (is_host) {
   }
 }
 
-group("runtime-compat") {
-  deps = [ ":runtime_compat($host_toolchain)" ]
+group("abi-compat") {
+  deps = [ ":abi_compat($host_toolchain)" ]
 }
 
 group("tests") {
-  deps = [ ":runtime_compat_test($host_toolchain)" ]
+  deps = [ ":abi_compat_test($host_toolchain)" ]
   testonly = true
 }

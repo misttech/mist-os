@@ -12,7 +12,7 @@ mod compare;
 mod convert;
 mod ir;
 
-/// Evaluate runtime compatibility between two Fuchsia platform versions.
+/// Evaluate ABI compatibility between two Fuchsia platform versions.
 #[derive(FromArgs)]
 struct Args {
     /// path to a JSON file representing the platform version used by an external component.
