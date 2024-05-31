@@ -355,11 +355,7 @@ pub fn random_connection_data() -> PastConnectionData {
         disconnect_time,
         uptime,
         client_types::DisconnectReason::DisconnectDetectedFromSme,
-        EwmaSignalData::new(
-            rng.gen_range(-90..-20),
-            rng.gen_range(10..50),
-            EWMA_SMOOTHING_FACTOR_FOR_METRICS,
-        ),
+        client_types::Signal { rssi_dbm: rng.gen_range(-90..-20), snr_db: rng.gen_range(10..50) },
         rng.gen::<u8>().into(),
     )
 }
