@@ -83,6 +83,8 @@ class SockScripter {
   bool LogIpTransparent(char* arg);
   bool SetIpHeaderInclude(char* arg);
   bool LogIpHeaderInclude(char* arg);
+  bool SetIcmp6Filter(char* arg);
+  bool LogIcmp6Filter(char* arg);
   bool Bind(char* arg);
   bool Shutdown(char* arg);
   bool Connect(char* arg);
