@@ -7,7 +7,6 @@ use {
         bedrock::{
             program::{self as program, ComponentStopOutcome, Program, StopRequestSuccess},
             program_output_dict::build_program_output_dictionary,
-            sandbox_construction::{self, build_component_sandbox, extend_dict_with_offers},
         },
         framework::{build_framework_dictionary, controller},
         model::{
@@ -35,7 +34,10 @@ use {
         sandbox_util::RoutableExt,
     },
     ::routing::{
-        bedrock::structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
+        bedrock::{
+            sandbox_construction::{self, build_component_sandbox, extend_dict_with_offers},
+            structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
+        },
         capability_source::ComponentCapability,
         component_instance::{
             ComponentInstanceInterface, ResolvedInstanceInterface, ResolvedInstanceInterfaceExt,

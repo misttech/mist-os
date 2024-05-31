@@ -4,5 +4,6 @@
 
 pub mod dict_ext;
 pub mod lazy_get;
+pub mod sandbox_construction;
 pub mod structured_dict;
 pub mod with_availability;

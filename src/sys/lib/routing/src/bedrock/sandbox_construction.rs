@@ -3,6 +3,11 @@
 // found in the LICENSE file.
 
 use {
+    crate::{
+        bedrock::structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
+        error::RoutingError,
+        DictExt, LazyGet, WithAvailability,
+    },
     async_trait::async_trait,
     cm_rust::{ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon},
     cm_types::{IterablePath, Name, SeparatedPath},
@@ -12,11 +17,6 @@ use {
     itertools::Itertools,
     moniker::{ChildName, Moniker},
     router_error::RouterError,
-    routing::{
-        bedrock::structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
-        error::RoutingError,
-        DictExt, LazyGet, WithAvailability,
-    },
     sandbox::{Capability, Dict, Request, Router, Unit},
     std::{collections::HashMap, fmt::Debug},
     tracing::warn,
