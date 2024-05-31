@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::handle::{AsHandleRef, EventPair, Signals};
 use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
+use fuchsia_zircon::Koid;
 use futures::FutureExt;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Mutex;
-use zx::AsHandleRef;
 
 use crate::Capability;
 
@@ -29,7 +29,7 @@ lazy_static! {
 ///
 pub(crate) fn insert(
     capability: Capability,
-    koid: zx::Koid,
+    koid: Koid,
     fut: impl Future<Output = ()> + Send + 'static,
 ) {
     let mut registry = REGISTRY.lock().unwrap();
@@ -47,18 +47,18 @@ pub(crate) fn insert(
 /// Inserts a capability into the registry and returns a token that can be
 /// used to lookup the same capability later. Short form of [`insert`] when
 /// the capability is represented externally as a token.
-pub(crate) fn insert_token(capability: Capability) -> zx::EventPair {
-    let (watcher, token) = zx::EventPair::create();
+pub(crate) fn insert_token(capability: Capability) -> EventPair {
+    let (watcher, token) = EventPair::create();
     insert(
         capability,
         token.basic_info().unwrap().koid,
-        fasync::OnSignals::new(watcher, zx::Signals::OBJECT_PEER_CLOSED).map(|_| ()),
+        fasync::OnSignals::new(watcher, Signals::OBJECT_PEER_CLOSED).map(|_| ()),
     );
     token
 }
 
 /// Get a capability from the global registry and returns it, if it exists.
-pub(crate) fn get(koid: zx::Koid) -> Option<Capability> {
+pub(crate) fn get(koid: Koid) -> Option<Capability> {
     let registry = REGISTRY.lock().unwrap();
     registry.get(koid).map(|entry| entry.capability.clone())
 }
@@ -76,7 +76,7 @@ pub struct Entry {
 /// There should only be a single Registry, outside of unit tests.
 #[derive(Default)]
 pub struct Registry {
-    entries: HashMap<zx::Koid, Entry>,
+    entries: HashMap<Koid, Entry>,
 }
 
 impl Registry {
@@ -86,17 +86,17 @@ impl Registry {
     /// and returns the old one.
     ///
     /// Returns None if the entry with the given koid did not previously exist.
-    pub(crate) fn insert(&mut self, koid: zx::Koid, entry: Entry) -> Option<Entry> {
+    pub(crate) fn insert(&mut self, koid: Koid, entry: Entry) -> Option<Entry> {
         self.entries.insert(koid, entry)
     }
 
     /// Removes an entry from the registry, if one with a matching koid exists.
-    pub(crate) fn remove(&mut self, koid: zx::Koid) -> Option<Entry> {
+    pub(crate) fn remove(&mut self, koid: Koid) -> Option<Entry> {
         self.entries.remove(&koid)
     }
 
     /// Gets an entry from the registry, if one with a matching koid exists.
-    pub(crate) fn get(&self, koid: zx::Koid) -> Option<&Entry> {
+    pub(crate) fn get(&self, koid: Koid) -> Option<&Entry> {
         self.entries.get(&koid)
     }
 }
@@ -114,7 +114,7 @@ mod tests {
         let mut registry = Registry::default();
 
         // Insert a Unit capability into the registry.
-        let koid = zx::Koid::from_raw(123);
+        let koid = Koid::from_raw(123);
         let unit = Unit::default();
         assert!(registry.insert(koid, Entry { capability: unit.into(), task: None }).is_none());
 
@@ -141,7 +141,7 @@ mod tests {
             let _ = receiver.await;
         });
 
-        let koid = zx::Koid::from_raw(123);
+        let koid = Koid::from_raw(123);
         let unit = Unit::default();
 
         insert(unit.into(), koid, task);

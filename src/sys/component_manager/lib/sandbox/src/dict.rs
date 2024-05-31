@@ -4,9 +4,10 @@
 
 use derivative::Derivative;
 use fidl::endpoints::{self, create_request_stream, ClientEnd};
+use fidl::handle::AsHandleRef;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fuchsia_async as fasync;
-use fuchsia_zircon::{self as zx, AsHandleRef};
+use fuchsia_zircon::Koid;
 use futures::TryStreamExt;
 use std::{
     collections::BTreeMap,
@@ -232,7 +233,7 @@ impl Dict {
     }
 
     /// Serves the `fuchsia.sandbox.Dictionary` protocol for this Open and moves it into the registry.
-    pub fn serve_and_register(self, stream: fsandbox::DictionaryRequestStream, koid: zx::Koid) {
+    pub fn serve_and_register(self, stream: fsandbox::DictionaryRequestStream, koid: Koid) {
         let mut dict = self.clone();
 
         // Move this capability into the registry.
@@ -360,6 +361,7 @@ mod tests {
     use fidl::endpoints::{
         create_endpoints, create_proxy, create_proxy_and_stream, Proxy, ServerEnd,
     };
+    use fidl::handle::{Channel, Status};
     use fidl_fuchsia_io as fio;
     use fuchsia_fs::directory::DirEntry;
     use futures::try_join;
@@ -730,7 +732,7 @@ mod tests {
             EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
         }
 
-        fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+        fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
             request.open_remote(self)
         }
     }
@@ -761,7 +763,7 @@ mod tests {
             serve_directory(remote.clone(), &scope, fio::OpenFlags::DIRECTORY).unwrap();
 
         assert_eq!(mock_dir.0.get(), 0);
-        let (client_end, server_end) = zx::Channel::create();
+        let (client_end, server_end) = Channel::create();
         let dir = dir_client_end.channel();
         fdio::service_connect_at(dir, &format!("{}/bar", *CAP_KEY), server_end).unwrap();
         fasync::Channel::from_channel(client_end).on_closed().await.unwrap();
@@ -794,7 +796,7 @@ mod tests {
 
         // Open the inner most capability.
         assert_eq!(mock_dir.0.get(), 0);
-        let (client_end, server_end) = zx::Channel::create();
+        let (client_end, server_end) = Channel::create();
         let dir = dir.into_channel().unwrap().into_zx_channel();
         fdio::service_connect_at(&dir, &format!("{}/{}/bar", *CAP_KEY, *CAP_KEY), server_end)
             .unwrap();

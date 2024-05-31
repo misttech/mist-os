@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 use crate::CapabilityTrait;
+use fidl::handle::{EventPair, Signals};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
+use fuchsia_zircon::Koid;
 use std::fmt::Debug;
 use std::{any::Any, sync::Arc};
 
@@ -31,11 +32,11 @@ impl From<WeakComponentToken> for fsandbox::Capability {
 }
 
 impl WeakComponentToken {
-    async fn serve(server: zx::EventPair) {
-        fasync::OnSignals::new(&server, zx::Signals::OBJECT_PEER_CLOSED).await.ok();
+    async fn serve(server: EventPair) {
+        fasync::OnSignals::new(&server, Signals::OBJECT_PEER_CLOSED).await.ok();
     }
 
-    pub fn register(self, koid: zx::Koid, server: zx::EventPair) {
+    pub fn register(self, koid: Koid, server: EventPair) {
         crate::registry::insert(self.into(), koid, WeakComponentToken::serve(server));
     }
 }

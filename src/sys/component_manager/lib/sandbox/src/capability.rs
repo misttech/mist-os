@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::{AsHandleRef, HandleRef};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use from_enum::FromEnum;
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleRef};
+use fuchsia_zircon_status as zx_status;
 use router_error::Explain;
 use std::{fmt::Debug, sync::Arc};
 use thiserror::Error;
@@ -35,10 +36,10 @@ pub enum RemoteError {
 }
 
 impl Explain for RemoteError {
-    fn as_zx_status(&self) -> zx::Status {
+    fn as_zx_status(&self) -> zx_status::Status {
         match self {
-            RemoteError::UnknownVariant => zx::Status::NOT_SUPPORTED,
-            RemoteError::Unregistered => zx::Status::INVALID_ARGS,
+            RemoteError::UnknownVariant => zx_status::Status::NOT_SUPPORTED,
+            RemoteError::Unregistered => zx_status::Status::INVALID_ARGS,
         }
     }
 }

@@ -64,6 +64,9 @@ impl Receiver {
     }
 }
 
+// These tests do not run on host because the `wait_handle` function below is not supported in the
+// handle emulation layer.
+#[cfg(target_os = "fuchsia")]
 #[cfg(test)]
 mod tests {
     use assert_matches::assert_matches;

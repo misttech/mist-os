@@ -5,9 +5,9 @@
 use crate::{Capability, CapabilityTrait, Dict, WeakComponentToken};
 use async_trait::async_trait;
 use cm_types::Availability;
-use fidl::AsHandleRef;
+use fidl::handle::{AsHandleRef, EventPair};
 use fidl_fuchsia_component_sandbox as fsandbox;
-use fuchsia_zircon as zx;
+use fuchsia_zircon::Koid;
 use futures::future::BoxFuture;
 use futures::TryStreamExt;
 use router_error::RouterError;
@@ -34,7 +34,7 @@ pub struct Request {
 impl From<Request> for fsandbox::RouteRequest {
     fn from(request: Request) -> Self {
         let availability = from_cm_type(request.availability);
-        let (token, server) = zx::EventPair::create();
+        let (token, server) = EventPair::create();
         request.target.register(token.get_koid().unwrap(), server);
         fsandbox::RouteRequest {
             availability: Some(availability),
@@ -156,7 +156,7 @@ impl Router {
     }
 
     /// Serves the `fuchsia.sandbox.Router` protocol and moves ourself into the registry.
-    pub fn serve_and_register(self, stream: fsandbox::RouterRequestStream, koid: zx::Koid) {
+    pub fn serve_and_register(self, stream: fsandbox::RouterRequestStream, koid: Koid) {
         let router = self.clone();
 
         // Move this capability into the registry.
@@ -222,7 +222,7 @@ mod tests {
     use super::*;
     use crate::{Message, Receiver};
     use assert_matches::assert_matches;
-    use fuchsia_zircon as zx;
+    use fidl::handle::Channel;
 
     #[derive(Debug)]
     struct FakeComponentToken {}
@@ -259,14 +259,14 @@ mod tests {
         };
 
         drop(receiver);
-        let (ch1, _ch2) = zx::Channel::create();
+        let (ch1, _ch2) = Channel::create();
         assert!(sender.send(Message { channel: ch1 }).is_err());
     }
 
     #[fuchsia::test]
     async fn serve_router() {
         let component = FakeComponentToken::new();
-        let (component_client, server) = zx::EventPair::create();
+        let (component_client, server) = EventPair::create();
         let koid = server.basic_info().unwrap().related_koid;
         component.register(koid, server);
 
@@ -308,7 +308,7 @@ mod tests {
         assert_matches!(capability, Err(fsandbox::RouterError::InvalidArgs));
 
         let component = FakeComponentToken::new();
-        let (component_client, server) = zx::EventPair::create();
+        let (component_client, server) = EventPair::create();
         let koid = server.basic_info().unwrap().related_koid;
         component.register(koid, server);
 
@@ -333,7 +333,7 @@ mod tests {
         let _stream = fuchsia_async::Task::spawn(router.serve_router(stream));
 
         // Create the client but don't register it.
-        let (component_client, _server) = zx::EventPair::create();
+        let (component_client, _server) = EventPair::create();
 
         let capability = client
             .route(fsandbox::RouteRequest {

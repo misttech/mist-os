@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 use core::fmt;
 use fidl::endpoints::ClientEnd;
+use fidl::handle::{AsHandleRef, Channel, Handle};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use std::sync::Arc;
 use vfs::{directory::entry::DirectoryEntry, remote::RemoteLike};
 
@@ -47,11 +47,11 @@ impl Clone for Directory {
         // Call `fuchsia.io/Directory.Clone` without converting the ClientEnd into a proxy.
         // This is necessary because we the conversion consumes the ClientEnd, but we can't take
         // it out of non-mut `&self`.
-        let (clone_client_end, clone_server_end) = zx::Channel::create();
+        let (clone_client_end, clone_server_end) = Channel::create();
         let raw_handle = self.client_end.as_handle_ref().raw_handle();
         // SAFETY: the channel is forgotten at the end of scope so it is not double closed.
         unsafe {
-            let borrowed: zx::Channel = zx::Handle::from_raw(raw_handle).into();
+            let borrowed: Channel = Handle::from_raw(raw_handle).into();
             let directory = fio::DirectorySynchronousProxy::new(borrowed);
             let _ = directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, clone_server_end.into());
             std::mem::forget(directory.into_channel());
@@ -89,8 +89,8 @@ mod tests {
     use super::*;
     use crate::Open;
     use fidl::endpoints::{create_endpoints, ServerEnd};
+    use fidl::handle::Status;
     use fidl_fuchsia_io as fio;
-    use fuchsia_zircon as zx;
     use futures::channel::mpsc;
     use futures::StreamExt;
     use vfs::{
@@ -125,7 +125,7 @@ mod tests {
                 EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
             }
 
-            fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+            fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
                 request.open_remote(self)
             }
         }
