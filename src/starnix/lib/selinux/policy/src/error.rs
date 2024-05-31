@@ -90,6 +90,8 @@ pub enum ValidateError {
     NonOptionalIdIsZero,
     #[error("required validation routine not implemented")]
     NotImplemented,
+    #[error("undefined {kind} Id value {id}")]
+    UnknownId { kind: &'static str, id: String },
 }
 
 /// Structured errors that may be encountered querying a binary policy.

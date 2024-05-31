@@ -12,7 +12,7 @@ use super::{
         Ports, RangeTransitions, RoleAllows, RoleTransitions, SimpleArray,
         MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY,
     },
-    error::{ParseError, QueryError},
+    error::{ParseError, QueryError, ValidateError},
     extensible_bitmap::ExtensibleBitmap,
     metadata::{Config, Counts, HandleUnknown, Magic, PolicyVersion, Signature},
     parser::ParseStrategy,
@@ -24,7 +24,7 @@ use super::{
 };
 
 use anyhow::Context as _;
-use std::fmt::Debug;
+use std::{collections::HashSet, fmt::Debug, hash::Hash};
 use zerocopy::little_endian as le;
 
 /// A parsed binary policy.
@@ -728,6 +728,64 @@ impl<PS: ParseStrategy> Validate for ParsedPolicy<PS> {
             .map_err(Into::<anyhow::Error>::into)
             .context("validating attribute_maps")?;
 
+        // Collate the sets of user, role, type, sensitivity and category Ids.
+        let user_ids: HashSet<UserId> = self.users.data.iter().map(|x| x.id()).collect();
+        let role_ids: HashSet<RoleId> = self.roles.data.iter().map(|x| x.id()).collect();
+        let type_ids: HashSet<TypeId> = self.types.data.iter().map(|x| x.id()).collect();
+        let sensitivity_ids: HashSet<SensitivityId> =
+            self.sensitivities.data.iter().map(|x| x.id()).collect();
+        let _category_ids: HashSet<CategoryId> =
+            self.categories.data.iter().map(|x| x.id()).collect();
+
+        // Validate that users use only defined sensitivities.
+        // TODO(b/329221265): Validate category Ids in MlsRanges.
+        for user in &self.users.data {
+            let range = user.mls_range();
+            validate_id(&sensitivity_ids, range.low().sensitivity(), "sensitivity")?;
+            if let Some(high) = range.high() {
+                validate_id(&sensitivity_ids, high.sensitivity(), "sensitivity")?;
+            }
+        }
+
+        // Validate that initial contexts use only defined user, role, type, etc Ids.
+        // TODO(b/329221265): Validate category Ids in MlsRanges.
+        for initial_sid in &self.initial_sids.data {
+            let context = initial_sid.context();
+            validate_id(&user_ids, context.user_id(), "user")?;
+            validate_id(&role_ids, context.role_id(), "role")?;
+            validate_id(&type_ids, context.type_id(), "type")?;
+            validate_id(&sensitivity_ids, context.low_level().sensitivity(), "sensitivity")?;
+            if let Some(high) = context.high_level() {
+                validate_id(&sensitivity_ids, high.sensitivity(), "sensitivity")?;
+            }
+        }
+
+        // Validate that roles output by role- transitions & allows are defined.
+        for transition in PS::deref_slice(&self.role_transitions.data) {
+            validate_id(&role_ids, transition.new_role(), "new_role")?;
+        }
+        for allow in PS::deref_slice(&self.role_allowlist.data) {
+            validate_id(&role_ids, allow.new_role(), "new_role")?;
+        }
+
+        // Validate that types output by access vector rules are defined.
+        for access_vector in &self.access_vectors.data {
+            if let Some(type_id) = access_vector.new_type() {
+                validate_id(&type_ids, type_id, "new_type")?;
+            }
+        }
+
         Ok(())
     }
+}
+
+fn validate_id<IdType: Debug + Eq + Hash>(
+    id_set: &HashSet<IdType>,
+    id: IdType,
+    debug_kind: &'static str,
+) -> Result<(), anyhow::Error> {
+    if !id_set.contains(&id) {
+        return Err(ValidateError::UnknownId { kind: debug_kind, id: format!("{:?}", id) }.into());
+    }
+    Ok(())
 }
