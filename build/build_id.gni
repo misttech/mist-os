@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/toolchain/buildidtool.gni")
+
 # Adds an ELF binary to the .build-id directory by hard-linking.
 #
 # Parameters
@@ -32,7 +34,7 @@ template("build_id_entry") {
     # TODO(https://fxbug.dev/42060773): Re-enable when fsatrace is fixed to not hang when running this tool.
     hermetic_deps = false
 
-    script = "//prebuilt/tools/buildidtool/${host_platform}/buildidtool"
+    script = buildidtool_path
     args = [
       "-entry",
       ".debug=" + rebase_path(invoker.debug, root_build_dir),
