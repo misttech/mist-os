@@ -658,6 +658,22 @@ assembly_input_bundle("kernel_pmm_checker_enabled") {
   ]
 }
 
+# Added when a board might support the PMM checker, but wants to defer to a run
+# time check to determine if it's real hardware or not.
+assembly_input_bundle("kernel_pmm_checker_enabled_auto") {
+  kernel_cmdline = [
+    # Enable PMM checker to detect certain kinds of buffer overrun and
+    # use-after-free bugs.
+    "kernel.pmm-checker.enable=auto",
+
+    # Use a small fill size to minimize performance impact.  In practice,
+    # corruption tends to happen at the start of a page so filling/checking only
+    # the first 16 bytes provides decent coverage without sacrificing
+    # performance.
+    "kernel.pmm-checker.fill-size=16",
+  ]
+}
+
 # sl4f: Scripting Layer for Fuchsia
 #
 # Often used for manipulating device during E2E tests.

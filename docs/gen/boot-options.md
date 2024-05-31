@@ -872,13 +872,21 @@ corruption.  Values must be one of:
  * `panic`
    - A fatal kernel panic will occur when corruption is detected.
 
-### kernel.pmm-checker.enable=\<bool>
+### kernel.pmm-checker.enable=\[true | false | auto\]
 
 **Default:** `false`
 
 This controls whether the PMM's use-after-free checker is enabled.
 The PMM checker can be expensive and is intended for use in debug and
-development builds.  See also "k pmm checker".
+development builds. Values must be one of:
+ * `true`
+   - Checker is always enabled.
+ * `false`
+   - Checker is never enabled.
+ * `auto`
+   - Kernel makes a decision to enable checker based on the environment and its performance
+     characteristics. Running under a hypervisor is one factor taken into consideration.
+See also "k pmm checker".
 
 ### kernel.pmm-checker.fill-size=\<uint64_t>
 

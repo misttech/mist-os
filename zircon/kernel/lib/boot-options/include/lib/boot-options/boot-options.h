@@ -120,6 +120,7 @@ struct BootOptions {
   OPTION_TYPE(CompressionStrategy);
   OPTION_TYPE(CompressionStorageStrategy);
   OPTION_TYPE(CheckFailAction);
+  OPTION_TYPE(CheckerEnable);
   OPTION_TYPE(std::optional<RamReservation>);
 #if BOOT_OPTIONS_TESTONLY_OPTIONS
   OPTION_TYPE(TestEnum);

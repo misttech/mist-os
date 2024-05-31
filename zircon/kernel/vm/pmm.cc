@@ -40,6 +40,10 @@
 #include "pmm_node.h"
 #include "vm_priv.h"
 
+#if defined(__x86_64__)
+#include <arch/x86/feature.h>
+#endif
+
 #include <ktl/enforce.h>
 
 #define LOCAL_TRACE VM_GLOBAL_TRACE(0)
@@ -220,7 +224,30 @@ static bool pmm_checker_is_enabled() { return pmm_node.Checker()->IsArmed(); }
 static void pmm_checker_print_status() { pmm_node.Checker()->PrintStatus(stdout); }
 
 void pmm_checker_init_from_cmdline() {
-  bool enabled = gBootOptions->pmm_checker_enabled;
+  bool enabled = false;
+  switch (gBootOptions->pmm_checker_enabled) {
+    case CheckerEnable::kTrue:
+      enabled = true;
+      break;
+    case CheckerEnable::kFalse:
+      enabled = false;
+      break;
+    case CheckerEnable::kAuto:
+#if defined(__x86_64__)
+      if (x86_has_hypervisor()) {
+        printf("PMM: Checker enabled set to auto and hypervisor detected, disabling\n");
+        enabled = false;
+      } else {
+        printf("PMM: Checker enabled set to auto and hypervisor not detected, enabling\n");
+        enabled = true;
+      }
+#else
+      printf(
+          "PMM: Checker enabled set to auto on platform without hypervisor detection, disabling\n");
+      enabled = false;
+#endif
+      break;
+  }
   if (enabled) {
     size_t fill_size = gBootOptions->pmm_checker_fill_size;
     if (!PmmChecker::IsValidFillSize(fill_size)) {

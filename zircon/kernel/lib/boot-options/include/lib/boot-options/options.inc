@@ -750,11 +750,19 @@ corruption.  Values must be one of:
    - A fatal kernel panic will occur when corruption is detected.
 )""")
 
-DEFINE_OPTION("kernel.pmm-checker.enable", bool, pmm_checker_enabled, {false},
+DEFINE_OPTION("kernel.pmm-checker.enable", CheckerEnable, pmm_checker_enabled, {CheckerEnable::kFalse},
               R"""(
 This controls whether the PMM's use-after-free checker is enabled.
 The PMM checker can be expensive and is intended for use in debug and
-development builds.  See also "k pmm checker".
+development builds. Values must be one of:
+ * `true`
+   - Checker is always enabled.
+ * `false`
+   - Checker is never enabled.
+ * `auto`
+   - Kernel makes a decision to enable checker based on the environment and its performance
+     characteristics. Running under a hypervisor is one factor taken into consideration.
+See also "k pmm checker".
 )""")
 
 DEFINE_OPTION("kernel.pmm-checker.fill-size", uint64_t, pmm_checker_fill_size, {ZX_PAGE_SIZE},

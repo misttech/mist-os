@@ -66,6 +66,7 @@ BOOTSTRAP_ENG_PLATFORM_AIB_NAMES = [
     "embeddable_eng",
     "bootstrap_eng",
     "kernel_pmm_checker_enabled",
+    "kernel_pmm_checker_enabled_auto",
     "power_framework_testing_sag",
 ]
 

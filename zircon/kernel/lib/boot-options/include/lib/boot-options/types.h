@@ -122,6 +122,13 @@ enum class CheckFailAction {
   kPanic,
 };
 
+// See kernel.pmm-checker.enable
+enum class CheckerEnable {
+  kTrue,
+  kFalse,
+  kAuto,
+};
+
 constexpr bool operator==(const RamReservation& lhs, const RamReservation& rhs) {
   return lhs.paddr == rhs.paddr && lhs.size == rhs.size;
 }
