@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 pub mod availability;
+pub mod bedrock;
 pub mod capability_source;
 pub mod collection;
 pub mod component_instance;
@@ -17,8 +18,6 @@ pub mod policy;
 pub mod resolving;
 pub mod rights;
 pub mod walk_state;
-
-mod bedrock;
 
 use fuchsia_zircon_status as zx;
 use {

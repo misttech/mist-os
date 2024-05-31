@@ -12,7 +12,6 @@ use {
             events::registry::EventSubscription,
             model::Model,
             start::Start,
-            structured_dict::ComponentInput,
             testing::{
                 mocks::*,
                 out_dir::OutDir,
@@ -22,7 +21,7 @@ use {
             },
         },
     },
-    ::routing::policy::PolicyError,
+    ::routing::{bedrock::structured_dict::ComponentInput, policy::PolicyError},
     assert_matches::assert_matches,
     async_trait::async_trait,
     cm_config::AllowlistEntryBuilder,

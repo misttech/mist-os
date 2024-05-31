@@ -578,7 +578,6 @@ mod tests {
             actions::{ActionsManager, ShutdownAction, ShutdownType, StopAction},
             component::instance::{ResolvedInstanceState, UnresolvedInstanceState},
             component::{Component, WeakComponentInstance},
-            structured_dict::ComponentInput,
             testing::{
                 routing_test_helpers::RoutingTestBuilder,
                 test_helpers::{self, ActionsTest},
@@ -594,7 +593,7 @@ mod tests {
         hooks::Event,
         hooks::{EventType, Hook, HooksRegistration},
         rand::seq::SliceRandom,
-        routing::resolving::ComponentAddress,
+        routing::{bedrock::structured_dict::ComponentInput, resolving::ComponentAddress},
         std::sync::{Mutex, Weak},
     };
 

@@ -32,12 +32,12 @@ use {
             routing_fns::RouteEntry,
             start::Start,
             storage::build_storage_admin_dictionary,
-            structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
             token::{InstanceToken, InstanceTokenState},
         },
         sandbox_util::RoutableExt,
     },
     ::routing::{
+        bedrock::structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
         capability_source::ComponentCapability,
         component_instance::{
             ComponentInstanceInterface, ResolvedInstanceInterface, ResolvedInstanceInterfaceExt,

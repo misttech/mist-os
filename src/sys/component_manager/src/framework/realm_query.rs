@@ -730,7 +730,6 @@ mod tests {
         super::*,
         crate::model::{
             component::StartReason,
-            structured_dict::ComponentInput,
             testing::test_helpers::{TestEnvironmentBuilder, TestModelResult},
         },
         assert_matches::assert_matches,
@@ -740,6 +739,7 @@ mod tests {
         fidl::endpoints::{create_endpoints, create_proxy, create_proxy_and_stream},
         fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_zircon as zx,
+        routing::bedrock::structured_dict::ComponentInput,
         routing_test_helpers::component_id_index::make_index_file,
     };
 

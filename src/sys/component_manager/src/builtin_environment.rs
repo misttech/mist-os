@@ -52,7 +52,6 @@ use {
             },
             model::{Model, ModelParams},
             resolver::{box_arc_resolver, ResolverRegistry},
-            structured_dict::ComponentInput,
             token::InstanceRegistry,
         },
         root_stop_notifier::RootStopNotifier,
@@ -61,6 +60,7 @@ use {
     ::diagnostics::lifecycle::ComponentLifecycleTimeStats,
     ::diagnostics::task_metrics::ComponentTreeStats,
     ::routing::{
+        bedrock::structured_dict::ComponentInput,
         capability_source::{ComponentCapability, InternalCapability},
         component_instance::TopInstanceInterface,
         environment::{DebugRegistry, RunnerRegistry},

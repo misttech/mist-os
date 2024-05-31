@@ -203,7 +203,6 @@ mod tests {
             component::{manager::ComponentManagerInstance, WeakExtendedInstance},
             context::ModelContext,
             environment::Environment,
-            structured_dict::ComponentInput,
         },
         anyhow::{format_err, Error},
         assert_matches::assert_matches,
@@ -214,8 +213,11 @@ mod tests {
         hooks::Hooks,
         lazy_static::lazy_static,
         moniker::Moniker,
-        routing::environment::{DebugRegistry, RunnerRegistry},
-        routing::resolving::ComponentResolutionContext,
+        routing::{
+            bedrock::structured_dict::ComponentInput,
+            environment::{DebugRegistry, RunnerRegistry},
+            resolving::ComponentResolutionContext,
+        },
         serde_json::json,
         std::sync::{Mutex, Weak},
     };

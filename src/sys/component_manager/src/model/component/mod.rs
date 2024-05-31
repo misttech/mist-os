@@ -1375,7 +1375,6 @@ pub mod tests {
         crate::model::{
             actions::{shutdown, test_utils::is_discovered, StopAction},
             events::registry::EventSubscription,
-            structured_dict::ComponentInput,
             testing::{
                 mocks::ControllerActionResponse,
                 out_dir::OutDir,
@@ -1383,7 +1382,7 @@ pub mod tests {
                 test_helpers::{component_decl_with_test_runner, ActionsTest, ComponentInfo},
             },
         },
-        ::routing::resolving::ComponentAddress,
+        ::routing::{bedrock::structured_dict::ComponentInput, resolving::ComponentAddress},
         assert_matches::assert_matches,
         cm_fidl_validator::error::DeclType,
         cm_rust::{

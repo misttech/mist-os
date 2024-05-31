@@ -443,12 +443,12 @@ mod tests {
         crate::model::{
             component::StartReason,
             start::Start,
-            structured_dict::ComponentInput,
             testing::{
                 out_dir::OutDir,
                 test_helpers::{TestEnvironmentBuilder, TestModelResult},
             },
         },
+        ::routing::bedrock::structured_dict::ComponentInput,
         assert_matches::assert_matches,
         cm_rust::*,
         cm_rust_testing::*,
