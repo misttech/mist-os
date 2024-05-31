@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::audio_default_settings::default_audio_info;
+use crate::audio::audio_default_settings::AudioInfoLoader;
 use crate::audio::{create_default_modified_counters, ModifiedCounters};
 use anyhow::{anyhow, Error};
 use serde::{Deserialize, Serialize};
 use settings_storage::device_storage::DeviceStorageCompatible;
-use settings_storage::storage_factory::NoneT;
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
 
@@ -79,17 +78,11 @@ pub struct AudioInfo {
 }
 
 impl DeviceStorageCompatible for AudioInfo {
-    type Loader = NoneT;
+    type Loader = AudioInfoLoader;
     const KEY: &'static str = "audio_info";
 
     fn try_deserialize_from(value: &str) -> Result<Self, Error> {
         Self::extract(value).or_else(|_| AudioInfoV2::try_deserialize_from(value).map(Self::from))
-    }
-}
-
-impl Default for AudioInfo {
-    fn default() -> Self {
-        default_audio_info()
     }
 }
 
@@ -119,9 +112,9 @@ impl AudioInfoV2 {
     }
 
     #[cfg(test)]
-    pub(super) fn default_value() -> Self {
+    pub(super) fn default_value(default_setting: AudioInfo) -> Self {
         AudioInfoV2 {
-            streams: default_audio_info().streams,
+            streams: default_setting.streams,
             input: AudioInputInfo { mic_mute: false },
             modified_counters: None,
         }
@@ -151,9 +144,9 @@ impl AudioInfoV1 {
     }
 
     #[cfg(test)]
-    pub(super) fn default_value() -> Self {
+    pub(super) fn default_value(default_setting: AudioInfo) -> Self {
         AudioInfoV1 {
-            streams: default_audio_info().streams,
+            streams: default_setting.streams,
             input: AudioInputInfo { mic_mute: false },
             modified_timestamps: None,
         }

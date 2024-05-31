@@ -5,9 +5,9 @@
 use crate::audio::types::{AudioInfo, AudioSettingSource, AudioStream, AudioStreamType};
 use crate::base::SettingInfo;
 use crate::config::default_settings::DefaultSetting;
-use lazy_static::lazy_static;
+use settings_storage::storage_factory::DefaultLoader;
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 const DEFAULT_VOLUME_LEVEL: f32 = 0.5;
 const DEFAULT_VOLUME_MUTED: bool = false;
@@ -27,14 +27,6 @@ const DEFAULT_AUDIO_INFO: AudioInfo =
 /// change from the number sent in the previous update if the stream type's
 /// volume has changed.
 pub type ModifiedCounters = HashMap<AudioStreamType, usize>;
-
-lazy_static! {
-    pub(crate) static ref AUDIO_DEFAULT_SETTINGS: Mutex<DefaultSetting<AudioInfo, &'static str>> =
-        Mutex::new(DefaultSetting::new(
-            Some(DEFAULT_AUDIO_INFO.clone()),
-            "/config/data/audio_config_data.json",
-        ));
-}
 
 pub(crate) fn create_default_modified_counters() -> ModifiedCounters {
     IntoIterator::into_iter([
@@ -57,19 +49,39 @@ pub(crate) const fn create_default_audio_stream(stream_type: AudioStreamType) ->
     }
 }
 
+pub fn build_audio_default_settings() -> DefaultSetting<AudioInfo, &'static str> {
+    DefaultSetting::new(Some(DEFAULT_AUDIO_INFO), "/config/data/audio_config_data.json")
+}
+
 /// Returns a default audio [`AudioInfo`] that is derived from
 /// [`DEFAULT_AUDIO_INFO`] with any fields specified in the
 /// audio configuration set.
 ///
 /// [`DEFAULT_AUDIO_INFO`]: static@DEFAULT_AUDIO_INFO
-pub(crate) fn default_audio_info() -> AudioInfo {
-    let mut default_audio_info: AudioInfo = DEFAULT_AUDIO_INFO.clone();
+#[derive(Clone)]
+pub struct AudioInfoLoader {
+    audio_default_settings: Arc<Mutex<DefaultSetting<AudioInfo, &'static str>>>,
+}
 
-    if let Ok(Some(audio_configuration)) = AUDIO_DEFAULT_SETTINGS.lock().unwrap().get_cached_value()
-    {
-        default_audio_info.streams = audio_configuration.streams;
+impl AudioInfoLoader {
+    pub(crate) fn new(audio_default_settings: DefaultSetting<AudioInfo, &'static str>) -> Self {
+        Self { audio_default_settings: Arc::new(Mutex::new(audio_default_settings)) }
     }
-    default_audio_info
+}
+
+impl DefaultLoader for AudioInfoLoader {
+    type Result = AudioInfo;
+
+    fn default_value(&self) -> Self::Result {
+        let mut default_audio_info: AudioInfo = DEFAULT_AUDIO_INFO.clone();
+
+        if let Ok(Some(audio_configuration)) =
+            self.audio_default_settings.lock().unwrap().get_cached_value()
+        {
+            default_audio_info.streams = audio_configuration.streams;
+        }
+        default_audio_info
+    }
 }
 
 impl From<AudioInfo> for SettingInfo {
@@ -123,15 +135,27 @@ mod tests {
         modified_counters: None,
     };
 
+    /// Load default settings from disk.
+    fn load_default_settings(
+        default_settings: &mut DefaultSetting<AudioInfo, &'static str>,
+    ) -> AudioInfo {
+        default_settings
+            .load_default_value()
+            .expect("if config exists, it should be parseable")
+            .expect("default value should always exist")
+    }
+
     #[fuchsia::test(allow_stalls = false)]
     async fn test_audio_config() {
-        let settings = default_audio_info();
+        let mut settings = build_audio_default_settings();
+        let settings = load_default_settings(&mut settings);
         assert_eq!(CONFIG_AUDIO_INFO, settings);
     }
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_audio_info_migration_v1_to_v2() {
-        let mut v1 = AudioInfoV1::default_value();
+        let mut default_settings = build_audio_default_settings();
+        let mut v1 = AudioInfoV1::default_value(load_default_settings(&mut default_settings));
         let updated_mic_mute_val = !v1.input.mic_mute;
         v1.input.mic_mute = updated_mic_mute_val;
 
@@ -146,10 +170,12 @@ mod tests {
     #[fuchsia::test]
     fn test_audio_info_migration_v2_to_current() {
         let mut executor = TestExecutor::new_with_fake_time();
+        let mut default_settings = build_audio_default_settings();
+        let settings = load_default_settings(&mut default_settings);
 
         let mut v2 = move_executor_forward_and_get(
             &mut executor,
-            async { AudioInfoV2::default_value() },
+            async { AudioInfoV2::default_value(settings) },
             "Unable to get V2 default value",
         );
         let updated_mic_mute_val = !v2.input.mic_mute;
@@ -160,16 +186,19 @@ mod tests {
         let current = AudioInfo::try_deserialize_from(&serialized_v2)
             .expect("deserialization should succeed");
 
-        assert_eq!(current, AudioInfo::default());
+        let loader = AudioInfoLoader::new(default_settings);
+        assert_eq!(current, loader.default_value());
     }
 
     #[fuchsia::test]
     fn test_audio_info_migration_v1_to_current() {
         let mut executor = TestExecutor::new_with_fake_time();
+        let mut default_settings = build_audio_default_settings();
+        let settings = load_default_settings(&mut default_settings);
 
         let mut v1 = move_executor_forward_and_get(
             &mut executor,
-            async { AudioInfoV1::default_value() },
+            async { AudioInfoV1::default_value(settings) },
             "Unable to get V1 default value",
         );
         let updated_mic_mute_val = !v1.input.mic_mute;
@@ -180,6 +209,7 @@ mod tests {
         let current = AudioInfo::try_deserialize_from(&serialized_v1)
             .expect("deserialization should succeed");
 
-        assert_eq!(current, AudioInfo::default());
+        let loader = AudioInfoLoader::new(default_settings);
+        assert_eq!(current, loader.default_value());
     }
 }

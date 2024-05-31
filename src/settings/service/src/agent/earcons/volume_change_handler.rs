@@ -294,7 +294,7 @@ mod tests {
 
     use futures::lock::Mutex;
 
-    use crate::audio::default_audio_info;
+    use crate::audio::build_audio_default_settings;
     use crate::message::base::MessengerType;
     use crate::service_context::ServiceContext;
 
@@ -306,7 +306,12 @@ mod tests {
         ModifiedCounters, // new_counters
         Vec<AudioStream>, // expected_changed_streams
     ) {
-        let fake_streams = default_audio_info().streams;
+        let mut settings = build_audio_default_settings();
+        let settings = settings
+            .load_default_value()
+            .expect("config data should exist and be parseable for tests")
+            .unwrap();
+        let fake_streams = settings.streams;
         let old_timestamps = create_default_modified_counters();
         let new_timestamps = [
             (AudioStreamType::Background, 0),

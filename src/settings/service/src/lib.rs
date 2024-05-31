@@ -9,6 +9,8 @@ use std::sync::Arc;
 #[cfg(test)]
 use anyhow::format_err;
 use anyhow::{Context, Error};
+use audio::types::AudioInfo;
+use audio::AudioInfoLoader;
 use display::display_controller::DisplayInfoLoader;
 use fidl_fuchsia_io::DirectoryProxy;
 use fidl_fuchsia_stash::StoreProxy;
@@ -66,7 +68,7 @@ use crate::service_context::ServiceContext;
 use crate::setup::setup_controller::SetupController;
 
 mod accessibility;
-mod audio;
+pub mod audio;
 mod clock;
 pub mod display;
 mod do_not_disturb;
@@ -230,6 +232,7 @@ pub struct EnvironmentBuilder<
     store_proxy: Option<StoreProxy>,
     fidl_storage_factory: Option<Arc<FidlStorageFactory>>,
     display_configuration: Option<DefaultSetting<DisplayConfiguration, &'static str>>,
+    audio_configuration: Option<DefaultSetting<AudioInfo, &'static str>>,
     input_configuration: Option<DefaultSetting<InputConfiguration, &'static str>>,
     light_configuration: Option<DefaultSetting<LightHardwareConfiguration, &'static str>>,
 }
@@ -255,6 +258,7 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
             store_proxy: None,
             fidl_storage_factory: None,
             display_configuration: None,
+            audio_configuration: None,
             input_configuration: None,
             light_configuration: None,
         }
@@ -286,6 +290,14 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
         display_configuration: DefaultSetting<DisplayConfiguration, &'static str>,
     ) -> Self {
         self.display_configuration = Some(display_configuration);
+        self
+    }
+
+    pub fn audio_configuration(
+        mut self,
+        audio_configuration: DefaultSetting<AudioInfo, &'static str>,
+    ) -> Self {
+        self.audio_configuration = Some(audio_configuration);
         self
     }
 
@@ -479,6 +491,7 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
             Arc::clone(&fidl_storage_factory),
             &flags,
             self.display_configuration.map(DisplayInfoLoader::new),
+            self.audio_configuration.map(AudioInfoLoader::new),
             self.input_configuration,
             self.light_configuration,
             &mut handler_factory,
@@ -572,6 +585,7 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
         fidl_storage_factory: Arc<F>,
         controller_flags: &HashSet<ControllerFlag>,
         display_loader: Option<DisplayInfoLoader>,
+        audio_loader: Option<AudioInfoLoader>,
         input_configuration: Option<DefaultSetting<InputConfiguration, &'static str>>,
         light_configuration: Option<DefaultSetting<LightHardwareConfiguration, &'static str>>,
         factory_handle: &mut SettingHandlerFactoryImpl,
@@ -592,12 +606,17 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
 
         // Audio
         if components.contains(&SettingType::Audio) {
+            let audio_loader = audio_loader.expect("Audio storage requires audio loader");
             device_storage_factory
-                .initialize::<AudioController>()
+                .initialize_with_loader::<AudioController>(audio_loader.clone())
                 .await
                 .expect("storage should still be initializing");
-            factory_handle
-                .register(SettingType::Audio, Box::new(DataHandler::<AudioController>::spawn));
+            factory_handle.register(
+                SettingType::Audio,
+                Box::new(move |context| {
+                    DataHandler::<AudioController>::spawn_with(context, audio_loader.clone())
+                }),
+            );
         }
 
         // Display

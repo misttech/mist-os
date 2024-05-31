@@ -10,6 +10,7 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_fs::OpenFlags;
 use fuchsia_inspect::component;
 use futures::lock::Mutex;
+use settings::audio::build_audio_default_settings;
 use settings::base::get_default_interfaces;
 use settings::config::base::get_default_agent_types;
 use settings::config::default_settings::DefaultSetting;
@@ -67,6 +68,7 @@ fn main() -> Result<(), Error> {
             .expect("invalid service flag configuration")
             .expect("no default service flags");
     let display_configuration = build_display_default_settings();
+    let audio_configuration = build_audio_default_settings();
 
     // Temporary solution for FEMU to have an agent config without camera agent.
     let agent_config = "/config/data/agent_configuration.json";
@@ -106,6 +108,7 @@ fn main() -> Result<(), Error> {
     EnvironmentBuilder::new(Arc::new(storage_factory))
         .configuration(configuration)
         .display_configuration(display_configuration)
+        .audio_configuration(audio_configuration)
         .input_configuration(input_configuration)
         .light_configuration(light_configuration)
         .setting_proxy_inspect_info(
