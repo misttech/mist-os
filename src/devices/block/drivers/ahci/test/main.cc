@@ -596,6 +596,17 @@ TEST_P(AhciTest, ShutdownWaitsForTransactionsInFlight) {
          }};
   sata_device_->BlockImplQueue(op, callback, &done);
 
+  Port* port = dut_->port(FakeBus::kTestPortNumber);
+  const SataTransaction* command;
+  while (true) {
+    command = port->TestGetRunning(0);
+    if (command != nullptr) {
+      break;
+    }
+    // Wait until read command is issued.
+    zx::nanosleep(zx::deadline_after(zx::msec(1)));
+  }
+
   zx::time time = zx::clock::get_monotonic();
   dut_->Shutdown();
   zx::duration shutdown_duration = zx::clock::get_monotonic() - time;
