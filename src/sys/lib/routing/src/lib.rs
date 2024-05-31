@@ -56,8 +56,7 @@ use {
     tracing::warn,
 };
 
-pub use bedrock::dict_ext::DictExt;
-pub use bedrock::with_availability::WithAvailability;
+pub use bedrock::{dict_ext::DictExt, lazy_get::LazyGet, with_availability::WithAvailability};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

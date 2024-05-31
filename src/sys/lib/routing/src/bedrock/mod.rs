@@ -3,5 +3,6 @@
 // found in the LICENSE file.
 
 pub mod dict_ext;
+pub mod lazy_get;
 pub mod structured_dict;
 pub mod with_availability;

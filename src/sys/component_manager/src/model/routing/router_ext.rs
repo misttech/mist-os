@@ -5,13 +5,15 @@
 use crate::capability::CapabilitySource;
 use crate::model::component::ComponentInstance;
 use crate::model::component::WeakComponentInstance;
-use ::routing::{error::RoutingError, policy::GlobalPolicyChecker};
+use ::routing::{
+    error::{ComponentInstanceError, RoutingError},
+    policy::GlobalPolicyChecker,
+};
 use async_trait::async_trait;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use futures::future::BoxFuture;
 use router_error::{Explain, RouterError};
-use routing::error::ComponentInstanceError;
 use sandbox::Capability;
 use sandbox::Dict;
 use sandbox::Open;

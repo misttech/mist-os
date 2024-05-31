@@ -10,14 +10,13 @@ use {
             component::{ComponentInstance, WeakComponentInstance},
             routing::router_ext::RouterExt,
         },
-        sandbox_util::RoutableExt,
     },
     ::routing::{
         bedrock::structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
         capability_source::ComponentCapability,
         component_instance::ComponentInstanceInterface,
         error::{ComponentInstanceError, RoutingError},
-        DictExt, WithAvailability,
+        DictExt, LazyGet, WithAvailability,
     },
     async_trait::async_trait,
     cm_rust::{

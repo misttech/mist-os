@@ -9,10 +9,9 @@ use {
     },
     ::routing::{
         capability_source::CapabilitySource, component_instance::ComponentInstanceInterface,
-        error::RoutingError, policy::GlobalPolicyChecker, DictExt,
+        error::RoutingError, policy::GlobalPolicyChecker,
     },
     async_trait::async_trait,
-    cm_types::IterablePath,
     cm_util::WeakTaskGroup,
     fidl::{
         endpoints::{ProtocolMarker, RequestStream},
@@ -187,13 +186,6 @@ pub trait RoutableExt: Routable {
     /// the channel to be readable, then delegates to the current router. The wait
     /// is performed in the provided `scope`.
     fn on_readable(self, scope: ExecutionScope, entry_type: fio::DirentType) -> Router;
-
-    /// Returns a router that requests capabilities from the specified `path` relative to
-    /// the base routable or fails the request with `not_found_error` if the member is not
-    /// found. The base routable should resolve with a dictionary capability.
-    fn lazy_get<P>(self, path: P, not_found_error: impl Into<RouterError>) -> Router
-    where
-        P: IterablePath + Debug + 'static;
 }
 
 impl<T: Routable + 'static> RoutableExt for T {
@@ -278,38 +270,6 @@ impl<T: Routable + 'static> RoutableExt for T {
         let router = Router::new(self);
         Router::new(OnReadableRouter { router, scope, entry_type })
     }
-
-    fn lazy_get<P>(self, path: P, not_found_error: impl Into<RouterError>) -> Router
-    where
-        P: IterablePath + Debug + 'static,
-    {
-        #[derive(Debug)]
-        struct ScopedDictRouter<P: IterablePath + Debug + 'static> {
-            router: Router,
-            path: P,
-            not_found_error: RouterError,
-        }
-
-        #[async_trait]
-        impl<P: IterablePath + Debug + 'static> Routable for ScopedDictRouter<P> {
-            async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-                match self.router.route(request.clone()).await? {
-                    Capability::Dictionary(dict) => {
-                        let maybe_capability =
-                            dict.get_with_request(&self.path, request.clone()).await?;
-                        maybe_capability.ok_or_else(|| self.not_found_error.clone())
-                    }
-                    _ => Err(RoutingError::BedrockMemberAccessUnsupported.into()),
-                }
-            }
-        }
-
-        Router::new(ScopedDictRouter {
-            router: Router::new(self),
-            path,
-            not_found_error: not_found_error.into(),
-        })
-    }
 }
 
 #[cfg(test)]
@@ -322,6 +282,7 @@ pub mod tests {
     use cm_types::RelativePath;
     use fuchsia_async::TestExecutor;
     use router_error::DowncastErrorForTest;
+    use routing::{DictExt, LazyGet};
     use sandbox::{Data, Dict, Receiver, WeakComponentToken};
     use std::{pin::pin, sync::Weak, task::Poll};
 
