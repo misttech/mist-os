@@ -205,7 +205,7 @@
       "name": "test.versions/ADDED_AT_HEAD",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-        "line": 59,
+        "line": 61,
         "column": 7,
         "length": 13
       },
@@ -225,7 +225,7 @@
               },
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-                "line": 58,
+                "line": 60,
                 "column": 12,
                 "length": 10
               }
@@ -233,7 +233,69 @@
           ],
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
-            "line": 58,
+            "line": 60,
+            "column": 1,
+            "length": 22
+          }
+        }
+      ],
+      "type": {
+        "kind": "primitive",
+        "subtype": "bool",
+        "type_shape_v2": {
+          "inline_size": 1,
+          "alignment": 1,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_flexible_envelope": false
+        }
+      },
+      "value": {
+        "kind": "literal",
+        "value": "true",
+        "expression": "true",
+        "literal": {
+          "kind": "bool",
+          "value": "true",
+          "expression": "true"
+        }
+      }
+    },
+    {
+      "name": "test.versions/ADDED_AT_NEXT",
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
+        "line": 58,
+        "column": 7,
+        "length": 13
+      },
+      "deprecated": false,
+      "maybe_attributes": [
+        {
+          "name": "available",
+          "arguments": [
+            {
+              "name": "added",
+              "type": "uint32",
+              "value": {
+                "kind": "identifier",
+                "value": "4291821568",
+                "expression": "NEXT",
+                "identifier": "fidl/NEXT"
+              },
+              "location": {
+                "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
+                "line": 57,
+                "column": 12,
+                "length": 10
+              }
+            }
+          ],
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
+            "line": 57,
             "column": 1,
             "length": 22
           }
@@ -1422,6 +1484,7 @@
   "new_type_declarations": [],
   "declaration_order": [
     "test.versions/ADDED_AT_HEAD",
+    "test.versions/ADDED_AT_NEXT",
     "test.versions/Alias",
     "test.versions/Bits",
     "test.versions/Const",
@@ -1436,6 +1499,7 @@
   "declarations": {
     "test.versions/Bits": "bits",
     "test.versions/ADDED_AT_HEAD": "const",
+    "test.versions/ADDED_AT_NEXT": "const",
     "test.versions/Const": "const",
     "test.versions/Enum": "enum",
     "test.versions/OtherProtocol": "protocol",

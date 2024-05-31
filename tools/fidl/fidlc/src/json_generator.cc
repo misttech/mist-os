@@ -254,6 +254,8 @@ void JSONGenerator::Generate(const Name& name) {
   // identifier (with a library name). We should solve this in a cleaner way.
   if (name.is_intrinsic() && name.decl_name() == "MAX") {
     EmitString(std::string_view("fidl/MAX"));
+  } else if (name.is_intrinsic() && name.decl_name() == "NEXT") {
+    EmitString(std::string_view("fidl/NEXT"));
   } else if (name.is_intrinsic() && name.decl_name() == "HEAD") {
     EmitString(std::string_view("fidl/HEAD"));
   } else {

@@ -22,6 +22,8 @@ pub type Alias = String;
 
 pub const ADDED_AT_HEAD: bool = true;
 
+pub const ADDED_AT_NEXT: bool = true;
+
 pub const CONST: u32 = 0;
 
 bitflags! {

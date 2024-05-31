@@ -19,8 +19,21 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
         "data": "ADDED_AT_HEAD",
-        "start_offset": 1160,
-        "end_offset": 1173
+        "start_offset": 1142,
+        "end_offset": 1155
+      },
+      "value": {
+        "type": "literal"
+      }
+    },
+    {
+      "identifier": "test.versions/ADDED_AT_NEXT",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
+        "data": "ADDED_AT_NEXT",
+        "start_offset": 1085,
+        "end_offset": 1098
       },
       "value": {
         "type": "literal"
