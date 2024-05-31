@@ -37,9 +37,9 @@ pub fn build_component_sandbox(
     program_output: &Router,
     child_inputs: &mut StructuredDictMap<ComponentInput>,
     collection_inputs: &mut StructuredDictMap<ComponentInput>,
-    environments: &mut StructuredDictMap<ComponentEnvironment>,
     declared_dictionaries: Dict,
 ) {
+    let mut environments: StructuredDictMap<ComponentEnvironment> = Default::default();
     for environment_decl in &decl.environments {
         environments
             .insert(

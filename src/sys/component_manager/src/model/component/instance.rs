@@ -36,7 +36,7 @@ use {
     ::routing::{
         bedrock::{
             sandbox_construction::{self, build_component_sandbox, extend_dict_with_offers},
-            structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
+            structured_dict::{ComponentInput, StructuredDictMap},
         },
         capability_source::ComponentCapability,
         component_instance::{
@@ -387,9 +387,6 @@ pub struct ResolvedInstanceState {
     /// dynamic offers).
     pub collection_inputs: StructuredDictMap<ComponentInput>,
 
-    /// The environments declared by this component.
-    bedrock_environments: StructuredDictMap<ComponentEnvironment>,
-
     /// State held by the framework on behalf of the component's program, including
     /// its outgoing directory server endpoint. Present if and only if the component
     /// has a program.
@@ -474,7 +471,6 @@ impl ResolvedInstanceState {
             capability_sourced_capabilities_dict: build_storage_admin_dictionary(component, &decl),
             program_input_dict_additions: Dict::new(),
             collection_inputs: Default::default(),
-            bedrock_environments: Default::default(),
             program_escrow,
         };
         state.add_static_children(component).await?;
@@ -504,7 +500,6 @@ impl ResolvedInstanceState {
             &component.program_output(),
             &mut child_inputs,
             &mut state.collection_inputs,
-            &mut state.bedrock_environments,
             declared_dictionaries,
         );
         state.discover_static_children(child_inputs).await;
