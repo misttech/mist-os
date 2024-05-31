@@ -501,8 +501,11 @@ void VmMapping::AspaceRemoveWriteLockedObject(uint64_t offset, uint64_t len) con
 
   // If this is a kernel mapping then we should not be modify mappings in the arch aspace,
   // unless this mapping has explicitly opted out of this check.
-  DEBUG_ASSERT(aspace_->is_user() || aspace_->is_guest_physical() ||
-               flags_ & VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING);
+  DEBUG_ASSERT_MSG(aspace_->is_user() || aspace_->is_guest_physical() ||
+                       flags_ & VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING,
+                   "region %p obj_offset %#" PRIx64 " size %zu, offset %#" PRIx64 " len %#" PRIx64
+                   "\n",
+                   this, object_offset_locked_object(), size_locked_object(), offset, len);
 
   zx_status_t status = ProtectRangesLockedObject().EnumerateProtectionRanges(
       base_locked_object(), size_locked_object(), base, new_len,
