@@ -438,6 +438,17 @@ fn convert_protocol(p: &ir::ProtocolDeclaration, context: Context) -> Result<com
         );
     }
 
+    let added = ir::get_attribute(&p.maybe_attributes, "available")
+        .expect("All protocols should have \"available\" attributes by this point")
+        .get_argument("added")
+        .expect(
+            "All protocol available attributes should have an \"added\" argument by this point.",
+        )
+        .value()
+        .to_string();
+    // TODO: remove "20" once 20 stabilizes and we move to "NEXT"
+    let is_unstable = matches!(added.as_str(), "HEAD" | "NEXT" | "4292870144" | "20");
+
     let discoverable = ir::get_attribute(&p.maybe_attributes, "discoverable").map(|discoverable| {
         let attr_or = |name: &str, default: &str| {
             discoverable
@@ -446,6 +457,12 @@ fn convert_protocol(p: &ir::ProtocolDeclaration, context: Context) -> Result<com
                 .unwrap_or(default.to_string())
         };
         let impl_locs = |name: &str| {
+            if is_unstable {
+                // If this protocol is unstable then the only implementation locations are in the platform.
+                // TODO: warn if something at an unstable level actually declares that external components can use it?
+                return compare::ImplementationLocation { platform: true, external: false };
+            }
+
             let locs: Vec<String> = attr_or(name, "platform,external")
                 .split(",")
                 .into_iter()
@@ -463,12 +480,22 @@ fn convert_protocol(p: &ir::ProtocolDeclaration, context: Context) -> Result<com
         }
     });
 
+    let added = ir::get_attribute(&p.maybe_attributes, "available")
+        .expect("All protocols should have \"available\" attributes by this point")
+        .get_argument("added")
+        .expect(
+            "All protocol available attributes should have an \"added\" argument by this point.",
+        )
+        .value()
+        .to_string();
+
     Ok(compare::Protocol {
         name: FlyStr::new(&p.name),
         path: context.path.clone(),
         openness: p.openness,
         methods,
         discoverable,
+        added,
     })
 }
 

@@ -232,6 +232,7 @@ pub struct Protocol {
     pub openness: Openness,
     pub discoverable: Option<Discoverable>,
     pub methods: BTreeMap<u64, Method>,
+    pub added: String,
 }
 
 impl Protocol {
