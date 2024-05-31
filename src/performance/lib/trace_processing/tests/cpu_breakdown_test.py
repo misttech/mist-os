@@ -244,3 +244,47 @@ class CpuBreakdownTest(unittest.TestCase):
                 },
             ],
         )
+
+    def test_group_by_process_name(self) -> None:
+        model = self.construct_trace_model()
+
+        processor = cpu_breakdown.CpuBreakdownMetricsProcessor(model)
+        breakdown = processor.process_metrics()
+        consolidated_breakdown = processor.group_by_process_name(breakdown)
+        self.assertEqual(len(consolidated_breakdown), 4)
+
+        # Make it easier to compare breakdown results.
+        for b in consolidated_breakdown:
+            b["percent"] = round(float(b["percent"]), 3)
+
+        # Each process has been consolidated.
+        # Sorted by descending cpu and descending percent.
+        self.assertEqual(
+            consolidated_breakdown,
+            [
+                {
+                    "process_name": "big_process",
+                    "cpu": 5,
+                    "percent": 54.545,
+                    "duration": 3000.0,
+                },
+                {
+                    "process_name": "big_process",
+                    "cpu": 3,
+                    "percent": 33.333,
+                    "duration": 1000.0,
+                },
+                {
+                    "process_name": "big_process",
+                    "cpu": 2,
+                    "percent": 81.25,
+                    "duration": 6500.0,
+                },
+                {
+                    "process_name": "small_process",
+                    "cpu": 2,
+                    "percent": 6.25,
+                    "duration": 500.0,
+                },
+            ],
+        )

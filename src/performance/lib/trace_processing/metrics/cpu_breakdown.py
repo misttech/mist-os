@@ -102,6 +102,14 @@ class CpuBreakdownMetricsProcessor:
         total_time: float = self._max_timestamp - self._min_timestamp
         return breakdown, total_time
 
+    def _merge(self, a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "process_name": a["process_name"],
+            "cpu": a["cpu"],
+            "duration": a["duration"] + b["duration"],
+            "percent": a["percent"] + b["percent"],
+        }
+
     def process_metrics(self) -> List[Dict[str, Any]]:
         """
         Given TraceModel, iterates through all the SchedulingRecords and calculates the duration
@@ -153,3 +161,37 @@ class CpuBreakdownMetricsProcessor:
             reverse=True,
         )
         return self._breakdown
+
+    def group_by_process_name(
+        self, breakdown: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Given a breakdown, group the metrics by process_name only,
+        ignoring thread name.
+        """
+        consolidated_breakdown: List[Dict[str, Any]] = []
+        breakdown = sorted(
+            breakdown, key=lambda m: (m["cpu"], m["process_name"])
+        )
+        if not breakdown:
+            return []
+        consolidated_breakdown = [breakdown[0]]
+        for metric in breakdown[1:]:
+            if (
+                metric["cpu"] == consolidated_breakdown[-1]["cpu"]
+                and metric["process_name"]
+                == consolidated_breakdown[-1]["process_name"]
+            ):
+                consolidated_breakdown[-1] = self._merge(
+                    metric, consolidated_breakdown[-1]
+                )
+            else:
+                metric.pop("thread_name", None)
+                metric.pop("tid", None)
+                consolidated_breakdown.append(metric)
+
+        return sorted(
+            consolidated_breakdown,
+            key=lambda m: (m["cpu"], m["percent"]),
+            reverse=True,
+        )
