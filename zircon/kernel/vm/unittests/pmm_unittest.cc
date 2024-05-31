@@ -17,16 +17,15 @@ namespace {
 class ManagedPmmNode {
  public:
   static constexpr size_t kNumPages = 64;
-  static constexpr size_t kDefaultWatermark = kNumPages / 2;
-  static constexpr size_t kDefaultDebounce = 2;
+  static constexpr size_t kDefaultMemEventLowerBound = kNumPages / 2;
+  static constexpr size_t kDefaultShouldWaitLevel = kNumPages / 4;
 
-  // Number of pages to alloc from the default config to put the node in a low mem state.
-  static constexpr size_t kDefaultLowMemAlloc = ManagedPmmNode::kNumPages -
-                                                ManagedPmmNode::kDefaultWatermark +
-                                                ManagedPmmNode::kDefaultDebounce;
+  static constexpr size_t kDefaultLowMemAlloc =
+      ManagedPmmNode::kNumPages - kDefaultShouldWaitLevel + 1;
+  static constexpr size_t kDefaultMemEventAlloc =
+      ManagedPmmNode::kNumPages - kDefaultMemEventLowerBound + 1;
 
-  explicit ManagedPmmNode(const uint64_t* watermarks = kDefaultArray, uint8_t watermark_count = 1,
-                          uint64_t debounce = kDefaultDebounce) {
+  ManagedPmmNode() {
     list_node list = LIST_INITIAL_VALUE(list);
     ZX_ASSERT(pmm_alloc_pages(kNumPages, 0, &list) == ZX_OK);
     vm_page_t* page;
@@ -37,8 +36,8 @@ class ManagedPmmNode {
     }
     node_.AddFreePages(&list);
 
-    ZX_ASSERT(node_.InitReclamation(watermarks, watermark_count, debounce * PAGE_SIZE, this,
-                                    StateCallback) == ZX_OK);
+    bool result = ResetDefaultMemEvent();
+    ASSERT(result);
   }
 
   ~ManagedPmmNode() {
@@ -52,19 +51,23 @@ class ManagedPmmNode {
     pmm_free(&list);
   }
 
-  uint8_t cur_level() const { return cur_level_; }
+  bool IsEventSignaled() { return event_.Wait(Deadline::infinite_past()) == ZX_OK; }
+
+  void UnsignalEvent() { event_.Unsignal(); }
+
+  bool ResetDefaultMemEvent() {
+    return SetFreeMemorySignal(kDefaultMemEventLowerBound, UINT64_MAX, kDefaultShouldWaitLevel);
+  }
+
+  bool SetFreeMemorySignal(uint64_t lower_bound, uint64_t higher_bound, uint64_t delay_pages) {
+    return node_.SetFreeMemorySignal(lower_bound, higher_bound, delay_pages, &event_);
+  }
+
   PmmNode& node() { return node_; }
 
  private:
   PmmNode node_;
-  uint8_t cur_level_ = MAX_WATERMARK_COUNT + 1;
-
-  static void StateCallback(void* context, uint8_t level) {
-    ManagedPmmNode* instance = reinterpret_cast<ManagedPmmNode*>(context);
-    instance->cur_level_ = level;
-  }
-
-  static constexpr uint64_t kDefaultArray[1] = {kDefaultWatermark * PAGE_SIZE};
+  Event event_;
 };
 
 }  // namespace
@@ -389,131 +392,84 @@ static bool pmm_node_oversized_alloc_test() {
   END_TEST;
 }
 
-// Checks the correctness of the reported watermark level.
-static bool pmm_node_watermark_level_test() {
+// Check that free memory events work correctly.
+static bool pmm_node_free_mem_event_test() {
   BEGIN_TEST;
+
   ManagedPmmNode node;
+
+  uint64_t free_count = node.node().CountFreePages();
+
+  // Should initially be some free pages, validate this to allow us to assume the ability to -1.
+  ASSERT_GT(free_count, 0u);
+
+  // Setting an event range that does not include the current free count should be invalid.
+  EXPECT_FALSE(node.SetFreeMemorySignal(free_count + 1, UINT64_MAX, 0));
+  EXPECT_FALSE(node.SetFreeMemorySignal(0, free_count - 1, 0));
+
+  // The range can be inclusive of the current free count.
+  EXPECT_TRUE(node.SetFreeMemorySignal(free_count, UINT64_MAX, 0));
+  EXPECT_TRUE(node.SetFreeMemorySignal(0, free_count, 0));
+
+  // Reset back to the default event.
+  EXPECT_TRUE(node.ResetDefaultMemEvent());
+
+  // Should never have triggered the event up to this point.
+  EXPECT_FALSE(node.IsEventSignaled());
+
+  // Allocate all but 1 of the pages to trigger the event.
   list_node list = LIST_INITIAL_VALUE(list);
 
-  EXPECT_EQ(node.cur_level(), 1);
-
-  while (node.node().CountFreePages() >
-         (ManagedPmmNode::kDefaultWatermark - ManagedPmmNode::kDefaultDebounce) + 1) {
+  for (size_t i = 1; i < ManagedPmmNode::kDefaultMemEventAlloc; i++) {
     vm_page_t* page;
-    zx_status_t status = node.node().AllocPage(0, &page, nullptr);
-    EXPECT_EQ(ZX_OK, status);
-    EXPECT_EQ(node.cur_level(), 1);
+    ASSERT_OK(node.node().AllocPage(0, &page, nullptr));
+    list_add_tail(&list, &page->queue_node);
+    if (node.IsEventSignaled()) {
+      printf("Event signaled at step %zu\n", i);
+    }
+  }
+  // Should not have triggered the event yet.
+  EXPECT_FALSE(node.IsEventSignaled());
+
+  // Allocate the last page, this should put us over the limit and set the event.
+  {
+    vm_page_t* page;
+    ASSERT_OK(node.node().AllocPage(0, &page, nullptr));
     list_add_tail(&list, &page->queue_node);
   }
+  EXPECT_TRUE(node.IsEventSignaled());
+  node.UnsignalEvent();
 
-  vm_page_t* page;
-  zx_status_t status = node.node().AllocPage(0, &page, nullptr);
-
-  EXPECT_EQ(ZX_OK, status);
-  EXPECT_EQ(node.cur_level(), 0);
-  list_add_tail(&list, &page->queue_node);
-
-  while (!list_is_empty(&list)) {
-    node.node().FreePage(list_remove_head_type(&list, vm_page_t, queue_node));
-    uint8_t expected = node.node().CountFreePages() >=
-                       ManagedPmmNode::kDefaultWatermark + ManagedPmmNode::kDefaultDebounce;
-    EXPECT_EQ(node.cur_level(), expected);
-  }
-
-  END_TEST;
-}
-
-// Checks the multiple watermark case given in the documentation for |pmm_init_reclamation|.
-static bool pmm_node_multi_watermark_level_test() {
-  BEGIN_TEST;
-
-  uint64_t watermarks[4] = {20 * PAGE_SIZE, 40 * PAGE_SIZE, 45 * PAGE_SIZE, 55 * PAGE_SIZE};
-
-  ManagedPmmNode node(watermarks, 4, 15);
-  list_node list = LIST_INITIAL_VALUE(list);
-
-  EXPECT_EQ(node.cur_level(), 4);
-
-  auto consume_fn = [&](uint64_t level, uint64_t lower_limit) -> bool {
-    while (node.node().CountFreePages() > lower_limit) {
-      EXPECT_EQ(node.cur_level(), level);
-
-      vm_page_t* page;
-      zx_status_t status = node.node().AllocPage(0, &page, nullptr);
-      EXPECT_EQ(ZX_OK, status);
-      list_add_tail(&list, &page->queue_node);
-    }
-    return true;
-  };
-
-  EXPECT_TRUE(consume_fn(4, 40));
-  EXPECT_TRUE(consume_fn(2, 25));
-  EXPECT_TRUE(consume_fn(1, 5));
-
-  auto release_fn = [&](uint64_t level, uint64_t upper_limit) -> bool {
-    while (node.node().CountFreePages() < upper_limit) {
-      EXPECT_EQ(node.cur_level(), level);
-      node.node().FreePage(list_remove_head_type(&list, vm_page_t, queue_node));
-    }
-    return true;
-  };
-
-  EXPECT_TRUE(release_fn(0, 35));
-  EXPECT_TRUE(release_fn(1, 55));
-  EXPECT_TRUE(release_fn(4, node.kNumPages));
-
-  END_TEST;
-}
-
-// A more abstract test for multiple watermarks.
-static bool pmm_node_multi_watermark_level_test2() {
-  BEGIN_TEST;
-
-  static constexpr uint64_t kInterval = 7;
-  uint64_t watermarks[MAX_WATERMARK_COUNT];
-  for (unsigned i = 0; i < MAX_WATERMARK_COUNT; i++) {
-    watermarks[i] = (i + 1) * kInterval * PAGE_SIZE;
-  }
-  static_assert(kInterval * MAX_WATERMARK_COUNT < ManagedPmmNode::kNumPages);
-
-  ManagedPmmNode node(watermarks, MAX_WATERMARK_COUNT);
-  list_node list = LIST_INITIAL_VALUE(list);
-
-  EXPECT_EQ(node.cur_level(), MAX_WATERMARK_COUNT);
-
-  uint64_t count = ManagedPmmNode::kNumPages;
-  while (node.node().CountFreePages() > 0) {
+  // Events are one-shot, and so putting a page back and allocating it again should not re-trigger
+  // the event.
+  node.node().FreePage(list_remove_head_type(&list, vm_page_t, queue_node));
+  {
     vm_page_t* page;
-    zx_status_t status = node.node().AllocPage(0, &page, nullptr);
-    EXPECT_EQ(ZX_OK, status);
+    ASSERT_OK(node.node().AllocPage(0, &page, nullptr));
     list_add_tail(&list, &page->queue_node);
-
-    count--;
-    uint64_t expected = ktl::min(static_cast<uint64_t>(MAX_WATERMARK_COUNT),
-                                 (count + ManagedPmmNode::kDefaultDebounce - 1) / kInterval);
-    EXPECT_EQ(node.cur_level(), expected);
   }
+  EXPECT_FALSE(node.IsEventSignaled());
 
-  vm_page_t* page;
-  zx_status_t status = node.node().AllocPage(0, &page, nullptr);
-  EXPECT_EQ(ZX_ERR_NO_MEMORY, status);
-  EXPECT_EQ(node.cur_level(), 0);
+  // Set a new free range that should trip ass we return the pages back.
+  EXPECT_TRUE(node.SetFreeMemorySignal(0, ManagedPmmNode::kNumPages - 1, 0));
 
-  while (!list_is_empty(&list)) {
-    node.node().FreePage(list_remove_head_type(&list, vm_page_t, queue_node));
-    count++;
-    uint64_t expected = ktl::min(static_cast<uint64_t>(MAX_WATERMARK_COUNT),
-                                 count > ManagedPmmNode::kDefaultDebounce
-                                     ? (count - ManagedPmmNode::kDefaultDebounce) / kInterval
-                                     : 0);
-    EXPECT_EQ(node.cur_level(), expected);
-  }
+  // Take one page off the list as our final page.
+  vm_page_t* page = list_remove_head_type(&list, vm_page_t, queue_node);
+
+  // Return the rest of the list.
+  node.node().FreeList(&list);
+  // Event should not have tripped yet.
+  EXPECT_FALSE(node.IsEventSignaled());
+
+  // Return the last page, should trip.
+  node.node().FreePage(page);
+  EXPECT_TRUE(node.IsEventSignaled());
 
   END_TEST;
 }
 
-// Checks sync allocation failure when the node is in a low-memory state.
-static bool pmm_node_oom_sync_alloc_failure_test() {
+// Checks sync allocation failure when the node crosses a threshold.
+static bool pmm_node_low_mem_alloc_failure_test() {
   BEGIN_TEST;
   ManagedPmmNode node;
   list_node list = LIST_INITIAL_VALUE(list);
@@ -521,7 +477,8 @@ static bool pmm_node_oom_sync_alloc_failure_test() {
   // Put the node in an oom state and make sure allocation fails.
   zx_status_t status = node.node().AllocPages(ManagedPmmNode::kDefaultLowMemAlloc, 0, &list);
   EXPECT_EQ(ZX_OK, status);
-  EXPECT_EQ(node.cur_level(), 0);
+  // Should also have been signaled.
+  EXPECT_TRUE(node.IsEventSignaled());
 
   vm_page_t* page;
   status = node.node().AllocPage(PMM_ALLOC_FLAG_CAN_WAIT, &page, nullptr);
@@ -535,9 +492,65 @@ static bool pmm_node_oom_sync_alloc_failure_test() {
   // Free the list.
   node.node().FreeList(&list);
 
+  // Allocations will still be delayed until we reset the trigger.
+  status = node.node().AllocPage(PMM_ALLOC_FLAG_CAN_WAIT, &page, nullptr);
+  EXPECT_EQ(status, ZX_ERR_SHOULD_WAIT);
+
+  EXPECT_TRUE(node.ResetDefaultMemEvent());
+
   // Allocations should work again, but the PMM is still allowed to randomly fail requests, so we
   // cannot guarantee that any small finite number of allocation attempts will work.
   // We can check that waiting to retry an allocation completes with no timeout though.
+  EXPECT_EQ(ZX_OK, node.node().WaitTillShouldRetrySingleAlloc(Deadline::infinite_past()));
+
+  // Reset the signal.
+  node.UnsignalEvent();
+  // Set a threshold such that a single allocation should trip into the low mem state.
+  EXPECT_TRUE(
+      node.SetFreeMemorySignal(ManagedPmmNode::kNumPages, UINT64_MAX, ManagedPmmNode::kNumPages));
+
+  // Signal should not yet be set, and allocations should not be delayed.
+  EXPECT_FALSE(node.IsEventSignaled());
+  EXPECT_EQ(ZX_OK, node.node().WaitTillShouldRetrySingleAlloc(Deadline::infinite_past()));
+
+  // Allocate a single page and validate that allocations are now delayed.
+  ASSERT_OK(node.node().AllocPages(1, 0, &list));
+  status = node.node().AllocPage(PMM_ALLOC_FLAG_CAN_WAIT, &page, nullptr);
+  EXPECT_EQ(status, ZX_ERR_SHOULD_WAIT);
+  EXPECT_EQ(ZX_ERR_TIMED_OUT,
+            node.node().WaitTillShouldRetrySingleAlloc(Deadline::after(ZX_MSEC(10))));
+
+  node.node().FreeList(&list);
+
+  END_TEST;
+}
+
+// Test that deliberately putting into a no alloc state (and back out) works.
+static bool pmm_node_explicit_should_wait_test() {
+  BEGIN_TEST;
+
+  ManagedPmmNode node;
+
+  // Place the node directly into a state the forbids allocations.
+  EXPECT_TRUE(node.SetFreeMemorySignal(0, ManagedPmmNode::kNumPages, UINT64_MAX));
+
+  // Allocations that can wait should be blocked.
+  vm_page_t* page;
+  zx_status_t status = node.node().AllocPage(PMM_ALLOC_FLAG_CAN_WAIT, &page, nullptr);
+  EXPECT_EQ(status, ZX_ERR_SHOULD_WAIT);
+  // Waiting for an allocation should block, although to only try with a very small timeout to not
+  // make this test take too long.
+  EXPECT_EQ(ZX_ERR_TIMED_OUT,
+            node.node().WaitTillShouldRetrySingleAlloc(Deadline::after(ZX_MSEC(10))));
+
+  // A regular allocation should work.
+  status = node.node().AllocPage(0, &page, nullptr);
+  ASSERT_OK(status);
+  node.node().FreePage(page);
+
+  // Changing the delayed threshold should re-enable allocations.
+  EXPECT_TRUE(node.ResetDefaultMemEvent());
+
   EXPECT_EQ(ZX_OK, node.node().WaitTillShouldRetrySingleAlloc(Deadline::infinite_past()));
 
   END_TEST;
@@ -1282,10 +1295,9 @@ VM_UNITTEST(pmm_node_singlton_list_test)
 VM_UNITTEST(pmm_node_loan_borrow_cancel_reclaim_end)
 VM_UNITTEST(pmm_node_loan_delete_lender)
 VM_UNITTEST(pmm_node_oversized_alloc_test)
-VM_UNITTEST(pmm_node_watermark_level_test)
-VM_UNITTEST(pmm_node_multi_watermark_level_test)
-VM_UNITTEST(pmm_node_multi_watermark_level_test2)
-VM_UNITTEST(pmm_node_oom_sync_alloc_failure_test)
+VM_UNITTEST(pmm_node_free_mem_event_test)
+VM_UNITTEST(pmm_node_low_mem_alloc_failure_test)
+VM_UNITTEST(pmm_node_explicit_should_wait_test)
 VM_UNITTEST(pmm_checker_test)
 VM_UNITTEST(pmm_checker_is_valid_fill_size_test)
 VM_UNITTEST(pmm_get_arena_info_test)

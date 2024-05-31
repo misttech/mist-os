@@ -32,8 +32,6 @@
 
 #define LOCAL_TRACE VM_GLOBAL_TRACE(0)
 
-using pretty::FormattedBytes;
-
 // The number of PMM allocation calls that have failed.
 KCOUNTER(pmm_alloc_failed, "vm.pmm.alloc.failed")
 KCOUNTER(pmm_alloc_delayed, "vm.pmm.alloc.delayed")
@@ -262,8 +260,7 @@ zx_status_t PmmNode::AllocPage(uint alloc_flags, vm_page_t** page_out, paddr_t* 
     // Note that we do not care if the allocation is happening from the loaned list or not since if
     // we are in the OOM state we still want to preference those loaned pages to allocations that
     // cannot be delayed.
-    if ((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT) && InOomStateLocked() &&
-        !never_return_should_wait_) {
+    if ((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT) && ShouldDelayAllocationLocked()) {
       pmm_alloc_delayed.Add(1);
       return ZX_ERR_SHOULD_WAIT;
     }
@@ -337,7 +334,7 @@ zx_status_t PmmNode::AllocPages(size_t count, uint alloc_flags, list_node* list)
                                           : free_count_.load(ktl::memory_order_relaxed);
 
     if (unlikely(count > free_count)) {
-      if ((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT) && !never_return_should_wait_) {
+      if ((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT) && should_wait_ != ShouldWaitState::Never) {
         pmm_alloc_delayed.Add(1);
         return ZX_ERR_SHOULD_WAIT;
       }
@@ -357,8 +354,7 @@ zx_status_t PmmNode::AllocPages(size_t count, uint alloc_flags, list_node* list)
       DecrementFreeCountLocked(count);
     }
 
-    if ((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT) && InOomStateLocked() &&
-        !never_return_should_wait_) {
+    if ((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT) && ShouldDelayAllocationLocked()) {
       // Loaned allocations do not support waiting, so we never have to undo the loaned count.
       DEBUG_ASSERT(!use_loaned_list);
       IncrementFreeCountLocked(count);
@@ -675,9 +671,12 @@ void PmmNode::FreeList(list_node* list) {
   FreeListLocked(list, fill);
 }
 
-bool PmmNode::InOomStateLocked() {
-  if (mem_avail_state_cur_index_ == 0) {
+bool PmmNode::ShouldDelayAllocationLocked() {
+  if (should_wait_ == ShouldWaitState::UntilReset) {
     return true;
+  }
+  if (should_wait_ == ShouldWaitState::Never) {
+    return false;
   }
   // See pmm_check_alloc_random_should_wait in pmm.cc for an assertion that random should wait is
   // only enabled if DEBUG_ASSERT_IMPLEMENTED.
@@ -746,137 +745,45 @@ void PmmNode::Dump(bool is_panic) const {
   }
 }
 
-zx_status_t PmmNode::InitReclamation(const uint64_t* watermarks, uint8_t watermark_count,
-                                     uint64_t debounce, void* context,
-                                     mem_avail_state_updated_callback_t callback) {
-  if (watermark_count > MAX_WATERMARK_COUNT) {
-    return ZX_ERR_INVALID_ARGS;
+void PmmNode::TripFreePagesLevelLocked() {
+  if (should_wait_ == ShouldWaitState::OnceLevelTripped) {
+    should_wait_ = ShouldWaitState::UntilReset;
+    free_pages_evt_.Unsignal();
   }
+}
 
-  AutoPreemptDisabler preempt_disable;
+bool PmmNode::SetFreeMemorySignal(uint64_t free_lower_bound, uint64_t free_upper_bound,
+                                  uint64_t delay_allocations_pages, Event* event) {
   Guard<Mutex> guard{&lock_};
-
-  uint64_t tmp[MAX_WATERMARK_COUNT];
-  uint64_t tmp_debounce = fbl::round_up(debounce, static_cast<uint64_t>(PAGE_SIZE)) / PAGE_SIZE;
-  for (uint8_t i = 0; i < watermark_count; i++) {
-    tmp[i] = watermarks[i] / PAGE_SIZE;
-    if (i > 0) {
-      if (tmp[i] <= tmp[i - 1]) {
-        return ZX_ERR_INVALID_ARGS;
-      }
-    } else {
-      if (tmp[i] < tmp_debounce) {
-        return ZX_ERR_INVALID_ARGS;
-      }
-    }
+  // Ensure delay allocations is valid.
+  DEBUG_ASSERT(delay_allocations_pages <= free_lower_bound ||
+               delay_allocations_pages == UINT64_MAX);
+  const uint64_t free_count = CountFreePages();
+  if (free_count < free_lower_bound || free_count > free_upper_bound) {
+    return false;
   }
-
-  mem_avail_state_watermark_count_ = watermark_count;
-  mem_avail_state_debounce_ = tmp_debounce;
-  mem_avail_state_context_ = context;
-  mem_avail_state_callback_ = callback;
-  memcpy(mem_avail_state_watermarks_, tmp, sizeof(mem_avail_state_watermarks_));
-  static_assert(sizeof(tmp) == sizeof(mem_avail_state_watermarks_));
-
-  UpdateMemAvailStateLocked();
-
-  return ZX_OK;
-}
-
-void PmmNode::UpdateMemAvailStateLocked() {
-  // Find the smallest watermark which is greater than the number of free pages.
-  uint8_t target = mem_avail_state_watermark_count_;
-  for (uint8_t i = 0; i < mem_avail_state_watermark_count_; i++) {
-    if (mem_avail_state_watermarks_[i] > free_count_.load(ktl::memory_order_relaxed)) {
-      target = i;
-      break;
-    }
-  }
-  SetMemAvailStateLocked(target);
-}
-
-void PmmNode::SetMemAvailStateLocked(uint8_t mem_avail_state) {
-  mem_avail_state_cur_index_ = mem_avail_state;
-
-  if (mem_avail_state_cur_index_ == 0) {
-    if (likely(!never_return_should_wait_)) {
-      free_pages_evt_.Unsignal();
-    }
-  } else {
+  if (delay_allocations_pages == UINT64_MAX) {
+    TripFreePagesLevelLocked();
+  } else if (should_wait_ == ShouldWaitState::UntilReset) {
     free_pages_evt_.Signal();
+    should_wait_ = ShouldWaitState::OnceLevelTripped;
   }
-
-  if (mem_avail_state_cur_index_ > 0) {
-    // If there is a smaller watermark, then we transition into that state when the
-    // number of free pages drops more than |mem_avail_state_debounce_| pages into that state.
-    mem_avail_state_lower_bound_ =
-        mem_avail_state_watermarks_[mem_avail_state_cur_index_ - 1] - mem_avail_state_debounce_;
-  } else {
-    // There is no smaller state, so we can't ever transition down.
-    mem_avail_state_lower_bound_ = 0;
-  }
-
-  if (mem_avail_state_cur_index_ < mem_avail_state_watermark_count_) {
-    // If there is a larger watermark, then we transition out of the current state when
-    // the number of free pages exceedes the current state's watermark by at least
-    // |mem_avail_state_debounce_|.
-    mem_avail_state_upper_bound_ =
-        mem_avail_state_watermarks_[mem_avail_state_cur_index_] + mem_avail_state_debounce_;
-  } else {
-    // There is no larger state, so we can't ever transition up.
-    mem_avail_state_upper_bound_ = UINT64_MAX / PAGE_SIZE;
-  }
-
-  mem_avail_state_callback_(mem_avail_state_context_, mem_avail_state_cur_index_);
+  should_wait_free_pages_level_ = delay_allocations_pages;
+  mem_signal_lower_bound_ = free_lower_bound;
+  mem_signal_upper_bound_ = free_upper_bound;
+  mem_signal_ = event;
+  return true;
 }
 
-void PmmNode::DumpMemAvailState() const {
-  Guard<Mutex> guard{&lock_};
-
-  printf("watermarks: [");
-  for (unsigned i = 0; i < mem_avail_state_watermark_count_; i++) {
-    printf("%s%s", FormattedBytes(mem_avail_state_watermarks_[i] * PAGE_SIZE).c_str(),
-           i + 1 == mem_avail_state_watermark_count_ ? "]\n" : ", ");
-  }
-  printf("debounce: %s\n", FormattedBytes(mem_avail_state_debounce_ * PAGE_SIZE).c_str());
-  printf("current state: %u\n", mem_avail_state_cur_index_);
-  printf("current bounds: [%s, %s]\n",
-         FormattedBytes(mem_avail_state_lower_bound_ * PAGE_SIZE).c_str(),
-         FormattedBytes(mem_avail_state_upper_bound_ * PAGE_SIZE).c_str());
-  printf("free memory: %s\n", FormattedBytes(free_count_ * PAGE_SIZE).c_str());
-}
-
-uint64_t PmmNode::DebugNumPagesTillMemState(uint8_t mem_state_idx) const {
-  Guard<Mutex> guard{&lock_};
-  if (mem_avail_state_cur_index_ <= mem_state_idx) {
-    // Already in mem_state_idx, or in a state with less available memory than mem_state_idx.
-    return 0;
-  }
-  // We need to either get free_pages below mem_avail_state_watermarks_[mem_state_idx] or, if we are
-  // in state (mem_state_idx + 1), we also need to clear the debounce amount. For simplicity we just
-  // always allocate the debounce amount as well.
-  uint64_t trigger = mem_avail_state_watermarks_[mem_state_idx] - mem_avail_state_debounce_;
-  return (free_count_ - trigger);
-}
-
-uint8_t PmmNode::DebugMaxMemAvailState() const {
-  Guard<Mutex> guard{&lock_};
-  return mem_avail_state_watermark_count_;
-}
-
-void PmmNode::DebugMemAvailStateCallback(uint8_t mem_state_idx) const {
-  Guard<Mutex> guard{&lock_};
-  if (mem_state_idx >= mem_avail_state_watermark_count_) {
-    return;
-  }
-  // Invoke callback for the requested state without allocating additional memory, or messing with
-  // any of the internal memory state tracking counters.
-  mem_avail_state_callback_(mem_avail_state_context_, mem_state_idx);
+void PmmNode::SignalFreeMemoryChangeLocked() {
+  DEBUG_ASSERT(mem_signal_);
+  mem_signal_->Signal();
+  mem_signal_ = nullptr;
 }
 
 void PmmNode::StopReturningShouldWait() {
   Guard<Mutex> guard{&lock_};
-  never_return_should_wait_ = true;
+  should_wait_ = ShouldWaitState::Never;
   free_pages_evt_.Signal();
 }
 
@@ -1092,10 +999,8 @@ void PmmNode::ReportAllocFailureLocked() {
   // every failure, but that's wasteful and we don't want to spam any underlying Event (or the
   // thread lock or the MemoryWatchdog).
   const bool first_time = !alloc_failed_no_mem.exchange(true, ktl::memory_order_relaxed);
-  if (first_time) {
-    // Note, the |cur_state| value passed to the callback doesn't really matter because all we're
-    // trying to do here is signal and unblock the MemoryWatchdog's worker thread.
-    mem_avail_state_callback_(mem_avail_state_context_, mem_avail_state_cur_index_);
+  if (first_time && mem_signal_) {
+    SignalFreeMemoryChangeLocked();
   }
 }
 

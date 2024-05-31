@@ -161,41 +161,29 @@ paddr_t vaddr_to_paddr(const void* va);
 // paddr to vm_page_t
 vm_page_t* paddr_to_vm_page(paddr_t addr);
 
-#define MAX_WATERMARK_COUNT 8
-
-typedef void (*mem_avail_state_updated_callback_t)(void* context, uint8_t cur_state);
-
-// Function to initialize PMM memory reclamation.
+// Configures the free memory bounds and allows for setting a one shot signal as well as a level
+// where allocations should start being delayed.
 //
-// |watermarks| is an array of values that delineate the memory availability states. The values
-// should be monotonically increasing with intervals of at least PAGE_SIZE and its first entry must
-// be larger than |debounce|. Its length is given by |watermark_count|, with a maximum of
-// MAX_WATERMARK_COUNT. The pointer is not retained after this function returns.
+// The event is signaled once the number of PMM free pages falls outside of the range given by
+// |free_lower_bound| and |free_upper_bound|. As the event is one shot, one signaled this must be
+// called again to configure a new range. If the number of free pages is already outside the
+// requested bound then this method fails (returns false) and no event is setup. In this case the
+// caller should recalculate a correct bounds and try again.
 //
-// When the system has a given amount of free memory available, the memory availability state is
-// defined as the index of the smallest watermark which is greater than that amount of free
-// memory.  Whenever the amount of memory enters a new state, |mem_avail_state_updated_callback|
-// will be invoked with the registered context and the index of the new state.
+// In addition to exiting the provided memory bounds, the event will also get signaled on the first
+// time an allocation fails (i.e. the first time at which pmm_has_alloc_failed_no_mem would return
+// true).
 //
-// Transitions are debounced by not leaving a state until the amount of memory is at least
-// |debounce| bytes outside of the state. Note that large |debounce| values can cause states
-// to be entirely skipped. Also note that this means that at least |debounce| bytes must be
-// reclaimed before the system can transition into a healthier memory availability state.
-//
-// To give an example of state transitions with the watermarks [20MB, 40MB, 45MB, 55MB] and
-// debounce 15MB.
-//   75MB:4 -> 41MB:4 -> 40MB:2 -> 26MB:2 -> 25MB:1 -> 6MB:1 ->
-//   5MB:0 -> 34MB:0 -> 35MB:1 -> 54MB:1 -> 55MB:4
-//
-// Invocations of |mem_avail_state_updated_callback| are fully serialized, but they occur on
-// arbitrary threads when pages are being freed. As this likely occurs under important locks, the
-// callback itself should not perform memory reclamation; instead it should communicate the memory
-// level to a separate thread that is responsible for reclaiming memory. Furthermore, the callback
-// is immediately invoked during the execution of this function with the index of the initial memory
-// state.
-zx_status_t pmm_init_reclamation(const uint64_t* watermarks, uint8_t watermark_count,
-                                 uint64_t debounce, void* context,
-                                 mem_avail_state_updated_callback_t callback);
+// |delay_allocations_level| is the number of PMM free pages below which the PMM will transition to
+// delaying allocations that can wait, i.e. those with PMM_ALLOC_FLAG_CAN_WAIT. This transition is
+// sticky, and even if pages are freed to go back above this line, allocations will remain delayed
+// until this method is called again to re-set the level. For this reason, and since there is only a
+// single common Event, the |delay_allocations_level| must either be <= the |free_lower_bound|,
+// ensuring that the caller will have been notified and can respond by freeing memory and/or setting
+// a new level, or |delay_allocations_level| can be UINT64_MAX, indicating allocations should start
+// and remain delayed.
+bool pmm_set_free_memory_signal(uint64_t free_lower_bound, uint64_t free_upper_bound,
+                                uint64_t delay_allocations_level, Event* event);
 
 // This is intended to be used if an allocation function returns ZX_ERR_SHOULD_WAIT and blocks
 // until such a time as it is appropriate to retry a single allocation for a single page. Due to

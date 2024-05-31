@@ -7,8 +7,6 @@
 #ifndef ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_MEMORY_WATCHDOG_H_
 #define ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_MEMORY_WATCHDOG_H_
 
-#include <inttypes.h>
-#include <lib/crashlog.h>
 #include <zircon/boot/crash-reason.h>
 #include <zircon/syscalls/object.h>
 #include <zircon/types.h>
@@ -17,10 +15,10 @@
 #include <object/event_dispatcher.h>
 #include <object/job_dispatcher.h>
 #include <object/port_dispatcher.h>
-#include <platform/crashlog.h>
 
 class Executor;
 
+// Object is thread safe.
 class MemoryWatchdog {
  public:
   enum PressureLevel : uint8_t {
@@ -32,14 +30,15 @@ class MemoryWatchdog {
     kNumLevels,
   };
 
+  // Init must be called before any other methods.
   void Init(Executor* executor);
 
   fbl::RefPtr<EventDispatcher> GetMemPressureEvent(uint32_t kind);
 
+  uint64_t DebugNumBytesTillPressureLevel(PressureLevel level);
+  void Dump();
+
  private:
-  // The callback provided to |pmm_init_reclamation|.
-  static void AvailableStateUpdatedCallback(void* context, uint8_t idx);
-  void AvailableStateUpdate(uint8_t idx);
   // The callback provided to the |eviction_trigger_| timer.
   static void EvictionTriggerCallback(Timer* timer, zx_time_t now, void* arg);
   void EvictionTrigger();
@@ -57,6 +56,11 @@ class MemoryWatchdog {
   // in response to pressure change to level |idx|.
   inline bool IsEvictionRequired(PressureLevel idx) const;
 
+  void WaitForMemChange(const Deadline& deadline);
+  ktl::pair<uint64_t, uint64_t> FreeMemBoundsForLevel(PressureLevel level) const;
+
+  PressureLevel CalculatePressureLevel() const;
+
   // Kernel-owned events used to signal userspace at different levels of memory pressure.
   ktl::array<fbl::RefPtr<EventDispatcher>, PressureLevel::kNumLevels> mem_pressure_events_;
 
@@ -64,8 +68,14 @@ class MemoryWatchdog {
   // the WorkerThread.
   AutounsignalEvent mem_state_signal_;
 
-  ktl::atomic<PressureLevel> mem_event_idx_ = PressureLevel::kNormal;
+  // Relaxed atomic so that debug methods can safely read it.
+  RelaxedAtomic<PressureLevel> mem_event_idx_ = PressureLevel::kNormal;
   PressureLevel prev_mem_event_idx_ = mem_event_idx_;
+
+  // Watermark information is not modified after Init and so is safe for multiple threads to access.
+  static constexpr uint8_t kNumWatermarks = PressureLevel::kNumLevels - 1;
+  ktl::array<uint64_t, kNumWatermarks> mem_watermarks_;
+  uint64_t watermark_debounce_ = 0;
 
   // Used to delay signaling memory level transitions in the case of rapid changes.
   zx_time_t hysteresis_seconds_ = ZX_SEC(10);
@@ -94,5 +104,7 @@ class MemoryWatchdog {
 
   Executor* executor_;
 };
+
+MemoryWatchdog& GetMemoryWatchdog();
 
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_MEMORY_WATCHDOG_H_

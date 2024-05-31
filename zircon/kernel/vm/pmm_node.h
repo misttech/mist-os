@@ -49,11 +49,10 @@ class PmmNode {
   void EndLoan(paddr_t address, size_t count, list_node* page_list);
   void DeleteLender(paddr_t address, size_t count);
 
-  // For purposes of signalling memory pressure level, only free_list_ pages are counted, not
-  // free_loaned_list_ pages.
-  zx_status_t InitReclamation(const uint64_t* watermarks, uint8_t watermark_count,
-                              uint64_t debounce, void* context,
-                              mem_avail_state_updated_callback_t callback);
+  // See |pmm_set_free_memory_signal|
+  bool SetFreeMemorySignal(uint64_t free_lower_bound, uint64_t free_upper_bound,
+                           uint64_t delay_allocations_pages, Event* event);
+
   zx_status_t WaitTillShouldRetrySingleAlloc(const Deadline& deadline) {
     return free_pages_evt_.Wait(deadline);
   }
@@ -74,11 +73,6 @@ class PmmNode {
   // though the data they return may be questionable
   void DumpFree() const TA_NO_THREAD_SAFETY_ANALYSIS;
   void Dump(bool is_panic) const TA_NO_THREAD_SAFETY_ANALYSIS;
-
-  void DumpMemAvailState() const;
-  void DebugMemAvailStateCallback(uint8_t mem_state_idx) const;
-  uint64_t DebugNumPagesTillMemState(uint8_t mem_state_idx) const;
-  uint8_t DebugMaxMemAvailState() const;
 
   zx_status_t AddArena(const pmm_arena_info_t* info);
 
@@ -161,22 +155,29 @@ class PmmNode {
   void FreePageHelperLocked(vm_page* page, bool already_filled) TA_REQ(lock_);
   void FreeListLocked(list_node* list, bool already_filled) TA_REQ(lock_);
 
+  void SignalFreeMemoryChangeLocked() TA_REQ(lock_);
+  void TripFreePagesLevelLocked() TA_REQ(lock_);
   void UpdateMemAvailStateLocked() TA_REQ(lock_);
   void SetMemAvailStateLocked(uint8_t mem_avail_state) TA_REQ(lock_);
 
   void IncrementFreeCountLocked(uint64_t amount) TA_REQ(lock_) {
     free_count_.fetch_add(amount, ktl::memory_order_relaxed);
 
-    if (unlikely(free_count_.load(ktl::memory_order_relaxed) >= mem_avail_state_upper_bound_)) {
-      UpdateMemAvailStateLocked();
+    if (mem_signal_ && free_count_.load(ktl::memory_order_relaxed) > mem_signal_upper_bound_) {
+      SignalFreeMemoryChangeLocked();
     }
   }
   void DecrementFreeCountLocked(uint64_t amount) TA_REQ(lock_) {
-    DEBUG_ASSERT(free_count_.load(ktl::memory_order_relaxed) >= amount);
-    free_count_.fetch_sub(amount, ktl::memory_order_relaxed);
+    [[maybe_unused]] uint64_t count = free_count_.fetch_sub(amount, ktl::memory_order_relaxed);
+    DEBUG_ASSERT(count >= amount);
 
-    if (unlikely(free_count_.load(ktl::memory_order_relaxed) <= mem_avail_state_lower_bound_)) {
-      UpdateMemAvailStateLocked();
+    if (should_wait_ == ShouldWaitState::OnceLevelTripped &&
+        free_count_.load(ktl::memory_order_relaxed) < should_wait_free_pages_level_) {
+      TripFreePagesLevelLocked();
+    }
+
+    if (mem_signal_ && free_count_.load(ktl::memory_order_relaxed) < mem_signal_lower_bound_) {
+      SignalFreeMemoryChangeLocked();
     }
   }
 
@@ -204,7 +205,7 @@ class PmmNode {
     loan_cancelled_count_.fetch_sub(amount, ktl::memory_order_relaxed);
   }
 
-  bool InOomStateLocked() TA_REQ(lock_);
+  bool ShouldDelayAllocationLocked() TA_REQ(lock_);
 
   void AllocPageHelperLocked(vm_page_t* page) TA_REQ(lock_);
 
@@ -233,23 +234,34 @@ class PmmNode {
   // Free pages where loaned && !loan_cancelled.
   list_node free_loaned_list_ TA_GUARDED(lock_) = LIST_INITIAL_VALUE(free_loaned_list_);
 
-  // Tracks whether we should honor PMM_ALLOC_FLAG_CAN_WAIT requests or not. When true we will
-  // always attempt to perform the allocation, or fail with ZX_ERR_NO_MEMORY.
-  bool never_return_should_wait_ TA_GUARDED(lock_) = false;
+  // Controls the behavior of requests that have the PMM_ALLOC_FLAG_CAN_WAIT.
+  enum class ShouldWaitState {
+    // The PMM_ALLOC_FLAG_CAN_WAIT should never be followed and we will always attempt to perform
+    // the allocation, or fail with ZX_ERR_NO_MEMORY. This state is permanent and cannot be left.
+    Never,
+    // Allocations do not need to be delayed, but the should_wait_free_pages_level_ should be
+    // monitored and once tripped should be delayed.
+    OnceLevelTripped,
+    // State indicates that the level got tripped, and we should delay any allocations until the
+    // level is reset.
+    UntilReset,
+  };
+  ShouldWaitState should_wait_ TA_GUARDED(lock_) = ShouldWaitState::OnceLevelTripped;
 
-  // Event is signaled either when there are pages available that can be allocated without entering
-  // the OOM state, or if |never_return_should_wait_| is true.
+  // Below this number of free pages the PMM will transition into delaying allocations.
+  uint64_t should_wait_free_pages_level_ TA_GUARDED(lock_) = 0;
+
+  // Event is signaled whenever allocations are allowed to happen based on the |should_wait_| state.
+  // Whenever in the |UntilReset| state, this event will be Unsignaled causing waiters to block.
   Event free_pages_evt_;
 
-  uint64_t mem_avail_state_watermarks_[MAX_WATERMARK_COUNT] TA_GUARDED(lock_) = {};
-  uint8_t mem_avail_state_watermark_count_ TA_GUARDED(lock_) = {};
-  uint8_t mem_avail_state_cur_index_ TA_GUARDED(lock_) = {};
-  uint64_t mem_avail_state_debounce_ TA_GUARDED(lock_) = {};
-  uint64_t mem_avail_state_upper_bound_ TA_GUARDED(lock_) = {};
-  uint64_t mem_avail_state_lower_bound_ TA_GUARDED(lock_) = {};
-  void* mem_avail_state_context_ TA_GUARDED(lock_) = {};
-  mem_avail_state_updated_callback_t mem_avail_state_callback_ TA_GUARDED(lock_) = [](void*,
-                                                                                      uint8_t) {};
+  // If mem_signal_ is not null, then once the available free memory falls outside of the defined
+  // lower and upper bound the signal is raised. This is a one-shot signal and is cleared after
+  // firing.
+  Event* mem_signal_ TA_GUARDED(lock_) = nullptr;
+  uint64_t mem_signal_lower_bound_ TA_GUARDED(lock_) = 0;
+  uint64_t mem_signal_upper_bound_ TA_GUARDED(lock_) = 0;
+
   PageQueues page_queues_;
 
   Evictor evictor_;
