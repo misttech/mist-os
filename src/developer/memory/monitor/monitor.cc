@@ -329,7 +329,7 @@ void Monitor::PrintHelp() {
 }
 
 inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& bucket_matches) {
-  inspect::Inspector inspector(inspect::InspectSettings{.maximum_size = 1024 * 1024});
+  inspect::Inspector inspector(inspect::InspectSettings{.maximum_size = 1024ul * 1024});
   auto& root = inspector.GetRoot();
   Capture capture;
   auto strategy = std::make_unique<StarnixCaptureStrategy>();
@@ -353,17 +353,62 @@ inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& buck
   }
 
   // Expose raw values for downstream computation.
-  auto values = root.CreateChild("values");
-  values.CreateUint("free_bytes", capture.kmem().free_bytes, &inspector);
-  values.CreateUint("free_heap_bytes", capture.kmem().free_heap_bytes, &inspector);
-  values.CreateUint("ipc_bytes", capture.kmem().ipc_bytes, &inspector);
-  values.CreateUint("mmu_overhead_bytes", capture.kmem().mmu_overhead_bytes, &inspector);
-  values.CreateUint("other_bytes", capture.kmem().other_bytes, &inspector);
-  values.CreateUint("total_bytes", capture.kmem().total_bytes, &inspector);
-  values.CreateUint("total_heap_bytes", capture.kmem().total_heap_bytes, &inspector);
-  values.CreateUint("vmo_bytes", capture.kmem().vmo_bytes, &inspector);
-  values.CreateUint("wired_bytes", capture.kmem().wired_bytes, &inspector);
-  inspector.emplace(std::move(values));
+  {
+    auto values = root.CreateChild("values");
+    const auto& stats = capture.kmem_extended();
+    values.CreateUint("total_bytes", stats.total_bytes, &inspector);
+    values.CreateUint("free_bytes", stats.free_bytes, &inspector);
+    values.CreateUint("wired_bytes", stats.wired_bytes, &inspector);
+    values.CreateUint("total_heap_bytes", stats.total_heap_bytes, &inspector);
+    values.CreateUint("free_heap_bytes", stats.free_heap_bytes, &inspector);
+    values.CreateUint("vmo_bytes", stats.vmo_bytes, &inspector);
+    values.CreateUint("vmo_pager_total_bytes", stats.vmo_pager_total_bytes, &inspector);
+    values.CreateUint("vmo_pager_newest_bytes", stats.vmo_pager_newest_bytes, &inspector);
+    values.CreateUint("vmo_pager_oldest_bytes", stats.vmo_pager_oldest_bytes, &inspector);
+    values.CreateUint("vmo_discardable_locked_bytes", stats.vmo_discardable_locked_bytes,
+                      &inspector);
+    values.CreateUint("vmo_discardable_unlocked_bytes", stats.vmo_discardable_unlocked_bytes,
+                      &inspector);
+    values.CreateUint("mmu_overhead_bytes", stats.mmu_overhead_bytes, &inspector);
+    values.CreateUint("ipc_bytes", stats.ipc_bytes, &inspector);
+    values.CreateUint("other_bytes", stats.other_bytes, &inspector);
+    values.CreateUint("vmo_reclaim_disabled_bytes", stats.vmo_reclaim_disabled_bytes, &inspector);
+    inspector.emplace(std::move(values));
+  }
+
+  {
+    auto values = root.CreateChild("kmem_stats_compression");
+    const auto& stats = capture.kmem_compression();
+    values.CreateUint("uncompressed_storage_bytes", stats.uncompressed_storage_bytes, &inspector);
+    values.CreateUint("compressed_storage_bytes", stats.compressed_storage_bytes, &inspector);
+    values.CreateUint("compressed_fragmentation_bytes", stats.compressed_fragmentation_bytes,
+                      &inspector);
+    values.CreateUint("compression_time", stats.compression_time, &inspector);
+    values.CreateUint("decompression_time", stats.decompression_time, &inspector);
+    values.CreateUint("total_page_compression_attempts", stats.total_page_compression_attempts,
+                      &inspector);
+    values.CreateUint("failed_page_compression_attempts", stats.failed_page_compression_attempts,
+                      &inspector);
+    values.CreateUint("total_page_decompressions", stats.total_page_decompressions, &inspector);
+    values.CreateUint("compressed_page_evictions", stats.compressed_page_evictions, &inspector);
+    values.CreateUint("eager_page_compressions", stats.eager_page_compressions, &inspector);
+    values.CreateUint("memory_pressure_page_compressions", stats.memory_pressure_page_compressions,
+                      &inspector);
+    values.CreateUint("critical_memory_page_compressions", stats.critical_memory_page_compressions,
+                      &inspector);
+    values.CreateUint("pages_decompressed_unit_ns", stats.pages_decompressed_unit_ns, &inspector);
+    constexpr size_t log_time_size =
+        sizeof(zx_info_kmem_stats_compression_t::pages_decompressed_within_log_time) /
+        sizeof(zx_info_kmem_stats_compression_t::pages_decompressed_within_log_time[0]);
+    inspect::UintArray array =
+        values.CreateUintArray("pages_decompressed_within_log_time", log_time_size);
+
+    for (size_t i = 0; i < log_time_size; i++) {
+      array.Set(i, stats.pages_decompressed_within_log_time[i]);
+    }
+    inspector.emplace(std::move(array));
+    inspector.emplace(std::move(values));
+  }
 
   Digest digest;
   digester_->Digest(capture, &digest);
