@@ -241,6 +241,8 @@ fidl_library://fidl/fuchsia.hardware.audio.signalprocessing
 fidl_library://fidl/fuchsia.hardware.gpio (unstable)
 fidl_library://fidl/fuchsia.hardware.gpioimpl (unstable)
 fidl_library://fidl/fuchsia.hardware.i2c
+fidl_library://fidl/fuchsia.hardware.i2c.businfo (unstable)
+fidl_library://fidl/fuchsia.hardware.i2cimpl (unstable)
 fidl_library://fidl/fuchsia.hardware.light
 fidl_library://fidl/fuchsia.hardware.network
 fidl_library://fidl/fuchsia.hardware.pci
