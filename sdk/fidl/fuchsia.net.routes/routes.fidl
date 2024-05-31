@@ -126,3 +126,14 @@ closed protocol State {
         NO_TABLE = 1;
     };
 };
+
+/// Specifies which table(s) the watcher is interested in.
+@available(added=HEAD)
+type TableInterest = flexible union {
+    /// Only watch for events on the specified table.
+    1: only TableId;
+    /// Watches on the main table without knowing the table ID.
+    2: main struct {};
+    /// Watches for all routing tables.
+    3: all struct {};
+};

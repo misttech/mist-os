@@ -25,29 +25,18 @@ use fuchsia_zircon as zx;
 use futures::{future::FutureExt as _, StreamExt};
 use itertools::Itertools as _;
 use net_declare::{fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix};
-use net_types::{
-    ip::{Ip, Ipv4, Ipv6, Subnet},
-    SpecifiedAddr,
-};
+use net_types::ip::{Ipv4, Ipv6, Subnet};
 use netstack_testing_common::{
     realms::{Netstack, Netstack3, TestSandboxExt},
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
+use routes_common::{test_route, TestSetup};
 use std::pin::pin;
 use test_case::{test_case, test_matrix};
 
 const METRIC_TRACKS_INTERFACE: fnet_routes::SpecifiedMetric =
     fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty);
-
-struct TestSetup<'a, I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt> {
-    realm: netemul::TestRealm<'a>,
-    network: netemul::TestNetwork<'a>,
-    interface: netemul::TestInterface<'a>,
-    route_table: <I::RouteTableMarker as ProtocolMarker>::Proxy,
-    global_route_table: <I::GlobalRouteTableMarker as ProtocolMarker>::Proxy,
-    state: <I::StateMarker as ProtocolMarker>::Proxy,
-}
 
 enum SystemRouteProtocol {
     NetRootRoutes,
@@ -57,53 +46,6 @@ enum SystemRouteProtocol {
 enum RouteSet {
     Global,
     User,
-}
-
-impl<'a, I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt> TestSetup<'a, I> {
-    async fn new<N: Netstack>(sandbox: &'a netemul::TestSandbox, name: &str) -> TestSetup<'a, I> {
-        let realm = sandbox
-            .create_netstack_realm::<N, _>(format!("routes-admin-{name}"))
-            .expect("create realm");
-        let network =
-            sandbox.create_network(format!("routes-admin-{name}")).await.expect("create network");
-        let interface = realm.join_network(&network, "ep1").await.expect("join network");
-        let route_table = realm
-            .connect_to_protocol::<I::RouteTableMarker>()
-            .expect("connect to routes-admin RouteTable");
-        let global_route_table = realm
-            .connect_to_protocol::<I::GlobalRouteTableMarker>()
-            .expect("connect to global route set provider");
-
-        let state = realm.connect_to_protocol::<I::StateMarker>().expect("connect to routes State");
-        TestSetup { realm, network, interface, route_table, global_route_table, state }
-    }
-}
-
-fn test_route<I: Ip>(
-    interface: &netemul::TestInterface<'_>,
-    metric: fnet_routes::SpecifiedMetric,
-) -> fnet_routes_ext::Route<I> {
-    let destination = I::map_ip(
-        (),
-        |()| net_declare::net_subnet_v4!("192.0.2.0/24"),
-        |()| net_declare::net_subnet_v6!("2001:DB8::/64"),
-    );
-    let next_hop_addr = I::map_ip(
-        (),
-        |()| net_declare::net_ip_v4!("192.0.2.1"),
-        |()| net_declare::net_ip_v6!("2001:DB8::1"),
-    );
-
-    fnet_routes_ext::Route {
-        destination,
-        action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
-            outbound_interface: interface.id(),
-            next_hop: Some(SpecifiedAddr::new(next_hop_addr).expect("is specified")),
-        }),
-        properties: fnet_routes_ext::RouteProperties {
-            specified_properties: fnet_routes_ext::SpecifiedRouteProperties { metric },
-        },
-    }
 }
 
 #[netstack_test]

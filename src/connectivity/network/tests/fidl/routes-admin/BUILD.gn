@@ -17,6 +17,7 @@ rustc_test("routes-admin") {
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/network/testing/netemul/rust:lib",
+    "//src/connectivity/network/tests/fidl/routes:common",
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
     "//src/lib/fidl/rust/fidl",

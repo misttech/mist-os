@@ -457,7 +457,12 @@ where
                     let Some(table_work_item) = table_work_item else {
                         continue;
                     };
-                    Self::handle_table_op(last_table_id, tables, table_work_item, route_work_receivers)
+                    Self::handle_table_op(
+                        last_table_id,
+                        tables,
+                        table_work_item,
+                        route_work_receivers
+                    )
                 },
                 complete => break,
             )
@@ -504,6 +509,8 @@ where
             TableOp::AddTable(_marker) => {
                 let result = {
                     match last_table_id.next() {
+                        // Never reuse table IDs, so the table IDs can only be
+                        // increasing.
                         None => Err(TableError::TableIdOverflows),
                         Some(table_id) => {
                             assert_matches!(

@@ -765,9 +765,45 @@ impl FidlRouteIpExt for Ipv6 {
     type Route = fnet_routes::RouteV6;
 }
 
+/// Options for getting a route watcher.
+#[derive(Default, Clone)]
+pub struct WatcherOptions {
+    /// The route table the watcher is interested in.
+    pub table_interest: Option<fnet_routes::TableInterest>,
+}
+
+impl From<WatcherOptions> for fnet_routes::WatcherOptionsV4 {
+    fn from(WatcherOptions { table_interest }: WatcherOptions) -> Self {
+        Self { table_interest, __source_breaking: fidl::marker::SourceBreaking }
+    }
+}
+
+impl From<WatcherOptions> for fnet_routes::WatcherOptionsV6 {
+    fn from(WatcherOptions { table_interest }: WatcherOptions) -> Self {
+        Self { table_interest, __source_breaking: fidl::marker::SourceBreaking }
+    }
+}
+
+impl From<fnet_routes::WatcherOptionsV4> for WatcherOptions {
+    fn from(
+        fnet_routes::WatcherOptionsV4 { table_interest, __source_breaking: _ }: fnet_routes::WatcherOptionsV4,
+    ) -> Self {
+        Self { table_interest }
+    }
+}
+
+impl From<fnet_routes::WatcherOptionsV6> for WatcherOptions {
+    fn from(
+        fnet_routes::WatcherOptionsV6 { table_interest, __source_breaking: _ }: fnet_routes::WatcherOptionsV6,
+    ) -> Self {
+        Self { table_interest }
+    }
+}
+
 /// Dispatches either `GetWatcherV4` or `GetWatcherV6` on the state proxy.
 pub fn get_watcher<I: FidlRouteIpExt>(
     state_proxy: &<I::StateMarker as fidl::endpoints::ProtocolMarker>::Proxy,
+    options: WatcherOptions,
 ) -> Result<<I::WatcherMarker as fidl::endpoints::ProtocolMarker>::Proxy, WatcherCreationError> {
     let (watcher_proxy, watcher_server_end) = fidl::endpoints::create_proxy::<I::WatcherMarker>()
         .map_err(WatcherCreationError::CreateProxy)?;
@@ -777,14 +813,15 @@ pub fn get_watcher<I: FidlRouteIpExt>(
     struct GetWatcherInputs<'a, I: FidlRouteIpExt> {
         watcher_server_end: fidl::endpoints::ServerEnd<I::WatcherMarker>,
         state_proxy: &'a <I::StateMarker as fidl::endpoints::ProtocolMarker>::Proxy,
+        options: WatcherOptions,
     }
     let IpInvariant(result) = I::map_ip::<GetWatcherInputs<'_, I>, _>(
-        GetWatcherInputs::<'_, I> { watcher_server_end, state_proxy },
-        |GetWatcherInputs { watcher_server_end, state_proxy }| {
-            IpInvariant(state_proxy.get_watcher_v4(watcher_server_end, &Default::default()))
+        GetWatcherInputs::<'_, I> { watcher_server_end, state_proxy, options },
+        |GetWatcherInputs { watcher_server_end, state_proxy, options }| {
+            IpInvariant(state_proxy.get_watcher_v4(watcher_server_end, &options.into()))
         },
-        |GetWatcherInputs { watcher_server_end, state_proxy }| {
-            IpInvariant(state_proxy.get_watcher_v6(watcher_server_end, &Default::default()))
+        |GetWatcherInputs { watcher_server_end, state_proxy, options }| {
+            IpInvariant(state_proxy.get_watcher_v6(watcher_server_end, &options.into()))
         },
     );
 
@@ -814,16 +851,36 @@ pub fn watch<'a, I: FidlRouteIpExt>(
     watch_fut
 }
 
-/// Connects to the watcher protocol and converts the Hanging-Get style API into
-/// an Event stream.
+/// [`event_stream_from_state_with_options`] with default [`WatcherOptions`].
+pub fn event_stream_from_state<I: FidlRouteIpExt>(
+    routes_state: &<I::StateMarker as fidl::endpoints::ProtocolMarker>::Proxy,
+) -> Result<impl Stream<Item = Result<Event<I>, WatchError>>, WatcherCreationError> {
+    event_stream_from_state_with_options(routes_state, Default::default())
+}
+
+/// Connects to the watcher protocol with [`WatcherOptions`] and converts the
+/// Hanging-Get style API into an Event stream.
 ///
 /// Each call to `Watch` returns a batch of events, which are flattened into a
 /// single stream. If an error is encountered while calling `Watch` or while
 /// converting the event, the stream is immediately terminated.
-pub fn event_stream_from_state<I: FidlRouteIpExt>(
+pub fn event_stream_from_state_with_options<I: FidlRouteIpExt>(
     routes_state: &<I::StateMarker as fidl::endpoints::ProtocolMarker>::Proxy,
+    options: WatcherOptions,
 ) -> Result<impl Stream<Item = Result<Event<I>, WatchError>>, WatcherCreationError> {
-    let watcher = get_watcher::<I>(routes_state)?;
+    let watcher = get_watcher::<I>(routes_state, options)?;
+    event_stream_from_watcher(watcher)
+}
+
+/// Turns the provided watcher client into a [`Event`] stream by applying
+/// Hanging-Get watch.
+///
+/// Each call to `Watch` returns a batch of events, which are flattened into a
+/// single stream. If an error is encountered while calling `Watch` or while
+/// converting the event, the stream is immediately terminated.
+pub fn event_stream_from_watcher<I: FidlRouteIpExt>(
+    watcher: <I::WatcherMarker as fidl::endpoints::ProtocolMarker>::Proxy,
+) -> Result<impl Stream<Item = Result<Event<I>, WatchError>>, WatcherCreationError> {
     Ok(futures::stream::try_unfold(watcher, |watcher| async {
         let events_batch = watch::<I>(&watcher).await.map_err(WatchError::Fidl)?;
         if events_batch.is_empty() {
