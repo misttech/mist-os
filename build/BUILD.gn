@@ -318,7 +318,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//zircon/kernel/lib/special-sections:*",
     "//zircon/kernel/phys/lib/boot-shim:*",
     "//zircon/kernel/phys/lib/memalloc:*",
-    "//zircon/kernel/phys/lib/page-table:*",
     "//zircon/system/ulib/abs_clock:*",
     "//zircon/system/ulib/affine:*",
     "//zircon/system/ulib/async:*",
