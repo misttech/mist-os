@@ -13,13 +13,13 @@
 
 <!-- This should begin with an H2 element (for example, ## Summary).-->
 
-## Summary
-
-A one paragraph description of the rest of the proposal.
-
-## Motivation
+## Problem Statement
 
 What problem does this proposal solve?
+
+## Summary
+
+A one paragraph description of the proposed change.
 
 ## Stakeholders
 

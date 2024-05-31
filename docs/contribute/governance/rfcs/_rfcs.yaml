@@ -3231,3 +3231,17 @@
   reviewers: ['olivernewman@google.com', 'phosek@google.com', 'surajmalhotra@google.com', 'tkilbourn@google.com']
   submitted: '2024-03-29'
   reviewed: '2024-05-02'
+
+- name: 'RFC-0248'
+  title: 'Problem Statement'
+  short_description: 'Adds a problem statement phase to the RFC processes and attempts to streamline the process for authors.'
+  authors: ['neelsa@google.com']
+  file: '0248_rfc_problem_statement.md'
+  area: ['Governance']
+  issue: ['']
+  gerrit_change_id: ['995604']
+  status: 'Accepted'
+  reviewers: ['abarth@google.com', 'cpu@google.com', 'harshanv@google.com', 'wittrock@google.com']
+  submitted: '2024-02-22'
+  reviewed: '2024-05-03'
+
