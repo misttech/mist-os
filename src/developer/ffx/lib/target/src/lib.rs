@@ -10,8 +10,8 @@ use errors::{ffx_bail, FfxError};
 use ffx_config::{keys::TARGET_DEFAULT_KEY, EnvironmentContext};
 use fidl::{endpoints::create_proxy, prelude::*};
 use fidl_fuchsia_developer_ffx::{
-    self as ffx, DaemonError, DaemonProxy, TargetAddrInfo, TargetCollectionMarker,
-    TargetCollectionProxy, TargetInfo, TargetIp, TargetMarker, TargetQuery,
+    self as ffx, DaemonError, DaemonProxy, TargetCollectionMarker, TargetCollectionProxy,
+    TargetInfo, TargetMarker, TargetQuery,
 };
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 use fidl_fuchsia_net as net;
@@ -21,8 +21,8 @@ use itertools::Itertools;
 use netext::IsLocalAddr;
 use std::cmp::Ordering;
 use std::collections::HashSet;
-use std::net::{IpAddr, Ipv6Addr};
-use std::net::{SocketAddr, SocketAddrV6};
+use std::net::IpAddr;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::Duration;
 use thiserror::Error;
@@ -30,10 +30,8 @@ use timeout::timeout;
 use tracing::{debug, info};
 
 mod connection;
-mod desc;
 mod fidl_pipe;
 mod overnet_connector;
-mod query;
 mod ssh_connector;
 
 const SSH_PORT_DEFAULT: u16 = 22;
@@ -41,11 +39,11 @@ const DEFAULT_SSH_TIMEOUT_MS: u64 = 10000;
 
 pub use connection::Connection;
 pub use connection::ConnectionError;
-pub use desc::{Description, FastbootInterface};
+pub use discovery::desc::{Description, FastbootInterface};
+pub use discovery::query::TargetInfoQuery;
 pub use fidl_pipe::create_overnet_socket;
 pub use fidl_pipe::FidlPipe;
 pub use overnet_connector::{OvernetConnection, OvernetConnector};
-pub use query::TargetInfoQuery;
 pub use ssh_connector::SshConnector;
 
 /// Re-export of [`fidl_fuchsia_developer_ffx::TargetProxy`] for ease of use
@@ -163,22 +161,6 @@ pub fn open_target_with_fut<'a, 'b: 'a>(
     };
 
     Ok((target_proxy, fut))
-}
-
-pub(crate) fn target_addr_info_to_socket(ti: &TargetAddrInfo) -> SocketAddr {
-    let (target_ip, port) = match ti {
-        TargetAddrInfo::Ip(a) => (a.clone(), 0),
-        TargetAddrInfo::IpPort(ip) => (TargetIp { ip: ip.ip, scope_id: ip.scope_id }, ip.port),
-    };
-    let socket = match target_ip {
-        TargetIp { ip: net::IpAddress::Ipv4(net::Ipv4Address { addr }), .. } => {
-            SocketAddr::new(IpAddr::from(addr), port)
-        }
-        TargetIp { ip: net::IpAddress::Ipv6(net::Ipv6Address { addr }), scope_id, .. } => {
-            SocketAddr::V6(SocketAddrV6::new(Ipv6Addr::from(addr), port, 0, scope_id))
-        }
-    };
-    socket
 }
 
 pub async fn is_discovery_enabled(ctx: &EnvironmentContext) -> bool {

@@ -6,15 +6,13 @@ use crate::target_handle::TargetHandle;
 use addr::TargetAddr;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use discovery::query::target_addr_info_to_socketaddr;
 use emulator_instance::targets as emulator_targets;
 use emulator_targets::EmulatorTargetAction;
 use ffx_config::EnvironmentContext;
 use ffx_daemon_events::TargetConnectionState;
 use ffx_daemon_target::{
-    target::{
-        self, target_addr_info_to_socketaddr, Target, TargetProtocol, TargetTransport,
-        TargetUpdateBuilder,
-    },
+    target::{self, Target, TargetProtocol, TargetTransport, TargetUpdateBuilder},
     target_collection::{TargetCollection, TargetUpdateFilter},
 };
 use ffx_stream_util::TryStreamUtilExt;

@@ -14,11 +14,13 @@ if (is_host) {
     with_unit_tests = true
 
     deps = [
+      "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
       "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
       "//src/developer/ffx/lib/addr:lib",
       "//src/developer/ffx/lib/emulator_instance:lib",
       "//src/developer/ffx/lib/manual_targets:lib",
       "//src/developer/ffx/lib/mdns_discovery:lib",
+      "//src/developer/ffx/lib/netext:lib",
       "//src/developer/ffx/lib/usb_fastboot_discovery:lib",
       "//src/lib/fuchsia-async",
       "//third_party/rust_crates:anyhow",
@@ -36,9 +38,11 @@ if (is_host) {
     ]
 
     sources = [
+      "src/desc.rs",
       "src/emulator_watcher.rs",
       "src/events.rs",
       "src/lib.rs",
+      "src/query.rs",
     ]
   }
 

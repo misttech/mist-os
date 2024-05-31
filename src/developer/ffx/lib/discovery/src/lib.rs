@@ -23,8 +23,10 @@ use usb_fastboot_discovery::{
 // but rather some other well-defined type
 use fidl_fuchsia_developer_ffx as ffx;
 
+pub mod desc;
 mod emulator_watcher;
 pub mod events;
+pub mod query;
 
 #[allow(dead_code)]
 /// A stream of new devices as they appear on the bus. See [`wait_for_devices`].

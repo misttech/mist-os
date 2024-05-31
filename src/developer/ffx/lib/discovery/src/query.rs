@@ -1,11 +1,11 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::desc::Description;
+use crate::{desc::Description, DiscoverySources};
 use addr::TargetAddr;
-use discovery::DiscoverySources;
-use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetInfo, TargetIpPort};
-use std::net::SocketAddr;
+use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetInfo, TargetIp, TargetIpPort};
+use fidl_fuchsia_net as net;
+use std::net::{IpAddr, Ipv6Addr, SocketAddr, SocketAddrV6};
 
 #[derive(Debug, Clone)]
 pub enum TargetInfoQuery {
@@ -90,7 +90,7 @@ impl TargetInfoQuery {
                 .as_ref()
                 .map(|addresses| {
                     addresses.iter().any(|a| {
-                        let mut a = crate::target_addr_info_to_socket(a);
+                        let mut a = target_addr_info_to_socket(a);
                         let ssh_port =
                             if let Some(TargetAddrInfo::IpPort(TargetIpPort { port: tp, .. })) =
                                 t.ssh_address
@@ -170,6 +170,34 @@ impl From<TargetAddr> for TargetInfoQuery {
     }
 }
 
+pub(crate) fn target_addr_info_to_socket(ti: &TargetAddrInfo) -> SocketAddr {
+    let (target_ip, port) = match ti {
+        TargetAddrInfo::Ip(a) => (a.clone(), 0),
+        TargetAddrInfo::IpPort(ip) => (TargetIp { ip: ip.ip, scope_id: ip.scope_id }, ip.port),
+    };
+    let socket = match target_ip {
+        TargetIp { ip: net::IpAddress::Ipv4(net::Ipv4Address { addr }), .. } => {
+            SocketAddr::new(IpAddr::from(addr), port)
+        }
+        TargetIp { ip: net::IpAddress::Ipv6(net::Ipv6Address { addr }), scope_id, .. } => {
+            SocketAddr::V6(SocketAddrV6::new(Ipv6Addr::from(addr), port, 0, scope_id))
+        }
+    };
+    socket
+}
+
+/// Convert a TargetAddrInfo to a SocketAddr preserving the port number if
+/// provided, otherwise the returned SocketAddr will have port number 0.
+pub fn target_addr_info_to_socketaddr(tai: TargetAddrInfo) -> SocketAddr {
+    let mut sa = SocketAddr::from(TargetAddr::from(&tai));
+    // TODO(raggi): the port special case needed here indicates a general problem in our
+    // addressing strategy that is worth reviewing.
+    if let TargetAddrInfo::IpPort(ref ipp) = tai {
+        sa.set_port(ipp.port)
+    }
+    sa
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -193,5 +221,62 @@ mod test {
             sources,
             DiscoverySources::MDNS | DiscoverySources::MANUAL | DiscoverySources::EMULATOR
         );
+    }
+
+    #[test]
+    fn test_target_addr_info_to_socketaddr() {
+        let tai = TargetAddrInfo::IpPort(TargetIpPort {
+            ip: net::IpAddress::Ipv4(net::Ipv4Address { addr: [127, 0, 0, 1] }),
+            port: 8022,
+            scope_id: 0,
+        });
+
+        let sa = "127.0.0.1:8022".parse::<SocketAddr>().unwrap();
+
+        assert_eq!(target_addr_info_to_socketaddr(tai), sa);
+
+        let tai = TargetAddrInfo::Ip(TargetIp {
+            ip: net::IpAddress::Ipv4(net::Ipv4Address { addr: [127, 0, 0, 1] }),
+            scope_id: 0,
+        });
+
+        let sa = "127.0.0.1:0".parse::<SocketAddr>().unwrap();
+
+        assert_eq!(target_addr_info_to_socketaddr(tai), sa);
+
+        let tai = TargetAddrInfo::IpPort(TargetIpPort {
+            ip: net::IpAddress::Ipv6(net::Ipv6Address {
+                addr: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            }),
+            port: 8022,
+            scope_id: 0,
+        });
+
+        let sa = "[::1]:8022".parse::<SocketAddr>().unwrap();
+
+        assert_eq!(target_addr_info_to_socketaddr(tai), sa);
+
+        let tai = TargetAddrInfo::Ip(TargetIp {
+            ip: net::IpAddress::Ipv6(net::Ipv6Address {
+                addr: [0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            }),
+            scope_id: 1,
+        });
+
+        let sa = "[fe80::1%1]:0".parse::<SocketAddr>().unwrap();
+
+        assert_eq!(target_addr_info_to_socketaddr(tai), sa);
+
+        let tai = TargetAddrInfo::IpPort(TargetIpPort {
+            ip: net::IpAddress::Ipv6(net::Ipv6Address {
+                addr: [0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            }),
+            port: 8022,
+            scope_id: 1,
+        });
+
+        let sa = "[fe80::1%1]:8022".parse::<SocketAddr>().unwrap();
+
+        assert_eq!(target_addr_info_to_socketaddr(tai), sa);
     }
 }
