@@ -14,12 +14,11 @@ some common target-agnostic utilities for working with these CIPD packages.
 
 import argparse
 import json
-import tempfile
 import os
 import re
 import subprocess
 import sys
-from typing import Dict, Iterable, List, Optional
+import tempfile
 
 _MY_DIR = os.path.dirname(__file__)
 _FUCHSIA_ROOT = os.path.normpath(os.path.join(_MY_DIR, "..", "..", ".."))
@@ -44,8 +43,11 @@ class Git:
         self.repo_path = repo_path
 
     def git(
-        self, command: Iterable[str], check=True, capture_output=True
-    ) -> subprocess.CompletedProcess:
+        self,
+        command: list[str],
+        check: bool = True,
+        capture_output: bool = True,
+    ) -> subprocess.CompletedProcess[str]:
         """Calls `git` in this repo.
 
         Args:
@@ -64,7 +66,7 @@ class Git:
             capture_output=capture_output,
         )
 
-    def changelog(self, start: Optional[str], end: str) -> str:
+    def changelog(self, start: str | None, end: str) -> str:
         """Returns the additive changelog between two revisions.
 
         An additive changelog only contains the commits that exist in |end| but
@@ -96,9 +98,9 @@ class Repo:
     # more complicated repo checkouts.
     #
     # If alias is None, it means to use the project name.
-    Spec = Dict[str, Optional[str]]
+    Spec = dict[str, str | None]
 
-    def __init__(self, root: str, spec: Optional[Spec] = None):
+    def __init__(self, root: str, spec: Spec | None = None):
         """Initializes the Repo object.
 
         Args:
@@ -115,7 +117,7 @@ class Repo:
         self.root = os.path.realpath(root)
         self.git_repos = self._list_git_repos(spec)
 
-    def _list_git_repos(self, spec: Optional[Spec] = None) -> Dict[str, Git]:
+    def _list_git_repos(self, spec: Spec | None = None) -> dict[str, Git]:
         """Returns a {name: Git} mapping of all repos in this checkout."""
         # `repo info` gives us the information we need. Output format is:
         #   ---------------
@@ -140,7 +142,7 @@ class Repo:
             re.MULTILINE,
         )
 
-        gits = {}
+        gits: dict[str, Git] = {}
         used_specs = set()
         for name, path in matches:
             relative_path = os.path.relpath(path, self.root)
@@ -171,7 +173,7 @@ class Repo:
         return gits
 
 
-def download_cipd(name: str, version: str, path: str):
+def download_cipd(name: str, version: str, path: str) -> None:
     """Downloads a CIPD package.
 
     Args:
@@ -188,7 +190,7 @@ def download_cipd(name: str, version: str, path: str):
     )
 
 
-def fetch_cipd_tags(name: str, version: str) -> List[str]:
+def fetch_cipd_tags(name: str, version: str) -> list[str]:
     """Fetches the tags for a given CIPD package.
 
     Args:
@@ -237,7 +239,7 @@ def fetch_cipd_tags(name: str, version: str) -> List[str]:
 
 def get_cipd_version_manifest(
     package: str, version_or_path: str
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Returns the contents of the manifest.json file in a CIPD package.
 
     We accept a version or a local path here because it's useful to produce
@@ -253,7 +255,7 @@ def get_cipd_version_manifest(
         A {name: version} mapping, or empty dict if manifest.json wasn't found.
     """
 
-    def read_manifest(path):
+    def read_manifest(path: str) -> dict[str, str]:
         try:
             with open(path, "r") as file:
                 return json.load(file)
@@ -343,7 +345,7 @@ def changelog(
     return "\n".join(lines)
 
 
-def copy(source_package: str, source_version: str, dest_package: str):
+def copy(source_package: str, source_version: str, dest_package: str) -> None:
     """Copies a CIPD package.
 
     Args:

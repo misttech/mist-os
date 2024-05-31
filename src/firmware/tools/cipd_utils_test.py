@@ -12,14 +12,14 @@ import os
 import subprocess
 import tempfile
 import textwrap
-from typing import List
 import unittest
+from typing import Callable, Any
 from unittest import mock
 
 import cipd_utils
 
 
-def get_run_commands(mock_run) -> List[List[str]]:
+def get_run_commands(mock_run: mock.MagicMock) -> list[list[str]]:
     """Extracts just the subprocess command list from a mock.
 
     This just helps reduce boilerplate in the common case where we just
@@ -35,8 +35,8 @@ def get_run_commands(mock_run) -> List[List[str]]:
 
 
 class GitTests(unittest.TestCase):
-    @mock.patch.object(cipd_utils.subprocess, "run", autospec=True)
-    def test_git_command(self, mock_run):
+    @mock.patch.object(subprocess, "run", autospec=True)
+    def test_git_command(self, mock_run: mock.MagicMock) -> None:
         git = cipd_utils.Git("path/to/repo/")
 
         git.git(["foo", "bar"])
@@ -48,10 +48,10 @@ class GitTests(unittest.TestCase):
             capture_output=True,
         )
 
-    @mock.patch.object(cipd_utils.subprocess, "run", autospec=True)
-    def test_changelog(self, mock_run):
+    @mock.patch.object(subprocess, "run", autospec=True)
+    def test_changelog(self, mock_run: mock.MagicMock) -> None:
         git = cipd_utils.Git("path/")
-        mock_run.return_value = subprocess.CompletedProcess(None, 0, "fake log")
+        mock_run.return_value = subprocess.CompletedProcess("", 0, "fake log")
 
         result = git.changelog("start_revision", "end_revision")
 
@@ -70,10 +70,10 @@ class GitTests(unittest.TestCase):
         )
         self.assertEqual(result, "fake log")
 
-    @mock.patch.object(cipd_utils.subprocess, "run", autospec=True)
-    def test_changelog_no_start(self, mock_run):
+    @mock.patch.object(subprocess, "run", autospec=True)
+    def test_changelog_no_start(self, mock_run: mock.MagicMock) -> None:
         git = cipd_utils.Git("path/")
-        mock_run.return_value = subprocess.CompletedProcess(None, 0, "fake log")
+        mock_run.return_value = subprocess.CompletedProcess("", 0, "fake log")
 
         result = git.changelog(None, "end_revision")
 
@@ -108,10 +108,10 @@ _FAKE_REPO_INFO = textwrap.dedent(
 
 
 class RepoTests(unittest.TestCase):
-    @mock.patch.object(cipd_utils.subprocess, "run", autospec=True)
-    def test_repo_init(self, mock_run):
+    @mock.patch.object(subprocess, "run", autospec=True)
+    def test_repo_init(self, mock_run: mock.MagicMock) -> None:
         mock_run.return_value = subprocess.CompletedProcess(
-            None, 0, _FAKE_REPO_INFO
+            "", 0, _FAKE_REPO_INFO
         )
 
         repo = cipd_utils.Repo("/repo/root")
@@ -123,10 +123,10 @@ class RepoTests(unittest.TestCase):
         self.assertEqual(repo.git_repos["foo"].repo_path, "/repo/root/foo")
         self.assertEqual(repo.git_repos["bar/baz"].repo_path, "/repo/root/baz")
 
-    @mock.patch.object(cipd_utils.subprocess, "run", autospec=True)
-    def test_repo_init_spec_no_alias(self, mock_run):
+    @mock.patch.object(subprocess, "run", autospec=True)
+    def test_repo_init_spec_no_alias(self, mock_run: mock.MagicMock) -> None:
         mock_run.return_value = subprocess.CompletedProcess(
-            None, 0, _FAKE_REPO_INFO
+            "", 0, _FAKE_REPO_INFO
         )
 
         repo = cipd_utils.Repo("/repo/root", spec={"foo": None})
@@ -134,10 +134,10 @@ class RepoTests(unittest.TestCase):
         self.assertEqual(len(repo.git_repos), 1)
         self.assertEqual(repo.git_repos["foo"].repo_path, "/repo/root/foo")
 
-    @mock.patch.object(cipd_utils.subprocess, "run", autospec=True)
-    def test_repo_init_spec_with_alias(self, mock_run):
+    @mock.patch.object(subprocess, "run", autospec=True)
+    def test_repo_init_spec_with_alias(self, mock_run: mock.MagicMock) -> None:
         mock_run.return_value = subprocess.CompletedProcess(
-            None, 0, _FAKE_REPO_INFO
+            "", 0, _FAKE_REPO_INFO
         )
 
         repo = cipd_utils.Repo("/repo/root", spec={"baz": "baz_alias"})
@@ -147,19 +147,21 @@ class RepoTests(unittest.TestCase):
             repo.git_repos["baz_alias"].repo_path, "/repo/root/baz"
         )
 
-    @mock.patch.object(cipd_utils.subprocess, "run", autospec=True)
-    def test_repo_init_spec_unused(self, mock_run):
+    @mock.patch.object(subprocess, "run", autospec=True)
+    def test_repo_init_spec_unused(self, mock_run: mock.MagicMock) -> None:
         mock_run.return_value = subprocess.CompletedProcess(
-            None, 0, _FAKE_REPO_INFO
+            "", 0, _FAKE_REPO_INFO
         )
 
         with self.assertRaises(ValueError):
             cipd_utils.Repo("/repo/root", spec={"foo": None, "unknown": None})
 
-    @mock.patch.object(cipd_utils.subprocess, "run", autospec=True)
-    def test_repo_init_spec_name_collision(self, mock_run):
+    @mock.patch.object(subprocess, "run", autospec=True)
+    def test_repo_init_spec_name_collision(
+        self, mock_run: mock.MagicMock
+    ) -> None:
         mock_run.return_value = subprocess.CompletedProcess(
-            None, 0, _FAKE_REPO_INFO
+            "", 0, _FAKE_REPO_INFO
         )
 
         with self.assertRaises(ValueError):
@@ -169,16 +171,18 @@ class RepoTests(unittest.TestCase):
 
 
 class CipdTests(unittest.TestCase):
-    @mock.patch.object(
-        cipd_utils.os.path, "isdir", autospec=True, return_value=False
-    )
-    @mock.patch.object(cipd_utils.subprocess, "run", autospec=True)
-    def test_cipd_manifest(self, mock_run, _mock_isdir):
+    @mock.patch.object(os.path, "isdir", autospec=True, return_value=False)
+    @mock.patch.object(subprocess, "run", autospec=True)
+    def test_cipd_manifest(
+        self, mock_run: mock.MagicMock, _mock_isdir: mock.MagicMock
+    ) -> None:
         # The code under test will download the CIPD package into a tempdir
         # so we don't know the path ahead of time. In order to inject a fake
         # manifest, this function will write it to disk as a side-effect of
         # the mock subprocess.run() call.
-        def write_cipd_manifest_side_effect(command, *args, **kwargs):
+        def write_cipd_manifest_side_effect(
+            command: list[str], *args: Any, **kwargs: Any
+        ) -> None:
             # The path to download will follow the "-root" arg.
             download_root = command[command.index("-root") + 1]
             with open(os.path.join(download_root, "manifest.json"), "w") as f:
@@ -198,8 +202,8 @@ class CipdTests(unittest.TestCase):
         manifest = cipd_utils.get_cipd_version_manifest("package", "version")
         self.assertEqual(manifest, {"repo1": "revision1", "repo2": "revision2"})
 
-    @mock.patch.object(cipd_utils.subprocess, "run", autospec=True)
-    def test_cipd_manifest_local(self, mock_run):
+    @mock.patch.object(subprocess, "run", autospec=True)
+    def test_cipd_manifest_local(self, mock_run: mock.MagicMock) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with open(os.path.join(temp_dir, "manifest.json"), "w") as f:
                 f.write(
@@ -223,8 +227,11 @@ class CipdTests(unittest.TestCase):
 
 
 def set_up_changelog_mocks(
-    mock_get_cipd_version_manifest, cipd_version_a, cipd_version_b, repo_info
-):
+    mock_get_cipd_version_manifest: mock.MagicMock,
+    cipd_version_a: str,
+    cipd_version_b: str,
+    repo_info: dict[str, Any],
+) -> cipd_utils.Repo:
     """Configures all the mocks needed to produce a changelog.
 
     There's a lot of mocking that needs to be done to set up the proper
@@ -243,7 +250,7 @@ def set_up_changelog_mocks(
     """
 
     # Mock out the CIPD manifest for the given repos.
-    def cipd_version_manifest(_, cipd_version):
+    def cipd_version_manifest(_: Any, cipd_version: str) -> dict[str, str]:
         if cipd_version == cipd_version_a:
             git_rev_index = 0
         elif cipd_version == cipd_version_b:
@@ -271,10 +278,10 @@ def set_up_changelog_mocks(
         # captured at call-time, not at definition. So we need a wrapper here
         # that we can call immediately to bind the loop variables, or else
         # they'll change on the next loop iteration.
-        def wrap_changelog():
+        def wrap_changelog() -> Callable[[str, str], str]:
             rev_a, rev_b, a_to_b, b_to_a = info
 
-            def changelog(old_revision, new_revision):
+            def changelog(old_revision: str, new_revision: str) -> str:
                 if old_revision == rev_a and new_revision == rev_b:
                     return "\n".join(a_to_b)
                 elif old_revision == rev_b and new_revision == rev_a:
@@ -293,7 +300,9 @@ def set_up_changelog_mocks(
 
 class ChangelogTests(unittest.TestCase):
     @mock.patch.object(cipd_utils, "get_cipd_version_manifest", autospec=True)
-    def test_changelog(self, mock_get_cipd_version_manifest):
+    def test_changelog(
+        self, mock_get_cipd_version_manifest: mock.MagicMock
+    ) -> None:
         mock_repo = set_up_changelog_mocks(
             mock_get_cipd_version_manifest,
             "cipd_ver_A",
@@ -342,7 +351,9 @@ class ChangelogTests(unittest.TestCase):
         )
 
     @mock.patch.object(cipd_utils, "get_cipd_version_manifest", autospec=True)
-    def test_changelog_new_repo(self, mock_get_cipd_version_manifest):
+    def test_changelog_new_repo(
+        self, mock_get_cipd_version_manifest: mock.MagicMock
+    ) -> None:
         mock_repo = set_up_changelog_mocks(
             mock_get_cipd_version_manifest,
             "cipd_ver_A",
@@ -375,7 +386,9 @@ class ChangelogTests(unittest.TestCase):
         )
 
     @mock.patch.object(cipd_utils, "get_cipd_version_manifest", autospec=True)
-    def test_changelog_deleted_repo(self, mock_get_cipd_version_manifest):
+    def test_changelog_deleted_repo(
+        self, mock_get_cipd_version_manifest: mock.MagicMock
+    ) -> None:
         mock_repo = set_up_changelog_mocks(
             mock_get_cipd_version_manifest,
             "cipd_ver_A",
@@ -418,7 +431,9 @@ class ChangelogTests(unittest.TestCase):
         )
 
     @mock.patch.object(cipd_utils, "get_cipd_version_manifest", autospec=True)
-    def test_changelog_removed_commits(self, mock_get_cipd_version_manifest):
+    def test_changelog_removed_commits(
+        self, mock_get_cipd_version_manifest: mock.MagicMock
+    ) -> None:
         mock_repo = set_up_changelog_mocks(
             mock_get_cipd_version_manifest,
             "cipd_ver_A",
@@ -455,7 +470,9 @@ class ChangelogTests(unittest.TestCase):
         )
 
     @mock.patch.object(cipd_utils, "get_cipd_version_manifest", autospec=True)
-    def test_changelog_no_changes(self, mock_get_cipd_version_manifest):
+    def test_changelog_no_changes(
+        self, mock_get_cipd_version_manifest: mock.MagicMock
+    ) -> None:
         mock_repo = set_up_changelog_mocks(
             mock_get_cipd_version_manifest,
             "cipd_ver_A",
@@ -487,10 +504,15 @@ class ChangelogTests(unittest.TestCase):
 
 
 class CopyTests(unittest.TestCase):
-    @mock.patch("cipd_utils.subprocess.run", autospec=True)
+    @mock.patch("subprocess.run", autospec=True)
     @mock.patch("cipd_utils.download_cipd", autospec=True)
     @mock.patch("cipd_utils.fetch_cipd_tags", autospec=True)
-    def test_copy(self, mock_fetch_cipd_tags, mock_download_cipd, mock_run):
+    def test_copy(
+        self,
+        mock_fetch_cipd_tags: mock.MagicMock,
+        mock_download_cipd: mock.MagicMock,
+        mock_run: mock.MagicMock,
+    ) -> None:
         mock_fetch_cipd_tags.return_value = ["tag1:foo", "tag2:bar"]
 
         cipd_utils.copy("source_name", "source_version", "dest_name")
