@@ -138,6 +138,7 @@ rustc_binary("bin") {
     "src/bedrock/mod.rs",
     "src/bedrock/program/component_controller.rs",
     "src/bedrock/program/mod.rs",
+    "src/bedrock/program_output_dict.rs",
     "src/bedrock/sandbox_construction.rs",
     "src/bootfs.rs",
     "src/builtin/builtin_resolver.rs",

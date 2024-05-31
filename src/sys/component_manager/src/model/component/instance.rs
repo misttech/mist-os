@@ -6,10 +6,8 @@ use {
     crate::{
         bedrock::{
             program::{self as program, ComponentStopOutcome, Program, StopRequestSuccess},
-            sandbox_construction::{
-                self, build_component_sandbox, build_program_output_dictionary,
-                extend_dict_with_offers,
-            },
+            program_output_dict::build_program_output_dictionary,
+            sandbox_construction::{self, build_component_sandbox, extend_dict_with_offers},
         },
         framework::{build_framework_dictionary, controller},
         model::{
