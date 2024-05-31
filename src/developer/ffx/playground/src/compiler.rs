@@ -80,7 +80,7 @@ impl Visitor {
 
     /// Get the names of all variables that were declared in the top level scope.
     pub fn get_top_level_variable_decls(&self) -> impl Iterator<Item = (&String, Mutability)> {
-        self.allocated_slots.iter().filter_map(|((name, slot), scope)| {
+        self.allocated_slots.iter().filter_map(|((name, scope), slot)| {
             if *scope == 0 {
                 Some((
                     name,
