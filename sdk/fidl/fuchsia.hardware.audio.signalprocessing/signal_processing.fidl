@@ -56,7 +56,7 @@ type ElementType = flexible enum {
     SAMPLE_RATE_CONVERSION = 11;
 
     /// The start/end of a pipeline.
-    @available(added=12, removed=20)
+    @available(added=12, removed=20, legacy=true)
     ENDPOINT = 12;
 
     /// Ring Buffer.
@@ -85,7 +85,7 @@ type TypeSpecificElement = flexible union {
     4: dynamics Dynamics;
 
     // See dai_interconnect.fidl.
-    @available(added=12, removed=20)
+    @available(added=12, removed=20, legacy=true)
     5: endpoint Endpoint;
 
     // See dai_interconnect.fidl.
@@ -93,7 +93,7 @@ type TypeSpecificElement = flexible union {
     6: dai_interconnect DaiInterconnect;
 };
 
-@available(removed=20)
+@available(removed=20, legacy=true)
 type Latency = flexible union {
     /// Latency added to the pipeline as a zx.Duration.
     1: latency_time zx.Duration;
@@ -128,7 +128,7 @@ type Element = table {
     /// # Deprecation
     ///
     /// Use `can_bypass` instead.
-    @available(removed=20)
+    @available(removed=20, legacy=true)
     4: can_disable bool;
 
     /// If included, a textual description of the processing element.
@@ -169,7 +169,7 @@ type TypeSpecificElementState = flexible union {
     4: dynamics DynamicsElementState;
 
     // See dai_interconnect.fidl.
-    @available(added=12, removed=20)
+    @available(added=12, removed=20, legacy=true)
     5: endpoint EndpointElementState;
 
     // See dai_interconnect.fidl.
@@ -200,7 +200,7 @@ type ElementState = table {
     /// # Deprecation
     ///
     /// Use `bypassed` instead.
-    @available(removed=20)
+    @available(removed=20, legacy=true)
     2: enabled bool;
 
     /// If included, how much latency is added to the pipeline if this processing element is
@@ -209,7 +209,7 @@ type ElementState = table {
     /// `WatchElementState` reply.
     ///
     /// Optional.
-    @available(removed=20)
+    @available(removed=20, legacy=true)
     3: latency Latency;
 
     /// If included, an opaque object of octets for exchanging vendor specific information.
