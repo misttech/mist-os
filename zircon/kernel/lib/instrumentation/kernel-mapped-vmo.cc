@@ -4,9 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include "kernel-mapped-vmo.h"
-
 #include <align.h>
+#include <lib/instrumentation/kernel-mapped-vmo.h>
 
 #include <ktl/move.h>
 #include <object/vm_object_dispatcher.h>

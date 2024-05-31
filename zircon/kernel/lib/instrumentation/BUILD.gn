@@ -28,10 +28,7 @@ zx_library("instrumentation") {
 if (is_kernel) {
   source_set("private") {
     visibility = [ ":*" ]
-    public = [
-      "kernel-mapped-vmo.h",
-      "private.h",
-    ]
+    public = [ "private.h" ]
     sources = [
       "kernel-mapped-vmo.cc",
       "phys.cc",
@@ -75,6 +72,7 @@ if (is_kernel) {
 
     sources = [ "sancov.cc" ]
     deps = [
+      ":headers",
       ":private",
       "//zircon/kernel/lib/init",
       "//zircon/kernel/lib/ktl",
