@@ -205,6 +205,8 @@ fuchsia_structured_config_values("default_config") {
   cm_label = ":conformance-manifest"
   values = {
     gpu_vendor_id = ""
+    gpu_vendor_id_int = 0
+    disabled_test_pattern = ""
   }
 }
 
@@ -212,6 +214,8 @@ fuchsia_structured_config_values("child_config") {
   cm_label = ":conformance_child_manifest"
   values = {
     gpu_vendor_id = ""
+    gpu_vendor_id_int = 0
+    disabled_test_pattern = ""
   }
 }
 
@@ -219,6 +223,8 @@ fuchsia_structured_config_values("arm_config") {
   cm_label = ":conformance-manifest"
   values = {
     gpu_vendor_id = "0x13B5"
+    gpu_vendor_id_int = 0
+    disabled_test_pattern = ""
   }
 }
 
@@ -226,6 +232,8 @@ fuchsia_structured_config_values("vsi_config") {
   cm_label = ":conformance-manifest"
   values = {
     gpu_vendor_id = "0x10001"
+    gpu_vendor_id_int = 0
+    disabled_test_pattern = ""
   }
 }
 
@@ -307,6 +315,8 @@ fuchsia_structured_config_values("default_config_hermetic") {
   cm_label = ":conformance-hermetic-manifest"
   values = {
     gpu_vendor_id = ""
+    gpu_vendor_id_int = 0
+    disabled_test_pattern = ""
   }
 }
 
@@ -326,6 +336,8 @@ fuchsia_structured_config_values("arm_config_hermetic") {
   cm_label = ":conformance-hermetic-manifest"
   values = {
     gpu_vendor_id = "0x13B5"
+    gpu_vendor_id_int = 0
+    disabled_test_pattern = ""
   }
 }
 
@@ -333,6 +345,8 @@ fuchsia_structured_config_values("vsi_config_hermetic") {
   cm_label = ":conformance-hermetic-manifest"
   values = {
     gpu_vendor_id = "0x10001"
+    gpu_vendor_id_int = 0
+    disabled_test_pattern = ""
   }
 }
 
