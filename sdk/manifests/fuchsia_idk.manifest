@@ -238,6 +238,8 @@ fidl_library://fidl/fuchsia.gpu.magma
 fidl_library://fidl/fuchsia.hardware.adc
 fidl_library://fidl/fuchsia.hardware.audio
 fidl_library://fidl/fuchsia.hardware.audio.signalprocessing
+fidl_library://fidl/fuchsia.hardware.gpio (unstable)
+fidl_library://fidl/fuchsia.hardware.gpioimpl (unstable)
 fidl_library://fidl/fuchsia.hardware.i2c
 fidl_library://fidl/fuchsia.hardware.light
 fidl_library://fidl/fuchsia.hardware.network

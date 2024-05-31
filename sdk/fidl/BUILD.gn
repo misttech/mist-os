@@ -64,6 +64,8 @@ sdk_fidl_targets = [
   "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc",
   "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio",
   "//sdk/fidl/fuchsia.hardware.audio.signalprocessing:fuchsia.hardware.audio.signalprocessing",
+  "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio",
+  "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl",
   "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c",
   "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light",
   "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network",
