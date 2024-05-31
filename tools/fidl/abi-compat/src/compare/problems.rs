@@ -330,6 +330,15 @@ impl CompatibilityProblems {
     pub fn sort(&mut self) {
         self.0.sort()
     }
+
+    pub fn into_errors_and_warnings(self) -> (Self, Self) {
+        let (warnings, errors) = self.0.into_iter().partition(|p| p.warning);
+        (Self(errors), Self(warnings))
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
 }
 
 impl IntoIterator for CompatibilityProblems {

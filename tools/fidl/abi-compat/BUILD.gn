@@ -9,6 +9,19 @@ import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_test.gni")
 import("//build/testing/host_test_data.gni")
 
+declare_args() {
+  # Enforce ABI compatibility checks for stable API levels.
+  enforce_abi_compat = false
+}
+
+# These API levels have known ABI incomaptibilities with the platform that we don't plan to fix.
+allow_abi_breakage = [
+  "15",
+  "16",
+  "17",
+  "18",
+]
+
 if (is_host) {
   abi_compat_deps = [
     "//src/lib/flyweights",
@@ -83,6 +96,12 @@ if (is_host) {
         rebase_path(report, root_build_dir),
       ]
 
+      # Stop the build if errors are found, unless the API level is in `allow_abi_breakage`.
+      if (enforce_abi_compat &&
+          filter_include(allow_abi_breakage, [ "$api_level" ]) == []) {
+        args += [ "--enforce" ]
+      }
+
       deps = [
         "//tools/fidl/platform-ir:platform_ir_${api_level}(${default_toolchain})",
         "//tools/fidl/platform-ir:platform_ir_head(${default_toolchain})",
@@ -93,10 +112,15 @@ if (is_host) {
   group("generate-reports") {
     deps = reports
   }
+  if (!enforce_abi_compat) {
+    not_needed([ "allow_abi_breakage" ])
+  }
 } else {
   group("generate-reports") {
     deps = [ ":generate-reports($host_toolchain)" ]
   }
+
+  not_needed([ "allow_abi_breakage" ])
 }
 
 group("abi-compat") {
