@@ -2,13 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::CapabilityTrait;
-use fidl::handle::{EventPair, Signals};
 use fidl_fuchsia_component_sandbox as fsandbox;
-use fuchsia_async as fasync;
-use fuchsia_zircon::Koid;
 use std::fmt::Debug;
 use std::{any::Any, sync::Arc};
+
+#[cfg(target_os = "fuchsia")]
+use {
+    fidl::handle::{EventPair, Signals},
+    fuchsia_async as fasync,
+    fuchsia_zircon::Koid,
+};
 
 /// The trait that `WeakComponentToken` holds.
 pub trait WeakComponentTokenAny: Debug + Send + Sync {
@@ -23,7 +26,8 @@ pub struct WeakComponentToken {
     pub inner: Arc<dyn WeakComponentTokenAny>,
 }
 
-impl CapabilityTrait for WeakComponentToken {}
+#[cfg(target_os = "fuchsia")]
+impl crate::CapabilityTrait for WeakComponentToken {}
 
 impl From<WeakComponentToken> for fsandbox::Capability {
     fn from(_component: WeakComponentToken) -> Self {
@@ -31,6 +35,7 @@ impl From<WeakComponentToken> for fsandbox::Capability {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl WeakComponentToken {
     async fn serve(server: EventPair) {
         fasync::OnSignals::new(&server, Signals::OBJECT_PEER_CLOSED).await.ok();

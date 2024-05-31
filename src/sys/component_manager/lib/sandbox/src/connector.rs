@@ -2,12 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{registry, CapabilityTrait, ConversionError, Open};
-use fidl::handle::Channel;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use futures::channel::mpsc;
-use std::{fmt::Debug, sync::Arc};
-use vfs::directory::entry::DirectoryEntry;
+use std::fmt::Debug;
+
+#[cfg(target_os = "fuchsia")]
+use {
+    crate::{registry, ConversionError},
+    fidl::handle::Channel,
+    std::sync::Arc,
+    vfs::directory::entry::DirectoryEntry,
+};
 
 #[derive(Debug)]
 pub struct Message {
@@ -47,6 +52,7 @@ impl Connector {
         Self { inner: std::sync::Arc::new(sender) }
     }
 
+    #[cfg(target_os = "fuchsia")]
     pub(crate) fn send_channel(&self, channel: Channel) -> Result<(), ()> {
         self.send(Message { channel })
     }
@@ -56,21 +62,14 @@ impl Connector {
     }
 }
 
-impl From<Connector> for Open {
-    fn from(connector: Connector) -> Self {
-        Self::new(vfs::service::endpoint(move |_scope, server_end| {
-            let _ = connector.send_channel(server_end.into_zx_channel().into());
-        }))
-    }
-}
-
 impl Connectable for Connector {
     fn send(&self, message: Message) -> Result<(), ()> {
         self.send(message)
     }
 }
 
-impl CapabilityTrait for Connector {
+#[cfg(target_os = "fuchsia")]
+impl crate::CapabilityTrait for Connector {
     fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         Ok(vfs::service::endpoint(move |_scope, server_end| {
             let _ = self.send_channel(server_end.into_zx_channel().into());
@@ -78,12 +77,14 @@ impl CapabilityTrait for Connector {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl From<Connector> for fsandbox::Connector {
     fn from(value: Connector) -> Self {
         fsandbox::Connector { token: registry::insert_token(value.into()) }
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl From<Connector> for fsandbox::Capability {
     fn from(connector: Connector) -> Self {
         fsandbox::Capability::Connector(connector.into())
@@ -139,11 +140,13 @@ mod tests {
         }
     }
 
+    // TODO(340891837): This test only runs on host because of the reliance on Open
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::test]
     async fn unwrap_server_end_or_serve_node_node_reference_and_describe() {
         let receiver = {
             let (receiver, sender) = Receiver::new();
-            let open: Open = sender.into();
+            let open: crate::Open = sender.into();
             let (client_end, server_end) = Channel::create();
             let scope = ExecutionScope::new();
             open.open(
@@ -171,10 +174,12 @@ mod tests {
         assert_matches!(receiver.receive().await, None);
     }
 
+    // TODO(340891837): This test only runs on host because of the reliance on Open
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::test]
     async fn unwrap_server_end_or_serve_node_describe() {
         let (receiver, sender) = Receiver::new();
-        let open: Open = sender.into();
+        let open: crate::Open = sender.into();
 
         let (client_end, server_end) = Channel::create();
         // The VFS should send the DESCRIBE event, then hand us the channel.
@@ -195,10 +200,12 @@ mod tests {
         );
     }
 
+    // TODO(340891837): This test only runs on host because of the reliance on Open
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::test]
     async fn unwrap_server_end_or_serve_node_empty() {
         let (receiver, sender) = Receiver::new();
-        let open: Open = sender.into();
+        let open: crate::Open = sender.into();
 
         let (client_end, server_end) = Channel::create();
         // The VFS should not send any event, but directly hand us the channel.

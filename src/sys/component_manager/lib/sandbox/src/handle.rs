@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{registry, CapabilityTrait};
 use fidl::handle::Handle;
-use fidl_fuchsia_component_sandbox as fsandbox;
 use std::sync::{Arc, Mutex};
+
+#[cfg(target_os = "fuchsia")]
+use {crate::registry, fidl_fuchsia_component_sandbox as fsandbox};
 
 /// A capability that vends a single Zircon handle.
 #[derive(Clone, Debug)]
@@ -31,14 +32,17 @@ impl From<Handle> for OneShotHandle {
     }
 }
 
-impl CapabilityTrait for OneShotHandle {}
+#[cfg(target_os = "fuchsia")]
+impl crate::CapabilityTrait for OneShotHandle {}
 
+#[cfg(target_os = "fuchsia")]
 impl From<OneShotHandle> for fsandbox::OneShotHandle {
     fn from(value: OneShotHandle) -> Self {
         fsandbox::OneShotHandle { token: registry::insert_token(value.into()) }
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl From<OneShotHandle> for fsandbox::Capability {
     fn from(one_shot: OneShotHandle) -> Self {
         Self::Handle(one_shot.into())

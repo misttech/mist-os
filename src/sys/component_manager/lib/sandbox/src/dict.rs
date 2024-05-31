@@ -2,28 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::Capability;
 use derivative::Derivative;
-use fidl::endpoints::{self, create_request_stream, ClientEnd};
-use fidl::handle::AsHandleRef;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fuchsia_async as fasync;
-use fuchsia_zircon::Koid;
-use futures::TryStreamExt;
 use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex, MutexGuard},
 };
-use tracing::warn;
-use vfs::{
-    directory::{
-        entry::DirectoryEntry,
-        helper::{AlreadyExists, DirectlyMutable},
-        immutable::simple as pfs,
-    },
-    name::Name,
-};
 
-use crate::{registry, Capability, CapabilityTrait, ConversionError};
+#[cfg(target_os = "fuchsia")]
+use {
+    crate::{registry, CapabilityTrait, ConversionError},
+    fidl::endpoints::{self, create_request_stream, ClientEnd},
+    fidl::handle::AsHandleRef,
+    fuchsia_zircon::Koid,
+    futures::TryStreamExt,
+    tracing::warn,
+    vfs::{
+        directory::{
+            entry::DirectoryEntry,
+            helper::{AlreadyExists, DirectlyMutable},
+            immutable::simple as pfs,
+        },
+        name::Name,
+    },
+};
 
 pub type Key = cm_types::Name;
 
@@ -40,6 +44,7 @@ pub struct Dict {
 
     /// Tasks that serve dictionary iterators.
     #[derivative(Debug = "ignore")]
+    #[allow(dead_code)]
     iterator_tasks: fasync::TaskGroup,
 }
 
@@ -141,6 +146,7 @@ impl Dict {
     }
 
     /// Serve the `fuchsia.component.sandbox.Dictionary` protocol for this `Dict`.
+    #[cfg(target_os = "fuchsia")]
     pub async fn serve_dict(
         &mut self,
         mut stream: fsandbox::DictionaryRequestStream,
@@ -233,6 +239,7 @@ impl Dict {
     }
 
     /// Serves the `fuchsia.sandbox.Dictionary` protocol for this Open and moves it into the registry.
+    #[cfg(target_os = "fuchsia")]
     pub fn serve_and_register(self, stream: fsandbox::DictionaryRequestStream, koid: Koid) {
         let mut dict = self.clone();
 
@@ -243,6 +250,7 @@ impl Dict {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl From<Dict> for ClientEnd<fsandbox::DictionaryMarker> {
     fn from(dict: Dict) -> Self {
         let (client_end, dict_stream) =
@@ -252,12 +260,14 @@ impl From<Dict> for ClientEnd<fsandbox::DictionaryMarker> {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl From<Dict> for fsandbox::Capability {
     fn from(dict: Dict) -> Self {
         Self::Dictionary(dict.into())
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl CapabilityTrait for Dict {
     fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         let dir = pfs::simple();
@@ -284,6 +294,7 @@ impl CapabilityTrait for Dict {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 async fn serve_dict_item_iterator(
     items: Vec<(Key, Capability)>,
     mut stream: fsandbox::DictionaryItemIteratorRequestStream,
@@ -321,6 +332,7 @@ async fn serve_dict_item_iterator(
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 async fn serve_dict_key_iterator(
     keys: Vec<Key>,
     mut stream: fsandbox::DictionaryKeyIteratorRequestStream,
@@ -352,6 +364,8 @@ async fn serve_dict_key_iterator(
     }
 }
 
+// These tests only run on target because the vfs library is not generally available on host.
+#[cfg(target_os = "fuchsia")]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -369,7 +383,7 @@ mod tests {
     use test_util::Counter;
     use vfs::{
         directory::{
-            entry::{serve_directory, EntryInfo, OpenRequest, SubNode},
+            entry::{serve_directory, DirectoryEntry, EntryInfo, OpenRequest, SubNode},
             entry_container::Directory as VfsDirectory,
         },
         execution_scope::ExecutionScope,

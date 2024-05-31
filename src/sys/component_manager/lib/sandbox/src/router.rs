@@ -2,17 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{Capability, CapabilityTrait, Dict, WeakComponentToken};
+use crate::{Capability, Dict, WeakComponentToken};
 use async_trait::async_trait;
 use cm_types::Availability;
-use fidl::handle::{AsHandleRef, EventPair};
-use fidl_fuchsia_component_sandbox as fsandbox;
-use fuchsia_zircon::Koid;
 use futures::future::BoxFuture;
-use futures::TryStreamExt;
 use router_error::RouterError;
 use std::fmt::Debug;
 use std::{fmt, sync::Arc};
+
+#[cfg(target_os = "fuchsia")]
+use {
+    fidl::handle::{AsHandleRef, EventPair},
+    fidl_fuchsia_component_sandbox as fsandbox,
+    fuchsia_zircon::Koid,
+    futures::TryStreamExt,
+};
 
 /// Types that implement [`Routable`] let the holder asynchronously request
 /// capabilities from them.
@@ -31,6 +35,7 @@ pub struct Request {
     pub target: WeakComponentToken,
 }
 
+#[cfg(target_os = "fuchsia")]
 impl From<Request> for fsandbox::RouteRequest {
     fn from(request: Request) -> Self {
         let availability = from_cm_type(request.availability);
@@ -63,7 +68,8 @@ impl fmt::Debug for Router {
 }
 
 // TODO(b/314343346): Complete or remove the Router implementation of sandbox::Capability
-impl CapabilityTrait for Router {
+#[cfg(target_os = "fuchsia")]
+impl crate::CapabilityTrait for Router {
     fn into_fidl(self) -> fsandbox::Capability {
         self.into()
     }
@@ -117,6 +123,7 @@ impl Router {
         self.routable.route(request).await
     }
 
+    #[cfg(target_os = "fuchsia")]
     async fn serve_router(
         self,
         mut stream: fsandbox::RouterRequestStream,
@@ -156,6 +163,7 @@ impl Router {
     }
 
     /// Serves the `fuchsia.sandbox.Router` protocol and moves ourself into the registry.
+    #[cfg(target_os = "fuchsia")]
     pub fn serve_and_register(self, stream: fsandbox::RouterRequestStream, koid: Koid) {
         let router = self.clone();
 
@@ -166,6 +174,7 @@ impl Router {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl From<Router> for fsandbox::Capability {
     fn from(router: Router) -> Self {
         let (client_end, sender_stream) =
@@ -199,6 +208,7 @@ impl Routable for RouterError {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 fn to_cm_type(value: fsandbox::Availability) -> cm_types::Availability {
     match value {
         fsandbox::Availability::Required => cm_types::Availability::Required,
@@ -208,6 +218,7 @@ fn to_cm_type(value: fsandbox::Availability) -> cm_types::Availability {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 fn from_cm_type(value: cm_types::Availability) -> fsandbox::Availability {
     match value {
         cm_types::Availability::Required => fsandbox::Availability::Required,

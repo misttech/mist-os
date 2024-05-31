@@ -2,27 +2,63 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::{AsHandleRef, HandleRef};
-use fidl_fuchsia_component_sandbox as fsandbox;
 use from_enum::FromEnum;
 use fuchsia_zircon_status as zx_status;
 use router_error::Explain;
-use std::{fmt::Debug, sync::Arc};
+use std::fmt::Debug;
 use thiserror::Error;
-use vfs::directory::entry::DirectoryEntry;
+
+#[cfg(target_os = "fuchsia")]
+use {
+    fidl::{AsHandleRef, HandleRef},
+    fidl_fuchsia_component_sandbox as fsandbox,
+    std::sync::Arc,
+    vfs::directory::entry::DirectoryEntry,
+};
 
 #[derive(Error, Debug, Clone)]
 pub enum ConversionError {
-    #[error("`{0}` is not a valid `fuchsia.io` node name")]
-    ParseName(#[from] vfs::name::ParseNameError),
+    #[error("invalid `fuchsia.io` node name: name `{0}` is too long")]
+    ParseNameErrorTooLong(String),
+
+    #[error("invalid `fuchsia.io` node name: name cannot be empty")]
+    ParseNameErrorEmpty,
+
+    #[error("invalid `fuchsia.io` node name: name cannot be `.`")]
+    ParseNameErrorDot,
+
+    #[error("invalid `fuchsia.io` node name: name cannot be `..`")]
+    ParseNameErrorDotDot,
+
+    #[error("invalid `fuchsia.io` node name: name cannot contain `/`")]
+    ParseNameErrorSlash,
+
+    #[error("invalid `fuchsia.io` node name: name cannot contain embedded NUL")]
+    ParseNameErrorEmbeddedNul,
+
     #[error("conversion to type is not supported")]
     NotSupported,
+
     #[error("value at `{key}` could not be converted")]
     Nested {
         key: String,
         #[source]
         err: Box<ConversionError>,
     },
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<vfs::name::ParseNameError> for ConversionError {
+    fn from(parse_name_error: vfs::name::ParseNameError) -> Self {
+        match parse_name_error {
+            vfs::name::ParseNameError::TooLong(s) => ConversionError::ParseNameErrorTooLong(s),
+            vfs::name::ParseNameError::Empty => ConversionError::ParseNameErrorEmpty,
+            vfs::name::ParseNameError::Dot => ConversionError::ParseNameErrorDot,
+            vfs::name::ParseNameError::DotDot => ConversionError::ParseNameErrorDotDot,
+            vfs::name::ParseNameError::Slash => ConversionError::ParseNameErrorSlash,
+            vfs::name::ParseNameError::EmbeddedNul => ConversionError::ParseNameErrorEmbeddedNul,
+        }
+    }
 }
 
 /// Errors arising from conversion between Rust and FIDL types.
@@ -48,13 +84,15 @@ impl Explain for RemoteError {
 pub enum Capability {
     Unit(crate::Unit),
     Connector(crate::Connector),
-    Open(crate::Open),
     Dictionary(crate::Dict),
     Data(crate::Data),
     Directory(crate::Directory),
     OneShotHandle(crate::OneShotHandle),
     Router(crate::Router),
     Component(crate::WeakComponentToken),
+
+    #[cfg(target_os = "fuchsia")]
+    Open(crate::Open),
 }
 
 impl Capability {
@@ -65,6 +103,7 @@ impl Capability {
         }
     }
 
+    #[cfg(target_os = "fuchsia")]
     pub fn into_fidl(self) -> fsandbox::Capability {
         match self {
             Self::Connector(s) => s.into_fidl(),
@@ -79,6 +118,7 @@ impl Capability {
         }
     }
 
+    #[cfg(target_os = "fuchsia")]
     pub fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         match self {
             Self::Connector(s) => s.try_into_directory_entry(),
@@ -96,7 +136,6 @@ impl Capability {
     pub fn debug_typename(&self) -> &'static str {
         match self {
             Self::Connector(_) => "Sender",
-            Self::Open(_) => "Open",
             Self::Router(_) => "Router",
             Self::Dictionary(_) => "Dictionary",
             Self::Data(_) => "Data",
@@ -104,6 +143,9 @@ impl Capability {
             Self::Directory(_) => "Directory",
             Self::OneShotHandle(_) => "Handle",
             Self::Component(_) => "Component",
+
+            #[cfg(target_os = "fuchsia")]
+            Self::Open(_) => "Open",
         }
     }
 }
@@ -112,18 +154,21 @@ impl Capability {
 /// with the handle's koid.
 ///
 /// Returns [RemoteError::Unregistered] if the capability is not in the registry.
+#[cfg(target_os = "fuchsia")]
 fn try_from_handle_in_registry<'a>(handle_ref: HandleRef<'_>) -> Result<Capability, RemoteError> {
     let koid = handle_ref.get_koid().unwrap();
     let capability = crate::registry::get(koid).ok_or(RemoteError::Unregistered)?;
     Ok(capability)
 }
 
+#[cfg(target_os = "fuchsia")]
 impl From<Capability> for fsandbox::Capability {
     fn from(capability: Capability) -> Self {
         capability.into_fidl()
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl TryFrom<fsandbox::Capability> for Capability {
     type Error = RemoteError;
 
@@ -173,6 +218,7 @@ impl TryFrom<fsandbox::Capability> for Capability {
 }
 
 /// The capability trait, implemented by all capabilities.
+#[cfg(target_os = "fuchsia")]
 pub trait CapabilityTrait: Into<fsandbox::Capability> + Clone + Debug + Send + Sync {
     fn into_fidl(self) -> fsandbox::Capability {
         self.into()

@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{connector::Connectable, registry, CapabilityTrait, ConversionError};
+use crate::{connector::Connectable, registry, CapabilityTrait, Connector, ConversionError};
 use core::fmt;
 use fidl::endpoints::{create_request_stream, ClientEnd};
 use fidl::handle::{AsHandleRef, Channel, Status};
@@ -191,6 +191,14 @@ impl From<Open> for ClientEnd<fio::OpenableMarker> {
 impl From<Open> for fsandbox::Capability {
     fn from(open: Open) -> Self {
         Self::Connector(crate::Connector::new_sendable(open).into())
+    }
+}
+
+impl From<Connector> for Open {
+    fn from(connector: Connector) -> Self {
+        Self::new(vfs::service::endpoint(move |_scope, server_end| {
+            let _ = connector.send_channel(server_end.into_zx_channel().into());
+        }))
     }
 }
 

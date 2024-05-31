@@ -4,7 +4,7 @@
 use fidl_fuchsia_component_sandbox as fsandbox;
 use std::fmt::Debug;
 
-use crate::{CapabilityTrait, RemoteError};
+use crate::RemoteError;
 
 /// A capability that holds immutable data.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -15,7 +15,8 @@ pub enum Data {
     Uint64(u64),
 }
 
-impl CapabilityTrait for Data {}
+#[cfg(target_os = "fuchsia")]
+impl crate::CapabilityTrait for Data {}
 
 impl TryFrom<fsandbox::Data> for Data {
     type Error = RemoteError;
