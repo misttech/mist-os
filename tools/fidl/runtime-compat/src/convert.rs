@@ -390,6 +390,7 @@ fn convert_method(method: &ir::ProtocolMethod, context: Context) -> Result<compa
     let path = context.path.clone();
     Ok(match (method.has_request, method.has_response) {
         (true, true) => compare::Method::two_way(
+            &method.name,
             path,
             flexibility,
             maybe_convert_type(
@@ -404,6 +405,7 @@ fn convert_method(method: &ir::ProtocolMethod, context: Context) -> Result<compa
             )?,
         ),
         (true, false) => compare::Method::one_way(
+            &method.name,
             path,
             flexibility,
             maybe_convert_type(
@@ -413,6 +415,7 @@ fn convert_method(method: &ir::ProtocolMethod, context: Context) -> Result<compa
             )?,
         ),
         (false, true) => compare::Method::event(
+            &method.name,
             path,
             flexibility,
             maybe_convert_type(

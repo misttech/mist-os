@@ -95,20 +95,42 @@ pub enum MethodPayload {
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Method {
+    pub name: FlyStr,
     pub path: Path,
     pub flexibility: Flexibility,
     pub payload: MethodPayload,
 }
 
 impl Method {
-    pub fn two_way(path: Path, flexibility: Flexibility, request: Type, response: Type) -> Self {
-        Self { path, flexibility, payload: MethodPayload::TwoWay(request, response) }
+    pub fn two_way(
+        name: impl Into<FlyStr>,
+        path: Path,
+        flexibility: Flexibility,
+        request: Type,
+        response: Type,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            path,
+            flexibility,
+            payload: MethodPayload::TwoWay(request, response),
+        }
     }
-    pub fn one_way(path: Path, flexibility: Flexibility, request: Type) -> Self {
-        Self { path, flexibility, payload: MethodPayload::OneWay(request) }
+    pub fn one_way(
+        name: impl Into<FlyStr>,
+        path: Path,
+        flexibility: Flexibility,
+        request: Type,
+    ) -> Self {
+        Self { name: name.into(), path, flexibility, payload: MethodPayload::OneWay(request) }
     }
-    pub fn event(path: Path, flexibility: Flexibility, payload: Type) -> Self {
-        Self { path, flexibility, payload: MethodPayload::Event(payload) }
+    pub fn event(
+        name: impl Into<FlyStr>,
+        path: Path,
+        flexibility: Flexibility,
+        payload: Type,
+    ) -> Self {
+        Self { name: name.into(), path, flexibility, payload: MethodPayload::Event(payload) }
     }
     fn kind(&self) -> &'static str {
         use MethodPayload::*;
@@ -305,7 +327,12 @@ impl Protocol {
                 problems.protocol(
                     &method.path,
                     &server.path,
-                    format!("Server missing method at API level {}", server.path.api_level()),
+                    format!(
+                        "Server(@{}) missing method {}.{}",
+                        server.path.api_level(),
+                        client.name,
+                        method.name
+                    ),
                 );
             }
         }
@@ -318,7 +345,12 @@ impl Protocol {
                 problems.protocol(
                     &client.path,
                     &method.path,
-                    format!("Client missing event at API LEVEL{}", client.path.api_level()),
+                    format!(
+                        "Client(@{}) missing event {}.{}",
+                        client.path.api_level(),
+                        server.name,
+                        method.name
+                    ),
                 );
             }
         }
