@@ -425,7 +425,7 @@ async fn construct_namespace(
         resolved_state.package(),
         &instance,
         resolved_state.decl(),
-        &resolved_state.program_input_dict,
+        &resolved_state.sandbox.program_input_dict,
         instance.execution_scope.clone(),
     )
     .await

@@ -147,7 +147,7 @@ async fn do_start(
         (
             resolved_state.decl().get_runner(),
             resolved_state.resolved_component.clone(),
-            resolved_state.program_input_dict.clone(),
+            resolved_state.sandbox.program_input_dict.clone(),
         )
     };
     let runner = match runner {

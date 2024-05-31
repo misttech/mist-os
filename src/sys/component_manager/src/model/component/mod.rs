@@ -485,6 +485,7 @@ impl ComponentInstance {
         };
 
         let child_input = state
+            .sandbox
             .collection_inputs
             .get(&Name::new(&collection_name).unwrap())
             .expect("dict missing for declared collection")
@@ -972,7 +973,7 @@ impl ComponentInstance {
 
     /// Obtains the program output dict.
     pub async fn get_program_output_dict(self: &Arc<Self>) -> Result<Dict, RouterError> {
-        Ok(self.lock_resolved_state().await?.program_output_dict.clone())
+        Ok(self.lock_resolved_state().await?.sandbox.program_output_dict.clone())
     }
 
     /// Returns a router that delegates to the program output dict.
@@ -999,7 +1000,7 @@ impl ComponentInstance {
 
     /// Obtains the component output dict.
     pub async fn get_component_output_dict(self: &Arc<Self>) -> Result<Dict, RouterError> {
-        Ok(self.lock_resolved_state().await?.component_output_dict.clone())
+        Ok(self.lock_resolved_state().await?.sandbox.component_output_dict.clone())
     }
 
     /// Returns a router that delegates to the component output dict.

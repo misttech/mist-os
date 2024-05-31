@@ -40,9 +40,9 @@ pub fn build_program_output_dictionary(
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     decl: &cm_rust::ComponentDecl,
     component_input: &ComponentInput,
-    program_output_dict: &Dict,
-    declared_dictionaries: &Dict,
-) {
+) -> (Dict, Dict) {
+    let program_output_dict = Dict::new();
+    let declared_dictionaries = Dict::new();
     for capability in &decl.capabilities {
         extend_dict_with_capability(
             component,
@@ -50,10 +50,11 @@ pub fn build_program_output_dictionary(
             decl,
             capability,
             component_input,
-            program_output_dict,
+            &program_output_dict,
             &declared_dictionaries,
         );
     }
+    (program_output_dict, declared_dictionaries)
 }
 
 /// Adds `capability` to the program output dict given the resolved `decl`. The program output dict

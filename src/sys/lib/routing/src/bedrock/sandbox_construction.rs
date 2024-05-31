@@ -22,35 +22,69 @@ use {
     tracing::warn,
 };
 
+/// A component's sandbox holds all the routing dictionaries that a component has once its been
+/// resolved.
+#[derive(Default, Clone)]
+pub struct ComponentSandbox {
+    /// The dictionary containing all capabilities that a component's parent provided to it.
+    pub component_input: ComponentInput,
+
+    /// The dictionary containing all capabilities that a component makes available to its parent.
+    pub component_output_dict: Dict,
+
+    /// The dictionary containing all capabilities that are available to a component's program.
+    pub program_input_dict: Dict,
+
+    /// The dictionary containing all capabilities that a component's program can provide.
+    pub program_output_dict: Dict,
+
+    /// The dictionary containing all framework capabilities that are available to a component.
+    pub framework_dict: Dict,
+
+    /// The dictionary containing all capabilities that a component declares based on another
+    /// capability. Currently this is only the storage admin protocol.
+    pub capability_sourced_capabilities_dict: Dict,
+
+    /// This set holds a dictionary for each collection declared by a component. Each dictionary
+    /// contains all capabilities the component has made available to a specific collection.
+    pub collection_inputs: StructuredDictMap<ComponentInput>,
+}
+
+/// This set holds a dictionary for each child declared by a component. Each dictionary contains
+/// all capabilities the component has made available to that child.
+pub type ChildInputs = StructuredDictMap<ComponentInput>;
+
 /// Once a component has been resolved and its manifest becomes known, this function produces the
 /// various dicts the component needs based on the contents of its manifest.
 pub fn build_component_sandbox(
     moniker: &Moniker,
-    child_component_output_routers: HashMap<ChildName, Router>,
+    child_component_output_dictionary_routers: HashMap<ChildName, Router>,
     decl: &cm_rust::ComponentDecl,
-    component_input: &ComponentInput,
-    framework_dict: &Dict,
-    capability_sourced_capabilities_dict: &Dict,
-    component_output_dict: &Dict,
-    program_input_dict: &Dict,
+    component_input: ComponentInput,
     program_input_dict_additions: &Dict,
-    program_output: &Router,
-    child_inputs: &mut StructuredDictMap<ComponentInput>,
-    collection_inputs: &mut StructuredDictMap<ComponentInput>,
+    program_output_dict: Dict,
+    program_output_router: Router,
+    framework_dict: Dict,
+    capability_sourced_capabilities_dict: Dict,
     declared_dictionaries: Dict,
-) {
+) -> (ComponentSandbox, ChildInputs) {
+    let component_output_dict = Dict::new();
+    let program_input_dict = Dict::new();
     let mut environments: StructuredDictMap<ComponentEnvironment> = Default::default();
+    let mut child_inputs: StructuredDictMap<ComponentInput> = Default::default();
+    let mut collection_inputs: StructuredDictMap<ComponentInput> = Default::default();
+
     for environment_decl in &decl.environments {
         environments
             .insert(
                 environment_decl.name.clone(),
                 build_environment(
                     moniker,
-                    &child_component_output_routers,
-                    component_input,
+                    &child_component_output_dictionary_routers,
+                    &component_input,
                     environment_decl,
                     program_input_dict_additions,
-                    program_output,
+                    &program_output_router,
                 ),
             )
             .ok();
@@ -88,13 +122,13 @@ pub fn build_component_sandbox(
     for use_ in &decl.uses {
         extend_dict_with_use(
             moniker,
-            &child_component_output_routers,
-            component_input,
-            program_input_dict,
+            &child_component_output_dictionary_routers,
+            &component_input,
+            &program_input_dict,
             program_input_dict_additions,
-            program_output,
-            framework_dict,
-            capability_sourced_capabilities_dict,
+            &program_output_router,
+            &framework_dict,
+            &capability_sourced_capabilities_dict,
             use_,
         );
     }
@@ -140,11 +174,11 @@ pub fn build_component_sandbox(
         };
         extend_dict_with_offer(
             moniker,
-            &child_component_output_routers,
-            component_input,
-            program_output,
-            framework_dict,
-            capability_sourced_capabilities_dict,
+            &child_component_output_dictionary_routers,
+            &component_input,
+            &program_output_router,
+            &framework_dict,
+            &capability_sourced_capabilities_dict,
             offer,
             &target_dict,
         );
@@ -153,23 +187,36 @@ pub fn build_component_sandbox(
     for expose in &decl.exposes {
         extend_dict_with_expose(
             moniker,
-            &child_component_output_routers,
-            program_output,
-            framework_dict,
-            capability_sourced_capabilities_dict,
+            &child_component_output_dictionary_routers,
+            &program_output_router,
+            &framework_dict,
+            &capability_sourced_capabilities_dict,
             expose,
-            component_output_dict,
+            &component_output_dict,
         );
     }
+
+    (
+        ComponentSandbox {
+            component_input,
+            component_output_dict,
+            program_input_dict,
+            program_output_dict,
+            framework_dict,
+            capability_sourced_capabilities_dict,
+            collection_inputs,
+        },
+        child_inputs,
+    )
 }
 
 fn build_environment(
     moniker: &Moniker,
-    child_component_output_routers: &HashMap<ChildName, Router>,
+    child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
     component_input: &ComponentInput,
     environment_decl: &cm_rust::EnvironmentDecl,
     program_input_dict_additions: &Dict,
-    program_output: &Router,
+    program_output_router: &Router,
 ) -> ComponentEnvironment {
     let mut environment = ComponentEnvironment::new();
     if environment_decl.extends == fdecl::EnvironmentExtends::Realm {
@@ -188,7 +235,7 @@ fn build_environment(
                 moniker,
                 program_input_dict_additions,
             ),
-            cm_rust::RegistrationSource::Self_ => program_output.clone().lazy_get(
+            cm_rust::RegistrationSource::Self_ => program_output_router.clone().lazy_get(
                 source_path.clone(),
                 RoutingError::use_from_self_not_found(
                     moniker,
@@ -197,7 +244,8 @@ fn build_environment(
             ),
             cm_rust::RegistrationSource::Child(child_name) => {
                 let child_name = ChildName::parse(child_name).expect("invalid child name");
-                let Some(child_component_output) = child_component_output_routers.get(&child_name)
+                let Some(child_component_output) =
+                    child_component_output_dictionary_routers.get(&child_name)
                 else {
                     continue;
                 };
@@ -226,10 +274,10 @@ fn build_environment(
 /// assumed to target `target_dict`.
 pub fn extend_dict_with_offers(
     moniker: &Moniker,
-    child_component_output_routers: &HashMap<ChildName, Router>,
+    child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
     component_input: &ComponentInput,
     dynamic_offers: &Vec<cm_rust::OfferDecl>,
-    program_output: &Router,
+    program_output_router: &Router,
     framework_dict: &Dict,
     capability_sourced_capabilities_dict: &Dict,
     target_input: &ComponentInput,
@@ -237,9 +285,9 @@ pub fn extend_dict_with_offers(
     for offer in dynamic_offers {
         extend_dict_with_offer(
             moniker,
-            &child_component_output_routers,
+            &child_component_output_dictionary_routers,
             component_input,
-            program_output,
+            program_output_router,
             framework_dict,
             capability_sourced_capabilities_dict,
             offer,
@@ -257,11 +305,11 @@ fn supported_use(use_: &cm_rust::UseDecl) -> Option<&cm_rust::UseProtocolDecl> {
 
 fn extend_dict_with_use(
     moniker: &Moniker,
-    child_component_output_routers: &HashMap<ChildName, Router>,
+    child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
     component_input: &ComponentInput,
     program_input_dict: &Dict,
     program_input_dict_additions: &Dict,
-    program_output: &Router,
+    program_output_router: &Router,
     framework_dict: &Dict,
     capability_sourced_capabilities_dict: &Dict,
     use_: &cm_rust::UseDecl,
@@ -278,13 +326,14 @@ fn extend_dict_with_use(
             moniker,
             program_input_dict_additions,
         ),
-        cm_rust::UseSource::Self_ => program_output.clone().lazy_get(
+        cm_rust::UseSource::Self_ => program_output_router.clone().lazy_get(
             source_path.to_owned(),
             RoutingError::use_from_self_not_found(moniker, source_path.iter_segments().join("/")),
         ),
         cm_rust::UseSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid child name");
-            let Some(child_component_output) = child_component_output_routers.get(&child_name)
+            let Some(child_component_output) =
+                child_component_output_dictionary_routers.get(&child_name)
             else {
                 panic!("use declaration in manifest for component {} has a source of a nonexistent child {}, this should be prevented by manifest validation", moniker, child_name);
             };
@@ -381,9 +430,9 @@ fn is_supported_offer(offer: &cm_rust::OfferDecl) -> bool {
 
 fn extend_dict_with_offer(
     moniker: &Moniker,
-    child_component_output_routers: &HashMap<ChildName, Router>,
+    child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
     component_input: &ComponentInput,
-    program_output: &Router,
+    program_output_router: &Router,
     framework_dict: &Dict,
     capability_sourced_capabilities_dict: &Dict,
     offer: &cm_rust::OfferDecl,
@@ -411,13 +460,14 @@ fn extend_dict_with_offer(
                 source_path.iter_segments().join("/"),
             ),
         ),
-        cm_rust::OfferSource::Self_ => program_output.clone().lazy_get(
+        cm_rust::OfferSource::Self_ => program_output_router.clone().lazy_get(
             source_path.to_owned(),
             RoutingError::offer_from_self_not_found(moniker, source_path.iter_segments().join("/")),
         ),
         cm_rust::OfferSource::Child(child_ref) => {
             let child_name: ChildName = child_ref.clone().try_into().expect("invalid child ref");
-            let Some(child_component_output) = child_component_output_routers.get(&child_name)
+            let Some(child_component_output) =
+                child_component_output_dictionary_routers.get(&child_name)
             else {
                 return;
             };
@@ -474,8 +524,8 @@ pub fn is_supported_expose(expose: &cm_rust::ExposeDecl) -> bool {
 
 fn extend_dict_with_expose(
     moniker: &Moniker,
-    child_component_output_routers: &HashMap<ChildName, Router>,
-    program_output: &Router,
+    child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
+    program_output_router: &Router,
     framework_dict: &Dict,
     capability_sourced_capabilities_dict: &Dict,
     expose: &cm_rust::ExposeDecl,
@@ -492,7 +542,7 @@ fn extend_dict_with_expose(
     let target_name = expose.target_name();
 
     let router = match expose.source() {
-        cm_rust::ExposeSource::Self_ => program_output.clone().lazy_get(
+        cm_rust::ExposeSource::Self_ => program_output_router.clone().lazy_get(
             source_path.to_owned(),
             RoutingError::expose_from_self_not_found(
                 moniker,
@@ -501,7 +551,9 @@ fn extend_dict_with_expose(
         ),
         cm_rust::ExposeSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid static child name");
-            if let Some(child_component_output) = child_component_output_routers.get(&child_name) {
+            if let Some(child_component_output) =
+                child_component_output_dictionary_routers.get(&child_name)
+            {
                 child_component_output.clone().lazy_get(
                     source_path.to_owned(),
                     RoutingError::expose_from_child_expose_not_found(
