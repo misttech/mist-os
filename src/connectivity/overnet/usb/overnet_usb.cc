@@ -4,6 +4,7 @@
 
 #include "src/connectivity/overnet/usb/overnet_usb.h"
 
+#include <fidl/fuchsia.hardware.usb.function/cpp/fidl.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_export.h>
@@ -26,18 +27,27 @@
 #include "lib/fidl/cpp/wire/channel.h"
 #include "lib/fidl/cpp/wire/internal/transport.h"
 
+namespace fendpoint = fuchsia_hardware_usb_endpoint;
+namespace ffunction = fuchsia_hardware_usb_function;
+
 static constexpr uint8_t kOvernetMagic[] = "OVERNET USB\xff\x00\xff\x00\xff";
 static constexpr size_t kOvernetMagicSize = sizeof(kOvernetMagic) - 1;
 
 zx::result<> OvernetUsb::Start() {
   zx::result<ddk::UsbFunctionProtocolClient> function =
       compat::ConnectBanjo<ddk::UsbFunctionProtocolClient>(incoming());
-
   if (function.is_error()) {
     FDF_SLOG(ERROR, "Failed to connect function", KV("status", function.status_string()));
     return function.take_error();
   }
   function_ = *function;
+
+  auto client = incoming()->Connect<ffunction::UsbFunctionService::Device>();
+  if (client.is_error()) {
+    FDF_SLOG(ERROR, "Failed to connect fidl protocol",
+             KV("status", zx_status_get_string(client.error_value())));
+    return zx::error(client.error_value());
+  }
 
   zx_status_t status =
       function_.AllocStringDesc("Overnet USB interface", &descriptors_.data_interface.i_interface);
@@ -60,6 +70,15 @@ zx::result<> OvernetUsb::Start() {
              KV("status", zx_status_get_string(status)));
     return zx::error(status);
   }
+  endpoint_dispatcher_.StartThread("endpoint_thread");
+
+  status = bulk_out_ep_.Init(descriptors_.out_ep.b_endpoint_address, *client,
+                             endpoint_dispatcher_.dispatcher());
+  if (status != ZX_OK) {
+    FDF_SLOG(ERROR, "Failed to init UsbEndpoint", KV("endpoint", "out"),
+             KV("status", zx_status_get_string(status)));
+    return zx::error(status);
+  }
 
   status = function_.AllocEp(USB_DIR_IN, &descriptors_.in_ep.b_endpoint_address);
   if (status != ZX_OK) {
@@ -68,28 +87,25 @@ zx::result<> OvernetUsb::Start() {
     return zx::error(status);
   }
 
-  usb_request_size_ = function_.GetRequestSize();
-
-  fbl::AutoLock lock(&lock_);
-
-  for (size_t i = 0; i < kRequestPoolSize; i++) {
-    std::optional<usb::Request<>> request;
-    status = usb::Request<>::Alloc(&request, kMtu, BulkOutAddress(), usb_request_size_);
-    if (status != ZX_OK) {
-      FDF_SLOG(ERROR, "Allocating reads failed", KV("status", status));
-      return zx::error(status);
-    }
-    free_read_pool_.Add(*std::move(request));
+  status = bulk_in_ep_.Init(descriptors_.in_ep.b_endpoint_address, *client,
+                            endpoint_dispatcher_.dispatcher());
+  if (status != ZX_OK) {
+    FDF_SLOG(ERROR, "Failed to init UsbEndpoint", KV("endpoint", "in"),
+             KV("status", zx_status_get_string(status)));
+    return zx::error(status);
   }
 
-  for (size_t i = 0; i < kRequestPoolSize; i++) {
-    std::optional<usb::Request<>> request;
-    status = usb::Request<>::Alloc(&request, kMtu, BulkInAddress(), usb_request_size_);
-    if (status != ZX_OK) {
-      FDF_SLOG(ERROR, "Allocating writes failed", KV("status", status));
-      return zx::error(status);
-    }
-    free_write_pool_.Add(*std::move(request));
+  auto actual = bulk_in_ep_.AddRequests(kRequestPoolSize, kMtu,
+                                        fuchsia_hardware_usb_request::Buffer::Tag::kVmoId);
+  if (actual != kRequestPoolSize) {
+    FDF_SLOG(ERROR, "Could not allocate all requests for IN endpoint",
+             KV("wanted", kRequestPoolSize), KV("got", actual));
+  }
+  actual = bulk_out_ep_.AddRequests(kRequestPoolSize, kMtu,
+                                    fuchsia_hardware_usb_request::Buffer::Tag::kVmoId);
+  if (actual != kRequestPoolSize) {
+    FDF_SLOG(ERROR, "Could not allocate all requests for OUT endpoint",
+             KV("wanted", kRequestPoolSize), KV("got", actual));
   }
 
   function_.SetInterface(this, &usb_function_interface_protocol_ops_);
@@ -132,7 +148,7 @@ zx::result<> OvernetUsb::Start() {
 
   if (result.is_error()) {
     FDF_SLOG(ERROR, "Could not add child node",
-             KV("error", result.error_value().FormatDescription().c_str()));
+             KV("error", result.error_value().FormatDescription()));
     return zx::error(ZX_ERR_INTERNAL);
   }
 
@@ -214,11 +230,21 @@ zx_status_t OvernetUsb::UsbFunctionInterfaceSetConfigured(bool configured, usb_s
 
   state_ = Ready();
 
-  std::optional<usb::Request<>> pending_request;
-  size_t request_length = usb::Request<>::RequestSize(usb_request_size_);
-  while ((pending_request = free_read_pool_.Get(request_length))) {
-    pending_requests_++;
-    function_.RequestQueue(pending_request->take(), &read_request_complete_);
+  std::vector<fuchsia_hardware_usb_request::Request> requests;
+  while (auto req = bulk_out_ep_.GetRequest()) {
+    req->reset_buffers(bulk_out_ep_.GetMapped);
+    zx_status_t status = req->CacheFlushInvalidate(bulk_out_ep_.GetMapped);
+    if (status != ZX_OK) {
+      FDF_SLOG(ERROR, "Cache flush failed", KV("status", zx_status_get_string(status)));
+    }
+
+    requests.emplace_back(req->take_request());
+  }
+  auto result = bulk_out_ep_->QueueRequests(std::move(requests));
+  if (result.is_error()) {
+    FDF_SLOG(ERROR, "Failed to QueueRequests",
+             KV("status", result.error_value().FormatDescription()));
+    return result.error_value().status();
   }
 
   return ZX_OK;
@@ -229,17 +255,17 @@ zx_status_t OvernetUsb::UsbFunctionInterfaceSetInterface(uint8_t interface, uint
   return ZX_OK;
 }
 
-std::optional<usb::Request<>> OvernetUsb::PrepareTx() {
+std::optional<usb::FidlRequest> OvernetUsb::PrepareTx() {
   if (!Online()) {
     return std::nullopt;
   }
 
-  std::optional<usb::Request<>> request;
-  request = free_write_pool_.Get(usb::Request<>::RequestSize(usb_request_size_));
+  auto request = bulk_in_ep_.GetRequest();
   if (!request) {
     FDF_SLOG(DEBUG, "No available TX requests");
     return std::nullopt;
   }
+  request->clear_buffers();
 
   return request;
 }
@@ -262,31 +288,41 @@ void OvernetUsb::HandleSocketReadable(async_dispatcher_t*, async::WaitBase*, zx_
     return;
   }
 
-  uint8_t* buf;
-  status = request->Mmap(reinterpret_cast<void**>(&buf));
+  // This should always be true because when we registered VMOs, we only registered one per
+  // request.
+  ZX_ASSERT((*request)->data()->size() == 1);
 
-  if (status != ZX_OK) {
-    FDF_SLOG(ERROR, "Failed to map TX buffer", KV("status", zx_status_get_string(status)));
-    free_write_pool_.Add(*std::move(request));
-    // Not clear what the right way to handle this error is. We'll just drop the socket. We could
-    // retry but we'd end up retrying in a tight loop if the failure persists.
-    ResetState();
+  std::optional<zx_vaddr_t> addr = bulk_out_ep_.GetMappedAddr(request->request(), 0);
+
+  if (!addr.has_value()) {
+    FDF_LOG(ERROR, "Failed to map request");
     return;
   }
 
   size_t actual;
+
   std::visit(
-      [this, buf, &actual, &status](auto&& state) __TA_REQUIRES(lock_) {
-        state_ = std::forward<decltype(state)>(state).SendData(buf, kMtu, &actual, &status);
+      [this, &addr, &actual, &status](auto&& state) __TA_REQUIRES(lock_) {
+        state_ = std::forward<decltype(state)>(state).SendData(reinterpret_cast<uint8_t*>(*addr),
+                                                               kMtu, &actual, &status);
       },
       std::move(state_));
 
   if (status == ZX_OK) {
-    request->request()->header.length = actual;
-    pending_requests_++;
-    function_.RequestQueue(request->take(), &write_request_complete_);
+    (*request)->data()->at(0).size(actual);
+    status = request->CacheFlush(bulk_in_ep_.GetMappedLocked);
+    if (status != ZX_OK) {
+      FDF_SLOG(ERROR, "Cache flush failed", KV("status", zx_status_get_string(status)));
+    }
+    std::vector<fuchsia_hardware_usb_request::Request> requests;
+    requests.emplace_back(request->take_request());
+    auto result = bulk_in_ep_->QueueRequests(std::move(requests));
+    if (result.is_error()) {
+      FDF_SLOG(ERROR, "Failed to QueueRequests",
+               KV("status", result.error_value().FormatDescription()));
+    }
   } else {
-    free_write_pool_.Add(*std::move(request));
+    bulk_in_ep_.PutRequest(usb::FidlRequest(std::move(*request)));
   }
 
   std::visit(
@@ -479,25 +515,29 @@ OvernetUsb::State OvernetUsb::Running::ReceiveData(uint8_t* data, size_t len,
   return std::move(*this);
 }
 
-void OvernetUsb::SendMagicReply(usb::Request<> request) {
-  ssize_t result = request.CopyTo(kOvernetMagic, kOvernetMagicSize, 0);
-  if (result < 0) {
-    FDF_SLOG(ERROR, "Failed to copy reply magic data", KV("status", result));
-    free_write_pool_.Add(std::move(request));
+void OvernetUsb::SendMagicReply(usb::FidlRequest request) {
+  auto actual = request.CopyTo(0, kOvernetMagic, kOvernetMagicSize, bulk_in_ep_.GetMappedLocked);
+
+  for (size_t i = 0; i < actual.size(); i++) {
+    request->data()->at(i).size(actual[i]);
+  }
+
+  auto status = request.CacheFlush(bulk_in_ep_.GetMappedLocked);
+  if (status != ZX_OK) {
+    FDF_SLOG(ERROR, "Cache flush failed", KV("status", zx_status_get_string(status)));
+  }
+
+  std::vector<fuchsia_hardware_usb_request::Request> requests;
+  requests.emplace_back(request.take_request());
+  auto result = bulk_in_ep_->QueueRequests(std::move(requests));
+  if (result.is_error()) {
+    FDF_SLOG(ERROR, "Failed to QueueRequests",
+             KV("status", result.error_value().FormatDescription()));
     ResetState();
     return;
   }
 
-  pending_requests_++;
-  request.request()->header.length = kOvernetMagicSize;
-
-  function_.RequestQueue(request.take(), &write_request_complete_);
-
   auto& state = std::get<Running>(state_);
-
-  // We have to count MagicSent as a pending request to keep ourselves from being
-  // free'd out from under the task it spawns, so we increment again.
-  pending_requests_++;
 
   state.MagicSent();
   ProcessReadsFromSocket();
@@ -509,10 +549,9 @@ void OvernetUsb::Running::MagicSent() {
 
   async::PostTask(owner_->dispatcher_, [this]() {
     fbl::AutoLock lock(&owner_->lock_);
-    owner_->pending_requests_--;
 
     if (std::holds_alternative<ShuttingDown>(owner_->state_)) {
-      if (owner_->pending_requests_ == 0) {
+      if (!owner_->HasPendingRequests()) {
         lock.release();
         owner_->ShutdownComplete();
       }
@@ -534,32 +573,34 @@ void OvernetUsb::Running::MagicSent() {
   });
 }
 
-void OvernetUsb::ReadComplete(usb_request_t* usb_request) {
+void OvernetUsb::ReadComplete(fendpoint::Completion completion) {
   fbl::AutoLock lock(&lock_);
-  usb::Request<> request(usb_request, usb_request_size_);
-  if (usb_request->response.status == ZX_ERR_IO_NOT_PRESENT) {
-    pending_requests_--;
+  auto request = usb::FidlRequest(std::move(completion.request().value()));
+  if (*completion.status() == ZX_ERR_IO_NOT_PRESENT) {
+    // Device disconnected from host.
     if (std::holds_alternative<ShuttingDown>(state_)) {
-      request.Release();
-      if (pending_requests_ == 0) {
+      if (!HasPendingRequests()) {
         lock.release();
         ShutdownComplete();
       }
       return;
     }
-    free_read_pool_.Add(std::move(request));
+    bulk_out_ep_.PutRequest(std::move(request));
     return;
   }
 
-  if (usb_request->response.status == ZX_OK) {
-    uint8_t* data;
-    zx_status_t status = request.Mmap(reinterpret_cast<void**>(&data));
-    if (status != ZX_OK) {
-      FDF_SLOG(ERROR, "Failed to map RX data", KV("status", zx_status_get_string(status)));
+  if (*completion.status() == ZX_OK) {
+    // This should always be true because when we registered VMOs, we only registered one per
+    // request.
+    ZX_ASSERT(request->data()->size() == 1);
+    auto addr = bulk_out_ep_.GetMappedAddr(request.request(), 0);
+    if (!addr.has_value()) {
+      FDF_SLOG(ERROR, "Failed to map RX data");
       return;
     }
 
-    size_t data_length = static_cast<size_t>(request.request()->response.actual);
+    uint8_t* data = reinterpret_cast<uint8_t*>(*addr);
+    size_t data_length = *completion.transfer_size();
 
     std::visit(
         [this, data, data_length](auto&& state) __TA_REQUIRES(lock_) {
@@ -581,34 +622,35 @@ void OvernetUsb::ReadComplete(usb_request_t* usb_request) {
           }
         },
         state_);
-  } else if (usb_request->response.status != ZX_ERR_CANCELED) {
-    FDF_SLOG(ERROR, "Read failed",
-             KV("status", zx_status_get_string(usb_request->response.status)));
+  } else if (*completion.status() != ZX_ERR_CANCELED) {
+    FDF_SLOG(ERROR, "Read failed", KV("status", zx_status_get_string(*completion.status())));
   }
 
   if (Online()) {
-    function_.RequestQueue(request.take(), &read_request_complete_);
+    std::vector<fuchsia_hardware_usb_request::Request> requests;
+    requests.emplace_back(request.take_request());
+    auto result = bulk_out_ep_->QueueRequests(std::move(requests));
+    if (result.is_error()) {
+      FDF_SLOG(ERROR, "Failed to QueueRequests",
+               KV("status", result.error_value().FormatDescription()));
+    }
   } else {
     if (std::holds_alternative<ShuttingDown>(state_)) {
-      request.Release();
-      pending_requests_--;
-      if (pending_requests_ == 0) {
+      if (!HasPendingRequests()) {
         lock.release();
         ShutdownComplete();
       }
       return;
     }
-    free_read_pool_.Add(std::move(request));
+    bulk_out_ep_.PutRequest(std::move(request));
   }
 }
 
-void OvernetUsb::WriteComplete(usb_request_t* usb_request) {
-  usb::Request<> request(usb_request, usb_request_size_);
+void OvernetUsb::WriteComplete(fendpoint::Completion completion) {
+  auto request = usb::FidlRequest(std::move(completion.request().value()));
   fbl::AutoLock lock(&lock_);
-  pending_requests_--;
   if (std::holds_alternative<ShuttingDown>(state_)) {
-    request.Release();
-    if (pending_requests_ == 0) {
+    if (!HasPendingRequests()) {
       lock.release();
       ShutdownComplete();
     }
@@ -622,7 +664,7 @@ void OvernetUsb::WriteComplete(usb_request_t* usb_request) {
     }
   }
 
-  free_write_pool_.Add(std::move(request));
+  bulk_in_ep_.PutRequest(std::move(request));
   ProcessReadsFromSocket();
 }
 
@@ -631,12 +673,9 @@ void OvernetUsb::Shutdown(fit::function<void()> callback) {
   function_.CancelAll(BulkInAddress());
   function_.CancelAll(BulkOutAddress());
 
-  free_read_pool_.Release();
-  free_write_pool_.Release();
-
   state_ = ShuttingDown(std::move(callback));
 
-  if (pending_requests_ == 0) {
+  if (!HasPendingRequests()) {
     lock.release();
     ShutdownComplete();
   }
