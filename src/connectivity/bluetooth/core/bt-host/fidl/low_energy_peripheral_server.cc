@@ -356,7 +356,7 @@ LowEnergyPeripheralServer::CreateConnectionServer(
 
   auto conn_server_id = next_connection_server_id_++;
   auto conn_server = std::make_unique<LowEnergyConnectionServer>(
-      gatt_, std::move(connection), std::move(local), [this, conn_server_id] {
+      adapter(), gatt_, std::move(connection), std::move(local), [this, conn_server_id] {
         bt_log(INFO, LOG_TAG, "connection closed");
         connections_.erase(conn_server_id);
       });

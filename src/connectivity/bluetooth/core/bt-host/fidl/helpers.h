@@ -255,6 +255,18 @@ std::optional<bt::sdp::DataElement> FidlToDataElement(
 std::optional<bt::sdp::DataElement> NewFidlToDataElement(
     const fuchsia_bluetooth_bredr::DataElement& fidl);
 
+pw::bluetooth::emboss::DataPathDirection DataPathDirectionFromFidl(
+    const fuchsia::bluetooth::DataDirection& fidl_direction);
+
+pw::bluetooth::emboss::CodingFormat CodingFormatFromFidl(
+    const fuchsia::bluetooth::AssignedCodingFormat& fidl_format);
+
+bt::StaticPacket<pw::bluetooth::emboss::CodecIdWriter> CodecIdFromFidl(
+    const fuchsia::bluetooth::CodecId& fidl_codec_id);
+
+pw::bluetooth::emboss::LogicalTransportType LogicalTransportTypeFromFidl(
+    const fuchsia::bluetooth::LogicalTransportType& fidl_transport_type);
+
 }  // namespace bthost::fidl_helpers
 
 // fidl::TypeConverter specializations for ByteBuffer and friends.

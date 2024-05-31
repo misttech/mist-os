@@ -1966,6 +1966,75 @@ std::unique_ptr<bt::gatt::Characteristic> Gatt2CharacteristicFromFidl(
   return chrc;
 }
 
+pw::bluetooth::emboss::DataPathDirection DataPathDirectionFromFidl(
+    const fuchsia::bluetooth::DataDirection& fidl_direction) {
+  switch (fidl_direction) {
+    case fuchsia::bluetooth::DataDirection::INPUT:
+      return pw::bluetooth::emboss::DataPathDirection::INPUT;
+    case fuchsia::bluetooth::DataDirection::OUTPUT:
+      return pw::bluetooth::emboss::DataPathDirection::OUTPUT;
+  }
+  BT_PANIC("Unrecognized value for data direction: %" PRIu8, fidl_direction);
+}
+
+// Both of these types use the spec representation, so we can just assign the underlying value
+// directly.
+pw::bluetooth::emboss::CodingFormat CodingFormatFromFidl(
+    const fuchsia::bluetooth::AssignedCodingFormat& fidl_format) {
+  switch (fidl_format) {
+    case fuchsia::bluetooth::AssignedCodingFormat::U_LAW_LOG:
+      return pw::bluetooth::emboss::CodingFormat::U_LAW;
+    case fuchsia::bluetooth::AssignedCodingFormat::A_LAW_LOG:
+      return pw::bluetooth::emboss::CodingFormat::A_LAW;
+    case fuchsia::bluetooth::AssignedCodingFormat::CVSD:
+      return pw::bluetooth::emboss::CodingFormat::CVSD;
+    case fuchsia::bluetooth::AssignedCodingFormat::TRANSPARENT:
+      return pw::bluetooth::emboss::CodingFormat::TRANSPARENT;
+    case fuchsia::bluetooth::AssignedCodingFormat::LINEAR_PCM:
+      return pw::bluetooth::emboss::CodingFormat::LINEAR_PCM;
+    case fuchsia::bluetooth::AssignedCodingFormat::MSBC:
+      return pw::bluetooth::emboss::CodingFormat::MSBC;
+    case fuchsia::bluetooth::AssignedCodingFormat::LC3:
+      return pw::bluetooth::emboss::CodingFormat::LC3;
+    case fuchsia::bluetooth::AssignedCodingFormat::G_729A:
+      return pw::bluetooth::emboss::CodingFormat::G729A;
+  }
+  BT_PANIC("Unrecognized value for coding format: %u", static_cast<unsigned>(fidl_format));
+}
+
+bt::StaticPacket<pw::bluetooth::emboss::CodecIdWriter> CodecIdFromFidl(
+    const fuchsia::bluetooth::CodecId& fidl_codec_id) {
+  bt::StaticPacket<pw::bluetooth::emboss::CodecIdWriter> result;
+  auto result_view = result.view();
+
+  if (fidl_codec_id.is_assigned_format()) {
+    pw::bluetooth::emboss::CodingFormat out_coding_format =
+        CodingFormatFromFidl(fidl_codec_id.assigned_format());
+    result_view.coding_format().Write(out_coding_format);
+  } else {
+    BT_ASSERT(fidl_codec_id.is_vendor_format());
+    result_view.coding_format().Write(pw::bluetooth::emboss::CodingFormat::VENDOR_SPECIFIC);
+    result_view.company_id().Write(fidl_codec_id.vendor_format().company_id());
+    result_view.vendor_codec_id().Write(fidl_codec_id.vendor_format().vendor_id());
+  }
+  return result;
+}
+
+// Note that:
+// a) The FIDL values used do not necessarily correspond to Core Spec values.
+// b) Only a subset of valid values are implemented in the FIDL type at the moment.
+pw::bluetooth::emboss::LogicalTransportType LogicalTransportTypeFromFidl(
+    const fuchsia::bluetooth::LogicalTransportType& fidl_transport_type) {
+  switch (fidl_transport_type) {
+    case fuchsia::bluetooth::LogicalTransportType::LE_CIS:
+      return pw::bluetooth::emboss::LogicalTransportType::LE_CIS;
+    case fuchsia::bluetooth::LogicalTransportType::LE_BIS:
+      return pw::bluetooth::emboss::LogicalTransportType::LE_BIS;
+  }
+  BT_PANIC("Unrecognized value for logical transport type: %u",
+           static_cast<unsigned>(fidl_transport_type));
+}
+
 }  // namespace bthost::fidl_helpers
 
 // static

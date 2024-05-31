@@ -21,7 +21,7 @@ class LowEnergyConnectionServer : public ServerBase<fuchsia::bluetooth::le::Conn
   // called in response to the client closing its end of the FIDL channel or when the LL connection
   // is severed. |closed_cb| will be called at most once in response to either of these events. The
   // owner of the LowEnergyConnectionServer instance is expected to destroy it.
-  LowEnergyConnectionServer(bt::gatt::GATT::WeakPtr gatt,
+  LowEnergyConnectionServer(bt::gap::Adapter::WeakPtr adapter, bt::gatt::GATT::WeakPtr gatt,
                             std::unique_ptr<bt::gap::LowEnergyConnectionHandle> connection,
                             zx::channel handle, fit::callback<void()> closed_cb);
 
@@ -42,6 +42,7 @@ class LowEnergyConnectionServer : public ServerBase<fuchsia::bluetooth::le::Conn
   std::unique_ptr<bt::gap::LowEnergyConnectionHandle> conn_;
   fit::callback<void()> closed_handler_;
   bt::PeerId peer_id_;
+  bt::gap::Adapter::WeakPtr adapter_;
   bt::gatt::GATT::WeakPtr gatt_;
   std::optional<Gatt2ClientServer> gatt_client_server_;
 

@@ -2175,5 +2175,63 @@ TEST(HelpersTest, Gatt2CharacteristicFromFidlWith2Descriptors) {
   EXPECT_FALSE(out->descriptors()[1]->write_permissions().allowed());
 }
 
+TEST(HelpersTest, DataPathDirectionFromFidl) {
+  EXPECT_EQ(DataPathDirectionFromFidl(fuchsia::bluetooth::DataDirection::INPUT),
+            pw::bluetooth::emboss::DataPathDirection::INPUT);
+  EXPECT_EQ(DataPathDirectionFromFidl(fuchsia::bluetooth::DataDirection::OUTPUT),
+            pw::bluetooth::emboss::DataPathDirection::OUTPUT);
+}
+
+TEST(HelpersTest, CodingFormatFromFidl) {
+  EXPECT_EQ(CodingFormatFromFidl(fuchsia::bluetooth::AssignedCodingFormat::U_LAW_LOG),
+            pw::bluetooth::emboss::CodingFormat::U_LAW);
+  EXPECT_EQ(CodingFormatFromFidl(fuchsia::bluetooth::AssignedCodingFormat::A_LAW_LOG),
+            pw::bluetooth::emboss::CodingFormat::A_LAW);
+  EXPECT_EQ(CodingFormatFromFidl(fuchsia::bluetooth::AssignedCodingFormat::CVSD),
+            pw::bluetooth::emboss::CodingFormat::CVSD);
+  EXPECT_EQ(CodingFormatFromFidl(fuchsia::bluetooth::AssignedCodingFormat::TRANSPARENT),
+            pw::bluetooth::emboss::CodingFormat::TRANSPARENT);
+  EXPECT_EQ(CodingFormatFromFidl(fuchsia::bluetooth::AssignedCodingFormat::LINEAR_PCM),
+            pw::bluetooth::emboss::CodingFormat::LINEAR_PCM);
+  EXPECT_EQ(CodingFormatFromFidl(fuchsia::bluetooth::AssignedCodingFormat::MSBC),
+            pw::bluetooth::emboss::CodingFormat::MSBC);
+  EXPECT_EQ(CodingFormatFromFidl(fuchsia::bluetooth::AssignedCodingFormat::LC3),
+            pw::bluetooth::emboss::CodingFormat::LC3);
+  EXPECT_EQ(CodingFormatFromFidl(fuchsia::bluetooth::AssignedCodingFormat::G_729A),
+            pw::bluetooth::emboss::CodingFormat::G729A);
+}
+
+TEST(HelpersTest, AssignedCodecIdFromFidl) {
+  // Assigned format
+  fuchsia::bluetooth::CodecId fidl_codec_id;
+  fidl_codec_id.set_assigned_format(fuchsia::bluetooth::AssignedCodingFormat::LC3);
+  auto codec_id = CodecIdFromFidl(fidl_codec_id);
+  auto view = codec_id.view();
+  EXPECT_EQ(view.coding_format().Read(), pw::bluetooth::emboss::CodingFormat::LC3);
+}
+
+TEST(HelpersTest, VendorCodecIdFromFidl) {
+  // Vendor-specific format
+  uint16_t kCompanyId = 0x1234;
+  uint16_t kVendorId = 0xfedc;
+  fuchsia::bluetooth::CodecId fidl_codec_id;
+  fuchsia::bluetooth::VendorCodingFormat vendor_format;
+  vendor_format.set_company_id(kCompanyId);
+  vendor_format.set_vendor_id(kVendorId);
+  fidl_codec_id.set_vendor_format(std::move(vendor_format));
+  auto codec_id = CodecIdFromFidl(fidl_codec_id);
+  auto view = codec_id.view();
+  EXPECT_EQ(view.coding_format().Read(), pw::bluetooth::emboss::CodingFormat::VENDOR_SPECIFIC);
+  EXPECT_EQ(view.company_id().Read(), kCompanyId);
+  EXPECT_EQ(view.vendor_codec_id().Read(), kVendorId);
+}
+
+TEST(HelpersTest, LogicalTransportTypeFromFidl) {
+  EXPECT_EQ(LogicalTransportTypeFromFidl(fuchsia::bluetooth::LogicalTransportType::LE_CIS),
+            pw::bluetooth::emboss::LogicalTransportType::LE_CIS);
+  EXPECT_EQ(LogicalTransportTypeFromFidl(fuchsia::bluetooth::LogicalTransportType::LE_BIS),
+            pw::bluetooth::emboss::LogicalTransportType::LE_BIS);
+}
+
 }  // namespace
 }  // namespace bthost::fidl_helpers
