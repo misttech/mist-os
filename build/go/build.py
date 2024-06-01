@@ -468,6 +468,23 @@ def main():
                     env=env,
                 ).check_returncode()
 
+        if args.buildidtool:
+            if not args.build_id_dir:
+                raise ValueError("Using --buildidtool requires --build-id-dir")
+            subprocess.run(
+                [
+                    args.buildidtool,
+                    "-build-id-dir",
+                    args.build_id_dir,
+                    "-stamp",
+                    dist + ".build-id.stamp",
+                    "-entry",
+                    ".debug=" + args.output_path,
+                    "-entry",
+                    "=" + dist,
+                ]
+            ).check_returncode()
+
     finally:
         # Clean up the tree of go files assembled in gopath_src to indicate to the
         # action tracer that they were intermediates and not final outputs.
