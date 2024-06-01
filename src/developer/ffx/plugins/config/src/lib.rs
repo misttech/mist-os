@@ -106,11 +106,11 @@ async fn exec_get<W: Write>(
     match get_cmd.name.as_ref() {
         Some(_) => match get_cmd.process {
             MappingMode::Raw => {
-                let value: Option<Value> = get_cmd.query(ctx).get_raw()?;
+                let value: Option<Value> = get_cmd.query(ctx).get_raw().await?;
                 output(writer, value)
             }
             MappingMode::Substitute => {
-                let value: std::result::Result<Vec<Value>, _> = get_cmd.query(ctx).get();
+                let value: std::result::Result<Vec<Value>, _> = get_cmd.query(ctx).get().await;
                 output_array(writer, value)
             }
             MappingMode::File => {
@@ -132,7 +132,7 @@ async fn exec_set(ctx: &EnvironmentContext, set_cmd: &SetCommand) -> Result<()> 
 async fn exec_remove(ctx: &EnvironmentContext, remove_cmd: &RemoveCommand) -> Result<()> {
     let entry = remove_cmd.query(ctx);
     // Check that there is a value before removing it.
-    if let Ok(Some(_val)) = entry.get_raw::<Option<Value>>() {
+    if let Ok(Some(_val)) = entry.get_raw::<Option<Value>>().await {
         entry.remove().await
     } else {
         ffx_bail_with_code!(2, "Configuration key not found")
@@ -166,7 +166,7 @@ async fn exec_env_set<W: Write>(
     // Double check read/write permissions and create the file if it doesn't exist.
     let _ = OpenOptions::new().read(true).write(true).create(true).open(&s.file)?;
 
-    let mut env = env_context.load().context("Loading environment file")?;
+    let mut env = env_context.load().await.context("Loading environment file")?;
 
     match &s.level {
         ConfigLevel::User => env.set_user(Some(&s.file)),
@@ -189,7 +189,7 @@ async fn exec_env<W: Write>(
                 writeln!(
                     writer,
                     "{}",
-                    &ctx.load().context("Loading environment file")?.display(&g.level)
+                    &ctx.load().await.context("Loading environment file")?.display(&g.level)
                 )?;
                 Ok(())
             }
@@ -198,7 +198,7 @@ async fn exec_env<W: Write>(
             writeln!(
                 writer,
                 "{}",
-                &ctx.load().context("Loading environment file")?.display(&None)
+                &ctx.load().await.context("Loading environment file")?.display(&None)
             )?;
             Ok(())
         }
@@ -267,7 +267,7 @@ mod test {
         let cmd =
             EnvSetCommand { file: "test.json".into(), level: ConfigLevel::User, build_dir: None };
         exec_env_set(&test_env.context, writer, &cmd).await?;
-        assert_eq!(cmd.file, test_env.load().get_user().unwrap());
+        assert_eq!(cmd.file, test_env.load().await.get_user().unwrap());
         Ok(())
     }
 

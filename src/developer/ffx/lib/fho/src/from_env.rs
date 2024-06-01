@@ -113,7 +113,7 @@ pub struct AvailabilityFlag<T>(pub T);
 impl<T: AsRef<str>> CheckEnv for AvailabilityFlag<T> {
     async fn check_env(self, env: &FhoEnvironment) -> Result<()> {
         let flag = self.0.as_ref();
-        if env.context.get(flag).unwrap_or(false) {
+        if env.context.get(flag).await.unwrap_or(false) {
             Ok(())
         } else {
             return_user_error!(

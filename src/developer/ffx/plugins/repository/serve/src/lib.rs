@@ -234,8 +234,10 @@ async fn serve_impl<W: Write + 'static>(
     context: EnvironmentContext,
     mut writer: W,
 ) -> Result<()> {
-    let bg: bool =
-        context.get(REPO_BACKGROUND_FEATURE_FLAG).context("checking for background server flag")?;
+    let bg: bool = context
+        .get(REPO_BACKGROUND_FEATURE_FLAG)
+        .await
+        .context("checking for background server flag")?;
     if bg {
         ffx_bail!(
             r#"The ffx setting '{}' and the foreground server '{}' are mutually incompatible.

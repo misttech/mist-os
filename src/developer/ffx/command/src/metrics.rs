@@ -52,7 +52,7 @@ impl MetricsSession {
             })
             .detach();
         });
-        let invoker = context.get("fuchsia.analytics.ffx_invoker").unwrap_or(None);
+        let invoker = context.get("fuchsia.analytics.ffx_invoker").await.unwrap_or(None);
         let build_info = context.build_info();
         let enabled = context.analytics_enabled().await;
         let sdk_version = if enabled {

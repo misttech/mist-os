@@ -52,6 +52,7 @@ impl ManualTargets for Config {
         ffx_config::query(MANUAL_TARGETS)
             .level(Some(ConfigLevel::User))
             .get()
+            .await
             .context("manual_targets::get")
     }
 

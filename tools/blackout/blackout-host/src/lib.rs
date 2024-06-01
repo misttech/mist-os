@@ -374,7 +374,8 @@ impl TestEnv {
     /// will panic.
     pub async fn new(package: &'static str, component: &'static str, opts: CommonOpts) -> TestEnv {
         let context = global_env_context().expect("No global context");
-        let ssh_key = context.get::<String, _>("ssh.priv").expect("could not get ssh key").into();
+        let ssh_key =
+            context.get::<String, _>("ssh.priv").await.expect("could not get ssh key").into();
         let isolate = Arc::new(
             ffx_isolate::Isolate::new_with_sdk("blackout-ffx", ssh_key, &context)
                 .await

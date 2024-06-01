@@ -197,7 +197,7 @@ async fn do_connect_to_target(ctx: &EnvironmentContext, cmd: &ListCommand) -> bo
         false
     } else {
         // TODO(b/340330010) Change the default to "true" when we are ready to roll this out to everyone
-        ctx.get("ffx.target-list.local-connect").unwrap_or(false)
+        ctx.get("ffx.target-list.local-connect").await.unwrap_or(false)
     }
 }
 

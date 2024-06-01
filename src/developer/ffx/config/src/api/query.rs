@@ -6,7 +6,7 @@ use crate::{
     api::ConfigResult, nested::RecursiveMap, validate_type, ConfigError, ConfigLevel, ConfigValue,
     Environment, EnvironmentContext, ValueStrategy,
 };
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use serde_json::Value;
 use std::{
     default::Default,
@@ -77,7 +77,7 @@ impl<'a> ConfigQuery<'a> {
         Self { ctx, ..self }
     }
 
-    fn get_env_context(&self) -> Result<EnvironmentContext> {
+    async fn get_env_context(&self) -> Result<EnvironmentContext> {
         match self.ctx {
             Some(ctx) => Ok(ctx.clone()),
             None => crate::global_env_context().context("No configured global environment"),
@@ -86,15 +86,15 @@ impl<'a> ConfigQuery<'a> {
 
     async fn get_env(&self) -> Result<Environment> {
         match self.ctx {
-            Some(ctx) => ctx.load(),
-            None => crate::global_env().context("No configured global environment"),
+            Some(ctx) => ctx.load().await,
+            None => crate::global_env().await.context("No configured global environment"),
         }
     }
 
-    fn get_config(&self, env: Environment) -> ConfigResult {
+    async fn get_config(&self, env: Environment) -> ConfigResult {
         debug!("{self}");
-        let config = env.config_from_cache(self.build)?;
-        let read_guard = config.read().map_err(|_| anyhow!("config read guard"))?;
+        let config = env.config_from_cache(self.build).await?;
+        let read_guard = config.read().await;
         let result = match self {
             Self { name: Some(name), level: None, select, .. } => read_guard.get(*name, *select),
             Self { name: Some(name), level: Some(level), .. } => {
@@ -109,31 +109,33 @@ impl<'a> ConfigQuery<'a> {
     }
 
     /// Get a value with as little processing as possible
-    pub fn get_raw<T>(&self) -> std::result::Result<T, T::Error>
+    pub async fn get_raw<T>(&self) -> std::result::Result<T, T::Error>
     where
         T: TryFrom<ConfigValue> + ValueStrategy,
         <T as std::convert::TryFrom<ConfigValue>>::Error: std::convert::From<ConfigError>,
     {
-        let ctx = self.get_env_context().map_err(|e| e.into())?;
+        let ctx = self.get_env_context().await.map_err(|e| e.into())?;
         T::validate_query(self)?;
-        self.get_config(ctx.load().map_err(|e| e.into())?)
+        self.get_config(ctx.load().await.map_err(|e| e.into())?)
+            .await
             .map_err(|e| e.into())?
             .recursive_map(&validate_type::<T>)
             .try_into()
     }
 
     /// Get a value with the normal processing of substitution strings
-    pub fn get<T>(&self) -> std::result::Result<T, T::Error>
+    pub async fn get<T>(&self) -> std::result::Result<T, T::Error>
     where
         T: TryFrom<ConfigValue> + ValueStrategy,
         <T as std::convert::TryFrom<ConfigValue>>::Error: std::convert::From<ConfigError>,
     {
         use crate::mapping::*;
 
-        let ctx = self.get_env_context().map_err(|e| e.into())?;
+        let ctx = self.get_env_context().await.map_err(|e| e.into())?;
         T::validate_query(self)?;
 
-        self.get_config(ctx.load().map_err(|e| e.into())?)
+        self.get_config(ctx.load().await.map_err(|e| e.into())?)
+            .await
             .map_err(|e| e.into())?
             .recursive_map(&|val| runtime(&ctx, val))
             .recursive_map(&|val| cache(&ctx, val))
@@ -156,9 +158,10 @@ impl<'a> ConfigQuery<'a> {
     {
         use crate::mapping::*;
 
-        let ctx = self.get_env_context().map_err(|e| e.into())?;
+        let ctx = self.get_env_context().await.map_err(|e| e.into())?;
         T::validate_query(self)?;
-        self.get_config(ctx.load().map_err(|e| e.into())?)
+        self.get_config(ctx.load().await.map_err(|e| e.into())?)
+            .await
             .map_err(|e| e.into())?
             .recursive_map(&|val| runtime(&ctx, val))
             .recursive_map(&|val| cache(&ctx, val))
@@ -196,9 +199,9 @@ impl<'a> ConfigQuery<'a> {
         tracing::debug!("Config set got environment");
         env.populate_defaults(&level).await?;
         tracing::debug!("Config set defaults populated");
-        let config = env.config_from_cache(self.build)?;
+        let config = env.config_from_cache(self.build).await?;
         tracing::debug!("Config set got value from cache");
-        let mut write_guard = config.write().map_err(|_| anyhow!("config write guard"))?;
+        let mut write_guard = config.write().await;
         tracing::debug!("Config set got write guard");
         write_guard.set(key, level, value)?;
         tracing::debug!("Config set performed");
@@ -211,8 +214,8 @@ impl<'a> ConfigQuery<'a> {
     pub async fn remove(&self) -> Result<()> {
         let (key, level) = self.validate_write_query()?;
         let env = self.get_env().await?;
-        let config = env.config_from_cache(self.build)?;
-        let mut write_guard = config.write().map_err(|_| anyhow!("config write guard"))?;
+        let config = env.config_from_cache(self.build).await?;
+        let mut write_guard = config.write().await;
         write_guard.remove(key, level)?;
         write_guard.save().await
     }
@@ -223,8 +226,8 @@ impl<'a> ConfigQuery<'a> {
         let (key, level) = self.validate_write_query()?;
         let mut env = self.get_env().await?;
         env.populate_defaults(&level).await?;
-        let config = env.config_from_cache(self.build)?;
-        let mut write_guard = config.write().map_err(|_| anyhow!("config write guard"))?;
+        let config = env.config_from_cache(self.build).await?;
+        let mut write_guard = config.write().await;
         if let Some(mut current) = write_guard.get_in_level(key, level) {
             if current.is_object() {
                 bail!("cannot add a value to a subtree");

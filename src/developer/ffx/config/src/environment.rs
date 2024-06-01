@@ -12,7 +12,7 @@ use std::{
     fs::{File, OpenOptions},
     io::{BufReader, ErrorKind, Write},
     path::{Path, PathBuf},
-    sync::{Arc, RwLock},
+    sync::Arc,
     time::Duration,
 };
 use tracing::info;
@@ -46,7 +46,7 @@ impl Environment {
         Self { context, files }
     }
 
-    fn load(context: &EnvironmentContext) -> Result<Self> {
+    async fn load(context: &EnvironmentContext) -> Result<Self> {
         let path = context.env_file_path()?;
 
         Self::load_env_file(&path, context)
@@ -96,12 +96,12 @@ impl Environment {
         Ok(())
     }
 
-    pub(crate) fn config_from_cache(
+    pub(crate) async fn config_from_cache(
         self,
         build_override: Option<BuildOverride<'_>>,
-    ) -> Result<Arc<RwLock<Config>>> {
+    ) -> Result<Arc<async_lock::RwLock<Config>>> {
         let build_dir = self.override_build_dir(build_override);
-        crate::cache::load_config(&self.context.cache, build_dir, || Config::from_env(&self))
+        crate::cache::load_config(&self.context.cache, build_dir, || Config::from_env(&self)).await
     }
 
     fn load_env_file(path: &Path, context: &EnvironmentContext) -> Result<Self> {
@@ -374,7 +374,7 @@ mod test {
         env_file.flush().unwrap();
 
         // Load the environment back in, and make sure it's correct.
-        let env_load = test_env.load();
+        let env_load = test_env.load().await;
         assert_eq!(env, env_load.files);
 
         // Remove the file to prevent a spurious success
@@ -405,7 +405,7 @@ mod test {
             Some(env_file_path.clone()),
         );
         assert!(!env_file_path.is_file(), "Environment file shouldn't exist yet");
-        let mut env = context.load().expect("Should be able to load the environment");
+        let mut env = context.load().await.expect("Should be able to load the environment");
 
         env.populate_defaults(&ConfigLevel::Build)
             .await
@@ -413,6 +413,7 @@ mod test {
         drop(env);
         let config = context
             .load()
+            .await
             .expect("should be able to load the test-configured env-file.")
             .get_build()
             .expect("should be a default build configuration");
@@ -449,6 +450,7 @@ mod test {
 
         if let Some(build_configs) = context
             .load()
+            .await
             .expect("should be able to load the manually configured env-file.")
             .files
             .build

@@ -111,8 +111,8 @@ impl TestEnv {
         Ok(test_env)
     }
 
-    pub fn load(&self) -> Environment {
-        self.context.load().expect("opening test env file")
+    pub async fn load(&self) -> Environment {
+        self.context.load().await.expect("opening test env file")
     }
 }
 

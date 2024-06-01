@@ -67,8 +67,11 @@ impl EmuStopTool {
         writer: &mut <EmuStopTool as fho::FfxMain>::Writer,
     ) -> fho::Result<Vec<Error>> {
         let mut names = vec![self.cmd.name];
-        let instance_dir: PathBuf =
-            self.context.get(emulator_instance::EMU_INSTANCE_ROOT_DIR).map_err(|e| bug!("{e}"))?;
+        let instance_dir: PathBuf = self
+            .context
+            .get(emulator_instance::EMU_INSTANCE_ROOT_DIR)
+            .await
+            .map_err(|e| bug!("{e}"))?;
         let emu_instances = EmulatorInstances::new(instance_dir);
 
         if self.cmd.all {

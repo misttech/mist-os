@@ -549,7 +549,9 @@ impl FidlProtocol for TargetCollectionProtocol {
         let tc2 = cx.get_target_collection().await?;
         let context = self.context.clone();
         self.tasks.spawn(async move {
-            let instance_root: PathBuf = match context.get(emulator_instance::EMU_INSTANCE_ROOT_DIR)
+            let instance_root: PathBuf = match context
+                .get(emulator_instance::EMU_INSTANCE_ROOT_DIR)
+                .await
             {
                 Ok(dir) => dir,
                 Err(e) => {
