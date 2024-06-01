@@ -529,7 +529,7 @@ async fn open2_invalid() {
 async fn open2_create_dot_fails_with_already_exists() {
     let harness = TestHarness::new().await;
 
-    if !(harness.config.supports_open2 && harness.config.supports_create) {
+    if !(harness.config.supports_open2 && harness.config.supports_modify_directory) {
         return;
     }
 

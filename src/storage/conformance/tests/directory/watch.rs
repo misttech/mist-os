@@ -15,9 +15,6 @@ use {
 #[fuchsia::test]
 async fn watch_dir_existing() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_directory_watchers {
-        return;
-    }
 
     let root = root_directory(vec![file("foo", b"test".to_vec())]);
     let root_dir = harness.get_directory(root, harness.dir_rights.all());
@@ -40,10 +37,7 @@ async fn watch_dir_existing() {
 #[fuchsia::test]
 async fn watch_dir_added_removed() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_directory_watchers {
-        return;
-    }
-    if !harness.config.supports_create {
+    if !harness.config.supports_modify_directory {
         return;
     }
 
@@ -96,10 +90,7 @@ async fn watch_dir_added_removed() {
 #[fuchsia::test]
 async fn watch_dir_existing_file_create_does_not_generate_new_event() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_directory_watchers {
-        return;
-    }
-    if !harness.config.supports_create {
+    if !harness.config.supports_modify_directory {
         return;
     }
 
@@ -155,13 +146,7 @@ async fn watch_dir_existing_file_create_does_not_generate_new_event() {
 #[fuchsia::test]
 async fn watch_dir_rename() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_directory_watchers {
-        return;
-    }
-    if !harness.config.supports_create {
-        return;
-    }
-    if !harness.config.supports_rename {
+    if !harness.config.supports_modify_directory {
         return;
     }
 

@@ -84,7 +84,6 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                     supports_get_backing_memory: true,
                     supports_remote_dir: true,
                     supports_open2: true,
-                    supports_directory_watchers: true,
                     supports_append: true,
                     supported_attributes: fio::NodeAttributesQuery::PROTOCOLS
                         | fio::NodeAttributesQuery::ABILITIES
@@ -93,12 +92,9 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                         | fio::NodeAttributesQuery::LINK_COUNT
                         | fio::NodeAttributesQuery::ID,
                     // Unsupported options:
-                    supports_link: false, // Link is not supported using a pseudo filesystem.
                     supports_link_into: false,
-                    supports_rename: false,
                     supports_get_token: false,
-                    supports_create: false,
-                    supports_unlink: false,
+                    supports_modify_directory: false,
                 };
                 responder.send(&config)?;
                 continue;

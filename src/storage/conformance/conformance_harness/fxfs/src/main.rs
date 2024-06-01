@@ -63,18 +63,14 @@ async fn run(mut stream: Io1HarnessRequestStream, fixture: &TestFixture) -> Resu
         match request {
             Io1HarnessRequest::GetConfig { responder } => {
                 responder.send(&Io1Config {
-                    supports_create: true,
                     supports_executable_file: false,
                     supports_get_backing_memory: true,
                     supports_remote_dir: false,
-                    supports_rename: true,
-                    supports_link: true,
                     supports_get_token: true,
-                    supports_unlink: true,
                     supports_open2: true,
                     supports_link_into: true,
-                    supports_directory_watchers: true,
                     supports_append: true,
+                    supports_modify_directory: true,
                     supported_attributes: fio::NodeAttributesQuery::PROTOCOLS
                         | fio::NodeAttributesQuery::ABILITIES
                         | fio::NodeAttributesQuery::CONTENT_SIZE
