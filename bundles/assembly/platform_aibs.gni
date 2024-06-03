@@ -111,6 +111,8 @@ bootstrap_eng_platform_aib_names = [
   "bootstrap_eng",
 
   # Kernel args
+  "kernel_oom_reboot_timeout_low",
+  "kernel_oom_behavior_jobkill",
   "kernel_pmm_checker_enabled",
   "kernel_pmm_checker_enabled_auto",
 

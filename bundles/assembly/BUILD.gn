@@ -1945,7 +1945,6 @@ assembly_input_bundle("detect_user") {
 # These AIBs are opaque groups of inputs that are common to many products, but
 # have not been organized into specific features yet.
 assembly_input_bundle("input_group_one") {
-  kernel_cmdline = [ "kernel.oom.behavior=reboot" ]
   base_packages = [ "//src/sys/cache_manager" ]
 }
 
@@ -3876,6 +3875,16 @@ assembly_resources_directory("resources") {
     "//src/media/audio/meta/multizone_leader.core_shard_eng.cml",
   ]
   deps = [ "//src/lib/icu/tzdata:revision" ]
+}
+
+# Sets a low timeout for rebooting when the device runs out-of-memory.
+assembly_input_bundle("kernel_oom_reboot_timeout_low") {
+  kernel_cmdline = [ "kernel.oom.reboot-timeout-ms=8000" ]
+}
+
+# Enables jobkilling when the device runs out-of-memory.
+assembly_input_bundle("kernel_oom_behavior_jobkill") {
+  kernel_cmdline = [ "kernel.oom.behavior=jobkill" ]
 }
 
 # Enables in kernel compression of anonymous memory with some common configuration options.

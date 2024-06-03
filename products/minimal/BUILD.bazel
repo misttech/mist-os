@@ -18,7 +18,6 @@ load(
 
 package(default_visibility = ["//visibility:public"])
 
-# LINT.IfChange
 _PRODUCT_CONFIG_BASE_JSON = {
     "platform": {
         "build_type": BUILD_TYPES.ENG,
@@ -34,6 +33,13 @@ _PRODUCT_CONFIG_BASE_JSON = {
                 INPUT_DEVICE_TYPE.TOUCHSCREEN,
             ],
         },
+        "kernel": {
+            "oom_behavior": {
+                "reboot": {
+                    "timeout": "low",
+                },
+            },
+        },
     },
     "product": {
         "build_info": DEFAULT_PRODUCT_BUILD_INFO,
@@ -44,7 +50,6 @@ fuchsia_product_configuration(
     name = "product_config",
     product_config_json = _PRODUCT_CONFIG_BASE_JSON,
 )
-# LINT.ThenChange(//products/minimal/BUILD.gn)
 
 fuchsia_product(
     name = "image.x64",

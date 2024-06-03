@@ -4,7 +4,9 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::{ensure, Context};
-use assembly_config_schema::platform_config::kernel_config::{MemorySize, PlatformKernelConfig};
+use assembly_config_schema::platform_config::kernel_config::{
+    MemorySize, OOMBehavior, OOMRebootTimeout, PlatformKernelConfig,
+};
 pub(crate) struct KernelSubsystem;
 
 impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
@@ -13,6 +15,18 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
         kernel_config: &PlatformKernelConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
+        match (&context.build_type, &kernel_config.oom_behavior) {
+            (_, OOMBehavior::Reboot { timeout: OOMRebootTimeout::Normal }) => {}
+            (&BuildType::Eng, OOMBehavior::Reboot { timeout: OOMRebootTimeout::Low }) => {
+                builder.platform_bundle("kernel_oom_reboot_timeout_low")
+            }
+            (&BuildType::Eng, OOMBehavior::JobKill) => {
+                builder.platform_bundle("kernel_oom_behavior_jobkill")
+            }
+            (&BuildType::UserDebug | &BuildType::User, _) => {
+                anyhow::bail!("'kernel.oom_behavior' can only be set on 'build_type=\"eng\"");
+            }
+        }
         if kernel_config.lru_memory_compression && !kernel_config.memory_compression {
             anyhow::bail!("'lru_memory_compression' can only be enabled with 'memory_compression'");
         }
