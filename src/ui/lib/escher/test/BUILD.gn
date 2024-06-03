@@ -210,8 +210,8 @@ group("force_examples_to_build_on_host") {
   if (is_host) {
     testonly = true
     deps = [
-      "//src/ui/examples/escher/rainfall($host_toolchain)",
-      "//src/ui/examples/escher/waterfall($host_toolchain)",
+      "//src/ui/examples/escher/rainfall:rainfall_on_fb($host_toolchain)",
+      "//src/ui/examples/escher/waterfall:waterfall_on_fb($host_toolchain)",
     ]
   }
 }

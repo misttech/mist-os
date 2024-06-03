@@ -15,6 +15,13 @@
 #include "src/ui/examples/escher/common/demo.h"
 #include "src/ui/lib/escher/util/trace_macros.h"
 
+#if defined(FUCHSIA_USE_SCENIC)
+#include <fidl/fuchsia.element/cpp/fidl.h>        // nogncheck
+#include <lib/component/incoming/cpp/protocol.h>  // nogncheck
+
+#include "sdk/lib/ui/scenic/cpp/view_creation_tokens.h"  // nogncheck
+#endif
+
 // Directory provided by the "isolated-cache-storage" feature of the component sandbox.
 static const char* kCacheDirectoryPath = "/cache";
 
@@ -50,13 +57,39 @@ std::string DemoHarnessFuchsia::GetCacheDirectoryPath() { return kCacheDirectory
 void DemoHarnessFuchsia::InitWindowSystem() {}
 
 vk::SurfaceKHR DemoHarnessFuchsia::CreateWindowAndSurface(const WindowParams& params) {
+#if defined(FUCHSIA_USE_SCENIC)
+  auto [view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
+#endif
   VkImagePipeSurfaceCreateInfoFUCHSIA create_info = {
       .sType = VK_STRUCTURE_TYPE_IMAGEPIPE_SURFACE_CREATE_INFO_FUCHSIA,
       .pNext = nullptr,
+#if defined(FUCHSIA_USE_SCENIC)
+      .imagePipeHandle = view_token.value.release(),
+#endif
   };
   VkSurfaceKHR surface;
   VkResult err = vkCreateImagePipeSurfaceFUCHSIA(instance(), &create_info, nullptr, &surface);
   FX_CHECK(!err);
+
+#if defined(FUCHSIA_USE_SCENIC)
+  fidl::Client<fuchsia_element::GraphicalPresenter> presenter;
+  {
+    auto client_end = component::Connect<fuchsia_element::GraphicalPresenter>();
+    if (client_end.is_error()) {
+      FX_LOGS(ERROR) << "Unable to connect to fuchsia_element::Presenter protocol: "
+                     << client_end.status_string();
+    }
+    presenter.Bind(std::move(*client_end), loop_->dispatcher());
+  }
+  fuchsia_element::ViewSpec view_spec;
+  view_spec.viewport_creation_token(
+      fuchsia_ui_views::ViewportCreationToken(std::move(parent_viewport_token.value)));
+  presenter->PresentView({{.view_spec = std::move(view_spec)}}).ThenExactlyOnce([](auto result) {
+    if (!result.is_ok())
+      FX_LOGS(ERROR) << "PresentView failed: " << result.error_value();
+  });
+#endif
+
   return surface;
 }
 
@@ -65,7 +98,12 @@ void DemoHarnessFuchsia::AppendPlatformSpecificInstanceExtensionNames(InstancePa
   params->extension_names.insert(VK_FUCHSIA_IMAGEPIPE_SURFACE_EXTENSION_NAME);
   params->extension_names.insert(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
   params->extension_names.insert(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+
+#if defined(FUCHSIA_USE_SCENIC)
+  params->layer_names.insert("VK_LAYER_FUCHSIA_imagepipe_swapchain");
+#else
   params->layer_names.insert("VK_LAYER_FUCHSIA_imagepipe_swapchain_fb");
+#endif
 }
 
 void DemoHarnessFuchsia::AppendPlatformSpecificDeviceExtensionNames(std::set<std::string>* names) {

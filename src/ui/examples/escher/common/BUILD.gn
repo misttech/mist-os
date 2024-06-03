@@ -7,6 +7,24 @@ config("vulkan_no_nodiscard") {
 }
 
 static_library("common") {
+  public_deps = [ ":common_base" ]
+}
+
+static_library("common_on_fb") {
+  public_deps = [ ":common_base" ]
+  if (is_fuchsia) {
+    deps = [ ":demo_harness_fuchsia_on_fb" ]
+  }
+}
+
+static_library("common_on_scenic") {
+  public_deps = [ ":common_base" ]
+  if (is_fuchsia) {
+    deps = [ ":demo_harness_fuchsia_on_scenic" ]
+  }
+}
+
+source_set("common_base") {
   sources = [ "demo_harness.cc" ]
   deps = [
     ":demo_base",
@@ -23,9 +41,6 @@ static_library("common") {
   ]
   include_dirs = [ "//lib" ]
 
-  if (is_fuchsia) {
-    deps += [ ":demo_harness_fuchsia" ]
-  }
   if (is_linux || is_mac) {
     deps += [ ":demo_harness_glfw" ]
   }
@@ -54,16 +69,47 @@ source_set("demo_base") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-source_set("demo_harness_fuchsia") {
+source_set("demo_harness_fuchsia_on_fb") {
   visibility = [ ":*" ]
   sources = [
     "demo_harness_fuchsia.cc",
     "demo_harness_fuchsia.h",
   ]
+
   deps = [
     "//sdk/lib/sys/cpp",
     "//src/lib/fsl",
-    "//src/lib/vulkan/swapchain",
+    "//src/lib/vulkan/swapchain:image_pipe_swapchain_fb_layer",
+    "//src/ui/input/lib/hid",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/trace-provider",
+  ]
+  public_deps = [
+    ":demo_base",
+    ":headers",
+  ]
+
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-conversion" ]
+
+  configs += [ ":vulkan_no_nodiscard" ]
+}
+
+source_set("demo_harness_fuchsia_on_scenic") {
+  visibility = [ ":*" ]
+  defines = [ "FUCHSIA_USE_SCENIC" ]
+  sources = [
+    "demo_harness_fuchsia.cc",
+    "demo_harness_fuchsia.h",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.element:fuchsia.element_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/sys/cpp",
+    "//sdk/lib/ui/scenic/cpp",
+    "//src/lib/fsl",
+    "//src/lib/vulkan/swapchain:image_pipe_swapchain_layer",
     "//src/ui/input/lib/hid",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
