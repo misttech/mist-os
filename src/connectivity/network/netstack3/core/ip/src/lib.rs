@@ -228,8 +228,8 @@ pub mod raw {
     pub use crate::internal::raw::state::{RawIpSocketLockedState, RawIpSocketState};
     pub use crate::internal::raw::{
         RawIpSocketApi, RawIpSocketId, RawIpSocketMap, RawIpSocketMapContext,
-        RawIpSocketStateContext, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes,
-        RawIpSocketsIpExt, WeakRawIpSocketId,
+        RawIpSocketSendToError, RawIpSocketStateContext, RawIpSocketsBindingsContext,
+        RawIpSocketsBindingsTypes, WeakRawIpSocketId,
     };
 }
 

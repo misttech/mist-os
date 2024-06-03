@@ -52,7 +52,6 @@ pub trait IpExt:
     + ip::device::IpDeviceIpExt
     + transport::tcp::DualStackIpExt
     + socket::datagram::DualStackIpExt
-    + ip::raw::RawIpSocketsIpExt
 {
 }
 
@@ -63,7 +62,6 @@ impl<O> IpExt for O where
         + ip::device::IpDeviceIpExt
         + transport::tcp::DualStackIpExt
         + socket::datagram::DualStackIpExt
-        + ip::raw::RawIpSocketsIpExt
 {
 }
 
