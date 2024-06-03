@@ -16,10 +16,36 @@ pub enum MemorySize {
     Relative(u8),
 }
 
+/// What should happen if the device runs out-of-memory.
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum OOMBehavior {
+    Reboot { timeout: OOMRebootTimeout },
+    JobKill,
+}
+
+impl Default for OOMBehavior {
+    fn default() -> Self {
+        OOMBehavior::Reboot { timeout: OOMRebootTimeout::default() }
+    }
+}
+
+/// The reboot timeout if the device runs out-of-memory.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum OOMRebootTimeout {
+    #[default]
+    Normal,
+    Low,
+}
+
 /// Platform configuration options for the kernel area.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformKernelConfig {
+    // What should happen if the device runs out-of-memory.
+    #[serde(default)]
+    pub oom_behavior: OOMBehavior,
     #[serde(default)]
     pub memory_compression: bool,
     #[serde(default)]
