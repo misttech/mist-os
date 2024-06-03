@@ -271,7 +271,7 @@ be visible to Driver Manager. These package labels are also considered to be in 
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/bringup.gni:34
+From //products/bringup.gni:33
 
 **Overridden from the default:** `[]`
 
@@ -279,7 +279,7 @@ From //BUILD.gn:38
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/bringup.gni:34
+From //products/bringup.gni:33
 
 **Overridden from the default:** `[]`
 
@@ -1043,7 +1043,7 @@ be built, they should be included in the build graph through other means.
 
 **Current value (from the default):** `["//build/images:main_assembly"]`
 
-From //build/product.gni:59
+From //build/product.gni:56
 
 ### clang_embed_bitcode
 
@@ -1184,7 +1184,7 @@ TODO: redo comments
 
 **Current value (from the default):** `[]`
 
-From //build/product.gni:27
+From //build/product.gni:24
 
 ### crash_diagnostics_dir
 
@@ -2825,7 +2825,7 @@ From //BUILD.gn:104
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:51
+From //build/product.gni:48
 
 ### emu_window_size_width
 
@@ -2833,7 +2833,7 @@ Configuration to override the default window size for the virtual device in pixe
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:50
+From //build/product.gni:47
 
 ### enable_bazel_remote_rbe
 
@@ -3467,7 +3467,7 @@ TODO(https://fxbug.dev/42161120) move this to a toolchain to allow multiple prod
 
 **Current value (from the default):** `true`
 
-From //build/product.gni:32
+From //build/product.gni:29
 
 ### fuchsia_product_assembly_config_label
 
@@ -3478,7 +3478,7 @@ For Bazel products, netboot will only be available when this is supplied.
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:38
+From //build/product.gni:35
 
 ### fuchsia_sdk_root
 
@@ -5636,26 +5636,6 @@ Example:
 
 From //build/assembly/developer_overrides.gni:284
 
-### product_bootfs_labels
-
-A list of binary labels to include in ZBIs built for this product.
-
-**Current value for `target_cpu = "arm64"`:** `["//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low"]`
-
-From //products/bringup.gni:37
-
-**Overridden from the default:** `[]`
-
-From //build/product.gni:11
-
-**Current value for `target_cpu = "x64"`:** `["//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low"]`
-
-From //products/bringup.gni:37
-
-**Overridden from the default:** `[]`
-
-From //build/product.gni:11
-
 ### product_bootfs_packages
 
 A list of packages to be included in the bootfs as
@@ -5663,7 +5643,7 @@ meta.fars and content-id'd blobs.
 
 **Current value (from the default):** `[]`
 
-From //build/product.gni:18
+From //build/product.gni:15
 
 ### product_description
 
@@ -5671,7 +5651,7 @@ A human readable product description.
 
 **Current value (from the default):** `""`
 
-From //build/product.gni:21
+From //build/product.gni:18
 
 ### product_host_labels
 
@@ -5679,7 +5659,7 @@ A list of binary host tool labels to also build.
 
 **Current value (from the default):** `[]`
 
-From //build/product.gni:14
+From //build/product.gni:11
 
 ### profile_source_files
 
@@ -7520,7 +7500,7 @@ extension mechanism for IDK bits outside of the main repository.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/bringup.gni:35
+From //products/bringup.gni:34
 
 **Overridden from the default:** `[]`
 
@@ -7528,7 +7508,7 @@ From //BUILD.gn:132
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/bringup.gni:35
+From //products/bringup.gni:34
 
 **Overridden from the default:** `[]`
 
@@ -8684,7 +8664,7 @@ between similar virtual device's using different configuration's such as
 
 **Current value (from the default):** `""`
 
-From //build/product.gni:47
+From //build/product.gni:44
 
 ### vm_tracing_level
 
@@ -8818,19 +8798,19 @@ The product assembly config used to configure the Zedboot image.
 
 **Current value for `target_cpu = "arm64"`:** `"//products/zedboot"`
 
-From //products/bringup.gni:42
+From //products/bringup.gni:36
 
 **Overridden from the default:** `false`
 
-From //build/product.gni:41
+From //build/product.gni:38
 
 **Current value for `target_cpu = "x64"`:** `"//products/zedboot"`
 
-From //products/bringup.gni:42
+From //products/bringup.gni:36
 
 **Overridden from the default:** `false`
 
-From //build/product.gni:41
+From //build/product.gni:38
 
 ### zircon_a_partition
 
