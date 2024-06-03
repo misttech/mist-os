@@ -3231,3 +3231,16 @@
   reviewers: ['olivernewman@google.com', 'phosek@google.com', 'surajmalhotra@google.com', 'tkilbourn@google.com']
   submitted: '2024-03-29'
   reviewed: '2024-05-02'
+
+- name: 'RFC-0249'
+  title: 'crosvm support in the platform'
+  short_description: 'This RFC advocates for crosvm to be a first class emulator supported by the fuchsia platform, in addition to qemu and femu.'
+  authors: ['surajmalhotra@google.com']
+  file: '0249_crosvm_support_in_the_platform.md'
+  area: ['Governance']
+  issue: ['335475104']
+  gerrit_change_id: ['1036475']
+  status: 'Accepted'
+  reviewers: ['cja@google.com', 'jamesr@google.com', 'mcgrathr@google.com', 'olivernewman@google.com', 'wittrock@google.com']
+  submitted: '2024-04-24'
+  reviewed: '2024-05-31'
