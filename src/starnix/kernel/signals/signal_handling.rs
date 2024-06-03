@@ -70,14 +70,13 @@ fn send_signal_prio(
     prio: SignalPriority,
     force_wake: bool,
 ) -> Result<(), Errno> {
-    let is_masked = task_state.signals.mask().has_signal(siginfo.signal);
-    let was_masked =
-        task_state.signals.saved_mask().is_some_and(|mask| mask.has_signal(siginfo.signal));
-    let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
+    let is_masked = task_state.is_signal_masked(siginfo.signal);
+    let was_masked = task_state.is_signal_masked_by_saved_mask(siginfo.signal);
+    let sigaction = task.get_signal_action(siginfo.signal);
     let action = action_for_signal(&siginfo, sigaction);
 
     if siginfo.signal.is_real_time() && prio != SignalPriority::First {
-        if task_state.signals.num_queued()
+        if task_state.pending_signal_count()
             >= task.thread_group.get_rlimit(Resource::SIGPENDING) as usize
         {
             return error!(EAGAIN);
@@ -92,9 +91,9 @@ fn send_signal_prio(
         action != DeliveryAction::Ignore || is_masked || was_masked || task_state.is_ptraced();
     if is_queued {
         if prio == SignalPriority::First {
-            task_state.signals.jump_queue(siginfo.clone());
+            task_state.enqueue_signal_front(siginfo.clone());
         } else {
-            task_state.signals.enqueue(siginfo.clone());
+            task_state.enqueue_signal(siginfo.clone());
         }
         task_state.set_flags(TaskFlags::SIGNALS_AVAILABLE, true);
     }
@@ -179,9 +178,7 @@ pub fn dequeue_signal(current_task: &mut CurrentTask) {
     if task.load_stopped().is_stopping_or_stopped() {
         return;
     }
-    let mask = task_state.signals.mask();
-    let siginfo =
-        task_state.signals.take_next_where(|sig| !mask.has_signal(sig.signal) || sig.force);
+    let siginfo = task_state.take_any_signal();
     prepare_to_restart_syscall(
         &mut thread_state.registers,
         siginfo.as_ref().map(|siginfo| task.thread_group.signal_actions.get(siginfo.signal)),
@@ -204,9 +201,9 @@ pub fn dequeue_signal(current_task: &mut CurrentTask) {
 
     // A syscall may have been waiting with a temporary mask which should be used to dequeue the
     // signal, but after the signal has been dequeued the old mask should be restored.
-    task_state.signals.restore_mask();
+    task_state.restore_signal_mask();
     {
-        let (clear, set) = if task_state.signals.is_empty() {
+        let (clear, set) = if task_state.pending_signal_count() == 0 {
             (TaskFlags::SIGNALS_AVAILABLE, TaskFlags::empty())
         } else {
             (TaskFlags::empty(), TaskFlags::SIGNALS_AVAILABLE)
@@ -249,7 +246,7 @@ pub fn deliver_signal(
                     task,
                     registers,
                     extended_pstate,
-                    &mut task_state.signals,
+                    task_state.signals_mut(),
                     siginfo,
                     sigaction,
                 ) {
@@ -275,12 +272,12 @@ pub fn deliver_signal(
                         //  disposition and mask.
                         let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
                         let action = action_for_signal(&siginfo, sigaction);
-                        let masked_signals = task_state.signals.mask();
+                        let masked_signals = task_state.signal_mask();
                         if signal == SIGSEGV
                             || masked_signals.has_signal(SIGSEGV)
                             || action == DeliveryAction::Ignore
                         {
-                            task_state.signals.set_mask(masked_signals & !SigSet::from(SIGSEGV));
+                            task_state.set_signal_mask(masked_signals & !SigSet::from(SIGSEGV));
                             task.thread_group.signal_actions.set(SIGSEGV, sigaction_t::default());
                         }
 
@@ -422,7 +419,7 @@ pub fn restore_from_signal_handler(current_task: &mut CurrentTask) -> Result<(),
     restore_registers(current_task, &signal_stack_frame, signal_frame_address)?;
 
     // Restore the stored signal mask.
-    current_task.write().signals.set_mask(SigSet::from(signal_stack_frame.context.uc_sigmask));
+    current_task.write().set_signal_mask(SigSet::from(signal_stack_frame.context.uc_sigmask));
 
     Ok(())
 }

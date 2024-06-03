@@ -7,8 +7,8 @@ use crate::{
     mutable_state::{state_accessor, state_implementation},
     security,
     signals::{
-        send_signal, send_standard_signal, syscalls::WaitingOptions, SignalActions, SignalDetail,
-        SignalInfo,
+        send_signal, send_standard_signal, syscalls::WaitingOptions, QueuedSignals, SignalActions,
+        SignalDetail, SignalInfo,
     },
     task::{
         interval_timer::IntervalTimerHandle, ptrace_detach, AtomicStopState, ClockId,
@@ -196,6 +196,9 @@ pub struct ThreadGroup {
 
     /// Tasks ptraced by this process
     pub ptracees: Mutex<BTreeMap<pid_t, TaskContainer>>,
+
+    /// The signals that are currently pending for this thread group.
+    pub pending_signals: Mutex<QueuedSignals>,
 }
 
 impl fmt::Debug for ThreadGroup {
@@ -392,6 +395,7 @@ impl ThreadGroup {
             next_seccomp_filter_id: Default::default(),
             ptracees: Default::default(),
             stop_state: AtomicStopState::new(StopState::Awake),
+            pending_signals: Default::default(),
             mutable_state: RwLock::new(ThreadGroupMutableState {
                 parent: parent.as_ref().map(|p| Arc::clone(p.base)),
                 tasks: BTreeMap::new(),
@@ -934,7 +938,7 @@ impl ThreadGroup {
             // If the calling process is a member of a background group and not ignoring SIGTTOU, a
             // SIGTTOU signal is sent to all members of this background process group.
             send_ttou = process_group.leader != cs.foregound_process_group_leader
-                && !current_task.read().signals.mask().has_signal(SIGTTOU)
+                && !current_task.read().signal_mask().has_signal(SIGTTOU)
                 && self.signal_actions.get(SIGTTOU).sa_handler != SIG_IGN;
             if !send_ttou {
                 *controlling_session = controlling_session

@@ -270,7 +270,7 @@ impl CurrentTask {
         {
             let mut state = self.write();
             state.set_flags(TaskFlags::TEMPORARY_SIGNAL_MASK, true);
-            state.signals.set_temporary_mask(signal_mask);
+            state.set_temporary_signal_mask(signal_mask);
         }
         wait_function(self)
     }
@@ -353,13 +353,13 @@ impl CurrentTask {
 
         {
             let mut state = self.write();
-            assert!(!state.signals.run_state.is_blocked());
+            assert!(!state.is_blocked());
             // A note on PTRACE_LISTEN - the thread cannot be scheduled
             // regardless of pending signals.
-            if state.signals.is_any_pending() && !state.is_ptrace_listening() {
+            if state.is_any_signal_pending() && !state.is_ptrace_listening() {
                 return error!(EINTR);
             }
-            state.signals.run_state = run_state.clone();
+            state.set_run_state(run_state.clone());
         }
 
         let result = callback();
@@ -367,10 +367,11 @@ impl CurrentTask {
         {
             let mut state = self.write();
             assert_eq!(
-                state.signals.run_state, run_state,
+                state.run_state(),
+                run_state,
                 "SignalState run state changed while waiting!"
             );
-            state.signals.run_state = RunState::Running;
+            state.set_run_state(RunState::Running);
         };
 
         result
@@ -891,7 +892,7 @@ impl CurrentTask {
         {
             let mut state = self.write();
             let mut persistent_info = self.persistent_info.lock();
-            state.signals.alt_stack = None;
+            state.set_sigaltstack(None);
             state.robust_list_head = UserAddress::NULL.into();
 
             // TODO(tbodt): Check whether capability xattrs are set on the file, and grant/limit
@@ -1584,7 +1585,7 @@ impl CurrentTask {
 
             no_new_privs = state.no_new_privs();
             seccomp_filters = state.seccomp_filters.clone();
-            child_signal_mask = state.signals.mask();
+            child_signal_mask = state.signal_mask();
 
             pid = pids.allocate_pid();
             command = self.command();
@@ -1688,8 +1689,8 @@ impl CurrentTask {
                 child.thread_group.add(&child_task)?;
                 let mut child_state = child.write();
                 let state = self.read();
-                child_state.signals.alt_stack = state.signals.alt_stack;
-                child_state.signals.set_mask(state.signals.mask());
+                child_state.set_sigaltstack(state.sigaltstack());
+                child_state.set_signal_mask(state.signal_mask());
                 self.mm().snapshot_to(locked, child.mm())?;
             }
 

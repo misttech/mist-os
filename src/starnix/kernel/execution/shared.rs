@@ -174,7 +174,7 @@ pub fn process_completed_restricted_exit(
                 .ptrace
                 .as_ref()
                 .is_some_and(|ptrace| ptrace.stop_status == crate::task::PtraceStatus::Continuing)
-                && task_state.signals.is_any_pending()
+                && task_state.is_any_signal_pending()
                 && !current_task.is_exitted()
             {
                 continue;
@@ -368,7 +368,7 @@ mod tests {
             move || {
                 let task = task.upgrade().expect("task must be alive");
                 // Wait for the task to have a waiter.
-                while !task.read().signals.run_state.is_blocked() {
+                while !task.read().is_blocked() {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
 
@@ -410,7 +410,7 @@ mod tests {
             move || {
                 let task = task.upgrade().expect("task must be alive");
                 // Wait for the task to have a waiter.
-                while !task.read().signals.run_state.is_blocked() {
+                while !task.read().is_blocked() {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
 

@@ -7061,7 +7061,7 @@ pub mod tests {
                     return;
                 };
                 // Wait for the task to start waiting.
-                while !task.read().signals.run_state.is_blocked() {
+                while !task.read().is_blocked() {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
                 // Do the kick.

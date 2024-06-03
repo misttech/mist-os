@@ -2016,7 +2016,7 @@ fn select(
     let mask = if !sigmask_addr.is_null() {
         let sigmask = current_task.read_object(sigmask_addr)?;
         let mask = if sigmask.ss.is_null() {
-            current_task.read().signals.mask()
+            current_task.read().signal_mask()
         } else {
             if sigmask.ss_len < std::mem::size_of::<sigset_t>() {
                 return error!(EINVAL);
@@ -2317,7 +2317,7 @@ impl<Key: Into<ReadyItemKey>> FileWaiter<Key> {
             // When wait_until() returns Ok() it means there was a wake up; however there may not
             // be a ready item, for example if waiting on a sync file with multiple sync points.
             // Keep waiting until there's at least one ready item.
-            let signal_mask = signal_mask.unwrap_or_else(|| current_task.read().signals.mask());
+            let signal_mask = signal_mask.unwrap_or_else(|| current_task.read().signal_mask());
             let mut result = current_task.wait_with_temporary_mask(signal_mask, |current_task| {
                 self.waiter.wait_until(current_task, deadline)
             });

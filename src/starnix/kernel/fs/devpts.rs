@@ -1350,7 +1350,7 @@ mod tests {
             ioctl::<i32>(&mut locked, &task2, &opened_replica, TIOCSPGRP, &task2_pgid),
             error!(EINTR)
         );
-        assert!(task2.read().signals.has_queued(SIGTTOU));
+        assert!(task2.read().has_signal_pending(SIGTTOU));
 
         // Set the foregound process to task2 process group
         ioctl::<i32>(&mut locked, &task1, &opened_replica, TIOCSPGRP, &task2_pgid).unwrap();

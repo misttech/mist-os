@@ -54,8 +54,7 @@ impl FileOps for SignalFd {
             while buf.len() + std::mem::size_of::<signalfd_siginfo>() <= data_len {
                 let signal = current_task
                     .write()
-                    .signals
-                    .take_next_where(|sig| mask.has_signal(sig.signal))
+                    .take_signal_with_mask(!mask)
                     .ok_or_else(|| errno!(EAGAIN))?;
                 let mut siginfo = signalfd_siginfo {
                     ssi_signo: signal.signal.number(),
@@ -126,7 +125,7 @@ impl FileOps for SignalFd {
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
         let task_state = current_task.read();
-        Some(task_state.signals.signal_wait.wait_async_fd_events(waiter, events, handler))
+        Some(task_state.wait_on_signal_fd_events(waiter, events, handler))
     }
 
     fn query_events(
@@ -135,7 +134,7 @@ impl FileOps for SignalFd {
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
         let mut events = FdEvents::empty();
-        if current_task.read().signals.is_any_allowed_by_mask(!*self.mask.lock()) {
+        if current_task.read().is_any_signal_allowed_by_mask(!*self.mask.lock()) {
             events |= FdEvents::POLLIN;
         }
         Ok(events)

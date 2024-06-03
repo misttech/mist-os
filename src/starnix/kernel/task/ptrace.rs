@@ -843,7 +843,7 @@ pub fn ptrace_dispatch(
             // sigset comes from *data.
             let src: UserRef<SigSet> = UserRef::from(data);
             let val = current_task.read_object(src)?;
-            state.signals.set_mask(val);
+            state.set_signal_mask(val);
 
             Ok(starnix_syscalls::SUCCESS)
         }
@@ -855,7 +855,7 @@ pub fn ptrace_dispatch(
             }
             // sigset goes in *data.
             let dst: UserRef<SigSet> = UserRef::from(data);
-            let val = state.signals.mask();
+            let val = state.signal_mask();
             current_task.write_object(dst, &val)?;
             Ok(starnix_syscalls::SUCCESS)
         }

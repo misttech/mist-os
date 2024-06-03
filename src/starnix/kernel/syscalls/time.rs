@@ -521,7 +521,7 @@ mod test {
             move || {
                 let task = task.upgrade().expect("task must be alive");
                 // Wait until the task is in nanosleep, and interrupt it.
-                while !task.read().signals.run_state.is_blocked() {
+                while !task.read().is_blocked() {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
                 task.interrupt();
