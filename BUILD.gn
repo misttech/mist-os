@@ -114,6 +114,9 @@ group("default") {
     "//src/starnix_lite:tests",
 
     #
+    "//src/lib/zircon/rust/examples/zx_toy:zx_toy_zbi",
+
+    #
     "//zircon/tools:tests",
   ]
 }

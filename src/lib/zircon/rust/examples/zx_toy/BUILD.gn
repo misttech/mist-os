@@ -6,6 +6,19 @@ import("//build/rust/rustc_binary.gni")
 
 rustc_binary("zx_toy") {
   output_name = "example_zx_toy"
+  edition = "2021"
   deps = [ "//src/lib/zircon/rust:fuchsia-zircon" ]
   sources = [ "src/main.rs" ]
+}
+
+if (is_mistos) {
+  import("//build/testing/boot_tests/kernel_zbi_test.gni")
+
+  kernel_zbi_test("zx_toy_zbi") {
+    args = [
+      "userboot.test.root=/",
+      "userboot.test.next=bin/example_zx_toy",
+    ]
+    deps = [ ":zx_toy" ]
+  }
 }
