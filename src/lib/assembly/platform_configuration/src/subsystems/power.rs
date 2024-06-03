@@ -57,6 +57,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                     }
                     false => {
                         builder.platform_bundle("power_framework_sag");
+                        builder.platform_bundle("topology_test_daemon");
                     }
                 }
             }

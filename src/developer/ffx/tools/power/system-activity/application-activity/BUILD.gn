@@ -1,0 +1,21 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//src/developer/ffx/build/ffx_plugin.gni")
+
+ffx_plugin("ffx_power_system_activity_application_activity") {
+  version = "0.1.0"
+  edition = "2021"
+
+  sources = [ "src/lib.rs" ]
+  deps = [
+    "//sdk/fidl/fuchsia.power.topology.test:fuchsia.power.topology.test_rust",
+    "//src/developer/ffx/lib/fho:lib",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
+  ]
+
+  args_sources = [ "src/args.rs" ]
+  args_with_unit_tests = true
+}

@@ -3490,6 +3490,27 @@ assembly_input_bundle("battery_manager") {
   ]
 }
 
+# TopologyTestDaemon support
+#
+# feature_set_levels: all
+# build-types: eng
+#
+assembly_input_bundle("topology_test_daemon") {
+  testonly = true
+  base_packages = [ "//src/power/topology-test-daemon:package" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/power/topology-test-daemon/meta/topology-test-daemon.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
 # Power metrics recorder support
 #
 # feature_set_levels: minimal

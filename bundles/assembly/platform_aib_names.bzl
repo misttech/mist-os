@@ -197,6 +197,7 @@ ENG_PLATFORM_AIB_NAMES = BOOTSTRAP_ENG_PLATFORM_AIB_NAMES + USERDEBUG_PLATFORM_A
     "sensors_playback",
     "system_update_checker",
     "testing_support",
+    "topology_test_daemon",
     "ui_eng",
     "ui_eng.icu_default_{}".format(icu_flavors.default_git_commit),
     "ui_eng.icu_latest_{}".format(icu_flavors.latest_git_commit),

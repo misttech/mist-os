@@ -48,6 +48,10 @@ ffx_subtool_fidl_allowlist = [
   # used by ffx process
   "//sdk/fidl/fuchsia.process.explorer:fuchsia.process.explorer",
 
+  # used by ffx power
+  "//sdk/fidl/fuchsia.power.topology.test:fuchsia.power.topology.test",
+  "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker",
+
   # used by ffx test
   "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager",
 
