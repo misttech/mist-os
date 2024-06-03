@@ -143,7 +143,7 @@ def FormatConfidenceInterval(value, offset):
 class Stats(object):
     def __init__(self, values, unit):
         self.unit = unit
-        sample_size = len(values)
+        self.sample_size = len(values)
         mean, stddev = MeanAndStddev(values)
         self._mean = mean
         if stddev is None:
@@ -151,9 +151,9 @@ class Stats(object):
             self.interval = None
         else:
             self._offset = (
-                -scipy.stats.t.ppf(ALPHA / 2, sample_size - 1)
+                -scipy.stats.t.ppf(ALPHA / 2, self.sample_size - 1)
                 * stddev
-                / math.sqrt(sample_size)
+                / math.sqrt(self.sample_size)
             )
             # Confidence interval for the mean.
             self.interval = (mean - self._offset, mean + self._offset)
@@ -466,6 +466,25 @@ def ComparePerf(args, out_fh):
     out_fh.write("Results from all test cases:\n\n")
     FormatTable(heading_row, all_rows, out_fh)
 
+    # Check that the sample size for each metric matches the
+    # "--expected_sample_size" argument (if given).  We apply this check
+    # after outputting the table so that the results will still be visible
+    # even if the check fails.
+    if args.expected_sample_size is not None:
+        mismatches = []
+        for results_map in results_maps:
+            for label, stats in sorted(results_map.items()):
+                if stats.sample_size != args.expected_sample_size:
+                    mismatches.append(
+                        "%s (got %d)" % (label, stats.sample_size)
+                    )
+        if len(mismatches) != 0:
+            raise AssertionError(
+                "The following metrics had an unexpected sample size"
+                " (expected %d):\n%s"
+                % (args.expected_sample_size, "\n".join(mismatches))
+            )
+
 
 def PrintMultibootDatasetTable(multiboot_dataset, out_fh):
     stats_map = StatsFromMultiBootDataset(multiboot_dataset)
@@ -604,6 +623,16 @@ def Main(argv, out_fh, run_cmd=subprocess.check_call):
         " tests had regressions or improvements. "
         " Otherwise (if given 1 or >2 datasets), the data is shown with no"
         " comparisons.",
+    )
+    subparser.add_argument(
+        "--expected_sample_size",
+        type=int,
+        help="Expected sample size (number of boots) for each metric in each"
+        " set of results. The subcommand will raise an error if the actual"
+        " sample size does not match this value. This may be passed by the"
+        " infra recipe to provide a consistency check to make sure that tests"
+        " are not accidentally run more times than intended, such as on a mix"
+        " of inconsistent device types.",
     )
     subparser.add_argument("results_dir", nargs="+")
     subparser.set_defaults(func=lambda args: ComparePerf(args, out_fh))

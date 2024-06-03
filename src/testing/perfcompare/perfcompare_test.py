@@ -393,9 +393,38 @@ class StatisticsTest(TempDirTestCase):
     def test_comparing_equal_zero_width_confidence_intervals(self):
         dir_path = self.DirOfData([[[200]], [[200]]])
         stdout = io.StringIO()
-        perfcompare.Main(["compare_perf", dir_path, dir_path], stdout)
+        perfcompare.Main(
+            ["compare_perf", "--expected_sample_size=2", dir_path, dir_path],
+            stdout,
+        )
         output = stdout.getvalue()
         GOLDEN.AssertCaseEq("comparison_no_change_zero_width_ci", output)
+
+    def test_sample_size_check(self):
+        dir1_path = self.DirOfData([[[10]], [[20]]])
+        dir2_path = self.DirOfData([[[10]], [[20]], [[30]]])
+        # Check that we get a descriptive error if the actual sample
+        # sizes do not match the "--expected_sample_size" argument.
+        error = (
+            "^The following metrics had an unexpected sample size"
+            " \(expected 99\):\n"
+            "example_suite: ExampleTest \(got 2\)\n"
+            "example_suite: ExampleTest \(got 3\)$"
+        )
+        stdout = io.StringIO()
+        with self.assertRaisesRegex(AssertionError, error):
+            perfcompare.Main(
+                [
+                    "compare_perf",
+                    "--expected_sample_size=99",
+                    dir1_path,
+                    dir2_path,
+                ],
+                stdout,
+            )
+        # There should be no check for the sample sizes if the
+        # "--expected_sample_size" argument is not given.
+        perfcompare.Main(["compare_perf", dir1_path, dir2_path], stdout)
 
 
 class PerfCompareTest(TempDirTestCase):
@@ -482,7 +511,15 @@ class PerfCompareTest(TempDirTestCase):
     # Returns the output of compare_perf when run on the given directories.
     def ComparePerf(self, before_dir, after_dir):
         stdout = io.StringIO()
-        perfcompare.Main(["compare_perf", before_dir, after_dir], stdout)
+        perfcompare.Main(
+            [
+                "compare_perf",
+                "--expected_sample_size=100",
+                before_dir,
+                after_dir,
+            ],
+            stdout,
+        )
         return stdout.getvalue()
 
     def test_mean_and_stddev(self):
@@ -572,7 +609,9 @@ class PerfCompareTest(TempDirTestCase):
     def test_display_single_dataset(self):
         dataset_dir = self.ExampleDataDir()
         stdout = io.StringIO()
-        perfcompare.Main(["compare_perf", dataset_dir], stdout)
+        perfcompare.Main(
+            ["compare_perf", "--expected_sample_size=100", dataset_dir], stdout
+        )
         output = stdout.getvalue()
         GOLDEN.AssertCaseEq("display_single_dataset", output)
 
@@ -583,7 +622,10 @@ class PerfCompareTest(TempDirTestCase):
             self.ExampleDataDir(mean=3000),
         ]
         stdout = io.StringIO()
-        perfcompare.Main(["compare_perf"] + dataset_dirs, stdout)
+        perfcompare.Main(
+            ["compare_perf", "--expected_sample_size=100"] + dataset_dirs,
+            stdout,
+        )
         output = stdout.getvalue()
         GOLDEN.AssertCaseEq("display_three_datasets", output)
 
@@ -591,7 +633,9 @@ class PerfCompareTest(TempDirTestCase):
     def test_display_single_boot_single_dataset(self):
         dataset_dir = self.ExampleDataDir(single_boot=True)
         stdout = io.StringIO()
-        perfcompare.Main(["compare_perf", dataset_dir], stdout)
+        perfcompare.Main(
+            ["compare_perf", "--expected_sample_size=1", dataset_dir], stdout
+        )
         output = stdout.getvalue()
         GOLDEN.AssertCaseEq("display_single_boot_single_dataset", output)
 
@@ -602,7 +646,9 @@ class PerfCompareTest(TempDirTestCase):
             self.ExampleDataDir(mean=2000, single_boot=True, drop_one=True),
         ]
         stdout = io.StringIO()
-        perfcompare.Main(["compare_perf"] + dataset_dirs, stdout)
+        perfcompare.Main(
+            ["compare_perf", "--expected_sample_size=1"] + dataset_dirs, stdout
+        )
         output = stdout.getvalue()
         GOLDEN.AssertCaseEq("display_single_boot_two_datasets", output)
 
