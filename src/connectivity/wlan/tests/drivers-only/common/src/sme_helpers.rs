@@ -2,7 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 //
-use fidl_fuchsia_wlan_sme as fidl_sme;
+use {
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fidl_fuchsia_wlan_sme as fidl_sme,
+    lazy_static::lazy_static,
+    rand::{distributions::Alphanumeric, Rng},
+};
+
+lazy_static! {
+    pub static ref DEFAULT_OPEN_AP_CONFIG: fidl_sme::ApConfig = fidl_sme::ApConfig {
+        ssid: random_ssid(),
+        password: vec![],
+        radio_cfg: fidl_sme::RadioConfig {
+            phy: fidl_common::WlanPhyType::Ofdm,
+            channel: fidl_common::WlanChannel {
+                primary: 1,
+                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                secondary80: 0,
+            },
+        },
+    };
+}
 
 pub async fn get_client_sme(
     generic_sme_proxy: &fidl_sme::GenericSmeProxy,
@@ -35,4 +55,18 @@ pub async fn get_ap_sme(generic_sme_proxy: &fidl_sme::GenericSmeProxy) -> fidl_s
         fidl::endpoints::create_proxy().expect("Failed to create ap SME proxy");
     generic_sme_proxy.get_ap_sme(ap_sme_server).await.expect("FIDL error").expect("GetApSme Error");
     ap_sme_proxy
+}
+
+pub fn random_string_as_bytes(len: usize) -> Vec<u8> {
+    rand::thread_rng().sample_iter(&Alphanumeric).take(len).collect()
+}
+
+pub fn random_ssid() -> Vec<u8> {
+    let ssid_len = rand::thread_rng().gen_range(1..=fidl_ieee80211::MAX_SSID_BYTE_LEN as usize);
+    random_string_as_bytes(ssid_len)
+}
+
+pub fn random_password() -> Vec<u8> {
+    let pw_len = rand::thread_rng().gen_range(8..=63);
+    random_string_as_bytes(pw_len)
 }

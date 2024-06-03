@@ -56,7 +56,11 @@ class WlanFullmacImplIfcToDriverBridge
         ForwardResult<WlanFullmacImplIfc::ConnectConf>(completer.ToAsync()));
   }
   void RoamConf(RoamConfRequest& request, RoamConfCompleter::Sync& completer) override {}
-  void AuthInd(AuthIndRequest& request, AuthIndCompleter::Sync& completer) override {}
+  void AuthInd(AuthIndRequest& request, AuthIndCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->AuthInd(request).Then(
+        ForwardResult<WlanFullmacImplIfc::AuthInd>(completer.ToAsync()));
+  }
   void DeauthConf(DeauthConfRequest& request, DeauthConfCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->DeauthConf(request).Then(
@@ -67,7 +71,11 @@ class WlanFullmacImplIfcToDriverBridge
     bridge_client_->DeauthInd(request).Then(
         ForwardResult<WlanFullmacImplIfc::DeauthInd>(completer.ToAsync()));
   }
-  void AssocInd(AssocIndRequest& request, AssocIndCompleter::Sync& completer) override {}
+  void AssocInd(AssocIndRequest& request, AssocIndCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->AssocInd(request).Then(
+        ForwardResult<WlanFullmacImplIfc::AssocInd>(completer.ToAsync()));
+  }
   void DisassocConf(DisassocConfRequest& request, DisassocConfCompleter::Sync& completer) override {
   }
   void DisassocInd(DisassocIndRequest& request, DisassocIndCompleter::Sync& completer) override {
@@ -216,13 +224,21 @@ class WlanFullmacImplToChannelBridge : public fdf::Server<fuchsia_wlan_fullmac::
     bridge_client_->Reconnect(request).Then(
         ForwardResult<WlanFullmacImplBridge::Reconnect>(completer.ToAsync()));
   }
-  void AuthResp(AuthRespRequest& request, AuthRespCompleter::Sync& completer) override {}
+  void AuthResp(AuthRespRequest& request, AuthRespCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->AuthResp(request).Then(
+        ForwardResult<WlanFullmacImplBridge::AuthResp>(completer.ToAsync()));
+  }
   void Deauth(DeauthRequest& request, DeauthCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->Deauth(request).Then(
         ForwardResult<WlanFullmacImplBridge::Deauth>(completer.ToAsync()));
   }
-  void AssocResp(AssocRespRequest& request, AssocRespCompleter::Sync& completer) override {}
+  void AssocResp(AssocRespRequest& request, AssocRespCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->AssocResp(request).Then(
+        ForwardResult<WlanFullmacImplBridge::AssocResp>(completer.ToAsync()));
+  }
   void Disassoc(DisassocRequest& request, DisassocCompleter::Sync& completer) override {}
   void Reset(ResetRequest& request, ResetCompleter::Sync& completer) override {}
   void StartBss(StartBssRequest& request, StartBssCompleter::Sync& completer) override {

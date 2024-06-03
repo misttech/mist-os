@@ -4,11 +4,13 @@
 
 use {
     crate::FullmacDriverFixture,
-    drivers_only_common::sme_helpers,
+    drivers_only_common::sme_helpers::{
+        self, random_password, random_ssid, DEFAULT_OPEN_AP_CONFIG,
+    },
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
     fullmac_helpers::{config::FullmacDriverConfig, recorded_request_stream::FullmacRequest},
-    rand::{distributions::Alphanumeric, seq::SliceRandom, Rng},
+    rand::{seq::SliceRandom, Rng},
     wlan_common::{assert_variant, ie::rsn::rsne},
 };
 
@@ -22,18 +24,45 @@ fn vec_to_cssid(input: &Vec<u8>) -> fidl_ieee80211::CSsid {
     cssid
 }
 
-fn random_string_as_bytes(len: usize) -> Vec<u8> {
-    rand::thread_rng().sample_iter(&Alphanumeric).take(len).collect()
-}
+/// Many tests require a started BSS. This helper function creates and starts an AP in the test
+/// realm and returns the ApSmeProxy, FullmacDriverFixture, and GenericSmeProxy.
+async fn setup_test_bss_started(
+    driver_config: FullmacDriverConfig,
+    ap_config: &fidl_sme::ApConfig,
+) -> (fidl_sme::ApSmeProxy, FullmacDriverFixture, fidl_sme::GenericSmeProxy) {
+    // This is wrapped in a Box::pin because otherwise the compiler complains about the future
+    // being too large.
+    Box::pin(async {
+        let (mut fullmac_driver, generic_sme_proxy) =
+            FullmacDriverFixture::create_and_get_generic_sme(driver_config).await;
+        let ap_sme_proxy = sme_helpers::get_ap_sme(&generic_sme_proxy).await;
 
-fn random_ssid() -> Vec<u8> {
-    let ssid_len = rand::thread_rng().gen_range(1..=fidl_ieee80211::MAX_SSID_BYTE_LEN as usize);
-    random_string_as_bytes(ssid_len)
-}
+        let ap_fut = ap_sme_proxy.start(&ap_config);
+        let driver_fut = async {
+            assert_variant!(fullmac_driver.request_stream.next().await,
+                fidl_fullmac::WlanFullmacImplBridgeRequest::StartBss { payload: _, responder } => {
+                    responder.send().expect("Could not respond to StartBss");
+            });
 
-fn random_password() -> Vec<u8> {
-    let pw_len = rand::thread_rng().gen_range(8..=63);
-    random_string_as_bytes(pw_len)
+            fullmac_driver
+                .ifc_proxy
+                .start_conf(&fidl_fullmac::WlanFullmacStartConfirm {
+                    result_code: fidl_fullmac::WlanStartResult::Success,
+                })
+                .await
+                .expect("Could not send StartConf");
+
+            assert_variant!(fullmac_driver.request_stream.next().await,
+                fidl_fullmac::WlanFullmacImplBridgeRequest::OnLinkStateChanged { online:_ , responder } => {
+                    responder.send().expect("Could not respond to OnLinkStateChanged");
+            });
+        };
+
+        let (_, _) = futures::join!(ap_fut, driver_fut);
+
+        fullmac_driver.request_stream.clear_history();
+        (ap_sme_proxy, fullmac_driver, generic_sme_proxy)
+    }).await
 }
 
 #[fuchsia::test]
@@ -175,4 +204,73 @@ async fn test_start_bss_fail_bad_channel() {
         ap_sme_proxy.start(&sme_ap_config).await.expect("Could not start AP"),
         fidl_sme::StartApResultCode::InvalidArguments
     );
+}
+
+#[fuchsia::test]
+async fn test_remote_client_connected_open() {
+    let (ap_sme_proxy, mut fullmac_driver, _generic_sme_proxy) =
+        setup_test_bss_started(FullmacDriverConfig::default_ap(), &DEFAULT_OPEN_AP_CONFIG).await;
+
+    let remote_sta_address: [u8; 6] = rand::thread_rng().gen();
+    fullmac_driver
+        .ifc_proxy
+        .auth_ind(&fidl_fullmac::WlanFullmacAuthInd {
+            peer_sta_address: remote_sta_address.clone(),
+            auth_type: fidl_fullmac::WlanAuthType::OpenSystem,
+        })
+        .await
+        .expect("Could not send AuthInd");
+
+    assert_variant!(fullmac_driver.request_stream.next().await,
+        fidl_fullmac::WlanFullmacImplBridgeRequest::AuthResp { payload: _, responder } => {
+            responder.send().expect("Could not respond to AuthResp");
+    });
+
+    fullmac_driver
+        .ifc_proxy
+        .assoc_ind(&fidl_fullmac::WlanFullmacAssocInd {
+            peer_sta_address: remote_sta_address.clone(),
+            listen_interval: 100,
+            ssid: vec_to_cssid(&DEFAULT_OPEN_AP_CONFIG.ssid),
+            rsne_len: 0,
+            rsne: [0; fidl_ieee80211::WLAN_IE_MAX_LEN as usize],
+            vendor_ie_len: 0,
+            vendor_ie: [0; fidl_fullmac::WLAN_VIE_MAX_LEN as usize],
+        })
+        .await
+        .expect("Could not send AssocInd");
+
+    assert_variant!(fullmac_driver.request_stream.next().await,
+        fidl_fullmac::WlanFullmacImplBridgeRequest::AssocResp { payload: _, responder } => {
+            responder.send().expect("Could not respond to AssocResp");
+    });
+
+    // Check AP status to see that SME reports that an AP is running.
+    // Driver does not take part in this interaction.
+    let running_ap =
+        ap_sme_proxy.status().await.expect("Could not get ApSme status").running_ap.unwrap();
+    assert_eq!(
+        running_ap.as_ref(),
+        &fidl_sme::Ap {
+            ssid: DEFAULT_OPEN_AP_CONFIG.ssid.clone(),
+            channel: DEFAULT_OPEN_AP_CONFIG.radio_cfg.channel.primary,
+            num_clients: 1,
+        }
+    );
+
+    let fullmac_request_history = fullmac_driver.request_stream.history();
+    assert_eq!(
+        fullmac_request_history[0],
+        FullmacRequest::AuthResp(fidl_fullmac::WlanFullmacImplBaseAuthRespRequest {
+            peer_sta_address: Some(remote_sta_address.clone()),
+            result_code: Some(fidl_fullmac::WlanAuthResult::Success),
+            ..Default::default()
+        })
+    );
+
+    let assoc_resp =
+        assert_variant!(&fullmac_request_history[1], FullmacRequest::AssocResp(resp) => resp);
+    assert_eq!(assoc_resp.peer_sta_address, Some(remote_sta_address.clone()));
+    assert_eq!(assoc_resp.result_code, Some(fidl_fullmac::WlanAssocResult::Success));
+    // Note: association id is not checked since SME can pick any value.
 }
