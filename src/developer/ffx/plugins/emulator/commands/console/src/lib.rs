@@ -32,7 +32,7 @@ impl FfxMain for EmuConsoleTool {
 
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
         let instance_dir: PathBuf =
-            self.context.get(EMU_INSTANCE_ROOT_DIR).await.map_err(|e| bug!("{e}"))?;
+            self.context.get(EMU_INSTANCE_ROOT_DIR).map_err(|e| bug!("{e}"))?;
         let builder = EngineBuilder::new(EmulatorInstances::new(instance_dir));
 
         let console = match get_console_type(&self.cmd) {

@@ -243,7 +243,7 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
     let mut log_root = None;
     let mut output_dir = None;
     let mut record = cmd.record;
-    match context.get("log.enabled").await {
+    match context.get("log.enabled") {
         Ok(enabled) => {
             let enabled: bool = enabled;
             if !enabled && cmd.record {
@@ -260,7 +260,7 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
                 fuchsia_async::Timer::new(Duration::from_millis(10000)).await;
             }
 
-            log_root = Some(context.get("log.dir").await?);
+            log_root = Some(context.get("log.dir")?);
             let final_output_dir =
                 cmd.output_dir.map(|s| PathBuf::from(s)).unwrap_or(std::env::current_dir()?);
 

@@ -96,11 +96,11 @@ pub fn global_env_context() -> Option<EnvironmentContext> {
     ENV.lock().unwrap().clone()
 }
 
-pub async fn global_env() -> Result<Environment> {
+pub fn global_env() -> Result<Environment> {
     let context =
         global_env_context().context("Tried to load global environment before configuration")?;
 
-    match context.load().await {
+    match context.load() {
         Err(err) => {
             tracing::error!("failed to load environment, reverting to default: {}", err);
             Ok(Environment::new_empty(context))
@@ -161,7 +161,7 @@ where
     <T as std::convert::TryFrom<ConfigValue>>::Error: std::convert::From<ConfigError>,
     U: Into<ConfigQuery<'a>>,
 {
-    query(with).get().await
+    query(with).get()
 }
 
 pub const SDK_OVERRIDE_KEY_PREFIX: &str = "sdk.overrides";
@@ -172,7 +172,7 @@ pub const SDK_OVERRIDE_KEY_PREFIX: &str = "sdk.overrides";
 pub async fn get_host_tool(sdk: &Sdk, name: &str) -> Result<PathBuf> {
     // Check for configured override for the host tool.
     let override_key = format!("{SDK_OVERRIDE_KEY_PREFIX}.{name}");
-    let override_result: Result<PathBuf, ConfigError> = query(&override_key).get().await;
+    let override_result: Result<PathBuf, ConfigError> = query(&override_key).get();
 
     if let Ok(tool_path) = override_result {
         if tool_path.exists() {
@@ -188,13 +188,13 @@ pub async fn get_host_tool(sdk: &Sdk, name: &str) -> Result<PathBuf> {
 }
 
 pub async fn print_config<W: Write>(ctx: &EnvironmentContext, mut writer: W) -> Result<()> {
-    let config = ctx.load().await?.config_from_cache(None).await?;
-    let read_guard = config.read().await;
+    let config = ctx.load()?.config_from_cache(None)?;
+    let read_guard = config.read().map_err(|_| anyhow!("config read guard"))?;
     writeln!(writer, "{}", *read_guard).context("displaying config")
 }
 
 pub async fn get_log_dirs() -> Result<Vec<String>> {
-    match query("log.dir").get().await {
+    match query("log.dir").get() {
         Ok(log_dirs) => Ok(log_dirs),
         Err(e) => errors::ffx_bail!("Failed to load host log directories from ffx config: {:?}", e),
     }

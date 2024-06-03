@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{environment::EnvironmentContext, nested::nested_get, ConfigValue};
+use anyhow::anyhow;
 use ffx_config_domain::ConfigMap;
 use serde_json::Value;
 
@@ -12,20 +13,20 @@ use serde_json::Value;
 // instead go through the accessor function.
 
 pub trait ConfigAliases {
-    async fn get_with_alias(&self, key: &str, alias: &str) -> Option<(ConfigValue, ConfigValue)>;
+    fn get_with_alias(&self, key: &str, alias: &str) -> Option<(ConfigValue, ConfigValue)>;
 }
 
 impl ConfigAliases for EnvironmentContext {
     // Return values at first config level for which either the key or the alias has a value
-    async fn get_with_alias(&self, key: &str, alias: &str) -> Option<(ConfigValue, ConfigValue)> {
-        let Ok(env) = self.load().await else { return None };
-        let Ok(config) = env.config_from_cache(None).await else { return None };
+    fn get_with_alias(&self, key: &str, alias: &str) -> Option<(ConfigValue, ConfigValue)> {
+        let Ok(env) = self.load() else { return None };
+        let Ok(config) = env.config_from_cache(None) else { return None };
         let key_vec: Vec<&str> = key.split('.').collect();
         let alias_vec: Vec<&str> = alias.split('.').collect();
         // These are called only by functions that hard-code the keys, so we won't panic
         let key_head = key_vec[0];
         let alias_head = alias_vec[0];
-        let read_guard = config.read().await;
+        let read_guard = config.read().map_err(|_| anyhow!("config read guard")).ok()?;
         for config in read_guard.iter() {
             let kval = nested_get(config, key_head, &key_vec[1..]);
             let aval = nested_get(config, alias_head, &alias_vec[1..]);
@@ -53,7 +54,7 @@ async fn get_with_isolated_alias(
     ctx: &EnvironmentContext,
     key: &str,
 ) -> Option<(Option<bool>, Option<bool>)> {
-    let (v, isov) = ctx.get_with_alias(key, FFX_ISOLATED).await?;
+    let (v, isov) = ctx.get_with_alias(key, FFX_ISOLATED)?;
     Some((bool::try_from(v).ok(), bool::try_from(isov).ok()))
 }
 

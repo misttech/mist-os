@@ -135,7 +135,7 @@ pub fn open_target_with_fut<'a, 'b: 'a>(
     };
     let t_clone = target.clone();
     let target_handle_fut = async move {
-        let is_fastboot_inline = env_context.get(FASTBOOT_INLINE_TARGET).await.unwrap_or(false);
+        let is_fastboot_inline = env_context.get(FASTBOOT_INLINE_TARGET).unwrap_or(false);
         if is_fastboot_inline {
             if let Some(ref serial_number) = target {
                 tracing::trace!("got serial number: {serial_number}");
@@ -368,10 +368,10 @@ async fn resolve_target_query_with_sources(
         let description = handle_to_description(handle);
         query.match_description(&description)
     };
-    let emu_instance_root: PathBuf = ctx.get(emulator_instance::EMU_INSTANCE_ROOT_DIR).await?;
+    let emu_instance_root: PathBuf = ctx.get(emulator_instance::EMU_INSTANCE_ROOT_DIR)?;
     let stream =
         discovery::wait_for_devices(filter, Some(emu_instance_root), true, false, sources).await?;
-    let discovery_delay = ctx.get(CONFIG_LOCAL_DISCOVERY_TIMEOUT).await.unwrap_or(2000);
+    let discovery_delay = ctx.get(CONFIG_LOCAL_DISCOVERY_TIMEOUT).unwrap_or(2000);
     let delay = Duration::from_millis(discovery_delay);
 
     // This is tricky. We want the stream to complete immediately if we find
@@ -692,7 +692,7 @@ pub async fn knock_target_daemonless(
 /// an explicit _name_ is provided.  In other contexts, it is valid for the specifier
 /// to be a substring, a network address, etc.
 pub async fn get_target_specifier(context: &EnvironmentContext) -> Result<Option<String>> {
-    let target_spec = context.get(TARGET_DEFAULT_KEY).await?;
+    let target_spec = context.get(TARGET_DEFAULT_KEY)?;
     match target_spec {
         Some(ref target) => info!("Target specifier: ['{target:?}']"),
         None => debug!("No target specified"),
