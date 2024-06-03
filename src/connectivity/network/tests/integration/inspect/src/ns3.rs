@@ -6,6 +6,8 @@
 // Needed for invocations of the `assert_data_tree` macro.
 #![recursion_limit = "256"]
 
+mod common;
+
 use std::{collections::HashMap, convert::TryFrom as _, num::NonZeroU64, time::Duration};
 
 use assert_matches::assert_matches;
@@ -1175,4 +1177,36 @@ async fn inspect_filtering_state(name: &str) {
             },
         }
     });
+}
+
+struct InspectDataGetter<'a> {
+    realm: &'a netemul::TestRealm<'a>,
+}
+
+impl<'a> common::InspectDataGetter for InspectDataGetter<'a> {
+    async fn get_inspect_data(&self, metric: &str) -> diagnostics_hierarchy::DiagnosticsHierarchy {
+        get_inspect_data(
+            self.realm,
+            "netstack",
+            metric,
+            constants::inspect::DEFAULT_INSPECT_TREE_NAME,
+        )
+        .await
+        .expect("inspect data should be present")
+    }
+}
+
+#[netstack_test]
+async fn inspect_for_sampler(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
+    // Connect to netstack service to spawn a netstack instance.
+    let _ = realm
+        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
+        .expect("connect to protocol");
+
+    let sampler = InspectDataGetter { realm: &realm };
+
+    common::inspect_for_sampler_test_inner(&sampler).await;
 }

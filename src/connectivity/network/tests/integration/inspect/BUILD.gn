@@ -41,7 +41,10 @@ rustc_test("netstack2_inspect_tests") {
   ]
 
   source_root = "src/ns2.rs"
-  sources = [ "src/ns2.rs" ]
+  sources = [
+    "src/common.rs",
+    "src/ns2.rs",
+  ]
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
@@ -49,6 +52,7 @@ rustc_test("netstack2_inspect_tests") {
 rustc_test("netstack3_inspect_tests") {
   edition = "2021"
   deps = [
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
@@ -59,10 +63,14 @@ rustc_test("netstack3_inspect_tests") {
     "//src/connectivity/network/testing/netemul/rust:lib",
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
+    "//src/diagnostics/lib/sampler-config",
+    "//src/lib/diagnostics/hierarchy/rust",
+    "//src/lib/diagnostics/selectors",
     "//src/lib/fuchsia-async",
     "//src/lib/network/fidl_fuchsia_net_filter_ext",
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:libc",
     "//third_party/rust_crates:test-case",
   ]
@@ -70,7 +78,10 @@ rustc_test("netstack3_inspect_tests") {
   test_deps = [ "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions" ]
 
   source_root = "src/ns3.rs"
-  sources = [ "src/ns3.rs" ]
+  sources = [
+    "src/common.rs",
+    "src/ns3.rs",
+  ]
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 
@@ -83,7 +94,7 @@ fuchsia_unittest_package("netstack2-inspect-integration-test") {
     ":netstack-empty-netemul-config",
     ":netstack-specified-procs-netemul-config",
     ":netstack2_inspect_tests",
-    ":sampler-config",
+    ":ns2-sampler-config",
     "//src/connectivity/network/netstack:component-debug",
     "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
     "//src/sys/stash:stash_secure_v2",
@@ -102,14 +113,20 @@ resource("netstack-specified-procs-netemul-config") {
   outputs = [ "netstack/specified_procs.json" ]
 }
 
-resource("sampler-config") {
+resource("ns2-sampler-config") {
   sources = [ "//src/diagnostics/config/sampler/netstack.json" ]
   outputs = [ "data/sampler-config/netstack.json" ]
+}
+
+resource("ns3-sampler-config") {
+  sources = [ "//src/diagnostics/config/sampler/netstack3.json" ]
+  outputs = [ "data/sampler-config/netstack3.json" ]
 }
 
 fuchsia_unittest_package("netstack3-inspect-integration-test") {
   deps = [
     ":netstack3_inspect_tests",
+    ":ns3-sampler-config",
     "//src/connectivity/network/netstack3:component-debug",
     "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
   ]
