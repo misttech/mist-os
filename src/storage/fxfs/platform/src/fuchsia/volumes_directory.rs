@@ -9,6 +9,7 @@ use {
         errors::map_to_status,
         fxblob::BlobDirectory,
         memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
+        profile::new_profile_state,
         volume::{FxVolume, FxVolumeAndRoot, MemoryPressureConfig, RootDir},
         RemoteCrypt,
     },
@@ -125,7 +126,11 @@ impl MountedVolumesGuard<'_> {
                 .await?;
             if let Some((profile_name, _)) = &(*self.volumes_directory.profiling_state.lock().await)
             {
-                if let Err(e) = volume.volume().record_or_replay_profile(profile_name).await {
+                if let Err(e) = volume
+                    .volume()
+                    .record_or_replay_profile(new_profile_state(true), profile_name)
+                    .await
+                {
                     error!(
                         "Failed to record or replay profile '{}' for volume {}: {:?}",
                         profile_name, name, e
@@ -306,7 +311,11 @@ impl VolumesDirectory {
             for (_, (volume_name, volume_and_root)) in &*volumes {
                 if volume_and_root.root().clone().into_any().downcast::<BlobDirectory>().is_ok() {
                     // Just log the errors, don't stop half-way.
-                    if let Err(e) = volume_and_root.volume().record_or_replay_profile(&name).await {
+                    if let Err(e) = volume_and_root
+                        .volume()
+                        .record_or_replay_profile(new_profile_state(true), &name)
+                        .await
+                    {
                         error!(
                             "Failed to record or replay profile '{}' for volume {}: {:?}",
                             &name, volume_name, e

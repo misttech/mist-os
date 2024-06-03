@@ -12,7 +12,7 @@ use {
         memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
         node::{FxNode, GetResult, NodeCache},
         pager::Pager,
-        profile::{new_profile_state, ProfileState},
+        profile::ProfileState,
         symlink::FxSymlink,
         volumes_directory::VolumesDirectory,
     },
@@ -122,8 +122,11 @@ impl Default for MemoryPressureConfig {
 struct ProfileHolder {
     state: Box<dyn ProfileState>,
 
-    /// The name for the ongoing recording upon completion and the object id of that recording.
-    recording_info: Option<(String, u64)>,
+    /// The name for the ongoing recording upon completion.
+    recording_name: String,
+
+    /// The object id of the ongoing recording.
+    recording_object: u64,
 }
 
 /// FxVolume represents an opened volume. It is also a (weak) cache for all opened Nodes within the
@@ -146,7 +149,7 @@ pub struct FxVolume {
 
     dirent_cache: DirentCache,
 
-    profile_state: Mutex<ProfileHolder>,
+    profile_state: Mutex<Option<ProfileHolder>>,
 }
 
 #[fxfs_trace::trace]
@@ -167,10 +170,7 @@ impl FxVolume {
             fs_id,
             scope,
             dirent_cache: DirentCache::new(DIRENT_CACHE_LIMIT),
-            profile_state: Mutex::new(ProfileHolder {
-                state: new_profile_state(true),
-                recording_info: None,
-            }),
+            profile_state: Mutex::new(None),
         })
     }
 
@@ -224,29 +224,35 @@ impl FxVolume {
         Ok(())
     }
 
-    /// Stops the profiling, returns if there is any status to be cleaned finished up from the
+    /// Stops the profiling, returns a ProfileHolder if there is any finalizing left for the
     /// recording. This may be used in a sync context during shutdown when we can't handle the
     /// mutations to finalize the recording.
-    fn stop_profiler(&self) -> Option<(String, u64)> {
+    fn stop_profiler(&self) -> Option<ProfileHolder> {
         let mut profile_state = self.profile_state.lock().unwrap();
-        // Clear recorder first to flush entries.
+        // Clear recorder first to flush entries. Possibly a no-op.
         self.pager.set_recorder(None);
-        // Stop profiler ensuring that the write handle is closed.
-        profile_state.state.stop_profiler();
-        info!("Stopping profile activity for volume object {}.", self.store.store_object_id());
-        std::mem::take(&mut profile_state.recording_info)
+        if let Some(state) = &mut (*profile_state) {
+            // Stop profiler ensuring that the write handle is closed.
+            state.state.stop_profiler();
+            info!("Stopping profile activity for volume object {}.", self.store.store_object_id());
+        }
+        std::mem::take(&mut *profile_state)
     }
 
     /// Stop profiling, recover resources from it and finalize recordings.
     pub async fn finish_profiling(self: &Arc<Self>) {
         // If there was a file being recorded, place it in the profile directory.
-        if let Some((name, object_id)) = self.stop_profiler() {
-            if let Err(e) = self.place_file(&name, object_id).await {
-                warn!("Failed to commit new profile recording '{}': {:?}", name, e);
+        if let Some(holder) = self.stop_profiler() {
+            if let Err(e) = self.place_file(&holder.recording_name, holder.recording_object).await {
+                warn!(
+                    "Failed to commit new profile recording '{}': {:?}",
+                    &holder.recording_name, e
+                );
             }
         }
     }
 
+    /// Opens or creates the profile directory in the volume's internal directory.
     pub async fn get_profile_directory(self: &Arc<Self>) -> Result<Directory<FxVolume>, Error> {
         let internal_dir = self
             .get_or_create_internal_dir()
@@ -277,15 +283,34 @@ impl FxVolume {
         })
     }
 
-    pub async fn record_or_replay_profile(self: &Arc<Self>, name: &str) -> Result<(), Error> {
+    /// Starts recording a profile for the volume under the name given, and if a profile exists
+    /// under that same name it is replayed and will be replaced after by the new recording if it
+    /// is cleanly shutdown and finalized.
+    pub async fn record_or_replay_profile(
+        self: &Arc<Self>,
+        mut state: Box<dyn ProfileState>,
+        name: &str,
+    ) -> Result<(), Error> {
         // We don't meddle in FxDirectory or FxFile here because we don't want a paged object.
         // Normally we ensure that there's only one copy by using the Node cache on the volume, but
         // that would create FxFile, so in this case we just assume that only one profile operation
         // should be ongoing at a time, as that is ensured in `VolumesDirectory`.
+
+        // If there is a recording already, prepare to replay it.
+        let profile_dir = self.get_profile_directory().await?;
+        let replay_handle = if let Some((id, descriptor)) = profile_dir.lookup(name).await? {
+            ensure!(matches!(descriptor, ObjectDescriptor::File), FxfsError::Inconsistent);
+            Some(Box::new(
+                ObjectStore::open_object(self, id, HandleOptions::default(), None).await?,
+            ))
+        } else {
+            None
+        };
+
+        // Start a recording handle. Put it in the graveyard in case we can't properly complete it.
         let mut transaction =
             self.store().filesystem().new_transaction(lock_keys![], Options::default()).await?;
-        // Start a recording first. Put it in the graveyard in case we can't properly complete it.
-        let handle = Box::new(
+        let recording_handle = Box::new(
             ObjectStore::create_object(
                 self,
                 &mut transaction,
@@ -295,29 +320,28 @@ impl FxVolume {
             )
             .await?,
         );
-        let recording_id = handle.handle().object_id();
-        self.store.add_to_graveyard(&mut transaction, recording_id);
+        let recording_object = recording_handle.handle().object_id();
+        self.store.add_to_graveyard(&mut transaction, recording_object);
         transaction.commit().await?;
-        {
-            let mut profile_state = self.profile_state.lock().unwrap();
-            self.pager.set_recorder(Some(profile_state.state.record_new(handle)));
-            profile_state.recording_info = Some((name.to_owned(), recording_id));
-        }
-        info!("Recording new profile '{name}' for volume object {}", self.store.store_object_id());
 
-        // If there is a recording already, replay it.
-        let profile_dir = self.get_profile_directory().await?;
-        if let Some((id, descriptor)) = profile_dir.lookup(name).await? {
-            ensure!(matches!(descriptor, ObjectDescriptor::File), FxfsError::Inconsistent);
-            let handle =
-                Box::new(ObjectStore::open_object(self, id, HandleOptions::default(), None).await?);
-            let mut profile_state = self.profile_state.lock().unwrap();
-            profile_state.state.replay_profile(handle, self.clone());
+        let mut profile_state = self.profile_state.lock().unwrap();
+        if let Some(mut holder) = profile_state.take() {
+            warn!("Profile operations already in flight. Stopping and dropping the current ones");
+            holder.state.stop_profiler();
+        }
+
+        info!("Recording new profile '{name}' for volume object {}", self.store.store_object_id());
+        // Begin recording first to ensure that we capture any activity from the replay.
+        self.pager.set_recorder(Some(state.record_new(recording_handle)));
+        if let Some(handle) = replay_handle {
+            state.replay_profile(handle, self.clone());
             info!(
                 "Replaying existing profile '{name}' for volume object {}",
                 self.store.store_object_id()
             );
         }
+        *profile_state =
+            Some(ProfileHolder { state, recording_name: name.to_owned(), recording_object });
         Ok(())
     }
 
@@ -826,6 +850,7 @@ mod tests {
             },
             memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
             pager::PagerBacked,
+            profile::new_profile_state,
             testing::{
                 close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
                 open_file_checked, write_at, TestFixture,
@@ -2279,7 +2304,12 @@ mod tests {
         device.reopen(false);
         let mut device = {
             let fixture = blob_testing::open_blob_fixture(device).await;
-            fixture.volume().volume().record_or_replay_profile("foo").await.expect("Recording");
+            fixture
+                .volume()
+                .volume()
+                .record_or_replay_profile(new_profile_state(true), "foo")
+                .await
+                .expect("Recording");
 
             // Page in the zero offsets only to avoid readahead strangeness.
             let mut writable = [0u8];
@@ -2312,7 +2342,12 @@ mod tests {
                     assert_eq!(blob.vmo().info().unwrap().committed_bytes, 0);
                 }
 
-                fixture.volume().volume().record_or_replay_profile("foo").await.expect("Replaying");
+                fixture
+                    .volume()
+                    .volume()
+                    .record_or_replay_profile(new_profile_state(true), "foo")
+                    .await
+                    .expect("Replaying");
 
                 // Move the file in flight to ensure a new version lands to be used next time.
                 {
@@ -2376,7 +2411,12 @@ mod tests {
         device.reopen(false);
         let device = {
             let fixture = blob_testing::open_blob_fixture(device).await;
-            fixture.volume().volume().record_or_replay_profile("foo").await.expect("Recording");
+            fixture
+                .volume()
+                .volume()
+                .record_or_replay_profile(new_profile_state(true), "foo")
+                .await
+                .expect("Recording");
 
             // Page in the zero offsets only to avoid readahead strangeness.
             {
@@ -2408,7 +2448,12 @@ mod tests {
                 assert_eq!(blob.vmo().info().unwrap().committed_bytes, 0);
             }
 
-            fixture.volume().volume().record_or_replay_profile("foo").await.expect("Replaying");
+            fixture
+                .volume()
+                .volume()
+                .record_or_replay_profile(new_profile_state(true), "foo")
+                .await
+                .expect("Replaying");
 
             // Await all data being played back by checking that things have paged in.
             {
@@ -2451,7 +2496,12 @@ mod tests {
                 assert_eq!(blob.vmo().info().unwrap().committed_bytes, 0);
             }
 
-            fixture.volume().volume().record_or_replay_profile("foo").await.expect("Replaying");
+            fixture
+                .volume()
+                .volume()
+                .record_or_replay_profile(new_profile_state(true), "foo")
+                .await
+                .expect("Replaying");
 
             // Await all data being played back by checking that things have paged in.
             {
