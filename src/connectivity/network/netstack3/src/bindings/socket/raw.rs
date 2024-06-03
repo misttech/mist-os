@@ -103,7 +103,12 @@ struct ReceivedIpPacket<I: Ip> {
 
 impl<I: IpExt> ReceivedIpPacket<I> {
     fn new<B: ByteSlice>(packet: &I::Packet<B>, device: WeakDeviceId) -> Self {
-        ReceivedIpPacket { src_addr: packet.src_ip(), data: packet.to_vec(), device }
+        // NB: Match Linux, and only provide the packet header for IPv4.
+        let data = match I::VERSION {
+            IpVersion::V4 => packet.to_vec(),
+            IpVersion::V6 => packet.body().to_vec(),
+        };
+        ReceivedIpPacket { src_addr: packet.src_ip(), data, device }
     }
 }
 

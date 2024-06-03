@@ -39,8 +39,6 @@
                 "AllInetTests/RawSocketTest.GetPeerName/*",
                 "AllInetTests/RawSocketTest.RecvBufLimits/*",
                 "AllInetTests/RawSocketTest.RecvBufLimitsEmptyRecvBuffer/*",
-                "AllInetTests/RawSocketTest.SendAndReceive/1",
-                "AllInetTests/RawSocketTest.SendAndReceive/3",
                 "AllInetTests/RawSocketTest.SendAndReceiveViaConnect/*",
                 "AllInetTests/RawSocketTest.SetSocketDetachFilterNoInstalledFilter/*",
                 "AllInetTests/RawSocketTest.SetSocketRecvBuf/*",
