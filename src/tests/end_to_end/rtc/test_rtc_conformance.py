@@ -54,6 +54,19 @@ class RtcTest(fuchsia_base_test.FuchsiaBaseTest):
         super().setup_class()
         self.dut: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
 
+    def teardown_class(self) -> None:
+        """Post-test teardown logic.
+
+        Because this test affects the real value in the RTC, the value needs to
+        be restored to walltime. Otherwise, this test causes interference with
+        other tests on the system if/when timekeeper syncs the system clock to
+        the value stored in the RTC chip.
+        """
+        LOGGER.info("Reverting RTC to host walltime")
+        self.rtc.set(datetime.datetime.now())
+        LOGGER.info("Walltime is now: %s", self.rtc.get())
+        super().teardown_class()
+
     def setup_test(self) -> None:
         super().setup_test()
         self.rtc = self.dut.rtc
