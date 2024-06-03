@@ -1237,10 +1237,14 @@ assembly_input_bundle("core_realm_eng") {
     # Always include 'ls'
     "ls",
 
-    # These are used by Chromium test infrastructure, and needs to always be
+    # These are used by Chromium test infrastructure, and need to always be
     # available.
     "cat",
     "sha1sum",
+
+    # These are used by vendor test infrastructure, and need to always be
+    # available.
+    "grep",
 
     # These are used by test infrastructure, and always need to be available.
     "mkdir",
