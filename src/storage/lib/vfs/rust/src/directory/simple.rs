@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 //! This is an implementation of "simple" pseudo directories.
-//! Use [`mod@crate::directory::immutable::simple`]
+//! Use [`crate::directory::immutable::Simple::new()`]
 //! to construct actual instances.  See [`Simple`] for details.
 
 use crate::{
@@ -67,7 +67,11 @@ impl<Connection> Simple<Connection>
 where
     Connection: DerivedConnection + 'static,
 {
-    pub(super) fn new(inode: u64) -> Arc<Self> {
+    pub fn new() -> Arc<Self> {
+        Self::new_with_inode(fio::INO_UNKNOWN)
+    }
+
+    pub(crate) fn new_with_inode(inode: u64) -> Arc<Self> {
         Arc::new(Simple {
             inner: Mutex::new(Inner { entries: BTreeMap::new(), watchers: Watchers::new() }),
             _connection: PhantomData,
@@ -474,12 +478,12 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{assert_event, file};
+    use crate::{assert_event, directory::immutable::Simple, file};
     use fidl::endpoints::create_proxy;
 
     #[test]
     fn add_entry_success() {
-        let dir = crate::directory::immutable::simple();
+        let dir = Simple::new();
         assert_eq!(
             dir.add_entry("path_without_separators", file::read_only(b"test")),
             Ok(()),
@@ -489,7 +493,7 @@ mod tests {
 
     #[test]
     fn add_entry_error_name_with_path_separator() {
-        let dir = crate::directory::immutable::simple();
+        let dir = Simple::new();
         let status = dir
             .add_entry("path/with/separators", file::read_only(b"test"))
             .expect_err("add entry with path separator should fail");
@@ -498,7 +502,7 @@ mod tests {
 
     #[test]
     fn add_entry_error_name_too_long() {
-        let dir = crate::directory::immutable::simple();
+        let dir = Simple::new();
         let status = dir
             .add_entry("a".repeat(10000), file::read_only(b"test"))
             .expect_err("add entry whose name is too long should fail");
@@ -507,14 +511,14 @@ mod tests {
 
     #[fuchsia::test]
     async fn not_found_handler() {
-        let dir = crate::directory::immutable::simple();
+        let dir = Simple::new();
         let path_mutex = Arc::new(Mutex::new(None));
         let path_mutex_clone = path_mutex.clone();
         dir.clone().set_not_found_handler(Box::new(move |path| {
             *path_mutex_clone.lock().unwrap() = Some(path.to_string());
         }));
 
-        let sub_dir = crate::directory::immutable::simple();
+        let sub_dir = Simple::new();
         let path_mutex_clone = path_mutex.clone();
         sub_dir.clone().set_not_found_handler(Box::new(move |path| {
             *path_mutex_clone.lock().unwrap() = Some(path.to_string());

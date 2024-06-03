@@ -35,8 +35,7 @@ impl Into<Status> for NotDirectory {
 }
 
 /// `DirectlyMutable` is a superset of `MutableDirectory` which also allows server-side management
-/// of directory entries (via `add_entry` and `remove_entry`). You may wish to use
-/// `filesystem::simple::SimpleFilesystem` to provide the filesystem type for this DirectlyMutable.
+/// of directory entries (via `add_entry` and `remove_entry`).
 pub trait DirectlyMutable: Directory + Send + Sync {
     /// Adds a child entry to this directory.
     ///

@@ -6,7 +6,8 @@
 
 use crate::{
     directory::{
-        entry::DirectoryEntry, entry_container::Directory, helper::DirectlyMutable, immutable,
+        entry::DirectoryEntry, entry_container::Directory, helper::DirectlyMutable,
+        immutable::Simple,
     },
     execution_scope::ExecutionScope,
     path::Path,
@@ -217,7 +218,7 @@ where
         let (client_proxy, server_end) =
             create_proxy::<Marker>().expect("Failed to create connection endpoints");
 
-        let root = immutable::simple();
+        let root = Simple::new();
         root.add_entry("server", self.server).unwrap();
 
         root.open(

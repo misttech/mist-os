@@ -65,7 +65,7 @@ fn pseudo_directory_impl(input: TokenStream) -> TokenStream {
         Some(ident) => (
             ident.clone(),
             quote! {
-                #ident = #directory_mod::immutable::simple();
+                #ident = #directory_mod::immutable::Simple::new();
             },
             quote! { #ident.clone() },
         ),
@@ -75,7 +75,7 @@ fn pseudo_directory_impl(input: TokenStream) -> TokenStream {
             (
                 ident.clone(),
                 quote! {
-                    let #ident = #directory_mod::immutable::simple();
+                    let #ident = #directory_mod::immutable::Simple::new();
                 },
                 quote! { #ident },
             )

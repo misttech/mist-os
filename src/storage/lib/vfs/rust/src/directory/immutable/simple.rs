@@ -10,7 +10,7 @@ mod tests;
 
 use crate::directory::{immutable::connection, simple};
 
-use {fidl_fuchsia_io as fio, std::sync::Arc};
+use std::sync::Arc;
 
 pub type Connection = connection::ImmutableConnection;
 pub type Simple = simple::Simple<Connection>;
@@ -19,14 +19,6 @@ pub type Simple = simple::Simple<Connection>;
 /// allowing the server to add or remove entries via the
 /// [`crate::directory::helper::DirectlyMutable::add_entry()`] and
 /// [`crate::directory::helper::DirectlyMutable::remove_entry()`] methods.
-///
-/// Also see [`crate::directory::immutable::lazy::Lazy`] directory, where the entries are "dynamic" in a
-/// sense that a specific listing (and, potentially, the entries themselves) are generated only
-/// when requested.
 pub fn simple() -> Arc<Simple> {
-    Simple::new(fio::INO_UNKNOWN)
-}
-
-pub fn simple_with_inode(inode: u64) -> Arc<Simple> {
-    Simple::new(inode)
+    Simple::new()
 }

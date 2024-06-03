@@ -2,9 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Tests for the immutable simple directory.
-
-use super::simple;
+//! Tests for the [`crate::directory::immutable::Simple`] directory.
 
 // Macros are exported into the root of the crate.
 use crate::{
@@ -20,7 +18,7 @@ use crate::{
         entry::EntryInfo,
         entry_container::Directory,
         helper::DirectlyMutable,
-        immutable::{simple_with_inode, Simple},
+        immutable::Simple,
         test_utils::{run_server_client, DirentsSameInodeBuilder},
     },
     execution_scope::ExecutionScope,
@@ -48,14 +46,14 @@ const S_IXUSR: u32 = libc::S_IXUSR as u32;
 
 #[test]
 fn empty_directory() {
-    run_server_client(fio::OpenFlags::RIGHT_READABLE, simple(), |root| async move {
+    run_server_client(fio::OpenFlags::RIGHT_READABLE, Simple::new(), |root| async move {
         assert_close!(root);
     });
 }
 
 #[test]
 fn empty_directory_get_attr() {
-    run_server_client(fio::OpenFlags::RIGHT_READABLE, simple(), |root| async move {
+    run_server_client(fio::OpenFlags::RIGHT_READABLE, Simple::new(), |root| async move {
         assert_get_attr!(
             root,
             fio::NodeAttributes {
@@ -76,7 +74,7 @@ fn empty_directory_get_attr() {
 fn empty_directory_with_custom_inode_get_attr() {
     run_server_client(
         fio::OpenFlags::RIGHT_READABLE,
-        simple_with_inode(12345),
+        Simple::new_with_inode(12345),
         |root| async move {
             assert_get_attr!(
                 root,
@@ -97,7 +95,7 @@ fn empty_directory_with_custom_inode_get_attr() {
 
 #[test]
 fn empty_directory_describe() {
-    run_server_client(fio::OpenFlags::RIGHT_READABLE, simple(), |root| async move {
+    run_server_client(fio::OpenFlags::RIGHT_READABLE, Simple::new(), |root| async move {
         assert_query!(root, fio::DIRECTORY_PROTOCOL_NAME);
         assert_close!(root);
     });
@@ -108,7 +106,7 @@ fn open_empty_directory_with_describe() {
     let exec = TestExecutor::new();
     let scope = ExecutionScope::new();
 
-    let server = simple();
+    let server = Simple::new();
 
     run_client(exec, || async move {
         let (root, server_end) =
@@ -679,7 +677,7 @@ fn no_dots_in_open() {
 }
 
 #[test]
-fn no_consequtive_slashes_in_open() {
+fn no_consecutive_slashes_in_open() {
     let root = pseudo_directory! {
         "dir" => pseudo_directory! {
             "dir2" => pseudo_directory! {},
@@ -1027,7 +1025,7 @@ fn add_entry_too_long_error() {
     // `MAX_FILENAME` to `usize` aligns the types.
     let max_filename = fio::MAX_FILENAME as usize;
 
-    let root = simple();
+    let root = Simple::new();
     let name = {
         let mut name = "This entry name will be longer than the MAX_FILENAME bytes".to_string();
 
@@ -1036,7 +1034,7 @@ fn add_entry_too_long_error() {
         let filler = " - filler";
         name.push_str(&filler.repeat((max_filename + filler.len()) / filler.len()));
 
-        // And we want exaclty `MAX_FILENAME + 1` bytes.  As all the characters are ASCII, we
+        // And we want exactly `MAX_FILENAME + 1` bytes.  As all the characters are ASCII, we
         // should be able to just cut at any byte.
         name.truncate(max_filename + 1);
         assert!(name.len() == max_filename + 1);
@@ -1070,7 +1068,7 @@ fn add_entry_too_long_error() {
 
 #[test]
 fn simple_add_file() {
-    let root = simple();
+    let root = Simple::new();
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root.clone(), |proxy| async move {
         {
@@ -1290,7 +1288,7 @@ fn in_tree_move_file() {
 
 #[test]
 fn watch_empty() {
-    run_server_client(fio::OpenFlags::RIGHT_READABLE, simple(), |root| async move {
+    run_server_client(fio::OpenFlags::RIGHT_READABLE, Simple::new(), |root| async move {
         let mask = fio::WatchMask::EXISTING
             | fio::WatchMask::IDLE
             | fio::WatchMask::ADDED

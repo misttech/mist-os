@@ -499,7 +499,7 @@ impl<T: DerivedConnection + 'static> Representation for BaseConnection<T> {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, crate::directory::immutable::simple::simple, assert_matches::assert_matches,
+        super::*, crate::directory::immutable::Simple, assert_matches::assert_matches,
         fidl_fuchsia_io as fio, futures::prelude::*,
     };
 
@@ -508,7 +508,7 @@ mod tests {
         let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("Create proxy to succeed");
 
-        let dir = simple();
+        let dir = Simple::new();
         dir.open(
             ExecutionScope::new(),
             fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
@@ -546,7 +546,7 @@ mod tests {
         let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("Create proxy to succeed");
 
-        let dir = simple();
+        let dir = Simple::new();
         dir.open(
             ExecutionScope::new(),
             fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
@@ -586,7 +586,7 @@ mod tests {
         let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("Create proxy to succeed");
 
-        let dir = simple();
+        let dir = Simple::new();
         dir.open(
             ExecutionScope::new(),
             fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
@@ -626,7 +626,7 @@ mod tests {
         let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("Create proxy to succeed");
 
-        let dir = simple();
+        let dir = Simple::new();
         dir.open(
             ExecutionScope::new(),
             fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,

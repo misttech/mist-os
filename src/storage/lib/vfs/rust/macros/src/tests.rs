@@ -30,7 +30,7 @@ fn empty() {
         "",
         "{ \
              use :: vfs :: directory :: helper :: DirectlyMutable ; \
-             let __dir = :: vfs :: directory :: immutable :: simple () ; \
+             let __dir = :: vfs :: directory :: immutable :: Simple :: new () ; \
              __dir \
          }"
     );
@@ -47,7 +47,7 @@ fn one_entry() {
         ),
         "{ \
              use :: vfs :: directory :: helper :: DirectlyMutable ; \
-             let __dir = :: vfs :: directory :: immutable :: simple () ; \
+             let __dir = :: vfs :: directory :: immutable :: Simple :: new () ; \
              :: vfs :: pseudo_directory :: unwrap_add_entry_span (\
                  \"name\" , \"bytes(1..7)\" , \
                  __dir . clone () . add_entry (\"name\" , read_only (\"content\"))) ; \
@@ -68,7 +68,7 @@ fn two_entries() {
         ),
         "{ \
              use :: vfs :: directory :: helper :: DirectlyMutable ; \
-             let __dir = :: vfs :: directory :: immutable :: simple () ; \
+             let __dir = :: vfs :: directory :: immutable :: Simple :: new () ; \
              :: vfs :: pseudo_directory :: unwrap_add_entry_span (\
                  \"first\" , \"bytes(1..8)\" , \
                  __dir . clone () . add_entry (\"first\" , read_only (\"A\"))) ; \
@@ -93,7 +93,7 @@ fn assign_to() {
         ),
         "{ \
              use :: vfs :: directory :: helper :: DirectlyMutable ; \
-             my_dir = :: vfs :: directory :: immutable :: simple () ; \
+             my_dir = :: vfs :: directory :: immutable :: Simple :: new () ; \
              :: vfs :: pseudo_directory :: unwrap_add_entry_span (\
                  \"first\" , \"bytes(11..18)\" , \
                  my_dir . clone () . add_entry (\"first\" , read_only (\"A\"))) ; \
@@ -116,7 +116,7 @@ fn entry_has_name_from_ref() {
         ),
         "{ \
              use :: vfs :: directory :: helper :: DirectlyMutable ; \
-             let __dir = :: vfs :: directory :: immutable :: simple () ; \
+             let __dir = :: vfs :: directory :: immutable :: Simple :: new () ; \
              :: vfs :: pseudo_directory :: unwrap_add_entry_span (\
                  test_name , \"bytes(1..10)\" , \
                  __dir . clone () . add_entry (test_name , read_only (\"content\"))) ; \

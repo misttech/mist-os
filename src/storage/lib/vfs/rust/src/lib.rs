@@ -44,8 +44,8 @@ pub mod pseudo_directory;
 ///
 /// separated by commas, with an optional trailing comma.
 ///
-/// It generates a nested pseudo directory, using [`directory::immutable::simple()`] then adding
-/// all the specified entries in it, by calling
+/// It generates a nested pseudo directory, using [`directory::immutable::Simple::new()`] then
+/// adding all the specified entries in it, by calling
 /// [`crate::directory::helper::DirectlyMutable::add_entry`].
 ///
 /// Note: Names specified as literals (both `str` and `[u8]`) are compared during compilation time,
@@ -68,38 +68,6 @@ pub mod pseudo_directory;
 ///         },
 ///     },
 ///     "uname" => read_only(b"Fuchsia"),
-/// };
-/// ```
-///
-/// An example of a tree with a writable file:
-/// ```
-/// let write_count = &RefCell::new(0);
-/// let root = pseudo_directory! {
-///     "etc" => pseudo_directory! {
-///         "sshd_config" => read_write(
-///           || Ok(b"# Empty".to_vec()),
-///           100,
-///           |content| {
-///               let mut count = write_count.borrow_mut();
-///               assert_eq!(*&content, format!("Port {}", 22 + *count).as_bytes());
-///               *count += 1;
-///               Ok(())
-///           }),
-///     },
-/// };
-/// ```
-///
-/// You can specify the POSIX attributes for the pseudo directory, by providing the attributes as
-/// an expression, fater a "protection_attributes" keyword followed by a comma, with a `;`
-/// separating it from the entry definitions:
-/// ```
-/// let root = pseudo_directory! {
-///     "etc" => pseudo_directory! {
-///         protection_attributes: S_IXOTH | S_IROTH | S_IXGRP | S_IRGRP | S_IXUSR | S_IRUSR;
-///         "fstab" => read_only_attr(S_IROTH | S_IRGRP | S_IRUSR,
-///                                   || Ok(b"/dev/fs /".to_vec())),
-///         "passwd" => read_only_attr(S_IRUSR, || Ok(b"[redacted]".to_vec())),
-///     },
 /// };
 /// ```
 pub use vfs_macros::pseudo_directory;

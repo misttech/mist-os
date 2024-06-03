@@ -46,7 +46,7 @@ impl Watchers {
     /// it's entries.  Meaning we need a async version of the [`EventProducer`] - and that is a lot
     /// of additional managing of functions and state.  Traits do not support async methods yet, so
     /// we would need to manage futures returned by the [`EventProducer`] methods explicitly.
-    /// Plus, for the [`crate::directory::simple::Simple`] directory it is all unnecessary.
+    /// Plus, for the [`crate::directory::immutable::Simple`] directory it is all unnecessary.
     #[must_use = "Caller of add() must send WATCH_EVENT_EXISTING and fio::WatchMask::IDLE on the \
                   returned controller"]
     pub fn add(

@@ -7,6 +7,6 @@
 //! directories.
 
 pub mod simple;
-pub use simple::{simple, simple_with_inode, Simple};
+pub use simple::{simple, Simple};
 
 pub mod connection;
