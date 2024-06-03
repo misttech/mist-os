@@ -10,6 +10,7 @@ use {
     },
 };
 
+mod ap;
 mod client;
 mod query;
 mod telemetry;

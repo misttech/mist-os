@@ -29,3 +29,10 @@ pub async fn get_telemetry(
         .expect("GetTelemetry error");
     telemetry_proxy
 }
+
+pub async fn get_ap_sme(generic_sme_proxy: &fidl_sme::GenericSmeProxy) -> fidl_sme::ApSmeProxy {
+    let (ap_sme_proxy, ap_sme_server) =
+        fidl::endpoints::create_proxy().expect("Failed to create ap SME proxy");
+    generic_sme_proxy.get_ap_sme(ap_sme_server).await.expect("FIDL error").expect("GetApSme Error");
+    ap_sme_proxy
+}

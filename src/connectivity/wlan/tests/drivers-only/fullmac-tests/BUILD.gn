@@ -26,6 +26,7 @@ rust_wlan_integration_test("fullmac-tests") {
     "//third_party/rust_crates:rand",
   ]
   sources = [
+    "src/ap.rs",
     "src/client.rs",
     "src/lib.rs",
     "src/query.rs",

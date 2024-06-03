@@ -75,7 +75,11 @@ class WlanFullmacImplIfcToDriverBridge
     bridge_client_->DisassocInd(request).Then(
         ForwardResult<WlanFullmacImplIfc::DisassocInd>(completer.ToAsync()));
   }
-  void StartConf(StartConfRequest& request, StartConfCompleter::Sync& completer) override {}
+  void StartConf(StartConfRequest& request, StartConfCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->StartConf(request).Then(
+        ForwardResult<WlanFullmacImplIfc::StartConf>(completer.ToAsync()));
+  }
   void StopConf(StopConfRequest& request, StopConfCompleter::Sync& completer) override {}
   void EapolConf(EapolConfRequest& request, EapolConfCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
@@ -221,7 +225,11 @@ class WlanFullmacImplToChannelBridge : public fdf::Server<fuchsia_wlan_fullmac::
   void AssocResp(AssocRespRequest& request, AssocRespCompleter::Sync& completer) override {}
   void Disassoc(DisassocRequest& request, DisassocCompleter::Sync& completer) override {}
   void Reset(ResetRequest& request, ResetCompleter::Sync& completer) override {}
-  void StartBss(StartBssRequest& request, StartBssCompleter::Sync& completer) override {}
+  void StartBss(StartBssRequest& request, StartBssCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->StartBss(request).Then(
+        ForwardResult<WlanFullmacImplBridge::StartBss>(completer.ToAsync()));
+  }
   void StopBss(StopBssRequest& request, StopBssCompleter ::Sync& completer) override {}
   void SetKeysReq(SetKeysReqRequest& request, SetKeysReqCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
