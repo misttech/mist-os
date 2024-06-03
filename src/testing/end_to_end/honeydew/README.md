@@ -141,11 +141,11 @@ CL author/contributor (or) CL reviewer/approver:
 
 #### Reviewer
 
-* Remind the CL author to follow [Best Practices] section by opening a comment
-  and asking author to resolve this comment only after they verify on absolute
-  final patchset that will be merged
+* Remind the CL author to follow [Best Practices][Best Practices] section by
+  opening a comment and asking author to resolve this comment only after they
+  verify on absolute final patchset that will be merged
 * Verify the author has included all the information in commit message as
-  mentioned [here](#Author)
+  mentioned in [Author][Author] section
 
 ## Interactive usage
 
@@ -155,6 +155,8 @@ If you like to use Honeydew in an interactive Python terminal refer to
 [Honeydew OWNERS]: ../OWNERS
 
 [Affordance OWNER]: honeydew/interfaces/OWNERS
+
+[Author]: #Author
 
 [Best Practices]: #Best-Practices
 
