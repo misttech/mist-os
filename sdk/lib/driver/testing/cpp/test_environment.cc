@@ -27,13 +27,17 @@ zx::result<> TestEnvironment::Initialize(
     return result.take_error();
   }
 
-  // Forward the LogSink protocol that we have from our own incoming namespace.
-  result = incoming_directory_server_.component().AddUnmanagedProtocol<fuchsia_logger::LogSink>(
-      [](fidl::ServerEnd<fuchsia_logger::LogSink> server_end) {
-        ZX_ASSERT(component::Connect<fuchsia_logger::LogSink>(std::move(server_end)).is_ok());
-      });
-  if (result.is_error()) {
-    return result.take_error();
+  if (!logsink_added_) {
+    // Forward the LogSink protocol that we have from our own incoming namespace.
+    result = incoming_directory_server_.component().AddUnmanagedProtocol<fuchsia_logger::LogSink>(
+        [](fidl::ServerEnd<fuchsia_logger::LogSink> server_end) {
+          ZX_ASSERT(component::Connect<fuchsia_logger::LogSink>(std::move(server_end)).is_ok());
+        });
+    if (result.is_error()) {
+      return result.take_error();
+    }
+
+    logsink_added_ = true;
   }
 
   return zx::ok();

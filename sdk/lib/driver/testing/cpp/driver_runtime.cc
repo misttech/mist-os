@@ -10,7 +10,7 @@
 #include <zircon/assert.h>
 #include <zircon/status.h>
 
-#include <latch>
+#include <atomic>
 #include <unordered_set>
 
 namespace fdf_testing {
@@ -56,7 +56,6 @@ fdf::UnownedSynchronizedDispatcher DriverRuntime::StartBackgroundDispatcher() {
   AssertCurrentThreadIsInitialThread();
   ZX_ASSERT_MSG(!is_shutdown_,
                 "Cannot start any more dispatchers after calling ShutdownAllDispatchers.");
-
   fdf_internal::TestSynchronizedDispatcher& dispatcher =
       background_dispatchers_.emplace_back(fdf_internal::kDispatcherManaged);
   return dispatcher.driver_dispatcher().borrow();
@@ -71,32 +70,95 @@ void DriverRuntime::ShutdownAllDispatchers(fdf_dispatcher_t* dut_initial_dispatc
   }
 
   std::unordered_set<const void*> dispatcher_owners;
-  for (auto& owner : background_dispatchers_) {
-    dispatcher_owners.insert(&owner);
+  for (auto& bg_dispatcher : background_dispatchers_) {
+    const void* owner = bg_dispatcher.owner();
+    auto [_iter, inserted] = shutdown_background_dispatcher_owners_.insert(owner);
+    if (inserted) {
+      dispatcher_owners.insert(owner);
+    }
   }
-  dispatcher_owners.insert(&foreground_dispatcher_);
 
-// TODO(https://fxbug.dev/336633211): Stop using std::latch or switch to C++20 before LLVM 20.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  std::latch latch(static_cast<int64_t>(dispatcher_owners.size()));
-#pragma clang diagnostic pop
+  dispatcher_owners.insert(foreground_dispatcher_->owner());
+
+  std::atomic_size_t counter = dispatcher_owners.size();
   for (const void* owner : dispatcher_owners) {
     auto shutdown = std::make_unique<fdf_env::DriverShutdown>();
     auto shutdown_ptr = shutdown.get();
-    auto shutdown_callback = [shutdown = std::move(shutdown), &latch](const void* shutdown_driver) {
-      latch.count_down();
-    };
-    ZX_ASSERT(ZX_OK == shutdown_ptr->Begin(owner, std::move(shutdown_callback)));
+    auto shutdown_callback = [shutdown = std::move(shutdown),
+                              &counter](const void* shutdown_driver) { counter -= 1; };
+    zx_status_t status = shutdown_ptr->Begin(owner, std::move(shutdown_callback));
+    if (status != ZX_OK) {
+      counter -= 1;
+    }
   }
 
-  while (!latch.try_wait()) {
-    RunUntilIdleInternal();
-    ResetQuit();
+  while (counter != 0) {
+    RunUntilIdle();
   }
 
   fdf_testing_set_default_dispatcher(dut_initial_dispatcher);
   is_shutdown_ = true;
+}
+
+void DriverRuntime::ResetForegroundDispatcher(fit::closure post_shutdown) {
+  AssertCurrentThreadIsInitialThread();
+
+  std::atomic_bool done = false;
+  auto shutdown = std::make_unique<fdf_env::DriverShutdown>();
+  auto shutdown_ptr = shutdown.get();
+  auto shutdown_callback = [shutdown = std::move(shutdown),
+                            post_shutdown = std::move(post_shutdown),
+                            &done](const void* shutdown_driver) mutable {
+    post_shutdown();
+    done = true;
+  };
+  zx_status_t status =
+      shutdown_ptr->Begin(foreground_dispatcher_->owner(), std::move(shutdown_callback));
+  if (status != ZX_OK) {
+    done = true;
+  }
+
+  while (!done) {
+    RunUntilIdle();
+  }
+
+  foreground_dispatcher_.reset();
+  foreground_dispatcher_.emplace(fdf_internal::kDispatcherDefault);
+}
+
+void DriverRuntime::ShutdownBackgroundDispatcher(fdf_dispatcher_t* dispatcher,
+                                                 fit::closure post_shutdown) {
+  AssertCurrentThreadIsInitialThread();
+
+  const void* owner = nullptr;
+  for (auto& bg_dispatcher : background_dispatchers_) {
+    if (bg_dispatcher.driver_dispatcher().get() == dispatcher) {
+      owner = bg_dispatcher.owner();
+      auto [_iter, inserted] = shutdown_background_dispatcher_owners_.insert(owner);
+      ZX_ASSERT_MSG(inserted, "Cannot shutdown the dispatcher twice.");
+      break;
+    }
+  }
+
+  ZX_ASSERT_MSG(owner != nullptr, "Did not find background dispatcher.");
+
+  std::atomic_bool done = false;
+  auto shutdown = std::make_unique<fdf_env::DriverShutdown>();
+  auto shutdown_ptr = shutdown.get();
+  auto shutdown_callback = [shutdown = std::move(shutdown),
+                            post_shutdown = std::move(post_shutdown),
+                            &done](const void* shutdown_driver) mutable {
+    post_shutdown();
+    done = true;
+  };
+  zx_status_t status = shutdown_ptr->Begin(owner, std::move(shutdown_callback));
+  if (status != ZX_OK) {
+    done = true;
+  }
+
+  while (!done) {
+    RunUntilIdle();
+  }
 }
 
 void DriverRuntime::Run() {
@@ -112,7 +174,7 @@ bool DriverRuntime::RunWithTimeout(zx::duration timeout) {
   auto canceled = std::make_shared<bool>(false);
   bool timed_out = false;
   async::PostDelayedTask(
-      foreground_dispatcher_.dispatcher(),
+      foreground_dispatcher_->dispatcher(),
       [this, canceled, &timed_out] {
         if (*canceled) {
           return;
@@ -167,7 +229,6 @@ bool DriverRuntime::RunWithTimeoutOrUntil(fit::function<bool()> condition, zx::d
 }
 
 void DriverRuntime::RunUntilIdle() {
-  AssertCurrentThreadIsInitialThread();
   RunUntilIdleInternal();
   ResetQuit();
 }

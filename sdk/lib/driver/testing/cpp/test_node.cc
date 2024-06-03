@@ -41,7 +41,7 @@ zx::result<fidl::ClientEnd<fuchsia_driver_framework::Node>> TestNode::CreateNode
 zx::result<> TestNode::Serve(fidl::ServerEnd<fuchsia_driver_framework::Node> server_end) {
   std::lock_guard guard(checker_);
   if (node_binding_.has_value()) {
-    return zx::error(ZX_ERR_ALREADY_EXISTS);
+    RemoveFromParent();
   }
 
   node_binding_.emplace(dispatcher_, std::move(server_end), this,
