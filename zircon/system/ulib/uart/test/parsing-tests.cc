@@ -9,6 +9,7 @@
 #include <lib/zbi-format/driver-config.h>
 
 #include <string>
+#include <utility>
 
 #include <zxtest/zxtest.h>
 
@@ -22,60 +23,63 @@ constexpr bool kX86 = true;
 constexpr bool kX86 = false;
 #endif
 
+using uart::internal::ParseInts;
+
 template <typename Uint>
 void TestOneUint() {
   // No leading comma.
   {
     Uint u{0xe};
-    EXPECT_FALSE(uart::internal::ParseInts("", &u));
+    EXPECT_EQ(ParseInts("", &u), 0u);
   }
 
   // Fewer elements than integers.
   {
     Uint u{0xe};
-    EXPECT_FALSE(uart::internal::ParseInts(",", &u));
+    EXPECT_EQ(ParseInts(",", &u), 0u);
   }
 
   {
     Uint u{0xe};
-    ASSERT_TRUE(uart::internal::ParseInts(",12", &u));
+    ASSERT_EQ(ParseInts(",12", &u), 1u);
     EXPECT_EQ(12, u);
   }
 
   {
     Uint u{0xe};
-    ASSERT_TRUE(uart::internal::ParseInts(",-12", &u));
+    ASSERT_EQ(ParseInts(",-12", &u), 1u);
     EXPECT_EQ(static_cast<Uint>(-12), u);
   }
 
   {
     Uint u{0xe};
-    ASSERT_TRUE(uart::internal::ParseInts(",0xa", &u));
+    ASSERT_EQ(ParseInts(",0xa", &u), 1u);
     EXPECT_EQ(0xa, u);
   }
 
   {
     Uint u{0xe};
-    ASSERT_TRUE(uart::internal::ParseInts(",-0xa", &u));
+    ASSERT_EQ(ParseInts(",-0xa", &u), 1u);
     EXPECT_EQ(static_cast<Uint>(-0xa), u);
   }
 
   {
     Uint u{0xe};
-    ASSERT_TRUE(uart::internal::ParseInts(",010", &u));
+    ASSERT_EQ(ParseInts(",010", &u), 1u);
     EXPECT_EQ(8, u);
   }
 
   {
     Uint u{0xe};
-    ASSERT_TRUE(uart::internal::ParseInts(",-010", &u));
+    ASSERT_EQ(ParseInts(",-010", &u), 1u);
     EXPECT_EQ(static_cast<Uint>(-8), u);
   }
 
   // More elements than integers.
   {
     Uint u{0xe};
-    EXPECT_FALSE(uart::internal::ParseInts(",12,34", &u));
+    ASSERT_EQ(ParseInts(",12,34", &u), 1);
+    EXPECT_EQ(u, 12);
   }
 }
 
@@ -85,27 +89,29 @@ void TestTwoUints() {
   {
     UintA uA{0xe};
     UintB uB{0xe};
-    EXPECT_FALSE(uart::internal::ParseInts("", &uA, &uB));
+    EXPECT_EQ(ParseInts("", &uA, &uB), 0u);
   }
 
   // Fewer elements than integers: no elements.
   {
     UintA uA{0xe};
     UintB uB{0xe};
-    EXPECT_FALSE(uart::internal::ParseInts(",", &uA, &uB));
+    EXPECT_EQ(ParseInts(",", &uA, &uB), 0u);
   }
 
   // Fewer elements than integers: one element.
   {
     UintA uA{0xe};
     UintB uB{0xe};
-    EXPECT_FALSE(uart::internal::ParseInts(",12", &uA, &uB));
+    EXPECT_EQ(ParseInts(",12", &uA, &uB), 1u);
+    EXPECT_EQ(uA, 12u);
+    EXPECT_EQ(uB, 0xe);
   }
 
   {
     UintA uA{0xe};
     UintB uB{0xe};
-    ASSERT_TRUE(uart::internal::ParseInts(",12,34", &uA, &uB));
+    ASSERT_EQ(ParseInts(",12,34", &uA, &uB), 2u);
     EXPECT_EQ(12, uA);
     EXPECT_EQ(34, uB);
   }
@@ -113,7 +119,7 @@ void TestTwoUints() {
   {
     UintA uA{0xe};
     UintB uB{0xe};
-    ASSERT_TRUE(uart::internal::ParseInts(",0x12,34", &uA, &uB));
+    ASSERT_EQ(ParseInts(",0x12,34", &uA, &uB), 2u);
     EXPECT_EQ(0x12, uA);
     EXPECT_EQ(34, uB);
   }
@@ -121,7 +127,7 @@ void TestTwoUints() {
   {
     UintA uA{0xe};
     UintB uB{0xe};
-    ASSERT_TRUE(uart::internal::ParseInts(",12,0x34", &uA, &uB));
+    ASSERT_EQ(ParseInts(",12,0x34", &uA, &uB), 2u);
     EXPECT_EQ(12, uA);
     EXPECT_EQ(0x34, uB);
   }
@@ -129,7 +135,7 @@ void TestTwoUints() {
   {
     UintA uA{0xe};
     UintB uB{0xe};
-    ASSERT_TRUE(uart::internal::ParseInts(",0x12,0x34", &uA, &uB));
+    ASSERT_EQ(ParseInts(",0x12,0x34", &uA, &uB), 2u);
     EXPECT_EQ(0x12, uA);
     EXPECT_EQ(0x34, uB);
   }
@@ -138,25 +144,25 @@ void TestTwoUints() {
   {
     UintA uA;
     UintB uB;
-    EXPECT_FALSE(uart::internal::ParseInts(",12,34,56", &uA, &uB));
+    EXPECT_EQ(ParseInts(",12,34,56", &uA, &uB), 2u);
   }
 }
 
 TEST(ParsingTests, NoUints) {
-  EXPECT_TRUE(uart::internal::ParseInts(""));
-  EXPECT_FALSE(uart::internal::ParseInts(",12"));
-  EXPECT_FALSE(uart::internal::ParseInts(",12,34"));
+  EXPECT_EQ(ParseInts(""), 0u);
+  EXPECT_EQ(ParseInts(",12"), 0u);
+  EXPECT_EQ(ParseInts(",12,34"), 0u);
 }
 
 TEST(ParsingTests, ParsingLargeValues) {
   {
     uint64_t u64{0xe};
-    EXPECT_TRUE(uart::internal::ParseInts(",0xffffffffffffffff", &u64));
+    EXPECT_EQ(ParseInts(",0xffffffffffffffff", &u64), 1u);
     EXPECT_EQ(static_cast<uint64_t>(-1), u64);
   }
   {
     uint64_t u64{0xe};
-    EXPECT_TRUE(uart::internal::ParseInts(",0x0123456789", &u64));
+    EXPECT_EQ(ParseInts(",0x0123456789", &u64), 1u);
     EXPECT_EQ(0x0123456789, u64);
   }
 }
@@ -164,12 +170,12 @@ TEST(ParsingTests, ParsingLargeValues) {
 TEST(ParsingTests, Overflow) {
   {
     uint8_t u8{0xe};
-    EXPECT_TRUE(uart::internal::ParseInts(",0xabc", &u8));
+    ASSERT_EQ(ParseInts(",0xabc", &u8), 1u);
     EXPECT_EQ(0xbc, u8);
   }
   {
     uint8_t u8{0xe};
-    EXPECT_TRUE(uart::internal::ParseInts(",0x100", &u8));
+    ASSERT_EQ(uart::internal::ParseInts(",0x100", &u8), 1u);
     EXPECT_EQ(0x00, u8);
   }
 }
@@ -179,16 +185,16 @@ TEST(ParsingTests, ParsingLongStrings) {
   waylong += std::string(100, '0');  // Longer than any integer size needs.
   waylong += "52";
   uint8_t u8{};
-  EXPECT_TRUE(uart::internal::ParseInts(waylong, &u8));
+  EXPECT_EQ(ParseInts(waylong, &u8), 1u);
   EXPECT_EQ(052, u8);
   waylong[2] = 'x';
-  EXPECT_TRUE(uart::internal::ParseInts(waylong, &u8));
+  EXPECT_EQ(ParseInts(waylong, &u8), 1u);
   EXPECT_EQ(0x52, u8);
 
   std::string longoverflow(",");
   longoverflow += std::string(100, '1');  // Extreme overflow.
   uint64_t u64{};
-  EXPECT_FALSE(uart::internal::ParseInts(longoverflow, &u64));
+  EXPECT_EQ(ParseInts(longoverflow, &u64), 0u);
 }
 
 TEST(ParsingTests, OneUint8) { ASSERT_NO_FATAL_FAILURE(TestOneUint<uint8_t>()); }
@@ -281,24 +287,49 @@ void CheckMaybeCreateFromAcpi(const U& debug_port) {
 }
 
 TEST(ParsingTests, Ns8250MmioDriver) {
-  auto driver = uart::ns8250::Mmio32Driver::MaybeCreate(kX86 ? "mmio,0xa,0xb" : "ns8250,0xa,0xb");
-  ASSERT_TRUE(driver.has_value());
-  EXPECT_STREQ(kX86 ? "mmio" : "ns8250", driver->config_name());
-  const zbi_dcfg_simple_t& config = driver->config();
-  EXPECT_EQ(0xa, config.mmio_phys);
-  EXPECT_EQ(0xb, config.irq);
-
+  {
+    auto driver = uart::ns8250::Mmio32Driver::MaybeCreate(kX86 ? "mmio,0xa,0xb" : "ns8250,0xa,0xb");
+    ASSERT_TRUE(driver.has_value());
+    EXPECT_STREQ(kX86 ? "mmio" : "ns8250", driver->config_name());
+    const zbi_dcfg_simple_t& config = driver->config();
+    EXPECT_EQ(0xa, config.mmio_phys);
+    EXPECT_EQ(0xb, config.irq);
+    EXPECT_EQ(0, config.flags);
+  }
+  {
+    auto driver =
+        uart::ns8250::Mmio32Driver::MaybeCreate(kX86 ? "mmio,0xa,0xb,0xc" : "ns8250,0xa,0xb,0xc");
+    ASSERT_TRUE(driver.has_value());
+    EXPECT_STREQ(kX86 ? "mmio" : "ns8250", driver->config_name());
+    const zbi_dcfg_simple_t& config = driver->config();
+    EXPECT_EQ(0xa, config.mmio_phys);
+    EXPECT_EQ(0xb, config.irq);
+    EXPECT_EQ(0xc, config.flags);
+  }
   CheckMaybeCreateFromAcpi<uart::ns8250::Mmio32Driver, true>(kMmioDebugPort);
   CheckMaybeCreateFromAcpi<uart::ns8250::Mmio32Driver, false>(kPioDebugPort);
 }
 
 TEST(ParsingTests, Ns82508BMmioDriver) {
-  auto driver = uart::ns8250::Mmio8Driver::MaybeCreate("ns8250-8bit,0xa,0xb");
-  ASSERT_TRUE(driver.has_value());
-  EXPECT_STREQ("ns8250-8bit", driver->config_name());
-  const zbi_dcfg_simple_t& config = driver->config();
-  EXPECT_EQ(0xa, config.mmio_phys);
-  EXPECT_EQ(0xb, config.irq);
+  {
+    auto driver = uart::ns8250::Mmio8Driver::MaybeCreate("ns8250-8bit,0xa,0xb");
+    ASSERT_TRUE(driver.has_value());
+    EXPECT_STREQ("ns8250-8bit", driver->config_name());
+    const zbi_dcfg_simple_t& config = driver->config();
+    EXPECT_EQ(0xa, config.mmio_phys);
+    EXPECT_EQ(0xb, config.irq);
+    EXPECT_EQ(0, config.flags);
+  }
+
+  {
+    auto driver = uart::ns8250::Mmio8Driver::MaybeCreate("ns8250-8bit,0xa,0xb,0xc");
+    ASSERT_TRUE(driver.has_value());
+    EXPECT_STREQ("ns8250-8bit", driver->config_name());
+    const zbi_dcfg_simple_t& config = driver->config();
+    EXPECT_EQ(0xa, config.mmio_phys);
+    EXPECT_EQ(0xb, config.irq);
+    EXPECT_EQ(0xc, config.flags);
+  }
 }
 
 TEST(ParsingTests, Ns8250PioDriver) {
@@ -323,12 +354,24 @@ TEST(ParsingTests, Ns8250LegacyDriver) {
 }
 
 TEST(ParsingTests, Pl011Driver) {
-  auto driver = uart::pl011::Driver::MaybeCreate("pl011,0xa,0xb");
-  ASSERT_TRUE(driver.has_value());
-  EXPECT_STREQ("pl011", driver->config_name());
-  const zbi_dcfg_simple_t& config = driver->config();
-  EXPECT_EQ(0xa, config.mmio_phys);
-  EXPECT_EQ(0xb, config.irq);
+  {
+    auto driver = uart::pl011::Driver::MaybeCreate("pl011,0xa,0xb");
+    ASSERT_TRUE(driver.has_value());
+    EXPECT_STREQ("pl011", driver->config_name());
+    const zbi_dcfg_simple_t& config = driver->config();
+    EXPECT_EQ(0xa, config.mmio_phys);
+    EXPECT_EQ(0xb, config.irq);
+    EXPECT_EQ(0, config.flags);
+  }
+  {
+    auto driver = uart::pl011::Driver::MaybeCreate("pl011,0xa,0xb,0xc");
+    ASSERT_TRUE(driver.has_value());
+    EXPECT_STREQ("pl011", driver->config_name());
+    const zbi_dcfg_simple_t& config = driver->config();
+    EXPECT_EQ(0xa, config.mmio_phys);
+    EXPECT_EQ(0xb, config.irq);
+    EXPECT_EQ(0xc, config.flags);
+  }
 
   CheckMaybeCreateFromAcpi<uart::pl011::Driver, false>(kMmioDebugPort);
   CheckMaybeCreateFromAcpi<uart::pl011::Driver, false>(kPioDebugPort);
@@ -341,15 +384,30 @@ TEST(ParsingTests, Pl011QemuDriver) {
   const zbi_dcfg_simple_t& config = driver->config();
   EXPECT_EQ(0x09000000, config.mmio_phys);
   EXPECT_EQ(33, config.irq);
+  EXPECT_EQ(ZBI_KERNEL_DRIVER_IRQ_FLAGS_LEVEL_TRIGGERED | ZBI_KERNEL_DRIVER_IRQ_FLAGS_POLARITY_HIGH,
+            config.flags);
 }
 
 TEST(ParsingTests, AmlogicDriver) {
-  auto driver = uart::amlogic::Driver::MaybeCreate("amlogic,0xa,0xb");
-  ASSERT_TRUE(driver.has_value());
-  EXPECT_STREQ("amlogic", driver->config_name());
-  const zbi_dcfg_simple_t& config = driver->config();
-  EXPECT_EQ(0xa, config.mmio_phys);
-  EXPECT_EQ(0xb, config.irq);
+  {
+    auto driver = uart::amlogic::Driver::MaybeCreate("amlogic,0xa,0xb");
+    ASSERT_TRUE(driver.has_value());
+    EXPECT_STREQ("amlogic", driver->config_name());
+    const zbi_dcfg_simple_t& config = driver->config();
+    EXPECT_EQ(0xa, config.mmio_phys);
+    EXPECT_EQ(0xb, config.irq);
+    EXPECT_EQ(0, config.flags);
+  }
+
+  {
+    auto driver = uart::amlogic::Driver::MaybeCreate("amlogic,0xa,0xb,0xc");
+    ASSERT_TRUE(driver.has_value());
+    EXPECT_STREQ("amlogic", driver->config_name());
+    const zbi_dcfg_simple_t& config = driver->config();
+    EXPECT_EQ(0xa, config.mmio_phys);
+    EXPECT_EQ(0xb, config.irq);
+    EXPECT_EQ(0xc, config.flags);
+  }
 
   CheckMaybeCreateFromAcpi<uart::amlogic::Driver, false>(kMmioDebugPort);
   CheckMaybeCreateFromAcpi<uart::amlogic::Driver, false>(kPioDebugPort);

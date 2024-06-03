@@ -1083,6 +1083,7 @@ void ComposedProtocol_TwoWayAnonComposedWithError_Result::Decode(::fidl::Decoder
 
   switch (value->tag_) {
     case ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_) ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
@@ -1437,6 +1438,7 @@ void ComposedProtocol_TwoWayNamedComposedWithError_Result::Decode(::fidl::Decode
 
   switch (value->tag_) {
     case ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_) ::test::protocollayoutssamelibrary::UnionPayload();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
@@ -1642,6 +1644,7 @@ void MainProtocol_TwoWayLocalWithError_Result::Decode(::fidl::Decoder* _decoder,
 
   switch (value->tag_) {
     case ::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_) ::test::protocollayoutssamelibrary::UnionPayload();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
@@ -2573,6 +2576,7 @@ void MainProtocol_TwoWayAnonWithError_Result::Decode(::fidl::Decoder* _decoder, 
 
   switch (value->tag_) {
     case ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_) ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;

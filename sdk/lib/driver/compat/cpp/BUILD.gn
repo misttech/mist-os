@@ -3,13 +3,13 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/cpp/sdk_source_set.gni")
 import("//build/test.gni")
 
-sdk_source_set("cpp") {
-  category = "internal"
-  sdk_name = "driver_compat"
-  include_base = "include"
+config("includes") {
+  include_dirs = [ "include" ]
+}
+
+source_set("cpp") {
   sources = [
     "banjo_client.cc",
     "connect.cc",
@@ -35,22 +35,19 @@ sdk_source_set("cpp") {
     "//sdk/lib/driver/async-helpers/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
   ]
+  public_configs = [ ":includes" ]
 }
 
-sdk_source_set("logging") {
-  category = "internal"
-  sdk_name = "driver_compat_logging"
-  include_base = "include"
+source_set("logging") {
   sources = [ "logging.cc" ]
   public = [ "include/lib/driver/compat/cpp/logging.h" ]
   public_deps = [ "//sdk/lib/driver/logging/cpp" ]
+  public_configs = [ ":includes" ]
 }
 
-sdk_source_set("symbols") {
-  category = "internal"
-  sdk_name = "driver_compat_symbols"
-  include_base = "//sdk"
-  sources = [ "symbols.h" ]
+source_set("symbols") {
+  sources = [ "include/lib/driver/compat/cpp/symbols.h" ]
+  public_configs = [ ":includes" ]
 }
 
 test("test") {

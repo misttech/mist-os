@@ -152,11 +152,9 @@ mod tests {
             directory::entry_container::Directory,
             file::{File, FileIo},
             node::Node,
+            ToObjectRequest,
         },
     };
-
-    #[cfg(feature = "supports_open2")]
-    use vfs::ToObjectRequest;
 
     struct TestEnv {
         _blobfs_fake: FakeBlobfs,
@@ -411,7 +409,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_succeeds() {
         let (_env, root_dir) = TestEnv::new().await;
@@ -435,7 +432,6 @@ mod tests {
         assert_eq!(fuchsia_fs::file::read(&proxy).await.unwrap(), hash.as_bytes());
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_open_modes() {
         let (_env, root_dir) = TestEnv::new().await;
@@ -465,7 +461,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_rights() {
         let (_env, root_dir) = TestEnv::new().await;
@@ -491,7 +486,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_file_protocols() {
         let (_env, root_dir) = TestEnv::new().await;

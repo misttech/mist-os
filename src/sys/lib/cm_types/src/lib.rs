@@ -1253,6 +1253,7 @@ pub enum DeliveryType {
     OnReadable,
 }
 
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 impl TryFrom<fdecl::DeliveryType> for DeliveryType {
     type Error = fdecl::DeliveryType;
 
@@ -1265,6 +1266,7 @@ impl TryFrom<fdecl::DeliveryType> for DeliveryType {
     }
 }
 
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 impl From<DeliveryType> for fdecl::DeliveryType {
     fn from(value: DeliveryType) -> Self {
         match value {

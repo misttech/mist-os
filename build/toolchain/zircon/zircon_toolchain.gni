@@ -7,6 +7,7 @@ import("//build/config/clang/clang.gni")
 import("//build/config/compiler.gni")
 import("//build/config/zircon/levels.gni")
 import("//build/toolchain/breakpad.gni")
+import("//build/toolchain/buildidtool.gni")
 import("//build/toolchain/ccache.gni")
 import("//build/toolchain/concurrent_jobs.gni")
 import("//build/toolchain/default_tools.gni")
@@ -15,10 +16,6 @@ import("//build/toolchain/rbe.gni")
 import("//build/toolchain/zircon/clang.gni")
 import("//build/toolchain/zircon/gcc.gni")
 import("//build/zircon/build_args.gni")
-
-_buildidtool =
-    rebase_path("//prebuilt/tools/buildidtool/${host_platform}/buildidtool",
-                root_build_dir)
 
 # IMPORTANT: The zircon_toolchain() template does not use clang_toolchain()
 # defined in //build/toolchain/clang_toolchain.gni, because there are several
@@ -638,9 +635,10 @@ template("zircon_toolchain") {
         debug_outfile = unstripped_outfile
       }
       buildid_stampfile = "${outfile}.build-id.stamp"
-      strip_command += " && $_buildidtool -build-id-dir \".build-id\"" +
-                       " -stamp \"$buildid_stampfile\"" +
-                       " -entry \"=$outfile\" -entry \".debug=$debug_outfile\""
+      strip_command +=
+          " && $buildidtool_invocation_path -build-id-dir \".build-id\"" +
+          " -stamp \"$buildid_stampfile\"" +
+          " -entry \"=$outfile\" -entry \".debug=$debug_outfile\""
       outputs += [ buildid_stampfile ]
     }
 
@@ -693,7 +691,10 @@ template("zircon_toolchain") {
   toolchain(target_name) {
     propagates_configs = true
 
+    deps = []
     forward_variables_from(invoker, [ "deps" ])
+
+    deps += buildidtool_toolchain_deps
 
     # Every toolchain needs the standard stamp and copy tools.
     tool("stamp") {

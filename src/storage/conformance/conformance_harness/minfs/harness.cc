@@ -70,13 +70,10 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
     fuchsia::io::test::Io1Config config;
 
     // Supported options
-    config.supports_create = true;
-    config.supports_rename = true;
-    config.supports_link = true;
+    config.supports_open2 = true;
     config.supports_get_token = true;
-    config.supports_unlink = true;
-    config.supports_directory_watchers = true;
     config.supports_append = true;
+    config.supports_modify_directory = true;
     config.supported_attributes = fuchsia::io::NodeAttributesQuery::CREATION_TIME |
                                   fuchsia::io::NodeAttributesQuery::MODIFICATION_TIME |
                                   fuchsia::io::NodeAttributesQuery::ID |

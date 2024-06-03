@@ -2,27 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::Capability;
 use derivative::Derivative;
-use fidl::endpoints::{self, create_request_stream, ClientEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fuchsia_async as fasync;
-use fuchsia_zircon::{self as zx, AsHandleRef};
-use futures::TryStreamExt;
 use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex, MutexGuard},
 };
-use tracing::warn;
-use vfs::{
-    directory::{
-        entry::DirectoryEntry,
-        helper::{AlreadyExists, DirectlyMutable},
-        immutable::simple as pfs,
-    },
-    name::Name,
-};
 
-use crate::{registry, Capability, CapabilityTrait, ConversionError};
+#[cfg(target_os = "fuchsia")]
+use {
+    crate::{registry, CapabilityTrait, ConversionError},
+    fidl::endpoints::{self, create_request_stream, ClientEnd},
+    fidl::handle::AsHandleRef,
+    fuchsia_zircon::Koid,
+    futures::TryStreamExt,
+    tracing::warn,
+    vfs::{
+        directory::{
+            entry::DirectoryEntry,
+            helper::{AlreadyExists, DirectlyMutable},
+            immutable::simple as pfs,
+        },
+        name::Name,
+    },
+};
 
 pub type Key = cm_types::Name;
 
@@ -39,6 +44,7 @@ pub struct Dict {
 
     /// Tasks that serve dictionary iterators.
     #[derivative(Debug = "ignore")]
+    #[allow(dead_code)]
     iterator_tasks: fasync::TaskGroup,
 }
 
@@ -86,7 +92,7 @@ impl Dict {
     /// exists at `key`, a `fsandbox::DictionaryError::AlreadyExists` will be
     /// returned.
     pub fn insert(
-        &mut self,
+        &self,
         key: Key,
         capability: Capability,
     ) -> Result<(), fsandbox::DictionaryError> {
@@ -105,7 +111,7 @@ impl Dict {
 
     /// Removes `key` from the entries, returning the capability at `key` if the
     /// key was already in the entries.
-    pub fn remove(&mut self, key: &Key) -> Option<Capability> {
+    pub fn remove(&self, key: &Key) -> Option<Capability> {
         self.lock_entries().remove(key)
     }
 
@@ -121,7 +127,7 @@ impl Dict {
     }
 
     /// Removes all entries from the Dict and returns them as an iterator.
-    pub fn drain(&mut self) -> impl Iterator<Item = (Key, Capability)> {
+    pub fn drain(&self) -> impl Iterator<Item = (Key, Capability)> {
         let entries = {
             let mut entries = self.lock_entries();
             std::mem::replace(&mut *entries, BTreeMap::new())
@@ -140,6 +146,7 @@ impl Dict {
     }
 
     /// Serve the `fuchsia.component.sandbox.Dictionary` protocol for this `Dict`.
+    #[cfg(target_os = "fuchsia")]
     pub async fn serve_dict(
         &mut self,
         mut stream: fsandbox::DictionaryRequestStream,
@@ -232,7 +239,8 @@ impl Dict {
     }
 
     /// Serves the `fuchsia.sandbox.Dictionary` protocol for this Open and moves it into the registry.
-    pub fn serve_and_register(self, stream: fsandbox::DictionaryRequestStream, koid: zx::Koid) {
+    #[cfg(target_os = "fuchsia")]
+    pub fn serve_and_register(self, stream: fsandbox::DictionaryRequestStream, koid: Koid) {
         let mut dict = self.clone();
 
         // Move this capability into the registry.
@@ -242,6 +250,7 @@ impl Dict {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl From<Dict> for ClientEnd<fsandbox::DictionaryMarker> {
     fn from(dict: Dict) -> Self {
         let (client_end, dict_stream) =
@@ -251,12 +260,14 @@ impl From<Dict> for ClientEnd<fsandbox::DictionaryMarker> {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl From<Dict> for fsandbox::Capability {
     fn from(dict: Dict) -> Self {
         Self::Dictionary(dict.into())
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl CapabilityTrait for Dict {
     fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         let dir = pfs::simple();
@@ -283,6 +294,7 @@ impl CapabilityTrait for Dict {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 async fn serve_dict_item_iterator(
     items: Vec<(Key, Capability)>,
     mut stream: fsandbox::DictionaryItemIteratorRequestStream,
@@ -320,6 +332,7 @@ async fn serve_dict_item_iterator(
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 async fn serve_dict_key_iterator(
     keys: Vec<Key>,
     mut stream: fsandbox::DictionaryKeyIteratorRequestStream,
@@ -351,6 +364,8 @@ async fn serve_dict_key_iterator(
     }
 }
 
+// These tests only run on target because the vfs library is not generally available on host.
+#[cfg(target_os = "fuchsia")]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -360,6 +375,7 @@ mod tests {
     use fidl::endpoints::{
         create_endpoints, create_proxy, create_proxy_and_stream, Proxy, ServerEnd,
     };
+    use fidl::handle::{Channel, Status};
     use fidl_fuchsia_io as fio;
     use fuchsia_fs::directory::DirEntry;
     use futures::try_join;
@@ -367,7 +383,7 @@ mod tests {
     use test_util::Counter;
     use vfs::{
         directory::{
-            entry::{serve_directory, EntryInfo, OpenRequest, SubNode},
+            entry::{serve_directory, DirectoryEntry, EntryInfo, OpenRequest, SubNode},
             entry_container::Directory as VfsDirectory,
         },
         execution_scope::ExecutionScope,
@@ -537,10 +553,10 @@ mod tests {
     #[fuchsia::test]
     async fn copy() -> Result<()> {
         // Create a Dict with a Unit inside, and copy the Dict.
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert("unit1".parse().unwrap(), Capability::Unit(Unit::default())).unwrap();
 
-        let mut copy = dict.shallow_copy();
+        let copy = dict.shallow_copy();
 
         // Insert a Unit into the copy.
         copy.insert("unit2".parse().unwrap(), Capability::Unit(Unit::default())).unwrap();
@@ -562,7 +578,7 @@ mod tests {
     #[fuchsia::test]
     async fn clone_by_reference() -> Result<()> {
         let dict = Dict::new();
-        let mut dict_clone = dict.clone();
+        let dict_clone = dict.clone();
 
         // Add a Unit into the clone.
         dict_clone.insert(CAP_KEY.clone(), Capability::Unit(Unit::default())).unwrap();
@@ -578,7 +594,7 @@ mod tests {
     /// Tests that a Dict can be cloned via `fuchsia.unknown/Cloneable.Clone2`
     #[fuchsia::test]
     async fn fidl_clone() -> Result<()> {
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert(CAP_KEY.clone(), Capability::Unit(Unit::default())).unwrap();
 
         let client_end: ClientEnd<fsandbox::DictionaryMarker> = dict.into();
@@ -641,7 +657,7 @@ mod tests {
             items.remove(0),
             fsandbox::DictionaryItem {
                 key,
-                value: fsandbox::Capability::Data(fsandbox::DataCapability::Int64(num))
+                value: fsandbox::Capability::Data(fsandbox::Data::Int64(num))
             }
             if key == "cap1"
             && num == 1
@@ -650,7 +666,7 @@ mod tests {
             items.remove(0),
             fsandbox::DictionaryItem {
                 key,
-                value: fsandbox::Capability::Data(fsandbox::DataCapability::Int64(num))
+                value: fsandbox::Capability::Data(fsandbox::Data::Int64(num))
             }
             if key == "cap2"
             && num == 2
@@ -676,7 +692,7 @@ mod tests {
             &[fsandbox::MAX_DICTIONARY_ITEMS_CHUNK, fsandbox::MAX_DICTIONARY_ITEMS_CHUNK, 1];
 
         // Create a Dict with [NUM_ENTRIES] entries that have Unit values.
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         for i in 0..NUM_ENTRIES {
             dict.insert(format!("{}", i).parse().unwrap(), Capability::Unit(Unit::default()))
                 .unwrap();
@@ -715,7 +731,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn try_into_open_error_not_supported() {
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert(CAP_KEY.clone(), Capability::Unit(Unit::default()))
             .expect("dict entry already exists");
         assert_matches!(
@@ -730,7 +746,7 @@ mod tests {
             EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
         }
 
-        fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+        fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
             request.open_remote(self)
         }
     }
@@ -750,7 +766,7 @@ mod tests {
     /// Convert a dict `{ CAP_KEY: open }` to [Open].
     #[fuchsia::test]
     async fn try_into_open_success() {
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         let mock_dir = Arc::new(MockDir(Counter::new(0)));
         dict.insert(CAP_KEY.clone(), Capability::Open(Open::new(mock_dir.clone())))
             .expect("dict entry already exists");
@@ -761,7 +777,7 @@ mod tests {
             serve_directory(remote.clone(), &scope, fio::OpenFlags::DIRECTORY).unwrap();
 
         assert_eq!(mock_dir.0.get(), 0);
-        let (client_end, server_end) = zx::Channel::create();
+        let (client_end, server_end) = Channel::create();
         let dir = dir_client_end.channel();
         fdio::service_connect_at(dir, &format!("{}/bar", *CAP_KEY), server_end).unwrap();
         fasync::Channel::from_channel(client_end).on_closed().await.unwrap();
@@ -771,12 +787,12 @@ mod tests {
     /// Convert a dict `{ CAP_KEY: { CAP_KEY: open } }` to [Open].
     #[fuchsia::test]
     async fn try_into_open_success_nested() {
-        let mut inner_dict = Dict::new();
+        let inner_dict = Dict::new();
         let mock_dir = Arc::new(MockDir(Counter::new(0)));
         inner_dict
             .insert(CAP_KEY.clone(), Capability::Open(Open::new(mock_dir.clone())))
             .expect("dict entry already exists");
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert(CAP_KEY.clone(), Capability::Dictionary(inner_dict)).unwrap();
 
         let remote = dict.try_into_directory_entry().expect("convert dict into Open capability");
@@ -794,7 +810,7 @@ mod tests {
 
         // Open the inner most capability.
         assert_eq!(mock_dir.0.get(), 0);
-        let (client_end, server_end) = zx::Channel::create();
+        let (client_end, server_end) = Channel::create();
         let dir = dir.into_channel().unwrap().into_zx_channel();
         fdio::service_connect_at(&dir, &format!("{}/{}/bar", *CAP_KEY, *CAP_KEY), server_end)
             .unwrap();
@@ -823,7 +839,7 @@ mod tests {
             "c" => open.into_remote(),
         };
         let directory = Directory::from(serve_vfs_dir(fs));
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         dict.insert(CAP_KEY.clone(), Capability::Directory(directory))
             .expect("dict entry already exists");
 

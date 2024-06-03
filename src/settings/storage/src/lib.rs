@@ -20,3 +20,7 @@ pub enum UpdateState {
     Unchanged,
     Updated,
 }
+
+mod private {
+    pub trait Sealed {}
+}

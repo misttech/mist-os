@@ -28,7 +28,7 @@ zx::result<> VirtualController::Start() {
   // TODO(https://fxbug.dev/303503457): Access virtual device via "/dev/class/bt-hci-virtual"
   auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(args_arena)
                    .connector(std::move(connector.value()))
-                   .class_name("sys/platform/00:00:30")
+                   .class_name("sys/platform/bt-hci-emulator")
                    .Build();
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(args_arena)
                   .name("bt_hci_virtual")

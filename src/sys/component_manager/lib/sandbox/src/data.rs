@@ -4,7 +4,7 @@
 use fidl_fuchsia_component_sandbox as fsandbox;
 use std::fmt::Debug;
 
-use crate::{CapabilityTrait, RemoteError};
+use crate::RemoteError;
 
 /// A capability that holds immutable data.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -15,29 +15,30 @@ pub enum Data {
     Uint64(u64),
 }
 
-impl CapabilityTrait for Data {}
+#[cfg(target_os = "fuchsia")]
+impl crate::CapabilityTrait for Data {}
 
-impl TryFrom<fsandbox::DataCapability> for Data {
+impl TryFrom<fsandbox::Data> for Data {
     type Error = RemoteError;
 
-    fn try_from(data_capability: fsandbox::DataCapability) -> Result<Self, Self::Error> {
+    fn try_from(data_capability: fsandbox::Data) -> Result<Self, Self::Error> {
         match data_capability {
-            fsandbox::DataCapability::Bytes(bytes) => Ok(Self::Bytes(bytes)),
-            fsandbox::DataCapability::String(string) => Ok(Self::String(string)),
-            fsandbox::DataCapability::Int64(num) => Ok(Self::Int64(num)),
-            fsandbox::DataCapability::Uint64(num) => Ok(Self::Uint64(num)),
-            fsandbox::DataCapabilityUnknown!() => Err(RemoteError::UnknownVariant),
+            fsandbox::Data::Bytes(bytes) => Ok(Self::Bytes(bytes)),
+            fsandbox::Data::String(string) => Ok(Self::String(string)),
+            fsandbox::Data::Int64(num) => Ok(Self::Int64(num)),
+            fsandbox::Data::Uint64(num) => Ok(Self::Uint64(num)),
+            fsandbox::DataUnknown!() => Err(RemoteError::UnknownVariant),
         }
     }
 }
 
-impl From<Data> for fsandbox::DataCapability {
+impl From<Data> for fsandbox::Data {
     fn from(data: Data) -> Self {
         match data {
-            Data::Bytes(bytes) => fsandbox::DataCapability::Bytes(bytes),
-            Data::String(string) => fsandbox::DataCapability::String(string),
-            Data::Int64(num) => fsandbox::DataCapability::Int64(num),
-            Data::Uint64(num) => fsandbox::DataCapability::Uint64(num),
+            Data::Bytes(bytes) => fsandbox::Data::Bytes(bytes),
+            Data::String(string) => fsandbox::Data::String(string),
+            Data::Int64(num) => fsandbox::Data::Int64(num),
+            Data::Uint64(num) => fsandbox::Data::Uint64(num),
         }
     }
 }

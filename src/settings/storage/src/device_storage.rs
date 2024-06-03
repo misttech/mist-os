@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::private::Sealed;
 use crate::stash_logger::StashInspectLogger;
+use crate::storage_factory::{DefaultLoader, NoneT};
 use crate::UpdateState;
 use anyhow::{format_err, Context, Error};
 use fidl_fuchsia_stash::{StoreAccessorProxy, Value};
@@ -31,6 +33,8 @@ pub struct DeviceStorage {
     /// Map of [`DeviceStorageCompatible`] keys to their typed storage.
     typed_storage_map: HashMap<&'static str, TypedStorage>,
 
+    typed_loader_map: HashMap<&'static str, Box<TypeErasedLoader>>,
+
     /// If true, reads will be returned from the data in memory rather than reading from storage.
     caching_enabled: bool,
 
@@ -56,7 +60,7 @@ struct TypedStorage {
 /// to some backing store.
 struct CachedStorage {
     /// Cache for the most recently read or written value.
-    current_data: Option<Box<dyn Any + Send + Sync>>,
+    current_data: Option<Box<TypeErasedData>>,
 
     /// Stash connection for this particular type's stash storage.
     stash_proxy: StoreAccessorProxy,
@@ -81,7 +85,7 @@ struct CachedStorage {
 pub trait DeviceStorageCompatible:
     Serialize + DeserializeOwned + Clone + PartialEq + Any + Send + Sync
 {
-    fn default_value() -> Self;
+    type Loader: DefaultDispatcher<Self>;
 
     fn try_deserialize_from(value: &str) -> Result<Self, Error> {
         Self::extract(value)
@@ -176,6 +180,8 @@ where
 }
 
 type MappingFn = Box<dyn FnOnce(&(dyn Any + Send + Sync)) -> String + Send>;
+type TypeErasedData = dyn Any + Send + Sync + 'static;
+type TypeErasedLoader = dyn Any + Send + Sync + 'static;
 
 impl DeviceStorage {
     /// Construct a device storage from the iteratable item, which will produce the keys for
@@ -186,14 +192,19 @@ impl DeviceStorage {
         inspect_handle: Arc<Mutex<StashInspectLogger>>,
     ) -> Self
     where
-        I: IntoIterator<Item = &'static str>,
+        I: IntoIterator<Item = (&'static str, Option<Box<TypeErasedLoader>>)>,
         G: Fn() -> StoreAccessorProxy,
     {
+        let mut typed_loader_map = HashMap::new();
         let typed_storage_map = iter
             .into_iter()
             .map({
                 let inspect_handle = Arc::clone(&inspect_handle);
-                move |key| {
+                let typed_loader_map = &mut typed_loader_map;
+                move |(key, loader)| {
+                    if let Some(loader) = loader {
+                        let _ = typed_loader_map.insert(key, loader);
+                    }
                     // Generate a separate stash proxy for each key.
                     let (flush_sender, flush_receiver) = futures::channel::mpsc::unbounded::<()>();
                     let stash_proxy = stash_generator();
@@ -243,6 +254,7 @@ impl DeviceStorage {
             caching_enabled: true,
             debounce_writes: true,
             typed_storage_map,
+            typed_loader_map,
             inspect_handle,
         }
     }
@@ -290,7 +302,7 @@ impl DeviceStorage {
         &self,
         key: &'static str,
         new_value: String,
-        data_as_any: Box<dyn Any + Send + Sync>,
+        data_as_any: Box<TypeErasedData>,
         mapping_fn: MappingFn,
     ) -> Result<UpdateState, Error> {
         let typed_storage = self
@@ -354,7 +366,7 @@ impl DeviceStorage {
         self.inner_write(
             T::KEY,
             new_value.serialize_to(),
-            Box::new(new_value.clone()) as Box<dyn Any + Send + Sync>,
+            Box::new(new_value.clone()) as Box<TypeErasedData>,
             Box::new(|any: &(dyn Any + Send + Sync)| {
                 // Attempt to downcast the `dyn Any` to its original type. If `T` was not its
                 // original type, then we want to panic because there's a compile-time issue
@@ -421,20 +433,12 @@ impl DeviceStorage {
     {
         let (mut cached_storage, update) = self.get_inner(T::KEY).await;
         if let Some(update) = update {
-            cached_storage.current_data = if let Some(string_value) = update {
-                match T::try_deserialize_from(&string_value) {
-                    Ok(val) => Some(Box::new(val) as Box<dyn Any + Send + Sync>),
-                    Err(e) => {
-                        tracing::error!(
-                            "Using default. Failed to deserialize type {}: {e:?}\nSource data: {string_value:?}",
-                            T::KEY
-                        );
-                        Some(Box::new(T::default_value()) as Box<dyn Any + Send + Sync>)
-                    }
-                }
-            } else {
-                Some(Box::new(T::default_value()) as Box<dyn Any + Send + Sync>)
-            };
+            cached_storage.current_data = Some(update.and_then(|string_value| {
+                T::try_deserialize_from(&string_value).map(|val| Box::new(val) as Box<TypeErasedData>).map_err(|e| tracing::error!(
+                    "Using default. Failed to deserialize type {}: {e:?}\nSource data: {string_value:?}",
+                    T::KEY
+                )).ok()
+            }).unwrap_or_else(|| Box::new(<T::Loader as DefaultDispatcher<T>>::get_default(self)) as Box<TypeErasedData>));
         };
 
         cached_storage
@@ -447,6 +451,40 @@ impl DeviceStorage {
                      value",
             )
             .clone()
+    }
+}
+
+pub trait DefaultDispatcher<T>: Sealed
+where
+    T: DeviceStorageCompatible,
+{
+    fn get_default(_: &DeviceStorage) -> T;
+}
+
+impl<T> DefaultDispatcher<T> for NoneT
+where
+    T: DeviceStorageCompatible<Loader = Self> + Default,
+{
+    fn get_default(_: &DeviceStorage) -> T {
+        T::default()
+    }
+}
+
+impl<T, L> DefaultDispatcher<T> for L
+where
+    T: DeviceStorageCompatible<Loader = L>,
+    L: DefaultLoader<Result = T> + 'static,
+{
+    fn get_default(storage: &DeviceStorage) -> T {
+        match storage.typed_loader_map.get(T::KEY) {
+            Some(loader) => match loader.downcast_ref::<T::Loader>() {
+                Some(loader) => loader.default_value(),
+                None => {
+                    panic!("Mismatch key and loader for key {}", T::KEY);
+                }
+            },
+            None => panic!("Missing loader for {}", T::KEY),
+        }
     }
 }
 
@@ -481,9 +519,12 @@ mod tests {
     const STORE_KEY: &str = "settings_testkey";
 
     impl DeviceStorageCompatible for TestStruct {
+        type Loader = NoneT;
         const KEY: &'static str = "testkey";
+    }
 
-        fn default_value() -> Self {
+    impl Default for TestStruct {
+        fn default() -> Self {
             TestStruct { value: VALUE0 }
         }
     }
@@ -573,7 +614,7 @@ mod tests {
         .detach();
 
         let storage = DeviceStorage::with_stash_proxy(
-            vec![TestStruct::KEY],
+            vec![(TestStruct::KEY, None)],
             move || stash_proxy.clone(),
             Arc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
         );
@@ -602,7 +643,7 @@ mod tests {
         .detach();
 
         let storage = DeviceStorage::with_stash_proxy(
-            vec![TestStruct::KEY],
+            vec![(TestStruct::KEY, None)],
             move || stash_proxy.clone(),
             Arc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
         );
@@ -633,7 +674,7 @@ mod tests {
         .detach();
 
         let storage = DeviceStorage::with_stash_proxy(
-            vec![TestStruct::KEY],
+            vec![(TestStruct::KEY, None)],
             move || stash_proxy.clone(),
             Arc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
         );
@@ -655,7 +696,7 @@ mod tests {
         let inspector = component::inspector();
         let logger_handle = Arc::new(Mutex::new(StashInspectLogger::new(inspector.root())));
         let storage = DeviceStorage::with_stash_proxy(
-            vec![TestStruct::KEY],
+            vec![(TestStruct::KEY, None)],
             move || stash_proxy.clone(),
             logger_handle,
         );
@@ -671,7 +712,7 @@ mod tests {
         {
             let respond_future = validate_stash_get_and_respond(
                 &mut stash_stream,
-                serde_json::to_string(&TestStruct::default_value()).unwrap(),
+                serde_json::to_string(&TestStruct::default()).unwrap(),
             );
             futures::pin_mut!(respond_future);
             advance_executor(&mut executor, &mut respond_future);
@@ -730,7 +771,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
 
         let storage = DeviceStorage::with_stash_proxy(
-            vec![TestStruct::KEY],
+            vec![(TestStruct::KEY, None)],
             move || stash_proxy.clone(),
             Arc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
         );
@@ -746,7 +787,7 @@ mod tests {
         {
             let respond_future = validate_stash_get_and_respond(
                 &mut stash_stream,
-                serde_json::to_string(&TestStruct::default_value()).unwrap(),
+                serde_json::to_string(&TestStruct::default()).unwrap(),
             );
             futures::pin_mut!(respond_future);
             advance_executor(&mut executor, &mut respond_future);
@@ -771,15 +812,12 @@ mod tests {
         advance_executor(&mut executor, &mut flush_future);
     }
 
-    #[derive(Copy, Clone, PartialEq, Serialize, Deserialize)]
+    #[derive(Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
     struct WrongStruct;
 
     impl DeviceStorageCompatible for WrongStruct {
+        type Loader = NoneT;
         const KEY: &'static str = "WRONG_STRUCT";
-
-        fn default_value() -> Self {
-            WrongStruct
-        }
     }
 
     // Test that an initial write to DeviceStorage causes a SetValue and Flush to Stash
@@ -807,7 +845,7 @@ mod tests {
         });
 
         let storage = DeviceStorage::with_stash_proxy(
-            vec![TestStruct::KEY],
+            vec![(TestStruct::KEY, None)],
             move || stash_proxy.clone(),
             Arc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
         );
@@ -839,7 +877,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
 
         let storage = DeviceStorage::with_stash_proxy(
-            vec![TestStruct::KEY],
+            vec![(TestStruct::KEY, None)],
             move || stash_proxy.clone(),
             Arc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
         );
@@ -859,7 +897,7 @@ mod tests {
             {
                 let respond_future = validate_stash_get_and_respond(
                     &mut stash_stream,
-                    serde_json::to_string(&TestStruct::default_value()).unwrap(),
+                    serde_json::to_string(&TestStruct::default()).unwrap(),
                 );
                 futures::pin_mut!(respond_future);
                 advance_executor(&mut executor, &mut respond_future);
@@ -929,8 +967,7 @@ mod tests {
     // This mod includes structs to only be used by
     // test_device_compatible_migration tests.
     mod test_device_compatible_migration {
-        use super::super::DeviceStorageCompatible;
-        use anyhow::Error;
+        use super::*;
         use serde::{Deserialize, Serialize};
 
         pub(crate) const DEFAULT_V1_VALUE: i32 = 1;
@@ -943,9 +980,12 @@ mod tests {
         }
 
         impl DeviceStorageCompatible for V1 {
+            type Loader = NoneT;
             const KEY: &'static str = "testkey";
+        }
 
-            fn default_value() -> Self {
+        impl Default for V1 {
+            fn default() -> Self {
                 Self { value: DEFAULT_V1_VALUE }
             }
         }
@@ -963,14 +1003,17 @@ mod tests {
         }
 
         impl DeviceStorageCompatible for Current {
+            type Loader = NoneT;
             const KEY: &'static str = "testkey2";
-
-            fn default_value() -> Self {
-                Self { value: DEFAULT_CURRENT_VALUE, value_2: DEFAULT_CURRENT_VALUE_2 }
-            }
 
             fn try_deserialize_from(value: &str) -> Result<Self, Error> {
                 Self::extract(value).or_else(|_| V1::extract(value).map(Self::from))
+            }
+        }
+
+        impl Default for Current {
+            fn default() -> Self {
+                Self { value: DEFAULT_CURRENT_VALUE, value_2: DEFAULT_CURRENT_VALUE_2 }
             }
         }
     }
@@ -978,7 +1021,7 @@ mod tests {
     #[fuchsia::test]
     fn test_device_compatible_custom_migration() {
         // Create an initial struct based on the first version.
-        let initial = test_device_compatible_migration::V1::default_value();
+        let initial = test_device_compatible_migration::V1::default();
         // Serialize.
         let initial_serialized = initial.serialize_to();
 
@@ -1016,7 +1059,7 @@ mod tests {
         .detach();
 
         let storage = DeviceStorage::with_stash_proxy(
-            vec![test_device_compatible_migration::Current::KEY],
+            vec![(test_device_compatible_migration::Current::KEY, None)],
             move || stash_proxy.clone(),
             Arc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
         );

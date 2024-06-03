@@ -25,7 +25,7 @@ using ::testing::StrEq;
 class TestSettingsFixture : public ::testing::Test {
  public:
   TestSettingsFixture()
-      : old_severity_(fuchsia_logging::GetMinLogLevel()),
+      : old_severity_(fuchsia_logging::GetMinLogSeverity()),
         old_stderr_(dup(STDERR_FILENO)),
         random_seed_(getenv("TEST_LOOP_RANDOM_SEED")) {}
   ~TestSettingsFixture() {
@@ -59,12 +59,12 @@ TEST_F(TestSettingsFixture, RandomSeed) {
 
 TEST_F(TestSettingsFixture, LogLevel) {
   EXPECT_TRUE(SetTestSettings(CommandLineFromInitializerList({"argv0", "--verbose=10"})));
-  EXPECT_EQ(fuchsia_logging::GetMinLogLevel(), 0x26);  // INFO(0x30) - 10
+  EXPECT_EQ(fuchsia_logging::GetMinLogSeverity(), 0x26);  // INFO(0x30) - 10
   // The value for --quiet needs to be smaller than LOG_FATAL because
   // min_log_level is capped at LOG_FATAL.
   const char *argv[] = {"argv0", "--quiet=2", nullptr};
   EXPECT_TRUE(SetTestSettings(2, argv));
-  EXPECT_EQ(fuchsia_logging::GetMinLogLevel(), fuchsia_logging::LOG_ERROR);
+  EXPECT_EQ(fuchsia_logging::GetMinLogSeverity(), fuchsia_logging::LOG_ERROR);
 }
 
 }  // namespace

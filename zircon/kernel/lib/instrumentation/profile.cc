@@ -6,6 +6,7 @@
 
 #include <align.h>
 #include <lib/instrumentation/debugdata.h>
+#include <lib/instrumentation/kernel-mapped-vmo.h>
 #include <lib/llvm-profdata/llvm-profdata.h>
 #include <lib/version.h>
 #include <stdint.h>
@@ -18,7 +19,6 @@
 #include <ktl/string_view.h>
 #include <vm/vm_object_paged.h>
 
-#include "kernel-mapped-vmo.h"
 #include "private.h"
 
 #include <ktl/enforce.h>

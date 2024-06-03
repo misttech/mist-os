@@ -24,4 +24,4 @@ class UtcClockReadyWatcher : public UtcClockReadyWatcherBase {
 
 }  // namespace forensics::stubs
 
-#endif
+#endif  // SRC_DEVELOPER_FORENSICS_TESTING_STUBS_UTC_CLOCK_READY_WATCHER_H_

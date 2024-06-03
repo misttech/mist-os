@@ -27,12 +27,7 @@ Note: For more details on the driver framework, see the
 
 ## What you'll need
 
-*   An x64-based machine running Linux or macOS
-
-    Note: While you can use an x64-based (Intel) macOS machine for this get-started
-    flow, you might run into issues. To help us improve, please
-    [file a bug][sdk-bug]{:.external} if you discover issues on macOS.
-
+*   An x64-based machine running Linux
 *   A configured [Fuchsia SDK environment][driver-get-started]{:.external}
 *   [Emulator product bundle][driver-product-bundle]
     for `core.x64`

@@ -8,15 +8,16 @@
 //! exposing the internal traits directly.
 
 use net_types::ip::{Ipv4, Ipv6};
+use netstack3_base::{
+    AnyDevice, CounterContext, DeviceIdContext, InstantBindingsTypes, ReferenceNotifiers,
+    RngContext, TimerBindingsTypes, TracingContext,
+};
 
 use crate::{
-    context::{
-        CounterContext, InstantBindingsTypes, ReferenceNotifiers, RngContext, TimerBindingsTypes,
-        TracingContext,
-    },
     device::{
-        self, AnyDevice, DeviceId, DeviceIdContext, DeviceLayerTypes, EthernetDeviceId,
-        EthernetLinkDevice, EthernetWeakDeviceId, WeakDeviceId,
+        self,
+        ethernet::{EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId},
+        DeviceId, DeviceLayerTypes, WeakDeviceId,
     },
     filter::{FilterBindingsContext, FilterBindingsTypes},
     ip::{
@@ -37,7 +38,7 @@ use crate::{
     socket,
     transport::{
         self,
-        tcp::socket::{TcpBindingsContext, TcpBindingsTypes, TcpContext},
+        tcp::{TcpBindingsContext, TcpBindingsTypes, TcpContext},
         udp::{UdpBindingsContext, UdpBindingsTypes, UdpCounters},
     },
     TimerId,
@@ -49,9 +50,8 @@ pub trait IpExt:
     + IpDeviceIpExt
     + ip::icmp::IcmpIpExt
     + ip::device::IpDeviceIpExt
-    + transport::tcp::socket::DualStackIpExt
+    + transport::tcp::DualStackIpExt
     + socket::datagram::DualStackIpExt
-    + ip::raw::RawIpSocketsIpExt
 {
 }
 
@@ -60,9 +60,8 @@ impl<O> IpExt for O where
         + IpDeviceIpExt
         + ip::icmp::IcmpIpExt
         + ip::device::IpDeviceIpExt
-        + transport::tcp::socket::DualStackIpExt
+        + transport::tcp::DualStackIpExt
         + socket::datagram::DualStackIpExt
-        + ip::raw::RawIpSocketsIpExt
 {
 }
 

@@ -10,11 +10,16 @@
             ],
         },
         {
+            type: "skip",
+            matchers: [
+                // TODO(https://fxbug.dev/343672830): Support IPV6_CHECKSUM.
+                "RawSocketTest.SendtoRecvfromV6",
+            ],
+        },
+        {
             type: "expect_failure",
             matchers: [
                 // TODO(https://fxbug.dev/42058079): Support raw sockets.
-                "RawSocketTest.SendToDifferentProtocolV4",
-                "RawSocketTest.SendtoRecvfromV6",
                 "RawSocketTest.SendtoRecvfrom",
                 "RawSocketICMPv6Test.GetSetFilterSucceeds",
                 "RawSocketICMPv6Test.FilterICMPPackets",

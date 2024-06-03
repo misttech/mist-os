@@ -16,13 +16,16 @@ use async_trait::async_trait;
 use fidl_fuchsia_recovery_policy::{DeviceMarker, DeviceProxy};
 use futures::lock::Mutex;
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
-use settings_storage::storage_factory::StorageAccess;
+use settings_storage::storage_factory::{NoneT, StorageAccess};
 use std::sync::Arc;
 
 impl DeviceStorageCompatible for FactoryResetInfo {
+    type Loader = NoneT;
     const KEY: &'static str = "factory_reset_info";
+}
 
-    fn default_value() -> Self {
+impl Default for FactoryResetInfo {
+    fn default() -> Self {
         FactoryResetInfo::new(true)
     }
 }
@@ -47,7 +50,8 @@ pub struct FactoryResetController {
 
 impl StorageAccess for FactoryResetController {
     type Storage = DeviceStorage;
-    const STORAGE_KEYS: &'static [&'static str] = &[FactoryResetInfo::KEY];
+    type Data = FactoryResetInfo;
+    const STORAGE_KEY: &'static str = FactoryResetInfo::KEY;
 }
 
 /// Keeps track of the current state of factory reset, is responsible for persisting that state to

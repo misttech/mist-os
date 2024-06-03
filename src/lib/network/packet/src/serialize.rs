@@ -1398,6 +1398,18 @@ pub trait Serializer: Sized {
         provider: P,
     ) -> Result<B, (SerializeError<P::Error>, Self)>;
 
+    /// Serializes the data into a new buffer without consuming `self`.
+    ///
+    /// Creates a new buffer using `alloc` and serializes the data into that
+    /// that new buffer. Unlike all other serialize methods,
+    /// `serialize_new_buf` takes `self` by reference. This allows to use the
+    /// same `Serializer` to serialize the data more than once.
+    fn serialize_new_buf<B: ReusableBuffer, A: BufferAlloc<B>>(
+        &self,
+        outer: PacketConstraints,
+        alloc: A,
+    ) -> Result<B, SerializeError<A::Error>>;
+
     /// Serializes this `Serializer`, allocating a [`Buf<Vec<u8>>`] if the
     /// contained buffer isn't large enough.
     ///
@@ -1556,43 +1568,41 @@ pub struct InnerSerializer<I, B> {
     buffer: B,
 }
 
+/// A wrapper for `InnerPacketBuilders` which implements `PacketBuilder` by
+/// treating the entire `InnerPacketBuilder` as the header of the
+/// `PacketBuilder`. This allows us to compose our InnerPacketBuilder with
+/// the outer `PacketBuilders` into a single, large `PacketBuilder`, and then
+/// serialize it using `self.buffer`.
+struct InnerPacketBuilderWrapper<I>(I);
+
+impl<I: InnerPacketBuilder> PacketBuilder for InnerPacketBuilderWrapper<I> {
+    fn constraints(&self) -> PacketConstraints {
+        let Self(wrapped) = self;
+        PacketConstraints::new(wrapped.bytes_len(), 0, 0, usize::MAX)
+    }
+
+    fn serialize(&self, target: &mut SerializeTarget<'_>, _body: FragmentedBytesMut<'_, '_>) {
+        let Self(wrapped) = self;
+
+        // Note that the body might be non-empty if an outer
+        // PacketBuilder added a minimum body length constraint that
+        // required padding.
+        debug_assert_eq!(target.header.len(), wrapped.bytes_len());
+        debug_assert_eq!(target.footer.len(), 0);
+
+        InnerPacketBuilder::serialize(wrapped, target.header);
+    }
+}
+
 impl<I: InnerPacketBuilder, B: GrowBuffer + ShrinkBuffer> Serializer for InnerSerializer<I, B> {
     type Buffer = B;
 
     #[inline]
-    #[allow(clippy::type_complexity)]
     fn serialize<BB: GrowBufferMut, P: BufferProvider<B, BB>>(
         self,
         outer: PacketConstraints,
         provider: P,
     ) -> Result<BB, (SerializeError<P::Error>, InnerSerializer<I, B>)> {
-        // A wrapper for InnerPacketBuilders which implements PacketBuilder by
-        // treating the entire InnerPacketBuilder as the header of the
-        // PacketBuilder. This allows us to compose our InnerPacketBuilder with
-        // the outer PacketBuilders into a single, large PacketBuilder, and then
-        // serialize it using self.buffer.
-        struct InnerPacketBuilderWrapper<I>(I);
-
-        impl<I: InnerPacketBuilder> PacketBuilder for InnerPacketBuilderWrapper<I> {
-            fn constraints(&self) -> PacketConstraints {
-                PacketConstraints::new(self.0.bytes_len(), 0, 0, usize::MAX)
-            }
-
-            fn serialize(
-                &self,
-                target: &mut SerializeTarget<'_>,
-                _body: FragmentedBytesMut<'_, '_>,
-            ) {
-                // Note that the body might be non-empty if an outer
-                // PacketBuilder added a minimum body length constraint that
-                // required padding.
-                debug_assert_eq!(target.header.len(), self.0.bytes_len());
-                debug_assert_eq!(target.footer.len(), 0);
-
-                InnerPacketBuilder::serialize(&self.0, target.header);
-            }
-        }
-
         let pb = InnerPacketBuilderWrapper(self.inner);
         debug_assert_eq!(self.buffer.len(), 0);
         self.buffer.encapsulate(pb).serialize(outer, provider).map_err(
@@ -1600,6 +1610,16 @@ impl<I: InnerPacketBuilder, B: GrowBuffer + ShrinkBuffer> Serializer for InnerSe
                 (err, InnerSerializer { inner: pb.0, buffer })
             },
         )
+    }
+
+    #[inline]
+    fn serialize_new_buf<BB: ReusableBuffer, A: BufferAlloc<BB>>(
+        &self,
+        outer: PacketConstraints,
+        alloc: A,
+    ) -> Result<BB, SerializeError<A::Error>> {
+        let pb = InnerPacketBuilderWrapper(&self.inner);
+        EmptyBuf.encapsulate(pb).serialize_new_buf(outer, alloc)
     }
 }
 
@@ -1615,6 +1635,26 @@ impl<B: GrowBuffer + ShrinkBuffer> Serializer for B {
         TruncatingSerializer::new(self, TruncateDirection::NoTruncating)
             .serialize(outer, provider)
             .map_err(|(err, ser)| (err, ser.buffer))
+    }
+
+    fn serialize_new_buf<BB: ReusableBuffer, A: BufferAlloc<BB>>(
+        &self,
+        outer: PacketConstraints,
+        alloc: A,
+    ) -> Result<BB, SerializeError<A::Error>> {
+        if self.len() > outer.max_body_len() {
+            return Err(SerializeError::SizeLimitExceeded);
+        }
+
+        let padding = outer.min_body_len().saturating_sub(self.len());
+        let tail_size = padding + outer.footer_len();
+        let buffer_size = outer.header_len() + self.len() + tail_size;
+        let mut buffer = alloc.alloc(buffer_size)?;
+        buffer.shrink_front(outer.header_len());
+        buffer.shrink_back(tail_size);
+        buffer.copy_from(self);
+        buffer.grow_back(padding);
+        Ok(buffer)
     }
 }
 
@@ -1641,6 +1681,17 @@ impl<A: Serializer, B: Serializer<Buffer = A::Buffer>> Serializer for EitherSeri
             EitherSerializer::B(s) => {
                 s.serialize(outer, provider).map_err(|(err, s)| (err, EitherSerializer::B(s)))
             }
+        }
+    }
+
+    fn serialize_new_buf<TB: ReusableBuffer, BA: BufferAlloc<TB>>(
+        &self,
+        outer: PacketConstraints,
+        alloc: BA,
+    ) -> Result<TB, SerializeError<BA::Error>> {
+        match self {
+            EitherSerializer::A(s) => s.serialize_new_buf(outer, alloc),
+            EitherSerializer::B(s) => s.serialize_new_buf(outer, alloc),
         }
     }
 }
@@ -1739,6 +1790,37 @@ impl<B: GrowBuffer + ShrinkBuffer> Serializer for TruncatingSerializer<B> {
             }
         }
     }
+
+    fn serialize_new_buf<BB: ReusableBuffer, A: BufferAlloc<BB>>(
+        &self,
+        outer: PacketConstraints,
+        alloc: A,
+    ) -> Result<BB, SerializeError<A::Error>> {
+        let truncated_size = cmp::min(self.buffer.len(), outer.max_body_len());
+        let discarded_bytes = self.buffer.len() - truncated_size;
+        let padding = outer.min_body_len().saturating_sub(truncated_size);
+        let tail_size = padding + outer.footer_len();
+        let buffer_size = outer.header_len() + truncated_size + tail_size;
+        let mut buffer = alloc.alloc(buffer_size)?;
+        buffer.shrink_front(outer.header_len());
+        buffer.shrink_back(tail_size);
+        buffer.with_bytes_mut(|mut dst| {
+            self.buffer.with_bytes(|src| {
+                let src = match (discarded_bytes > 0, self.direction) {
+                    (false, _) => src,
+                    (true, TruncateDirection::DiscardFront) => src.slice(discarded_bytes..),
+                    (true, TruncateDirection::DiscardBack) => src.slice(..truncated_size),
+                    (true, TruncateDirection::NoTruncating) => {
+                        return Err(SerializeError::SizeLimitExceeded)
+                    }
+                };
+                dst.copy_from(&src);
+                Ok(())
+            })
+        })?;
+        buffer.grow_back_zero(padding);
+        Ok(buffer)
+    }
 }
 
 impl<I: Serializer, O: PacketBuilder> Serializer for Nested<I, O> {
@@ -1762,6 +1844,21 @@ impl<I: Serializer, O: PacketBuilder> Serializer for Nested<I, O> {
             Err((err, inner)) => Err((err, inner.encapsulate(self.outer))),
         }
     }
+
+    #[inline]
+    fn serialize_new_buf<B: ReusableBuffer, A: BufferAlloc<B>>(
+        &self,
+        outer: PacketConstraints,
+        alloc: A,
+    ) -> Result<B, SerializeError<A::Error>> {
+        let Some(outer) = self.outer.constraints().try_encapsulate(&outer) else {
+            return Err(SerializeError::SizeLimitExceeded);
+        };
+
+        let mut buf = self.inner.serialize_new_buf(outer, alloc)?;
+        GrowBufferMut::serialize(&mut buf, &self.outer);
+        Ok(buf)
+    }
 }
 
 #[cfg(test)]
@@ -1770,6 +1867,7 @@ mod tests {
     use crate::BufferMut;
     use std::fmt::Debug;
     use test_case::test_case;
+    use test_util::{assert_geq, assert_leq};
 
     // DummyPacketBuilder:
     // - Implements PacketBuilder with the stored constraints; it fills the
@@ -1832,11 +1930,62 @@ mod tests {
         }
     }
 
-    impl SerializeError<Never> {
-        fn into<E>(self) -> SerializeError<E> {
-            match self {
-                SerializeError::Alloc(never) => match never {},
-                SerializeError::SizeLimitExceeded => SerializeError::SizeLimitExceeded,
+    // Helper for `VerifyingSerializer` used to verify the serialization result.
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+    struct SerializerVerifier {
+        // Total size if the inner body if not truncated or `None` if
+        // serialization is expected to fail due to size limit.
+        inner_len: Option<usize>,
+
+        // Is the inner Serializer truncating (a TruncatingSerializer with
+        // TruncateDirection::DiscardFront or DiscardBack)?
+        truncating: bool,
+    }
+
+    impl SerializerVerifier {
+        fn new<S: Serializer>(serializer: &S, truncating: bool) -> Self {
+            let inner_len = serializer
+                .serialize_new_buf(PacketConstraints::UNCONSTRAINED, new_buf_vec)
+                .map(|buf| buf.len())
+                .inspect_err(|err| assert!(err.is_size_limit_exceeded()))
+                .ok();
+            Self { inner_len, truncating }
+        }
+
+        fn verify_result<B: GrowBufferMut, A>(
+            &self,
+            result: Result<&B, &SerializeError<A>>,
+            outer: PacketConstraints,
+        ) {
+            let should_exceed_size_limit = match self.inner_len {
+                Some(inner_len) => outer.max_body_len() < inner_len && !self.truncating,
+                None => true,
+            };
+
+            match result {
+                Ok(buf) => {
+                    assert_geq!(buf.prefix_len(), outer.header_len());
+                    assert_geq!(buf.suffix_len(), outer.footer_len());
+                    assert_leq!(buf.len(), outer.max_body_len());
+
+                    // It is `Serialize::serialize()`'s responsibility to ensure that there
+                    // is enough suffix room to fit any post-body padding and the footer,
+                    // but it is the caller's responsibility to actually add that padding
+                    // (ie, move it from the suffix to the body).
+                    let padding = outer.min_body_len().saturating_sub(buf.len());
+                    assert_leq!(padding + outer.footer_len(), buf.suffix_len());
+
+                    assert!(!should_exceed_size_limit);
+                }
+                Err(err) => {
+                    // If we shouldn't fail as a result of a size limit exceeded
+                    // error, we might still fail as a result of allocation.
+                    if should_exceed_size_limit {
+                        assert!(err.is_size_limit_exceeded());
+                    } else {
+                        assert!(err.is_alloc());
+                    }
+                }
             }
         }
     }
@@ -1852,9 +2001,7 @@ mod tests {
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     struct VerifyingSerializer<S> {
         ser: S,
-        // Is the inner Serializer truncating (a TruncatingSerializer with
-        // TruncateDirection::DiscardFront or DiscardBack)?
-        truncating: bool,
+        verifier: SerializerVerifier,
     }
 
     impl<S: Serializer + Debug + Clone + Eq> Serializer for VerifyingSerializer<S>
@@ -1868,47 +2015,29 @@ mod tests {
             outer: PacketConstraints,
             provider: P,
         ) -> Result<B, (SerializeError<P::Error>, Self)> {
-            let orig = self.ser.clone();
+            let Self { ser, verifier } = self;
+            let orig = ser.clone();
 
-            // How long is the packet if we serialize it without the outer
-            // PacketBuilder?
-            let inner_len = self.clone().ser.serialize_vec_outer().map(|buf| buf.len()).map_err(
-                |(err, ser)| {
-                    // If serialization fails, the original Serializer should be
-                    // unmodified.
-                    assert_eq!(ser, orig);
-                    (err.into(), ser.into_verifying(self.truncating))
-                },
-            )?;
-            let should_exceed_size_limit = outer.max_body_len() < inner_len && !self.truncating;
+            let result = ser.serialize(outer, provider).map_err(|(err, ser)| {
+                // If serialization fails, the original Serializer should be
+                // unmodified.
+                assert_eq!(ser, orig);
+                (err, Self { ser, verifier })
+            });
 
-            let res = self.ser.serialize(outer, provider);
-            match res {
-                Ok(buf) => {
-                    assert!(buf.prefix_len() >= outer.header_len());
-                    assert!(buf.suffix_len() >= outer.footer_len());
-                    assert!(buf.len() <= outer.max_body_len());
+            verifier.verify_result(result.as_ref().map_err(|(err, _ser)| err), outer);
 
-                    // It is `self.ser.serialize()`'s responsibility to ensure that there
-                    // is enough suffix room to fit any post-body padding and the footer,
-                    // but it is the caller's responsibility to actually add that padding
-                    // (ie, move it from the suffix to the body).
-                    let padding = outer.min_body_len().saturating_sub(buf.len());
-                    assert!(padding + outer.footer_len() <= buf.suffix_len());
+            result
+        }
 
-                    assert!(!should_exceed_size_limit);
-                    Ok(buf)
-                }
-                Err((err, ser)) => {
-                    // If we shouldn't fail as a result of a size limit exceeded
-                    // error, we might still fail as a result of allocation.
-                    assert!(should_exceed_size_limit || err.is_alloc());
-                    // If serialization fails, the original Serializer should be
-                    // unmodified.
-                    assert_eq!(ser, orig);
-                    Err((err, ser.into_verifying(self.truncating)))
-                }
-            }
+        fn serialize_new_buf<B: ReusableBuffer, A: BufferAlloc<B>>(
+            &self,
+            outer: PacketConstraints,
+            alloc: A,
+        ) -> Result<B, SerializeError<A::Error>> {
+            let res = self.ser.serialize_new_buf(outer, alloc);
+            self.verifier.verify_result(res.as_ref(), outer);
+            res
         }
     }
 
@@ -1917,7 +2046,8 @@ mod tests {
         where
             Self::Buffer: ReusableBuffer,
         {
-            VerifyingSerializer { ser: self, truncating }
+            let verifier = SerializerVerifier::new(&self, truncating);
+            VerifyingSerializer { ser: self, verifier }
         }
 
         fn encapsulate_verifying<B: PacketBuilder>(
@@ -2142,16 +2272,19 @@ mod tests {
             min_body_len: usize,
         ) {
             let old_body = buffer.to_flattened_vec();
+            let serializer = buffer.encapsulate(DummyPacketBuilder::new(
+                header_len,
+                footer_len,
+                min_body_len,
+                usize::MAX,
+            ));
 
-            let buffer = buffer
-                .encapsulate(DummyPacketBuilder::new(
-                    header_len,
-                    footer_len,
-                    min_body_len,
-                    usize::MAX,
-                ))
-                .serialize_vec_outer()
+            let buffer0 = serializer
+                .serialize_new_buf(PacketConstraints::UNCONSTRAINED, new_buf_vec)
                 .unwrap();
+            verify(buffer0, &old_body, header_len, footer_len, min_body_len);
+
+            let buffer = serializer.serialize_vec_outer().unwrap();
             verify(buffer, &old_body, header_len, footer_len, min_body_len);
         }
 
@@ -2371,42 +2504,41 @@ mod tests {
 
     #[test]
     fn test_truncating_serializer() {
-        //
-        // Test truncate front.
-        //
+        fn verify_result<S: Serializer + Debug>(ser: S, expected: &[u8])
+        where
+            S::Buffer: ReusableBuffer + AsRef<[u8]>,
+        {
+            let buf = ser.serialize_new_buf(PacketConstraints::UNCONSTRAINED, new_buf_vec).unwrap();
+            assert_eq!(buf.as_ref(), &expected[..]);
+            let buf = ser.serialize_vec_outer().unwrap();
+            assert_eq!(buf.as_ref(), &expected[..]);
+        }
 
+        // Test truncate front.
         let body = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
         let ser =
             TruncatingSerializer::new(Buf::new(body.clone(), ..), TruncateDirection::DiscardFront)
-                .into_verifying(true);
-        let buf = ser.clone().with_size_limit_verifying(4, true).serialize_vec_outer().unwrap();
-        let buf: &[u8] = buf.as_ref();
-        assert_eq!(buf, &[6, 7, 8, 9][..]);
+                .into_verifying(true)
+                .with_size_limit_verifying(4, true);
+        verify_result(ser, &[6, 7, 8, 9]);
 
-        //
         // Test truncate back.
-        //
-
         let ser =
             TruncatingSerializer::new(Buf::new(body.clone(), ..), TruncateDirection::DiscardBack)
-                .into_verifying(true);
-        let buf = ser.with_size_limit_verifying(7, true).serialize_vec_outer().unwrap();
-        let buf: &[u8] = buf.as_ref();
-        assert_eq!(buf, &[0, 1, 2, 3, 4, 5, 6][..]);
+                .into_verifying(true)
+                .with_size_limit_verifying(7, true);
+        verify_result(ser, &[0, 1, 2, 3, 4, 5, 6]);
 
-        //
         // Test no truncating (default/original case).
-        //
-
         let ser =
             TruncatingSerializer::new(Buf::new(body.clone(), ..), TruncateDirection::NoTruncating)
-                .into_verifying(false);
-        assert!(ser.clone().with_size_limit_verifying(5, true).serialize_vec_outer().is_err());
-        assert!(ser.with_size_limit_verifying(5, true).serialize_vec_outer().is_err());
+                .into_verifying(false)
+                .with_size_limit_verifying(5, true);
+        assert!(ser.clone().serialize_vec_outer().is_err());
+        assert!(ser.serialize_new_buf(PacketConstraints::UNCONSTRAINED, new_buf_vec).is_err());
+        assert!(ser.serialize_vec_outer().is_err());
 
-        //
         // Test that, when serialization fails, any truncation is undone.
-        //
 
         // `ser` has a body of `[1, 2]` and no prefix or suffix
         fn test_serialization_failure<S: Serializer + Clone + Eq + Debug>(

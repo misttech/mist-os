@@ -70,31 +70,6 @@ open protocol CombinedBufferCollectionToken {
         is_alternate bool;
     }) error zx.Status;
 
-    // fuchsia.sysmem/BufferCollectionToken, with de-conflicted names:
-    //
-    // Still handled, for clients that haven't been re-built yet.
-    @selector("fuchsia.sysmem/BufferCollectionToken.Sync")
-    strict DeprecatedSyncV1() -> ();
-    // Still handled, for clients that haven't been re-built yet.
-    @selector("fuchsia.sysmem/BufferCollectionToken.Close")
-    strict DeprecatedCloseV1();
-    // Still handled, for clients that haven't been re-built yet.
-    @selector("fuchsia.sysmem/BufferCollectionToken.SetName")
-    strict DeprecatedSetNameV1(struct {
-        priority uint32;
-        name string:64;
-    });
-    // Still handled, for clients that haven't been re-built yet.
-    @selector("fuchsia.sysmem/BufferCollectionToken.SetDebugClientInfo")
-    strict DeprecatedSetDebugClientInfoV1(struct {
-        name string:64;
-        id uint64;
-    });
-    // Still handled, for clients that haven't been re-built yet.
-    @selector("fuchsia.sysmem/BufferCollectionToken.SetDebugTimeoutLogDeadline")
-    strict DeprecatedSetDebugTimeoutLogDeadlineV1(struct {
-        deadline zx.Time;
-    });
     @selector("fuchsia.sysmem/BufferCollectionToken.DuplicateSync")
     strict DuplicateSyncV1(struct {
         rights_attenuation_masks vector<zx.Rights>:MAX_COUNT_DUPLICATES_V1;

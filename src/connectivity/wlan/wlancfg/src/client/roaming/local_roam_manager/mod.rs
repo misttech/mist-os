@@ -5,11 +5,11 @@
 use {
     crate::{
         client::{
-            connection_selection::{ConnectionSelectionRequester, EWMA_SMOOTHING_FACTOR},
+            connection_selection::ConnectionSelectionRequester,
             roaming::{lib::*, roam_monitor},
             types,
         },
-        telemetry::{TelemetryEvent, TelemetrySender},
+        telemetry::{TelemetryEvent, TelemetrySender, EWMA_SMOOTHING_FACTOR_FOR_METRICS},
         util::pseudo_energy::EwmaSignalData,
     },
     anyhow::{format_err, Error},
@@ -62,7 +62,7 @@ impl LocalRoamManagerApi for LocalRoamManager {
     ) -> Box<dyn roam_monitor::RoamMonitorApi> {
         let connection_data = ConnectionData::new(
             currently_fulfilled_connection.clone(),
-            EwmaSignalData::new(signal.rssi_dbm, signal.snr_db, EWMA_SMOOTHING_FACTOR),
+            EwmaSignalData::new(signal.rssi_dbm, signal.snr_db, EWMA_SMOOTHING_FACTOR_FOR_METRICS),
             fasync::Time::now(),
         );
         Box::new(roam_monitor::RoamMonitor::new(
@@ -249,7 +249,7 @@ mod tests {
         let mut serve_fut = pin!(serve_fut);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
-        let signal_data = EwmaSignalData::new(-80, 10, EWMA_SMOOTHING_FACTOR);
+        let signal_data = EwmaSignalData::new(-80, 10, EWMA_SMOOTHING_FACTOR_FOR_METRICS);
 
         let connection_data = ConnectionData::new(
             test_values.currently_fulfilled_connection.clone(),
@@ -305,7 +305,8 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Initialize current connection data.
-        let signal_data = EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR);
+        let signal_data =
+            EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR_FOR_METRICS);
         let connection_data = ConnectionData::new(
             test_values.currently_fulfilled_connection.clone(),
             signal_data,
@@ -375,7 +376,8 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Initialize current connection data.
-        let signal_data = EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR);
+        let signal_data =
+            EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR_FOR_METRICS);
         let connection_data = ConnectionData::new(
             test_values.currently_fulfilled_connection.clone(),
             signal_data,

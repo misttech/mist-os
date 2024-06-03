@@ -149,16 +149,18 @@ impl TilingWm {
                     .context("GraphicalPresenterPresentView present")?;
 
                 // Alert the client that the view has been presented, then begin servicing ViewController requests.
-                let view_controller_request_stream = view_controller_request_stream.unwrap();
-                view_controller_request_stream
-                    .control_handle()
-                    .send_on_presented()
-                    .context("GraphicalPresenterPresentView send_on_presented")?;
-                run_tile_controller_request_stream(
-                    new_tile_id,
-                    view_controller_request_stream,
-                    self.internal_sender.clone(),
-                );
+                if view_controller_request_stream.is_some() {
+                    let view_controller_request_stream = view_controller_request_stream.unwrap();
+                    view_controller_request_stream
+                        .control_handle()
+                        .send_on_presented()
+                        .context("GraphicalPresenterPresentView send_on_presented")?;
+                    run_tile_controller_request_stream(
+                        new_tile_id,
+                        view_controller_request_stream,
+                        self.internal_sender.clone(),
+                    );
+                }
 
                 // Begin servicing ChildViewWatcher requests.
                 Self::watch_tile(new_tile_id, tile_watcher, self.internal_sender.clone());

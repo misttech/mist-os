@@ -1,0 +1,9 @@
+{
+    "short_description": "Test driver that declares the usage of the metadata that it requests",
+    "manufacturer": "",
+    "families": [],
+    "models": [],
+    "areas": [
+        "DriverFramework"
+    ]
+}

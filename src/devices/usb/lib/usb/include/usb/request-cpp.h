@@ -5,7 +5,11 @@
 #ifndef SRC_DEVICES_USB_LIB_USB_INCLUDE_USB_REQUEST_CPP_H_
 #define SRC_DEVICES_USB_LIB_USB_INCLUDE_USB_REQUEST_CPP_H_
 
-#include <lib/ddk/debug.h>
+#ifdef DFV2_COMPAT_LOGGING
+#include <lib/driver/compat/cpp/logging.h>  // nogncheck
+#else
+#include <lib/ddk/debug.h>  // nogncheck
+#endif
 #include <lib/ddk/phys-iter.h>
 #include <lib/fit/function.h>
 #include <lib/operation/operation.h>

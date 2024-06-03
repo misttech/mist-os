@@ -21,17 +21,20 @@ class LoaderApp;
 class LavapipeDevice : public GpuDevice {
  public:
   static std::unique_ptr<LavapipeDevice> Create(LoaderApp* app, const std::string& name,
-                                                inspect::Node* parent);
+                                                inspect::Node* parent,
+                                                const std::string& lavapipe_icd_url);
 
   IcdList& icd_list() override { return icd_list_; }
 
  private:
   explicit LavapipeDevice(LoaderApp* app) : GpuDevice(app) {}
 
-  bool Initialize(const std::string& name, inspect::Node* parent);
+  bool Initialize(const std::string& name, inspect::Node* parent,
+                  const std::string& lavapipe_icd_url);
 
   FIT_DECLARE_THREAD_CHECKER(main_thread_)
   IcdList icd_list_;
+  std::string lavapipe_icd_url_;
 
   FXL_DISALLOW_COPY_ASSIGN_AND_MOVE(LavapipeDevice);
 };

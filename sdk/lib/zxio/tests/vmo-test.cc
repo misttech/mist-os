@@ -25,9 +25,10 @@ TEST(Vmo, Create) {
   ASSERT_OK(zxio_create(backing.release(), &storage));
   zxio_t* io = &storage.io;
 
-  zxio_node_attributes_t attr = {.has = {.content_size = true}};
+  zxio_node_attributes_t attr = {.has = {.content_size = true, .object_type = true}};
   ASSERT_OK(zxio_attr_get(io, &attr));
   EXPECT_EQ(kSize, attr.content_size);
+  EXPECT_EQ(ZXIO_OBJECT_TYPE_VMO, attr.object_type);
   ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED, zxio_attr_set(io, &attr));
 
   ASSERT_OK(zxio_close(io, /*should_wait=*/true));
@@ -233,8 +234,7 @@ TEST_F(HugeVmoTest, SeekPositiveOverflow) {
 
 class VmoCloseTest : public VmoTest {
  public:
-  void TearDown() override { /* The test case body will exercise closing */
-  }
+  void TearDown() override { /* The test case body will exercise closing */ }
 };
 
 TEST_F(VmoCloseTest, UseAfterClose) {

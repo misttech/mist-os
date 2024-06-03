@@ -36,6 +36,18 @@ const MAX_CHILD_COUNT uint32 = 128;
 /// `fuchsia.component.Realm`.
 @discoverable(server="platform")
 closed protocol Realm {
+    /// Operate on a child component. See documentation for [`Controller`].
+    ///
+    /// Errors:
+    /// - `INVALID_ARGUMENTS`: `child` is not a valid child reference.
+    /// - `INSTANCE_NOT_FOUND`: `child` does not exist.
+    /// - `INSTANCE_DIED`: This realm no longer exists.
+    @available(added=HEAD)
+    strict OpenController(resource struct {
+        child fuchsia.component.decl.ChildRef;
+        controller server_end:Controller;
+    }) -> () error Error;
+
     /// Opens the exposed directory of a child component instance. When this
     /// function successfully returns, `exposed_dir` is bound to a directory
     /// that contains the capabilities which the child exposed to its realm

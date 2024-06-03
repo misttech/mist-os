@@ -64,6 +64,9 @@ zx::result<fs::VnodeAttributes> VnodeDir::GetAttributes() const {
       .link_count = link_count_,
       .creation_time = create_time_,
       .modification_time = modify_time_,
+      .mode = mode_,
+      .uid = uid_,
+      .gid = gid_,
   });
 }
 

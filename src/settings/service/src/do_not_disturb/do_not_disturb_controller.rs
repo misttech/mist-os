@@ -11,12 +11,15 @@ use crate::handler::setting_handler::{
 };
 use async_trait::async_trait;
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
-use settings_storage::storage_factory::StorageAccess;
+use settings_storage::storage_factory::{NoneT, StorageAccess};
 
 impl DeviceStorageCompatible for DoNotDisturbInfo {
+    type Loader = NoneT;
     const KEY: &'static str = "do_not_disturb_info";
+}
 
-    fn default_value() -> Self {
+impl Default for DoNotDisturbInfo {
+    fn default() -> Self {
         DoNotDisturbInfo::new(false, false)
     }
 }
@@ -33,7 +36,8 @@ pub struct DoNotDisturbController {
 
 impl StorageAccess for DoNotDisturbController {
     type Storage = DeviceStorage;
-    const STORAGE_KEYS: &'static [&'static str] = &[DoNotDisturbInfo::KEY];
+    type Data = DoNotDisturbInfo;
+    const STORAGE_KEY: &'static str = DoNotDisturbInfo::KEY;
 }
 
 #[async_trait]

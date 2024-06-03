@@ -14,7 +14,7 @@ use fidl_fuchsia_io::{self as fio, DirectoryMarker};
 use fidl_fuchsia_sys2 as fsys2;
 use fuchsia_zircon_status::Status;
 use futures::{StreamExt, TryStreamExt};
-use moniker::{Moniker, MonikerBase};
+use moniker::Moniker;
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::Path;

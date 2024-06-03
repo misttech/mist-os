@@ -32,8 +32,9 @@ class DirectoryConnection final : public Connection,
 
   void BindImpl(zx::channel channel, OnUnbound on_unbound) final;
   zx::result<> Unbind() final;
-  zx::result<> WithRepresentation(fit::callback<void(fuchsia_io::wire::Representation)> handler,
-                                  std::optional<fuchsia_io::NodeAttributesQuery> query) const final;
+  zx::result<> WithRepresentation(
+      fit::callback<zx::result<>(fuchsia_io::wire::Representation)> handler,
+      std::optional<fuchsia_io::NodeAttributesQuery> query) const final;
   zx::result<> WithNodeInfoDeprecated(
       fit::callback<void(fuchsia_io::wire::NodeInfoDeprecated)> handler) const final;
 
@@ -91,10 +92,7 @@ class DirectoryConnection final : public Connection,
   void Watch(WatchRequestView request, WatchCompleter::Sync& completer) final;
   void QueryFilesystem(QueryFilesystemCompleter::Sync& completer) final;
   void Open2(fuchsia_io::wire::Directory2Open2Request* request,
-             Open2Completer::Sync& completer) final {
-    fidl::ServerEnd<fuchsia_io::Node>(std::move(request->object_request))
-        .Close(ZX_ERR_NOT_SUPPORTED);
-  }
+             Open2Completer::Sync& completer) final;
 #if FUCHSIA_API_LEVEL_AT_LEAST(18)
   void CreateSymlink(fuchsia_io::wire::Directory2CreateSymlinkRequest* request,
                      CreateSymlinkCompleter::Sync& completer) final {

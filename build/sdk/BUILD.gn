@@ -30,6 +30,7 @@ _sdk_source_sets_list = [
   "//sdk/lib/driver/devfs/cpp",
   "//sdk/lib/driver/incoming/cpp",
   "//sdk/lib/driver/logging/cpp",
+  "//sdk/lib/driver/metadata/cpp",
   "//sdk/lib/driver/outgoing/cpp",
   "//sdk/lib/driver/runtime:driver_runtime_cpp",
   "//sdk/lib/driver/runtime:driver_runtime_env_cpp",

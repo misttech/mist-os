@@ -16,6 +16,7 @@ board_configuration("x64") {
   }
 
   provided_features = [
+    "fuchsia::pmm_checker_auto",
     "fuchsia::wlan_softmac",
     "fuchsia::paravirtualization",
     "fuchsia::paver",

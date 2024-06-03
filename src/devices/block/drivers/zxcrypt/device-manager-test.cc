@@ -41,7 +41,7 @@ class ZxcryptInspect : public gtest::RealLoopFixture {
     driver_integration_test::IsolatedDevmgr::Args args;
     ASSERT_EQ(driver_integration_test::IsolatedDevmgr::Create(&args, &devmgr_), ZX_OK);
     ASSERT_EQ(device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(),
-                                                   "sys/platform/00:00:2d/ramctl")
+                                                   "sys/platform/ram-disk/ramctl")
                   .status_value(),
               ZX_OK);
   }
@@ -52,7 +52,7 @@ class ZxcryptInspect : public gtest::RealLoopFixture {
 
     const std::string moniker =
         std::string{"realm_builder:"} + devmgr_.RealmChildName() +
-        "/driver_test_realm/realm_builder:0/boot-drivers:dev.sys.platform.00_00_2d.ramctl.ramdisk-0.block";
+        "/driver_test_realm/realm_builder:0/boot-drivers:dev.sys.platform.ram-disk.ramctl.ramdisk-0.block";
 
     return fpromise::make_ok_promise(
                std::unique_ptr<ArchiveReader>(new ArchiveReader(

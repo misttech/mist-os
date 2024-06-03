@@ -144,7 +144,7 @@ void DriverHost::StartDriver(fbl::RefPtr<Driver> driver,
                                   fidl::ServerEnd<fdh::Driver> server) {
       if (!info.is_user_initiated()) {
         FX_SLOG(WARNING, "Unexpected stop of driver", FX_KV("url", driver->url().data()),
-                FX_KV("status_str", info.FormatDescription()).data());
+                FX_KV("status_str", info.FormatDescription().data()));
       }
       ShutdownDriver(driver, std::move(server));
     };

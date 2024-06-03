@@ -24,7 +24,7 @@ const KERNEL_URL: &str = "starnix_kernel#meta/starnix_kernel.cm";
 ///
 /// It also reports the memory usage attribution of each kernel.
 pub struct Kernels {
-    /// Mapping from name to StarnixKernel.
+    /// Mapping from kernel name to StarnixKernel.
     kernels: Arc<Mutex<HashMap<String, Arc<StarnixKernel>>>>,
     memory_attribution_server: AttributionServerHandle,
     memory_update_publisher: attribution::Publisher,

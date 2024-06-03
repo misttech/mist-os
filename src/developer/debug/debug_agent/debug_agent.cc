@@ -974,6 +974,16 @@ std::vector<const Filter*> DebugAgent::GetMatchingFiltersForComponentInfo(
   return matches;
 }
 
+void DebugAgent::RemoveObserver(DebugAgentObserver* observer) {
+  observers_.RemoveObserver(observer);
+
+  // If we just removed the last server and there is no debug_ipc client, it's time to exit.
+  if (!observers_.might_have_observers() && !is_connected()) {
+    ClearState();
+    debug::MessageLoop::Current()->QuitNow();
+  }
+}
+
 void DebugAgent::WriteLog(debug::LogSeverity severity, const debug::FileLineFunction& location,
                           std::string log) {
   debug_ipc::NotifyLog notify;

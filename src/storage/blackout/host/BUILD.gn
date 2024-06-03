@@ -5,16 +5,25 @@
 import("//build/python/python_mobly_test.gni")
 import("//build/testing/environments.gni")
 
+# Note:
+#  - "*_unstable*" groups contains tests that are running in infra but are not yet eligible to be
+#    included in CQ
+#  - "*_stable*" groups contains tests that are running in infra in CQ
+
 group("blackout_all") {
   testonly = true
   deps = [
-    ":blackout_emulator",
+    ":blackout_emulator_stable",
+    ":blackout_emulator_unstable",
     ":blackout_fail",
-    ":blackout_vim3",
+    ":blackout_starnix_vim3_stable",
+    ":blackout_starnix_vim3_unstable",
+    ":blackout_vim3_stable",
+    ":blackout_vim3_unstable",
   ]
 }
 
-group("blackout_emulator") {
+group("blackout_emulator_stable") {
   testonly = true
   deps = [
     ":blackout_integration_test_no_reboot($host_toolchain)",
@@ -22,12 +31,42 @@ group("blackout_emulator") {
   ]
 }
 
-group("blackout_vim3") {
+group("blackout_emulator_unstable") {
+  testonly = true
+  deps = []
+}
+
+group("blackout_vim3_stable") {
+  testonly = true
+  deps = []
+}
+
+group("blackout_vim3_unstable") {
   testonly = true
   deps = [
+    # Integration tests
     ":blackout_integration_test_reboot($host_toolchain)",
     "//src/storage/blackout/target/blackout-integration",
+
+    # Fxfs tests
+    ":blackout_fxfs_tree_hard_reboot($host_toolchain)",
+    ":blackout_fxfs_tree_soft_reboot($host_toolchain)",
+    "//src/storage/blackout/target/fs-tree:blackout-fxfs-tree",
   ]
+}
+
+group("blackout_starnix_vim3_unstable") {
+  testonly = true
+  deps = [
+    # Fxfs tests
+    ":blackout_fxfs_tree_idle_suspend_timer_resume($host_toolchain)",
+    "//src/storage/blackout/target/fs-tree:blackout-fxfs-tree",
+  ]
+}
+
+group("blackout_starnix_vim3_stable") {
+  testonly = true
+  deps = []
 }
 
 # This is a special integration test which is supposed to fail, to test that verification failures
@@ -108,5 +147,90 @@ if (is_host) {
       test_case_revive = true
       fuchsia_device_operation = "None"
     }
+  }
+
+  python_mobly_test("blackout_fxfs_tree_soft_reboot") {
+    main_source = "blackout.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
+      "//tools/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data",
+    ]
+    transport = "fuchsia-controller"
+    params = {
+      # Blackout args
+      component_name = "/core/ffx-laboratory:blackout-target"
+      component_url = "fuchsia-pkg://fuchsia.com/blackout-fxfs-tree#meta/blackout-fxfs-tree-component.cm"
+      test_duration = 30
+
+      # TODO(https://fxbug.dev/338452001): the vim3 bootloader currently resets the gpt partition
+      # table if it isn't the exact hard-coded partition table it expects, so we use the label of a
+      # 32MiB partition that isn't used so it doesn't get blown away on reboot. Once the bootloader
+      # doesn't do that, we can use our own partition (in other words, delete the following line
+      # once the bug is resolved).
+      device_label = "factory"
+
+      # test case revive args
+      test_case_revive = true
+      fuchsia_device_operation = "Soft-Reboot"
+    }
+    environments = [ vim3_env ]
+  }
+
+  python_mobly_test("blackout_fxfs_tree_hard_reboot") {
+    main_source = "blackout.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
+      "//tools/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data",
+    ]
+    transport = "fuchsia-controller"
+    params = {
+      # Blackout args
+      component_name = "/core/ffx-laboratory:blackout-target"
+      component_url = "fuchsia-pkg://fuchsia.com/blackout-fxfs-tree#meta/blackout-fxfs-tree-component.cm"
+      test_duration = 30
+
+      # TODO(https://fxbug.dev/338452001): the vim3 bootloader currently resets the gpt partition
+      # table if it isn't the exact hard-coded partition table it expects, so we use the label of a
+      # 32MiB partition that isn't used so it doesn't get blown away on reboot. Once the bootloader
+      # doesn't do that, we can use our own partition (in other words, delete the following line
+      # once the bug is resolved).
+      device_label = "factory"
+
+      # test case revive args
+      test_case_revive = true
+      fuchsia_device_operation = "Hard-Reboot"
+    }
+    environments = [ vim3_env ]
+  }
+
+  python_mobly_test("blackout_fxfs_tree_idle_suspend_timer_resume") {
+    main_source = "blackout.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
+      "//tools/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data",
+    ]
+    transport = "fuchsia-controller"
+    params = {
+      # Blackout args
+      component_name = "/core/ffx-laboratory:blackout-target"
+      component_url = "fuchsia-pkg://fuchsia.com/blackout-fxfs-tree#meta/blackout-fxfs-tree-component.cm"
+      test_duration = 30
+
+      # TODO(https://fxbug.dev/338452001): the vim3 bootloader currently resets the gpt partition
+      # table if it isn't the exact hard-coded partition table it expects, so we use the label of a
+      # 32MiB partition that isn't used so it doesn't get blown away on reboot. Once the bootloader
+      # doesn't do that, we can use our own partition (in other words, delete the following line
+      # once the bug is resolved).
+      device_label = "factory"
+
+      # test case revive args
+      test_case_revive = true
+      fuchsia_device_operation = "idle-suspend-timer-resume"
+      resume_timer_duration_sec = 3
+    }
+    environments = [ vim3_env ]
   }
 }

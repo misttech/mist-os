@@ -11,7 +11,16 @@ rustc_library("wlan-ffi-transport") {
 
   with_unit_tests = true
 
-  deps = [ "//third_party/rust_crates:thiserror" ]
+  deps = [
+    "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_rust",
+    "//src/connectivity/wlan/lib/fidl-ext:wlan-fidl-ext",
+    "//src/connectivity/wlan/lib/trace:wlan-trace",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/trace/rust:trace",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:tracing",
+  ]
 
   test_deps = [ "//third_party/rust_crates:test-case" ]
 
@@ -19,6 +28,7 @@ rustc_library("wlan-ffi-transport") {
     "src/buffers.rs",
     "src/errors.rs",
     "src/lib.rs",
+    "src/transport.rs",
   ]
 }
 

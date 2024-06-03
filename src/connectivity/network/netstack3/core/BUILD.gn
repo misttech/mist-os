@@ -25,6 +25,21 @@ _all_core_crates = [
   "ip:netstack3-ip-instrumented",
   "ip:netstack3-ip-loom",
   "ip:netstack3-ip-testutils",
+  "device:netstack3-device",
+  "device:netstack3-device-benchmarks",
+  "device:netstack3-device-instrumented",
+  "device:netstack3-device-loom",
+  "device:netstack3-device-testutils",
+  "tcp:netstack3-tcp",
+  "tcp:netstack3-tcp-benchmarks",
+  "tcp:netstack3-tcp-instrumented",
+  "tcp:netstack3-tcp-loom",
+  "tcp:netstack3-tcp-testutils",
+  "udp:netstack3-udp",
+  "udp:netstack3-udp-benchmarks",
+  "udp:netstack3-udp-instrumented",
+  "udp:netstack3-udp-loom",
+  "udp:netstack3-udp-testutils",
   "sync:netstack3-sync",
   "sync:netstack3-sync-instrumented",
   "sync:netstack3-sync-loom",
@@ -33,54 +48,23 @@ _all_core_crates = [
 rustc_library_with_features("netstack3-core") {
   version = "0.1.0"
   edition = "2021"
-  if (!is_host) {
-    configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
-  }
+  configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+  check_cfgs = [ "benchmark" ]
   sources = [
     "src/api.rs",
     "src/benchmarks.rs",
     "src/context.rs",
     "src/counters.rs",
-    "src/device/api.rs",
-    "src/device/arp.rs",
     "src/device/base.rs",
-    "src/device/config.rs",
     "src/device/ethernet.rs",
-    "src/device/ethernet/integration.rs",
-    "src/device/ethernet/integration_tests.rs",
-    "src/device/id.rs",
-    "src/device/integration.rs",
-    "src/device/integration_tests.rs",
     "src/device/loopback.rs",
-    "src/device/loopback/integration.rs",
-    "src/device/loopback/integration_tests.rs",
     "src/device/pure_ip.rs",
-    "src/device/pure_ip/integration.rs",
-    "src/device/pure_ip/integration_tests.rs",
-    "src/device/queue.rs",
-    "src/device/queue/api.rs",
-    "src/device/queue/fifo.rs",
-    "src/device/queue/rx.rs",
-    "src/device/queue/tx.rs",
     "src/device/socket.rs",
-    "src/device/socket/integration.rs",
-    "src/device/socket/integration_tests.rs",
-    "src/device/state.rs",
     "src/filter/integration.rs",
-    "src/ip/device/integration.rs",
-    "src/ip/device/integration_tests/base.rs",
-    "src/ip/device/integration_tests/ndp.rs",
-    "src/ip/device/integration_tests/nud.rs",
-    "src/ip/device/integration_tests/route_discovery.rs",
-    "src/ip/device/integration_tests/slaac.rs",
-    "src/ip/integration.rs",
-    "src/ip/integration_tests/base.rs",
-    "src/ip/integration_tests/forwarding.rs",
-    "src/ip/integration_tests/gmp.rs",
-    "src/ip/integration_tests/icmp.rs",
-    "src/ip/integration_tests/socket.rs",
-    "src/ip/raw/integration.rs",
+    "src/ip/base.rs",
+    "src/ip/device.rs",
+    "src/ip/raw.rs",
     "src/lib.rs",
     "src/lock_ordering.rs",
     "src/marker.rs",
@@ -89,70 +73,34 @@ rustc_library_with_features("netstack3-core") {
     "src/time.rs",
     "src/transport.rs",
     "src/transport/integration.rs",
-    "src/transport/tcp.rs",
-    "src/transport/tcp/buffer.rs",
-    "src/transport/tcp/congestion.rs",
-    "src/transport/tcp/congestion/cubic.rs",
-    "src/transport/tcp/rtt.rs",
-    "src/transport/tcp/segment.rs",
-    "src/transport/tcp/seqnum.rs",
-    "src/transport/tcp/socket.rs",
-    "src/transport/tcp/socket/accept_queue.rs",
-    "src/transport/tcp/socket/demux.rs",
-    "src/transport/tcp/socket/isn.rs",
-    "src/transport/tcp/state.rs",
-    "src/transport/udp.rs",
-    "src/transport/udp/integration_tests.rs",
-    "src/uninstantiable.rs",
   ]
   deps = [
-    # TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11):
-    # remove this module.
-    "//src/lib/fakealloc",
-
-    # TODO(https://github.com/rust-lang/rust/issues/62502): remove this module.
-    "fakestd",
-
-    # Placeholder comment so the auto formatter does not move one of these
-    # dependencies above "fakestd".
     "lock-order",
     "macros:netstack3-macros",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
-    "//src/connectivity/network/lib/explicit",
-    "//src/lib/const-unwrap",
-    "//src/lib/dense-map",
     "//src/lib/network/packet",
-    "//src/lib/replace-with",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:derivative",
-    "//third_party/rust_crates:either",
-    "//third_party/rust_crates:rand",
-    "//third_party/rust_crates:ref-cast",
-    "//third_party/rust_crates:siphasher",
-    "//third_party/rust_crates:smallvec",
-    "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
+
+    # TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11):
+    # remove this module.
+    "//src/lib/fakealloc",
   ]
   _testutil_deps = [ "//third_party/rust_crates:zerocopy" ]
-  test_deps = [
-    "//src/connectivity/lib/ip-test-macro",
-    "//src/connectivity/lib/net-declare",
-    "//src/lib/proptest-support",
-    "//third_party/rust_crates:itertools",
-    "//third_party/rust_crates:proptest",
-    "//third_party/rust_crates:test-case",
-  ]
-  test_deps += _testutil_deps
 
   feature_sets = [
     {
       features = []
       deps += [
         "base:netstack3-base",
+        "device:netstack3-device",
         "filter:netstack3-filter",
         "ip:netstack3-ip",
         "sync:netstack3-sync",
+        "tcp:netstack3-tcp",
+        "udp:netstack3-udp",
       ]
     },
 
@@ -165,30 +113,26 @@ rustc_library_with_features("netstack3-core") {
       with_unit_tests = true
       non_test_deps = [
         "base:netstack3-base-instrumented",
+        "device:netstack3-device-instrumented",
         "filter:netstack3-filter-instrumented",
         "ip:netstack3-ip-instrumented",
         "sync:netstack3-sync-instrumented",
+        "tcp:netstack3-tcp-instrumented",
+        "udp:netstack3-udp-instrumented",
       ]
-      test_deps += [
+      test_deps = [
         "base:netstack3-base-testutils",
+        "device:netstack3-device-testutils",
         "filter:netstack3-filter-testutils",
         "ip:netstack3-ip-testutils",
         "sync:netstack3-sync-instrumented",
-        "//third_party/rust_crates:scopeguard",
+        "tcp:netstack3-tcp-testutils",
+        "udp:netstack3-udp-testutils",
       ]
+      test_deps += _testutil_deps
 
       # Guard against bad crate variants.
       assert_no_deps = _all_core_crates - non_test_deps
-
-      # TODO(https://fxbug.dev/42086491): Split up large tests.
-      # Compiling the tests OOMs on RBE with these variants.
-      if (is_coverage || is_asan || is_hwasan || is_fuzzer ||
-          optimize == "sanitizer" || target_cpu == "arm64") {
-        test_disable_rbe = true
-
-        # This is known to take over 17GB memory locally for coverage.
-        pool = "//build/config:highmem($default_toolchain)"
-      }
     },
 
     # A variant of the netstack3-core library that exposes test utilities.
@@ -202,9 +146,12 @@ rustc_library_with_features("netstack3-core") {
 
       _core_deps = [
         "base:netstack3-base-testutils",
+        "device:netstack3-device-testutils",
         "filter:netstack3-filter-testutils",
         "ip:netstack3-ip-testutils",
         "sync:netstack3-sync-instrumented",
+        "tcp:netstack3-tcp-testutils",
+        "udp:netstack3-udp-testutils",
       ]
 
       deps += _core_deps
@@ -223,9 +170,12 @@ rustc_library_with_features("netstack3-core") {
 
       _core_deps = [
         "base:netstack3-base-benchmarks",
+        "device:netstack3-device-benchmarks",
         "filter:netstack3-filter-benchmarks",
         "ip:netstack3-ip-benchmarks",
         "sync:netstack3-sync",
+        "tcp:netstack3-tcp-benchmarks",
+        "udp:netstack3-udp-benchmarks",
       ]
       deps += _core_deps
       deps += [ "//third_party/rust_crates:criterion" ]
@@ -251,9 +201,12 @@ rustc_library_with_features("netstack3-core") {
         ]
         _core_deps = [
           "base:netstack3-base-loom",
+          "device:netstack3-device-loom",
           "filter:netstack3-filter-loom",
           "ip:netstack3-ip-loom",
           "sync:netstack3-sync-loom",
+          "tcp:netstack3-tcp-loom",
+          "udp:netstack3-udp-loom",
         ]
         deps += _core_deps
         deps += _testutil_deps
@@ -341,11 +294,14 @@ group("tests") {
     ":netstack3-core-instrumented_test($host_toolchain)",
     ":netstack3-core-test-package",
     "base:tests",
+    "device:tests",
     "filter:tests",
     "ip:tests",
     "lock-order:tests",
     "macros:tests",
     "sync:tests",
+    "tcp:tests",
     "tests($host_toolchain)",
+    "udp:tests",
   ]
 }

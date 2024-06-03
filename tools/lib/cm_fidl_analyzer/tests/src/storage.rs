@@ -11,7 +11,7 @@ mod tests {
         component_id_index::InstanceId,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
         fuchsia_zircon_status as zx_status,
-        moniker::{Moniker, MonikerBase},
+        moniker::Moniker,
         routing::{mapper::RouteSegment, RegistrationDecl},
         routing_test_helpers::{
             component_id_index::make_index_file, storage::CommonStorageTest, CheckUse,

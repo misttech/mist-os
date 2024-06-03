@@ -4,18 +4,12 @@
 
 use {
     crate::{
-        client::{
-            connection_selection::{
-                scoring_functions::score_current_connection_signal_data, EWMA_SMOOTHING_FACTOR,
-            },
-            roaming::local_roam_manager::LocalRoamManagerApi,
-            types,
-        },
+        client::{roaming::local_roam_manager::LocalRoamManagerApi, types},
         config_management::{PastConnectionData, SavedNetworksManagerApi},
         mode_management::{Defect, IfaceFailure},
         telemetry::{
-            DisconnectInfo, TelemetryEvent, TelemetrySender, TimestampedConnectionScore,
-            AVERAGE_SCORE_DELTA_MINIMUM_DURATION, METRICS_SHORT_CONNECT_DURATION,
+            DisconnectInfo, TelemetryEvent, TelemetrySender, AVERAGE_SCORE_DELTA_MINIMUM_DURATION,
+            METRICS_SHORT_CONNECT_DURATION,
         },
         util::{
             historical_list::HistoricalList,
@@ -23,7 +17,6 @@ use {
                 ClientListenerMessageSender, ClientNetworkState, ClientStateUpdate,
                 Message::NotifyListeners,
             },
-            pseudo_energy::EwmaSignalData,
             state_machine::{self, ExitReason, IntoStateExt},
         },
     },
@@ -42,10 +35,7 @@ use {
     },
     std::{convert::Infallible, sync::Arc},
     tracing::{debug, error, info, warn},
-    wlan_common::{
-        bss::BssDescription, energy::DecibelMilliWatt, sequestered::Sequestered,
-        stats::SignalStrengthAverage,
-    },
+    wlan_common::{bss::BssDescription, sequestered::Sequestered},
 };
 
 const MAX_CONNECTION_ATTEMPTS: u8 = 4; // arbitrarily chosen until we have some data
@@ -491,7 +481,6 @@ async fn connecting_state<'a>(
                 multiple_bss_candidates: options.connect_selection.target.network_has_multiple_bss,
                 connection_attempt_time: start_time,
                 time_to_connect: fasync::Time::now() - start_time,
-                past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
                 network_is_likely_hidden,
             };
             return Ok(connected_state(common_options, connected_options).into_state());
@@ -536,8 +525,6 @@ struct ConnectedOptions {
     pub connection_attempt_time: fasync::Time,
     /// Duration from connection attempt to success, historical data for network scoring.
     pub time_to_connect: zx::Duration,
-    /// Rolling log of connection scores
-    pub past_connection_scores: HistoricalList<TimestampedConnectionScore>,
 }
 
 /// The CONNECTED state monitors the SME status. It handles the SME status response:
@@ -555,13 +542,14 @@ async fn connected_state(
     debug!("Entering connected state");
     let mut connect_start_time = fasync::Time::now();
 
-    // Track the EWMA signal and velocity for metrics
-    let signal_data = EwmaSignalData::new(
-        options.ap_state.tracked.signal.rssi_dbm,
-        options.ap_state.tracked.signal.snr_db,
-        EWMA_SMOOTHING_FACTOR,
-    );
-    let initial_score = score_current_connection_signal_data(signal_data, 0.0);
+    // Tracked signals
+    let mut past_signals = HistoricalList::new(NUM_PAST_SCORES);
+    past_signals.add(types::TimestampedSignal {
+        time: fasync::Time::now(),
+        signal: options.ap_state.tracked.signal,
+    });
+
+    let initial_signal = options.ap_state.tracked.signal;
 
     // Used to receive roam requests. The sender is cloned to send to the RoamManager.
     let (roam_sender, mut roam_receiver) = mpsc::unbounded::<types::ScannedCandidate>();
@@ -570,9 +558,6 @@ async fn connected_state(
         options.currently_fulfilled_connection.clone(),
         roam_sender,
     );
-
-    // Keep track of the connection's average signal strength for future scoring.
-    let mut avg_rssi = SignalStrengthAverage::new();
 
     // Timer to log post-connection scores metrics.
     let mut post_connect_metric_timer =
@@ -596,19 +581,18 @@ async fn connected_state(
                                 disconnect_source: fidl_info.disconnect_source,
                                 previous_connect_reason: options.currently_fulfilled_connection.reason,
                                 ap_state: (*options.ap_state).clone(),
-                                connection_scores: options.past_connection_scores.clone()
+                                signals: past_signals.clone(),
                             };
                             common_options.telemetry_sender.send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
 
                             // Record data about the connection and disconnect for future network
                             // selection.
-                            let signal_data = roam_monitor.get_signal_data();
                             record_disconnect(
                                 &common_options,
                                 &options,
                                 connect_start_time,
                                 types::DisconnectReason::DisconnectDetectedFromSme,
-                                Some(signal_data),
+                                options.ap_state.tracked.signal,
                             ).await;
 
                             !fidl_info.is_sme_reconnecting
@@ -637,14 +621,22 @@ async fn connected_state(
                         }
                         fidl_sme::ConnectTransactionEvent::OnSignalReport { ind } => {
                             // Update connection data
-                            options.ap_state.tracked.signal.rssi_dbm = ind.rssi_dbm;
-                            options.ap_state.tracked.signal.snr_db = ind.snr_db;
-                            avg_rssi.add(DecibelMilliWatt(ind.rssi_dbm));
+                            options.ap_state.tracked.signal = ind.into();
 
-                            let score = roam_monitor.handle_connection_stats(ind);
-                            if let Ok(score) = score {
-                                options.past_connection_scores.add(TimestampedConnectionScore::new(score, fasync::Time::now()));
-                            }
+                            // Update list of signals
+                            past_signals.add(types::TimestampedSignal {
+                                time: fasync::Time::now(),
+                                signal: ind.into(),
+                            });
+
+                            // Send signal report metrics
+                            common_options.telemetry_sender.send(TelemetryEvent::OnSignalReport {
+                                ind
+                            });
+
+                            // Send indication to roam_monitor
+                            let _ = roam_monitor.handle_connection_stats(ind);
+
                             false
                         }
                         fidl_sme::ConnectTransactionEvent::OnChannelSwitched { info } => {
@@ -675,15 +667,14 @@ async fn connected_state(
                 match req {
                     Some(ManualRequest::Disconnect((reason, responder))) => {
                         debug!("Disconnect requested");
-                        let signal_data = roam_monitor.get_signal_data();
                         record_disconnect(
                             &common_options,
                             &options,
                             connect_start_time,
                             reason,
-                            Some(signal_data)
+                            options.ap_state.tracked.signal,
                         ).await;
-                        let ConnectedOptions {ap_state, past_connection_scores, currently_fulfilled_connection, ..} = options;
+                        let ConnectedOptions {ap_state, currently_fulfilled_connection, ..} = options;
                         let options = DisconnectingOptions {
                             disconnect_responder: Some(responder),
                             previous_network: Some((currently_fulfilled_connection.target.network.clone(), types::DisconnectStatus::ConnectionStopped)),
@@ -696,7 +687,7 @@ async fn connected_state(
                             disconnect_source: fidl_sme::DisconnectSource::User(types::convert_to_sme_disconnect_reason(options.reason)),
                             ap_state: *ap_state,
                             previous_connect_reason: currently_fulfilled_connection.reason,
-                            connection_scores: past_connection_scores
+                            signals: past_signals.clone(),
                         };
                         common_options.telemetry_sender.send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
                         return Ok(disconnecting_state(common_options, options).into_state());
@@ -711,13 +702,12 @@ async fn connected_state(
                                 types::DisconnectReason::Unknown
                             });
 
-                            let signal_data = roam_monitor.get_signal_data();
                             record_disconnect(
                                 &common_options,
                                 &options,
                                 connect_start_time,
                                 disconnect_reason,
-                                Some(signal_data)
+                                options.ap_state.tracked.signal,
                             ).await;
 
 
@@ -725,7 +715,7 @@ async fn connected_state(
                                 connect_selection: new_connect_selection.clone(),
                                 attempt_counter: 0,
                             };
-                            let ConnectedOptions { ap_state, past_connection_scores, currently_fulfilled_connection, ..} = options;
+                            let ConnectedOptions { ap_state, currently_fulfilled_connection, ..} = options;
                             let options = DisconnectingOptions {
                                 disconnect_responder: None,
                                 previous_network: Some((currently_fulfilled_connection.target.network, types::DisconnectStatus::ConnectionStopped)),
@@ -739,7 +729,7 @@ async fn connected_state(
                                 disconnect_source: fidl_sme::DisconnectSource::User(types::convert_to_sme_disconnect_reason(options.reason)),
                                 ap_state: *ap_state,
                                 previous_connect_reason: currently_fulfilled_connection.reason,
-                                connection_scores: past_connection_scores
+                                signals: past_signals.clone(),
                             };
                             common_options.telemetry_sender.send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
                             return Ok(disconnecting_state(common_options, options).into_state())
@@ -749,15 +739,14 @@ async fn connected_state(
                 };
             },
             () = post_connect_metric_timer => {
-                // Log the score deltas since connection.
                 common_options.telemetry_sender.send(
-                    TelemetryEvent::PostConnectionScores { connect_time: connect_start_time, score_at_connect: initial_score, scores: options.past_connection_scores.clone() }
+                    TelemetryEvent::PostConnectionSignals { connect_time: connect_start_time, signal_at_connect: initial_signal, signals: past_signals.clone() }
                 );
             },
             () = connect_duration_metric_timer => {
                 // Log the average connection score metric for a long duration connection.
                 common_options.telemetry_sender.send(
-                    TelemetryEvent::LongDurationConnectionScoreAverage{ scores: options.past_connection_scores.get_before(fasync::Time::now()) }
+                    TelemetryEvent::LongDurationSignals{ signals: past_signals.get_before(fasync::Time::now()) }
                 );
             }
             _roam_request = roam_receiver.next() => {
@@ -772,35 +761,29 @@ async fn record_disconnect(
     options: &ConnectedOptions,
     connect_start_time: fasync::Time,
     reason: types::DisconnectReason,
-    signal_data: Option<EwmaSignalData>,
+    signal: types::Signal,
 ) {
-    if let Some(signal_data) = signal_data {
-        let curr_time = fasync::Time::now();
-        let uptime = curr_time - connect_start_time;
-        let data = PastConnectionData::new(
-            options.ap_state.original().bssid,
-            options.connection_attempt_time,
-            options.time_to_connect,
-            curr_time,
-            uptime,
-            reason,
-            signal_data,
-            // TODO: record average phy rate over connection once available
-            0,
-        );
-        common_options
-            .saved_networks_manager
-            .record_disconnect(
-                &options.currently_fulfilled_connection.target.network.clone(),
-                &options.currently_fulfilled_connection.target.credential,
-                data,
-            )
-            .await;
-    } else {
-        // This is an unlikely error that would happen the LocalRoamManager was not informed about
-        // the beginning of the connection.
-        error!("Could not record disconnect because signal data is not available.");
-    }
+    let curr_time = fasync::Time::now();
+    let uptime = curr_time - connect_start_time;
+    let data = PastConnectionData::new(
+        options.ap_state.original().bssid,
+        options.connection_attempt_time,
+        options.time_to_connect,
+        curr_time,
+        uptime,
+        reason,
+        signal,
+        // TODO: record average phy rate over connection once available
+        0,
+    );
+    common_options
+        .saved_networks_manager
+        .record_disconnect(
+            &options.currently_fulfilled_connection.target.network.clone(),
+            &options.currently_fulfilled_connection.target.credential,
+            data,
+        )
+        .await;
 }
 
 /// Get the disconnect reason corresponding to the connect reason. Return an error if the connect
@@ -840,8 +823,7 @@ mod tests {
                 },
             },
         },
-        fidl::endpoints::create_proxy_and_stream,
-        fidl::prelude::*,
+        fidl::{endpoints::create_proxy_and_stream, prelude::*},
         fidl_fuchsia_stash as fidl_stash, fidl_fuchsia_wlan_policy as fidl_policy,
         fuchsia_zircon::prelude::*,
         futures::{task::Poll, Future},
@@ -1305,11 +1287,10 @@ mod tests {
                 disconnect_time: fasync::Time::now(),
                 connection_uptime: zx::Duration::from_minutes(0),
                 disconnect_reason: types::DisconnectReason::DisconnectDetectedFromSme,
-                signal_data_at_disconnect: EwmaSignalData::new(
-                    bss_description.rssi_dbm,
-                    bss_description.snr_db,
-                    EWMA_SMOOTHING_FACTOR,
-                ),
+                signal_at_disconnect: types::Signal {
+                    rssi_dbm: bss_description.rssi_dbm,
+                    snr_db: bss_description.snr_db,
+                },
                 // TODO: record average phy rate over connection once available
                 average_tx_rate: 0,
             },
@@ -1816,7 +1797,7 @@ mod tests {
         let connect_selection = generate_connect_selection();
         let bss_description =
             Sequestered::release(connect_selection.target.bss.bss_description.clone());
-        let ap_state =
+        let init_ap_state =
             types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
 
         let (connect_txn_proxy, _connect_txn_stream) =
@@ -1827,12 +1808,11 @@ mod tests {
         let options = ConnectedOptions {
             currently_fulfilled_connection: connect_selection.clone(),
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
-            ap_state: Box::new(ap_state.clone()),
+            ap_state: Box::new(init_ap_state.clone()),
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
             connection_attempt_time,
             time_to_connect,
-            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -1845,18 +1825,18 @@ mod tests {
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        // Run forward to get post connection score metrics
+        // Run forward to get post connection signals metrics
         exec.set_fake_time(fasync::Time::after(AVERAGE_SCORE_DELTA_MINIMUM_DURATION + 1.second()));
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::PostConnectionScores { .. });
+            assert_variant!(event, TelemetryEvent::PostConnectionSignals { .. });
         });
 
-        // Run forward to get long duration score metrics
+        // Run forward to get long duration signals metrics
         exec.set_fake_time(fasync::Time::after(METRICS_SHORT_CONNECT_DURATION + 1.second()));
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::LongDurationConnectionScoreAverage { .. });
+            assert_variant!(event, TelemetryEvent::LongDurationSignals { .. });
         });
 
         // Run forward to disconnect time
@@ -1904,13 +1884,12 @@ mod tests {
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
             assert_variant!(event, TelemetryEvent::Disconnected { track_subsequent_downtime, info } => {
                 assert!(!track_subsequent_downtime);
-                assert_eq!(info, DisconnectInfo {
-                    connected_duration: 12.hours(),
-                    is_sme_reconnecting: false,
-                    disconnect_source: fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::FidlStopClientConnectionsRequest),
-                    previous_connect_reason: connect_selection.reason,
-                    ap_state: ap_state.clone(),
-                    connection_scores: HistoricalList::new(NUM_PAST_SCORES),
+                assert_variant!(info, DisconnectInfo {connected_duration, is_sme_reconnecting, disconnect_source, previous_connect_reason, ap_state, ..} => {
+                    assert_eq!(connected_duration, 12.hours());
+                    assert!(!is_sme_reconnecting);
+                    assert_eq!(disconnect_source, fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::FidlStopClientConnectionsRequest));
+                    assert_eq!(previous_connect_reason, connect_selection.reason);
+                    assert_eq!(ap_state, init_ap_state.clone());
                 });
             });
         });
@@ -1920,17 +1899,16 @@ mod tests {
             id: connect_selection.target.network.clone(),
             credential: connect_selection.target.credential.clone(),
             data: PastConnectionData {
-                bssid: ap_state.original().bssid,
+                bssid: init_ap_state.original().bssid,
                 connection_attempt_time,
                 time_to_connect,
                 disconnect_time,
                 connection_uptime: zx::Duration::from_hours(12),
                 disconnect_reason: types::DisconnectReason::FidlStopClientConnectionsRequest,
-                signal_data_at_disconnect: EwmaSignalData::new(
-                    bss_description.rssi_dbm,
-                    bss_description.snr_db,
-                    EWMA_SMOOTHING_FACTOR,
-                ),
+                signal_at_disconnect: types::Signal {
+                    rssi_dbm: bss_description.rssi_dbm,
+                    snr_db: bss_description.snr_db,
+                },
                 // TODO: record average phy rate over connection once available
                 average_tx_rate: 0,
             },
@@ -1951,7 +1929,7 @@ mod tests {
         let connect_selection = generate_connect_selection();
         let bss_description =
             Sequestered::release(connect_selection.target.bss.bss_description.clone());
-        let ap_state =
+        let init_ap_state =
             types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
 
         // Save the network in order to later record the disconnect to it.
@@ -1971,12 +1949,11 @@ mod tests {
         let options = ConnectedOptions {
             currently_fulfilled_connection: connect_selection.clone(),
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
-            ap_state: Box::new(ap_state.clone()),
+            ap_state: Box::new(init_ap_state.clone()),
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
             connection_attempt_time,
             time_to_connect,
-            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
 
         // Start the state machine in the connected state.
@@ -1989,8 +1966,7 @@ mod tests {
         exec.set_fake_time(disconnect_time);
 
         // SME notifies Policy of disconnection
-        let is_sme_reconnecting = false;
-        let fidl_disconnect_info = generate_disconnect_info(is_sme_reconnecting);
+        let fidl_disconnect_info = generate_disconnect_info(false);
         connect_txn_handle
             .send_on_disconnect(&fidl_disconnect_info)
             .expect("failed to send disconnection event");
@@ -2001,17 +1977,16 @@ mod tests {
             id: connect_selection.target.network.clone(),
             credential: connect_selection.target.credential.clone(),
             data: PastConnectionData {
-                bssid: ap_state.original().bssid,
+                bssid: init_ap_state.original().bssid,
                 connection_attempt_time,
                 time_to_connect,
                 disconnect_time,
                 connection_uptime: zx::Duration::from_hours(12),
                 disconnect_reason: types::DisconnectReason::DisconnectDetectedFromSme,
-                signal_data_at_disconnect: EwmaSignalData::new(
-                    bss_description.rssi_dbm,
-                    bss_description.snr_db,
-                    EWMA_SMOOTHING_FACTOR,
-                ),
+                signal_at_disconnect: types::Signal {
+                    rssi_dbm: bss_description.rssi_dbm,
+                    snr_db: bss_description.snr_db,
+                },
                 // TODO: record average phy rate over connection once available
                 average_tx_rate: 0,
             },
@@ -2020,17 +1995,16 @@ mod tests {
             assert_eq!(connection_data, &expected_recorded_connection);
         });
 
+        // Disconnect telemetry event sent
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            // Disconnect telemetry event sent
             assert_variant!(event, TelemetryEvent::Disconnected { track_subsequent_downtime, info } => {
                 assert!(track_subsequent_downtime);
-                assert_eq!(info, DisconnectInfo {
-                    connected_duration: 12.hours(),
-                    is_sme_reconnecting,
-                    disconnect_source: fidl_disconnect_info.disconnect_source,
-                    previous_connect_reason: connect_selection.reason,
-                    ap_state: ap_state.clone(),
-                    connection_scores: HistoricalList::new(NUM_PAST_SCORES),
+                assert_variant!(info, DisconnectInfo {connected_duration, is_sme_reconnecting, disconnect_source, previous_connect_reason, ap_state, ..} => {
+                    assert_eq!(connected_duration, 12.hours());
+                    assert!(!is_sme_reconnecting);
+                    assert_eq!(disconnect_source, fidl_disconnect_info.disconnect_source);
+                    assert_eq!(previous_connect_reason, connect_selection.reason);
+                    assert_eq!(ap_state, init_ap_state);
                 });
             });
         });
@@ -2062,7 +2036,6 @@ mod tests {
             network_is_likely_hidden: false,
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
-            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -2077,14 +2050,14 @@ mod tests {
         exec.set_fake_time(fasync::Time::after(AVERAGE_SCORE_DELTA_MINIMUM_DURATION + 1.second()));
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::PostConnectionScores { .. });
+            assert_variant!(event, TelemetryEvent::PostConnectionSignals { .. });
         });
 
-        // Run forward to get long duration score metrics
+        // Run forward to get long duration signals metrics
         exec.set_fake_time(fasync::Time::after(METRICS_SHORT_CONNECT_DURATION + 1.second()));
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::LongDurationConnectionScoreAverage { .. });
+            assert_variant!(event, TelemetryEvent::LongDurationSignals { .. });
         });
 
         // Run forward to disconnect time
@@ -2206,11 +2179,10 @@ mod tests {
                 disconnect_time,
                 connection_uptime: zx::Duration::from_hours(5),
                 disconnect_reason: types::DisconnectReason::DisconnectDetectedFromSme,
-                signal_data_at_disconnect: EwmaSignalData::new(
-                    bss_description.rssi_dbm,
-                    bss_description.snr_db,
-                    EWMA_SMOOTHING_FACTOR,
-                ),
+                signal_at_disconnect: types::Signal {
+                    rssi_dbm: bss_description.rssi_dbm,
+                    snr_db: bss_description.snr_db,
+                },
                 average_tx_rate: 0,
             },
         };
@@ -2243,7 +2215,6 @@ mod tests {
             network_is_likely_hidden: false,
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
-            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -2296,7 +2267,6 @@ mod tests {
             network_is_likely_hidden: false,
             connection_attempt_time,
             time_to_connect,
-            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -2309,18 +2279,18 @@ mod tests {
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        // Run forward to get post connection score metrics
+        // Run forward to get post connection signals metrics
         exec.set_fake_time(fasync::Time::after(AVERAGE_SCORE_DELTA_MINIMUM_DURATION + 1.second()));
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::PostConnectionScores { .. });
+            assert_variant!(event, TelemetryEvent::PostConnectionSignals { .. });
         });
 
-        // Run forward to get long duration score metrics
+        // Run forward to get long duration signals metrics
         exec.set_fake_time(fasync::Time::after(METRICS_SHORT_CONNECT_DURATION + 1.second()));
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::LongDurationConnectionScoreAverage { .. });
+            assert_variant!(event, TelemetryEvent::LongDurationSignals { .. });
         });
 
         // Run forward to disconnect time
@@ -2381,13 +2351,12 @@ mod tests {
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
             assert_variant!(event, TelemetryEvent::Disconnected { track_subsequent_downtime, info } => {
                 assert!(!track_subsequent_downtime);
-                assert_eq!(info, DisconnectInfo {
-                    connected_duration: 12.hours(),
-                    is_sme_reconnecting: false,
-                    disconnect_source: fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::ProactiveNetworkSwitch),
-                    previous_connect_reason: first_connect_selection.reason,
-                    ap_state: first_ap_state.clone(),
-                    connection_scores: HistoricalList::new(NUM_PAST_SCORES),
+                assert_variant!(info, DisconnectInfo {connected_duration, is_sme_reconnecting, disconnect_source, previous_connect_reason, ap_state, ..} => {
+                    assert_eq!(connected_duration, 12.hours());
+                    assert!(!is_sme_reconnecting);
+                    assert_eq!(disconnect_source, fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::ProactiveNetworkSwitch));
+                    assert_eq!(previous_connect_reason, first_connect_selection.reason);
+                    assert_eq!(ap_state, first_ap_state.clone());
                 });
             });
         });
@@ -2447,11 +2416,10 @@ mod tests {
                 disconnect_time,
                 connection_uptime: zx::Duration::from_hours(12),
                 disconnect_reason: types::DisconnectReason::ProactiveNetworkSwitch,
-                signal_data_at_disconnect: EwmaSignalData::new(
-                    first_bss_desc.rssi_dbm,
-                    first_bss_desc.snr_db,
-                    EWMA_SMOOTHING_FACTOR,
-                ),
+                signal_at_disconnect: types::Signal {
+                    rssi_dbm: first_bss_desc.rssi_dbm,
+                    snr_db: first_bss_desc.snr_db,
+                },
                 // TODO: record average phy rate over connection once available
                 average_tx_rate: 0,
             },
@@ -2484,7 +2452,6 @@ mod tests {
             network_is_likely_hidden: false,
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
-            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -2539,7 +2506,6 @@ mod tests {
             network_is_likely_hidden: false,
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
-            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -2597,7 +2563,6 @@ mod tests {
             network_is_likely_hidden: false,
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
-            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -2704,7 +2669,6 @@ mod tests {
             network_is_likely_hidden: false,
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
-            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
 
@@ -2726,12 +2690,6 @@ mod tests {
 
         // Do a quick check that state machine does not exist and there's no disconnect to SME
         assert_variant!(poll_sme_req(&mut exec, &mut sme_fut), Poll::Pending);
-
-        // The tracked signal data uses the RSS/SNR data from the time of connection and the first
-        // stats are sent after updated with the first signal report data.
-        let mut expected_signal_data =
-            EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR);
-        expected_signal_data.update_with_new_measurement(rssi_1, snr_1);
 
         // Verify that connection stats are sent out
         assert_variant!(test_values.stats_receiver.try_next(), Ok(Some(stats)) => {
@@ -2782,7 +2740,6 @@ mod tests {
             network_is_likely_hidden: false,
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
-            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
 

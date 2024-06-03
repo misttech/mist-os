@@ -39,7 +39,6 @@ pub struct MutableConnection {
 
 impl DerivedConnection for MutableConnection {
     type Directory = dyn MutableDirectory;
-    const MUTABLE: bool = true;
 }
 
 impl MutableConnection {

@@ -64,10 +64,18 @@ open protocol Vendor {
         encoded vector<uint8>:BT_VENDOR_MAX_COMMAND_BUFFER_LEN;
     }) error zx.Status;
 
+    /// Deprecated.
     /// Open the HCI protocol to the controller.  This call may block until the
     /// controller has been initialized.
     /// Returns ALREADY_BOUND if another client has already connected.
     flexible OpenHci() -> (resource struct {
         channel client_end:Hci;
+    }) error zx.Status;
+
+    /// Open the HciTransport protocol to the controller. This call may block until the
+    /// controller has been initialized.
+    /// Returns ALREADY_BOUND if another client has already connected.
+    flexible OpenHciTransport() -> (resource struct {
+        channel client_end:HciTransport;
     }) error zx.Status;
 };

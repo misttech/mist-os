@@ -15,15 +15,19 @@ use fidl_fuchsia_posix_socket_raw as fpraw;
 use fuchsia_zircon as zx;
 use futures::StreamExt as _;
 use net_types::{
-    ip::{Ip, Ipv4, Ipv6},
+    ip::{Ip, IpVersion, Ipv4, Ipv6},
     SpecifiedAddr,
 };
 use netstack3_core::{
-    ip::{RawIpSocketProtocol, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes},
+    ip::{
+        IpSockCreateAndSendError, IpSockSendError, RawIpSocketProtocol, RawIpSocketSendToError,
+        RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes,
+    },
     socket::StrictlyZonedAddr,
     sync::Mutex,
     IpExt,
 };
+use packet::Buf;
 use packet_formats::ip::IpPacket as _;
 use tracing::error;
 use zerocopy::ByteSlice;
@@ -32,9 +36,12 @@ use zx::{HandleBased, Peered};
 use crate::bindings::{
     socket::{
         queue::{BodyLen, MessageQueue},
-        IpSockAddrExt, SockAddr,
+        IntoErrno, IpSockAddrExt, SockAddr,
     },
-    util::{AllowBindingIdFromWeak, RemoveResourceResultExt, TryFromFidl, TryIntoFidlWithContext},
+    util::{
+        AllowBindingIdFromWeak, RemoveResourceResultExt, TryFromFidl, TryFromFidlWithContext,
+        TryIntoFidlWithContext,
+    },
     BindingsCtx, Ctx,
 };
 
@@ -484,8 +491,13 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
                     .send(result.as_ref().map(RecvMsgResponse::borrowed).map_err(|e| *e))
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
-            fpraw::SocketRequest::SendMsg { addr: _, data: _, control: _, flags: _, responder } => {
-                respond_not_supported!("raw::SendMsg", responder)
+            fpraw::SocketRequest::SendMsg { addr, data: msg, control, flags, responder } => {
+                responder
+                    .send(maybe_log_error!(
+                        "sendmsg",
+                        handle_sendmsg(ctx, data, addr, msg, control, flags)
+                    ))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             fpraw::SocketRequest::GetInfo { responder } => {
                 respond_not_supported!("raw::GetInfo", responder)
@@ -656,6 +668,52 @@ fn handle_recvmsg<I: IpExt + IpSockAddrExt>(
     })
 }
 
+/// Handler for a [`fpraw::SocketRequest::SendMsg`] request.
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+fn handle_sendmsg<I: IpExt + IpSockAddrExt>(
+    ctx: &mut Ctx,
+    socket: &SocketWorkerState<I>,
+    addr: Option<Box<fnet::SocketAddress>>,
+    data: Vec<u8>,
+    control: fposix_socket::NetworkSocketSendControlData,
+    flags: fposix_socket::SendMsgFlags,
+) -> Result<(), fposix::Errno> {
+    // TODO(https://fxbug.dev/42175797): Support control data & flags.
+    let _control = control;
+    let _flags = flags;
+
+    let remote_addr = addr
+        .map(|addr| {
+            // Match Linux and return `Einval` when asked to send to an IPv4
+            // addr on an IPv6 socket. This errno is unique to raw IP sockets.
+            let addr = match (I::VERSION, *addr) {
+                (IpVersion::V6, fnet::SocketAddress::Ipv4(_)) => Err(fposix::Errno::Einval),
+                (_, _) => I::SocketAddress::from_sock_addr(*addr),
+            }?;
+            // NB: raw IP sockets ignore the port.
+            let (remote_addr, _port) =
+                TryFromFidlWithContext::try_from_fidl_with_ctx(ctx.bindings_ctx(), addr)
+                    .map_err(IntoErrno::into_errno)?;
+            Ok(remote_addr)
+        })
+        .transpose()?;
+    let body = Buf::new(data, ..);
+    match remote_addr {
+        Some(remote_addr) => ctx
+            .api()
+            .raw_ip_socket()
+            .send_to(&socket.id, remote_addr, body)
+            .map_err(IntoErrno::into_errno),
+        None => {
+            // TODO(https://fxbug.dev/342577389): Support sending on connected
+            // sockets.
+            // TODO(https://fxbug.dev/339692009): Support sending when the
+            // remote_ip is provided via IP_HDRINCL.
+            Err(fposix::Errno::Edestaddrreq)
+        }
+    }
+}
+
 /// Handler for a [`fpraw::SocketRequest::SetBindToDevice`] request.
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
 fn handle_set_device<I: IpExt>(
@@ -698,6 +756,25 @@ impl<I: IpExt> TryFromFidl<fpraw::ProtocolAssociation> for RawIpSocketProtocol<I
                     RawIpSocketProtocol::Proto(_) => Ok(protocol),
                 }
             }
+        }
+    }
+}
+
+impl IntoErrno for RawIpSocketSendToError {
+    fn into_errno(self) -> fposix::Errno {
+        match self {
+            RawIpSocketSendToError::ProtocolRaw => fposix::Errno::Einval,
+            RawIpSocketSendToError::MappedRemoteIp => fposix::Errno::Enetunreach,
+            RawIpSocketSendToError::Ip(inner) => match inner {
+                // MTU errors result in `Emsgsize` for sendto, but `Einval` for
+                // send.
+                IpSockCreateAndSendError::Send(IpSockSendError::Mtu) => fposix::Errno::Emsgsize,
+                IpSockCreateAndSendError::Send(IpSockSendError::Unroutable(inner)) => {
+                    inner.into_errno()
+                }
+                IpSockCreateAndSendError::Create(inner) => inner.into_errno(),
+            },
+            RawIpSocketSendToError::Zone(inner) => inner.into_errno(),
         }
     }
 }

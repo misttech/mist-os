@@ -181,18 +181,20 @@ class F2fs final {
     block_t GetLastDnodeBlkaddr() const { return last_dnode_blkaddr_; }
     void SetLastDnodeBlkaddr(block_t blkaddr) { last_dnode_blkaddr_ = blkaddr; }
     VnodeF2fs &GetVnode() const { return *vnode_; }
+    void SetSize(size_t size) { size_ = size; }
+    size_t GetSize() const { return size_; }
 
    private:
     fbl::RefPtr<VnodeF2fs> vnode_ = nullptr;  // vfs inode pointer
     block_t last_dnode_blkaddr_ = 0;          // block address locating the last dnode
+    size_t size_ = 0;                         // the content size retrieved from fsyncd dnodes
   };
   using FsyncInodeList = fbl::DoublyLinkedList<std::unique_ptr<FsyncInodeEntry>>;
 
   FsyncInodeEntry *GetFsyncInode(FsyncInodeList &inode_list, nid_t ino);
   zx_status_t RecoverDentry(NodePage &ipage, VnodeF2fs &vnode);
   zx_status_t RecoverInode(VnodeF2fs &vnode, NodePage &node_page);
-  zx_status_t FindFsyncDnodes(FsyncInodeList &inode_list);
-  void DestroyFsyncDnodes(FsyncInodeList &inode_list);
+  zx::result<FsyncInodeList> FindFsyncDnodes();
   void CheckIndexInPrevNodes(block_t blkaddr);
   void DoRecoverData(VnodeF2fs &vnode, NodePage &page);
   void RecoverData(FsyncInodeList &inode_list, CursegType type);

@@ -106,14 +106,14 @@ async fn handle_controller<T: Test + 'static>(
     match request {
         ControllerRequest::Setup { responder, device_label, device_path, seed } => {
             let res = test.setup(device_label, device_path, seed).await.map_err(|e| {
-                tracing::error!("{}", e);
+                tracing::error!("{:?}", e);
                 zx::Status::INTERNAL.into_raw()
             });
             responder.send(res)?;
         }
         ControllerRequest::Test { responder, device_label, device_path, seed, duration } => {
             let test_fut = test.test(device_label, device_path, seed).map_err(|e| {
-                tracing::error!("{}", e);
+                tracing::error!("{:?}", e);
                 zx::Status::INTERNAL.into_raw()
             });
             if duration != 0 {
@@ -138,7 +138,7 @@ async fn handle_controller<T: Test + 'static>(
         ControllerRequest::Verify { responder, device_label, device_path, seed } => {
             let res = test.verify(device_label, device_path, seed).await.map_err(|e| {
                 // The test tries failing on purpose, so only print errors as warnings.
-                tracing::warn!("{}", e);
+                tracing::warn!("{:?}", e);
                 zx::Status::BAD_STATE.into_raw()
             });
             responder.send(res)?;
@@ -189,7 +189,7 @@ fn dev_class_block() -> fio::DirectoryProxy {
     .expect("failed to open /dev/class/block")
 }
 
-const RAMDISK_PREFIX: &'static str = "/dev/sys/platform/00:00:2d/ramctl";
+const RAMDISK_PREFIX: &'static str = "/dev/sys/platform/ram-disk/ramctl";
 
 /// During the setup step, formats a device with fvm, creating a single partition named
 /// [`partition_label`]. If [`device_path`] is `None`, finds a device which already had fvm, erase

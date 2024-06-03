@@ -12,6 +12,13 @@ board_configuration("qemu-arm64") {
     "//boards/emulation/virtio",
   ]
 
+  hardware_info = {
+    name = "qemu-arm64"
+    product_id = 1
+    vendor_id = 1
+    revision = 1
+  }
+
   filesystems = {
     fvm = {
       slice_size = 8388608

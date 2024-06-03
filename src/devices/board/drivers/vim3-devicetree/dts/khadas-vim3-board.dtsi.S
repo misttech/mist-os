@@ -10,7 +10,7 @@
 #include <soc/aml-a311d/a311d-hw.h>
 #include <soc/aml-a311d/a311d-gpio.h>
 
-#include "sdk/lib/driver/devicetree/visitors/drivers/interrupt-controllers/arm-gicv2/arm-gicv2.h"
+#include "sdk/lib/driver/devicetree/visitors/drivers/interrupt-controllers/arm-gic/arm-gicv2.h"
 
 / {
 	compatible = "khadas,vim3", "amlogic,a311d";
@@ -198,7 +198,7 @@
 
 	power_button: gpio-buttons {
 		compatible = "fuchsia,gpio-buttons";
-		gpios = <&gpio 97 0>;
+		gpios = <&gpio 92 0>;
 		gpio-names = "POWER";
 	};
 

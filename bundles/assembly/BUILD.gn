@@ -658,6 +658,22 @@ assembly_input_bundle("kernel_pmm_checker_enabled") {
   ]
 }
 
+# Added when a board might support the PMM checker, but wants to defer to a run
+# time check to determine if it's real hardware or not.
+assembly_input_bundle("kernel_pmm_checker_enabled_auto") {
+  kernel_cmdline = [
+    # Enable PMM checker to detect certain kinds of buffer overrun and
+    # use-after-free bugs.
+    "kernel.pmm-checker.enable=auto",
+
+    # Use a small fill size to minimize performance impact.  In practice,
+    # corruption tends to happen at the start of a page so filling/checking only
+    # the first 16 bytes provides decent coverage without sacrificing
+    # performance.
+    "kernel.pmm-checker.fill-size=16",
+  ]
+}
+
 # sl4f: Scripting Layer for Fuchsia
 #
 # Often used for manipulating device during E2E tests.
@@ -753,9 +769,6 @@ assembly_input_bundle("core_realm") {
       name = "core"
       components = [
         {
-          # All paths must be rebased since this is passed directly to the AIB
-          # config.
-
           component_name = "core"
           shards = [
             "//src/sys/core/meta/core.cml",
@@ -1129,10 +1142,6 @@ assembly_input_bundle("core_realm_eng") {
       components = [ "bt-hci-tool" ]
     },
     {
-      package = "bt-intel-tool"
-      components = [ "bt-intel-tool" ]
-    },
-    {
       package = "bt-avdtp-tool"
       components = [ "bt-avdtp-tool" ]
     },
@@ -1261,8 +1270,6 @@ assembly_input_bundle("core_realm_eng") {
       name = "core"
       components = [
         {
-          # All paths must be rebased since this is passed directly to the AIB
-          # config.
           component_name = "core"
           shards = [
             # The process_resolver core shard (either the base-resolver or
@@ -1305,8 +1312,6 @@ assembly_input_bundle("core_realm_user_and_userdebug") {
       name = "core"
       components = [
         {
-          # All paths must be rebased since this is passed directly to the AIB
-          # config.
           component_name = "core"
           shards = [
             # user and userdebug only have the base resolver, not the full
@@ -1369,8 +1374,6 @@ assembly_input_bundle("core_realm_development_access") {
       name = "core"
       components = [
         {
-          # All paths must be rebased since this is passed directly to the AIB
-          # config.
           component_name = "core"
           shards = [
             "//src/developer/debug/debug_agent/meta/debug_agent.core_shard.cml",
@@ -1469,8 +1472,6 @@ assembly_input_bundle("core_realm_development_access_rcs_usb") {
       name = "core"
       components = [
         {
-          # All paths must be rebased since this is passed directly to the AIB
-          # config.
           component_name = "core"
           shards = [ "//src/developer/remote-control/meta/remote-control-with-usb.core_shard.cml" ]
         },
@@ -1485,8 +1486,6 @@ assembly_input_bundle("core_realm_development_access_rcs_no_usb") {
       name = "core"
       components = [
         {
-          # All paths must be rebased since this is passed directly to the AIB
-          # config.
           component_name = "core"
           shards = [
             "//src/developer/remote-control/meta/remote-control.core_shard.cml",
@@ -1589,7 +1588,6 @@ assembly_input_bundle("common_standard") {
   base_packages = [
     # The SWD stack artifacts that enable OTAs
     "//src/sys/pkg/bin/system-updater",
-    "//src/sys/full-resolver:full-resolver-pkg",
 
     # Cobalt
     "//src/cobalt/bin/app:cobalt",
@@ -1688,8 +1686,6 @@ assembly_input_bundle("common_standard") {
       name = "core"
       components = [
         {
-          # All paths must be rebased since this is passed directly to the AIB
-          # config.
           component_name = "core"
           shards = [
             "//src/diagnostics/realm/meta/diagnostics.core_shard.cml",
@@ -1759,8 +1755,6 @@ assembly_input_bundle("standard_user") {
       name = "core"
       components = [
         {
-          # All paths must be rebased since this is passed directly to the AIB
-          # config.
           component_name = "core"
           shards = [
             "//src/developer/memory/monitor/meta/memory_monitor.core_shard.cml",
@@ -1818,7 +1812,10 @@ assembly_input_bundle("standard_userdebug") {
 #
 assembly_input_bundle("standard_eng") {
   testonly = true
-  base_packages = []
+  base_packages = [
+    # Used to resolve ephemeral components.
+    "//src/sys/full-resolver:full-resolver-pkg",
+  ]
   cache_packages = [
     # Backend for ffx process command.
     "//src/developer/process_explorer:process_explorer_package",
@@ -3348,8 +3345,6 @@ assembly_input_bundle("session_manager") {
       name = "core"
       components = [
         {
-          # All paths must be rebased since this is passed directly to the AIB
-          # config.
           component_name = "core"
           shards = [ "//src/session/bin/session_manager/meta/session_manager.core_shard.cml" ]
         },
@@ -3717,8 +3712,6 @@ assembly_input_bundle("example_assembly_bundle") {
       name = "core"
       components = [
         {
-          # All paths must be rebased since this is passed directly to the AIB
-          # config.
           component_name = "core"
           shards = [ "//src/tests/assembly/assemble_image/compiled_package/meta/test.core_shard.cml" ]
         },

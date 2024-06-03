@@ -43,6 +43,7 @@ typedef struct zx_system_powerctl_arg {
 // Topics used by zx_system_{get,set}_performance_info():
 #define ZX_CPU_PERF_SCALE ((uint32_t)1u)
 #define ZX_CPU_DEFAULT_PERF_SCALE ((uint32_t)2u)
+// #define ZX_PROCESSOR_POWER_LEVEL 3, see syscall-next.h.
 
 typedef struct zx_cpu_performance_scale {
   uint32_t integral_part;

@@ -7,7 +7,7 @@ use {
         actions::StopAction,
         component::{IncomingCapabilities, StartReason, WeakComponentInstance},
     },
-    fidl::endpoints::RequestStream,
+    fidl::endpoints::{ProtocolMarker, RequestStream},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox,
     fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::prelude::*,
@@ -20,7 +20,7 @@ pub async fn run_controller(
     stream: fcomponent::ControllerRequestStream,
 ) {
     if let Err(err) = serve_controller(weak_component_instance, stream).await {
-        warn!(%err, "failed to serve controller");
+        warn!(%err, "Error serving {}", fcomponent::ControllerMarker::DEBUG_NAME);
     }
 }
 

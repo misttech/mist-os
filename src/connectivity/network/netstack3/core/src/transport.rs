@@ -56,8 +56,6 @@
 //!       of the "weak host model" vs "strong host model" discussion.
 
 mod integration;
-pub(crate) mod tcp;
-pub(crate) mod udp;
 
 use derivative::Derivative;
 use net_types::ip::{Ip, Ipv4, Ipv6};
@@ -67,11 +65,21 @@ use crate::{
     device::WeakDeviceId,
     socket::datagram,
     transport::{
-        tcp::{TcpCounters, TcpState},
+        tcp::{TcpCounters, TcpState, TcpTimerId},
         udp::{UdpCounters, UdpState, UdpStateBuilder},
     },
     BindingsContext, BindingsTypes,
 };
+
+// TODO(https://fxbug.dev/342685842): Remove this re-export.
+pub(crate) mod tcp {
+    pub(crate) use netstack3_tcp::*;
+}
+
+// TODO(https://fxbug.dev/342685842): Remove this re-export.
+pub(crate) mod udp {
+    pub(crate) use netstack3_udp::*;
+}
 
 /// A builder for transport layer state.
 #[derive(Default, Clone)]
@@ -81,8 +89,7 @@ pub struct TransportStateBuilder {
 
 impl TransportStateBuilder {
     /// Get the builder for the UDP state.
-    #[cfg(test)]
-    pub(crate) fn udp_builder(&mut self) -> &mut UdpStateBuilder {
+    pub fn udp_builder(&mut self) -> &mut UdpStateBuilder {
         &mut self.udp
     }
 
@@ -102,7 +109,7 @@ impl TransportStateBuilder {
 }
 
 /// The state associated with the transport layer.
-pub(crate) struct TransportLayerState<BT: BindingsTypes> {
+pub struct TransportLayerState<BT: BindingsTypes> {
     udpv4: UdpState<Ipv4, WeakDeviceId<BT>, BT>,
     udpv6: UdpState<Ipv6, WeakDeviceId<BT>, BT>,
     tcpv4: TcpState<Ipv4, WeakDeviceId<BT>, BT>,
@@ -110,7 +117,7 @@ pub(crate) struct TransportLayerState<BT: BindingsTypes> {
 }
 
 impl<BT: BindingsTypes> TransportLayerState<BT> {
-    fn tcp_state<I: tcp::socket::DualStackIpExt>(&self) -> &TcpState<I, WeakDeviceId<BT>, BT> {
+    fn tcp_state<I: tcp::DualStackIpExt>(&self) -> &TcpState<I, WeakDeviceId<BT>, BT> {
         I::map_ip((), |()| &self.tcpv4, |()| &self.tcpv6)
     }
 
@@ -137,13 +144,13 @@ impl<BT: BindingsTypes> TransportLayerState<BT> {
     Debug(bound = "")
 )]
 pub(crate) enum TransportLayerTimerId<BT: BindingsTypes> {
-    Tcp(tcp::socket::TimerId<WeakDeviceId<BT>, BT>),
+    Tcp(TcpTimerId<WeakDeviceId<BT>, BT>),
 }
 
 impl<CC, BT> HandleableTimer<CC, BT> for TransportLayerTimerId<BT>
 where
     BT: BindingsTypes,
-    CC: TimerHandler<BT, tcp::socket::TimerId<WeakDeviceId<BT>, BT>>,
+    CC: TimerHandler<BT, TcpTimerId<WeakDeviceId<BT>, BT>>,
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BT) {
         match self {
@@ -152,10 +159,8 @@ where
     }
 }
 
-impl<BT: BindingsTypes> From<tcp::socket::TimerId<WeakDeviceId<BT>, BT>>
-    for TransportLayerTimerId<BT>
-{
-    fn from(id: tcp::socket::TimerId<WeakDeviceId<BT>, BT>) -> Self {
+impl<BT: BindingsTypes> From<TcpTimerId<WeakDeviceId<BT>, BT>> for TransportLayerTimerId<BT> {
+    fn from(id: TcpTimerId<WeakDeviceId<BT>, BT>) -> Self {
         TransportLayerTimerId::Tcp(id)
     }
 }

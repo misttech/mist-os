@@ -279,6 +279,7 @@ async fn enter_fastboot(
         let line = res.unwrap();
         eprintln!("{}", line);
         if line.contains("Press f to enter fastboot.") {
+            eprintln!("TEST: About to press f");
             writer.write_all(b"f").await.expect("failed to press f");
             break;
         }

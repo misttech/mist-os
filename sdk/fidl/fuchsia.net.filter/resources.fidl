@@ -327,7 +327,8 @@ type Action = flexible union {
     /// packet is redirected by rewriting the destination IP address to one
     /// owned by the ingress interface (if operating on incoming traffic in
     /// INGRESS) or the loopback address (if operating on locally-generated
-    /// traffic in LOCAL_EGRESS).
+    /// traffic in LOCAL_EGRESS). If this rule is installed on INGRESS and no IP
+    /// address is assigned to the incoming interface, the packet is dropped.
     ///
     /// As with all DNAT actions, this action is only valid in the INGRESS and
     /// LOCAL_EGRESS hooks. If a destination port is specified, this action is

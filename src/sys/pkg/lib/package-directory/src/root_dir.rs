@@ -32,12 +32,9 @@ use {
         execution_scope::ExecutionScope,
         immutable_attributes,
         path::Path as VfsPath,
-        ObjectRequestRef, ProtocolsExt as _, ToObjectRequest,
+        CreationMode, ObjectRequestRef, ProtocolsExt as _, ToObjectRequest,
     },
 };
-
-#[cfg(feature = "supports_open2")]
-use vfs::CreationMode;
 
 /// The root directory of Fuchsia package.
 #[derive(Debug)]
@@ -434,18 +431,6 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
         let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
     }
 
-    #[cfg(not(feature = "supports_open2"))]
-    fn open2(
-        self: Arc<Self>,
-        _scope: ExecutionScope,
-        _path: VfsPath,
-        _protocols: fio::ConnectionProtocols,
-        _object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), zx::Status> {
-        Err(zx::Status::NOT_SUPPORTED)
-    }
-
-    #[cfg(feature = "supports_open2")]
     fn open2(
         self: Arc<Self>,
         scope: ExecutionScope,
@@ -605,6 +590,7 @@ mod tests {
         fidl::endpoints::{create_proxy, Proxy as _},
         fuchsia_fs::directory::{DirEntry, DirentKind},
         fuchsia_pkg_testing::{blobfs::Fake as FakeBlobfs, PackageBuilder},
+        futures::TryStreamExt as _,
         pretty_assertions::assert_eq,
         std::convert::TryInto as _,
         std::io::Cursor,
@@ -613,9 +599,6 @@ mod tests {
             node::Node,
         },
     };
-
-    #[cfg(feature = "supports_open2")]
-    use futures::TryStreamExt as _;
 
     struct TestEnv {
         _blobfs_fake: FakeBlobfs,
@@ -1219,7 +1202,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_self() {
         let (_env, root_dir) = TestEnv::new().await;
@@ -1242,7 +1224,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_non_meta_file() {
         let (_env, root_dir) = TestEnv::new().await;
@@ -1258,16 +1239,18 @@ mod tests {
             protocols
                 .to_object_request(server_end)
                 .handle(|req| root_dir.clone().open2(scope, path, protocols, req));
-            // TODO(b/293947862): FakeBlobfs is backed by memfs, which currently does not support
-            // Open2. Once memfs supports Open2, this test case will need to be updated.
-            assert_matches!(
-                proxy.take_event_stream().try_next().await,
-                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+
+            assert_eq!(
+                fuchsia_fs::file::read(&fio::FileProxy::from_channel(
+                    proxy.into_channel().unwrap()
+                ))
+                .await
+                .unwrap(),
+                b"blob-contents".to_vec()
             );
         }
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_meta_as_file() {
         let (_env, root_dir) = TestEnv::new().await;
@@ -1303,7 +1286,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_meta_as_dir() {
         let (_env, root_dir) = TestEnv::new().await;
@@ -1350,7 +1332,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_meta_as_node_reference() {
         let (_env, root_dir) = TestEnv::new().await;
@@ -1397,7 +1378,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_meta_as_symlink_wrong_type() {
         let (_env, root_dir) = TestEnv::new().await;
@@ -1424,7 +1404,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_meta_file() {
         let (_env, root_dir) = TestEnv::new().await;
@@ -1444,7 +1423,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_meta_subdir() {
         let (_env, root_dir) = TestEnv::new().await;
@@ -1467,7 +1445,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_non_meta_subdir() {
         let (_env, root_dir) = TestEnv::new().await;
@@ -1490,7 +1467,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_open_modes() {
         let (_env, sub_dir) = TestEnv::new().await;
@@ -1514,7 +1490,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_rights() {
         let (_env, root_dir) = TestEnv::new().await;
@@ -1534,7 +1509,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_file_protocols() {
         let (_env, root_dir) = TestEnv::new().await;

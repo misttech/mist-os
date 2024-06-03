@@ -358,6 +358,8 @@ void UITestRealm::ConfigureSceneOwner() {
                                 ConfigValue(std::to_string(display_pixel_density)));
   realm_builder_.SetConfigValue(kSceneManagerName, "display_rotation",
                                 ConfigValue::Uint64(config_.display_rotation));
+  realm_builder_.SetConfigValue(kSceneManagerName, "idle_threshold_ms",
+                                ConfigValue::Uint64(config_.idle_threshold_ms));
 }
 
 void UITestRealm::Build() {

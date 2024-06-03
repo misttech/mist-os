@@ -20,6 +20,7 @@
 #include <src/lib/files/glob.h>
 
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
+#include "third_party/rapidjson/include/rapidjson/rapidjson.h"
 
 using diagnostics::reader::InspectData;
 
@@ -125,6 +126,17 @@ class InspectTest : public gtest::RealLoopFixture {
   fuchsia::component::RealmPtr realm_proxy_;
 };
 
+void expect_array_non_empty(const InspectData& data, const std::vector<std::string>& path) {
+  auto& value = data.GetByPath(path);
+  EXPECT_EQ(value.GetType(), rapidjson::kArrayType) << path.back() << " is not an array";
+  EXPECT_NE(value.GetArray().Size(), 0u) << path.back() << " is empty";
+}
+
+void expect_number(const InspectData& data, const std::vector<std::string>& path) {
+  auto& value = data.GetByPath(path);
+  EXPECT_EQ(value.GetType(), rapidjson::kNumberType) << path.back() << " is not a number";
+}
+
 void expect_string_not_empty(const InspectData& data, const std::vector<std::string>& path) {
   auto& value = data.GetByPath(path);
   EXPECT_EQ(value.GetType(), rapidjson::kStringType) << path.back() << " is not a string";
@@ -172,5 +184,37 @@ TEST_F(InspectTest, SecondLaunch) {
   expect_string_not_empty(data, {"root", "high_water_previous_boot"});
   expect_string_not_empty(data, {"root", "high_water_digest"});
   expect_string_not_empty(data, {"root", "high_water_digest_previous_boot"});
+
   expect_object_not_empty(data, {"root", "values"});
+  expect_number(data, {"root", "values", "total_bytes"});
+  expect_number(data, {"root", "values", "free_bytes"});
+  expect_number(data, {"root", "values", "wired_bytes"});
+  expect_number(data, {"root", "values", "total_heap_bytes"});
+  expect_number(data, {"root", "values", "free_heap_bytes"});
+  expect_number(data, {"root", "values", "vmo_bytes"});
+  expect_number(data, {"root", "values", "vmo_pager_total_bytes"});
+  expect_number(data, {"root", "values", "vmo_pager_newest_bytes"});
+  expect_number(data, {"root", "values", "vmo_pager_oldest_bytes"});
+  expect_number(data, {"root", "values", "vmo_discardable_locked_bytes"});
+  expect_number(data, {"root", "values", "vmo_discardable_unlocked_bytes"});
+  expect_number(data, {"root", "values", "mmu_overhead_bytes"});
+  expect_number(data, {"root", "values", "ipc_bytes"});
+  expect_number(data, {"root", "values", "other_bytes"});
+  expect_number(data, {"root", "values", "vmo_reclaim_disabled_bytes"});
+
+  expect_object_not_empty(data, {"root", "kmem_stats_compression"});
+  expect_number(data, {"root", "kmem_stats_compression", "uncompressed_storage_bytes"});
+  expect_number(data, {"root", "kmem_stats_compression", "compressed_storage_bytes"});
+  expect_number(data, {"root", "kmem_stats_compression", "compressed_fragmentation_bytes"});
+  expect_number(data, {"root", "kmem_stats_compression", "compression_time"});
+  expect_number(data, {"root", "kmem_stats_compression", "decompression_time"});
+  expect_number(data, {"root", "kmem_stats_compression", "total_page_compression_attempts"});
+  expect_number(data, {"root", "kmem_stats_compression", "failed_page_compression_attempts"});
+  expect_number(data, {"root", "kmem_stats_compression", "total_page_decompressions"});
+  expect_number(data, {"root", "kmem_stats_compression", "compressed_page_evictions"});
+  expect_number(data, {"root", "kmem_stats_compression", "eager_page_compressions"});
+  expect_number(data, {"root", "kmem_stats_compression", "critical_memory_page_compressions"});
+  expect_number(data, {"root", "kmem_stats_compression", "pages_decompressed_unit_ns"});
+  expect_array_non_empty(data,
+                         {"root", "kmem_stats_compression", "pages_decompressed_within_log_time"});
 }

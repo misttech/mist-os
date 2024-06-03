@@ -122,7 +122,7 @@ class MinfsFvmTest : public BaseFilesystemTest {
       return zx::error(ZX_ERR_BAD_STATE);
     }
 
-    // Want something like "/dev/sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm"
+    // Want something like "/dev/sys/platform/ram-disk/ramctl/ramdisk-0/block/fvm"
     std::string fvm_path = ram_disk->path() + "/fvm";
     return component::Connect<fuchsia_hardware_block_volume::VolumeManager>(fvm_path);
   }

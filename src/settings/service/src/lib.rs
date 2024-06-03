@@ -2,20 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#[cfg(test)]
-use tracing as _; // Make it easier to debug tests by always building with tracing
-
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
 #[cfg(test)]
-use ::fidl::endpoints::{create_proxy, ServerEnd};
-#[cfg(test)]
 use anyhow::format_err;
 use anyhow::{Context, Error};
-#[cfg(test)]
-use fidl_fuchsia_io::DirectoryMarker;
+use audio::types::AudioInfo;
+use audio::AudioInfoLoader;
+use display::display_controller::DisplayInfoLoader;
 use fidl_fuchsia_io::DirectoryProxy;
 use fidl_fuchsia_stash::StoreProxy;
 use fuchsia_async as fasync;
@@ -30,6 +26,9 @@ use fuchsia_zircon::{Duration, DurationNum};
 use futures::{lock::Mutex, StreamExt};
 use settings_storage::device_storage::DeviceStorage;
 use settings_storage::fidl_storage::FidlStorage;
+use settings_storage::storage_factory::{FidlStorageFactory, StorageFactory};
+#[cfg(test)]
+use tracing as _; // Make it easier to debug tests by always building with tracing
 
 pub use display::display_configuration::DisplayConfiguration;
 pub use handler::setting_proxy_inspect_info::SettingProxyInspectInfo;
@@ -37,16 +36,6 @@ pub use input::input_device_configuration::InputConfiguration;
 pub use light::light_hardware_configuration::LightHardwareConfiguration;
 use serde::Deserialize;
 pub use service::{Address, Payload};
-#[cfg(test)]
-use vfs::directory::entry_container::Directory;
-#[cfg(test)]
-use vfs::directory::mutable::simple::tree_constructor;
-#[cfg(test)]
-use vfs::execution_scope::ExecutionScope;
-#[cfg(test)]
-use vfs::file::vmo::read_write;
-#[cfg(test)]
-use vfs::mut_pseudo_directory;
 
 use crate::accessibility::accessibility_controller::AccessibilityController;
 use crate::agent::authority::Authority;
@@ -54,6 +43,7 @@ use crate::agent::{AgentCreator, Lifespan};
 use crate::audio::audio_controller::AudioController;
 use crate::base::{Dependency, Entity, SettingType};
 use crate::config::base::{AgentType, ControllerFlag};
+use crate::config::default_settings::DefaultSetting;
 use crate::display::display_controller::{DisplayController, ExternalBrightnessControl};
 use crate::do_not_disturb::do_not_disturb_controller::DoNotDisturbController;
 use crate::factory_reset::factory_reset_controller::FactoryResetController;
@@ -76,20 +66,19 @@ use crate::service::message::Delegate;
 use crate::service_context::GenerateService;
 use crate::service_context::ServiceContext;
 use crate::setup::setup_controller::SetupController;
-use settings_storage::storage_factory::{FidlStorageFactory, StorageFactory};
 
 mod accessibility;
-mod audio;
+pub mod audio;
 mod clock;
-mod display;
+pub mod display;
 mod do_not_disturb;
 mod event;
 mod factory_reset;
-mod input;
+pub mod input;
 mod intl;
 mod job;
 mod keyboard;
-mod light;
+pub mod light;
 mod night_mode;
 mod privacy;
 mod service;
@@ -210,17 +199,12 @@ impl Environment {
 
 #[cfg(test)]
 fn init_storage_dir() -> DirectoryProxy {
-    let fs_scope = ExecutionScope::build()
-        .entry_constructor(tree_constructor(move |_, _| Ok(read_write(b""))))
-        .new();
-    let (directory, server) = create_proxy::<DirectoryMarker>().unwrap();
-    mut_pseudo_directory! {}.open(
-        fs_scope,
+    let tempdir = tempfile::tempdir().expect("failed to create tempdir");
+    fuchsia_fs::directory::open_in_namespace(
+        tempdir.path().to_str().expect("tempdir path is not valid UTF-8"),
         OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-        vfs::path::Path::dot(),
-        ServerEnd::new(server.into_channel()),
-    );
-    directory
+    )
+    .expect("failed to open connection to tempdir")
 }
 
 #[cfg(not(test))]
@@ -247,6 +231,10 @@ pub struct EnvironmentBuilder<
     storage_dir: Option<DirectoryProxy>,
     store_proxy: Option<StoreProxy>,
     fidl_storage_factory: Option<Arc<FidlStorageFactory>>,
+    display_configuration: Option<DefaultSetting<DisplayConfiguration, &'static str>>,
+    audio_configuration: Option<DefaultSetting<AudioInfo, &'static str>>,
+    input_configuration: Option<DefaultSetting<InputConfiguration, &'static str>>,
+    light_configuration: Option<DefaultSetting<LightHardwareConfiguration, &'static str>>,
 }
 
 impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
@@ -269,6 +257,10 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
             storage_dir: None,
             store_proxy: None,
             fidl_storage_factory: None,
+            display_configuration: None,
+            audio_configuration: None,
+            input_configuration: None,
+            light_configuration: None,
         }
     }
 
@@ -290,6 +282,38 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
     /// [EnvironmentBuilder::policies], and [EnvironmentBuilder::flags].
     pub fn configuration(mut self, configuration: ServiceConfiguration) -> Self {
         self.configuration = Some(configuration);
+        self
+    }
+
+    pub fn display_configuration(
+        mut self,
+        display_configuration: DefaultSetting<DisplayConfiguration, &'static str>,
+    ) -> Self {
+        self.display_configuration = Some(display_configuration);
+        self
+    }
+
+    pub fn audio_configuration(
+        mut self,
+        audio_configuration: DefaultSetting<AudioInfo, &'static str>,
+    ) -> Self {
+        self.audio_configuration = Some(audio_configuration);
+        self
+    }
+
+    pub fn input_configuration(
+        mut self,
+        input_configuration: DefaultSetting<InputConfiguration, &'static str>,
+    ) -> Self {
+        self.input_configuration = Some(input_configuration);
+        self
+    }
+
+    pub fn light_configuration(
+        mut self,
+        light_configuration: DefaultSetting<LightHardwareConfiguration, &'static str>,
+    ) -> Self {
+        self.light_configuration = Some(light_configuration);
         self
     }
 
@@ -466,6 +490,10 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
             Arc::clone(&self.storage_factory),
             Arc::clone(&fidl_storage_factory),
             &flags,
+            self.display_configuration.map(DisplayInfoLoader::new),
+            self.audio_configuration.map(AudioInfoLoader::new),
+            self.input_configuration,
+            self.light_configuration,
             &mut handler_factory,
         )
         .await;
@@ -556,6 +584,10 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
         device_storage_factory: Arc<T>,
         fidl_storage_factory: Arc<F>,
         controller_flags: &HashSet<ControllerFlag>,
+        display_loader: Option<DisplayInfoLoader>,
+        audio_loader: Option<AudioInfoLoader>,
+        input_configuration: Option<DefaultSetting<InputConfiguration, &'static str>>,
+        light_configuration: Option<DefaultSetting<LightHardwareConfiguration, &'static str>>,
         factory_handle: &mut SettingHandlerFactoryImpl,
     ) where
         F: StorageFactory<Storage = FidlStorage>,
@@ -574,18 +606,25 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
 
         // Audio
         if components.contains(&SettingType::Audio) {
+            let audio_loader = audio_loader.expect("Audio storage requires audio loader");
             device_storage_factory
-                .initialize::<AudioController>()
+                .initialize_with_loader::<AudioController>(audio_loader.clone())
                 .await
                 .expect("storage should still be initializing");
-            factory_handle
-                .register(SettingType::Audio, Box::new(DataHandler::<AudioController>::spawn));
+            factory_handle.register(
+                SettingType::Audio,
+                Box::new(move |context| {
+                    DataHandler::<AudioController>::spawn_with(context, audio_loader.clone())
+                }),
+            );
         }
 
         // Display
         if components.contains(&SettingType::Display) {
             device_storage_factory
-                .initialize::<DisplayController>()
+                .initialize_with_loader::<DisplayController>(
+                    display_loader.expect("Display storage requires display loader"),
+                )
                 .await
                 .expect("storage should still be initializing");
             factory_handle.register(
@@ -602,22 +641,42 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
 
         // Light
         if components.contains(&SettingType::Light) {
+            let light_configuration = Arc::new(std::sync::Mutex::new(
+                light_configuration.expect("Light controller requires a light configuration"),
+            ));
             fidl_storage_factory
                 .initialize::<LightController>()
                 .await
                 .expect("storage should still be initializing");
-            factory_handle
-                .register(SettingType::Light, Box::new(DataHandler::<LightController>::spawn));
+            factory_handle.register(
+                SettingType::Light,
+                Box::new(move |context| {
+                    DataHandler::<LightController>::spawn_with_async(
+                        context,
+                        Arc::clone(&light_configuration),
+                    )
+                }),
+            );
         }
 
         // Input
         if components.contains(&SettingType::Input) {
+            let input_configuration = Arc::new(std::sync::Mutex::new(
+                input_configuration.expect("Input controller requires an input configuration"),
+            ));
             device_storage_factory
                 .initialize::<InputController>()
                 .await
                 .expect("storage should still be initializing");
-            factory_handle
-                .register(SettingType::Input, Box::new(DataHandler::<InputController>::spawn));
+            factory_handle.register(
+                SettingType::Input,
+                Box::new(move |context| {
+                    DataHandler::<InputController>::spawn_with(
+                        context,
+                        Arc::clone(&input_configuration),
+                    )
+                }),
+            );
         }
 
         // Intl

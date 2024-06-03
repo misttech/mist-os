@@ -79,6 +79,7 @@ fn config_for_manifest(
     let config_bytes = fidl::persist(&config_values).map_err(RepackageError::EncodeConfig)?;
     let path = match &config_decl.value_source {
         cm_rust::ConfigValueSource::PackagePath(path) => Some(path.to_string()),
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
         cm_rust::ConfigValueSource::Capabilities(_) => None,
     };
     Ok((config_bytes, path))
@@ -153,6 +154,7 @@ pub fn validate_component(
 
     let path = match &config_decl.value_source {
         cm_rust::ConfigValueSource::PackagePath(path) => path,
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
         cm_rust::ConfigValueSource::Capabilities(_) => return Ok(()),
     };
     let config_bytes = reader.read_file(&path).map_err(ValidationError::ConfigValuesMissing)?;

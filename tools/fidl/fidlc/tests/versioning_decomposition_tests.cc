@@ -423,18 +423,23 @@ TEST(VersioningDecompositionTests, MutualRecursion) {
 library example;
 
 @available(added=2)
-type Foo = struct {
-    str string;
+type Foo = table {
+    1: str string;
     @available(added=3)
-    bars vector<box<Bar>>;
+    // Struct wrapper needed because tables aren't allowed to be boxed.
+    2: bars vector<box<struct { bar Bar; }>>;
 };
 
 @available(added=2)
-type Bar = struct {
+type Bar = table {
     @available(removed=5)
-    foo box<Foo>;
+    // OuterStruct needed because aren't allowed to contain boxes.
+    // InnerStruct needed because tables aren't allowed to be boxed.
+    1: foo @generated_name("OuterStruct") struct {
+        inner box<@generated_name("InnerStruct") struct { foo Foo; }>;
+    };
     @available(added=4)
-    str string;
+    2: str string;
 };
 )FIDL";
 
@@ -447,12 +452,14 @@ library example;
 @available(added=2, removed=3)
 library example;
 
-type Foo = struct {
-    str string;
+type Foo = table {
+    1: str string;
 };
 
-type Bar = struct {
-    foo box<Foo>;
+type Bar = table {
+    1: foo @generated_name("OuterStruct") struct {
+        inner box<@generated_name("InnerStruct") struct { foo Foo; }>;
+    };
 };
 )FIDL";
 
@@ -460,13 +467,15 @@ type Bar = struct {
 @available(added=3, removed=4)
 library example;
 
-type Foo = struct {
-    str string;
-    bars vector<box<Bar>>;
+type Foo = table {
+    1: str string;
+    2: bars vector<box<struct { bar Bar; }>>;
 };
 
-type Bar = struct {
-    foo box<Foo>;
+type Bar = table {
+    1: foo @generated_name("OuterStruct") struct {
+        inner box<@generated_name("InnerStruct") struct { foo Foo; }>;
+    };
 };
 )FIDL";
 
@@ -474,14 +483,16 @@ type Bar = struct {
 @available(added=4, removed=5)
 library example;
 
-type Foo = struct {
-    str string;
-    bars vector<box<Bar>>;
+type Foo = table {
+    1: str string;
+    2: bars vector<box<struct { bar Bar; }>>;
 };
 
-type Bar = struct {
-    foo box<Foo>;
-    str string;
+type Bar = table {
+    1: foo @generated_name("OuterStruct") struct {
+        inner box<@generated_name("InnerStruct") struct { foo Foo; }>;
+    };
+    2: str string;
 };
 )FIDL";
 
@@ -489,13 +500,13 @@ type Bar = struct {
 @available(added=5)
 library example;
 
-type Foo = struct {
-    str string;
-    bars vector<box<Bar>>;
+type Foo = table {
+    1: str string;
+    2: bars vector<box<struct { bar Bar; }>>;
 };
 
-type Bar = struct {
-    str string;
+type Bar = table {
+    2: str string;
 };
 )FIDL";
 
@@ -1224,13 +1235,13 @@ TEST(VersioningDecompositionTests, Complicated) {
 @available(added=1)
 library example;
 
-type X = resource struct {
+type X = resource table {
     @available(removed=7)
-    x1 bool;
+    1: x1 bool;
     @available(added=3)
-    x2 Y;
+    2: x2 Y;
     @available(added=4)
-    x3 Z;
+    3: x3 Z;
 };
 
 @available(added=3)
@@ -1280,8 +1291,8 @@ protocol AB {
 @available(added=1, removed=3)
 library example;
 
-type X = resource struct {
-    x1 bool;
+type X = resource table {
+    1: x1 bool;
 };
 
 protocol A {
@@ -1297,9 +1308,9 @@ protocol AB {
 @available(added=3, removed=4)
 library example;
 
-type X = resource struct {
-    x1 bool;
-    x2 Y;
+type X = resource table {
+    1: x1 bool;
+    2: x2 Y;
 };
 
 type Y = resource union {
@@ -1332,10 +1343,10 @@ protocol AB {
 @available(added=4, removed=5)
 library example;
 
-type X = resource struct {
-    x1 bool;
-    x2 Y;
-    x3 Z;
+type X = resource table {
+    1: x1 bool;
+    2: x2 Y;
+    3: x3 Z;
 };
 
 type Y = resource union {
@@ -1370,10 +1381,10 @@ protocol AB {
 @available(added=5, removed=6)
 library example;
 
-type X = resource struct {
-    x1 bool;
-    x2 Y;
-    x3 Z;
+type X = resource table {
+    1: x1 bool;
+    2: x2 Y;
+    3: x3 Z;
 };
 
 type Y = resource union {
@@ -1410,10 +1421,10 @@ protocol AB {
 @available(added=6, removed=7)
 library example;
 
-type X = resource struct {
-    x1 bool;
-    x2 Y;
-    x3 Z;
+type X = resource table {
+    1: x1 bool;
+    2: x2 Y;
+    3: x3 Z;
 };
 
 type Y = resource union {
@@ -1445,9 +1456,9 @@ protocol B {
 @available(added=7)
 library example;
 
-type X = resource struct {
-    x2 Y;
-    x3 Z;
+type X = resource table {
+    2: x2 Y;
+    3: x3 Z;
 };
 
 type Y = resource union {

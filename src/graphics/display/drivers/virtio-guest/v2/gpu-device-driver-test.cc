@@ -6,7 +6,7 @@
 
 #include <fidl/fuchsia.hardware.pci/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire_test_base.h>
-#include <fidl/fuchsia.sysmem/cpp/wire_test_base.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire_test_base.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
@@ -23,8 +23,6 @@
 #include "src/devices/testing/fake-bti/include/lib/fake-bti/bti.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/lib/testing/predicates/status.h"
-
-namespace sysmem = fuchsia_sysmem;
 
 namespace {
 
@@ -43,54 +41,69 @@ constexpr int kTestSubsysDeviceId = 0x1af4;
 //
 // TODO(https://fxbug.dev/42072949): Consider creating and using a unified set of sysmem
 // testing doubles instead of writing mocks for each display driver test.
-class StubBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem::BufferCollection> {
+class StubBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem2::BufferCollection> {
  public:
   void SetConstraints(SetConstraintsRequestView request,
                       SetConstraintsCompleter::Sync& _completer) override {
-    if (!request->has_constraints) {
+    if (!request->has_constraints()) {
       return;
     }
-    auto& image_constraints = request->constraints.image_format_constraints[0];
-    EXPECT_EQ(sysmem::wire::PixelFormatType::kBgra32, image_constraints.pixel_format.type);
-    EXPECT_EQ(4u, image_constraints.bytes_per_row_divisor);
+    auto& image_constraints = request->constraints().image_format_constraints()[0];
+    EXPECT_EQ(fuchsia_images2::wire::PixelFormat::kB8G8R8A8, image_constraints.pixel_format());
+    EXPECT_EQ(4u, image_constraints.bytes_per_row_divisor());
   }
 
-  void CheckBuffersAllocated(CheckBuffersAllocatedCompleter::Sync& completer) override {
-    completer.Reply(ZX_OK);
+  void CheckAllBuffersAllocated(CheckAllBuffersAllocatedCompleter::Sync& completer) override {
+    completer.Reply(zx::ok());
   }
 
-  void WaitForBuffersAllocated(WaitForBuffersAllocatedCompleter::Sync& _completer) override {
-    sysmem::wire::BufferCollectionInfo2 info;
-    info.settings.has_image_format_constraints = true;
-    info.buffer_count = 1;
-    ASSERT_OK(zx::vmo::create(4096, 0, &info.buffers[0].vmo));
-    sysmem::wire::ImageFormatConstraints& constraints = info.settings.image_format_constraints;
-    constraints.pixel_format.type = sysmem::wire::PixelFormatType::kBgra32;
-    constraints.pixel_format.has_format_modifier = true;
-    constraints.pixel_format.format_modifier.value = sysmem::wire::kFormatModifierLinear;
-    constraints.max_coded_width = 1000;
-    constraints.max_bytes_per_row = 4000;
-    constraints.bytes_per_row_divisor = 1;
-    _completer.Reply(ZX_OK, std::move(info));
+  void WaitForAllBuffersAllocated(WaitForAllBuffersAllocatedCompleter::Sync& _completer) override {
+    auto info = fuchsia_sysmem2::wire::BufferCollectionInfo::Builder(arena_);
+    info.settings(
+        fuchsia_sysmem2::wire::SingleBufferSettings::Builder(arena_)
+            .image_format_constraints(
+                fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena_)
+                    .pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8)
+                    .pixel_format_modifier(fuchsia_images2::wire::PixelFormatModifier::kLinear)
+                    .max_size(fuchsia_math::wire::SizeU{
+                        .width = 1000, .height = std::numeric_limits<uint32_t>::max()})
+                    .max_bytes_per_row(4000)
+                    .Build())
+            .Build());
+
+    zx::vmo vmo;
+    ASSERT_OK(zx::vmo::create(4096, 0, &vmo));
+    info.buffers(std::vector{fuchsia_sysmem2::wire::VmoBuffer::Builder(arena_)
+                                 .vmo(std::move(vmo))
+                                 .vmo_usable_start(0)
+                                 .Build()});
+    auto response =
+        fuchsia_sysmem2::wire::BufferCollectionWaitForAllBuffersAllocatedResponse::Builder(arena_)
+            .buffer_collection_info(info.Build())
+            .Build();
+    _completer.Reply(fit::ok(&response));
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
     EXPECT_TRUE(false);
   }
+
+ private:
+  fidl::Arena<fidl::kDefaultArenaInitialCapacity> arena_;
 };
 
-class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocator> {
+class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem2::Allocator> {
  public:
   explicit MockAllocator() = default;
   explicit MockAllocator(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {
     EXPECT_TRUE(dispatcher_);
   }
-  explicit MockAllocator(fidl::ServerEnd<sysmem::Allocator> server_end) {
+  explicit MockAllocator(fidl::ServerEnd<fuchsia_sysmem2::Allocator> server_end) {
     binding_group_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                               std::move(server_end), this, fidl::kIgnoreBindingClosure);
   }
 
-  zx_status_t Connect(fidl::ServerEnd<sysmem::Allocator> request) {
+  zx_status_t Connect(fidl::ServerEnd<fuchsia_sysmem2::Allocator> request) {
     binding_group_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(request),
                               this, fidl::kIgnoreBindingClosure);
     return ZX_OK;
@@ -102,16 +115,16 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
     fbl::AutoLock lock(&lock_);
     active_buffer_collections_.emplace(
         buffer_collection_id,
-        BufferCollection{.token_client = std::move(request->token),
-                         .unowned_collection_server = request->buffer_collection_request,
+        BufferCollection{.token_client = std::move(request->token()),
+                         .unowned_collection_server = request->buffer_collection_request(),
                          .mock_buffer_collection = std::make_unique<StubBufferCollection>()});
 
     auto ref = fidl::BindServer(
         fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-        std::move(request->buffer_collection_request),
+        std::move(request->buffer_collection_request()),
         active_buffer_collections_.at(buffer_collection_id).mock_buffer_collection.get(),
         [this, buffer_collection_id](StubBufferCollection*, fidl::UnbindInfo,
-                                     fidl::ServerEnd<fuchsia_sysmem::BufferCollection>) {
+                                     fidl::ServerEnd<fuchsia_sysmem2::BufferCollection>) {
           fbl::AutoLock lock(&lock_);
           inactive_buffer_collection_tokens_.push_back(
               std::move(active_buffer_collections_.at(buffer_collection_id).token_client));
@@ -121,13 +134,13 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
 
   void SetDebugClientInfo(SetDebugClientInfoRequestView request,
                           SetDebugClientInfoCompleter::Sync& completer) override {
-    EXPECT_EQ(request->name.get().find("virtio-gpu-display"), 0u);
+    EXPECT_EQ(request->name().get().find("virtio-gpu-display"), 0u);
   }
 
-  std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+  std::vector<fidl::UnownedClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
   GetActiveBufferCollectionTokenClients() const {
     fbl::AutoLock lock(&lock_);
-    std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+    std::vector<fidl::UnownedClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
         unowned_token_clients;
     unowned_token_clients.reserve(active_buffer_collections_.size());
 
@@ -137,10 +150,10 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
     return unowned_token_clients;
   }
 
-  std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+  std::vector<fidl::UnownedClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
   GetInactiveBufferCollectionTokenClients() const {
     fbl::AutoLock lock(&lock_);
-    std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+    std::vector<fidl::UnownedClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
         unowned_token_clients;
     unowned_token_clients.reserve(inactive_buffer_collection_tokens_.size());
 
@@ -155,18 +168,18 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
   }
 
  private:
-  fidl::ServerBindingGroup<sysmem::Allocator> binding_group_;
+  fidl::ServerBindingGroup<fuchsia_sysmem2::Allocator> binding_group_;
 
   struct BufferCollection {
-    fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> token_client;
-    fidl::UnownedServerEnd<fuchsia_sysmem::BufferCollection> unowned_collection_server;
+    fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> token_client;
+    fidl::UnownedServerEnd<fuchsia_sysmem2::BufferCollection> unowned_collection_server;
     std::unique_ptr<StubBufferCollection> mock_buffer_collection;
   };
 
   mutable fbl::Mutex lock_;
   std::unordered_map<display::DriverBufferCollectionId, BufferCollection> active_buffer_collections_
       __TA_GUARDED(lock_);
-  std::vector<fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+  std::vector<fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
       inactive_buffer_collection_tokens_ __TA_GUARDED(lock_);
 
   display::DriverBufferCollectionId next_buffer_collection_id_ =
@@ -181,9 +194,10 @@ class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::S
     return fuchsia_hardware_sysmem::Service::InstanceHandler({
         .sysmem = sysmem_bindings_.CreateHandler(
             this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
-        .allocator_v1 =
-            allocator_v1_.bind_handler(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
-        .allocator_v2 = [](fidl::ServerEnd<fuchsia_sysmem2::Allocator> request) {},
+        .allocator_v1 = [](fidl::ServerEnd<fuchsia_sysmem::Allocator> request) {},
+        .allocator_v2 =
+            allocator_v2_.bind_handler(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
+
     });
   }
 
@@ -192,7 +206,7 @@ class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::S
   }
 
  private:
-  MockAllocator allocator_v1_;
+  MockAllocator allocator_v2_;
   fidl::ServerBindingGroup<fuchsia_hardware_sysmem::Sysmem> sysmem_bindings_;
 };
 

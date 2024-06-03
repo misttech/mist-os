@@ -28,7 +28,7 @@ use {
     futures::StreamExt,
     lazy_static::lazy_static,
     measure_tape_for_instance::Measurable,
-    moniker::{Moniker, MonikerBase},
+    moniker::Moniker,
     router_error::Explain,
     routing::{
         component_instance::{ComponentInstanceInterface, ResolvedInstanceInterface},
@@ -425,7 +425,7 @@ async fn construct_namespace(
         resolved_state.package(),
         &instance,
         resolved_state.decl(),
-        &resolved_state.program_input_dict,
+        &resolved_state.sandbox.program_input_dict,
         instance.execution_scope.clone(),
     )
     .await
@@ -552,7 +552,7 @@ async fn connect_to_storage_admin(
         .await
         .ok_or(fsys::ConnectToStorageAdminError::InstanceNotFound)?;
 
-    let storage_admin = StorageAdmin::new(Arc::downgrade(model));
+    let storage_admin = StorageAdmin::new();
     let task_group = instance.nonblocking_task_group();
 
     let storage_decl = {
@@ -730,7 +730,6 @@ mod tests {
         super::*,
         crate::model::{
             component::StartReason,
-            structured_dict::ComponentInput,
             testing::test_helpers::{TestEnvironmentBuilder, TestModelResult},
         },
         assert_matches::assert_matches,
@@ -740,6 +739,7 @@ mod tests {
         fidl::endpoints::{create_endpoints, create_proxy, create_proxy_and_stream},
         fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_zircon as zx,
+        routing::bedrock::structured_dict::ComponentInput,
         routing_test_helpers::component_id_index::make_index_file,
     };
 

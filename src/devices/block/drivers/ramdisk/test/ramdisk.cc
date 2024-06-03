@@ -77,7 +77,7 @@ class Environment : public testing::Environment {
  public:
   void SetUp() override {
     ASSERT_EQ(
-        device_watcher::RecursiveWaitForFile("/dev/sys/platform/00:00:2d/ramctl").status_value(),
+        device_watcher::RecursiveWaitForFile("/dev/sys/platform/ram-disk/ramctl").status_value(),
         ZX_OK);
   }
 };

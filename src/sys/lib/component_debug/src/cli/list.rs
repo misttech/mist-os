@@ -7,7 +7,6 @@ use {
     ansi_term::Colour,
     anyhow::Result,
     fidl_fuchsia_sys2 as fsys,
-    moniker::MonikerBase,
     prettytable::{cell, format::consts::FORMAT_CLEAN, row, Table},
     std::collections::HashSet,
     std::str::FromStr,

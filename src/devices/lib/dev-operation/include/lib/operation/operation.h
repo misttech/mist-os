@@ -5,7 +5,12 @@
 #ifndef SRC_DEVICES_LIB_DEV_OPERATION_INCLUDE_LIB_OPERATION_OPERATION_H_
 #define SRC_DEVICES_LIB_DEV_OPERATION_INCLUDE_LIB_OPERATION_OPERATION_H_
 
-#include <lib/ddk/debug.h>
+#ifdef DFV2_COMPAT_LOGGING
+#include <lib/driver/compat/cpp/logging.h>  // nogncheck
+#else
+#include <lib/ddk/debug.h>  // nogncheck
+#endif
+
 #include <lib/operation/helpers/algorithm.h>
 #include <lib/operation/helpers/intrusive_double_list.h>
 #include <zircon/assert.h>

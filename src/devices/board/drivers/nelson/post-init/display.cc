@@ -7,6 +7,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/display-panel.h>
+#include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
@@ -20,7 +21,6 @@
 #include <soc/aml-s905d3/s905d3-hw.h>
 
 #include "post-init.h"
-#include "sdk/lib/driver/compat/cpp/metadata.h"
 #include "src/devices/board/drivers/nelson/nelson-btis.h"
 
 namespace nelson {

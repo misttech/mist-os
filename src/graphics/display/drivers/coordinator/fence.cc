@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/coordinator/fence.h"
 
 #include <lib/async/cpp/wait.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>
 #include <lib/fit/thread_checker.h>
 #include <lib/trace/event.h>
@@ -27,10 +28,11 @@
 namespace display {
 
 bool Fence::CreateRef() {
-  FIT_DCHECK_IS_THREAD_VALID(thread_checker_);
+  ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent() == fence_creation_dispatcher_);
+
   fbl::AllocChecker ac;
-  cur_ref_ =
-      fbl::AdoptRef(new (&ac) FenceReference(fbl::RefPtr<Fence>(this), std::this_thread::get_id()));
+  cur_ref_ = fbl::AdoptRef(
+      new (&ac) FenceReference(fbl::RefPtr<Fence>(this), fence_creation_dispatcher_->borrow()));
   if (ac.check()) {
     ref_count_++;
   }
@@ -39,7 +41,7 @@ bool Fence::CreateRef() {
 }
 
 void Fence::ClearRef() {
-  FIT_DCHECK_IS_THREAD_VALID(thread_checker_);
+  ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent() == fence_creation_dispatcher_);
   cur_ref_ = nullptr;
 }
 
@@ -50,13 +52,13 @@ void Fence::Signal() const { event_.signal(0, ZX_EVENT_SIGNALED); }
 bool Fence::OnRefDead() { return --ref_count_ == 0; }
 
 zx_status_t Fence::OnRefArmed(fbl::RefPtr<FenceReference>&& ref) {
-  FIT_DCHECK_IS_THREAD_VALID(thread_checker_);
+  ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent() == fence_creation_dispatcher_);
 
   if (armed_refs_.is_empty()) {
     ready_wait_.set_object(event_.get());
     ready_wait_.set_trigger(ZX_EVENT_SIGNALED);
 
-    zx_status_t status = ready_wait_.Begin(dispatcher_);
+    zx_status_t status = ready_wait_.Begin(&event_dispatcher_);
     if (status != ZX_OK) {
       return status;
     }
@@ -67,7 +69,7 @@ zx_status_t Fence::OnRefArmed(fbl::RefPtr<FenceReference>&& ref) {
 }
 
 void Fence::OnRefDisarmed(FenceReference* ref) {
-  FIT_DCHECK_IS_THREAD_VALID(thread_checker_);
+  ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent() == fence_creation_dispatcher_);
 
   armed_refs_.erase(*ref);
   if (armed_refs_.is_empty()) {
@@ -77,7 +79,7 @@ void Fence::OnRefDisarmed(FenceReference* ref) {
 
 void Fence::OnReady(async_dispatcher_t* dispatcher, async::WaitBase* self, zx_status_t status,
                     const zx_packet_signal_t* signal) {
-  FIT_DCHECK_IS_THREAD_VALID(thread_checker_);
+  ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent() == fence_creation_dispatcher_);
 
   ZX_DEBUG_ASSERT(status == ZX_OK && (signal->observed & ZX_EVENT_SIGNALED));
   TRACE_DURATION("gfx", "Display::Fence::OnReady");
@@ -90,12 +92,19 @@ void Fence::OnReady(async_dispatcher_t* dispatcher, async::WaitBase* self, zx_st
   cb_->OnFenceFired(ref.get());
 
   if (!armed_refs_.is_empty()) {
-    ready_wait_.Begin(dispatcher_);
+    ready_wait_.Begin(&event_dispatcher_);
   }
 }
 
-Fence::Fence(FenceCallback* cb, async_dispatcher_t* dispatcher, EventId fence_id, zx::event&& event)
-    : cb_(cb), dispatcher_(dispatcher), event_(std::move(event)) {
+Fence::Fence(FenceCallback* cb, async_dispatcher_t* event_dispatcher, EventId fence_id,
+             zx::event event)
+    : cb_(cb),
+      event_dispatcher_(*event_dispatcher),
+      fence_creation_dispatcher_(fdf::Dispatcher::GetCurrent()),
+      event_(std::move(event)) {
+  ZX_DEBUG_ASSERT(event_dispatcher != nullptr);
+  ZX_DEBUG_ASSERT(fence_creation_dispatcher_->get() != nullptr);
+
   id = fence_id;
   ZX_DEBUG_ASSERT(event_.is_valid());
   zx_info_handle_basic_t info;
@@ -105,18 +114,18 @@ Fence::Fence(FenceCallback* cb, async_dispatcher_t* dispatcher, EventId fence_id
 }
 
 Fence::~Fence() {
-  FIT_DCHECK_IS_THREAD_VALID(thread_checker_);
+  ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent() == fence_creation_dispatcher_);
   ZX_DEBUG_ASSERT(armed_refs_.is_empty());
   ZX_DEBUG_ASSERT(ref_count_ == 0);
 }
 
 zx_status_t FenceReference::StartReadyWait() {
-  FIT_DCHECK_IS_THREAD_VALID(thread_checker_);
+  ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent() == fence_creation_dispatcher_);
   return fence_->OnRefArmed(fbl::RefPtr<FenceReference>(this));
 }
 
 void FenceReference::ResetReadyWait() {
-  FIT_DCHECK_IS_THREAD_VALID(thread_checker_);
+  ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent() == fence_creation_dispatcher_);
   fence_->OnRefDisarmed(this);
 }
 
@@ -125,7 +134,7 @@ void FenceReference::SetImmediateRelease(fbl::RefPtr<FenceReference>&& fence) {
 }
 
 void FenceReference::OnReady() {
-  FIT_DCHECK_IS_THREAD_VALID(thread_checker_);
+  ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent() == fence_creation_dispatcher_);
   if (release_fence_) {
     release_fence_->Signal();
     release_fence_ = nullptr;
@@ -134,11 +143,14 @@ void FenceReference::OnReady() {
 
 void FenceReference::Signal() const { fence_->Signal(); }
 
-FenceReference::FenceReference(fbl::RefPtr<Fence> fence, std::thread::id fence_thread_id)
-    : fence_(std::move(fence)), thread_checker_(fence_thread_id) {}
+FenceReference::FenceReference(fbl::RefPtr<Fence> fence,
+                               fdf::UnownedDispatcher fence_creation_dispatcher)
+    : fence_(std::move(fence)), fence_creation_dispatcher_(std::move(fence_creation_dispatcher)) {
+  ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent() == fence_creation_dispatcher_);
+}
 
 FenceReference::~FenceReference() {
-  FIT_DCHECK_IS_THREAD_VALID(thread_checker_);
+  ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent() == fence_creation_dispatcher_);
   fence_->cb_->OnRefForFenceDead(fence_.get());
 }
 

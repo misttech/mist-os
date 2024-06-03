@@ -1,12 +1,13 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{connector::Connectable, registry, CapabilityTrait, ConversionError};
+use crate::{connector::Connectable, registry, CapabilityTrait, Connector, ConversionError};
 use core::fmt;
 use fidl::endpoints::{create_request_stream, ClientEnd};
+use fidl::handle::{AsHandleRef, Channel, Status};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::{self as zx, AsHandleRef};
+use fuchsia_zircon::Koid;
 use futures::TryStreamExt;
 use std::sync::Arc;
 use vfs::{
@@ -18,7 +19,7 @@ use vfs::{
 };
 
 /// An [Open] capability lets the holder obtain other capabilities by pipelining
-/// a [zx::Channel], usually treated as the server endpoint of some FIDL protocol.
+/// a [Channel], usually treated as the server endpoint of some FIDL protocol.
 /// We call this operation opening the capability.
 ///
 /// ## Open via remoting
@@ -80,7 +81,7 @@ impl Open {
         scope: ExecutionScope,
         flags: fio::OpenFlags,
         path: impl ValidatePath,
-        server_end: zx::Channel,
+        server_end: Channel,
     ) {
         flags.to_object_request(server_end).handle(|object_request| {
             let path = path.validate()?;
@@ -89,7 +90,7 @@ impl Open {
     }
 
     /// Forwards the open request.
-    pub fn open_entry(&self, open_request: OpenRequest<'_>) -> Result<(), zx::Status> {
+    pub fn open_entry(&self, open_request: OpenRequest<'_>) -> Result<(), Status> {
         self.entry.clone().open_entry(open_request)
     }
 
@@ -127,7 +128,7 @@ impl Open {
     }
 
     /// Serves the `fuchsia.io.Openable` protocol for this Open and moves it into the registry.
-    pub fn serve_and_register(self, mut stream: fio::OpenableRequestStream, koid: zx::Koid) {
+    pub fn serve_and_register(self, mut stream: fio::OpenableRequestStream, koid: Koid) {
         let open = self.clone();
 
         // Move this capability into the registry.
@@ -193,24 +194,32 @@ impl From<Open> for fsandbox::Capability {
     }
 }
 
+impl From<Connector> for Open {
+    fn from(connector: Connector) -> Self {
+        Self::new(vfs::service::endpoint(move |_scope, server_end| {
+            let _ = connector.send_channel(server_end.into_zx_channel().into());
+        }))
+    }
+}
+
 pub trait ValidatePath {
-    fn validate(self) -> Result<vfs::path::Path, zx::Status>;
+    fn validate(self) -> Result<vfs::path::Path, Status>;
 }
 
 impl ValidatePath for vfs::path::Path {
-    fn validate(self) -> Result<vfs::path::Path, zx::Status> {
+    fn validate(self) -> Result<vfs::path::Path, Status> {
         Ok(self)
     }
 }
 
 impl ValidatePath for String {
-    fn validate(self) -> Result<vfs::path::Path, zx::Status> {
+    fn validate(self) -> Result<vfs::path::Path, Status> {
         vfs::path::Path::validate_and_split(self)
     }
 }
 
 impl ValidatePath for &str {
-    fn validate(self) -> Result<vfs::path::Path, zx::Status> {
+    fn validate(self) -> Result<vfs::path::Path, Status> {
         vfs::path::Path::validate_and_split(self)
     }
 }
@@ -224,7 +233,6 @@ mod tests {
     use fidl::endpoints::{create_endpoints, create_proxy};
     use fidl_fuchsia_io as fio;
     use fuchsia_async as fasync;
-    use fuchsia_zircon as zx;
     use futures::StreamExt;
     use vfs::directory::{
         entry::serve_directory, entry_container::Directory as _, helper::DirectlyMutable,
@@ -300,14 +308,14 @@ mod tests {
 
         let event = event_stream.try_next().await.unwrap().unwrap();
         let on_open = event.into_on_open_().unwrap();
-        assert_eq!(on_open.0, zx::Status::INVALID_ARGS.into_raw());
+        assert_eq!(on_open.0, Status::INVALID_ARGS.into_raw());
 
         let event = event_stream.try_next().await;
         let error = event.unwrap_err();
         assert_matches!(
             error,
             fidl::Error::ClientChannelClosed { status, .. }
-            if status == zx::Status::INVALID_ARGS
+            if status == Status::INVALID_ARGS
         );
     }
 
@@ -315,7 +323,7 @@ mod tests {
     async fn test_connector_into_open() {
         let (receiver, sender) = Receiver::new();
         let open = Open::new(sender.try_into_directory_entry().unwrap());
-        let (client_end, server_end) = zx::Channel::create();
+        let (client_end, server_end) = Channel::create();
         let scope = ExecutionScope::new();
         open.open(scope, fio::OpenFlags::empty(), ".".to_owned(), server_end);
         let msg = receiver.receive().await.unwrap();
@@ -331,7 +339,7 @@ mod tests {
 
         let (receiver, sender) = Receiver::new();
         let open = Open::new(sender.try_into_directory_entry().unwrap());
-        let (client_end, server_end) = zx::Channel::create();
+        let (client_end, server_end) = Channel::create();
         let scope = ExecutionScope::new();
         open.open(scope, fio::OpenFlags::empty(), "foo".to_owned(), server_end);
 
@@ -344,19 +352,19 @@ mod tests {
         assert_matches!(
             result,
             Err(fidl::Error::ClientChannelClosed { status, .. })
-            if status == zx::Status::NOT_DIR
+            if status == Status::NOT_DIR
         );
     }
 
     #[fuchsia::test]
     async fn test_connector_into_open_via_dict() {
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         let (receiver, sender) = Receiver::new();
         dict.insert("echo".parse().unwrap(), Capability::Connector(sender))
             .expect("dict entry already exists");
 
         let open = Open::new(dict.try_into_directory_entry().unwrap());
-        let (client_end, server_end) = zx::Channel::create();
+        let (client_end, server_end) = Channel::create();
         let scope = ExecutionScope::new();
         open.open(scope, fio::OpenFlags::empty(), "echo".to_owned(), server_end);
 
@@ -371,13 +379,13 @@ mod tests {
     fn test_connector_into_open_via_dict_extra_path() {
         let mut ex = fasync::TestExecutor::new();
 
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         let (receiver, sender) = Receiver::new();
         dict.insert("echo".parse().unwrap(), Capability::Connector(sender))
             .expect("dict entry already exists");
 
         let open = Open::new(dict.try_into_directory_entry().unwrap());
-        let (client_end, server_end) = zx::Channel::create();
+        let (client_end, server_end) = Channel::create();
         let scope = ExecutionScope::new();
         open.open(scope, fio::OpenFlags::empty(), "echo/foo".to_owned(), server_end);
 
@@ -390,7 +398,7 @@ mod tests {
         assert_matches!(
             result,
             Err(fidl::Error::ClientChannelClosed { status, .. })
-            if status == zx::Status::NOT_DIR
+            if status == Status::NOT_DIR
         );
     }
 }

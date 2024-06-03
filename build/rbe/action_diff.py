@@ -353,7 +353,7 @@ def main(argv: Sequence[str]) -> int:
     # len(logs) == 2, enforced by _MAIN_ARG_PARSER.
 
     cfg_path = remotetool._REPROXY_CFG
-    reproxy_cfg = remotetool.read_config_file_lines(
+    reproxy_cfg = cl_util.read_config_file_lines(
         cfg_path.read_text().splitlines()
     )
 

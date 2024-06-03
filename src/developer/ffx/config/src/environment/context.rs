@@ -265,8 +265,8 @@ impl EnvironmentContext {
         &self.kind
     }
 
-    pub async fn load(&self) -> Result<Environment> {
-        Environment::load(self).await
+    pub fn load(&self) -> Result<Environment> {
+        Environment::load(self)
     }
 
     /// Gets an environment variable, either from the system environment or from the isolation-configured
@@ -316,13 +316,13 @@ impl EnvironmentContext {
 
     /// A shorthand for the very common case of querying a value from the global config
     /// cache and this environment, using the provided value converted into a query.
-    pub async fn get<'a, T, U>(&'a self, with: U) -> std::result::Result<T, T::Error>
+    pub fn get<'a, T, U>(&'a self, with: U) -> std::result::Result<T, T::Error>
     where
         T: TryFrom<ConfigValue> + ValueStrategy,
         <T as std::convert::TryFrom<ConfigValue>>::Error: std::convert::From<ConfigError>,
         U: Into<ConfigQuery<'a>>,
     {
-        self.query(with).get().await
+        self.query(with).get()
     }
 
     /// Find the appropriate sdk root for this invocation of ffx, looking at configuration
@@ -333,12 +333,12 @@ impl EnvironmentContext {
         // Out of tree, we will always want to pull the config from the normal config path, which
         // we can defer to the SdkRoot's mechanisms for.
         let runtime_root: Option<PathBuf> =
-            self.query("sdk.root").build(Some(BuildOverride::NoBuild)).get().await.ok();
+            self.query("sdk.root").build(Some(BuildOverride::NoBuild)).get().ok();
 
         match (&self.kind, runtime_root) {
             (EnvironmentKind::InTree { build_dir: Some(build_dir), .. }, None) => {
                 let manifest = build_dir.clone();
-                let module = self.query("sdk.module").get().await.ok();
+                let module = self.query("sdk.module").get().ok();
                 match module {
                     Some(module) => Ok(SdkRoot::Modular { manifest, module }),
                     None => Ok(SdkRoot::Full(manifest)),
@@ -478,7 +478,7 @@ impl EnvironmentContext {
                 }
             }
         };
-        let module = self.query("sdk.module").build(Some(BuildOverride::NoBuild)).get().await.ok();
+        let module = self.query("sdk.module").build(Some(BuildOverride::NoBuild)).get().ok();
         match module {
             Some(module) => {
                 debug!("Found modular Fuchsia SDK at {manifest:?} with module {module}");

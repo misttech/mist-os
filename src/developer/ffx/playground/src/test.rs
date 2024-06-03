@@ -882,3 +882,15 @@ async fn subtract() {
         })
         .await;
 }
+
+#[fuchsia::test]
+async fn complex_global_usage_interleaving() {
+    let interpreter = test_interpreter(false, None).await;
+
+    assert!(matches!(interpreter.run("def a { 5 }").await.unwrap(), Value::Null));
+    assert!(matches!(interpreter.run("def b { $_ + 2 }").await.unwrap(), Value::Null));
+    assert!(matches!(interpreter.run("def c { a | b }").await.unwrap(), Value::Null));
+
+    let value = interpreter.run("c").await.unwrap();
+    assert_eq!(7, value.try_usize().unwrap());
+}

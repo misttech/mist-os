@@ -20,17 +20,13 @@ rustc_library("sandbox") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/from-enum",
     "//src/lib/fuchsia-async",
-    "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/storage/lib/vfs/rust:vfs",
+    "//src/lib/zircon/rust:fuchsia-zircon-status",
     "//src/sys/component_manager/lib/router_error",
     "//src/sys/lib/cm_types",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:lazy_static",
-    "//third_party/rust_crates:scopeguard",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [
@@ -40,7 +36,6 @@ rustc_library("sandbox") {
     "//src/lib/test_util",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:lazy_static",
   ]
 
   sources = [
@@ -52,12 +47,24 @@ rustc_library("sandbox") {
     "src/directory.rs",
     "src/handle.rs",
     "src/lib.rs",
-    "src/open.rs",
     "src/receiver.rs",
-    "src/registry.rs",
     "src/router.rs",
     "src/unit.rs",
   ]
+
+  if (!is_host) {
+    deps += [
+      "//src/lib/zircon/rust:fuchsia-zircon",
+      "//src/storage/lib/vfs/rust:vfs",
+      "//third_party/rust_crates:lazy_static",
+      "//third_party/rust_crates:scopeguard",
+      "//third_party/rust_crates:tracing",
+    ]
+    sources += [
+      "src/open.rs",
+      "src/registry.rs",
+    ]
+  }
 
   visibility = [
     "//src/sys/component_manager/*",

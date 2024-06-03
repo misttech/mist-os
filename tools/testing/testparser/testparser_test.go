@@ -1440,7 +1440,7 @@ Type: Summary
 	testCaseCmp(t, stdout, want)
 }
 
-func TestParseMoblyTestError(t *testing.T) {
+func TestParseMoblyTestErrorNoSummary(t *testing.T) {
 	stdout := `
 Running [InfraDriver]
 ======== Mobly config content ========
@@ -1492,6 +1492,77 @@ UID: null
 			Duration:    1 * time.Millisecond,
 			Format:      "Mobly",
 		},
+		{
+			DisplayName: "TestparserError",
+			FailReason:  "[TestparserError] Missing Mobly summary record - potental infra timeout.",
+			SuiteName:   "Synthetic",
+			CaseName:    "Synthetic",
+			Status:      runtests.TestAborted,
+			Format:      "Mobly",
+		},
+	}
+
+	testCaseCmp(t, stdout, want)
+}
+
+func TestParseMoblyTestErrorMissingHeader(t *testing.T) {
+	stdout := `
+Running [InfraDriver]
+======== Mobly config content ========
+MoblyParams:
+  LogPath: /tmp
+TestBeds:
+- Controllers:
+    FuchsiaDevice:
+    - name: fuchsia-emulator
+      transport: fuchsia-controller
+  Name: InfraTestbed
+  TestParams: {}
+
+======================================
+
+`
+
+	want := []runtests.TestCaseResult{
+		{
+			DisplayName: "TestparserError",
+			FailReason:  "[TestparserError] Missing Mobly summary record - potental infra timeout.",
+			SuiteName:   "Synthetic",
+			CaseName:    "Synthetic",
+			Status:      runtests.TestAborted,
+			Format:      "Mobly",
+		},
+	}
+
+	testCaseCmp(t, stdout, want)
+}
+
+func TestParseMoblyTestErrorMalformedYAML(t *testing.T) {
+	stdout := `
+Running [InfraDriver]
+======== Mobly config content ========
+MoblyParams:
+  LogPath: /tmp
+TestBeds:
+- Controllers:
+    FuchsiaDevice:
+    - name: fuchsia-emulator
+      transport: fuchsia-controller
+  Name: InfraTestbed
+  TestParams: {}
+
+======================================
+
+[=====MOBLY RESULTS=====]
+---
+Requested Tests:
+- test_goodbye
+  test_hello:
+    malformed
+
+`
+
+	want := []runtests.TestCaseResult{
 		{
 			DisplayName: "TestparserError",
 			FailReason:  "[TestparserError] Missing Mobly summary record - potental infra timeout.",

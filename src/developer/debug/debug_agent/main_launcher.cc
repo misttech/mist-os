@@ -94,6 +94,9 @@ class DebugAgentLegacyLauncher : public fidl::Server<fuchsia_debugger::DebugAgen
       }
     }
 
+    void OnFatalException(
+        fidl::Event<fuchsia_debugger::DebugAgent::OnFatalException>& event) override {}
+
     void handle_unknown_event(
         fidl::UnknownEventMetadata<fuchsia_debugger::DebugAgent> metadata) override {
       FX_LOGS(WARNING) << "Unknown event: " << metadata.event_ordinal;
@@ -135,8 +138,14 @@ class DebugAgentLegacyLauncher : public fidl::Server<fuchsia_debugger::DebugAgen
     clients_.insert({client_handle, std::move(client)});
   }
 
+  // Unsupported methods for the legacy launcher.
   void GetAttachedProcesses(GetAttachedProcessesRequest& request,
                             GetAttachedProcessesCompleter::Sync& completer) override {}
+
+  void AttachTo(AttachToRequest& request, AttachToCompleter::Sync& completer) override {}
+
+  void GetProcessInfo(GetProcessInfoRequest& request,
+                      GetProcessInfoCompleter::Sync& completer) override {}
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_debugger::DebugAgent> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override {

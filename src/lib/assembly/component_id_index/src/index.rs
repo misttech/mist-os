@@ -41,7 +41,7 @@ impl ComponentIdIndexBuilder {
 mod tests {
     use super::*;
     use component_id_index::InstanceId;
-    use moniker::{Moniker, MonikerBase};
+    use moniker::Moniker;
     use pretty_assertions::assert_eq;
     use std::io::Write;
 

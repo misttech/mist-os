@@ -35,7 +35,7 @@ pub struct FakeDevice {
     read_only: AtomicBool,
 }
 
-const TRANSFER_HEAP_SIZE: usize = 16 * 1024 * 1024;
+const TRANSFER_HEAP_SIZE: usize = 64 * 1024 * 1024;
 
 impl FakeDevice {
     pub fn new(block_count: u64, block_size: u32) -> Self {

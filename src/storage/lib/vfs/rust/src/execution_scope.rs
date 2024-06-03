@@ -16,9 +16,7 @@
 //! Implementation wise, execution scope is just a proxy, that forwards all the tasks to an actual
 //! executor, provided as an instance of a [`futures::task::Spawn`] trait.
 
-use crate::{
-    directory::mutable::entry_constructor::EntryConstructor, token_registry::TokenRegistry,
-};
+use crate::token_registry::TokenRegistry;
 
 use {
     futures::{
@@ -53,7 +51,6 @@ pub type SpawnError = task::SpawnError;
 #[derive(Clone)]
 pub struct ExecutionScope {
     executor: Arc<Executor>,
-    entry_constructor: Option<Arc<dyn EntryConstructor + Send + Sync>>,
 }
 
 struct Executor {
@@ -130,8 +127,8 @@ impl Inner {
 }
 
 impl ExecutionScope {
-    /// Constructs an execution scope that has no `entry_constructor`.  Use
-    /// [`ExecutionScope::build()`] if you want to specify other parameters.
+    /// Constructs an execution scope.  Use [`ExecutionScope::build()`] if you want to specify
+    /// parameters.
     pub fn new() -> Self {
         Self::build().new()
     }
@@ -177,10 +174,6 @@ impl ExecutionScope {
 
     pub fn token_registry(&self) -> &TokenRegistry {
         &self.executor.token_registry
-    }
-
-    pub fn entry_constructor(&self) -> Option<Arc<dyn EntryConstructor + Send + Sync>> {
-        self.entry_constructor.as_ref().map(Arc::clone)
     }
 
     pub fn shutdown(&self) {
@@ -254,18 +247,11 @@ impl std::fmt::Debug for ExecutionScope {
 
 #[derive(Default)]
 pub struct ExecutionScopeParams {
-    entry_constructor: Option<Arc<dyn EntryConstructor + Send + Sync>>,
     #[cfg(target_os = "fuchsia")]
     async_executor: Option<EHandle>,
 }
 
 impl ExecutionScopeParams {
-    pub fn entry_constructor(mut self, value: Arc<dyn EntryConstructor + Send + Sync>) -> Self {
-        assert!(self.entry_constructor.is_none(), "`entry_constructor` is already set");
-        self.entry_constructor = Some(value);
-        self
-    }
-
     #[cfg(target_os = "fuchsia")]
     pub fn executor(mut self, value: EHandle) -> Self {
         assert!(self.async_executor.is_none(), "`executor` is already set");
@@ -286,7 +272,6 @@ impl ExecutionScopeParams {
                 #[cfg(target_os = "fuchsia")]
                 async_executor: self.async_executor.map_or_else(|| OnceLock::new(), |e| e.into()),
             }),
-            entry_constructor: self.entry_constructor,
         }
     }
 }
@@ -394,8 +379,6 @@ pub async fn yield_to_executor() {
 #[cfg(test)]
 mod tests {
     use super::{yield_to_executor, ExecutionScope};
-
-    use crate::directory::mutable::entry_constructor::EntryConstructor;
 
     use {
         fuchsia_async::{Task, TestExecutor, Timer},
@@ -585,26 +568,6 @@ mod tests {
         assert!(done.load(Ordering::SeqCst));
     }
 
-    #[test]
-    fn with_mock_entry_constructor() {
-        let entry_constructor: Arc<dyn EntryConstructor + Send + Sync> =
-            mocks::MockEntryConstructor::new();
-
-        let scope = ExecutionScope::build().entry_constructor(entry_constructor.clone()).new();
-
-        let entry_constructor2 = scope.entry_constructor().unwrap();
-        assert!(
-            // Note this ugly cast in place of
-            // `Arc::ptr_eq(&entry_constructor, &entry_constructor2)` here is
-            // to ensure we don't compare vtable pointers, which are not strictly guaranteed to be
-            // the same across casts done in different code generation units at compilation time.
-            entry_constructor.as_ref() as *const dyn EntryConstructor as *const u8
-                == entry_constructor2.as_ref() as *const dyn EntryConstructor as *const u8,
-            "`scope` returned `Arc` to an entry constructor is different from the one initially \
-             set."
-        );
-    }
-
     #[cfg(target_os = "fuchsia")]
     #[fuchsia::test]
     async fn test_shutdown_waits_for_channels() {
@@ -717,16 +680,7 @@ mod tests {
     }
 
     mod mocks {
-        use crate::{
-            directory::{
-                entry::DirectoryEntry,
-                mutable::entry_constructor::{EntryConstructor, NewEntryType},
-            },
-            path::Path,
-        };
-
         use {
-            fuchsia_zircon_status::Status,
             futures::{
                 channel::oneshot,
                 task::{Context, Poll},
@@ -848,26 +802,6 @@ mod tests {
             fn drop(&mut self) {
                 self.drop_call_count.fetch_add(1, Ordering::Relaxed);
                 self.drop_sender.take().unwrap().send(()).unwrap();
-            }
-        }
-
-        pub(super) struct MockEntryConstructor {}
-
-        impl MockEntryConstructor {
-            pub(super) fn new() -> Arc<Self> {
-                Arc::new(Self {})
-            }
-        }
-
-        impl EntryConstructor for MockEntryConstructor {
-            fn create_entry(
-                self: Arc<Self>,
-                _parent: Arc<dyn DirectoryEntry>,
-                _what: NewEntryType,
-                _name: &str,
-                _path: &Path,
-            ) -> Result<Arc<dyn DirectoryEntry>, Status> {
-                panic!("Not implemented")
             }
         }
     }

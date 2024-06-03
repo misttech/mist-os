@@ -9,23 +9,13 @@ use crate::handler::setting_handler::{
     controller, ControllerError, IntoHandlerResult, SettingHandlerResult,
 };
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
-use settings_storage::storage_factory::StorageAccess;
+use settings_storage::storage_factory::{NoneT, StorageAccess};
 
 use async_trait::async_trait;
 
 impl DeviceStorageCompatible for AccessibilityInfo {
+    type Loader = NoneT;
     const KEY: &'static str = "accessibility_info";
-
-    fn default_value() -> Self {
-        AccessibilityInfo {
-            audio_description: None,
-            screen_reader: None,
-            color_inversion: None,
-            enable_magnification: None,
-            color_correction: None,
-            captions_settings: None,
-        }
-    }
 }
 
 impl From<AccessibilityInfo> for SettingInfo {
@@ -40,7 +30,8 @@ pub(crate) struct AccessibilityController {
 
 impl StorageAccess for AccessibilityController {
     type Storage = DeviceStorage;
-    const STORAGE_KEYS: &'static [&'static str] = &[AccessibilityInfo::KEY];
+    type Data = AccessibilityInfo;
+    const STORAGE_KEY: &'static str = AccessibilityInfo::KEY;
 }
 
 #[async_trait]

@@ -6,12 +6,9 @@ use {
     crate::{
         bedrock::{
             program::{self as program, ComponentStopOutcome, Program, StopRequestSuccess},
-            sandbox_construction::{
-                self, build_component_sandbox, build_program_output_dictionary,
-                extend_dict_with_offers,
-            },
+            program_output_dict::build_program_output_dictionary,
         },
-        framework::controller,
+        framework::{build_framework_dictionary, controller},
         model::{
             actions::{shutdown, ActionsManager, DiscoverAction, StopAction},
             component::{
@@ -31,17 +28,24 @@ use {
             },
             routing_fns::RouteEntry,
             start::Start,
-            structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
+            storage::build_storage_admin_dictionary,
             token::{InstanceToken, InstanceTokenState},
         },
-        sandbox_util::{DictExt, RoutableExt},
+        sandbox_util::RoutableExt,
     },
     ::routing::{
+        bedrock::{
+            sandbox_construction::{
+                self, build_component_sandbox, extend_dict_with_offers, ComponentSandbox,
+            },
+            structured_dict::{ComponentInput, StructuredDictMap},
+        },
         capability_source::ComponentCapability,
         component_instance::{
             ComponentInstanceInterface, ResolvedInstanceInterface, ResolvedInstanceInterfaceExt,
         },
         resolving::{ComponentAddress, ComponentResolutionContext},
+        DictExt,
     },
     async_trait::async_trait,
     async_utils::async_once::Once,
@@ -64,7 +68,7 @@ use {
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::future::BoxFuture,
     hooks::{CapabilityReceiver, EventPayload},
-    moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
+    moniker::{ChildName, Moniker},
     sandbox::{
         Capability, CapabilityTrait, Dict, Open, Request, Routable, Router, WeakComponentToken,
     },
@@ -358,29 +362,12 @@ pub struct ResolvedInstanceState {
     /// Anonymized service directories aggregated from collections and children.
     pub anonymized_services: HashMap<AnonymizedServiceRoute, Arc<AnonymizedAggregateServiceDir>>,
 
-    /// The dict containing all capabilities that the parent wished to provide to us.
-    pub component_input: ComponentInput,
-
-    /// The dict containing all capabilities that we expose.
-    pub component_output_dict: Dict,
-
-    /// The dict containing all capabilities that we use.
-    pub program_input_dict: Dict,
-
-    /// The dict containing all capabilities that we declare, as Routers.
-    pub program_output_dict: Dict,
+    /// The sandbox holds all dictionaries involved in capability routing.
+    pub sandbox: ComponentSandbox,
 
     /// Dictionary of extra capabilities passed to the component when it is started.
     // TODO(b/322564390): Move this into `StartedInstanceState` once stop action releases lock on it
-    pub program_input_dict_additions: Option<Dict>,
-
-    /// Dicts containing the capabilities we want to provide to each collection. Each new
-    /// dynamic child gets a clone of one of these inputs (which is potentially extended by
-    /// dynamic offers).
-    pub collection_inputs: StructuredDictMap<ComponentInput>,
-
-    /// The environments declared by this component.
-    bedrock_environments: StructuredDictMap<ComponentEnvironment>,
+    pub program_input_dict_additions: Dict,
 
     /// State held by the framework on behalf of the component's program, including
     /// its outgoing directory server endpoint. Present if and only if the component
@@ -458,40 +445,29 @@ impl ResolvedInstanceState {
             dynamic_offers: vec![],
             address,
             anonymized_services: HashMap::new(),
-            component_input,
-            component_output_dict: Dict::new(),
-            program_input_dict: Dict::new(),
-            program_output_dict: Dict::new(),
-            program_input_dict_additions: None,
-            collection_inputs: Default::default(),
-            bedrock_environments: Default::default(),
+            sandbox: Default::default(),
+            program_input_dict_additions: Dict::new(),
             program_escrow,
         };
         state.add_static_children(component).await?;
 
-        let declared_dictionaries = Dict::new();
-        build_program_output_dictionary(
-            component,
-            &state.children,
+        let (program_output_dict, declared_dictionaries) =
+            build_program_output_dictionary(component, &state.children, &decl, &component_input);
+        let child_outgoing_dictionary_routers =
+            state.get_child_component_output_dictionary_routers();
+        let (component_sandbox, child_inputs) = build_component_sandbox(
+            &component.moniker,
+            child_outgoing_dictionary_routers,
             &decl,
-            &state.component_input,
-            &state.program_output_dict,
-            &declared_dictionaries,
-        );
-        let mut child_inputs = Default::default();
-        build_component_sandbox(
-            component,
-            &state.children,
-            &decl,
-            &state.component_input,
-            &state.component_output_dict,
-            &state.program_input_dict,
-            &component.program_output(),
-            &mut child_inputs,
-            &mut state.collection_inputs,
-            &mut state.bedrock_environments,
+            component_input,
+            &state.program_input_dict_additions,
+            program_output_dict,
+            component.program_output(),
+            build_framework_dictionary(component),
+            build_storage_admin_dictionary(component, &decl),
             declared_dictionaries,
         );
+        state.sandbox = component_sandbox;
         state.discover_static_children(child_inputs).await;
         Ok(state)
     }
@@ -549,7 +525,7 @@ impl ResolvedInstanceState {
                 &mut self.instance_token_state,
                 Default::default(),
             ),
-            component_input: self.component_input.clone(),
+            component_input: self.sandbox.component_input.clone(),
         }
     }
 
@@ -607,7 +583,7 @@ impl ResolvedInstanceState {
                 self.resolved_component.package.as_ref(),
                 &component,
                 &self.resolved_component.decl,
-                &self.program_input_dict,
+                &self.sandbox.program_input_dict,
                 component.execution_scope.clone(),
             )
             .await?;
@@ -636,7 +612,7 @@ impl ResolvedInstanceState {
         let dict = Router::dict_routers_to_open(
             &WeakComponentToken::new(self.weak_component.clone()),
             &self.weak_component.upgrade().unwrap().execution_scope,
-            &self.component_output_dict,
+            &self.sandbox.component_output_dict,
         );
         Self::extend_exposed_dict_with_legacy(&self.weak_component, self.decl(), &dict);
         dict
@@ -849,7 +825,7 @@ impl ResolvedInstanceState {
         collection: Option<&CollectionDecl>,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
         dynamic_capabilities: Option<Vec<fdecl::Capability>>,
-        mut child_input: ComponentInput,
+        child_input: ComponentInput,
     ) -> Result<(Arc<ComponentInstance>, ComponentInput), AddChildError> {
         assert!(
             (dynamic_offers.is_none()) || collection.is_some(),
@@ -865,14 +841,18 @@ impl ResolvedInstanceState {
         let child_name =
             ChildName::try_new(child.name.as_str(), collection.map(|c| c.name.as_str()))?;
 
+        let child_component_output_dictionary_routers =
+            self.get_child_component_output_dictionary_routers();
         if !dynamic_offers.is_empty() {
             extend_dict_with_offers(
-                component,
-                &self.children,
-                &self.component_input,
+                &component.moniker,
+                &child_component_output_dictionary_routers,
+                &self.sandbox.component_input,
                 &dynamic_offers,
                 &component.program_output(),
-                &mut child_input,
+                &self.sandbox.framework_dict,
+                &self.sandbox.capability_sourced_capabilities_dict,
+                &child_input,
             );
         }
 
@@ -1066,6 +1046,10 @@ impl ResolvedInstanceState {
                 .await
                 .expect("failed to discover child");
         }
+    }
+
+    fn get_child_component_output_dictionary_routers(&self) -> HashMap<ChildName, Router> {
+        self.children.iter().map(|(name, child)| (name.clone(), child.component_output())).collect()
     }
 }
 

@@ -280,6 +280,8 @@ static inline bool x86_hypervisor_has_pv_eoi() { return g_hypervisor_has_pv_eoi;
 
 static inline bool x86_hypervisor_has_pv_ipi() { return g_hypervisor_has_pv_ipi; }
 
+static inline bool x86_has_hypervisor() { return x86_hypervisor != X86_HYPERVISOR_NONE; }
+
 /* returns 0 if unknown, otherwise value in Hz */
 typedef uint64_t (*x86_get_timer_freq_func_t)();
 

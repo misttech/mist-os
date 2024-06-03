@@ -151,6 +151,7 @@ void FlexibleFoo::Decode(::fidl::Decoder* _decoder, FlexibleFoo* value, size_t o
 
   switch (value->tag_) {
     case ::test::requestflexibleenvelope::FlexibleFoo::Tag::kS: {
+      value->s_.~decltype(value->s_)();
       new (&value->s_)::std::string();
       ::fidl::Decode(_decoder, &value->s_, value_offset);
       break;
@@ -366,6 +367,7 @@ void StrictFoo::Decode(::fidl::Decoder* _decoder, StrictFoo* value, size_t offse
 
   switch (value->tag_) {
     case ::test::requestflexibleenvelope::StrictFoo::Tag::kS: {
+      value->s_.~decltype(value->s_)();
       new (&value->s_)::std::string();
       ::fidl::Decode(_decoder, &value->s_, value_offset);
       break;

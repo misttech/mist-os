@@ -38,9 +38,6 @@ fuchsia_cc_driver(
         "aml-sdmmc-export.cc",
         "aml-sdmmc-regs.h",
     ],
-    copts = [
-        "-Wno-vla-cxx-extension",
-    ],
     defines = [
         "ZX_ASSERT_LEVEL=2",
         "_ALL_SOURCE",
@@ -59,6 +56,7 @@ fuchsia_cc_driver(
         "//src/lib/vmo_store",
         "//zircon/system/ulib/ddk-platform-defs",
         "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
         "@fuchsia_sdk//pkg/driver_component_cpp",
         "@fuchsia_sdk//pkg/driver_runtime_cpp",
         "@fuchsia_sdk//pkg/fit",
@@ -71,7 +69,6 @@ fuchsia_cc_driver(
         "@internal_sdk//fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
         "@internal_sdk//fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
         "@internal_sdk//fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
-        "@internal_sdk//fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
         "@internal_sdk//fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
         "@internal_sdk//pkg/zircon-internal",
     ],

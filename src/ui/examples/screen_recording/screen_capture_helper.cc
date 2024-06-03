@@ -15,7 +15,7 @@ using flatland::MapHostPointer;
 using fuchsia::ui::composition::RegisterBufferCollectionArgs;
 using fuchsia::ui::composition::RegisterBufferCollectionUsages;
 
-fuchsia::sysmem2::BufferCollectionInfo CreateBufferCollectionInfo2WithConstraints(
+fuchsia::sysmem2::BufferCollectionInfo CreateBufferCollectionInfoWithConstraints(
     fuchsia::sysmem2::BufferCollectionConstraints constraints,
     allocation::BufferCollectionExportToken export_token,
     fuchsia::ui::composition::Allocator_Sync* flatland_allocator,

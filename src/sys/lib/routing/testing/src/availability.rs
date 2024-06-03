@@ -10,7 +10,7 @@ use {
     cm_rust::*,
     cm_rust_testing::*,
     fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status,
-    moniker::{Moniker, MonikerBase},
+    moniker::Moniker,
     std::{
         marker::PhantomData,
         path::{Path, PathBuf},

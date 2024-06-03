@@ -14,6 +14,7 @@
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/clock.h>
 
+#include <future>
 #include <queue>
 #include <unordered_map>
 #include <vector>
@@ -56,13 +57,21 @@ class PlaybackController : public camera::actor::ActorBase {
   fpromise::promise<void, ConfigureSensorRateError> ConfigureSensorRate(
       SensorId sensor_id, SensorRateConfig rate_config);
 
+  fpromise::promise<void> SetDisconnectDriverClientCallback(
+      std::function<fpromise::promise<void>(zx_status_t)> disconnect_callback);
+
   fpromise::promise<void> SetEventCallback(std::function<void(const SensorEvent&)> event_callback);
+
+  void DriverClientDisconnected(fit::callback<void()> unbind_callback);
+
+  void PlaybackClientDisconnected(fit::callback<void()> unbind_callback);
 
  private:
   constexpr static int64_t kDefaultSamplingPeriodNs = 1e9;     // 1 second.
   constexpr static int64_t kDefaultMaxReportingLatencyNs = 0;  // No buffering.
 
   enum class PlaybackMode : std::uint8_t {
+    kNone,
     kFixedValuesMode,
   };
 
@@ -78,6 +87,10 @@ class PlaybackController : public camera::actor::ActorBase {
     std::vector<SensorEvent> fixed_sensor_events;
     int next_fixed_event = 0;
   };
+
+  // Tells any attached Driver protocol implementation to disconnect their client with the given
+  // epitaph.
+  fpromise::promise<void> DisconnectDriverClient(zx_status_t epitaph);
 
   // Populate the sensor lists for this playback component with the sensors from the given list.
   // This should only be called from a promise scheduled to run on this actor's executor.
@@ -102,6 +115,9 @@ class PlaybackController : public camera::actor::ActorBase {
   fpromise::promise<void> SendEvent(const SensorEvent& event);
 
   fpromise::promise<void> StopScheduledPlayback();
+
+  // Callback to initiate a driver client disconnect.
+  std::function<fpromise::promise<void>(zx_status_t)> disconnect_driver_client_callback_;
 
   // Callback to call with sensor events.
   std::function<void(const SensorEvent&)> event_callback_;

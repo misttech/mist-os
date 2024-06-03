@@ -21,7 +21,7 @@ namespace {
 class LogSettingsFixture : public ::testing::Test {
  public:
   LogSettingsFixture()
-      : old_severity_(fuchsia_logging::GetMinLogLevel()), old_stderr_(dup(STDERR_FILENO)) {}
+      : old_severity_(fuchsia_logging::GetMinLogSeverity()), old_stderr_(dup(STDERR_FILENO)) {}
   ~LogSettingsFixture() {
     fuchsia_logging::SetLogSettings({.min_log_level = old_severity_});
     dup2(old_stderr_.get(), STDERR_FILENO);
@@ -128,16 +128,16 @@ TEST_F(LogSettingsFixture, SetValidOptions) {
   EXPECT_TRUE(
       SetLogSettingsFromCommandLine(CommandLineFromInitializerList({"argv0", "--verbose=20"})));
   // verbosity scaled between INFO & DEBUG, but capped at 15 levels
-  EXPECT_EQ(fuchsia_logging::LOG_DEBUG + 1, fuchsia_logging::GetMinLogLevel());
+  EXPECT_EQ(fuchsia_logging::LOG_DEBUG + 1, fuchsia_logging::GetMinLogSeverity());
 }
 
 TEST_F(LogSettingsFixture, SetInvalidOptions) {
-  fuchsia_logging::LogSeverity old_severity = fuchsia_logging::GetMinLogLevel();
+  fuchsia_logging::LogSeverity old_severity = fuchsia_logging::GetMinLogSeverity();
 
   EXPECT_FALSE(SetLogSettingsFromCommandLine(
       CommandLineFromInitializerList({"argv0", "--verbose=garbage"})));
 
-  EXPECT_EQ(old_severity, fuchsia_logging::GetMinLogLevel());
+  EXPECT_EQ(old_severity, fuchsia_logging::GetMinLogSeverity());
 }
 
 TEST_F(LogSettingsFixture, ToArgv) {

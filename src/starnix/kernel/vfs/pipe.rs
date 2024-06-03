@@ -9,7 +9,8 @@ use crate::{
     vfs::{
         buffers::{
             Buffer, InputBuffer, InputBufferCallback, MessageQueue, OutputBuffer,
-            OutputBufferCallback, PeekBufferSegmentsCallback,
+            OutputBufferCallback, PeekBufferSegmentsCallback, UserBuffersInputBuffer,
+            UserBuffersOutputBuffer,
         },
         default_fcntl, default_ioctl, fileops_impl_nonseekable, CacheMode, FileHandle, FileObject,
         FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeInfo, FsStr,
@@ -27,7 +28,7 @@ use starnix_uapi::{
     signals::SIGPIPE,
     statfs, uapi,
     user_address::{UserAddress, UserRef},
-    user_buffer::UserBuffer,
+    user_buffer::{UserBuffer, UserBuffers},
     vfs::{default_statfs, FdEvents},
     FIONREAD, F_GETPIPE_SZ, F_SETPIPE_SZ, PIPEFS_MAGIC,
 };
@@ -877,9 +878,10 @@ impl PipeFileObject {
         &self,
         current_task: &CurrentTask,
         self_file: &FileHandle,
-        data: &mut dyn InputBuffer,
+        iovec: UserBuffers,
         non_blocking: bool,
     ) -> Result<usize, Errno> {
+        let mut data = UserBuffersInputBuffer::unified_new(current_task, iovec)?;
         let data_len = data.available();
         let mut pipe =
             self.lock_pipe_for_writing(current_task, self_file, non_blocking, data_len)?;
@@ -910,38 +912,15 @@ impl PipeFileObject {
         &self,
         current_task: &CurrentTask,
         self_file: &FileHandle,
-        data: &mut dyn OutputBuffer,
+        iovec: UserBuffers,
         non_blocking: bool,
     ) -> Result<usize, Errno> {
-        let data_len = data.available();
         let mut pipe = self.lock_pipe_for_reading(current_task, self_file, non_blocking)?;
-        let mut available = std::cmp::min(data_len, pipe.messages.len());
 
-        let mut bytes_transferred = 0;
-        while let Some(mut message) = pipe.messages.read_message() {
-            let requested = std::cmp::min(available, message.data.len());
-            let actual = match data.write(&message.data.bytes()[0..requested]) {
-                Ok(actual) => actual,
-                Err(e) => {
-                    pipe.messages.write_front(message);
-                    return Err(e);
-                }
-            };
-            assert_eq!(actual, requested);
-            if let Some(data) = message.data.split_off(actual) {
-                // Some data is left in the message. Push it back.
-                pipe.messages.write_front(data.into());
-            }
-            bytes_transferred += actual;
-            available -= actual;
-            if available == 0 {
-                break;
-            }
-        }
-        if bytes_transferred > 0 {
-            pipe.notify_read();
-        }
-        Ok(bytes_transferred)
+        let mut data = UserBuffersOutputBuffer::unified_new(current_task, iovec)?;
+        let len = std::cmp::min(data.available(), pipe.messages.len());
+        let mut buffer = SpliceInputBuffer { pipe: &mut pipe, len, available: len };
+        data.write_buffer(&mut buffer)
     }
 
     /// Obtain the pipe objects from the given file handles, if they are both pipes.

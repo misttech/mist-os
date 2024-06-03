@@ -28,6 +28,8 @@
 
 namespace i2c_hid {
 
+namespace fhidbus = fuchsia_hardware_hidbus;
+
 namespace {
 
 // Sets the bytes for an I2c command. This requires there to be at least 5 bytes in |command_bytes|.
@@ -44,9 +46,10 @@ constexpr uint8_t SetI2cCommandBytes(uint16_t command_register, uint8_t command,
 
 // Set the command bytes for a HID GET/SET command. Returns the number of bytes set.
 static uint8_t SetI2cGetSetCommandBytes(uint16_t command_register, uint8_t command,
-                                        uint8_t rpt_type, uint8_t rpt_id, uint8_t* command_bytes) {
+                                        fuchsia_hardware_input::ReportType rpt_type, uint8_t rpt_id,
+                                        uint8_t* command_bytes) {
   uint8_t command_bytes_index = 0;
-  uint8_t command_data = static_cast<uint8_t>(rpt_type << 4U);
+  uint8_t command_data = static_cast<uint8_t>(static_cast<uint8_t>(rpt_type) << 4U);
   if (rpt_id < 0xF) {
     command_data |= rpt_id;
   } else {
@@ -62,7 +65,7 @@ static uint8_t SetI2cGetSetCommandBytes(uint16_t command_register, uint8_t comma
 }  // namespace
 
 // Poll interval: 10 ms
-#define I2C_POLL_INTERVAL_USEC 10000
+constexpr zx::duration kI2cPollInterval = zx::msec(10);
 
 // Send the device a HOST initiated RESET.  Caller must call
 // i2c_wait_for_ready_locked() afterwards to guarantee completion.
@@ -96,66 +99,66 @@ void I2cHidbus::WaitForReadyLocked() {
   }
 }
 
-zx_status_t I2cHidbus::HidbusGetReport(uint8_t rpt_type, uint8_t rpt_id, uint8_t* data, size_t len,
-                                       size_t* out_len) {
+void I2cHidbus::GetReport(fhidbus::wire::HidbusGetReportRequest* request,
+                          GetReportCompleter::Sync& completer) {
   uint16_t cmd_reg = letoh16(hiddesc_.wCommandRegister);
   uint16_t data_reg = letoh16(hiddesc_.wDataRegister);
   uint8_t command_bytes[7];
   uint8_t command_bytes_index = 0;
 
   // Set the command bytes.
-  command_bytes_index +=
-      SetI2cGetSetCommandBytes(cmd_reg, kGetReportCommand, rpt_type, rpt_id, command_bytes);
+  command_bytes_index += SetI2cGetSetCommandBytes(cmd_reg, kGetReportCommand, request->rpt_type,
+                                                  request->rpt_id, command_bytes);
   command_bytes[command_bytes_index++] = static_cast<uint8_t>(data_reg & 0xff);
   command_bytes[command_bytes_index++] = static_cast<uint8_t>(data_reg >> 8);
 
   fbl::AutoLock lock(&i2c_lock_);
 
   // Send the command and read back the length of the response.
-  std::vector<uint8_t> report(len + 2);
+  std::vector<uint8_t> report(request->len + 2);
   zx_status_t status =
       i2c_.WriteReadSync(command_bytes, command_bytes_index, report.data(), report.size());
   if (status != ZX_OK) {
     zxlogf(ERROR, "i2c-hid: could not issue get_report: %d", status);
-    return status;
+    completer.ReplyError(status);
+    return;
   }
 
   uint16_t response_len = static_cast<uint16_t>(report[0] + (report[1] << 8U));
-  if (response_len != len + 2) {
-    zxlogf(ERROR, "i2c-hid: response_len %d != len: %ld", response_len, len + 2);
+  if (response_len != request->len + 2) {
+    zxlogf(ERROR, "i2c-hid: response_len %d != len: %ld", response_len, request->len + 2);
   }
 
   uint16_t report_len = response_len - 2;
-  if (report_len > len) {
-    return ZX_ERR_BUFFER_TOO_SMALL;
+  if (report_len > request->len) {
+    completer.ReplyError(ZX_ERR_BUFFER_TOO_SMALL);
+    return;
   }
-  *out_len = report_len;
-  memcpy(data, report.data() + 2, report_len);
-  return ZX_OK;
+  completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(report.data() + 2, report_len));
 }
 
-zx_status_t I2cHidbus::HidbusSetReport(uint8_t rpt_type, uint8_t rpt_id, const uint8_t* data,
-                                       size_t len) {
+void I2cHidbus::SetReport(fhidbus::wire::HidbusSetReportRequest* request,
+                          SetReportCompleter::Sync& completer) {
   uint16_t cmd_reg = letoh16(hiddesc_.wCommandRegister);
   uint16_t data_reg = letoh16(hiddesc_.wDataRegister);
 
   // The command bytes are the 6 or 7 bytes for the command, 2 bytes for the report's size,
   // and then the full report.
-  std::vector<uint8_t> command_bytes(7 + 2 + len);
+  std::vector<uint8_t> command_bytes(7 + 2 + request->data.count());
   uint8_t command_bytes_index = 0;
 
   // Set the command bytes.
-  command_bytes_index +=
-      SetI2cGetSetCommandBytes(cmd_reg, kSetReportCommand, rpt_type, rpt_id, command_bytes.data());
+  command_bytes_index += SetI2cGetSetCommandBytes(cmd_reg, kSetReportCommand, request->rpt_type,
+                                                  request->rpt_id, command_bytes.data());
 
   command_bytes[command_bytes_index++] = static_cast<uint8_t>(data_reg & 0xff);
   command_bytes[command_bytes_index++] = static_cast<uint8_t>(data_reg >> 8);
   // Set the bytes for the report's size.
-  command_bytes[command_bytes_index++] = static_cast<uint8_t>((len + 2) & 0xff);
-  command_bytes[command_bytes_index++] = static_cast<uint8_t>((len + 2) >> 8);
+  command_bytes[command_bytes_index++] = static_cast<uint8_t>((request->data.count() + 2) & 0xff);
+  command_bytes[command_bytes_index++] = static_cast<uint8_t>((request->data.count() + 2) >> 8);
   // Set the bytes for the report.
-  memcpy(command_bytes.data() + command_bytes_index, data, len);
-  command_bytes_index += len;
+  memcpy(command_bytes.data() + command_bytes_index, request->data.data(), request->data.count());
+  command_bytes_index += request->data.count();
 
   fbl::AutoLock lock(&i2c_lock_);
 
@@ -163,44 +166,46 @@ zx_status_t I2cHidbus::HidbusSetReport(uint8_t rpt_type, uint8_t rpt_id, const u
   zx_status_t status = i2c_.WriteSync(command_bytes.data(), command_bytes_index);
   if (status != ZX_OK) {
     zxlogf(ERROR, "i2c-hid: could not issue set_report: %d", status);
-    return status;
+    completer.ReplyError(status);
+    return;
   }
-  return ZX_OK;
+  completer.ReplySuccess();
 }
 
-zx_status_t I2cHidbus::HidbusQuery(uint32_t options, hid_info_t* info) {
-  if (!info) {
-    return ZX_ERR_INVALID_ARGS;
+void I2cHidbus::Query(QueryCompleter::Sync& completer) {
+  fidl::Arena<> arena;
+  auto info = fhidbus::wire::HidInfo::Builder(arena)
+                  .dev_num(0)
+                  .boot_protocol(fhidbus::wire::HidBootProtocol::kNone)
+                  .vendor_id(hiddesc_.wVendorID)
+                  .product_id(hiddesc_.wProductID)
+                  .version(hiddesc_.wVersionID);
+  if (!irq_.is_valid()) {
+    info.polling_rate(kI2cPollInterval.to_usecs());
   }
-  info->dev_num = 0;
-  info->device_class = HID_DEVICE_CLASS_OTHER;
-  info->boot_device = false;
-
-  info->vendor_id = hiddesc_.wVendorID;
-  info->product_id = hiddesc_.wProductID;
-  info->version = hiddesc_.wVersionID;
-  return ZX_OK;
+  completer.ReplySuccess(info.Build());
 }
 
-zx_status_t I2cHidbus::HidbusStart(const hidbus_ifc_protocol_t* ifc) {
-  fbl::AutoLock lock(&ifc_lock_);
-  if (ifc_.is_valid()) {
-    return ZX_ERR_ALREADY_BOUND;
+void I2cHidbus::Start(StartCompleter::Sync& completer) {
+  if (started_) {
+    zxlogf(ERROR, "Already started");
+    completer.ReplyError(ZX_ERR_ALREADY_BOUND);
+    return;
   }
-  ifc_ = ddk::HidbusIfcProtocolClient(ifc);
-  return ZX_OK;
+
+  started_ = true;
+  completer.ReplySuccess();
 }
 
-void I2cHidbus::HidbusStop() {
-  fbl::AutoLock lock(&ifc_lock_);
-  ifc_.clear();
-}
+void I2cHidbus::Stop(StopCompleter::Sync& completer) { Stop(); }
 
-zx_status_t I2cHidbus::HidbusGetDescriptor(hid_description_type_t desc_type,
-                                           uint8_t* out_data_buffer, size_t data_size,
-                                           size_t* out_data_actual) {
-  if (desc_type != HID_DESCRIPTION_TYPE_REPORT) {
-    return ZX_ERR_NOT_FOUND;
+void I2cHidbus::Stop() { started_ = false; }
+
+void I2cHidbus::GetDescriptor(fhidbus::wire::HidbusGetDescriptorRequest* request,
+                              GetDescriptorCompleter::Sync& completer) {
+  if (request->desc_type != fhidbus::wire::HidDescriptorType::kReport) {
+    completer.ReplyError(ZX_ERR_NOT_FOUND);
+    return;
   }
 
   fbl::AutoLock lock(&i2c_lock_);
@@ -210,20 +215,17 @@ zx_status_t I2cHidbus::HidbusGetDescriptor(hid_description_type_t desc_type,
   uint16_t desc_reg = letoh16(hiddesc_.wReportDescRegister);
   uint16_t buf = htole16(desc_reg);
 
-  if (data_size < desc_len) {
-    return ZX_ERR_BUFFER_TOO_SMALL;
-  }
-
-  zx_status_t status = i2c_.WriteReadSync(reinterpret_cast<uint8_t*>(&buf), sizeof(uint16_t),
-                                          static_cast<uint8_t*>(out_data_buffer), desc_len);
+  std::vector<uint8_t> desc(desc_len);
+  zx_status_t status =
+      i2c_.WriteReadSync(reinterpret_cast<uint8_t*>(&buf), sizeof(uint16_t), desc.data(), desc_len);
   if (status < 0) {
     zxlogf(ERROR, "i2c-hid: could not read HID report descriptor from reg 0x%04x: %d", desc_reg,
            status);
-    return ZX_ERR_NOT_SUPPORTED;
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+    return;
   }
 
-  *out_data_actual = desc_len;
-  return ZX_OK;
+  completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(desc.data(), desc.size()));
 }
 
 // TODO(teisenbe/tkilbourn): Remove this once we pipe IRQs from ACPI
@@ -254,7 +256,7 @@ int I2cHidbus::WorkerThreadNoIrq() {
   // Until we have a way to map the GPIO associated with an i2c slave to an
   // IRQ, we just poll.
   while (!stop_worker_thread_) {
-    usleep(I2C_POLL_INTERVAL_USEC);
+    usleep(kI2cPollInterval.to_usecs());
     TRACE_DURATION("input", "Device Read");
 
     last_report_len = report_len;
@@ -316,12 +318,20 @@ int I2cHidbus::WorkerThreadNoIrq() {
       }
     }
 
-    {
-      fbl::AutoLock lock(&ifc_lock_);
-      if (ifc_.is_valid()) {
-        ifc_.IoQueue(buf + 2, report_len - 2, zx_clock_get_monotonic());
+    sync_completion_t wait;
+    async::PostTask(dispatcher_, [this, &buf, &report_len, &wait]() {
+      if (!(started_ && binding_)) {
+        return;
       }
-    }
+      auto result = fidl::WireSendEvent(*binding_)->OnReportReceived(
+          fidl::VectorView<uint8_t>::FromExternal(buf + 2, report_len - 2),
+          zx_clock_get_monotonic());
+      if (!result.ok()) {
+        zxlogf(ERROR, "OnReportReceived failed %s", result.error().FormatDescription().c_str());
+      }
+      sync_completion_signal(&wait);
+    });
+    sync_completion_wait(&wait, ZX_TIME_INFINITE);
   }
 
   free(buf);
@@ -398,12 +408,19 @@ int I2cHidbus::WorkerThreadIrq() {
       }
     }
 
-    {
-      fbl::AutoLock lock(&ifc_lock_);
-      if (ifc_.is_valid()) {
-        ifc_.IoQueue(buf + 2, report_len - 2, timestamp.get());
+    sync_completion_t wait;
+    async::PostTask(dispatcher_, [this, &buf, &report_len, &timestamp, &wait]() {
+      if (!(started_ && binding_)) {
+        return;
       }
-    }
+      auto result = fidl::WireSendEvent(*binding_)->OnReportReceived(
+          fidl::VectorView<uint8_t>::FromExternal(buf + 2, report_len - 2), timestamp.get());
+      if (!result.ok()) {
+        zxlogf(ERROR, "OnReportReceived failed %s", result.error().FormatDescription().c_str());
+      }
+      sync_completion_signal(&wait);
+    });
+    sync_completion_wait(&wait, ZX_TIME_INFINITE);
   }
 
   free(buf);
@@ -418,11 +435,6 @@ void I2cHidbus::Shutdown() {
   if (worker_thread_started_) {
     worker_thread_started_ = false;
     thrd_join(worker_thread_, NULL);
-  }
-
-  {
-    fbl::AutoLock lock(&ifc_lock_);
-    ifc_.clear();
   }
 }
 
@@ -519,9 +531,39 @@ zx_status_t I2cHidbus::Bind(ddk::I2cChannel i2c) {
     zxlogf(WARNING, "Failed to map IRQ: %s", irq_result.status_string());
   }
 
-  status = DdkAdd("i2c-hid");
+  dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+  auto result = outgoing_.AddService<fhidbus::Service>(fhidbus::Service::InstanceHandler({
+      .device =
+          [this](fidl::ServerEnd<fhidbus::Hidbus> server_end) {
+            if (binding_) {
+              server_end.Close(ZX_ERR_ALREADY_BOUND);
+              return;
+            }
+            binding_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                             std::move(server_end), this, [this](fidl::UnbindInfo info) {
+                               Stop();
+                               binding_.reset();
+                             });
+          },
+  }));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add Hidbus protocol: %s", result.status_string());
+    return result.status_value();
+  }
+  auto [directory_client, directory_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  result = outgoing_.Serve(std::move(directory_server));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to service the outgoing directory");
+    return result.status_value();
+  }
+
+  std::array offers = {
+      fhidbus::Service::Name,
+  };
+  status = DdkAdd(ddk::DeviceAddArgs("i2c-hid").set_fidl_service_offers(offers).set_outgoing_dir(
+      directory_client.TakeChannel()));
   if (status != ZX_OK) {
-    zxlogf(ERROR, "i2c-hid: could not add device: %d", status);
+    zxlogf(ERROR, "DdkAdd failed: %d", status);
     return status;
   }
   return ZX_OK;

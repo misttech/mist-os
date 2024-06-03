@@ -9,4 +9,6 @@ pub mod input_device_configuration;
 pub mod types;
 
 pub(crate) use self::common::monitor_media_buttons;
+pub use self::input_device_configuration::build_input_default_settings;
+
 mod input_fidl_handler;

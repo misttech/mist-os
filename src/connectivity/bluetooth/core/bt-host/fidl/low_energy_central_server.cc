@@ -327,7 +327,8 @@ void LowEnergyCentralServer::Connect(fuchsia::bluetooth::PeerId id, fble::Connec
       }
     };
     auto server = std::make_unique<LowEnergyConnectionServer>(
-        self->gatt_, std::move(conn_ref), request.TakeChannel(), std::move(closed_cb));
+        self->adapter(), self->gatt_, std::move(conn_ref), request.TakeChannel(),
+        std::move(closed_cb));
 
     BT_ASSERT(!conn_iter->second);
     conn_iter->second = std::move(server);

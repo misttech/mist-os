@@ -21,6 +21,21 @@ import("config.gni")
 
 visibility = [ ":*" ]
 
+# Log a message if a non-default set of API levels or CPU architecture will be
+# built as this reduces the compatibility coverage of the build and should not
+# happen in infra. Ensure the messages are only logged once.
+if (!is_host) {
+  if (override_build_time_supported_api_levels != false) {
+    print(
+        "IDK build supported API levels is overridden: ${platform_version.build_time_supported_api_levels}. Compatibility with other levels cannot be checked.")
+  }
+
+  # Ignore default list or an override that exactly matches (including order).
+  if (idk_target_cpus != idk_target_cpus_default) {
+    print("IDK build only covers a subset of target CPUs: ${idk_target_cpus}.")
+  }
+}
+
 # Verify that `override_target_api_level` is actually supported.
 if (override_target_api_level != "PLATFORM") {
   _override_is_supported = false
@@ -567,14 +582,10 @@ sdk_molecule("core_packages") {
   deps = [
     "//src/graphics/examples/vkproto/cmd-buf-benchmark:cmd-buf-benchmark-test-sdk",
     "//src/graphics/examples/vkproto/driver-tests:vkproto-driver-test-sdk",
-
-    # TODO(https://fxbug.dev/326231777): Uncomment this once
-    # realm_builder_server can build targeting API levels.
-    #
-    # "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_sdk"
     "//src/graphics/tests/benchmark:vkcopy-test-sdk",
     "//src/graphics/tests/vkext:vkext-test-sdk",
     "//src/graphics/tests/vkloop:vkloop-test-sdk",
+    "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_sdk",
     "//src/performance/memory/heapdump/collector:collector_sdk",
   ]
 }
@@ -784,8 +795,6 @@ sdk_molecule("platform_libs") {
   category = "internal"
   deps = [
     ":version_history",
-    "//sdk/lib/driver/compat/cpp:cpp_sdk",
-    "//sdk/lib/driver/compat/cpp:logging_sdk",
     "//sdk/lib/driver/devicetree/manager:manager_sdk",
     "//sdk/lib/driver/devicetree/testing:board-test-helper_sdk",
     "//sdk/lib/driver/devicetree/visitors:driver-visitor_sdk",
@@ -793,7 +802,6 @@ sdk_molecule("platform_libs") {
     "//sdk/lib/driver/devicetree/visitors:registration_sdk",
     "//sdk/lib/driver/devicetree/visitors/default:default_sdk",
     "//sdk/lib/driver/devicetree/visitors/drivers:all-driver-visitors_sdk",
-    "//sdk/lib/driver/testing/cpp:gtest_fixture_sdk",
     "//src/devices/lib/mmio:test_helper_sdk",
     "//src/devices/registers/testing/mock-registers:mock-registers_sdk",
     "//src/devices/testing/fake-bti:fake-bti_sdk",

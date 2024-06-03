@@ -628,7 +628,7 @@ mod tests {
         fidl_fuchsia_io as fio,
         fuchsia_merkle::{Hash, HASH_SIZE},
         maplit::{hashmap, hashset},
-        moniker::{Moniker, MonikerBase},
+        moniker::Moniker,
         routing::{environment::RunnerRegistry, mapper::RouteSegment},
         scrutiny::prelude::{DataController, DataModel},
         scrutiny_testing::fake::fake_data_model,

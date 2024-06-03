@@ -29,7 +29,7 @@ void WriteToSysmemBuffer(const std::vector<uint8_t>& write_values,
                          uint32_t buffer_collection_idx, uint32_t kBytesPerPixel,
                          uint32_t image_width, uint32_t image_height);
 
-fuchsia::sysmem2::BufferCollectionInfo CreateBufferCollectionInfo2WithConstraints(
+fuchsia::sysmem2::BufferCollectionInfo CreateBufferCollectionInfoWithConstraints(
     fuchsia::sysmem2::BufferCollectionConstraints constraints,
     allocation::BufferCollectionExportToken export_token,
     fuchsia::ui::composition::Allocator_Sync* flatland_allocator,

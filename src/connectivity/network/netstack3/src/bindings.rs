@@ -821,24 +821,20 @@ impl BindingsCtx {
         })
     }
 
-    pub(crate) async fn apply_main_table_route_change<I: Ip>(
+    pub(crate) async fn apply_route_change<I: Ip>(
         &self,
         change: routes::Change<I::Addr>,
     ) -> Result<routes::ChangeOutcome, routes::ChangeError> {
         self.routes.send_main_table_route_change(change).await
     }
 
-    pub(crate) async fn apply_main_table_route_change_either(
+    pub(crate) async fn apply_route_change_either(
         &self,
         change: routes::ChangeEither,
     ) -> Result<routes::ChangeOutcome, routes::ChangeError> {
         match change {
-            routes::ChangeEither::V4(change) => {
-                self.apply_main_table_route_change::<Ipv4>(change).await
-            }
-            routes::ChangeEither::V6(change) => {
-                self.apply_main_table_route_change::<Ipv6>(change).await
-            }
+            routes::ChangeEither::V4(change) => self.apply_route_change::<Ipv4>(change).await,
+            routes::ChangeEither::V6(change) => self.apply_route_change::<Ipv6>(change).await,
         }
     }
 
@@ -846,12 +842,8 @@ impl BindingsCtx {
         &self,
         device: &netstack3_core::device::WeakDeviceId<Self>,
     ) {
-        // TODO(https://fxbug.dev/337065118): Remove all routes across route
-        // tables.
         match self
-            .apply_main_table_route_change::<Ipv4>(routes::Change::RemoveMatchingDevice(
-                device.clone(),
-            ))
+            .apply_route_change::<Ipv4>(routes::Change::RemoveMatchingDevice(device.clone()))
             .await
             .expect("deleting routes on device during removal should succeed")
         {
@@ -859,12 +851,8 @@ impl BindingsCtx {
                 // We don't care whether there were any routes on the device or not.
             }
         }
-        // TODO(https://fxbug.dev/337065118): Remove all routes across route
-        // tables.
         match self
-            .apply_main_table_route_change::<Ipv6>(routes::Change::RemoveMatchingDevice(
-                device.clone(),
-            ))
+            .apply_route_change::<Ipv6>(routes::Change::RemoveMatchingDevice(device.clone()))
             .await
             .expect("deleting routes on device during removal should succeed")
         {
@@ -944,7 +932,7 @@ async fn add_loopback_routes(bindings_ctx: &BindingsCtx, loopback: &DeviceId<Bin
 
     for change in v4_changes.chain(v6_changes) {
         bindings_ctx
-            .apply_main_table_route_change_either(change)
+            .apply_route_change_either(change)
             .await
             .map(|outcome| assert_matches!(outcome, routes::ChangeOutcome::Changed))
             .expect("adding loopback routes should succeed");

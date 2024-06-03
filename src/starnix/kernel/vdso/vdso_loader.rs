@@ -2,11 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    arch::vdso::{raw_ticks, VDSO_SIGRETURN_NAME},
-    mm::PAGE_SIZE,
-    time::utc::update_utc_clock,
-};
+use crate::{arch::vdso::VDSO_SIGRETURN_NAME, mm::PAGE_SIZE, time::utc::update_utc_clock};
 use fidl::AsHandleRef;
 use fuchsia_zircon::{
     ClockTransformation, HandleBased, {self as zx},
@@ -20,13 +16,8 @@ use std::{
 };
 
 static VVAR_SIZE: Lazy<usize> = Lazy::new(|| *PAGE_SIZE as usize);
-
-#[derive(Default)]
-pub struct VvarInitialValues {
-    pub raw_ticks_to_ticks_offset: i64,
-    pub ticks_to_mono_numerator: u32,
-    pub ticks_to_mono_denominator: u32,
-}
+pub static ZX_TIME_VALUES_VMO: Lazy<Arc<zx::Vmo>> =
+    Lazy::new(|| load_time_values_vmo().expect("Could not find time values VMO"));
 
 #[derive(Default)]
 pub struct MemoryMappedVvar {
@@ -37,10 +28,7 @@ impl MemoryMappedVvar {
     /// Maps the vvar vmo to a region of the Starnix kernel root VMAR and stores the address of
     /// the mapping in this object.
     /// Initialises the mapped region with data by writing an initial set of vvar data
-    pub fn new(
-        vmo: &zx::Vmo,
-        vvar_initial_values: VvarInitialValues,
-    ) -> Result<MemoryMappedVvar, zx::Status> {
+    pub fn new(vmo: &zx::Vmo) -> Result<MemoryMappedVvar, zx::Status> {
         let vvar_data_size = size_of::<uapi::vvar_data>();
         // Check that the vvar_data struct isn't larger than the size of the memory mapped vvar
         debug_assert!(vvar_data_size <= *VVAR_SIZE);
@@ -51,16 +39,6 @@ impl MemoryMappedVvar {
         let map_addr = fuchsia_runtime::vmar_root_self().map(0, &vmo, 0, *VVAR_SIZE, flags)?;
         let memory_mapped_vvar = MemoryMappedVvar { map_addr };
         let vvar_data = memory_mapped_vvar.get_pointer_to_memory_mapped_vvar();
-        vvar_data
-            .raw_ticks_to_ticks_offset
-            .store(vvar_initial_values.raw_ticks_to_ticks_offset, Ordering::Release);
-        vvar_data
-            .ticks_to_mono_numerator
-            .store(vvar_initial_values.ticks_to_mono_numerator, Ordering::Release);
-        vvar_data
-            .ticks_to_mono_denominator
-            .store(vvar_initial_values.ticks_to_mono_denominator, Ordering::Release);
-
         vvar_data.seq_num.store(0, Ordering::Release);
         Ok(memory_mapped_vvar)
     }
@@ -145,11 +123,8 @@ fn create_vvar_and_handles() -> (Arc<MemoryMappedVvar>, Arc<zx::Vmo>) {
     let vvar_vmo_writeable =
         Arc::new(zx::Vmo::create(*VVAR_SIZE as u64).expect("Couldn't create vvar vvmo"));
     // Map the writeable vvar_vmo to a region of Starnix kernel VMAR and write initial vvar_data
-    let vvar_initial_values = get_vvar_values();
-    let vvar_memory_mapped = Arc::new(
-        MemoryMappedVvar::new(&vvar_vmo_writeable, vvar_initial_values)
-            .expect("couldn't map vvar vmo"),
-    );
+    let vvar_memory_mapped =
+        Arc::new(MemoryMappedVvar::new(&vvar_vmo_writeable).expect("couldn't map vvar vmo"));
     // Write initial mono to utc transform to the vvar.
     update_utc_clock(&vvar_memory_mapped);
     let vvar_writeable_rights = vvar_vmo_writeable
@@ -197,6 +172,41 @@ fn load_vdso_from_file() -> Result<Arc<zx::Vmo>, Errno> {
     Ok(Arc::new(vdso_vmo))
 }
 
+fn load_time_values_vmo() -> Result<Arc<zx::Vmo>, Errno> {
+    const FILENAME: &str = "time_values";
+    const DIR: &str = "/boot/kernel";
+
+    let (client, server) = fidl::Channel::create();
+    let dir_proxy = fidl_fuchsia_io::DirectorySynchronousProxy::new(client);
+
+    let namespace = fdio::Namespace::installed().map_err(|_| errno!(EINVAL))?;
+    namespace
+        .open(DIR, fuchsia_fs::OpenFlags::RIGHT_READABLE, server)
+        .map_err(|_| errno!(ENOENT))?;
+
+    let vmo = syncio::directory_open_vmo(
+        &dir_proxy,
+        FILENAME,
+        fidl_fuchsia_io::VmoFlags::READ,
+        zx::Time::INFINITE,
+    )
+    .map_err(|status| from_status_like_fdio!(status))?;
+
+    // Check that the time values VMO is the expected size of 1 page. If it is not,
+    // panic the kernel, as it means that the size of the time values VMO has changed
+    // and the starnix vDSO linker script at //src/starnix/kernel/vdso/vdso.ld should
+    // be updated.
+    let vmo_size = vmo.get_size().expect("failed to get time values VMO size");
+    let expected_size = 0x1000u64;
+    if vmo_size != expected_size {
+        panic!(
+            "time values VMO has unexpected size; got {:?}, expected {:?}",
+            vmo_size, expected_size
+        );
+    }
+    Ok(Arc::new(vmo))
+}
+
 fn get_sigreturn_offset(vdso_vmo: &zx::Vmo, sigreturn_name: &str) -> Result<u64, Errno> {
     let dyn_section = elf_parse::Elf64DynSection::from_vmo(vdso_vmo).map_err(|_| errno!(EINVAL))?;
     let symtab =
@@ -228,40 +238,4 @@ fn get_sigreturn_offset(vdso_vmo: &zx::Vmo, sigreturn_name: &str) -> Result<u64,
         }
         symtab_offset += SYM_ENTRY_SIZE as u64;
     }
-}
-
-fn get_vvar_values() -> VvarInitialValues {
-    let clock = zx::Clock::create(zx::ClockOpts::MONOTONIC | zx::ClockOpts::AUTO_START, None)
-        .expect("failed to create clock");
-    let details = clock.get_details().expect("Failed to get clock details");
-    let ticks_offset = calculate_ticks_offset();
-    VvarInitialValues {
-        raw_ticks_to_ticks_offset: ticks_offset,
-        ticks_to_mono_numerator: details.ticks_to_synthetic.rate.synthetic_ticks,
-        ticks_to_mono_denominator: details.ticks_to_synthetic.rate.reference_ticks,
-    }
-}
-
-fn calculate_ticks_offset() -> i64 {
-    let mut ticks_offset: i64 = i64::MIN;
-    let mut min_read_diff: i64 = i64::MAX;
-    // Assuming `zx_get_ticks` is based on the same registers that `get_raw_ticks`
-    // use, estimate the offset between the raw value and the ticks as returned by
-    // `zx_get_ticks`. Since the reads will not be made at the same time, the
-    // result will not be presice, so do the estimation several times and choose the
-    // measurement with the smallest error bars.
-    //
-    // TODO(https://g-issues.fuchsia.dev/issues/297375051): Obtain this value from Zircon
-    for _i in 0..5 {
-        let zx_read_first = zx::ticks_get();
-        let read_raw_ticks = raw_ticks();
-        let zx_read_second = zx::ticks_get();
-        let read_diff = zx_read_second - zx_read_first;
-        if read_diff < min_read_diff {
-            min_read_diff = read_diff;
-            let midpoint = zx_read_first + read_diff / 2;
-            ticks_offset = midpoint - read_raw_ticks as i64;
-        }
-    }
-    ticks_offset
 }

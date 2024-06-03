@@ -12,9 +12,6 @@
 
 __BEGIN_CDECLS
 
-// Returns the raw ticks value, which is obtained by reading the hardware clock (the TSC in x64).
-uint64_t get_raw_ticks();
-
 // Performs a syscall with 3 arguments.
 int syscall(intptr_t syscall_number, intptr_t arg1, intptr_t arg2, intptr_t arg3);
 

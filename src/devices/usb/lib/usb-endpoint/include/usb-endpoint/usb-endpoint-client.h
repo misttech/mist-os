@@ -6,7 +6,12 @@
 #define SRC_DEVICES_USB_LIB_USB_ENDPOINT_INCLUDE_USB_ENDPOINT_USB_ENDPOINT_CLIENT_H_
 
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/fidl.h>
-#include <lib/ddk/debug.h>
+
+#ifdef DFV2_COMPAT_LOGGING
+#include <lib/driver/compat/cpp/logging.h>  // nogncheck
+#else
+#include <lib/ddk/debug.h>  // nogncheck
+#endif
 
 #include <queue>
 

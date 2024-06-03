@@ -51,5 +51,6 @@ group("tests") {
     "system-activity-governor:tests",
     "testing:tests",
     "thermd:tests",
+    "topology-test-daemon:tests",
   ]
 }

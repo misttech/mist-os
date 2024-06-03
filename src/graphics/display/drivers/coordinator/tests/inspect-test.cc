@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/async/default.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/cpp/reader.h>
@@ -39,7 +40,8 @@ class InspectTest : public ::testing::Test {
   InspectTest()
       : engine_driver_client_and_server_(EngineDriverClientAndServer::Create()),
         inspector_(),
-        controller_(std::move(engine_driver_client_and_server_.engine_driver_client), inspector_) {}
+        controller_(std::move(engine_driver_client_and_server_.engine_driver_client),
+                    /*dispatcher=*/driver_runtime_.StartBackgroundDispatcher(), inspector_) {}
 
   void SetUp() override {
     fpromise::result<inspect::Hierarchy> hierarchy_maybe =
@@ -50,6 +52,8 @@ class InspectTest : public ::testing::Test {
   }
 
  protected:
+  fdf_testing::DriverRuntime driver_runtime_;
+
   EngineDriverClientAndServer engine_driver_client_and_server_;
   inspect::Inspector inspector_;
   Controller controller_;

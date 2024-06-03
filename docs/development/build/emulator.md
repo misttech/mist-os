@@ -137,35 +137,10 @@ FEMU currently does not run on:
 
 ## Supported hardware for graphics acceleration {#supported-hardware}
 
-FEMU currently supports a limited set of GPUs on macOS and Linux for
-hardware graphics acceleration. FEMU uses a software renderer fallback
-for unsupported GPUs.
-
-
-<table>
-  <tbody>
-    <tr>
-      <th>Operating System</th>
-      <th>GPU Manufacturer</th>
-      <th>OS / Driver Version</th>
-    </tr>
-    <tr>
-      <td>Linux</td>
-      <td>Nvidia Quadro</td>
-      <td>Nvidia Linux Drivers <a href="https://www.nvidia.com/download/driverResults.aspx/160175/en-us">440.100</a>+</td>
-    </tr>
-    <tr>
-      <td>macOS</td>
-      <td><a href="https://support.apple.com/en-us/HT204349#intelhd">Intel HD Graphics</a></td>
-      <td>macOS version 10.15+</td>
-    </tr>
-    <tr>
-      <td>macOS</td>
-      <td>AMD Radeon Pro</td>
-      <td>macOS version 10.15+</td>
-    </tr>
-  </tbody>
-</table>
+FEMU currently supports Nvidia Quadro on Linux
+for hardware graphics acceleration
+([Nvidia Linux Drivers](https://www.nvidia.com/download/driverResults.aspx/160175/en-us">440.100)).
+FEMU uses a software renderer fallback for unsupported GPUs.
 
 ## Common usage {#common-usage}
 

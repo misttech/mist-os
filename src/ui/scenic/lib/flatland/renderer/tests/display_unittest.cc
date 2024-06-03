@@ -101,7 +101,7 @@ class DisplayTest : public gtest::RealLoopFixture {
 
   std::unique_ptr<async::Executor> executor_;
   std::unique_ptr<scenic_impl::display::DisplayManager> display_manager_;
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
 };
 
 // Create a buffer collection and set constraints on the display, the vulkan renderer
@@ -123,9 +123,11 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
   // First create the pair of sysmem tokens, one for the client, one for the renderer.
   auto tokens = flatland::SysmemTokens::Create(sysmem_allocator_.get());
 
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr display_token;
-  zx_status_t status = tokens.local_token->Duplicate(std::numeric_limits<uint32_t>::max(),
-                                                     display_token.NewRequest());
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr display_token;
+  fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest dup_request;
+  dup_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
+  dup_request.set_token_request(display_token.NewRequest());
+  zx_status_t status = tokens.local_token->Duplicate(std::move(dup_request));
   FX_DCHECK(status == ZX_OK);
 
   // Register the collection with the renderer, which sets the vk constraints.
@@ -175,19 +177,21 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
       /*image_count*/ 1,
       /*width*/ kWidth,
       /*height*/ kHeight,
-      /*usage*/ flatland::kNoneUsage, fuchsia::sysmem::PixelFormatType::BGRA32,
+      /*usage*/ fidl::Clone(flatland::get_none_usage()), fuchsia::images2::PixelFormat::B8G8R8A8,
       /*memory_constraints*/ std::nullopt,
-      std::make_optional(fuchsia::sysmem::FORMAT_MODIFIER_LINEAR));
+      std::make_optional(fuchsia::images2::PixelFormatModifier::LINEAR));
 
   // Have the client wait for buffers allocated so it can populate its information
   // struct with the vmo data.
-  fuchsia::sysmem::BufferCollectionInfo_2 client_collection_info = {};
+  fuchsia::sysmem2::BufferCollectionInfo client_collection_info;
   {
-    zx_status_t allocation_status = ZX_OK;
-    auto status =
-        client_collection->WaitForBuffersAllocated(&allocation_status, &client_collection_info);
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+    auto status = client_collection->WaitForAllBuffersAllocated(&wait_result);
     EXPECT_EQ(status, ZX_OK);
-    EXPECT_EQ(allocation_status, ZX_OK);
+    EXPECT_TRUE(!wait_result.is_framework_err());
+    EXPECT_TRUE(!wait_result.is_err());
+    EXPECT_TRUE(wait_result.is_response());
+    client_collection_info = std::move(*wait_result.response().mutable_buffer_collection_info());
   }
 
   // Now that the renderer, client, and the display have set their constraints, we import one last

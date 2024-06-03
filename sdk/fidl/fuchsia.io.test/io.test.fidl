@@ -36,9 +36,6 @@ using zx;
 /// to true informs the test suites that files hosted by this harness do not
 /// support mutation.
 type Io1Config = struct {
-    /// Directories support the CREATE flag for creating new files.
-    supports_create bool;
-
     /// ExecutableFile objects are supported.
     supports_executable_file bool;
 
@@ -48,17 +45,8 @@ type Io1Config = struct {
     /// Remote directories are supported.
     supports_remote_dir bool;
 
-    /// Rename is supported.
-    supports_rename bool;
-
-    /// Link is supported.
-    supports_link bool;
-
     /// GetToken is supported.
     supports_get_token bool;
-
-    /// Unlink is supported.
-    supports_unlink bool;
 
     /// Supports fuchsia.io's Open2 method.
     supports_open2 bool;
@@ -66,15 +54,15 @@ type Io1Config = struct {
     /// Supports fuchsia.io's LinkInto method.
     supports_link_into bool;
 
-    /// Supports directory watchers.
-    supports_directory_watchers bool;
-
     /// Files can be opened in append mode.
     supports_append bool;
 
     /// The set of attributes the filesystem supports. If mutable attributes are reported, the
     /// harness must support [`fuchsia.io/Node.SetAttr`] and [`fuchsia.io/Node.UpdateAttributes`].
     supported_attributes fuchsia.io.NodeAttributesQuery;
+
+    /// Directories support creating files, Rename, Link, and Unlink.
+    supports_modify_directory bool;
 };
 
 /// Directory entries should support opening with any combination of read/write/execute rights.

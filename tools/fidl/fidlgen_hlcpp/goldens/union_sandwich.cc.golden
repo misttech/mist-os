@@ -286,6 +286,7 @@ void UnionSize12Alignment4::Decode(::fidl::Decoder* _decoder, UnionSize12Alignme
 
   switch (value->tag_) {
     case ::test::unionsandwich::UnionSize12Alignment4::Tag::kVariant: {
+      value->variant_.~decltype(value->variant_)();
       new (&value->variant_)::std::array<uint8_t, 6>();
       ::fidl::Decode(_decoder, &value->variant_, value_offset);
       break;
@@ -505,6 +506,7 @@ void UnionSize24Alignment8::Decode(::fidl::Decoder* _decoder, UnionSize24Alignme
 
   switch (value->tag_) {
     case ::test::unionsandwich::UnionSize24Alignment8::Tag::kVariant: {
+      value->variant_.~decltype(value->variant_)();
       new (&value->variant_)::test::unionsandwich::StructSize16Alignment8();
       ::fidl::Decode(_decoder, &value->variant_, value_offset);
       break;
@@ -692,6 +694,7 @@ void UnionSize36Alignment4::Decode(::fidl::Decoder* _decoder, UnionSize36Alignme
 
   switch (value->tag_) {
     case ::test::unionsandwich::UnionSize36Alignment4::Tag::kVariant: {
+      value->variant_.~decltype(value->variant_)();
       new (&value->variant_)::std::array<uint8_t, 32>();
       ::fidl::Decode(_decoder, &value->variant_, value_offset);
       break;

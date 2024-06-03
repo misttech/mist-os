@@ -33,22 +33,21 @@ int main(int argc, const char* argv[]) {
     auto zircon_system_interface = std::make_unique<debug_agent::ZirconSystemInterface>();
     debug_agent::DebugAgent debug_agent(std::move(zircon_system_interface));
 
-    auto res = outgoing.AddProtocol<fuchsia_debugger::DebugAgent>(
-        std::make_unique<debug_agent::DebugAgentServer>(debug_agent.GetWeakPtr()));
+    auto res = outgoing.AddUnmanagedProtocol<fuchsia_debugger::DebugAgent>(
+        [&](fidl::ServerEnd<fuchsia_debugger::DebugAgent> server_end) {
+          debug_agent::DebugAgentServer::BindServer(
+              message_loop.dispatcher(), std::move(server_end), debug_agent.GetWeakPtr());
+        });
     FX_CHECK(res.is_ok()) << res.error_value();
 
     res = outgoing.ServeFromStartupInfo();
     FX_CHECK(res.is_ok()) << res.error_value();
 
     // Now explicitly bind to the given server_end from the startup handles.
-    auto debug_agent_server =
-        std::make_unique<debug_agent::DebugAgentServer>(debug_agent.GetWeakPtr());
-
-    fidl::BindServer(
+    debug_agent::DebugAgentServer::BindServer(
         message_loop.dispatcher(),
         fidl::ServerEnd<fuchsia_debugger::DebugAgent>(std::move(server_end)),
-        std::move(debug_agent_server),
-        cpp20::bind_front(&debug_agent::DebugAgentServer::OnUnboundFn, debug_agent_server.get()));
+        debug_agent.GetWeakPtr());
 
     // Run the loop.
     message_loop.Run();

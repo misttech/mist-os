@@ -5,7 +5,7 @@
 use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq, Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(PartialEq, Default, Debug, Clone, Copy, Deserialize, Serialize)]
 pub struct SetupInfo {
     pub configuration_interfaces: ConfigurationInterfaceFlags,
 }
@@ -16,6 +16,12 @@ bitflags! {
         const ETHERNET = 1 << 0;
         const WIFI = 1 << 1;
         const DEFAULT = Self::WIFI.bits();
+    }
+}
+
+impl Default for ConfigurationInterfaceFlags {
+    fn default() -> Self {
+        Self::DEFAULT
     }
 }
 

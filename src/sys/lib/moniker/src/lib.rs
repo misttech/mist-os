@@ -10,8 +10,8 @@ mod moniker;
 mod serde_ext;
 
 pub use self::{
-    child_name::{ChildName, ChildNameBase},
+    child_name::ChildName,
     error::MonikerError,
     extended_moniker::{ExtendedMoniker, EXTENDED_MONIKER_COMPONENT_MANAGER_STR},
-    moniker::{Moniker, MonikerBase},
+    moniker::Moniker,
 };

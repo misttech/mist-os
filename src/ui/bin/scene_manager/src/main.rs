@@ -5,7 +5,8 @@
 use {
     crate::color_transform_manager::ColorTransformManager,
     ::input_pipeline::{
-        input_device::InputDeviceType, light_sensor::Configuration as LightSensorConfiguration,
+        activity::ActivityManager, input_device::InputDeviceType,
+        light_sensor::Configuration as LightSensorConfiguration,
     },
     anyhow::{Context, Error},
     fidl_fuchsia_accessibility::{ColorTransformHandlerMarker, ColorTransformMarker},
@@ -14,6 +15,8 @@ use {
         GraphicalPresenterRequest, GraphicalPresenterRequestStream, PresentViewError, ViewSpec,
     },
     fidl_fuchsia_input_injection::InputDeviceRegistryRequestStream,
+    fidl_fuchsia_input_interaction::NotifierRequestStream,
+    fidl_fuchsia_input_interaction_observation::AggregatorRequestStream,
     fidl_fuchsia_lightsensor::SensorRequestStream as LightSensorRequestStream,
     fidl_fuchsia_recovery_policy::DeviceRequestStream as FactoryResetDeviceRequestStream,
     fidl_fuchsia_recovery_ui::FactoryResetCountdownRequestStream,
@@ -33,7 +36,7 @@ use {
     },
     fuchsia_async as fasync,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
-    fuchsia_inspect as inspect,
+    fuchsia_inspect as inspect, fuchsia_zircon as zx,
     futures::lock::Mutex,
     futures::{StreamExt, TryStreamExt},
     scene_management::{SceneManager, SceneManagerTrait, ViewingDistance},
@@ -64,6 +67,8 @@ enum ExposedServices {
     InputDeviceRegistry(InputDeviceRegistryRequestStream),
     LightSensor(LightSensorRequestStream),
     SceneManager(SceneManagerRequestStream),
+    UserInteractionObservation(AggregatorRequestStream),
+    UserInteraction(NotifierRequestStream),
 }
 
 #[fuchsia::main(logging_tags = [ "scene_manager" ])]
@@ -118,7 +123,9 @@ async fn inner_main() -> Result<(), Error> {
         .add_fidl_service(ExposedServices::FocusChainProvider)
         .add_fidl_service(ExposedServices::GraphicalPresenter)
         .add_fidl_service(ExposedServices::InputDeviceRegistry)
-        .add_fidl_service(ExposedServices::SceneManager);
+        .add_fidl_service(ExposedServices::SceneManager)
+        .add_fidl_service(ExposedServices::UserInteractionObservation)
+        .add_fidl_service(ExposedServices::UserInteraction);
 
     let light_sensor_configuration: Option<LightSensorConfiguration> =
         match File::open(LIGHT_SENSOR_CONFIGURATION) {
@@ -172,6 +179,7 @@ async fn inner_main() -> Result<(), Error> {
         display_rotation,
         display_pixel_density,
         viewing_distance,
+        idle_threshold_ms,
     } = Config::take_from_startup_handle();
 
     let display_pixel_density = match display_pixel_density.trim().parse::<f32>() {
@@ -252,6 +260,10 @@ async fn inner_main() -> Result<(), Error> {
         }
         fasync::Task::local(input_pipeline.handle_input_events()).detach();
     };
+
+    // Create Activity Manager.
+    let activity_manager =
+        ActivityManager::new(zx::Duration::from_millis(idle_threshold_ms as i64));
 
     // Create and register a ColorTransformManager.
     let color_converter = connect_to_protocol::<color::ConverterMarker>()?;
@@ -375,6 +387,38 @@ async fn inner_main() -> Result<(), Error> {
                         warn!("failed to forward fuchsia.recovery.policy.Device: {:?}", e)
                     }
                 }
+            }
+            ExposedServices::UserInteractionObservation(stream) => {
+                let activity_manager = activity_manager.clone();
+                fasync::Task::local(async move {
+                match activity_manager
+                    .handle_interaction_aggregator_request_stream(stream)
+                    .await
+                {
+                    Ok(()) => (),
+                    Err(e) => {
+                        warn!(
+                      "failure while serving fuchsia.input.interaction.observation.Aggregator: {:?}",
+                      e
+                  );
+                    }}
+                }).detach();
+            }
+            ExposedServices::UserInteraction(stream) => {
+                let activity_manager = activity_manager.clone();
+                fasync::Task::local(async move {
+                    match activity_manager.handle_interaction_notifier_request_stream(stream).await
+                    {
+                        Ok(()) => (),
+                        Err(e) => {
+                            warn!(
+                                "failure while serving fuchsia.input.interaction.Notifier: {:?}",
+                                e
+                            );
+                        }
+                    }
+                })
+                .detach();
             }
             ExposedServices::GraphicalPresenter(stream) => {
                 fasync::Task::local(handle_graphical_presenter_request_stream(

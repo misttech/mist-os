@@ -25,6 +25,12 @@ closed protocol Controller {
         is_started bool;
     }) error Error;
 };
+
+/// A protocol used to operate on a component.
+///
+/// One may get access to a `Controller` when creating a component with the
+/// `Realm.CreateChild` method. You may also obtain a `Controller` for an
+/// existing child component with the `Realm.OpenController` method.
 @available(added=18)
 open protocol Controller {
     /// Start the component, optionally providing additional handles to be given

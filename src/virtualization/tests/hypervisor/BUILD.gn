@@ -32,7 +32,7 @@ executable("hypervisor_integration_tests") {
     "//src/lib/fxl/test:test_settings",
     "//src/virtualization/bin/vmm:bits",
     "//third_party/googletest:gtest",
-    "//zircon/kernel/phys/lib/page-table",
+    "//zircon/kernel/lib/arch",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/page_tables",
     "//zircon/system/ulib/zx",

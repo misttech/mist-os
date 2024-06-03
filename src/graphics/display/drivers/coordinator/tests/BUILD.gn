@@ -8,6 +8,7 @@ import("//build/test.gni")
 test("display-coordinator-unittests") {
   configs += [ "//build/config:all_source" ]
   sources = [
+    "display-info-unittest.cc",
     "display-test.cc",
     "fence-test.cc",
     "image-test.cc",
@@ -24,6 +25,7 @@ test("display-coordinator-unittests") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//sdk/lib/driver/testing/cpp",
+    "//src/graphics/display/lib/edid-values",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//third_party/googletest:gtest",

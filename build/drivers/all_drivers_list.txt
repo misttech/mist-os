@@ -1,5 +1,8 @@
 //examples/drivers/demo-number:driver
 //examples/drivers/driver_test_realm/sample-driver:driver
+//examples/drivers/metadata:forwarder_driver
+//examples/drivers/metadata:retriever_driver
+//examples/drivers/metadata:sender_driver
 //examples/drivers/simple/dfv1:driver
 //examples/drivers/simple/dfv2:driver
 //examples/drivers/skeleton:driver
@@ -17,6 +20,10 @@
 //examples/drivers/transport/zircon/v2:child_driver
 //examples/drivers/transport/zircon/v2:parent_driver
 //sdk/lib/driver/devicetree/examples/example-board:bazel_package.bazel_build
+//sdk/lib/driver/metadata/cpp/tests/test_child:driver
+//sdk/lib/driver/metadata/cpp/tests/test_grandchild:driver
+//sdk/lib/driver/metadata/cpp/tests/test_parent:driver
+//sdk/lib/driver/metadata/cpp/tests/test_root:driver
 //sdk/lib/driver_test_realm/fake_driver:driver
 //src/camera/drivers/bus/aml_mipicsi:aml_mipicsi_driver-driver
 //src/camera/drivers/controller/sherlock:sherlock-camera-controller_driver

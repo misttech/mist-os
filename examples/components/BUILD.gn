@@ -9,6 +9,7 @@ group("components") {
   deps = [
     "config",
     "config_from_parent",
+    "dictionaries:dictionary-examples",
     "echo:echo-example",
     "lifecycle:lifecycle-example",
 
@@ -28,6 +29,7 @@ group("hermetic_tests") {
   deps = [
     "config:hermetic_tests",
     "config_from_parent:hermetic_tests",
+    "dictionaries:hermetic_tests",
     "echo:hermetic_tests",
     "realm_builder:hermetic_tests",
     "routing:hermetic_tests",

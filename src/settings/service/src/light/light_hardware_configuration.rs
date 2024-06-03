@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::config::default_settings::DefaultSetting;
 use crate::light::types::LightType;
 use serde::{Deserialize, Serialize};
 
@@ -45,4 +46,8 @@ pub enum DisableConditions {
     /// Signals that the light group should be marked as disabled when the device's mic switch is
     /// set to "on".
     MicSwitch,
+}
+
+pub fn build_light_default_settings() -> DefaultSetting<LightHardwareConfiguration, &'static str> {
+    DefaultSetting::new(None, "/config/data/light_hardware_config.json")
 }

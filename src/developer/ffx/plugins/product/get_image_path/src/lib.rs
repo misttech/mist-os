@@ -51,7 +51,6 @@ impl FfxMain for PbGetImagePathTool {
                 .env
                 .query("product.path")
                 .get()
-                .await
                 .map(|p: PathBuf| p.into())
                 .map_err(|e| bug!(e))?
             {

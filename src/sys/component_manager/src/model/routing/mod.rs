@@ -24,7 +24,6 @@ use {
     errors::ModelError,
     fidl::endpoints::create_proxy,
     fidl_fuchsia_io as fio,
-    moniker::MonikerBase,
     router_error::{Explain, RouterError},
     std::{collections::BTreeMap, sync::Arc},
     tracing::{info, warn},
@@ -140,7 +139,7 @@ pub fn request_for_namespace_capability_expose(exposes: Vec<&ExposeDecl>) -> Opt
     match first_expose {
         cm_rust::ExposeDecl::Protocol(_)
         | cm_rust::ExposeDecl::Service(_)
-        | cm_rust::ExposeDecl::Directory(_) => Some(exposes.into()),
+        | cm_rust::ExposeDecl::Directory(_) => Some(exposes.try_into().unwrap()),
         // These do not add directory entries.
         cm_rust::ExposeDecl::Runner(_)
         | cm_rust::ExposeDecl::Resolver(_)

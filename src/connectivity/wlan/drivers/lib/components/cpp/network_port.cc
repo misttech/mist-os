@@ -67,7 +67,9 @@ void NetworkPort::Init(Role role, fdf_dispatcher_t* dispatcher,
     netdev_ifc_.buffer(arena)
         ->AddPort(port_id_, std::move(endpoints->client))
         .Then(
-            [this, on_complete = std::move(on_complete)](
+            // We capture |dispatcher| in case |RemovePort| was called in the meanwhile and
+            // |dispatcher_| was cleared.
+            [this, on_complete = std::move(on_complete), dispatcher](
                 fdf::WireUnownedResult<fuchsia_hardware_network_driver::NetworkDeviceIfc::AddPort>&
                     result) mutable {
               const zx_status_t status = [&] {
@@ -81,20 +83,27 @@ void NetworkPort::Init(Role role, fdf_dispatcher_t* dispatcher,
                 }
                 return ZX_OK;
               }();
-              if (status != ZX_OK) {
-                // If adding the port failed, go through the entire removal process. There won't be
-                // a port to remove but there are still bindings to unbind and state to clean up.
-                // Call the on_complete callback once the removal is complete to indicate that the
-                // port object is ready to be destroyed. Clear out netdev_ifc_ so that RemovePort
-                // doesn't attempt to remove the port, it was never added.
-                // RemovePortLocked will unlock the mutex.
-                mutex_.lock();
-                netdev_ifc_ = {};
-                RemovePortLocked([on_complete = std::move(on_complete),
-                                  status](zx_status_t) mutable { on_complete(status); });
-                return;
-              }
-              on_complete(status);
+              // Since the |AddPort| call from the port to the netdev_ifc may have been inlined
+              // by the driver runtime (called directly in the same stack), we may deadlock
+              // if trying to acquire the port's lock again. Post a task instead to avoid this.
+              async::PostTask(
+                  fdf_dispatcher_get_async_dispatcher(dispatcher),
+                  [this, status = status, on_complete = std::move(on_complete)]() mutable {
+                    if (status != ZX_OK) {
+                      // If adding the port failed, go through the entire removal process. There
+                      // won't be a port to remove but there are still bindings to unbind and state
+                      // to clean up. Call the on_complete callback once the removal is complete to
+                      // indicate that the port object is ready to be destroyed. Clear out
+                      // netdev_ifc_ so that RemovePort doesn't attempt to remove the port, it was
+                      // never added. RemovePortLocked will unlock the mutex.
+                      mutex_.lock();
+                      netdev_ifc_ = {};
+                      RemovePortLocked([on_complete = std::move(on_complete),
+                                        status](zx_status_t) mutable { on_complete(status); });
+                      return;
+                    }
+                    on_complete(status);
+                  });
             });
     return ZX_OK;
   }();

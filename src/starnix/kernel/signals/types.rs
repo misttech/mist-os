@@ -116,6 +116,108 @@ impl PartialEq<RunState> for RunState {
     }
 }
 
+#[derive(Default)]
+pub struct QueuedSignals {
+    /// The queue of standard signals for the task.
+    queue: VecDeque<SignalInfo>,
+
+    /// Real-time signals queued for the task. Unlike standard signals there may be more than one
+    /// instance of the same real-time signal in the queue. POSIX requires real-time signals
+    /// with lower values to be delivered first. `enqueue()` ensures proper ordering when adding
+    /// new elements. There are no ordering requirements for standard signals. We always dequeue
+    /// standard signals first. This matches Linux behavior.
+    rt_queue: VecDeque<SignalInfo>,
+}
+
+impl QueuedSignals {
+    pub fn enqueue(&mut self, siginfo: SignalInfo) {
+        if siginfo.signal.is_real_time() {
+            // Real-time signals are stored in `rt_queue` in the order they will be delivered,
+            // i.e. they sorted by the signal number. Signals with the same number must be
+            // delivered in the order they were queued. Use binary search to find the right
+            // position to insert the signal. Note that the comparator return `Less` when the
+            // signal is the same.
+            let pos = self
+                .rt_queue
+                .binary_search_by(|v| {
+                    if v.signal.number() <= siginfo.signal.number() {
+                        Ordering::Less
+                    } else {
+                        Ordering::Greater
+                    }
+                })
+                .expect_err("Invalid result from binary_search_by()");
+            self.rt_queue.insert(pos, siginfo);
+        } else {
+            // Don't queue duplicate standard signals.
+            if self.queue.iter().any(move |info| info.signal == siginfo.signal) {
+                return;
+            }
+            self.queue.push_back(siginfo);
+        };
+    }
+
+    /// Used by ptrace to provide a replacement for the signal that might have been
+    /// delivered when the task entered signal-delivery-stop.
+    pub fn jump_queue(&mut self, siginfo: SignalInfo) {
+        self.queue.push_front(siginfo);
+    }
+
+    /// Finds the next queued signal where the given function returns true, removes it from the
+    /// queue, and returns it.
+    pub fn take_next_where<F>(&mut self, predicate: F) -> Option<SignalInfo>
+    where
+        F: Fn(&SignalInfo) -> bool,
+    {
+        // Find the first signal passing `predicate`, prioritizing standard signals.
+        if let Some(index) = self.queue.iter().position(&predicate) {
+            return self.queue.remove(index);
+        }
+        if let Some(index) = self.rt_queue.iter().position(predicate) {
+            return self.rt_queue.remove(index);
+        }
+        None
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.queue.is_empty() && self.rt_queue.is_empty()
+    }
+
+    /// Returns whether any signals are queued and not blocked by the given mask.
+    pub fn is_any_allowed_by_mask(&self, mask: SigSet) -> bool {
+        self.iter().any(|sig| !mask.has_signal(sig.signal))
+    }
+
+    /// Returns an iterator over all the pending signals.
+    fn iter(&self) -> impl Iterator<Item = &SignalInfo> {
+        [&self.queue, &self.rt_queue].into_iter().flatten()
+    }
+
+    /// Iterates over queued signals with the given number.
+    fn iter_queued_by_number(&self, signal: Signal) -> impl Iterator<Item = &SignalInfo> {
+        self.iter().filter(move |info| info.signal == signal)
+    }
+
+    /// Returns the set of currently pending signals, both standard and real time.
+    pub fn pending(&self) -> SigSet {
+        self.iter().fold(SigSet::default(), |pending, signal| pending | signal.signal.into())
+    }
+
+    /// Tests whether a signal with the given number is in the queue.
+    pub fn has_queued(&self, signal: Signal) -> bool {
+        self.iter_queued_by_number(signal).next().is_some()
+    }
+
+    pub fn num_queued(&self) -> usize {
+        self.queue.len() + self.rt_queue.len()
+    }
+
+    #[cfg(test)]
+    pub fn queued_count(&self, signal: Signal) -> usize {
+        self.iter_queued_by_number(signal).count()
+    }
+}
+
 /// Per-task signal handling state.
 #[derive(Default)]
 pub struct SignalState {
@@ -143,15 +245,8 @@ pub struct SignalState {
     /// is dequeued `mask` can be reset to `saved_mask`.
     saved_mask: Option<SigSet>,
 
-    /// The queue of standard signals for the task.
-    queue: VecDeque<SignalInfo>,
-
-    /// Real-time signals queued for the task. Unlike standard signals there may be more than one
-    /// instance of the same real-time signal in the queue. POSIX requires real-time signals
-    /// with lower values to be delivered first. `enqueue()` ensures proper ordering when adding
-    /// new elements. There are no ordering requirements for standard signals. We always dequeue
-    /// standard signals first. This matches Linux behavior.
-    rt_queue: VecDeque<SignalInfo>,
+    /// The queue of signals for the task.
+    queue: QueuedSignals,
 }
 
 impl SignalState {
@@ -194,43 +289,19 @@ impl SignalState {
     }
 
     pub fn enqueue(&mut self, siginfo: SignalInfo) {
-        if siginfo.signal.is_real_time() {
-            // Real-time signals are stored in `rt_queue` in the order they will be delivered,
-            // i.e. they sorted by the signal number. Signals with the same number must be
-            // delivered in the order they were queued. Use binary search to find the right
-            // position to insert the signal. Note that the comparator return `Less` when the
-            // signal is the same.
-            let pos = self
-                .rt_queue
-                .binary_search_by(|v| {
-                    if v.signal.number() <= siginfo.signal.number() {
-                        Ordering::Less
-                    } else {
-                        Ordering::Greater
-                    }
-                })
-                .expect_err("Invalid result from binary_search_by()");
-            self.rt_queue.insert(pos, siginfo);
-        } else {
-            // Don't queue duplicate standard signals.
-            if self.queue.iter().any(move |info| info.signal == siginfo.signal) {
-                return;
-            }
-            self.queue.push_back(siginfo);
-        };
-
+        self.queue.enqueue(siginfo);
         self.signal_wait.notify_all();
     }
 
     /// Used by ptrace to provide a replacement for the signal that might have been
     /// delivered when the task entered signal-delivery-stop.
     pub fn jump_queue(&mut self, siginfo: SignalInfo) {
-        self.queue.push_front(siginfo);
+        self.queue.jump_queue(siginfo);
         self.signal_wait.notify_all();
     }
 
     pub fn is_empty(&self) -> bool {
-        self.queue.is_empty() && self.rt_queue.is_empty()
+        self.queue.is_empty()
     }
 
     /// Finds the next queued signal where the given function returns true, removes it from the
@@ -239,59 +310,35 @@ impl SignalState {
     where
         F: Fn(&SignalInfo) -> bool,
     {
-        // Find the first non-blocked signal.
-        if let Some(index) = self.queue.iter().position(&predicate) {
-            return self.queue.remove(index);
-        }
-        if let Some(index) = self.rt_queue.iter().position(predicate) {
-            return self.rt_queue.remove(index);
-        }
-        None
+        self.queue.take_next_where(predicate)
     }
 
     /// Returns whether any signals are pending (queued and not blocked).
     pub fn is_any_pending(&self) -> bool {
-        self.is_any_allowed_by_mask(self.mask)
+        self.queue.is_any_allowed_by_mask(self.mask)
     }
 
     /// Returns whether any signals are queued and not blocked by the given mask.
     pub fn is_any_allowed_by_mask(&self, mask: SigSet) -> bool {
-        self.queue.iter().any(|sig| !mask.has_signal(sig.signal))
-            || self.rt_queue.iter().any(|sig| !mask.has_signal(sig.signal))
-    }
-
-    /// Iterates over queued signals with the given number.
-    fn iter_queued_by_number(&self, signal: Signal) -> impl Iterator<Item = &SignalInfo> {
-        [&self.queue, &self.rt_queue]
-            .into_iter()
-            .flatten()
-            .filter(move |info| info.signal == signal)
-            .into_iter()
+        self.queue.is_any_allowed_by_mask(mask)
     }
 
     pub fn pending(&self) -> SigSet {
-        let mut pending = SigSet::default();
-        for signal in &self.queue {
-            pending = pending | signal.signal.into();
-        }
-        for signal in &self.rt_queue {
-            pending = pending | signal.signal.into();
-        }
-        pending
+        self.queue.pending()
     }
 
     /// Tests whether a signal with the given number is in the queue.
     pub fn has_queued(&self, signal: Signal) -> bool {
-        self.iter_queued_by_number(signal).next().is_some()
+        self.queue.has_queued(signal)
     }
 
     pub fn num_queued(&self) -> usize {
-        self.queue.len() + self.rt_queue.len()
+        self.queue.num_queued()
     }
 
     #[cfg(test)]
     pub fn queued_count(&self, signal: Signal) -> usize {
-        self.iter_queued_by_number(signal).count()
+        self.queue.queued_count(signal)
     }
 }
 

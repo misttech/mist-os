@@ -7,7 +7,6 @@ use {
     errors::ModelError,
     futures::{channel::*, lock::Mutex},
     hooks::{Event, EventType, Hook, HooksRegistration},
-    moniker::MonikerBase,
     std::sync::{Arc, Weak},
 };
 

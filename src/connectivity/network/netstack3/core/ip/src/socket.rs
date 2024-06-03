@@ -76,7 +76,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         body: S,
         mtu: Option<u32>,
         options: &O,
-    ) -> Result<(), (S, IpSockSendError)>
+    ) -> Result<(), IpSockSendError>
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
@@ -126,9 +126,8 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
             .map_err(|err| SendOneShotIpPacketError::CreateAndSendError { err: err.into() })?;
         let packet = get_body_from_src_ip(*tmp.local_ip())
             .map_err(SendOneShotIpPacketError::SerializeError)?;
-        self.send_ip_packet(bindings_ctx, &tmp, packet, mtu, options).map_err(|(_body, err)| {
-            SendOneShotIpPacketError::CreateAndSendError { err: err.into() }
-        })
+        self.send_ip_packet(bindings_ctx, &tmp, packet, mtu, options)
+            .map_err(|err| SendOneShotIpPacketError::CreateAndSendError { err: err.into() })
     }
 
     /// Sends a one-shot IP packet but with a non-fallible serializer.
@@ -407,7 +406,7 @@ where
         body: S,
         mtu: Option<u32>,
         options: &O,
-    ) -> Result<(), (S, IpSockSendError)>
+    ) -> Result<(), IpSockSendError>
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
@@ -434,6 +433,10 @@ pub trait SendOptions<I: Ip> {
     /// a packet going to the given destination. Otherwise the default value
     /// will be used.
     fn hop_limit(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8>;
+
+    /// Returns true if outgoing multicast packets should be looped back and
+    /// delivered to local receivers who joined the multicast group.
+    fn multicast_loop(&self) -> bool;
 }
 
 /// Empty send options that never overrides default values.
@@ -443,6 +446,10 @@ pub struct DefaultSendOptions;
 impl<I: Ip> SendOptions<I> for DefaultSendOptions {
     fn hop_limit(&self, _destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
         None
+    }
+
+    fn multicast_loop(&self) -> bool {
+        false
     }
 }
 
@@ -487,7 +494,7 @@ fn send_ip_packet<I, S, BC, CC, O>(
     mut body: S,
     mtu: Option<u32>,
     options: &O,
-) -> Result<(), (S, IpSockSendError)>
+) -> Result<(), IpSockSendError>
 where
     I: IpExt + IpDeviceStateIpExt + packet_formats::ip::IpExt,
     S: TransportPacketSerializer<I>,
@@ -502,15 +509,14 @@ where
     let IpSock { definition: IpSockDefinition { remote_ip, local_ip, device, proto } } = socket;
     let device = match device.as_ref().map(|d| d.upgrade()) {
         Some(Some(device)) => Some(device),
-        Some(None) => return Err((body, ResolveRouteError::Unreachable.into())),
+        Some(None) => return Err(ResolveRouteError::Unreachable.into()),
         None => None,
     };
 
     let ResolvedRoute { src_addr: got_local_ip, local_delivery_device: _, device, next_hop } =
-        match core_ctx.lookup_route(bindings_ctx, device.as_ref(), Some(*local_ip), *remote_ip) {
-            Ok(o) => o,
-            Err(e) => return Err((body, IpSockSendError::Unroutable(e))),
-        };
+        core_ctx
+            .lookup_route(bindings_ctx, device.as_ref(), Some(*local_ip), *remote_ip)
+            .map_err(|e| IpSockSendError::Unroutable(e))?;
     assert_eq!(local_ip, &got_local_ip);
 
     // TODO(https://fxbug.dev/318717702): when we implement NAT, perform re-routing
@@ -532,10 +538,10 @@ where
     }
 
     let Some(local_ip) = SpecifiedAddr::new(packet.src_addr()) else {
-        return Err((body, IpSockSendError::Unroutable(ResolveRouteError::NoSrcAddr)));
+        return Err(IpSockSendError::Unroutable(ResolveRouteError::NoSrcAddr));
     };
     let Some(remote_ip) = SpecifiedAddr::new(packet.dst_addr()) else {
-        return Err((body, IpSockSendError::Unroutable(ResolveRouteError::Unreachable)));
+        return Err(IpSockSendError::Unroutable(ResolveRouteError::Unreachable));
     };
 
     let (next_hop, broadcast) = next_hop.into_next_hop_and_broadcast_marker(remote_ip);
@@ -556,7 +562,7 @@ where
         body,
         packet_metadata,
     )
-    .map_err(|s| (s, IpSockSendError::Mtu))
+    .map_err(|_s| IpSockSendError::Mtu)
 }
 
 /// Enables a blanket implementation of [`DeviceIpSocketHandler`].
@@ -1020,7 +1026,7 @@ pub(crate) mod testutil {
             _body: S,
             _mtu: Option<u32>,
             _options: &O,
-        ) -> Result<(), (S, IpSockSendError)>
+        ) -> Result<(), IpSockSendError>
         where
             S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,
@@ -1061,19 +1067,14 @@ pub(crate) mod testutil {
             body: S,
             mtu: Option<u32>,
             options: &O,
-        ) -> Result<(), (S, IpSockSendError)>
+        ) -> Result<(), IpSockSendError>
         where
             S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,
             O: SendOptions<I>,
         {
-            let meta = match self.state.as_mut().resolve_send_meta(socket, mtu, options) {
-                Ok(meta) => meta,
-                Err(e) => {
-                    return Err((body, e));
-                }
-            };
-            self.send_frame(bindings_ctx, meta, body).map_err(|s| (s, IpSockSendError::Mtu))
+            let meta = self.state.as_mut().resolve_send_meta(socket, mtu, options)?;
+            self.send_frame(bindings_ctx, meta, body).map_err(|_s| IpSockSendError::Mtu)
         }
     }
 
@@ -1290,7 +1291,7 @@ pub(crate) mod testutil {
             body: S,
             mtu: Option<u32>,
             options: &O,
-        ) -> Result<(), (S, IpSockSendError)>
+        ) -> Result<(), IpSockSendError>
         where
             S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,
@@ -1331,19 +1332,14 @@ pub(crate) mod testutil {
             body: S,
             mtu: Option<u32>,
             options: &O,
-        ) -> Result<(), (S, IpSockSendError)>
+        ) -> Result<(), IpSockSendError>
         where
             S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,
             O: SendOptions<I>,
         {
-            let meta = match self.state.inner_mut::<I>().resolve_send_meta(socket, mtu, options) {
-                Ok(meta) => meta,
-                Err(e) => {
-                    return Err((body, e));
-                }
-            };
-            self.send_frame(bindings_ctx, meta, body).map_err(|s| (s, IpSockSendError::Mtu))
+            let meta = self.state.inner_mut::<I>().resolve_send_meta(socket, mtu, options)?;
+            self.send_frame(bindings_ctx, meta, body).map_err(|_s| IpSockSendError::Mtu)
         }
     }
 

@@ -31,15 +31,22 @@
 
 namespace flatland {
 
-const fuchsia::sysmem::BufferUsage kCpuUsageRead = {.cpu = fuchsia::sysmem::cpuUsageRead};
+fuchsia::sysmem2::BufferUsage get_cpu_usage_read() {
+  static const fuchsia::sysmem2::BufferUsage usage = [] {
+    fuchsia::sysmem2::BufferUsage usage;
+    usage.set_cpu(fuchsia::sysmem2::CPU_USAGE_READ);
+    return usage;
+  }();
+  return fidl::Clone(usage);
+}
 
 using allocation::BufferCollectionUsage;
 using allocation::ImageMetadata;
 using fuchsia::ui::composition::ImageFlip;
 using fuchsia::ui::composition::Orientation;
 
-// TODO(https://fxbug.dev/42129956): Move common functions to testing::WithParamInterface instead of function
-// calls.
+// TODO(https://fxbug.dev/42129956): Move common functions to testing::WithParamInterface instead of
+// function calls.
 using NullRendererTest = RendererTest;
 using VulkanRendererTest = RendererTest;
 
@@ -102,13 +109,15 @@ glm::ivec4 GetPixel(const uint8_t* vmo_host, uint32_t width, uint32_t x, uint32_
 allocation::GlobalBufferCollectionId SetupBufferCollection(
     const uint32_t& num_buffers, const uint32_t& image_width, const uint32_t& image_height,
     allocation::BufferCollectionUsage usage, Renderer* renderer,
-    fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
-    fuchsia::sysmem::BufferCollectionInfo_2* collection_info,
-    fuchsia::sysmem::BufferCollectionSyncPtr& collection_ptr,
+    fuchsia::sysmem2::Allocator_Sync* sysmem_allocator,
+    fuchsia::sysmem2::BufferCollectionInfo* collection_info,
+    fuchsia::sysmem2::BufferCollectionSyncPtr& collection_ptr,
     allocation::GlobalBufferCollectionId collection_id =
         allocation::GenerateUniqueBufferCollectionId()) {
   // First create the pair of sysmem tokens, one for the client, one for the renderer.
   auto tokens = flatland::SysmemTokens::Create(sysmem_allocator);
+  EXPECT_TRUE(tokens.dup_token.is_bound());
+  EXPECT_TRUE(tokens.local_token.is_bound());
 
   auto result = renderer->ImportBufferCollection(collection_id, sysmem_allocator,
                                                  std::move(tokens.dup_token), usage, std::nullopt);
@@ -120,17 +129,21 @@ allocation::GlobalBufferCollectionId SetupBufferCollection(
       sysmem_allocator, std::move(tokens.local_token),
       /*image_count*/ num_buffers,
       /*width*/ image_width,
-      /*height*/ image_height, buffer_usage, fuchsia::sysmem::PixelFormatType::R8G8B8A8,
-      std::make_optional(memory_constraints),
-      std::make_optional(fuchsia::sysmem::FORMAT_MODIFIER_LINEAR));
+      /*height*/ image_height, std::move(buffer_usage), fuchsia::images2::PixelFormat::R8G8B8A8,
+      std::make_optional(std::move(memory_constraints)),
+      std::make_optional(fuchsia::images2::PixelFormatModifier::LINEAR));
+  EXPECT_TRUE(collection_ptr.is_bound());
 
   // Have the client wait for buffers allocated so it can populate its information
   // struct with the vmo data.
   {
-    zx_status_t allocation_status = ZX_OK;
-    auto status = collection_ptr->WaitForBuffersAllocated(&allocation_status, collection_info);
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+    auto status = collection_ptr->WaitForAllBuffersAllocated(&wait_result);
     EXPECT_EQ(status, ZX_OK);
-    EXPECT_EQ(allocation_status, ZX_OK);
+    EXPECT_TRUE(!wait_result.is_framework_err());
+    EXPECT_TRUE(!wait_result.is_err());
+    EXPECT_TRUE(wait_result.is_response());
+    *collection_info = std::move(*wait_result.response().mutable_buffer_collection_info());
   }
 
   return collection_id;
@@ -138,7 +151,7 @@ allocation::GlobalBufferCollectionId SetupBufferCollection(
 }  // anonymous namespace
 
 // Make sure a valid token can be used to import a buffer collection.
-void ImportCollectionTest(Renderer* renderer, fuchsia::sysmem::Allocator_Sync* sysmem_allocator) {
+void ImportCollectionTest(Renderer* renderer, fuchsia::sysmem2::Allocator_Sync* sysmem_allocator) {
   auto tokens = SysmemTokens::Create(sysmem_allocator);
 
   // First id should be valid.
@@ -156,14 +169,16 @@ void ImportCollectionTest(Renderer* renderer, fuchsia::sysmem::Allocator_Sync* s
 // will be in the renderer's map twice. So if all tokens are set, both server-side
 // importer collections should be allocated (since they are just pointers that refer
 // to the same collection).
-void SameTokenTwiceTest(Renderer* renderer, fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
+void SameTokenTwiceTest(Renderer* renderer, fuchsia::sysmem2::Allocator_Sync* sysmem_allocator,
                         bool use_vulkan) {
   auto tokens = flatland::SysmemTokens::Create(sysmem_allocator);
 
   // Create a client token to represent a single client.
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr client_token;
-  auto status = tokens.local_token->Duplicate(std::numeric_limits<uint32_t>::max(),
-                                              client_token.NewRequest());
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr client_token;
+  fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest dup_request;
+  dup_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
+  dup_request.set_token_request(client_token.NewRequest());
+  auto status = tokens.local_token->Duplicate(std::move(dup_request));
   EXPECT_EQ(status, ZX_OK);
 
   // First id should be valid.
@@ -180,13 +195,14 @@ void SameTokenTwiceTest(Renderer* renderer, fuchsia::sysmem::Allocator_Sync* sys
   EXPECT_TRUE(result);
 
   // Set the client constraints.
-  std::vector<uint64_t> additional_format_modifiers;
+  std::vector<fuchsia::images2::PixelFormatModifier> additional_format_modifiers;
   if (escher::VulkanIsSupported() && escher::test::GlobalEscherUsesVirtualGpu()) {
-    additional_format_modifiers.push_back(fuchsia::sysmem::FORMAT_MODIFIER_GOOGLE_GOLDFISH_OPTIMAL);
+    additional_format_modifiers.push_back(
+        fuchsia::images2::PixelFormatModifier::GOOGLE_GOLDFISH_OPTIMAL);
   }
   SetClientConstraintsAndWaitForAllocated(sysmem_allocator, std::move(client_token),
                                           /* image_count */ 1, /* width */ 64, /* height */ 32,
-                                          use_vulkan ? kNoneUsage : kCpuUsageRead,
+                                          use_vulkan ? get_none_usage() : get_cpu_usage_read(),
                                           additional_format_modifiers);
 
   // Now check that both server ids are allocated.
@@ -206,7 +222,7 @@ void SameTokenTwiceTest(Renderer* renderer, fuchsia::sysmem::Allocator_Sync* sys
   EXPECT_TRUE(res_2);
 }
 
-void BadImageInputTest(Renderer* renderer, fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
+void BadImageInputTest(Renderer* renderer, fuchsia::sysmem2::Allocator_Sync* sysmem_allocator,
                        bool use_vulkan) {
   const uint32_t kNumImages = 1;
   auto tokens = SysmemTokens::Create(sysmem_allocator);
@@ -217,13 +233,15 @@ void BadImageInputTest(Renderer* renderer, fuchsia::sysmem::Allocator_Sync* sysm
                                        BufferCollectionUsage::kRenderTarget, std::nullopt);
   EXPECT_TRUE(result);
 
-  std::vector<uint64_t> additional_format_modifiers;
+  std::vector<fuchsia::images2::PixelFormatModifier> additional_format_modifiers;
   if (escher::VulkanIsSupported() && escher::test::GlobalEscherUsesVirtualGpu()) {
-    additional_format_modifiers.push_back(fuchsia::sysmem::FORMAT_MODIFIER_GOOGLE_GOLDFISH_OPTIMAL);
+    additional_format_modifiers.push_back(
+        fuchsia::images2::PixelFormatModifier::GOOGLE_GOLDFISH_OPTIMAL);
   }
   SetClientConstraintsAndWaitForAllocated(sysmem_allocator, std::move(tokens.local_token),
                                           /* image_count */ kNumImages, /* width */ 64,
-                                          /* height */ 32, use_vulkan ? kNoneUsage : kCpuUsageRead,
+                                          /* height */ 32,
+                                          use_vulkan ? get_none_usage() : get_cpu_usage_read(),
                                           additional_format_modifiers);
 
   // Using an invalid buffer collection id.
@@ -255,7 +273,7 @@ void BadImageInputTest(Renderer* renderer, fuchsia::sysmem::Allocator_Sync* sysm
 // Test the ImportBufferImage() function. First call ImportBufferImage() without setting the client
 // constraints, which should return false, and then set the client constraints which
 // should cause it to return true.
-void ImportImageTest(Renderer* renderer, fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
+void ImportImageTest(Renderer* renderer, fuchsia::sysmem2::Allocator_Sync* sysmem_allocator,
                      bool use_vulkan) {
   auto tokens = SysmemTokens::Create(sysmem_allocator);
 
@@ -271,13 +289,14 @@ void ImportImageTest(Renderer* renderer, fuchsia::sysmem::Allocator_Sync* sysmem
       {.collection_id = bcid, .identifier = image_id, .vmo_index = 0, .width = 1, .height = 1},
       BufferCollectionUsage::kRenderTarget));
 
-  std::vector<uint64_t> additional_format_modifiers;
+  std::vector<fuchsia::images2::PixelFormatModifier> additional_format_modifiers;
   if (escher::VulkanIsSupported() && escher::test::GlobalEscherUsesVirtualGpu()) {
-    additional_format_modifiers.push_back(fuchsia::sysmem::FORMAT_MODIFIER_GOOGLE_GOLDFISH_OPTIMAL);
+    additional_format_modifiers.push_back(
+        fuchsia::images2::PixelFormatModifier::GOOGLE_GOLDFISH_OPTIMAL);
   }
   SetClientConstraintsAndWaitForAllocated(sysmem_allocator, std::move(tokens.local_token),
                                           /* image_count */ 1, /* width */ 64, /* height */ 32,
-                                          use_vulkan ? kNoneUsage : kCpuUsageRead,
+                                          use_vulkan ? get_none_usage() : get_cpu_usage_read(),
                                           additional_format_modifiers);
 
   // The buffer collection *should* be valid here.
@@ -290,7 +309,7 @@ void ImportImageTest(Renderer* renderer, fuchsia::sysmem::Allocator_Sync* sysmem
 // Simple release test that calls ReleaseBufferCollection() directly without
 // any zx::events just to make sure that the method's functionality itself is
 // working as intended.
-void DeregistrationTest(Renderer* renderer, fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
+void DeregistrationTest(Renderer* renderer, fuchsia::sysmem2::Allocator_Sync* sysmem_allocator,
                         bool use_vulkan) {
   auto tokens = SysmemTokens::Create(sysmem_allocator);
 
@@ -306,13 +325,14 @@ void DeregistrationTest(Renderer* renderer, fuchsia::sysmem::Allocator_Sync* sys
       {.collection_id = bcid, .identifier = image_id, .vmo_index = 0, .width = 1, .height = 1},
       BufferCollectionUsage::kRenderTarget));
 
-  std::vector<uint64_t> additional_format_modifiers;
+  std::vector<fuchsia::images2::PixelFormatModifier> additional_format_modifiers;
   if (escher::VulkanIsSupported() && escher::test::GlobalEscherUsesVirtualGpu()) {
-    additional_format_modifiers.push_back(fuchsia::sysmem::FORMAT_MODIFIER_GOOGLE_GOLDFISH_OPTIMAL);
+    additional_format_modifiers.push_back(
+        fuchsia::images2::PixelFormatModifier::GOOGLE_GOLDFISH_OPTIMAL);
   }
   SetClientConstraintsAndWaitForAllocated(sysmem_allocator, std::move(tokens.local_token),
                                           /* image_count */ 1, /* width */ 64, /* height */ 32,
-                                          use_vulkan ? kNoneUsage : kCpuUsageRead,
+                                          use_vulkan ? get_none_usage() : get_cpu_usage_read(),
                                           additional_format_modifiers);
 
   // The buffer collection *should* be valid here.
@@ -333,9 +353,8 @@ void DeregistrationTest(Renderer* renderer, fuchsia::sysmem::Allocator_Sync* sys
 
 // Test that calls ReleaseBufferCollection() before ReleaseBufferImage() and makes sure that
 // imported Image can still be rendered.
-void RenderImageAfterBufferCollectionReleasedTest(Renderer* renderer,
-                                                  fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
-                                                  bool use_vulkan) {
+void RenderImageAfterBufferCollectionReleasedTest(
+    Renderer* renderer, fuchsia::sysmem2::Allocator_Sync* sysmem_allocator, bool use_vulkan) {
   auto texture_tokens = SysmemTokens::Create(sysmem_allocator);
   auto target_tokens = SysmemTokens::Create(sysmem_allocator);
 
@@ -351,20 +370,23 @@ void RenderImageAfterBufferCollectionReleasedTest(Renderer* renderer,
                                             BufferCollectionUsage::kRenderTarget, std::nullopt);
   EXPECT_TRUE(result);
 
-  std::vector<uint64_t> additional_format_modifiers;
+  std::vector<fuchsia::images2::PixelFormatModifier> additional_format_modifiers;
   if (escher::VulkanIsSupported() && escher::test::GlobalEscherUsesVirtualGpu()) {
-    additional_format_modifiers.push_back(fuchsia::sysmem::FORMAT_MODIFIER_GOOGLE_GOLDFISH_OPTIMAL);
+    additional_format_modifiers.push_back(
+        fuchsia::images2::PixelFormatModifier::GOOGLE_GOLDFISH_OPTIMAL);
   }
   const uint32_t kWidth = 64, kHeight = 32;
-  SetClientConstraintsAndWaitForAllocated(
-      sysmem_allocator, std::move(texture_tokens.local_token),
-      /* image_count */ 1, /* width */ kWidth,
-      /* height */ kHeight, use_vulkan ? kNoneUsage : kCpuUsageRead, additional_format_modifiers);
+  SetClientConstraintsAndWaitForAllocated(sysmem_allocator, std::move(texture_tokens.local_token),
+                                          /* image_count */ 1, /* width */ kWidth,
+                                          /* height */ kHeight,
+                                          use_vulkan ? get_none_usage() : get_cpu_usage_read(),
+                                          additional_format_modifiers);
 
-  SetClientConstraintsAndWaitForAllocated(
-      sysmem_allocator, std::move(target_tokens.local_token),
-      /* image_count */ 1, /* width */ kWidth,
-      /* height */ kHeight, use_vulkan ? kNoneUsage : kCpuUsageRead, additional_format_modifiers);
+  SetClientConstraintsAndWaitForAllocated(sysmem_allocator, std::move(target_tokens.local_token),
+                                          /* image_count */ 1, /* width */ kWidth,
+                                          /* height */ kHeight,
+                                          use_vulkan ? get_none_usage() : get_cpu_usage_read(),
+                                          additional_format_modifiers);
 
   // Import render target.
   ImageMetadata render_target = {.collection_id = target_collection_id,
@@ -399,7 +421,7 @@ void RenderImageAfterBufferCollectionReleasedTest(Renderer* renderer,
 }
 
 void RenderAfterImageReleasedTest(Renderer* renderer,
-                                  fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
+                                  fuchsia::sysmem2::Allocator_Sync* sysmem_allocator,
                                   bool use_vulkan) {
   auto texture_tokens = SysmemTokens::Create(sysmem_allocator);
   auto target_tokens = SysmemTokens::Create(sysmem_allocator);
@@ -416,20 +438,23 @@ void RenderAfterImageReleasedTest(Renderer* renderer,
                                             BufferCollectionUsage::kRenderTarget, std::nullopt);
   EXPECT_TRUE(result);
 
-  std::vector<uint64_t> additional_format_modifiers;
+  std::vector<fuchsia::images2::PixelFormatModifier> additional_format_modifiers;
   if (escher::VulkanIsSupported() && escher::test::GlobalEscherUsesVirtualGpu()) {
-    additional_format_modifiers.push_back(fuchsia::sysmem::FORMAT_MODIFIER_GOOGLE_GOLDFISH_OPTIMAL);
+    additional_format_modifiers.push_back(
+        fuchsia::images2::PixelFormatModifier::GOOGLE_GOLDFISH_OPTIMAL);
   }
   const uint32_t kWidth = 64, kHeight = 32;
-  SetClientConstraintsAndWaitForAllocated(
-      sysmem_allocator, std::move(texture_tokens.local_token),
-      /* image_count */ 1, /* width */ kWidth,
-      /* height */ kHeight, use_vulkan ? kNoneUsage : kCpuUsageRead, additional_format_modifiers);
+  SetClientConstraintsAndWaitForAllocated(sysmem_allocator, std::move(texture_tokens.local_token),
+                                          /* image_count */ 1, /* width */ kWidth,
+                                          /* height */ kHeight,
+                                          use_vulkan ? get_none_usage() : get_cpu_usage_read(),
+                                          additional_format_modifiers);
 
-  SetClientConstraintsAndWaitForAllocated(
-      sysmem_allocator, std::move(target_tokens.local_token),
-      /* image_count */ 1, /* width */ kWidth,
-      /* height */ kHeight, use_vulkan ? kNoneUsage : kCpuUsageRead, additional_format_modifiers);
+  SetClientConstraintsAndWaitForAllocated(sysmem_allocator, std::move(target_tokens.local_token),
+                                          /* image_count */ 1, /* width */ kWidth,
+                                          /* height */ kHeight,
+                                          use_vulkan ? get_none_usage() : get_cpu_usage_read(),
+                                          additional_format_modifiers);
 
   // Import render target.
   ImageMetadata render_target = {.collection_id = target_collection_id,
@@ -470,7 +495,7 @@ void MultithreadingTest(Renderer* renderer, bool use_vulkan) {
     async::TestLoop loop;
 
     // Make an extra sysmem allocator for tokens.
-    fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator =
+    fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator =
         utils::CreateSysmemAllocatorSyncPtr("MultithreadingTest");
 
     auto tokens = SysmemTokens::Create(sysmem_allocator.get());
@@ -481,14 +506,14 @@ void MultithreadingTest(Renderer* renderer, bool use_vulkan) {
         BufferCollectionUsage::kRenderTarget, std::nullopt);
     EXPECT_TRUE(result);
 
-    std::vector<uint64_t> additional_format_modifiers;
+    std::vector<fuchsia::images2::PixelFormatModifier> additional_format_modifiers;
     if (escher::VulkanIsSupported() && escher::test::GlobalEscherUsesVirtualGpu()) {
       additional_format_modifiers.push_back(
-          fuchsia::sysmem::FORMAT_MODIFIER_GOOGLE_GOLDFISH_OPTIMAL);
+          fuchsia::images2::PixelFormatModifier::GOOGLE_GOLDFISH_OPTIMAL);
     }
     SetClientConstraintsAndWaitForAllocated(sysmem_allocator.get(), std::move(tokens.local_token),
                                             /* image_count */ 1, /* width */ 64, /* height */ 32,
-                                            use_vulkan ? kNoneUsage : kCpuUsageRead,
+                                            use_vulkan ? get_none_usage() : get_cpu_usage_read(),
                                             additional_format_modifiers);
 
     // Add the bcid to the global vector in a thread-safe manner.
@@ -536,11 +561,11 @@ void MultithreadingTest(Renderer* renderer, bool use_vulkan) {
 // a zx::event which can be used by an async::Wait object to asynchronously
 // call a custom function.
 void AsyncEventSignalTest(async::TestLoop* loop, Renderer* renderer,
-                          fuchsia::sysmem::Allocator_Sync* sysmem_allocator, bool use_vulkan) {
+                          fuchsia::sysmem2::Allocator_Sync* sysmem_allocator, bool use_vulkan) {
   // Setup the render target collection.
   const uint32_t kWidth = 64, kHeight = 32;
-  fuchsia::sysmem::BufferCollectionInfo_2 client_target_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr target_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo client_target_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr target_ptr;
   auto target_id =
       SetupBufferCollection(1, kWidth, kHeight, BufferCollectionUsage::kRenderTarget, renderer,
                             sysmem_allocator, &client_target_info, target_ptr);
@@ -716,15 +741,15 @@ VK_TEST_F(VulkanRendererTest, RenderTest) {
   auto [escher, renderer] = CreateEscherAndPrewarmedRenderer();
 
   // Setup renderable texture collection.
-  fuchsia::sysmem::BufferCollectionInfo_2 client_collection_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr collection_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo client_collection_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr collection_ptr;
   auto collection_id =
       SetupBufferCollection(1, 60, 40, BufferCollectionUsage::kClientImage, renderer.get(),
                             sysmem_allocator_.get(), &client_collection_info, collection_ptr);
 
   // Setup the render target collection.
-  fuchsia::sysmem::BufferCollectionInfo_2 client_target_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr target_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo client_target_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr target_ptr;
   auto target_id =
       SetupBufferCollection(1, 60, 40, BufferCollectionUsage::kRenderTarget, renderer.get(),
                             sysmem_allocator_.get(), &client_target_info, target_ptr);
@@ -768,9 +793,9 @@ VK_TEST_F(VulkanRendererTest, RenderTest) {
   MapHostPointer(
       client_collection_info, renderable_texture.vmo_index, HostPointerAccessMode::kWriteOnly,
       [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        EXPECT_EQ(kBytesPerRGBAPixel, utils::GetBytesPerPixel(client_collection_info.settings));
+        EXPECT_EQ(kBytesPerRGBAPixel, utils::GetBytesPerPixel(client_collection_info.settings()));
         const uint32_t pixels_per_row =
-            utils::GetPixelsPerRow(client_collection_info.settings, kTextureWidth);
+            utils::GetPixelsPerRow(client_collection_info.settings(), kTextureWidth);
 
         // The texture only has 8 pixels, so it needs 32 write values for 4 channels. We
         // set the left half of pixels to red and the right half to green.
@@ -860,8 +885,8 @@ VK_TEST_F(VulkanRendererTest, FullScreenRenderTest) {
   const uint32_t kHeight = 128;
 
   // Setup the render target collection.
-  fuchsia::sysmem::BufferCollectionInfo_2 client_target_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr target_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo client_target_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr target_ptr;
   auto target_id = SetupBufferCollection(1, kWidth, kHeight, BufferCollectionUsage::kRenderTarget,
                                          renderer.get(), sysmem_allocator_.get(),
                                          &client_target_info, target_ptr);
@@ -878,8 +903,8 @@ VK_TEST_F(VulkanRendererTest, FullScreenRenderTest) {
   EXPECT_TRUE(import_res);
 
   // Setup renderable texture collection.
-  fuchsia::sysmem::BufferCollectionInfo_2 client_collection_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr collection_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo client_collection_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr collection_ptr;
   auto collection_id =
       SetupBufferCollection(1, kWidth, kHeight, BufferCollectionUsage::kClientImage, renderer.get(),
                             sysmem_allocator_.get(), &client_collection_info, collection_ptr);
@@ -902,9 +927,9 @@ VK_TEST_F(VulkanRendererTest, FullScreenRenderTest) {
   MapHostPointer(
       client_collection_info, renderable_texture.vmo_index, HostPointerAccessMode::kWriteOnly,
       [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        EXPECT_EQ(kBytesPerRGBAPixel, utils::GetBytesPerPixel(client_collection_info.settings));
+        EXPECT_EQ(kBytesPerRGBAPixel, utils::GetBytesPerPixel(client_collection_info.settings()));
         const uint32_t pixels_per_row =
-            utils::GetPixelsPerRow(client_collection_info.settings, kWidth);
+            utils::GetPixelsPerRow(client_collection_info.settings(), kWidth);
 
         const uint8_t kWriteRed[] = {/*red*/ 255U, 0, 0, 255U};
         const uint8_t kWriteGreen[] = {/*green*/ 0, 255U, 0, 255U};
@@ -930,8 +955,9 @@ VK_TEST_F(VulkanRendererTest, FullScreenRenderTest) {
   MapHostPointer(
       client_target_info, render_target.vmo_index, HostPointerAccessMode::kReadOnly,
       [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        EXPECT_EQ(kBytesPerRGBAPixel, utils::GetBytesPerPixel(client_target_info.settings));
-        const uint32_t pixels_per_row = utils::GetPixelsPerRow(client_target_info.settings, kWidth);
+        EXPECT_EQ(kBytesPerRGBAPixel, utils::GetBytesPerPixel(client_target_info.settings()));
+        const uint32_t pixels_per_row =
+            utils::GetPixelsPerRow(client_target_info.settings(), kWidth);
 
         // Flush the cache before reading back target image.
         EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host, pixels_per_row * kHeight * kBytesPerRGBAPixel,
@@ -1004,15 +1030,15 @@ VK_TEST_F(VulkanRendererTest, RotationRenderTest) {
   SKIP_TEST_IF_ESCHER_USES_DEVICE(VirtualGpu);
   auto [escher, renderer] = CreateEscherAndPrewarmedRenderer();
 
-  fuchsia::sysmem::BufferCollectionInfo_2 client_collection_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr collection_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo client_collection_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr collection_ptr;
   auto collection_id =
       SetupBufferCollection(1, 60, 40, BufferCollectionUsage::kClientImage, renderer.get(),
                             sysmem_allocator_.get(), &client_collection_info, collection_ptr);
 
   // Setup the render target collection.
-  fuchsia::sysmem::BufferCollectionInfo_2 client_target_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr target_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo client_target_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr target_ptr;
   auto target_id =
       SetupBufferCollection(2, 60, 40, BufferCollectionUsage::kRenderTarget, renderer.get(),
                             sysmem_allocator_.get(), &client_target_info, target_ptr);
@@ -1069,9 +1095,9 @@ VK_TEST_F(VulkanRendererTest, RotationRenderTest) {
   MapHostPointer(
       client_collection_info, renderable_texture.vmo_index, HostPointerAccessMode::kWriteOnly,
       [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        EXPECT_EQ(kBytesPerRGBAPixel, utils::GetBytesPerPixel(client_collection_info.settings));
+        EXPECT_EQ(kBytesPerRGBAPixel, utils::GetBytesPerPixel(client_collection_info.settings()));
         const uint32_t pixels_per_row =
-            utils::GetPixelsPerRow(client_collection_info.settings, kTextureWidth);
+            utils::GetPixelsPerRow(client_collection_info.settings(), kTextureWidth);
 
         // The texture only has 8 pixels, so it needs 32 write values for 4 channels. We
         // set the left half of pixels to red and the right half to green.
@@ -1269,15 +1295,15 @@ VK_TEST_F(VulkanRendererTest, FlipLeftRightAndRotate90RenderTest) {
       env->GetVulkanDevice(), env->GetFilesystem(), /*gpu_allocator*/ nullptr);
   VkRenderer renderer(unique_escher->GetWeakPtr());
 
-  fuchsia::sysmem::BufferCollectionInfo_2 client_collection_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr collection_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo client_collection_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr collection_ptr;
   auto collection_id =
       SetupBufferCollection(1, 60, 40, BufferCollectionUsage::kClientImage, &renderer,
                             sysmem_allocator_.get(), &client_collection_info, collection_ptr);
 
   // Setup the render target collection.
-  fuchsia::sysmem::BufferCollectionInfo_2 client_target_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr target_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo client_target_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr target_ptr;
   auto target_id = SetupBufferCollection(2, 60, 40, BufferCollectionUsage::kRenderTarget, &renderer,
                                          sysmem_allocator_.get(), &client_target_info, target_ptr);
 
@@ -1333,9 +1359,9 @@ VK_TEST_F(VulkanRendererTest, FlipLeftRightAndRotate90RenderTest) {
   MapHostPointer(
       client_collection_info, renderable_texture.vmo_index, HostPointerAccessMode::kWriteOnly,
       [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        EXPECT_EQ(kBytesPerRGBAPixel, utils::GetBytesPerPixel(client_collection_info.settings));
+        EXPECT_EQ(kBytesPerRGBAPixel, utils::GetBytesPerPixel(client_collection_info.settings()));
         const uint32_t pixels_per_row =
-            utils::GetPixelsPerRow(client_collection_info.settings, kTextureWidth);
+            utils::GetPixelsPerRow(client_collection_info.settings(), kTextureWidth);
 
         // The texture only has 8 pixels, so it needs 32 write values for 4 channels. We
         // set the left half of pixels to red and the right half to green.
@@ -1446,15 +1472,15 @@ VK_TEST_F(VulkanRendererTest, FlipUpDownAndRotate90RenderTest) {
       env->GetVulkanDevice(), env->GetFilesystem(), /*gpu_allocator*/ nullptr);
   VkRenderer renderer(unique_escher->GetWeakPtr());
 
-  fuchsia::sysmem::BufferCollectionInfo_2 client_collection_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr collection_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo client_collection_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr collection_ptr;
   auto collection_id =
       SetupBufferCollection(1, 60, 40, BufferCollectionUsage::kClientImage, &renderer,
                             sysmem_allocator_.get(), &client_collection_info, collection_ptr);
 
   // Setup the render target collection.
-  fuchsia::sysmem::BufferCollectionInfo_2 client_target_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr target_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo client_target_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr target_ptr;
   auto target_id = SetupBufferCollection(2, 60, 40, BufferCollectionUsage::kRenderTarget, &renderer,
                                          sysmem_allocator_.get(), &client_target_info, target_ptr);
 
@@ -1511,8 +1537,8 @@ VK_TEST_F(VulkanRendererTest, FlipUpDownAndRotate90RenderTest) {
   MapHostPointer(
       client_collection_info, renderable_texture.vmo_index, HostPointerAccessMode::kWriteOnly,
       [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        EXPECT_EQ(4u, utils::GetBytesPerPixel(client_collection_info.settings));
-        uint32_t pixels_per_row = utils::GetPixelsPerRow(client_collection_info.settings, 1U);
+        EXPECT_EQ(4u, utils::GetBytesPerPixel(client_collection_info.settings()));
+        uint32_t pixels_per_row = utils::GetPixelsPerRow(client_collection_info.settings(), 1U);
 
         const uint8_t kNumWrites = static_cast<uint8_t>((pixels_per_row * 4) + 4);
 
@@ -1581,8 +1607,8 @@ VK_TEST_F(VulkanRendererTest, SolidColorTest) {
   auto [escher, renderer] = CreateEscherAndPrewarmedRenderer();
 
   // Setup the render target collection.
-  fuchsia::sysmem::BufferCollectionInfo_2 client_target_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr target_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo client_target_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr target_ptr;
   auto target_id =
       SetupBufferCollection(1, 60, 40, BufferCollectionUsage::kRenderTarget, renderer.get(),
                             sysmem_allocator_.get(), &client_target_info, target_ptr);
@@ -1652,8 +1678,8 @@ VK_TEST_F(VulkanRendererTest, ColorCorrectionTest) {
   renderer->SetColorConversionValues(matrix, preoffsets, postoffsets);
 
   // Setup the render target collection.
-  fuchsia::sysmem::BufferCollectionInfo_2 client_target_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr target_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo client_target_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr target_ptr;
   auto target_id =
       SetupBufferCollection(1, 60, 40, BufferCollectionUsage::kRenderTarget, renderer.get(),
                             sysmem_allocator_.get(), &client_target_info, target_ptr);
@@ -1735,8 +1761,8 @@ VK_TEST_F(VulkanRendererTest, MultipleSolidColorTest) {
   auto [escher, renderer] = CreateEscherAndPrewarmedRenderer();
 
   // Setup the render target collection.
-  fuchsia::sysmem::BufferCollectionInfo_2 client_target_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr target_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo client_target_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr target_ptr;
   auto target_id =
       SetupBufferCollection(1, 60, 40, BufferCollectionUsage::kRenderTarget, renderer.get(),
                             sysmem_allocator_.get(), &client_target_info, target_ptr);
@@ -1813,8 +1839,8 @@ VK_TEST_F(VulkanRendererTest, MixSolidColorAndImageTest) {
   // Both renderables should be the same size.
   const uint32_t kRenderableWidth = 93;
   const uint32_t kRenderableHeight = 78;
-  fuchsia::sysmem::BufferCollectionInfo_2 client_collection_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr collection_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo client_collection_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr collection_ptr;
   auto collection_id =
       SetupBufferCollection(1, 100, 100, BufferCollectionUsage::kClientImage, renderer.get(),
                             sysmem_allocator_.get(), &client_collection_info, collection_ptr);
@@ -1822,8 +1848,8 @@ VK_TEST_F(VulkanRendererTest, MixSolidColorAndImageTest) {
   // Setup the render target collection.
   const uint32_t kTargetWidth = 200;
   const uint32_t kTargetHeight = 100;
-  fuchsia::sysmem::BufferCollectionInfo_2 client_target_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr target_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo client_target_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr target_ptr;
   auto target_id =
       SetupBufferCollection(1, 200, 100, BufferCollectionUsage::kRenderTarget, renderer.get(),
                             sysmem_allocator_.get(), &client_target_info, target_ptr);
@@ -1919,15 +1945,15 @@ VK_TEST_F(VulkanRendererTest, TransparencyTest) {
   SKIP_TEST_IF_ESCHER_USES_DEVICE(VirtualGpu);
   auto [escher, renderer] = CreateEscherAndPrewarmedRenderer();
 
-  fuchsia::sysmem::BufferCollectionInfo_2 client_collection_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr collection_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo client_collection_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr collection_ptr;
   auto collection_id =
       SetupBufferCollection(2, 60, 40, BufferCollectionUsage::kClientImage, renderer.get(),
                             sysmem_allocator_.get(), &client_collection_info, collection_ptr);
 
   // Setup the render target collection.
-  fuchsia::sysmem::BufferCollectionInfo_2 client_target_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr target_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo client_target_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr target_ptr;
   auto target_id =
       SetupBufferCollection(1, 60, 40, BufferCollectionUsage::kRenderTarget, renderer.get(),
                             sysmem_allocator_.get(), &client_target_info, target_ptr);
@@ -2043,15 +2069,15 @@ VK_TEST_F(VulkanRendererTest, MultiplyColorTest) {
   SKIP_TEST_IF_ESCHER_USES_DEVICE(VirtualGpu);
   auto [escher, renderer] = CreateEscherAndPrewarmedRenderer();
 
-  fuchsia::sysmem::BufferCollectionInfo_2 client_collection_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr collection_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo client_collection_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr collection_ptr;
   auto collection_id =
       SetupBufferCollection(1, 1, 1, BufferCollectionUsage::kClientImage, renderer.get(),
                             sysmem_allocator_.get(), &client_collection_info, collection_ptr);
 
   // Setup the render target collection.
-  fuchsia::sysmem::BufferCollectionInfo_2 client_target_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr target_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo client_target_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr target_ptr;
   auto target_id =
       SetupBufferCollection(1, 60, 40, BufferCollectionUsage::kRenderTarget, renderer.get(),
                             sysmem_allocator_.get(), &client_target_info, target_ptr);
@@ -2150,7 +2176,7 @@ VK_TEST_F(VulkanRendererTest, MultiplyColorTest) {
 
 class VulkanRendererParameterizedYuvTest
     : public VulkanRendererTest,
-      public ::testing::WithParamInterface<fuchsia::sysmem::PixelFormatType> {};
+      public ::testing::WithParamInterface<fuchsia::images2::PixelFormat> {};
 
 // This test actually renders a YUV format texture using the VKRenderer. We create a single
 // rectangle, with a fuchsia texture. The render target and the rectangle are 32x32.
@@ -2172,24 +2198,27 @@ VK_TEST_P(VulkanRendererParameterizedYuvTest, YuvTest) {
   const uint32_t kTargetHeight = 32;
 
   // Set the local constraints for the Image.
-  const fuchsia::sysmem::PixelFormatType pixel_format = GetParam();
+  const fuchsia::images2::PixelFormat pixel_format = GetParam();
   auto [buffer_usage, memory_constraints] = GetUsageAndMemoryConstraintsForCpuWriteOften();
   auto image_collection = CreateBufferCollectionSyncPtrAndSetConstraints(
       sysmem_allocator_.get(), std::move(image_tokens.local_token),
       /*image_count*/ 1,
       /*width*/ kTargetWidth,
-      /*height*/ kTargetHeight, buffer_usage, pixel_format, std::make_optional(memory_constraints),
-      std::make_optional(fuchsia::sysmem::FORMAT_MODIFIER_LINEAR));
+      /*height*/ kTargetHeight, fidl::Clone(buffer_usage), pixel_format,
+      std::make_optional(fidl::Clone(memory_constraints)),
+      std::make_optional(fuchsia::images2::PixelFormatModifier::LINEAR));
 
   // Wait for buffers allocated so it can populate its information struct with the vmo data.
-  fuchsia::sysmem::BufferCollectionInfo_2 image_collection_info = {};
+  fuchsia::sysmem2::BufferCollectionInfo image_collection_info;
   {
-    zx_status_t allocation_status = ZX_OK;
-    auto status =
-        image_collection->WaitForBuffersAllocated(&allocation_status, &image_collection_info);
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+    auto status = image_collection->WaitForAllBuffersAllocated(&wait_result);
     EXPECT_EQ(status, ZX_OK);
-    EXPECT_EQ(allocation_status, ZX_OK);
-    EXPECT_EQ(image_collection_info.settings.image_format_constraints.pixel_format.type,
+    EXPECT_TRUE(!wait_result.is_framework_err());
+    EXPECT_TRUE(!wait_result.is_err());
+    EXPECT_TRUE(wait_result.is_response());
+    image_collection_info = std::move(*wait_result.response().mutable_buffer_collection_info());
+    EXPECT_EQ(image_collection_info.settings().image_format_constraints().pixel_format(),
               pixel_format);
   }
 
@@ -2219,18 +2248,21 @@ VK_TEST_P(VulkanRendererParameterizedYuvTest, YuvTest) {
       sysmem_allocator_.get(), std::move(render_target_tokens.local_token),
       /*image_count*/ 1,
       /*width*/ kTargetWidth,
-      /*height*/ kTargetHeight, buffer_usage, fuchsia::sysmem::PixelFormatType::R8G8B8A8,
-      std::make_optional(memory_constraints),
-      std::make_optional(fuchsia::sysmem::FORMAT_MODIFIER_LINEAR));
+      /*height*/ kTargetHeight, fidl::Clone(buffer_usage), fuchsia::images2::PixelFormat::R8G8B8A8,
+      std::make_optional(fidl::Clone(memory_constraints)),
+      std::make_optional(fuchsia::images2::PixelFormatModifier::LINEAR));
 
   // Wait for buffers allocated so it can populate its information struct with the vmo data.
-  fuchsia::sysmem::BufferCollectionInfo_2 render_target_collection_info = {};
+  fuchsia::sysmem2::BufferCollectionInfo render_target_collection_info;
   {
-    zx_status_t allocation_status = ZX_OK;
-    auto status = render_target_collection->WaitForBuffersAllocated(&allocation_status,
-                                                                    &render_target_collection_info);
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+    auto status = render_target_collection->WaitForAllBuffersAllocated(&wait_result);
     EXPECT_EQ(status, ZX_OK);
-    EXPECT_EQ(allocation_status, ZX_OK);
+    EXPECT_TRUE(!wait_result.is_framework_err());
+    EXPECT_TRUE(!wait_result.is_err());
+    EXPECT_TRUE(wait_result.is_response());
+    render_target_collection_info =
+        std::move(*wait_result.response().mutable_buffer_collection_info());
   }
 
   // Create the render_target image metadata and import.
@@ -2257,14 +2289,14 @@ VK_TEST_P(VulkanRendererParameterizedYuvTest, YuvTest) {
                      vmo_host[i] = kFuchsiaYuvValues[0];
                    }
                    switch (GetParam()) {
-                     case fuchsia::sysmem::PixelFormatType::NV12:
+                     case fuchsia::images2::PixelFormat::NV12:
                        for (uint32_t i = num_pixels; i < num_pixels + num_pixels / 2; i += 2) {
                          vmo_host[i] = kFuchsiaYuvValues[1];
                          vmo_host[i + 1] = kFuchsiaYuvValues[2];
                        }
                        break;
                        break;
-                     case fuchsia::sysmem::PixelFormatType::I420:
+                     case fuchsia::images2::PixelFormat::I420:
                        for (uint32_t i = num_pixels; i < num_pixels + num_pixels / 4; ++i) {
                          vmo_host[i] = kFuchsiaYuvValues[1];
                        }
@@ -2299,8 +2331,8 @@ VK_TEST_P(VulkanRendererParameterizedYuvTest, YuvTest) {
 }
 
 INSTANTIATE_TEST_SUITE_P(YuvPixelFormats, VulkanRendererParameterizedYuvTest,
-                         ::testing::Values(fuchsia::sysmem::PixelFormatType::NV12,
-                                           fuchsia::sysmem::PixelFormatType::I420));
+                         ::testing::Values(fuchsia::images2::PixelFormat::NV12,
+                                           fuchsia::images2::PixelFormat::I420));
 
 // This test actually renders a protected memory backed image using the VKRenderer.
 VK_TEST_F(VulkanRendererTest, ProtectedMemoryTest) {
@@ -2326,32 +2358,41 @@ VK_TEST_F(VulkanRendererTest, ProtectedMemoryTest) {
   const uint32_t kTargetHeight = 32;
 
   // Set the local constraints for the Image.
-  const fuchsia::sysmem::PixelFormatType pixel_format = fuchsia::sysmem::PixelFormatType::BGRA32;
-  const fuchsia::sysmem::BufferMemoryConstraints memory_constraints = {
-      .secure_required = true,
-      .cpu_domain_supported = false,
-      .inaccessible_domain_supported = true,
-  };
-  const fuchsia::sysmem::BufferUsage buffer_usage = {.vulkan =
-                                                         fuchsia::sysmem::vulkanUsageTransferSrc};
+  const fuchsia::images2::PixelFormat pixel_format = fuchsia::images2::PixelFormat::B8G8R8A8;
+  const fuchsia::sysmem2::BufferMemoryConstraints memory_constraints = [] {
+    fuchsia::sysmem2::BufferMemoryConstraints memory_constraints;
+    memory_constraints.set_secure_required(true);
+    memory_constraints.set_cpu_domain_supported(false);
+    memory_constraints.set_ram_domain_supported(false);
+    memory_constraints.set_inaccessible_domain_supported(true);
+    return memory_constraints;
+  }();
+  const fuchsia::sysmem2::BufferUsage buffer_usage = [] {
+    fuchsia::sysmem2::BufferUsage usage;
+    usage.set_vulkan(fuchsia::sysmem2::VULKAN_IMAGE_USAGE_TRANSFER_SRC);
+    return usage;
+  }();
   auto image_collection = CreateBufferCollectionSyncPtrAndSetConstraints(
       sysmem_allocator_.get(), std::move(image_tokens.local_token),
       /*image_count*/ 1,
       /*width*/ kTargetWidth,
-      /*height*/ kTargetHeight, buffer_usage, pixel_format, std::make_optional(memory_constraints),
-      std::make_optional(fuchsia::sysmem::FORMAT_MODIFIER_LINEAR));
+      /*height*/ kTargetHeight, fidl::Clone(buffer_usage), pixel_format,
+      std::make_optional(fidl::Clone(memory_constraints)),
+      std::make_optional(fuchsia::images2::PixelFormatModifier::LINEAR));
 
   // Wait for buffers allocated so it can populate its information struct with the vmo data.
-  fuchsia::sysmem::BufferCollectionInfo_2 image_collection_info = {};
+  fuchsia::sysmem2::BufferCollectionInfo image_collection_info;
   {
-    zx_status_t allocation_status = ZX_OK;
-    auto status =
-        image_collection->WaitForBuffersAllocated(&allocation_status, &image_collection_info);
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+    auto status = image_collection->WaitForAllBuffersAllocated(&wait_result);
     EXPECT_EQ(status, ZX_OK);
-    EXPECT_EQ(allocation_status, ZX_OK);
-    EXPECT_EQ(image_collection_info.settings.image_format_constraints.pixel_format.type,
+    EXPECT_TRUE(!wait_result.is_framework_err());
+    EXPECT_TRUE(!wait_result.is_err());
+    EXPECT_TRUE(wait_result.is_response());
+    image_collection_info = std::move(*wait_result.response().mutable_buffer_collection_info());
+    EXPECT_EQ(image_collection_info.settings().image_format_constraints().pixel_format(),
               pixel_format);
-    EXPECT_TRUE(image_collection_info.settings.buffer_settings.is_secure);
+    EXPECT_TRUE(image_collection_info.settings().buffer_settings().is_secure());
   }
 
   // Create the image meta data for the Image and import.
@@ -2380,19 +2421,21 @@ VK_TEST_F(VulkanRendererTest, ProtectedMemoryTest) {
       sysmem_allocator_.get(), std::move(render_target_tokens.local_token),
       /*image_count*/ 1,
       /*width*/ kTargetWidth,
-      /*height*/ kTargetHeight, buffer_usage, fuchsia::sysmem::PixelFormatType::R8G8B8A8,
-      std::make_optional(memory_constraints),
-      std::make_optional(fuchsia::sysmem::FORMAT_MODIFIER_LINEAR));
+      /*height*/ kTargetHeight, fidl::Clone(buffer_usage), fuchsia::images2::PixelFormat::R8G8B8A8,
+      std::make_optional(fidl::Clone(memory_constraints)),
+      std::make_optional(fuchsia::images2::PixelFormatModifier::LINEAR));
 
   // Wait for buffers allocated so it can populate its information struct with the vmo data.
-  fuchsia::sysmem::BufferCollectionInfo_2 render_target_collection_info = {};
+  fuchsia::sysmem2::BufferCollectionInfo render_target_collection_info;
   {
-    zx_status_t allocation_status = ZX_OK;
-    auto status = render_target_collection->WaitForBuffersAllocated(&allocation_status,
-                                                                    &render_target_collection_info);
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+    auto status = render_target_collection->WaitForAllBuffersAllocated(&wait_result);
     EXPECT_EQ(status, ZX_OK);
-    EXPECT_EQ(allocation_status, ZX_OK);
-    EXPECT_TRUE(image_collection_info.settings.buffer_settings.is_secure);
+    EXPECT_TRUE(!wait_result.is_framework_err());
+    EXPECT_TRUE(!wait_result.is_err());
+    EXPECT_TRUE(wait_result.is_response());
+    image_collection_info = std::move(*wait_result.response().mutable_buffer_collection_info());
+    EXPECT_TRUE(image_collection_info.settings().buffer_settings().is_secure());
   }
 
   // Create the render_target image metadata and import.
@@ -2427,23 +2470,28 @@ VK_TEST_F(VulkanRendererTest, ReadbackTest) {
       target_id, sysmem_allocator_.get(), std::move(tokens.dup_token),
       BufferCollectionUsage::kRenderTarget, std::nullopt);
   ASSERT_TRUE(result);
-  fuchsia::sysmem::BufferCollectionSyncPtr target_ptr;
-  zx_status_t status = sysmem_allocator_->BindSharedCollection(std::move(tokens.local_token),
-                                                               target_ptr.NewRequest());
+  fuchsia::sysmem2::BufferCollectionSyncPtr target_ptr;
+  fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.set_token(std::move(tokens.local_token));
+  bind_shared_request.set_buffer_collection_request(target_ptr.NewRequest());
+  zx_status_t status = sysmem_allocator_->BindSharedCollection(std::move(bind_shared_request));
   ASSERT_TRUE(status == ZX_OK);
-  status = target_ptr->SetConstraints(false, {});
+
+  status = target_ptr->SetConstraints(fuchsia::sysmem2::BufferCollectionSetConstraintsRequest{});
+  ASSERT_EQ(status, ZX_OK);
   {
-    fuchsia::sysmem::BufferCollectionInfo_2 client_target_info;
-    zx_status_t allocation_status = ZX_OK;
-    auto status = target_ptr->WaitForBuffersAllocated(&allocation_status, &client_target_info);
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+    auto status = target_ptr->WaitForAllBuffersAllocated(&wait_result);
     ASSERT_EQ(status, ZX_OK);
-    ASSERT_EQ(allocation_status, ZX_OK);
+    ASSERT_TRUE(!wait_result.is_framework_err());
+    ASSERT_TRUE(!wait_result.is_err());
+    ASSERT_TRUE(wait_result.is_response());
   }
-  target_ptr->Close();
+  target_ptr->Release();
 
   // Setup the readback collection.
-  fuchsia::sysmem::BufferCollectionInfo_2 readback_info;
-  fuchsia::sysmem::BufferCollectionSyncPtr readback_ptr;
+  fuchsia::sysmem2::BufferCollectionInfo readback_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr readback_ptr;
   auto readback_id =
       SetupBufferCollection(1, 60, 40, BufferCollectionUsage::kReadback, renderer.get(),
                             sysmem_allocator_.get(), &readback_info, readback_ptr, target_id);
@@ -2528,27 +2576,34 @@ VK_TEST_P(VulkanRendererParameterizedAFBCTest, EnablesAFBC) {
 
   // Create a client-side handle to the render target's buffer collection and set the client
   // constraints.
-  fuchsia::sysmem::BufferCollectionSyncPtr render_target_collection;
-  zx_status_t status = sysmem_allocator_->BindSharedCollection(
-      std::move(render_target_tokens.local_token), render_target_collection.NewRequest());
+  fuchsia::sysmem2::BufferCollectionSyncPtr render_target_collection;
+  fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.set_token(std::move(render_target_tokens.local_token));
+  bind_shared_request.set_buffer_collection_request(render_target_collection.NewRequest());
+  zx_status_t status = sysmem_allocator_->BindSharedCollection(std::move(bind_shared_request));
   ASSERT_EQ(status, ZX_OK);
-  status = render_target_collection->SetConstraints(false, {});
+  status = render_target_collection->SetConstraints(
+      fuchsia::sysmem2::BufferCollectionSetConstraintsRequest{});
   ASSERT_EQ(status, ZX_OK);
 
   // Wait for buffers allocated so it can populate its information struct with the vmo data.
-  fuchsia::sysmem::BufferCollectionInfo_2 render_target_collection_info = {};
+  fuchsia::sysmem2::BufferCollectionInfo render_target_collection_info;
   {
-    zx_status_t allocation_status = ZX_OK;
-    auto status = render_target_collection->WaitForBuffersAllocated(&allocation_status,
-                                                                    &render_target_collection_info);
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+    auto status = render_target_collection->WaitForAllBuffersAllocated(&wait_result);
     EXPECT_EQ(status, ZX_OK);
-    EXPECT_EQ(allocation_status, ZX_OK);
+    EXPECT_TRUE(!wait_result.is_framework_err());
+    EXPECT_TRUE(!wait_result.is_err());
+    EXPECT_TRUE(wait_result.is_response());
+    render_target_collection_info =
+        std::move(*wait_result.response().mutable_buffer_collection_info());
   }
 
-  ASSERT_TRUE(render_target_collection_info.settings.image_format_constraints.pixel_format
-                  .has_format_modifier);
-  const uint64_t format_modifier = render_target_collection_info.settings.image_format_constraints
-                                       .pixel_format.format_modifier.value;
+  ASSERT_TRUE(render_target_collection_info.settings()
+                  .image_format_constraints()
+                  .has_pixel_format_modifier());
+  const fuchsia::images2::PixelFormatModifier format_modifier =
+      render_target_collection_info.settings().image_format_constraints().pixel_format_modifier();
 
   // The format modifier should not be linear.
   EXPECT_NE(format_modifier, fuchsia::sysmem::FORMAT_MODIFIER_ARM_LINEAR_TE);

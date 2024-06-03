@@ -59,9 +59,15 @@ constexpr fuchsia_io::Rights All() { return fuchsia_io::Rights::kMask; }
 
 }  // namespace Rights
 
+// All io1 OpenFlags that correspond to connection rights.
 constexpr fuchsia_io::OpenFlags kAllIo1Rights = fuchsia_io::OpenFlags::kRightReadable |
                                                 fuchsia_io::OpenFlags::kRightWritable |
                                                 fuchsia_io::OpenFlags::kRightExecutable;
+
+// All io2 Rights that allow a connection to modify the filesystem.
+constexpr fuchsia_io::Rights kAllMutableIo2Rights = fuchsia_io::Rights::kWriteBytes |
+                                                    fuchsia_io::Rights::kModifyDirectory |
+                                                    fuchsia_io::Rights::kUpdateAttributes;
 
 // Specifies the type of object when creating new nodes.
 enum class CreationType : uint8_t {
@@ -77,7 +83,7 @@ enum class VnodeProtocol : uint8_t {
   kService = uint64_t{fuchsia_io::NodeProtocolKinds::kConnector},
   kDirectory = uint64_t{fuchsia_io::NodeProtocolKinds::kDirectory},
   kFile = uint64_t{fuchsia_io::NodeProtocolKinds::kFile},
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+#if !defined(__Fuchsia__) || FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   kSymlink = uint64_t{fuchsia_io::NodeProtocolKinds::kSymlink},
 #endif
 };
@@ -141,7 +147,7 @@ struct VnodeConnectionOptions {
   // Translates the io1 flags passed by the client into an equivalent set of io2 protocols.
   constexpr fuchsia_io::NodeProtocolKinds protocols() const {
     constexpr fuchsia_io::NodeProtocolKinds kSupportedIo1Protocols =
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+#if !defined(__Fuchsia__) || FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
         // Symlinks are not supported via io1.
         fuchsia_io::NodeProtocolKinds::kMask ^ fuchsia_io::NodeProtocolKinds::kSymlink;
 #else
@@ -188,8 +194,9 @@ struct VnodeAttributes {
   std::optional<uint64_t> modification_time;
 
   // POSIX Compatibility Attributes
-  // TODO(https://fxbug.dev/340626555): Add support for uid/gid.
   std::optional<uint32_t> mode;
+  std::optional<uint32_t> uid;
+  std::optional<uint32_t> gid;
 
   // Compare two |VnodeAttributes| instances for equality.
   bool operator==(const VnodeAttributes& other) const {
@@ -212,7 +219,11 @@ struct VnodeAttributes {
 struct VnodeAttributesUpdate {
   std::optional<uint64_t> creation_time;
   std::optional<uint64_t> modification_time;
-  // TODO(https://fxbug.dev/340626555): Add support for mode/uid/gid.
+
+  // POSIX Compatibility Attributes
+  std::optional<uint32_t> mode;
+  std::optional<uint32_t> uid;
+  std::optional<uint32_t> gid;
 
   // Return a set of flags representing those attributes which we want to update.
   constexpr VnodeAttributesQuery Query() const {
@@ -223,6 +234,17 @@ struct VnodeAttributesUpdate {
     if (modification_time) {
       query |= VnodeAttributesQuery::kModificationTime;
     }
+#if !defined(__Fuchsia__) || FUCHSIA_API_LEVEL_AT_LEAST(18)
+    if (mode) {
+      query |= VnodeAttributesQuery::kMode;
+    }
+    if (uid) {
+      query |= VnodeAttributesQuery::kUid;
+    }
+    if (gid) {
+      query |= VnodeAttributesQuery::kGid;
+    }
+#endif
     return query;
   }
 
@@ -247,6 +269,17 @@ struct VnodeAttributesUpdate {
     if (attrs.has_modification_time()) {
       attr_update.modification_time = attrs.modification_time();
     }
+#if !defined(__Fuchsia__) || FUCHSIA_API_LEVEL_AT_LEAST(18)
+    if (attrs.has_mode()) {
+      attr_update.mode = attrs.mode();
+    }
+    if (attrs.has_uid()) {
+      attr_update.uid = attrs.uid();
+    }
+    if (attrs.has_gid()) {
+      attr_update.gid = attrs.gid();
+    }
+#endif
     return attr_update;
   }
 };
@@ -283,6 +316,8 @@ zx::result<VnodeProtocol> NegotiateProtocol(fuchsia_io::NodeProtocolKinds suppor
 // reported by the io1 GetAttrs method. Callers should use the io2 GetAttributes method to get
 // an accurate representation of the mode bits.
 uint32_t GetPosixMode(fuchsia_io::NodeProtocolKinds protocols, fuchsia_io::Abilities abilities);
+
+fuchsia_io::NodeProtocolKinds GetProtocols(const fuchsia_io::wire::ConnectionProtocols& protocols);
 
 // Encapsulates the state of a node's wire attributes on the stack. Used by connections for sending
 // an OnRepresentation event or responding to a fuchsia.io/Node.GetAttributes call.

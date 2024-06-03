@@ -6,15 +6,18 @@ import json
 import os
 import tempfile
 import unittest
+
+from typing import Any
+
 from generate_metadata_json import convert_to_final_dict, validate
 
 
 class GenerateMetadataTests(unittest.TestCase):
-    def test_convert_to_final_dict(self):
+    def test_convert_to_final_dict(self) -> None:
         url = "fuchsia-pkg://abc/def#meta/ghi"
         identifier = "a-matching-id"
-        appendix_data = {"appendix": {"stuff": {}}}
-        intermediate_data = [
+        appendix_data: dict[str, Any] = {"appendix": {"stuff": {}}}
+        intermediate_data: list[dict[str, Any]] = [
             {
                 "environments": [
                     {"dimensions": {"device_type": "unused"}, "is_emu": True}
@@ -84,7 +87,7 @@ class GenerateMetadataTests(unittest.TestCase):
         ret = convert_to_final_dict(appendix_data, intermediate_data)
         self.assertFalse(ret["tests"][0]["is_automated"])
 
-        invalid_data = {"test": {}}
+        invalid_data: dict[str, Any] = {"test": {}}
         intermediate_data.append(invalid_data)
         with self.assertRaises(ValueError) as ctx:
             convert_to_final_dict(appendix_data, intermediate_data)
@@ -93,10 +96,10 @@ class GenerateMetadataTests(unittest.TestCase):
             str(ctx.exception),
         )
 
-    def test_validate(self):
+    def test_validate(self) -> None:
         url = "foo"
         url2 = "bar"
-        data = {
+        data: dict[str, Any] = {
             "certification_type": {
                 "device_driver": {},
             },

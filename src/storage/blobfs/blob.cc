@@ -357,6 +357,11 @@ fuchsia_io::NodeProtocolKinds Blob::GetProtocols() const {
   return fuchsia_io::NodeProtocolKinds::kFile;
 }
 
+fuchsia_io::Abilities Blob::GetAbilities() const {
+  using fuchsia_io::Abilities;
+  return Abilities::kGetAttributes | Abilities::kReadBytes | Abilities::kExecute;
+}
+
 bool Blob::ValidateRights(fuchsia_io::Rights rights) const {
   // To acquire write access to a blob, it must be empty.
   //

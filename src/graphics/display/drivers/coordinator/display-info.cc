@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iterator>
+#include <limits>
 #include <utility>
 
 #include <audio-proto-utils/format-utils.h>
@@ -57,6 +58,42 @@ inline void audio_stream_format_fidl_from_banjo(
   destination->min_channels = source.min_channels;
   destination->max_channels = source.max_channels;
   destination->flags = source.flags;
+}
+
+const char* const kDefaultEdidError = "unknown error";
+
+fit::result<const char*, DisplayInfo::Edid> InitEdidFromI2c(ddk::I2cImplProtocolClient& i2c) {
+  bool success = false;
+  const char* error = kDefaultEdidError;
+
+  DisplayInfo::Edid edid;
+  int edid_attempt = 0;
+  static constexpr int kEdidRetries = 3;
+  do {
+    if (edid_attempt != 0) {
+      zxlogf(DEBUG, "Error %d/%d initializing edid: \"%s\"", edid_attempt, kEdidRetries, error);
+      zx_nanosleep(zx_deadline_after(ZX_MSEC(5)));
+    }
+    edid_attempt++;
+    success = edid.base.Init(&i2c, ddc_tx, &error);
+  } while (!success && edid_attempt < kEdidRetries);
+
+  if (success) {
+    return fit::ok(std::move(edid));
+  }
+  return fit::error(error);
+}
+
+fit::result<const char*, DisplayInfo::Edid> InitEdidFromBytes(cpp20::span<const uint8_t> bytes) {
+  ZX_DEBUG_ASSERT(bytes.size() <= std::numeric_limits<uint16_t>::max());
+
+  DisplayInfo::Edid edid;
+  const char* error = kDefaultEdidError;
+  bool success = edid.base.Init(bytes.data(), static_cast<uint16_t>(bytes.size()), &error);
+  if (success) {
+    return fit::ok(std::move(edid));
+  }
+  return fit::error(error);
 }
 
 }  // namespace
@@ -125,37 +162,27 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_arg
     return zx::ok(std::move(out));
   }
 
-  ZX_DEBUG_ASSERT(info.panel_capabilities_source == PANEL_CAPABILITIES_SOURCE_EDID_I2C);
-  out->edid = DisplayInfo::Edid{};
-  ddk::I2cImplProtocolClient i2c(&info.panel.i2c);
-  if (!i2c.is_valid()) {
-    zxlogf(ERROR, "Presented edid display with no i2c bus");
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
+  ZX_DEBUG_ASSERT(info.panel_capabilities_source == PANEL_CAPABILITIES_SOURCE_EDID_I2C ||
+                  info.panel_capabilities_source == PANEL_CAPABILITIES_SOURCE_EDID_BYTES);
 
-  bool success = false;
-  const char* edid_err = "unknown error";
-
-  uint32_t edid_attempt = 0;
-  static constexpr uint32_t kEdidRetries = 3;
-  do {
-    if (edid_attempt != 0) {
-      zxlogf(DEBUG, "Error %d/%d initializing edid: \"%s\"", edid_attempt, kEdidRetries, edid_err);
-      zx_nanosleep(zx_deadline_after(ZX_MSEC(5)));
+  fit::result edid_result = [&] {
+    if (info.panel_capabilities_source == PANEL_CAPABILITIES_SOURCE_EDID_I2C) {
+      ddk::I2cImplProtocolClient i2c(&info.panel.i2c);
+      ZX_ASSERT(i2c.is_valid());
+      return InitEdidFromI2c(i2c);
     }
-    edid_attempt++;
 
-    success = out->edid->base.Init(&i2c, ddc_tx, &edid_err);
-  } while (!success && edid_attempt < kEdidRetries);
+    ZX_DEBUG_ASSERT(info.panel_capabilities_source == PANEL_CAPABILITIES_SOURCE_EDID_BYTES);
+    cpp20::span<const uint8_t> edid_bytes(info.panel.edid_bytes.bytes_list,
+                                          info.panel.edid_bytes.bytes_count);
+    return InitEdidFromBytes(edid_bytes);
+  }();
 
-  if (!success) {
-    zxlogf(INFO, "Failed to parse edid (%d bytes) \"%s\"", out->edid->base.edid_length(), edid_err);
-    if (zxlog_level_enabled(INFO) && out->edid->base.edid_bytes()) {
-      hexdump(out->edid->base.edid_bytes(), out->edid->base.edid_length());
-    }
+  if (!edid_result.is_ok()) {
+    zxlogf(ERROR, "Failed to initialize EDID: %s", edid_result.error_value());
     return zx::error(ZX_ERR_INTERNAL);
   }
-
+  out->edid = std::move(edid_result).value();
   out->PopulateDisplayAudio();
 
   if (zxlog_level_enabled(DEBUG) && out->edid->audio.size()) {

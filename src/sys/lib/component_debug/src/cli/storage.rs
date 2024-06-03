@@ -6,7 +6,7 @@ use {
     crate::storage::{copy, delete, delete_all, list, make_directory},
     anyhow::{format_err, Result},
     fidl_fuchsia_sys2 as fsys,
-    moniker::{Moniker, MonikerBase},
+    moniker::Moniker,
 };
 
 async fn get_storage_admin(

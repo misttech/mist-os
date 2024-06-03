@@ -4,7 +4,7 @@
 
 use {
     crate::model::component::{ComponentInstance, WeakComponentInstance},
-    ::routing::capability_source::{ComponentCapability, InternalCapability},
+    ::routing::capability_source::InternalCapability,
     async_trait::async_trait,
     cm_util::TaskGroup,
     errors::CapabilityProviderError,
@@ -87,16 +87,4 @@ pub trait FrameworkCapability: Send + Sync {
         scope: WeakComponentInstance,
         target: WeakComponentInstance,
     ) -> Box<dyn CapabilityProvider>;
-}
-
-/// This trait is implemented by capabilities that are derived from other capabilities.
-#[async_trait]
-pub trait DerivedCapability: Send + Sync {
-    /// Returns a [CapabilityProvider] that serves this derived capability with `scope`
-    /// if `source_capability` matches, or `None` otherwise.
-    async fn maybe_new_provider(
-        &self,
-        source_capability: &ComponentCapability,
-        scope: WeakComponentInstance,
-    ) -> Option<Box<dyn CapabilityProvider>>;
 }

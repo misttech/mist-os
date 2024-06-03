@@ -773,8 +773,11 @@ impl Journal {
             // Reset the stream to indicate that we've remounted the journal.
             writer_checkpoint.checksum ^= RESET_XOR;
             writer_checkpoint.version = LATEST_VERSION;
-            inner.device_flushed_offset = device_flushed_offset;
             inner.flushed_offset = writer_checkpoint.file_offset;
+
+            // When we open the filesystem as writable, we flush the device.
+            inner.device_flushed_offset = inner.flushed_offset;
+
             inner.writer.seek(writer_checkpoint);
             inner.output_reset_version = true;
             inner.valid_to = last_checkpoint.file_offset;
@@ -787,9 +790,6 @@ impl Journal {
             .on_replay_complete()
             .await
             .context("Failed to complete replay for object manager")?;
-
-        // Tell the allocator where we know the device has been flushed to.
-        self.objects.allocator().did_flush_device(device_flushed_offset).await;
 
         info!(checkpoint = last_checkpoint.file_offset, discarded_to, "replay complete");
         Ok(())

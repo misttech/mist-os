@@ -4,13 +4,15 @@
 
 use crate::base::SettingType;
 use crate::config::base::{AgentType, ControllerFlag};
+use crate::config::default_settings::DefaultSetting;
+use crate::display::build_display_default_settings;
 use crate::display::types::{DisplayInfo, LowLightMode, Theme};
 use crate::ingress::fidl::{display, Interface};
 use crate::storage::testing::InMemoryStorageFactory;
 use crate::tests::fakes::brightness_service::BrightnessService;
 use crate::tests::fakes::service_registry::ServiceRegistry;
-use crate::tests::test_failure_utils::create_test_env_with_failures;
-use crate::EnvironmentBuilder;
+use crate::tests::test_failure_utils::create_test_env_with_failures_and_config;
+use crate::{DisplayConfiguration, EnvironmentBuilder};
 use anyhow::{anyhow, Result};
 use assert_matches::assert_matches;
 use fidl::Error::ClientChannelClosed;
@@ -25,15 +27,20 @@ use std::sync::Arc;
 const ENV_NAME: &str = "settings_service_display_test_environment";
 const AUTO_BRIGHTNESS_LEVEL: f32 = 0.9;
 
+fn default_settings() -> DefaultSetting<DisplayConfiguration, &'static str> {
+    build_display_default_settings()
+}
+
 // Creates an environment that will fail on a get request.
 async fn create_display_test_env_with_failures(
     storage_factory: Arc<InMemoryStorageFactory>,
 ) -> DisplayProxy {
-    create_test_env_with_failures(
+    create_test_env_with_failures_and_config(
         storage_factory,
         ENV_NAME,
         Interface::Display(display::InterfaceFlags::BASE),
         SettingType::Display,
+        |builder| builder.display_configuration(default_settings()),
     )
     .await
     .connect_to_protocol::<DisplayMarker>()
@@ -89,6 +96,7 @@ async fn validate_restore_with_storage_controller(
         .service(Box::new(ServiceRegistry::serve(service_registry)))
         .agents(vec![AgentType::Restore.into()])
         .fidl_interfaces(&[Interface::Display(display::InterfaceFlags::BASE)])
+        .display_configuration(default_settings())
         .spawn_and_get_protocol_connector(ENV_NAME)
         .await
         .ok();
@@ -169,6 +177,7 @@ fn validate_restore_with_brightness_controller(
             .agents(vec![AgentType::Restore.into()])
             .fidl_interfaces(&[Interface::Display(display::InterfaceFlags::BASE)])
             .flags(&[ControllerFlag::ExternalBrightnessControl])
+            .display_configuration(default_settings())
             .spawn_and_get_protocol_connector(ENV_NAME)
             .await
             .is_ok());
@@ -215,6 +224,7 @@ async fn test_display_failure() {
     let env = EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
         .service(Box::new(service_gen))
         .fidl_interfaces(&[Interface::Display(display::InterfaceFlags::BASE), Interface::Intl])
+        .display_configuration(default_settings())
         .spawn_and_get_protocol_connector(ENV_NAME)
         .await
         .unwrap();

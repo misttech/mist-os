@@ -196,7 +196,7 @@ func GetBuildIDs(filename string, file io.ReaderAt) ([][]byte, error) {
 		return nil, fmt.Errorf("could not parse %q as ELF: %w", filename, err)
 	}
 	if len(elfFile.Progs) == 0 && len(elfFile.Sections) == 0 {
-		return nil, fmt.Errorf("no program headers or sections in %s", filename)
+		return [][]byte{}, nil
 	}
 	var endian binary.ByteOrder
 	if elfFile.Data == elf.ELFDATA2LSB {

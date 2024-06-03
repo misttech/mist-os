@@ -48,6 +48,7 @@ enum class InodeInfoFlag {
   kDataExist,     // indicate data exists
   kBad,           // should drop this inode without purging
   kNoExtent,      // not to use the extent cache
+  kSyncInode,     // need to write its inode block during fdatasync
   kFlagSize,
 };
 
@@ -84,13 +85,12 @@ class VnodeF2fs : public fs::PagedVnode,
 
   void Init(LockedPage &node_page) __TA_EXCLUDES(mutex_);
   void InitTime() __TA_EXCLUDES(mutex_);
-  void InitFileCache(uint64_t nbytes = 0) __TA_EXCLUDES(mutex_);
+  zx_status_t InitFileCache(uint64_t nbytes = 0) __TA_EXCLUDES(mutex_);
 
   ino_t GetKey() const { return ino_; }
 
   void Sync(SyncCallback closure) override;
-  zx_status_t SyncFile(loff_t start, loff_t end, int datasync)
-      __TA_EXCLUDES(f2fs::GetGlobalLock(), mutex_);
+  zx_status_t SyncFile(bool datasync = true) __TA_EXCLUDES(f2fs::GetGlobalLock(), mutex_);
 
   void fbl_recycle() { RecycleNode(); }
 
@@ -120,7 +120,7 @@ class VnodeF2fs : public fs::PagedVnode,
 
   zx::result<LockedPage> NewInodePage() __TA_EXCLUDES(mutex_);
   zx_status_t RemoveInodePage();
-  void UpdateInodePage(LockedPage &inode_page) __TA_EXCLUDES(mutex_);
+  void UpdateInodePage(LockedPage &inode_page, bool checkpoint = false) __TA_EXCLUDES(mutex_);
 
   void TruncateNode(LockedPage &page);
 
@@ -209,17 +209,19 @@ class VnodeF2fs : public fs::PagedVnode,
     return std::string_view(name_);
   }
 
-  // stat_lock
-  uint64_t GetBlockCount() const {
-    return safemath::CheckDiv<uint64_t>(fbl::round_up(GetSize(), kBlockSize), kBlockSize)
-        .ValueOrDie();
+  void IncBlocks(const block_t &nblocks) {
+    if (!nblocks) {
+      return;
+    }
+    SetFlag(InodeInfoFlag::kSyncInode);
+    num_blocks_.fetch_add(nblocks);
   }
-  void IncBlocks(const block_t &nblocks) { num_blocks_.fetch_add(nblocks); }
   void DecBlocks(const block_t &nblocks) {
-    ZX_ASSERT(num_blocks_ >= nblocks);
+    ZX_DEBUG_ASSERT(nblocks > 0);
+    ZX_DEBUG_ASSERT(num_blocks_ >= nblocks);
+    SetFlag(InodeInfoFlag::kSyncInode);
     num_blocks_.fetch_sub(nblocks, std::memory_order_release);
   }
-  void InitBlocks() { SetBlocks(0); }
   block_t GetBlocks() const { return num_blocks_.load(std::memory_order_acquire); }
   void SetBlocks(const uint64_t &blocks) {
     num_blocks_.store(safemath::checked_cast<block_t>(blocks), std::memory_order_release);
@@ -342,7 +344,7 @@ class VnodeF2fs : public fs::PagedVnode,
   VmoManager &GetVmoManager() { return vmo_manager(); }
   const VmoManager &GetVmoManager() const { return vmo_manager(); }
   block_t GetReadBlockSize(block_t start_block, block_t req_size, block_t end_block);
-  void InitFileCacheUnsafe(uint64_t nbytes = 0) __TA_REQUIRES(mutex_);
+  zx_status_t InitFileCacheUnsafe(uint64_t nbytes = 0) __TA_REQUIRES(mutex_);
 
   // for testing
   void ResetFileCache() { file_cache_->Reset(); }
@@ -392,14 +394,15 @@ class VnodeF2fs : public fs::PagedVnode,
       ATOMIC_FLAG_INIT};
   std::condition_variable_any flag_cvar_;
 
-  uint64_t current_depth_ __TA_GUARDED(mutex_) = 1;  // use only in directory structure
-  uint64_t data_version_ __TA_GUARDED(mutex_) = 0;   // lastest version of data for fsync
-  uint32_t inode_flags_ __TA_GUARDED(mutex_) = 0;    // keep an inode flags for ioctl
-  uint16_t extra_isize_ = 0;                         // extra inode attribute size in bytes
-  uint16_t inline_xattr_size_ = 0;                   // inline xattr size
-  [[maybe_unused]] umode_t acl_mode_ = 0;            // keep file acl mode temporarily
-  uint8_t advise_ __TA_GUARDED(mutex_) = 0;          // use to give file attribute hints
-  uint8_t dir_level_ __TA_GUARDED(mutex_) = 0;       // use for dentry level for large dir
+  uint64_t checkpointed_size_ __TA_GUARDED(mutex_) = 0;  // use only in directory structure
+  uint64_t current_depth_ __TA_GUARDED(mutex_) = 1;      // use only in directory structure
+  uint64_t data_version_ __TA_GUARDED(mutex_) = 0;       // lastest version of data for fsync
+  uint32_t inode_flags_ __TA_GUARDED(mutex_) = 0;        // keep an inode flags for ioctl
+  uint16_t extra_isize_ = 0;                             // extra inode attribute size in bytes
+  uint16_t inline_xattr_size_ = 0;                       // inline xattr size
+  [[maybe_unused]] umode_t acl_mode_ = 0;                // keep file acl mode temporarily
+  uint8_t advise_ __TA_GUARDED(mutex_) = 0;              // use to give file attribute hints
+  uint8_t dir_level_ __TA_GUARDED(mutex_) = 0;           // use for dentry level for large dir
   // TODO: revisit thread annotation when xattr is available.
   nid_t xattr_nid_ = 0;  // node id that contains xattrs
   std::optional<Timestamps> time_ __TA_GUARDED(mutex_) = std::nullopt;

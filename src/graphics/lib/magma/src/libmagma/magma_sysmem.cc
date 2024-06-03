@@ -7,11 +7,23 @@
 #include <lib/magma/util/macros.h>
 #include <lib/magma/util/short_macros.h>
 
+#if __Fuchsia_API_level__ >= 19
+magma_status_t magma_sysmem2_connection_import(magma_handle_t channel,
+                                               magma_sysmem_connection_t* connection_out) {
+  auto platform_connection = magma_sysmem::PlatformSysmemConnection::Import2(channel);
+  if (!platform_connection) {
+    return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Failed to create sysmem connection (sysmem2)");
+  }
+  *connection_out = reinterpret_cast<magma_sysmem_connection_t>(platform_connection.release());
+  return MAGMA_STATUS_OK;
+}
+#endif
+
 magma_status_t magma_sysmem_connection_import(magma_handle_t channel,
                                               magma_sysmem_connection_t* connection_out) {
   auto platform_connection = magma_sysmem::PlatformSysmemConnection::Import(channel);
   if (!platform_connection) {
-    return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Failed to create sysmem connection");
+    return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Failed to create sysmem connection (sysmem(1))");
   }
   *connection_out = reinterpret_cast<magma_sysmem_connection_t>(platform_connection.release());
   return MAGMA_STATUS_OK;

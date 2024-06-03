@@ -49,7 +49,7 @@ pub mod tests {
         futures::channel::oneshot,
         futures::lock::Mutex,
         hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
-        moniker::{Moniker, MonikerBase},
+        moniker::Moniker,
         std::sync::Weak,
     };
 

@@ -149,13 +149,13 @@ Accordingly, we have created the following:
 * Package groups:
   * Package group naming scheme: `<PRODUCT>_<BOARD>_<STABILITY>[ |_sl4f]_packages`
 * Builders:
-  * Package group naming scheme: `<PRODUCT>.<BOARD>-debug-pye2e-[ |staging|ci]`
+  * Package group naming scheme: `<PRODUCT>.<BOARD>-[debug|release]-lacewing-[ |staging|ci]`
     * If builder is for "CQ" then no postfix is needed but for other stages,
       postfix is necessary (`-staging` or `-ci`)
   * Examples
-    * `core.x64-debug-pye2e` - CQ builder to run stable emulator and NUC tests
-    * `core.x64-debug-pye2e-staging` - FYI builder to run unstable emulator and NUC tests
-    * `core.vim3-debug-pye2e-staging` - FYI builder to run unstable VIM3 tests
+    * `core.x64-debug-lacewing` - CQ builder to run stable emulator and NUC tests
+    * `core.x64-debug-lacewing-staging` - FYI builder to run unstable emulator and NUC tests
+    * `core.vim3-debug-lacewing-staging` - FYI builder to run unstable VIM3 tests
 
 
 [Honeydew Infra Test Groups]: BUILD.gn

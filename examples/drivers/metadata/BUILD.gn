@@ -1,0 +1,93 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bind/bind.gni")
+import("//build/drivers.gni")
+import("//build/fidl/fidl.gni")
+
+fidl("fuchsia.examples.metadata") {
+  sources = [ "fuchsia.examples.metadata.fidl" ]
+  public_deps = [ "//zircon/vdso/zx" ]
+}
+
+source_set("metadata") {
+  sources = [ "metadata.h" ]
+
+  public_deps = [
+    ":fuchsia.examples.metadata_cpp",
+    "//sdk/lib/driver/metadata/cpp",
+  ]
+}
+
+driver_bind_rules("bind") {
+  disable_autobind = true
+}
+
+# Sender
+fuchsia_driver("sender_driver") {
+  output_name = "sender"
+  sources = [ "sender.cc" ]
+  deps = [
+    ":metadata",
+    "//src/devices/lib/driver:driver_runtime",
+  ]
+}
+
+fuchsia_driver_component("sender_component") {
+  component_name = "sender"
+  manifest = "meta/sender.cml"
+  deps = [
+    ":bind",
+    ":sender_driver",
+  ]
+  info = "sender-info.json"
+}
+
+# Retriever
+fuchsia_driver("retriever_driver") {
+  output_name = "retriever"
+  sources = [ "retriever.cc" ]
+  deps = [
+    ":metadata",
+    "//src/devices/lib/driver:driver_runtime",
+  ]
+}
+
+fuchsia_driver_component("retriever_component") {
+  component_name = "retriever"
+  manifest = "meta/retriever.cml"
+  deps = [
+    ":bind",
+    ":retriever_driver",
+  ]
+  info = "retriever-info.json"
+}
+
+# Forwarder
+fuchsia_driver("forwarder_driver") {
+  output_name = "forwarder"
+  sources = [ "forwarder.cc" ]
+  deps = [
+    ":metadata",
+    "//src/devices/lib/driver:driver_runtime",
+  ]
+}
+
+fuchsia_driver_component("forwarder_component") {
+  component_name = "forwarder"
+  manifest = "meta/forwarder.cml"
+  deps = [
+    ":bind",
+    ":forwarder_driver",
+  ]
+  info = "forwarder-info.json"
+}
+
+group("drivers") {
+  deps = [
+    ":forwarder_component",
+    ":retriever_component",
+    ":sender_component",
+  ]
+}

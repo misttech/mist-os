@@ -164,8 +164,6 @@
             protocol: [
                 "fuchsia.device.NameProvider",
                 "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.diagnostics.FeedbackArchiveAccessor",
-                "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.logger.LogSink",
                 "fuchsia.paver.Paver",

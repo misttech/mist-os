@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
-use async_lock::{RwLock, RwLockUpgradableReadGuard};
+use anyhow::{anyhow, Result};
+use std::sync::RwLock;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -38,10 +38,10 @@ impl<T> Default for Cache<T> {
 /// Invalidate the cache. Call this if you do anything that might make a cached config go stale
 /// in a critical way, like changing the environment.
 pub(crate) async fn invalidate<T>(cache: &Cache<T>) {
-    cache.0.write().await.clear();
+    cache.0.write().expect("config write guard").clear();
 }
 
-async fn read_cache<T>(
+fn read_cache<T>(
     guard: &impl std::ops::Deref<Target = HashMap<Option<PathBuf>, CacheItem<T>>>,
     build_dir: Option<&Path>,
     now: Instant,
@@ -52,27 +52,29 @@ async fn read_cache<T>(
         .map(|item| item.config.clone())
 }
 
-pub(crate) async fn load_config<T>(
+pub(crate) fn load_config<T>(
     cache: &Cache<T>,
     build_dir: Option<&Path>,
     new_config: impl FnOnce() -> Result<T>,
 ) -> Result<Arc<RwLock<T>>> {
-    load_config_with_instant(build_dir, Instant::now(), cache, new_config).await
+    load_config_with_instant(build_dir, Instant::now(), cache, new_config)
 }
 
-async fn load_config_with_instant<T>(
+fn load_config_with_instant<T>(
     build_dir: Option<&Path>,
     now: Instant,
     cache: &Cache<T>,
     new_config: impl FnOnce() -> Result<T>,
 ) -> Result<Arc<RwLock<T>>> {
-    let guard = cache.0.upgradable_read().await;
-    //let build_dir = env.override_build_dir(build_dir);
-    let cache_hit = read_cache(&guard, build_dir, now).await;
+    let cache_hit = {
+        let guard = cache.0.read().map_err(|_| anyhow!("config read guard"))?;
+        //let build_dir = env.override_build_dir(build_dir);
+        read_cache(&guard, build_dir, now)
+    };
     match cache_hit {
         Some(h) => Ok(h),
         None => {
-            let mut guard = RwLockUpgradableReadGuard::upgrade(guard).await;
+            let mut guard = cache.0.write().map_err(|_| anyhow!("config write guard"))?;
             let config = Arc::new(RwLock::new(new_config()?));
 
             guard.insert(
@@ -93,11 +95,10 @@ mod test {
 
     async fn load(now: Instant, key: Option<&Path>, cache: &Cache<usize>) {
         let tests = 25;
-        let mut futures = Vec::new();
+        let mut result = Vec::new();
         for x in 0..tests {
-            futures.push(load_config_with_instant(key, now, cache, move || Ok(x)));
+            result.push(load_config_with_instant(key, now, cache, move || Ok(x)));
         }
-        let result = join_all(futures).await;
         assert_eq!(tests, result.len());
         result.iter().for_each(|x| {
             assert!(x.is_ok());
@@ -112,12 +113,12 @@ mod test {
         cache: &Cache<usize>,
     ) {
         {
-            let read_guard = cache.0.read().await;
+            let read_guard = cache.0.read().expect("config read guard");
             assert_eq!(expected_len_before, (*read_guard).len());
         }
         load(now, key, cache).await;
         {
-            let read_guard = cache.0.read().await;
+            let read_guard = cache.0.read().expect("config read guard");
             assert_eq!(expected_len_after, (*read_guard).len());
         }
     }
@@ -151,7 +152,7 @@ mod test {
         let futures = build_dirs.iter().map(|x| load(now, x.as_deref(), &cache));
         let result = join_all(futures).await;
         assert_eq!(tests, result.len());
-        let read_guard = cache.0.read().await;
+        let read_guard = cache.0.read().expect("config read guard");
         assert_eq!(tests, (*read_guard).len());
     }
 

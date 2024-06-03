@@ -3,14 +3,15 @@
 // found in the LICENSE file.
 
 use crate::audio::types::{AudioInfo, AudioSettingSource, AudioStream, AudioStreamType};
-use crate::audio::{create_default_modified_counters, default_audio_info};
+use crate::audio::{build_audio_default_settings, create_default_modified_counters};
 use crate::base::SettingType;
 use crate::config::base::AgentType;
+use crate::config::default_settings::DefaultSetting;
 use crate::ingress::fidl::Interface;
 use crate::storage::testing::InMemoryStorageFactory;
 use crate::tests::fakes::audio_core_service::{self, AudioCoreService};
 use crate::tests::fakes::service_registry::ServiceRegistry;
-use crate::tests::test_failure_utils::create_test_env_with_failures;
+use crate::tests::test_failure_utils::create_test_env_with_failures_and_config;
 use crate::EnvironmentBuilder;
 use assert_matches::assert_matches;
 use fidl::Error::ClientChannelClosed;
@@ -41,14 +42,30 @@ fn changed_media_stream_settings() -> AudioStreamSettings {
     }
 }
 
+fn default_audio_info() -> DefaultSetting<AudioInfo, &'static str> {
+    build_audio_default_settings()
+}
+
+fn load_default_audio_info(
+    default_settings: &mut DefaultSetting<AudioInfo, &'static str>,
+) -> AudioInfo {
+    default_settings.load_default_value().expect("config should exist and parse for test").unwrap()
+}
+
 /// Creates an environment that will fail on a get request.
 async fn create_audio_test_env_with_failures(
     storage_factory: Arc<InMemoryStorageFactory>,
 ) -> AudioProxy {
-    create_test_env_with_failures(storage_factory, ENV_NAME, Interface::Audio, SettingType::Audio)
-        .await
-        .connect_to_protocol::<AudioMarker>()
-        .unwrap()
+    create_test_env_with_failures_and_config(
+        storage_factory,
+        ENV_NAME,
+        Interface::Audio,
+        SettingType::Audio,
+        |builder| builder.audio_configuration(default_audio_info()),
+    )
+    .await
+    .connect_to_protocol::<AudioMarker>()
+    .unwrap()
 }
 
 // Used to store fake services for mocking dependencies and checking input/outputs.
@@ -58,12 +75,8 @@ struct FakeServices {
     audio_core: Arc<Mutex<AudioCoreService>>,
 }
 
-fn get_default_stream(stream_type: AudioStreamType) -> AudioStream {
-    *default_audio_info()
-        .streams
-        .iter()
-        .find(|x| x.stream_type == stream_type)
-        .expect("contains stream")
+fn get_default_stream(stream_type: AudioStreamType, info: AudioInfo) -> AudioStream {
+    info.streams.into_iter().find(|x| x.stream_type == stream_type).expect("contains stream")
 }
 
 // Verifies that a stream equal to |stream| is inside of |settings|.
@@ -78,9 +91,11 @@ fn verify_audio_stream(settings: &AudioSettings, stream: AudioStreamSettings) {
 }
 
 // Returns a registry and audio related services it is populated with
-async fn create_services() -> (Arc<Mutex<ServiceRegistry>>, FakeServices) {
+async fn create_services(
+    default_settings: AudioInfo,
+) -> (Arc<Mutex<ServiceRegistry>>, FakeServices) {
     let service_registry = ServiceRegistry::create();
-    let audio_core_service_handle = audio_core_service::Builder::new().build();
+    let audio_core_service_handle = audio_core_service::Builder::new(default_settings).build();
     service_registry.lock().await.register_service(audio_core_service_handle.clone());
 
     (service_registry, FakeServices { audio_core: audio_core_service_handle })
@@ -88,13 +103,16 @@ async fn create_services() -> (Arc<Mutex<ServiceRegistry>>, FakeServices) {
 
 async fn create_environment(
     service_registry: Arc<Mutex<ServiceRegistry>>,
+    mut default_settings: DefaultSetting<AudioInfo, &'static str>,
 ) -> (ProtocolConnector, Arc<DeviceStorage>) {
-    let storage_factory =
-        Arc::new(InMemoryStorageFactory::with_initial_data(&default_audio_info()));
+    let storage_factory = Arc::new(InMemoryStorageFactory::with_initial_data(
+        &load_default_audio_info(&mut default_settings),
+    ));
 
     let connector = EnvironmentBuilder::new(Arc::clone(&storage_factory))
         .service(ServiceRegistry::serve(service_registry))
         .fidl_interfaces(&[Interface::Audio])
+        .audio_configuration(default_settings)
         .spawn_and_get_protocol_connector(ENV_NAME)
         .await
         .unwrap();
@@ -105,9 +123,10 @@ async fn create_environment(
 // Test that the audio settings are restored correctly.
 #[fuchsia::test(allow_stalls = false)]
 async fn test_volume_restore() {
-    let (service_registry, fake_services) = create_services().await;
+    let mut default_settings = default_audio_info();
+    let mut stored_info = load_default_audio_info(&mut default_settings);
+    let (service_registry, fake_services) = create_services(stored_info.clone()).await;
     let expected_info = (0.9, false);
-    let mut stored_info = default_audio_info();
     for stream in stored_info.streams.iter_mut() {
         if stream.stream_type == AudioStreamType::Media {
             stream.user_volume_level = expected_info.0;
@@ -120,6 +139,7 @@ async fn test_volume_restore() {
         .service(Box::new(ServiceRegistry::serve(service_registry)))
         .agents(vec![AgentType::Restore.into()])
         .fidl_interfaces(&[Interface::Audio])
+        .audio_configuration(default_settings)
         .spawn_nested(ENV_NAME)
         .await
         .is_ok());
@@ -132,9 +152,11 @@ async fn test_volume_restore() {
 // Ensure that we won't crash if audio core fails.
 #[fuchsia::test(allow_stalls = false)]
 async fn test_bringup_without_audio_core() {
+    let mut default_settings = default_audio_info();
+    let default_info = load_default_audio_info(&mut default_settings);
     let service_registry = ServiceRegistry::create();
 
-    let (connector, _) = create_environment(service_registry).await;
+    let (connector, _) = create_environment(service_registry, default_settings).await;
 
     // At this point we should not crash.
     let audio_proxy = connector.connect_to_protocol::<AudioMarker>().unwrap();
@@ -142,13 +164,15 @@ async fn test_bringup_without_audio_core() {
     let settings = audio_proxy.watch().await.expect("watch completed");
     verify_audio_stream(
         &settings,
-        AudioStreamSettings::from(get_default_stream(AudioStreamType::Media)),
+        AudioStreamSettings::from(get_default_stream(AudioStreamType::Media, default_info)),
     );
 }
 
 #[fuchsia::test(allow_stalls = false)]
 async fn test_persisted_values_applied_at_start() {
-    let (service_registry, fake_services) = create_services().await;
+    let mut default_settings = default_audio_info();
+    let (service_registry, fake_services) =
+        create_services(load_default_audio_info(&mut default_settings)).await;
 
     let test_audio_info = AudioInfo {
         streams: [
@@ -192,6 +216,7 @@ async fn test_persisted_values_applied_at_start() {
         .service(ServiceRegistry::serve(service_registry))
         .agents(vec![AgentType::Restore.into()])
         .fidl_interfaces(&[Interface::Audio])
+        .audio_configuration(default_settings)
         .spawn_and_get_protocol_connector(ENV_NAME)
         .await
         .unwrap();
@@ -227,11 +252,14 @@ async fn test_channel_failure_watch() {
 // Tests that a set call for a stream that isn't in the audio settings fails.
 #[fuchsia::test(allow_stalls = false)]
 async fn test_invalid_stream_fails() {
+    let mut default_settings = default_audio_info();
     // Create a service registry with a fake audio core service that suppresses client errors, since
     // the invalid set call will cause the connection to close.
     let service_registry = ServiceRegistry::create();
     let audio_core_service_handle =
-        audio_core_service::Builder::new().set_suppress_client_errors(true).build();
+        audio_core_service::Builder::new(load_default_audio_info(&mut default_settings))
+            .set_suppress_client_errors(true)
+            .build();
     service_registry.lock().await.register_service(audio_core_service_handle.clone());
 
     // AudioInfo has to have 5 streams, but make them all the same stream type so that we can
@@ -280,6 +308,7 @@ async fn test_invalid_stream_fails() {
         .service(ServiceRegistry::serve(service_registry))
         .agents(vec![AgentType::Restore.into()])
         .fidl_interfaces(&[Interface::Audio])
+        .audio_configuration(default_settings)
         .spawn_and_get_protocol_connector(ENV_NAME)
         .await
         .unwrap();

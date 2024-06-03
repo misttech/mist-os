@@ -212,31 +212,44 @@ vk::ImageUsageFlags GetImageUsageFlags(const BufferCollectionUsage usage) {
 }
 
 // Creates a duplicate of |token|. Returns a std::nullopt if it fails.
-std::optional<fuchsia::sysmem::BufferCollectionTokenSyncPtr> Duplicate(
-    fuchsia::sysmem::BufferCollectionTokenSyncPtr& token) {
-  std::vector<fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>> dup_tokens;
-  if (const auto status = token->DuplicateSync({ZX_RIGHT_SAME_RIGHTS}, &dup_tokens);
-      status != ZX_OK) {
+std::optional<fuchsia::sysmem2::BufferCollectionTokenSyncPtr> Duplicate(
+    fuchsia::sysmem2::BufferCollectionTokenSyncPtr& token) {
+  fuchsia::sysmem2::BufferCollectionTokenDuplicateSyncRequest dup_sync_request;
+  dup_sync_request.set_rights_attenuation_masks({ZX_RIGHT_SAME_RIGHTS});
+  fuchsia::sysmem2::BufferCollectionToken_DuplicateSync_Result dup_sync_result;
+  const auto status = token->DuplicateSync(std::move(dup_sync_request), &dup_sync_result);
+  if (status != ZX_OK) {
     FX_LOGS(ERROR) << "Could not duplicate token: " << zx_status_get_string(status);
     return std::nullopt;
   }
-  FX_DCHECK(dup_tokens.size() == 1);
-  return dup_tokens.front().BindSync();
+  if (dup_sync_result.is_framework_err()) {
+    FX_LOGS(ERROR) << "Could not duplicate token (framework): "
+                   << fidl::ToUnderlying(dup_sync_result.framework_err());
+    return std::nullopt;
+  }
+  FX_DCHECK(dup_sync_result.response().tokens().size() == 1);
+  return dup_sync_result.response().mutable_tokens()->front().BindSync();
 }
 
-std::optional<fuchsia::sysmem::BufferCollectionSyncPtr>
-CreateBufferCollectionPtrWithEmptyConstraints(fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
-                                              fuchsia::sysmem::BufferCollectionTokenSyncPtr token) {
-  fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
+std::optional<fuchsia::sysmem2::BufferCollectionSyncPtr>
+CreateBufferCollectionPtrWithEmptyConstraints(
+    fuchsia::sysmem2::Allocator_Sync* sysmem_allocator,
+    fuchsia::sysmem2::BufferCollectionTokenSyncPtr token) {
+  fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
+  fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.set_token(std::move(token));
+  bind_shared_request.set_buffer_collection_request(buffer_collection.NewRequest());
   if (const zx_status_t status =
-          sysmem_allocator->BindSharedCollection(std::move(token), buffer_collection.NewRequest());
+          sysmem_allocator->BindSharedCollection(std::move(bind_shared_request));
       status != ZX_OK) {
     FX_LOGS(ERROR) << "Could not bind buffer collection: " << zx_status_get_string(status);
     return std::nullopt;
   }
 
-  if (const zx_status_t status = buffer_collection->SetConstraints(
-          /*has_constraints=*/false, fuchsia::sysmem::BufferCollectionConstraints{});
+  fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  // intentionally don't set the constraints field of the request
+  if (const zx_status_t status =
+          buffer_collection->SetConstraints(std::move(set_constraints_request));
       status != ZX_OK) {
     FX_LOGS(ERROR) << "Cannot set constraints: " << zx_status_get_string(status);
     return std::nullopt;
@@ -276,8 +289,8 @@ bool IsValidImage(const allocation::ImageMetadata& metadata) {
 
   // Check we have valid dimensions.
   if (metadata.width == 0 || metadata.height == 0) {
-    FX_LOGS(WARNING) << "Image has invalid dimensions: " << "(" << metadata.width << ", "
-                     << metadata.height << ").";
+    FX_LOGS(WARNING) << "Image has invalid dimensions: "
+                     << "(" << metadata.width << ", " << metadata.height << ").";
     return false;
   }
 
@@ -324,7 +337,7 @@ VkRenderer::~VkRenderer() {
 
 std::optional<vk::BufferCollectionFUCHSIA>
 VkRenderer::SetConstraintsAndCreateVulkanBufferCollection(
-    fuchsia::sysmem::BufferCollectionTokenSyncPtr token, const BufferCollectionUsage usage,
+    fuchsia::sysmem2::BufferCollectionTokenSyncPtr token, const BufferCollectionUsage usage,
     const std::optional<fuchsia::math::SizeU> size) {
   auto vk_device = escher_->vk_device();
   auto vk_loader = escher_->device()->dispatch_loader();
@@ -375,16 +388,21 @@ std::optional<vk::BufferCollectionFUCHSIA> VkRenderer::GetAllocatedVulkanBufferC
   }
 
   // Check to see if the buffers are allocated and return std::nullptr if not.
-  zx_status_t allocation_status = ZX_OK;
-  if (const zx_status_t status = collection->CheckBuffersAllocated(&allocation_status);
+  fuchsia::sysmem2::BufferCollection_CheckAllBuffersAllocated_Result check_result;
+  if (const zx_status_t status = collection->CheckAllBuffersAllocated(&check_result);
       status != ZX_OK) {
     FX_LOGS(WARNING) << "Collection was not allocated (FIDL status: "
                      << zx_status_get_string(status) << ").";
     return std::nullopt;
   }
-  if (allocation_status != ZX_OK) {
-    FX_LOGS(WARNING) << "Collection was not allocated (allocation status: "
-                     << zx_status_get_string(allocation_status) << ").";
+  if (!check_result.is_response()) {
+    if (check_result.is_framework_err()) {
+      FX_LOGS(WARNING) << "Collection was not allocated (framework err): "
+                       << fidl::ToUnderlying(check_result.framework_err());
+    } else {
+      FX_LOGS(WARNING) << "Collection was not allocated (allocation Error: "
+                       << static_cast<uint32_t>(check_result.err()) << ").";
+    }
     return std::nullopt;
   }
 
@@ -393,8 +411,8 @@ std::optional<vk::BufferCollectionFUCHSIA> VkRenderer::GetAllocatedVulkanBufferC
 }
 
 bool VkRenderer::ImportBufferCollection(
-    GlobalBufferCollectionId collection_id, fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
-    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
+    GlobalBufferCollectionId collection_id, fuchsia::sysmem2::Allocator_Sync* sysmem_allocator,
+    fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token,
     BufferCollectionUsage usage, std::optional<fuchsia::math::SizeU> size) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   TRACE_DURATION("gfx", "flatland::VkRenderer::ImportBufferCollection");
@@ -402,22 +420,24 @@ bool VkRenderer::ImportBufferCollection(
   FX_DCHECK(token.is_valid());
 
   // TODO(https://fxbug.dev/42128380): See if this can become asynchronous.
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr local_token = token.BindSync();
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr vulkan_token;
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr local_token = token.BindSync();
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr vulkan_token;
   if (auto dup_token = Duplicate(local_token)) {
     vulkan_token = std::move(*dup_token);
   } else {
     return false;
   }
 
-  fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
+  fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
   if (auto collection =
           CreateBufferCollectionPtrWithEmptyConstraints(sysmem_allocator, std::move(local_token))) {
     buffer_collection = std::move(*collection);
     // Use a name with a priority that's greater than the vulkan implementation, but less than
     // what any client would use.
-    buffer_collection->SetName(/*priority=*/10u,
-                               GetNextBufferCollectionIdString(GetImageName(usage).c_str()));
+    fuchsia::sysmem2::NodeSetNameRequest set_name_request;
+    set_name_request.set_priority(10u);
+    set_name_request.set_name(GetNextBufferCollectionIdString(GetImageName(usage).c_str()));
+    buffer_collection->SetName(std::move(set_name_request));
   } else {
     return false;
   }
@@ -470,7 +490,7 @@ void VkRenderer::ReleaseBufferCollection(GlobalBufferCollectionId collection_id,
   vk_device.destroyBufferCollectionFUCHSIA(collection_itr->second.vk_collection, nullptr,
                                            vk_loader);
 
-  const zx_status_t status = collection_itr->second.collection->Close();
+  const zx_status_t status = collection_itr->second.collection->Release();
   // AttachToken failure causes ZX_ERR_PEER_CLOSED.
   if (status != ZX_OK && status != ZX_ERR_PEER_CLOSED) {
     FX_LOGS(ERROR) << "Error when closing buffer collection: " << zx_status_get_string(status);

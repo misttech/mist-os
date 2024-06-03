@@ -85,7 +85,7 @@
             rights: [ "r*" ],
         },
         {
-            // ... including the `virtual_audio` driver, at /dev/sys/platform/00:00:2f.
+            // ... including the `virtual_audio` driver, at /dev/sys/platform/virtual-audio.
             directory: "sys",
             from: "parent",
             to: [ "#devices-tests" ],

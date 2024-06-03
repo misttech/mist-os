@@ -47,7 +47,7 @@ class FvmTest : public zxtest::Test {
 
     ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr_));
 
-    ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/00:00:2d/ramctl")
+    ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/ram-disk/ramctl")
                   .status_value());
   }
 
@@ -145,13 +145,13 @@ TEST_F(FvmTest, TryBindAlreadyFormattedWithBiggerSize) {
 }
 
 constexpr char kRamdisk0BlobPath[] =
-    "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/blobfs-p-1/block";
+    "sys/platform/ram-disk/ramctl/ramdisk-0/block/fvm/blobfs-p-1/block";
 constexpr char kRamdisk0DataPath[] =
-    "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/data-p-2/block";
+    "sys/platform/ram-disk/ramctl/ramdisk-0/block/fvm/data-p-2/block";
 constexpr char kRamdisk1BlobPath[] =
-    "sys/platform/00:00:2d/ramctl/ramdisk-1/block/fvm/blobfs-p-1/block";
+    "sys/platform/ram-disk/ramctl/ramdisk-1/block/fvm/blobfs-p-1/block";
 constexpr char kRamdisk1DataPath[] =
-    "sys/platform/00:00:2d/ramctl/ramdisk-1/block/fvm/data-p-2/block";
+    "sys/platform/ram-disk/ramctl/ramdisk-1/block/fvm/data-p-2/block";
 
 TEST_F(FvmTest, AllocateEmptyPartitions) {
   ASSERT_NO_FAILURES(CreateRamdisk());
@@ -298,7 +298,7 @@ TEST_F(FvmTest, Unbind) {
                                     data_server.TakeChannel().release()));
   ASSERT_OK(fidl::WireCall(data)->GetInfo().status());
 
-  ASSERT_OK(paver::FvmUnbind(devfs_root(), "/dev/sys/platform/00:00:2d/ramctl/ramdisk-0/block"));
+  ASSERT_OK(paver::FvmUnbind(devfs_root(), "/dev/sys/platform/ram-disk/ramctl/ramdisk-0/block"));
 }
 
 TEST_F(FvmTest, UnbindInvalidPath) {
@@ -339,7 +339,7 @@ TEST_F(FvmTest, UnbindInvalidPath) {
   path[sizeof(path) - 1] = '\0';
   ASSERT_EQ(paver::FvmUnbind(devfs_root(), path), ZX_ERR_INVALID_ARGS);
 
-  ASSERT_OK(paver::FvmUnbind(devfs_root(), "/dev/sys/platform/00:00:2d/ramctl/ramdisk-0/block"));
+  ASSERT_OK(paver::FvmUnbind(devfs_root(), "/dev/sys/platform/ram-disk/ramctl/ramdisk-0/block"));
 }
 
 }  // namespace

@@ -10,9 +10,9 @@ use crate::{
     context::{ContextPair as _, ContextProvider, CoreCtx, CtxPair, TimerHandler as _},
     counters::CountersApi,
     device::{
-        api::{DeviceAnyApi, DeviceApi},
-        queue::api::{ReceiveQueueApi, TransmitQueueApi},
+        queue::{ReceiveQueueApi, TransmitQueueApi},
         socket::DeviceSocketApi,
+        DeviceAnyApi, DeviceApi,
     },
     filter::FilterApi,
     ip::{
@@ -23,7 +23,7 @@ use crate::{
         RoutesAnyApi, RoutesApi,
     },
     time::TimerId,
-    transport::{tcp::socket::TcpApi, udp::UdpApi},
+    transport::{tcp::TcpApi, udp::UdpApi},
     BindingsTypes,
 };
 

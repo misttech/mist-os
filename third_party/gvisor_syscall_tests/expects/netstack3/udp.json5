@@ -77,9 +77,6 @@
                 "AllInetTests/UdpSocketControlMessagesTest.SetAndReceivePktInfo/2",
 
                 // Netstack3 does not have complete support for multicast UDP sockets.
-                "AllUDPSockets/UDPSocketPairTest.MulticastLoopDefault/*",
-                "AllUDPSockets/UDPSocketPairTest.SetMulticastLoop/*",
-                "AllUDPSockets/UDPSocketPairTest.SetMulticastLoopChar/*",
                 "AllUDPSockets/UDPSocketPairTest.SetUDPMulticastTTLMin/*",
                 "AllUDPSockets/UDPSocketPairTest.SetEmptyIPAddMembership/0",
                 "AllUDPSockets/UDPSocketPairTest.SetEmptyIPAddMembership/2",

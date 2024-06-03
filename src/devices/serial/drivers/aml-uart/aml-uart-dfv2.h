@@ -26,8 +26,6 @@ class AmlUartV2 : public fdf::DriverBase {
   // Used by the unit test to access the device.
   AmlUart& aml_uart_for_testing();
 
-  fidl::ClientEnd<fuchsia_power_broker::ElementControl>& element_control_for_testing();
-
  private:
   zx_status_t GetPowerConfiguration(
       const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev);
@@ -47,6 +45,7 @@ class AmlUartV2 : public fdf::DriverBase {
   fidl::WireClient<fuchsia_driver_framework::Node> parent_node_client_;
   fuchsia_hardware_serial::wire::SerialPortInfo serial_port_info_;
   std::optional<fdf::SynchronizedDispatcher> irq_dispatcher_;
+  std::optional<fdf::SynchronizedDispatcher> timer_dispatcher_;
   std::optional<AmlUart> aml_uart_;
   std::optional<fdf::PrepareStopCompleter> prepare_stop_completer_;
   compat::AsyncInitializedDeviceServer device_server_;
@@ -55,7 +54,9 @@ class AmlUartV2 : public fdf::DriverBase {
   aml_uart_dfv2_config::Config driver_config_;
 
   // Client ends for talking to power broker.
-  fidl::ClientEnd<fuchsia_power_broker::ElementControl> element_control_client_end_;
+  std::optional<fidl::ClientEnd<fuchsia_power_broker::CurrentLevel>> current_level_client_end_;
+  std::optional<fidl::ClientEnd<fuchsia_power_broker::RequiredLevel>> required_level_client_end_;
+  std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control_client_end_;
   std::optional<fidl::ClientEnd<fuchsia_power_broker::Lessor>> lessor_client_end_;
 };
 

@@ -43,7 +43,7 @@ const IGNORED_PATH_PREFIXES: &[&str] = &[
 
 /// Regular expression to deduplicate commonly seen numbered elements of paths in internal
 /// filesystems.
-const NUMBER_DEDUPER: &str = r#"(block/[A-Za-z]+|cpu|proc/|pid_|uid_)\d+"#;
+const NUMBER_DEDUPER: &str = r#"(block/[A-Za-z]+|cpu|proc/|pid_|uid_|task|task/)\d+"#;
 
 static NOT_FOUND_COUNTS: Lazy<Mutex<HashMap<BString, u64>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
@@ -150,6 +150,10 @@ mod tests {
             "/sys/kernel/tracing/options/record-tgid",
             "/sys/kernel/tracing/per_cpu/cpu20/trace",
             "/sys/kernel/tracing/per_cpu/cpu3/trace",
+            "/proc/1/task/1004/wchan",
+            "/proc/1/task/1009/wchan",
+            "/proc/2/task1004/wchan",
+            "/proc/2/task1009/wchan",
         ];
         let observed =
             dedupe_uninteresting_numbers_in_paths(original_paths.iter().map(|p| (p.as_bytes(), 1)))
@@ -161,6 +165,8 @@ mod tests {
             ("/dev/pmsg0", 1),
             ("/proc/N/cgroup", 4),
             ("/proc/N/schedstat", 4),
+            ("/proc/N/task/N/wchan", 2),
+            ("/proc/N/taskN/wchan", 2),
             ("/proc/sys/kernel/domainname", 1),
             ("/proc/sys/net/ipv4/conf", 1),
             ("/proc/sys/net/ipv6/conf/default/accept_ra_rt_info_min_plen", 1),

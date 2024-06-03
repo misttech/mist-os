@@ -31,7 +31,21 @@ _LOGGER = logging.getLogger(__name__)
 class BlackoutTest(test_case_revive.TestCaseRevive):
     def setup_class(self) -> None:
         super().setup_class()
+
         self.dut: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
+        asserts.abort_class_if(
+            "component_name" not in self.user_params, "Missing component name!"
+        )
+        asserts.abort_class_if(
+            "component_url" not in self.user_params, "Missing component url!"
+        )
+        self.component_name = self.user_params["component_name"]
+        self.component_url = self.user_params["component_url"]
+
+        self.device_label = self.user_params.get("device_label", "default-test")
+        self.device_path = self.user_params.get("device_path")
+        self.test_duration = self.user_params.get("test_duration", 0)
+
         self.create_blackout_component()
         self.dut.register_for_on_device_boot(fn=self.create_blackout_component)
 
@@ -40,7 +54,7 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
             [
                 "component",
                 "stop",
-                self.user_params["component_name"],
+                self.component_name,
             ]
         )
         super().teardown_class()
@@ -50,8 +64,8 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
         _LOGGER.info("Blackout: Setting up test filesystem")
         res = asyncio.run(
             self.blackout_proxy.setup(
-                device_label=self.user_params["device_label"],
-                device_path=self.user_params["device_path"],
+                device_label=self.device_label,
+                device_path=self.device_path,
                 seed=1234,
             )
         )
@@ -59,10 +73,10 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
         _LOGGER.info("Blackout: Running filesystem load")
         res = asyncio.run(
             self.blackout_proxy.test(
-                device_label=self.user_params["device_label"],
-                device_path=self.user_params["device_path"],
+                device_label=self.device_label,
+                device_path=self.device_path,
                 seed=1234,
-                duration=self.user_params["test_duration"],
+                duration=self.test_duration,
             )
         )
         asserts.assert_equal(res.err, None, "Failed to run load generation")
@@ -76,17 +90,15 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
                     "component",
                     "run",
                     "--recreate",
-                    self.user_params["component_name"],
-                    self.user_params["component_url"],
+                    self.component_name,
+                    self.component_url,
                 ]
             ),
             timeout=60,
             wait_time=5,
         )
         ch = self.dut.fuchsia_controller.connect_device_proxy(
-            FidlEndpoint(
-                self.user_params["component_name"], blackout.Controller.MARKER
-            )
+            FidlEndpoint(self.component_name, blackout.Controller.MARKER)
         )
         self.blackout_proxy = blackout.Controller.Client(ch)
 
@@ -98,8 +110,8 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
         _LOGGER.info("Blackout: Running device verification")
         res = asyncio.run(
             self.blackout_proxy.verify(
-                device_label=self.user_params["device_label"],
-                device_path=self.user_params["device_path"],
+                device_label=self.device_label,
+                device_path=self.device_path,
                 seed=1234,
             )
         )

@@ -1513,18 +1513,6 @@ impl From<Rc<Target>> for DiscoveredTarget {
     }
 }
 
-/// Convert a TargetAddrInfo to a SocketAddr preserving the port number if
-/// provided, otherwise the returned SocketAddr will have port number 0.
-pub fn target_addr_info_to_socketaddr(tai: TargetAddrInfo) -> SocketAddr {
-    let mut sa = SocketAddr::from(TargetAddr::from(&tai));
-    // TODO(raggi): the port special case needed here indicates a general problem in our
-    // addressing strategy that is worth reviewing.
-    if let TargetAddrInfo::IpPort(ref ipp) = tai {
-        sa.set_port(ipp.port)
-    }
-    sa
-}
-
 #[cfg(test)]
 impl PartialEq for Target {
     fn eq(&self, o: &Target) -> bool {
@@ -1576,7 +1564,6 @@ mod test {
     use super::*;
     use assert_matches::assert_matches;
     use chrono::TimeZone;
-    use ffx::TargetIp;
     use fidl_fuchsia_developer_remotecontrol as rcs;
     use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
     use fidl_fuchsia_net::Subnet;
@@ -2177,63 +2164,6 @@ mod test {
 
         assert_eq!(ip, "::1".parse::<IpAddr>().unwrap());
         assert_eq!(port, 8022);
-    }
-
-    #[test]
-    fn test_target_addr_info_to_socketaddr() {
-        let tai = TargetAddrInfo::IpPort(TargetIpPort {
-            ip: IpAddress::Ipv4(Ipv4Address { addr: [127, 0, 0, 1] }),
-            port: 8022,
-            scope_id: 0,
-        });
-
-        let sa = "127.0.0.1:8022".parse::<SocketAddr>().unwrap();
-
-        assert_eq!(target_addr_info_to_socketaddr(tai), sa);
-
-        let tai = TargetAddrInfo::Ip(TargetIp {
-            ip: IpAddress::Ipv4(Ipv4Address { addr: [127, 0, 0, 1] }),
-            scope_id: 0,
-        });
-
-        let sa = "127.0.0.1:0".parse::<SocketAddr>().unwrap();
-
-        assert_eq!(target_addr_info_to_socketaddr(tai), sa);
-
-        let tai = TargetAddrInfo::IpPort(TargetIpPort {
-            ip: IpAddress::Ipv6(Ipv6Address {
-                addr: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-            }),
-            port: 8022,
-            scope_id: 0,
-        });
-
-        let sa = "[::1]:8022".parse::<SocketAddr>().unwrap();
-
-        assert_eq!(target_addr_info_to_socketaddr(tai), sa);
-
-        let tai = TargetAddrInfo::Ip(TargetIp {
-            ip: IpAddress::Ipv6(Ipv6Address {
-                addr: [0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-            }),
-            scope_id: 1,
-        });
-
-        let sa = "[fe80::1%1]:0".parse::<SocketAddr>().unwrap();
-
-        assert_eq!(target_addr_info_to_socketaddr(tai), sa);
-
-        let tai = TargetAddrInfo::IpPort(TargetIpPort {
-            ip: IpAddress::Ipv6(Ipv6Address {
-                addr: [0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-            }),
-            port: 8022,
-            scope_id: 1,
-        });
-
-        let sa = "[fe80::1%1]:8022".parse::<SocketAddr>().unwrap();
-
-        assert_eq!(target_addr_info_to_socketaddr(tai), sa);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

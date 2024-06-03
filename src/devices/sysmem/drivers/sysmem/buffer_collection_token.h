@@ -98,26 +98,16 @@ class BufferCollectionToken : public Node, public LoggingMixin {
     // FIDL "compose Node" "interface" (identical among BufferCollection, BufferCollectionToken,
     // BufferCollectionTokenGroup)
     void SyncV1(SyncV1Completer::Sync& completer) override;
-    void DeprecatedSyncV1(DeprecatedSyncV1Completer::Sync& completer) override;
     void CloseV1(CloseV1Completer::Sync& completer) override;
-    void DeprecatedCloseV1(DeprecatedCloseV1Completer::Sync& completer) override;
     void GetNodeRefV1(GetNodeRefV1Completer::Sync& completer) override;
     void IsAlternateForV1(IsAlternateForV1Request& request,
                           IsAlternateForV1Completer::Sync& completer) override;
     void SetNameV1(SetNameV1Request& request, SetNameV1Completer::Sync& completer) override;
-    void DeprecatedSetNameV1(DeprecatedSetNameV1Request& request,
-                             DeprecatedSetNameV1Completer::Sync& completer) override;
     void SetDebugClientInfoV1(SetDebugClientInfoV1Request& request,
                               SetDebugClientInfoV1Completer::Sync& completer) override;
-    void DeprecatedSetDebugClientInfoV1(
-        DeprecatedSetDebugClientInfoV1Request& request,
-        DeprecatedSetDebugClientInfoV1Completer::Sync& completer) override;
     void SetDebugTimeoutLogDeadlineV1(
         SetDebugTimeoutLogDeadlineV1Request& request,
         SetDebugTimeoutLogDeadlineV1Completer::Sync& completer) override;
-    void DeprecatedSetDebugTimeoutLogDeadlineV1(
-        DeprecatedSetDebugTimeoutLogDeadlineV1Request& request,
-        DeprecatedSetDebugTimeoutLogDeadlineV1Completer::Sync& completer) override;
     void SetVerboseLoggingV1(SetVerboseLoggingV1Completer::Sync& completer) override;
     // fuchsia.sysmem.BufferCollectionToken interface methods (see also "compose Node" methods
     // above)

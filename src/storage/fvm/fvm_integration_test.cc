@@ -124,7 +124,7 @@ class FvmTest : public zxtest::Test {
 
     ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr_));
     ASSERT_OK(device_watcher::RecursiveWaitForFile(devfs_root_fd().get(),
-                                                   "sys/platform/00:00:2d/ramctl"));
+                                                   "sys/platform/ram-disk/ramctl"));
 
     fdio_ns_t* name_space;
     ASSERT_OK(fdio_ns_get_installed(&name_space));

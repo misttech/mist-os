@@ -73,41 +73,44 @@ class NullRendererIntegrationTest : public LoggingEventLoop, public ::testing::T
   }
 
  protected:
-  void SetConstraintsAndAllocateBuffer(fuchsia::sysmem::BufferCollectionTokenSyncPtr token) {
-    fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
-    auto status =
-        sysmem_allocator_->BindSharedCollection(std::move(token), buffer_collection.NewRequest());
+  void SetConstraintsAndAllocateBuffer(fuchsia::sysmem2::BufferCollectionTokenSyncPtr token) {
+    fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
+    fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+    bind_shared_request.set_token(std::move(token));
+    bind_shared_request.set_buffer_collection_request(buffer_collection.NewRequest());
+    auto status = sysmem_allocator_->BindSharedCollection(std::move(bind_shared_request));
     ASSERT_EQ(status, ZX_OK);
-    fuchsia::sysmem::BufferCollectionConstraints constraints;
-    constraints.usage.none = fuchsia::sysmem::noneUsage;
-    constraints.min_buffer_count = 1;
-    constraints.image_format_constraints_count = 1;
-    auto& image_constraints = constraints.image_format_constraints[0];
-    image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::BGRA32;
-    image_constraints.color_spaces_count = 1;
-    image_constraints.color_space[0] =
-        fuchsia::sysmem::ColorSpace{.type = fuchsia::sysmem::ColorSpaceType::SRGB};
-    image_constraints.required_min_coded_width = display_width_;
-    image_constraints.required_min_coded_height = display_height_;
-    image_constraints.required_max_coded_width = display_width_;
-    image_constraints.required_max_coded_height = display_height_;
-    status = buffer_collection->SetConstraints(true, constraints);
+    fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+    auto& constraints = *set_constraints_request.mutable_constraints();
+    constraints.mutable_usage()->set_none(fuchsia::sysmem2::NONE_USAGE);
+    constraints.set_min_buffer_count(1);
+    uint32_t constraints_min_buffer_count = constraints.min_buffer_count();
+    auto& image_constraints = constraints.mutable_image_format_constraints()->emplace_back();
+    image_constraints.set_pixel_format(fuchsia::images2::PixelFormat::B8G8R8A8);
+    image_constraints.mutable_color_spaces()->emplace_back(fuchsia::images2::ColorSpace::SRGB);
+    image_constraints.set_required_min_size(
+        fuchsia::math::SizeU{.width = display_width_, .height = display_height_});
+    image_constraints.set_required_max_size(
+        fuchsia::math::SizeU{.width = display_width_, .height = display_height_});
+    status = buffer_collection->SetConstraints(std::move(set_constraints_request));
     ASSERT_EQ(status, ZX_OK);
-    zx_status_t allocation_status = ZX_OK;
-    fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info{};
-    status =
-        buffer_collection->WaitForBuffersAllocated(&allocation_status, &buffer_collection_info);
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+    status = buffer_collection->WaitForAllBuffersAllocated(&wait_result);
     ASSERT_EQ(ZX_OK, status);
-    ASSERT_EQ(ZX_OK, allocation_status);
-    EXPECT_EQ(constraints.min_buffer_count, buffer_collection_info.buffer_count);
-    ASSERT_EQ(ZX_OK, buffer_collection->Close());
+    ASSERT_TRUE(!wait_result.is_framework_err());
+    ASSERT_TRUE(!wait_result.is_err());
+    ASSERT_TRUE(wait_result.is_response());
+    auto buffer_collection_info =
+        std::move(*wait_result.response().mutable_buffer_collection_info());
+    EXPECT_EQ(constraints_min_buffer_count, buffer_collection_info.buffers().size());
+    ASSERT_EQ(ZX_OK, buffer_collection->Release());
   }
 
   const TransformId kRootTransform{.value = 1};
   uint32_t display_width_ = 0;
   uint32_t display_height_ = 0;
 
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
   fuchsia::ui::composition::AllocatorSyncPtr flatland_allocator_;
   FlatlandPtr root_flatland_;
   fuchsia::ui::composition::ScreenshotSyncPtr screenshotter_;
@@ -125,7 +128,9 @@ TEST_F(NullRendererIntegrationTest, RendersContent) {
       allocation::BufferCollectionImportExportTokens::New();
   fuchsia::ui::composition::RegisterBufferCollectionArgs rbc_args = {};
   rbc_args.set_export_token(std::move(bc_tokens.export_token));
-  rbc_args.set_buffer_collection_token(std::move(scenic_token));
+  rbc_args.set_buffer_collection_token(
+      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
+          scenic_token.Unbind().TakeChannel()));
   fuchsia::ui::composition::Allocator_RegisterBufferCollection_Result result;
   flatland_allocator_->RegisterBufferCollection(std::move(rbc_args), &result);
   ASSERT_FALSE(result.is_err());
@@ -165,7 +170,9 @@ TEST_F(NullRendererIntegrationTest, ScreenshotIsAllZeroes) {
       allocation::BufferCollectionImportExportTokens::New();
   fuchsia::ui::composition::RegisterBufferCollectionArgs rbc_args = {};
   rbc_args.set_export_token(std::move(bc_tokens.export_token));
-  rbc_args.set_buffer_collection_token(std::move(scenic_token));
+  rbc_args.set_buffer_collection_token(
+      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
+          scenic_token.Unbind().TakeChannel()));
   fuchsia::ui::composition::Allocator_RegisterBufferCollection_Result result;
   flatland_allocator_->RegisterBufferCollection(std::move(rbc_args), &result);
   ASSERT_FALSE(result.is_err());

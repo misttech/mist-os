@@ -34,8 +34,9 @@ TEST(NullTest, Default) {
   size_t offset = 0u;
   ASSERT_STATUS(zxio_seek(&io, ZXIO_SEEK_ORIGIN_START, 0, &offset), ZX_ERR_WRONG_TYPE);
   ASSERT_STATUS(zxio_truncate(&io, 0u), ZX_ERR_NOT_SUPPORTED);
-  uint32_t flags = 0u;
-  ASSERT_STATUS(zxio_flags_get(&io, &flags), ZX_ERR_NOT_SUPPORTED);
+  uint32_t flags = 42u;
+  ASSERT_STATUS(zxio_flags_get(&io, &flags), ZX_OK);
+  ASSERT_EQ(0, flags);
   ASSERT_STATUS(zxio_flags_set(&io, flags), ZX_ERR_NOT_SUPPORTED);
   zx_handle_t vmo = ZX_HANDLE_INVALID;
   ASSERT_STATUS(zxio_vmo_get_copy(&io, &vmo), ZX_ERR_NOT_SUPPORTED);
@@ -97,8 +98,9 @@ TEST(NullTest, Null) {
   size_t offset = 0u;
   ASSERT_STATUS(zxio_seek(&io, ZXIO_SEEK_ORIGIN_START, 0, &offset), ZX_ERR_WRONG_TYPE);
   ASSERT_STATUS(zxio_truncate(&io, 0u), ZX_ERR_NOT_SUPPORTED);
-  uint32_t flags = 0u;
-  ASSERT_STATUS(zxio_flags_get(&io, &flags), ZX_ERR_NOT_SUPPORTED);
+  uint32_t flags = 42u;
+  ASSERT_STATUS(zxio_flags_get(&io, &flags), 0);
+  ASSERT_EQ(0, flags);
   ASSERT_STATUS(zxio_flags_set(&io, flags), ZX_ERR_NOT_SUPPORTED);
   zx_handle_t vmo = ZX_HANDLE_INVALID;
   ASSERT_STATUS(zxio_vmo_get_copy(&io, &vmo), ZX_ERR_NOT_SUPPORTED);

@@ -14,7 +14,7 @@
 
 namespace flatland {
 
-using BufferCollectionHandle = fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>;
+using BufferCollectionHandle = fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>;
 
 // |BufferCollectionInfo| stores the information regarding a BufferCollection.
 // Instantiated via calls to |New| below.
@@ -23,15 +23,20 @@ class BufferCollectionInfo {
   // Creates a new |BufferCollectionInfo| instance. The return value is null if the buffer was
   // not created successfully. This function sets the server-side sysmem image constraints.
   //
-  // TODO(https://fxbug.dev/42125043): Make this an asynchronous call. This function is currently thread safe
-  // as Allocator_Sync pointers are thread safe, but if this becomes async it may become unsafe.
+  // TODO(https://fxbug.dev/42125043): Make this an asynchronous call. This function is currently
+  // thread safe as Allocator_Sync pointers are thread safe, but if this becomes async it may become
+  // unsafe.
   static fit::result<fit::failed, BufferCollectionInfo> New(
-      fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
+      fuchsia::sysmem2::Allocator_Sync* sysmem_allocator,
       BufferCollectionHandle buffer_collection_token,
-      std::optional<fuchsia::sysmem::ImageFormatConstraints> image_format_constraints =
+      std::optional<fuchsia::sysmem2::ImageFormatConstraints> image_format_constraints =
           std::nullopt,
-      fuchsia::sysmem::BufferUsage buffer_usage =
-          fuchsia::sysmem::BufferUsage{.none = fuchsia::sysmem::noneUsage},
+      fuchsia::sysmem2::BufferUsage buffer_usage =
+          [] {
+            fuchsia::sysmem2::BufferUsage result;
+            result.set_none(fuchsia::sysmem2::NONE_USAGE);
+            return result;
+          }(),
       allocation::BufferCollectionUsage usage = allocation::BufferCollectionUsage::kClientImage);
 
   // Creates a non-initialized instance of this class. Fully initialized instances must
@@ -58,18 +63,18 @@ class BufferCollectionInfo {
 
   // Info describing |buffer_collection_ptr|. Do not call this until after verifying the allocation
   // status of the buffer collection with BuffersAreAllocated().
-  const fuchsia::sysmem::BufferCollectionInfo_2& GetSysmemInfo() const {
+  const fuchsia::sysmem2::BufferCollectionInfo& GetSysmemInfo() const {
     // DCHECK if the struct is uninitialized.
-    FX_DCHECK(buffer_collection_info_.buffer_count >= 1);
+    FX_DCHECK(buffer_collection_info_.buffers().size() >= 1);
     return buffer_collection_info_;
   }
 
  private:
-  BufferCollectionInfo(fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection_ptr)
+  BufferCollectionInfo(fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection_ptr)
       : buffer_collection_ptr_(std::move(buffer_collection_ptr)) {}
 
-  fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection_ptr_;
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info_;
+  fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection_ptr_;
+  fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info_;
 };
 
 }  // namespace flatland

@@ -986,38 +986,6 @@ TEST_F(DriverTest, Start_BindFailed) {
   EXPECT_TRUE(v1_test->did_release);
 }
 
-TEST_F(DriverTest, GetVariable) {
-  auto driver = StartDriver({
-      .v1_driver_path = "/pkg/driver/v1_test.so",
-      .ops =
-          {
-              .get_protocol = [](void*, uint32_t, void*) { return ZX_OK; },
-          },
-  });
-  // Verify that v1_test.so has added a child device.
-  WaitForChildDeviceAdded();
-
-  // Verify that v1_test.so has set a context.
-  std::unique_ptr<V1Test> v1_test(static_cast<V1Test*>(driver->Context()));
-  ASSERT_NE(nullptr, v1_test.get());
-
-  char variable[20];
-  size_t actual;
-  ASSERT_EQ(ZX_OK,
-            device_get_variable(v1_test->zxdev, "driver.foo", variable, sizeof(variable), &actual));
-  ASSERT_EQ(actual, 4u);
-  ASSERT_EQ(strncmp(variable, "true", sizeof(variable)), 0);
-  // Invalid variable name
-  ASSERT_EQ(ZX_ERR_NOT_FOUND, device_get_variable(v1_test->zxdev, "kernel.shell", variable,
-                                                  sizeof(variable), &actual));
-  // Buffer too small
-  ASSERT_EQ(ZX_ERR_BUFFER_TOO_SMALL,
-            device_get_variable(v1_test->zxdev, "driver.foo", variable, 1, &actual));
-  ASSERT_EQ(actual, 4u);
-
-  UnbindAndFreeDriver(std::move(driver));
-}
-
 TEST_F(DriverTest, SetProfileByRole) {
   auto driver = StartDriver({
       .v1_driver_path = "/pkg/driver/v1_test.so",

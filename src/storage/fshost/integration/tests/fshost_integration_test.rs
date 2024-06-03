@@ -289,7 +289,7 @@ async fn partition_max_size_set() {
     // TODO(https://fxbug.dev/42072287): Remove hardcoded paths
     let volume_proxy_data = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
         &fixture.dir("dev-topological", fio::OpenFlags::empty()),
-        "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/blobfs-p-1/block",
+        "sys/platform/ram-disk/ramctl/ramdisk-0/block/fvm/blobfs-p-1/block",
     )
     .unwrap();
     let (status, data_instance_guid) = volume_proxy_data.get_instance_guid().await.unwrap();
@@ -321,7 +321,7 @@ async fn partition_max_size_set() {
     // TODO(https://fxbug.dev/42072287): Remove hardcoded paths
     let fvm_proxy = connect_to_named_protocol_at_dir_root::<VolumeManagerMarker>(
         &fixture.dir("dev-topological", fio::OpenFlags::empty()),
-        "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm",
+        "sys/platform/ram-disk/ramctl/ramdisk-0/block/fvm",
     )
     .unwrap();
 
@@ -768,7 +768,7 @@ async fn reset_fvm_partitions() {
 
     let fvm_proxy = fuchsia_fs::directory::open_directory(
         &fixture.dir("dev-topological", fio::OpenFlags::empty()),
-        "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm",
+        "sys/platform/ram-disk/ramctl/ramdisk-0/block/fvm",
         fio::OpenFlags::empty(),
     )
     .await
@@ -816,7 +816,7 @@ async fn reset_fvm_partitions() {
     if DATA_FILESYSTEM_FORMAT != "minfs" {
         let data_volume_proxy = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
             &fixture.dir("dev-topological", fio::OpenFlags::empty()),
-            &format!("sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/{}/block", data_name),
+            &format!("sys/platform/ram-disk/ramctl/ramdisk-0/block/fvm/{}/block", data_name),
         )
         .expect("Failed to connect to data VolumeProxy");
         let (status, manager_info, volume_info) =
@@ -862,7 +862,7 @@ async fn reset_fvm_partitions_no_existing_data_partition() {
 
     let fvm_proxy = fuchsia_fs::directory::open_directory(
         &fixture.dir("dev-topological", fio::OpenFlags::empty()),
-        "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm",
+        "sys/platform/ram-disk/ramctl/ramdisk-0/block/fvm",
         fio::OpenFlags::empty(),
     )
     .await

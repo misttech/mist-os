@@ -4,25 +4,31 @@
 
 #include "vdso-common.h"
 
-#include <lib/affine/ratio.h>
+#include <lib/fasttime/time.h>
 #include <sys/syscall.h>
 
 #include "vdso-calculate-time.h"
 #include "vdso-platform.h"
 
 int64_t calculate_monotonic_time_nsec() {
-  uint64_t raw_ticks = get_raw_ticks();
-  uint64_t ticks = raw_ticks + vvar.raw_ticks_to_ticks_offset.load(std::memory_order_acquire);
-  affine::Ratio ticks_to_mono_ratio(vvar.ticks_to_mono_numerator.load(std::memory_order_acquire),
-                                    vvar.ticks_to_mono_denominator.load(std::memory_order_acquire));
-  return ticks_to_mono_ratio.Scale(ticks);
+  zx_vaddr_t time_values_addr = reinterpret_cast<zx_vaddr_t>(&time_values);
+  return fasttime::compute_monotonic_time(time_values_addr);
 }
 
 int clock_gettime_impl(int clock_id, timespec* tp) {
   int ret = 0;
   if ((clock_id == CLOCK_MONOTONIC) || (clock_id == CLOCK_MONOTONIC_RAW) ||
       (clock_id == CLOCK_MONOTONIC_COARSE) || (clock_id == CLOCK_BOOTTIME)) {
-    uint64_t monot_nsec = calculate_monotonic_time_nsec();
+    int64_t monot_nsec = calculate_monotonic_time_nsec();
+    if (monot_nsec == ZX_TIME_INFINITE_PAST) {
+      // If calculate_monotonic_time_nsec returned ZX_TIME_INFINITE_PAST, then either:
+      // 1. The ticks register is not userspace accessible, or
+      // 2. The version of libfasttime is out of sync with the version of the time values VMO.
+      // In either case, we must invoke a syscall to get the correct time value.
+      ret = syscall(__NR_clock_gettime, static_cast<intptr_t>(clock_id),
+                    reinterpret_cast<intptr_t>(tp), 0);
+      return ret;
+    }
     tp->tv_sec = monot_nsec / kNanosecondsPerSecond;
     tp->tv_nsec = monot_nsec % kNanosecondsPerSecond;
   } else if (clock_id == CLOCK_REALTIME) {

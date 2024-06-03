@@ -1860,6 +1860,10 @@ TEST(MemallocPoolTests, OutOfMemory) {
   ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
   ASSERT_NO_FATAL_FAILURE(Oom(ctx.pool));
 
+  // Capture the state now, before any further operations are made, for an
+  // integrity check later.
+  std::vector<Range> before(ctx.pool.begin(), ctx.pool.end());
+
   // Allocations should now fail.
   {
     auto result = ctx.pool.Allocate(Type::kPoolTestPayload, 1, 1);
@@ -1886,6 +1890,11 @@ TEST(MemallocPoolTests, OutOfMemory) {
                                                             it->addr, 1,
                                                             /*alloc_error=*/true));
   }
+
+  // Now, after the failed operations, verify that the contents remain
+  // unmodified.
+  std::vector<Range> after(ctx.pool.begin(), ctx.pool.end());
+  ASSERT_NO_FATAL_FAILURE(CompareRanges(before, after));
 }
 
 TEST(MemallocPoolTests, NormalizeRanges) {

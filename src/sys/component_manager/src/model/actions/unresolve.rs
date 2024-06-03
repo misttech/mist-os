@@ -105,7 +105,7 @@ pub mod tests {
         errors::{ActionError, UnresolveActionError},
         fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync,
         hooks::EventType,
-        moniker::{Moniker, MonikerBase},
+        moniker::Moniker,
         std::sync::Arc,
     };
 

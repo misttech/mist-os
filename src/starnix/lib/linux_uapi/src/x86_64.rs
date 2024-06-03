@@ -17850,9 +17850,6 @@ pub struct StdAtomicU64 {
 #[repr(C)]
 #[derive(Debug, Default)]
 pub struct vvar_data {
-    pub raw_ticks_to_ticks_offset: std::sync::atomic::AtomicI64,
-    pub ticks_to_mono_numerator: std::sync::atomic::AtomicU32,
-    pub ticks_to_mono_denominator: std::sync::atomic::AtomicU32,
     pub seq_num: std::sync::atomic::AtomicU64,
     pub mono_to_utc_reference_offset: std::sync::atomic::AtomicI64,
     pub mono_to_utc_synthetic_offset: std::sync::atomic::AtomicI64,

@@ -61,8 +61,11 @@ closed protocol StateV6 {
     strict GetWatcherV6(resource struct {
         watcher server_end:WatcherV6;
         options @generated_name("WatcherOptionsV6") table {
-            /// Only watch for events on the specified table.
-            1: table_id TableId;
+            /// Filter events on tables matching `table_interest`.
+            ///
+            /// Interpreted as `all` if absent. The server does not validate if
+            /// `TableInterest` contains valid table IDs.
+            1: table_interest TableInterest;
         };
     });
 

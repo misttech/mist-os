@@ -105,6 +105,8 @@ SECTIONS {
   .dynamic : { *(.dynamic) } :load :dynamic
   .rela.dyn : { *(.rela.*) } :load
   .rel.dyn : { *(.rel.*) }
+  .relr.auth.dyn : { *(.relr.auth.*) }
+  ASSERT(SIZEOF(.relr.auth.dyn) == 0, ".relr.auth.dyn is not supported")
   .relr.dyn : { *(.relr.*) }
   .gnu.hash : { *(.gnu.hash) }
   .dynsym : { *(.dynsym) }

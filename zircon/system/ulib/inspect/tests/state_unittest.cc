@@ -280,7 +280,7 @@ TEST(State, CreateAndFreeStringReference) {
   ASSERT_TRUE(snapshot);
 
   BlockIndex idx;
-  std::string_view sr("abcdefg");
+  auto sr = inspect::StringReference("abcdefg");
   ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(sr, &idx));
   ASSERT_EQ("abcdefg", TesterLoadStringReference(*state, idx));
 
@@ -299,17 +299,20 @@ TEST(State, CreateSeveralStringReferences) {
   ASSERT_TRUE(state != nullptr);
 
   const auto one = std::string(150, '1');
+  const auto one_ref = inspect::StringReference(one.c_str());
   const auto two = std::string(150, '2');
+  const auto two_ref = inspect::StringReference(two.c_str());
   const auto three = std::string(200, '3');
+  const auto three_ref = inspect::StringReference(three.c_str());
+
+  ASSERT_NE(one_ref.ID(), two_ref.ID());
+  ASSERT_NE(two_ref.ID(), three_ref.ID());
+  ASSERT_NE(one_ref.ID(), three_ref.ID());
 
   BlockIndex idx1, idx2, idx3;
-  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(one, &idx1));
-  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(two, &idx2));
-  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(three, &idx3));
-
-  ASSERT_NE(idx1, idx2);
-  ASSERT_NE(idx1, idx3);
-  ASSERT_NE(idx2, idx3);
+  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(one_ref, &idx1));
+  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(two_ref, &idx2));
+  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(three_ref, &idx3));
 
   ASSERT_EQ(one, TesterLoadStringReference(*state, idx1));
   ASSERT_EQ(two, TesterLoadStringReference(*state, idx2));
@@ -332,7 +335,8 @@ TEST(State, CreateLargeStringReference) {
   BlockIndex idx;
   std::string data(6000, '.');
 
-  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(data, &idx));
+  auto sr = inspect::StringReference(data.c_str());
+  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(sr, &idx));
   ASSERT_EQ(data, TesterLoadStringReference(*state, idx));
 
   fbl::WAVLTree<BlockIndex, std::unique_ptr<ScannedBlock>> blocks2;
@@ -361,7 +365,8 @@ TEST(State, CreateAndFreeFromSameReference) {
   BlockIndex idx2;
   std::string data(3000, '.');
 
-  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(data, &idx2));
+  auto sr2 = inspect::StringReference(data.c_str());
+  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(sr2, &idx2));
   ASSERT_EQ(data, TesterLoadStringReference(*state, idx2));
 
   fbl::WAVLTree<BlockIndex, std::unique_ptr<ScannedBlock>> blocks2;
@@ -374,7 +379,7 @@ TEST(State, CreateAndFreeFromSameReference) {
 
   // CreateStringReferenceWithCount will bump the reference count
   BlockIndex should_be_same;
-  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(data, &should_be_same));
+  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(sr2, &should_be_same));
   ASSERT_EQ(data, TesterLoadStringReference(*state, idx2));
   ASSERT_EQ(data, TesterLoadStringReference(*state, should_be_same));
   ASSERT_EQ(idx2, should_be_same);
@@ -392,7 +397,7 @@ TEST(State, CreateAndFreeFromSameReference) {
   state->ReleaseStringReference(should_be_same);
 
   // After release, this causes a re-allocation
-  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(data, &idx2));
+  ASSERT_EQ(ZX_OK, state->CreateAndIncrementStringReference(sr2, &idx2));
   ASSERT_EQ(data, TesterLoadStringReference(*state, idx2));
 
   fbl::WAVLTree<BlockIndex, std::unique_ptr<ScannedBlock>> blocks4;
@@ -1474,9 +1479,9 @@ TEST(State, LinkTest) {
 
   // root will be at block index 2
   Node root = state->CreateNode("root", 0);
-  Link link = state->CreateLink("lnk1", 2u /* root index */, "tst1", LinkBlockDisposition::kChild);
+  Link link = state->CreateLink("link", 2u /* root index */, "/tst", LinkBlockDisposition::kChild);
   Link link2 =
-      state->CreateLink("lnk2", 2u /* root index */, "tst2", LinkBlockDisposition::kInline);
+      state->CreateLink("lnk2", 2u /* root index */, "/tst", LinkBlockDisposition::kInline);
 
   fbl::WAVLTree<BlockIndex, std::unique_ptr<ScannedBlock>> blocks;
   size_t free_blocks, allocated_blocks;
@@ -1502,8 +1507,8 @@ TEST(State, LinkTest) {
       MakeBlock(ValueBlockFields::Type::Make(BlockType::kLinkValue) |
                     ValueBlockFields::ParentIndex::Make(2) | ValueBlockFields::NameIndex::Make(5),
                 LinkBlockPayload::ContentIndex::Make(6)));
-  CompareBlock(blocks.find(5)->block, MakeInlinedOrder0StringReferenceBlock("lnk1"));
-  CompareBlock(blocks.find(6)->block, MakeInlinedOrder0StringReferenceBlock("tst1"));
+  CompareBlock(blocks.find(5)->block, MakeInlinedOrder0StringReferenceBlock("link"));
+  CompareBlock(blocks.find(6)->block, MakeInlinedOrder0StringReferenceBlock("/tst"));
   CompareBlock(
       blocks.find(7)->block,
       MakeBlock(ValueBlockFields::Type::Make(BlockType::kLinkValue) |
@@ -1511,7 +1516,7 @@ TEST(State, LinkTest) {
                 LinkBlockPayload::ContentIndex::Make(9) |
                     LinkBlockPayload::Flags::Make(LinkBlockDisposition::kInline)));
   CompareBlock(blocks.find(8)->block, MakeInlinedOrder0StringReferenceBlock("lnk2"));
-  CompareBlock(blocks.find(9)->block, MakeInlinedOrder0StringReferenceBlock("tst2"));
+  CompareBlock(blocks.find(9)->block, MakeInlinedOrder0StringReferenceBlock("/tst"));
 }
 
 TEST(State, LinkContentsAllocationFailure) {
@@ -1521,8 +1526,7 @@ TEST(State, LinkContentsAllocationFailure) {
   // root will be at block index 2
   Node root = state->CreateNode("root", 0);
   std::string name(2000, 'a');
-  std::string content(2000, 'b');
-  Link link = state->CreateLink(name, 2u /* root index */, content, LinkBlockDisposition::kChild);
+  Link link = state->CreateLink(name, 2u /* root index */, name, LinkBlockDisposition::kChild);
 
   fbl::WAVLTree<BlockIndex, std::unique_ptr<ScannedBlock>> blocks;
   size_t free_blocks, allocated_blocks;
@@ -1564,7 +1568,8 @@ TEST(State, GetStatsWithFailedAllocationTest) {
 
   BlockIndex idx;
   std::string data(5000, '.');
-  ASSERT_EQ(ZX_ERR_NO_MEMORY, state->CreateAndIncrementStringReference(data, &idx));
+  auto sr = inspect::StringReference(data.c_str());
+  ASSERT_EQ(ZX_ERR_NO_MEMORY, state->CreateAndIncrementStringReference(sr, &idx));
 
   inspect::InspectStats stats = state->GetStats();
   EXPECT_EQ(0u, stats.dynamic_child_count);

@@ -189,7 +189,7 @@ mod tests {
     use fidl::endpoints::spawn_stream_handler;
     use fidl_fuchsia_io as fio;
     use fidl_fuchsia_sys2 as fsys;
-    use moniker::{Moniker, MonikerBase};
+    use moniker::Moniker;
 
     use super::OpenDirType;
     use super::{

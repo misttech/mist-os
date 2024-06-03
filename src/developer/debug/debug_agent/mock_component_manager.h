@@ -8,8 +8,16 @@
 #include <map>
 
 #include "src/developer/debug/debug_agent/component_manager.h"
+#include "src/developer/debug/debug_agent/debug_agent.h"
 
 namespace debug_agent {
+
+enum class FakeEventType : uint32_t {
+  kDiscovered = 0,
+  kDebugStarted,
+  kStopped,
+  kLast,
+};
 
 class MockComponentManager : public ComponentManager {
  public:
@@ -20,7 +28,7 @@ class MockComponentManager : public ComponentManager {
   auto& component_info() { return component_info_; }
 
   // ComponentManager implementation.
-  void SetDebugAgent(DebugAgent*) override {}
+  void SetDebugAgent(DebugAgent* agent) override { debug_agent_ = agent; }
 
   std::vector<debug_ipc::ComponentInfo> FindComponentInfo(zx_koid_t job_koid) const override {
     auto [start, end] = component_info_.equal_range(job_koid);
@@ -37,6 +45,28 @@ class MockComponentManager : public ComponentManager {
     return components;
   }
 
+  void InjectComponentEvent(FakeEventType type, const std::string& moniker,
+                            const std::string& url) {
+    switch (type) {
+      case FakeEventType::kDiscovered: {
+        debug_agent_->OnComponentDiscovered(moniker, url);
+        break;
+      }
+      case FakeEventType::kDebugStarted: {
+        debug_agent_->OnComponentStarted(moniker, url);
+        break;
+      }
+      case FakeEventType::kStopped: {
+        debug_agent_->OnComponentExited(moniker, url);
+        break;
+      }
+      default: {
+        FX_NOTREACHED();
+        break;
+      }
+    }
+  }
+
   debug::Status LaunchComponent(std::string url) override { return debug::Status("Not supported"); }
 
   debug::Status LaunchTest(std::string url, std::optional<std::string> realm,
@@ -50,6 +80,7 @@ class MockComponentManager : public ComponentManager {
   }
 
  private:
+  DebugAgent* debug_agent_;
   std::multimap<zx_koid_t, debug_ipc::ComponentInfo> component_info_;
 };
 

@@ -3,7 +3,7 @@
 // found in the LICENSE file
 
 #include "sdmmc.h"
-#include "sdk/lib/driver/devicetree/visitors/drivers/interrupt-controllers/arm-gicv2/arm-gicv2.h"
+#include "sdk/lib/driver/devicetree/visitors/drivers/interrupt-controllers/arm-gic/arm-gicv2.h"
 
 /dts-v1/;
 / {

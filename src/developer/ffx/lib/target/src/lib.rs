@@ -3,46 +3,48 @@
 // found in the LICENSE file.
 
 use addr::TargetAddr;
-use anyhow::{Context as _, Result};
-use async_lock::Mutex;
+use anyhow::{bail, Context as _, Result};
 use compat_info::CompatibilityInfo;
 use discovery::{DiscoverySources, TargetEvent, TargetHandle, TargetState};
 use errors::{ffx_bail, FfxError};
 use ffx_config::{keys::TARGET_DEFAULT_KEY, EnvironmentContext};
 use fidl::{endpoints::create_proxy, prelude::*};
 use fidl_fuchsia_developer_ffx::{
-    self as ffx, DaemonError, DaemonProxy, TargetAddrInfo, TargetCollectionMarker,
-    TargetCollectionProxy, TargetInfo, TargetIp, TargetMarker, TargetQuery,
+    self as ffx, DaemonError, DaemonProxy, TargetCollectionMarker, TargetCollectionProxy,
+    TargetInfo, TargetMarker, TargetQuery,
 };
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 use fidl_fuchsia_net as net;
-use fuchsia_async::Timer;
-use futures::{select, Future, FutureExt, StreamExt, TryStreamExt};
+use fuchsia_async::TimeoutExt;
+use futures::{future::join_all, select, Future, FutureExt, StreamExt, TryStreamExt};
 use itertools::Itertools;
 use netext::IsLocalAddr;
 use std::cmp::Ordering;
 use std::collections::HashSet;
-use std::net::{IpAddr, Ipv6Addr};
-use std::net::{SocketAddr, SocketAddrV6};
+use std::net::IpAddr;
+use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
 use timeout::timeout;
 use tracing::{debug, info};
 
-mod desc;
+mod connection;
 mod fidl_pipe;
 mod overnet_connector;
-mod query;
 mod ssh_connector;
 
 const SSH_PORT_DEFAULT: u16 = 22;
+const DEFAULT_SSH_TIMEOUT_MS: u64 = 10000;
 
-pub use desc::{Description, FastbootInterface};
+pub use connection::Connection;
+pub use connection::ConnectionError;
+pub use discovery::desc::{Description, FastbootInterface};
+pub use discovery::query::TargetInfoQuery;
 pub use fidl_pipe::create_overnet_socket;
 pub use fidl_pipe::FidlPipe;
-pub use query::TargetInfoQuery;
+pub use overnet_connector::{OvernetConnection, OvernetConnector};
+pub use ssh_connector::SshConnector;
 
 /// Re-export of [`fidl_fuchsia_developer_ffx::TargetProxy`] for ease of use
 pub use fidl_fuchsia_developer_ffx::TargetProxy;
@@ -133,7 +135,7 @@ pub fn open_target_with_fut<'a, 'b: 'a>(
     };
     let t_clone = target.clone();
     let target_handle_fut = async move {
-        let is_fastboot_inline = env_context.get(FASTBOOT_INLINE_TARGET).await.unwrap_or(false);
+        let is_fastboot_inline = env_context.get(FASTBOOT_INLINE_TARGET).unwrap_or(false);
         if is_fastboot_inline {
             if let Some(ref serial_number) = target {
                 tracing::trace!("got serial number: {serial_number}");
@@ -159,22 +161,6 @@ pub fn open_target_with_fut<'a, 'b: 'a>(
     };
 
     Ok((target_proxy, fut))
-}
-
-pub(crate) fn target_addr_info_to_socket(ti: &TargetAddrInfo) -> SocketAddr {
-    let (target_ip, port) = match ti {
-        TargetAddrInfo::Ip(a) => (a.clone(), 0),
-        TargetAddrInfo::IpPort(ip) => (TargetIp { ip: ip.ip, scope_id: ip.scope_id }, ip.port),
-    };
-    let socket = match target_ip {
-        TargetIp { ip: net::IpAddress::Ipv4(net::Ipv4Address { addr }), .. } => {
-            SocketAddr::new(IpAddr::from(addr), port)
-        }
-        TargetIp { ip: net::IpAddress::Ipv6(net::Ipv6Address { addr }), scope_id, .. } => {
-            SocketAddr::V6(SocketAddrV6::new(Ipv6Addr::from(addr), port, 0, scope_id))
-        }
-    };
-    socket
 }
 
 pub async fn is_discovery_enabled(ctx: &EnvironmentContext) -> bool {
@@ -222,6 +208,131 @@ pub async fn resolve_target_query(
     .await
 }
 
+pub async fn resolve_target_query_to_info(
+    query: TargetInfoQuery,
+    ctx: &EnvironmentContext,
+) -> Result<Vec<ffx::TargetInfo>> {
+    let handles = resolve_target_query(query, ctx).await?;
+    let targets =
+        join_all(handles.into_iter().map(|t| async { get_handle_info(t, ctx).await })).await;
+    targets.into_iter().collect::<Result<Vec<ffx::TargetInfo>>>()
+}
+
+async fn get_handle_info(
+    handle: TargetHandle,
+    context: &EnvironmentContext,
+) -> Result<ffx::TargetInfo> {
+    let (target_state, addresses) = match handle.state {
+        TargetState::Unknown => (ffx::TargetState::Unknown, None),
+        TargetState::Product(target_addrs) => (ffx::TargetState::Product, Some(target_addrs)),
+        TargetState::Fastboot(_) => (ffx::TargetState::Fastboot, None),
+        TargetState::Zedboot => (ffx::TargetState::Zedboot, None),
+    };
+    let RetrievedTargetInfo { rcs_state, product_config, board_config, ssh_address } =
+        if let Some(ref target_addrs) = addresses {
+            RetrievedTargetInfo::get(context, target_addrs).await?
+        } else {
+            RetrievedTargetInfo::default()
+        };
+    let addresses =
+        addresses.map(|ta| ta.into_iter().map(|x| x.into()).collect::<Vec<ffx::TargetAddrInfo>>());
+    Ok(ffx::TargetInfo {
+        nodename: handle.node_name,
+        addresses,
+        rcs_state: Some(rcs_state),
+        target_state: Some(target_state),
+        board_config,
+        product_config,
+        ssh_address: ssh_address.map(|a| TargetAddr::from(a).into()),
+        ..Default::default()
+    })
+}
+
+async fn try_get_target_info(
+    addr: addr::TargetAddr,
+    context: &EnvironmentContext,
+) -> Result<(Option<String>, Option<String>), KnockError> {
+    let connector =
+        SshConnector::new(addr.into(), context).await.context("making ssh connector")?;
+    let conn = Connection::new(connector).await.context("making direct connection")?;
+    let rcs = conn.rcs_proxy().await.context("getting RCS proxy")?;
+    let (pc, bc) = match rcs.identify_host().await {
+        Ok(Ok(id_result)) => (id_result.product_config, id_result.board_config),
+        _ => (None, None),
+    };
+    Ok((pc, bc))
+}
+
+struct RetrievedTargetInfo {
+    rcs_state: ffx::RemoteControlState,
+    product_config: Option<String>,
+    board_config: Option<String>,
+    ssh_address: Option<SocketAddr>,
+}
+
+impl Default for RetrievedTargetInfo {
+    fn default() -> Self {
+        Self {
+            rcs_state: ffx::RemoteControlState::Unknown,
+            product_config: None,
+            board_config: None,
+            ssh_address: None,
+        }
+    }
+}
+
+impl RetrievedTargetInfo {
+    async fn get(context: &EnvironmentContext, addrs: &[addr::TargetAddr]) -> Result<Self> {
+        let ssh_timeout: u64 =
+            ffx_config::get("target.host_pipe_ssh_timeout").await.unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
+        let ssh_timeout = Duration::from_millis(ssh_timeout);
+        for addr in addrs {
+            tracing::debug!("Trying to make a connection to {addr:?}");
+
+            // If the port is 0, we treat that as the default ssh port.
+            let mut addr = *addr;
+            if addr.port() == 0 {
+                addr.set_port(SSH_PORT_DEFAULT);
+            }
+
+            match try_get_target_info(addr, context)
+                .on_timeout(ssh_timeout, || {
+                    Err(KnockError::NonCriticalError(anyhow::anyhow!("knock_rcs() timed out")))
+                })
+                .await
+            {
+                Ok((product_config, board_config)) => {
+                    return Ok(Self {
+                        rcs_state: ffx::RemoteControlState::Up,
+                        product_config,
+                        board_config,
+                        ssh_address: Some(addr.into()),
+                    });
+                }
+                Err(KnockError::NonCriticalError(e)) => {
+                    tracing::debug!("Could not connect to {addr:?}: {e:?}");
+                    continue;
+                }
+                e => {
+                    tracing::debug!("Got error {e:?} when trying to connect to {addr:?}");
+                    return Ok(Self {
+                        rcs_state: ffx::RemoteControlState::Unknown,
+                        product_config: None,
+                        board_config: None,
+                        ssh_address: None,
+                    });
+                }
+            }
+        }
+        Ok(Self {
+            rcs_state: ffx::RemoteControlState::Down,
+            product_config: None,
+            board_config: None,
+            ssh_address: None,
+        })
+    }
+}
+
 pub async fn resolve_target_query_with(
     query: TargetInfoQuery,
     ctx: &EnvironmentContext,
@@ -257,10 +368,10 @@ async fn resolve_target_query_with_sources(
         let description = handle_to_description(handle);
         query.match_description(&description)
     };
-    let emu_instance_root: PathBuf = ctx.get(emulator_instance::EMU_INSTANCE_ROOT_DIR).await?;
+    let emu_instance_root: PathBuf = ctx.get(emulator_instance::EMU_INSTANCE_ROOT_DIR)?;
     let stream =
         discovery::wait_for_devices(filter, Some(emu_instance_root), true, false, sources).await?;
-    let discovery_delay = ctx.get(CONFIG_LOCAL_DISCOVERY_TIMEOUT).await.unwrap_or(2000);
+    let discovery_delay = ctx.get(CONFIG_LOCAL_DISCOVERY_TIMEOUT).unwrap_or(2000);
     let delay = Duration::from_millis(discovery_delay);
 
     // This is tricky. We want the stream to complete immediately if we find
@@ -280,7 +391,7 @@ async fn resolve_target_query_with_sources(
     // the whole thing to be an Err.  We could stop the race early in case of
     // failure by using the same technique, I suppose.
     let target_events: Result<Vec<TargetEvent>> = {
-        let timer = Timer::new(delay).fuse();
+        let timer = fuchsia_async::Timer::new(delay).fuse();
         let found_target_event = async_utils::event::Event::new();
         let found_it = found_target_event.wait().fuse();
         let results: Vec<Result<_>> = stream
@@ -328,7 +439,8 @@ async fn resolve_target_query_with_sources(
 pub async fn resolve_target_address(
     target_spec: Option<String>,
     env_context: &EnvironmentContext,
-) -> Result<Option<SocketAddr>> {
+) -> Result<SocketAddr> {
+    let target_spec_info = target_spec.clone().unwrap_or_else(|| "<unspecified>".to_owned());
     let query = TargetInfoQuery::from(target_spec.clone());
     // If it's already an address, return it
     if let TargetInfoQuery::Addr(a) = query {
@@ -337,11 +449,11 @@ pub async fn resolve_target_address(
             0 => SSH_PORT_DEFAULT,
             p => p,
         };
-        return Ok(Some(TargetAddr::new(a.ip(), scope_id, port).into()));
+        return Ok(TargetAddr::new(a.ip(), scope_id, port).into());
     }
     let handles = resolve_target_query(query, env_context).await?;
     if handles.len() == 0 {
-        return Ok(None);
+        bail!("unable to resolve address for target '{target_spec_info}'");
     }
     if handles.len() > 1 {
         return Err(FfxError::DaemonError {
@@ -355,9 +467,7 @@ pub async fn resolve_target_address(
     match &target.state {
         TargetState::Product(ref addresses) => {
             if addresses.is_empty() {
-                return Err(anyhow::anyhow!(
-                    "Target discovered but does not contain addresses: {target:?}"
-                ));
+                bail!("Target discovered but does not contain addresses: {target:?}");
             }
             let mut addrs_sorted = addresses
                 .into_iter()
@@ -374,29 +484,10 @@ pub async fn resolve_target_address(
             if sock.port() == 0 {
                 sock.set_port(SSH_PORT_DEFAULT)
             }
-            Ok(Some(sock))
+            tracing::debug!("resolved target spec '{target_spec_info}' to address {sock}");
+            Ok(sock)
         }
         state => Err(anyhow::anyhow!("Target discovered but not in the correct state: {state:?}")),
-    }
-}
-
-/// If daemon discovery is disabled, attempts to resolve the query into an
-/// _address_ string query that can be passed to the daemon. If already an
-/// address, just return it. Otherwise, perform discovery to find the address.
-/// Returns Some(_) if a target has been found, None otherwise.
-pub async fn maybe_locally_resolve_target_spec(
-    target_spec: Option<String>,
-    env_context: &EnvironmentContext,
-) -> Result<Option<String>> {
-    if is_discovery_enabled(env_context).await {
-        Ok(target_spec)
-    } else {
-        let query = TargetInfoQuery::from(target_spec.clone());
-        let addr = match query {
-            TargetInfoQuery::Addr(addr) => Some(addr),
-            _ => resolve_target_address(target_spec, env_context).await?,
-        };
-        Ok(addr.map(|addr| addr.to_string()))
     }
 }
 
@@ -416,6 +507,15 @@ pub enum KnockError {
 pub const DEFAULT_RCS_KNOCK_TIMEOUT: Duration =
     Duration::new(rcs::RCS_KNOCK_TIMEOUT.as_secs() * 3, rcs::RCS_KNOCK_TIMEOUT.subsec_nanos() * 3);
 
+impl From<ConnectionError> for KnockError {
+    fn from(e: ConnectionError) -> Self {
+        match e {
+            ConnectionError::KnockError(ke) => KnockError::NonCriticalError(ke.into()),
+            other => KnockError::CriticalError(other.into()),
+        }
+    }
+}
+
 /// Attempts to "knock" a target to determine if it is up and connectable via RCS.
 ///
 /// This is intended to be run in a loop, with a non-critical error implying the caller
@@ -423,6 +523,66 @@ pub const DEFAULT_RCS_KNOCK_TIMEOUT: Duration =
 /// and no longer loop.
 pub async fn knock_target(target: &TargetProxy) -> Result<(), KnockError> {
     knock_target_with_timeout(target, DEFAULT_RCS_KNOCK_TIMEOUT).await
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum WaitFor {
+    DeviceOnline,
+    DeviceOffline,
+}
+
+const OPEN_TARGET_TIMEOUT: Duration = Duration::from_millis(1000);
+const DOWN_REPOLL_DELAY_MS: u64 = 500;
+
+pub async fn wait_for_device(
+    wait_timeout: Option<Duration>,
+    target_spec: Option<String>,
+    target_collection: &TargetCollectionProxy,
+    behavior: WaitFor,
+) -> Result<(), ffx_command::Error> {
+    let target_spec_clone = target_spec.clone();
+    let knock_fut = async {
+        loop {
+            break match knock_target_by_name(
+                &target_spec_clone,
+                target_collection,
+                OPEN_TARGET_TIMEOUT,
+                DEFAULT_RCS_KNOCK_TIMEOUT,
+            )
+            .await
+            {
+                Err(KnockError::CriticalError(e)) => Err(ffx_command::Error::Unexpected(e)),
+                Err(KnockError::NonCriticalError(e)) => {
+                    if let WaitFor::DeviceOffline = behavior {
+                        Ok(())
+                    } else {
+                        tracing::debug!("unable to knock target: {e:?}");
+                        continue;
+                    }
+                }
+                Ok(()) => {
+                    if let WaitFor::DeviceOffline = behavior {
+                        async_io::Timer::after(Duration::from_millis(DOWN_REPOLL_DELAY_MS)).await;
+                        continue;
+                    } else {
+                        Ok(())
+                    }
+                }
+            };
+        }
+    };
+    let timer = if wait_timeout.is_some() {
+        async_io::Timer::after(wait_timeout.unwrap())
+    } else {
+        async_io::Timer::never()
+    };
+    futures_lite::FutureExt::or(knock_fut, async {
+        timer.await;
+        Err(ffx_command::Error::User(
+            FfxError::DaemonError { err: DaemonError::Timeout, target: target_spec }.into(),
+        ))
+    })
+    .await
 }
 
 /// Attempts to "knock" a target to determine if it is up and connectable via RCS, within
@@ -439,7 +599,7 @@ pub async fn knock_target_with_timeout(
 ) -> Result<(), KnockError> {
     if rcs_timeout <= rcs::RCS_KNOCK_TIMEOUT {
         return Err(KnockError::CriticalError(anyhow::anyhow!(
-            "rcs_timeout must be greater than {:?}",
+            "rcs verification timeout must be greater than {:?}",
             rcs::RCS_KNOCK_TIMEOUT
         )));
     }
@@ -490,121 +650,34 @@ pub async fn knock_target_by_name(
     knock_target_with_timeout(&target_proxy, rcs_timeout).await
 }
 
-struct OvernetClient {
-    node: Arc<overnet_core::Router>,
-}
-
-impl OvernetClient {
-    async fn locate_remote_control_node(&self) -> Result<overnet_core::NodeId> {
-        let lpc = self.node.new_list_peers_context().await;
-        let node_id;
-        'found: loop {
-            let new_peers = lpc.list_peers().await?;
-            for peer in &new_peers {
-                let peer_has_remote_control =
-                    peer.services.contains(&RemoteControlMarker::PROTOCOL_NAME.to_string());
-                if peer_has_remote_control {
-                    node_id = peer.node_id;
-                    break 'found;
-                }
-            }
-        }
-        Ok(node_id)
-    }
-
-    /// This is the remote control proxy that should be used for everything.
-    ///
-    /// If this is dropped, it will close the FidlPipe connection.
-    pub(crate) async fn connect_remote_control(&self) -> Result<RemoteControlProxy> {
-        let (server, client) = fidl::Channel::create();
-        let node_id = self.locate_remote_control_node().await?;
-        let _ = self
-            .node
-            .connect_to_service(node_id, RemoteControlMarker::PROTOCOL_NAME, server)
-            .await?;
-        let proxy = RemoteControlProxy::new(fidl::AsyncChannel::from_channel(client));
-        Ok(proxy)
-    }
-}
-
-/// Represents a direct (no daemon) connection to a Fuchsia target.
-pub struct DirectConnection {
-    overnet: OvernetClient,
-    fidl_pipe: FidlPipe,
-    rcs_proxy: Mutex<Option<RemoteControlProxy>>,
-}
-
-impl DirectConnection {
-    pub async fn new(target_spec: String, context: &EnvironmentContext) -> Result<Self> {
-        let addr = resolve_target_address(Some(target_spec.clone()), &context)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Unable to resolve address of target '{target_spec}'"))
-            .context("resolving target address")?;
-        tracing::debug!("Resolved {target_spec:?} to {addr:?}");
-        let node = overnet_core::Router::new(None)?;
-        let fidl_pipe =
-            FidlPipe::new(context, addr, node.clone()).await.context("starting fidl pipe")?;
-        Ok(Self { overnet: OvernetClient { node }, fidl_pipe, rcs_proxy: Default::default() })
-    }
-
-    pub async fn rcs_proxy(&self) -> Result<RemoteControlProxy> {
-        let mut rcs = self.rcs_proxy.lock().await;
-        if rcs.is_none() {
-            *rcs = Some(
-                self.overnet
-                    .connect_remote_control()
-                    .await
-                    .map_err(|e| self.wrap_connection_errors(e).context("getting RCS proxy"))?,
-            );
-        }
-        Ok(rcs.as_ref().unwrap().clone())
-    }
-
-    pub async fn knock_rcs(&self) -> Result<Option<CompatibilityInfo>, KnockError> {
-        let mut rcs = self.rcs_proxy.lock().await;
-        // These are the two places where errors can propagate to the user. For other code using
-        // the FIDL pipe it might be trickier to ensure that errors from the pipe are caught.
-        // For things like FHO integration these errors will probably just be handled outside of
-        // the main subtool.
-        if rcs.is_none() {
-            *rcs = Some(self.overnet.connect_remote_control().await.map_err(|e| {
-                KnockError::CriticalError(
-                    self.wrap_connection_errors(e).context("finding RCS proxy"),
-                )
-            })?);
-        }
-        let res = rcs::knock_rcs(rcs.as_ref().unwrap()).await.map_err(|e| anyhow::anyhow!("{e:?}"));
-        match res {
-            Ok(()) => Ok(self.fidl_pipe.compatibility_info()),
-            Err(e) => Err(KnockError::NonCriticalError(
-                self.wrap_connection_errors(e).context("getting RCS proxy"),
-            )),
-        }
-    }
-
-    /// Takes a given connection error and, if there have been underlying connection errors, adds
-    /// additional context to the passed error, else leaves the error the same.
-    ///
-    /// This function is used to overcome some of the shortcomings around FIDL errors, as on the
-    /// host they are being used to simulate what is essentially a networked connection, and not an
-    /// OS-backed operation (like when using FIDL on a Fuchsia device).
-    pub fn wrap_connection_errors(&self, e: anyhow::Error) -> anyhow::Error {
-        if let Some(pipe_errors) = self.fidl_pipe.try_drain_errors() {
-            return anyhow::anyhow!("{e:?}\n{pipe_errors:?}");
-        }
-        e
-    }
-}
-
 /// Identical to the above "knock_target" but does not use the daemon.
 ///
-/// Unlike other errors, this is not intended to be run in a tight loop.
+/// Keep in mind because there is no daemon being used, the connection process must be bootstrapped
+/// for each attempt, so this function may need more time to run than the functions that perform
+/// this action through the daemon (which is presumed to be already active). As a result, if
+/// `knock_timeout` is set to `None`, the default timeout will be set to 2 times
+/// `DEFAULT_RCS_KNOCK_TIMEOUT`.
 pub async fn knock_target_daemonless(
-    target_spec: String,
+    target_spec: Option<String>,
     context: &EnvironmentContext,
+    knock_timeout: Option<Duration>,
 ) -> Result<Option<CompatibilityInfo>, KnockError> {
-    let conn = DirectConnection::new(target_spec, context).await?;
-    conn.knock_rcs().await
+    let knock_timeout = knock_timeout.unwrap_or(DEFAULT_RCS_KNOCK_TIMEOUT * 2);
+    let res_future = async {
+        tracing::trace!("resolving target spec address from {target_spec:?}");
+        let address = resolve_target_address(target_spec, context).await?;
+        tracing::debug!("daemonless knock connecting to address {address}");
+        let conn = Connection::new(SshConnector::new(address, context).await?)
+            .await
+            .map_err(|e| KnockError::CriticalError(e.into()))?;
+        tracing::debug!("daemonless knock connection established");
+        let _ = conn.rcs_proxy().await.map_err(|e| KnockError::NonCriticalError(e.into()))?;
+        Ok(conn.compatibility_info())
+    };
+    futures_lite::pin!(res_future);
+    timeout::timeout(knock_timeout, res_future)
+        .await
+        .map_err(|e| KnockError::NonCriticalError(e.into()))?
 }
 
 /// Get the target specifier.  This uses the normal config mechanism which
@@ -619,7 +692,7 @@ pub async fn knock_target_daemonless(
 /// an explicit _name_ is provided.  In other contexts, it is valid for the specifier
 /// to be a substring, a network address, etc.
 pub async fn get_target_specifier(context: &EnvironmentContext) -> Result<Option<String>> {
-    let target_spec = context.get(TARGET_DEFAULT_KEY).await?;
+    let target_spec = context.get(TARGET_DEFAULT_KEY)?;
     match target_spec {
         Some(ref target) => info!("Target specifier: ['{target:?}']"),
         None => debug!("No target specified"),
@@ -673,50 +746,7 @@ pub async fn add_manual_target(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::overnet_connector::{OvernetConnection, OvernetConnectionError, OvernetConnector};
-    use async_channel::Receiver;
     use ffx_config::{macro_deps::serde_json::Value, test_init, ConfigLevel};
-    use fidl_fuchsia_developer_remotecontrol as rcs_fidl;
-    use fuchsia_async::Task;
-
-    fn create_overnet_circuit(router: Arc<overnet_core::Router>) -> fidl::AsyncSocket {
-        let (local_socket, remote_socket) = fidl::Socket::create_stream();
-        let local_socket = fidl::AsyncSocket::from_socket(local_socket);
-
-        let socket = fidl::AsyncSocket::from_socket(remote_socket);
-        let (mut rx, mut tx) = futures::AsyncReadExt::split(socket);
-        Task::spawn(async move {
-            let (errors_sender, errors) = futures::channel::mpsc::unbounded();
-            if let Err(e) = futures::future::join(
-                circuit::multi_stream::multi_stream_node_connection_to_async(
-                    router.circuit_node(),
-                    &mut rx,
-                    &mut tx,
-                    true,
-                    circuit::Quality::NETWORK,
-                    errors_sender,
-                    "client".to_owned(),
-                ),
-                errors
-                    .map(|e| {
-                        eprintln!("A client circuit stream failed: {e:?}");
-                    })
-                    .collect::<()>(),
-            )
-            .map(|(result, ())| result)
-            .await
-            {
-                if let circuit::Error::ConnectionClosed(msg) = e {
-                    eprintln!("testing overnet link closed: {:?}", msg);
-                } else {
-                    eprintln!("error handling Overnet link: {:?}", e);
-                }
-            }
-        })
-        .detach();
-
-        local_socket
-    }
 
     #[fuchsia::test]
     async fn test_target_wait_too_short_timeout() {
@@ -801,177 +831,15 @@ mod test {
         std::env::remove_var("MY_LITTLE_TMPKEY");
     }
 
-    #[derive(Debug, Clone, Eq, PartialEq)]
-    enum FakeOvernetBehavior {
-        CloseRcsImmediately,
-        KeepRcsOpen,
-    }
-
-    #[derive(Debug)]
-    struct FakeOvernet {
-        circuit_node: Arc<overnet_core::Router>,
-        error_receiver: Receiver<anyhow::Error>,
-        behavior: FakeOvernetBehavior,
-    }
-
-    impl FakeOvernet {
-        async fn handle_transaction(
-            req: rcs_fidl::RemoteControlRequest,
-            behavior: &FakeOvernetBehavior,
-        ) {
-            match req {
-                rcs_fidl::RemoteControlRequest::OpenCapability {
-                    server_channel,
-                    responder,
-                    ..
-                } => {
-                    match behavior {
-                        FakeOvernetBehavior::KeepRcsOpen => {
-                            // We're just going to assume this capability is always going to be
-                            // RCS, and avoid string matching for the sake of avoiding changes
-                            // to monikers and/or capability connecting.
-                            let mut stream = rcs_fidl::RemoteControlRequestStream::from_channel(
-                                fidl::AsyncChannel::from_channel(server_channel),
-                            );
-                            // This task is here to ensure the channel stays open, but won't
-                            // necessarily need do anything.
-                            Task::spawn(async move {
-                                while let Ok(Some(req)) = stream.try_next().await {
-                                    eprintln!("Got a request: {req:?}")
-                                }
-                            })
-                            .detach();
-                        }
-                        FakeOvernetBehavior::CloseRcsImmediately => {
-                            drop(server_channel);
-                        }
-                    }
-                    responder.send(Ok(())).unwrap();
-                }
-                rcs_fidl::RemoteControlRequest::EchoString { value, responder } => {
-                    responder.send(&value).unwrap()
-                }
-                _ => panic!("Received an unexpected request: {req:?}"),
-            }
-        }
-    }
-
-    impl OvernetConnector for FakeOvernet {
-        async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError> {
-            let circuit_socket = create_overnet_circuit(self.circuit_node.clone());
-            let (rcs_sender, rcs_receiver) = async_channel::unbounded();
-            self.circuit_node
-                .register_service(
-                    rcs_fidl::RemoteControlMarker::PROTOCOL_NAME.to_owned(),
-                    move |channel| {
-                        let _ = rcs_sender.try_send(channel).unwrap();
-                        Ok(())
-                    },
-                )
-                .await
-                .unwrap();
-            let behavior = self.behavior.clone();
-            let rcs_task = Task::local(async move {
-                while let Ok(channel) = rcs_receiver.recv().await {
-                    let mut stream = rcs_fidl::RemoteControlRequestStream::from_channel(
-                        fidl::AsyncChannel::from_channel(channel),
-                    );
-                    while let Ok(Some(req)) = stream.try_next().await {
-                        Self::handle_transaction(req, &behavior).await;
-                    }
-                }
-            });
-            let (circuit_reader, circuit_writer) = tokio::io::split(circuit_socket);
-            Ok(OvernetConnection {
-                output: Box::new(tokio::io::BufReader::new(circuit_reader)),
-                input: Box::new(circuit_writer),
-                errors: self.error_receiver.clone(),
-                compat: None,
-                main_task: Some(rcs_task),
-            })
-        }
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_overnet_rcs_knock() {
-        let node = overnet_core::Router::new(None).unwrap();
-        let overnet_socket = create_overnet_socket(node.clone()).unwrap();
-        let (reader, writer) = tokio::io::split(overnet_socket);
-        let circuit_node = overnet_core::Router::new(None).unwrap();
-        let (_sender, error_receiver) = async_channel::unbounded();
-        let circuit = FakeOvernet {
-            circuit_node: circuit_node.clone(),
-            error_receiver,
-            behavior: FakeOvernetBehavior::KeepRcsOpen,
-        };
-        let fidl_pipe =
-            FidlPipe::start_internal("127.0.0.1:22".parse().unwrap(), reader, writer, circuit)
-                .await
-                .unwrap();
-        let conn = DirectConnection {
-            overnet: OvernetClient { node },
-            fidl_pipe,
-            rcs_proxy: Default::default(),
-        };
-        assert!(conn.knock_rcs().await.is_ok());
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_overnet_rcs_knock_failure_disconnect() {
-        let node = overnet_core::Router::new(None).unwrap();
-        let overnet_socket = create_overnet_socket(node.clone()).unwrap();
-        let (reader, writer) = tokio::io::split(overnet_socket);
-        let circuit_node = overnet_core::Router::new(None).unwrap();
-        let (error_sender, error_receiver) = async_channel::unbounded();
-        let circuit = FakeOvernet {
-            circuit_node: circuit_node.clone(),
-            error_receiver,
-            behavior: FakeOvernetBehavior::CloseRcsImmediately,
-        };
-        let fidl_pipe =
-            FidlPipe::start_internal("[::1]:22".parse().unwrap(), reader, writer, circuit)
-                .await
-                .unwrap();
-        let conn = DirectConnection {
-            overnet: OvernetClient { node },
-            fidl_pipe,
-            rcs_proxy: Default::default(),
-        };
-        error_sender.send(anyhow::anyhow!("kaboom")).await.unwrap();
-        let err = conn.knock_rcs().await;
-        assert!(err.is_err());
-        let err_string = err.unwrap_err().to_string();
-        assert!(err_string.contains("kaboom"));
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_overnet_rcs_echo_multiple_times() {
-        let node = overnet_core::Router::new(None).unwrap();
-        let overnet_socket = create_overnet_socket(node.clone()).unwrap();
-        let (reader, writer) = tokio::io::split(overnet_socket);
-        let circuit_node = overnet_core::Router::new(None).unwrap();
-        let (_sender, error_receiver) = async_channel::unbounded();
-        let circuit = FakeOvernet {
-            circuit_node: circuit_node.clone(),
-            error_receiver,
-            behavior: FakeOvernetBehavior::KeepRcsOpen,
-        };
-        let fidl_pipe =
-            FidlPipe::start_internal("127.0.0.1:22".parse().unwrap(), reader, writer, circuit)
-                .await
-                .unwrap();
-        let conn = DirectConnection {
-            overnet: OvernetClient { node },
-            fidl_pipe,
-            rcs_proxy: Default::default(),
-        };
-        let rcs = conn.rcs_proxy().await.unwrap();
-        assert_eq!(rcs.echo_string("foobart").await.unwrap(), "foobart".to_owned());
-        let rcs2 = conn.rcs_proxy().await.unwrap();
-        assert_eq!(rcs2.echo_string("foobarr").await.unwrap(), "foobarr".to_owned());
-        drop(rcs);
-        drop(rcs2);
-        let rcs3 = conn.rcs_proxy().await.unwrap();
-        assert_eq!(rcs3.echo_string("foobarz").await.unwrap(), "foobarz".to_owned());
+    #[fuchsia::test]
+    async fn test_bad_timeout() {
+        let env = test_init().await.unwrap();
+        assert!(knock_target_daemonless(
+            Some("foo".to_string()),
+            &env.context,
+            Some(rcs::RCS_KNOCK_TIMEOUT)
+        )
+        .await
+        .is_err());
     }
 }

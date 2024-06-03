@@ -134,7 +134,13 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             )?
             .field("display_pixel_density", ui_config.display_pixel_density.clone())?
             .field("display_rotation", ui_config.display_rotation)?
-            .field("viewing_distance", ui_config.viewing_distance.as_ref())?;
+            .field("viewing_distance", ui_config.viewing_distance.as_ref())?
+            .field("idle_threshold_ms", {
+                match context.build_type {
+                    BuildType::Eng => 5000,
+                    BuildType::UserDebug | BuildType::User => 100,
+                }
+            })?;
 
         let config_dir = builder
             .add_domain_config(PackageSetDestination::Blob(PackageDestination::SensorConfig))

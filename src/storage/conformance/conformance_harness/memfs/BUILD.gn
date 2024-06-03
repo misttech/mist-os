@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components.gni")
+import("//src/storage/conformance/storage_conformance_test.gni")
 
 executable("bin") {
   testonly = true
@@ -21,19 +21,7 @@ executable("bin") {
   ]
 }
 
-fuchsia_component("memfs-harness") {
-  testonly = true
-  manifest = "meta/memfs_harness.cml"
-  deps = [ ":bin" ]
-}
-
-fuchsia_component("memfs-test") {
-  testonly = true
-  manifest = "//src/storage/conformance/meta/memfs_conformance_test.cml"
-  deps = [ "//src/storage/conformance:io1_conformance_test" ]
-}
-
-fuchsia_test_package("memfs-conformance-test") {
-  test_components = [ ":memfs-test" ]
-  deps = [ ":memfs-harness" ]
+storage_conformance_test("memfs") {
+  harness_manifest = "meta/memfs_harness.cml"
+  harness_binary = ":bin"
 }

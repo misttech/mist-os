@@ -97,7 +97,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
           // We cannot free Free() bookkeeping ranges.
           if (type != memalloc::Type::kPoolBookkeeping) {
             allocations.emplace_back(
-                memalloc::Range{.addr = std::move(result).value(), .size = size, .type = type});
+                memalloc::Range{.addr = result.value(), .size = size, .type = type});
           }
         }
         break;
@@ -129,15 +129,13 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
           break;
         }
         // Resize the last allocation.
-        auto allocation = allocations.back();
+        auto& allocation = allocations.back();
         uint64_t new_size = provider.ConsumeIntegralInRange<uint64_t>(1, kMax);
         uint64_t min_alignment = uint64_t{1} << provider.ConsumeIntegralInRange<size_t>(
                                      0, cpp20::countr_zero(allocation.addr));
         if (auto result = ctx.pool.Resize(allocation, new_size, min_alignment); result.is_ok()) {
-          allocations.pop_back();
-          allocation.addr = std::move(result).value();
+          allocation.addr = result.value();
           allocation.size = new_size;
-          allocations.push_back(allocation);
         }
         break;
       }

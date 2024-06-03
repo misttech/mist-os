@@ -78,6 +78,11 @@ int cmd_reboot(int argc, const cmd_args* argv, uint32_t flags) {
     // unreachable
   }
 
+  if (argc > 1 && !strcmp(argv[1].str, "bootloader")) {
+    dprintf(INFO, "rebooting to the bootloader . . .\n");
+    platform_halt(HALT_ACTION_REBOOT_BOOTLOADER, ZirconCrashReason::NoCrash);
+    // unreachable
+  }
   platform_halt(HALT_ACTION_REBOOT, ZirconCrashReason::NoCrash);
 }
 }  // namespace

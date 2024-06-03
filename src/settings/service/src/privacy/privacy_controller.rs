@@ -11,14 +11,11 @@ use crate::handler::setting_handler::{
 use crate::privacy::types::PrivacyInfo;
 use async_trait::async_trait;
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
-use settings_storage::storage_factory::StorageAccess;
+use settings_storage::storage_factory::{NoneT, StorageAccess};
 
 impl DeviceStorageCompatible for PrivacyInfo {
+    type Loader = NoneT;
     const KEY: &'static str = "privacy_info";
-
-    fn default_value() -> Self {
-        PrivacyInfo { user_data_sharing_consent: None }
-    }
 }
 
 impl From<PrivacyInfo> for SettingInfo {
@@ -33,7 +30,8 @@ pub struct PrivacyController {
 
 impl StorageAccess for PrivacyController {
     type Storage = DeviceStorage;
-    const STORAGE_KEYS: &'static [&'static str] = &[PrivacyInfo::KEY];
+    type Data = PrivacyInfo;
+    const STORAGE_KEY: &'static str = PrivacyInfo::KEY;
 }
 
 #[async_trait]

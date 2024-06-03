@@ -29,9 +29,18 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
         // If the board supports the PMM checker, and this is an eng build-type
         // build, enable the pmm checker.
         if context.board_info.provides_feature("fuchsia::pmm_checker")
+            && context.board_info.provides_feature("fuchsia::pmm_checker_auto")
+        {
+            anyhow::bail!("Board provides conflicting features of 'fuchsia::pmm_checker' and 'fuchsia::pmm_checker_auto'");
+        }
+        if context.board_info.provides_feature("fuchsia::pmm_checker")
             && context.build_type == &BuildType::Eng
         {
             builder.platform_bundle("kernel_pmm_checker_enabled");
+        } else if context.board_info.provides_feature("fuchsia::pmm_checker_auto")
+            && context.build_type == &BuildType::Eng
+        {
+            builder.platform_bundle("kernel_pmm_checker_enabled_auto");
         }
 
         if context.board_info.kernel.contiguous_physical_pages {

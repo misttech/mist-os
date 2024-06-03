@@ -5,6 +5,7 @@
 #include "sockscripter.h"
 
 #include <arpa/inet.h>
+#include <netinet/icmp6.h>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -557,6 +558,74 @@ TEST(SockOptTestMulticastIf, SetGetParam) {
       });
   cmd << "tcp set-mcast-if4 192.168.0.1%1 log-mcast-if4";
   EXPECT_EQ(test.RunCommandLine(cmd.str()), 0);
+}
+
+TEST(SockOptTestIcmp6Filter, SetGetParam) {
+  testing::StrictMock<TestApi> test;
+  testing::InSequence s;
+  std::stringstream cmd;
+  EXPECT_CALL(test, socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)).WillOnce(testing::Return(kSockFd));
+  icmp6_filter expected;
+  EXPECT_CALL(test, setsockopt(kSockFd, SOL_ICMPV6, ICMP6_FILTER, testing::_, testing::_))
+      .WillOnce([&expected](testing::Unused, testing::Unused, testing::Unused, const void* optval,
+                            socklen_t optlen) {
+        EXPECT_EQ(optlen, sizeof(expected));
+        memcpy(&expected, optval, optlen);
+        return 0;
+      });
+  EXPECT_CALL(test, getsockopt(kSockFd, SOL_ICMPV6, ICMP6_FILTER, testing::_, testing::_))
+      .WillOnce([&expected](testing::Unused, testing::Unused, testing::Unused, void* optval,
+                            socklen_t* optlen) {
+        EXPECT_EQ(*optlen, sizeof(icmp6_filter));
+        memcpy(optval, &expected.icmp6_filt, *optlen);
+        *optlen = sizeof(expected.icmp6_filt);
+        return 0;
+      });
+  cmd << "raw6 58"
+      << " set-icmp6-filter 0123FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF7654"
+      << " log-icmp6-filter";
+  ASSERT_EQ(test.RunCommandLine(cmd.str()), 0);
+  EXPECT_EQ(expected.icmp6_filt[0], (uint32_t)0xFFFF7654);
+  EXPECT_EQ(expected.icmp6_filt[1], (uint32_t)0xFFFFFFFF);
+  EXPECT_EQ(expected.icmp6_filt[2], (uint32_t)0xFFFFFFFF);
+  EXPECT_EQ(expected.icmp6_filt[3], (uint32_t)0xFFFFFFFF);
+  EXPECT_EQ(expected.icmp6_filt[4], (uint32_t)0xFFFFFFFF);
+  EXPECT_EQ(expected.icmp6_filt[5], (uint32_t)0xFFFFFFFF);
+  EXPECT_EQ(expected.icmp6_filt[6], (uint32_t)0xFFFFFFFF);
+  EXPECT_EQ(expected.icmp6_filt[7], (uint32_t)0x0123FFFF);
+}
+
+TEST(SockOptTestIcmp6Filter, SetGetParamOmitLeadingZeros) {
+  testing::StrictMock<TestApi> test;
+  testing::InSequence s;
+  std::stringstream cmd;
+  EXPECT_CALL(test, socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)).WillOnce(testing::Return(kSockFd));
+  icmp6_filter expected;
+  EXPECT_CALL(test, setsockopt(kSockFd, SOL_ICMPV6, ICMP6_FILTER, testing::_, testing::_))
+      .WillOnce([&expected](testing::Unused, testing::Unused, testing::Unused, const void* optval,
+                            socklen_t optlen) {
+        EXPECT_EQ(optlen, sizeof(expected));
+        memcpy(&expected, optval, optlen);
+        return 0;
+      });
+  EXPECT_CALL(test, getsockopt(kSockFd, SOL_ICMPV6, ICMP6_FILTER, testing::_, testing::_))
+      .WillOnce([&expected](testing::Unused, testing::Unused, testing::Unused, void* optval,
+                            socklen_t* optlen) {
+        EXPECT_EQ(*optlen, sizeof(icmp6_filter));
+        memcpy(optval, &expected.icmp6_filt, *optlen);
+        *optlen = sizeof(expected.icmp6_filt);
+        return 0;
+      });
+  cmd << "raw6 58 set-icmp6-filter 1 log-icmp6-filter";
+  ASSERT_EQ(test.RunCommandLine(cmd.str()), 0);
+  EXPECT_EQ(expected.icmp6_filt[0], (uint32_t)0x00000001);
+  EXPECT_EQ(expected.icmp6_filt[1], (uint32_t)0x00000000);
+  EXPECT_EQ(expected.icmp6_filt[2], (uint32_t)0x00000000);
+  EXPECT_EQ(expected.icmp6_filt[3], (uint32_t)0x00000000);
+  EXPECT_EQ(expected.icmp6_filt[4], (uint32_t)0x00000000);
+  EXPECT_EQ(expected.icmp6_filt[5], (uint32_t)0x00000000);
+  EXPECT_EQ(expected.icmp6_filt[6], (uint32_t)0x00000000);
+  EXPECT_EQ(expected.icmp6_filt[7], (uint32_t)0x00000000);
 }
 
 INSTANTIATE_TEST_SUITE_P(

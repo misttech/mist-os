@@ -28,7 +28,6 @@ use {
                 routing_test_helpers::*, test_helpers::*,
             },
         },
-        sandbox_util::DictExt,
     },
     ::routing::{
         capability_source::{
@@ -36,6 +35,7 @@ use {
         },
         error::ComponentInstanceError,
         resolving::ResolverError,
+        DictExt,
     },
     assert_matches::assert_matches,
     async_trait::async_trait,
@@ -59,7 +59,7 @@ use {
     },
     hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
     maplit::btreemap,
-    moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
+    moniker::{ChildName, Moniker},
     router_error::{DowncastErrorForTest, RouterError},
     routing::component_instance::ComponentInstanceInterface,
     routing_test_helpers::{
@@ -1069,7 +1069,7 @@ async fn create_child_with_dict() {
     ];
 
     // Create a dictionary with a sender for the `hippo` protocol.
-    let mut dict = sandbox::Dict::new();
+    let dict = sandbox::Dict::new();
 
     let (receiver, sender) = sandbox::Receiver::new();
 
@@ -3412,7 +3412,7 @@ async fn source_component_stopping_when_routing() {
 
     // Start to request a capability from the component.
     let (client_end, server_end) = zx::Channel::create();
-    let output = root.lock_resolved_state().await.unwrap().component_output_dict.clone();
+    let output = root.lock_resolved_state().await.unwrap().sandbox.component_output_dict.clone();
     let route_and_open_fut = async {
         // Route the capability.
         let entry = output
@@ -3478,7 +3478,7 @@ async fn source_component_stopped_after_routing_before_open() {
     assert!(!root.is_started().await);
 
     // Request a capability from the component.
-    let output = root.lock_resolved_state().await.unwrap().component_output_dict.clone();
+    let output = root.lock_resolved_state().await.unwrap().sandbox.component_output_dict.clone();
     let cap = output
         .get_capability(&RelativePath::new("foo").unwrap())
         .unwrap()
@@ -3547,7 +3547,7 @@ async fn source_component_shutdown_after_routing_before_open() {
     assert!(!root.is_started().await);
 
     // Request a capability from the component.
-    let output = root.lock_resolved_state().await.unwrap().component_output_dict.clone();
+    let output = root.lock_resolved_state().await.unwrap().sandbox.component_output_dict.clone();
     let cap = output
         .get_capability(&RelativePath::new("foo").unwrap())
         .unwrap()

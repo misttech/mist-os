@@ -99,8 +99,12 @@ static_library("lib") {
 
   if (is_fuchsia) {
     sources += [
+      "backtrace_utils.cc",
+      "backtrace_utils.h",
       "debug_agent_server.cc",
       "debug_agent_server.h",
+      "process_info_iterator.cc",
+      "process_info_iterator.h",
       "test_realm.cc",
       "test_realm.h",
       "zircon_arch.cc",
@@ -143,6 +147,7 @@ static_library("lib") {
       "//third_party/crashpad/src/util",
       "//zircon/system/ulib/async-loop:async-loop-cpp",
       "//zircon/system/ulib/async-loop:async-loop-default",
+      "//zircon/system/ulib/inspector",
     ]
 
     deps += [
@@ -342,6 +347,7 @@ test("unit_tests") {
     sources += [
       "automation_instruction_executor_unittest.cc",
       "breakpoint_unittest.cc",
+      "debug_agent_server_unittest.cc",
       "debug_agent_unittest.cc",
       "debugged_process_unittest.cc",
       "debugged_thread_breakpoint_unittest.cc",
@@ -349,6 +355,7 @@ test("unit_tests") {
       "elf_utils_unittest.cc",
       "filter_unittest.cc",
       "hardware_breakpoint_unittest.cc",
+      "process_info_iterator_unittest.cc",
       "software_breakpoint_unittest.cc",
       "system_interface_unittest.cc",
       "time_zircon_unittest.cc",

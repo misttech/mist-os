@@ -108,6 +108,13 @@ PhysBootTimes gBootTimes;
 
   RelocateElfKernel(elf_kernel);
 
+  if (elf_kernel.memory_image().size_bytes() > KERNEL_IMAGE_MAX_SIZE) {
+    ZX_PANIC(
+        "%s: Attempting to load kernel of size %#zx. Max supported kernel size is %#zx (\"KERNEL_IMAGE_MAX_SIZE\").\n",
+        gSymbolize->name(), elf_kernel.memory_image().size_bytes(),
+        static_cast<size_t>(KERNEL_IMAGE_MAX_SIZE));
+  }
+
   // Prepare the handoff data structures.  Repurpose the storage item as a
   // place to put the handoff payload.  The KERNEL_STORAGE payload was already
   // decompressed elsewhere, so it's no longer in use.

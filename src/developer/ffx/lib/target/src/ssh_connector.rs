@@ -38,14 +38,14 @@ impl From<SshError> for OvernetConnectionError {
 }
 
 #[derive(Debug)]
-pub(crate) struct SshConnector {
+pub struct SshConnector {
     pub(crate) cmd: Option<Child>,
     target: SocketAddr,
     env_context: EnvironmentContext,
 }
 
 impl SshConnector {
-    pub(crate) async fn new(target: SocketAddr, env_context: &EnvironmentContext) -> Result<Self> {
+    pub async fn new(target: SocketAddr, env_context: &EnvironmentContext) -> Result<Self> {
         Ok(Self { cmd: None, target, env_context: env_context.clone() })
     }
 }

@@ -20,10 +20,10 @@ use {
     },
     std::pin::Pin,
     tracing::{error, info},
-    wlan_ffi_transport::BufferProvider,
+    wlan_ffi_transport::{BufferProvider, EthernetTx, WlanRx},
     wlan_fidl_ext::{ResponderExt, SendResultExt, WithName},
     wlan_mlme::{
-        device::{completers::InitCompleter, DeviceOps, FrameProcessor},
+        device::{completers::InitCompleter, DeviceOps},
         DriverEvent, DriverEventSink,
     },
     wlan_sme::serve::create_sme,
@@ -444,14 +444,20 @@ async fn bootstrap_generic_sme<D: DeviceOps>(
     // Calling WlanSoftmac.Start() indicates to the vendor driver that this driver (wlansoftmac) is
     // ready to receive WlanSoftmacIfc messages. wlansoftmac will buffer all WlanSoftmacIfc messages
     // in an mpsc::UnboundedReceiver<DriverEvent> sink until the MLME server drains them.
-    let usme_bootstrap_channel_via_iface_creation =
-        match device.start(ifc_bridge, FrameProcessor::new(driver_event_sink)).await {
-            Ok(channel) => channel,
-            Err(status) => {
-                error!("Failed to receive a UsmeBootstrap handle: {}", status);
-                return Err(status);
-            }
-        };
+    let usme_bootstrap_channel_via_iface_creation = match device
+        .start(
+            ifc_bridge,
+            EthernetTx::new(Box::new(driver_event_sink.clone())),
+            WlanRx::new(Box::new(driver_event_sink)),
+        )
+        .await
+    {
+        Ok(channel) => channel,
+        Err(status) => {
+            error!("Failed to receive a UsmeBootstrap handle: {}", status);
+            return Err(status);
+        }
+    };
     let server = fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(
         usme_bootstrap_channel_via_iface_creation,
     );

@@ -1929,8 +1929,8 @@ void Thread::Current::BecomeIdle() {
     Scheduler::RemoveFirstThread(t);
     t->set_running();
 
-    // Cpu is active.
-    mp_set_curr_cpu_active(true);
+    // Cpu must be marked active by now, indicate that it is idle as well.
+    DEBUG_ASSERT(mp_is_cpu_active(curr_cpu));
     mp_set_cpu_idle(curr_cpu);
 
     // Pend a preemption to ensure a reschedule.
@@ -1983,7 +1983,7 @@ void Thread::SecondaryCpuInitEarly() {
 void thread_secondary_cpu_entry() {
   DEBUG_ASSERT(arch_blocking_disallowed());
 
-  mp_set_curr_cpu_active(true);
+  Scheduler::SetCurrCpuActive(true);
 
   percpu& current_cpu = percpu::GetCurrent();
 

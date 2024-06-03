@@ -36,7 +36,7 @@ required for running the test suite.
    python3 $TEST_TOOLCHAIN start \
      --rust $DEV_ROOT/rust/install/fuchsia-rust \
      --sdk $DEV_ROOT/sdk \
-     --target {{ '<var>' }}x64_64|arm64{{ '</var>' }}-unknown-fuchsia
+     --target {{ '<var>' }}x86_64|arm64{{ '</var>' }}-unknown-fuchsia
    ```
 
    Note: If the host architecture doesn't match the target architecture,

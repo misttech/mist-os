@@ -14,8 +14,17 @@
         compat: "driver/i2c-hid.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
+    capabilities: [
+        { service: "fuchsia.hardware.hidbus.Service" },
+    ],
     use: [
         { service: "fuchsia.hardware.acpi.Service" },
         { service: "fuchsia.hardware.i2c.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.hidbus.Service",
+            from: "self",
+        },
     ],
 }

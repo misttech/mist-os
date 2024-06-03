@@ -570,8 +570,10 @@ pub struct zxio_node_attr {
     pub fsverity_options: zxio_verification_options_t,
     pub fsverity_root_hash: *mut u8,
     pub fsverity_enabled: bool,
+    pub __bindgen_padding_1: [u8; 3usize],
+    pub object_type: zxio_object_type_t,
     pub has: zxio_node_attr_zxio_node_attr_has_t,
-    pub __bindgen_padding_1: [u8; 6usize],
+    pub __bindgen_padding_2: [u8; 6usize],
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
@@ -593,6 +595,7 @@ pub struct zxio_node_attr_zxio_node_attr_has_t {
     pub fsverity_options: bool,
     pub fsverity_root_hash: bool,
     pub fsverity_enabled: bool,
+    pub object_type: bool,
 }
 impl Default for zxio_node_attr {
     fn default() -> Self {
@@ -1377,6 +1380,21 @@ pub const ZXIO_ALLOCATE_PUNCH_HOLE: zxio_allocate_mode_t = 4;
 pub const ZXIO_ALLOCATE_COLLAPSE_RANGE: zxio_allocate_mode_t = 8;
 pub const ZXIO_ALLOCATE_ZERO_RANGE: zxio_allocate_mode_t = 16;
 pub const ZXIO_ALLOCATE_INSERT_RANGE: zxio_allocate_mode_t = 32;
+pub const ZXIO_OBJECT_TYPE_NONE: zxio_object_type_t = 0;
+pub const ZXIO_OBJECT_TYPE_NODE: zxio_object_type_t = 1;
+pub const ZXIO_OBJECT_TYPE_DIR: zxio_object_type_t = 2;
+pub const ZXIO_OBJECT_TYPE_SERVICE: zxio_object_type_t = 3;
+pub const ZXIO_OBJECT_TYPE_FILE: zxio_object_type_t = 4;
+pub const ZXIO_OBJECT_TYPE_TTY: zxio_object_type_t = 5;
+pub const ZXIO_OBJECT_TYPE_VMO: zxio_object_type_t = 6;
+pub const ZXIO_OBJECT_TYPE_DEBUGLOG: zxio_object_type_t = 7;
+pub const ZXIO_OBJECT_TYPE_PIPE: zxio_object_type_t = 8;
+pub const ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET: zxio_object_type_t = 9;
+pub const ZXIO_OBJECT_TYPE_STREAM_SOCKET: zxio_object_type_t = 10;
+pub const ZXIO_OBJECT_TYPE_RAW_SOCKET: zxio_object_type_t = 11;
+pub const ZXIO_OBJECT_TYPE_PACKET_SOCKET: zxio_object_type_t = 12;
+pub const ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET: zxio_object_type_t = 13;
+pub const ZXIO_OBJECT_TYPE_SYMLINK: zxio_object_type_t = 14;
 pub type __builtin_va_list = [__va_list_tag; 1usize];
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]

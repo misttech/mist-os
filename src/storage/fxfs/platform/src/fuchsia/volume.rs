@@ -12,7 +12,7 @@ use {
         memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
         node::{FxNode, GetResult, NodeCache},
         pager::Pager,
-        profile::ProfileState,
+        profile::{new_profile_state, ProfileState},
         symlink::FxSymlink,
         volumes_directory::VolumesDirectory,
     },
@@ -120,7 +120,7 @@ impl Default for MemoryPressureConfig {
 
 /// Holds all the state about current profile recording and replay.
 struct ProfileHolder {
-    state: ProfileState,
+    state: Box<dyn ProfileState>,
 
     /// The name for the ongoing recording upon completion and the object id of that recording.
     recording_info: Option<(String, u64)>,
@@ -168,7 +168,7 @@ impl FxVolume {
             scope,
             dirent_cache: DirentCache::new(DIRENT_CACHE_LIMIT),
             profile_state: Mutex::new(ProfileHolder {
-                state: ProfileState::new(),
+                state: new_profile_state(true),
                 recording_info: None,
             }),
         })
@@ -285,14 +285,16 @@ impl FxVolume {
         let mut transaction =
             self.store().filesystem().new_transaction(lock_keys![], Options::default()).await?;
         // Start a recording first. Put it in the graveyard in case we can't properly complete it.
-        let handle = ObjectStore::create_object(
-            self,
-            &mut transaction,
-            HandleOptions::default(),
-            None,
-            None,
-        )
-        .await?;
+        let handle = Box::new(
+            ObjectStore::create_object(
+                self,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await?,
+        );
         let recording_id = handle.handle().object_id();
         self.store.add_to_graveyard(&mut transaction, recording_id);
         transaction.commit().await?;
@@ -307,7 +309,8 @@ impl FxVolume {
         let profile_dir = self.get_profile_directory().await?;
         if let Some((id, descriptor)) = profile_dir.lookup(name).await? {
             ensure!(matches!(descriptor, ObjectDescriptor::File), FxfsError::Inconsistent);
-            let handle = ObjectStore::open_object(self, id, HandleOptions::default(), None).await?;
+            let handle =
+                Box::new(ObjectStore::open_object(self, id, HandleOptions::default(), None).await?);
             let mut profile_state = self.profile_state.lock().unwrap();
             profile_state.state.replay_profile(handle, self.clone());
             info!(

@@ -6,8 +6,9 @@ use core::{convert::Infallible as Never, num::NonZeroU16};
 
 use net_types::ip::{GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use packet::{
-    Buf, BufferMut, BufferViewMut, EitherSerializer, EmptyBuf, InnerSerializer, Nested,
-    ParsablePacket, ParseBuffer, ParseMetadata, Serializer, SliceBufViewMut,
+    Buf, BufferAlloc, BufferMut, BufferProvider, BufferViewMut, EitherSerializer, EmptyBuf,
+    GrowBufferMut, InnerSerializer, Nested, PacketConstraints, ParsablePacket, ParseBuffer,
+    ParseMetadata, ReusableBuffer, SerializeError, Serializer, SliceBufViewMut,
 };
 use packet_formats::{
     icmp::{
@@ -456,6 +457,14 @@ impl<I: IpExt, B: BufferMut> Serializer for ForwardedPacket<I, B> {
         body.serialize(outer, provider)
             .map_err(|(err, body)| (err, Self { src_addr, dst_addr, protocol, meta, body }))
     }
+
+    fn serialize_new_buf<BB: packet::ReusableBuffer, A: packet::BufferAlloc<BB>>(
+        &self,
+        outer: packet::PacketConstraints,
+        alloc: A,
+    ) -> Result<BB, packet::SerializeError<A::Error>> {
+        self.body.serialize_new_buf(outer, alloc)
+    }
 }
 
 impl<I: IpExt, B: BufferMut> IpPacket<I> for ForwardedPacket<I, B> {
@@ -545,36 +554,17 @@ impl<I: IpExt, B: BufferMut> IpPacket<I> for ForwardedPacket<I, B> {
     }
 
     fn transport_packet(&self) -> Self::TransportPacket<'_> {
-        I::map_ip(
-            self,
-            |ForwardedPacket { protocol, body, .. }| {
-                parse_transport_header_in_ipv4_packet(*protocol, Buf::new(body, ..))
-            },
-            |ForwardedPacket { protocol, body, .. }| {
-                parse_transport_header_in_ipv6_packet(*protocol, Buf::new(body, ..))
-            },
-        )
+        let ForwardedPacket { protocol, body, .. } = self;
+        parse_transport_header_in_ip_packet::<I, _>(*protocol, Buf::new(body, ..))
     }
 
     fn transport_packet_mut(&mut self) -> Self::TransportPacketMut<'_> {
-        I::map_ip(
-            self,
-            |ForwardedPacket { src_addr, dst_addr, protocol, body, meta: _ }| {
-                ParsedTransportHeaderMut::parse_in_ipv4_packet(
-                    *src_addr,
-                    *dst_addr,
-                    *protocol,
-                    SliceBufViewMut::new(body.as_mut()),
-                )
-            },
-            |ForwardedPacket { src_addr, dst_addr, protocol, body, meta: _ }| {
-                ParsedTransportHeaderMut::parse_in_ipv6_packet(
-                    *src_addr,
-                    *dst_addr,
-                    *protocol,
-                    SliceBufViewMut::new(body.as_mut()),
-                )
-            },
+        let ForwardedPacket { src_addr, dst_addr, protocol, body, meta: _ } = self;
+        ParsedTransportHeaderMut::<I>::parse_in_ip_packet(
+            *src_addr,
+            *dst_addr,
+            *protocol,
+            SliceBufViewMut::new(body.as_mut()),
         )
     }
 }
@@ -670,6 +660,15 @@ where
     ) -> Result<G, (packet::SerializeError<P::Error>, Self)> {
         let Self(nested) = self;
         nested.serialize(outer, provider).map_err(|(err, nested)| (err, Self(nested)))
+    }
+
+    fn serialize_new_buf<BB: packet::ReusableBuffer, A: packet::BufferAlloc<BB>>(
+        &self,
+        outer: packet::PacketConstraints,
+        alloc: A,
+    ) -> Result<BB, packet::SerializeError<A::Error>> {
+        let Self(nested) = self;
+        nested.serialize_new_buf(outer, alloc)
     }
 }
 
@@ -1143,6 +1142,88 @@ impl<I> MaybeTransportPacket
     }
 }
 
+/// An unsanitized IP packet body.
+///
+/// Allows packets from raw IP sockets (with a user provided IP body), to be
+/// tracked from the filtering module.
+#[derive(GenericOverIp)]
+#[generic_over_ip(I, Ip)]
+pub struct RawIpBody<I: IpExt, B: ParseBuffer> {
+    /// The IANA protocol of the inner message. This may be, but is not required
+    /// to be, a transport protocol.
+    protocol: I::Proto,
+    /// The source IP addr of the packet. Required by
+    /// [`ParsedTransportHeaderMut`] to recompute checksums.
+    src_addr: I::Addr,
+    /// The destination IP addr of the packet. Required by
+    /// [`ParsedTransportHeaderMut`] to recompute checksums.
+    dst_addr: I::Addr,
+    /// The body of the IP packet. The body is expected to be a message of type
+    /// `protocol`, but is not guaranteed to be valid.
+    body: B,
+    /// The parsed transport header contained within `body`. Only `Some` if body
+    /// is a valid transport header.
+    transport_header: Option<ParsedTransportHeader>,
+}
+
+impl<I: IpExt, B: ParseBuffer> RawIpBody<I, B> {
+    /// Construct a new [`RawIpBody`] from it's parts.
+    pub fn new(
+        protocol: I::Proto,
+        src_addr: I::Addr,
+        dst_addr: I::Addr,
+        body: B,
+    ) -> RawIpBody<I, B> {
+        let transport_header =
+            parse_transport_header_in_ip_packet::<I, _>(protocol, Buf::new(&body, ..));
+        RawIpBody { protocol, src_addr, dst_addr, body, transport_header }
+    }
+}
+
+impl<I: IpExt, B: ParseBuffer> MaybeTransportPacket for RawIpBody<I, B> {
+    type TransportPacket = ParsedTransportHeader;
+    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
+        self.transport_header.as_ref()
+    }
+}
+
+impl<I: IpExt, B: BufferMut> MaybeTransportPacketMut<I> for RawIpBody<I, B> {
+    type TransportPacketMut<'a> = ParsedTransportHeaderMut<'a, I> where Self: 'a;
+
+    fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
+        let RawIpBody { protocol, src_addr, dst_addr, body, transport_header: _ } = self;
+        ParsedTransportHeaderMut::<I>::parse_in_ip_packet(
+            *src_addr,
+            *dst_addr,
+            *protocol,
+            SliceBufViewMut::new(body.as_mut()),
+        )
+    }
+}
+
+impl<I: IpExt, B: BufferMut> Serializer for RawIpBody<I, B> {
+    type Buffer = <B as Serializer>::Buffer;
+
+    fn serialize<G: GrowBufferMut, P: BufferProvider<Self::Buffer, G>>(
+        self,
+        outer: PacketConstraints,
+        provider: P,
+    ) -> Result<G, (SerializeError<P::Error>, Self)> {
+        let Self { protocol, src_addr, dst_addr, body, transport_header } = self;
+        body.serialize(outer, provider).map_err(|(err, body)| {
+            (err, Self { protocol, src_addr, dst_addr, body, transport_header })
+        })
+    }
+
+    fn serialize_new_buf<BB: ReusableBuffer, A: BufferAlloc<BB>>(
+        &self,
+        outer: PacketConstraints,
+        alloc: A,
+    ) -> Result<BB, SerializeError<A::Error>> {
+        self.body.serialize_new_buf(outer, alloc)
+    }
+}
+
 #[derive(GenericOverIp)]
 #[generic_over_ip()]
 pub struct ParsedTransportHeader {
@@ -1158,6 +1239,17 @@ impl TransportPacket for ParsedTransportHeader {
     fn dst_port(&self) -> u16 {
         self.dst_port
     }
+}
+
+fn parse_transport_header_in_ip_packet<I: IpExt, B: ParseBuffer>(
+    proto: I::Proto,
+    body: B,
+) -> Option<ParsedTransportHeader> {
+    I::map_ip(
+        (proto, IpInvariant(body)),
+        |(proto, IpInvariant(body))| parse_transport_header_in_ipv4_packet(proto, body),
+        |(proto, IpInvariant(body))| parse_transport_header_in_ipv6_packet(proto, body),
+    )
 }
 
 fn parse_transport_header_in_ipv4_packet<B: ParseBuffer>(
@@ -1307,6 +1399,27 @@ impl<'a> ParsedTransportHeaderMut<'a, Ipv6> {
 }
 
 impl<'a, I: IpExt> ParsedTransportHeaderMut<'a, I> {
+    fn parse_in_ip_packet<BV: BufferViewMut<&'a mut [u8]>>(
+        src_ip: I::Addr,
+        dst_ip: I::Addr,
+        proto: I::Proto,
+        body: BV,
+    ) -> Option<Self> {
+        I::map_ip(
+            (src_ip, dst_ip, proto, IpInvariant(body)),
+            |(src_ip, dst_ip, proto, IpInvariant(body))| {
+                ParsedTransportHeaderMut::<'a, Ipv4>::parse_in_ipv4_packet(
+                    src_ip, dst_ip, proto, body,
+                )
+            },
+            |(src_ip, dst_ip, proto, IpInvariant(body))| {
+                ParsedTransportHeaderMut::<'a, Ipv6>::parse_in_ipv6_packet(
+                    src_ip, dst_ip, proto, body,
+                )
+            },
+        )
+    }
+
     fn update_pseudo_header_address(&mut self, old: I::Addr, new: I::Addr) {
         match self {
             Self::Tcp(segment) => segment.update_checksum_pseudo_header_address(old, new),
@@ -1479,6 +1592,7 @@ pub mod testutil {
             const SUBNET: Subnet<Self::Addr> = net_subnet_v6!("2001:db8::/126");
         }
 
+        #[derive(Clone, Debug, PartialEq)]
         pub struct FakeIpPacket<I: IpExt, T>
         where
             for<'a> &'a T: TransportPacketExt<I>,
@@ -1486,6 +1600,12 @@ pub mod testutil {
             pub src_ip: I::Addr,
             pub dst_ip: I::Addr,
             pub body: T,
+        }
+
+        impl<I: IpExt> FakeIpPacket<I, FakeTcpSegment> {
+            pub(crate) fn reply(&self) -> Self {
+                Self { src_ip: self.dst_ip, dst_ip: self.src_ip, body: self.body.reply() }
+            }
         }
 
         pub trait TransportPacketExt<I: IpExt>: MaybeTransportPacket {
@@ -1529,9 +1649,16 @@ pub mod testutil {
             }
         }
 
+        #[derive(Clone, Debug, PartialEq)]
         pub struct FakeTcpSegment {
             pub src_port: u16,
             pub dst_port: u16,
+        }
+
+        impl FakeTcpSegment {
+            fn reply(&self) -> Self {
+                Self { src_port: self.dst_port, dst_port: self.src_port }
+            }
         }
 
         impl<I: IpExt> TransportPacketExt<I> for &FakeTcpSegment {
@@ -1894,14 +2021,11 @@ mod tests {
         let mut buf = P::make_packet::<I>(I::SRC_IP, I::DST_IP);
         let view = SliceBufViewMut::new(&mut buf);
 
-        let mut packet = I::map_ip::<_, Option<ParsedTransportHeaderMut<'_, I>>>(
-            (I::SRC_IP, I::DST_IP, P::proto::<I>(), IpInvariant(view)),
-            |(src, dst, proto, IpInvariant(view))| {
-                ParsedTransportHeaderMut::parse_in_ipv4_packet(src, dst, proto, view)
-            },
-            |(src, dst, proto, IpInvariant(view))| {
-                ParsedTransportHeaderMut::parse_in_ipv6_packet(src, dst, proto, view)
-            },
+        let mut packet = ParsedTransportHeaderMut::<I>::parse_in_ip_packet(
+            I::SRC_IP,
+            I::DST_IP,
+            P::proto::<I>(),
+            view,
         )
         .expect("parse transport header");
         packet.update_pseudo_header_src_addr(I::SRC_IP, I::SRC_IP_2);
@@ -1928,14 +2052,11 @@ mod tests {
         let mut buf = P::make_packet_with_ports::<I>(I::SRC_IP, I::DST_IP, SRC_PORT, DST_PORT);
         let view = SliceBufViewMut::new(&mut buf);
 
-        let mut packet = I::map_ip::<_, Option<ParsedTransportHeaderMut<'_, I>>>(
-            (I::SRC_IP, I::DST_IP, P::proto::<I>(), IpInvariant(view)),
-            |(src, dst, proto, IpInvariant(view))| {
-                ParsedTransportHeaderMut::parse_in_ipv4_packet(src, dst, proto, view)
-            },
-            |(src, dst, proto, IpInvariant(view))| {
-                ParsedTransportHeaderMut::parse_in_ipv6_packet(src, dst, proto, view)
-            },
+        let mut packet = ParsedTransportHeaderMut::<I>::parse_in_ip_packet(
+            I::SRC_IP,
+            I::DST_IP,
+            P::proto::<I>(),
+            view,
         )
         .expect("parse transport header");
         let expected_src_port = if update_src_port {

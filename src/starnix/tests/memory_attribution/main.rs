@@ -2,8 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assert_matches::assert_matches;
 use diagnostics_reader::{ArchiveReader, Logs};
 use fidl_fuchsia_component as fcomponent;
+use fidl_fuchsia_component_decl as fdecl;
+use fidl_fuchsia_memory_attribution as fattribution;
 use fuchsia_component_test::{RealmBuilder, RealmBuilderParams, ScopedInstanceFactory};
 use futures::StreamExt;
 use moniker::Moniker;
@@ -22,14 +25,55 @@ async fn mmap_anonymous() {
     .expect("created");
     let realm = builder.build().await.expect("build test realm");
 
-    // Start the container.
-    let _execution = realm.root.start().await.expect("start test realm");
-
-    // Use the container to start the Starnix program.
+    // Start the container and obtain its execution controller.
+    let (container_controller, server_end) =
+        fidl::endpoints::create_proxy::<fcomponent::ControllerMarker>().unwrap();
     let realm_proxy =
         realm.root.connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>().unwrap();
+    realm_proxy
+        .open_controller(
+            &fdecl::ChildRef { name: "debian_container".to_string(), collection: None },
+            server_end,
+        )
+        .await
+        .unwrap()
+        .expect("open_controller");
+    let (container_execution, server_end) =
+        fidl::endpoints::create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
+    container_controller
+        .start(fcomponent::StartChildArgs::default(), server_end)
+        .await
+        .unwrap()
+        .expect("start debian container");
+
+    // Use the container to start the Starnix program.
     let factory = ScopedInstanceFactory::new(PROGRAM_COLLECTION).with_realm_proxy(realm_proxy);
     let program = factory.new_instance(PROGRAM_URL).await.unwrap();
+
+    // Connect to the attribution protocol of the starnix runner.
+    let attribution_provider =
+        realm.root.connect_to_protocol_at_exposed_dir::<fattribution::ProviderMarker>().unwrap();
+    let introspector =
+        realm.root.connect_to_protocol_at_exposed_dir::<fcomponent::IntrospectorMarker>().unwrap();
+    let mut attribution = attribution_testing::attribute_memory(
+        "starnix_runner".to_string(),
+        attribution_provider,
+        introspector,
+    );
+
+    // Stream memory attribution data until the container shows up in the reporting.
+    let mut tree: attribution_testing::Principal;
+    loop {
+        tree = attribution.next().await.unwrap();
+        if tree.children.len() == 1 {
+            break;
+        }
+    }
+    // Starnix runner should report a single container, backed by a job.
+    assert_eq!(tree.children.len(), 1);
+    assert_eq!(tree.children[0].name, "debian_container");
+    assert_eq!(tree.children[0].children.len(), 0);
+    assert_eq!(tree.children[0].resources.len(), 1);
 
     // Wait for magic log from the program.
     let mut reader = ArchiveReader::new();
@@ -49,4 +93,16 @@ async fn mmap_anonymous() {
     // using the `fuchsia.memory.attribution.Provider` protocol.
 
     drop(program);
+
+    // Stop the container and verify that the starnix runner reports that the
+    // container is removed.
+    container_execution.stop().unwrap();
+    let event = container_execution.take_event_stream().next().await.unwrap().unwrap();
+    assert_matches!(event, fcomponent::ExecutionControllerEvent::OnStop { .. });
+    loop {
+        tree = attribution.next().await.unwrap();
+        if tree.children.is_empty() {
+            break;
+        }
+    }
 }

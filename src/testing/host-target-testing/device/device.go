@@ -708,15 +708,6 @@ func (c *Client) Flash(
 		return fmt.Errorf("failed to get flash manifest from build: %w", err)
 	}
 
-	if err := c.RebootToBootloader(ctx); err != nil {
-		return err
-	}
-
-	_, err = c.deviceResolver.WaitToFindDeviceInFastboot(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to wait for device to reboot into bootloader: %w", err)
-	}
-
 	flasher := ffx.Flasher()
 	flasher.SetSSHPublicKey(publicKey)
 	flasher.SetManifest(manifest)

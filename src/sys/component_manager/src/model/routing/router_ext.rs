@@ -5,15 +5,15 @@
 use crate::capability::CapabilitySource;
 use crate::model::component::ComponentInstance;
 use crate::model::component::WeakComponentInstance;
-use ::routing::{error::RoutingError, policy::GlobalPolicyChecker};
+use ::routing::{
+    error::{ComponentInstanceError, RoutingError},
+    policy::GlobalPolicyChecker,
+};
 use async_trait::async_trait;
-use cm_types::Availability;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use futures::future::BoxFuture;
-use futures::FutureExt;
 use router_error::{Explain, RouterError};
-use routing::error::ComponentInstanceError;
 use sandbox::Capability;
 use sandbox::Dict;
 use sandbox::Open;
@@ -35,10 +35,6 @@ pub trait RouterExt: Send + Sync {
         capability_source: CapabilitySource,
         policy_checker: GlobalPolicyChecker,
     ) -> Self;
-
-    /// Returns a router that ensures the capability request has an availability
-    /// strength that is at least the provided `availability`.
-    fn with_availability(self, availability: Availability) -> Router;
 
     /// Returns a [Dict] equivalent to `dict`, but with all [Router]s replaced with [Open].
     ///
@@ -80,33 +76,12 @@ impl RouterExt for Router {
         Router::new(PolicyCheckRouter::new(capability_source, policy_checker, self))
     }
 
-    fn with_availability(self, availability: Availability) -> Router {
-        let route_fn = move |mut request: Request| {
-            let router = self.clone();
-            async move {
-                // The availability of the request must be compatible with the
-                // availability of this step of the route.
-                match ::routing::availability::advance(request.availability, availability) {
-                    Ok(updated) => {
-                        request.availability = updated;
-                        // Everything checks out, forward the request.
-                        let res = router.route(request).await;
-                        res
-                    }
-                    Err(e) => Err(RoutingError::from(e).into()),
-                }
-            }
-            .boxed()
-        };
-        Router::new(route_fn)
-    }
-
     fn dict_routers_to_open(
         weak_component: &WeakComponentToken,
         scope: &ExecutionScope,
         dict: &Dict,
     ) -> Dict {
-        let mut out = Dict::new();
+        let out = Dict::new();
         for (key, value) in dict.enumerate() {
             let value = match value {
                 Capability::Dictionary(dict) => {
@@ -305,72 +280,5 @@ impl WeakComponentTokenExt for WeakComponentToken {
 
     fn moniker(&self) -> moniker::Moniker {
         self.as_ref().moniker.clone()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use assert_matches::assert_matches;
-    use router_error::DowncastErrorForTest;
-    use sandbox::Data;
-
-    #[derive(Debug)]
-    struct FakeComponentToken {}
-
-    impl FakeComponentToken {
-        fn new() -> WeakComponentToken {
-            WeakComponentToken { inner: Arc::new(FakeComponentToken {}) }
-        }
-    }
-
-    impl sandbox::WeakComponentTokenAny for FakeComponentToken {
-        fn as_any(&self) -> &dyn std::any::Any {
-            self
-        }
-    }
-
-    #[fuchsia::test]
-    async fn availability_good() {
-        let source: Capability = Data::String("hello".to_string()).into();
-        let base = Router::new(source);
-        let proxy = base.with_availability(Availability::Optional);
-        let capability = proxy
-            .route(Request {
-                availability: Availability::Optional,
-                target: FakeComponentToken::new(),
-            })
-            .await
-            .unwrap();
-        let capability = match capability {
-            Capability::Data(d) => d,
-            c => panic!("Bad enum {:#?}", c),
-        };
-        assert_eq!(capability, Data::String("hello".to_string()));
-    }
-
-    #[fuchsia::test]
-    async fn availability_bad() {
-        let source: Capability = Data::String("hello".to_string()).into();
-        let base = Router::new(source);
-        let proxy = base.with_availability(Availability::Optional);
-        let error = proxy
-            .route(Request {
-                availability: Availability::Required,
-                target: FakeComponentToken::new(),
-            })
-            .await
-            .unwrap_err();
-        use ::routing::error::AvailabilityRoutingError;
-        assert_matches!(
-            error,
-            RouterError::NotFound(err)
-            if matches!(
-                err.downcast_for_test::<RoutingError>(),
-                RoutingError::AvailabilityRoutingError(
-                    AvailabilityRoutingError::TargetHasStrongerAvailability
-                )
-            )
-        );
     }
 }

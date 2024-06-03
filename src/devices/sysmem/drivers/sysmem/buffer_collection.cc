@@ -131,10 +131,6 @@ void BufferCollection::V2::Sync(SyncCompleter::Sync& completer) {
   parent_.SyncImpl(ConnectionVersion::kVersion2, completer);
 }
 
-void BufferCollection::V1::DeprecatedSync(DeprecatedSyncCompleter::Sync& completer) {
-  parent_.SyncImpl(ConnectionVersion::kVersion1, completer);
-}
-
 void BufferCollection::V1::SetConstraintsAuxBuffers(
     SetConstraintsAuxBuffersRequest& request, SetConstraintsAuxBuffersCompleter::Sync& completer) {
   parent_.FailSync(FROM_HERE, completer, Error::kProtocolDeviation,
@@ -576,21 +572,12 @@ void BufferCollection::V2::Release(ReleaseCompleter::Sync& completer) {
   parent_.ReleaseImpl(ConnectionVersion::kVersion2, completer);
 }
 
-void BufferCollection::V1::DeprecatedClose(DeprecatedCloseCompleter::Sync& completer) {
-  parent_.ReleaseImpl(ConnectionVersion::kVersion1, completer);
-}
-
 void BufferCollection::V1::SetName(SetNameRequest& request, SetNameCompleter::Sync& completer) {
   parent_.SetNameImplV1(request, completer);
 }
 
 void BufferCollection::V2::SetName(SetNameRequest& request, SetNameCompleter::Sync& completer) {
   parent_.SetNameImplV2(request, completer);
-}
-
-void BufferCollection::V1::DeprecatedSetName(DeprecatedSetNameRequest& request,
-                                             DeprecatedSetNameCompleter::Sync& completer) {
-  parent_.SetNameImplV1(request, completer);
 }
 
 void BufferCollection::V1::SetDebugClientInfo(SetDebugClientInfoRequest& request,
@@ -601,12 +588,6 @@ void BufferCollection::V1::SetDebugClientInfo(SetDebugClientInfoRequest& request
 void BufferCollection::V2::SetDebugClientInfo(SetDebugClientInfoRequest& request,
                                               SetDebugClientInfoCompleter::Sync& completer) {
   parent_.SetDebugClientInfoImplV2(request, completer);
-}
-
-void BufferCollection::V1::DeprecatedSetDebugClientInfo(
-    DeprecatedSetDebugClientInfoRequest& request,
-    DeprecatedSetDebugClientInfoCompleter::Sync& completer) {
-  parent_.SetDebugClientInfoImplV1(request, completer);
 }
 
 void BufferCollection::V1::SetDebugTimeoutLogDeadline(

@@ -31,7 +31,7 @@
 namespace fvm {
 namespace {
 
-constexpr char kRamdiskCtlPath[] = "sys/platform/00:00:2d/ramctl";
+constexpr char kRamdiskCtlPath[] = "sys/platform/ram-disk/ramctl";
 constexpr zx::duration kDeviceWaitTime = zx::sec(30);
 
 template <typename Protocol>

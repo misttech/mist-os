@@ -6,15 +6,13 @@ use crate::target_handle::TargetHandle;
 use addr::TargetAddr;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use discovery::query::target_addr_info_to_socketaddr;
 use emulator_instance::targets as emulator_targets;
 use emulator_targets::EmulatorTargetAction;
 use ffx_config::EnvironmentContext;
 use ffx_daemon_events::TargetConnectionState;
 use ffx_daemon_target::{
-    target::{
-        self, target_addr_info_to_socketaddr, Target, TargetProtocol, TargetTransport,
-        TargetUpdateBuilder,
-    },
+    target::{self, Target, TargetProtocol, TargetTransport, TargetUpdateBuilder},
     target_collection::{TargetCollection, TargetUpdateFilter},
 };
 use ffx_stream_util::TryStreamUtilExt;
@@ -551,9 +549,7 @@ impl FidlProtocol for TargetCollectionProtocol {
         let tc2 = cx.get_target_collection().await?;
         let context = self.context.clone();
         self.tasks.spawn(async move {
-            let instance_root: PathBuf = match context
-                .get(emulator_instance::EMU_INSTANCE_ROOT_DIR)
-                .await
+            let instance_root: PathBuf = match context.get(emulator_instance::EMU_INSTANCE_ROOT_DIR)
             {
                 Ok(dir) => dir,
                 Err(e) => {

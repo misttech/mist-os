@@ -466,7 +466,7 @@ mod tests {
         futures::pin_mut!(watcher_fut);
 
         // Drive the watcher, asserting it observes the expected data.
-        let watcher = get_watcher::<I>(&state).expect("failed to get watcher");
+        let watcher = get_watcher::<I>(&state, Default::default()).expect("failed to get watcher");
         for batch_shape in test_shape {
             futures::select!(
                  () = watcher_fut => panic!("fake watcher implementation unexpectedly finished"),

@@ -7,11 +7,11 @@ use {
         actions::{Action, ActionKey},
         component::instance::{InstanceState, UnresolvedInstanceState},
         component::ComponentInstance,
-        structured_dict::ComponentInput,
     },
     async_trait::async_trait,
     errors::{ActionError, DiscoverActionError},
     hooks::EventPayload,
+    routing::bedrock::structured_dict::ComponentInput,
     std::sync::Arc,
 };
 

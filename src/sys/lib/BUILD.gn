@@ -25,7 +25,7 @@ group("tests") {
     "fuchsia_backoff:tests",
     "library_loader:tests",
     "mem_util:tests",
-    "moniker:moniker-tests",
+    "moniker:tests",
     "namespace:tests",
     "notify-batch-watcher:tests",
     "payload_streamer:tests",

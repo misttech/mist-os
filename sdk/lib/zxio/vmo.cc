@@ -62,6 +62,9 @@ class Vmo : public HasIo {
     if (inout_attr->has.content_size) {
       ZXIO_NODE_ATTR_SET(*inout_attr, content_size, content_size);
     }
+    if (inout_attr->has.object_type) {
+      ZXIO_NODE_ATTR_SET(*inout_attr, object_type, ZXIO_OBJECT_TYPE_VMO);
+    }
     return ZX_OK;
   }
 
@@ -185,8 +188,8 @@ class Vmo : public HasIo {
       // ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE adds ZX_RIGHT_WRITE automatically, but we shouldn't
       // return a handle with that right unless requested using ZXIO_VMO_WRITE.
       //
-      // TODO(https://fxbug.dev/42112453): Supporting ZXIO_VMO_PRIVATE_CLONE & ZXIO_VMO_WRITE for Vmofiles is a
-      // bit weird and inconsistent. See bug for more info.
+      // TODO(https://fxbug.dev/42112453): Supporting ZXIO_VMO_PRIVATE_CLONE & ZXIO_VMO_WRITE for
+      // Vmofiles is a bit weird and inconsistent. See bug for more info.
       zx::vmo result;
       status = child_vmo.replace(rights, &result);
       if (status != ZX_OK) {

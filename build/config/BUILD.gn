@@ -390,6 +390,23 @@ config("no_remote_link") {
   }
 }
 
+# Use a bigger remote worker machine type than the default one
+# in build/rbe/fuchsia-rewrapper.cfg.
+# There are generally far fewer of these bigger machines available.
+# Reserve use of this for only the largest jobs that need it.
+config("big_rbe_machine") {
+  _remote_flag = "--remote-flag=--platform=gceMachineType=n2-standard-8"
+
+  # No C++ compile should ever require this.
+  if (link_rbe_enable) {
+    ldflags = [ _remote_flag ]
+  }
+  if (rust_rbe_enable) {
+    rustflags = [ _remote_flag ]
+  }
+  not_needed([ "_remote_flag" ])
+}
+
 config("download_outputs") {
   # Override global settings that may disable downloading of outputs.
   # This is useful for targets that are known to be needed for local actions.
@@ -703,6 +720,10 @@ config("default_warnings") {
     "-Wno-cast-function-type-strict",
     "-Wno-cast-function-type-mismatch",
     "-Wno-unknown-warning-option",
+
+    # TODO(https://fxbug.dev/344080745): After the issue is fixed,
+    # remove "-Wno-missing-template-arg-list-after-template-kw".
+    "-Wno-missing-template-arg-list-after-template-kw",
   ]
 
   cflags_cc = []
@@ -845,7 +866,6 @@ config("Wno-vla-cxx-extension") {
     "//src/developer/memory/metrics/tests:*",
     "//src/devices/block/bin/gpt:*",
     "//src/devices/block/bin/iochk:*",
-    "//src/devices/block/drivers/aml-sdmmc:*",
     "//src/devices/spi/bin/spiutil:*",
     "//src/devices/usb/bin/usbctl:*",
     "//src/graphics/display/drivers/amlogic-display:*",

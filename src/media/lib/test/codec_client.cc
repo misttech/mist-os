@@ -101,22 +101,6 @@ CodecClient::CodecClient(async::Loop* loop, thrd_t loop_thread,
   });
 }
 
-CodecClient::CodecClient(async::Loop* loop, thrd_t loop_thread,
-                         fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem1_param)
-    : CodecClient(loop, loop_thread, [sysmem1_param = std::move(sysmem1_param)]() mutable {
-        auto sysmem1 = sysmem1_param.BindSync();
-        fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> sysmem2;
-        ZX_ASSERT(ZX_OK == sysmem1->ConnectToSysmem2Allocator(sysmem2.NewRequest()));
-        return sysmem2;
-      }()) {
-  FX_LOGS(WARNING)
-      << "#########################################################################################";
-  FX_LOGS(WARNING)
-      << "CodecClient::CodecClient(sysmem1) is deprecated; please pass a sysmem2 allocator instead.";
-  FX_LOGS(WARNING)
-      << "#########################################################################################";
-}
-
 CodecClient::~CodecClient() { Stop(); }
 
 fidl::InterfaceRequest<fuchsia::media::StreamProcessor> CodecClient::GetTheRequestOnce() {

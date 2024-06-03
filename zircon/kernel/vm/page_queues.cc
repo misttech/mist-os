@@ -24,8 +24,6 @@ namespace {
 
 KCOUNTER(pq_aging_reason_before_min_timeout, "pq.aging.reason_before_min_timeout")
 KCOUNTER(pq_aging_spurious_wakeup, "pq.aging.spurious_wakeup")
-KCOUNTER(pq_aging_timeout_with_reason, "pq.aging.timeout_with_reason")
-KCOUNTER(pq_aging_reason_none, "pq.aging.reason.none")
 KCOUNTER(pq_aging_reason_timeout, "pq.aging.reason.timeout")
 KCOUNTER(pq_aging_reason_active_ratio, "pq.aging.reason.active_ratio")
 KCOUNTER(pq_aging_reason_manual, "pq.aging.reason.manual")
@@ -271,7 +269,7 @@ void PageQueues::StopThreads() {
       if (aging_disabled_.exchange(false)) {
         dps.Pend(PendingSignal::AgingToken);
       }
-      dps.Pend(PendingSignal::AgingEvent);
+      dps.Pend(PendingSignal::AgingActiveRatioEvent);
       dps.Pend(PendingSignal::LruEvent);
       mru_thread = mru_thread_;
       lru_thread = lru_thread_;
@@ -299,32 +297,89 @@ void PageQueues::SetActiveRatioMultiplier(uint32_t multiplier) {
   Guard<SpinLock, IrqSave> guard{&lock_};
   active_ratio_multiplier_ = multiplier;
   // The change in multiplier might have caused us to need to age.
-  MaybeTriggerAgingLocked(dps);
+  MaybeSignalActiveRatioAgingLocked(dps);
 }
 
-void PageQueues::MaybeTriggerAging() {
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  MaybeTriggerAgingLocked(dps);
-}
-
-void PageQueues::MaybeTriggerAgingLocked(DeferPendingSignals& dps) {
-  if (GetAgeReasonLocked() != AgeReason::None) {
-    dps.Pend(PendingSignal::AgingEvent);
+void PageQueues::MaybeSignalActiveRatioAgingLocked(DeferPendingSignals& dps) {
+  if (active_ratio_triggered_) {
+    // Already triggered, nothing more to do.
+    return;
+  }
+  if (IsActiveRatioTriggeringAging()) {
+    active_ratio_triggered_ = true;
+    dps.Pend(PendingSignal::AgingActiveRatioEvent);
   }
 }
 
-PageQueues::AgeReason PageQueues::GetAgeReason() const {
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  return GetAgeReasonLocked();
+bool PageQueues::IsActiveRatioTriggeringAging() const {
+  ActiveInactiveCounts active_count = GetActiveInactiveCountsLocked();
+  return active_count.active * active_ratio_multiplier_ > active_count.inactive;
 }
 
-PageQueues::AgeReason PageQueues::GetAgeReasonLocked() const {
-  ActiveInactiveCounts active_count = GetActiveInactiveCountsLocked();
-  if (active_count.active * active_ratio_multiplier_ > active_count.inactive) {
+ktl::variant<PageQueues::AgeReason, zx_time_t> PageQueues::ConsumeAgeReason() {
+  AutoPreemptDisabler apd;
+  Guard<SpinLock, IrqSave> guard{&lock_};
+  auto reason = GetAgeReasonLocked();
+  // If the age reason is the active ratio, consume the trigger.
+  if (const AgeReason* age_reason = ktl::get_if<AgeReason>(&reason)) {
+    no_pending_aging_signal_.Unsignal();
+    if (*age_reason == AgeReason::ActiveRatio) {
+      active_ratio_triggered_ = false;
+      aging_active_ratio_event_.Unsignal();
+    }
+  } else {
+    no_pending_aging_signal_.Signal();
+  }
+  return reason;
+}
+
+void PageQueues::SynchronizeWithAging() {
+  while (true) {
+    // Wait for any in progress aging to complete. This is not an Autounsignal event and so waiting
+    // on it without the lock is not manipulating its state.
+    no_pending_aging_signal_.Wait();
+
+    // The MruThread may not have woken up yet to clear the pending signal, so we must check
+    // ourselves.
+    Guard<SpinLock, IrqSave> guard{&lock_};
+    if (!ktl::holds_alternative<AgeReason>(GetAgeReasonLocked())) {
+      // There is no aging reason, so there is no race to worry about, and no aging can be in
+      // progress.
+      return;
+    }
+    // We may have raced with the MruThread. Either it has already seen that there is an AgeReason
+    // and cleared the this signal, or it is still pending to be scheduled and clear it. If it
+    // already cleared it, then us clearing it again is harmless, and if it is still waiting to run
+    // by clearing it we can then Wait on the event, knowing once the MruThread finishes performing
+    // aging it will do the signal.
+    // Since we hold the lock, and know there is an age reason, we know that we are not racing with
+    // the signal being set, and so cannot lose a signal here.
+    no_pending_aging_signal_.Unsignal();
+  }
+}
+
+ktl::variant<PageQueues::AgeReason, zx_time_t> PageQueues::GetAgeReasonLocked() const {
+  const zx_time_t current = current_time();
+  // Check if there is an active ratio that wants us to age.
+  if (active_ratio_triggered_) {
+    // Need to have passed the min time though.
+    const zx_time_t min_timeout =
+        zx_time_add_duration(last_age_time_.load(ktl::memory_order_relaxed), min_mru_rotate_time_);
+    if (current < min_timeout) {
+      return min_timeout;
+    }
+    // At least min time has elapsed, can age via active ratio.
     return AgeReason::ActiveRatio;
   }
-  return AgeReason::None;
+
+  // Exceeding the maximum time forces aging.
+  const zx_time_t max_timeout =
+      zx_time_add_duration(last_age_time_.load(ktl::memory_order_relaxed), max_mru_rotate_time_);
+  if (max_timeout <= current) {
+    return AgeReason::Timeout;
+  }
+  // With no other reason, we will age once we hit the maximum timeout.
+  return max_timeout;
 }
 
 void PageQueues::MaybeTriggerLruProcessing() {
@@ -394,8 +449,6 @@ void PageQueues::EnableAging() {
 
 const char* PageQueues::string_from_age_reason(PageQueues::AgeReason reason) {
   switch (reason) {
-    case AgeReason::None:
-      return "None";
     case AgeReason::ActiveRatio:
       return "Active ratio";
     case AgeReason::Timeout:
@@ -486,57 +539,63 @@ void PageQueues::Dump() {
 void PageQueues::MruThread() {
   // Pretend that aging happens during startup to simplify the rest of the loop logic.
   last_age_time_ = current_time();
+  unsigned int iterations_since_last_age = 0;
   while (!shutdown_threads_.load(ktl::memory_order_relaxed)) {
-    // Wait for the min rotate time to pass.
-    Thread::Current::Sleep(
-        zx_time_add_duration(last_age_time_.load(ktl::memory_order_relaxed), min_mru_rotate_time_));
-
-    // Wait on the aging_event_ in a loop to deal with spurious signals on the event. Will exit
-    // the loop for either of
-    // * A legitimate age reason returned by GetAgeReason
-    // * Reached the maximum wait time
-    // * Shutdown has been requested.
-    // We specifically check GetAgeReason() and then wait on the aging event to catch scenarios
-    // where we both timed out *and* found a pending age reason. This just allows us to log this
-    // scenario, and is not necessary for correctness.
-    zx_status_t result = ZX_OK;
-    AgeReason age_reason = AgeReason::None;
-    int iterations = 0;
-    while (!shutdown_threads_.load(ktl::memory_order_relaxed) &&
-           (age_reason = GetAgeReason()) == AgeReason::None && result != ZX_ERR_TIMED_OUT) {
-      result = aging_event_.WaitDeadline(
-          zx_time_add_duration(last_age_time_.load(ktl::memory_order_relaxed),
-                               max_mru_rotate_time_),
-          Interruptible::No);
-      iterations++;
+    // Normally we should retry the loop at most once (i.e. pass this line of code twice) if an
+    // active ratio was triggered (kicking us out of the event), but we still needed to wait for the
+    // min timeout. In this case in the first pass we do not get an age reason, wake up on the event
+    // then perform the Sleep, come back around the loop and can now get an age reason.
+    //
+    // Unfortunately due to the way DeferredPendingSignals works, there is race where a thread can
+    // set `active_ratio_triggered_`, but fail to actually signal the event before being preempted.
+    // It is possible for us to then call ConsumeAgeReason and perform the aging without waiting on
+    // the event. At some later point that first thread could finally deliver the signal, spuriously
+    // waking us up. In an extremely unlikely event there could be multiple threads queued up in
+    // this state to deliver an unbounded number of late signals. This is extremely unlikely though
+    // and would require some precise scheduling behavior. Nevertheless it is technically possible
+    // and so we just print a warning that it has happened and do not generate any errors.
+    if (iterations_since_last_age == 10) {
+      printf("%s iterated %u times, possible bug or overloaded system", __FUNCTION__,
+             iterations_since_last_age);
     }
-
-    if (shutdown_threads_.load(ktl::memory_order_relaxed)) {
-      break;
-    }
-
-    if (iterations == 0) {
-      // If We did zero iterations then this means there was an age_reason waiting for us, meaning
-      // we wanted to age prior to the min timeout clearing.
-      pq_aging_reason_before_min_timeout.Add(1);
-    } else if (iterations > 1) {
-      // Every loop iteration above 1 indicates a spurious wake up.
-      pq_aging_spurious_wakeup.Add(iterations - 1);
-    }
-
-    // If we didn't have an age reason then since we already handled the disable_aging_ case the
-    // only other age cause must be a timeout.
-    if (age_reason == AgeReason::None) {
-      DEBUG_ASSERT(result == ZX_ERR_TIMED_OUT);
-      age_reason = AgeReason::Timeout;
-    } else {
-      // Had an age reason, but check if a timeout also occurred. This could happen legitimately due
-      // to races or delays in scheduling this thread, but we log this case in a counter anyway
-      // since it happening regularly could indicate a bug.
-      if (result == ZX_ERR_TIMED_OUT) {
-        pq_aging_timeout_with_reason.Add(1);
+    // Check if there is an age reason waiting for us, consuming if there is, or if we need to wait.
+    auto reason_or_timeout = ConsumeAgeReason();
+    if (const zx_time_t* age_deadline = ktl::get_if<zx_time_t>(&reason_or_timeout)) {
+      // Wait for this time, ensuring we wake up if the active ratio should change.
+      zx_status_t result = aging_active_ratio_event_.WaitDeadline(*age_deadline, Interruptible::No);
+      // Check if shutdown has been requested, we need this extra check even though it is part of
+      // the main loop check to ensure that we do not perform the minimal rotate time sleep with a
+      // shutdown pending.
+      if (shutdown_threads_.load(ktl::memory_order_relaxed)) {
+        break;
       }
+      if (result != ZX_ERR_TIMED_OUT) {
+        // Might have woken up too early, ensure we have passed the minimal timeout. If the timeout
+        // was already passed and we legitimately woke up due to an active ratio event, then this
+        // sleep will short-circuit internally and immediately return.
+        Thread::Current::Sleep(zx_time_add_duration(last_age_time_.load(ktl::memory_order_relaxed),
+                                                    min_mru_rotate_time_));
+      }
+      // Due to races, there may or may not be an age reason at this point, so go back around the
+      // loop and find out, counting how many times we go around.
+      iterations_since_last_age++;
+      continue;
     }
+    AgeReason age_reason = ktl::get<AgeReason>(reason_or_timeout);
+
+    if (iterations_since_last_age == 0) {
+      // If we did zero iterations then this means there was an age_reason waiting for us, meaning
+      // the min rotation time had already elapsed. This is not an error, but implies that aging
+      // thread is running behind.
+      pq_aging_reason_before_min_timeout.Add(1);
+    } else if (iterations_since_last_age > 1) {
+      // Typically a single iteration is expected as we might fail ConsumeAgeReason once due to
+      // needing to wait for a timeout. However, due to DeferredPendingSignals, there could be
+      // additional spurious wakeups (see comment at the top of the loop). This does not necessarily
+      // mean there is an error, but implies that other threads are running badly behind.
+      pq_aging_spurious_wakeup.Add(iterations_since_last_age - 1);
+    }
+    iterations_since_last_age = 0;
 
     // Taken the aging token, potentially blocking if aging is disabled, make sure to return it when
     // we are done.
@@ -627,9 +686,6 @@ void PageQueues::RotateReclaimQueues(AgeReason reason) {
   }
   // Keep a count of the different reasons we have rotated.
   switch (reason) {
-    case AgeReason::None:
-      pq_aging_reason_none.Add(1);
-      break;
     case AgeReason::Timeout:
       pq_aging_reason_timeout.Add(1);
       break;
@@ -735,9 +791,6 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessLruQueueHelper(
   if (list_is_empty(operating_queue)) {
     lru_gen_.store(lru + 1, ktl::memory_order_relaxed);
     mru_semaphore_.Post();
-    // Changing the lru_gen_ might  in the future trigger a scenario where need to age, but this
-    // is presently a no-op.
-    MaybeTriggerAgingLocked(dps);
   }
 
   return ktl::nullopt;
@@ -915,7 +968,7 @@ void PageQueues::UpdateActiveInactiveLocked(PageQueue old_queue, PageQueue new_q
   } else if (queue_is_inactive(new_queue, mru)) {
     inactive_queue_count_++;
   }
-  MaybeTriggerAgingLocked(dps);
+  MaybeSignalActiveRatioAgingLocked(dps);
 }
 
 void PageQueues::MarkAccessedContinued(vm_page_t* page) {
@@ -1238,7 +1291,7 @@ void PageQueues::RecalculateActiveInactiveLocked(DeferPendingSignals& dps) {
   inactive_queue_count_ = inactive;
 
   // New counts might mean we need to age.
-  MaybeTriggerAgingLocked(dps);
+  MaybeSignalActiveRatioAgingLocked(dps);
 }
 
 void PageQueues::EndAccessScan() {
@@ -1419,8 +1472,14 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::PeekReclaim(size_t lowest_que
   lowest_queue = ktl::max(lowest_queue, kNumActiveQueues);
   // The target gen is 1 larger than the lowest queue because evicting from queue X is done by
   // attempting to make the lru queue be X+1.
-  return ProcessDontNeedAndLruQueues(mru_gen_.load(ktl::memory_order_relaxed) - (lowest_queue - 1),
-                                     true);
+  ktl::optional<VmoBacklink> result = ProcessDontNeedAndLruQueues(
+      mru_gen_.load(ktl::memory_order_relaxed) - (lowest_queue - 1), true);
+  if (!result) {
+    SynchronizeWithAging();
+    result = ProcessDontNeedAndLruQueues(
+        mru_gen_.load(ktl::memory_order_relaxed) - (lowest_queue - 1), true);
+  }
+  return result;
 }
 
 PageQueues::ActiveInactiveCounts PageQueues::GetActiveInactiveCounts() const {

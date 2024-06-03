@@ -15,8 +15,8 @@ namespace allocation {
 class MockBufferCollectionImporter : public BufferCollectionImporter {
  public:
   MOCK_METHOD(bool, ImportBufferCollection,
-              (GlobalBufferCollectionId, fuchsia::sysmem::Allocator_Sync*,
-               fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
+              (GlobalBufferCollectionId, fuchsia::sysmem2::Allocator_Sync*,
+               fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>,
                allocation::BufferCollectionUsage, std::optional<fuchsia::math::SizeU>));
 
   MOCK_METHOD(void, ReleaseBufferCollection,

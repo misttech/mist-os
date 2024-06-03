@@ -28,7 +28,7 @@ pub trait DaemonConfig {
 #[async_trait::async_trait]
 impl DaemonConfig for EnvironmentContext {
     async fn get_ascendd_path(&self) -> Result<PathBuf> {
-        match self.get(Self::OVERNET_SOCKET_KEY).await {
+        match self.get(Self::OVERNET_SOCKET_KEY) {
             Ok(path) => Ok(path),
             _ => self.get_default_ascendd_path(),
         }
@@ -36,7 +36,6 @@ impl DaemonConfig for EnvironmentContext {
 
     async fn get_proxy_timeout(&self) -> Result<Duration> {
         self.get(Self::PROXY_TIMEOUT_KEY)
-            .await
             .with_context(|| ffx_error!("Unable to load proxy timeout"))
             .map(Duration::from_secs_f64)
     }

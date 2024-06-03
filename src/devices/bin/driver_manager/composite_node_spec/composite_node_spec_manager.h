@@ -35,9 +35,10 @@ class CompositeNodeSpecManager {
   // Adds a composite node spec to the driver index. If it's successfully added, then the
   // CompositeNodeSpecManager stores the composite node spec in a map. After that, it sends a call
   // to CompositeManagerBridge to bind all unbound devices.
-  fit::result<fuchsia_driver_framework::CompositeNodeSpecError> AddSpec(
+  void AddSpec(
       fuchsia_driver_framework::wire::CompositeNodeSpec fidl_spec,
-      std::unique_ptr<CompositeNodeSpec> spec);
+      std::unique_ptr<CompositeNodeSpec> spec,
+      fit::callback<void(fit::result<fuchsia_driver_framework::CompositeNodeSpecError>)> callback);
 
   // Binds the device to the spec parents it was matched to. If |enable_multibind| is false,
   // CompositeNodeSpecManager will only bind the device to the first unbound parent. Depending

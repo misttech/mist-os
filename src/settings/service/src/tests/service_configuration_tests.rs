@@ -8,6 +8,7 @@ use std::sync::Arc;
 use fidl_fuchsia_settings::{AccessibilityMarker, DisplayMarker, PrivacyMarker};
 
 use crate::config::default_settings::DefaultSetting;
+use crate::display::build_display_default_settings;
 use crate::ingress::fidl::InterfaceSpec;
 use crate::storage::testing::InMemoryStorageFactory;
 use crate::AgentConfiguration;
@@ -57,9 +58,11 @@ async fn test_default_interfaces_configuration_provided() {
     let flags = ServiceFlags::default();
     let configuration =
         ServiceConfiguration::from(AgentConfiguration::default(), configuration, flags);
+    let display_configuration = build_display_default_settings();
 
     let env = EnvironmentBuilder::new(Arc::new(factory))
         .configuration(configuration)
+        .display_configuration(display_configuration)
         .spawn_and_get_protocol_connector(ENV_NAME)
         .await
         .unwrap();

@@ -58,6 +58,13 @@ def find_declaration(name, declarations):
     raise Exception(f"{name} not found")
 
 
+def get_available_attribute(declaration):
+    for attr in declaration.get("maybe_attributes", []):
+        if attr["name"] == "available":
+            return attr
+    return None
+
+
 def merge_irs(
     inputs: typing.List[typing.TextIO],
     output: typing.TextIO,
@@ -89,6 +96,14 @@ def merge_irs(
             else:
                 raise Exception("Available mismatch")
 
+        # grab @available from the library.
+        library_available = get_available_attribute(ir)
+        assert library_available is not None
+        # and grab the added= attribute argument
+        (library_added,) = [
+            a for a in library_available["arguments"] if a["name"] == "added"
+        ]
+
         # track all of the external dependencies declared in this library
         for lib in ir["library_dependencies"]:
             dependencies.update(n for n in lib["declarations"].keys())
@@ -96,12 +111,24 @@ def merge_irs(
         # track the declarations in this library
         for name, kind in ir["declarations"].items():
             assert kind in KINDS
-            decl = (kind, find_declaration(name, ir[f"{kind}_declarations"]))
+            decl = find_declaration(name, ir[f"{kind}_declarations"])
+
+            # if the decl doesn't have an @available attribute, use the one from its library
+            avail = get_available_attribute(decl)
+            if avail is None:
+                if "maybe_attributes" not in decl:
+                    decl["maybe_attributes"] = []
+                decl["maybe_attributes"].append(library_available)
+            else:
+                # if the decl's @available is missing the added argument, use the one from its library
+                if "added" not in [a["name"] for a in avail["arguments"]]:
+                    avail["arguments"].append(library_added)
+
             if name in declarations:
-                if decl != declarations[name]:
+                if declarations[name] != (kind, decl):
                     raise Exception(f"conflicting definitions for {name}")
             else:
-                declarations[name] = decl
+                declarations[name] = (kind, decl)
 
     # make sure the dependencies are satisfied
     declaration_names = frozenset(declarations.keys())

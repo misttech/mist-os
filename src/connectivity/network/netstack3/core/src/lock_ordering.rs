@@ -139,6 +139,8 @@ pub enum NdpCounters {}
 pub enum DeviceCounters {}
 // Provides unlocked access of EthernetDeviceCounters.
 pub enum EthernetDeviceCounters {}
+// Provides unlocked access of LoopbackDeviceCounters.
+pub enum LoopbackDeviceCounters {}
 // Provides unlocked access of PureIpDeviceCounters.
 pub enum PureIpDeviceCounters {}
 // Provides unlocked access of ArpCounters.

@@ -33,6 +33,10 @@ class VulkanTest {
   static bool Exec(VulkanTest* t1, VulkanTest* t2, bool temporary);
   static bool ExecUsingQueue(VulkanTest* t1, VulkanTest* t2, bool temporary);
 
+  // TODO(https://fxbug.dev/322210019): use this to skip tests that are currently broken on
+  // Lavapipe.  Eventually all tests should also pass with Lavapipe; delete this when tests pass.
+  bool IsLavapipe() const { return is_lavapipe_; }
+
  private:
   static constexpr uint32_t kSemaphoreCount = 2;
 
@@ -55,6 +59,7 @@ class VulkanTest {
   VkQueue vk_queue_{};
 
   std::array<VkSemaphore, kSemaphoreCount> vk_semaphores_{};
+  bool is_lavapipe_ = false;
 };
 
 VulkanTest::VulkanTest() {}
@@ -172,6 +177,12 @@ bool VulkanTest::InitVulkan() {
   RTN_IF_VK_ERR(
       false, vkEnumeratePhysicalDevices(instance, &physical_device_count, physical_devices.data()),
       "vkEnumeratePhysicalDevices");
+
+  // TODO(https://fxbug.dev/322210019): use this to skip tests that are currently broken on
+  // Lavapipe.  Eventually all tests should also pass with Lavapipe; delete this when tests pass.
+  VkPhysicalDeviceProperties device_properties;
+  vkGetPhysicalDeviceProperties(physical_devices[0], &device_properties);
+  is_lavapipe_ = 0 == strncmp("llvmpipe", device_properties.deviceName, strlen("llvmpipe"));
 
   // Always select the first physical device retrieved by default.
   // Select a graphics queue compatible family.
@@ -457,6 +468,12 @@ TEST(VulkanExtension, QueueExternalSemaphoreFuchsia) {
   VulkanTest t1, t2;
   ASSERT_TRUE(t1.Initialize());
   ASSERT_TRUE(t2.Initialize());
+
+  // TODO(https://fxbug.dev/42086544)
+  if (t1.IsLavapipe()) {
+    GTEST_SKIP();
+  }
+
   EXPECT_TRUE(VulkanTest::ExecUsingQueue(&t1, &t2, false));
 }
 
@@ -464,6 +481,12 @@ TEST(VulkanExtension, QueueTemporaryExternalSemaphoreFuchsia) {
   VulkanTest t1, t2;
   ASSERT_TRUE(t1.Initialize());
   ASSERT_TRUE(t2.Initialize());
+
+  // TODO(https://fxbug.dev/42086544)
+  if (t1.IsLavapipe()) {
+    GTEST_SKIP();
+  }
+
   EXPECT_TRUE(VulkanTest::ExecUsingQueue(&t1, &t2, true));
 }
 

@@ -87,10 +87,10 @@ fuchsia_cc_test(
     srcs = ["tests/test.cc"],
     deps = [
         ":common",
+        "//sdk/lib/driver/testing/cpp:driver_testing_cpp_gtest_fixture",
         "@com_google_googletest//:gtest_main",
         "@fuchsia_sdk//pkg/driver_runtime_cpp",
         "@fuchsia_sdk//pkg/driver_testing_cpp",
-        "@internal_sdk//pkg/driver_testing_cpp_gtest_fixture",
     ],
 )
 

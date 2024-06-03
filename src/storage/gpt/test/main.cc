@@ -39,9 +39,9 @@ int main(int argc, char** argv) {
     return -1;
   }
   zx::result channel =
-      device_watcher::RecursiveWaitForFile(dev.get(), "sys/platform/00:00:2d/ramctl");
+      device_watcher::RecursiveWaitForFile(dev.get(), "sys/platform/ram-disk/ramctl");
   if (channel.is_error()) {
-    fprintf(stderr, "RecursiveWaitForFile(dev, \"sys/platform/00:00:2d/ramctl\"): %s\n",
+    fprintf(stderr, "RecursiveWaitForFile(dev, \"sys/platform/ram-disk/ramctl\"): %s\n",
             channel.status_string());
     return -1;
   }

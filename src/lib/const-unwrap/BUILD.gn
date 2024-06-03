@@ -8,6 +8,7 @@ rustc_library("const-unwrap") {
   name = "const-unwrap"
   version = "0.1.0"
   edition = "2021"
+  check_cfgs = [ "ignore" ]
 
   sources = [ "src/lib.rs" ]
 }

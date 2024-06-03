@@ -10,8 +10,8 @@ namespace utils {
 
 namespace {
 // List of supported pixel formats
-std::vector<fuchsia::sysmem::PixelFormatType> kSupportedPixelFormats = {
-    fuchsia::sysmem::PixelFormatType::BGRA32, fuchsia::sysmem::PixelFormatType::R8G8B8A8};
+std::vector<fuchsia::images2::PixelFormat> kSupportedPixelFormats = {
+    fuchsia::images2::PixelFormat::B8G8R8A8, fuchsia::images2::PixelFormat::R8G8B8A8};
 }  // namespace
 
 uint8_t LinearToSrgb(const float val) {
@@ -26,6 +26,15 @@ uint8_t LinearToSrgb(const float val) {
 Pixel Pixel::FromUnormBgra(float blue, float green, float red, float alpha) {
   return Pixel{LinearToSrgb(blue), LinearToSrgb(green), LinearToSrgb(red),
                static_cast<uint8_t>(roundf(alpha * 255U))};
+}
+
+Pixel Pixel::FromVmo(const uint8_t* vmo_host, uint32_t stride, uint32_t x, uint32_t y,
+                     fuchsia::images2::PixelFormat type) {
+  if (type == fuchsia::images2::PixelFormat::B8G8R8A8) {
+    return FromVmoBgra(vmo_host, stride, x, y);
+  }
+  FX_DCHECK(type == fuchsia::images2::PixelFormat::R8G8B8A8);
+  return FromVmoRgba(vmo_host, stride, x, y);
 }
 
 Pixel Pixel::FromVmo(const uint8_t* vmo_host, uint32_t stride, uint32_t x, uint32_t y,
@@ -53,6 +62,14 @@ Pixel Pixel::FromVmoBgra(const uint8_t* vmo_host, uint32_t stride, uint32_t x, u
   return utils::Pixel(b, g, r, a);
 }
 
+std::vector<uint8_t> Pixel::ToFormat(fuchsia::images2::PixelFormat type) {
+  if (type == fuchsia::images2::PixelFormat::B8G8R8A8) {
+    return ToBgra();
+  }
+  FX_DCHECK(type == fuchsia::images2::PixelFormat::R8G8B8A8);
+  return ToRgba();
+}
+
 std::vector<uint8_t> Pixel::ToFormat(fuchsia::sysmem::PixelFormatType type) {
   if (type == fuchsia::sysmem::PixelFormatType::BGRA32) {
     return ToBgra();
@@ -61,14 +78,19 @@ std::vector<uint8_t> Pixel::ToFormat(fuchsia::sysmem::PixelFormatType type) {
   return ToRgba();
 }
 
+bool Pixel::IsFormatSupported(fuchsia::images2::PixelFormat type) {
+  return std::any_of(kSupportedPixelFormats.begin(), kSupportedPixelFormats.end(),
+                     [type](fuchsia::images2::PixelFormat supported) { return supported == type; });
+}
 bool Pixel::IsFormatSupported(fuchsia::sysmem::PixelFormatType type) {
-  return std::any_of(
-      kSupportedPixelFormats.begin(), kSupportedPixelFormats.end(),
-      [type](fuchsia::sysmem::PixelFormatType supported) { return supported == type; });
+  fuchsia::images2::PixelFormat v2_pixel_format =
+      static_cast<fuchsia::images2::PixelFormat>(static_cast<uint32_t>(type));
+  return IsFormatSupported(v2_pixel_format);
 }
 
 std::ostream& operator<<(std::ostream& stream, const Pixel& pixel) {
-  return stream << "{Pixel:" << " r:" << static_cast<unsigned int>(pixel.red)
+  return stream << "{Pixel:"
+                << " r:" << static_cast<unsigned int>(pixel.red)
                 << " g:" << static_cast<unsigned int>(pixel.green)
                 << " b:" << static_cast<unsigned int>(pixel.blue)
                 << " a:" << static_cast<unsigned int>(pixel.alpha) << "}";

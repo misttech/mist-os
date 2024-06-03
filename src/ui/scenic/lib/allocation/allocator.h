@@ -5,7 +5,7 @@
 #ifndef SRC_UI_SCENIC_LIB_ALLOCATION_ALLOCATOR_H_
 #define SRC_UI_SCENIC_LIB_ALLOCATION_ALLOCATOR_H_
 
-#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/cpp/component_context.h>
@@ -28,7 +28,7 @@ class Allocator : public fuchsia::ui::composition::Allocator {
                 default_buffer_collection_importers,
             const std::vector<std::shared_ptr<BufferCollectionImporter>>&
                 screenshot_buffer_collection_importers,
-            fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator);
+            fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator);
   ~Allocator() override;
 
   // |fuchsia::ui::composition::Allocator|
@@ -57,7 +57,7 @@ class Allocator : public fuchsia::ui::composition::Allocator {
   std::vector<std::shared_ptr<BufferCollectionImporter>> screenshot_buffer_collection_importers_;
 
   // A Sysmem allocator to facilitate buffer allocation with the Renderer.
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
 
   // Keep track of buffer collection Ids for garbage collection.
   std::unordered_map<GlobalBufferCollectionId,

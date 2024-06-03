@@ -87,8 +87,8 @@ void ViewProviderImpl::CreateView2(fuchsia::ui::app::CreateView2Args args) {
         RegisterBufferCollectionUsages::DEFAULT | RegisterBufferCollectionUsages::SCREENSHOT;
 
     fuchsia::sysmem2::BufferCollectionInfo sc_buffer_collection_info_ =
-        CreateBufferCollectionInfo2WithConstraints(
-            utils::CreateDefaultConstraints2(num_buffers_, half_display_width_, display_height_),
+        CreateBufferCollectionInfoWithConstraints(
+            utils::CreateDefaultConstraints(num_buffers_, half_display_width_, display_height_),
             std::move(scr_ref_pair.export_token), flatland_allocator_.get(),
             sysmem_allocator_.get(), usage_types);
 

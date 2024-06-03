@@ -8,7 +8,9 @@
 #include <string.h>
 #include <sys/types.h>
 
+#include <arch/defines.h>
 #include <arch/riscv64/mmu.h>
+#include <fbl/algorithm.h>
 #include <ktl/tuple.h>
 #include <vm/physmap.h>
 
@@ -24,14 +26,6 @@ namespace {
 // In the RISC-V spec, for sv39, the top level of the page table tree is level 2
 // whereas in the code below it is level 0.
 
-constexpr size_t kNumBootPageTables = 8;
-alignas(PAGE_SIZE) uint64_t boot_page_tables[RISCV64_MMU_PT_ENTRIES * kNumBootPageTables];
-
-// Will track the physical address of the page table array above. Starts off initialized to the
-// virtual address, but will be adjusted in riscv64_boot_map_init().
-paddr_t boot_page_tables_pa = reinterpret_cast<paddr_t>(boot_page_tables);
-size_t boot_page_table_offset;
-
 // Level 0 PTEs may point to large pages of size 1GB.
 constexpr uintptr_t l0_large_page_size = 1UL << (PAGE_SIZE_SHIFT + 2 * RISCV64_MMU_PT_SHIFT);
 constexpr uintptr_t l0_large_page_size_mask = l0_large_page_size - 1;
@@ -39,6 +33,23 @@ constexpr uintptr_t l0_large_page_size_mask = l0_large_page_size - 1;
 // Level 1 PTEs may point to large pages of size 2MB.
 constexpr uintptr_t l1_large_page_size = 1UL << (PAGE_SIZE_SHIFT + RISCV64_MMU_PT_SHIFT);
 constexpr uintptr_t l1_large_page_size_mask = l1_large_page_size - 1;
+
+// Physmap is mapped using L0 entries, each entry consist of 1 GB range.
+constexpr size_t kPhysmapBootPages = 0;
+
+constexpr size_t kKernelBootPages =
+    // L1 pages for kernel mapping.
+    fbl::round_up<size_t>(KERNEL_IMAGE_MAX_SIZE, l0_large_page_size) / l0_large_page_size +
+    // L2 pages for kernel mapping.
+    fbl::round_up<size_t>(KERNEL_IMAGE_MAX_SIZE, l1_large_page_size) / l1_large_page_size;
+
+constexpr size_t kNumBootPageTables = kPhysmapBootPages + kKernelBootPages;
+alignas(PAGE_SIZE) uint64_t boot_page_tables[RISCV64_MMU_PT_ENTRIES * kNumBootPageTables];
+
+// Will track the physical address of the page table array above. Starts off initialized to the
+// virtual address, but will be adjusted in riscv64_boot_map_init().
+paddr_t boot_page_tables_pa = reinterpret_cast<paddr_t>(boot_page_tables);
+size_t boot_page_table_offset;
 
 // Extract the level 0 physical page number from the virtual address.  In the
 // RISC-V spec this corresponds to va.vpn[2] for sv39.

@@ -192,6 +192,7 @@ void ExampleUseOfErrorSyntax_CallWhichMayFail_Result::Decode(::fidl::Decoder* _d
 
   switch (value->tag_) {
     case ::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_)::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Response();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;

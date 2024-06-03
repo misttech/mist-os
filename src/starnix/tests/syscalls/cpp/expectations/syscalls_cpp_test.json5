@@ -19,6 +19,10 @@
 
                 // TODO(): Make these tests reliably pass in Starnix then re-enable.
                 "FcntlLockTest.*",
+
+                // TODO(https://fxbug.dev/342416456): Rework the test to take
+                // into account logs from the system.
+                "SyslogTest.ProcKmsgPoll",
             ],
         },
         {

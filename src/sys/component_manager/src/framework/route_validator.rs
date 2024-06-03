@@ -23,7 +23,7 @@ use {
     fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     futures::{future::join_all, TryStreamExt},
     lazy_static::lazy_static,
-    moniker::{ExtendedMoniker, Moniker, MonikerBase},
+    moniker::{ExtendedMoniker, Moniker},
     std::{
         cmp::Ordering,
         sync::{Arc, Weak},
@@ -155,7 +155,7 @@ impl RouteValidator {
                     name: target_name.to_string(),
                     decl_type: fsys::DeclType::Expose,
                 };
-                let request = e.into();
+                let request = e.try_into().unwrap();
                 (target, request)
             });
             Ok(use_requests.chain(expose_requests).collect())
@@ -209,7 +209,7 @@ impl RouteValidator {
                                     name: target_name.to_string(),
                                     decl_type: target.decl_type,
                                 };
-                                let request = e.into();
+                                let request = e.try_into().unwrap();
                                 Some(Ok((target, request)))
                             })
                             .collect();
@@ -404,12 +404,25 @@ async fn validate_exposes(
     for (target_name, e) in exposes {
         let capability = Some(target_name.to_string());
         let decl_type = Some(fsys::DeclType::Expose);
-        let route_request = RouteRequest::from(e);
-        let availability = route_request.availability().map(fdecl::Availability::from);
-        let error = if let Err(e) = route_request.route(instance).await {
-            Some(fsys::RouteError { summary: Some(e.to_string()), ..Default::default() })
-        } else {
-            None
+        let (availability, error) = match RouteRequest::try_from(e) {
+            Err(e) => (
+                None,
+                Some(fsys::RouteError { summary: Some(e.to_string()), ..Default::default() }),
+            ),
+            Ok(route_request) => {
+                let availability = route_request.availability().map(fdecl::Availability::from);
+                if let Err(e) = route_request.route(instance).await {
+                    (
+                        availability,
+                        Some(fsys::RouteError {
+                            summary: Some(e.to_string()),
+                            ..Default::default()
+                        }),
+                    )
+                } else {
+                    (availability, None)
+                }
+            }
         };
 
         reports.push(fsys::RouteReport {
@@ -430,12 +443,12 @@ mod tests {
         crate::model::{
             component::StartReason,
             start::Start,
-            structured_dict::ComponentInput,
             testing::{
                 out_dir::OutDir,
                 test_helpers::{TestEnvironmentBuilder, TestModelResult},
             },
         },
+        ::routing::bedrock::structured_dict::ComponentInput,
         assert_matches::assert_matches,
         cm_rust::*,
         cm_rust_testing::*,

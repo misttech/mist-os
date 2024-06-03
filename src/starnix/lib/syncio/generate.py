@@ -38,6 +38,7 @@ bindgen.var_allowlist = [
     "SO.*",
     "IP.*",
     "MSG_.*",
+    "__bindgen_missing_.*",
 ]
 bindgen.type_allowlist = [
     "cmsghdr.*",
@@ -54,6 +55,13 @@ bindgen.set_auto_derive_traits(
         (r"in6_addr*", ["AsBytes, FromBytes", "FromZeros", "NoCell"]),
         (r"timespec", ["AsBytes, FromBytes", "FromZeros", "NoCell"]),
         (r"timeval", ["AsBytes, FromBytes", "FromZeros", "NoCell"]),
+    ]
+)
+
+bindgen.set_replacements(
+    [
+        # Remove __bindgen_missing from the start of constants defined in missing_includes.h
+        (r"const __bindgen_missing_([a-zA-Z_0-9]+)", "const \\1"),
     ]
 )
 

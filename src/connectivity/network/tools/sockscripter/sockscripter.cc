@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include <getopt.h>
 #include <net/if.h>
+#include <netinet/icmp6.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -18,6 +19,7 @@
 #include "log.h"
 #include "packet.h"
 #include "src/lib/fxl/strings/string_number_conversions.h"
+#include "src/lib/fxl/strings/string_printf.h"
 #include "util.h"
 
 #if PACKET_SOCKETS
@@ -178,6 +180,9 @@ const struct Command {
      &SockScripter::LogIpTransparent},
     {"set-ip-hdrincl", "{0|1}", "set IP_HDRINCL flag", &SockScripter::SetIpHeaderInclude},
     {"log-ip-hdrincl", nullptr, "log IP_HDRINCL option value", &SockScripter::LogIpHeaderInclude},
+    {"set-icmp6-filter", "\"xxxx..\"",
+     "set ICMP6_FILTER option with 256-bit hex number (big-endian)", &SockScripter::SetIcmp6Filter},
+    {"log-icmp6-filter", nullptr, "log ICMP6_FILTER option value", &SockScripter::LogIcmp6Filter},
 
     {"join4", "<mcast-ip>-<local-intf-Addr>",
      "join IPv4 mcast group (IP_ADD_MEMBERSHIP) on local interface", &SockScripter::Join4},
@@ -819,6 +824,63 @@ bool SockScripter::SetIpHeaderInclude(char* arg) {
 
 bool SockScripter::LogIpHeaderInclude(char* arg) {
   LOG_SOCK_OPT_VAL(IPPROTO_IP, IP_HDRINCL, int);
+  return true;
+}
+
+std::string IcmpFilterString(const icmp6_filter& filter) {
+  std::string result;
+  // NB: Iterate backwards to present the data in big endian format.
+  for (int i = 7; i >= 0; i--) {
+    result += fxl::StringPrintf("%08x", filter.icmp6_filt[i]);
+  }
+  return result;
+}
+
+bool SockScripter::SetIcmp6Filter(char* arg) {
+  constexpr int kFilterSize = 64;
+  std::string_view str(arg);
+  if (str.size() > kFilterSize || str.size() <= 0) {
+    LOG(ERROR) << "ICMP6_FILTER should be a 256-bit hex number (want 1-64 digits, got "
+               << str.size() << " digits)";
+    return false;
+  }
+
+  icmp6_filter filter = {};
+  // NB: parse backwards to read the data in big endian format from the user.
+  int i = 0;
+  while (!str.empty()) {
+    size_t chunk_end = str.size();
+    size_t chunk_start = chunk_end > 8 ? chunk_end - 8 : 0;
+    uint32_t chunk;
+    if (!fxl::StringToNumberWithError(str.substr(chunk_start, chunk_end), &chunk, fxl::Base::k16)) {
+      LOG(ERROR) << "Failed to parse substring (" << str.substr(chunk_start, chunk_end)
+                 << ") as a hex number.";
+      return false;
+    }
+    filter.icmp6_filt[i] = chunk;
+    str = str.substr(0, chunk_start);
+    i++;
+  }
+
+  if (api_->setsockopt(sockfd_, SOL_ICMPV6, ICMP6_FILTER, &filter, sizeof(filter)) < 0) {
+    LOG(ERROR) << "Failed to set SOL_ICMPV6:ICMP6_FILTER socket option - "
+               << "[" << errno << "]" << strerror(errno);
+    return false;
+  }
+  LOG(INFO) << "Set SOL_ICMPV6:ICMP6_FILTER - " << IcmpFilterString(filter);
+  return true;
+}
+
+bool SockScripter::LogIcmp6Filter(char* arg) {
+  icmp6_filter filter;
+  socklen_t filter_len = sizeof(filter);
+  if (api_->getsockopt(sockfd_, SOL_ICMPV6, ICMP6_FILTER, &filter, &filter_len) < 0) {
+    LOG(ERROR) << "Error getting SOL_ICMPV6: ICMP6_FILTER -"
+               << " [" << errno << "] " << strerror(errno);
+    return false;
+  }
+
+  LOG(INFO) << "IPPROTO_IPV6: ICMP6_FILTER - " << IcmpFilterString(filter);
   return true;
 }
 

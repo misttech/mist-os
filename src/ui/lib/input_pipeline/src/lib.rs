@@ -34,6 +34,7 @@ pub mod pointer_sensor_scale_handler;
 pub mod text_settings_handler;
 pub mod touch_injector_handler;
 
+pub mod activity;
 pub mod focus_listener;
 pub mod gestures;
 pub mod input_pipeline;

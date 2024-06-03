@@ -28,38 +28,14 @@ class RtcTest(unittest.TestCase):
             mock.patch.object(frtc.Device, "Client")
         ).return_value
 
-        self.transport = mock.create_autospec(
-            fuchsia_controller.FuchsiaController
-        )
-        self.reboot_af = mock.create_autospec(
+        transport = mock.create_autospec(fuchsia_controller.FuchsiaController)
+        reboot_af = mock.create_autospec(
             affordances_capable.RebootCapableDevice
         )
 
-        self.rtc = rtc.Rtc(self.transport, self.reboot_af)
-        self.transport.connect_device_proxy.assert_called_once()
-        self.reboot_af.register_for_on_device_boot.assert_called_once()
-
-    def test_rtc_setup_fallback(self) -> None:
-        self.transport.reset_mock()
-        self.reboot_af.reset_mock()
-
-        self.transport.connect_device_proxy.side_effect = [
-            RuntimeError("Device not found"),
-            ZX_OK,
-        ]
-
-        _ = rtc.Rtc(self.transport, self.reboot_af)
-        self.assertEqual(self.transport.connect_device_proxy.call_count, 2)
-        self.reboot_af.register_for_on_device_boot.assert_called_once()
-
-        (ep1,), _ = self.transport.connect_device_proxy.call_args_list[0]
-        (ep2,), _ = self.transport.connect_device_proxy.call_args_list[1]
-
-        self.assertEqual(rtc.Rtc.MONIKER_OLD, ep1.moniker)
-        self.assertEqual(rtc.CAPABILITY, ep1.protocol)
-
-        self.assertEqual(rtc.Rtc.MONIKER_NEW, ep2.moniker)
-        self.assertEqual(rtc.CAPABILITY, ep2.protocol)
+        self.rtc = rtc.Rtc(transport, reboot_af)
+        transport.connect_device_proxy.assert_called_once()
+        reboot_af.register_for_on_device_boot.assert_called_once()
 
     def test_rtc_get(self) -> None:
         chip_time = frtc.Time(23, 50, 15, 5, 2, 2022)

@@ -237,14 +237,14 @@ CompareConfig GetCompareConfigForBoard(std::string_view board_name, int display_
 
 static std::vector<uint8_t> GetColoredPixels(uint32_t bytes_per_row, uint32_t row_width,
                                              uint32_t num_rows,
-                                             fuchsia::sysmem::PixelFormatType pixel_format,
+                                             fuchsia::images2::PixelFormat pixel_format,
                                              std::array<uint8_t, 4> rgba) {
   uint32_t color = 0;
   switch (pixel_format) {
-    case fuchsia::sysmem::PixelFormatType::R8G8B8A8:
+    case fuchsia::images2::PixelFormat::R8G8B8A8:
       color = rgba[0] | rgba[1] << 8 | rgba[2] << 16 | rgba[3] << 24;
       break;
-    case fuchsia::sysmem::PixelFormatType::BGRA32:
+    case fuchsia::images2::PixelFormat::B8G8R8A8:
       color = rgba[0] << 16 | rgba[1] << 8 | rgba[2] | rgba[3] << 24;
       break;
     default:
@@ -263,10 +263,10 @@ static std::vector<uint8_t> GetColoredPixels(uint32_t bytes_per_row, uint32_t ro
 }
 
 static std::vector<uint8_t> FillVmoWithColor(
-    const fuchsia::sysmem::BufferCollectionInfo_2& collection_info, uint32_t vmo_index,
-    fuchsia::sysmem::PixelFormatType pixel_format, uint32_t image_width, uint32_t image_height,
+    const fuchsia::sysmem2::BufferCollectionInfo& collection_info, uint32_t vmo_index,
+    fuchsia::images2::PixelFormat pixel_format, uint32_t image_width, uint32_t image_height,
     std::array<uint8_t, 4> rgba) {
-  const uint32_t bytes_per_row = utils::GetBytesPerRow(collection_info.settings, image_width);
+  const uint32_t bytes_per_row = utils::GetBytesPerRow(collection_info.settings(), image_width);
 
   auto pixels = GetColoredPixels(bytes_per_row, image_width, image_height, pixel_format, rgba);
 
@@ -288,10 +288,12 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     // Create the SysmemAllocator.
     zx_status_t status = fdio_service_connect(
-        "/svc/fuchsia.sysmem.Allocator", sysmem_allocator_.NewRequest().TakeChannel().release());
+        "/svc/fuchsia.sysmem2.Allocator", sysmem_allocator_.NewRequest().TakeChannel().release());
     EXPECT_EQ(status, ZX_OK);
-    sysmem_allocator_->SetDebugClientInfo(
-        fsl::GetCurrentProcessName() + " DisplayCompositorPixelTest", fsl::GetCurrentProcessKoid());
+    fuchsia::sysmem2::AllocatorSetDebugClientInfoRequest set_debug_request;
+    set_debug_request.set_name(fsl::GetCurrentProcessName() + " DisplayCompositorPixelTest");
+    set_debug_request.set_id(fsl::GetCurrentProcessKoid());
+    sysmem_allocator_->SetDebugClientInfo(std::move(set_debug_request));
 
     executor_ = std::make_unique<async::Executor>(dispatcher());
 
@@ -331,7 +333,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
   static constexpr fuchsia_images2::PixelFormat kDisplayPixelFormat =
       fuchsia_images2::PixelFormat::kB8G8R8A8;
 
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
   std::unique_ptr<async::Executor> executor_;
   std::unique_ptr<scenic_impl::display::DisplayManager> display_manager_;
 
@@ -399,11 +401,9 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
   // capture buffer, tests should let display driver make decision for the
   // capture buffer format, and use the sysmem format in BufferCollectionInfo
   // for capture-and-golden comparison.
-  fpromise::result<fuchsia::sysmem::BufferCollectionSyncPtr, zx_status_t> SetupCapture(
-      allocation::GlobalBufferCollectionId collection_id,
-      fuchsia::sysmem::PixelFormatType pixel_type,
-      fuchsia::sysmem::BufferCollectionInfo_2* collection_info,
-      allocation::GlobalImageId image_id) {
+  fpromise::result<fuchsia::sysmem2::BufferCollectionSyncPtr, zx_status_t> SetupCapture(
+      allocation::GlobalBufferCollectionId collection_id, fuchsia::images2::PixelFormat pixel_type,
+      fuchsia::sysmem2::BufferCollectionInfo* collection_info, allocation::GlobalImageId image_id) {
     auto display = display_manager_->default_display();
     auto display_coordinator = display_manager_->default_display_coordinator();
     EXPECT_TRUE(display);
@@ -425,64 +425,63 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     auto result = scenic_impl::ImportBufferCollection(
         collection_id, *display_coordinator.get(), std::move(tokens.dup_token), image_buffer_usage);
     EXPECT_TRUE(result);
-    fuchsia::sysmem::BufferCollectionSyncPtr collection;
-    zx_status_t status = sysmem_allocator_->BindSharedCollection(std::move(tokens.local_token),
-                                                                 collection.NewRequest());
+    fuchsia::sysmem2::BufferCollectionSyncPtr collection;
+    fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+    bind_shared_request.set_token(std::move(tokens.local_token));
+    bind_shared_request.set_buffer_collection_request(collection.NewRequest());
+    zx_status_t status = sysmem_allocator_->BindSharedCollection(std::move(bind_shared_request));
     EXPECT_EQ(status, ZX_OK);
 
-    collection->SetName(100u, "FlatlandTestCaptureImage");
+    fuchsia::sysmem2::NodeSetNameRequest set_name_request;
+    set_name_request.set_priority(100u);
+    set_name_request.set_name("FlatlandTestCaptureImage");
+    collection->SetName(std::move(set_name_request));
 
     // Set the client constraints.
     {
-      fuchsia::sysmem::BufferCollectionConstraints constraints;
+      fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+      auto& constraints = *set_constraints_request.mutable_constraints();
 
       // finally setup our constraints
-      constraints.usage.cpu =
-          fuchsia::sysmem::cpuUsageReadOften | fuchsia::sysmem::cpuUsageWriteOften;
-      constraints.min_buffer_count_for_camping = 1;
-      constraints.has_buffer_memory_constraints = true;
-      constraints.buffer_memory_constraints.ram_domain_supported = true;
-      constraints.image_format_constraints_count = 1;
-      fuchsia::sysmem::ImageFormatConstraints& image_constraints =
-          constraints.image_format_constraints[0];
+      constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_READ_OFTEN |
+                                           fuchsia::sysmem2::CPU_USAGE_WRITE_OFTEN);
+      constraints.set_min_buffer_count_for_camping(1);
+      constraints.mutable_buffer_memory_constraints()->set_ram_domain_supported(true);
+      fuchsia::sysmem2::ImageFormatConstraints& image_constraints =
+          constraints.mutable_image_format_constraints()->emplace_back();
 
 #ifdef FAKE_DISPLAY
-      image_constraints.pixel_format.type = pixel_type;
+      image_constraints.set_pixel_format(pixel_type);
 #else
       // This format required for AMLOGIC capture.
-      image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::BGR24;
+      image_constraints.set_pixel_format(fuchsia::images2::PixelFormat::B8G8R8);
 #endif  // FAKE_DISPLAY
 
-      image_constraints.color_spaces_count = 1;
-      image_constraints.color_space[0] = fuchsia::sysmem::ColorSpace{
-          .type = fuchsia::sysmem::ColorSpaceType::SRGB,
-      };
-      image_constraints.min_coded_width = 0;
-      image_constraints.max_coded_width = std::numeric_limits<uint32_t>::max();
-      image_constraints.min_coded_height = 0;
-      image_constraints.max_coded_height = std::numeric_limits<uint32_t>::max();
-      image_constraints.min_bytes_per_row = 0;
-      image_constraints.max_bytes_per_row = std::numeric_limits<uint32_t>::max();
-      image_constraints.max_coded_width_times_coded_height = std::numeric_limits<uint32_t>::max();
-      image_constraints.layers = 1;
-      image_constraints.coded_width_divisor = 1;
-      image_constraints.coded_height_divisor = 1;
-      image_constraints.bytes_per_row_divisor = 1;
-      image_constraints.start_offset_divisor = 1;
-      image_constraints.display_width_divisor = 1;
-      image_constraints.display_height_divisor = 1;
+      image_constraints.mutable_color_spaces()->emplace_back(fuchsia::images2::ColorSpace::SRGB);
+      image_constraints.set_min_size(fuchsia::math::SizeU{.width = 0, .height = 0});
+      image_constraints.set_max_size(
+          fuchsia::math::SizeU{.width = std::numeric_limits<uint32_t>::max(),
+                               .height = std::numeric_limits<uint32_t>::max()});
+      image_constraints.set_min_bytes_per_row(0);
+      image_constraints.set_max_bytes_per_row(std::numeric_limits<uint32_t>::max());
+      image_constraints.set_max_width_times_height(std::numeric_limits<uint32_t>::max());
+      image_constraints.set_size_alignment(fuchsia::math::SizeU{.width = 1, .height = 1});
+      image_constraints.set_bytes_per_row_divisor(1);
+      image_constraints.set_start_offset_divisor(1);
+      image_constraints.set_display_rect_alignment(fuchsia::math::SizeU{.width = 1, .height = 1});
 
-      status = collection->SetConstraints(true /* has_constraints */, constraints);
+      status = collection->SetConstraints(std::move(set_constraints_request));
       EXPECT_EQ(status, ZX_OK);
     }
 
     // Have the client wait for buffers allocated so it can populate its information
     // struct with the vmo data.
     {
-      zx_status_t allocation_status = ZX_OK;
-      status = collection->WaitForBuffersAllocated(&allocation_status, collection_info);
+      fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+      status = collection->WaitForAllBuffersAllocated(&wait_result);
       EXPECT_EQ(status, ZX_OK);
-      EXPECT_EQ(allocation_status, ZX_OK);
+      EXPECT_TRUE(wait_result.is_response());
+      *collection_info = std::move(*wait_result.response().mutable_buffer_collection_info());
     }
 
     // TODO(https://fxbug.dev/332521780): Display clients will be required to
@@ -505,10 +504,10 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
   // Sets up the buffer collection information for collections that will be imported
   // into the engine.
-  fuchsia::sysmem::BufferCollectionSyncPtr SetupClientTextures(
+  fuchsia::sysmem2::BufferCollectionSyncPtr SetupClientTextures(
       DisplayCompositor* display_compositor, allocation::GlobalBufferCollectionId collection_id,
-      fuchsia::sysmem::PixelFormatType pixel_type, uint32_t width, uint32_t height,
-      uint32_t num_vmos, fuchsia::sysmem::BufferCollectionInfo_2* collection_info) {
+      fuchsia::images2::PixelFormat pixel_type, uint32_t width, uint32_t height, uint32_t num_vmos,
+      fuchsia::sysmem2::BufferCollectionInfo* collection_info) {
     // Setup the buffer collection that will be used for the flatland rectangle's texture.
     auto texture_tokens = SysmemTokens::Create(sysmem_allocator_.get());
 
@@ -518,18 +517,19 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     EXPECT_TRUE(result);
 
     auto [buffer_usage, memory_constraints] = GetUsageAndMemoryConstraintsForCpuWriteOften();
-    fuchsia::sysmem::BufferCollectionSyncPtr texture_collection =
+    fuchsia::sysmem2::BufferCollectionSyncPtr texture_collection =
         CreateBufferCollectionSyncPtrAndSetConstraints(
             sysmem_allocator_.get(), std::move(texture_tokens.local_token), num_vmos, width, height,
-            buffer_usage, pixel_type, memory_constraints,
-            std::make_optional(fuchsia::sysmem::FORMAT_MODIFIER_LINEAR));
+            fidl::Clone(buffer_usage), pixel_type, fidl::Clone(memory_constraints),
+            std::make_optional(fuchsia::images2::PixelFormatModifier::LINEAR));
 
     // Have the client wait for buffers allocated so it can populate its information
     // struct with the vmo data.
-    zx_status_t allocation_status = ZX_OK;
-    auto status = texture_collection->WaitForBuffersAllocated(&allocation_status, collection_info);
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+    auto status = texture_collection->WaitForAllBuffersAllocated(&wait_result);
     EXPECT_EQ(status, ZX_OK);
-    EXPECT_EQ(allocation_status, ZX_OK);
+    EXPECT_TRUE(wait_result.is_response());
+    *collection_info = std::move(*wait_result.response().mutable_buffer_collection_info());
 
     return texture_collection;
   }
@@ -548,7 +548,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
   }
 
   // Captures the pixel values on the display and reads them into |read_values|.
-  void CaptureDisplayOutput(const fuchsia::sysmem::BufferCollectionInfo_2& collection_info,
+  void CaptureDisplayOutput(const fuchsia::sysmem2::BufferCollectionInfo& collection_info,
                             allocation::GlobalImageId capture_image_id,
                             std::vector<uint8_t>* read_values, bool release_capture_image = true) {
     // Make sure the config from the DisplayCompositor has been completely applied first before
@@ -599,16 +599,15 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 #ifdef FAKE_DISPLAY
   bool CaptureCompare(cpp20::span<const uint8_t> captured_image,
                       cpp20::span<const uint8_t> input_image,
-                      fuchsia::sysmem::PixelFormatType input_image_pixel_format_type,
-                      uint32_t height, uint32_t width) {
-    fuchsia_sysmem::wire::PixelFormat pixel_format = {
-        .type = static_cast<fuchsia_sysmem::wire::PixelFormatType>(input_image_pixel_format_type),
-        .format_modifier = {
-          .value = 0,
-        }};
-    FX_CHECK(input_image_pixel_format_type == fuchsia::sysmem::PixelFormatType::R8G8B8A8 ||
-             input_image_pixel_format_type == fuchsia::sysmem::PixelFormatType::BGRA32);
-    const int image_formats_bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(pixel_format);
+                      fuchsia::images2::PixelFormat input_image_pixel_format, uint32_t height,
+                      uint32_t width) {
+    PixelFormatAndModifier pixel_format_and_modifier(
+        static_cast<fuchsia_images2::PixelFormat>(input_image_pixel_format),
+        fuchsia_images2::PixelFormatModifier::kLinear);
+    FX_CHECK(input_image_pixel_format == fuchsia::images2::PixelFormat::R8G8B8A8 ||
+             input_image_pixel_format == fuchsia::images2::PixelFormat::B8G8R8A8);
+    const int image_formats_bytes_per_pixel =
+        ImageFormatStrideBytesPerWidthPixel(pixel_format_and_modifier);
     EXPECT_EQ(captured_image.size(),
               static_cast<size_t>(width) * height * image_formats_bytes_per_pixel);
     EXPECT_EQ(captured_image.size(), input_image.size());
@@ -621,10 +620,10 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 #else
   bool CaptureCompare(cpp20::span<const uint8_t> captured_image,
                       cpp20::span<const uint8_t> input_image,
-                      fuchsia::sysmem::PixelFormatType input_image_pixel_format_type, int height,
+                      fuchsia::images2::PixelFormat input_image_pixel_format_type, int height,
                       int width) {
-    FX_CHECK(input_image_pixel_format_type == fuchsia::sysmem::PixelFormatType::R8G8B8A8 ||
-             input_image_pixel_format_type == fuchsia::sysmem::PixelFormatType::BGRA32);
+    FX_CHECK(input_image_pixel_format_type == fuchsia::images2::PixelFormat::R8G8B8A8 ||
+             input_image_pixel_format_type == fuchsia::images2::PixelFormat::B8G8R8A8);
 
     auto expected_rgba_image = std::vector<uint8_t>(input_image.begin(), input_image.end());
 
@@ -634,7 +633,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     // comparison.
     for (size_t i = 0; i + 3 < expected_rgba_image.size(); i += 4) {
       switch (input_image_pixel_format_type) {
-        case fuchsia::sysmem::PixelFormatType::BGRA32: {
+        case fuchsia::images2::PixelFormat::B8G8R8A8: {
           uint8_t r, g, b, a;
           std::tie(b, g, r, a) = std::tie(expected_rgba_image[i + 0], expected_rgba_image[i + 1],
                                           expected_rgba_image[i + 2], expected_rgba_image[i + 3]);
@@ -642,7 +641,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
                    expected_rgba_image[i + 2], expected_rgba_image[i + 3]) = std::tie(r, g, b, a);
           break;
         }
-        case fuchsia::sysmem::PixelFormatType::R8G8B8A8:
+        case fuchsia::images2::PixelFormat::R8G8B8A8:
           // No need to convert.
           break;
         default:
@@ -663,12 +662,11 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     const int capture_stride = static_cast<int>(
         fbl::round_up(width * kCaptureImageBytesPerPixel, kCaptureImageRowByteAlignment));
 
-    fuchsia_sysmem::wire::PixelFormat pixel_format = {
-        .type = static_cast<fuchsia_sysmem::wire::PixelFormatType>(input_image_pixel_format_type),
-        .format_modifier = {
-          .value = 0,
-        }};
-    const uint32_t input_image_bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(pixel_format);
+    PixelFormatAndModifier pixel_format_and_modifier(
+        static_cast<fuchsia_images2::wire::PixelFormat>(input_image_pixel_format_type),
+        fuchsia_images2::PixelFormatModifier::kLinear);
+    const uint32_t input_image_bytes_per_pixel =
+        ImageFormatStrideBytesPerWidthPixel(pixel_format_and_modifier);
     // TODO(https://fxbug.dev/42076192): This should not be hardcoded, instead sysmem
     // should read it from the sysmem BufferCollectionInfo of allocated input
     // image buffer.
@@ -785,7 +783,7 @@ the build files but if it does not please add manually.
 
 class DisplayCompositorParameterizedPixelTest
     : public DisplayCompositorPixelTest,
-      public ::testing::WithParamInterface<fuchsia::sysmem::PixelFormatType> {};
+      public ::testing::WithParamInterface<fuchsia::images2::PixelFormat> {};
 
 // Renders a fullscreen green rectangle to the provided display. This
 // tests the engine's ability to properly read in flatland uberstruct
@@ -807,7 +805,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
 
   // Set up buffer collection and image for display_coordinator capture.
   allocation::GlobalImageId capture_image_id = allocation::GenerateUniqueBufferCollectionId();
-  fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
+  fuchsia::sysmem2::BufferCollectionInfo capture_info;
   auto capture_collection_result =
       SetupCapture(kCaptureCollectionId, GetParam(), &capture_info, capture_image_id);
   if (capture_collection_result.is_error() &&
@@ -824,7 +822,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
   // must also have a fullscreen texture to match.
   const uint32_t kRectWidth = display->width_in_px(), kTextureWidth = display->width_in_px();
   const uint32_t kRectHeight = display->height_in_px(), kTextureHeight = display->height_in_px();
-  fuchsia::sysmem::BufferCollectionInfo_2 texture_collection_info;
+  fuchsia::sysmem2::BufferCollectionInfo texture_collection_info;
   auto texture_collection =
       SetupClientTextures(display_compositor.get(), kTextureCollectionId, GetParam(), kTextureWidth,
                           kTextureHeight, 1, &texture_collection_info);
@@ -833,7 +831,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
   }
 
   const uint32_t texture_bytes_per_row =
-      utils::GetBytesPerRow(texture_collection_info.settings, kTextureWidth);
+      utils::GetBytesPerRow(texture_collection_info.settings(), kTextureWidth);
 
   auto release_texture_collection =
       fit::defer([display_compositor = display_compositor.get(), kTextureCollectionId] {
@@ -843,9 +841,9 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
   // Setup the values we will compare the display capture against.
   const uint32_t color = [pixel_format = GetParam()] {
     switch (pixel_format) {
-      case fuchsia::sysmem::PixelFormatType::R8G8B8A8:
+      case fuchsia::images2::PixelFormat::R8G8B8A8:
         return /*A*/ (255U << 24) | /*B*/ (255U << 16);
-      case fuchsia::sysmem::PixelFormatType::BGRA32:
+      case fuchsia::images2::PixelFormat::B8G8R8A8:
         return /*A*/ (255U << 24) | /*B*/ (255U << 0);
       default:
         FX_NOTREACHED();
@@ -945,7 +943,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
 
   // Set up buffer collection and image for display_coordinator capture.
   allocation::GlobalImageId capture_image_id = allocation::GenerateUniqueImageId();
-  fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
+  fuchsia::sysmem2::BufferCollectionInfo capture_info;
   auto capture_collection_result =
       SetupCapture(kCaptureCollectionId, GetParam(), &capture_info, capture_image_id);
   if (capture_collection_result.is_error() &&
@@ -962,7 +960,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
   // must also have a fullscreen texture to match.
   const uint32_t kRectWidth = display->width_in_px(), kTextureWidth = display->width_in_px();
   const uint32_t kRectHeight = display->height_in_px(), kTextureHeight = display->height_in_px();
-  fuchsia::sysmem::BufferCollectionInfo_2 compare_collection_info;
+  fuchsia::sysmem2::BufferCollectionInfo compare_collection_info;
   auto compare_collection =
       SetupClientTextures(display_compositor.get(), kCompareCollectionId, GetParam(), kTextureWidth,
                           kTextureHeight, 1, &compare_collection_info);
@@ -1053,7 +1051,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
 
   // Set up buffer collection and image for display_coordinator capture.
   allocation::GlobalImageId capture_image_id = allocation::GenerateUniqueImageId();
-  fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
+  fuchsia::sysmem2::BufferCollectionInfo capture_info;
   auto capture_collection_result =
       SetupCapture(kCaptureCollectionId, GetParam(), &capture_info, capture_image_id);
   if (capture_collection_result.is_error() &&
@@ -1070,7 +1068,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
   // must also have a fullscreen texture to match.
   const uint32_t kRectWidth = display->width_in_px(), kTextureWidth = display->width_in_px();
   const uint32_t kRectHeight = display->height_in_px(), kTextureHeight = display->height_in_px();
-  fuchsia::sysmem::BufferCollectionInfo_2 compare_collection_info;
+  fuchsia::sysmem2::BufferCollectionInfo compare_collection_info;
   auto compare_collection =
       SetupClientTextures(display_compositor.get(), kCompareCollectionId, GetParam(), kTextureWidth,
                           kTextureHeight, 1, &compare_collection_info);
@@ -1152,7 +1150,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
 
   // Set up buffer collection and image for display_coordinator capture.
   allocation::GlobalImageId capture_image_id = allocation::GenerateUniqueImageId();
-  fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
+  fuchsia::sysmem2::BufferCollectionInfo capture_info;
   auto capture_collection_result =
       SetupCapture(kCaptureCollectionId, GetParam(), &capture_info, capture_image_id);
   if (capture_collection_result.is_error() &&
@@ -1169,7 +1167,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   // must also have a fullscreen texture to match.
   const uint32_t kRectWidth = display->width_in_px(), kTextureWidth = display->width_in_px();
   const uint32_t kRectHeight = display->height_in_px(), kTextureHeight = display->height_in_px();
-  fuchsia::sysmem::BufferCollectionInfo_2 compare_collection_info;
+  fuchsia::sysmem2::BufferCollectionInfo compare_collection_info;
   auto compare_collection =
       SetupClientTextures(display_compositor.get(), kCompareCollectionId, GetParam(), kTextureWidth,
                           kTextureHeight, 1, &compare_collection_info);
@@ -1188,8 +1186,8 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   std::vector<uint8_t> expected_values;
   expected_values.assign(num_pixels * 4, kMinimum);
   switch (GetParam()) {
-    case fuchsia::sysmem::PixelFormatType::BGRA32:
-    case fuchsia::sysmem::PixelFormatType::R8G8B8A8: {
+    case fuchsia::images2::PixelFormat::B8G8R8A8:
+    case fuchsia::images2::PixelFormat::R8G8B8A8: {
       MapHostPointer(compare_collection_info, /*vmo_index*/ 0, HostPointerAccessMode::kWriteOnly,
                      [&expected_values](uint8_t* vmo_host, uint32_t num_bytes) {
                        EXPECT_GE(num_bytes, sizeof(uint8_t) * expected_values.size());
@@ -1256,12 +1254,12 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
 // TODO(https://fxbug.dev/42154038): Add YUV formats when they are supported by fake or real
 // display.
 INSTANTIATE_TEST_SUITE_P(PixelFormats, DisplayCompositorParameterizedPixelTest,
-                         ::testing::Values(fuchsia::sysmem::PixelFormatType::BGRA32,
-                                           fuchsia::sysmem::PixelFormatType::R8G8B8A8));
+                         ::testing::Values(fuchsia::images2::PixelFormat::B8G8R8A8,
+                                           fuchsia::images2::PixelFormat::R8G8B8A8));
 
 class DisplayCompositorFallbackParameterizedPixelTest
     : public DisplayCompositorPixelTest,
-      public ::testing::WithParamInterface<fuchsia::sysmem::PixelFormatType> {};
+      public ::testing::WithParamInterface<fuchsia::images2::PixelFormat> {};
 
 // Test the software path of the engine. Render 2 rectangles, each taking up half of the
 // display's screen, so that the left half is blue and the right half is red.
@@ -1275,9 +1273,9 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
 
   // Set up buffer collection and image for display_coordinator capture.
   allocation::GlobalImageId capture_image_id = allocation::GenerateUniqueImageId();
-  fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
+  fuchsia::sysmem2::BufferCollectionInfo capture_info;
   auto capture_collection_result =
-      SetupCapture(kCaptureCollectionId, fuchsia::sysmem::PixelFormatType::BGRA32, &capture_info,
+      SetupCapture(kCaptureCollectionId, fuchsia::images2::PixelFormat::B8G8R8A8, &capture_info,
                    capture_image_id);
   if (capture_collection_result.is_error() &&
       capture_collection_result.error() == ZX_ERR_NOT_SUPPORTED) {
@@ -1291,7 +1289,7 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
   // Setup the collection for the textures. Since we're rendering in software, we don't have to
   // deal with display limitations.
   const uint32_t kTextureWidth = 32, kTextureHeight = 32;
-  fuchsia::sysmem::BufferCollectionInfo_2 texture_collection_info;
+  fuchsia::sysmem2::BufferCollectionInfo texture_collection_info;
 
   // Create the image metadatas.
   ImageMetadata image_metadatas[2];
@@ -1325,7 +1323,7 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
     MapHostPointer(texture_collection_info, /*vmo_index*/ i, HostPointerAccessMode::kWriteOnly,
                    [i](uint8_t* vmo_host, uint32_t num_bytes) {
                      switch (GetParam()) {
-                       case fuchsia::sysmem::PixelFormatType::BGRA32: {
+                       case fuchsia::images2::PixelFormat::B8G8R8A8: {
                          const uint8_t kBlueBgraValues[] = {255U, 0U, 0U, 255U};
                          const uint8_t kRedBgraValues[] = {0U, 0U, 255U, 255U};
                          const uint8_t* cols = i == 0 ? kBlueBgraValues : kRedBgraValues;
@@ -1333,7 +1331,7 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
                            vmo_host[p] = cols[p % 4];
                          break;
                        }
-                       case fuchsia::sysmem::PixelFormatType::R8G8B8A8: {
+                       case fuchsia::images2::PixelFormat::R8G8B8A8: {
                          const uint8_t kBlueRgbaValues[] = {0U, 0U, 255U, 255U};
                          const uint8_t kRedRgbaValues[] = {255U, 0U, 0U, 255U};
                          const uint8_t* cols = i == 0 ? kBlueRgbaValues : kRedRgbaValues;
@@ -1341,7 +1339,7 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
                            vmo_host[p] = cols[p % 4];
                          break;
                        }
-                       case fuchsia::sysmem::PixelFormatType::NV12: {
+                       case fuchsia::images2::PixelFormat::NV12: {
                          const uint8_t kBlueYuvValues[] = {29U, 255U, 107U};
                          const uint8_t kRedYuvValues[] = {76U, 84U, 255U};
                          const uint8_t* cols = i == 0 ? kBlueYuvValues : kRedYuvValues;
@@ -1353,7 +1351,7 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
                          }
                          break;
                        }
-                       case fuchsia::sysmem::PixelFormatType::I420: {
+                       case fuchsia::images2::PixelFormat::I420: {
                          const uint8_t kBlueYuvValues[] = {29U, 255U, 107U};
                          const uint8_t kRedYuvValues[] = {76U, 84U, 255U};
                          const uint8_t* cols = i == 0 ? kBlueYuvValues : kRedYuvValues;
@@ -1379,7 +1377,7 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
     EXPECT_TRUE(result);
   }
 
-  fuchsia::sysmem::BufferCollectionInfo_2 render_target_info;
+  fuchsia::sysmem2::BufferCollectionInfo render_target_info;
   DisplayInfo display_info{
       .dimensions = glm::uvec2(display->width_in_px(), display->height_in_px()),
       .formats = {kDisplayPixelFormat}};
@@ -1410,8 +1408,8 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
                    CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
 
                    // Compare the capture vmo data to the values we are expecting.
-                   const fuchsia::sysmem::PixelFormatType render_target_pixel_format =
-                       render_target_info.settings.image_format_constraints.pixel_format.type;
+                   const fuchsia::images2::PixelFormat render_target_pixel_format =
+                       render_target_info.settings().image_format_constraints().pixel_format();
                    bool images_are_same = CaptureCompare(
                        read_values, cpp20::span(vmo_host, num_bytes), render_target_pixel_format,
                        display->height_in_px(), display->width_in_px());
@@ -1441,10 +1439,10 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
 }
 
 INSTANTIATE_TEST_SUITE_P(PixelFormats, DisplayCompositorFallbackParameterizedPixelTest,
-                         ::testing::Values(fuchsia::sysmem::PixelFormatType::BGRA32,
-                                           fuchsia::sysmem::PixelFormatType::R8G8B8A8,
-                                           fuchsia::sysmem::PixelFormatType::NV12,
-                                           fuchsia::sysmem::PixelFormatType::I420));
+                         ::testing::Values(fuchsia::images2::PixelFormat::B8G8R8A8,
+                                           fuchsia::images2::PixelFormat::R8G8B8A8,
+                                           fuchsia::images2::PixelFormat::NV12,
+                                           fuchsia::images2::PixelFormat::I420));
 
 // Test to make sure that the engine can handle rendering a transparent object overlapping an
 // opaque one.
@@ -1458,9 +1456,9 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
 
   // Set up buffer collection and image for display_coordinator capture.
   allocation::GlobalImageId capture_image_id = allocation::GenerateUniqueImageId();
-  fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
+  fuchsia::sysmem2::BufferCollectionInfo capture_info;
   auto capture_collection_result =
-      SetupCapture(kCaptureCollectionId, fuchsia::sysmem::PixelFormatType::BGRA32, &capture_info,
+      SetupCapture(kCaptureCollectionId, fuchsia::images2::PixelFormat::B8G8R8A8, &capture_info,
                    capture_image_id);
   if (capture_collection_result.is_error() &&
       capture_collection_result.error() == ZX_ERR_NOT_SUPPORTED) {
@@ -1474,7 +1472,7 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
   // Setup the collection for the textures. Since we're rendering in software, we don't have to
   // deal with display limitations.
   const uint32_t kTextureWidth = 1, kTextureHeight = 1;
-  fuchsia::sysmem::BufferCollectionInfo_2 texture_collection_info;
+  fuchsia::sysmem2::BufferCollectionInfo texture_collection_info;
 
   // Create the image metadatas.
   ImageMetadata image_metadatas[2];
@@ -1498,7 +1496,7 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
 
   auto texture_collection =
       SetupClientTextures(display_compositor.get(), kTextureCollectionId,
-                          fuchsia::sysmem::PixelFormatType::BGRA32, kTextureWidth, kTextureHeight,
+                          fuchsia::images2::PixelFormat::B8G8R8A8, kTextureWidth, kTextureHeight,
                           /*num_vmos*/ 2, &texture_collection_info);
   auto release_texture_collection =
       fit::defer([display_compositor = display_compositor.get(), kTextureCollectionId] {
@@ -1527,7 +1525,7 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
     EXPECT_TRUE(result);
   }
 
-  fuchsia::sysmem::BufferCollectionInfo_2 render_target_info;
+  fuchsia::sysmem2::BufferCollectionInfo render_target_info;
   DisplayInfo display_info{
       .dimensions = glm::uvec2(display->width_in_px(), display->height_in_px()),
       .formats = {kDisplayPixelFormat}};
@@ -1567,8 +1565,8 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
         std::vector<uint8_t> read_values;
         CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
 
-        const fuchsia::sysmem::PixelFormatType render_target_pixel_format_type =
-            render_target_info.settings.image_format_constraints.pixel_format.type;
+        const fuchsia::images2::PixelFormat render_target_pixel_format_type =
+            render_target_info.settings().image_format_constraints().pixel_format();
 
         // Compare the capture vmo data to the values we are expecting.
         bool images_are_same = CaptureCompare(read_values, cpp20::span(vmo_host, num_bytes),
@@ -1586,10 +1584,10 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
           const uint32_t current_color_render_target_format = host_ptr[i];
           uint32_t current_color_bgra = 0;
           switch (render_target_pixel_format_type) {
-            case fuchsia::sysmem::PixelFormatType::BGRA32:
+            case fuchsia::images2::PixelFormat::B8G8R8A8:
               current_color_bgra = current_color_render_target_format;
               break;
-            case fuchsia::sysmem::PixelFormatType::R8G8B8A8: {
+            case fuchsia::images2::PixelFormat::R8G8B8A8: {
               cpp20::span<const uint8_t> rgba(
                   reinterpret_cast<const uint8_t*>(&current_color_render_target_format), 4);
               current_color_bgra =
@@ -1622,12 +1620,12 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
 
 class DisplayCompositorParameterizedTest
     : public DisplayCompositorPixelTest,
-      public ::testing::WithParamInterface<fuchsia::sysmem::PixelFormatType> {};
+      public ::testing::WithParamInterface<fuchsia::images2::PixelFormat> {};
 
 // TODO(https://fxbug.dev/42154038): Add YUV formats when they are supported by fake or real
 // display.
 INSTANTIATE_TEST_SUITE_P(PixelFormats, DisplayCompositorParameterizedTest,
-                         ::testing::Values(fuchsia::sysmem::PixelFormatType::BGRA32));
+                         ::testing::Values(fuchsia::images2::PixelFormat::B8G8R8A8));
 
 // Pixel test for making sure that multiparented transforms render properly.
 // This is for A11Y Magnification.
@@ -1667,7 +1665,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
 
   // Set up buffer collection and image for display_coordinator capture.
   allocation::GlobalImageId capture_image_id = allocation::GenerateUniqueImageId();
-  fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
+  fuchsia::sysmem2::BufferCollectionInfo capture_info;
   auto capture_collection_result =
       SetupCapture(kCaptureCollectionId, GetParam(), &capture_info, capture_image_id);
   if (capture_collection_result.is_error() &&
@@ -1683,7 +1681,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
   // Setup the collection for the textures. Since we're rendering in software, we don't have to
   // deal with display limitations.
   const uint32_t kTextureWidth = 2, kTextureHeight = 2;
-  fuchsia::sysmem::BufferCollectionInfo_2 texture_collection_info;
+  fuchsia::sysmem2::BufferCollectionInfo texture_collection_info;
 
   // Create the texture's metadata.
   ImageMetadata image_metadata = {.collection_id = kTextureCollectionId,
@@ -1702,7 +1700,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
       });
 
   switch (GetParam()) {
-    case fuchsia::sysmem::PixelFormatType::BGRA32: {
+    case fuchsia::images2::PixelFormat::B8G8R8A8: {
       MapHostPointer(texture_collection_info, /*vmo_index*/ 0, HostPointerAccessMode::kWriteOnly,
                      [](uint8_t* vmo_host, uint32_t num_bytes) {
                        const uint8_t kBlueBgraValues[] = {255U, 0U, 0U, 255U};
@@ -1737,7 +1735,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
   session.graph().AddChild(parent_1_handle, child_handle);
   session.graph().AddChild(parent_2_handle, child_handle);
 
-  fuchsia::sysmem::BufferCollectionInfo_2 render_target_info;
+  fuchsia::sysmem2::BufferCollectionInfo render_target_info;
   DisplayInfo display_info{
       .dimensions = glm::uvec2(display->width_in_px(), display->height_in_px()),
       .formats = {kDisplayPixelFormat}};
@@ -1780,7 +1778,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
   MapHostPointer(render_target_info, /*vmo_index*/ 0, HostPointerAccessMode::kReadOnly,
                  [&](const uint8_t* vmo_host, uint32_t num_bytes) {
                    const uint32_t display_bytes_per_row =
-                       utils::GetBytesPerRow(render_target_info.settings, display->width_in_px());
+                       utils::GetBytesPerRow(render_target_info.settings(), display->width_in_px());
                    EXPECT_EQ(0U, display_bytes_per_row % 4);
                    const uint32_t display_width_including_padding = display_bytes_per_row / 4;
 
@@ -1916,7 +1914,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
 
   // Set up buffer collection and image for display_coordinator capture.
   allocation::GlobalImageId capture_image_id = allocation::GenerateUniqueImageId();
-  fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
+  fuchsia::sysmem2::BufferCollectionInfo capture_info;
   auto capture_collection_result =
       SetupCapture(kCaptureCollectionId, GetParam(), &capture_info, capture_image_id);
   if (capture_collection_result.is_error() &&
@@ -1932,7 +1930,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
   // Setup the collection for the textures. Since we're rendering in software, we don't have to
   // deal with display limitations.
   const uint32_t kTextureWidth = 2, kTextureHeight = 2;
-  fuchsia::sysmem::BufferCollectionInfo_2 texture_collection_info;
+  fuchsia::sysmem2::BufferCollectionInfo texture_collection_info;
 
   // Create the texture's metadata.
   ImageMetadata image_metadata = {.collection_id = kTextureCollectionId,
@@ -1951,7 +1949,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
       });
 
   switch (GetParam()) {
-    case fuchsia::sysmem::PixelFormatType::BGRA32: {
+    case fuchsia::images2::PixelFormat::B8G8R8A8: {
       MapHostPointer(texture_collection_info, /*vmo_index*/ 0, HostPointerAccessMode::kWriteOnly,
                      [](uint8_t* vmo_host, uint32_t num_bytes) {
                        const uint8_t kBlueBgraValues[] = {255U, 0U, 0U, 255U};
@@ -1980,7 +1978,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
 
   session.graph().AddChild(root_handle, parent_handle);
 
-  fuchsia::sysmem::BufferCollectionInfo_2 render_target_info;
+  fuchsia::sysmem2::BufferCollectionInfo render_target_info;
   DisplayInfo display_info{
       .dimensions = glm::uvec2(display->width_in_px(), display->height_in_px()),
       .formats = {kDisplayPixelFormat}};
@@ -2018,8 +2016,8 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
         std::vector<uint8_t> read_values;
         CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
 
-        const fuchsia::sysmem::PixelFormatType render_target_pixel_format_type =
-            render_target_info.settings.image_format_constraints.pixel_format.type;
+        const fuchsia::images2::PixelFormat render_target_pixel_format_type =
+            render_target_info.settings().image_format_constraints().pixel_format();
 
         // Compare the capture vmo data to the values we are expecting.
         bool images_are_same = CaptureCompare(read_values, cpp20::span(vmo_host, num_bytes),
@@ -2036,11 +2034,11 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
           // |vmo_host| has BGRA sequence in pixel values.
           uint32_t bgra = 0;
           switch (render_target_pixel_format_type) {
-            case fuchsia::sysmem::PixelFormatType::R8G8B8A8:
+            case fuchsia::images2::PixelFormat::R8G8B8A8:
               bgra = (vmo_host[i + 3] << 24) | (vmo_host[i + 0] << 16) | (vmo_host[i + 1] << 8) |
                      vmo_host[i + 2];
               break;
-            case fuchsia::sysmem::PixelFormatType::BGRA32:
+            case fuchsia::images2::PixelFormat::B8G8R8A8:
               bgra = (vmo_host[i + 3] << 24) | (vmo_host[i + 2] << 16) | (vmo_host[i + 1] << 8) |
                      vmo_host[i + 0];
               break;
@@ -2059,15 +2057,15 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
 
         auto get_bgra_pixel =
             [&display, pixel_format_type =
-                           render_target_info.settings.image_format_constraints.pixel_format.type](
+                           render_target_info.settings().image_format_constraints().pixel_format()](
                 const uint8_t* vmo_host, uint32_t x, uint32_t y) -> uint32_t {
           uint32_t index = y * display->width_in_px() * 4 + x * 4;
 
           switch (pixel_format_type) {
-            case fuchsia::sysmem::PixelFormatType::R8G8B8A8:
+            case fuchsia::images2::PixelFormat::R8G8B8A8:
               return (vmo_host[index + 3] << 24) | (vmo_host[index + 0] << 16) |
                      (vmo_host[index + 1] << 8) | vmo_host[index + 2];
-            case fuchsia::sysmem::PixelFormatType::BGRA32:
+            case fuchsia::images2::PixelFormat::B8G8R8A8:
               return (vmo_host[index + 3] << 24) | (vmo_host[index + 2] << 16) |
                      (vmo_host[index + 1] << 8) | vmo_host[index + 0];
             default:
@@ -2090,7 +2088,7 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
   auto display = display_manager_->default_display();
   auto display_coordinator = display_manager_->default_display_coordinator();
 
-  const auto kPixelFormat = fuchsia::sysmem::PixelFormatType::BGRA32;
+  const auto kPixelFormat = fuchsia::images2::PixelFormat::B8G8R8A8;
 
   auto [escher, renderer] = NewVkRenderer();
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
@@ -2103,7 +2101,7 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
 
   // Set up buffer collection and image for display_coordinator capture.
   allocation::GlobalImageId capture_image_id = allocation::GenerateUniqueImageId();
-  fuchsia::sysmem::BufferCollectionInfo_2 capture_info;
+  fuchsia::sysmem2::BufferCollectionInfo capture_info;
   auto capture_collection_result =
       SetupCapture(kCaptureCollectionId, kPixelFormat, &capture_info, capture_image_id);
   if (capture_collection_result.is_error() &&
@@ -2121,7 +2119,7 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
   const uint32_t kRectWidth = display->width_in_px(), kTextureWidth = display->width_in_px();
   const uint32_t kRectHeight = display->height_in_px(), kTextureHeight = display->height_in_px();
 
-  fuchsia::sysmem::BufferCollectionInfo_2 texture_collection_info;
+  fuchsia::sysmem2::BufferCollectionInfo texture_collection_info;
   auto texture_collection =
       SetupClientTextures(display_compositor.get(), kTextureCollectionId, kPixelFormat,
                           kTextureWidth, kTextureHeight, 2, &texture_collection_info);
@@ -2134,7 +2132,7 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
       });
 
   const uint32_t texture_bytes_per_row =
-      utils::GetBytesPerRow(texture_collection_info.settings, kTextureWidth);
+      utils::GetBytesPerRow(texture_collection_info.settings(), kTextureWidth);
 
   std::vector<uint8_t> blue_write_values =
       FillVmoWithColor(texture_collection_info, /*vmo_index=*/0, /*pixel_format=*/kPixelFormat,
@@ -2177,7 +2175,7 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
   //
   // Other tests use the buffer collection info to obtain the pixel format when comparing the
   // captured display contents to the expected values, but here we always use kDisplayPixelFormat.
-  fuchsia::sysmem::BufferCollectionInfo_2 unused_render_target_info;
+  fuchsia::sysmem2::BufferCollectionInfo unused_render_target_info;
   DisplayInfo display_info{
       .dimensions = glm::uvec2(display->width_in_px(), display->height_in_px()),
       .formats = {kDisplayPixelFormat}};

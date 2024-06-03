@@ -10,8 +10,10 @@ import json
 import os
 import sys
 
+from typing import Any
 
-def validate(data):
+
+def validate(data: dict[str, Any]) -> bool:
     tests = data["tests"]
     test_types = data["driver_test_types"]
     categories = data["device_category_types"]
@@ -46,7 +48,7 @@ def validate(data):
     return True
 
 
-def check_required_fhcp_fields(d):
+def check_required_fhcp_fields(d: dict[str, Any]) -> None:
     # "test_types" key must exist and have a non-empty value.
     if "test_types" not in d or not d["test_types"]:
         raise ValueError(
@@ -86,7 +88,9 @@ def check_required_fhcp_fields(d):
             )
 
 
-def convert_to_final_dict(appendix, data):
+def convert_to_final_dict(
+    appendix: dict[str, Any], data: list[dict[str, Any]]
+) -> dict[str, Any]:
     test_entries = {}
     fhcp_entries = {}
 
@@ -128,7 +132,7 @@ def convert_to_final_dict(appendix, data):
     return appendix
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--appendix_json", help="Path to the appendix JSON", required=True
@@ -144,7 +148,7 @@ def main():
     appendix = {}
     with open(args.appendix_json, "r") as f:
         appendix = json.load(f)
-    intermediate = {}
+    intermediate = []
     with open(args.intermediate_json, "r") as f:
         intermediate = json.load(f)
 

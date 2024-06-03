@@ -63,9 +63,6 @@ rustc_library("vfs") {
     "src/directory/immutable/simple/tests.rs",
     "src/directory/mutable.rs",
     "src/directory/mutable/connection.rs",
-    "src/directory/mutable/entry_constructor.rs",
-    "src/directory/mutable/simple.rs",
-    "src/directory/mutable/simple/tests.rs",
     "src/directory/read_dirents.rs",
     "src/directory/simple.rs",
     "src/directory/test_utils.rs",
@@ -108,7 +105,6 @@ rustc_library("vfs") {
     "//src/lib/fuchsia",
     "//src/testing/fidl:placeholders_rust",
     "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:test-case",
   ]
 }
 

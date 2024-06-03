@@ -69,7 +69,12 @@ zx_status_t zxio_default_seek(zxio_t* io, zxio_seek_origin_t start, int64_t offs
 
 zx_status_t zxio_default_truncate(zxio_t* io, uint64_t length) { return ZX_ERR_NOT_SUPPORTED; }
 
-zx_status_t zxio_default_flags_get(zxio_t* io, uint32_t* out_flags) { return ZX_ERR_NOT_SUPPORTED; }
+zx_status_t zxio_default_flags_get(zxio_t* io, uint32_t* out_flags) {
+  // We return a default value, as it's valid for a remote to simply not support
+  // FCNTL, but we still want to report a value.
+  *out_flags = 0;
+  return ZX_OK;
+}
 
 zx_status_t zxio_default_flags_set(zxio_t* io, uint32_t flags) { return ZX_ERR_NOT_SUPPORTED; }
 

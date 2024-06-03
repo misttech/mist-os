@@ -110,8 +110,9 @@ use {
             object_manager::ReservationUpdate,
             transaction::{
                 lock_keys, AllocatorMutation, AssocObj, LockKey, Mutation, Options, Transaction,
+                WriteGuard,
             },
-            tree, DirectWriter, HandleOptions, ObjectStore,
+            tree, DataObjectHandle, DirectWriter, HandleOptions, ObjectStore,
         },
         range::RangeExt,
         round::{round_div, round_down},
@@ -399,10 +400,11 @@ pub struct AllocatorInfoV32 {
     pub layers: Vec<u64>,
     /// Maps from owner_object_id to bytes allocated.
     pub allocated_bytes: BTreeMap<u64, u64>,
-    /// Set of owner_object_id that we should ignore if found in layer files.
+    /// Set of owner_object_id that we should ignore if found in layer files.  For now, this should
+    /// always be empty on-disk because we always do full compactions.
     pub marked_for_deletion: HashSet<u64>,
-    // The limit for the number of allocates bytes per `owner_object_id` whereas the value. If there
-    // is no limit present here for an `owner_object_id` assume it is max u64.
+    /// The limit for the number of allocates bytes per `owner_object_id` whereas the value. If
+    /// there is no limit present here for an `owner_object_id` assume it is max u64.
     pub limit_bytes: BTreeMap<u64, u64>,
 }
 
@@ -451,11 +453,14 @@ struct ByteTracking {
     /// whereas the value in `Info::allocated_bytes` is the value as it was when we last flushed.
     /// This is i64 because it can be negative during replay.
     allocated_bytes: i64,
+
     /// This value is the number of bytes allocated to uncommitted allocations.
     /// (Bytes allocated, but not yet persisted to disk)
     uncommitted_allocated_bytes: u64,
+
     /// This value is the number of bytes allocated to reservations.
     reserved_bytes: u64,
+
     /// Committed deallocations that we cannot use until they are flushed to the device.  Each entry
     /// in this list is the log file offset at which it was committed and an array of deallocations
     /// that occurred at that time.
@@ -498,9 +503,11 @@ struct CommittedDeallocation {
 
 struct Inner {
     info: AllocatorInfo,
+
     /// The allocator can only be opened if there have been no allocations and it has not already
     /// been opened or initialized.
     opened: bool,
+
     /// When we allocate a range from RAM, we add it to Allocator::temporary_allocations.
     /// This layer is added to layer_set in rebuild_strategy and take_for trim so we don't assume
     /// the range is available.
@@ -529,32 +536,42 @@ struct Inner {
     /// to prevent reuse until after the deallocation has been successfully flushed.
     /// In this scenario we don't want to call 'free()' until the range is ready to use again.
     dropped_temporary_allocations: Vec<Range<u64>>,
+
     /// The per-owner counters for bytes at various stages of the data life-cycle. From initial
     /// reservation through until the bytes are unallocated and eventually uncommitted.
     owner_bytes: BTreeMap<u64, ByteTracking>,
+
     /// This value is the number of bytes allocated to reservations but not tracked as part of a
     /// particular volume.
     unattributed_reserved_bytes: u64,
+
     /// Committed deallocations that we cannot use until they are flushed to the device.
     committed_deallocated: VecDeque<CommittedDeallocation>,
-    /// Maps |owner_object_id| to log offset and bytes allocated to a deleted encryption volume.
-    /// Once the journal has been flushed beyond 'log_offset', we replace entries here with
-    /// an entry in AllocatorInfo to have all iterators ignore owner_object_id. That entry is
-    /// then cleaned up at next (major) compaction time.
-    committed_encrypted_volume_deletions: BTreeMap<u64, (/*log_offset:*/ u64, /*bytes:*/ u64)>,
+
     /// Bytes which are currently being trimmed.  These can still be allocated from, but the
     /// allocation will block until the current batch of trimming is finished.
     trim_reserved_bytes: u64,
+
     /// While a trim is being performed, this listener is set.  When the current batch of extents
     /// being trimmed have been released (and trim_reserved_bytes is 0), this is signaled.
     /// This should only be listened to while the allocation_mutex is held.
     trim_listener: Option<EventListener>,
+
     /// This controls how we allocate our free space to manage fragmentation.
     strategy: Box<strategy::BestFit>,
+
     /// Tracks the number of allocations of size 1,2,...63,>=64.
     histogram: [u64; 64],
+
     /// Tracks which size bucket triggers rebuild_strategy.
     rebuild_strategy_trigger_histogram: [u64; 64],
+
+    /// This is distinct from the set contained in `info`.  New entries are inserted *after* a
+    /// device has been flushed.  It is not safe to ignore deleted volumes until that has happened.
+    marked_for_deletion: HashSet<u64>,
+
+    /// The count of volumes deleted that are waiting for a sync.
+    volumes_deleted_pending_sync: HashSet<u64>,
 }
 
 impl Inner {
@@ -597,7 +614,6 @@ impl Inner {
     // reuse those bytes yet.
     fn unavailable_bytes(&self) -> u64 {
         self.owner_bytes.values().map(|x| x.unavailable_bytes()).sum::<u64>()
-            + self.committed_encrypted_volume_deletions.values().map(|(_, x)| x).sum::<u64>()
     }
 
     // Returns the total number of bytes that are taken either from reservations, allocations or
@@ -700,11 +716,9 @@ impl Allocator {
         // We expect device size to be a multiple of block size. Throw away any tail.
         let device_size = round_down(filesystem.device().size(), block_size);
         if device_size != filesystem.device().size() {
-            tracing::warn!("Device size is not block aligned. Rounding down.");
+            warn!("Device size is not block aligned. Rounding down.");
         }
         let max_extent_size_bytes = max_extent_size_for_block_size(filesystem.block_size());
-        // Note that we use BestFit strategy for new filesystems to favour dense packing of
-        // data and 'FirstFit' for existing filesystems for better fragmentation.
         let mut strategy = Box::new(strategy::BestFit::default());
         strategy.free(0..device_size).expect("new fs");
         Allocator {
@@ -722,12 +736,13 @@ impl Allocator {
                 owner_bytes: BTreeMap::new(),
                 unattributed_reserved_bytes: 0,
                 committed_deallocated: VecDeque::new(),
-                committed_encrypted_volume_deletions: BTreeMap::new(),
                 trim_reserved_bytes: 0,
                 trim_listener: None,
                 strategy,
                 histogram: [0; 64],
                 rebuild_strategy_trigger_histogram: [0; 64],
+                marked_for_deletion: HashSet::new(),
+                volumes_deleted_pending_sync: HashSet::new(),
             }),
             allocation_mutex: futures::lock::Mutex::new(()),
             counters: Mutex::new(AllocatorCounters::default()),
@@ -740,25 +755,26 @@ impl Allocator {
     }
 
     /// Returns an iterator that yields all allocations, filtering out tombstones and any
-    /// owner_object_id that have been marked as deleted.
+    /// owner_object_id that have been marked as deleted.  If `committed_marked_for_deletion` is
+    /// true, then filter using the committed volumes marked for deletion rather than the in-memory
+    /// copy which excludes volumes that have been deleted but there hasn't been a sync yet.
     pub async fn filter(
         &self,
         iter: impl LayerIterator<AllocatorKey, AllocatorValue>,
+        committed_marked_for_deletion: bool,
     ) -> Result<impl LayerIterator<AllocatorKey, AllocatorValue>, Error> {
-        let marked_for_deletion = self.inner.lock().unwrap().info.marked_for_deletion.clone();
+        let marked_for_deletion = {
+            let inner = self.inner.lock().unwrap();
+            if committed_marked_for_deletion {
+                &inner.info.marked_for_deletion
+            } else {
+                &inner.marked_for_deletion
+            }
+            .clone()
+        };
         let iter =
             filter_marked_for_deletion(filter_tombstones(iter).await?, marked_for_deletion).await?;
         Ok(iter)
-    }
-
-    pub fn objects_pending_deletion(&self) -> Vec<u64> {
-        self.inner
-            .lock()
-            .unwrap()
-            .committed_encrypted_volume_deletions
-            .keys()
-            .cloned()
-            .collect::<Vec<_>>()
     }
 
     /// A histogram of allocation request sizes.
@@ -796,7 +812,14 @@ impl Allocator {
         let filesystem = self.filesystem.upgrade().unwrap();
         let root_store = filesystem.root_store();
 
-        self.inner.lock().unwrap().strategy = Box::new(strategy::BestFit::default());
+        {
+            let mut inner = self.inner.lock().unwrap();
+
+            inner.strategy = Box::new(strategy::BestFit::default());
+
+            // We can assume the device has been flushed.
+            inner.volumes_deleted_pending_sync.clear();
+        }
 
         let handle =
             ObjectStore::open_object(&root_store, self.object_id, HandleOptions::default(), None)
@@ -811,13 +834,6 @@ impl Allocator {
             let mut cursor = std::io::Cursor::new(serialized_info);
             let (mut info, _version) = AllocatorInfo::deserialize_with_version(&mut cursor)
                 .context("Failed to deserialize AllocatorInfo")?;
-
-            // Make sure the allocated_bytes don't exceed the size of the device.
-            let mut device_bytes = self.device_size;
-            for bytes in info.allocated_bytes.values() {
-                ensure!(*bytes <= device_bytes, FxfsError::Inconsistent);
-                device_bytes -= bytes;
-            }
 
             let mut handles = Vec::new();
             let mut total_size = 0;
@@ -840,29 +856,56 @@ impl Allocator {
                 // recorded in info.
                 for (owner_object_id, bytes) in &info.allocated_bytes {
                     let amount: i64 = (*bytes).try_into().map_err(|_| {
-                        anyhow!(FxfsError::Inconsistent).context("Allocated bytes inconsistent")
+                        anyhow!(FxfsError::Inconsistent).context(format!(
+                            "Allocated bytes inconsistent info={:?}",
+                            info.allocated_bytes
+                        ))
                     })?;
-                    let entry = inner.owner_bytes.entry(*owner_object_id).or_default();
-                    match entry.allocated_bytes.checked_add(amount) {
-                        None => {
-                            bail!(anyhow!(FxfsError::Inconsistent)
-                                .context("Allocated bytes overflow"));
-                        }
-                        Some(value) if value < 0 || value as u64 > self.device_size => {
-                            bail!(anyhow!(FxfsError::Inconsistent)
-                                .context("Allocated bytes inconsistent"));
-                        }
-                        Some(value) => {
-                            entry.allocated_bytes = value;
-                        }
-                    };
+                    let allocated_bytes =
+                        &mut inner.owner_bytes.entry(*owner_object_id).or_default().allocated_bytes;
+                    match allocated_bytes.checked_add(amount) {
+                        None => bail!(anyhow!(FxfsError::Inconsistent).context(format!(
+                            "Allocated bytes overflow info={:?}, owner_bytes={:?}",
+                            info.allocated_bytes, inner.owner_bytes
+                        ))),
+                        Some(value) => *allocated_bytes = value,
+                    }
                 }
+
+                // Merge `marked_for_deletion`.
+                info.marked_for_deletion.extend(inner.info.marked_for_deletion.iter());
+
+                // Don't continue tracking bytes for anything that has been marked for deletion.
+                let AllocatorInfo { marked_for_deletion, limit_bytes, .. } = &mut info;
+                for owner_id in marked_for_deletion.iter() {
+                    limit_bytes.remove(owner_id);
+                    // There shouldn't be anything in `owner_bytes`, but just to be safe...
+                    inner.owner_bytes.remove(owner_id);
+                }
+
+                // Check all allocated_bytes are valid and fit within the device.
+                let mut device_bytes = self.device_size as i64;
+                for (_, ByteTracking { allocated_bytes, .. }) in &inner.owner_bytes {
+                    ensure!(
+                        *allocated_bytes >= 0 && *allocated_bytes <= self.device_size as i64,
+                        anyhow!(FxfsError::Inconsistent)
+                            .context(format!("Bad allocated bytes: {:?}", inner.owner_bytes))
+                    );
+                    ensure!(
+                        *allocated_bytes <= device_bytes,
+                        anyhow!(FxfsError::Inconsistent).context(format!(
+                            "Allocated bytes exceeds device size: {:?}",
+                            inner.owner_bytes
+                        ))
+                    );
+                    device_bytes -= *allocated_bytes;
+                }
+
                 // Merge in current data which has picked up the deltas on top of the snapshot.
                 info.limit_bytes.extend(inner.info.limit_bytes.iter());
-                // Don't continue tracking bytes for anything that has been marked for deletion.
-                for k in &inner.info.marked_for_deletion {
-                    info.limit_bytes.remove(k);
-                }
+
+                inner.marked_for_deletion = info.marked_for_deletion.clone();
+
                 inner.info = info;
             }
             let layer_file_sizes =
@@ -878,7 +921,7 @@ impl Allocator {
         // space at all times. This may change if we ever support mounting of read-only
         // redistributable filesystem images.
         if !self.rebuild_strategy().await.context("Build free extents")? {
-            tracing::error!("Device contains no free space.");
+            error!("Device contains no free space.");
             return Err(FxfsError::Inconsistent).context("Device appears to contain no free space");
         }
 
@@ -900,7 +943,7 @@ impl Allocator {
 
         let mut to_add = Vec::new();
         let mut merger = layer_set.merger();
-        let mut iter = self.filter(merger.seek(Bound::Unbounded).await?).await?;
+        let mut iter = self.filter(merger.seek(Bound::Unbounded).await?, false).await?;
         let mut last_offset = 0;
         while last_offset < self.device_size {
             let next_range = match iter.get() {
@@ -964,7 +1007,10 @@ impl Allocator {
         self.tree.add_all_layers_to_layer_set(&mut layer_set);
         let mut merger = layer_set.merger();
         let mut iter = self
-            .filter(merger.seek(Bound::Included(&AllocatorKey { device_range: offset..0 })).await?)
+            .filter(
+                merger.seek(Bound::Included(&AllocatorKey { device_range: offset..0 })).await?,
+                false,
+            )
             .await?;
         let mut last_offset = offset;
         'outer: while last_offset < self.device_size {
@@ -1054,6 +1100,11 @@ impl Allocator {
             inner.owner_bytes.get(&owner_object_id).map(|b| b.used_bytes()).unwrap_or(0u64),
             inner.info.limit_bytes.get(&owner_object_id).copied(),
         )
+    }
+
+    /// Returns owner bytes debug information.
+    pub fn owner_bytes_debug(&self) -> String {
+        format!("{:?}", self.inner.lock().unwrap().owner_bytes)
     }
 
     fn needs_sync(&self) -> bool {
@@ -1244,6 +1295,40 @@ impl Allocator {
 
         ensure!(len > 0, FxfsError::NoSpace);
 
+        // If volumes have been deleted, flush the device so that we can use any of the freed space.
+        let volumes_deleted = {
+            let inner = self.inner.lock().unwrap();
+            (!inner.volumes_deleted_pending_sync.is_empty())
+                .then(|| inner.volumes_deleted_pending_sync.clone())
+        };
+
+        if let Some(volumes_deleted) = volumes_deleted {
+            // No locks are held here, so in theory, there could be unnecessary syncs, but it
+            // should be sufficiently rare that it won't matter.
+            self.filesystem
+                .upgrade()
+                .unwrap()
+                .sync(SyncOptions {
+                    flush_device: true,
+                    precondition: Some(Box::new(|| {
+                        !self.inner.lock().unwrap().volumes_deleted_pending_sync.is_empty()
+                    })),
+                    ..Default::default()
+                })
+                .await?;
+
+            {
+                let mut inner = self.inner.lock().unwrap();
+                for owner_id in volumes_deleted {
+                    inner.volumes_deleted_pending_sync.remove(&owner_id);
+                    inner.marked_for_deletion.insert(owner_id);
+                }
+            }
+
+            let _guard = self.allocation_mutex.lock().await;
+            self.rebuild_strategy().await?;
+        }
+
         #[allow(clippy::never_loop)] // Loop used as a for {} else {}.
         let _guard = 'sync: loop {
             // Cap number of sync attempts before giving up on finding free space.
@@ -1320,7 +1405,7 @@ impl Allocator {
                             [std::cmp::min(63, (len / self.block_size) as usize)] += 1;
                     }
                     Err(err) => {
-                        tracing::error!(%err, "Likely filesystem corruption.");
+                        error!(%err, "Likely filesystem corruption.");
                         return Err(err.into());
                     }
                     Ok(x) => {
@@ -1332,7 +1417,7 @@ impl Allocator {
             // exists more of this size on device. Rescan device and circle back.
             // We already hold the allocation_mutex, so exclusive access is guaranteed.
             if !self.rebuild_strategy().await? {
-                tracing::error!("Cannot find additional free space. Corruption?");
+                error!("Cannot find additional free space. Corruption?");
                 return Err(FxfsError::Inconsistent.into());
             }
         };
@@ -1496,20 +1581,8 @@ impl Allocator {
     /// of the mutable layer but we must be careful not to do this too early and risk premature
     /// reuse of extents.
     ///
-    /// Applying the mutation moves byte count for the owner_object_id from 'allocated_bytes' to
-    /// 'committed_encrypted_volume_deletions'.
-    ///
     /// Replay is not guaranteed until the *device* gets flushed, so we cannot reuse the deleted
-    /// extents until we receive a `did_flush_device` callback.
-    ///
-    /// At this point, the mutation is guaranteed so the 'committed_encrypted_volume_deletions'
-    /// entry is removed and the owner_object_id is added to the 'marked_for_deletion' set. This set
-    /// of owner_object_id are filtered out of all iterators used by the allocator.
-    ///
-    /// Since this was first written, an allocator free list has been introduced which muddies this
-    /// otherwise clean implementation. Because we now need to add all the extents that are filtered
-    /// out to the free list, we don't get away without at least a read over the LSMTree at this
-    /// point in order to add the newly freed extents.
+    /// extents until we've flushed the device.
     ///
     /// TODO(b/316827348): Consider removing the use of mark_for_deletion in AllocatorInfo and
     /// just compacting?
@@ -1545,43 +1618,6 @@ impl Allocator {
             break std::mem::take(&mut inner.committed_deallocated);
         };
 
-        // We also have to scan and add to this set any ranges that should be added to our free list
-        // (inner.strategy).
-        let committed_encrypted_volume_deletions =
-            std::mem::take(&mut self.inner.lock().unwrap().committed_encrypted_volume_deletions);
-        if committed_encrypted_volume_deletions.len() != 0 {
-            let mut ranges = Vec::new();
-            let layer_set = self.tree.layer_set();
-            let mut merger = layer_set.merger();
-            let mut iter = self.filter(merger.seek(Bound::Unbounded).await.unwrap()).await.unwrap();
-            loop {
-                match iter.get() {
-                    None => {
-                        break;
-                    }
-                    Some(ItemRef {
-                        key: AllocatorKey { device_range },
-                        value: AllocatorValue::Abs { owner_object_id, .. },
-                        ..
-                    }) => {
-                        if let Some((log_offset, _bytes)) =
-                            committed_encrypted_volume_deletions.get(&owner_object_id)
-                        {
-                            if *log_offset < flush_log_offset {
-                                ranges.push(device_range.clone());
-                            }
-                        }
-                    }
-                    _ => unreachable!(), // self.filter() should ensure we don't see this.
-                }
-                iter.advance().await.unwrap();
-            }
-            let mut inner = self.inner.lock().unwrap();
-            for range in ranges {
-                inner.strategy.free(range).expect("committed encrypted volume deletions");
-            }
-        }
-
         // Now we can free those elements.
         let mut inner = self.inner.lock().unwrap();
         let mut totals = BTreeMap::<u64, u64>::new();
@@ -1601,20 +1637,6 @@ impl Allocator {
                 None => panic!("Failed to decrement for unknown owner: {}", owner_object_id),
             }
         }
-
-        // We can now reuse any marked_for_deletion extents that have been committed to journal.
-        for (owner_object_id, (log_offset, bytes)) in committed_encrypted_volume_deletions {
-            if log_offset >= flush_log_offset {
-                inner
-                    .committed_encrypted_volume_deletions
-                    .insert(owner_object_id, (log_offset, bytes));
-            } else {
-                inner.info.marked_for_deletion.insert(owner_object_id);
-            }
-            // After the journal is fulled replayed, anything marked_for_deletion should stop being
-            // tracked in memory so that it will not show up in the next write of AllocatorInfo.
-            inner.owner_bytes.remove(&owner_object_id);
-        }
     }
 
     /// Returns a reservation that can be used later, or None if there is insufficient space. The
@@ -1627,12 +1649,11 @@ impl Allocator {
         {
             let mut inner = self.inner.lock().unwrap();
 
+            let device_free = self.device_size.checked_sub(inner.used_bytes()).unwrap();
+
             let limit = match owner_object_id {
-                Some(id) => std::cmp::min(
-                    inner.owner_id_bytes_left(id),
-                    self.device_size - inner.used_bytes(),
-                ),
-                None => self.device_size - inner.used_bytes(),
+                Some(id) => std::cmp::min(inner.owner_id_bytes_left(id), device_free),
+                None => device_free,
             };
             if limit < amount {
                 return None;
@@ -1711,17 +1732,15 @@ impl JournalingObject for Allocator {
         match mutation {
             Mutation::Allocator(AllocatorMutation::MarkForDeletion(owner_object_id)) => {
                 let mut inner = self.inner.lock().unwrap();
-                // If live, we haven't serialized this yet so we track the commitment in RAM.
-                // If we're replaying the journal, we know this is already on storage and
-                // MUST happen so this will be cleared out of AllocatorInfo at next allocator flush.
-                let old_allocated_bytes =
-                    inner.owner_bytes.remove(&owner_object_id).map(|v| v.allocated_bytes);
-                if let Some(old_bytes) = old_allocated_bytes {
-                    inner.committed_encrypted_volume_deletions.insert(
-                        owner_object_id,
-                        (context.checkpoint.file_offset, old_bytes as u64),
-                    );
-                }
+                inner.owner_bytes.remove(&owner_object_id);
+
+                // We use `info.marked_for_deletion` to track the committed state and
+                // `inner.marked_for_deletion` to track volumes marked for deletion *after* we have
+                // flushed the device.  It is not safe to use extents belonging to deleted volumes
+                // until after we have flushed the device.
+                inner.info.marked_for_deletion.insert(owner_object_id);
+                inner.volumes_deleted_pending_sync.insert(owner_object_id);
+
                 inner.info.limit_bytes.remove(&owner_object_id);
             }
             Mutation::Allocator(AllocatorMutation::Allocate { device_range, owner_object_id }) => {
@@ -1861,135 +1880,10 @@ impl JournalingObject for Allocator {
             return Ok(self.tree.get_earliest_version());
         }
 
-        let keys = lock_keys![LockKey::flush(self.object_id())];
-        let _guard = filesystem.lock_manager().write_lock(keys).await;
-
-        let reservation = object_manager.metadata_reservation();
-        let txn_options = Options {
-            skip_journal_checks: true,
-            borrow_metadata_space: true,
-            allocator_reservation: Some(reservation),
-            ..Default::default()
-        };
-        let mut transaction = filesystem.clone().new_transaction(lock_keys![], txn_options).await?;
-
-        let root_store = self.filesystem.upgrade().unwrap().root_store();
-        let layer_object_handle = ObjectStore::create_object(
-            &root_store,
-            &mut transaction,
-            HandleOptions { skip_journal_checks: true, ..Default::default() },
-            None,
-            None,
-        )
-        .await?;
-        let object_id = layer_object_handle.object_id();
-        root_store.add_to_graveyard(&mut transaction, object_id);
-        // It's important that this transaction does not include any allocations because we use
-        // BeginFlush as a snapshot point for mutations to the tree: other allocator mutations
-        // within this transaction might get applied before seal (which would be OK), but they could
-        // equally get applied afterwards (since Transaction makes no guarantees about the order in
-        // which mutations are applied whilst committing), in which case they'd get lost on replay
-        // because the journal will only send mutations that follow this transaction.
-        transaction.add(self.object_id(), Mutation::BeginFlush);
-        transaction.commit().await?;
-
-        let layer_set = self.tree.immutable_layer_set();
-        {
-            let mut merger = layer_set.merger();
-            let iter = self.filter(merger.seek(Bound::Unbounded).await?).await?;
-            let iter = CoalescingIterator::new(iter).await?;
-            self.tree
-                .compact_with_iterator(
-                    iter,
-                    DirectWriter::new(&layer_object_handle, txn_options).await,
-                    layer_object_handle.block_size(),
-                )
-                .await?;
-        }
-
-        // Both of these forward-declared variables need to outlive the transaction.
-        let object_handle;
-        let reservation_update;
-        let mut transaction = filesystem
-            .clone()
-            .new_transaction(
-                lock_keys![LockKey::object(root_store.store_object_id(), self.object_id())],
-                txn_options,
-            )
-            .await?;
-        let mut serialized_info = Vec::new();
-
-        debug!(oid = object_id, "new allocator layer file");
-        object_handle =
-            ObjectStore::open_object(&root_store, self.object_id(), HandleOptions::default(), None)
-                .await?;
-
-        // We must be careful to take a copy AllocatorInfo here rather than manipulate the
-        // live one. If we remove marked_for_deletion entries prematurely, we may fail any
-        // allocate() calls that are performed before the new version makes it to disk.
-        // Specifically, txn_write() below must allocate space and may fail if we prematurely
-        // clear marked_for_deletion.
-        let new_info = {
-            let mut info = self.inner.lock().unwrap().info.clone();
-
-            // After compaction, all new layers have marked_for_deletion objects removed.
-            info.marked_for_deletion.clear();
-
-            // Move all the existing layers to the graveyard.
-            for object_id in &info.layers {
-                root_store.add_to_graveyard(&mut transaction, *object_id);
-            }
-
-            info.layers = vec![object_id];
-            info
-        };
-        new_info.serialize_with_version(&mut serialized_info)?;
-
-        let mut buf = object_handle.allocate_buffer(serialized_info.len()).await;
-        buf.as_mut_slice()[..serialized_info.len()].copy_from_slice(&serialized_info[..]);
-        object_handle.txn_write(&mut transaction, 0u64, buf.as_ref()).await?;
-
-        reservation_update = ReservationUpdate::new(tree::reservation_amount_from_layer_size(
-            layer_object_handle.get_size(),
-        ));
-        let layer_file_sizes = vec![layer_object_handle.get_size()];
-
-        // It's important that EndFlush is in the same transaction that we write AllocatorInfo,
-        // because we use EndFlush to make the required adjustments to allocated_bytes.
-        transaction.add_with_object(
-            self.object_id(),
-            Mutation::EndFlush,
-            AssocObj::Borrowed(&reservation_update),
-        );
-        root_store.remove_from_graveyard(&mut transaction, object_id);
-
-        let layers = layers_from_handles([layer_object_handle]).await?;
-        transaction
-            .commit_with_callback(|_| {
-                self.tree.set_layers(layers);
-
-                // At this point we've committed the new layers to disk so we can start using them.
-                // This means we can also switch to the new AllocatorInfo which clears
-                // marked_for_deletion.
-                self.inner.lock().unwrap().info = new_info;
-            })
-            .await?;
-
-        // Now close the layers and purge them.
-        for layer in layer_set.layers {
-            let object_id = layer.handle().map(|h| h.object_id());
-            layer.close_layer().await;
-            if let Some(object_id) = object_id {
-                root_store.tombstone_object(object_id, txn_options).await?;
-            }
-        }
-
-        let mut counters = self.counters.lock().unwrap();
-        counters.num_flushes += 1;
-        counters.last_flush_time = Some(std::time::SystemTime::now());
-        counters.persistent_layer_file_sizes = layer_file_sizes;
-        // Return the earliest version used by a struct in the tree
-        Ok(self.tree.get_earliest_version())
+        let fs = self.filesystem.upgrade().unwrap();
+        let mut flusher = Flusher::new(self, &fs).await;
+        let new_layer_file = flusher.start().await?;
+        flusher.finish(new_layer_file).await
     }
 }
 
@@ -2055,22 +1949,200 @@ impl<I: LayerIterator<AllocatorKey, AllocatorValue>> LayerIterator<AllocatorKey,
     }
 }
 
+struct Flusher<'a> {
+    allocator: &'a Allocator,
+    fs: &'a Arc<FxFilesystem>,
+    _guard: WriteGuard<'a>,
+}
+
+impl<'a> Flusher<'a> {
+    async fn new(allocator: &'a Allocator, fs: &'a Arc<FxFilesystem>) -> Self {
+        let keys = lock_keys![LockKey::flush(allocator.object_id())];
+        Self { allocator, fs, _guard: fs.lock_manager().write_lock(keys).await }
+    }
+
+    fn txn_options(allocator_reservation: &Reservation) -> Options<'_> {
+        Options {
+            skip_journal_checks: true,
+            borrow_metadata_space: true,
+            allocator_reservation: Some(allocator_reservation),
+            ..Default::default()
+        }
+    }
+
+    async fn start(&mut self) -> Result<DataObjectHandle<ObjectStore>, Error> {
+        let object_manager = self.fs.object_manager();
+        let mut transaction = self
+            .fs
+            .clone()
+            .new_transaction(lock_keys![], Self::txn_options(object_manager.metadata_reservation()))
+            .await?;
+
+        let root_store = self.fs.root_store();
+        let layer_object_handle = ObjectStore::create_object(
+            &root_store,
+            &mut transaction,
+            HandleOptions { skip_journal_checks: true, ..Default::default() },
+            None,
+            None,
+        )
+        .await?;
+        root_store.add_to_graveyard(&mut transaction, layer_object_handle.object_id());
+        // It's important that this transaction does not include any allocations because we use
+        // BeginFlush as a snapshot point for mutations to the tree: other allocator mutations
+        // within this transaction might get applied before seal (which would be OK), but they could
+        // equally get applied afterwards (since Transaction makes no guarantees about the order in
+        // which mutations are applied whilst committing), in which case they'd get lost on replay
+        // because the journal will only send mutations that follow this transaction.
+        transaction.add(self.allocator.object_id(), Mutation::BeginFlush);
+        transaction.commit().await?;
+        Ok(layer_object_handle)
+    }
+
+    async fn finish(
+        self,
+        layer_object_handle: DataObjectHandle<ObjectStore>,
+    ) -> Result<Version, Error> {
+        let object_manager = self.fs.object_manager();
+        let txn_options = Self::txn_options(object_manager.metadata_reservation());
+
+        let layer_set = self.allocator.tree.immutable_layer_set();
+        {
+            let mut merger = layer_set.merger();
+            let iter = self.allocator.filter(merger.seek(Bound::Unbounded).await?, true).await?;
+            let iter = CoalescingIterator::new(iter).await?;
+            self.allocator
+                .tree
+                .compact_with_iterator(
+                    iter,
+                    DirectWriter::new(&layer_object_handle, txn_options).await,
+                    layer_object_handle.block_size(),
+                )
+                .await?;
+        }
+
+        let root_store = self.fs.root_store();
+
+        // Both of these forward-declared variables need to outlive the transaction.
+        let object_handle;
+        let reservation_update;
+        let mut transaction = self
+            .fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(
+                    root_store.store_object_id(),
+                    self.allocator.object_id()
+                )],
+                txn_options,
+            )
+            .await?;
+        let mut serialized_info = Vec::new();
+
+        debug!(oid = layer_object_handle.object_id(), "new allocator layer file");
+        object_handle = ObjectStore::open_object(
+            &root_store,
+            self.allocator.object_id(),
+            HandleOptions::default(),
+            None,
+        )
+        .await?;
+
+        // We must be careful to take a copy AllocatorInfo here rather than manipulate the
+        // live one. If we remove marked_for_deletion entries prematurely, we may fail any
+        // allocate() calls that are performed before the new version makes it to disk.
+        // Specifically, txn_write() below must allocate space and may fail if we prematurely
+        // clear marked_for_deletion.
+        let (new_info, marked_for_deletion) = {
+            let mut info = self.allocator.inner.lock().unwrap().info.clone();
+
+            // After compaction, since we always do a major compaction, all new layers have
+            // marked_for_deletion objects removed.
+            let marked_for_deletion = std::mem::take(&mut info.marked_for_deletion);
+
+            // Move all the existing layers to the graveyard.
+            for object_id in &info.layers {
+                root_store.add_to_graveyard(&mut transaction, *object_id);
+            }
+
+            info.layers = vec![layer_object_handle.object_id()];
+
+            (info, marked_for_deletion)
+        };
+        new_info.serialize_with_version(&mut serialized_info)?;
+
+        let mut buf = object_handle.allocate_buffer(serialized_info.len()).await;
+        buf.as_mut_slice()[..serialized_info.len()].copy_from_slice(&serialized_info[..]);
+        object_handle.txn_write(&mut transaction, 0u64, buf.as_ref()).await?;
+
+        reservation_update = ReservationUpdate::new(tree::reservation_amount_from_layer_size(
+            layer_object_handle.get_size(),
+        ));
+        let layer_file_sizes = vec![layer_object_handle.get_size()];
+
+        // It's important that EndFlush is in the same transaction that we write AllocatorInfo,
+        // because we use EndFlush to make the required adjustments to allocated_bytes.
+        transaction.add_with_object(
+            self.allocator.object_id(),
+            Mutation::EndFlush,
+            AssocObj::Borrowed(&reservation_update),
+        );
+        root_store.remove_from_graveyard(&mut transaction, layer_object_handle.object_id());
+
+        let layers = layers_from_handles([layer_object_handle]).await?;
+        transaction
+            .commit_with_callback(|_| {
+                self.allocator.tree.set_layers(layers);
+
+                // At this point we've committed the new layers to disk so we can start using them.
+                // This means we can also switch to the new AllocatorInfo which clears
+                // marked_for_deletion.
+                let mut inner = self.allocator.inner.lock().unwrap();
+                inner.info = new_info;
+                for owner_id in marked_for_deletion {
+                    inner.marked_for_deletion.remove(&owner_id);
+                }
+            })
+            .await?;
+
+        // Now close the layers and purge them.
+        for layer in layer_set.layers {
+            let object_id = layer.handle().map(|h| h.object_id());
+            layer.close_layer().await;
+            if let Some(object_id) = object_id {
+                root_store.tombstone_object(object_id, txn_options).await?;
+            }
+        }
+
+        let mut counters = self.allocator.counters.lock().unwrap();
+        counters.num_flushes += 1;
+        counters.last_flush_time = Some(std::time::SystemTime::now());
+        counters.persistent_layer_file_sizes = layer_file_sizes;
+        // Return the earliest version used by a struct in the tree
+        Ok(self.allocator.tree.get_earliest_version())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use {
         crate::{
             filesystem::{FxFilesystem, FxFilesystemBuilder, JournalingObject, OpenFxFilesystem},
+            fsck::fsck,
             lsm_tree::{
                 cache::NullCache,
                 skip_list_layer::SkipListLayer,
                 types::{Item, ItemRef, Layer, LayerIterator},
                 LSMTree,
             },
+            object_handle::ObjectHandle,
             object_store::{
                 allocator::{
                     merge::merge, Allocator, AllocatorKey, AllocatorValue, CoalescingIterator,
                 },
                 transaction::{lock_keys, Options},
+                volume::root_volume,
+                Directory, LockKey, ObjectStore,
             },
             range::RangeExt,
         },
@@ -2205,7 +2277,7 @@ mod tests {
         let layer_set = allocator.tree.layer_set();
         let mut merger = layer_set.merger();
         let mut iter = allocator
-            .filter(merger.seek(Bound::Unbounded).await.expect("seek failed"))
+            .filter(merger.seek(Bound::Unbounded).await.expect("seek failed"), false)
             .await
             .expect("build iterator");
         let mut allocations: Vec<Range<u64>> = Vec::new();
@@ -2223,7 +2295,7 @@ mod tests {
         let layer_set = allocator.tree.layer_set();
         let mut merger = layer_set.merger();
         let mut iter = allocator
-            .filter(merger.seek(Bound::Unbounded).await.expect("seek failed"))
+            .filter(merger.seek(Bound::Unbounded).await.expect("seek failed"), false)
             .await
             .expect("build iterator");
         let mut found = 0;
@@ -2465,6 +2537,140 @@ mod tests {
 
         assert!(!allocator.get_owner_allocated_bytes().contains_key(&STORE_OBJECT_ID));
         assert_eq!(*allocator.get_owner_allocated_bytes().get(&100).unwrap() as u64, target_bytes,);
+    }
+
+    async fn create_file(store: &Arc<ObjectStore>, size: usize) {
+        let root_directory =
+            Directory::open(store, store.root_directory_object_id()).await.expect("open failed");
+
+        let mut transaction = store
+            .filesystem()
+            .new_transaction(
+                lock_keys![LockKey::object(
+                    store.store_object_id(),
+                    store.root_directory_object_id()
+                )],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        let file = root_directory
+            .create_child_file(&mut transaction, &format!("foo {}", size), None)
+            .await
+            .expect("create_child_file failed");
+        transaction.commit().await.expect("commit failed");
+
+        let buffer = file.allocate_buffer(size).await;
+
+        // Append some data to it.
+        let mut transaction = file
+            .new_transaction_with_options(Options {
+                borrow_metadata_space: true,
+                ..Default::default()
+            })
+            .await
+            .expect("new_transaction_with_options failed");
+        file.txn_write(&mut transaction, 0, buffer.as_ref()).await.expect("txn_write failed");
+        transaction.commit().await.expect("commit failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_replay_with_deleted_store_and_compaction() {
+        let (fs, _) = test_fs().await;
+
+        const FILE_SIZE: usize = 10_000_000;
+
+        {
+            let root_vol = root_volume(fs.clone()).await.expect("root_volume failed");
+            let store = root_vol.new_volume("vol", None).await.expect("new_volume failed");
+
+            create_file(&store, FILE_SIZE).await;
+        }
+
+        fs.close().await.expect("close failed");
+        let device = fs.take_device().await;
+        device.reopen(false);
+
+        let mut fs = FxFilesystemBuilder::new().open(device).await.expect("open failed");
+
+        // Compact so that when we replay the transaction to delete the store won't find any
+        // mutations.
+        fs.journal().compact().await.expect("compact failed");
+
+        for _ in 0..2 {
+            {
+                let root_vol = root_volume(fs.clone()).await.expect("root_volume failed");
+
+                let transaction = fs
+                    .clone()
+                    .new_transaction(
+                        lock_keys![LockKey::object(
+                            root_vol.volume_directory().store().store_object_id(),
+                            root_vol.volume_directory().object_id(),
+                        )],
+                        Options { borrow_metadata_space: true, ..Default::default() },
+                    )
+                    .await
+                    .expect("new_transaction failed");
+                root_vol
+                    .delete_volume("vol", transaction, || {})
+                    .await
+                    .expect("delete_volume failed");
+
+                let store = root_vol.new_volume("vol", None).await.expect("new_volume failed");
+                create_file(&store, FILE_SIZE).await;
+            }
+
+            fs.close().await.expect("close failed");
+            let device = fs.take_device().await;
+            device.reopen(false);
+
+            fs = FxFilesystemBuilder::new().open(device).await.expect("open failed");
+        }
+
+        fsck(fs.clone()).await.expect("fsck failed");
+        fs.close().await.expect("close failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_delete_multiple_volumes() {
+        let (mut fs, _) = test_fs().await;
+
+        for _ in 0..50 {
+            {
+                let root_vol = root_volume(fs.clone()).await.expect("root_volume failed");
+                let store = root_vol.new_volume("vol", None).await.expect("new_volume failed");
+
+                create_file(&store, 1_000_000).await;
+
+                let transaction = fs
+                    .clone()
+                    .new_transaction(
+                        lock_keys![LockKey::object(
+                            root_vol.volume_directory().store().store_object_id(),
+                            root_vol.volume_directory().object_id(),
+                        )],
+                        Options { borrow_metadata_space: true, ..Default::default() },
+                    )
+                    .await
+                    .expect("new_transaction failed");
+                root_vol
+                    .delete_volume("vol", transaction, || {})
+                    .await
+                    .expect("delete_volume failed");
+
+                fs.allocator().flush().await.expect("flush failed");
+            }
+
+            fs.close().await.expect("close failed");
+            let device = fs.take_device().await;
+            device.reopen(false);
+
+            fs = FxFilesystemBuilder::new().open(device).await.expect("open failed");
+        }
+
+        fsck(fs.clone()).await.expect("fsck failed");
+        fs.close().await.expect("close failed");
     }
 
     #[fuchsia::test]

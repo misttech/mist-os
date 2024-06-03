@@ -30,16 +30,16 @@ $ fx run-e2e-tests name_of_the_test
 Where `name_of_the_test` is the name of the dart_test rule (like `sl4f_test`).
 
 # Running an end-to-end test in infra
-* Refer to [CQ VS CI vs FYI](#CQ-VS-CI-vs-FYI) section to decide which test case
-build group the new test belongs to
-* Once decided, you can add it accordingly to that group by updating
-[Honeydew Infra Test Groups]
+* Refer to [CQ VS CI vs FYI](#CQ-VS-CI-vs-FYI) section to decide which test
+group the new test belongs to and which builder the test need to be run on
+* Accordingly add the test to corresponding test group by updating [Lacewing User Tests Infra Groups]
 * If the desired group is not present in [Lacewing User Tests Infra Groups] then
   * create new group test group in [Lacewing User Tests Infra Groups]
-  * Update the corresponding Lacewing builder configuration file (maintained by
-    Foundation Infra team) to include this newly created group in
-    [Lacewing User Tests Infra Groups]. If your test depends on target side
-    packages, make sure to include the appropriate `*_packages` group.
+  * Update the corresponding [Lacewing Builders] configuration file (maintained
+    by Build and HW service layer team) to include this newly created group. If
+    your test depends on target side packages, make sure to include the
+    appropriate `*_packages` group
+* If the desired [Lacewing Builders] is not present then reach out to `lacewing-admin@google.com` to create the builder
 * Update the test case's `python_mobly_test` rule in BUILD.gn to include
   appropriate BOARDS (based on what all the boards this test need to be run in
   infra) in `environments` field ([example](../../testing/end_to_end/examples/test_soft_reboot/BUILD.gn))
@@ -50,12 +50,24 @@ build group the new test belongs to
 Please reach out to Lacewing team if you need help with this one.
 
 ## CQ VS CI vs FYI
+Lacewing test case can be run in Infra in of the following builder types:
+* CQ builder - Builds and tests pending CLs before they get checked in, to make
+  it less likely that breakages will make their way to main (and thus break the
+  CI).
+* CI builder - Builds and tests the code that has been checked in. Any failure
+  in this builder will be reported Fuchsia Build gardeners and need to be
+  triaged ASAP.
+* FYI builder - Build and and tests the code that has been checked in, but
+  unlike CI these builders are not expected to be green at all times.
+
 Use the following approach in deciding whether to run the test case in CQ/CI/FYI:
-* Any test case that can be run using Emulator will be first run in FYI.
-  After 200 consecutive successful runs, test case will be promoted to CQ.
-* Any test case that can be run using hardware (NUC, VIM3 etc) will be run in
-  FYI and will remain in FYI. (We are exploring options on gradually promoting
-  these tests from FYI to CI but at the moment these tests will remain in FYI).
+* Anytime a new Lacewing test needs to be run in infra, always start in FYI.
+* After 200 consecutive successful runs, test case can then be promoted to CQ/CI
+  based on below criteria:
+  * If infra has enough testbed capacity (that is needed to run this test) then
+    it can be promoted to CQ.
+  * If infra has limited testbeds (that is needed to run this test) to run this
+    test then it can be promoted to CI.
 
 Based on this we have created the following:
 * Test case build groups:
@@ -78,14 +90,19 @@ Based on this we have created the following:
         (as it depends on `<BOARD>` also).
     * `[ |_sl4f]` informs whether a test group can be run on certain products.
     * `<BOARD>` informs whether a test group can be run on certain boards.
-* Builder examples:
-  * `core.x64-debug-pye2e` - CQ builder to run stable emulator and NUC tests
-  * `core.x64-debug-pye2e-users-staging` - FYI builder to run unstable emulator and NUC tests
-  * `core.vim3-debug-pye2e-users-staging` - FYI builder to run unstable VIM3 tests
-  * format: `<PRODUCT>.<BOARD>-debug-pye2e[-users| ]-[ |staging|ci]`, where
+* Package groups:
+  * Package group naming scheme: `<PRODUCT>_<BOARD>_<STABILITY>[ |_sl4f]_packages`
+* Builders:
+  * Builder naming scheme:  `<PRODUCT>.<BOARD>-[debug|release]-lacewing[-users| ]-[ |staging|ci]`
     * for "staging" builders `-users` will be used in the builder name
     * if builder is for "CQ" then no postfix is needed but for other stages,
       postfix is necessary (`-staging` or `-ci`)
-
+  * Link to list of all [Lacewing Builders]
+  * Examples:
+    * `core.x64-debug-lacewing` - CQ builder to run stable emulator and NUC tests
+    * `core.x64-debug-lacewing-users-staging` - FYI builder to run unstable emulator and NUC tests
+    * `core.vim3-debug-lacewing-users-staging` - FYI builder to run unstable VIM3 tests
 
 [Lacewing User Tests Infra Groups]: BUILD.gn
+
+[Lacewing Builders]: https://luci-milo.appspot.com/ui/builder-search?q=lacewing

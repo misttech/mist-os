@@ -80,7 +80,7 @@ class ScreenCaptureTest : public gtest::TestLoopFixture {
   std::shared_ptr<flatland::MockRenderer> renderer_;
 
  private:
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
   std::pair<std::vector<ImageRect>, std::vector<allocation::ImageMetadata>> renderables_;
 };
 

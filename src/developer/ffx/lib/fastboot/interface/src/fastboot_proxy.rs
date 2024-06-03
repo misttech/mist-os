@@ -278,6 +278,12 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
                             };
                             Err(FastbootError::FlashError(FlashError::TimeoutError(message)))
                         }
+                        SendError::ShortWrite { written, expected } => {
+                            Err(FastbootError::ShortWrite {
+                                written: *written,
+                                expected: *expected,
+                            })
+                        }
                     }
                 } else {
                     Err(FastbootError::FlashError(

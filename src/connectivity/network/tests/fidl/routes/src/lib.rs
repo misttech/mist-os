@@ -14,6 +14,7 @@ use assert_matches::assert_matches;
 use either::Either;
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_net_ext::IntoExt;
+use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fuchsia_async::TimeoutExt;
@@ -26,9 +27,10 @@ use net_types::ip::{
 use netemul::{InStack, InterfaceConfig};
 use netstack_testing_common::{
     interfaces,
-    realms::{Netstack, NetstackVersion, TestRealmExt as _, TestSandboxExt as _},
+    realms::{Netstack, Netstack3, NetstackVersion, TestRealmExt as _, TestSandboxExt as _},
 };
 use netstack_testing_macros::netstack_test;
+use routes_common::{test_route, TestSetup};
 
 async fn resolve(
     routes: &fidl_fuchsia_net_routes::StateProxy,
@@ -742,7 +744,7 @@ async fn watcher_already_pending<
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
     let state_proxy =
         realm.connect_to_protocol::<I::StateMarker>().expect("failed to connect to routes/State");
-    let watcher_proxy = fnet_routes_ext::get_watcher::<I>(&state_proxy)
+    let watcher_proxy = fnet_routes_ext::get_watcher::<I>(&state_proxy, Default::default())
         .expect("failed to connect to watcher protocol");
 
     // Call `Watch` in a loop until the idle event is observed.
@@ -892,4 +894,145 @@ async fn watcher_multiple_instances<
             assert_eq!(added_route, expected_route);
         }
     }
+}
+
+#[netstack_test]
+async fn watch_nonexisting_table<
+    I: net_types::ip::Ip
+        + fnet_routes_ext::FidlRouteIpExt
+        + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let state_proxy =
+        realm.connect_to_protocol::<I::StateMarker>().expect("failed to connect to routes/State");
+
+    let watcher = fnet_routes_ext::get_watcher::<I>(
+        &state_proxy,
+        fnet_routes_ext::WatcherOptions {
+            table_interest: Some(fnet_routes::TableInterest::Only(100)),
+        },
+    )
+    .expect("failed to create watcher");
+
+    let mut events =
+        pin!(fnet_routes_ext::event_stream_from_watcher::<I>(watcher)
+            .expect("convert to event stream"));
+    assert_matches!(events.next().await, Some(Ok(fnet_routes_ext::Event::Idle)));
+}
+
+#[netstack_test]
+async fn route_watcher_in_specific_table<
+    I: net_types::ip::Ip
+        + fnet_routes_ext::admin::FidlRouteAdminIpExt
+        + fnet_routes_ext::FidlRouteIpExt,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    // We don't support multiple route tables in netstack2.
+    let TestSetup {
+        realm,
+        network: _network,
+        interface,
+        route_table: _,
+        global_route_table: _,
+        state,
+    } = TestSetup::<I>::new::<Netstack3>(&sandbox, name).await;
+    let route_table_provider = realm
+        .connect_to_protocol::<I::RouteTableProviderMarker>()
+        .expect("connect to main route table");
+    let user_route_table =
+        fnet_routes_ext::admin::new_route_table::<I>(&route_table_provider, None)
+            .expect("create new user table");
+    let user_table_id =
+        fnet_routes_ext::admin::get_table_id::<I>(&user_route_table).await.expect("get table id");
+    let user_route_set = fnet_routes_ext::admin::new_route_set::<I>(&user_route_table)
+        .expect("failed to create a new user route set");
+
+    let mut main_table_routes_stream =
+        pin!(fnet_routes_ext::event_stream_from_state_with_options::<I>(
+            &state,
+            fnet_routes_ext::WatcherOptions {
+                table_interest: Some(fnet_routes::TableInterest::Main(fnet_routes::Main)),
+            },
+        )
+        .expect("failed to watch the main table"));
+
+    let existing_main_routes =
+        fnet_routes_ext::collect_routes_until_idle::<I, Vec<_>>(&mut main_table_routes_stream)
+            .await
+            .expect("collect routes should succeed");
+
+    assert_eq!(
+        existing_main_routes
+            .iter()
+            .find(|installed_route| installed_route.table_id == u32::from(user_table_id)),
+        None
+    );
+
+    let grant = interface.get_authorization().await.expect("getting grant should succeed");
+    let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
+    fnet_routes_ext::admin::authenticate_for_interface::<I>(&user_route_set, proof)
+        .await
+        .expect("no FIDL error")
+        .expect("authentication should succeed");
+
+    let route_to_add =
+        test_route::<I>(&interface, fnet_routes::SpecifiedMetric::ExplicitMetric(10));
+
+    assert!(fnet_routes_ext::admin::add_route::<I>(
+        &user_route_set,
+        &route_to_add.try_into().expect("convert to FIDL")
+    )
+    .await
+    .expect("no FIDL error")
+    .expect("add route"));
+
+    let mut user_table_routes_stream =
+        pin!(fnet_routes_ext::event_stream_from_state_with_options::<I>(
+            &state,
+            fnet_routes_ext::WatcherOptions {
+                table_interest: Some(fnet_routes::TableInterest::Only(user_table_id.into()))
+            }
+        )
+        .expect("failed to create event stream"));
+
+    let user_table_routes =
+        fnet_routes_ext::collect_routes_until_idle::<I, Vec<_>>(&mut user_table_routes_stream)
+            .await
+            .expect("collect routes should succeed");
+
+    assert_matches!(
+        &user_table_routes[..],
+        [installed] => assert!(installed.matches_route_and_table_id(&route_to_add, user_table_id))
+    );
+
+    fnet_routes_ext::admin::remove_route_table::<I>(&user_route_table)
+        .await
+        .expect("fidl error")
+        .expect("failed to remove table");
+
+    assert_matches!(
+        user_table_routes_stream.next().await,
+        Some(Ok(fnet_routes_ext::Event::Removed(removed))) => assert!(
+            removed.matches_route_and_table_id(&route_to_add, user_table_id)
+        )
+    );
+    // The main table watcher must not have received any update for the user
+    // table.
+    assert_matches!(
+        main_table_routes_stream
+            .next()
+            .on_timeout(
+                fuchsia_async::Time::after(
+                    netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT
+                ),
+                || None,
+            )
+            .await,
+        None
+    );
 }

@@ -104,16 +104,6 @@ struct KeyValue final {
   constexpr KeyValue(Key key, Value value) : key(key), value(value) {}
 };
 
-template <size_t i, size_t size>
-constexpr bool ILessThanSize() {
-  return i < size;
-}
-
-template <bool expr>
-constexpr bool Not() {
-  return !expr;
-}
-
 // Opaque structure representing the backend encode state.
 // This structure only has meaning to the backend and application code shouldn't
 // touch these values.
@@ -129,11 +119,6 @@ struct LogBuffer final {
   // Log data (used by the backend to encode the log into). The format
   // for this is backend-specific.
   uint64_t data[kBufferSize];
-
-  // Does nothing (enabled when we hit the last parameter that the user passed into us)
-  template <size_t i, size_t size, typename... T,
-            typename std::enable_if<Not<ILessThanSize<i, size>()>(), int>::type = 0>
-  void Encode(Tuplet<T...> value) {}
 
   // Encodes an int8
   void Encode(KeyValue<const char*, int8_t> value) {
@@ -216,60 +201,14 @@ struct LogBuffer final {
   void Encode(KeyValue<const char*, bool> value) {
     syslog_runtime::WriteKeyValue(this, value.key, value.value);
   }
-
-  // Encodes an arbitrary list of values recursively.
-  template <size_t i, size_t size, typename... T,
-            typename std::enable_if<ILessThanSize<i, size>(), int>::type = 0>
-  void Encode(Tuplet<T...> value) {
-    auto val = std::get<i>(value.tuple);
-    Encode(val);
-    Encode<i + 1, size>(value);
-  }
 };
 }  // namespace syslog_runtime
 
 namespace fuchsia_logging {
 
-template <typename... LogArgs>
-constexpr syslog_runtime::Tuplet<LogArgs...> Args(LogArgs... values) {
-  return syslog_runtime::Tuplet<LogArgs...>(std::make_tuple(values...), sizeof...(values));
-}
-
-template <typename Key, typename Value>
-constexpr syslog_runtime::KeyValue<Key, Value> KeyValueInternal(Key key, Value value) {
-  return syslog_runtime::KeyValue<Key, Value>(key, value);
-}
-
 // Used to denote a key-value pair for use in structured logging API calls.
 // This macro exists solely to improve readability of calls to FX_SLOG
-#define FX_KV(a, b) a, b
-
-template <typename Msg, typename... KeyValuePairs>
-struct LogValue final {
-  constexpr LogValue(Msg msg, syslog_runtime::Tuplet<KeyValuePairs...> kvps)
-      : msg(msg), kvps(kvps) {}
-  // FIXME(https://fxbug.dev/42057899): With hwasan, or asan without stack-to-heap promotion for
-  // detecting use-after-returns, we can encounter a stack overflow in blobfs when bringing
-  // up one of the drivers needed for networking. This largely has to do with the LogBuffer
-  // which is 32kB and inlining can cause 4 of them to be allocated in a single frame. Without
-  // hwasan/asan, stack coloring can merge these to use the same stack space, but hwasan/asan
-  // both prevent this. It's still desirable to not have such a large object on the stack, so
-  // until we come up with a better API for using this or figure out sanitizers and stack coloring,
-  // we can temporarily work around the stack overflow by disabling inlining for this function.
-  __attribute__((__noinline__)) void LogNew(::fuchsia_logging::LogSeverity severity,
-                                            const char* file, unsigned int line,
-                                            const char* condition) const {
-    syslog_runtime::LogBuffer buffer;
-    syslog_runtime::BeginRecord(&buffer, severity, file, line, msg, condition);
-    // https://bugs.llvm.org/show_bug.cgi?id=41093 -- Clang loses constexpr
-    // even though this should be constexpr here.
-    buffer.Encode<0, sizeof...(KeyValuePairs)>(kvps);
-    syslog_runtime::FlushRecord(&buffer);
-  }
-
-  Msg msg;
-  syslog_runtime::Tuplet<KeyValuePairs...> kvps;
-};
+#define FX_KV(a, b) ::syslog_runtime::KeyValue(a, b)
 
 class LogMessageVoidify final {
  public:
@@ -425,41 +364,12 @@ fuchsia_logging::LogSeverity GetSeverityFromVerbosity(uint8_t verbosity);
 #define FX_NOTIMPLEMENTED() FX_LOGS(ERROR) << "Not implemented in: " << __PRETTY_FUNCTION__
 
 template <typename Msg, typename... Args>
-static auto MakeValue(Msg msg, syslog_runtime::Tuplet<Args...> args) {
-  return fuchsia_logging::LogValue<Msg, Args...>(msg, args);
-}
-
-template <size_t i, size_t size, typename... Values, typename... Tuple,
-          typename std::enable_if<syslog_runtime::Not<syslog_runtime::ILessThanSize<i, size>()>(),
-                                  int>::type = 0>
-static auto MakeKV(std::tuple<Values...> value, std::tuple<Tuple...> tuple) {
-  return syslog_runtime::Tuplet<Tuple...>(tuple, size);
-}
-
-template <size_t i, size_t size, typename... Values, typename... Tuple,
-          typename std::enable_if<syslog_runtime::ILessThanSize<i, size>(), int>::type = 0>
-static auto MakeKV(std::tuple<Values...> value, std::tuple<Tuple...> tuple) {
-  // Key at index i, value at index i+1
-  auto k = std::get<i>(value);
-  auto v = std::get<i + 1>(value);
-  auto new_tuple = std::tuple_cat(tuple, std::make_tuple(fuchsia_logging::KeyValueInternal(k, v)));
-  return MakeKV<i + 2, size, Values...>(value, new_tuple);
-}
-
-template <typename... Args, typename... EmptyTuple>
-static auto MakeKV(std::tuple<Args...> args, std::tuple<EmptyTuple...> start_tuple) {
-  return MakeKV<0, sizeof...(Args), Args..., EmptyTuple...>(args, start_tuple);
-}
-
-template <typename... Args>
-static auto MakeKV(std::tuple<Args...> args) {
-  return MakeKV(args, std::make_tuple());
-}
-
-template <typename Msg, typename... Args>
-static void fx_slog_internal(fuchsia_logging::LogSeverity flag, const char* file, int line, Msg msg,
-                             Args... args) {
-  MakeValue(msg, MakeKV<Args...>(std::make_tuple(args...))).LogNew(flag, file, line, nullptr);
+void fx_slog_internal(fuchsia_logging::LogSeverity flag, const char* file, int line, Msg msg,
+                      Args... args) {
+  syslog_runtime::LogBuffer buffer;
+  syslog_runtime::BeginRecord(&buffer, flag, file, line, msg, nullptr);
+  (void)std::initializer_list<int>{(buffer.Encode(args), 0)...};
+  syslog_runtime::FlushRecord(&buffer);
 }
 
 #define FX_SLOG_ETC(flag, args...)                         \

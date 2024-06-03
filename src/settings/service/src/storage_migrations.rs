@@ -31,17 +31,9 @@ pub(crate) fn register_migrations(
 mod tests {
     use super::*;
     use fidl::endpoints::create_proxy;
-    use fidl::{endpoints::ServerEnd, Vmo};
     use fidl_fuchsia_io::{DirectoryMarker, OpenFlags};
     use fidl_fuchsia_stash::StoreMarker;
     use fuchsia_async as fasync;
-    use futures::lock::Mutex;
-    use std::collections::HashMap;
-    use std::sync::Arc;
-    use vfs::directory::entry_container::Directory;
-    use vfs::directory::mutable::simple::tree_constructor;
-    use vfs::execution_scope::ExecutionScope;
-    use vfs::file::vmo::read_write;
 
     // Run migration registration with all settings and policies turned on so we can ensure there's
     // no issues with registering any of the migrations.
@@ -68,21 +60,12 @@ mod tests {
         }
     }
 
-    /// Serve a directory from a virtual file system.
-    pub(crate) fn serve_vfs_dir(
-        root: Arc<impl Directory>,
-    ) -> (DirectoryProxy, Arc<Mutex<HashMap<String, Vmo>>>) {
-        let vmo_map = Arc::new(Mutex::new(HashMap::new()));
-        let fs_scope = ExecutionScope::build()
-            .entry_constructor(tree_constructor(move |_, _| Ok(read_write(b""))))
-            .new();
-        let (client, server) = create_proxy::<DirectoryMarker>().unwrap();
-        root.open(
-            fs_scope,
+    // Opens a FIDL connection to a `TempDir`.
+    pub(crate) fn open_tempdir(tempdir: &tempfile::TempDir) -> DirectoryProxy {
+        fuchsia_fs::directory::open_in_namespace(
+            tempdir.path().to_str().expect("tempdir path is not valid UTF-8"),
             OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-            vfs::path::Path::dot(),
-            ServerEnd::new(server.into_channel()),
-        );
-        (client, vmo_map)
+        )
+        .expect("failed to open connection to tempdir")
     }
 }

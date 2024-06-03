@@ -230,30 +230,6 @@ def parse_show_action_output(lines: Iterable[str]) -> ShowActionResult:
     )
 
 
-def read_config_file_lines(lines: Iterable[str]) -> Dict[str, str]:
-    """Parser for reading RBE config files.
-
-    RBE config files are text files with lines of "VAR=VALUE"
-    (ignoring whole-line #-comments and blank lines).
-    Spec details can be found at:
-    https://github.com/bazelbuild/reclient/blob/main/internal/pkg/rbeflag/rbeflag.go
-
-    Args:
-      lines: lines of config from a file
-
-    Returns:
-      dictionary of key-value pairs read from the config file.
-    """
-    result = {}
-    for line in lines:
-        stripped = line.strip()
-        if stripped and not stripped.startswith("#"):
-            key, sep, value = stripped.partition("=")
-            if sep == "=":
-                result[key] = value
-    return result
-
-
 class RemoteTool(object):
     def __init__(self, reproxy_cfg: Path):
         self._reproxy_cfg = reproxy_cfg
@@ -409,7 +385,9 @@ class RemoteTool(object):
 
 
 def configure_remotetool(cfg: Path) -> RemoteTool:
-    return RemoteTool(read_config_file_lines(cfg.read_text().splitlines()))
+    return RemoteTool(
+        cl_utils.read_config_file_lines(cfg.read_text().splitlines())
+    )
 
 
 def main(argv: Sequence[str]) -> int:

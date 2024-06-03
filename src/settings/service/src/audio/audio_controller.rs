@@ -1,10 +1,9 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use super::AudioInfoLoader;
 use crate::audio::types::{AudioInfo, AudioStream, AudioStreamType, SetAudioStream};
-use crate::audio::{
-    create_default_modified_counters, default_audio_info, ModifiedCounters, StreamVolumeControl,
-};
+use crate::audio::{create_default_modified_counters, ModifiedCounters, StreamVolumeControl};
 use crate::base::SettingType;
 use crate::handler::base::Request;
 use crate::handler::setting_handler::persist::{
@@ -19,22 +18,9 @@ use fuchsia_async as fasync;
 use fuchsia_trace as ftrace;
 use futures::lock::Mutex;
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
-use settings_storage::storage_factory::StorageAccess;
+use settings_storage::storage_factory::{DefaultLoader, StorageAccess};
 use std::collections::HashMap;
 use std::sync::Arc;
-
-fn get_streams_array_from_map(
-    stream_map: &HashMap<AudioStreamType, StreamVolumeControl>,
-) -> [AudioStream; 5] {
-    let mut streams: [AudioStream; 5] = default_audio_info().streams;
-    for stream in &mut streams {
-        if let Some(volume_control) = stream_map.get(&stream.stream_type) {
-            *stream = volume_control.stored_stream;
-        }
-    }
-
-    streams
-}
 
 type VolumeControllerHandle = Arc<Mutex<VolumeController>>;
 
@@ -43,6 +29,7 @@ pub(crate) struct VolumeController {
     audio_service_connected: bool,
     stream_volume_controls: HashMap<AudioStreamType, StreamVolumeControl>,
     modified_counters: ModifiedCounters,
+    audio_info_loader: AudioInfoLoader,
 }
 
 enum UpdateFrom {
@@ -51,12 +38,16 @@ enum UpdateFrom {
 }
 
 impl VolumeController {
-    async fn create(client: ClientProxy) -> VolumeControllerHandle {
+    fn create_with(
+        client: ClientProxy,
+        audio_info_loader: AudioInfoLoader,
+    ) -> VolumeControllerHandle {
         Arc::new(Mutex::new(Self {
             client,
             stream_volume_controls: HashMap::new(),
             audio_service_connected: false,
             modified_counters: create_default_modified_counters(),
+            audio_info_loader,
         }))
     }
 
@@ -116,6 +107,20 @@ impl VolumeController {
         Ok(None)
     }
 
+    async fn get_streams_array_from_map(
+        &self,
+        stream_map: &HashMap<AudioStreamType, StreamVolumeControl>,
+    ) -> [AudioStream; 5] {
+        let mut streams: [AudioStream; 5] = self.audio_info_loader.default_value().streams;
+        for stream in &mut streams {
+            if let Some(volume_control) = stream_map.get(&stream.stream_type) {
+                *stream = volume_control.stored_stream;
+            }
+        }
+
+        streams
+    }
+
     /// Updates the state with the given streams' volume levels.
     ///
     /// If `push_to_audio_core` is true, pushes the changes to the audio core.
@@ -165,7 +170,11 @@ impl VolumeController {
 
         if push_to_audio_core {
             let guard = trace_guard!(id, c"push to core");
-            self.check_and_bind_volume_controls(id, default_audio_info().streams.iter()).await?;
+            self.check_and_bind_volume_controls(
+                id,
+                self.audio_info_loader.default_value().streams.iter(),
+            )
+            .await?;
             drop(guard);
 
             trace!(id, c"setting core");
@@ -184,7 +193,8 @@ impl VolumeController {
 
         if let Some(mut stored_value) = stored_value {
             let guard = trace_guard!(id, c"updating streams and counters");
-            stored_value.streams = get_streams_array_from_map(&self.stream_volume_controls);
+            stored_value.streams =
+                self.get_streams_array_from_map(&self.stream_volume_controls).await;
             stored_value.modified_counters = Some(self.modified_counters.clone());
             drop(guard);
 
@@ -277,13 +287,14 @@ pub(crate) struct AudioController {
 
 impl StorageAccess for AudioController {
     type Storage = DeviceStorage;
-    const STORAGE_KEYS: &'static [&'static str] = &[AudioInfo::KEY];
+    type Data = AudioInfo;
+    const STORAGE_KEY: &'static str = AudioInfo::KEY;
 }
 
-#[async_trait]
-impl data_controller::Create for AudioController {
-    async fn create(client: ClientProxy) -> Result<Self, ControllerError> {
-        Ok(AudioController { volume: VolumeController::create(client).await })
+impl data_controller::CreateWith for AudioController {
+    type Data = AudioInfoLoader;
+    fn create_with(client: ClientProxy, data: Self::Data) -> Result<Self, ControllerError> {
+        Ok(AudioController { volume: VolumeController::create_with(client, data) })
     }
 }
 

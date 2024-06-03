@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+pub(crate) mod nat;
+
 use core::{num::NonZeroU16, ops::RangeInclusive};
 
 use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
@@ -60,7 +62,7 @@ pub(crate) struct Interfaces<'a, D> {
 /// The result of packet processing for a given routine.
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-enum RoutineResult<I: IpExt> {
+pub(crate) enum RoutineResult<I: IpExt> {
     /// The packet should stop traversing the rest of the current installed
     /// routine, but continue travsering other routines installed in the hook.
     Accept,
@@ -82,8 +84,6 @@ enum RoutineResult<I: IpExt> {
         /// The optional range of destination ports used to rewrite the packet.
         ///
         /// If absent, the destination port of the packet is not rewritten.
-        // TODO(https://fxbug.dev/333419001): implement Redirect NAT.
-        #[allow(dead_code)]
         dst_port: Option<RangeInclusive<NonZeroU16>>,
     },
 }
@@ -584,6 +584,7 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::{FakeBindingsCtx, FakeCtx, FakeDeviceClass},
+        logic::nat::NatConfig,
         matchers::{
             testutil::{ethernet_interface, wlan_interface, FakeDeviceId},
             InterfaceMatcher, PacketMatcher, PortMatcher, TransportProtocolMatcher,
@@ -591,11 +592,11 @@ mod tests {
         packets::testutil::internal::{
             ArbitraryValue, FakeIpPacket, FakeTcpSegment, TestIpExt, TransportPacketExt,
         },
-        state::{ConntrackExternalData, IpRoutines, UninstalledRoutine},
+        state::{IpRoutines, UninstalledRoutine},
     };
 
     impl<I: IpExt> Rule<I, FakeDeviceClass, ()> {
-        fn new(
+        pub(crate) fn new(
             matcher: PacketMatcher<I, FakeDeviceClass>,
             action: Action<I, FakeDeviceClass, ()>,
         ) -> Self {
@@ -640,14 +641,14 @@ mod tests {
     impl<I: IpExt, BC: FilterBindingsContext> FilterIpMetadata<I, BC> for NullMetadata {
         fn take_conntrack_connection(
             &mut self,
-        ) -> Option<crate::conntrack::Connection<I, BC, ConntrackExternalData>> {
+        ) -> Option<crate::conntrack::Connection<I, BC, NatConfig>> {
             None
         }
 
         fn replace_conntrack_connection(
             &mut self,
-            _conn: crate::conntrack::Connection<I, BC, ConntrackExternalData>,
-        ) -> Option<crate::conntrack::Connection<I, BC, ConntrackExternalData>> {
+            _conn: crate::conntrack::Connection<I, BC, NatConfig>,
+        ) -> Option<crate::conntrack::Connection<I, BC, NatConfig>> {
             None
         }
     }

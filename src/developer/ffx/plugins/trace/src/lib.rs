@@ -196,7 +196,6 @@ async fn get_category_group_names(ctx: &EnvironmentContext) -> Result<Vec<String
         .query("trace.category_groups")
         .select(ffx_config::SelectMode::All)
         .get::<Value>()
-        .await
         .context("could not query `trace.category_groups` in config.")?;
     let mut group_names: Vec<String> = all_groups
         .as_array()
@@ -216,7 +215,6 @@ async fn get_category_group(
 ) -> Result<Vec<String>> {
     let category_group = ctx
         .get::<Vec<String>, _>(&format!("trace.category_groups.{}", category_group_name))
-        .await
         .context(format!(
             "Error: no category group found for {0}, you can add this category locally by calling \
               `ffx config set trace.category_groups.{0} '[\"list\", \"of\", \"categories\"]'`\
@@ -732,7 +730,7 @@ https://fuchsia.dev/fuchsia-src/development/sdk/ffx/record-traces"
                 ffx_bail!("Trace already running for file {}", output);
             }
             RecordingError::RecordingStart => {
-                let log_file: String = context.get("log.dir").await?;
+                let log_file: String = context.get("log.dir")?;
                 ffx_bail!(
                     "Error starting Fuchsia trace. See {}/ffx.daemon.log\n
 Search for lines tagged with `ffx_daemon_service_tracing`. A common issue is a
@@ -743,7 +741,7 @@ package is missing from the device's system image.",
                 );
             }
             RecordingError::RecordingStop => {
-                let log_file: String = context.get("log.dir").await?;
+                let log_file: String = context.get("log.dir")?;
                 ffx_bail!(
                     "Error stopping Fuchsia trace. See {}/ffx.daemon.log\n
 Search for lines tagged with `ffx_daemon_service_tracing`. A common issue is a
@@ -1683,7 +1681,7 @@ Current tracing status:
 
         // Get all of the category groups found in config.json
         let category_groups_json: serde_json::Value =
-            env.context.get("trace.category_groups").await.unwrap();
+            env.context.get("trace.category_groups").unwrap();
 
         for category_group_name in category_groups_json.as_object().unwrap().keys() {
             let category_group =

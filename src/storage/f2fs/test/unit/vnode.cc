@@ -259,8 +259,7 @@ TEST_F(VnodeTest, SyncFile) {
   uint64_t pre_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   fs_->GetSuperblockInfo().ClearOpt(MountOption::kDisableRollForward);
   file_vnode->SetDirty();
-  ASSERT_EQ(file_vnode->SyncFile(0, safemath::checked_cast<loff_t>(file_vnode->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(file_vnode->SyncFile(false), ZX_OK);
   uint64_t curr_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   ASSERT_EQ(pre_checkpoint_ver, curr_checkpoint_ver);
   fs_->GetSuperblockInfo().SetOpt(MountOption::kDisableRollForward);
@@ -268,8 +267,7 @@ TEST_F(VnodeTest, SyncFile) {
   // 2. Check vnode is clean
   pre_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   file_vnode->ClearDirty();
-  ASSERT_EQ(file_vnode->SyncFile(0, safemath::checked_cast<loff_t>(file_vnode->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(file_vnode->SyncFile(false), ZX_OK);
   curr_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   ASSERT_EQ(pre_checkpoint_ver, curr_checkpoint_ver);
 
@@ -277,8 +275,7 @@ TEST_F(VnodeTest, SyncFile) {
   pre_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   file_vnode->SetFlag(InodeInfoFlag::kNeedCp);
   file_vnode->SetDirty();
-  ASSERT_EQ(file_vnode->SyncFile(0, safemath::checked_cast<loff_t>(file_vnode->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(file_vnode->SyncFile(false), ZX_OK);
   ASSERT_FALSE(file_vnode->TestFlag(InodeInfoFlag::kNeedCp));
   curr_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   ASSERT_EQ(pre_checkpoint_ver + 1, curr_checkpoint_ver);
@@ -288,8 +285,7 @@ TEST_F(VnodeTest, SyncFile) {
   block_t temp_user_block_count = fs_->GetSuperblockInfo().GetTotalBlockCount();
   fs_->GetSuperblockInfo().SetTotalBlockCount(0);
   file_vnode->SetDirty();
-  ASSERT_EQ(file_vnode->SyncFile(0, safemath::checked_cast<loff_t>(file_vnode->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(file_vnode->SyncFile(false), ZX_OK);
   ASSERT_FALSE(file_vnode->TestFlag(InodeInfoFlag::kNeedCp));
   curr_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   ASSERT_EQ(pre_checkpoint_ver + 1, curr_checkpoint_ver);
@@ -383,7 +379,7 @@ TEST_F(VnodeTest, FindDataBlockAddrsAndPages) {
       buf[0] = i;
       FileTester::AppendToFile(file.get(), buf, kPageSize);
     }
-    file->SyncFile(0, safemath::checked_cast<loff_t>(file->GetSize()), 0);
+    file->SyncFile(false);
 
     auto addrs_and_pages_or = file->FindDataBlockAddrsAndPages(kStartOffset, kEndOffset);
     ASSERT_TRUE(addrs_and_pages_or.is_ok());

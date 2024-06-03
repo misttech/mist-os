@@ -383,6 +383,8 @@ class Protocol_ResponseEncoder {
 
 #endif  // __Fuchsia__
 
+constexpr bool ADDED_AT_NEXT = true;
+
 constexpr bool ADDED_AT_HEAD = true;
 
 }  // namespace versions
@@ -492,7 +494,7 @@ struct Equality<::test::versions::Table> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::versions::Union> : public std::true_type {};
+struct IsFidlXUnion<::test::versions::Union> : public std::true_type{};
 
 template <>
 struct CodingTraits<::test::versions::Union>

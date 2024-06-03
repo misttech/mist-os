@@ -3,20 +3,17 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/rust/rustc_embed_files.gni")
 import("//build/rust/rustc_library.gni")
-
-# Rust looks for files included with `include_str` relative to the callsite. Rebase the
-# version_history.json relative to the files in src/.
-rebased_version_history_path = rebase_path("//sdk/version_history.json", "src")
 
 rustc_library("version-history-shared") {
   edition = "2021"
   with_unit_tests = true
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
-  rustenv = [ "SDK_VERSION_HISTORY=$rebased_version_history_path" ]
 
   deps = [
+    ":version-history-data",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:serde",
@@ -24,11 +21,21 @@ rustc_library("version-history-shared") {
   ]
 
   sources = [ "src/lib.rs" ]
-  inputs = [ "//sdk/version_history.json" ]
   visibility = [ "//src/lib/versioning/version-history/rust/*" ]
 }
 
 group("tests") {
   testonly = true
   deps = [ ":version-history-shared_test($host_toolchain)" ]
+}
+
+rustc_embed_files("version-history-data") {
+  edition = "2021"
+
+  files = [
+    {
+      constant_name = "VERSION_HISTORY"
+      source = "//sdk/version_history.json"
+    },
+  ]
 }

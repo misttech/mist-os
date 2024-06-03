@@ -37,10 +37,11 @@ SECTIONS {
    * These clauses detect any relocation records that haven't been applied by the hermetic link.
    * No references outside the hermetic blob are allowed.
    */
+  .relr.auth.dyn : { *(.relr.auth.dyn) }
   .relr : { *(.relr.*) }
   .rela : { *(.rela.*) }
   .rel : { *(.rel.*) }
-  ASSERT(SIZEOF(.relr) + SIZEOF(.rela) + SIZEOF(.rel) == 0,
+  ASSERT(SIZEOF(.relr.auth.dyn) + SIZEOF(.relr) + SIZEOF(.rela) + SIZEOF(.rel) == 0,
          "hermetic code blob cannot use dynamic relocations")
 
   /*

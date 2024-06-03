@@ -9,7 +9,6 @@ group("lib") {
   deps = [
     "boot-shim",
     "memalloc",
-    "page-table",
   ]
 }
 
@@ -18,6 +17,5 @@ group("tests") {
   deps = [
     "boot-shim:tests",
     "memalloc:tests",
-    "page-table:tests",
   ]
 }

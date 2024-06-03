@@ -28,7 +28,7 @@ pub fn tuf_error_as_update_tuf_client_event_code(
     match e {
         Tuf(BadSignature(_)) => EventCodes::BadSignature,
         Tuf(Encoding(_)) => EventCodes::Encoding,
-        Tuf(ExpiredMetadata(_)) => EventCodes::ExpiredMetadata,
+        Tuf(ExpiredMetadata { .. }) => EventCodes::ExpiredMetadata,
         Tuf(IllegalArgument(_)) => EventCodes::IllegalArgument,
         Tuf(NoSupportedHashAlgorithm) => EventCodes::NoSupportedHashAlgorithm,
         Tuf(MetadataNotFound { .. }) => EventCodes::MissingMetadata,
@@ -74,7 +74,7 @@ pub fn tuf_error_as_create_tuf_client_event_code(
     match e {
         Tuf(BadSignature(_)) => EventCodes::BadSignature,
         Tuf(Encoding(_)) => EventCodes::Encoding,
-        Tuf(ExpiredMetadata(_)) => EventCodes::ExpiredMetadata,
+        Tuf(ExpiredMetadata { .. }) => EventCodes::ExpiredMetadata,
         Tuf(IllegalArgument(_)) => EventCodes::IllegalArgument,
         Tuf(MetadataNotFound { .. }) => EventCodes::MissingMetadata,
         Tuf(NoSupportedHashAlgorithm) => EventCodes::NoSupportedHashAlgorithm,

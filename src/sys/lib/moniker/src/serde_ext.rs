@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        child_name::{ChildName, ChildNameBase},
-        moniker::{Moniker, MonikerBase},
-    },
+    crate::{child_name::ChildName, moniker::Moniker},
     schemars::{gen::SchemaGenerator, schema::Schema, schema_for, JsonSchema},
     serde::{
         de::{self, Deserializer, Visitor},

@@ -150,7 +150,20 @@ fuchsia_test_component("vkext-unprotected-lavapipe-test-component") {
 fuchsia_test_package("vkext-unprotected-lavapipe-package") {
   package_name = "vkext_unprotected_lavapipe_test"
   test_components = [ ":vkext-unprotected-lavapipe-test-component" ]
-  subpackages = [ ":vkext-child-package" ]
+  renameable_subpackages = [
+    {
+      name = "vkext-test"
+      package = ":vkext-child-package"
+    },
+    {
+      name = "vulkan_loader"
+      package = "//src/graphics/bin/vulkan_loader:hermetic_vulkan_loader_with_lavapipe"
+    },
+    {
+      name = "vulkan_loader_mock_directories"
+      package = "//src/graphics/bin/vulkan_loader/test:vulkan_loader_test_lib_provider"
+    },
+  ]
   test_specs = {
     environments = []
     log_settings = {

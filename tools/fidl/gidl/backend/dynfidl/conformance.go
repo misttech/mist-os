@@ -109,10 +109,20 @@ func isSupportedStructField(decl mixer.Declaration) bool {
 	switch decl := decl.(type) {
 	case *mixer.BoolDecl, *mixer.IntegerDecl, *mixer.StringDecl:
 		return true
+	case *mixer.StructDecl:
+		if decl.IsResourceType() {
+			return false
+		}
+		for _, fieldName := range decl.FieldNames() {
+			if !isSupportedStructField(decl.Field(fieldName)) {
+				return false
+			}
+		}
+		return true
 	case *mixer.VectorDecl:
 		return isSupportedVectorElement(decl.Elem())
 	case *mixer.ArrayDecl, *mixer.BitsDecl, *mixer.EnumDecl, *mixer.FloatDecl,
-		*mixer.HandleDecl, *mixer.StructDecl, *mixer.TableDecl, *mixer.UnionDecl:
+		*mixer.HandleDecl, *mixer.TableDecl, *mixer.UnionDecl:
 		return false
 	default:
 		panic(fmt.Sprintf("unrecognized type %s", decl))
@@ -161,6 +171,7 @@ const (
 	_ outerVariant = iota
 	basicVariant
 	vectorVariant
+	structVariant
 	unsupportedVariant
 )
 
@@ -170,6 +181,8 @@ func (v outerVariant) String() string {
 		return "Basic"
 	case vectorVariant:
 		return "Vector"
+	case structVariant:
+		return "Struct"
 	case unsupportedVariant:
 		return "UNSUPPORTED"
 	default:
@@ -211,16 +224,23 @@ func visit(value ir.Value, decl mixer.Declaration) visitResult {
 		valueStr := "Structure::default()"
 		for _, field := range value.Fields {
 			fieldResult := visit(field.Value, decl.Field(field.Key.Name))
-			valueStr += fmt.Sprintf(
-				".field(Field::%s(%s(%s)))",
-				fieldResult.OuterVariant,
-				fieldResult.InnerEnumAndVariant,
-				fieldResult.ValueStr)
+			if fieldResult.InnerEnumAndVariant != "" {
+				valueStr += fmt.Sprintf(
+					".field(Field::%s(%s(%s)))",
+					fieldResult.OuterVariant,
+					fieldResult.InnerEnumAndVariant,
+					fieldResult.ValueStr)
+			} else {
+				valueStr += fmt.Sprintf(
+					".field(Field::%s(%s))",
+					fieldResult.OuterVariant,
+					fieldResult.ValueStr)
+			}
 		}
 		return visitResult{
 			ValueStr:            valueStr,
-			OuterVariant:        unsupportedVariant,
-			InnerEnumAndVariant: "UNUSED",
+			OuterVariant:        structVariant,
+			InnerEnumAndVariant: "",
 		}
 	case []ir.Value:
 		elemDecl := decl.(*mixer.VectorDecl).Elem()

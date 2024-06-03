@@ -78,7 +78,6 @@ struct TableInner<I: IpExt, BT: FilterBindingsTypes, E> {
     table_limit_drops: u32,
 }
 
-#[allow(dead_code)]
 impl<I: IpExt, BT: FilterBindingsTypes, E> Table<I, BT, E> {
     /// Returns whether the table contains a connection for the specified tuple.
     ///
@@ -323,11 +322,11 @@ impl<I: IpExt, BT: FilterBindingsTypes, E: Inspectable> Inspectable for Table<I,
 #[derive(Debug, Clone, PartialEq, Eq, Hash, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 pub struct Tuple<I: IpExt> {
-    protocol: I::Proto,
-    src_addr: I::Addr,
-    dst_addr: I::Addr,
-    src_port_or_id: u16,
-    dst_port_or_id: u16,
+    pub(crate) protocol: I::Proto,
+    pub(crate) src_addr: I::Addr,
+    pub(crate) dst_addr: I::Addr,
+    pub(crate) src_port_or_id: u16,
+    pub(crate) dst_port_or_id: u16,
 }
 
 impl<I: IpExt> Tuple<I> {
@@ -429,7 +428,7 @@ pub enum Connection<I: IpExt, BT: FilterBindingsTypes, E> {
 }
 
 impl<I: IpExt, BT: FilterBindingsTypes, E> Connection<I, BT, E> {
-    /// Returns the tuple of the original direction of this connection
+    /// Returns the tuple of the original direction of this connection.
     pub(crate) fn original_tuple(&self) -> &Tuple<I> {
         match self {
             Connection::Exclusive(c) => &c.inner.original_tuple,
@@ -446,7 +445,6 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> Connection<I, BT, E> {
     }
 
     /// Returns a reference to the [`Connection::external_data`] field.
-    #[allow(dead_code)]
     pub(crate) fn external_data(&self) -> &E {
         match self {
             Connection::Exclusive(c) => &c.inner.external_data,
@@ -597,6 +595,11 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> ConnectionExclusive<I, BT, E> {
     /// order to insert into the [`Table`] table.
     fn make_shared(self) -> Arc<ConnectionShared<I, BT, E>> {
         Arc::new(ConnectionShared { inner: self.inner, state: Mutex::new(self.state) })
+    }
+
+    pub(crate) fn reply_tuple_and_external_data_mut(&mut self) -> (&mut Tuple<I>, &mut E) {
+        let ConnectionCommon { reply_tuple, external_data, .. } = &mut self.inner;
+        (reply_tuple, external_data)
     }
 }
 

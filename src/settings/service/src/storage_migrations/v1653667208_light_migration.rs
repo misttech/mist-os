@@ -79,7 +79,7 @@ impl Migration for V1653667208LightMigration {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage_migrations::tests::serve_vfs_dir;
+    use crate::storage_migrations::tests::open_tempdir;
     use assert_matches::assert_matches;
     use fidl_fuchsia_io::OpenFlags;
     use fidl_fuchsia_settings::{LightGroup, LightState, LightType, LightValue};
@@ -87,11 +87,10 @@ mod tests {
     use fidl_fuchsia_ui_types::ColorRgb;
     use fuchsia_async as fasync;
     use futures::StreamExt;
-    use vfs::mut_pseudo_directory;
 
     // Ensure that failing to get data from stash (i.e. not out of space or not found) results in
     // an unrecoverable error.
-    #[fasync::run_until_stalled(test)]
+    #[fuchsia::test]
     async fn v1653667208_light_migration_error_getting_value() {
         let (store_proxy, server_end) =
             create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
@@ -120,8 +119,8 @@ mod tests {
         });
 
         let migration = V1653667208LightMigration(store_proxy);
-        let fs = mut_pseudo_directory! {};
-        let (directory, _vmo_map) = serve_vfs_dir(fs);
+        let fs = tempfile::tempdir().expect("failed to create tempdir");
+        let directory = open_tempdir(&fs);
         let file_generator = FileGenerator::new(0, migration.id(), Clone::clone(&directory));
         let result = migration.migrate(file_generator).await;
         assert_matches!(result, Err(MigrationError::Unrecoverable(_)));
@@ -134,7 +133,7 @@ mod tests {
     }
 
     // Ensure we see that no data is available when the data is not in stash.
-    #[fasync::run_until_stalled(test)]
+    #[fuchsia::test]
     async fn v1653667208_light_migration_no_data() {
         let (store_proxy, server_end) =
             create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
@@ -162,8 +161,8 @@ mod tests {
         });
 
         let migration = V1653667208LightMigration(store_proxy);
-        let fs = mut_pseudo_directory! {};
-        let (directory, _vmo_map) = serve_vfs_dir(fs);
+        let fs = tempfile::tempdir().expect("failed to create tempdir");
+        let directory = open_tempdir(&fs);
         let file_generator = FileGenerator::new(0, migration.id(), Clone::clone(&directory));
         assert_matches!(migration.migrate(file_generator).await, Err(MigrationError::NoData));
 
@@ -173,7 +172,7 @@ mod tests {
     }
 
     // Ensure we can properly migrate the original json data in stash over to persistent fidl.
-    #[fasync::run_until_stalled(test)]
+    #[fuchsia::test]
     async fn v1653667208_light_migration_test() {
         let (store_proxy, server_end) =
             create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
@@ -261,8 +260,8 @@ mod tests {
         });
 
         let migration = V1653667208LightMigration(store_proxy);
-        let fs = mut_pseudo_directory! {};
-        let (directory, _vmo_map) = serve_vfs_dir(fs);
+        let fs = tempfile::tempdir().expect("failed to create tempdir");
+        let directory = open_tempdir(&fs);
         let file_generator = FileGenerator::new(0, migration.id(), Clone::clone(&directory));
         assert_matches!(migration.migrate(file_generator).await, Ok(()));
 

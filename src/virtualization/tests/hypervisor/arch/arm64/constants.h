@@ -20,4 +20,9 @@
 // Virtual memory region size.
 #define REGION_SIZE_BITS 34
 
+// Memory Attribute Indirection Register (MAIR)
+//
+// [arm/v8]: D13.2.95  MAIR_EL1, Memory Attribute Indirection Register, EL1
+#define MAIR_ATTR_NORMAL_CACHED 0xff  // Normal Memory (outer WB, inner WB)
+
 #endif  // SRC_VIRTUALIZATION_TESTS_HYPERVISOR_ARCH_ARM64_CONSTANTS_H_

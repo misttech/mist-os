@@ -72,6 +72,26 @@ board_configuration("vim3") {
         # Prefer using the built-in NIC to the CDC-ether interface.
         # TODO(https://fxbug.dev/42068759): Update topopath when dwmac is off
         # netdevice migration.
+        netsvc_interface =
+            "/dwmac/dwmac/Designware-MAC/netdevice-migration/network-device"
+      }
+    }
+    development_support = {
+      # Enable the Debug Access Port (DAP) for improved lockup/crash diagnostics.
+      enable_debug_access_port_for_soc = "amlogic-a311d"
+    }
+  }
+  input_bundles += [ ":board_driver" ]
+}
+
+board_configuration("vim3-devicetree") {
+  forward_variables_from(_base, "*")
+  platform = {
+    connectivity = {
+      network = {
+        # Prefer using the built-in NIC to the CDC-ether interface.
+        # TODO(https://fxbug.dev/42068759): Update topopath when dwmac is off
+        # netdevice migration.
         netsvc_interface = "/dwmac-ff3f0000_group/dwmac/Designware-MAC/netdevice-migration/network-device"
       }
     }

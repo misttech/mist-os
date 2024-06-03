@@ -147,6 +147,22 @@ class TestServerEvent final : public CloseCountingFileServer {
   zx::event event_;
 };
 
+class GetAttrTestServer final : public CloseCountingFileServer {
+ public:
+  void GetAttr(GetAttrCompleter::Sync& completer) final {
+    completer.Reply(0, fuchsia_io::wire::NodeAttributes{});
+  }
+};
+
+TEST_F(File, Open) {
+  ASSERT_NO_FAILURES(StartServer<GetAttrTestServer>());
+  ASSERT_NO_FAILURES(OpenFile());
+
+  zxio_node_attributes_t attr = {.has = {.object_type = true}};
+  ASSERT_OK(zxio_attr_get(&file_.io, &attr));
+  EXPECT_EQ(ZXIO_OBJECT_TYPE_FILE, attr.object_type);
+}
+
 TEST_F(File, WaitTimeOut) {
   ASSERT_NO_FAILURES(StartServer<TestServerEvent>());
   ASSERT_NO_FAILURES(OpenFile());

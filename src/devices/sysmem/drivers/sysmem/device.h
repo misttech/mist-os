@@ -32,6 +32,7 @@
 #include <region-alloc/region-alloc.h>
 
 #include "src/devices/sysmem/drivers/sysmem/memory_allocator.h"
+#include "src/devices/sysmem/drivers/sysmem/sysmem_config.h"
 #include "src/devices/sysmem/drivers/sysmem/sysmem_metrics.h"
 
 namespace sys {
@@ -76,12 +77,10 @@ class Device final : public DdkDeviceType,
   // ~unique_ptr<Device>. The destructor is also called by some tests.
   ~Device();
 
-  [[nodiscard]] zx::result<std::string> GetFromCommandLine(const char* name);
-  [[nodiscard]] zx::result<bool> GetBoolFromCommandLine(const char* name, bool default_value);
   [[nodiscard]] zx_status_t GetContiguousGuardParameters(
-      uint64_t* guard_bytes_out, bool* unused_pages_guarded,
-      zx::duration* unused_page_check_cycle_period, bool* internal_guard_pages_out,
-      bool* crash_on_fail_out);
+      const std::optional<sysmem_config::Config>& config, uint64_t* guard_bytes_out,
+      bool* unused_pages_guarded, zx::duration* unused_page_check_cycle_period,
+      bool* internal_guard_pages_out, bool* crash_on_fail_out);
 
   [[nodiscard]] static zx_status_t Bind(std::unique_ptr<Device> device);
   // currently public only for tests
@@ -195,7 +194,7 @@ class Device final : public DdkDeviceType,
 
   bool protected_ranges_disable_dynamic() const override {
     std::lock_guard checker(*loop_checker_);
-    return cmdline_protected_ranges_disable_dynamic_;
+    return protected_ranges_disable_dynamic_;
   }
 
   // false - no secure heaps are expected to exist
@@ -411,7 +410,7 @@ class Device final : public DdkDeviceType,
 
   SysmemMetrics metrics_;
 
-  bool cmdline_protected_ranges_disable_dynamic_ __TA_GUARDED(*loop_checker_) = false;
+  bool protected_ranges_disable_dynamic_ __TA_GUARDED(*loop_checker_) = false;
 
   bool is_secure_mem_ready_ __TA_GUARDED(*loop_checker_) = false;
 

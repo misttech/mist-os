@@ -43,12 +43,11 @@ use crate::{
 };
 
 pub use netstack3_base::{
-    BuildableCoreContext, ContextPair, ContextProvider, CoreEventContext, CoreTimerContext,
-    CounterContext, CtxPair, DeferredResourceRemovalContext, EventContext, HandleableTimer,
-    InstantBindingsTypes, InstantContext, NestedIntoCoreTimerCtx, ReceivableFrameMeta,
-    RecvFrameContext, ReferenceNotifiers, ReferenceNotifiersExt, ResourceCounterContext,
-    RngContext, SendFrameContext, SendableFrameMeta, TimerBindingsTypes, TimerContext,
-    TimerHandler, TracingContext,
+    BuildableCoreContext, ContextPair, ContextProvider, CoreTimerContext, CounterContext, CtxPair,
+    DeferredResourceRemovalContext, EventContext, HandleableTimer, InstantBindingsTypes,
+    InstantContext, ReceivableFrameMeta, ReferenceNotifiers, ReferenceNotifiersExt,
+    ResourceCounterContext, RngContext, TimerBindingsTypes, TimerContext, TimerHandler,
+    TracingContext,
 };
 
 // Enable all blanket implementations on CoreCtx.
@@ -72,7 +71,7 @@ impl<BC: BindingsContext, L> crate::transport::udp::UseUdpIpTransportContextBlan
     for CoreCtx<'_, BC, L>
 {
 }
-impl<BC: BindingsContext, L> crate::device::ethernet::UseArpFrameMetadataBlanket
+impl<BC: BindingsContext, L> crate::device::marker::UseArpFrameMetadataBlanket
     for CoreCtx<'_, BC, L>
 {
 }
@@ -184,6 +183,7 @@ mod locked {
 /// Fake implementations of context traits.
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
+    // TODO(https://fxbug.dev/342685842): Remove this re-export.
     pub use netstack3_base::testutil::{
         FakeBindingsCtx, FakeCoreCtx, FakeCryptoRng, FakeEventCtx, FakeFrameCtx, FakeInstant,
         FakeInstantCtx, FakeNetwork, FakeNetworkLinks, FakeNetworkSpec, FakeTimerCtx,

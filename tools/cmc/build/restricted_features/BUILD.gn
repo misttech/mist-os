@@ -10,6 +10,7 @@ group("structured_config") {
 # The allowlist of components that can use dictionaries in CML.
 group("dictionaries") {
   visibility = [
+    "//examples/components/dictionaries/*",
     "//src/session/bin/session_manager:*",
     "//src/sys/component_manager/tests/*",
     "//vendor/google/boards/*",

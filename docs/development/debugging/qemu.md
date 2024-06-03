@@ -12,19 +12,6 @@ conveniently using `fx qemu` (see below).
 
 ## Build QEMU
 
-### Install Prerequisites
-
-Building QEMU on macOS requires a few packages. As of macOS 10.12.1:
-
-```
-# Using http://brew.sh
-brew install pkg-config glib automake libtool
-
-# Or use http://macports.org ("port install ...") or build manually
-```
-
-### Build
-
 ```
 cd $SRC
 git clone --recursive https://fuchsia.googlesource.com/third_party/qemu
@@ -67,46 +54,12 @@ a network interface using the Linux tun/tap network device named "qemu".  QEMU
 does not need to be run with any special privileges for this, but you need to
 create a persistent tun/tap device ahead of time (which does require you be root):
 
-On Linux:
-
 ```
 sudo ip tuntap add dev qemu mode tap user $USER
 sudo ip link set qemu up
 ```
 
 This is sufficient to enable link local IPv6 (as the loglistener tool uses).
-
-On macOS:
-
-macOS does not support tun/tap devices out of the box; however, there is a widely
-used set of kernel extensions called tuntaposx, which can be downloaded
-[here](http://tuntaposx.sourceforge.net/download.xhtml). Once the installer
-completes, the extensions will create up to 16 tun/tap devices. The
-run-zircon-x64 script uses /dev/tap0.
-
-```
-sudo chown $USER /dev/tap0
-
-# Run zircon in QEMU, which will open /dev/tap0
-fx qemu -N
-
-# (In a different window) bring up tap0 with a link local IPv6 address
-sudo ip addr add dev tap0 fc00::/7
-sudo ip link set tap0 up
-```
-
-<aside class="note">
-One caveat with tuntaposx is that the network interface will
-automatically go down when QEMU exits and closes the network device. So the
-network interface needs to be brought back up each time QEMU is restarted. To
-automate this, you can use the -u flag to run a script on qemu startup. An
-example startup script containing the above command is located in
-scripts/qemu-ifup-macos, so QEMU can be started with:
-
-<pre>
-fx qemu -Nu ./scripts/qemu-ifup-macos
-</pre>
-</aside>
 
 ## Using Emulated Disk under QEMU
 

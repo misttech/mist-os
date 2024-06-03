@@ -5,9 +5,10 @@
 
 import copy
 import enum
-from typing import Any, Dict, Iterator, List, Optional, Self, TypeVar
+from functools import total_ordering
+from typing import Any, Iterator, Optional, Self, TypeVar
 
-import trace_processing.trace_time as trace_time
+from trace_processing import trace_time
 
 INT32_MIN = -0x80000000
 
@@ -40,7 +41,7 @@ class Event:
         start: trace_time.TimePoint,
         pid: int,
         tid: int,
-        args: Dict[str, Any],
+        args: dict[str, Any],
     ) -> None:
         self.category: str = category
         self.name: str = name
@@ -48,11 +49,11 @@ class Event:
         self.pid: int = pid
         self.tid: int = tid
         # Any extra arguments that the event contains.
-        self.args: Dict[str, Any] = args.copy()
+        self.args: dict[str, Any] = args.copy()
 
     @staticmethod
     # from_dict should not be called on an instance
-    def from_dict(event_dict: Dict[str, Any]) -> "Event":
+    def from_dict(event_dict: dict[str, Any]) -> "Event":
         category: str = event_dict["cat"]
         name: str = event_dict["name"]
         start: trace_time.TimePoint = trace_time.TimePoint.from_epoch_delta(
@@ -60,7 +61,7 @@ class Event:
         )
         pid: int = event_dict["pid"]
         tid: int = event_dict["tid"]
-        args: Dict[str, Any] = event_dict.get("args", {})
+        args: dict[str, Any] = event_dict.get("args", {})
 
         return Event(category, name, start, pid, tid, args)
 
@@ -68,7 +69,7 @@ class Event:
 class InstantEvent(Event):
     """An event that corresponds to a single moment in time."""
 
-    INSTANT_EVENT_SCOPE_MAP: Dict[str, InstantEventScope] = {
+    INSTANT_EVENT_SCOPE_MAP: dict[str, InstantEventScope] = {
         "g": InstantEventScope.GLOBAL,
         "p": InstantEventScope.PROCESS,
         "t": InstantEventScope.THREAD,
@@ -81,7 +82,7 @@ class InstantEvent(Event):
         self.scope: InstantEventScope = scope
 
     @staticmethod
-    def from_dict(event_dict: Dict[str, Any]) -> "InstantEvent":
+    def from_dict(event_dict: dict[str, Any]) -> "InstantEvent":
         scope_key: str = "s"
         if scope_key not in event_dict:
             raise TypeError(
@@ -116,7 +117,7 @@ class CounterEvent(Event):
         self.id: Optional[int] = id
 
     @staticmethod
-    def from_dict(event_dict: Dict[str, Any]) -> "CounterEvent":
+    def from_dict(event_dict: dict[str, Any]) -> "CounterEvent":
         id_key: str = "id"
         id: Optional[int] = None
         if id_key in event_dict:
@@ -145,8 +146,8 @@ class DurationEvent(Event):
         self,
         duration: Optional[trace_time.TimeDelta],
         parent: Optional[Self],
-        child_durations: List[Self],
-        child_flows: List["FlowEvent"],
+        child_durations: list[Self],
+        child_flows: list["FlowEvent"],
         base: Event,
     ) -> None:
         super().__init__(
@@ -154,11 +155,11 @@ class DurationEvent(Event):
         )
         self.duration: Optional[trace_time.TimeDelta] = duration
         self.parent: Optional[Self] = parent
-        self.child_durations: List[Self] = child_durations
-        self.child_flows: List["FlowEvent"] = child_flows
+        self.child_durations: list[Self] = child_durations
+        self.child_flows: list["FlowEvent"] = child_flows
 
     @staticmethod
-    def from_dict(event_dict: Dict[str, Any]) -> "DurationEvent":
+    def from_dict(event_dict: dict[str, Any]) -> "DurationEvent":
         duration_key: str = "dur"
         duration: Optional[trace_time.TimeDelta] = None
         microseconds: Optional[float | int] = event_dict.get(duration_key, None)
@@ -200,7 +201,7 @@ class AsyncEvent(Event):
     @staticmethod
     # from_dict should not be called on an instance
     # type: ignore[override]
-    def from_dict(id: int, event_dict: Dict[str, Any]) -> "AsyncEvent":
+    def from_dict(id: int, event_dict: dict[str, Any]) -> "AsyncEvent":
         return AsyncEvent(id, duration=None, base=Event.from_dict(event_dict))
 
 
@@ -215,7 +216,7 @@ class FlowEvent(Event):
       * An end flow event with no preceding (category, name, id) tuple.
     """
 
-    FLOW_EVENT_PHASE_MAP: Dict[str, FlowEventPhase] = {
+    FLOW_EVENT_PHASE_MAP: dict[str, FlowEventPhase] = {
         "s": FlowEventPhase.START,
         "t": FlowEventPhase.STEP,
         "f": FlowEventPhase.END,
@@ -245,7 +246,7 @@ class FlowEvent(Event):
     def from_dict(
         id: str,
         enclosing_duration: Optional[DurationEvent],
-        event_dict: Dict[str, Any],
+        event_dict: dict[str, Any],
     ) -> "FlowEvent":
         phase_key: str = "ph"
         if phase_key not in event_dict:
@@ -276,6 +277,7 @@ class FlowEvent(Event):
         )
 
 
+@total_ordering
 class ThreadState(enum.Enum):
     """Phase within the control flow lifecycle that a `FlowEvent` applies to."""
 
@@ -301,6 +303,11 @@ class ThreadState(enum.Enum):
     ZX_THREAD_STATE_BLOCKED_INTERRUPT = 0x0803
     ZX_THREAD_STATE_BLOCKED_PAGER = 0x0903
 
+    def __lt__(self, other: Any) -> bool:
+        if isinstance(other, ThreadState):
+            return self.value < other.value
+        return NotImplemented
+
 
 class SchedulingRecord:
     """A record giving us information about cpu scheduling decisions"""
@@ -310,12 +317,12 @@ class SchedulingRecord:
         start: trace_time.TimePoint,
         tid: int,
         prio: int | None,
-        args: Dict[str, Any],
+        args: dict[str, Any],
     ) -> None:
         self.start: trace_time.TimePoint = start
         self.tid: int = tid
         self.prio: int | None = prio
-        self.args: Dict[str, Any] = args.copy()
+        self.args: dict[str, Any] = args.copy()
 
     def is_idle(self) -> bool:
         """
@@ -335,7 +342,7 @@ class ContextSwitch(SchedulingRecord):
         incoming_prio: int | None,
         outgoing_prio: int | None,
         outgoing_state: ThreadState,
-        args: Dict[str, Any],
+        args: dict[str, Any],
     ):
         super().__init__(start, incoming_tid, incoming_prio, args.copy())
         self.outgoing_tid = outgoing_tid
@@ -351,7 +358,7 @@ class Waking(SchedulingRecord):
         start: trace_time.TimePoint,
         tid: int,
         prio: int | None,
-        args: Dict[str, Any],
+        args: dict[str, Any],
     ) -> None:
         super().__init__(start, tid, prio, args.copy())
 
@@ -363,11 +370,11 @@ class Thread:
         self,
         tid: int,
         name: Optional[str] = None,
-        events: Optional[List[Event]] = None,
+        events: Optional[list[Event]] = None,
     ) -> None:
         self.tid: int = tid
         self.name: str = "" if name is None else name
-        self.events: List[Event] = [] if events is None else events
+        self.events: list[Event] = [] if events is None else events
 
 
 class Process:
@@ -377,19 +384,19 @@ class Process:
         self,
         pid: int,
         name: Optional[str] = None,
-        threads: Optional[List[Thread]] = None,
+        threads: Optional[list[Thread]] = None,
     ) -> None:
         self.pid: int = pid
         self.name: str = "" if name is None else name
-        self.threads: List[Thread] = [] if threads is None else threads
+        self.threads: list[Thread] = [] if threads is None else threads
 
 
 class Model:
     """The root of the trace model."""
 
     def __init__(self) -> None:
-        self.processes: List[Process] = []
-        self.scheduling_records: Dict[int, List[SchedulingRecord]] = {}
+        self.processes: list[Process] = []
+        self.scheduling_records: dict[int, list[SchedulingRecord]] = {}
 
     def all_events(self) -> Iterator[Event]:
         for process in self.processes:
@@ -418,7 +425,7 @@ class Model:
         # need to update so that all the relations in the new model stay within
         # the new model. This dict tracks for each event of the old model, which
         # event in the new model it corresponds to.
-        new_event_map: Dict[Any, Event] = {}
+        new_event_map: dict[Any, Event] = {}
 
         T = TypeVar("T")
 

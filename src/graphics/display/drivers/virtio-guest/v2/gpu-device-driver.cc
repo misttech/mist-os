@@ -6,7 +6,7 @@
 
 #include <fidl/fuchsia.hardware.display.engine/cpp/driver/wire.h>
 #include <fidl/fuchsia.hardware.pci/cpp/wire.h>
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/legacy-bind-constants/legacy-bind-constants.h>
@@ -217,7 +217,7 @@ void GpuDeviceDriver::Start(fdf::StartCompleter completer) {
   FDF_LOG(TRACE, "GpuDeviceDriver::Start");
 
   {
-    auto sysmem_result = incoming()->Connect<fuchsia_hardware_sysmem::Service::AllocatorV1>();
+    auto sysmem_result = incoming()->Connect<fuchsia_hardware_sysmem::Service::AllocatorV2>();
     if (!sysmem_result.is_ok()) {
       FDF_LOG(ERROR, "Error connecting to sysmem: %s", sysmem_result.status_string());
       completer(sysmem_result.take_error());
@@ -226,8 +226,12 @@ void GpuDeviceDriver::Start(fdf::StartCompleter completer) {
     auto sysmem = fidl::WireSyncClient(std::move(sysmem_result.value()));
     auto pid = GetKoid(zx_process_self());
     std::string debug_name = fxl::StringPrintf("virtio-gpu-display[%lu]", pid);
-    auto set_debug_status =
-        sysmem->SetDebugClientInfo(fidl::StringView::FromExternal(debug_name), pid);
+    fidl::Arena arena;
+    auto set_debug_status = sysmem->SetDebugClientInfo(
+        fuchsia_sysmem2::wire::AllocatorSetDebugClientInfoRequest::Builder(arena)
+            .name(fidl::StringView::FromExternal(debug_name))
+            .id(pid)
+            .Build());
     if (!set_debug_status.ok()) {
       FDF_LOG(ERROR, "Cannot set sysmem allocator debug info: %s",
               set_debug_status.status_string());

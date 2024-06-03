@@ -30,7 +30,6 @@ mod tests {
         hooks::EventType,
         inspect::{ExponentialHistogramParams, LinearHistogramParams},
         moniker::Moniker,
-        moniker::MonikerBase,
         std::future,
         std::sync::Arc,
     };

@@ -1,0 +1,9 @@
+{
+    "short_description": "Driver Framework example for sending metadata",
+    "manufacturer": "",
+    "families": [],
+    "models": [],
+    "areas": [
+        "DriverFramework"
+    ]
+}

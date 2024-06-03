@@ -41,7 +41,7 @@ use {
     },
     cm_types::Name,
     derivative::Derivative,
-    moniker::{ChildName, ChildNameBase, Moniker},
+    moniker::{ChildName, Moniker},
     std::collections::HashSet,
     std::{fmt, slice},
     std::{marker::PhantomData, sync::Arc},

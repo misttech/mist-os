@@ -8,7 +8,7 @@
 //! expects the tree structure to be defined at compile time, while this helper allows the tree
 //! structure to be dynamic.
 
-use crate::directory::{entry::DirectoryEntry, helper::DirectlyMutable, immutable};
+use crate::directory::{entry::DirectoryEntry, helper::DirectlyMutable, immutable::Simple};
 
 use {
     fidl_fuchsia_io as fio,
@@ -83,16 +83,16 @@ pub enum TreeBuilder {
 }
 
 /// Collects a number of [`DirectoryEntry`] nodes and corresponding paths and the constructs a tree
-/// of [`immutable::simple::Simple`] directories that hold these nodes.  This is a companion tool,
-/// related to the [`vfs_macros::pseudo_directory!`] macro, except that it is collecting the paths
-/// dynamically, while the [`vfs_macros::pseudo_directory!`] expects the tree to be specified at
-/// compilation time.
+/// of [`crate::directory::immutable::simple::Simple`] directories that hold these nodes.  This is a
+/// companion tool, related to the [`vfs_macros::pseudo_directory!`] macro, except that it is
+/// collecting the paths dynamically, while the [`vfs_macros::pseudo_directory!`] expects the tree
+/// to be specified at compilation time.
 ///
 /// Note that the final tree is build as a result of the [`Self::build()`] method that consumes the
 /// builder.  You would need to use the [`crate::directory::helper::DirectlyMutable::add_entry()`]
 /// interface to add any new nodes afterwards (a [`crate::directory::watchers::Controller`] APIs).
 impl TreeBuilder {
-    /// Constructs an empty builder.  It is always an empty [`crate::directory::simple::Simple`]
+    /// Constructs an empty builder.  It is always an empty [`crate::directory::immutable::Simple`]
     /// directory.
     pub fn empty_dir() -> Self {
         TreeBuilder::Directory(HashMap::new())
@@ -141,13 +141,13 @@ impl TreeBuilder {
     ///
     /// ```should_panic
     /// use crate::{
-    ///     directory::immutable::simple,
+    ///     directory::immutable::Simple,
     ///     file::vmo::read_only,
     /// };
     ///
     /// let mut tree = TreeBuilder::empty_dir();
-    /// tree.add_entry(&["dir1"], simple());
-    /// tree.add_entry(&["dir1", "nested"], file::new(b"A file"));
+    /// tree.add_entry(&["dir1"], Simple::new());
+    /// tree.add_entry(&["dir1", "nested"], read_only(b"A file"));
     /// ```
     ///
     /// The problem is that the builder does not see "dir1" as a directory, but as a leaf node that
@@ -156,14 +156,11 @@ impl TreeBuilder {
     /// If you use `add_empty_dir()` instead, it would work:
     ///
     /// ```
-    /// use crate::{
-    ///     directory::immutable::simple,
-    ///     file::vmo::read_only,
-    /// };
+    /// use crate::file::vmo::read_only;
     ///
     /// let mut tree = TreeBuilder::empty_dir();
     /// tree.add_empty_dir(&["dir1"]);
-    /// tree.add_entry(&["dir1", "nested"], file::new(b"A file"));
+    /// tree.add_entry(&["dir1", "nested"], read_only(b"A file"));
     /// ```
     pub fn add_empty_dir<'components, P: 'components, PathImpl>(
         &mut self,
@@ -258,22 +255,22 @@ impl TreeBuilder {
 
     // Helper function for building a tree with a default inode generator. Use if you don't
     // care about directory inode values.
-    pub fn build(self) -> Arc<immutable::Simple> {
+    pub fn build(self) -> Arc<Simple> {
         let mut generator = |_| -> u64 { fio::INO_UNKNOWN };
         self.build_with_inode_generator(&mut generator)
     }
 
     /// Consumes the builder, producing a tree with all the nodes provided to
     /// [`crate::directory::helper::DirectlyMutable::add_entry()`] at their respective locations.
-    /// The tree itself is built using [`crate::directory::simple::Simple`]
+    /// The tree itself is built using [`crate::directory::immutable::Simple`]
     /// nodes, and the top level is a directory.
     pub fn build_with_inode_generator(
         self,
         get_inode: &mut impl FnMut(String) -> u64,
-    ) -> Arc<immutable::Simple> {
+    ) -> Arc<Simple> {
         match self {
             TreeBuilder::Directory(mut entries) => {
-                let res = immutable::simple_with_inode(get_inode(".".to_string()));
+                let res = Simple::new_with_inode(get_inode(".".to_string()));
                 for (name, child) in entries.drain() {
                     res.clone()
                         .add_entry(&name, child.build_dyn(name.clone(), get_inode))
@@ -298,7 +295,7 @@ impl TreeBuilder {
     ) -> Arc<dyn DirectoryEntry> {
         match self {
             TreeBuilder::Directory(mut entries) => {
-                let res = immutable::simple_with_inode(get_inode(dir));
+                let res = Simple::new_with_inode(get_inode(dir));
                 for (name, child) in entries.drain() {
                     res.clone()
                         .add_entry(&name, child.build_dyn(name.clone(), get_inode))
@@ -366,7 +363,7 @@ pub enum Error {
 
 #[cfg(test)]
 mod tests {
-    use super::{Error, TreeBuilder};
+    use super::{Error, Simple, TreeBuilder};
 
     // Macros are exported into the root of the crate.
     use crate::{
@@ -376,10 +373,7 @@ mod tests {
         open_get_vmo_file_proxy_assert_ok,
     };
 
-    use crate::{
-        directory::{immutable::simple, test_utils::run_server_client},
-        file,
-    };
+    use crate::{directory::test_utils::run_server_client, file};
 
     use {fidl_fuchsia_io as fio, vfs_macros::pseudo_directory};
 
@@ -807,7 +801,7 @@ mod tests {
         let mut tree = TreeBuilder::empty_dir();
 
         // Even when a leaf is itself a directory the tree builder cannot insert a nested entry.
-        tree.add_entry(&["top", "file"], simple()).unwrap();
+        tree.add_entry(&["top", "file"], Simple::new()).unwrap();
         let err = tree
             .add_entry(&["top", "file", "nested"], file::read_only(b"Invalid"))
             .expect_err("A leaf may not be constructed over another leaf.");

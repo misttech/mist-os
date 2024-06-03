@@ -44,9 +44,10 @@ pub mod datagram {
     pub use crate::internal::datagram::{
         close, collect_all_sockets, connect, create, disconnect_connected, get_bound_device,
         get_info, get_ip_hop_limits, get_ip_transparent, get_multicast_interface,
-        get_options_device, get_sharing, get_shutdown_connected, listen, send_conn, send_to,
-        set_device, set_ip_transparent, set_multicast_interface, set_multicast_membership,
-        shutdown_connected, update_ip_hop_limit, update_sharing, with_other_stack_ip_options,
+        get_multicast_loop, get_options_device, get_sharing, get_shutdown_connected, listen,
+        send_conn, send_to, set_device, set_ip_transparent, set_multicast_interface,
+        set_multicast_loop, set_multicast_membership, shutdown_connected, update_ip_hop_limit,
+        update_sharing, with_other_stack_ip_options,
         with_other_stack_ip_options_and_default_hop_limits, with_other_stack_ip_options_mut,
         with_other_stack_ip_options_mut_if_unbound, BoundSocketState, BoundSocketStateType,
         BoundSockets, ConnInfo, ConnectError, DatagramBoundStateContext, DatagramFlowId,
@@ -111,13 +112,12 @@ pub mod device {
         del_ip_addr_inner, get_ipv4_addr_subnet, get_ipv6_hop_limit, is_ip_device_enabled,
         is_ip_forwarding_enabled, join_ip_multicast, join_ip_multicast_with_config,
         leave_ip_multicast, leave_ip_multicast_with_config, receive_igmp_packet,
-        with_assigned_ipv4_addr_subnets, AddressRemovedReason, DelIpAddr, IpAddressId,
-        IpAddressIdSpec, IpAddressIdSpecContext, IpAddressState, IpDeviceAddr,
-        IpDeviceAddressContext, IpDeviceAddressIdContext, IpDeviceBindingsContext,
-        IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt, IpDeviceSendContext,
-        IpDeviceStateContext, IpDeviceTimerId, Ipv4DeviceTimerId, Ipv6DeviceAddr,
-        Ipv6DeviceConfigurationContext, Ipv6DeviceContext, Ipv6DeviceHandler, Ipv6DeviceTimerId,
-        WithIpDeviceConfigurationMutInner, WithIpv6DeviceConfigurationMutInner,
+        AddressRemovedReason, DelIpAddr, IpAddressId, IpAddressIdSpec, IpAddressIdSpecContext,
+        IpAddressState, IpDeviceAddr, IpDeviceAddressContext, IpDeviceAddressIdContext,
+        IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt,
+        IpDeviceSendContext, IpDeviceStateContext, IpDeviceTimerId, Ipv4DeviceTimerId,
+        Ipv6DeviceAddr, Ipv6DeviceConfigurationContext, Ipv6DeviceContext, Ipv6DeviceHandler,
+        Ipv6DeviceTimerId, WithIpDeviceConfigurationMutInner, WithIpv6DeviceConfigurationMutInner,
     };
 
     /// IP device test utilities.
@@ -126,7 +126,9 @@ pub mod device {
         pub use crate::internal::device::slaac::testutil::{
             calculate_slaac_addr_sub, collect_slaac_timers_integration,
         };
-        pub use crate::internal::device::testutil::with_assigned_ipv6_addr_subnets;
+        pub use crate::internal::device::testutil::{
+            with_assigned_ipv4_addr_subnets, with_assigned_ipv6_addr_subnets,
+        };
     }
 }
 
@@ -226,8 +228,8 @@ pub mod raw {
     pub use crate::internal::raw::state::{RawIpSocketLockedState, RawIpSocketState};
     pub use crate::internal::raw::{
         RawIpSocketApi, RawIpSocketId, RawIpSocketMap, RawIpSocketMapContext,
-        RawIpSocketStateContext, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes,
-        RawIpSocketsIpExt, WeakRawIpSocketId,
+        RawIpSocketSendToError, RawIpSocketStateContext, RawIpSocketsBindingsContext,
+        RawIpSocketsBindingsTypes, WeakRawIpSocketId,
     };
 }
 

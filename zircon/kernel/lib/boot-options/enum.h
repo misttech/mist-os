@@ -108,6 +108,14 @@ inline constexpr auto Enum<CheckFailAction> = [](auto&& Switch) {
       .Case("panic", CheckFailAction::kPanic);
 };
 
+template <>
+inline constexpr auto Enum<CheckerEnable> = [](auto&& Switch) {
+  return Switch  //
+      .Case("true", CheckerEnable::kTrue)
+      .Case("false", CheckerEnable::kFalse)
+      .Case("auto", CheckerEnable::kAuto);
+};
+
 #if BOOT_OPTIONS_GENERATOR || defined(__aarch64__)
 
 template <>

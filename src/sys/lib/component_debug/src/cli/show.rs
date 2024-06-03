@@ -251,7 +251,6 @@ mod tests {
     use super::*;
     use crate::test_utils::*;
     use fidl_fuchsia_component_decl as fdecl;
-    use moniker::MonikerBase;
     use std::collections::HashMap;
     use std::fs;
     use tempfile::TempDir;

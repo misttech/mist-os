@@ -14,7 +14,7 @@ pub(crate) mod router_solicitation;
 pub(crate) mod slaac;
 pub(crate) mod state;
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::vec::Vec;
 use core::{
     fmt::{Debug, Display},
     hash::Hash,
@@ -101,6 +101,11 @@ impl<D: WeakDeviceIdentifier> Ipv4DeviceTimerId<D> {
     fn device_id(&self) -> Option<D::Strong> {
         let Self(this) = self;
         this.device_id().upgrade()
+    }
+
+    /// Transforms this timer ID into the common [`IpDeviceTimerId`] version.
+    pub fn into_common<S: IpAddressIdSpec>(self) -> IpDeviceTimerId<Ipv4, D, S> {
+        self.into()
     }
 }
 
@@ -193,6 +198,11 @@ impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> Ipv6DeviceTimerId<D,
             Self::Slaac(id) => id.device_id(),
         }
         .upgrade()
+    }
+
+    /// Transforms this timer ID into the common [`IpDeviceTimerId`] version.
+    pub fn into_common<S: IpAddressIdSpec<WeakV6 = A>>(self) -> IpDeviceTimerId<Ipv6, D, S> {
+        self.into()
     }
 }
 
@@ -1375,28 +1385,12 @@ fn disable_ipv4_device_with_config<
     })
 }
 
-/// Calls the callback with an iterator of the IPv4 addresses assigned to
-/// `device_id`.
-pub fn with_assigned_ipv4_addr_subnets<
-    BT: IpDeviceStateBindingsTypes,
-    CC: IpDeviceStateContext<Ipv4, BT>,
-    O,
-    F: FnOnce(Box<dyn Iterator<Item = AddrSubnet<Ipv4Addr>> + '_>) -> O,
->(
-    core_ctx: &mut CC,
-    device_id: &CC::DeviceId,
-    cb: F,
-) -> O {
-    core_ctx
-        .with_address_ids(device_id, |addrs, _core_ctx| cb(Box::new(addrs.map(|a| a.addr_sub()))))
-}
-
 /// Gets a single IPv4 address and subnet for a device.
 pub fn get_ipv4_addr_subnet<BT: IpDeviceStateBindingsTypes, CC: IpDeviceStateContext<Ipv4, BT>>(
     core_ctx: &mut CC,
     device_id: &CC::DeviceId,
 ) -> Option<AddrSubnet<Ipv4Addr>> {
-    with_assigned_ipv4_addr_subnets(core_ctx, device_id, |mut addrs| addrs.nth(0))
+    core_ctx.with_address_ids(device_id, |mut addrs, _core_ctx| addrs.next().map(|a| a.addr_sub()))
 }
 
 /// Gets the hop limit for new IPv6 packets that will be sent out from `device`.
@@ -1817,7 +1811,26 @@ pub fn clear_ipv6_device_state<
 
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
+    use alloc::boxed::Box;
+
     use super::*;
+
+    /// Calls the callback with an iterator of the IPv4 addresses assigned to
+    /// `device_id`.
+    pub fn with_assigned_ipv4_addr_subnets<
+        BT: IpDeviceStateBindingsTypes,
+        CC: IpDeviceStateContext<Ipv4, BT>,
+        O,
+        F: FnOnce(Box<dyn Iterator<Item = AddrSubnet<Ipv4Addr>> + '_>) -> O,
+    >(
+        core_ctx: &mut CC,
+        device_id: &CC::DeviceId,
+        cb: F,
+    ) -> O {
+        core_ctx.with_address_ids(device_id, |addrs, _core_ctx| {
+            cb(Box::new(addrs.map(|a| a.addr_sub())))
+        })
+    }
 
     /// Gets the IPv6 address and subnet pairs associated with this device which are
     /// in the assigned state.

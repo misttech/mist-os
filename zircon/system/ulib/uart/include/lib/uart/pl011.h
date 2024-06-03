@@ -23,7 +23,10 @@
 namespace uart::pl011 {
 
 // This is where QEMU puts its emulated PL011.
-constexpr zbi_dcfg_simple_t kQemuConfig{.mmio_phys = 0x09000000, .irq = 33};
+constexpr zbi_dcfg_simple_t kQemuConfig{.mmio_phys = 0x09000000,
+                                        .irq = 33,
+                                        .flags = ZBI_KERNEL_DRIVER_IRQ_FLAGS_LEVEL_TRIGGERED |
+                                                 ZBI_KERNEL_DRIVER_IRQ_FLAGS_POLARITY_HIGH};
 
 // We use expanded title (first clause in the Function column of the manual)
 // rather than the acronym (Name column in the manual) for readability, except

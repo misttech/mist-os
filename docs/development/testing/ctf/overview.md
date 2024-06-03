@@ -2,7 +2,7 @@
 
 Note: Compatibility testing documents are being overhauled in Q2
 2024.  Some information in this document is out of date. See
-https://fxbug.dev/339893257 for details.
+[this ticket][bug-ticket-01]{:.external} for details.
 
 Compatibility Testing for Fuchsia is a mechanism to freeze artifacts on release
 branches and then thaw those artifacts for testing in CI/CQ.
@@ -13,6 +13,10 @@ the current state of the Fuchsia source repository.
 
 To learn how it works, and to get started on adding CTF tests for
 your area, please see the links below.
+
+## Getting started
+
+* Read the [user guide] for the latest guidance on using CTF.
 
 ## Contributing to CTF
 
@@ -36,11 +40,14 @@ your area, please see the links below.
 * Bugs: <https://issuetracker.google.com/components/1375729>
 
 <!-- Links. Please link source code to https://cs.opensource.google -->
+
 [all tests]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/ctf/tests
 [contributing guide]: /docs/development/testing/ctf/contributing_tests.md
 [CTF overview]: /docs/development/testing/ctf/compatibility_testing.md
 [FAQ]: /docs/development/testing/ctf/faq.md
 [RFC-0015]: /docs/contribute/governance/rfcs/0015_cts.md
 [RFC-0141]: /docs/contribute/governance/rfcs/0141_cts_process.md
+[user guide]: /docs/development/testing/ctf/user_guide.md
 [C++ echo test]: /sdk/ctf/tests/examples/fidl/fuchsia.examples/cc/
 [Rust echo test]: /sdk/ctf/tests/examples/fidl/fuchsia.examples/rust/
+[bug-ticket-01]: https://fxbug.dev/339893257

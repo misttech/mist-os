@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::config::default_settings::DefaultSetting;
 use crate::input::types::{DeviceStateSource, InputDeviceType};
 use serde::Deserialize;
 
-#[derive(PartialEq, Debug, Clone, Deserialize)]
+#[derive(PartialEq, Debug, Default, Clone, Deserialize)]
 pub struct InputConfiguration {
     /// List of input devices that are present on this product.
     pub devices: Vec<InputDeviceConfiguration>,
@@ -38,4 +39,11 @@ pub struct SourceState {
     /// The number representing the state for the source. This is the sum of
     /// the bitflags that are set.
     pub state: u64,
+}
+
+pub fn build_input_default_settings() -> DefaultSetting<InputConfiguration, &'static str> {
+    DefaultSetting::new(
+        Some(InputConfiguration::default()),
+        "/config/data/input_device_config.json",
+    )
 }

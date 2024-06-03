@@ -1427,6 +1427,7 @@ void Protocol_ErrorBasic_Result::Decode(::fidl::Decoder* _decoder, Protocol_Erro
 
   switch (value->tag_) {
     case ::test::typesinprotocols::Protocol_ErrorBasic_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_) ::test::typesinprotocols::Basic();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
@@ -1632,6 +1633,7 @@ void Protocol_ErrorCompound_Result::Decode(::fidl::Decoder* _decoder, Protocol_E
 
   switch (value->tag_) {
     case ::test::typesinprotocols::Protocol_ErrorCompound_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_) ::test::typesinprotocols::Compound();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
@@ -1837,6 +1839,7 @@ void Protocol_ErrorArrayBasic_Result::Decode(::fidl::Decoder* _decoder, Protocol
 
   switch (value->tag_) {
     case ::test::typesinprotocols::Protocol_ErrorArrayBasic_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_) ::test::typesinprotocols::ArrayBasic();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
@@ -2042,6 +2045,7 @@ void Protocol_ErrorArrayCompound_Result::Decode(::fidl::Decoder* _decoder, Proto
 
   switch (value->tag_) {
     case ::test::typesinprotocols::Protocol_ErrorArrayCompound_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_) ::test::typesinprotocols::ArrayCompound();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
@@ -2247,6 +2251,7 @@ void Protocol_ErrorVectorBasic_Result::Decode(::fidl::Decoder* _decoder, Protoco
 
   switch (value->tag_) {
     case ::test::typesinprotocols::Protocol_ErrorVectorBasic_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_) ::test::typesinprotocols::VectorBasic();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
@@ -2452,6 +2457,7 @@ void Protocol_ErrorVectorCompound_Result::Decode(::fidl::Decoder* _decoder, Prot
 
   switch (value->tag_) {
     case ::test::typesinprotocols::Protocol_ErrorVectorCompound_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_) ::test::typesinprotocols::VectorCompound();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
@@ -2657,6 +2663,7 @@ void Protocol_ErrorVectorOptional_Result::Decode(::fidl::Decoder* _decoder, Prot
 
   switch (value->tag_) {
     case ::test::typesinprotocols::Protocol_ErrorVectorOptional_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_) ::test::typesinprotocols::VectorOptional();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
@@ -2862,6 +2869,7 @@ void Protocol_ErrorArrayVectorNested_Result::Decode(::fidl::Decoder* _decoder, P
 
   switch (value->tag_) {
     case ::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_) ::test::typesinprotocols::ArrayVectorNested();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;
@@ -3069,6 +3077,7 @@ void Protocol_ErrorResource_Result::Decode(::fidl::Decoder* _decoder, Protocol_E
 
   switch (value->tag_) {
     case ::test::typesinprotocols::Protocol_ErrorResource_Result::Tag::kResponse: {
+      value->response_.~decltype(value->response_)();
       new (&value->response_) ::test::typesinprotocols::Resource();
       ::fidl::Decode(_decoder, &value->response_, value_offset);
       break;

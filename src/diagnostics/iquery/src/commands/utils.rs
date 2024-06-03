@@ -10,7 +10,7 @@ use cm_rust::SourceName;
 use component_debug::realm::*;
 use fidl_fuchsia_sys2 as fsys2;
 use lazy_static::lazy_static;
-use moniker::{Moniker, MonikerBase};
+use moniker::Moniker;
 use regex::Regex;
 
 lazy_static! {

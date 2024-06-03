@@ -513,7 +513,7 @@ mod tests {
         // Setting the default should write to the config.
         set_default_repository("foo").await.unwrap();
         assert_eq!(
-            env.context.get::<Value, _>(CONFIG_KEY_DEFAULT_REPOSITORY).await.unwrap(),
+            env.context.get::<Value, _>(CONFIG_KEY_DEFAULT_REPOSITORY).unwrap(),
             json!("foo"),
         );
         assert_eq!(get_default_repository().await.unwrap(), Some("foo".into()));
@@ -521,7 +521,7 @@ mod tests {
         // We don't care if the repository has `.` in it.
         set_default_repository("foo.bar").await.unwrap();
         assert_eq!(
-            env.context.get::<Value, _>(CONFIG_KEY_DEFAULT_REPOSITORY).await.unwrap(),
+            env.context.get::<Value, _>(CONFIG_KEY_DEFAULT_REPOSITORY).unwrap(),
             json!("foo.bar"),
         );
         assert_eq!(get_default_repository().await.unwrap(), Some("foo.bar".into()));
@@ -529,7 +529,7 @@ mod tests {
         // Unset removes the default repository from the config.
         unset_default_repository().await.unwrap();
         assert_eq!(
-            env.context.get::<Option<Value>, _>(CONFIG_KEY_DEFAULT_REPOSITORY).await.unwrap(),
+            env.context.get::<Option<Value>, _>(CONFIG_KEY_DEFAULT_REPOSITORY).unwrap(),
             None,
         );
         assert_eq!(get_default_repository().await.unwrap(), None);
@@ -560,7 +560,7 @@ mod tests {
 
         // Make sure we wrote to the config.
         assert_eq!(
-            env.context.get::<Value, _>(CONFIG_KEY_REPOSITORIES).await.unwrap(),
+            env.context.get::<Value, _>(CONFIG_KEY_REPOSITORIES).unwrap(),
             json!({
                 "repo": {
                     "type": "pm",
@@ -578,10 +578,7 @@ mod tests {
 
         // We can remove the repository.
         remove_repository("repo").await.unwrap();
-        assert_eq!(
-            env.context.get::<Option<Value>, _>(CONFIG_KEY_REPOSITORIES).await.unwrap(),
-            None,
-        );
+        assert_eq!(env.context.get::<Option<Value>, _>(CONFIG_KEY_REPOSITORIES).unwrap(), None,);
         assert_eq!(get_repository("repo").await.unwrap(), None);
     }
 
@@ -613,7 +610,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            env.context.get::<Value, _>(CONFIG_KEY_REPOSITORIES).await.unwrap(),
+            env.context.get::<Value, _>(CONFIG_KEY_REPOSITORIES).unwrap(),
             json!({
                 "repo%2Ename": {
                     "type": "pm",
@@ -652,7 +649,7 @@ mod tests {
 
         // Make sure it was written to the config.
         assert_eq!(
-            env.context.get::<Value, _>(CONFIG_KEY_REGISTRATIONS).await.unwrap(),
+            env.context.get::<Value, _>(CONFIG_KEY_REGISTRATIONS).unwrap(),
             json!({
                 "repo": {
                     "target": {
@@ -736,7 +733,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            env.context.get::<Value, _>(CONFIG_KEY_REGISTRATIONS).await.unwrap(),
+            env.context.get::<Value, _>(CONFIG_KEY_REGISTRATIONS).unwrap(),
             json!({
                 "repo%2Ename": {
                     "target%2Ename": {

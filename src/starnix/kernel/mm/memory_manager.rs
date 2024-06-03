@@ -1472,7 +1472,13 @@ impl MemoryManagerState {
                         return error!(EINVAL);
                     }
                     MADV_DONTNEED => zx::VmoOp::ZERO,
-                    MADV_WILLNEED => zx::VmoOp::COMMIT,
+                    MADV_WILLNEED => {
+                        if mapping.flags.contains(MappingFlags::WRITE) {
+                            zx::VmoOp::COMMIT
+                        } else {
+                            zx::VmoOp::PREFETCH
+                        }
+                    }
                     MADV_NOHUGEPAGE => return Ok(()),
                     advice => {
                         track_stub!(TODO("https://fxbug.dev/322874202"), "madvise", advice);

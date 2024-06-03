@@ -143,7 +143,7 @@ mod tests {
         },
         fidl_fuchsia_data as fdata,
         lazy_static::lazy_static,
-        moniker::{Moniker, MonikerBase},
+        moniker::Moniker,
         std::{collections::HashMap, sync::Arc},
         test_case::test_case,
     };

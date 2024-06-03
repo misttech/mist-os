@@ -33,24 +33,33 @@ pub async fn bind_fvm(proxy: &ControllerProxy) -> Result<()> {
 }
 
 async fn partition_type_guid_matches(guid: &Guid, partition: &PartitionProxy) -> Result<bool> {
-    let (status, type_guid) = partition.get_type_guid().await?;
+    let (status, type_guid) =
+        partition.get_type_guid().await.context("Failed to get type guid (fidl error")?;
     zx::ok(status).context("Failed to get type guid")?;
     let type_guid = if let Some(guid) = type_guid { guid } else { return Ok(false) };
-    Ok(type_guid.value == *guid)
+    let matched = type_guid.value == *guid;
+    tracing::info!(matched, ?type_guid, target_guid=?guid, "matching type guid");
+    Ok(matched)
 }
 
 async fn partition_instance_guid_matches(guid: &Guid, partition: &PartitionProxy) -> Result<bool> {
-    let (status, instance_guid) = partition.get_instance_guid().await?;
+    let (status, instance_guid) =
+        partition.get_instance_guid().await.context("Failed to get instance guid (fidl error")?;
     zx::ok(status).context("Failed to get instance guid")?;
     let instance_guid = if let Some(guid) = instance_guid { guid } else { return Ok(false) };
-    Ok(instance_guid.value == *guid)
+    let matched = instance_guid.value == *guid;
+    tracing::info!(matched, ?instance_guid, target_guid=?guid, "matching instance guid");
+    Ok(matched)
 }
 
 async fn partition_name_matches(name: &str, partition: &PartitionProxy) -> Result<bool> {
-    let (status, partition_name) = partition.get_name().await?;
+    let (status, partition_name) =
+        partition.get_name().await.context("Failed to get partition name (fidl error")?;
     zx::ok(status).context("Failed to get partition name")?;
     let partition_name = if let Some(name) = partition_name { name } else { return Ok(false) };
-    Ok(partition_name == name)
+    let matched = partition_name == name;
+    tracing::info!(matched, partition_name, target_name = name, "matching name");
+    Ok(matched)
 }
 
 async fn block_contents_match(format: DiskFormat, block: &PartitionProxy) -> Result<bool> {
@@ -59,6 +68,7 @@ async fn block_contents_match(format: DiskFormat, block: &PartitionProxy) -> Res
 }
 
 /// A constraint for the block device being waited for in `wait_for_block_device`.
+#[derive(Debug)]
 pub enum BlockDeviceMatcher<'a> {
     /// Only matches block devices that have this type Guid.
     TypeGuid(&'a Guid),
@@ -127,15 +137,24 @@ pub async fn find_block_device(matchers: &[BlockDeviceMatcher<'_>]) -> Result<Pa
         .context("Failed to readdir /dev/class/block")?;
     for entry in entries {
         let path = Path::new(DEV_CLASS_BLOCK).join(entry.name);
+        tracing::info!(?path, "checking device");
         let partition = connect_to_protocol_at_path::<PartitionMarker>(path.to_str().unwrap())?;
         let mut matches = true;
         for matcher in matchers {
-            if !matcher.matches(&partition).await.unwrap_or(false) {
+            let this_matches = match matcher.matches(&partition).await {
+                Ok(this_matches) => this_matches,
+                Err(error) => {
+                    tracing::warn!(?error, ?matcher, "matcher returned an error");
+                    false
+                }
+            };
+            if !this_matches {
                 matches = false;
                 break;
             }
         }
         if matches {
+            tracing::info!(?path, "found match");
             return Ok(path);
         }
     }

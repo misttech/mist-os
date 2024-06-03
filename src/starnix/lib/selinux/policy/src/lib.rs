@@ -32,23 +32,23 @@ use {
 pub const SUPPORTED_POLICY_VERSION: u32 = 33;
 
 /// Identifies a user within a policy.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct UserId(NonZeroU32);
 
 /// Identifies a role within a policy.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct RoleId(NonZeroU32);
 
 /// Identifies a type within a policy.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct TypeId(NonZeroU32);
 
 /// Identifies a sensitivity level within a policy.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, PartialOrd)]
 pub struct SensitivityId(NonZeroU32);
 
 /// Identifies a security category within a policy.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, PartialOrd)]
 pub struct CategoryId(NonZeroU32);
 
 /// The set of permissions that may be granted to sources accessing targets of a particular class,

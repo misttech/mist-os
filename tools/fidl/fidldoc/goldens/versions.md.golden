@@ -133,12 +133,21 @@ Type: <code>uint32</code>
 <table>
     <tr><th>Name</th><th>Value</th><th>Type</th><th>Description</th></tr>
         <tr id="ADDED_AT_HEAD">
-            <td><a href="https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/versions.test.fidl;l=59">ADDED_AT_HEAD</a></td>
+            <td><a href="https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/versions.test.fidl;l=61">ADDED_AT_HEAD</a></td>
                 <td>
                     <code>true</code>
                 </td>
                 <td><code>bool</code></td>
             <td><div class="fidl-version-div"><span class="fidl-attribute fidl-version">Added: HEAD</span></div>
+</td>
+        </tr>
+        <tr id="ADDED_AT_NEXT">
+            <td><a href="https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/versions.test.fidl;l=58">ADDED_AT_NEXT</a></td>
+                <td>
+                    <code>true</code>
+                </td>
+                <td><code>bool</code></td>
+            <td><div class="fidl-version-div"><span class="fidl-attribute fidl-version">Added: NEXT</span></div>
 </td>
         </tr>
         <tr id="Const">

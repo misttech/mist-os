@@ -29,11 +29,15 @@ struct Pixel {
   }
 
   static Pixel FromVmo(const uint8_t* vmo_host, uint32_t stride, uint32_t x, uint32_t y,
+                       fuchsia::images2::PixelFormat type);
+  static Pixel FromVmo(const uint8_t* vmo_host, uint32_t stride, uint32_t x, uint32_t y,
                        fuchsia::sysmem::PixelFormatType type);
 
   static Pixel FromVmoBgra(const uint8_t* vmo_host, uint32_t stride, uint32_t x, uint32_t y);
 
   static Pixel FromVmoRgba(const uint8_t* vmo_host, uint32_t stride, uint32_t x, uint32_t y);
+
+  std::vector<uint8_t> ToFormat(fuchsia::images2::PixelFormat type);
 
   std::vector<uint8_t> ToFormat(fuchsia::sysmem::PixelFormatType type);
 
@@ -41,6 +45,8 @@ struct Pixel {
 
   std::vector<uint8_t> ToRgba() { return {red, green, blue, alpha}; }
 
+  static bool IsFormatSupported(fuchsia::images2::PixelFormat type);
+  // deprecated; use other overload just above
   static bool IsFormatSupported(fuchsia::sysmem::PixelFormatType type);
 
   inline bool operator!=(const Pixel& rhs) const { return !(*this == rhs); }

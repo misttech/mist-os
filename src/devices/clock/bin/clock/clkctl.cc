@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.clock.measure/cpp/wire.h>
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <getopt.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -14,13 +15,11 @@
 
 #include "src/lib/files/directory.h"
 
-using FrequencyInfo = fuchsia_hardware_clock::wire::FrequencyInfo;
+using FrequencyInfo = fuchsia_hardware_clock_measure::wire::FrequencyInfo;
 
 using action_t = enum action {
   UNKNOWN,
   MEASURE,
-  ENABLE,
-  DISABLE,
 };
 
 int usage(const char* cmd) {
@@ -28,10 +27,8 @@ int usage(const char* cmd) {
           "\nInteract with clocks on the SOC:\n"
           "   %s measure                    Measures all clock values\n"
           "   %s measure -idx <idx>         Measure CLK idx\n"
-          "   %s enable -idx <idx>          Enable clock idx\n"
-          "   %s disable -idx <idx>         Disable clock idx\n"
           "   %s help                       Print this message\n",
-          cmd, cmd, cmd, cmd, cmd);
+          cmd, cmd, cmd);
   return -1;
 }
 
@@ -76,29 +73,28 @@ std::optional<std::string> guess_dev() {
   return std::nullopt;
 }
 
-ssize_t measure_clk_util(const fidl::WireSyncClient<fuchsia_hardware_clock::Device>& client,
-                         uint32_t idx) {
-  auto measure_result = client->Measure(idx);
-
-  if (!measure_result.ok()) {
-    fprintf(stderr, "Failed to measure clock: %s\n", zx_status_get_string(measure_result.status()));
-    return -1;
-  }
-
+ssize_t measure_clk_util(
+    const fidl::WireSyncClient<fuchsia_hardware_clock_measure::Measurer>& client, uint32_t idx) {
   auto result = client->Measure(idx);
 
   if (!result.ok()) {
-    fprintf(stderr, "ERROR: failed to measure clock: %d\n", result.status());
+    fprintf(stderr, "ERROR: failed to measure clock: %s\n", zx_status_get_string(result.status()));
     return -1;
   }
 
-  std::string name(std::begin(result->info.name), std::end(result->info.name));
+  if (result->is_error()) {
+    fprintf(stderr, "ERROR: failed to measure clock: %s\n",
+            zx_status_get_string(result->error_value()));
+    return -1;
+  }
 
-  printf("[%4d][%4ld MHz] %s\n", idx, result->info.frequency, name.c_str());
+  std::string name(std::begin(result.value()->info.name), std::end(result.value()->info.name));
+
+  printf("[%4d][%4ld MHz] %s\n", idx, result.value()->info.frequency, name.c_str());
   return 0;
 }
 
-ssize_t measure_clk(const fidl::WireSyncClient<fuchsia_hardware_clock::Device>& client,
+ssize_t measure_clk(const fidl::WireSyncClient<fuchsia_hardware_clock_measure::Measurer>& client,
                     uint32_t idx, bool clk) {
   auto clk_count_result = client->GetCount();
   if (!clk_count_result.ok()) {
@@ -123,34 +119,6 @@ ssize_t measure_clk(const fidl::WireSyncClient<fuchsia_hardware_clock::Device>& 
   return 0;
 }
 
-ssize_t toggle_clk(const fidl::WireSyncClient<fuchsia_hardware_clock::Device>& client, uint32_t idx,
-                   action_t subcmd) {
-  if (subcmd != ENABLE && subcmd != DISABLE) {
-    return -1;
-  }
-
-  if (subcmd == ENABLE) {
-    auto en_result = client->Enable(idx);
-    if (!en_result.ok()) {
-      fprintf(stderr, "ERROR: Failed to enable clock: %s\n",
-              zx_status_get_string(en_result.status()));
-      return -1;
-    }
-  } else if (subcmd == DISABLE) {
-    auto dis_result = client->Disable(idx);
-    if (!dis_result.ok()) {
-      fprintf(stderr, "ERROR: Failed to disable clock: %s\n",
-              zx_status_get_string(dis_result.status()));
-      return -1;
-    }
-  } else {
-    fprintf(stderr, "ERROR: Unknown command\n");
-    return -1;
-  }
-
-  return 0;
-}
-
 int main(int argc, char** argv) {
   const char* cmd = basename(argv[0]);
   const char* index = nullptr;
@@ -169,10 +137,6 @@ int main(int argc, char** argv) {
     const char* arg = argv[1];
     if (prefix_match(&arg, "measure")) {
       subcmd = MEASURE;
-    } else if (prefix_match(&arg, "enable")) {
-      subcmd = ENABLE;
-    } else if (prefix_match(&arg, "disable")) {
-      subcmd = DISABLE;
     }
 
     if (prefix_match(&arg, "-idx")) {
@@ -197,7 +161,8 @@ int main(int argc, char** argv) {
     fprintf(stderr, "No CLK device found.\n");
     return usage(cmd);
   }
-  zx::result client_end = component::Connect<fuchsia_hardware_clock::Device>(path.value());
+  zx::result client_end =
+      component::Connect<fuchsia_hardware_clock_measure::Measurer>(path.value());
   if (client_end.is_error()) {
     fprintf(stderr, "Failed to connect to clock_device: %s\n", client_end.status_string());
     return -1;
@@ -210,19 +175,6 @@ int main(int argc, char** argv) {
       err = measure_clk(client, idx, clk);
       if (err) {
         printf("Measure CLK failed.\n");
-      }
-      break;
-    case ENABLE:
-      __FALLTHROUGH;
-    case DISABLE:
-      if (!clk) {
-        printf("-idx argument is required.\n");
-        return -1;
-      }
-
-      err = toggle_clk(client, idx, subcmd);
-      if (err) {
-        printf("Clock Toggle failed\n");
       }
       break;
     default:

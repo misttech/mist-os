@@ -67,14 +67,13 @@ zx::result<pgoff_t> CheckNodePage(F2fs *fs, NodePage &node_page) {
   for (uint32_t index = 0; index < block_count; ++index) {
     block_t data_blkaddr = node_page.GetBlockAddr(index);
     if (data_blkaddr == kNullAddr) {
-      break;
+      continue;
     }
-    if (CheckDataPage(fs, data_blkaddr, safemath::checked_cast<uint32_t>(start_index + index)) ==
+    if (CheckDataPage(fs, data_blkaddr, safemath::checked_cast<uint32_t>(start_index + index)) !=
         ZX_OK) {
-      ++checked;
-    } else {
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
+    ++checked;
   }
   return zx::ok(checked);
 }
@@ -115,25 +114,17 @@ void CheckFsyncedFile(F2fs *fs, ino_t ino, pgoff_t data_page_count, pgoff_t node
       break;
     }
 
-    if (node_page->IsInode()) {
-      ASSERT_EQ(node_page->NidOfNode(), node_page->InoOfNode());
-      ASSERT_TRUE(node_page->IsDentDnode());
-    } else {
-      ASSERT_FALSE(node_page->IsDentDnode());
+    if (node_page->InoOfNode() == ino) {
+      if (node_page_count == ++checked_node_page_count) {
+        ASSERT_TRUE(node_page->IsFsyncDnode());
+      } else {
+        ASSERT_FALSE(node_page->IsFsyncDnode());
+      }
+      auto result = CheckNodePage(fs, *node_page);
+      ASSERT_EQ(result.status_value(), ZX_OK);
+      checked_data_page_count += result.value();
     }
-
-    // Last dnode page
-    if (node_page_count == (checked_node_page_count + 1)) {
-      ASSERT_TRUE(node_page->IsFsyncDnode());
-    } else {
-      ASSERT_FALSE(node_page->IsFsyncDnode());
-    }
-
-    auto result = CheckNodePage(fs, *node_page);
-    ASSERT_EQ(result.status_value(), ZX_OK);
     data_blkaddr = node_page->NextBlkaddrOfNode();
-    checked_data_page_count += result.value();
-    ++checked_node_page_count;
   }
   ASSERT_EQ(checked_data_page_count, data_page_count);
   ASSERT_EQ(checked_node_page_count, node_page_count);
@@ -169,8 +160,7 @@ TEST(FsyncRecoveryTest, FsyncInode) {
       fs->GetSegmentManager().NextFreeBlkAddr(CursegType::kCursegWarmData);
 
   uint64_t pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  ASSERT_EQ(fsync_vnode->SyncFile(0, safemath::checked_cast<loff_t>(fsync_vnode->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(fsync_vnode->SyncFile(false), ZX_OK);
   uint64_t curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   // Checkpoint should not be performed instead of fsync
   ASSERT_EQ(pre_checkpoint_ver, curr_checkpoint_ver);
@@ -234,8 +224,7 @@ TEST(FsyncRecoveryTest, FsyncDnode) {
       fs->GetSegmentManager().NextFreeBlkAddr(CursegType::kCursegWarmData);
 
   uint64_t pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  ASSERT_EQ(fsync_vnode->SyncFile(0, safemath::checked_cast<loff_t>(fsync_vnode->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(fsync_vnode->SyncFile(false), ZX_OK);
   uint64_t curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   // Checkpoint should not be performed instead of fsync
   ASSERT_EQ(pre_checkpoint_ver, curr_checkpoint_ver);
@@ -300,8 +289,7 @@ TEST(FsyncRecoveryTest, FsyncIndirectDnode) {
       fs->GetSegmentManager().NextFreeBlkAddr(CursegType::kCursegWarmData);
 
   uint64_t pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  ASSERT_EQ(fsync_vnode->SyncFile(0, safemath::checked_cast<loff_t>(fsync_vnode->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(fsync_vnode->SyncFile(false), ZX_OK);
   uint64_t curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   // Checkpoint should not be performed instead of fsync
   ASSERT_EQ(pre_checkpoint_ver, curr_checkpoint_ver);
@@ -356,29 +344,26 @@ TEST(FsyncRecoveryTest, FsyncCheckpoint) {
   fbl::RefPtr<VnodeF2fs> fsync_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(file_fs_vnode));
 
   uint64_t pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  ASSERT_EQ(fsync_vnode->SyncFile(0, safemath::checked_cast<loff_t>(fsync_vnode->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(fsync_vnode->SyncFile(false), ZX_OK);
   uint64_t curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  // Checkpoint should be performed instead of fsync
+  // fsync should trigger checkpoint
   ASSERT_EQ(pre_checkpoint_ver + 1, curr_checkpoint_ver);
 
   ASSERT_EQ(fsync_vnode->Close(), ZX_OK);
   fsync_vnode = nullptr;
 
-  // 2. Fsync Nlink = 0
+  // 2. Fsync Nlink > 1
   file_fs_vnode = root_dir->Create("fsync_file_nlink", fs::CreationType::kFile);
   ASSERT_TRUE(file_fs_vnode.is_ok()) << file_fs_vnode.status_string();
   fsync_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(file_fs_vnode));
-  uint32_t temp_nlink = fsync_vnode->GetNlink();
-  fsync_vnode->ClearNlink();
+  fsync_vnode->IncNlink();
 
   pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  ASSERT_EQ(fsync_vnode->SyncFile(0, safemath::checked_cast<loff_t>(fsync_vnode->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(fsync_vnode->SyncFile(false), ZX_OK);
   curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  // Checkpoint should be performed instead of fsync
+  // fsync should trigger checkpoint
   ASSERT_EQ(pre_checkpoint_ver + 1, curr_checkpoint_ver);
-  fsync_vnode->SetNlink(temp_nlink);
+  fsync_vnode->DropNlink();
   fsync_vnode->SetDirty();
 
   ASSERT_EQ(fsync_vnode->Close(), ZX_OK);
@@ -391,10 +376,9 @@ TEST(FsyncRecoveryTest, FsyncCheckpoint) {
   fsync_vnode->SetFlag(InodeInfoFlag::kNeedCp);
 
   pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  ASSERT_EQ(fsync_vnode->SyncFile(0, safemath::checked_cast<loff_t>(fsync_vnode->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(fsync_vnode->SyncFile(false), ZX_OK);
   curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  // Checkpoint should be performed instead of fsync
+  // fsync should trigger checkpoint
   ASSERT_EQ(pre_checkpoint_ver + 1, curr_checkpoint_ver);
 
   ASSERT_EQ(fsync_vnode->Close(), ZX_OK);
@@ -408,10 +392,9 @@ TEST(FsyncRecoveryTest, FsyncCheckpoint) {
   fs->GetSuperblockInfo().SetTotalBlockCount(0);
 
   pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  ASSERT_EQ(fsync_vnode->SyncFile(0, safemath::checked_cast<loff_t>(fsync_vnode->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(fsync_vnode->SyncFile(false), ZX_OK);
   curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  // Checkpoint should be performed instead of fsync
+  // fsync should trigger checkpoint
   ASSERT_EQ(pre_checkpoint_ver + 1, curr_checkpoint_ver);
   fs->GetSuperblockInfo().SetTotalBlockCount(temp_user_block_count);
 
@@ -427,10 +410,9 @@ TEST(FsyncRecoveryTest, FsyncCheckpoint) {
   fsync_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(file_fs_vnode));
 
   pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  ASSERT_EQ(fsync_vnode->SyncFile(0, safemath::checked_cast<loff_t>(fsync_vnode->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(fsync_vnode->SyncFile(false), ZX_OK);
   curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  // Checkpoint should be performed instead of fsync
+  // fsync should trigger checkpoint
   ASSERT_EQ(pre_checkpoint_ver + 1, curr_checkpoint_ver);
 
   ASSERT_EQ(fsync_vnode->Close(), ZX_OK);
@@ -453,10 +435,9 @@ TEST(FsyncRecoveryTest, FsyncCheckpoint) {
   fsync_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(file_fs_vnode));
 
   pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  ASSERT_EQ(fsync_vnode->SyncFile(0, safemath::checked_cast<loff_t>(fsync_vnode->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(fsync_vnode->SyncFile(false), ZX_OK);
   curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  // Checkpoint should be performed instead of fsync
+  // fsync should trigger checkpoint
   ASSERT_EQ(pre_checkpoint_ver + 1, curr_checkpoint_ver);
 
   ASSERT_EQ(fsync_vnode->Close(), ZX_OK);
@@ -493,8 +474,7 @@ TEST(FsyncRecoveryTest, FsyncRecoveryIndirectDnode) {
 
   // 2. Fsync file
   uint64_t pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  ASSERT_EQ(fsync_vnode->SyncFile(0, safemath::checked_cast<loff_t>(fsync_vnode->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(fsync_vnode->SyncFile(false), ZX_OK);
   uint64_t curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   // Checkpoint should not be performed instead of fsync
   ASSERT_EQ(pre_checkpoint_ver, curr_checkpoint_ver);
@@ -566,8 +546,7 @@ TEST(FsyncRecoveryTest, FsyncRecoveryMultipleFiles) {
 
   // 2. Fsync file 1
   uint64_t pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  ASSERT_EQ(fsync_vnode_1->SyncFile(0, safemath::checked_cast<loff_t>(fsync_vnode_1->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(fsync_vnode_1->SyncFile(false), ZX_OK);
   uint64_t curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   // Checkpoint should not be performed instead of fsync
   ASSERT_EQ(pre_checkpoint_ver, curr_checkpoint_ver);
@@ -582,8 +561,7 @@ TEST(FsyncRecoveryTest, FsyncRecoveryMultipleFiles) {
 
   // 4. Fsync file 2
   pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  ASSERT_EQ(fsync_vnode_2->SyncFile(0, safemath::checked_cast<loff_t>(fsync_vnode_2->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(fsync_vnode_2->SyncFile(false), ZX_OK);
   curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   // Checkpoint should not be performed instead of fsync
   ASSERT_EQ(pre_checkpoint_ver, curr_checkpoint_ver);
@@ -696,8 +674,7 @@ TEST(FsyncRecoveryTest, FsyncRecoveryInlineData) {
   FileTester::CheckInlineFile(inline_vnode.get());
   ASSERT_EQ(inline_file_ptr->GetSize(), target_size);
 
-  ASSERT_EQ(inline_vnode->SyncFile(0, safemath::checked_cast<loff_t>(inline_vnode->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(inline_vnode->SyncFile(false), ZX_OK);
 
   ASSERT_EQ(inline_vnode->Close(), ZX_OK);
   inline_vnode = nullptr;
@@ -735,8 +712,7 @@ TEST(FsyncRecoveryTest, FsyncRecoveryInlineData) {
   FileTester::CheckNonInlineFile(inline_vnode.get());
   ASSERT_EQ(inline_file_ptr->GetSize(), target_size);
 
-  ASSERT_EQ(inline_vnode->SyncFile(0, safemath::checked_cast<loff_t>(inline_vnode->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(inline_vnode->SyncFile(false), ZX_OK);
 
   inline_file_ptr = nullptr;
   ASSERT_EQ(inline_vnode->Close(), ZX_OK);
@@ -843,7 +819,7 @@ TEST(FsyncRecoveryTest, RenameFileWithStrictFsync) {
   fbl::RefPtr<fs::Vnode> child_dir_vn;
   FileTester::Lookup(root_dir.get(), "a", &child_dir_vn);
   fbl::RefPtr<Dir> child_dir = fbl::RefPtr<Dir>::Downcast(std::move(child_dir_vn));
-  ASSERT_EQ(child_dir->SyncFile(0, safemath::checked_cast<loff_t>(child_dir->GetSize()), 0), ZX_OK);
+  ASSERT_EQ(child_dir->SyncFile(false), ZX_OK);
 
   // 2. Create "a/foo"
   uint32_t first_signature = 0xa1;
@@ -851,9 +827,7 @@ TEST(FsyncRecoveryTest, RenameFileWithStrictFsync) {
   auto ret = CreateFileAndWritePages(child_dir.get(), "foo", data_page_count, first_signature);
   ASSERT_TRUE(ret.is_ok());
   fbl::RefPtr<VnodeF2fs> first_foo_vnode = std::move(*ret);
-  ASSERT_EQ(
-      first_foo_vnode->SyncFile(0, safemath::checked_cast<loff_t>(first_foo_vnode->GetSize()), 0),
-      ZX_OK);
+  ASSERT_EQ(first_foo_vnode->SyncFile(false), ZX_OK);
 
   // 3. Rename "a/foo" to "a/bar"
   FileTester::RenameChild(child_dir, child_dir, "foo", "bar");
@@ -866,9 +840,7 @@ TEST(FsyncRecoveryTest, RenameFileWithStrictFsync) {
 
   // 5. Fsync "a/foo"
   uint64_t pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  ASSERT_EQ(
-      second_foo_vnode->SyncFile(0, safemath::checked_cast<loff_t>(second_foo_vnode->GetSize()), 0),
-      ZX_OK);
+  ASSERT_EQ(second_foo_vnode->SyncFile(false), ZX_OK);
   uint64_t curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   // Checkpoint should be performed instead of fsync in STRICT mode
   ASSERT_EQ(pre_checkpoint_ver + 1, curr_checkpoint_ver);
@@ -956,16 +928,14 @@ TEST(FsyncRecoveryTest, RenameFileToOtherDirWithStrictFsync) {
   fbl::RefPtr<fs::Vnode> child_a_dir_vn;
   FileTester::Lookup(root_dir.get(), "a", &child_a_dir_vn);
   fbl::RefPtr<Dir> child_a_dir = fbl::RefPtr<Dir>::Downcast(std::move(child_a_dir_vn));
-  ASSERT_EQ(child_a_dir->SyncFile(0, safemath::checked_cast<loff_t>(child_a_dir->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(child_a_dir->SyncFile(false), ZX_OK);
 
   // 1. Create "b"
   FileTester::CreateChild(root_dir.get(), S_IFDIR, "b");
   fbl::RefPtr<fs::Vnode> child_b_dir_vn;
   FileTester::Lookup(root_dir.get(), "b", &child_b_dir_vn);
   fbl::RefPtr<Dir> child_b_dir = fbl::RefPtr<Dir>::Downcast(std::move(child_b_dir_vn));
-  ASSERT_EQ(child_b_dir->SyncFile(0, safemath::checked_cast<loff_t>(child_b_dir->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(child_b_dir->SyncFile(false), ZX_OK);
 
   // 2. Create "a/foo"
   uint32_t first_signature = 0xa1;
@@ -973,9 +943,7 @@ TEST(FsyncRecoveryTest, RenameFileToOtherDirWithStrictFsync) {
   auto ret = CreateFileAndWritePages(child_a_dir.get(), "foo", data_page_count, first_signature);
   ASSERT_TRUE(ret.is_ok());
   fbl::RefPtr<VnodeF2fs> first_foo_vnode = std::move(*ret);
-  ASSERT_EQ(
-      first_foo_vnode->SyncFile(0, safemath::checked_cast<loff_t>(first_foo_vnode->GetSize()), 0),
-      ZX_OK);
+  ASSERT_EQ(first_foo_vnode->SyncFile(false), ZX_OK);
 
   // 3. Rename "a/foo" to "b/bar"
   FileTester::RenameChild(child_a_dir, child_b_dir, "foo", "bar");
@@ -988,9 +956,7 @@ TEST(FsyncRecoveryTest, RenameFileToOtherDirWithStrictFsync) {
 
   // 5. Fsync "a/foo"
   uint64_t pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  ASSERT_EQ(
-      second_foo_vnode->SyncFile(0, safemath::checked_cast<loff_t>(second_foo_vnode->GetSize()), 0),
-      ZX_OK);
+  ASSERT_EQ(second_foo_vnode->SyncFile(false), ZX_OK);
   uint64_t curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   // Checkpoint should be performed instead of fsync in STRICT mode
   ASSERT_EQ(pre_checkpoint_ver + 1, curr_checkpoint_ver);
@@ -1085,7 +1051,7 @@ TEST(FsyncRecoveryTest, RenameDirectoryWithStrictFsync) {
   fbl::RefPtr<fs::Vnode> child_dir_vn;
   FileTester::Lookup(root_dir.get(), "a", &child_dir_vn);
   fbl::RefPtr<Dir> child_dir = fbl::RefPtr<Dir>::Downcast(std::move(child_dir_vn));
-  ASSERT_EQ(child_dir->SyncFile(0, safemath::checked_cast<loff_t>(child_dir->GetSize()), 0), ZX_OK);
+  ASSERT_EQ(child_dir->SyncFile(false), ZX_OK);
 
   // 2. Create "a/foo"
   FileTester::CreateChild(child_dir.get(), S_IFDIR, "foo");
@@ -1093,8 +1059,7 @@ TEST(FsyncRecoveryTest, RenameDirectoryWithStrictFsync) {
   FileTester::Lookup(child_dir.get(), "foo", &first_foo_vnode);
   auto first_foo_dir = fbl::RefPtr<Dir>::Downcast(std::move(first_foo_vnode));
   FileTester::CreateChild(first_foo_dir.get(), S_IFREG, "bar_verification_file");
-  ASSERT_EQ(first_foo_dir->SyncFile(0, safemath::checked_cast<loff_t>(first_foo_dir->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(first_foo_dir->SyncFile(false), ZX_OK);
 
   // 3. Rename "a/foo" to "a/bar"
   FileTester::RenameChild(child_dir, child_dir, "foo", "bar");
@@ -1108,9 +1073,7 @@ TEST(FsyncRecoveryTest, RenameDirectoryWithStrictFsync) {
 
   // 5. Fsync "a/foo"
   uint64_t pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  ASSERT_EQ(
-      second_foo_dir->SyncFile(0, safemath::checked_cast<loff_t>(second_foo_dir->GetSize()), 0),
-      ZX_OK);
+  ASSERT_EQ(second_foo_dir->SyncFile(false), ZX_OK);
   uint64_t curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   // Checkpoint should be performed instead of fsync in STRICT mode
   ASSERT_EQ(pre_checkpoint_ver + 1, curr_checkpoint_ver);
@@ -1201,12 +1164,8 @@ TEST(FsyncRecoveryTest, AtomicFsync) {
 
   // 2. Fsync file
   uint64_t pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  ASSERT_EQ(valid_fsync_vnode->SyncFile(
-                0, safemath::checked_cast<loff_t>(valid_fsync_vnode->GetSize()), 0),
-            ZX_OK);
-  ASSERT_EQ(invalid_fsync_vnode->SyncFile(
-                0, safemath::checked_cast<loff_t>(invalid_fsync_vnode->GetSize()), 0),
-            ZX_OK);
+  ASSERT_EQ(valid_fsync_vnode->SyncFile(false), ZX_OK);
+  ASSERT_EQ(invalid_fsync_vnode->SyncFile(false), ZX_OK);
   uint64_t curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   // Checkpoint should not be performed instead of fsync
   ASSERT_EQ(pre_checkpoint_ver, curr_checkpoint_ver);
@@ -1269,6 +1228,64 @@ TEST(FsyncRecoveryTest, AtomicFsync) {
   root_dir = nullptr;
 
   // 7. Unmount and check filesystem
+  FileTester::Unmount(std::move(fs), &bc);
+  EXPECT_EQ(Fsck(std::move(bc), FsckOptions{.repair = false}, &bc), ZX_OK);
+}
+
+TEST(FsyncRecoveryTest, Fdatasync) {
+  std::unique_ptr<BcacheMapper> bc;
+  FileTester::MkfsOnFakeDev(&bc);
+
+  std::unique_ptr<F2fs> fs;
+  MountOptions options{};
+  // Enable roll-forward recovery
+  ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
+
+  fbl::RefPtr<VnodeF2fs> root;
+  FileTester::CreateRoot(fs.get(), &root);
+  fbl::RefPtr<Dir> root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
+
+  // 1. Create file
+  const pgoff_t data_page_count = kAddrsPerInode + 1;
+  auto ret = CreateFileAndWritePages(root_dir.get(), "fsync_dnode_file", data_page_count, 0);
+  ASSERT_TRUE(ret.is_ok());
+  auto fsync_vnode = std::move(ret.value());
+  ino_t fsync_file_ino = fsync_vnode->Ino();
+
+  File *file = static_cast<File *>(fsync_vnode.get());
+  size_t out;
+  char r_buf[kPageSize];
+  ASSERT_EQ(FileTester::Read(file, r_buf, kPageSize, kAddrsPerInode * kPageSize, &out), ZX_OK);
+
+  char w_buf[kPageSize];
+  std::memset(w_buf, 0xFF, kPageSize);
+  ASSERT_EQ(FileTester::Write(file, w_buf, kPageSize, kAddrsPerInode * kPageSize, &out), ZX_OK);
+
+  // 2. Checkpoint
+  fs->SyncFs(true);
+
+  // 3. Write the last block that causes updates on dnode
+  ASSERT_EQ(FileTester::Write(file, r_buf, kPageSize, kAddrsPerInode * kPageSize, &out), ZX_OK);
+
+  // 4. Request fdatasync() to log the dnode
+  ASSERT_EQ(fsync_vnode->SyncFile(true), ZX_OK);
+  ASSERT_EQ(fsync_vnode->Close(), ZX_OK);
+  fsync_vnode = nullptr;
+  ASSERT_EQ(root_dir->Close(), ZX_OK);
+  root_dir = nullptr;
+
+  // 5. SPO and check blocks to be recovered
+  FileTester::SuddenPowerOff(std::move(fs), &bc);
+  ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 1), ZX_OK);
+  FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
+  CheckFsyncedFile(fs.get(), fsync_file_ino, 1, 1);
+
+  // 6. SPO and check the recovery
+  FileTester::SuddenPowerOff(std::move(fs), &bc);
+  ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
+  FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
   FileTester::Unmount(std::move(fs), &bc);
   EXPECT_EQ(Fsck(std::move(bc), FsckOptions{.repair = false}, &bc), ZX_OK);
 }

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::base::Merge;
 use fidl_fuchsia_settings::IntlSettings;
 use serde::{Deserialize, Serialize};
-
-use crate::base::Merge;
-use settings_storage::fidl_storage::FidlStorageConvertible;
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct IntlInfo {
@@ -14,30 +12,6 @@ pub struct IntlInfo {
     pub temperature_unit: Option<TemperatureUnit>,
     pub time_zone_id: Option<String>,
     pub hour_cycle: Option<HourCycle>,
-}
-
-impl FidlStorageConvertible for IntlInfo {
-    type Storable = fidl_fuchsia_settings::IntlSettings;
-    const KEY: &'static str = "intl";
-
-    fn default_value() -> Self {
-        IntlInfo {
-            // `-x-fxdef` is a private use extension and a special marker denoting that the
-            // setting is a fallback default, and not actually set through any user action.
-            locales: Some(vec![LocaleId { id: "en-US-x-fxdef".to_string() }]),
-            temperature_unit: Some(TemperatureUnit::Celsius),
-            time_zone_id: Some("UTC".to_string()),
-            hour_cycle: Some(HourCycle::H12),
-        }
-    }
-
-    fn to_storable(self) -> Self::Storable {
-        self.into()
-    }
-
-    fn from_storable(storable: Self::Storable) -> Self {
-        storable.into()
-    }
 }
 
 impl Merge for IntlInfo {

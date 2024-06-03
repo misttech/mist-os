@@ -134,6 +134,15 @@ typedef uint64_t zx_processor_power_control_t;
 #define ZX_PROCESSOR_POWER_CONTROL_RISCV_SBI ((zx_processor_power_control_t)(3u))
 #define ZX_PROCESSOR_POWER_CONTROL_RISCV_WFI ((zx_processor_power_control_t)(4u))
 
+// zx_performance_set_info topic.
+#define ZX_PROCESSOR_POWER_LEVEL ((uint32_t)3u)
+
+// Extending port packets.
+#define ZX_PKT_TYPE_PROCESSOR_POWER_LEVEL_TRANSITION_REQUEST ((zx_packet_type_t)0x0Au)
+
+#define ZX_PKT_IS_PROCESSOR_POWER_LEVEL_TRANSITION_REQUEST(type) \
+  ((type) == ZX_PKT_TYPE_PROCESSOR_POWER_LEVEL_TRANSITION_REQUEST)
+
 // Represents a processor power level.
 typedef struct {
   zx_processor_power_level_options_t options;
@@ -163,6 +172,15 @@ typedef struct {
 
   uint8_t reserved[6];
 } zx_processor_power_level_transition_t;
+
+typedef struct {
+  // The target power domain, represented as the mask of CPUs belonging to
+  // the power domain,
+  uint64_t target;
+
+  // Must match the context on the transition request.
+  uint64_t context;
+} zx_processor_power_level_info_t;
 
 // ====== End of runtime processor power management support ====== //
 // ====== Upcoming IOB support ====== //

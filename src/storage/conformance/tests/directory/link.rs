@@ -10,7 +10,7 @@ use {
 #[fuchsia::test]
 async fn link_with_sufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_link || !harness.config.supports_get_token {
+    if !harness.config.supports_modify_directory || !harness.config.supports_get_token {
         return;
     }
     let contents = "abcdef".as_bytes();
@@ -40,7 +40,7 @@ async fn link_with_sufficient_rights() {
 #[fuchsia::test]
 async fn link_with_insufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_link || !harness.config.supports_get_token {
+    if !harness.config.supports_modify_directory || !harness.config.supports_get_token {
         return;
     }
     let contents = "abcdef".as_bytes();

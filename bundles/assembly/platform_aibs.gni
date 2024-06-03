@@ -112,6 +112,7 @@ bootstrap_eng_platform_aib_names = [
 
   # Kernel args
   "kernel_pmm_checker_enabled",
+  "kernel_pmm_checker_enabled_auto",
 
   # Power Framework
   "power_framework_testing_sag",

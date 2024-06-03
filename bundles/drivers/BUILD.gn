@@ -12,6 +12,7 @@ group("drivers-not-templates") {
     "//examples/drivers",
     "//examples/drivers/template:bazel_package",
     "//sdk/lib/driver/devicetree/examples/example-board:bazel_package",
+    "//sdk/lib/driver/metadata/cpp:drivers",
     "//sdk/lib/driver_test_realm/fake_driver:component",
     "//src/camera:drivers",
     "//src/connectivity/bundles:drivers",

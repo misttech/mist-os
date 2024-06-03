@@ -41,6 +41,9 @@ static constexpr zxio_ops_t zxio_pipe_ops = []() {
           *inout_attr, abilities,
           ZXIO_OPERATION_READ_BYTES | ZXIO_OPERATION_WRITE_BYTES | ZXIO_OPERATION_GET_ATTRIBUTES);
     }
+    if (inout_attr->has.object_type) {
+      ZXIO_NODE_ATTR_SET(*inout_attr, object_type, ZXIO_OBJECT_TYPE_PIPE);
+    }
     return ZX_OK;
   };
 

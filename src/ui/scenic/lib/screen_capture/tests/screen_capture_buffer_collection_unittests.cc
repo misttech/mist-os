@@ -20,7 +20,7 @@
 namespace screen_capture::test {
 
 using allocation::BufferCollectionUsage;
-using fuchsia::sysmem::PixelFormatType;
+using fuchsia::images2::PixelFormat;
 
 class ScreenCaptureBufferCollectionTest : public flatland::RendererTest {
  public:
@@ -31,11 +31,11 @@ class ScreenCaptureBufferCollectionTest : public flatland::RendererTest {
         utils::CreateSysmemAllocatorSyncPtr("SCBCTest::Setup"), renderer_);
   }
 
-  fuchsia::sysmem::BufferCollectionInfo_2 CreateBufferCollectionInfo2WithConstraints(
-      fuchsia::sysmem::BufferCollectionConstraints constraints,
+  fuchsia::sysmem2::BufferCollectionInfo CreateBufferCollectionInfoWithConstraints(
+      fuchsia::sysmem2::BufferCollectionConstraints constraints,
       allocation::GlobalBufferCollectionId collection_id) {
     zx_status_t status;
-    fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator =
+    fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator =
         utils::CreateSysmemAllocatorSyncPtr("CreateBCInfo2WithConstraints");
     // Create Sysmem tokens.
 
@@ -47,24 +47,26 @@ class ScreenCaptureBufferCollectionTest : public flatland::RendererTest {
         BufferCollectionUsage::kRenderTarget, std::nullopt);
     EXPECT_TRUE(result);
 
-    fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
-    status = sysmem_allocator->BindSharedCollection(std::move(local_token),
-                                                    buffer_collection.NewRequest());
+    fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
+    fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+    bind_shared_request.set_token(std::move(local_token));
+    bind_shared_request.set_buffer_collection_request(buffer_collection.NewRequest());
+    status = sysmem_allocator->BindSharedCollection(std::move(bind_shared_request));
     EXPECT_EQ(status, ZX_OK);
 
-    status = buffer_collection->SetConstraints(true, constraints);
+    fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+    set_constraints_request.set_constraints(std::move(constraints));
+    status = buffer_collection->SetConstraints(std::move(set_constraints_request));
     EXPECT_EQ(status, ZX_OK);
 
     // Wait for allocation.
-    zx_status_t allocation_status = ZX_OK;
-    fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info = {};
-    status =
-        buffer_collection->WaitForBuffersAllocated(&allocation_status, &buffer_collection_info);
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+    status = buffer_collection->WaitForAllBuffersAllocated(&wait_result);
     EXPECT_EQ(status, ZX_OK);
-    EXPECT_EQ(allocation_status, ZX_OK);
-    status = buffer_collection->Close();
+    EXPECT_TRUE(wait_result.is_response());
+    status = buffer_collection->Release();
     EXPECT_EQ(status, ZX_OK);
-    return buffer_collection_info;
+    return std::move(*wait_result.response().mutable_buffer_collection_info());
   }
 
  protected:
@@ -73,18 +75,18 @@ class ScreenCaptureBufferCollectionTest : public flatland::RendererTest {
 };
 
 class ScreenCaptureBCTestParameterized : public ScreenCaptureBufferCollectionTest,
-                                         public testing::WithParamInterface<PixelFormatType> {};
+                                         public testing::WithParamInterface<PixelFormat> {};
 
-// TODO(https://fxbug.dev/42158284): we don't want to "warm up" render passes and pipelines for multiple
-// framebuffer formats, so we allow only BGRA framebuffers.  This is supported by all current
-// platforms, including the emulator.
+// TODO(https://fxbug.dev/42158284): we don't want to "warm up" render passes and pipelines for
+// multiple framebuffer formats, so we allow only BGRA framebuffers.  This is supported by all
+// current platforms, including the emulator.
 INSTANTIATE_TEST_SUITE_P(, ScreenCaptureBCTestParameterized,
-                         testing::Values(PixelFormatType::BGRA32));
+                         testing::Values(PixelFormat::B8G8R8A8));
 
 VK_TEST_F(ScreenCaptureBufferCollectionTest, ImportAndReleaseBufferCollection) {
   // Create Sysmem tokens.
   zx_status_t status;
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator =
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator =
       utils::CreateSysmemAllocatorSyncPtr("SCBCTest-ImportAndReleaseBC");
   // Create Sysmem tokens.
 
@@ -109,11 +111,11 @@ VK_TEST_P(ScreenCaptureBCTestParameterized, ImportBufferImage) {
   const uint32_t kWidth = 32;
   const uint32_t kHeight = 32;
   const uint32_t buffer_count = 2;
-  fuchsia::sysmem::BufferCollectionConstraints constraints =
+  fuchsia::sysmem2::BufferCollectionConstraints constraints =
       utils::CreateDefaultConstraints(buffer_count, kWidth, kHeight);
-  constraints.image_format_constraints[0].pixel_format.type = pixel_format;
+  constraints.mutable_image_format_constraints()->at(0).set_pixel_format(pixel_format);
 
-  CreateBufferCollectionInfo2WithConstraints(constraints, collection_id);
+  CreateBufferCollectionInfoWithConstraints(std::move(constraints), collection_id);
   // Extract image into the first Session.
   allocation::ImageMetadata metadata;
   metadata.width = kWidth;
@@ -137,12 +139,12 @@ VK_TEST_P(ScreenCaptureBCTestParameterized, GetBufferCountFromCollectionId) {
   const uint32_t kWidth = 32;
   const uint32_t kHeight = 32;
   const uint32_t buffer_count = 2;
-  fuchsia::sysmem::BufferCollectionConstraints constraints =
+  fuchsia::sysmem2::BufferCollectionConstraints constraints =
       utils::CreateDefaultConstraints(buffer_count, kWidth, kHeight);
-  constraints.image_format_constraints[0].pixel_format.type = pixel_format;
+  constraints.mutable_image_format_constraints()->at(0).set_pixel_format(pixel_format);
 
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info =
-      CreateBufferCollectionInfo2WithConstraints(constraints, collection_id);
+  fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info =
+      CreateBufferCollectionInfoWithConstraints(std::move(constraints), collection_id);
 
   std::optional<uint32_t> info = importer_->GetBufferCollectionBufferCount(collection_id);
 
@@ -154,13 +156,19 @@ VK_TEST_P(ScreenCaptureBCTestParameterized, GetBufferCountFromCollectionId) {
 }
 
 VK_TEST_F(ScreenCaptureBufferCollectionTest, ImportBufferCollection_ErrorCases) {
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator =
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator =
       utils::CreateSysmemAllocatorSyncPtr("SCBCTest-ImportBC_ErrorCases");
 
   const auto collection_id = allocation::GenerateUniqueBufferCollectionId();
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr token1;
-  zx_status_t status = sysmem_allocator->AllocateSharedCollection(token1.NewRequest());
-  EXPECT_EQ(status, ZX_OK);
+
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr token1;
+  {
+    fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
+    allocate_shared_request.set_token_request(token1.NewRequest());
+    zx_status_t status =
+        sysmem_allocator->AllocateSharedCollection(std::move(allocate_shared_request));
+    EXPECT_EQ(status, ZX_OK);
+  }
   bool result =
       importer_->ImportBufferCollection(collection_id, sysmem_allocator.get(), std::move(token1),
                                         BufferCollectionUsage::kRenderTarget, std::nullopt);
@@ -168,8 +176,11 @@ VK_TEST_F(ScreenCaptureBufferCollectionTest, ImportBufferCollection_ErrorCases) 
 
   // Buffer collection id dup.
   {
-    fuchsia::sysmem::BufferCollectionTokenSyncPtr token2;
-    status = sysmem_allocator->AllocateSharedCollection(token2.NewRequest());
+    fuchsia::sysmem2::BufferCollectionTokenSyncPtr token2;
+    fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
+    allocate_shared_request.set_token_request(token2.NewRequest());
+    zx_status_t status =
+        sysmem_allocator->AllocateSharedCollection(std::move(allocate_shared_request));
     EXPECT_EQ(status, ZX_OK);
     result =
         importer_->ImportBufferCollection(collection_id, sysmem_allocator.get(), std::move(token2),
@@ -185,12 +196,12 @@ VK_TEST_P(ScreenCaptureBCTestParameterized, ImportBufferImage_ErrorCases) {
   const uint32_t kWidth = 32;
   const uint32_t kHeight = 32;
   const uint32_t buffer_count = 2;
-  fuchsia::sysmem::BufferCollectionConstraints constraints =
+  fuchsia::sysmem2::BufferCollectionConstraints constraints =
       utils::CreateDefaultConstraints(buffer_count, kWidth, kHeight);
-  constraints.image_format_constraints[0].pixel_format.type = pixel_format;
+  constraints.mutable_image_format_constraints()->at(0).set_pixel_format(pixel_format);
 
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info =
-      CreateBufferCollectionInfo2WithConstraints(constraints, collection_id);
+  fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info =
+      CreateBufferCollectionInfoWithConstraints(std::move(constraints), collection_id);
 
   zx_status_t status;
   bool result;
@@ -240,15 +251,15 @@ VK_TEST_P(ScreenCaptureBCTestParameterized, GetBufferCollectionBufferCount_Error
   auto collection_id = allocation::GenerateUniqueBufferCollectionId();
   // Set constraints.
   const auto pixel_format = GetParam();
-  const uint32_t kWidth = 0;
-  const uint32_t kHeight = 0;
+  const uint32_t kWidth = 32;
+  const uint32_t kHeight = 32;
   const uint32_t buffer_count = 2;
-  fuchsia::sysmem::BufferCollectionConstraints constraints =
+  fuchsia::sysmem2::BufferCollectionConstraints constraints =
       utils::CreateDefaultConstraints(buffer_count, kWidth, kHeight);
-  constraints.image_format_constraints[0].pixel_format.type = pixel_format;
+  constraints.mutable_image_format_constraints()->at(0).set_pixel_format(pixel_format);
 
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info =
-      CreateBufferCollectionInfo2WithConstraints(constraints, collection_id);
+  fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info =
+      CreateBufferCollectionInfoWithConstraints(std::move(constraints), collection_id);
 
   // collection_id does not exist
   {
@@ -264,7 +275,7 @@ VK_TEST_P(ScreenCaptureBCTestParameterized, GetBufferCollectionBufferCount_Error
 VK_TEST_P(ScreenCaptureBCTestParameterized, GetBufferCollectionBufferCount_BuffersNotAllocated) {
   auto collection_id = allocation::GenerateUniqueBufferCollectionId();
   zx_status_t status;
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator =
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator =
       utils::CreateSysmemAllocatorSyncPtr("GetBCBC_BuffersNotAllocated");
   // Create Sysmem tokens.
   auto [local_token, dup_token] = utils::CreateSysmemTokens(sysmem_allocator.get());
@@ -274,9 +285,11 @@ VK_TEST_P(ScreenCaptureBCTestParameterized, GetBufferCollectionBufferCount_Buffe
                                         BufferCollectionUsage::kRenderTarget, std::nullopt);
   EXPECT_TRUE(result);
 
-  fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
-  status = sysmem_allocator->BindSharedCollection(std::move(local_token),
-                                                  buffer_collection.NewRequest());
+  fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
+  fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.set_token(std::move(local_token));
+  bind_shared_request.set_buffer_collection_request(buffer_collection.NewRequest());
+  status = sysmem_allocator->BindSharedCollection(std::move(bind_shared_request));
   EXPECT_EQ(status, ZX_OK);
 
   // CheckForBuffersAllocated will return false

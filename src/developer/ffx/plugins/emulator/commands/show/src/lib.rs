@@ -58,11 +58,8 @@ fho::embedded_plugin!(EmuShowTool);
 impl FfxMain for EmuShowTool {
     type Writer = VerifiedMachineWriter<Vec<ShowDetail>>;
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        let instance_dir: PathBuf = self
-            .context
-            .get(emulator_instance::EMU_INSTANCE_ROOT_DIR)
-            .await
-            .map_err(|e| bug!("{e}"))?;
+        let instance_dir: PathBuf =
+            self.context.get(emulator_instance::EMU_INSTANCE_ROOT_DIR).map_err(|e| bug!("{e}"))?;
         let emu_instances = EmulatorInstances::new(instance_dir);
         self.show(&emu_instances, writer).await.map_err(|e| e.into())
     }

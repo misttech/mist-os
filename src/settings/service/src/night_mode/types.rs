@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(PartialEq, Default, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct NightModeInfo {
     pub night_mode_enabled: Option<bool>,
 }

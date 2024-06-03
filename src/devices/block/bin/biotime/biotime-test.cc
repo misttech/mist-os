@@ -20,7 +20,7 @@ namespace {
 // returns a success status.
 void run_biotime(fbl::Vector<const char*>&& args) {
   ramdisk_client_t* ramdisk;
-  ASSERT_OK(device_watcher::RecursiveWaitForFile("/dev/sys/platform/00:00:2d/ramctl"));
+  ASSERT_OK(device_watcher::RecursiveWaitForFile("/dev/sys/platform/ram-disk/ramctl"));
   ASSERT_OK(ramdisk_create(1024, 100, &ramdisk));
   auto cleanup = fit::defer([&] { EXPECT_OK(ramdisk_destroy(ramdisk)); });
 

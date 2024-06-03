@@ -42,15 +42,22 @@ template("ffx") {
 
     if (_large_binary_optimizations) {
       # ffx is known to be a massive, time/resource-consuming target.
-      # When running locally (including RBE local and racing strategies),
-      # limit its concurrency with other memory-intensive jobs.
-      # See https://fxbug.dev/42062387 for context.
-      pool = "//build/config:highmem($default_toolchain)"
 
-      # Since remote workers tend to be slightly slower than the local
-      # machine, and ffx is frequently on critical path, race local against
-      # remote execution, which stll lets it remotely cache.
-      configs += [ "//build/config/rust:rbe_strategy_racing" ]
+      # Requires RBE machine with more memory.
+      configs += [ "//build/config:big_rbe_machine" ]
+
+      _remote_only = true
+      if (!_remote_only) {
+        # When running locally (including RBE local and racing strategies),
+        # limit its concurrency with other memory-intensive jobs.
+        # See https://fxbug.dev/42062387 for context.
+        pool = "//build/config:highmem($default_toolchain)"
+
+        # Since remote workers tend to be slightly slower than the local
+        # machine, and ffx is frequently on critical path, race local against
+        # remote execution, which still lets it remotely cache.
+        configs += [ "//build/config/rust:rbe_strategy_racing" ]
+      }
 
       # Use up to 16 threads for codegen
       configs += [ "//build/config/rust:codegen_units_16" ]

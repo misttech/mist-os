@@ -2,12 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{registry, CapabilityTrait, ConversionError, Open};
 use fidl_fuchsia_component_sandbox as fsandbox;
-use fuchsia_zircon::{self as zx};
 use futures::channel::mpsc;
-use std::{fmt::Debug, sync::Arc};
-use vfs::directory::entry::DirectoryEntry;
+use std::fmt::Debug;
+
+#[cfg(target_os = "fuchsia")]
+use {
+    crate::{registry, ConversionError},
+    fidl::handle::Channel,
+    std::sync::Arc,
+    vfs::directory::entry::DirectoryEntry,
+};
 
 #[derive(Debug)]
 pub struct Message {
@@ -47,20 +52,13 @@ impl Connector {
         Self { inner: std::sync::Arc::new(sender) }
     }
 
-    pub(crate) fn send_channel(&self, channel: zx::Channel) -> Result<(), ()> {
+    #[cfg(target_os = "fuchsia")]
+    pub(crate) fn send_channel(&self, channel: Channel) -> Result<(), ()> {
         self.send(Message { channel })
     }
 
     pub fn send(&self, msg: Message) -> Result<(), ()> {
         self.inner.send(msg)
-    }
-}
-
-impl From<Connector> for Open {
-    fn from(connector: Connector) -> Self {
-        Self::new(vfs::service::endpoint(move |_scope, server_end| {
-            let _ = connector.send_channel(server_end.into_zx_channel().into());
-        }))
     }
 }
 
@@ -70,7 +68,8 @@ impl Connectable for Connector {
     }
 }
 
-impl CapabilityTrait for Connector {
+#[cfg(target_os = "fuchsia")]
+impl crate::CapabilityTrait for Connector {
     fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         Ok(vfs::service::endpoint(move |_scope, server_end| {
             let _ = self.send_channel(server_end.into_zx_channel().into());
@@ -78,12 +77,14 @@ impl CapabilityTrait for Connector {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl From<Connector> for fsandbox::Connector {
     fn from(value: Connector) -> Self {
         fsandbox::Connector { token: registry::insert_token(value.into()) }
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl From<Connector> for fsandbox::Capability {
     fn from(connector: Connector) -> Self {
         fsandbox::Capability::Connector(connector.into())
@@ -96,10 +97,10 @@ mod tests {
     use crate::Receiver;
     use assert_matches::assert_matches;
     use fidl::endpoints::ClientEnd;
+    use fidl::handle::{HandleBased, Rights, Status};
     use fidl_fuchsia_io as fio;
     use futures::StreamExt;
     use vfs::execution_scope::ExecutionScope;
-    use zx::HandleBased;
 
     // NOTE: sending-and-receiving tests are written in `receiver.rs`.
 
@@ -110,7 +111,7 @@ mod tests {
         let (receiver, sender) = Receiver::new();
 
         // Send a channel through the Connector.
-        let (ch1, _ch2) = zx::Channel::create();
+        let (ch1, _ch2) = Channel::create();
         sender.send_channel(ch1).unwrap();
 
         // Convert the Sender to a FIDL token.
@@ -118,7 +119,7 @@ mod tests {
 
         // Clone the Sender by cloning the token.
         let token_clone = fsandbox::Connector {
-            token: connector.token.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+            token: connector.token.duplicate_handle(Rights::SAME_RIGHTS).unwrap(),
         };
         let connector_clone = match crate::Capability::try_from(fsandbox::Capability::Connector(
             token_clone,
@@ -130,7 +131,7 @@ mod tests {
         };
 
         // Send a channel through the cloned Sender.
-        let (ch1, _ch2) = zx::Channel::create();
+        let (ch1, _ch2) = Channel::create();
         connector_clone.send_channel(ch1).unwrap();
 
         // The Receiver should receive two channels, one from each connector.
@@ -139,12 +140,14 @@ mod tests {
         }
     }
 
+    // TODO(340891837): This test only runs on host because of the reliance on Open
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::test]
     async fn unwrap_server_end_or_serve_node_node_reference_and_describe() {
         let receiver = {
             let (receiver, sender) = Receiver::new();
-            let open: Open = sender.into();
-            let (client_end, server_end) = zx::Channel::create();
+            let open: crate::Open = sender.into();
+            let (client_end, server_end) = Channel::create();
             let scope = ExecutionScope::new();
             open.open(
                 scope,
@@ -160,7 +163,7 @@ mod tests {
             assert_matches!(
                 result,
                 Ok(fio::NodeEvent::OnOpen_ { s, info })
-                    if s == zx::Status::OK.into_raw()
+                    if s == Status::OK.into_raw()
                     && *info.as_ref().unwrap().as_ref() == fio::NodeInfoDeprecated::Service(fio::Service {})
             );
 
@@ -171,12 +174,14 @@ mod tests {
         assert_matches!(receiver.receive().await, None);
     }
 
+    // TODO(340891837): This test only runs on host because of the reliance on Open
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::test]
     async fn unwrap_server_end_or_serve_node_describe() {
         let (receiver, sender) = Receiver::new();
-        let open: Open = sender.into();
+        let open: crate::Open = sender.into();
 
-        let (client_end, server_end) = zx::Channel::create();
+        let (client_end, server_end) = Channel::create();
         // The VFS should send the DESCRIBE event, then hand us the channel.
         open.open(ExecutionScope::new(), fio::OpenFlags::DESCRIBE, ".", server_end);
 
@@ -190,17 +195,19 @@ mod tests {
         assert_matches!(
             result,
             Ok(fio::NodeEvent::OnOpen_ { s, info })
-            if s == zx::Status::OK.into_raw()
+            if s == Status::OK.into_raw()
             && *info.as_ref().unwrap().as_ref() == fio::NodeInfoDeprecated::Service(fio::Service {})
         );
     }
 
+    // TODO(340891837): This test only runs on host because of the reliance on Open
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::test]
     async fn unwrap_server_end_or_serve_node_empty() {
         let (receiver, sender) = Receiver::new();
-        let open: Open = sender.into();
+        let open: crate::Open = sender.into();
 
-        let (client_end, server_end) = zx::Channel::create();
+        let (client_end, server_end) = Channel::create();
         // The VFS should not send any event, but directly hand us the channel.
         open.open(ExecutionScope::new(), fio::OpenFlags::empty(), ".", server_end);
 

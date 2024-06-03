@@ -17,6 +17,7 @@ InstrumentationDataVmo SancovGetCountsVmo() { return {}; }
 
 #else  // HAVE_SANCOV
 
+#include <lib/instrumentation/kernel-mapped-vmo.h>
 #include <stdint.h>
 #include <zircon/assert.h>
 
@@ -24,8 +25,6 @@ InstrumentationDataVmo SancovGetCountsVmo() { return {}; }
 #include <ktl/atomic.h>
 #include <lk/init.h>
 #include <vm/vm_object_paged.h>
-
-#include "kernel-mapped-vmo.h"
 
 #include <ktl/enforce.h>
 

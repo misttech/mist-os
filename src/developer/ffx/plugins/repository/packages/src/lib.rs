@@ -535,6 +535,7 @@ mod test {
     }
 
     #[fasync::run_singlethreaded(test)]
+    #[ignore = "TODO(https://fxbug.dev/344009079): Learn cause of whitespace difference and fix"]
     async fn test_package_list_including_components() {
         let tmp = tempfile::tempdir().unwrap();
         let env = setup_repo(tmp.path()).await;

@@ -12,7 +12,6 @@ use {
             events::registry::EventSubscription,
             model::Model,
             start::Start,
-            structured_dict::ComponentInput,
             testing::{
                 mocks::*,
                 out_dir::OutDir,
@@ -22,7 +21,7 @@ use {
             },
         },
     },
-    ::routing::policy::PolicyError,
+    ::routing::{bedrock::structured_dict::ComponentInput, policy::PolicyError},
     assert_matches::assert_matches,
     async_trait::async_trait,
     cm_config::AllowlistEntryBuilder,
@@ -39,7 +38,7 @@ use {
     fuchsia_async as fasync, fuchsia_sync as fsync, fuchsia_zircon as zx,
     futures::{channel::mpsc, future::pending, join, lock::Mutex, prelude::*},
     hooks::{Event, EventType, Hook, HooksRegistration},
-    moniker::{ChildName, Moniker, MonikerBase},
+    moniker::{ChildName, Moniker},
     std::{
         collections::HashSet,
         sync::{Arc, Weak},

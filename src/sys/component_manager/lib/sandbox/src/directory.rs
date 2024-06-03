@@ -5,11 +5,14 @@ use core::fmt;
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::{self as zx, AsHandleRef};
-use std::sync::Arc;
-use vfs::{directory::entry::DirectoryEntry, remote::RemoteLike};
 
-use crate::CapabilityTrait;
+#[cfg(target_os = "fuchsia")]
+use {
+    crate::CapabilityTrait,
+    fidl::handle::{AsHandleRef, Channel, Handle},
+    std::sync::Arc,
+    vfs::{directory::entry::DirectoryEntry, remote::RemoteLike},
+};
 
 /// A capability that is a `fuchsia.io` directory.
 ///
@@ -30,6 +33,7 @@ impl Directory {
     }
 
     /// Turn the [Directory] into a remote VFS node.
+    #[cfg(target_os = "fuchsia")]
     pub(crate) fn into_remote(self) -> Arc<impl RemoteLike + DirectoryEntry> {
         let client_end = ClientEnd::<fio::DirectoryMarker>::from(self);
         vfs::remote::remote_dir(client_end.into_proxy().unwrap())
@@ -42,16 +46,17 @@ impl fmt::Debug for Directory {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl Clone for Directory {
     fn clone(&self) -> Self {
         // Call `fuchsia.io/Directory.Clone` without converting the ClientEnd into a proxy.
         // This is necessary because we the conversion consumes the ClientEnd, but we can't take
         // it out of non-mut `&self`.
-        let (clone_client_end, clone_server_end) = zx::Channel::create();
+        let (clone_client_end, clone_server_end) = Channel::create();
         let raw_handle = self.client_end.as_handle_ref().raw_handle();
         // SAFETY: the channel is forgotten at the end of scope so it is not double closed.
         unsafe {
-            let borrowed: zx::Channel = zx::Handle::from_raw(raw_handle).into();
+            let borrowed: Channel = Handle::from_raw(raw_handle).into();
             let directory = fio::DirectorySynchronousProxy::new(borrowed);
             let _ = directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, clone_server_end.into());
             std::mem::forget(directory.into_channel());
@@ -61,6 +66,16 @@ impl Clone for Directory {
     }
 }
 
+#[cfg(not(target_os = "fuchsia"))]
+impl Clone for Directory {
+    fn clone(&self) -> Self {
+        // TODO(343379094): get this to work on host.
+        let (client_end, _server_end) = fidl::endpoints::create_endpoints();
+        Self { client_end }
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
 impl CapabilityTrait for Directory {}
 
 impl From<ClientEnd<fio::DirectoryMarker>> for Directory {
@@ -84,13 +99,15 @@ impl From<Directory> for fsandbox::Capability {
     }
 }
 
+// These tests only run on target because the vfs library is not generally available on host.
+#[cfg(target_os = "fuchsia")]
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::Open;
     use fidl::endpoints::{create_endpoints, ServerEnd};
+    use fidl::handle::Status;
     use fidl_fuchsia_io as fio;
-    use fuchsia_zircon as zx;
     use futures::channel::mpsc;
     use futures::StreamExt;
     use vfs::{
@@ -125,7 +142,7 @@ mod tests {
                 EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
             }
 
-            fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+            fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
                 request.open_remote(self)
             }
         }

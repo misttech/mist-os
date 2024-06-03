@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    crate::client::types as client_types,
     anyhow::{format_err, Error},
     tracing::error,
 };
@@ -53,6 +54,22 @@ impl EwmaSignalData {
             ewma_snr: EwmaPseudoDecibel::new(ewma_weight, initial_snr),
         }
     }
+
+    pub fn new_from_list(
+        signals: &Vec<client_types::Signal>,
+        ewma_weight: usize,
+    ) -> Result<Self, anyhow::Error> {
+        if signals.is_empty() {
+            return Err(format_err!("At least one signal must be provided"));
+        }
+
+        let mut ewma = Self::new(signals[0].rssi_dbm, signals[0].snr_db, ewma_weight);
+        for signal in signals.iter().skip(1) {
+            ewma.update_with_new_measurement(signal.rssi_dbm, signal.snr_db);
+        }
+        Ok(ewma)
+    }
+
     pub fn update_with_new_measurement(&mut self, rssi: impl Into<f64>, snr: impl Into<f64>) {
         self.ewma_rssi.update_average(rssi);
         self.ewma_snr.update_average(snr);
@@ -112,6 +129,14 @@ impl RssiVelocity {
         Self { curr_velocity: 0.0, prev_rssi: initial_rssi.into() }
     }
 
+    pub fn new_from_list(rssi_samples: &Vec<f64>) -> Result<Self, anyhow::Error> {
+        let last = rssi_samples.last().ok_or(format_err!("empty list"))?;
+        match calculate_raw_velocity(rssi_samples.to_vec()) {
+            Ok(velocity) => Ok(Self { curr_velocity: velocity, prev_rssi: *last }),
+            Err(e) => Err(e),
+        }
+    }
+
     pub fn get(&mut self) -> f64 {
         self.curr_velocity
     }
@@ -136,7 +161,7 @@ mod tests {
     };
 
     #[fuchsia::test]
-    fn test_simple_averaging_calculations() {
+    fn test_ewma_pseudo_decibel_simple_averaging_calculations() {
         let mut ewma_signal = EwmaPseudoDecibel::new(10, -50);
         assert_eq!(ewma_signal.get(), -50.0);
 
@@ -153,7 +178,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_small_variation_averaging() {
+    fn test_ewma_pseudo_decibel_small_variation_averaging() {
         let mut ewma_signal = EwmaPseudoDecibel::new(5, -90);
         assert_eq!(ewma_signal.get(), -90.0);
 
@@ -170,60 +195,26 @@ mod tests {
         assert_lt!(ewma_signal.get(), -90.9);
     }
 
-    /// Vector argument must have length >=2.
     #[fuchsia::test]
-    fn test_insufficient_args() {
-        assert!(calculate_raw_velocity(vec![]).is_err());
-        assert!(calculate_raw_velocity(vec![-60.0]).is_err());
+    fn test_ewma_signal_data_new_from_list() {
+        let signals = vec![
+            client_types::Signal { rssi_dbm: -40, snr_db: 30 },
+            client_types::Signal { rssi_dbm: -60, snr_db: 15 },
+        ];
+        let ewma = EwmaSignalData::new_from_list(&signals, 10).unwrap();
+        assert_lt!(ewma.ewma_rssi.get(), -40.0);
+        assert_gt!(ewma.ewma_rssi.get(), -60.0);
+        assert_lt!(ewma.ewma_snr.get(), 30.0);
+        assert_gt!(ewma.ewma_snr.get(), 15.0);
     }
 
     #[fuchsia::test]
-    fn test_calculate_negative_velocity() {
-        assert_eq!(calculate_raw_velocity(vec![-60.0, -75.0]).expect("failed to calculate"), -15.0);
-        assert_eq!(
-            calculate_raw_velocity(vec![-40.0, -50.0, -58.0, -64.0]).expect("failed to calculate"),
-            -8.0
-        );
+    fn test_ewma_signal_data_new_from_list_empty() {
+        assert!(EwmaSignalData::new_from_list(&vec![], 10).is_err());
     }
 
     #[fuchsia::test]
-    fn test_calculate_positive_velocity() {
-        assert_eq!(calculate_raw_velocity(vec![-48.0, -45.0]).expect("failed to calculate"), 3.0);
-        assert_eq!(
-            calculate_raw_velocity(vec![-70.0, -55.0, -45.0, -30.0]).expect("failed to calculate"),
-            13.0
-        );
-    }
-
-    #[fuchsia::test]
-    fn test_calculate_constant_zero_velocity() {
-        assert_eq!(
-            calculate_raw_velocity(vec![-25.0, -25.0, -25.0, -25.0, -25.0, -25.0])
-                .expect("failed to calculate"),
-            0.0
-        );
-    }
-
-    #[fuchsia::test]
-    fn test_calculate_oscillating_zero_velocity() {
-        assert_eq!(
-            calculate_raw_velocity(vec![-35.0, -45.0, -35.0, -25.0, -35.0, -45.0, -35.0,])
-                .expect("failed to calculate"),
-            0.0
-        );
-    }
-
-    #[fuchsia::test]
-    fn test_calculate_min_max_velocity() {
-        assert_eq!(
-            calculate_raw_velocity(vec![-1.0, -128.0]).expect("failed to calculate"),
-            -127.0
-        );
-        assert_eq!(calculate_raw_velocity(vec![-128.0, -1.0]).expect("failed to calculate"), 127.0);
-    }
-
-    #[fuchsia::test]
-    fn test_update_with_new_measurements() {
+    fn test_ewma_signal_data_update_with_new_measurements() {
         let mut signal_data = EwmaSignalData::new(-40, 30, 10);
         signal_data.update_with_new_measurement(-60, 15);
         assert_lt!(signal_data.ewma_rssi.get(), -40.0);
@@ -232,8 +223,60 @@ mod tests {
         assert_gt!(signal_data.ewma_snr.get(), 15.0);
     }
 
+    /// Vector argument must have length >=2.
     #[fuchsia::test]
-    fn test_update_rssi_velocity() {
+    fn test_calculate_raw_velocity_insufficient_args() {
+        assert!(calculate_raw_velocity(vec![]).is_err());
+        assert!(calculate_raw_velocity(vec![-60.0]).is_err());
+    }
+
+    #[fuchsia::test]
+    fn test_calculate_raw_velocity_negative() {
+        assert_eq!(calculate_raw_velocity(vec![-60.0, -75.0]).expect("failed to calculate"), -15.0);
+        assert_eq!(
+            calculate_raw_velocity(vec![-40.0, -50.0, -58.0, -64.0]).expect("failed to calculate"),
+            -8.0
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_calculate_raw_velocity_positive() {
+        assert_eq!(calculate_raw_velocity(vec![-48.0, -45.0]).expect("failed to calculate"), 3.0);
+        assert_eq!(
+            calculate_raw_velocity(vec![-70.0, -55.0, -45.0, -30.0]).expect("failed to calculate"),
+            13.0
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_calculate_raw_velocity_constant_zero() {
+        assert_eq!(
+            calculate_raw_velocity(vec![-25.0, -25.0, -25.0, -25.0, -25.0, -25.0])
+                .expect("failed to calculate"),
+            0.0
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_calculate_raw_velocity_oscillating_zero() {
+        assert_eq!(
+            calculate_raw_velocity(vec![-35.0, -45.0, -35.0, -25.0, -35.0, -45.0, -35.0,])
+                .expect("failed to calculate"),
+            0.0
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_calculate_raw_velocity_min_max() {
+        assert_eq!(
+            calculate_raw_velocity(vec![-1.0, -128.0]).expect("failed to calculate"),
+            -127.0
+        );
+        assert_eq!(calculate_raw_velocity(vec![-128.0, -1.0]).expect("failed to calculate"), 127.0);
+    }
+
+    #[fuchsia::test]
+    fn test_rssi_velocity_update() {
         let mut velocity = RssiVelocity::new(-40.0);
         velocity.update(-80.0);
         assert_lt!(velocity.get(), 0.0);
@@ -241,5 +284,71 @@ mod tests {
         let mut velocity = RssiVelocity::new(-40.0);
         velocity.update(-20.0);
         assert_gt!(velocity.get(), 0.0);
+    }
+
+    #[fuchsia::test]
+    fn test_rssi_velocity_new_from_list_insufficent_args() {
+        assert!(RssiVelocity::new_from_list(&vec![]).is_err());
+        assert!(RssiVelocity::new_from_list(&vec![-40.0]).is_err());
+    }
+
+    #[fuchsia::test]
+    fn test_rssi_velocity_new_from_list_negative() {
+        assert_eq!(
+            RssiVelocity::new_from_list(&vec![-60.0, -75.0]).expect("failed to calculate").get(),
+            -15.0
+        );
+        assert_eq!(
+            RssiVelocity::new_from_list(&vec![-40.0, -50.0, -58.0, -64.0])
+                .expect("failed to calculate")
+                .get(),
+            -8.0
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_rssi_velocity_new_from_list_positive() {
+        assert_eq!(
+            RssiVelocity::new_from_list(&vec![-48.0, -45.0]).expect("failed to calculate").get(),
+            3.0
+        );
+        assert_eq!(
+            RssiVelocity::new_from_list(&vec![-70.0, -55.0, -45.0, -30.0])
+                .expect("failed to calculate")
+                .get(),
+            13.0
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_rssi_velocity_new_from_list_constant_zero() {
+        assert_eq!(
+            RssiVelocity::new_from_list(&vec![-25.0, -25.0, -25.0, -25.0, -25.0, -25.0])
+                .expect("failed to calculate")
+                .get(),
+            0.0
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_rssi_velocity_new_from_list_oscillating_zero() {
+        assert_eq!(
+            RssiVelocity::new_from_list(&vec![-35.0, -45.0, -35.0, -25.0, -35.0, -45.0, -35.0,])
+                .expect("failed to calculate")
+                .get(),
+            0.0
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_rssi_velocity_new_from_list_min_max() {
+        assert_eq!(
+            RssiVelocity::new_from_list(&vec![-1.0, -128.0]).expect("failed to calculate").get(),
+            -127.0
+        );
+        assert_eq!(
+            RssiVelocity::new_from_list(&vec![-128.0, -1.0]).expect("failed to calculate").get(),
+            127.0
+        );
     }
 }

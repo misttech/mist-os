@@ -1092,10 +1092,12 @@ TEST_F(DriverRunnerTest, CreateAndBindCompositeNodeSpec) {
       },
       dispatcher(), &driver_runner());
   fidl::Arena<> arena;
-  auto added = driver_runner().composite_node_spec_manager().AddSpec(fidl::ToWire(arena, fidl_spec),
-                                                                     std::move(spec));
-  ASSERT_TRUE(added.is_ok());
 
+  driver_runner().composite_node_spec_manager().AddSpec(
+      fidl::ToWire(arena, fidl_spec), std::move(spec),
+      [](fit::result<fuchsia_driver_framework::CompositeNodeSpecError> result) {
+        ASSERT_TRUE(result.is_ok());
+      });
   EXPECT_TRUE(RunLoopUntilIdle());
 
   ASSERT_EQ(2u,

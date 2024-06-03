@@ -119,7 +119,7 @@ void x86_mmu_percpu_init();
 void x86_mmu_early_init();
 void x86_mmu_init();
 // Called once on the BSP after CPU init has been completed.
-void x86_mmu_feature_init();
+void x86_mmu_prevm_init();
 
 paddr_t x86_kernel_cr3();
 

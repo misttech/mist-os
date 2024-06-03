@@ -95,8 +95,9 @@ void TestBindManagerBridge::AddCompositeNodeSpec(
                                 }},
                             });
 
-  auto result = composite_manager_.AddSpec(fidl::ToWire(arena, fidl_spec), std::move(spec));
-  ASSERT_TRUE(result.is_ok());
+  composite_manager_.AddSpec(
+      fidl::ToWire(arena, fidl_spec), std::move(spec),
+      [](fit::result<fdf::CompositeNodeSpecError> result) { EXPECT_TRUE(result.is_ok()); });
 }
 
 void BindManagerTestBase::SetUp() {

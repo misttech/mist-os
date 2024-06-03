@@ -8,6 +8,7 @@
 #include <lib/arch/intrin.h>
 #include <lib/cbuf.h>
 #include <lib/debuglog.h>
+#include <lib/mmio-ptr/mmio-ptr.h>
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zircon-internal/macros.h>
 #include <lib/zx/result.h>
@@ -47,15 +48,15 @@
 #define UART_DMACR (0x48)
 // clang-format on
 
-#define UARTREG(base, reg) (*REG32((base) + (reg)))
-
 #define RXBUF_SIZE 16
 
-// values read from zbi
-static vaddr_t uart_base = 0;
-static uint32_t uart_irq = 0;
+namespace {
 
-static Cbuf uart_rx_buf;
+// values read from zbi
+vaddr_t uart_base = 0;
+uint32_t uart_irq = 0;
+
+Cbuf uart_rx_buf;
 
 /*
  * Tx driven irq:
@@ -63,49 +64,59 @@ static Cbuf uart_rx_buf;
  * mask it when we no longer care about it and unmask it when we start
  * xmitting.
  */
-static bool uart_tx_irq_enabled = false;
-static AutounsignalEvent uart_dputc_event{true};
+bool uart_tx_irq_enabled = false;
+AutounsignalEvent uart_dputc_event{true};
 
-namespace {
 // It's important to ensure that no other locks are acquired while holding this lock.  This lock
 // is needed for the printf and panic code paths, and printing and panicking must be safe while
 // holding (almost) any lock.
 DECLARE_SINGLETON_SPINLOCK_WITH_TYPE(uart_spinlock, MonitoredSpinLock);
-}  // namespace
 
-static inline void uartreg_and_eq(uintptr_t base, ptrdiff_t reg, uint32_t flags) {
-  volatile uint32_t* ptr = reinterpret_cast<volatile uint32_t*>(base + reg);
-  *ptr = *ptr & flags;
+inline void uartreg_and_eq(uintptr_t base, ptrdiff_t reg, uint32_t flags) {
+  volatile MMIO_PTR uint32_t* ptr = reinterpret_cast<volatile MMIO_PTR uint32_t*>(base + reg);
+  MmioWrite32(MmioRead32(ptr) & flags, ptr);
 }
 
-static inline void uartreg_or_eq(uintptr_t base, ptrdiff_t reg, uint32_t flags) {
-  volatile uint32_t* ptr = reinterpret_cast<volatile uint32_t*>(base + reg);
-  *ptr = *ptr | flags;
+inline void uartreg_or_eq(uintptr_t base, ptrdiff_t reg, uint32_t flags) {
+  volatile MMIO_PTR uint32_t* ptr = reinterpret_cast<volatile MMIO_PTR uint32_t*>(base + reg);
+  MmioWrite32(MmioRead32(ptr) | flags, ptr);
+}
+
+inline uint32_t uartreg_read(uintptr_t base, ptrdiff_t reg) {
+  volatile MMIO_PTR uint32_t* ptr = reinterpret_cast<volatile MMIO_PTR uint32_t*>(base + reg);
+
+  return MmioRead32(ptr);
+}
+
+inline void uartreg_write(uintptr_t base, ptrdiff_t reg, uint32_t val) {
+  volatile MMIO_PTR uint32_t* ptr = reinterpret_cast<volatile MMIO_PTR uint32_t*>(base + reg);
+
+  MmioWrite32(val, ptr);
 }
 
 // clear and set txim (transmit interrupt mask)
-static inline void pl011_mask_tx() TA_REQ(uart_spinlock::Get()) {
+inline void pl011_mask_tx() TA_REQ(uart_spinlock::Get()) {
   uartreg_and_eq(uart_base, UART_IMSC, ~(1 << 5));
 }
-static inline void pl011_unmask_tx() TA_REQ(uart_spinlock::Get()) {
+inline void pl011_unmask_tx() TA_REQ(uart_spinlock::Get()) {
   uartreg_or_eq(uart_base, UART_IMSC, (1 << 5));
 }
 
 // clear and set rtim and rxim (receive timeout and interrupt mask)
-static inline void pl011_mask_rx() TA_REQ(uart_spinlock::Get()) {
+inline void pl011_mask_rx() TA_REQ(uart_spinlock::Get()) {
   uartreg_and_eq(uart_base, UART_IMSC, ~((1 << 6) | (1 << 4)));
 }
-static inline void pl011_unmask_rx() TA_REQ(uart_spinlock::Get()) {
+inline void pl011_unmask_rx() TA_REQ(uart_spinlock::Get()) {
   uartreg_or_eq(uart_base, UART_IMSC, (1 << 6) | (1 << 4));
 }
 
-static void pl011_uart_irq(void* arg) {
+void pl011_uart_irq(void* arg) {
   /* read interrupt status and mask */
-  uint32_t isr = UARTREG(uart_base, UART_TMIS);
+  uint32_t isr = uartreg_read(uart_base, UART_TMIS);
 
   if (isr & ((1 << 6) | (1 << 4))) {  // rtims/rxmis
     /* while fifo is not empty, read chars out of it */
-    while ((UARTREG(uart_base, UART_FR) & (1 << 4)) == 0) {
+    while ((uartreg_read(uart_base, UART_FR) & (1 << 4)) == 0) {
       /* if we're out of rx buffer, mask the irq instead of handling it */
       {
         /*
@@ -137,7 +148,7 @@ static void pl011_uart_irq(void* arg) {
         }
       }
 
-      char c = static_cast<char>(UARTREG(uart_base, UART_DR));
+      char c = static_cast<char>(uartreg_read(uart_base, UART_DR));
       uart_rx_buf.WriteChar(c);
     }
   }
@@ -158,6 +169,8 @@ static void pl011_uart_irq(void* arg) {
   }
 }
 
+}  // namespace
+
 void Pl011UartInitLate() {
   // Initialize circular buffer to hold received data.
   uart_rx_buf.Initialize(RXBUF_SIZE, malloc(RXBUF_SIZE));
@@ -167,14 +180,13 @@ void Pl011UartInitLate() {
   DEBUG_ASSERT(status == ZX_OK);
 
   // clear all irqs
-  UARTREG(uart_base, UART_ICR) = 0x3ff;
+  uartreg_write(uart_base, UART_ICR, 0x3ff);
 
   // set fifo trigger level
-  UARTREG(uart_base, UART_IFLS) = 0;  // 1/8 rxfifo, 1/8 txfifo
+  uartreg_write(uart_base, UART_IFLS, 0);  // 1/8 rxfifo, 1/8 txfifo
 
   // enable rx interrupt
-  UARTREG(uart_base, UART_IMSC) = (1 << 4) |  //  rxim
-                                  (1 << 6);   //  rtim
+  uartreg_write(uart_base, UART_IMSC, (1 << 4) | (1 << 6));  //  rxim, rtim
 
   // enable receive
   uartreg_or_eq(uart_base, UART_CR, (1 << 9));  // rxen
@@ -191,7 +203,9 @@ void Pl011UartInitLate() {
   }
 }
 
-static int pl011_uart_getc(bool wait) {
+namespace {
+
+int pl011_uart_getc(bool wait) {
   zx::result<char> result = uart_rx_buf.ReadChar(wait);
   if (result.is_ok()) {
     {
@@ -200,7 +214,7 @@ static int pl011_uart_getc(bool wait) {
       pl011_unmask_rx();
 
       // TODO(https://fxbug.dev/42051758): See comment in |pl011_uart_getc| where we write to ICR.
-      UARTREG(uart_base, UART_ICR) = 0;
+      uartreg_write(uart_base, UART_ICR, 0);
     }
     return result.value();
   }
@@ -209,22 +223,21 @@ static int pl011_uart_getc(bool wait) {
 }
 
 /* panic-time getc/putc */
-static void pl011_uart_pputc(char c) {
+void pl011_uart_pputc(char c) {
   /* spin while fifo is full */
-  while (UARTREG(uart_base, UART_FR) & (1 << 5))
+  while (uartreg_read(uart_base, UART_FR) & (1 << 5))
     ;
-  UARTREG(uart_base, UART_DR) = c;
+  uartreg_write(uart_base, UART_DR, c);
 }
 
-static int pl011_uart_pgetc() {
-  if ((UARTREG(uart_base, UART_FR) & (1 << 4)) == 0) {
-    return UARTREG(uart_base, UART_DR);
-  } else {
-    return -1;
+int pl011_uart_pgetc() {
+  if ((uartreg_read(uart_base, UART_FR) & (1 << 4)) == 0) {
+    return uartreg_read(uart_base, UART_DR);
   }
+  return -1;
 }
 
-static void pl011_dputs(const char* str, size_t len, bool block) {
+void pl011_dputs(const char* str, size_t len, bool block) {
   bool copied_CR = false;
 
   // if tx irqs are disabled, override block/noblock argument
@@ -242,7 +255,7 @@ static void pl011_dputs(const char* str, size_t len, bool block) {
     // reacquiring the spinlock every cycle.
     Guard<MonitoredSpinLock, IrqSave> guard{uart_spinlock::Get(), SOURCE_TAG};
 
-    uint32_t uart_fr = UARTREG(uart_base, UART_FR);
+    uint32_t uart_fr = uartreg_read(uart_base, UART_FR);
     if (uart_fr & (1 << 7)) {  // txfe
       // Is FIFO completely empty? If so, we can write up to 16 bytes guaranteed.
       const size_t max_fifo = 16;
@@ -259,10 +272,10 @@ static void pl011_dputs(const char* str, size_t len, bool block) {
     for (size_t i = 0; i < to_write; i++) {
       if (!copied_CR && *str == '\n') {
         copied_CR = true;
-        UARTREG(uart_base, UART_DR) = '\r';
+        uartreg_write(uart_base, UART_DR, '\r');
       } else {
         copied_CR = false;
-        UARTREG(uart_base, UART_DR) = *str++;
+        uartreg_write(uart_base, UART_DR, *str++);
         len--;
       }
     }
@@ -289,12 +302,14 @@ static void pl011_dputs(const char* str, size_t len, bool block) {
   }
 }
 
-static const struct pdev_uart_ops uart_ops = {
+const struct pdev_uart_ops uart_ops = {
     .getc = pl011_uart_getc,
     .pputc = pl011_uart_pputc,
     .pgetc = pl011_uart_pgetc,
     .dputs = pl011_dputs,
 };
+
+}  // anonymous namespace
 
 void Pl011UartInitEarly(const zbi_dcfg_simple_t& config) {
   ASSERT(config.mmio_phys != 0);
@@ -304,8 +319,8 @@ void Pl011UartInitEarly(const zbi_dcfg_simple_t& config) {
   ASSERT(uart_base != 0);
   uart_irq = config.irq;
 
-  UARTREG(uart_base, UART_LCRH) = (3 << 5) | (1 << 4);  // 8 bit word, enable fifos
-  UARTREG(uart_base, UART_CR) = (1 << 8) | (1 << 0);    // tx_enable, uarten
+  uartreg_write(uart_base, UART_LCRH, (3 << 5) | (1 << 4));  // 8 bit word, enable fifos
+  uartreg_write(uart_base, UART_CR, (1 << 8) | (1 << 0));    // tx_enable, uarten
 
   pdev_register_uart(&uart_ops);
 }

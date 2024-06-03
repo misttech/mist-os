@@ -56,7 +56,7 @@ impl<I: IpExt, C, P: IpSocketHandler<I, C>> IpSocketHandler<I, C> for Uninstanti
         _body: S,
         _mtu: Option<u32>,
         _options: &O,
-    ) -> Result<(), (S, IpSockSendError)>
+    ) -> Result<(), IpSockSendError>
     where
         S: Serializer,
         S::Buffer: BufferMut,

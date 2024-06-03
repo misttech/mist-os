@@ -8,6 +8,7 @@ use ffx_command::{return_user_error, FfxCommandLine, FfxContext, Result};
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
 use ffx_fidl::VersionInfo;
+use ffx_target::{resolve_target_query_to_info, TargetInfoQuery};
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 use rcs::OpenDirType;
@@ -112,7 +113,7 @@ pub struct AvailabilityFlag<T>(pub T);
 impl<T: AsRef<str>> CheckEnv for AvailabilityFlag<T> {
     async fn check_env(self, env: &FhoEnvironment) -> Result<()> {
         let flag = self.0.as_ref();
-        if env.context.get(flag).await.unwrap_or(false) {
+        if env.context.get(flag).unwrap_or(false) {
             Ok(())
         } else {
             return_user_error!(
@@ -202,6 +203,45 @@ impl<T: TryFromEnv> Connector<T> {
 impl<T: TryFromEnv> TryFromEnv for Connector<T> {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         Ok(Connector { env: env.clone(), _connects_to: Default::default() })
+    }
+}
+
+#[async_trait(?Send)]
+impl TryFromEnv for ffx_fidl::TargetInfo {
+    /// Retrieve `TargetInfo` for a target matching a specifier. Fails if more than one target
+    /// matches.
+    ///
+    /// Note that if no target is specified in configuration or on the command-line that this will
+    /// end up attempting to connect to all discoverable targets which may be problematic in test or
+    /// lab environments.
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        let targets = Vec::<Self>::try_from_env(env).await?;
+        if targets.is_empty() {
+            return_user_error!("Could not discover any targets.");
+        } else if targets.len() > 1 {
+            return_user_error!("Found more than one target: {targets:#?}.");
+        } else {
+            Ok(targets[0].clone())
+        }
+    }
+}
+
+#[async_trait(?Send)]
+impl TryFromEnv for Vec<ffx_fidl::TargetInfo> {
+    /// Retrieve `TargetInfo` for any targets matching a specifier.
+    ///
+    /// Note that if no target is specified in configuration or on the command-line that this will
+    /// end up attempting to connect to all discoverable targets which may be problematic in test or
+    /// lab environments.
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        let target = ffx_target::get_target_specifier(&env.context)
+            .await
+            .bug_context("getting ffx target")?
+            .user_message("A target must either be set as default or explicitly provided.")?;
+        let targets = resolve_target_query_to_info(TargetInfoQuery::from(target), &env.context)
+            .await
+            .bug_context("resolving target")?;
+        Ok(targets)
     }
 }
 

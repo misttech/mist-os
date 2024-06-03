@@ -56,7 +56,6 @@ def handle_package_manifest(
     depfile_collection: Dict[Path, Path],
     inputs: Dict[str, str],
     visited_subpackages: Set[Path],
-    content_checklist_path: Path,
     is_subpackage=False,
 ) -> Path:
     """
@@ -86,8 +85,6 @@ def handle_package_manifest(
                                 paths and other structures.
         visited_subpackages:    Set used for tracking levels of recursion in
                                 subpackages.
-        content_checklist_path: Path to content_checklist file which will be
-                                added to files of this variant.
         is_subpackage:          Boolean used to track if this iteration is
                                 processing a subpackages. Used to determine if
                                 `sdk_metadata` changes are required, as well as
@@ -117,7 +114,7 @@ def handle_package_manifest(
         "" if is_subpackage else PACKAGE_DIR_TO_SUBPACKAGE_MANIFESTS_DIR
     )
 
-    target_files = [content_checklist_path]
+    target_files = []
     # `meta_far_merkle` necessary for naming subpackage manifests.
     meta_far_merkle = ""
     for blob in input_manifest["blobs"]:
@@ -213,11 +210,6 @@ def main():
         "--manifest", help="Path to the package manifest.", required=True
     )
     parser.add_argument(
-        "--sdk-package-content-checklist-path",
-        help="Path to the SDK package content checklist file.",
-        required=True,
-    )
-    parser.add_argument(
         "--output", help="Directory to write SDK objects to.", required=True
     )
     parser.add_argument("--api-level", help="Target API level.", required=True)
@@ -257,14 +249,7 @@ def main():
     depfile_collection = {}
     visited_subpackages = set()
 
-    # Capture content checklist file in metadata and file list.
     subtype = f"{arch}-api-{api_level}"
-    content_checklist_path = (
-        f"packages/{distribution_name}/{subtype}/release/content_checklist_path"
-    )
-    sdk_file_map.add(
-        f"{content_checklist_path}={args.sdk_package_content_checklist_path}"
-    )
 
     handle_package_manifest(
         args.output,
@@ -274,7 +259,6 @@ def main():
         depfile_collection,
         inputs,
         visited_subpackages,
-        content_checklist_path,
         is_subpackage=False,
     )
 

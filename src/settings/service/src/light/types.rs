@@ -6,7 +6,7 @@ use crate::light::light_hardware_configuration::DisableConditions;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Default, Debug, Clone, Serialize, Deserialize)]
 pub struct LightInfo {
     pub light_groups: HashMap<String, LightGroup>,
 }

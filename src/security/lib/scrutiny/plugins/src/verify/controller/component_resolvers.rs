@@ -11,7 +11,6 @@ use {
         ComponentInstanceVisitor, ComponentModelWalker,
     },
     cm_rust::UseDecl,
-    moniker::MonikerBase,
     routing::component_instance::{ComponentInstanceInterface, ExtendedInstanceInterface},
     scrutiny::{model::controller::DataController, model::model::*},
     serde::{Deserialize, Serialize},

@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components.gni")
+import("//src/storage/conformance/storage_conformance_test.gni")
 
 executable("bin") {
   testonly = true
@@ -22,19 +22,7 @@ executable("bin") {
   ]
 }
 
-fuchsia_component("cppvfs-harness") {
-  testonly = true
-  manifest = "meta/cppvfs_harness.cml"
-  deps = [ ":bin" ]
-}
-
-fuchsia_component("cppvfs-test") {
-  testonly = true
-  manifest = "//src/storage/conformance/meta/io1_conformance_test.cml"
-  deps = [ "//src/storage/conformance:io1_conformance_test" ]
-}
-
-fuchsia_test_package("cppvfs-io1-conformance-test") {
-  test_components = [ ":cppvfs-test" ]
-  deps = [ ":cppvfs-harness" ]
+storage_conformance_test("cppvfs") {
+  harness_manifest = "meta/cppvfs_harness.cml"
+  harness_binary = ":bin"
 }

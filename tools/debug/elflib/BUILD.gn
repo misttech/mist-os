@@ -32,10 +32,12 @@ if (is_host) {
   host_test_data("testdata") {
     sources = [
       "testdata/cycle.elf",
+      "testdata/empty-relocatable.elf",
       "testdata/libc.elf.section-only",
       "testdata/libc.elf.stripped",
       "testdata/libc.yaml",
       "testdata/libc.yaml.section-only",
+      "testdata/pe-no-id.exe",
       "testdata/pe-x64.efi",
       "testdata/pe-x64.yaml",
     ]

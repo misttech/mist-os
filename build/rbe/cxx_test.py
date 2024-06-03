@@ -49,11 +49,12 @@ class CxxActionTests(unittest.TestCase):
         source = Path("hello.cc")
         ii_file = Path("hello.ii")
         output = Path("hello.o")
-        c = cxx.CxxAction(_strs(["clang++", "-c", source, "-o", output]))
+        clang = Path("clang++")
+        c = cxx.CxxAction(_strs([clang, "-c", source, "-o", output]))
         self.assertEqual(c.output_file, output)
         self.assertEqual(
             c.compiler,
-            cxx.CompilerTool(tool=Path("clang++"), type=cxx.Compiler.CLANG),
+            cxx.CompilerTool(tool=clang, type=cxx.Compiler.CLANG),
         )
         self.assertFalse(c.save_temps)
         self.assertTrue(c.compiler_is_clang)
@@ -83,6 +84,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(c.sanitizers, set())
         self.assertFalse(c.using_asan)
         self.assertFalse(c.using_ubsan)
+        self.assertEqual(c.uninterpreted_args, _strs([clang, "-c", source]))
         self.assertEqual(list(c.input_files()), [source])
         self.assertEqual(list(c.output_files()), [output])
         self.assertEqual(list(c.output_dirs()), [])
@@ -99,6 +101,25 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(
             compile,
             _strs(["clang++", "-c", ii_file, "-o", output]),
+        )
+
+    def test_all_unknown_flags_ignored(self):
+        command = ["clang", "--yolo", "foobar", "-q", "-k", "-quack"]
+        c = cxx.CxxAction(command + ["-o", "required.o"])
+        self.assertEqual(c.uninterpreted_args, command)
+
+    def test_output_flag_not_matched(self):
+        command_pieces = (
+            ["clang"],
+            ["-octopus"],
+        )  # not to be interpreted as "-o"
+        output = Path("required.o")
+        c = cxx.CxxAction(
+            command_pieces[0] + _strs(["-o", output]) + command_pieces[1]
+        )
+        self.assertEqual(c.output_file, output)
+        self.assertEqual(
+            c.uninterpreted_args, command_pieces[0] + command_pieces[1]
         )
 
     def test_clang_cxx_save_temps(self):
@@ -391,7 +412,7 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertEqual(c.libdirs, [Path("../foo/foo"), Path("bar/bar")])
 
-    def test_unwindlib(self):
+    def test_unwindlib_equals_arg(self):
         source = Path("hello.o")
         output = Path("hello")
         c = cxx.CxxAction(
@@ -399,13 +420,58 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertEqual(c.unwindlib, "libunwind")
 
-    def test_rtlib(self):
+    def test_unwindlib_separate_arg(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        c = cxx.CxxAction(
+            _strs(["clang++", "-unwindlib", "libunwind", source, "-o", output])
+        )
+        self.assertEqual(c.unwindlib, "libunwind")
+
+    def test_not_a_prefix_for_unwindlib(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        for unknown_flag in ("-u", "--u", "--un", "-un", "-uu"):
+            c = cxx.CxxAction(
+                _strs(["clang++", unknown_flag, source, "-o", output])
+            )
+            self.assertIsNone(c.unwindlib)
+            self.assertIn(unknown_flag, c.uninterpreted_args)
+
+    def test_not_a_prefix_for_rtlib(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        for unknown_flag in ("-r", "--r", "--rt", "-rt", "-rx"):
+            c = cxx.CxxAction(
+                _strs(["clang++", unknown_flag, source, "-o", output])
+            )
+            self.assertIsNone(c.rtlib)
+            self.assertIn(unknown_flag, c.uninterpreted_args)
+
+    def test_rtlib_equals_arg(self):
         source = Path("hello.o")
         output = Path("hello")
         c = cxx.CxxAction(
             _strs(["clang++", "-rtlib=compiler-rt", source, "-o", output])
         )
         self.assertEqual(c.rtlib, "compiler-rt")
+
+    def test_rtlib_separate_arg(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        c = cxx.CxxAction(
+            _strs(
+                [
+                    "clang++",
+                    "-rtlib",
+                    "different-compiler-rt",
+                    source,
+                    "-o",
+                    output,
+                ]
+            )
+        )
+        self.assertEqual(c.rtlib, "different-compiler-rt")
 
     def test_static_libstdcxx(self):
         source = Path("hello.o")

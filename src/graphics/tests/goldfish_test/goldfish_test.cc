@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.math/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fdio.h>
@@ -12,9 +13,11 @@
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
 #include <unistd.h>
+#include <zircon/rights.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
+#include <bind/fuchsia/goldfish/platform/sysmem/heap/cpp/bind.h>
 #include <gtest/gtest.h>
 
 #include "src/lib/fsl/handles/object_info.h"
@@ -38,24 +41,33 @@ zx::result<fidl::ClientEnd<fuchsia_hardware_goldfish::AddressSpaceDevice>> Conne
       "/dev/class/goldfish-address-space/000");
 }
 
-fidl::WireSyncClient<fuchsia_sysmem::Allocator> CreateSysmemAllocator() {
-  zx::result client_end = component::Connect<fuchsia_sysmem::Allocator>();
+fidl::WireSyncClient<fuchsia_sysmem2::Allocator> CreateSysmemAllocator() {
+  zx::result client_end = component::Connect<fuchsia_sysmem2::Allocator>();
   EXPECT_EQ(client_end.status_value(), ZX_OK);
   if (!client_end.is_ok()) {
     return {};
   }
   fidl::WireSyncClient allocator(std::move(*client_end));
   // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
-  (void)allocator->SetDebugClientInfo(fidl::StringView::FromExternal(fsl::GetCurrentProcessName()),
-                                      fsl::GetCurrentProcessKoid());
+  fidl::Arena arena;
+  (void)allocator->SetDebugClientInfo(
+      ::fuchsia_sysmem2::wire::AllocatorSetDebugClientInfoRequest::Builder(arena)
+          .id(fsl::GetCurrentProcessKoid())
+          .name(fidl::StringView::FromExternal(fsl::GetCurrentProcessName()))
+          .Build());
   return allocator;
 }
 
-void SetDefaultCollectionName(fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection) {
+void SetDefaultCollectionName(fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& collection) {
   constexpr uint32_t kTestNamePriority = 1000u;
   std::string test_name = ::testing::UnitTest::GetInstance()->current_test_info()->name();
-  EXPECT_TRUE(
-      collection->SetName(kTestNamePriority, fidl::StringView::FromExternal(test_name)).ok());
+  fidl::Arena arena;
+  EXPECT_TRUE(collection
+                  ->SetName(fuchsia_sysmem2::wire::NodeSetNameRequest::Builder(arena)
+                                .name(fidl::StringView::FromExternal(test_name))
+                                .priority(kTestNamePriority)
+                                .Build())
+                  .ok());
 }
 }  // namespace
 
@@ -173,52 +185,70 @@ TEST(GoldfishControlTests, GoldfishControlTest) {
   auto allocator = CreateSysmemAllocator();
   ASSERT_TRUE(allocator.is_valid());
 
-  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
-  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints.server)).status(), ZX_OK);
-
-  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
+  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
+  fidl::Arena arena;
   ASSERT_EQ(allocator
-                ->BindSharedCollection(std::move(token_endpoints.client),
-                                       std::move(collection_endpoints.server))
+                ->AllocateSharedCollection(
+                    fuchsia_sysmem2::wire::AllocatorAllocateSharedCollectionRequest::Builder(arena)
+                        .token_request(std::move(token_endpoints.server))
+                        .Build())
                 .status(),
             ZX_OK);
 
-  fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
-  constraints.usage.vulkan = fuchsia_sysmem::wire::kVulkanImageUsageTransferDst;
-  constraints.min_buffer_count_for_camping = 1;
-  constraints.has_buffer_memory_constraints = true;
-  constraints.buffer_memory_constraints = fuchsia_sysmem::wire::BufferMemoryConstraints{
-      .min_size_bytes = 4 * 1024,
-      .max_size_bytes = 4 * 1024,
-      .physically_contiguous_required = false,
-      .secure_required = false,
-      .ram_domain_supported = false,
-      .cpu_domain_supported = false,
-      .inaccessible_domain_supported = true,
-      .heap_permitted_count = 1,
-      .heap_permitted = {fuchsia_sysmem::wire::HeapType::kGoldfishDeviceLocal}};
+  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
+  ASSERT_EQ(allocator
+                ->BindSharedCollection(
+                    fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena)
+                        .buffer_collection_request(std::move(collection_endpoints.server))
+                        .token(std::move(token_endpoints.client))
+                        .Build())
+                .status(),
+            ZX_OK);
 
-  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(
+  auto constraints = fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
+  constraints
+      .usage(fuchsia_sysmem2::wire::BufferUsage::Builder(arena)
+                 .vulkan(fuchsia_sysmem2::wire::kVulkanImageUsageTransferDst)
+                 .Build())
+      .min_buffer_count_for_camping(1)
+      .buffer_memory_constraints(
+          fuchsia_sysmem2::wire::BufferMemoryConstraints::Builder(arena)
+              .min_size_bytes(4 * 1024)
+              .max_size_bytes(4 * 1024)
+              .physically_contiguous_required(false)
+              .secure_required(false)
+              .ram_domain_supported(false)
+              .cpu_domain_supported(false)
+              .inaccessible_domain_supported(true)
+              .permitted_heaps(std::vector{
+                  fuchsia_sysmem2::wire::Heap::Builder(arena)
+                      .heap_type(bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_DEVICE_LOCAL)
+                      .id(0)
+                      .Build()})
+              .Build());
+
+  fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection> collection(
       std::move(collection_endpoints.client));
 
   SetDefaultCollectionName(collection);
-  EXPECT_TRUE(collection->SetConstraints(true, std::move(constraints)).ok());
+  EXPECT_TRUE(collection
+                  ->SetConstraints(
+                      fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena)
+                          .constraints(constraints.Build())
+                          .Build())
+                  .ok());
 
-  fuchsia_sysmem::wire::BufferCollectionInfo2 info;
-  {
-    auto result = collection->WaitForBuffersAllocated();
-    ASSERT_TRUE(result.ok());
-    EXPECT_EQ(result->status, ZX_OK);
+  auto wait_result = collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(wait_result.ok());
+  EXPECT_TRUE(wait_result->is_ok());
 
-    info = std::move(result->buffer_collection_info);
-    EXPECT_EQ(info.buffer_count, 1U);
-    EXPECT_TRUE(info.buffers[0].vmo.is_valid());
-  }
+  const auto& info = wait_result->value()->buffer_collection_info();
+  EXPECT_EQ(info.buffers().count(), 1U);
 
-  zx::vmo vmo = std::move(info.buffers[0].vmo);
-  EXPECT_TRUE(vmo.is_valid());
+  zx::vmo vmo = std::move(info.buffers()[0].vmo());
+  ASSERT_TRUE(vmo.is_valid());
 
-  EXPECT_TRUE(collection->Close().ok());
+  EXPECT_TRUE(collection->Release().ok());
 
   zx::vmo vmo_copy;
   EXPECT_EQ(vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo_copy), ZX_OK);
@@ -273,69 +303,73 @@ TEST(GoldfishControlTests, GoldfishControlTest_HostVisible) {
   auto allocator = CreateSysmemAllocator();
   ASSERT_TRUE(allocator.is_valid());
 
-  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
-  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints.server)).status(), ZX_OK);
-
-  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
+  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
+  fidl::Arena arena;
   ASSERT_EQ(allocator
-                ->BindSharedCollection(std::move(token_endpoints.client),
-                                       std::move(collection_endpoints.server))
+                ->AllocateSharedCollection(
+                    fuchsia_sysmem2::wire::AllocatorAllocateSharedCollectionRequest::Builder(arena)
+                        .token_request(std::move(token_endpoints.server))
+                        .Build())
+                .status(),
+            ZX_OK);
+
+  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
+  ASSERT_EQ(allocator
+                ->BindSharedCollection(
+                    fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena)
+                        .token(std::move(token_endpoints.client))
+                        .buffer_collection_request(std::move(collection_endpoints.server))
+                        .Build())
+
                 .status(),
             ZX_OK);
 
   const size_t kMinSizeBytes = 4 * 1024;
   const size_t kMaxSizeBytes = 4 * 4096;
-  fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
-  constraints.usage.vulkan = fuchsia_sysmem::wire::kVulkanImageUsageTransferDst;
-  constraints.min_buffer_count_for_camping = 1;
-  constraints.has_buffer_memory_constraints = true;
-  constraints.buffer_memory_constraints = fuchsia_sysmem::wire::BufferMemoryConstraints{
-      .min_size_bytes = kMinSizeBytes,
-      .max_size_bytes = kMaxSizeBytes,
-      .physically_contiguous_required = false,
-      .secure_required = false,
-      .ram_domain_supported = false,
-      .cpu_domain_supported = true,
-      .inaccessible_domain_supported = false,
-      .heap_permitted_count = 1,
-      .heap_permitted = {fuchsia_sysmem::wire::HeapType::kGoldfishHostVisible}};
-  constraints.image_format_constraints_count = 1;
-  constraints.image_format_constraints[0] = fuchsia_sysmem::wire::ImageFormatConstraints{
-      .pixel_format =
-          fuchsia_sysmem::wire::PixelFormat{
-              .type = fuchsia_sysmem::wire::PixelFormatType::kBgra32,
-              .has_format_modifier = false,
-              .format_modifier = {},
-          },
-      .color_spaces_count = 1,
-      .color_space =
-          {
-              fuchsia_sysmem::wire::ColorSpace{.type = fuchsia_sysmem::wire::ColorSpaceType::kSrgb},
-          },
-      .min_coded_width = 32,
-      .min_coded_height = 32,
-  };
+  auto constraints = fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
+  constraints.usage(fuchsia_sysmem2::wire::BufferUsage::Builder(arena)
+                        .vulkan(fuchsia_sysmem2::wire::kVulkanImageUsageTransferDst)
+                        .Build());
+  constraints.min_buffer_count_for_camping(1)
+      .buffer_memory_constraints(
+          fuchsia_sysmem2::wire::BufferMemoryConstraints::Builder(arena)
+              .min_size_bytes(kMinSizeBytes)
+              .max_size_bytes(kMaxSizeBytes)
+              .cpu_domain_supported(true)
+              .permitted_heaps(std::vector{
+                  fuchsia_sysmem2::wire::Heap::Builder(arena)
+                      .heap_type(bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_HOST_VISIBLE)
+                      .id(0)
+                      .Build()})
+              .Build())
+      .image_format_constraints(
+          std::vector{fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena)
+                          .pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8)
+                          .color_spaces(std::vector{fuchsia_images2::wire::ColorSpace::kSrgb})
+                          .min_size(fuchsia_math::wire::SizeU{.width = 32, .height = 32})
+                          .Build()});
 
-  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(
+  fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection> collection(
       std::move(collection_endpoints.client));
   SetDefaultCollectionName(collection);
-  EXPECT_TRUE(collection->SetConstraints(true, std::move(constraints)).ok());
+  EXPECT_TRUE(collection
+                  ->SetConstraints(
+                      fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena)
+                          .constraints(constraints.Build())
+                          .Build())
+                  .ok());
 
-  fuchsia_sysmem::wire::BufferCollectionInfo2 info;
-  {
-    auto result = collection->WaitForBuffersAllocated();
-    ASSERT_TRUE(result.ok());
-    EXPECT_EQ(result->status, ZX_OK);
+  auto wait_result = collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(wait_result.ok());
+  EXPECT_TRUE(wait_result->is_ok());
 
-    info = std::move(result->buffer_collection_info);
-    EXPECT_EQ(info.buffer_count, 1U);
-    EXPECT_TRUE(info.buffers[0].vmo.is_valid());
-    EXPECT_EQ(info.settings.buffer_settings.coherency_domain,
-              fuchsia_sysmem::wire::CoherencyDomain::kCpu);
-  }
+  const auto& info = wait_result->value()->buffer_collection_info();
+  EXPECT_EQ(info.buffers().count(), 1U);
+  EXPECT_EQ(info.settings().buffer_settings().coherency_domain(),
+            fuchsia_sysmem2::wire::CoherencyDomain::kCpu);
 
-  zx::vmo vmo = std::move(info.buffers[0].vmo);
-  EXPECT_TRUE(vmo.is_valid());
+  zx::vmo vmo = std::move(info.buffers()[0].vmo());
+  ASSERT_TRUE(vmo.is_valid());
 
   uint64_t vmo_size;
   EXPECT_EQ(vmo.get_size(&vmo_size), ZX_OK);
@@ -360,12 +394,12 @@ TEST(GoldfishControlTests, GoldfishControlTest_HostVisible) {
 
   EXPECT_EQ(zx::vmar::root_self()->unmap(addr, PAGE_SIZE), ZX_OK);
 
-  EXPECT_TRUE(collection->Close().ok());
+  EXPECT_TRUE(collection->Release().ok());
 }
 
 TEST(GoldfishControlTests, GoldfishControlTest_HostVisible_MultiClients) {
-  using fuchsia_sysmem::BufferCollection;
-  using fuchsia_sysmem::wire::BufferCollectionConstraints;
+  using fuchsia_sysmem2::BufferCollection;
+  using fuchsia_sysmem2::wire::BufferCollectionConstraints;
 
   zx::result control = ConnectToControl();
   EXPECT_EQ(control.status_value(), ZX_OK);
@@ -375,115 +409,130 @@ TEST(GoldfishControlTests, GoldfishControlTest_HostVisible_MultiClients) {
 
   constexpr size_t kNumClients = 2;
 
-  fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> token_client[kNumClients];
-  fidl::ClientEnd<fuchsia_sysmem::BufferCollection> collection_client[kNumClients];
+  fidl::Arena arena;
+  fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> token_client[kNumClients];
+  fidl::ClientEnd<fuchsia_sysmem2::BufferCollection> collection_client[kNumClients];
 
   // Client 0.
   {
-    auto endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
-    ASSERT_EQ(allocator->AllocateSharedCollection(std::move(endpoints.server)).status(), ZX_OK);
+    auto endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
+    ASSERT_EQ(
+        allocator
+            ->AllocateSharedCollection(
+                fuchsia_sysmem2::wire::AllocatorAllocateSharedCollectionRequest::Builder(arena)
+                    .token_request(std::move(endpoints.server))
+                    .Build())
+            .status(),
+        ZX_OK);
     token_client[0] = std::move(endpoints.client);
   }
 
   // Client 1.
   {
-    auto endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
-    ASSERT_EQ(fidl::WireCall(token_client[0].borrow())
-                  ->Duplicate(0, std::move(endpoints.server))
-                  .status(),
-              ZX_OK);
+    auto endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
+    ASSERT_EQ(
+        fidl::WireCall(token_client[0].borrow())
+            ->Duplicate(fuchsia_sysmem2::wire::BufferCollectionTokenDuplicateRequest::Builder(arena)
+                            .token_request(std::move(endpoints.server))
+                            .rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS)
+                            .Build())
+            .status(),
+        ZX_OK);
     ASSERT_EQ(fidl::WireCall(token_client[0].borrow())->Sync().status(), ZX_OK);
     token_client[1] = std::move(endpoints.client);
   }
 
   for (size_t i = 0; i < kNumClients; i++) {
-    auto endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
+    auto endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
 
-    ASSERT_EQ(
-        allocator->BindSharedCollection(std::move(token_client[i]), std::move(endpoints.server))
-            .status(),
-        ZX_OK);
+    ASSERT_EQ(allocator
+                  ->BindSharedCollection(
+                      fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena)
+                          .token(std::move(token_client[i]))
+                          .buffer_collection_request(std::move(endpoints.server))
+                          .Build())
+                  .status(),
+              ZX_OK);
     collection_client[i] = std::move(endpoints.client);
   }
 
   const size_t kMinSizeBytes = 4 * 1024;
   const size_t kMaxSizeBytes = 4 * 1024 * 512;
   const size_t kTargetSizeBytes = 4 * 1024 * 512;
-  BufferCollectionConstraints constraints[kNumClients];
+  std::vector<fuchsia_sysmem2::wire::BufferCollectionConstraints> constraints;
   for (size_t i = 0; i < kNumClients; i++) {
-    constraints[i].usage.vulkan = fuchsia_sysmem::wire::kVulkanImageUsageTransferDst;
-    constraints[i].min_buffer_count = 1;
-    constraints[i].has_buffer_memory_constraints = true;
-    constraints[i].buffer_memory_constraints = fuchsia_sysmem::wire::BufferMemoryConstraints{
-        .min_size_bytes = kMinSizeBytes,
-        .max_size_bytes = kMaxSizeBytes,
-        .physically_contiguous_required = false,
-        .secure_required = false,
-        .ram_domain_supported = false,
-        .cpu_domain_supported = true,
-        .inaccessible_domain_supported = false,
-        .heap_permitted_count = 1,
-        .heap_permitted = {fuchsia_sysmem::wire::HeapType::kGoldfishHostVisible}};
-    constraints[i].image_format_constraints_count = 1;
-    constraints[i].image_format_constraints[0] = fuchsia_sysmem::wire::ImageFormatConstraints{
-        .pixel_format =
-            fuchsia_sysmem::wire::PixelFormat{
-                .type = fuchsia_sysmem::wire::PixelFormatType::kBgra32,
-                .has_format_modifier = false,
-                .format_modifier = {},
-            },
-        .color_spaces_count = 1,
-        .color_space =
-            {
-                fuchsia_sysmem::wire::ColorSpace{.type =
-                                                     fuchsia_sysmem::wire::ColorSpaceType::kSrgb},
-            },
-    };
-  }
+    auto builder = fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
+    auto image_constraints = fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena);
+    image_constraints.pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8)
+        .color_spaces(std::vector{fuchsia_images2::wire::ColorSpace::kSrgb});
 
-  // Set different min_coded_width and required_max_coded_width for each client.
-  constraints[0].image_format_constraints[0].min_coded_width = 32;
-  constraints[0].image_format_constraints[0].min_coded_height = 64;
-  constraints[1].image_format_constraints[0].min_coded_width = 16;
-  constraints[1].image_format_constraints[0].min_coded_height = 512;
-  constraints[1].image_format_constraints[0].required_max_coded_width = 1024;
-  constraints[1].image_format_constraints[0].required_max_coded_height = 256;
+    // Set different min_coded_width and required_max_coded_width for each client.
+    if (i == 0) {
+      image_constraints.min_size(fuchsia_math::wire::SizeU{.width = 32, .height = 64});
+    }
+    if (i == 1) {
+      image_constraints.min_size(fuchsia_math::wire::SizeU{.width = 16, .height = 512});
+      image_constraints.required_max_size(fuchsia_math::wire::SizeU{.width = 1024, .height = 256});
+    }
+    builder
+        .usage(fuchsia_sysmem2::wire::BufferUsage::Builder(arena)
+                   .vulkan(fuchsia_sysmem2::wire::kVulkanImageUsageTransferDst)
+                   .Build())
+        .min_buffer_count(1)
+        .buffer_memory_constraints(
+            fuchsia_sysmem2::wire::BufferMemoryConstraints::Builder(arena)
+                .cpu_domain_supported(true)
+                .min_size_bytes(kMinSizeBytes)
+                .max_size_bytes(kMaxSizeBytes)
+                .permitted_heaps(std::vector{
+                    fuchsia_sysmem2::wire::Heap::Builder(arena)
+                        .heap_type(
+                            bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_HOST_VISIBLE)
+                        .id(0)
+                        .Build()})
+                .Build())
+        .image_format_constraints(std::vector{image_constraints
+
+                                                  .Build()});
+    constraints.push_back(builder.Build());
+  }
 
   fidl::WireSyncClient<BufferCollection> collection[kNumClients];
   for (size_t i = 0; i < kNumClients; i++) {
     collection[i] = fidl::WireSyncClient<BufferCollection>(std::move(collection_client[i])),
     SetDefaultCollectionName(collection[i]);
-    EXPECT_TRUE(collection[i]->SetConstraints(true, std::move(constraints[i])).ok());
+    EXPECT_TRUE(collection[i]
+                    ->SetConstraints(
+                        fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena)
+                            .constraints(std::move(constraints[i]))
+                            .Build())
+                    .ok());
   };
 
-  fuchsia_sysmem::wire::BufferCollectionInfo2 info;
-  {
-    auto result = collection[0]->WaitForBuffersAllocated();
-    ASSERT_TRUE(result.ok());
-    EXPECT_EQ(result->status, ZX_OK);
+  auto wait_result = collection[0]->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(wait_result.ok());
+  EXPECT_TRUE(wait_result->is_ok());
 
-    info = std::move(result->buffer_collection_info);
-    EXPECT_EQ(info.buffer_count, 1u);
-    EXPECT_TRUE(info.buffers[0].vmo.is_valid());
-    EXPECT_EQ(info.settings.buffer_settings.coherency_domain,
-              fuchsia_sysmem::wire::CoherencyDomain::kCpu);
+  const auto& info = wait_result->value()->buffer_collection_info();
+  EXPECT_EQ(info.buffers().count(), 1U);
+  EXPECT_EQ(info.settings().buffer_settings().coherency_domain(),
+            fuchsia_sysmem2::wire::CoherencyDomain::kCpu);
 
-    const auto& image_format_constraints =
-        result.value().buffer_collection_info.settings.image_format_constraints;
+  const auto& image_format_constraints =
+      wait_result->value()->buffer_collection_info().settings().image_format_constraints();
 
-    EXPECT_EQ(image_format_constraints.min_coded_width, 32u);
-    EXPECT_EQ(image_format_constraints.min_coded_height, 512u);
-    EXPECT_EQ(image_format_constraints.required_max_coded_width, 1024u);
-    EXPECT_EQ(image_format_constraints.required_max_coded_height, 256u);
+  EXPECT_EQ(image_format_constraints.min_size().width, 32u);
+  EXPECT_EQ(image_format_constraints.min_size().height, 512u);
+  EXPECT_EQ(image_format_constraints.required_max_size().width, 1024u);
+  EXPECT_EQ(image_format_constraints.required_max_size().height, 256u);
 
-    // Expected coded_width = max(min_coded_width, required_max_coded_width);
-    // Expected coded_height = max(min_coded_height, required_max_coded_height).
-    // Thus target size should be 1024 x 512 x 4.
-    EXPECT_GE(info.settings.buffer_settings.size_bytes, kTargetSizeBytes);
-  }
+  // Expected coded_width = max(min_coded_width, required_max_coded_width);
+  // Expected coded_height = max(min_coded_height, required_max_coded_height).
+  // Thus target size should be 1024 x 512 x 4.
+  EXPECT_GE(info.settings().buffer_settings().size_bytes(), kTargetSizeBytes);
 
-  zx::vmo vmo = std::move(info.buffers[0].vmo);
-  EXPECT_TRUE(vmo.is_valid());
+  zx::vmo vmo = std::move(info.buffers()[0].vmo());
+  ASSERT_TRUE(vmo.is_valid());
 
   uint64_t vmo_size;
   EXPECT_EQ(vmo.get_size(&vmo_size), ZX_OK);
@@ -509,7 +558,7 @@ TEST(GoldfishControlTests, GoldfishControlTest_HostVisible_MultiClients) {
   EXPECT_EQ(zx::vmar::root_self()->unmap(addr, PAGE_SIZE), ZX_OK);
 
   for (size_t i = 0; i < kNumClients; i++) {
-    EXPECT_TRUE(collection[i]->Close().ok());
+    EXPECT_TRUE(collection[i]->Release().ok());
   }
 }
 
@@ -519,57 +568,72 @@ TEST(GoldfishControlTests, GoldfishControlTest_HostVisibleBuffer) {
   fidl::WireSyncClient<fuchsia_hardware_goldfish::ControlDevice> control(
       std::move(control_connection.value()));
 
+  fidl::Arena arena;
   auto allocator = CreateSysmemAllocator();
   ASSERT_TRUE(allocator.is_valid());
 
-  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
-  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints.server)).status(), ZX_OK);
-
-  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
+  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
   ASSERT_EQ(allocator
-                ->BindSharedCollection(std::move(token_endpoints.client),
-                                       std::move(collection_endpoints.server))
+                ->AllocateSharedCollection(
+                    fuchsia_sysmem2::wire::AllocatorAllocateSharedCollectionRequest::Builder(arena)
+                        .token_request(std::move(token_endpoints.server))
+                        .Build())
+                .status(),
+            ZX_OK);
+  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
+  ASSERT_EQ(allocator
+                ->BindSharedCollection(
+                    fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena)
+                        .buffer_collection_request(std::move(collection_endpoints.server))
+                        .token(std::move(token_endpoints.client))
+                        .Build())
                 .status(),
             ZX_OK);
 
   const size_t kMinSizeBytes = 4 * 1024;
   const size_t kMaxSizeBytes = 4 * 4096;
-  fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
-  constraints.usage.vulkan = fuchsia_sysmem::wire::kVulkanUsageTransferDst;
-  constraints.min_buffer_count_for_camping = 1;
-  constraints.has_buffer_memory_constraints = true;
-  constraints.buffer_memory_constraints = fuchsia_sysmem::wire::BufferMemoryConstraints{
-      .min_size_bytes = kMinSizeBytes,
-      .max_size_bytes = kMaxSizeBytes,
-      .physically_contiguous_required = false,
-      .secure_required = false,
-      .ram_domain_supported = false,
-      .cpu_domain_supported = true,
-      .inaccessible_domain_supported = false,
-      .heap_permitted_count = 1,
-      .heap_permitted = {fuchsia_sysmem::wire::HeapType::kGoldfishHostVisible}};
-  constraints.image_format_constraints_count = 0;
+  auto constraints = fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
+  constraints
+      .usage(fuchsia_sysmem2::wire::BufferUsage::Builder(arena)
+                 .vulkan(fuchsia_sysmem2::wire::kVulkanImageUsageTransferDst)
+                 .Build())
+      .min_buffer_count_for_camping(1)
+      .buffer_memory_constraints(
+          fuchsia_sysmem2::wire::BufferMemoryConstraints::Builder(arena)
+              .min_size_bytes(kMinSizeBytes)
+              .max_size_bytes(kMaxSizeBytes)
+              .physically_contiguous_required(false)
+              .secure_required(false)
+              .ram_domain_supported(false)
+              .cpu_domain_supported(true)
+              .inaccessible_domain_supported(false)
+              .permitted_heaps(std::vector{
+                  fuchsia_sysmem2::wire::Heap::Builder(arena)
+                      .heap_type(bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_HOST_VISIBLE)
+                      .id(0)
+                      .Build()})
+              .Build());
 
-  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(
+  fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection> collection(
       std::move(collection_endpoints.client));
   SetDefaultCollectionName(collection);
-  EXPECT_TRUE(collection->SetConstraints(true, std::move(constraints)).ok());
+  EXPECT_TRUE(collection
+                  ->SetConstraints(
+                      fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena)
+                          .constraints(constraints.Build())
+                          .Build())
+                  .ok());
+  auto wait_result = collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(wait_result.ok());
+  EXPECT_TRUE(wait_result->is_ok());
 
-  fuchsia_sysmem::wire::BufferCollectionInfo2 info;
-  {
-    auto result = collection->WaitForBuffersAllocated();
-    ASSERT_TRUE(result.ok());
-    EXPECT_EQ(result->status, ZX_OK);
+  const auto& info = wait_result->value()->buffer_collection_info();
+  EXPECT_EQ(info.buffers().count(), 1U);
+  EXPECT_EQ(info.settings().buffer_settings().coherency_domain(),
+            fuchsia_sysmem2::wire::CoherencyDomain::kCpu);
 
-    info = std::move(result->buffer_collection_info);
-    EXPECT_EQ(info.buffer_count, 1U);
-    EXPECT_TRUE(info.buffers[0].vmo.is_valid());
-    EXPECT_EQ(info.settings.buffer_settings.coherency_domain,
-              fuchsia_sysmem::wire::CoherencyDomain::kCpu);
-  }
-
-  zx::vmo vmo = std::move(info.buffers[0].vmo);
-  EXPECT_TRUE(vmo.is_valid());
+  zx::vmo vmo = std::move(info.buffers()[0].vmo());
+  ASSERT_TRUE(vmo.is_valid());
 
   uint64_t vmo_size;
   EXPECT_EQ(vmo.get_size(&vmo_size), ZX_OK);
@@ -594,7 +658,7 @@ TEST(GoldfishControlTests, GoldfishControlTest_HostVisibleBuffer) {
 
   EXPECT_EQ(zx::vmar::root_self()->unmap(addr, PAGE_SIZE), ZX_OK);
 
-  EXPECT_TRUE(collection->Close().ok());
+  EXPECT_TRUE(collection->Release().ok());
 }
 
 TEST(GoldfishControlTests, GoldfishControlTest_DataBuffer) {
@@ -606,52 +670,68 @@ TEST(GoldfishControlTests, GoldfishControlTest_DataBuffer) {
   auto allocator = CreateSysmemAllocator();
   ASSERT_TRUE(allocator.is_valid());
 
-  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
-  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints.server)).status(), ZX_OK);
-
-  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
+  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
+  fidl::Arena arena;
   ASSERT_EQ(allocator
-                ->BindSharedCollection(std::move(token_endpoints.client),
-                                       std::move(collection_endpoints.server))
+                ->AllocateSharedCollection(
+                    fuchsia_sysmem2::wire::AllocatorAllocateSharedCollectionRequest::Builder(arena)
+                        .token_request(std::move(token_endpoints.server))
+                        .Build())
+                .status(),
+            ZX_OK);
+  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
+  ASSERT_EQ(allocator
+                ->BindSharedCollection(
+                    fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena)
+                        .buffer_collection_request(std::move(collection_endpoints.server))
+                        .token(std::move(token_endpoints.client))
+                        .Build())
                 .status(),
             ZX_OK);
 
   constexpr size_t kBufferSizeBytes = 4 * 1024;
-  fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
-  constraints.usage.vulkan = fuchsia_sysmem::wire::kVulkanBufferUsageTransferDst;
-  constraints.min_buffer_count_for_camping = 1;
-  constraints.has_buffer_memory_constraints = true;
-  constraints.buffer_memory_constraints = fuchsia_sysmem::wire::BufferMemoryConstraints{
-      .min_size_bytes = kBufferSizeBytes,
-      .max_size_bytes = kBufferSizeBytes,
-      .physically_contiguous_required = false,
-      .secure_required = false,
-      .ram_domain_supported = false,
-      .cpu_domain_supported = false,
-      .inaccessible_domain_supported = true,
-      .heap_permitted_count = 1,
-      .heap_permitted = {fuchsia_sysmem::wire::HeapType::kGoldfishDeviceLocal}};
+  auto constraints = fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
+  constraints
+      .usage(fuchsia_sysmem2::wire::BufferUsage::Builder(arena)
+                 .vulkan(fuchsia_sysmem2::wire::kVulkanImageUsageTransferDst)
+                 .Build())
+      .min_buffer_count_for_camping(1)
+      .buffer_memory_constraints(
+          fuchsia_sysmem2::wire::BufferMemoryConstraints::Builder(arena)
+              .min_size_bytes(kBufferSizeBytes)
+              .max_size_bytes(kBufferSizeBytes)
+              .physically_contiguous_required(false)
+              .secure_required(false)
+              .ram_domain_supported(false)
+              .cpu_domain_supported(false)
+              .inaccessible_domain_supported(true)
+              .permitted_heaps(std::vector{
+                  fuchsia_sysmem2::wire::Heap::Builder(arena)
+                      .heap_type(bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_DEVICE_LOCAL)
+                      .id(0)
+                      .Build()})
+              .Build());
 
-  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(
+  fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection> collection(
       std::move(collection_endpoints.client));
   SetDefaultCollectionName(collection);
-  EXPECT_TRUE(collection->SetConstraints(true, std::move(constraints)).ok());
+  EXPECT_TRUE(collection
+                  ->SetConstraints(
+                      fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena)
+                          .constraints(constraints.Build())
+                          .Build())
+                  .ok());
+  auto wait_result = collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(wait_result.ok());
+  EXPECT_TRUE(wait_result->is_ok());
 
-  fuchsia_sysmem::wire::BufferCollectionInfo2 info;
-  {
-    auto result = collection->WaitForBuffersAllocated();
-    ASSERT_TRUE(result.ok());
-    EXPECT_EQ(result->status, ZX_OK);
+  const auto& info = wait_result->value()->buffer_collection_info();
+  EXPECT_EQ(info.buffers().count(), 1U);
 
-    info = std::move(result->buffer_collection_info);
-    EXPECT_EQ(info.buffer_count, 1u);
-    EXPECT_TRUE(info.buffers[0].vmo.is_valid());
-  }
+  zx::vmo vmo = std::move(info.buffers()[0].vmo());
+  ASSERT_TRUE(vmo.is_valid());
 
-  zx::vmo vmo = std::move(info.buffers[0].vmo);
-  EXPECT_TRUE(vmo.is_valid());
-
-  EXPECT_TRUE(collection->Close().ok());
+  EXPECT_TRUE(collection->Release().ok());
 
   zx::vmo vmo_copy;
   EXPECT_EQ(vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo_copy), ZX_OK);
@@ -768,54 +848,72 @@ TEST(GoldfishControlTests, GoldfishControlTest_CreateColorBuffer2Args) {
   auto allocator = CreateSysmemAllocator();
   ASSERT_TRUE(allocator.is_valid());
 
-  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
-  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints.server)).status(), ZX_OK);
-
-  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
+  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
+  fidl::Arena arena;
   ASSERT_EQ(allocator
-                ->BindSharedCollection(std::move(token_endpoints.client),
-                                       std::move(collection_endpoints.server))
+                ->AllocateSharedCollection(
+                    fuchsia_sysmem2::wire::AllocatorAllocateSharedCollectionRequest::Builder(arena)
+                        .token_request(std::move(token_endpoints.server))
+                        .Build())
+                .status(),
+            ZX_OK);
+
+  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
+  ASSERT_EQ(allocator
+                ->BindSharedCollection(
+                    fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena)
+                        .buffer_collection_request(std::move(collection_endpoints.server))
+                        .token(std::move(token_endpoints.client))
+                        .Build())
                 .status(),
             ZX_OK);
 
   // ----------------------------------------------------------------------//
   // Use device local heap which only *registers* the koid of vmo to control
   // device.
-  fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
-  constraints.usage.vulkan = fuchsia_sysmem::wire::kVulkanImageUsageTransferDst;
-  constraints.min_buffer_count_for_camping = 1;
-  constraints.has_buffer_memory_constraints = true;
-  constraints.buffer_memory_constraints = fuchsia_sysmem::wire::BufferMemoryConstraints{
-      .min_size_bytes = 4 * 1024,
-      .max_size_bytes = 4 * 1024,
-      .physically_contiguous_required = false,
-      .secure_required = false,
-      .ram_domain_supported = false,
-      .cpu_domain_supported = false,
-      .inaccessible_domain_supported = true,
-      .heap_permitted_count = 1,
-      .heap_permitted = {fuchsia_sysmem::wire::HeapType::kGoldfishDeviceLocal}};
+  auto constraints = fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
+  constraints
+      .usage(fuchsia_sysmem2::wire::BufferUsage::Builder(arena)
+                 .vulkan(fuchsia_sysmem2::wire::kVulkanImageUsageTransferDst)
+                 .Build())
+      .min_buffer_count_for_camping(1)
+      .buffer_memory_constraints(
+          fuchsia_sysmem2::wire::BufferMemoryConstraints::Builder(arena)
+              .min_size_bytes(4 * 1024)
+              .max_size_bytes(4 * 1024)
+              .physically_contiguous_required(false)
+              .secure_required(false)
+              .ram_domain_supported(false)
+              .cpu_domain_supported(false)
+              .inaccessible_domain_supported(true)
+              .permitted_heaps(std::vector{
+                  fuchsia_sysmem2::wire::Heap::Builder(arena)
+                      .heap_type(bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_DEVICE_LOCAL)
+                      .id(0)
+                      .Build()})
+              .Build());
 
-  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(
+  fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection> collection(
       std::move(collection_endpoints.client));
   SetDefaultCollectionName(collection);
-  EXPECT_TRUE(collection->SetConstraints(true, std::move(constraints)).ok());
+  EXPECT_TRUE(collection
+                  ->SetConstraints(
+                      fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena)
+                          .constraints(constraints.Build())
+                          .Build())
+                  .ok());
 
-  fuchsia_sysmem::wire::BufferCollectionInfo2 info;
-  {
-    auto result = collection->WaitForBuffersAllocated();
-    ASSERT_TRUE(result.ok());
-    EXPECT_EQ(result->status, ZX_OK);
+  auto wait_result = collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(wait_result.ok());
+  EXPECT_TRUE(wait_result->is_ok());
 
-    info = std::move(result->buffer_collection_info);
-    EXPECT_EQ(info.buffer_count, 1u);
-    EXPECT_TRUE(info.buffers[0].vmo.is_valid());
-  }
+  const auto& info = wait_result->value()->buffer_collection_info();
+  EXPECT_EQ(info.buffers().count(), 1U);
 
-  zx::vmo vmo = std::move(info.buffers[0].vmo);
-  EXPECT_TRUE(vmo.is_valid());
+  zx::vmo vmo = std::move(info.buffers()[0].vmo());
+  ASSERT_TRUE(vmo.is_valid());
 
-  EXPECT_TRUE(collection->Close().ok());
+  EXPECT_TRUE(collection->Release().ok());
 
   // ----------------------------------------------------------------------//
   // Try creating color buffer.
@@ -902,54 +1000,71 @@ TEST(GoldfishControlTests, GoldfishControlTest_CreateBuffer2Args) {
   auto allocator = CreateSysmemAllocator();
   ASSERT_TRUE(allocator.is_valid());
 
-  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
-  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints.server)).status(), ZX_OK);
-
-  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
+  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
+  fidl::Arena arena;
   ASSERT_EQ(allocator
-                ->BindSharedCollection(std::move(token_endpoints.client),
-                                       std::move(collection_endpoints.server))
+                ->AllocateSharedCollection(
+                    fuchsia_sysmem2::wire::AllocatorAllocateSharedCollectionRequest::Builder(arena)
+                        .token_request(std::move(token_endpoints.server))
+                        .Build())
+                .status(),
+            ZX_OK);
+
+  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
+  ASSERT_EQ(allocator
+                ->BindSharedCollection(
+                    fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena)
+                        .buffer_collection_request(std::move(collection_endpoints.server))
+                        .token(std::move(token_endpoints.client))
+                        .Build())
                 .status(),
             ZX_OK);
 
   // ----------------------------------------------------------------------//
   // Use device local heap which only *registers* the koid of vmo to control
   // device.
-  fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
-  constraints.usage.vulkan = fuchsia_sysmem::wire::kVulkanImageUsageTransferDst;
-  constraints.min_buffer_count_for_camping = 1;
-  constraints.has_buffer_memory_constraints = true;
-  constraints.buffer_memory_constraints = fuchsia_sysmem::wire::BufferMemoryConstraints{
-      .min_size_bytes = 4 * 1024,
-      .max_size_bytes = 4 * 1024,
-      .physically_contiguous_required = false,
-      .secure_required = false,
-      .ram_domain_supported = false,
-      .cpu_domain_supported = false,
-      .inaccessible_domain_supported = true,
-      .heap_permitted_count = 1,
-      .heap_permitted = {fuchsia_sysmem::wire::HeapType::kGoldfishDeviceLocal}};
+  auto constraints = fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
+  constraints
+      .usage(fuchsia_sysmem2::wire::BufferUsage::Builder(arena)
+                 .vulkan(fuchsia_sysmem2::wire::kVulkanImageUsageTransferDst)
+                 .Build())
+      .min_buffer_count_for_camping(1)
+      .buffer_memory_constraints(
+          fuchsia_sysmem2::wire::BufferMemoryConstraints::Builder(arena)
+              .min_size_bytes(4 * 1024)
+              .max_size_bytes(4 * 1024)
+              .physically_contiguous_required(false)
+              .secure_required(false)
+              .ram_domain_supported(false)
+              .cpu_domain_supported(false)
+              .inaccessible_domain_supported(true)
+              .permitted_heaps(std::vector{
+                  fuchsia_sysmem2::wire::Heap::Builder(arena)
+                      .heap_type(bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_DEVICE_LOCAL)
+                      .id(0)
+                      .Build()})
+              .Build());
 
-  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(
+  fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection> collection(
       std::move(collection_endpoints.client));
   SetDefaultCollectionName(collection);
-  EXPECT_TRUE(collection->SetConstraints(true, std::move(constraints)).ok());
+  EXPECT_TRUE(collection
+                  ->SetConstraints(
+                      fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena)
+                          .constraints(constraints.Build())
+                          .Build())
+                  .ok());
+  auto wait_result = collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(wait_result.ok());
+  EXPECT_TRUE(wait_result->is_ok());
 
-  fuchsia_sysmem::wire::BufferCollectionInfo2 info;
-  {
-    auto result = collection->WaitForBuffersAllocated();
-    ASSERT_TRUE(result.ok());
-    EXPECT_EQ(result->status, ZX_OK);
+  const auto& info = wait_result->value()->buffer_collection_info();
+  EXPECT_EQ(info.buffers().count(), 1U);
 
-    info = std::move(result->buffer_collection_info);
-    EXPECT_EQ(info.buffer_count, 1u);
-    EXPECT_TRUE(info.buffers[0].vmo.is_valid());
-  }
+  zx::vmo vmo = std::move(info.buffers()[0].vmo());
+  ASSERT_TRUE(vmo.is_valid());
 
-  zx::vmo vmo = std::move(info.buffers[0].vmo);
-  EXPECT_TRUE(vmo.is_valid());
-
-  EXPECT_TRUE(collection->Close().ok());
+  EXPECT_TRUE(collection->Release().ok());
 
   // ----------------------------------------------------------------------//
   // Try creating data buffers.
@@ -999,51 +1114,66 @@ TEST(GoldfishControlTests, GoldfishControlTest_GetNotCreatedColorBuffer) {
   auto allocator = CreateSysmemAllocator();
   ASSERT_TRUE(allocator.is_valid());
 
-  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
-  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints.server)).status(), ZX_OK);
-
-  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
+  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
+  fidl::Arena arena;
   ASSERT_EQ(allocator
-                ->BindSharedCollection(std::move(token_endpoints.client),
-                                       std::move(collection_endpoints.server))
+                ->AllocateSharedCollection(
+                    fuchsia_sysmem2::wire::AllocatorAllocateSharedCollectionRequest::Builder(arena)
+                        .token_request(std::move(token_endpoints.server))
+                        .Build())
                 .status(),
             ZX_OK);
+  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
+  ASSERT_EQ(allocator
+                ->BindSharedCollection(
+                    fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena)
+                        .buffer_collection_request(std::move(collection_endpoints.server))
+                        .token(std::move(token_endpoints.client))
+                        .Build())
+                .status(),
+            ZX_OK);
+  auto constraints = fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
+  constraints
+      .usage(fuchsia_sysmem2::wire::BufferUsage::Builder(arena)
+                 .vulkan(fuchsia_sysmem2::wire::kVulkanImageUsageTransferDst)
+                 .Build())
+      .min_buffer_count_for_camping(1)
+      .buffer_memory_constraints(
+          fuchsia_sysmem2::wire::BufferMemoryConstraints::Builder(arena)
+              .min_size_bytes(4 * 1024)
+              .max_size_bytes(4 * 1024)
+              .physically_contiguous_required(false)
+              .secure_required(false)
+              .ram_domain_supported(false)
+              .cpu_domain_supported(false)
+              .inaccessible_domain_supported(true)
+              .permitted_heaps(std::vector{
+                  fuchsia_sysmem2::wire::Heap::Builder(arena)
+                      .heap_type(bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_DEVICE_LOCAL)
+                      .id(0)
+                      .Build()})
+              .Build());
 
-  fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
-  constraints.usage.vulkan = fuchsia_sysmem::wire::kVulkanImageUsageTransferDst;
-  constraints.min_buffer_count_for_camping = 1;
-  constraints.has_buffer_memory_constraints = true;
-  constraints.buffer_memory_constraints = fuchsia_sysmem::wire::BufferMemoryConstraints{
-      .min_size_bytes = 4 * 1024,
-      .max_size_bytes = 4 * 1024,
-      .physically_contiguous_required = false,
-      .secure_required = false,
-      .ram_domain_supported = false,
-      .cpu_domain_supported = false,
-      .inaccessible_domain_supported = true,
-      .heap_permitted_count = 1,
-      .heap_permitted = {fuchsia_sysmem::wire::HeapType::kGoldfishDeviceLocal}};
-
-  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(
+  fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection> collection(
       std::move(collection_endpoints.client));
   SetDefaultCollectionName(collection);
-  EXPECT_TRUE(collection->SetConstraints(true, constraints).ok());
+  EXPECT_TRUE(collection
+                  ->SetConstraints(
+                      fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena)
+                          .constraints(constraints.Build())
+                          .Build())
+                  .ok());
+  auto wait_result = collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(wait_result.ok());
+  EXPECT_TRUE(wait_result->is_ok());
 
-  fuchsia_sysmem::wire::BufferCollectionInfo2 info;
-  {
-    auto result = collection->WaitForBuffersAllocated();
-    ASSERT_TRUE(result.ok());
-    EXPECT_EQ(result->status, ZX_OK);
+  const auto& info = wait_result->value()->buffer_collection_info();
+  EXPECT_EQ(info.buffers().count(), 1U);
 
-    info = std::move(result->buffer_collection_info);
-    EXPECT_EQ(info.buffer_count, 1u);
-    EXPECT_TRUE(info.buffers[0].vmo.is_valid());
-  }
+  zx::vmo vmo = std::move(info.buffers()[0].vmo());
+  ASSERT_TRUE(vmo.is_valid());
 
-  zx::vmo vmo = std::move(info.buffers[0].vmo);
-  EXPECT_TRUE(vmo.is_valid());
-
-  EXPECT_TRUE(collection->Close().ok());
+  EXPECT_TRUE(collection->Release().ok());
 
   zx::vmo vmo_copy;
   EXPECT_EQ(vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo_copy), ZX_OK);
@@ -1207,17 +1337,25 @@ TEST(GoldfishHostMemoryTests, GoldfishHostVisibleColorBuffer) {
   auto allocator = CreateSysmemAllocator();
   ASSERT_TRUE(allocator.is_valid());
 
-  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
-  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints.server)).status(), ZX_OK);
-
-  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
+  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
+  fidl::Arena arena;
   ASSERT_EQ(allocator
-                ->BindSharedCollection(std::move(token_endpoints.client),
-                                       std::move(collection_endpoints.server))
+                ->AllocateSharedCollection(
+                    fuchsia_sysmem2::wire::AllocatorAllocateSharedCollectionRequest::Builder(arena)
+                        .token_request(std::move(token_endpoints.server))
+                        .Build())
                 .status(),
             ZX_OK);
-  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(
-      std::move(collection_endpoints.client));
+
+  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
+  ASSERT_EQ(allocator
+                ->BindSharedCollection(
+                    fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena)
+                        .buffer_collection_request(std::move(collection_endpoints.server))
+                        .token(std::move(token_endpoints.client))
+                        .Build())
+                .status(),
+            ZX_OK);
 
   // ----------------------------------------------------------------------//
   // Setup address space driver.
@@ -1259,39 +1397,49 @@ TEST(GoldfishHostMemoryTests, GoldfishHostVisibleColorBuffer) {
   // ----------------------------------------------------------------------//
   // Use device local heap which only *registers* the koid of vmo to control
   // device.
-  fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
-  constraints.usage.vulkan = fuchsia_sysmem::wire::kVulkanImageUsageTransferDst;
-  constraints.min_buffer_count_for_camping = 1;
-  constraints.has_buffer_memory_constraints = true;
-  constraints.buffer_memory_constraints = fuchsia_sysmem::wire::BufferMemoryConstraints{
-      .min_size_bytes = 4 * 1024,
-      .max_size_bytes = 4 * 1024,
-      .physically_contiguous_required = false,
-      .secure_required = false,
-      .ram_domain_supported = false,
-      .cpu_domain_supported = false,
-      .inaccessible_domain_supported = true,
-      .heap_permitted_count = 1,
-      .heap_permitted = {fuchsia_sysmem::wire::HeapType::kGoldfishDeviceLocal}};
+  auto constraints = fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
+  constraints
+      .usage(fuchsia_sysmem2::wire::BufferUsage::Builder(arena)
+                 .vulkan(fuchsia_sysmem2::wire::kVulkanImageUsageTransferDst)
+                 .Build())
+      .min_buffer_count_for_camping(1)
+      .buffer_memory_constraints(
+          fuchsia_sysmem2::wire::BufferMemoryConstraints::Builder(arena)
+              .min_size_bytes(4 * 1024)
+              .max_size_bytes(4 * 1024)
+              .physically_contiguous_required(false)
+              .secure_required(false)
+              .ram_domain_supported(false)
+              .cpu_domain_supported(false)
+              .inaccessible_domain_supported(true)
+              .permitted_heaps(std::vector{
+                  fuchsia_sysmem2::wire::Heap::Builder(arena)
+                      .heap_type(bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_DEVICE_LOCAL)
+                      .id(0)
+                      .Build()})
+              .Build());
+
+  fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection> collection(
+      std::move(collection_endpoints.client));
 
   SetDefaultCollectionName(collection);
-  EXPECT_TRUE(collection->SetConstraints(true, constraints).ok());
+  EXPECT_TRUE(collection
+                  ->SetConstraints(
+                      fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena)
+                          .constraints(constraints.Build())
+                          .Build())
+                  .ok());
+  auto wait_result = collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(wait_result.ok());
+  EXPECT_TRUE(wait_result->is_ok());
 
-  fuchsia_sysmem::wire::BufferCollectionInfo2 info;
-  {
-    auto result = collection->WaitForBuffersAllocated();
-    ASSERT_TRUE(result.ok());
-    EXPECT_EQ(result->status, ZX_OK);
+  const auto& info = wait_result->value()->buffer_collection_info();
+  EXPECT_EQ(info.buffers().count(), 1U);
 
-    info = std::move(result->buffer_collection_info);
-    EXPECT_EQ(info.buffer_count, 1U);
-    EXPECT_TRUE(info.buffers[0].vmo.is_valid());
-  }
+  zx::vmo vmo = std::move(info.buffers()[0].vmo());
+  ASSERT_TRUE(vmo.is_valid());
 
-  zx::vmo vmo = std::move(info.buffers[0].vmo);
-  EXPECT_TRUE(vmo.is_valid());
-
-  EXPECT_TRUE(collection->Close().ok());
+  EXPECT_TRUE(collection->Release().ok());
 
   // ----------------------------------------------------------------------//
   // Creates color buffer and map host memory.
@@ -1364,50 +1512,70 @@ TEST_P(GoldfishCreateColorBufferTest, CreateColorBufferWithFormat) {
   auto allocator = CreateSysmemAllocator();
   ASSERT_TRUE(allocator.is_valid());
 
-  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
-  ASSERT_EQ(allocator->AllocateSharedCollection(std::move(token_endpoints.server)).status(), ZX_OK);
-
-  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
+  auto token_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
+  fidl::Arena arena;
   ASSERT_EQ(allocator
-                ->BindSharedCollection(std::move(token_endpoints.client),
-                                       std::move(collection_endpoints.server))
+                ->AllocateSharedCollection(
+                    fuchsia_sysmem2::wire::AllocatorAllocateSharedCollectionRequest::Builder(arena)
+                        .token_request(std::move(token_endpoints.server))
+                        .Build())
                 .status(),
             ZX_OK);
-  fidl::WireSyncClient collection(std::move(collection_endpoints.client));
 
-  fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
-  constraints.usage.vulkan = fuchsia_sysmem::wire::kVulkanImageUsageTransferDst;
-  constraints.min_buffer_count_for_camping = 1;
-  constraints.has_buffer_memory_constraints = true;
-  constraints.buffer_memory_constraints = fuchsia_sysmem::wire::BufferMemoryConstraints{
-      .min_size_bytes = 4 * 1024,
-      .max_size_bytes = 4 * 1024,
-      .physically_contiguous_required = false,
-      .secure_required = false,
-      .ram_domain_supported = false,
-      .cpu_domain_supported = false,
-      .inaccessible_domain_supported = true,
-      .heap_permitted_count = 1,
-      .heap_permitted = {fuchsia_sysmem::wire::HeapType::kGoldfishDeviceLocal}};
+  auto collection_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
+  ASSERT_EQ(allocator
+                ->BindSharedCollection(
+                    fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena)
+                        .buffer_collection_request(std::move(collection_endpoints.server))
+                        .token(std::move(token_endpoints.client))
+                        .Build())
+                .status(),
+            ZX_OK);
+
+  auto constraints = fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
+  constraints
+      .usage(fuchsia_sysmem2::wire::BufferUsage::Builder(arena)
+                 .vulkan(fuchsia_sysmem2::wire::kVulkanImageUsageTransferDst)
+                 .Build())
+      .min_buffer_count_for_camping(1)
+      .buffer_memory_constraints(
+          fuchsia_sysmem2::wire::BufferMemoryConstraints::Builder(arena)
+              .min_size_bytes(4 * 1024)
+              .max_size_bytes(4 * 1024)
+              .physically_contiguous_required(false)
+              .secure_required(false)
+              .ram_domain_supported(false)
+              .cpu_domain_supported(false)
+              .inaccessible_domain_supported(true)
+              .permitted_heaps(std::vector{
+                  fuchsia_sysmem2::wire::Heap::Builder(arena)
+                      .heap_type(bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_DEVICE_LOCAL)
+                      .id(0)
+                      .Build()})
+              .Build());
+
+  fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection> collection(
+      std::move(collection_endpoints.client));
 
   SetDefaultCollectionName(collection);
-  EXPECT_TRUE(collection->SetConstraints(true, constraints).ok());
+  EXPECT_TRUE(collection
+                  ->SetConstraints(
+                      fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena)
+                          .constraints(constraints.Build())
+                          .Build())
+                  .ok());
 
-  fuchsia_sysmem::wire::BufferCollectionInfo2 info;
-  {
-    auto result = collection->WaitForBuffersAllocated();
-    ASSERT_TRUE(result.ok());
-    EXPECT_EQ(result->status, ZX_OK);
+  auto wait_result = collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(wait_result.ok());
+  EXPECT_TRUE(wait_result->is_ok());
 
-    info = std::move(result->buffer_collection_info);
-    EXPECT_EQ(info.buffer_count, 1U);
-    EXPECT_TRUE(info.buffers[0].vmo.is_valid());
-  }
+  const auto& info = wait_result->value()->buffer_collection_info();
+  EXPECT_EQ(info.buffers().count(), 1U);
 
-  zx::vmo vmo = std::move(info.buffers[0].vmo);
-  EXPECT_TRUE(vmo.is_valid());
+  zx::vmo vmo = std::move(info.buffers()[0].vmo());
+  ASSERT_TRUE(vmo.is_valid());
 
-  EXPECT_TRUE(collection->Close().ok());
+  EXPECT_TRUE(collection->Release().ok());
 
   zx::vmo vmo_copy;
   EXPECT_EQ(vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo_copy), ZX_OK);

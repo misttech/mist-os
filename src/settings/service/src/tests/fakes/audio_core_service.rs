@@ -1,7 +1,8 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::audio::default_audio_info;
+
+use crate::audio::types::AudioInfo;
 use crate::tests::fakes::base::Service;
 use anyhow::{format_err, Error};
 use fidl::{endpoints::ServerEnd, prelude::*};
@@ -18,11 +19,12 @@ use std::sync::Arc;
 
 pub(crate) struct Builder {
     suppress_client_errors: bool,
+    default_settings: AudioInfo,
 }
 
 impl Builder {
-    pub(crate) fn new() -> Self {
-        Self { suppress_client_errors: false }
+    pub(crate) fn new(default_settings: AudioInfo) -> Self {
+        Self { suppress_client_errors: false, default_settings }
     }
 
     /// Sets whether errors originating from communicating with the client
@@ -34,7 +36,10 @@ impl Builder {
     }
 
     pub(crate) fn build(self) -> Arc<Mutex<AudioCoreService>> {
-        Arc::new(Mutex::new(AudioCoreService::new(self.suppress_client_errors)))
+        Arc::new(Mutex::new(AudioCoreService::new(
+            self.suppress_client_errors,
+            self.default_settings,
+        )))
     }
 }
 /// An implementation of audio core service that captures the set gains on
@@ -46,9 +51,9 @@ pub(crate) struct AudioCoreService {
 }
 
 impl AudioCoreService {
-    pub(crate) fn new(suppress_client_errors: bool) -> Self {
+    pub(crate) fn new(suppress_client_errors: bool, default_settings: AudioInfo) -> Self {
         let mut streams = HashMap::new();
-        for stream in default_audio_info().streams.iter() {
+        for stream in default_settings.streams.iter() {
             let _ = streams.insert(
                 AudioRenderUsage::from(stream.stream_type),
                 (stream.user_volume_level, stream.user_volume_muted),

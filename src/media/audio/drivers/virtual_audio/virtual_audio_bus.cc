@@ -7,7 +7,7 @@
 
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_control_impl.h"
 
-// Define a bus driver that binds to /dev/sys/platform/00:00:2f/virtual_audio.
+// Define a bus driver that binds to /dev/sys/platform/virtual-audio/virtual_audio.
 static constexpr zx_driver_ops_t virtual_audio_bus_driver_ops = []() {
   zx_driver_ops_t ops = {};
   ops.version = DRIVER_OPS_VERSION;

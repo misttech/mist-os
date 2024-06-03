@@ -6,7 +6,7 @@
 
 #include <lib/affine/ratio.h>
 #include <lib/boot-options/boot-options.h>
-#include <lib/time-values-abi.h>
+#include <lib/fasttime/internal/abi.h>
 #include <lib/userabi/vdso-constants.h>
 #include <lib/userabi/vdso.h>
 #include <lib/version.h>
@@ -230,7 +230,7 @@ void SetTimeValues(const fbl::RefPtr<VmObject>& vmo) {
 #endif
 
   // Initialize the time values that should be visible to the vDSO.
-  internal::TimeValues values = {
+  fasttime::internal::TimeValues values = {
       .version = 1,
       .ticks_per_second = per_second,
       .raw_ticks_to_ticks_offset = platform_get_raw_ticks_to_ticks_offset(),

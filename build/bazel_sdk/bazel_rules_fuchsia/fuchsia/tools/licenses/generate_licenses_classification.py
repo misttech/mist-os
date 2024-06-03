@@ -150,15 +150,22 @@ def _apply_policy_and_overrides(
     return classification
 
 
-def _print_verification_errors(
+def _verification_error_message(
     classifications: LicensesClassifications, preamble_file_path
-):
+) -> str:
+    message: List[str] = [
+        "ERROR: Licenses verification failed. See following details."
+    ]
+
+    def p(s: str) -> None:
+        message.append(s)
+
     if preamble_file_path:
         with open(preamble_file_path, "r") as preamble_file:
             preamble_text = preamble_file.read()
-            _log("=====================")
-            _log(preamble_text)
-            _log("=====================")
+            p("=====================")
+            p(preamble_text)
+            p("=====================")
 
     verification_messages = classifications.verification_errors()
 
@@ -169,15 +176,17 @@ def _print_verification_errors(
         verification_messages = verification_messages[0:max_verification_errors]
 
     for i in range(0, len(verification_messages)):
-        _log(f"==========================")
-        _log(f"VERIFICATION MESSAGE {i+1}/{message_count}:")
-        _log(f"==========================")
-        _log(verification_messages[i])
+        p(f"==========================")
+        p(f"VERIFICATION MESSAGE {i+1}/{message_count}:")
+        p(f"==========================")
+        p(verification_messages[i])
 
     if message_count > max_verification_errors:
-        _log(
+        p(
             f"WARNING: Too many verification errors. Only showing the first {max_verification_errors} of {message_count} errors."
         )
+
+    return "\n".join(message)
 
 
 def main():
@@ -329,10 +338,12 @@ allowing downstream customers to provide project specific instructions.
     if args.fail_on_disallowed_conditions:
         if classification.failed_verifications_count() > 0:
             _log("ERROR: Licenses verification failed.")
-            _print_verification_errors(
-                classification, preamble_file_path=args.failure_message_preamble
+            raise RuntimeError(
+                _verification_error_message(
+                    classification,
+                    preamble_file_path=args.failure_message_preamble,
+                )
             )
-            sys.exit(-1)
 
 
 if __name__ == "__main__":

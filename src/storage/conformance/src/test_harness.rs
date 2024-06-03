@@ -33,7 +33,7 @@ impl TestHarness {
         let config = proxy.get_config().await.expect("Could not get config from proxy");
 
         // Validate configuration options for consistency, disallow invalid combinations.
-        if config.supports_rename || config.supports_link {
+        if config.supports_modify_directory {
             assert!(
                 config.supports_get_token,
                 "GetToken must be supported for testing Rename/Link!"

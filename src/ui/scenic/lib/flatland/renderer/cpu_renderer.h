@@ -6,6 +6,7 @@
 #define SRC_UI_SCENIC_LIB_FLATLAND_RENDERER_CPU_RENDERER_H_
 
 #include <fidl/fuchsia.images2/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 
 #include <mutex>
 #include <unordered_map>
@@ -27,8 +28,8 @@ class CpuRenderer final : public Renderer {
 
   // |BufferCollectionImporter|
   bool ImportBufferCollection(allocation::GlobalBufferCollectionId collection_id,
-                              fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
-                              fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
+                              fuchsia::sysmem2::Allocator_Sync* sysmem_allocator,
+                              fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token,
                               BufferCollectionUsage usage,
                               std::optional<fuchsia::math::SizeU> size) override;
 
@@ -79,7 +80,7 @@ class CpuRenderer final : public Renderer {
   std::unordered_map<allocation::GlobalBufferCollectionId, BufferCollectionInfo> readback_map_
       FXL_GUARDED_BY(lock_);
   std::unordered_map<allocation::GlobalImageId,
-                     std::pair<zx::vmo, fuchsia::sysmem::ImageFormatConstraints>>
+                     std::pair<zx::vmo, fuchsia::sysmem2::ImageFormatConstraints>>
       image_map_ FXL_GUARDED_BY(lock_);
 };
 

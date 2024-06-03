@@ -43,6 +43,25 @@ import("//build/rust/rustc_library.gni")
 #  targets.
 template("rustc_library_with_features") {
   assert(defined(invoker.feature_sets), "Must define supported feature sets.")
+  _check_cfgs = []
+  if (defined(invoker.check_cfgs)) {
+    _check_cfgs += invoker.check_cfgs
+  }
+  _features = []
+  foreach(feature_set, invoker.feature_sets) {
+    if (defined(feature_set.features)) {
+      foreach(feature, feature_set.features) {
+        _f = "\"${feature}\""
+
+        # Dedup the list and to keep compilation commands more readable.
+        _features += [ _f ]
+        _features -= [ _f ]
+        _features += [ _f ]
+      }
+    }
+  }
+  _features_str = string_join(",", _features)
+  _check_cfgs += [ "feature, values(${_features_str})" ]
 
   foreach(feature_set, invoker.feature_sets) {
     if (defined(invoker.name)) {
@@ -67,12 +86,18 @@ template("rustc_library_with_features") {
         # to generate duplicate rustdocs for each variant of the crate.
         disable_rustdoc = true
       }
+      check_cfgs = _check_cfgs
 
       # Note that callers of this template can specify variables either in the
       # invoker's scope or the scope of a particular feature set; the feature
       # set scopes inherit from the outer scope, but any changes in the scope of
       # a feature set take final precedence for that crate.
-      forward_variables_from(invoker, "*", [ "name" ])
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "name",
+                               "check_cfgs",
+                             ])
       forward_variables_from(feature_set,
                              "*",
                              [

@@ -130,14 +130,15 @@ template("rustc_test_internal") {
 
     forward_variables_from(invoker,
                            [
+                             "check_cfgs",
                              "disable_clippy",
-                             "quiet_clippy",
+                             "edition",
                              "enforce_source_listing",
                              "features",
-                             "edition",
                              "inputs",
-                             "sources",
+                             "quiet_clippy",
                              "rustenv",
+                             "sources",
                              "visibility",
                            ])
 
@@ -290,6 +291,12 @@ template("rustc_test_internal") {
 #     A list of conditional compilation flags to enable. This can be used to set features for crates
 #     built in-tree which are also published to crates.io. This would be passed to rustc as
 #     '--cfg feature="XXX"'
+#
+#   check_cfgs (optional)
+#     A list of valid configurations for the target.
+#     Passed to rustc as '--check-cfg=cfg(###)'.
+#     Not specifying or using an empty list disables configuration checking.
+#     See https://doc.rust-lang.org/nightly/rustc/check-cfg.html for the syntax.
 #
 #   rustenv (optional)
 #     A list of environment variables that will be set when running the rust

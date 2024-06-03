@@ -29,12 +29,7 @@ class Rtc(rtc.Rtc):
     # Currently, this is board-specific. Once the RTC protocol lands and is
     # routable from the toolbox realm, this affordance can be made
     # board-agnostic.
-
-    # TODO(b/340607972): To allow for smooth transition from vim3 to vim3-devicetree, both monikers
-    # will be tried. Whichever path exists will be used. Once the migration is complete, the old
-    # moniker can be discarded.
-    MONIKER_OLD = "/bootstrap/pkg-drivers:dev.sys.platform.05_00_2.i2c-0.aml-i2c.i2c.i2c-0-81"
-    MONIKER_NEW = "/bootstrap/pkg-drivers:dev.sys.platform.i2c-5000.i2c-5000_group.aml-i2c.i2c.i2c-0-81"
+    MONIKER = "/bootstrap/pkg-drivers:dev.sys.platform.05_00_2.i2c-0.aml-i2c.i2c.i2c-0-81"
 
     def __init__(
         self,
@@ -52,26 +47,10 @@ class Rtc(rtc.Rtc):
 
     def _connect_proxy(self) -> None:
         """Connect the RTC Device protocol proxy."""
-        ep_old = custom_types.FidlEndpoint(
-            self.__class__.MONIKER_OLD, CAPABILITY
+        ep = custom_types.FidlEndpoint(self.__class__.MONIKER, CAPABILITY)
+        self._proxy: frtc.Device.Client = frtc.Device.Client(
+            self._controller.connect_device_proxy(ep)
         )
-        ep_new = custom_types.FidlEndpoint(
-            self.__class__.MONIKER_NEW, CAPABILITY
-        )
-        try:
-            self._proxy: frtc.Device.Client = frtc.Device.Client(
-                self._controller.connect_device_proxy(ep_old)
-            )
-        except RuntimeError:
-            # Try connecting through the other moniker.
-            try:
-                self._proxy = frtc.Device.Client(
-                    self._controller.connect_device_proxy(ep_new)
-                )
-            except RuntimeError:
-                raise errors.HoneydewRtcError(
-                    "Failed to connect to either moniker."
-                ) from None
 
     # Protocol methods.
     def get(self) -> datetime.datetime:

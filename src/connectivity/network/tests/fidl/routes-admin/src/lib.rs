@@ -25,29 +25,18 @@ use fuchsia_zircon as zx;
 use futures::{future::FutureExt as _, StreamExt};
 use itertools::Itertools as _;
 use net_declare::{fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix};
-use net_types::{
-    ip::{Ip, Ipv4, Ipv6, Subnet},
-    SpecifiedAddr,
-};
+use net_types::ip::{Ipv4, Ipv6, Subnet};
 use netstack_testing_common::{
     realms::{Netstack, Netstack3, TestSandboxExt},
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
+use routes_common::{test_route, TestSetup};
 use std::pin::pin;
 use test_case::{test_case, test_matrix};
 
 const METRIC_TRACKS_INTERFACE: fnet_routes::SpecifiedMetric =
     fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty);
-
-struct TestSetup<'a, I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt> {
-    realm: netemul::TestRealm<'a>,
-    network: netemul::TestNetwork<'a>,
-    interface: netemul::TestInterface<'a>,
-    route_table: <I::RouteTableMarker as ProtocolMarker>::Proxy,
-    global_route_table: <I::GlobalRouteTableMarker as ProtocolMarker>::Proxy,
-    state: <I::StateMarker as ProtocolMarker>::Proxy,
-}
 
 enum SystemRouteProtocol {
     NetRootRoutes,
@@ -57,53 +46,6 @@ enum SystemRouteProtocol {
 enum RouteSet {
     Global,
     User,
-}
-
-impl<'a, I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt> TestSetup<'a, I> {
-    async fn new<N: Netstack>(sandbox: &'a netemul::TestSandbox, name: &str) -> TestSetup<'a, I> {
-        let realm = sandbox
-            .create_netstack_realm::<N, _>(format!("routes-admin-{name}"))
-            .expect("create realm");
-        let network =
-            sandbox.create_network(format!("routes-admin-{name}")).await.expect("create network");
-        let interface = realm.join_network(&network, "ep1").await.expect("join network");
-        let route_table = realm
-            .connect_to_protocol::<I::RouteTableMarker>()
-            .expect("connect to routes-admin RouteTable");
-        let global_route_table = realm
-            .connect_to_protocol::<I::GlobalRouteTableMarker>()
-            .expect("connect to global route set provider");
-
-        let state = realm.connect_to_protocol::<I::StateMarker>().expect("connect to routes State");
-        TestSetup { realm, network, interface, route_table, global_route_table, state }
-    }
-}
-
-fn test_route<I: Ip>(
-    interface: &netemul::TestInterface<'_>,
-    metric: fnet_routes::SpecifiedMetric,
-) -> fnet_routes_ext::Route<I> {
-    let destination = I::map_ip(
-        (),
-        |()| net_declare::net_subnet_v4!("192.0.2.0/24"),
-        |()| net_declare::net_subnet_v6!("2001:DB8::/64"),
-    );
-    let next_hop_addr = I::map_ip(
-        (),
-        |()| net_declare::net_ip_v4!("192.0.2.1"),
-        |()| net_declare::net_ip_v6!("2001:DB8::1"),
-    );
-
-    fnet_routes_ext::Route {
-        destination,
-        action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
-            outbound_interface: interface.id(),
-            next_hop: Some(SpecifiedAddr::new(next_hop_addr).expect("is specified")),
-        }),
-        properties: fnet_routes_ext::RouteProperties {
-            specified_properties: fnet_routes_ext::SpecifiedRouteProperties { metric },
-        },
-    }
 }
 
 #[netstack_test]
@@ -1753,6 +1695,88 @@ async fn add_route_in_user_table<I: net_types::ip::Ip + FidlRouteAdminIpExt + Fi
     fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
         routes.iter().any(|installed_route| {
             installed_route.matches_route_and_table_id(&route_to_add, user_table_id)
+        })
+    })
+    .await
+    .expect("should succeed");
+}
+
+#[netstack_test]
+async fn interface_removal_remove_routes_in_all_tables<
+    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    // We don't support multiple route tables in netstack2.
+    let TestSetup {
+        realm,
+        network: _network,
+        interface,
+        route_table,
+        global_route_table: _,
+        state,
+    } = TestSetup::<I>::new::<Netstack3>(&sandbox, name).await;
+    let route_table_provider = realm
+        .connect_to_protocol::<I::RouteTableProviderMarker>()
+        .expect("connect to main route table");
+    let user_route_table =
+        fnet_routes_ext::admin::new_route_table::<I>(&route_table_provider, None)
+            .expect("create new user table");
+    let user_route_set = fnet_routes_ext::admin::new_route_set::<I>(&user_route_table)
+        .expect("failed to create a new user route set");
+    let main_route_set = fnet_routes_ext::admin::new_route_set::<I>(&route_table)
+        .expect("failed to create a new main route set");
+    let main_table_id =
+        fnet_routes_ext::admin::get_table_id::<I>(&route_table).await.expect("get table id");
+    let user_table_id =
+        fnet_routes_ext::admin::get_table_id::<I>(&user_route_table).await.expect("get table id");
+
+    let route_to_add =
+        test_route::<I>(&interface, fnet_routes::SpecifiedMetric::ExplicitMetric(10));
+
+    for route_set in [&main_route_set, &user_route_set] {
+        let grant = interface.get_authorization().await.expect("getting grant should succeed");
+        let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
+        fnet_routes_ext::admin::authenticate_for_interface::<I>(&route_set, proof)
+            .await
+            .expect("no FIDL error")
+            .expect("authentication should succeed");
+
+        assert!(fnet_routes_ext::admin::add_route::<I>(
+            &route_set,
+            &route_to_add.try_into().expect("convert to FIDL")
+        )
+        .await
+        .expect("no FIDL error")
+        .expect("add route"));
+    }
+
+    let routes_stream =
+        fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
+    let mut routes_stream = pin!(routes_stream);
+
+    let mut routes =
+        fnet_routes_ext::collect_routes_until_idle::<I, HashSet<_>>(&mut routes_stream)
+            .await
+            .expect("collect routes should succeed");
+
+    assert_eq!(
+        routes
+            .iter()
+            .filter_map(|installed_route| (&installed_route.route == &route_to_add)
+                .then_some(installed_route.table_id))
+            .collect::<HashSet<_>>(),
+        HashSet::from([main_table_id, user_table_id])
+    );
+
+    drop(interface);
+
+    // The route should be removed across all tables.
+    fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
+        routes.iter().all(|installed_route| {
+            !installed_route.matches_route_and_table_id(&route_to_add, user_table_id)
+                && !installed_route.matches_route_and_table_id(&route_to_add, main_table_id)
         })
     })
     .await

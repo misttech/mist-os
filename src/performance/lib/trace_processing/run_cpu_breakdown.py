@@ -62,6 +62,12 @@ def main() -> None:
         default=DEFAULT_PERCENT_CUTOFF,
         help="percent cutoff (CPU usage less than this percent will not be logged)",
     )
+    parser.add_argument(
+        "--group_processes",
+        type=bool,
+        default=False,
+        help="Saves CPU breakdown by processes only (not thread-level granularity)",
+    )
 
     agg_subparser = subparsers.add_parser(
         "by_freq",
@@ -116,11 +122,14 @@ def RunCpuBreakdown(args: argparse.Namespace, trace_path_json: str) -> None:
     model: trace_model.Model = trace_importing.create_model_from_file_path(
         trace_path_json
     )
-    breakdown: List[
-        Dict[str, Any]
-    ] = cpu_breakdown.CpuBreakdownMetricsProcessor(
+    processor = cpu_breakdown.CpuBreakdownMetricsProcessor(
         model, args.percent_cutoff
-    ).process_metrics()
+    )
+
+    breakdown: List[Dict[str, Any]] = processor.process_metrics()
+
+    if args.group_processes:
+        breakdown = processor.group_by_process_name(breakdown)
 
     with open(args.output_path, "w") as json_file:
         json.dump(breakdown, json_file, indent=4)

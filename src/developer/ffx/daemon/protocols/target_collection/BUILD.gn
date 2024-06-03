@@ -20,6 +20,7 @@ rustc_library("ffx_daemon_protocol_target_collection") {
     "//src/developer/ffx/daemon/target:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/addr:lib",
+    "//src/developer/ffx/lib/discovery:lib",
     "//src/developer/ffx/lib/emulator_instance:lib",
     "//src/developer/ffx/lib/fastboot:lib",
     "//src/developer/ffx/lib/fastboot/interface:lib",

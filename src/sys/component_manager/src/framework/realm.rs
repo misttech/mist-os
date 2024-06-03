@@ -5,12 +5,15 @@
 use {
     crate::{
         capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
+        framework,
         model::{
             component::{ComponentInstance, WeakComponentInstance},
             model::Model,
         },
     },
-    ::routing::capability_source::InternalCapability,
+    ::routing::{
+        capability_source::InternalCapability, component_instance::ComponentInstanceInterface,
+    },
     anyhow::Error,
     async_trait::async_trait,
     cm_config::RuntimeConfig,
@@ -22,7 +25,7 @@ use {
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::prelude::*,
     lazy_static::lazy_static,
-    moniker::{ChildName, ChildNameBase, Moniker},
+    moniker::{ChildName, Moniker},
     std::{
         cmp,
         sync::{Arc, Weak},
@@ -155,6 +158,10 @@ impl RealmCapabilityHost {
                 let res = Self::open_exposed_dir(component, child, exposed_dir).await;
                 responder.send(res)?;
             }
+            fcomponent::RealmRequest::OpenController { child, controller, responder } => {
+                let res = Self::open_controller(component, child, controller).await;
+                responder.send(res)?;
+            }
         }
         Ok(())
     }
@@ -184,6 +191,26 @@ impl RealmCapabilityHost {
         )
     }
 
+    async fn open_controller(
+        component: &WeakComponentInstance,
+        child: fdecl::ChildRef,
+        controller: ServerEnd<fcomponent::ControllerMarker>,
+    ) -> Result<(), fcomponent::Error> {
+        match Self::get_child(component, child.clone()).await? {
+            Some(child) => {
+                child.nonblocking_task_group().spawn(framework::controller::run_controller(
+                    child.as_weak(),
+                    controller.into_stream().unwrap(),
+                ));
+            }
+            None => {
+                debug!(?child, "open_controller() failed: instance not found");
+                return Err(fcomponent::Error::InstanceNotFound);
+            }
+        }
+        Ok(())
+    }
+
     async fn open_exposed_dir(
         component: &WeakComponentInstance,
         child: fdecl::ChildRef,
@@ -199,10 +226,10 @@ impl RealmCapabilityHost {
                     );
                     return fcomponent::Error::InstanceCannotResolve;
                 })?;
-                // TODO(https://fxbug.dev/42161419): open_exposed does not have a rights input
-                // parameter, so this makes use of the POSIX_[WRITABLE|EXECUTABLE] flags to open a
-                // connection with those rights if available from the parent directory connection
-                // but without failing if not available.
+                // open_exposed does not have a rights input parameter, so this
+                // makes use of the  POSIX_[WRITABLE|EXECUTABLE] flags to open
+                // a connection with those rights if available from the parent
+                // directory connection but without failing if not available.
                 let flags = OPEN_FLAGS_MAX_POSSIBLE_RIGHTS | fio::OpenFlags::DIRECTORY;
                 let mut object_request = flags.to_object_request(exposed_dir);
                 child
@@ -347,7 +374,6 @@ mod tests {
         fuchsia_component::client,
         futures::lock::Mutex,
         hooks::EventType,
-        moniker::MonikerBase,
         routing_test_helpers::component_decl_with_exposed_binder,
         std::collections::HashSet,
     };
@@ -1394,6 +1420,75 @@ mod tests {
             let err = test
                 .realm_proxy
                 .open_exposed_dir(&child_ref, server_end)
+                .await
+                .expect("fidl call failed")
+                .expect_err("unexpected success");
+            assert_eq!(err, fcomponent::Error::InstanceDied);
+        }
+    }
+
+    #[fuchsia::test]
+    async fn open_controller() {
+        let mut test = RealmCapabilityTest::new(
+            vec![
+                ("root", ComponentDeclBuilder::new().child_default("system").build()),
+                ("system", component_decl_with_test_runner()),
+            ],
+            Moniker::root(),
+        )
+        .await;
+
+        // Success.
+        {
+            let child_ref = fdecl::ChildRef { name: "system".to_string(), collection: None };
+            let (_, server_end) =
+                endpoints::create_proxy::<fcomponent::ControllerMarker>().unwrap();
+            test.realm_proxy
+                .open_controller(&child_ref, server_end)
+                .await
+                .expect("fidl call failed")
+                .expect("open_controller() failed");
+            // Business logic tests for `fuchsia.component.Controller` is at
+            // src/sys/component_manager/tests/controller/src/lib.rs
+        }
+
+        // Invalid ref.
+        {
+            let child_ref = fdecl::ChildRef { name: "-&*:(\\".to_string(), collection: None };
+            let (_, server_end) =
+                endpoints::create_proxy::<fcomponent::ControllerMarker>().unwrap();
+            let err = test
+                .realm_proxy
+                .open_controller(&child_ref, server_end)
+                .await
+                .expect("fidl call failed")
+                .expect_err("unexpected success");
+            assert_eq!(err, fcomponent::Error::InvalidArguments);
+        }
+
+        // Instance not found.
+        {
+            let child_ref = fdecl::ChildRef { name: "missing".to_string(), collection: None };
+            let (_, server_end) =
+                endpoints::create_proxy::<fcomponent::ControllerMarker>().unwrap();
+            let err = test
+                .realm_proxy
+                .open_controller(&child_ref, server_end)
+                .await
+                .expect("fidl call failed")
+                .expect_err("unexpected success");
+            assert_eq!(err, fcomponent::Error::InstanceNotFound);
+        }
+
+        // Instance died.
+        {
+            test.drop_component();
+            let child_ref = fdecl::ChildRef { name: "system".to_string(), collection: None };
+            let (_, server_end) =
+                endpoints::create_proxy::<fcomponent::ControllerMarker>().unwrap();
+            let err = test
+                .realm_proxy
+                .open_controller(&child_ref, server_end)
                 .await
                 .expect("fidl call failed")
                 .expect_err("unexpected success");

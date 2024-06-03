@@ -111,6 +111,9 @@ pub enum FastbootError {
 
     #[error("Failed to get all variables: {}", .0 )]
     GetAllVarsFailed(String),
+
+    #[error("Did not write correct number of bytes. Got {:?}. Want {}", written, expected)]
+    ShortWrite { written: usize, expected: usize },
 }
 
 #[derive(thiserror::Error, Debug)]

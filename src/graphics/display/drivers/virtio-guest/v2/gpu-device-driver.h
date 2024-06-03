@@ -69,7 +69,7 @@ class GpuDeviceDriver : public fdf::DriverBase {
   fbl::Mutex request_lock_;
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_;
+  fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_;
 };
 
 }  // namespace virtio_display

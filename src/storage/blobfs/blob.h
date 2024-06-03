@@ -55,8 +55,9 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
   // const digest::Digest& digest() const;
 
   // fs::Vnode implementation:
-  fuchsia_io::NodeProtocolKinds GetProtocols() const final __TA_EXCLUDES(mutex_);
-  bool ValidateRights(fuchsia_io::Rights rights) const final __TA_EXCLUDES(mutex_);
+  fuchsia_io::NodeProtocolKinds GetProtocols() const final;
+  fuchsia_io::Abilities GetAbilities() const final;
+  bool ValidateRights(fuchsia_io::Rights rights) const final;
   zx_status_t Read(void* data, size_t len, size_t off, size_t* out_actual) final
       __TA_EXCLUDES(mutex_);
   zx_status_t Write(const void* data, size_t len, size_t offset, size_t* out_actual) final

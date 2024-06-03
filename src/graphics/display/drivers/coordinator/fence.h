@@ -10,8 +10,8 @@
 #endif
 
 #include <lib/async/cpp/wait.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>
-#include <lib/fit/thread_checker.h>
 #include <lib/zx/event.h>
 #include <threads.h>
 #include <zircon/compiler.h>
@@ -42,13 +42,27 @@ class FenceCallback {
 //
 // Fence is not thread-safe (but thread-compatible). For the sake of simplicity,
 // in order to avoid data races, we require `Fence`s and its `FenceReference`s
-// be created and destroyed on the same thread where the Fence is created.
+// be created and destroyed on the same fdf::Dispatcher where the Fence is
+// created.
 class Fence : public fbl::RefCounted<Fence>,
               public IdMappable<fbl::RefPtr<Fence>, EventId>,
               public fbl::SinglyLinkedListable<fbl::RefPtr<Fence>> {
  public:
-  Fence(FenceCallback* cb, async_dispatcher_t* dispatcher, EventId id, zx::event&& event);
+  // `Fence` must be created on a dispatcher managed by the driver framework.
+  // The dispatcher must be valid throughout the lifetime of the `Fence`.
+  //
+  // `event_dispatcher` is where the asynchronous events regarding this Fence
+  // are dispatched. It may be the same as the dispatcher where the Fence is
+  // created.
+  //
+  // `event_dispatcher` must not be null and must outlive Fence.
+  Fence(FenceCallback* cb, async_dispatcher_t* event_dispatcher, EventId id, zx::event event);
   ~Fence();
+
+  Fence(const Fence& other) = delete;
+  Fence(Fence&& other) = delete;
+  Fence& operator=(const Fence& other) = delete;
+  Fence& operator=(Fence&& other) = delete;
 
   // Creates a new FenceReference when an event is imported.
   bool CreateRef();
@@ -83,16 +97,15 @@ class Fence : public fbl::RefCounted<Fence>,
   async::WaitMethod<Fence, &Fence::OnReady> ready_wait_{this};
 
   FenceCallback* cb_;
-  async_dispatcher_t* dispatcher_;
+
+  async_dispatcher_t& event_dispatcher_;
+  fdf::UnownedDispatcher const fence_creation_dispatcher_;
+
   zx::event event_;
   int ref_count_ = 0;
   zx_koid_t koid_ = 0;
 
-  FIT_DECLARE_THREAD_CHECKER(thread_checker_)
-
   friend FenceReference;
-
-  DISALLOW_COPY_ASSIGN_AND_MOVE(Fence);
 };
 
 // Each FenceReference represents a pending / active wait or signaling of the
@@ -101,12 +114,20 @@ class Fence : public fbl::RefCounted<Fence>,
 //
 // FenceReference is not thread-safe (but thread-compatible). For the sake of
 // simplicity, we require `FenceReference`s be created and destroyed on the same
-// thread where the Fence is created.
+// fdf::Dispatcher where the Fence is created.
 class FenceReference : public fbl::RefCounted<FenceReference>,
                        public fbl::DoublyLinkedListable<fbl::RefPtr<FenceReference>> {
  public:
-  explicit FenceReference(fbl::RefPtr<Fence> fence, std::thread::id fence_thread_id);
+  // `FenceReference` must be created on `fence_creation_dispatcher`, which is
+  // the dispatcher where `fence` is created.
+  explicit FenceReference(fbl::RefPtr<Fence> fence,
+                          fdf::UnownedDispatcher fence_creation_dispatcher);
   ~FenceReference();
+
+  FenceReference(const FenceReference& other) = delete;
+  FenceReference(FenceReference&& other) = delete;
+  FenceReference& operator=(const FenceReference& other) = delete;
+  FenceReference& operator=(FenceReference&& other) = delete;
 
   void Signal() const;
 
@@ -122,9 +143,7 @@ class FenceReference : public fbl::RefCounted<FenceReference>,
 
   fbl::RefPtr<FenceReference> release_fence_;
 
-  const fit::thread_checker thread_checker_;
-
-  DISALLOW_COPY_ASSIGN_AND_MOVE(FenceReference);
+  fdf::UnownedDispatcher const fence_creation_dispatcher_;
 };
 
 // FenceCollection controls the access and lifecycles for several display::Fences.
@@ -132,8 +151,11 @@ class FenceCollection : private FenceCallback {
  public:
   // Creates an empty collection.
   //
-  // `dispatcher` must outlive the newly created instance. `on_fence_fired` must
-  // be callable while the newly created instance is alive.
+  // Fence events are dispatched on `dispatcher`.
+  // `dispatcher` must be non-null and must outlive the newly created instance.
+  //
+  // `on_fence_fired` must be callable while the newly created instance is
+  // alive.
   //
   // `on_fence_fired` will be called when one of the fences fires. The call
   // will be done from an async task processed using `dispatcher`.

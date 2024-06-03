@@ -43,10 +43,6 @@
   (TCR_EL1_TG0_4KIB | TCR_EL1_T0SZ | TCR_EL1_SH0_INNER_SHAREABLE | TCR_EL1_ORGN0_WB_WA | \
    TCR_EL1_IRGN0_WB_WA))
 
-// Memory Attribute Indirection Register (MAIR)
-//
-// [arm/v8]: D13.2.95  MAIR_EL1, Memory Attribute Indirection Register, EL1
-.set MAIR_ATTR_NORMAL_CACHED, 0xff  // Normal Memory (outer WB, inner WB)
 .set GUEST_MAIR_EL1, (MAIR_ATTR_NORMAL_CACHED << 0)
 
 // Bits for the SCTLR registers.

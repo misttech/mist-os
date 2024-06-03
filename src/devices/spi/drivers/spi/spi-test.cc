@@ -9,6 +9,8 @@
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
+#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/spi/spi.h>
 #include <zircon/errors.h>
@@ -18,8 +20,6 @@
 
 #include <gtest/gtest.h>
 
-#include "sdk/lib/driver/outgoing/cpp/outgoing_directory.h"
-#include "sdk/lib/driver/testing/cpp/fixtures/gtest_fixture.h"
 #include "spi-child.h"
 #include "src/lib/testing/predicates/status.h"
 

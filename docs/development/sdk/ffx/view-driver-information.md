@@ -171,12 +171,12 @@ $ ffx driver dump
 [dev] pid=5521 fuchsia-boot:///platform-bus#meta/platform-bus.cm
   [sys] pid=None unbound
     [platform] pid=None unbound
-      [00_00_2d] pid=7584 fuchsia-boot:///ramdisk#meta/ramdisk.cm
+      [ram-disk] pid=7584 fuchsia-boot:///ramdisk#meta/ramdisk.cm
         [ramctl] pid=None unbound
       [00_00_2e] pid=None unbound
-      [00_00_2f] pid=25117 fuchsia-pkg://fuchsia.com/virtual_audio#meta/virtual_audio_driver.cm
+      [virtual-audio] pid=25117 fuchsia-pkg://fuchsia.com/virtual_audio#meta/virtual_audio_driver.cm
         [virtual_audio] pid=None unbound
-      [00_00_30] pid=None unbound
+      [bt-hci-emulator] pid=None unbound
       [00_00_33] pid=24707 fuchsia-pkg://fuchsia.com/fake-battery#meta/fake_battery.cm
         [fake-battery] pid=None unbound
         [power-simulator] pid=None unbound
@@ -222,10 +222,10 @@ digraph {
      "3675787314320" [label="dev"]
      "3675787305008" [label="sys"]
      "3675787315872" [label="platform"]
-     "3675787309664" [label="00_00_2d"]
+     "3675787309664" [label="ram-disk"]
      "3675787306560" [label="00_00_2e"]
-     "3675787308112" [label="00_00_2f"]
-     "3675787312768" [label="00_00_30"]
+     "3675787308112" [label="virtual-audio"]
+     "3675787312768" [label="bt-hci-emulator"]
      "3675787311216" [label="00_00_33"]
      "3675787325184" [label="pt"]
      "3675787317424" [label="00_00_1b"]
@@ -253,15 +253,15 @@ $ ffx driver list-devices
 dev
 dev.sys
 dev.sys.platform
-dev.sys.platform.00_00_2d
+dev.sys.platform.ram-disk
 dev.sys.platform.00_00_2e
-dev.sys.platform.00_00_2f
-dev.sys.platform.00_00_30
+dev.sys.platform.virtual-audio
+dev.sys.platform.bt-hci-emulator
 dev.sys.platform.00_00_33
 dev.sys.platform.pt
 dev.sys.platform.00_00_1b
-dev.sys.platform.00_00_2d.ramctl
-dev.sys.platform.00_00_2f.virtual_audio
+dev.sys.platform.ram-disk.ramctl
+dev.sys.platform.virtual-audio.virtual_audio
 dev.sys.platform.00_00_33.fake-battery
 dev.sys.platform.00_00_33.power-simulator
 dev.sys.platform.pt.PCI0

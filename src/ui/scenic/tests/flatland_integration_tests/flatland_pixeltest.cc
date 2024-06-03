@@ -141,29 +141,22 @@ class FlatlandPixelTestBase : public LoggingEventLoop, public zxtest::Test {
     flatland->AddChild(fuchsia::ui::composition::TransformId{kRootTransform}, kTransformId);
   }
 
-  fuchsia::sysmem::BufferCollectionConstraints GetBufferConstraints(
-      fuchsia::sysmem::PixelFormatType pixel_format, fuchsia::sysmem::ColorSpaceType color_space) {
-    fuchsia::sysmem::BufferCollectionConstraints constraints;
-    constraints.has_buffer_memory_constraints = true;
-    constraints.buffer_memory_constraints = {.ram_domain_supported = true,
-                                             .cpu_domain_supported = true};
-
-    constraints.usage = fuchsia::sysmem::BufferUsage{.cpu = fuchsia::sysmem::cpuUsageWriteOften};
-
-    constraints.min_buffer_count = 1;
-
-    constraints.image_format_constraints_count = 1;
-    auto& image_constraints = constraints.image_format_constraints[0];
-    image_constraints.pixel_format.type = pixel_format;
-    image_constraints.pixel_format.has_format_modifier = true;
-    image_constraints.pixel_format.format_modifier.value = fuchsia::sysmem::FORMAT_MODIFIER_LINEAR;
-    image_constraints.color_spaces_count = 1;
-    image_constraints.color_space[0].type = color_space;
-    image_constraints.required_min_coded_width = display_width_;
-    image_constraints.required_min_coded_height = display_height_;
-    image_constraints.required_max_coded_width = display_width_;
-    image_constraints.required_max_coded_height = display_height_;
-
+  fuchsia::sysmem2::BufferCollectionConstraints GetBufferConstraints(
+      fuchsia::images2::PixelFormat pixel_format, fuchsia::images2::ColorSpace color_space) {
+    fuchsia::sysmem2::BufferCollectionConstraints constraints;
+    auto& bmc = *constraints.mutable_buffer_memory_constraints();
+    bmc.set_ram_domain_supported(true);
+    bmc.set_cpu_domain_supported(true);
+    constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_WRITE_OFTEN);
+    constraints.set_min_buffer_count(1);
+    auto& image_constraints = constraints.mutable_image_format_constraints()->emplace_back();
+    image_constraints.set_pixel_format(pixel_format);
+    image_constraints.set_pixel_format_modifier(fuchsia::images2::PixelFormatModifier::LINEAR);
+    image_constraints.mutable_color_spaces()->emplace_back(color_space);
+    image_constraints.set_required_min_size(
+        fuchsia::math::SizeU{.width = display_width_, .height = display_height_});
+    image_constraints.set_required_max_size(
+        fuchsia::math::SizeU{.width = display_width_, .height = display_height_});
     return constraints;
   }
 
@@ -203,33 +196,39 @@ class FlatlandPixelTestBase : public LoggingEventLoop, public zxtest::Test {
   }
 
  protected:
-  fuchsia::sysmem::BufferCollectionInfo_2 SetConstraintsAndAllocateBuffer(
-      fuchsia::sysmem::BufferCollectionTokenSyncPtr token,
-      fuchsia::sysmem::BufferCollectionConstraints constraints) {
-    fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
-    auto status =
-        sysmem_allocator_->BindSharedCollection(std::move(token), buffer_collection.NewRequest());
+  fuchsia::sysmem2::BufferCollectionInfo SetConstraintsAndAllocateBuffer(
+      fuchsia::sysmem2::BufferCollectionTokenSyncPtr token,
+      fuchsia::sysmem2::BufferCollectionConstraints constraints) {
+    fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
+    fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+    bind_shared_request.set_token(std::move(token));
+    bind_shared_request.set_buffer_collection_request(buffer_collection.NewRequest());
+    auto status = sysmem_allocator_->BindSharedCollection(std::move(bind_shared_request));
     FX_CHECK(status == ZX_OK);
 
-    status = buffer_collection->SetConstraints(true, constraints);
-    FX_CHECK(status == ZX_OK);
-    zx_status_t allocation_status = ZX_OK;
+    uint32_t constraints_min_buffer_count = constraints.min_buffer_count();
 
-    fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info{};
-
-    status =
-        buffer_collection->WaitForBuffersAllocated(&allocation_status, &buffer_collection_info);
+    fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+    set_constraints_request.set_constraints(std::move(constraints));
+    status = buffer_collection->SetConstraints(std::move(set_constraints_request));
     FX_CHECK(status == ZX_OK);
-    FX_CHECK(allocation_status == ZX_OK);
-    EXPECT_EQ(constraints.min_buffer_count, buffer_collection_info.buffer_count);
-    FX_CHECK(buffer_collection->Close() == ZX_OK);
+
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+    status = buffer_collection->WaitForAllBuffersAllocated(&wait_result);
+    FX_CHECK(status == ZX_OK);
+    FX_CHECK(!wait_result.is_framework_err());
+    FX_CHECK(!wait_result.is_err());
+    auto buffer_collection_info =
+        std::move(*wait_result.response().mutable_buffer_collection_info());
+    EXPECT_EQ(constraints_min_buffer_count, buffer_collection_info.buffers().size());
+    FX_CHECK(buffer_collection->Release() == ZX_OK);
     return buffer_collection_info;
   }
 
   uint32_t display_width_ = 0;
   uint32_t display_height_ = 0;
 
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
   fuc::AllocatorSyncPtr flatland_allocator_;
   fuc::FlatlandPtr root_flatland_;
   fuc::ScreenshotSyncPtr screenshotter_;
@@ -243,13 +242,13 @@ class FlatlandPixelTestBase : public LoggingEventLoop, public zxtest::Test {
 
 class ParameterizedPixelFormatTest
     : public FlatlandPixelTestBase,
-      public zxtest::WithParamInterface<fuchsia::sysmem::PixelFormatType> {};
+      public zxtest::WithParamInterface<fuchsia::images2::PixelFormat> {};
 
 class ParameterizedYUVPixelTest : public ParameterizedPixelFormatTest {};
 
 INSTANTIATE_TEST_SUITE_P(YuvPixelFormats, ParameterizedYUVPixelTest,
-                         zxtest::Values(fuchsia::sysmem::PixelFormatType::NV12,
-                                        fuchsia::sysmem::PixelFormatType::I420));
+                         zxtest::Values(fuchsia::images2::PixelFormat::NV12,
+                                        fuchsia::images2::PixelFormat::I420));
 
 TEST_P(ParameterizedYUVPixelTest, YUVTest) {
   auto [local_token, scenic_token] = utils::CreateSysmemTokens(sysmem_allocator_.get());
@@ -259,7 +258,9 @@ TEST_P(ParameterizedYUVPixelTest, YUVTest) {
       allocation::BufferCollectionImportExportTokens::New();
   fuc::RegisterBufferCollectionArgs rbc_args = {};
   rbc_args.set_export_token(std::move(bc_tokens.export_token));
-  rbc_args.set_buffer_collection_token(std::move(scenic_token));
+  rbc_args.set_buffer_collection_token(
+      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
+          scenic_token.Unbind().TakeChannel()));
   fuc::Allocator_RegisterBufferCollection_Result result;
   ASSERT_OK(flatland_allocator_->RegisterBufferCollection(std::move(rbc_args), &result));
   ASSERT_FALSE(result.is_err());
@@ -267,14 +268,16 @@ TEST_P(ParameterizedYUVPixelTest, YUVTest) {
   // Use the local token to allocate a protected buffer.
   auto info = SetConstraintsAndAllocateBuffer(
       std::move(local_token),
-      GetBufferConstraints(GetParam(), fuchsia::sysmem::ColorSpaceType::REC709));
+      GetBufferConstraints(GetParam(), fuchsia::images2::ColorSpace::REC709));
 
   // Write the pixel values to the VMO.
   const uint32_t num_pixels = display_width_ * display_height_;
   const uint64_t image_vmo_bytes = (3 * num_pixels) / 2;
-  zx::vmo& image_vmo = info.buffers[0].vmo;
+
+  zx::vmo& image_vmo = *info.mutable_buffers()->at(0).mutable_vmo();
   zx_status_t status = zx::vmo::create(image_vmo_bytes, 0, &image_vmo);
   EXPECT_EQ(ZX_OK, status);
+
   uint8_t* vmo_base;
   status = zx::vmar::root_self()->map(ZX_VM_PERM_WRITE | ZX_VM_PERM_READ, 0, image_vmo, 0,
                                       image_vmo_bytes, reinterpret_cast<uintptr_t*>(&vmo_base));
@@ -289,13 +292,13 @@ TEST_P(ParameterizedYUVPixelTest, YUVTest) {
     vmo_base[i] = kYValue;
   }
 
-  if (GetParam() == fuchsia::sysmem::PixelFormatType::NV12) {
+  if (GetParam() == fuchsia::images2::PixelFormat::NV12) {
     // Set all the UV pixels pairwise at half res.
     for (uint32_t i = num_pixels; i < image_vmo_bytes; i += 2) {
       vmo_base[i] = kUValue;
       vmo_base[i + 1] = kVValue;
     }
-  } else if (GetParam() == fuchsia::sysmem::PixelFormatType::I420) {
+  } else if (GetParam() == fuchsia::images2::PixelFormat::I420) {
     for (uint32_t i = num_pixels; i < num_pixels + num_pixels / 4; ++i) {
       vmo_base[i] = kUValue;
     }
@@ -333,8 +336,8 @@ TEST_P(ParameterizedYUVPixelTest, YUVTest) {
 class ParameterizedSRGBPixelTest : public ParameterizedPixelFormatTest {};
 
 INSTANTIATE_TEST_SUITE_P(RgbPixelFormats, ParameterizedSRGBPixelTest,
-                         zxtest::Values(fuchsia::sysmem::PixelFormatType::BGRA32,
-                                        fuchsia::sysmem::PixelFormatType::R8G8B8A8));
+                         zxtest::Values(fuchsia::images2::PixelFormat::B8G8R8A8,
+                                        fuchsia::images2::PixelFormat::R8G8B8A8));
 
 TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
   auto [local_token, scenic_token] = utils::CreateSysmemTokens(sysmem_allocator_.get());
@@ -344,22 +347,23 @@ TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
       allocation::BufferCollectionImportExportTokens::New();
   fuc::RegisterBufferCollectionArgs rbc_args = {};
   rbc_args.set_export_token(std::move(bc_tokens.export_token));
-  rbc_args.set_buffer_collection_token(std::move(scenic_token));
+  rbc_args.set_buffer_collection_token(
+      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
+          scenic_token.Unbind().TakeChannel()));
   fuc::Allocator_RegisterBufferCollection_Result result;
   flatland_allocator_->RegisterBufferCollection(std::move(rbc_args), &result);
   ASSERT_FALSE(result.is_err());
 
   // Use the local token to allocate a protected buffer.
   auto info = SetConstraintsAndAllocateBuffer(
-      std::move(local_token),
-      GetBufferConstraints(GetParam(), fuchsia::sysmem::ColorSpaceType::SRGB));
+      std::move(local_token), GetBufferConstraints(GetParam(), fuchsia::images2::ColorSpace::SRGB));
 
   // Write the pixel values to the VMO.
   const uint32_t num_pixels = display_width_ * display_height_;
   const uint64_t image_vmo_bytes = num_pixels * kByterPerPixel;
-  ASSERT_EQ(image_vmo_bytes, info.settings.buffer_settings.size_bytes);
+  ASSERT_EQ(image_vmo_bytes, info.settings().buffer_settings().size_bytes());
 
-  zx::vmo& image_vmo = info.buffers[0].vmo;
+  const zx::vmo& image_vmo = info.buffers()[0].vmo();
 
   uint8_t* vmo_base;
   auto status =
@@ -368,18 +372,18 @@ TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
   EXPECT_EQ(ZX_OK, status);
 
   const utils::Pixel color = utils::kBlue;
-  vmo_base += info.buffers[0].vmo_usable_start;
+  vmo_base += info.buffers()[0].vmo_usable_start();
 
   for (uint32_t i = 0; i < num_pixels * kByterPerPixel; i += kByterPerPixel) {
     // For BGRA32 pixel format, the first and the third byte in the pixel corresponds to the blue
     // and the red channel respectively.
-    if (GetParam() == fuchsia::sysmem::PixelFormatType::BGRA32) {
+    if (GetParam() == fuchsia::images2::PixelFormat::B8G8R8A8) {
       vmo_base[i] = color.blue;
       vmo_base[i + 2] = color.red;
     }
     // For R8G8B8A8 pixel format, the first and the third byte in the pixel corresponds to the red
     // and the blue channel respectively.
-    if (GetParam() == fuchsia::sysmem::PixelFormatType::R8G8B8A8) {
+    if (GetParam() == fuchsia::images2::PixelFormat::R8G8B8A8) {
       vmo_base[i] = color.red;
       vmo_base[i + 2] = color.blue;
     }
@@ -387,9 +391,10 @@ TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
     vmo_base[i + 3] = color.alpha;
   }
 
-  if (info.settings.buffer_settings.coherency_domain == fuchsia::sysmem::CoherencyDomain::RAM) {
-    EXPECT_EQ(ZX_OK,
-              info.buffers[0].vmo.op_range(ZX_VMO_OP_CACHE_CLEAN, 0, image_vmo_bytes, nullptr, 0));
+  if (info.settings().buffer_settings().coherency_domain() ==
+      fuchsia::sysmem2::CoherencyDomain::RAM) {
+    EXPECT_EQ(ZX_OK, info.buffers()[0].vmo().op_range(ZX_VMO_OP_CACHE_CLEAN, 0, image_vmo_bytes,
+                                                      nullptr, 0));
   }
 
   // Create the image in the Flatland instance.
@@ -415,7 +420,7 @@ TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
 // representation of the input image, see |GetImageColorSetter|. For an ASCII representation of the
 // expected output, see the constructor for |ParameterizedFlipAndOrientationTest|.
 using FlipAndOrientationTestParams =
-    std::tuple<fuchsia::sysmem::PixelFormatType, fuc::Orientation, fuc::ImageFlip>;
+    std::tuple<fuchsia::images2::PixelFormat, fuc::Orientation, fuc::ImageFlip>;
 
 class ParameterizedFlipAndOrientationTest
     : public FlatlandPixelTestBase,
@@ -570,8 +575,8 @@ class ParameterizedFlipAndOrientationTest
 
 INSTANTIATE_TEST_SUITE_P(ParameterizedFlipAndOrientationTestWithParams,
                          ParameterizedFlipAndOrientationTest,
-                         zxtest::Combine(zxtest::Values(fuchsia::sysmem::PixelFormatType::BGRA32,
-                                                        fuchsia::sysmem::PixelFormatType::R8G8B8A8),
+                         zxtest::Combine(zxtest::Values(fuchsia::images2::PixelFormat::B8G8R8A8,
+                                                        fuchsia::images2::PixelFormat::R8G8B8A8),
                                          zxtest::Values(fuc::Orientation::CCW_0_DEGREES,
                                                         fuc::Orientation::CCW_90_DEGREES,
                                                         fuc::Orientation::CCW_180_DEGREES,
@@ -592,7 +597,9 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
       allocation::BufferCollectionImportExportTokens::New();
   fuc::RegisterBufferCollectionArgs rbc_args = {};
   rbc_args.set_export_token(std::move(bc_tokens.export_token));
-  rbc_args.set_buffer_collection_token(std::move(scenic_token));
+  rbc_args.set_buffer_collection_token(
+      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
+          scenic_token.Unbind().TakeChannel()));
   fuc::Allocator_RegisterBufferCollection_Result result;
   flatland_allocator_->RegisterBufferCollection(std::move(rbc_args), &result);
   ASSERT_FALSE(result.is_err());
@@ -600,12 +607,12 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
   // Use the local token to allocate a protected buffer.
   auto info = SetConstraintsAndAllocateBuffer(
       std::move(local_token),
-      GetBufferConstraints(pixel_format, fuchsia::sysmem::ColorSpaceType::SRGB));
+      GetBufferConstraints(pixel_format, fuchsia::images2::ColorSpace::SRGB));
 
   // Write the pixel values to the VMO.
-  ASSERT_EQ(image_vmo_bytes, info.settings.buffer_settings.size_bytes);
+  ASSERT_EQ(image_vmo_bytes, info.settings().buffer_settings().size_bytes());
 
-  zx::vmo& image_vmo = info.buffers[0].vmo;
+  const zx::vmo& image_vmo = info.buffers()[0].vmo();
 
   unsigned int current_image_content_id = 1;
   uint8_t* vmo_base;
@@ -614,7 +621,7 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
                                  image_vmo_bytes, reinterpret_cast<uintptr_t*>(&vmo_base));
   EXPECT_EQ(ZX_OK, status);
 
-  vmo_base += info.buffers[0].vmo_usable_start;
+  vmo_base += info.buffers()[0].vmo_usable_start();
 
   unsigned int image_width = display_width_;
   unsigned int image_height = display_height_;
@@ -629,13 +636,13 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
     // For BGRA32 pixel format, the first and the third byte in the pixel corresponds to the
     // blue
     // and the red channel respectively.
-    if (pixel_format == fuchsia::sysmem::PixelFormatType::BGRA32) {
+    if (pixel_format == fuchsia::images2::PixelFormat::B8G8R8A8) {
       vmo_base[i] = color.blue;
       vmo_base[i + 2] = color.red;
     }
     // For R8G8B8A8 pixel format, the first and the third byte in the pixel corresponds to the
     // red and the blue channel respectively.
-    if (pixel_format == fuchsia::sysmem::PixelFormatType::R8G8B8A8) {
+    if (pixel_format == fuchsia::images2::PixelFormat::R8G8B8A8) {
       vmo_base[i] = color.red;
       vmo_base[i + 2] = color.blue;
     }
@@ -643,9 +650,10 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
     vmo_base[i + 3] = color.alpha;
   }
 
-  if (info.settings.buffer_settings.coherency_domain == fuchsia::sysmem::CoherencyDomain::RAM) {
-    EXPECT_EQ(ZX_OK,
-              info.buffers[0].vmo.op_range(ZX_VMO_OP_CACHE_CLEAN, 0, image_vmo_bytes, nullptr, 0));
+  if (info.settings().buffer_settings().coherency_domain() ==
+      fuchsia::sysmem2::CoherencyDomain::RAM) {
+    EXPECT_EQ(ZX_OK, info.buffers()[0].vmo().op_range(ZX_VMO_OP_CACHE_CLEAN, 0, image_vmo_bytes,
+                                                      nullptr, 0));
   }
 
   fuc::ImageProperties image_properties = {};

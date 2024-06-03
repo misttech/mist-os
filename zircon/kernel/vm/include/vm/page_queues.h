@@ -19,6 +19,7 @@
 #include <kernel/semaphore.h>
 #include <ktl/array.h>
 #include <ktl/optional.h>
+#include <ktl/variant.h>
 #include <vm/debug_compressor.h>
 #include <vm/page.h>
 
@@ -165,8 +166,6 @@ class PageQueues {
   // Used to identify the reason that aging is triggered, mostly for debugging and informational
   // purposes.
   enum class AgeReason {
-    // There is no current age reason.
-    None,
     // Aging occurred due to the maximum timeout being reached before any other reason could trigger
     Timeout,
     // The allowable ratio of active versus inactive pages was exceeded.
@@ -353,7 +352,7 @@ class PageQueues {
   enum class PendingSignal : uint32_t {
     None = 0x0,
     AgingToken = 0x1,
-    AgingEvent = 0x2,
+    AgingActiveRatioEvent = 0x2,
     LruEvent = 0x4,
   };
 
@@ -433,8 +432,8 @@ class PageQueues {
           page_queues_.aging_token_.Signal();
         }
 
-        if (pending & static_cast<T>(PendingSignal::AgingEvent)) {
-          page_queues_.aging_event_.Signal();
+        if (pending & static_cast<T>(PendingSignal::AgingActiveRatioEvent)) {
+          page_queues_.aging_active_ratio_event_.Signal();
         }
 
         if (pending & static_cast<T>(PendingSignal::LruEvent)) {
@@ -474,6 +473,7 @@ class PageQueues {
     PendingSignalEvent() = default;
     explicit PendingSignalEvent(bool initial_state) : AutounsignalEvent(initial_state) {}
 
+    using AutounsignalEvent::Unsignal;
     using AutounsignalEvent::Wait;
     using AutounsignalEvent::WaitDeadline;
 
@@ -638,10 +638,30 @@ class PageQueues {
 
   // Entry point for the thread that will performing aging and increment the mru generation.
   void MruThread();
-  void MaybeTriggerAging() TA_EXCL(lock_);
-  void MaybeTriggerAgingLocked(DeferPendingSignals& dps) TA_REQ(lock_);
-  AgeReason GetAgeReason() const TA_EXCL(lock_);
-  AgeReason GetAgeReasonLocked() const TA_REQ(lock_);
+
+  // Checks if the active ratio has exceeded the threshold to cause aging, and if so signals the
+  // event.
+  void MaybeSignalActiveRatioAgingLocked(DeferPendingSignals& dps) TA_REQ(lock_);
+
+  // Consumes any pending age reason and either returns the reason, or how long till aging will
+  // happen. This timeout does not take into account that other changes, namely the active ratio,
+  // could cause aging to be necessary before that timeout.
+  // Due to the active ratio being sticky, it needs to be reset, which is why this method is called
+  // consume. As a result, calling ConsumeAgeReason and then GetAgeReasonLocked could give different
+  // results if an active ratio event was consumed and returned by the first call.
+  ktl::variant<AgeReason, zx_time_t> ConsumeAgeReason() TA_EXCL(lock_);
+
+  // Checks if there is any pending age reason that could be consumed. See ConsumeAgeReason for more
+  // details.
+  ktl::variant<AgeReason, zx_time_t> GetAgeReasonLocked() const TA_REQ(lock_);
+
+  // Synchronizes with any outstanding aging. This is intended to allow a reclamation process to
+  // ensure it is not racing with, and falsely failing to reclaim, the aging thread due to
+  // scheduling or other delays.
+  void SynchronizeWithAging() TA_EXCL(lock_);
+
+  // Helper method that calculates whether the current active ratio would trigger aging.
+  bool IsActiveRatioTriggeringAging() const TA_REQ(lock_);
 
   void LruThread();
   void MaybeTriggerLruProcessing() TA_EXCL(lock_);
@@ -675,12 +695,30 @@ class PageQueues {
   // Time at which the mru_gen_ was last incremented.
   ktl::atomic<zx_time_t> last_age_time_ = ZX_TIME_INFINITE_PAST;
   // Reason the last aging event happened, this is purely for informational/debugging purposes.
-  AgeReason last_age_reason_ TA_GUARDED(lock_) = AgeReason::None;
-  // Used to signal the aging thread that it should wake up and see if it needs to do anything.
-  PendingSignalEvent aging_event_;
+  // Initialized to Timeout as a somewhat arbitrary choice.
+  AgeReason last_age_reason_ TA_GUARDED(lock_) = AgeReason::Timeout;
+  // Used to signal the aging thread that the active ratio has changed sufficiently that aging might
+  // be required. Due to other factors, such as a min timeouts, races, etc, this being signaled does
+  // not mean aging will happen.
+  PendingSignalEvent aging_active_ratio_event_;
+  // Tracks whether the active ratio has been tripped and should contribute as an aging trigger.
+  // This is stored as a boolean so that it is sticky in the advent of a race with additional
+  // modifications to the page queues. Were this not sticky then, in the absence of a debounce
+  // threshold, we could repeatedly trigger the active ratio on and off, causing the aging thread
+  // to repeatedly wake up, miss the trigger, and do nothing.
+  bool active_ratio_triggered_ TA_GUARDED(lock_) = false;
   // Used to signal the lru thread that it should wake up and check if the lru queue needs
   // processing.
   PendingSignalEvent lru_event_;
+
+  // Tracks whether there is a pending aging event that will happen that can be waited on. This is a
+  // raw Event, and not an AutounsignalEvent, as it is a level triggered signal. The signal itself,
+  // and hence any calls to Signal or Unsignal on the Event, must be coordinated by under the lock_
+  // to ensure no races. Due to this need to coordinate a PendingSignalEvent cannot be used, and
+  // preemption must be disabled to allow for manipulating the event with lock_ held.
+  // This event itself gets set/cleared in both ConsumeAgeReason and SynchronizeWithAging based on
+  // whether this is any aging reason present.
+  Event no_pending_aging_signal_{true};
 
   // What to do with pages when processing the LRU queue.
   LruAction lru_action_ TA_GUARDED(lock_) = LruAction::None;

@@ -88,6 +88,18 @@ fuchsia_structured_config_values("default_config_values") {
     allow_magma_icds = true
     allow_goldfish_icd = true
     allow_lavapipe_icd = false
+    lavapipe_icd_url =
+        "fuchsia-pkg://fuchsia.com/libvulkan_lavapipe#meta/vulkan.cm"
+  }
+}
+
+fuchsia_structured_config_values("hermetic_lavapipe_config_values") {
+  cm_label = ":manifest"
+  values = {
+    allow_magma_icds = false
+    allow_goldfish_icd = false
+    allow_lavapipe_icd = true
+    lavapipe_icd_url = "lavapipe_icd#meta/vulkan.cm"
   }
 }
 
@@ -104,5 +116,18 @@ fuchsia_package("vulkan_loader") {
   deps = [
     ":default_config_values",
     ":vulkan_loader_cmp",
+  ]
+}
+
+fuchsia_package("hermetic_vulkan_loader_with_lavapipe") {
+  deps = [
+    ":hermetic_lavapipe_config_values",
+    ":vulkan_loader_cmp",
+  ]
+  renameable_subpackages = [
+    {
+      name = "lavapipe_icd"
+      package = "//src/graphics/lib/lavapipe-vulkan:lavapipe_pkg"
+    },
   ]
 }

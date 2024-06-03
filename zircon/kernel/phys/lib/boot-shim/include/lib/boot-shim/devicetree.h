@@ -98,6 +98,11 @@ class DevicetreeItemBase {
 // Helper class for decoding interrupt cells and obtaining IRQ numbers.
 class DevicetreeIrqResolver {
  public:
+  struct IrqConfig {
+    uint32_t irq = 0;
+    uint32_t flags = 0;
+  };
+
   constexpr DevicetreeIrqResolver() = default;
   explicit constexpr DevicetreeIrqResolver(devicetree::ByteView bytes) : interrupt_bytes_(bytes) {}
 
@@ -112,11 +117,12 @@ class DevicetreeIrqResolver {
 
   // Obtains the IRQ number from the interrupt described by the |index|-th element in the interrupt
   // property.
-  std::optional<uint32_t> GetIrqNumber(size_t index) const {
+  IrqConfig GetIrqConfig(size_t index) const {
     ZX_ASSERT(irq_resolver_);
     const size_t entry_size = *interrupt_cells_ * sizeof(uint32_t);
     return irq_resolver_(interrupt_bytes_.subspan(index * entry_size, entry_size),
-                         *interrupt_cells_);
+                         *interrupt_cells_)
+        .value_or(IrqConfig{.irq = 0, .flags = 0});
   }
 
   // May only be called after resolving the IRQ Controller, see |ResolveIrqController()|.
@@ -130,7 +136,7 @@ class DevicetreeIrqResolver {
   bool NeedsInterruptParent() const { return !error_ && interrupt_parent_ && !irq_resolver_; }
 
  private:
-  fit::inline_function<std::optional<uint32_t>(devicetree::ByteView, uint32_t)> irq_resolver_;
+  fit::inline_function<std::optional<IrqConfig>(devicetree::ByteView, uint32_t)> irq_resolver_;
   devicetree::ByteView interrupt_bytes_;
   std::optional<uint32_t> interrupt_parent_;
   std::optional<uint32_t> interrupt_cells_;
@@ -295,7 +301,10 @@ class DevicetreeChosenNodeMatcherBase
   // May only be called after |uart_irq_.ResolveIrqController| returns |fit::ok(true)|.
   void UpdateUart() {
     if (uart_emplacer_) {
-      uart_dcfg_.irq = uart_irq_.GetIrqNumber(0).value_or(0);
+      auto irq_config = uart_irq_.GetIrqConfig(0);
+      uart_dcfg_.irq = irq_config.irq;
+      uart_dcfg_.flags = irq_config.flags;
+
       uart_emplacer_(uart_dcfg_);
     }
   }

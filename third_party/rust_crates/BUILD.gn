@@ -671,7 +671,7 @@ if (!(current_os == "fuchsia")) {
 }
 
 group("proptest") {
-  public_deps = [ ":proptest-v1_0_0" ]
+  public_deps = [ ":proptest-v1_4_0" ]
 }
 
 group("proptest-derive") {
@@ -1006,13 +1006,13 @@ if (!(current_os == "fuchsia")) {
 
 if (!(current_os == "fuchsia")) {
   group("tokio") {
-    public_deps = [ ":tokio-v1_25_2" ]
+    public_deps = [ ":tokio-v1_32_1" ]
   }
 }
 
 if (current_os == "fuchsia") {
   group("tokio") {
-    public_deps = [ ":tokio-v1_25_2" ]
+    public_deps = [ ":tokio-v1_32_1" ]
   }
 }
 
@@ -1073,7 +1073,7 @@ if (current_os == "fuchsia") {
 }
 
 group("tuf") {
-  public_deps = [ ":tuf-v0_3_0-beta11" ]
+  public_deps = [ ":tuf-v0_3_0-beta12" ]
 }
 
 group("typed-builder") {
@@ -2223,6 +2223,28 @@ rust_library("atty-v0_2_11") {
   applicable_licenses = [ ":atty-v0_2_11.license" ]
 }
 
+rust_library("backtrace-v0_3_61") {
+  crate_name = "backtrace"
+  crate_root = "//third_party/rust_crates/empty/backtrace/src/lib.rs"
+  output_name = "backtrace-78d5fcff862777ab"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=78d5fcff862777ab",
+    "-Cextra-filename=-78d5fcff862777ab",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
+}
+
 license("base16ct-v0_1_1.license") {
   public_package_name = "base16ct"
   license_files = [
@@ -2783,7 +2805,7 @@ rust_library("camino-v1_1_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":proptest-v1_0_0" ]
+  deps += [ ":proptest-v1_4_0" ]
   deps += [ ":serde-v1_0_147" ]
 
   rustenv = []
@@ -5621,7 +5643,7 @@ rust_library("fuse3-v0_6_1") {
   deps += [ ":nix-v0_26_2" ]
   deps += [ ":serde-v1_0_147" ]
   deps += [ ":slab-v0_4_7" ]
-  deps += [ ":tokio-v1_25_2" ]
+  deps += [ ":tokio-v1_32_1" ]
   deps += [ ":tracing-v0_1_40" ]
   deps += [ ":which-v4_0_2" ]
 
@@ -6862,7 +6884,7 @@ rust_library("hyper-v0_14_19") {
   deps += [ ":httpdate-v1_0_2" ]
   deps += [ ":itoa-v1_0_5" ]
   deps += [ ":pin-project-lite-v0_2_13" ]
-  deps += [ ":tokio-v1_25_2" ]
+  deps += [ ":tokio-v1_32_1" ]
   deps += [ ":tower-service-v0_3_0" ]
   deps += [ ":tracing-v0_1_40" ]
   deps += [ ":want-v0_3_0" ]
@@ -6909,7 +6931,7 @@ rust_library("hyper-rustls-v0_22_1") {
   deps += [ ":log-v0_4_20" ]
   deps += [ ":rustls-native-certs-v0_5_0" ]
   deps += [ ":tokio-rustls-v0_22_0" ]
-  deps += [ ":tokio-v1_25_2" ]
+  deps += [ ":tokio-v1_32_1" ]
   deps += [ ":webpki-v0_21_0" ]
 
   rustenv = []
@@ -9357,6 +9379,7 @@ rust_library("num-traits-v0_2_18") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
+  deps += [ ":libm-v0_2_1" ]
 
   rustenv = []
 
@@ -9367,6 +9390,7 @@ rust_library("num-traits-v0_2_18") {
     "-Cextra-filename=-7866ac47502981a8",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"i128\"",
+    "--cfg=feature=\"libm\"",
     "--cfg=feature=\"std\"",
     "--cfg=has_copysign",
     "--cfg=has_div_euclid",
@@ -11138,47 +11162,45 @@ rust_proc_macro("proc-macro-error-attr-v1_0_4") {
   applicable_licenses = [ ":proc-macro-error-attr-v1_0_4.license" ]
 }
 
-license("proptest-v1_0_0.license") {
+license("proptest-v1_4_0.license") {
   public_package_name = "proptest"
   license_files = [
-    "//third_party/rust_crates/vendor/proptest-1.0.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/proptest-1.0.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/proptest-1.4.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/proptest-1.4.0/LICENSE-MIT",
   ]
 }
 
-rust_library("proptest-v1_0_0") {
+rust_library("proptest-v1_4_0") {
   crate_name = "proptest"
-  crate_root = "//third_party/rust_crates/vendor/proptest-1.0.0/src/lib.rs"
-  output_name = "proptest-524e1e7f7004ea48"
+  crate_root = "//third_party/rust_crates/vendor/proptest-1.4.0/src/lib.rs"
+  output_name = "proptest-60c7a54e1a2dc821"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":byteorder-v1_4_3" ]
   deps += [ ":bit-set-v0_5_3" ]
-  deps += [ ":bitflags-v1_3_2" ]
+  deps += [ ":bit-vec-v0_6_3" ]
+  deps += [ ":bitflags-v2_4_1" ]
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":num-traits-v0_2_18" ]
-  deps += [ ":quick-error-v2_0_1" ]
   deps += [ ":rand-v0_8_4" ]
   deps += [ ":rand_chacha-v0_3_1" ]
   deps += [ ":rand_xorshift-v0_3_0" ]
-  deps += [ ":regex-syntax-v0_6_29" ]
+  deps += [ ":regex-syntax-v0_8_3" ]
   deps += [ ":rusty-fork-v0_3_0" ]
   deps += [ ":tempfile-v3_2_0" ]
+  deps += [ ":unarray-v0_1_4" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=524e1e7f7004ea48",
-    "-Cextra-filename=-524e1e7f7004ea48",
+    "-Cmetadata=60c7a54e1a2dc821",
+    "-Cextra-filename=-60c7a54e1a2dc821",
     "--cfg=feature=\"bit-set\"",
-    "--cfg=feature=\"break-dead-code\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"fork\"",
     "--cfg=feature=\"lazy_static\"",
-    "--cfg=feature=\"quick-error\"",
     "--cfg=feature=\"regex-syntax\"",
     "--cfg=feature=\"rusty-fork\"",
     "--cfg=feature=\"std\"",
@@ -11188,7 +11210,7 @@ rust_library("proptest-v1_0_0") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":proptest-v1_0_0.license" ]
+  applicable_licenses = [ ":proptest-v1_4_0.license" ]
 }
 
 license("proptest-derive-v0_3_0.license") {
@@ -11459,36 +11481,6 @@ rust_library("quick-error-v1_2_2") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":quick-error-v1_2_2.license" ]
-}
-
-license("quick-error-v2_0_1.license") {
-  public_package_name = "quick_error"
-  license_files = [
-    "//third_party/rust_crates/vendor/quick-error-2.0.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/quick-error-2.0.1/LICENSE-MIT",
-  ]
-}
-
-rust_library("quick-error-v2_0_1") {
-  crate_name = "quick_error"
-  crate_root = "//third_party/rust_crates/vendor/quick-error-2.0.1/src/lib.rs"
-  output_name = "quick_error-68d04ccb9a9a55d5"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=68d04ccb9a9a55d5",
-    "-Cextra-filename=-68d04ccb9a9a55d5",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":quick-error-v2_0_1.license" ]
 }
 
 license("quote-v0_6_11.license") {
@@ -12642,7 +12634,7 @@ rust_library("ring-v0_16_20") {
   visibility += [ ":rustls-v0_19_1" ]
   visibility += [ ":sct-v0_6_0" ]
   visibility += [ ":trust-dns-proto-v0_21_2" ]
-  visibility += [ ":tuf-v0_3_0-beta11" ]
+  visibility += [ ":tuf-v0_3_0-beta12" ]
   visibility += [ ":webpki-v0_21_0" ]
 
   applicable_licenses = [ ":ring-v0_16_20.license" ]
@@ -15879,21 +15871,21 @@ rust_library("tinyvec_macros-v0_1_0") {
   applicable_licenses = [ ":tinyvec_macros-v0_1_0.license" ]
 }
 
-license("tokio-v1_25_2.license") {
+license("tokio-v1_32_1.license") {
   public_package_name = "tokio"
-  license_files = [ "//third_party/rust_crates/vendor/tokio-1.25.2/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/tokio-1.32.1/LICENSE" ]
 }
 
-rust_library("tokio-v1_25_2") {
+rust_library("tokio-v1_32_1") {
   crate_name = "tokio"
-  crate_root = "//third_party/rust_crates/vendor/tokio-1.25.2/src/lib.rs"
-  output_name = "tokio-838d0fb9e953004a"
+  crate_root = "//third_party/rust_crates/vendor/tokio-1.32.1/src/lib.rs"
+  output_name = "tokio-e632fd320a52613b"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":pin-project-lite-v0_2_13" ]
   if (false) {
-    deps += [ ":windows-sys-v0_42_0" ]
+    deps += [ ":backtrace-v0_3_61" ]
   }
   if (!(current_os == "fuchsia")) {
     deps += [ ":bytes-v1_0_1" ]
@@ -15902,33 +15894,33 @@ rust_library("tokio-v1_25_2") {
     deps += [ ":mio-v0_8_9" ]
     deps += [ ":num_cpus-v1_13_0" ]
     deps += [ ":signal-hook-registry-v1_4_1" ]
-    deps += [ ":socket2-v0_4_4" ]
+    deps += [ ":socket2-v0_5_5" ]
   }
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=838d0fb9e953004a",
-    "-Cextra-filename=-838d0fb9e953004a",
+    "--edition=2021",
+    "-Cmetadata=e632fd320a52613b",
+    "-Cextra-filename=-e632fd320a52613b",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"sync\"",
     "--cfg=feature=\"time\"",
   ]
   if (!(current_os == "fuchsia")) {
     rustflags += [
-      "--cfg=feature=\"libc\"",
+      "--cfg=feature=\"bytes\"",
       "--cfg=feature=\"fs\"",
+      "--cfg=feature=\"io-util\"",
+      "--cfg=feature=\"libc\"",
       "--cfg=feature=\"mio\"",
       "--cfg=feature=\"net\"",
       "--cfg=feature=\"num_cpus\"",
       "--cfg=feature=\"process\"",
-      "--cfg=feature=\"io-util\"",
-      "--cfg=feature=\"bytes\"",
-      "--cfg=feature=\"signal-hook-registry\"",
-      "--cfg=feature=\"rt\"",
       "--cfg=feature=\"rt-multi-thread\"",
+      "--cfg=feature=\"rt\"",
+      "--cfg=feature=\"signal-hook-registry\"",
       "--cfg=feature=\"socket2\"",
       "--cfg=feature=\"sync\"",
       "--cfg=feature=\"time\"",
@@ -15937,7 +15929,7 @@ rust_library("tokio-v1_25_2") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":tokio-v1_25_2.license" ]
+  applicable_licenses = [ ":tokio-v1_32_1.license" ]
 }
 
 license("tokio-rustls-v0_22_0.license") {
@@ -15956,7 +15948,7 @@ rust_library("tokio-rustls-v0_22_0") {
 
   deps = []
   deps += [ ":rustls-v0_19_1" ]
-  deps += [ ":tokio-v1_25_2" ]
+  deps += [ ":tokio-v1_32_1" ]
   deps += [ ":webpki-v0_21_0" ]
 
   rustenv = []
@@ -15988,7 +15980,7 @@ rust_library("tokio-stream-v0_1_14") {
   deps = []
   deps += [ ":futures-core-v0_3_19" ]
   deps += [ ":pin-project-lite-v0_2_13" ]
-  deps += [ ":tokio-v1_25_2" ]
+  deps += [ ":tokio-v1_32_1" ]
 
   rustenv = []
 
@@ -16509,29 +16501,28 @@ rust_library("ttf-parser-v0_10_1") {
   applicable_licenses = [ ":ttf-parser-v0_10_1.license" ]
 }
 
-license("tuf-v0_3_0-beta11.license") {
+license("tuf-v0_3_0-beta12.license") {
   public_package_name = "tuf"
   license_files = [
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta11/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/tuf-0.3.0-beta11/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/LICENSE-MIT",
   ]
 }
 
-rust_library("tuf-v0_3_0-beta11") {
+rust_library("tuf-v0_3_0-beta12") {
   crate_name = "tuf"
-  crate_root = "//third_party/rust_crates/vendor/tuf-0.3.0-beta11/src/lib.rs"
-  output_name = "tuf-626873d1c4c31241"
+  crate_root = "//third_party/rust_crates/vendor/tuf-0.3.0-beta12/src/lib.rs"
+  output_name = "tuf-90ecc9b52560181b"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":chrono-v0_4_34" ]
   deps += [ ":data-encoding-v2_3_2" ]
-  deps += [ ":derp-v0_0_14" ]
   deps += [ ":futures-io-v0_3_19" ]
   deps += [ ":futures-util-v0_3_19" ]
   deps += [ ":http-v0_2_4" ]
   deps += [ ":hyper-v0_14_19" ]
-  deps += [ ":itoa-v0_4_3" ]
+  deps += [ ":itoa-v1_0_5" ]
   deps += [ ":log-v0_4_20" ]
   deps += [ ":percent-encoding-v2_2_0" ]
   deps += [ ":ring-v0_16_20" ]
@@ -16548,14 +16539,14 @@ rust_library("tuf-v0_3_0-beta11") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=626873d1c4c31241",
-    "-Cextra-filename=-626873d1c4c31241",
+    "-Cmetadata=90ecc9b52560181b",
+    "-Cextra-filename=-90ecc9b52560181b",
     "--cfg=feature=\"hyper\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":tuf-v0_3_0-beta11.license" ]
+  applicable_licenses = [ ":tuf-v0_3_0-beta12.license" ]
 }
 
 license("typed-arena-v1_4_1.license") {
@@ -16685,6 +16676,36 @@ rust_library("ucd-trie-v0_1_6") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":ucd-trie-v0_1_6.license" ]
+}
+
+license("unarray-v0_1_4.license") {
+  public_package_name = "unarray"
+  license_files = [
+    "//third_party/rust_crates/vendor/unarray-0.1.4/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/unarray-0.1.4/LICENSE-MIT",
+  ]
+}
+
+rust_library("unarray-v0_1_4") {
+  crate_name = "unarray"
+  crate_root = "//third_party/rust_crates/vendor/unarray-0.1.4/src/lib.rs"
+  output_name = "unarray-7c47013ab5fe76e9"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=7c47013ab5fe76e9",
+    "-Cextra-filename=-7c47013ab5fe76e9",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":unarray-v0_1_4.license" ]
 }
 
 license("unic-char-property-v0_9_0.license") {
@@ -18064,9 +18085,7 @@ rust_library("windows-sys-v0_42_0") {
     "--edition=2015",
     "-Cmetadata=c774e6555c42216d",
     "-Cextra-filename=-c774e6555c42216d",
-    "--cfg=feature=\"Win32_Foundation\"",
     "--cfg=feature=\"Win32_Networking_WinSock\"",
-    "--cfg=feature=\"Win32_Security_Authorization\"",
   ]
 
   visibility = [ ":*" ]

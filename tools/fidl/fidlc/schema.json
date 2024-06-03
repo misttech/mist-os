@@ -1061,7 +1061,7 @@
         },
         "version-identifier": {
             "description": "Definition of a version identifier",
-            "pattern": "^([1-9][0-9]*|HEAD|LEGACY)$",
+            "pattern": "^([1-9][0-9]*|NEXT|HEAD|LEGACY)$",
             "type": "string"
         },
         "literal-constant": {

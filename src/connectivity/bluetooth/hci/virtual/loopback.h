@@ -8,7 +8,8 @@
 #include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/driver/devfs/cpp/connector.h>
-#include <zircon/device/bt-hci.h>
+
+#include "bt-hci.h"
 
 namespace bt_hci_virtual {
 
@@ -28,6 +29,7 @@ class LoopbackDevice : public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
   void EncodeCommand(EncodeCommandRequestView request,
                      EncodeCommandCompleter::Sync& completer) override;
   void OpenHci(OpenHciCompleter::Sync& completer) override;
+  void OpenHciTransport(OpenHciTransportCompleter::Sync& completer) override {}
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;

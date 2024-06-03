@@ -115,7 +115,7 @@ mod tests {
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
         hooks::{Event, EventType, Hook, HooksRegistration},
-        moniker::{Moniker, MonikerBase},
+        moniker::Moniker,
     };
 
     /// Use SystemController to shut down a system whose root has the child `a`

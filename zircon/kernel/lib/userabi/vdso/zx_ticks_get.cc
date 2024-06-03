@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/fasttime.h>
+#include <lib/fasttime/internal/time.h>
 
 #include "private.h"
 
 __EXPORT zx_ticks_t _zx_ticks_get(void) {
-  return internal::compute_monotonic_ticks<internal::FasttimeVerificationMode::kSkip>(
-      DATA_TIME_VALUES);
+  return fasttime::internal::compute_monotonic_ticks<
+      fasttime::internal::FasttimeVerificationMode::kSkip>(DATA_TIME_VALUES);
 }
 
 VDSO_INTERFACE_FUNCTION(zx_ticks_get);

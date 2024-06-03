@@ -111,7 +111,7 @@ void main(List<String> args) {
       expect(body['method'], 'diagnostics_facade.SnapshotInspect');
       expect(body['params']['selectors'], []);
       expect(body['params']['service_name'],
-          'fuchsia.diagnostics.FeedbackArchiveAccessor');
+          'fuchsia.diagnostics.ArchiveAccessor');
       req.response.write(jsonEncode({
         'id': body['id'],
         'result': expectedHierarchies,
@@ -122,8 +122,7 @@ void main(List<String> args) {
 
     fakeServer.listen(handler);
 
-    final result =
-        await Inspect(sl4f).snapshotAll(pipeline: InspectPipeline.feedback);
+    final result = await Inspect(sl4f).snapshotAll();
     expect(result, equals(expectedHierarchies));
   });
 

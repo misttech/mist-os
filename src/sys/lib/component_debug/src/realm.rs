@@ -10,7 +10,7 @@ use {
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     fuchsia_async::TimeoutExt,
     futures::TryFutureExt,
-    moniker::{Moniker, MonikerBase, MonikerError},
+    moniker::{Moniker, MonikerError},
     thiserror::Error,
 };
 

@@ -47,7 +47,7 @@ func loadData(filename string, file io.ReaderAt, peFile *pe.File, dir pe.DataDir
 			return data[start:end], nil
 		}
 	}
-	return nil, fmt.Errorf("debug virtual address not found in sections in %s", filename)
+	return nil, fmt.Errorf("debug virtual address %#x not found in sections in %s", dir.VirtualAddress, filename)
 }
 
 func parsePDBInfo(filename string, data []byte) ([]byte, error) {
@@ -82,6 +82,9 @@ func PEGetBuildIDs(filename string, file io.ReaderAt) ([][]byte, error) {
 		return nil, fmt.Errorf("PE-COFF file %s not 64-bit?", filename)
 	}
 	dir := hdr64.DataDirectory[pe.IMAGE_DIRECTORY_ENTRY_DEBUG]
+	if dir.VirtualAddress == 0 {
+		return [][]byte{}, nil
+	}
 	data, err := loadData(filename, file, peFile, dir)
 	if err != nil {
 		return nil, err

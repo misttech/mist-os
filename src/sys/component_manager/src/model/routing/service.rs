@@ -27,7 +27,7 @@ use {
         stream::TryStreamExt,
     },
     hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
-    moniker::{ExtendedMoniker, Moniker, MonikerBase},
+    moniker::{ExtendedMoniker, Moniker},
     router_error::Explain,
     routing::capability_source::{
         AggregateInstance, AggregateMember, AnonymizedAggregateCapabilityProvider,

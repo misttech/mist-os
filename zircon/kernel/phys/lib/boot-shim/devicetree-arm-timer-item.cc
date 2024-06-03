@@ -30,9 +30,9 @@ devicetree::ScanState ArmDevicetreeTimerItem::OnNode(const devicetree::NodePath&
 
   auto set_payload = [this]() {
     this->set_payload(zbi_dcfg_arm_generic_timer_driver_t{
-        .irq_phys = irq_.GetIrqNumber(kNonSecureIrqIndex).value_or(0),
-        .irq_virt = irq_.GetIrqNumber(kVirtualIrqIndex).value_or(0),
-        .irq_sphys = irq_.GetIrqNumber(kSecureIrqIndex).value_or(0),
+        .irq_phys = irq_.GetIrqConfig(kNonSecureIrqIndex).irq,
+        .irq_virt = irq_.GetIrqConfig(kVirtualIrqIndex).irq,
+        .irq_sphys = irq_.GetIrqConfig(kSecureIrqIndex).irq,
         .freq_override = static_cast<uint32_t>(frequency_.value_or(0)),
     });
   };

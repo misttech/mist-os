@@ -11,6 +11,7 @@ group("tests") {
     "component/cpp:tests",
     "devfs:tests",
     "devicetree:tests",
+    "metadata/cpp:tests",
     "power/cpp:tests",
   ]
 }

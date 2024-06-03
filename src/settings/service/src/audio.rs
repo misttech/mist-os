@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+pub use self::audio_default_settings::build_audio_default_settings;
 #[cfg(test)]
 pub(crate) use self::audio_default_settings::create_default_audio_stream;
-pub use self::audio_default_settings::ModifiedCounters;
 pub(crate) use self::audio_default_settings::{
-    create_default_modified_counters, default_audio_info,
+    create_default_modified_counters, AudioInfoLoader, ModifiedCounters,
 };
 pub use self::stream_volume_control::StreamVolumeControl;
 pub mod audio_controller;

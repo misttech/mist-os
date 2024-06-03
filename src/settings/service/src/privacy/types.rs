@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(PartialEq, Default, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct PrivacyInfo {
     pub user_data_sharing_consent: Option<bool>,
 }

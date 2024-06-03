@@ -123,6 +123,8 @@ static_assert(__offsetof(VmxState, guest_state.cr2) == GS_CR2);
 // exited again. Otherwise, we failed to launch the guest.
 zx::result<> vmx_enter(VmxState* vmx_state);
 
+bool vmx_ept_supports_large_pages();
+
 // Implemented in assembly.
 extern "C" {
 

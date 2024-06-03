@@ -224,37 +224,6 @@ Output Files From Directories
             remotetool.parse_show_action_output([])
 
 
-class ReadConfigFileLinesTests(unittest.TestCase):
-    def test_empty_file(self):
-        self.assertEqual(remotetool.read_config_file_lines([]), dict())
-
-    def test_ignore_blank_lines(self):
-        self.assertEqual(
-            remotetool.read_config_file_lines(["", "\t", "\n"]), dict()
-        )
-
-    def test_ignore_comments(self):
-        self.assertEqual(
-            remotetool.read_config_file_lines(["####", "# comment"]), dict()
-        )
-
-    def test_ignore_non_key_value_pairs(self):
-        self.assertEqual(
-            remotetool.read_config_file_lines(["value-only"]), dict()
-        )
-
-    def test_key_value(self):
-        self.assertEqual(
-            remotetool.read_config_file_lines(["key=value"]), {"key": "value"}
-        )
-
-    def test_last_wins(self):
-        self.assertEqual(
-            remotetool.read_config_file_lines(["key=value-1", "key=value-2"]),
-            {"key": "value-2"},
-        )
-
-
 _TEST_CFG = {
     "service": "other.remote.service.com:443",
     "instance": "projects/your-project/instance/default",

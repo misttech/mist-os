@@ -12,7 +12,7 @@ use {
     cm_rust::{CapabilityDecl, CollectionDecl, ComponentDecl, ExposeDecl, OfferDecl, UseDecl},
     cm_types::{Name, Url},
     config_encoder::ConfigFields,
-    moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
+    moniker::{ChildName, Moniker},
     routing::{
         capability_source::{BuiltinCapabilities, NamespaceCapabilities},
         component_instance::{

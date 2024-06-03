@@ -31,6 +31,7 @@
 #include <kernel/timer.h>
 #include <ktl/algorithm.h>
 #include <lk/init.h>
+#include <object/memory_watchdog.h>
 #include <vm/physmap.h>
 #include <vm/pmm_checker.h>
 #include <vm/scanner.h>
@@ -39,6 +40,10 @@
 #include "pmm_arena.h"
 #include "pmm_node.h"
 #include "vm_priv.h"
+
+#if defined(__x86_64__)
+#include <arch/x86/feature.h>
+#endif
 
 #include <ktl/enforce.h>
 
@@ -180,10 +185,10 @@ PhysicalPageBorrowingConfig* pmm_physical_page_borrowing_config() {
   return &ppb_config;
 }
 
-zx_status_t pmm_init_reclamation(const uint64_t* watermarks, uint8_t watermark_count,
-                                 uint64_t debounce, void* context,
-                                 mem_avail_state_updated_callback_t callback) {
-  return pmm_node.InitReclamation(watermarks, watermark_count, debounce, context, callback);
+bool pmm_set_free_memory_signal(uint64_t free_lower_bound, uint64_t free_upper_bound,
+                                uint64_t delay_allocations_pages, Event* event) {
+  return pmm_node.SetFreeMemorySignal(free_lower_bound, free_upper_bound, delay_allocations_pages,
+                                      event);
 }
 
 zx_status_t pmm_wait_till_should_retry_single_alloc(const Deadline& deadline) {
@@ -220,7 +225,30 @@ static bool pmm_checker_is_enabled() { return pmm_node.Checker()->IsArmed(); }
 static void pmm_checker_print_status() { pmm_node.Checker()->PrintStatus(stdout); }
 
 void pmm_checker_init_from_cmdline() {
-  bool enabled = gBootOptions->pmm_checker_enabled;
+  bool enabled = false;
+  switch (gBootOptions->pmm_checker_enabled) {
+    case CheckerEnable::kTrue:
+      enabled = true;
+      break;
+    case CheckerEnable::kFalse:
+      enabled = false;
+      break;
+    case CheckerEnable::kAuto:
+#if defined(__x86_64__)
+      if (x86_has_hypervisor()) {
+        printf("PMM: Checker enabled set to auto and hypervisor detected, disabling\n");
+        enabled = false;
+      } else {
+        printf("PMM: Checker enabled set to auto and hypervisor not detected, enabling\n");
+        enabled = true;
+      }
+#else
+      printf(
+          "PMM: Checker enabled set to auto on platform without hypervisor detection, disabling\n");
+      enabled = false;
+#endif
+      break;
+  }
   if (enabled) {
     size_t fill_size = gBootOptions->pmm_checker_fill_size;
     if (!PmmChecker::IsValidFillSize(fill_size)) {
@@ -274,10 +302,6 @@ static int cmd_oom(int argc, const cmd_args* argv) {
       return cmd_oom_dip();
     }
 
-    if (!strcmp(argv[2].str, "signal")) {
-      pmm_node.DebugMemAvailStateCallback(0);
-      return ZX_OK;
-    }
     if (!strcmp(argv[2].str, "hard")) {
       hard = true;
     } else {
@@ -299,7 +323,9 @@ static int cmd_oom(int argc, const cmd_args* argv) {
   uint64_t pages_till_oom;
   // In case we are racing with someone freeing pages we will leak in a loop until we are sure
   // we have hit the oom state.
-  while ((pages_till_oom = pmm_node.DebugNumPagesTillMemState(0)) > 0) {
+  while ((pages_till_oom = GetMemoryWatchdog().DebugNumBytesTillPressureLevel(
+                               MemoryWatchdog::PressureLevel::kOutOfMemory) /
+                           PAGE_SIZE) > 0) {
     list_node list = LIST_INITIAL_VALUE(list);
     if (rate > 0) {
       uint64_t pages_leaked = 0;
@@ -350,10 +376,6 @@ static int cmd_usage(const char* cmd_name, bool is_panic) {
     printf(
         "%s oom hard                                 : leak memory aggressively and keep on "
         "leaking\n",
-        cmd_name);
-    printf(
-        "%s oom signal                               : trigger oom signal without leaking "
-        "memory\n",
         cmd_name);
     printf("%s mem_avail_state info                     : dump memory availability state info\n",
            cmd_name);
@@ -419,7 +441,7 @@ static int cmd_pmm(int argc, const cmd_args* argv, uint32_t flags) {
       return cmd_usage(name, is_panic);
     }
     if (!strcmp(argv[2].str, "info")) {
-      pmm_node.DumpMemAvailState();
+      GetMemoryWatchdog().Dump();
     } else {
       bool step = false;
       int index = 2;
@@ -428,10 +450,11 @@ static int cmd_pmm(int argc, const cmd_args* argv, uint32_t flags) {
         index++;
       }
 
-      uint8_t state = static_cast<uint8_t>(argv[index++].u);
-      if (state > pmm_node.DebugMaxMemAvailState()) {
+      MemoryWatchdog::PressureLevel state =
+          static_cast<MemoryWatchdog::PressureLevel>(argv[index++].u);
+      if (state >= MemoryWatchdog::PressureLevel::kNumLevels) {
         printf("Invalid memstate %u. Specify a value between 0 and %u.\n", state,
-               pmm_node.DebugMaxMemAvailState());
+               MemoryWatchdog::PressureLevel::kNumLevels - 1u);
         return cmd_usage(name, is_panic);
       }
 
@@ -439,12 +462,14 @@ static int cmd_pmm(int argc, const cmd_args* argv, uint32_t flags) {
       list_node list = LIST_INITIAL_VALUE(list);
 
       if (step) {
-        uint8_t s = pmm_node.DebugMaxMemAvailState();
+        uint8_t s = MemoryWatchdog::PressureLevel::kNumLevels - 1;
         while (true) {
           // In case we are racing with someone freeing pages we will leak in a loop until we are
           // sure we have hit the required memory availability state.
           uint64_t pages_allocated = 0;
-          while ((pages_to_alloc = pmm_node.DebugNumPagesTillMemState(s)) > 0) {
+          while ((pages_to_alloc = GetMemoryWatchdog().DebugNumBytesTillPressureLevel(
+                                       MemoryWatchdog::PressureLevel(s)) /
+                                   PAGE_SIZE) > 0) {
             if (pmm_node.AllocPages(pages_to_alloc, 0, &list) == ZX_OK) {
               printf("Leaked %lu pages\n", pages_to_alloc);
               pages_allocated += pages_to_alloc;
@@ -463,7 +488,8 @@ static int cmd_pmm(int argc, const cmd_args* argv, uint32_t flags) {
       } else {
         // In case we are racing with someone freeing pages we will leak in a loop until we are
         // sure we have hit the required memory availability state.
-        while ((pages_to_alloc = pmm_node.DebugNumPagesTillMemState(state)) > 0) {
+        while ((pages_to_alloc =
+                    GetMemoryWatchdog().DebugNumBytesTillPressureLevel(state) / PAGE_SIZE) > 0) {
           if (pmm_node.AllocPages(pages_to_alloc, 0, &list) == ZX_OK) {
             printf("Leaked %lu pages\n", pages_to_alloc);
             pages_to_free += pages_to_alloc;

@@ -52,16 +52,14 @@ group_with_no_dir_target_deps("workbench_emulator_stable_tests") {
   testonly = true
   public_deps = [
     "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests($host_toolchain)",
+    "//src/tests/end_to_end/diagnostics:diagnostics_test($host_toolchain)",
     "//src/tests/end_to_end/snapshot:snapshot_test_fc($host_toolchain)",
   ]
 }
 
 group_with_no_dir_target_deps("workbench_emulator_unstable_tests") {
   testonly = true
-  public_deps = [
-    "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests_staging",
-    "//src/tests/end_to_end/diagnostics:diagnostics_test($host_toolchain)",
-  ]
+  public_deps = [ "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests_staging" ]
 }
 
 group("workbench_emulator_staging_tests") {
@@ -79,6 +77,7 @@ group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
   public_deps = [
     "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests($host_toolchain)",
     "//src/firmware/tests/lacewing:lacewing($host_toolchain)",
+    "//src/tests/end_to_end/diagnostics:diagnostics_test($host_toolchain)",
     "//src/tests/end_to_end/rtc:rtc_conformance_test($host_toolchain)",
     "//src/tests/end_to_end/snapshot:snapshot_test_fc($host_toolchain)",
   ]
@@ -89,7 +88,6 @@ group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
   public_deps = [
     "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests_staging",
     "//src/firmware/tests/lacewing:lacewing($host_toolchain)",
-    "//src/tests/end_to_end/diagnostics:diagnostics_test($host_toolchain)",
   ]
 }
 
@@ -107,6 +105,7 @@ group_with_no_dir_target_deps("workbench_nuc_stable_tests") {
   testonly = true
   public_deps = [
     "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests",
+    "//src/tests/end_to_end/diagnostics:diagnostics_test($host_toolchain)",
     "//src/tests/end_to_end/snapshot:snapshot_test_fc($host_toolchain)",
   ]
 }
@@ -121,12 +120,10 @@ group("workbench_nuc_staging_tests") {
   public_deps = [
     ":workbench_nuc_stable_tests",
     ":workbench_nuc_unstable_tests",
-    "//src/tests/end_to_end/diagnostics:diagnostics_test($host_toolchain)",
   ]
 }
 
 # minimal.vim3
-# Note - minimal does not support SL4F
 group_with_no_dir_target_deps("minimal_vim3_stable_tests") {
   testonly = true
   public_deps = []
@@ -146,6 +143,27 @@ group("minimal_vim3_staging_tests") {
   ]
 }
 
+# starnix.vim3
+# Note: This will be run on internal builder, hence using `starnix` here
+# instead of internal `<PRODUCT>` name.
+group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
+  testonly = true
+  public_deps = []
+}
+
+group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
+  testonly = true
+  public_deps = []
+}
+
+group("starnix_vim3_staging_tests") {
+  testonly = true
+  public_deps = [
+    ":starnix_vim3_stable_tests",
+    ":starnix_vim3_unstable_tests",
+  ]
+}
+
 ############################## Test groups - End ###############################
 
 ############################ Package groups - Start ############################
@@ -153,12 +171,12 @@ group("minimal_vim3_staging_tests") {
 # Note - workbench does not support SL4F
 group_with_no_dir_target_deps("workbench_emulator_stable_packages") {
   testonly = true
-  public_deps = [ "//src/storage/blackout/host:blackout_emulator" ]
+  public_deps = [ "//src/storage/blackout/host:blackout_emulator_stable" ]
 }
 
 group_with_no_dir_target_deps("workbench_emulator_unstable_packages") {
   testonly = true
-  public_deps = []
+  public_deps = [ "//src/storage/blackout/host:blackout_emulator_unstable" ]
 }
 
 group("workbench_emulator_staging_packages") {
@@ -173,12 +191,12 @@ group("workbench_emulator_staging_packages") {
 # Note - workbench does not support SL4F
 group_with_no_dir_target_deps("workbench_vim3_stable_packages") {
   testonly = true
-  public_deps = []
+  public_deps = [ "//src/storage/blackout/host:blackout_vim3_unstable" ]
 }
 
 group_with_no_dir_target_deps("workbench_vim3_unstable_packages") {
   testonly = true
-  public_deps = [ "//src/storage/blackout/host:blackout_vim3" ]
+  public_deps = [ "//src/storage/blackout/host:blackout_vim3_unstable" ]
 }
 
 group("workbench_vim3_staging_packages") {
@@ -210,7 +228,6 @@ group("workbench_nuc_staging_packages") {
 }
 
 # minimal.vim3
-# Note - minimal does not support SL4F
 group_with_no_dir_target_deps("minimal_vim3_stable_packages") {
   testonly = true
   public_deps = []
@@ -226,6 +243,27 @@ group("minimal_vim3_staging_packages") {
   public_deps = [
     ":minimal_vim3_stable_packages",
     ":minimal_vim3_unstable_packages",
+  ]
+}
+
+# starnix.vim3
+# Note: This will be run on internal builder, hence using `starnix` here instead
+# of internal `<PRODUCT>` name.
+group_with_no_dir_target_deps("starnix_vim3_stable_packages") {
+  testonly = true
+  public_deps = [ "//src/storage/blackout/host:blackout_starnix_vim3_stable" ]
+}
+
+group_with_no_dir_target_deps("starnix_vim3_unstable_packages") {
+  testonly = true
+  public_deps = [ "//src/storage/blackout/host:blackout_starnix_vim3_unstable" ]
+}
+
+group("starnix_vim3_staging_packages") {
+  testonly = true
+  public_deps = [
+    ":starnix_vim3_stable_packages",
+    ":starnix_vim3_unstable_packages",
   ]
 }
 ############################ Package groups - End ##############################

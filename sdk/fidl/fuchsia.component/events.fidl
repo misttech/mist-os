@@ -26,7 +26,7 @@ type EventType = strict enum {
     CAPABILITY_REQUESTED = 1;
 
     /// A directory exposed to the framework by a component is available.
-    @available(removed=20)
+    @available(removed=20, legacy=true)
     DIRECTORY_READY = 2;
 
     /// A component instance was discovered. This is the first stage in the lifecycle
@@ -67,7 +67,7 @@ type EventPayload = flexible resource union {
     2: purged PurgedPayload;
 
     /// Payload for DirectoryReady events
-    @available(deprecated=19, removed=20)
+    @available(deprecated=19, removed=20, legacy=true)
     3: directory_ready DirectoryReadyPayload;
 
     /// Payload for Discovered events.
@@ -93,7 +93,7 @@ type EventPayload = flexible resource union {
 };
 
 /// Payload for DirectoryReady events
-@available(added=11, deprecated=19, removed=20)
+@available(added=11, deprecated=19, removed=20, legacy=true)
 type DirectoryReadyPayload = resource table {
     /// The name of the capability.
     1: name name;

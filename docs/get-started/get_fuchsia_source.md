@@ -18,24 +18,11 @@ The steps are:
 Fuchsia requires `curl`, `file`, `unzip`, and `git` to be up to date. The version
 of `git` needs to be 2.31 or higher.
 
-* {Linux}
+Install (or update) the following packages:
 
-  Install (or update) the following packages:
-
-  ```posix-terminal
-  sudo apt install curl file git unzip
-  ```
-
-* {macOS}
-
-  Install the Xcode command line tools:
-
-  Note: Skip this step if `ffx platform preflight` shows that Xcode tools
-  are already installed on your machine.
-
-  ```posix-terminal
-  xcode-select --install
-  ```
+```posix-terminal
+sudo apt install curl file git unzip
+```
 
 ## 2. Perform a preflight check {#perform-a-preflight-check}
 
@@ -48,18 +35,9 @@ Note: The preflight tool only works for the x64 architecture.
 
 Run the following command:
 
-* {Linux}
-
-  ```posix-terminal
-  curl -sO https://storage.googleapis.com/fuchsia-ffx/ffx-linux-x64 && chmod +x ffx-linux-x64 && ./ffx-linux-x64 platform preflight
-  ```
-
-* {macOS}
-
-  ```posix-terminal
-  curl -sO https://storage.googleapis.com/fuchsia-ffx/ffx-macos-x64 && chmod +x ffx-macos-x64 && ./ffx-macos-x64 platform preflight
-  ```
-
+```posix-terminal
+curl -sO https://storage.googleapis.com/fuchsia-ffx/ffx-linux-x64 && chmod +x ffx-linux-x64 && ./ffx-linux-x64 platform preflight
+```
 
 ## 3. Download the Fuchsia source code {#download-the-fuchsia-source-code}
 
@@ -180,8 +158,7 @@ do the following:
 Note: This step is not required for building or running Fuchsia. But it is
 recommended to ensure that Fuchsia's emulator instances run smoothly on Linux.
 
-(**Linux only**) If you're planning on running Fuchsia on Linux, it is advised to
-run the following command to allow Fuchsia-specific traffic on the host machine:
+Run the following command to allow Fuchsia-specific traffic on the host machine:
 
 ```posix-terminal
 fx setup-ufw

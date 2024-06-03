@@ -19,6 +19,8 @@
         },
         {
             protocol: [
+                "fuchsia.input.interaction.Notifier",
+                "fuchsia.input.interaction.observation.Aggregator",
                 "fuchsia.input.wayland.Keymap",
                 "fuchsia.lightsensor.Sensor",
                 "fuchsia.recovery.policy.Device",
@@ -65,6 +67,11 @@
                 "fuchsia.ui.scenic.Scenic",
             ],
         },
+        {
+            // Used to report activity.
+            protocol: "fuchsia.input.interaction.observation.Aggregator",
+            from: "self",
+        },
     ],
     expose: [
         {
@@ -75,6 +82,8 @@
         },
         {
             protocol: [
+                "fuchsia.input.interaction.Notifier",
+                "fuchsia.input.interaction.observation.Aggregator",
                 "fuchsia.input.wayland.Keymap",
                 "fuchsia.lightsensor.Sensor",
                 "fuchsia.recovery.policy.Device",

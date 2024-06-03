@@ -880,6 +880,9 @@ if (is_kernel) {
 
     # Used as a bias when patching kernel code.
     defines = [ "KERNEL_LINK_ADDRESS=${kernel_base}" ]
+
+    # Defines the maximum support kernel image size.
+    configs += [ "//zircon/kernel:kernel_image_max_size" ]
   }
 
   kernel_elf_binary("physboot-elf-kernel") {
@@ -906,6 +909,9 @@ if (is_kernel) {
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",
     ]
+
+    # Defines the maximum support kernel image size.
+    configs += [ "//zircon/kernel:kernel_image_max_size" ]
   }
 
   # A physboot-compatible ELF kernel depends on this.

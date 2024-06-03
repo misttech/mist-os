@@ -8,7 +8,7 @@ use std::{collections::HashSet, pin::pin};
 
 use async_utils::event::Event;
 use either::Either;
-use fidl::endpoints::{DiscoverableProtocolMarker as _, ProtocolMarker as _};
+use fidl::endpoints::{DiscoverableProtocolMarker as _, ProtocolMarker};
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
@@ -30,9 +30,10 @@ use netstack3_core::{
     routes::{NextHop, ResolvedRoute, WrapBroadcastMarker},
 };
 use thiserror::Error;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::bindings::{
+    routes,
     util::{ConversionContext as _, IntoCore as _, IntoFidl as _},
     BindingsCtx, Ctx, IpExt,
 };
@@ -196,10 +197,8 @@ pub(crate) async fn serve_state_v4(
     dispatcher: &RouteUpdateDispatcher<Ipv4>,
 ) {
     rs.try_for_each_concurrent(None, |req| match req {
-        // TODO(https://fxbug.dev/336367363): Use the `options` to only watch
-        // for a specific route table.
-        fnet_routes::StateV4Request::GetWatcherV4 { options: _, watcher, control_handle: _ } => {
-            serve_watcher::<Ipv4>(watcher, dispatcher).map(|result| {
+        fnet_routes::StateV4Request::GetWatcherV4 { options, watcher, control_handle: _ } => {
+            serve_watcher::<Ipv4>(watcher, options.into(), dispatcher).map(|result| {
                 Ok(result.unwrap_or_else(|e| {
                     warn!("error serving {}: {:?}", fnet_routes::WatcherV4Marker::DEBUG_NAME, e)
                 }))
@@ -225,10 +224,8 @@ pub(crate) async fn serve_state_v6(
     dispatcher: &RouteUpdateDispatcher<Ipv6>,
 ) {
     rs.try_for_each_concurrent(None, |req| match req {
-        // TODO(https://fxbug.dev/336367363): Use the `options` to only watch
-        // for a specific route table.
-        fnet_routes::StateV6Request::GetWatcherV6 { options: _, watcher, control_handle: _ } => {
-            serve_watcher::<Ipv6>(watcher, dispatcher).map(|result| {
+        fnet_routes::StateV6Request::GetWatcherV6 { options, watcher, control_handle: _ } => {
+            serve_watcher::<Ipv6>(watcher, options.into(), dispatcher).map(|result| {
                 Ok(result.unwrap_or_else(|e| {
                     warn!("error serving {}: {:?}", fnet_routes::WatcherV6Marker::DEBUG_NAME, e)
                 }))
@@ -263,15 +260,29 @@ enum ServeWatcherError {
 // Serve a single client of the `WatcherV4` or `WatcherV6` protocol.
 async fn serve_watcher<I: fnet_routes_ext::FidlRouteIpExt>(
     server_end: fidl::endpoints::ServerEnd<I::WatcherMarker>,
+    fnet_routes_ext::WatcherOptions { table_interest }: fnet_routes_ext::WatcherOptions,
     RouteUpdateDispatcher(dispatcher): &RouteUpdateDispatcher<I>,
 ) -> Result<(), ServeWatcherError> {
-    let request_stream =
-        server_end.into_stream().expect("failed to acquire request_stream from server_end");
-
+    let client_interest = match table_interest {
+        Some(fnet_routes::TableInterest::Main(fnet_routes::Main)) => {
+            ClientInterest::Only { table_id: routes::main_table_id::<I>().into() }
+        }
+        Some(fnet_routes::TableInterest::Only(table_id)) => ClientInterest::Only { table_id },
+        Some(fnet_routes::TableInterest::All(fnet_routes::All)) | None => ClientInterest::All,
+        Some(fnet_routes::TableInterest::__SourceBreaking { unknown_ordinal }) => {
+            return Err(ServeWatcherError::ErrorInStream(fidl::Error::UnknownOrdinal {
+                ordinal: unknown_ordinal,
+                protocol_name: <I::WatcherMarker as ProtocolMarker>::DEBUG_NAME,
+            }))
+        }
+    };
     let mut watcher = {
         let mut dispatcher = dispatcher.lock().await;
-        dispatcher.connect_new_client()
+        dispatcher.connect_new_client(client_interest)
     };
+
+    let request_stream =
+        server_end.into_stream().expect("failed to acquire request_stream from server_end");
 
     let canceled_fut = watcher.canceled.wait();
 
@@ -423,9 +434,10 @@ impl<I: Ip> RouteUpdateDispatcherInner<I> {
     }
 
     // Register a new client with this `RouteUpdateDispatcher`.
-    fn connect_new_client(&mut self) -> RoutesWatcher<I> {
+    fn connect_new_client(&mut self, client_interest: ClientInterest) -> RoutesWatcher<I> {
         let RouteUpdateDispatcherInner { routes, clients } = self;
-        let (watcher, sink) = RoutesWatcher::new_with_existing_routes(routes.iter().cloned());
+        let (watcher, sink) =
+            RoutesWatcher::new_with_existing_routes(routes.iter().cloned(), client_interest);
         clients.push(sink);
         watcher
     }
@@ -452,6 +464,33 @@ impl<I: Ip> RouteUpdateDispatcher<I> {
         inner.lock().await.notify(update)
     }
 }
+
+/// The tables the client is interested in.
+#[derive(Debug)]
+enum ClientInterest {
+    /// The client is interested in updates across all tables.
+    All,
+    /// The client only want updates on the specific table.
+    ///
+    /// The table ID is a scalar instead of [`TableId`] because we don't perform
+    /// validation but only filtering.
+    Only { table_id: u32 },
+}
+
+impl ClientInterest {
+    fn has_interest_in<I: Ip>(&self, event: &fnet_routes_ext::Event<I>) -> bool {
+        match event {
+            fnet_routes_ext::Event::Unknown | fnet_routes_ext::Event::Idle => true,
+            fnet_routes_ext::Event::Existing(installed_route)
+            | fnet_routes_ext::Event::Added(installed_route)
+            | fnet_routes_ext::Event::Removed(installed_route) => match self {
+                ClientInterest::All => true,
+                ClientInterest::Only { table_id } => installed_route.table_id == *table_id,
+            },
+        }
+    }
+}
+
 // Consumes events for a single client of the
 // `fuchsia.net.routes/WatcherV{4,6}` protocols.
 #[derive(Debug)]
@@ -460,11 +499,23 @@ struct RoutesWatcherSink<I: Ip> {
     sink: mpsc::Sender<fnet_routes_ext::Event<I>>,
     // The mechanism with which to cancel the client.
     cancel: Event,
+    // What table is this client interested in.
+    interest: ClientInterest,
 }
 
 impl<I: Ip> RoutesWatcherSink<I> {
     // Send this [`RoutesWatcherSink`] a new event.
     fn send(&mut self, event: fnet_routes_ext::Event<I>) {
+        let interested = self.interest.has_interest_in(&event);
+
+        if !interested {
+            debug!(
+                "The client for sink {:?} is not interested in this event {:?}, skipping",
+                self, event
+            );
+            return;
+        }
+
         self.sink.try_send(event).unwrap_or_else(|e| {
             if e.is_full() {
                 if self.cancel.signal() {
@@ -505,6 +556,7 @@ impl<I: Ip> RoutesWatcher<I> {
     // Creates a new `RoutesWatcher` with the given existing routes.
     fn new_with_existing_routes<R: Iterator<Item = fnet_routes_ext::InstalledRoute<I>>>(
         routes: R,
+        interest: ClientInterest,
     ) -> (Self, RoutesWatcherSink<I>) {
         let (sender, receiver) = mpsc::channel(MAX_PENDING_EVENTS);
         let cancel = Event::new();
@@ -512,13 +564,14 @@ impl<I: Ip> RoutesWatcher<I> {
             RoutesWatcher {
                 existing_events: routes
                     .map(fnet_routes_ext::Event::Existing)
+                    .filter(|event| interest.has_interest_in(event))
                     .chain(std::iter::once(fnet_routes_ext::Event::Idle))
                     .collect::<Vec<_>>()
                     .into_iter(),
                 receiver: receiver,
                 canceled: cancel.clone(),
             },
-            RoutesWatcherSink { sink: sender, cancel },
+            RoutesWatcherSink { sink: sender, cancel, interest },
         )
     }
 
@@ -541,6 +594,7 @@ impl<I: Ip> RoutesWatcher<I> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use net_declare::{net_subnet_v4, net_subnet_v6};
 
@@ -599,7 +653,7 @@ mod tests {
         let mut dispatcher = RouteUpdateDispatcherInner::default();
 
         // Add a new watcher and verify there are no existing routes.
-        let mut watcher1 = dispatcher.connect_new_client();
+        let mut watcher1 = dispatcher.connect_new_client(ClientInterest::All);
         assert_eq!(watcher1.watch().now_or_never().unwrap(), [fnet_routes_ext::Event::<I>::Idle]);
 
         // Add a route and verify that the watcher is notified.
@@ -611,7 +665,7 @@ mod tests {
         );
 
         // Connect a second watcher and verify it sees the route as `Existing`.
-        let mut watcher2 = dispatcher.connect_new_client();
+        let mut watcher2 = dispatcher.connect_new_client(ClientInterest::All);
         assert_eq!(
             watcher2.watch().now_or_never().unwrap(),
             [fnet_routes_ext::Event::Existing(route), fnet_routes_ext::Event::<I>::Idle]
@@ -665,8 +719,8 @@ mod tests {
             let route = arbitrary_route_on_interface::<I>(i.try_into().unwrap());
             dispatcher.notify(RoutingTableUpdate::RouteAdded(route)).expect("failed to notify");
         }
-        let mut watcher1 = dispatcher.connect_new_client();
-        let mut watcher2 = dispatcher.connect_new_client();
+        let mut watcher1 = dispatcher.connect_new_client(ClientInterest::All);
+        let mut watcher2 = dispatcher.connect_new_client(ClientInterest::All);
         assert_eq!(watcher1.canceled.wait().now_or_never(), None);
         assert_eq!(watcher2.canceled.wait().now_or_never(), None);
         // Drain all of the `Existing` events (and +1 for the `Idle` event).
@@ -690,5 +744,74 @@ mod tests {
         }
         assert_eq!(watcher1.canceled.wait().now_or_never(), None);
         assert_eq!(watcher2.canceled.wait().now_or_never(), Some(()));
+    }
+
+    #[ip_test]
+    fn watcher_respects_interest<I: Ip>() {
+        let mut dispatcher = RouteUpdateDispatcherInner::default();
+        let main_table_id = routes::main_table_id::<I>();
+        let other_table_id = main_table_id.next().expect("no next ID");
+        let main_route = fnet_routes_ext::InstalledRoute {
+            table_id: main_table_id.into(),
+            ..arbitrary_route_on_interface::<I>(0)
+        };
+        dispatcher.notify(RoutingTableUpdate::RouteAdded(main_route)).expect("failed to notify");
+        let other_route = fnet_routes_ext::InstalledRoute {
+            table_id: other_table_id.into(),
+            ..arbitrary_route_on_interface::<I>(0)
+        };
+        dispatcher.notify(RoutingTableUpdate::RouteAdded(other_route)).expect("failed to notify");
+        let mut all_watcher = dispatcher.connect_new_client(ClientInterest::All);
+        let mut main_watcher = dispatcher.connect_new_client(ClientInterest::Only {
+            table_id: routes::main_table_id::<I>().into(),
+        });
+        let mut other_watcher =
+            dispatcher.connect_new_client(ClientInterest::Only { table_id: other_table_id.into() });
+        // They can get out of order because installed routes are stored in
+        // HashSet.
+        assert_matches!(
+            &all_watcher.watch().now_or_never().unwrap()[..],
+            [
+                fnet_routes_ext::Event::Existing(installed_1),
+                fnet_routes_ext::Event::Existing(installed_2),
+                fnet_routes_ext::Event::<I>::Idle
+            ] => {
+                assert_eq!(
+                    HashSet::<fnet_routes_ext::InstalledRoute<I>>::from_iter(
+                        [*installed_1, *installed_2]
+                    ), HashSet::from_iter([main_route, other_route]));
+            }
+        );
+        assert_eq!(
+            main_watcher.watch().now_or_never().unwrap(),
+            [fnet_routes_ext::Event::Existing(main_route), fnet_routes_ext::Event::<I>::Idle]
+        );
+        assert_eq!(
+            other_watcher.watch().now_or_never().unwrap(),
+            [fnet_routes_ext::Event::Existing(other_route), fnet_routes_ext::Event::<I>::Idle]
+        );
+        dispatcher.notify(RoutingTableUpdate::RouteRemoved(main_route)).expect("failed to notify");
+        dispatcher.notify(RoutingTableUpdate::RouteRemoved(other_route)).expect("failed to notify");
+        // For a watcher interested in all tables, it should observe all route
+        // changes in all tables.
+        assert_eq!(
+            all_watcher.watch().now_or_never().unwrap(),
+            [
+                fnet_routes_ext::Event::Removed(main_route),
+                fnet_routes_ext::Event::Removed(other_route),
+            ]
+        );
+        // For a watcher interested in only the main table, it should observe
+        // route changes in only the main table.
+        assert_eq!(
+            main_watcher.watch().now_or_never().unwrap(),
+            [fnet_routes_ext::Event::Removed(main_route)]
+        );
+        // For a watcher interested in only the other table, it should observe
+        // route changes in only the other table.
+        assert_eq!(
+            other_watcher.watch().now_or_never().unwrap(),
+            [fnet_routes_ext::Event::Removed(other_route)]
+        );
     }
 }

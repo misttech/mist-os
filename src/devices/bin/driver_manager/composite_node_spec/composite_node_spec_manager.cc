@@ -15,23 +15,26 @@ namespace fdfw = fuchsia_driver_framework;
 CompositeNodeSpecManager::CompositeNodeSpecManager(CompositeManagerBridge *bridge)
     : bridge_(bridge) {}
 
-fit::result<fdfw::CompositeNodeSpecError> CompositeNodeSpecManager::AddSpec(
+void CompositeNodeSpecManager::AddSpec(
     fuchsia_driver_framework::wire::CompositeNodeSpec fidl_spec,
-    std::unique_ptr<CompositeNodeSpec> spec) {
+    std::unique_ptr<CompositeNodeSpec> spec,
+    fit::callback<void(fit::result<fdfw::CompositeNodeSpecError>)> callback) {
   ZX_ASSERT(spec);
   ZX_ASSERT(fidl_spec.has_name() && fidl_spec.has_parents() && !fidl_spec.parents().empty());
 
   auto name = std::string(fidl_spec.name().get());
   if (specs_.find(name) != specs_.end()) {
     LOGF(ERROR, "Duplicate composite node spec %.*s", static_cast<int>(name.size()), name.data());
-    return fit::error(fdfw::CompositeNodeSpecError::kAlreadyExists);
+    return callback(fit::error(fdfw::CompositeNodeSpecError::kAlreadyExists));
   }
 
-  AddToIndexCallback callback = [this, spec_impl = std::move(spec),
-                                 name](zx::result<> result) mutable {
+  AddToIndexCallback index_callback = [this, spec_impl = std::move(spec),
+                                       callback = std::move(callback),
+                                       name](zx::result<> result) mutable {
     if (!result.is_ok()) {
       LOGF(ERROR, "CompositeNodeSpecManager::AddCompositeNodeSpec failed: %d",
            result.status_value());
+      callback(fit::error(fdfw::CompositeNodeSpecError::kDriverIndexFailure));
       return;
     }
 
@@ -40,15 +43,14 @@ fit::result<fdfw::CompositeNodeSpecError> CompositeNodeSpecManager::AddSpec(
     // Now that there is a new composite node spec, we can tell the bridge to attempt binds
     // again.
     bridge_->BindNodesForCompositeNodeSpec();
+    callback(fit::ok());
   };
 
-  bridge_->AddSpecToDriverIndex(fidl_spec, std::move(callback));
-  return fit::ok();
+  bridge_->AddSpecToDriverIndex(fidl_spec, std::move(index_callback));
 }
 
 zx::result<BindSpecResult> CompositeNodeSpecManager::BindParentSpec(
-    fidl::AnyArena &arena,
-    fidl::VectorView<fuchsia_driver_framework::wire::CompositeParent> composite_parents,
+    fidl::AnyArena &arena, fidl::VectorView<fdfw::wire::CompositeParent> composite_parents,
     const DeviceOrNode &device_or_node, bool enable_multibind) {
   if (composite_parents.empty()) {
     LOGF(ERROR, "composite_parents needs to contain as least one composite parent.");

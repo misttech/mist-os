@@ -1,0 +1,31 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "driver_testing_cpp_base_fixture",
+    hdrs = [
+        "include/lib/driver/testing/cpp/fixtures/base_fixture.h",
+        "include/lib/driver/testing/cpp/fixtures/internal/fixture_internals.h",
+    ],
+    strip_include_prefix = "include",
+    target_compatible_with = ["@platforms//os:fuchsia"],
+    deps = [
+        "@fuchsia_sdk//pkg/async_patterns_testing_cpp",
+        "@fuchsia_sdk//pkg/driver_testing_cpp",
+    ],
+)
+
+cc_library(
+    name = "driver_testing_cpp_gtest_fixture",
+    hdrs = [
+        "include/lib/driver/testing/cpp/fixtures/gtest_fixture.h",
+    ],
+    strip_include_prefix = "include",
+    target_compatible_with = ["@platforms//os:fuchsia"],
+    deps = [
+        ":driver_testing_cpp_base_fixture",
+    ],
+)

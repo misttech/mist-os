@@ -7,7 +7,7 @@ use {
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_sys2 as fsys,
     fuchsia_async::Task,
     futures::StreamExt,
-    moniker::{Moniker, MonikerBase},
+    moniker::Moniker,
     std::collections::HashMap,
     std::fs::{create_dir_all, write},
     tempfile::TempDir,

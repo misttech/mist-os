@@ -5,8 +5,7 @@
 use {
     crate::{
         capability::{
-            BuiltinCapability, CapabilityProvider, CapabilitySource, DerivedCapability,
-            FrameworkCapability,
+            BuiltinCapability, CapabilityProvider, CapabilitySource, FrameworkCapability,
         },
         model::component::WeakComponentInstance,
         model::token::InstanceRegistry,
@@ -27,7 +26,6 @@ pub struct ModelContext {
     runtime_config: Arc<RuntimeConfig>,
     builtin_capabilities: Mutex<Option<Vec<Box<dyn BuiltinCapability>>>>,
     framework_capabilities: Mutex<Option<Vec<Box<dyn FrameworkCapability>>>>,
-    derived_capabilities: Mutex<Option<Vec<Box<dyn DerivedCapability>>>>,
     instance_registry: Arc<InstanceRegistry>,
 }
 
@@ -46,7 +44,6 @@ impl ModelContext {
             runtime_config,
             builtin_capabilities: Mutex::new(None),
             framework_capabilities: Mutex::new(None),
-            derived_capabilities: Mutex::new(None),
             instance_registry,
         })
     }
@@ -83,7 +80,6 @@ impl ModelContext {
         &self,
         b: Vec<Box<dyn BuiltinCapability>>,
         f: Vec<Box<dyn FrameworkCapability>>,
-        d: Vec<Box<dyn DerivedCapability>>,
     ) {
         {
             let mut builtin_capabilities = self.builtin_capabilities.lock().await;
@@ -94,11 +90,6 @@ impl ModelContext {
             let mut framework_capabilities = self.framework_capabilities.lock().await;
             assert!(framework_capabilities.is_none(), "already initialized");
             *framework_capabilities = Some(f);
-        }
-        {
-            let mut derived_capabilities = self.derived_capabilities.lock().await;
-            assert!(derived_capabilities.is_none(), "already initialized");
-            *derived_capabilities = Some(d);
         }
     }
 
@@ -130,17 +121,6 @@ impl ModelContext {
                 for c in framework_capabilities.as_ref().expect("not initialized") {
                     if c.matches(capability) {
                         return Some(c.new_provider(component.clone(), target));
-                    }
-                }
-                None
-            }
-            CapabilitySource::Capability { source_capability, component } => {
-                let derived_capabilities = self.derived_capabilities.lock().await;
-                for c in derived_capabilities.as_ref().expect("not initialized") {
-                    if let Some(provider) =
-                        c.maybe_new_provider(source_capability, component.clone()).await
-                    {
-                        return Some(provider);
                     }
                 }
                 None

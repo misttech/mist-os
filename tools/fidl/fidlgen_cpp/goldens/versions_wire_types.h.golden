@@ -302,6 +302,8 @@ class Union {
 
 constexpr uint32_t kConst = 0u;
 
+constexpr bool kAddedAtNext = true;
+
 constexpr bool kAddedAtHead = true;
 
 }  // namespace wire
@@ -344,11 +346,11 @@ struct TypeTraits<::test_versions::wire::Struct> {
 };
 
 template <>
-struct IsFidlType<::test_versions::wire::Struct> : public std::true_type {};
+struct IsFidlType<::test_versions::wire::Struct> : public std::true_type{};
 template <>
-struct IsWire<::test_versions::wire::Struct> : public std::true_type {};
+struct IsWire<::test_versions::wire::Struct> : public std::true_type{};
 template <>
-struct IsStruct<::test_versions::wire::Struct> : public std::true_type {};
+struct IsStruct<::test_versions::wire::Struct> : public std::true_type{};
 static_assert(std::is_standard_layout_v<::test_versions::wire::Struct>);
 static_assert(offsetof(::test_versions::wire::Struct, x) == 0);
 static_assert(sizeof(::test_versions::wire::Struct) == TypeTraits<::test_versions::wire::Struct>::kPrimarySize);
@@ -390,11 +392,11 @@ struct TypeTraits<::test_versions::wire::Table> {
 };
 
 template <>
-struct IsFidlType<::test_versions::wire::Table> : public std::true_type {};
+struct IsFidlType<::test_versions::wire::Table> : public std::true_type{};
 template <>
-struct IsWire<::test_versions::wire::Table> : public std::true_type {};
+struct IsWire<::test_versions::wire::Table> : public std::true_type{};
 template <>
-struct IsTable<::test_versions::wire::Table> : public std::true_type {};
+struct IsTable<::test_versions::wire::Table> : public std::true_type{};
 static_assert(std::is_standard_layout_v<::test_versions::wire::Table>);
 
 template <bool IsRecursive>
@@ -477,11 +479,11 @@ struct TypeTraits<::test_versions::wire::Union> {
 };
 
 template <>
-struct IsFidlType<::test_versions::wire::Union> : public std::true_type {};
+struct IsFidlType<::test_versions::wire::Union> : public std::true_type{};
 template <>
-struct IsWire<::test_versions::wire::Union> : public std::true_type {};
+struct IsWire<::test_versions::wire::Union> : public std::true_type{};
 template <>
-struct IsUnion<::test_versions::wire::Union> : public std::true_type {};
+struct IsUnion<::test_versions::wire::Union> : public std::true_type{};
 static_assert(std::is_standard_layout_v<::test_versions::wire::Union>);
 
 template <typename Constraint, bool IsRecursive>

@@ -24,12 +24,10 @@ trap 'rm -rf "$TEMPDIR"' EXIT
 
 dep_list_file="${TEMPDIR}/dep_list"
 partner_sdk_deps_file="${TEMPDIR}/partner_sdk_deps_list"
-internal_sdk_deps_file="${TEMPDIR}/internal_sdk_deps_list"
 non_sdk_deps_file="${TEMPDIR}/non_sdk_deps_list"
 
 touch ${dep_list_file}
 touch ${partner_sdk_deps_file}
-touch ${internal_sdk_deps_file}
 touch ${non_sdk_deps_file}
 
 collect_deps() {
@@ -41,7 +39,8 @@ collect_deps() {
         if [[ "${dep}" == *"shlib-allowlist-check"* \
            || "${dep}" == *"static-libc++-deps"* \
            || "${dep}" == *"tools/bindc:bin"* \
-           || "${dep}" == *"zircon/public/sysroot"* ]]; then
+           || "${dep}" == *"zircon/public/sysroot"* \
+           || "${dep}" != "//"* ]] ; then
             continue
         fi
         if [[ "${dep}" == ${prefix}* ]]; then
@@ -70,7 +69,6 @@ main() {
         esac
         shift
     done
-
     if [[ "${#targets[@]}" -eq 0 && "${#sdk_deps[@]}" -eq 0 ]]; then
         echo "Either a target that contains driver or a dependency needs to be passed in."
         fx-command-help sdk-deps
@@ -110,18 +108,12 @@ main() {
     done
 
     local core_deps=()
-    local platform_deps=()
     local non_sdk=()
 
     local partner_sdk_deps="${TEMPDIR}/partner_sdk_all_deps"
-    local internal_sdk_deps="${TEMPDIR}/internal_sdk_all_deps"
 
     fx-info "Collecting Core SDK dependencies..."
     fx-command-run gn desc "${build_dir}" "//sdk:core" deps --all > ${partner_sdk_deps} &
-    fx-info "Collecting Driver SDK dependencies..."
-    fx-command-run gn desc "${build_dir}" "//sdk:driver" deps --all >> ${partner_sdk_deps} &
-    fx-info "Collecting Platform SDK dependencies..."
-    fx-command-run gn desc "${build_dir}" "//sdk:platform" deps --all > ${internal_sdk_deps} &
 
     wait $(jobs -rp)
 
@@ -141,25 +133,15 @@ main() {
             continue
         fi
 
-        if [[ $(grep ${dep_sdk} ${internal_sdk_deps} | wc -l) -gt 0 ]]; then
-            echo "${dep}" >> "${internal_sdk_deps_file}"
-            continue
-        fi
-
         echo "${dep}" >> "${non_sdk_deps_file}"
     done
 
     fx-info "Result:"
     echo
-    echo "    Partner (Including //sdk:core and //sdk:driver):"
+    echo "    In SDK:"
     sed -i -e 's/^/      /' ${partner_sdk_deps_file}
     echo "      Total items:" $(cat ${partner_sdk_deps_file} | wc -l)
     cat ${partner_sdk_deps_file}
-    echo
-    echo "    Internal (Including //sdk:platform):"
-    sed -i -e 's/^/      /' ${internal_sdk_deps_file}
-    echo "      Total items:" $(cat ${internal_sdk_deps_file} | wc -l)
-    cat ${internal_sdk_deps_file}
     echo
     echo "    Not in SDK:"
     sed -i -e 's/^/      /' ${non_sdk_deps_file}

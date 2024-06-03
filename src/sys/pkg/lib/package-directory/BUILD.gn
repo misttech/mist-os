@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
-import("//src/storage/fshost/generated_fshost_config.gni")
 
 rustc_library("package-directory") {
   version = "0.1.0"
@@ -64,12 +63,6 @@ rustc_library("package-directory") {
     "src/root_dir_cache.rs",
   ]
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
-
-  # TODO(https://fxbug.dev/324112857): When Blobfs also supports open2, remove this feature flag
-  # and the generated_fshost_config.gni import above.
-  if (fxfs_blob) {
-    features = [ "supports_open2" ]
-  }
 }
 
 fuchsia_component("test-component") {

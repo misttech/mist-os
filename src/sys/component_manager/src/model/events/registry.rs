@@ -30,7 +30,7 @@ use {
     errors::{EventsError, ModelError},
     futures::lock::Mutex,
     hooks::{Event as ComponentEvent, EventType, HasEventType, Hook, HooksRegistration},
-    moniker::{ChildNameBase, ExtendedMoniker, Moniker, MonikerBase},
+    moniker::{ExtendedMoniker, Moniker},
     std::{
         collections::{HashMap, HashSet},
         sync::{Arc, Weak},

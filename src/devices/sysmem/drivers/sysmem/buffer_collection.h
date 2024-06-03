@@ -95,20 +95,13 @@ class BufferCollection : public Node {
     // BufferCollectionTokenGroup)
     //
     void Sync(SyncCompleter::Sync& completer) override;
-    void DeprecatedSync(DeprecatedSyncCompleter::Sync& completer) override;
     void Close(CloseCompleter::Sync& completer) override;
-    void DeprecatedClose(DeprecatedCloseCompleter::Sync& completer) override;
     void GetNodeRef(GetNodeRefCompleter::Sync& completer) override;
     void IsAlternateFor(IsAlternateForRequest& request,
                         IsAlternateForCompleter::Sync& completer) override;
     void SetName(SetNameRequest& request, SetNameCompleter::Sync& completer) override;
-    void DeprecatedSetName(DeprecatedSetNameRequest& request,
-                           DeprecatedSetNameCompleter::Sync& completer) override;
     void SetDebugClientInfo(SetDebugClientInfoRequest& request,
                             SetDebugClientInfoCompleter::Sync& completer) override;
-    void DeprecatedSetDebugClientInfo(
-        DeprecatedSetDebugClientInfoRequest& request,
-        DeprecatedSetDebugClientInfoCompleter::Sync& completer) override;
     void SetDebugTimeoutLogDeadline(SetDebugTimeoutLogDeadlineRequest& request,
                                     SetDebugTimeoutLogDeadlineCompleter::Sync& completer) override;
     void SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) override;

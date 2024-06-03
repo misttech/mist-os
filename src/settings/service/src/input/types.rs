@@ -53,13 +53,13 @@ impl DeviceStorageConvertible for InputInfo {
     }
 }
 
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct InputInfoSources {
     pub input_device_state: InputState,
 }
 
-#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(PartialEq, Default, Debug, Clone, Copy, Serialize, Deserialize)]
 // DO NOT USE - this type is deprecated and will be replaced by
 // the use of InputDevice.
 pub struct Microphone {
@@ -76,7 +76,7 @@ pub struct InputState {
 
 impl InputState {
     pub(crate) fn new() -> Self {
-        Self { input_categories: HashMap::<InputDeviceType, InputCategory>::new() }
+        Self::default()
     }
 
     /// Insert an InputDevice's state into the internal InputState hierarchy, updating the

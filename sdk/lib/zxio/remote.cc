@@ -349,7 +349,7 @@ zx_status_t map_status(zx_status_t status) {
   return status;
 }
 
-template <typename Protocol>
+template <typename Protocol, zxio_object_type_t kObjectType>
 class Remote : public HasIo {
  protected:
   Remote(fidl::ClientEnd<Protocol> client_end, const zxio_ops_t& ops)
@@ -473,7 +473,7 @@ class Remote : public HasIo {
   fidl::WireSyncClient<Protocol> client_;
 };
 
-class Pty : public Remote<fuchsia_hardware_pty::Device> {
+class Pty : public Remote<fuchsia_hardware_pty::Device, ZXIO_OBJECT_TYPE_TTY> {
  public:
   Pty(fidl::ClientEnd<fuchsia_hardware_pty::Device> client_end, zx::eventpair event)
       : Remote(std::move(client_end), kOps), event_(std::move(event)) {}
@@ -576,8 +576,8 @@ constexpr zxio_ops_t Pty::kOps = ([]() {
   return ops;
 })();
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::Sync() {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::Sync() {
   const fidl::WireResult result = client()->Sync();
   if (!result.ok()) {
     return result.status();
@@ -742,8 +742,11 @@ zx_status_t AttributesSetCommon(const fidl::WireSyncClient<Protocol>& client,
 #endif
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::AttrGet(zxio_node_attributes_t* inout_attr) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::AttrGet(zxio_node_attributes_t* inout_attr) {
+  if (inout_attr->has.object_type) {
+    ZXIO_NODE_ATTR_SET(*inout_attr, object_type, kObjectType);
+  }
   // If any of the attributes that exist only in io2 are requested, we call GetAttributes (io2)
   if (inout_attr->has.mode || inout_attr->has.uid || inout_attr->has.gid || inout_attr->has.rdev ||
       inout_attr->has.access_time || inout_attr->has.change_time ||
@@ -754,8 +757,8 @@ zx_status_t Remote<Protocol>::AttrGet(zxio_node_attributes_t* inout_attr) {
   return AttrGetCommon(client(), ToZxioAbilitiesForFile(), inout_attr);
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::AttrSet(const zxio_node_attributes_t* attr) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::AttrSet(const zxio_node_attributes_t* attr) {
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   // If these attributes are set, call `update_attributes` (io2) otherwise, we can fall back to
   // `SetAttr` to only update creation and modification time.
@@ -766,8 +769,8 @@ zx_status_t Remote<Protocol>::AttrSet(const zxio_node_attributes_t* attr) {
   return AttrSetCommon(client(), ToIo1ModePermissionsForFile(), attr);
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::AdvisoryLock(advisory_lock_req* req) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::AdvisoryLock(advisory_lock_req* req) {
   fio::wire::AdvisoryLockType lock_type;
   switch (req->type) {
     case ADVISORY_LOCK_SHARED:
@@ -824,9 +827,9 @@ zx_status_t zxio_remote_do_vector(const zx_iovec_t* vector, size_t vector_count,
                                });
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::Readv(const zx_iovec_t* vector, size_t vector_count,
-                                    zxio_flags_t flags, size_t* out_actual) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::Readv(const zx_iovec_t* vector, size_t vector_count,
+                                                 zxio_flags_t flags, size_t* out_actual) {
   if (flags) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -855,9 +858,10 @@ zx_status_t Remote<Protocol>::Readv(const zx_iovec_t* vector, size_t vector_coun
                                });
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::ReadvAt(zx_off_t offset, const zx_iovec_t* vector,
-                                      size_t vector_count, zxio_flags_t flags, size_t* out_actual) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::ReadvAt(zx_off_t offset, const zx_iovec_t* vector,
+                                                   size_t vector_count, zxio_flags_t flags,
+                                                   size_t* out_actual) {
   if (flags) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -888,9 +892,9 @@ zx_status_t Remote<Protocol>::ReadvAt(zx_off_t offset, const zx_iovec_t* vector,
       });
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::Writev(const zx_iovec_t* vector, size_t vector_count,
-                                     zxio_flags_t flags, size_t* out_actual) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::Writev(const zx_iovec_t* vector, size_t vector_count,
+                                                  zxio_flags_t flags, size_t* out_actual) {
   if (flags) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -920,10 +924,10 @@ zx_status_t Remote<Protocol>::Writev(const zx_iovec_t* vector, size_t vector_cou
       });
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::WritevAt(zx_off_t offset, const zx_iovec_t* vector,
-                                       size_t vector_count, zxio_flags_t flags,
-                                       size_t* out_actual) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::WritevAt(zx_off_t offset, const zx_iovec_t* vector,
+                                                    size_t vector_count, zxio_flags_t flags,
+                                                    size_t* out_actual) {
   if (flags) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -954,8 +958,9 @@ zx_status_t Remote<Protocol>::WritevAt(zx_off_t offset, const zx_iovec_t* vector
       });
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::Seek(zxio_seek_origin_t start, int64_t offset, size_t* out_offset) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::Seek(zxio_seek_origin_t start, int64_t offset,
+                                                size_t* out_offset) {
   const fidl::WireResult result = client()->Seek(static_cast<fio::wire::SeekOrigin>(start), offset);
   if (!result.ok()) {
     return result.status();
@@ -968,8 +973,8 @@ zx_status_t Remote<Protocol>::Seek(zxio_seek_origin_t start, int64_t offset, siz
   return ZX_OK;
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::Truncate(uint64_t length) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::Truncate(uint64_t length) {
   const fidl::WireResult result = client()->Resize(length);
   if (!result.ok()) {
     return result.status();
@@ -981,8 +986,8 @@ zx_status_t Remote<Protocol>::Truncate(uint64_t length) {
   return ZX_OK;
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::FlagsGet(uint32_t* out_flags) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::FlagsGet(uint32_t* out_flags) {
   const fidl::WireResult result = client()->GetFlags();
   if (!result.ok()) {
     return result.status();
@@ -995,8 +1000,8 @@ zx_status_t Remote<Protocol>::FlagsGet(uint32_t* out_flags) {
   return ZX_OK;
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::FlagsSet(uint32_t flags) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::FlagsSet(uint32_t flags) {
   const fidl::WireResult result = client()->SetFlags(static_cast<fio::wire::OpenFlags>(flags));
   if (!result.ok()) {
     return result.status();
@@ -1005,8 +1010,9 @@ zx_status_t Remote<Protocol>::FlagsSet(uint32_t flags) {
   return response.s;
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::VmoGet(zxio_vmo_flags_t zxio_flags, zx_handle_t* out_vmo) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::VmoGet(zxio_vmo_flags_t zxio_flags,
+                                                  zx_handle_t* out_vmo) {
   fio::wire::VmoFlags flags;
   if (zxio_flags & ZXIO_VMO_READ) {
     flags |= fio::wire::VmoFlags::kRead;
@@ -1036,9 +1042,9 @@ zx_status_t Remote<Protocol>::VmoGet(zxio_vmo_flags_t zxio_flags, zx_handle_t* o
   return ZX_OK;
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::Open(uint32_t flags, const char* path, size_t path_len,
-                                   zxio_storage_t* storage) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::Open(uint32_t flags, const char* path, size_t path_len,
+                                                zxio_storage_t* storage) {
   auto [client_end, server_end] = fidl::Endpoints<fio::Node>::Create();
   const fidl::Status result =
       client()->Open(static_cast<fio::wire::OpenFlags>(flags) | fio::wire::OpenFlags::kDescribe, {},
@@ -1049,10 +1055,11 @@ zx_status_t Remote<Protocol>::Open(uint32_t flags, const char* path, size_t path
   return zxio_create_with_on_open(client_end.TakeChannel().release(), storage);
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::Open2(const char* path, size_t path_len,
-                                    const zxio_open_options_t* options,
-                                    zxio_node_attributes_t* inout_attr, zxio_storage_t* storage) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::Open2(const char* path, size_t path_len,
+                                                 const zxio_open_options_t* options,
+                                                 zxio_node_attributes_t* inout_attr,
+                                                 zxio_storage_t* storage) {
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   zx::channel client_end, server_end;
   if (zx_status_t status = zx::channel::create(0, &client_end, &server_end); status != ZX_OK) {
@@ -1250,9 +1257,9 @@ zx_status_t Remote<Protocol>::Open2(const char* path, size_t path_len,
 #endif
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::OpenAsync(uint32_t flags, const char* path, size_t path_len,
-                                        zx_handle_t request) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::OpenAsync(uint32_t flags, const char* path,
+                                                     size_t path_len, zx_handle_t request) {
   fidl::ServerEnd<fio::Node> node_request{zx::channel(request)};
   const fidl::Status result =
       client()->Open(static_cast<fio::wire::OpenFlags>(flags), {},
@@ -1260,8 +1267,8 @@ zx_status_t Remote<Protocol>::OpenAsync(uint32_t flags, const char* path, size_t
   return result.status();
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::Unlink(const char* name, size_t name_len, int flags) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::Unlink(const char* name, size_t name_len, int flags) {
   fidl::Arena allocator;
   auto options = fio::wire::UnlinkOptions::Builder(allocator);
   auto io_flags = fio::wire::UnlinkFlags::kMustBeDirectory;
@@ -1280,8 +1287,8 @@ zx_status_t Remote<Protocol>::Unlink(const char* name, size_t name_len, int flag
   return ZX_OK;
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::TokenGet(zx_handle_t* out_token) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::TokenGet(zx_handle_t* out_token) {
   fidl::WireResult result = client()->GetToken();
   if (!result.ok()) {
     return result.status();
@@ -1294,10 +1301,10 @@ zx_status_t Remote<Protocol>::TokenGet(zx_handle_t* out_token) {
   return ZX_OK;
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::Rename(const char* old_path, size_t old_path_len,
-                                     zx_handle_t dst_token, const char* new_path,
-                                     size_t new_path_len) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::Rename(const char* old_path, size_t old_path_len,
+                                                  zx_handle_t dst_token, const char* new_path,
+                                                  size_t new_path_len) {
   const fidl::WireResult result =
       client()->Rename(fidl::StringView::FromExternal(old_path, old_path_len), zx::event(dst_token),
                        fidl::StringView::FromExternal(new_path, new_path_len));
@@ -1311,9 +1318,10 @@ zx_status_t Remote<Protocol>::Rename(const char* old_path, size_t old_path_len,
   return ZX_OK;
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::Link(const char* src_path, size_t src_path_len, zx_handle_t dst_token,
-                                   const char* dst_path, size_t dst_path_len) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::Link(const char* src_path, size_t src_path_len,
+                                                zx_handle_t dst_token, const char* dst_path,
+                                                size_t dst_path_len) {
   const fidl::WireResult result =
       client()->Link(fidl::StringView::FromExternal(src_path, src_path_len), zx::handle(dst_token),
                      fidl::StringView::FromExternal(dst_path, dst_path_len));
@@ -1324,9 +1332,9 @@ zx_status_t Remote<Protocol>::Link(const char* src_path, size_t src_path_len, zx
   return response.s;
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::LinkInto(zx_handle_t dst_token_handle, const char* dst_path,
-                                       size_t dst_path_len) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::LinkInto(zx_handle_t dst_token_handle,
+                                                    const char* dst_path, size_t dst_path_len) {
   zx::event dst_token(dst_token_handle);
 #if __Fuchsia_API_level__ >= 18
   const fidl::WireResult result = client()->LinkInto(
@@ -1344,25 +1352,25 @@ zx_status_t Remote<Protocol>::LinkInto(zx_handle_t dst_token_handle, const char*
 #endif
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::DirentIteratorInit(zxio_dirent_iterator_t* iterator) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::DirentIteratorInit(zxio_dirent_iterator_t* iterator) {
   new (iterator) DirentIteratorImpl(io());
   return ZX_OK;
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::DirentIteratorNext(zxio_dirent_iterator_t* iterator,
-                                                 zxio_dirent_t* inout_entry) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::DirentIteratorNext(zxio_dirent_iterator_t* iterator,
+                                                              zxio_dirent_t* inout_entry) {
   return reinterpret_cast<DirentIteratorImpl*>(iterator)->Next(inout_entry);
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::DirentIteratorRewind(zxio_dirent_iterator_t* iterator) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::DirentIteratorRewind(zxio_dirent_iterator_t* iterator) {
   return reinterpret_cast<DirentIteratorImpl*>(iterator)->Rewind();
 }
 
-template <typename Protocol>
-void Remote<Protocol>::DirentIteratorDestroy(zxio_dirent_iterator_t* iterator) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+void Remote<Protocol, kObjectType>::DirentIteratorDestroy(zxio_dirent_iterator_t* iterator) {
   reinterpret_cast<DirentIteratorImpl*>(iterator)->~DirentIteratorImpl();
 }
 
@@ -1371,8 +1379,8 @@ zx_status_t Pty::IsAtty(bool* tty) {
   return ZX_OK;
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::GetWindowSize(uint32_t* width, uint32_t* height) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::GetWindowSize(uint32_t* width, uint32_t* height) {
   if (!client().is_valid()) {
     return ZX_ERR_BAD_STATE;
   }
@@ -1389,8 +1397,8 @@ zx_status_t Remote<Protocol>::GetWindowSize(uint32_t* width, uint32_t* height) {
   return ZX_OK;
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::SetWindowSize(uint32_t width, uint32_t height) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::SetWindowSize(uint32_t width, uint32_t height) {
   if (!client().is_valid()) {
     return ZX_ERR_BAD_STATE;
   }
@@ -1412,10 +1420,9 @@ zx_status_t Remote<Protocol>::SetWindowSize(uint32_t width, uint32_t height) {
   return ZX_OK;
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::XattrList(void (*callback)(void* context, const uint8_t* name,
-                                                         size_t name_len),
-                                        void* context) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::XattrList(
+    void (*callback)(void* context, const uint8_t* name, size_t name_len), void* context) {
 #if __Fuchsia_API_level__ >= 18
   if (!client().is_valid()) {
     return ZX_ERR_BAD_STATE;
@@ -1451,11 +1458,11 @@ zx_status_t Remote<Protocol>::XattrList(void (*callback)(void* context, const ui
 #endif
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::XattrGet(const uint8_t* name, size_t name_len,
-                                       zx_status_t (*callback)(void* context,
-                                                               zxio_xattr_data_t data),
-                                       void* context) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::XattrGet(const uint8_t* name, size_t name_len,
+                                                    zx_status_t (*callback)(void* context,
+                                                                            zxio_xattr_data_t data),
+                                                    void* context) {
 #if __Fuchsia_API_level__ >= 18
   if (!client().is_valid()) {
     return ZX_ERR_BAD_STATE;
@@ -1500,9 +1507,10 @@ zx_status_t Remote<Protocol>::XattrGet(const uint8_t* name, size_t name_len,
 #endif
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::XattrSet(const uint8_t* name, size_t name_len, const uint8_t* value,
-                                       size_t value_len, zxio_xattr_set_mode_t mode) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::XattrSet(const uint8_t* name, size_t name_len,
+                                                    const uint8_t* value, size_t value_len,
+                                                    zxio_xattr_set_mode_t mode) {
 #if __Fuchsia_API_level__ >= 18
   if (!client().is_valid()) {
     return ZX_ERR_BAD_STATE;
@@ -1556,8 +1564,8 @@ zx_status_t Remote<Protocol>::XattrSet(const uint8_t* name, size_t name_len, con
 #endif
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::XattrRemove(const uint8_t* name, size_t name_len) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::XattrRemove(const uint8_t* name, size_t name_len) {
 #if __Fuchsia_API_level__ >= 18
   if (!client().is_valid()) {
     return ZX_ERR_BAD_STATE;
@@ -1579,8 +1587,9 @@ zx_status_t Remote<Protocol>::XattrRemove(const uint8_t* name, size_t name_len) 
 #endif
 }
 
-template <typename Protocol>
-zx_status_t Remote<Protocol>::Allocate(uint64_t offset, uint64_t len, zxio_allocate_mode_t mode) {
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::Allocate(uint64_t offset, uint64_t len,
+                                                    zxio_allocate_mode_t mode) {
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   if (!client().is_valid()) {
     return ZX_ERR_BAD_STATE;
@@ -1614,7 +1623,7 @@ zx_status_t Remote<Protocol>::Allocate(uint64_t offset, uint64_t len, zxio_alloc
 #endif
 }
 
-class Node : public Remote<fio::Node> {
+class Node : public Remote<fio::Node, ZXIO_OBJECT_TYPE_NODE> {
  public:
   explicit Node(fidl::ClientEnd<fio::Node> client_end) : Remote(std::move(client_end), kOps) {}
 
@@ -1638,7 +1647,7 @@ constexpr zxio_ops_t Node::kOps = ([]() {
   return ops;
 })();
 
-class Directory : public Remote<fio::Directory> {
+class Directory : public Remote<fio::Directory, ZXIO_OBJECT_TYPE_DIR> {
  public:
   explicit Directory(fidl::ClientEnd<fio::Directory> client_end)
       : Remote(std::move(client_end), kOps) {}
@@ -1669,6 +1678,9 @@ class Directory : public Remote<fio::Directory> {
   }
 
   zx_status_t AttrGet(zxio_node_attributes_t* inout_attr) {
+    if (inout_attr->has.object_type) {
+      ZXIO_NODE_ATTR_SET(*inout_attr, object_type, ZXIO_OBJECT_TYPE_DIR);
+    }
     // If any of the attributes that exist only in io2 are requested, we call GetAttributes (io2)
     if (inout_attr->has.mode || inout_attr->has.uid || inout_attr->has.gid ||
         inout_attr->has.rdev || inout_attr->has.access_time || inout_attr->has.change_time) {
@@ -1856,7 +1868,7 @@ constexpr zxio_ops_t Directory::kOps = ([]() {
   return ops;
 })();
 
-class File : public Remote<fio::File> {
+class File : public Remote<fio::File, ZXIO_OBJECT_TYPE_FILE> {
  public:
   File(fidl::ClientEnd<fio::File> client_end, zx::event event, zx::stream stream)
       : Remote(std::move(client_end), kOps), event_(std::move(event)), stream_(std::move(stream)) {}
@@ -2020,7 +2032,7 @@ constexpr zxio_ops_t File::kOps = ([]() {
 
 #if __Fuchsia_API_level__ >= 18
 
-class Symlink : public Remote<fio::Symlink> {
+class Symlink : public Remote<fio::Symlink, ZXIO_OBJECT_TYPE_SYMLINK> {
  public:
   Symlink(fidl::ClientEnd<fio::Symlink> client_end, std::vector<uint8_t> target)
       : Remote(std::move(client_end), kOps), target_(std::move(target)) {}

@@ -4,16 +4,15 @@
 use fidl_fuchsia_component_sandbox as fsandbox;
 use std::fmt::Debug;
 
-use crate::CapabilityTrait;
-
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Unit;
 
-impl CapabilityTrait for Unit {}
+#[cfg(target_os = "fuchsia")]
+impl crate::CapabilityTrait for Unit {}
 
-impl From<Unit> for fsandbox::UnitCapability {
+impl From<Unit> for fsandbox::Unit {
     fn from(_unit: Unit) -> Self {
-        fsandbox::UnitCapability {}
+        fsandbox::Unit {}
     }
 }
 
@@ -31,6 +30,6 @@ mod tests {
     fn test_into_fidl() {
         let unit = Unit::default();
         let fidl_capability: fsandbox::Capability = unit.into();
-        assert_eq!(fidl_capability, fsandbox::Capability::Unit(fsandbox::UnitCapability {}));
+        assert_eq!(fidl_capability, fsandbox::Capability::Unit(fsandbox::Unit {}));
     }
 }

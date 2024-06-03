@@ -22,16 +22,31 @@ RemoteDir::RemoteDir(fidl::ClientEnd<fio::Directory> remote_dir_client)
 
 RemoteDir::~RemoteDir() = default;
 
-fuchsia_io::NodeProtocolKinds RemoteDir::GetProtocols() const {
-  return fuchsia_io::NodeProtocolKinds::kDirectory;
+fio::NodeProtocolKinds RemoteDir::GetProtocols() const {
+  return fio::NodeProtocolKinds::kDirectory;
 }
 
 bool RemoteDir::IsRemote() const { return true; }
 
-zx_status_t RemoteDir::OpenRemote(fio::OpenFlags flags, fio::ModeType mode, fidl::StringView path,
-                                  fidl::ServerEnd<fio::Node> object) const {
-  FS_PRETTY_TRACE_DEBUG("RemoteDir::OpenRemote: path='", path, "' flags=", flags);
-  return fidl::WireCall(remote_client_)->Open(flags, mode, path, std::move(object)).status();
+void RemoteDir::OpenRemote(fio::OpenFlags flags, fio::ModeType mode, fidl::StringView path,
+                           fidl::ServerEnd<fio::Node> object) const {
+  // We consume |object| when making the wire call to the remote end, so on failure there isn't
+  // anywhere for us to propagate the error.
+  [[maybe_unused]] auto status =
+      fidl::WireCall(remote_client_)->Open(flags, mode, path, std::move(object));
+  FS_PRETTY_TRACE_DEBUG("RemoteDir::OpenRemote: path='", path, "', flags=", flags,
+                        ", response=", status.FormatDescription());
+}
+
+void RemoteDir::OpenRemote(fuchsia_io::wire::Directory2Open2Request request) const {
+  // We consume the |request| channel when making the wire call to the remote end, so on failure
+  // there isn't anywhere for us to propagate the error.
+  [[maybe_unused]] auto status =
+      fidl::WireCall(remote_client_)
+          ->Open2(request.path, request.protocols, std::move(request.object_request));
+  FS_PRETTY_TRACE_DEBUG("RemoteDir::OpenRemote: path='", request.path,
+                        "', protocols=", request.protocols,
+                        ", response=", status.FormatDescription());
 }
 
 }  // namespace fs

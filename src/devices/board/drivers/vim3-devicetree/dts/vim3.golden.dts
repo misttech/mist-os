@@ -191,7 +191,7 @@
 	gpio-buttons {
 		compatible = "fuchsia,gpio-buttons";
 		gpio-names = "POWER";
-		gpios = <0x07 0x61 0x00>;
+		gpios = <0x07 0x5c 0x00>;
 	};
 
 	hdmi-display@ff900000 {

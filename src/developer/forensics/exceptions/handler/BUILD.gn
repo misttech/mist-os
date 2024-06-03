@@ -46,6 +46,7 @@ source_set("lib") {
     "//sdk/lib/syslog/cpp",
     "//src/developer/forensics/exceptions:constants",
     "//src/developer/forensics/utils:errors",
+    "//src/lib/fidl/cpp/contrib/fpromise:fpromise",
     "//src/lib/fsl",
   ]
 }

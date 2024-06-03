@@ -50,8 +50,6 @@
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.device.NameProvider",
                 "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.diagnostics.FeedbackArchiveAccessor",
-                "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
                 "fuchsia.element.GraphicalPresenter",
                 "fuchsia.feedback.DataProvider",
                 "fuchsia.hardware.power.statecontrol.Admin",

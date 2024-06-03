@@ -16,3 +16,16 @@ pub async fn get_client_sme(
         .expect("GetClientSme Error");
     client_sme_proxy
 }
+
+pub async fn get_telemetry(
+    generic_sme_proxy: &fidl_sme::GenericSmeProxy,
+) -> fidl_sme::TelemetryProxy {
+    let (telemetry_proxy, telemetry_server) =
+        fidl::endpoints::create_proxy().expect("Failed to create telemetry SME proxy");
+    generic_sme_proxy
+        .get_sme_telemetry(telemetry_server)
+        .await
+        .expect("FIDL error")
+        .expect("GetTelemetry error");
+    telemetry_proxy
+}

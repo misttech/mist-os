@@ -4,9 +4,8 @@
 
 import("//build/components/fuchsia_unittest_package.gni")
 
-executable("bin") {
+executable("fasttime-unittests") {
   testonly = true
-  output_name = "fasttime_unittests"
   sources = [ "fasttime_test.cc" ]
   deps = [
     "//sdk/lib/fdio",
@@ -18,13 +17,13 @@ executable("bin") {
   ]
 }
 
-fuchsia_unittest_package("fasttime-unittests") {
+fuchsia_unittest_package("fasttime-tests") {
   manifest = "meta/fasttime_unittests.cml"
   test_type = "system"
-  deps = [ ":bin" ]
+  deps = [ ":fasttime-unittests" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":fasttime-unittests" ]
+  deps = [ ":fasttime-tests" ]
 }

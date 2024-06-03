@@ -47,6 +47,7 @@ type MouseEventPhase = flexible enum {
 /// A tool to inject mouse events into Input Pipeline.
 ///
 /// Please extend as necessary.
+@discoverable
 closed protocol Mouse {
     /// Injects an input report corresponding to the event specified.
     ///

@@ -6,6 +6,7 @@
 import("//build/config/clang/clang.gni")
 import("//build/rust/config.gni")
 import("//build/toolchain/breakpad.gni")
+import("//build/toolchain/buildidtool.gni")
 import("//build/toolchain/ccache.gni")
 import("//build/toolchain/concurrent_jobs.gni")
 import("//build/toolchain/default_tools.gni")
@@ -322,14 +323,6 @@ template("clang_toolchain") {
               ])
     }
 
-    use_buildidtool =
-        invoker.toolchain_os == "linux" || invoker.toolchain_os == "fuchsia"
-    if (use_buildidtool) {
-      buildidtool = rebase_path(
-              "//prebuilt/tools/buildidtool/${host_platform}/buildidtool",
-              root_build_dir)
-    }
-
     forward_variables_from(invoker, [ "use_strip" ])
     if (use_strip) {
       if (invoker.toolchain_os == "mac") {
@@ -347,6 +340,9 @@ template("clang_toolchain") {
           gsymutil = "${prefix}/llvm-gsymutil"
         }
       }
+
+      use_buildidtool =
+          invoker.toolchain_os == "linux" || invoker.toolchain_os == "fuchsia"
     }
 
     # Override any tools as requested by the invoker
@@ -356,6 +352,7 @@ template("clang_toolchain") {
     if (defined(invoker.cxx)) {
       cxx = invoker.cxx
     }
+    deps = []
     forward_variables_from(invoker,
                            [
                              "ar",
@@ -570,7 +567,7 @@ template("clang_toolchain") {
           buildid_stampfile = "${outfile}.build-id.stamp"
           outputs += [ buildid_stampfile ]
           command_suffix +=
-              " && $buildidtool -build-id-dir .build-id" +
+              " && $buildidtool_invocation_path -build-id-dir .build-id" +
               " -stamp \"$buildid_stampfile\"" + " -entry \"=$outfile\"" +
               " -entry \".debug={{UNSTRIPPED_OUTFILE}}\""
         }
@@ -612,12 +609,12 @@ template("clang_toolchain") {
           }
         }
 
-        # dump_syms will fail if there is no build ID.  buildidtool succeeds and
-        # writes an empty stamp file for that case, so use it to tell whether
-        # dump_syms should be run. In any case always create a .sym because we
-        # told ninja we would create one above.
-        # TODO(b/321834013): Cases that clearly do not have a build-id should
-        # ideally not attempt to dump_syms.
+        # dump_syms will fail if there is no build ID.  buildidtool succeeds
+        # and writes an empty stamp file for that case, so use it to tell
+        # whether dump_syms should be run. In any case always create a .sym
+        # because we told ninja we would create one above.  TODO(b/321834013):
+        # Cases that clearly do not have a build-id should ideally not attempt
+        # to dump_syms.
         log_it = rebase_path(log_it_script, root_build_dir)
         command_suffix += " && { " + "test ! -s \"$buildid_stampfile\" && " +
                           "touch \"$outfile.sym\" || " + "{{REMOTE_DUMP_SYMS_PREFIX}}$log_it --log \"$breakpad_outfile\" -- $dump_syms -r {{BREAKPAD_NAME}}-o Fuchsia \"{{UNSTRIPPED_OUTFILE}}\"" + " ;}"
@@ -1384,6 +1381,23 @@ template("clang_toolchain") {
                                  "target_cpu",
                                ])
       }
+    }
+
+    # When defining a $host_toolchain variant this causes a circularity, so it
+    # can only apply to other toolchains.  Other dependencies in other
+    # toolchains will tend to get it built somehow, but this makes it a bit
+    # unreliable to set use_prebuilt_buildidtool=false in the general case.  It
+    # remains useful for local development touching buildidtool because it will
+    # get built and be in place eventually with manual iteration.
+    if (defined(toolchain_args.toolchain_variant)) {
+      _variant = toolchain_args.toolchain_variant
+      _is_host_toolchain =
+          _variant.base == "//build/toolchain:host_${invoker.toolchain_cpu}"
+    } else {
+      _is_host_toolchain = false
+    }
+    if (!_is_host_toolchain) {
+      deps += buildidtool_toolchain_deps
     }
   }
 }

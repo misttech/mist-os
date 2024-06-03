@@ -12,17 +12,16 @@ use {
         error::RoutingError, policy::GlobalPolicyChecker,
     },
     async_trait::async_trait,
-    cm_types::IterablePath,
     cm_util::WeakTaskGroup,
     fidl::{
         endpoints::{ProtocolMarker, RequestStream},
         epitaph::ChannelEpitaphExt,
         AsyncChannel,
     },
-    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{future::BoxFuture, FutureExt},
     router_error::RouterError,
-    sandbox::{Capability, Connectable, Connector, Dict, Message, Open, Request, Routable, Router},
+    sandbox::{Capability, Connectable, Connector, Message, Open, Request, Routable, Router},
     std::{fmt::Debug, sync::Arc},
     tracing::warn,
     vfs::{
@@ -36,130 +35,6 @@ use {
 pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::RequestStream {
     let channel = AsyncChannel::from_channel(channel);
     P::RequestStream::from_channel(channel)
-}
-
-pub trait DictExt {
-    /// Returns the capability at the path, if it exists. Returns `None` if path is empty.
-    fn get_capability(&self, path: &impl IterablePath) -> Option<Capability>;
-
-    /// Inserts the capability at the path. Intermediary dictionaries are created as needed.
-    fn insert_capability(
-        &self,
-        path: &impl IterablePath,
-        capability: Capability,
-    ) -> Result<(), fsandbox::DictionaryError>;
-
-    /// Removes the capability at the path, if it exists.
-    fn remove_capability(&self, path: &impl IterablePath);
-
-    /// Looks up the element at `path`. When encountering an intermediate router, use `request`
-    /// to request the underlying capability from it. In contrast, `get_capability` will return
-    /// `None`.
-    async fn get_with_request<'a>(
-        &self,
-        path: &'a impl IterablePath,
-        request: Request,
-    ) -> Result<Option<Capability>, RouterError>;
-}
-
-impl DictExt for Dict {
-    fn get_capability(&self, path: &impl IterablePath) -> Option<Capability> {
-        let mut segments = path.iter_segments();
-        let Some(mut current_name) = segments.next() else { return Some(self.clone().into()) };
-        let mut current_dict = self.clone();
-        loop {
-            match segments.next() {
-                Some(next_name) => {
-                    // Lifetimes are weird here with the MutexGuard, so we do this in two steps
-                    let sub_dict =
-                        current_dict.get(current_name).and_then(|value| value.to_dictionary())?;
-                    current_dict = sub_dict;
-
-                    current_name = next_name;
-                }
-                None => return current_dict.get(current_name),
-            }
-        }
-    }
-
-    fn insert_capability(
-        &self,
-        path: &impl IterablePath,
-        capability: Capability,
-    ) -> Result<(), fsandbox::DictionaryError> {
-        let mut segments = path.iter_segments();
-        let mut current_name = segments.next().expect("path must be non-empty");
-        let mut current_dict = self.clone();
-        loop {
-            match segments.next() {
-                Some(next_name) => {
-                    let sub_dict = {
-                        match current_dict.get(current_name) {
-                            Some(cap) => cap.to_dictionary().unwrap(),
-                            None => {
-                                let cap = Capability::Dictionary(Dict::new());
-                                current_dict.insert(current_name.clone(), cap.clone())?;
-                                cap.to_dictionary().unwrap()
-                            }
-                        }
-                    };
-                    current_dict = sub_dict;
-
-                    current_name = next_name;
-                }
-                None => {
-                    return current_dict.insert(current_name.clone(), capability);
-                }
-            }
-        }
-    }
-
-    fn remove_capability(&self, path: &impl IterablePath) {
-        let mut segments = path.iter_segments();
-        let mut current_name = segments.next().expect("path must be non-empty");
-        let mut current_dict = self.clone();
-        loop {
-            match segments.next() {
-                Some(next_name) => {
-                    let sub_dict = current_dict
-                        .get(current_name)
-                        .and_then(|value| value.clone().to_dictionary());
-                    if sub_dict.is_none() {
-                        // The capability doesn't exist, there's nothing to remove.
-                        return;
-                    }
-                    current_dict = sub_dict.unwrap();
-                    current_name = next_name;
-                }
-                None => {
-                    current_dict.remove(current_name);
-                    return;
-                }
-            }
-        }
-    }
-
-    async fn get_with_request<'a>(
-        &self,
-        path: &'a impl IterablePath,
-        request: Request,
-    ) -> Result<Option<Capability>, RouterError> {
-        let mut current_capability: Capability = self.clone().into();
-        for next_name in path.iter_segments() {
-            // We have another name but no subdictionary, so exit.
-            let Capability::Dictionary(current_dict) = &current_capability else { return Ok(None) };
-
-            // Get the capability.
-            let capability = current_dict.get(next_name);
-
-            // The capability doesn't exist.
-            let Some(capability) = capability else { return Ok(None) };
-
-            // Resolve the capability, this is a noop if it's not a router.
-            current_capability = capability.route(request.clone()).await?;
-        }
-        Ok(Some(current_capability))
-    }
 }
 
 /// Waits for a new message on a receiver, and launches a new async task on a `WeakTaskGroup` to
@@ -311,13 +186,6 @@ pub trait RoutableExt: Routable {
     /// the channel to be readable, then delegates to the current router. The wait
     /// is performed in the provided `scope`.
     fn on_readable(self, scope: ExecutionScope, entry_type: fio::DirentType) -> Router;
-
-    /// Returns a router that requests capabilities from the specified `path` relative to
-    /// the base routable or fails the request with `not_found_error` if the member is not
-    /// found. The base routable should resolve with a dictionary capability.
-    fn lazy_get<P>(self, path: P, not_found_error: impl Into<RouterError>) -> Router
-    where
-        P: IterablePath + Debug + 'static;
 }
 
 impl<T: Routable + 'static> RoutableExt for T {
@@ -402,38 +270,6 @@ impl<T: Routable + 'static> RoutableExt for T {
         let router = Router::new(self);
         Router::new(OnReadableRouter { router, scope, entry_type })
     }
-
-    fn lazy_get<P>(self, path: P, not_found_error: impl Into<RouterError>) -> Router
-    where
-        P: IterablePath + Debug + 'static,
-    {
-        #[derive(Debug)]
-        struct ScopedDictRouter<P: IterablePath + Debug + 'static> {
-            router: Router,
-            path: P,
-            not_found_error: RouterError,
-        }
-
-        #[async_trait]
-        impl<P: IterablePath + Debug + 'static> Routable for ScopedDictRouter<P> {
-            async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-                match self.router.route(request.clone()).await? {
-                    Capability::Dictionary(dict) => {
-                        let maybe_capability =
-                            dict.get_with_request(&self.path, request.clone()).await?;
-                        maybe_capability.ok_or_else(|| self.not_found_error.clone())
-                    }
-                    _ => Err(RoutingError::BedrockMemberAccessUnsupported.into()),
-                }
-            }
-        }
-
-        Router::new(ScopedDictRouter {
-            router: Router::new(self),
-            path,
-            not_found_error: not_found_error.into(),
-        })
-    }
 }
 
 #[cfg(test)]
@@ -446,19 +282,20 @@ pub mod tests {
     use cm_types::RelativePath;
     use fuchsia_async::TestExecutor;
     use router_error::DowncastErrorForTest;
-    use sandbox::{Data, Receiver, WeakComponentToken};
+    use routing::{DictExt, LazyGet};
+    use sandbox::{Data, Dict, Receiver, WeakComponentToken};
     use std::{pin::pin, sync::Weak, task::Poll};
 
     #[fuchsia::test]
     async fn get_capability() {
-        let mut sub_dict = Dict::new();
+        let sub_dict = Dict::new();
         sub_dict
             .insert("bar".parse().unwrap(), Capability::Dictionary(Dict::new()))
             .expect("dict entry already exists");
         let (_, sender) = Receiver::new();
         sub_dict.insert("baz".parse().unwrap(), sender.into()).expect("dict entry already exists");
 
-        let mut test_dict = Dict::new();
+        let test_dict = Dict::new();
         test_dict
             .insert("foo".parse().unwrap(), Capability::Dictionary(sub_dict))
             .expect("dict entry already exists");
@@ -735,7 +572,7 @@ pub mod tests {
     #[fuchsia::test]
     async fn lazy_get() {
         let source = Capability::Data(Data::String("hello".to_string()));
-        let mut dict1 = Dict::new();
+        let dict1 = Dict::new();
         dict1.insert("source".parse().unwrap(), source).expect("dict entry already exists");
 
         let base_router = Router::new_ok(dict1);
@@ -761,17 +598,17 @@ pub mod tests {
     #[fuchsia::test]
     async fn lazy_get_deep() {
         let source = Capability::Data(Data::String("hello".to_string()));
-        let mut dict1 = Dict::new();
+        let dict1 = Dict::new();
         dict1.insert("source".parse().unwrap(), source).expect("dict entry already exists");
-        let mut dict2 = Dict::new();
+        let dict2 = Dict::new();
         dict2
             .insert("dict1".parse().unwrap(), Capability::Dictionary(dict1))
             .expect("dict entry already exists");
-        let mut dict3 = Dict::new();
+        let dict3 = Dict::new();
         dict3
             .insert("dict2".parse().unwrap(), Capability::Dictionary(dict2))
             .expect("dict entry already exists");
-        let mut dict4 = Dict::new();
+        let dict4 = Dict::new();
         dict4
             .insert("dict3".parse().unwrap(), Capability::Dictionary(dict3))
             .expect("dict entry already exists");

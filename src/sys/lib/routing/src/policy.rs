@@ -9,7 +9,7 @@ use {
         DebugCapabilityKey, SecurityPolicy,
     },
     fuchsia_zircon_status as zx,
-    moniker::{ExtendedMoniker, Moniker, MonikerBase},
+    moniker::{ExtendedMoniker, Moniker},
     std::sync::Arc,
     thiserror::Error,
     tracing::{error, warn},

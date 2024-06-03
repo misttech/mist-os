@@ -19,7 +19,7 @@ use fidl_fuchsia_hardware_light::{Info, LightMarker, LightProxy};
 use fidl_fuchsia_settings_storage::LightGroups;
 use futures::lock::Mutex;
 use settings_storage::fidl_storage::{FidlStorage, FidlStorageConvertible};
-use settings_storage::storage_factory::StorageAccess;
+use settings_storage::storage_factory::{NoneT, StorageAccess};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -33,11 +33,8 @@ pub(crate) const DEVICE_PATH: &str = "/dev/class/light/*";
 
 impl FidlStorageConvertible for LightInfo {
     type Storable = LightGroups;
+    type Loader = NoneT;
     const KEY: &'static str = "light_info";
-
-    fn default_value() -> Self {
-        LightInfo { light_groups: Default::default() }
-    }
 
     #[allow(clippy::redundant_closure)]
     fn to_storable(self) -> Self::Storable {
@@ -87,18 +84,14 @@ pub struct LightController {
 
 impl StorageAccess for LightController {
     type Storage = FidlStorage;
-    const STORAGE_KEYS: &'static [&'static str] = &[LightInfo::KEY];
+    type Data = LightInfo;
+    const STORAGE_KEY: &'static str = LightInfo::KEY;
 }
 
-#[async_trait]
-impl data_controller::Create for LightController {
-    async fn create(client: ClientProxy) -> Result<Self, ControllerError> {
-        let light_hardware_config = DefaultSetting::<LightHardwareConfiguration, &str>::new(
-            None,
-            "/config/data/light_hardware_config.json",
-        )
-        .load_default_value()
-        .map_err(|_| {
+impl data_controller::CreateWithAsync for LightController {
+    type Data = Arc<std::sync::Mutex<DefaultSetting<LightHardwareConfiguration, &'static str>>>;
+    async fn create_with(client: ClientProxy, data: Self::Data) -> Result<Self, ControllerError> {
+        let light_hardware_config = data.lock().unwrap().load_default_value().map_err(|_| {
             ControllerError::InitFailure("Invalid default light hardware config".into())
         })?;
 
@@ -496,7 +489,6 @@ mod tests {
     use crate::tests::fakes::service_registry::ServiceRegistry;
     use crate::{service, Address, LightController, ServiceContext, SettingType};
     use futures::lock::Mutex;
-    use settings_storage::fidl_storage::FidlStorageConvertible;
     use settings_storage::UpdateState;
     use std::sync::Arc;
 
@@ -558,7 +550,7 @@ mod tests {
                                 // Just respond with the default value as we're not testing storage.
                                 let _ = message_client.reply(service::Payload::Storage(
                                     StoragePayload::Response(StorageResponse::Read(
-                                        LightInfo::default_value().into(),
+                                        LightInfo::default().into(),
                                     )),
                                 ));
                             }
@@ -653,7 +645,7 @@ mod tests {
                                 // Just respond with the default value as we're not testing storage.
                                 let _ = message_client.reply(service::Payload::Storage(
                                     StoragePayload::Response(StorageResponse::Read(
-                                        LightInfo::default_value().into(),
+                                        LightInfo::default().into(),
                                     )),
                                 ));
                             }

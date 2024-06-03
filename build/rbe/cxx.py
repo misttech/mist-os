@@ -22,13 +22,31 @@ def _remove_suffix(text: str, suffix: str) -> str:
     return text
 
 
-def _cxx_command_scanner() -> argparse.ArgumentParser:
+def _cxx_command_scanner() -> Tuple[argparse.ArgumentParser, Sequence[str]]:
     parser = argparse.ArgumentParser(
         description="Detects C++ compilation attributes (clang, gcc)",
         argument_default=[],
+        allow_abbrev=False,
         add_help=False,
     )
-    parser.add_argument(
+
+    single_dash_longopts = []
+
+    def _add_single_dash_longopt_argument(name: str, *args, **kwargs):
+        """Add a single-dash option that will be internally treated as a
+        double-dash long-option to avoid unwanted prefix-matching behavior.
+        See _interpret_single_dash_longopts().
+
+        This is suitable for non-fused single-dash options like '-o'
+        (by preventing '-other' from matching '-o'), and suitable for
+        '-shared' (by preventing '-s' from prefix-matching '-shared'),
+        but not suitable for fused options like '-Lpath/to/dir'
+        and '-Wl...' which require special handling.
+        """
+        parser.add_argument("-" + name, *args, **kwargs)
+        single_dash_longopts.append(name)
+
+    _add_single_dash_longopt_argument(  # do not match -other
         "-o",
         type=Path,
         dest="output",
@@ -58,7 +76,7 @@ def _cxx_command_scanner() -> argparse.ArgumentParser:
         default="",
         help="target platform",
     )
-    parser.add_argument(
+    _add_single_dash_longopt_argument(
         "-shared",
         default=False,
         action="store_true",
@@ -134,21 +152,21 @@ def _cxx_command_scanner() -> argparse.ArgumentParser:
         default=False,
         help="Compiler saves intermediate files.",
     )
-    parser.add_argument(
+    _add_single_dash_longopt_argument(
         "-unwindlib",
         type=str,
         default=None,
         metavar="LIB",
         help="unwind library (e.g. libunwind)",
     )
-    parser.add_argument(
+    _add_single_dash_longopt_argument(
         "-rtlib",
         type=str,
         default=None,
         metavar="LIB",
         help="run-time library (e.g. compiler-rt)",
     )
-    parser.add_argument(
+    _add_single_dash_longopt_argument(
         "-static-libstdc++",
         dest="static_libstdcxx",
         default=False,
@@ -164,10 +182,10 @@ def _cxx_command_scanner() -> argparse.ArgumentParser:
         metavar="FLAG",
         help="Forwarded driver flags like -Wl,... -Wa,... -Wp,...",
     )
-    return parser
+    return parser, single_dash_longopts
 
 
-_CXX_COMMAND_SCANNER = _cxx_command_scanner()
+_CXX_COMMAND_SCANNER, _SINGLE_DASH_LONGOPTS = _cxx_command_scanner()
 
 
 class Compiler(enum.Enum):
@@ -452,6 +470,60 @@ def _assign_explicit_flag_defaults(opts: Iterable[str]) -> Iterable[str]:
             yield opt
 
 
+def _interpret_single_dash_longopts(
+    single_dash_longopts: Sequence[str], opts: Iterable[str]
+) -> Iterable[str]:
+    """Workaround argparse limitation handling single-dash options.
+
+    clang/gcc interpret many long options that only start with a single-dash.
+    Unfortunately, ArgumentParse.parse_known_args() uses prefix matching on
+    single-dash flags even with allow_abbrev=False, which means '-r' gets
+    mis-interpreted as '-rtlib'.
+
+    See https://docs.python.org/3/library/argparse.html#partial-parsing
+
+    To avoid this prefix matching behavior, we transform known options from
+    single-dash to double-dash, and add parser arguments using the double-dash
+    form only.
+
+    Args:
+      single_dash_longopts: Set of '-foo' flags that will be interpreted as '--foo'.
+      opts: command-line arguments, which can contain some single-dash long-options.
+
+    Yields:
+      transformed command-line arguments, with some double-dash substitutions.
+    """
+
+    def rewrite_opt(str) -> str:
+        for prefix in single_dash_longopts:
+            if opt.startswith(prefix):
+                return "-" + opt  # interpret as double-dash
+
+        return opt
+
+    for opt in opts:
+        yield rewrite_opt(opt)
+
+
+def _restore_single_dash_longopts(
+    single_dash_longopts: Sequence[str], opts: Iterable[str]
+) -> Iterable[str]:
+    """Reverse transformation of _interpret_single_dash_longopts().
+
+    This is useful for viewing the original form for testing.
+    """
+
+    def rewrite_opt(str) -> str:
+        for prefix in single_dash_longopts:
+            if opt.startswith("-" + prefix):  # double-dashed
+                return opt[1:]  # restore single-dash
+
+        return opt
+
+    for opt in opts:
+        yield rewrite_opt(opt)
+
+
 class CxxAction(object):
     """Attributes of C/C++ (or dialect) compilation command.
 
@@ -476,12 +548,21 @@ class CxxAction(object):
             self._attributes,
             remaining_args,
         ) = _CXX_COMMAND_SCANNER.parse_known_args(
-            _assign_explicit_flag_defaults(argparseable_args)
+            _interpret_single_dash_longopts(
+                _SINGLE_DASH_LONGOPTS,
+                _assign_explicit_flag_defaults(argparseable_args),
+            )
         )
         self._compiler = _find_compiler_from_command(argparseable_args)
         self._sources = list(_compile_action_sources(remaining_args))
         self._dialect = _infer_dialect_from_sources(self._sources)
         self._linker_inputs = list(_link_direct_inputs(remaining_args))
+
+        # For testing purposes only, record uninterpreted args as they appeared
+        # before being transformed by _interpret_single_dash_longopts().
+        self._uninterpreted_args = list(
+            _restore_single_dash_longopts(_SINGLE_DASH_LONGOPTS, remaining_args)
+        )
 
         # Handle -W driver flags.
         self._preprocessor_driver_flags = []
@@ -561,6 +642,10 @@ class CxxAction(object):
     @property
     def libdirs(self) -> Sequence[Path]:
         return self._attributes.libdirs
+
+    @property
+    def uninterpreted_args(self) -> Sequence[str]:
+        return self._uninterpreted_args
 
     @property
     def clang_linker_executable(self) -> str:  # basename only

@@ -3,9 +3,14 @@
 // found in the LICENSE file.
 
 use {
-    crate::config_management::{self},
+    crate::{
+        config_management::{self},
+        util::historical_list::Timestamped,
+    },
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_sme as fidl_sme,
+    fuchsia_async::Time,
+    fuchsia_zircon as zx,
     wlan_common::{
         bss::BssDescription, channel::Channel, security::SecurityAuthenticator,
         sequestered::Sequestered,
@@ -140,6 +145,24 @@ pub struct Signal {
     pub rssi_dbm: i8,
     /// Signal to noise ratio  for the beacon/probe response.
     pub snr_db: i8,
+}
+
+impl From<fidl_internal::SignalReportIndication> for Signal {
+    fn from(ind: fidl_internal::SignalReportIndication) -> Signal {
+        Signal { rssi_dbm: ind.rssi_dbm, snr_db: ind.snr_db }
+    }
+}
+
+// For tracking the past signal reports
+#[derive(Clone, Debug, PartialEq)]
+pub struct TimestampedSignal {
+    pub signal: Signal,
+    pub time: Time,
+}
+impl Timestamped for TimestampedSignal {
+    fn time(&self) -> Time {
+        self.time
+    }
 }
 
 /// BSS information tracked by the client state machine.

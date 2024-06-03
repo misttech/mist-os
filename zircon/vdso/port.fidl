@@ -106,6 +106,23 @@ type PacketPageRequest = struct {
     reserved1 uint64;
 };
 
+@next
+type PacketProcessorPowerLevelTransitionRequest = struct {
+    /// Request targetting the provided power domain.
+    power_domain uint64;
+
+    /// Opaque argument provided for the OPP transition.
+    /// The value is provided through `ProcessorPowerLevel` to the kernel.
+    control_argument uint64;
+
+    /// Opaque value indicating the context in which the transition is requested.
+    /// This value must be provided when acknowleding the transition.
+    context uint64;
+
+    /// Padding
+    reserved uint64;
+};
+
 type PortPacket = struct {
     key uint64;
     type uint32;
@@ -121,6 +138,7 @@ type PortPacket = struct {
     guest_vcpu PacketGuestVcpu;
     interrupt PacketInterrupt;
     page_request PacketPageRequest;
+    processor_power_level_transition PacketProcessorPowerLevelTransitionRequest;
     // };
 };
 

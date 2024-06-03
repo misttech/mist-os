@@ -10,7 +10,7 @@ use {
     futures::{channel::mpsc, lock::Mutex, sink::SinkExt},
     hooks::{Event as ComponentEvent, EventPayload, TransferEvent},
     maplit::btreemap,
-    moniker::{ExtendedMoniker, MonikerBase},
+    moniker::ExtendedMoniker,
 };
 
 /// EventDispatcher and EventStream are two ends of a channel.

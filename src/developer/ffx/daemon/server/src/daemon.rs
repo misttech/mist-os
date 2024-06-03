@@ -407,7 +407,7 @@ impl Daemon {
         let _socket_file_watcher =
             self.start_socket_watch(quit_tx.clone()).await.context("Starting socket watcher")?;
         self.start_signal_monitoring(quit_tx.clone());
-        let should_start_expiry = context.get(DISCOVERY_EXPIRE_TARGETS).await.unwrap_or(true);
+        let should_start_expiry = context.get(DISCOVERY_EXPIRE_TARGETS).unwrap_or(true);
         if should_start_expiry == true {
             self.start_target_expiry(Duration::from_secs(1), Arc::clone(&node));
         }
@@ -971,19 +971,6 @@ mod test {
         daemon.target_collection.merge_insert(target);
         let result = daemon.open_remote_control(None).await;
         assert!(result.is_err());
-    }
-
-    struct FakeConfigReader {
-        query_expected: String,
-        value: String,
-    }
-
-    #[async_trait(?Send)]
-    impl ConfigReader for FakeConfigReader {
-        async fn get(&self, q: &str) -> Result<Option<String>> {
-            assert_eq!(q, self.query_expected);
-            Ok(Some(self.value.clone()))
-        }
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

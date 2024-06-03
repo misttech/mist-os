@@ -6,7 +6,7 @@ library fuchsia.component.sandbox;
 using zx;
 using fuchsia.io;
 
-/// Maximum number of bytes in a [DataCapability].
+/// Maximum number of bytes in a [Data].
 const MAX_DATA_LENGTH uint32 = 8192;
 
 /// Maximum number of items returned by [DictionaryItemIterator].
@@ -15,13 +15,17 @@ const MAX_DICTIONARY_ITEMS_CHUNK uint32 = 128;
 /// Maximum number of items returned by [DictionaryKeyIterator].
 const MAX_DICTIONARY_KEYS_CHUNK uint32 = 128;
 
+/// A token represents a bedrock object. Tokens are reference counted, dropping
+/// all counts of the token removes the object.
+alias Token = zx.Handle:EVENTPAIR;
+
 @available(added=HEAD)
 type OneShotHandle = resource struct {
-    token zx.Handle:EVENTPAIR;
+    token Token;
 };
 
 @available(added=HEAD)
-type DataCapability = flexible union {
+type Data = flexible union {
     1: bytes vector<byte>:MAX_DATA_LENGTH;
     2: string string:MAX_DATA_LENGTH;
     3: int64 int64;
@@ -30,14 +34,14 @@ type DataCapability = flexible union {
 
 @available(added=HEAD)
 type Connector = resource struct {
-    token zx.Handle:EVENTPAIR;
+    token Token;
 };
 
 @available(added=HEAD)
 type Capability = flexible resource union {
-    1: unit @generated_name("UnitCapability") struct {};
+    1: unit @generated_name("Unit") struct {};
     2: handle OneShotHandle;
-    3: data DataCapability;
+    3: data Data;
     4: dictionary client_end:Dictionary;
     5: connector Connector;
     6: directory client_end:fuchsia.io.Directory;
@@ -171,10 +175,9 @@ open protocol DictionaryKeyIterator {
 };
 
 /// This represents a component within the framework.
-/// There are currently no methods here as this is used as a token.
 @available(added=HEAD)
 type ComponentToken = resource struct {
-    token zx.Handle:EVENTPAIR;
+    token Token;
 };
 
 /// A request for a route.

@@ -39,5 +39,21 @@
 
         // If value is less than 0 then it is ignored.
         contiguous_memory_size_override: { type: "int32" },
+
+        // If true, sysmem crashes on a guard page violation.
+        contiguous_guard_pages_fatal: { type: "bool" },
+
+        // If true, sysmem will create guard regions around every allocation.
+        contiguous_guard_pages_internal: { type: "bool" },
+
+        // If false, sysmem will _not_ treat currently-unused pages as guard pages.
+        contiguous_guard_pages_unused: { type: "bool" },
+
+        // If value is less than 0 then it is ignored.
+        contiguous_guard_page_count_override: { type: "int64" },
+
+        // If value is less than 0 then it is ignored.
+        contiguous_guard_pages_unused_cycle_seconds_override: { type: "int64" },
+        protected_ranges_disable_dynamic: { type: "bool" },
     },
 }

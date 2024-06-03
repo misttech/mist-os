@@ -8,8 +8,6 @@
 #include <lib/stdcompat/type_traits.h>
 #include <zircon/assert.h>
 
-#include <memory>
-#include <set>
 #include <sstream>
 #include <string_view>
 
@@ -46,6 +44,8 @@ std::string Display(const Platform& p);
 std::string Display(Version v);
 std::string Display(VersionRange r);
 std::string Display(const VersionSet& s);
+std::string Display(AbiKind k);
+std::string Display(AbiValue v);
 template <typename T, typename = decltype(std::to_string(std::declval<T>()))>
 std::string Display(T val) {
   return std::to_string(val);

@@ -441,12 +441,6 @@ zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device, const cha
                                                   const char* service_name,
                                                   const char* protocol_name, zx_handle_t request);
 
-// Returns a string containing the variable for the given |name|. If |out| is not large enough,
-// |size_actual| will contain the size of the required buffer. |out| is guaranateed to be null
-// terminated. |device| should not be null.
-zx_status_t device_get_variable(zx_device_t* device, const char* name, char* out, size_t out_size,
-                                size_t* size_actual);
-
 typedef enum {
   DEVICE_BIND_PROPERTY_KEY_UNDEFINED = 0,
   DEVICE_BIND_PROPERTY_KEY_INT = 1,

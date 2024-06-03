@@ -10,11 +10,15 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_fs::OpenFlags;
 use fuchsia_inspect::component;
 use futures::lock::Mutex;
+use settings::audio::build_audio_default_settings;
 use settings::base::get_default_interfaces;
 use settings::config::base::get_default_agent_types;
 use settings::config::default_settings::DefaultSetting;
+use settings::display::build_display_default_settings;
 use settings::handler::setting_proxy_inspect_info::SettingProxyInspectInfo;
+use settings::input::build_input_default_settings;
 use settings::inspect::listener_logger::ListenerInspectLogger;
+use settings::light::build_light_default_settings;
 use settings::AgentConfiguration;
 use settings::EnabledInterfacesConfiguration;
 use settings::EnvironmentBuilder;
@@ -46,6 +50,10 @@ fn main() -> Result<(), Error> {
     let default_enabled_interfaces_configuration =
         EnabledInterfacesConfiguration::with_interfaces(get_default_interfaces());
 
+    let input_configuration = build_input_default_settings();
+
+    let light_configuration = build_light_default_settings();
+
     let enabled_interface_configuration = DefaultSetting::new(
         Some(default_enabled_interfaces_configuration),
         "/config/data/interface_configuration.json",
@@ -59,6 +67,8 @@ fn main() -> Result<(), Error> {
             .load_default_value()
             .expect("invalid service flag configuration")
             .expect("no default service flags");
+    let display_configuration = build_display_default_settings();
+    let audio_configuration = build_audio_default_settings();
 
     // Temporary solution for FEMU to have an agent config without camera agent.
     let agent_config = "/config/data/agent_configuration.json";
@@ -97,6 +107,10 @@ fn main() -> Result<(), Error> {
 
     EnvironmentBuilder::new(Arc::new(storage_factory))
         .configuration(configuration)
+        .display_configuration(display_configuration)
+        .audio_configuration(audio_configuration)
+        .input_configuration(input_configuration)
+        .light_configuration(light_configuration)
         .setting_proxy_inspect_info(
             setting_proxy_inspect_info.node(),
             Arc::new(Mutex::new(listener_inspect_logger)),

@@ -143,14 +143,22 @@ source_set("device_client") {
 source_set("sysmem_connection") {
   configs += [ "..:platform_include_config" ]
 
-  sources = [ "zircon_platform_sysmem_connection.cc" ]
+  sources = [
+    # TODO(b/306258175): When all vulkan ICDs have moved to sysmem2, and/or all vulkan ICDs are
+    # built at API level >= 21, move zircon_platform_sysmem2_connection.cc over top of
+    # zircon_platform_sysmem_connection.cc.
+    "zircon_platform_sysmem2_connection.cc",
+    "zircon_platform_sysmem_connection.cc",
+  ]
 
   deps = [
     ":buffer",
     "..:sysmem_connection_header",
     "..:thread",
     "..:trace",
+    "//sdk/fidl/fuchsia.images2:fuchsia.images2_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//src/graphics/magma/lib/magma/util:short_macros",
     "//zircon/system/ulib/image-format",
     "//zircon/system/ulib/zx",

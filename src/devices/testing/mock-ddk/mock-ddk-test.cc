@@ -117,16 +117,6 @@ class TestDevice : public DeviceType {
     return zx::error(status);
   }
 
-  zx::result<std::string> GetVariable(const char* name, size_t max_size) {
-    std::vector<char> data(max_size, '\0');
-    size_t actual;
-    auto status = device_get_variable(parent_, name, data.data(), max_size, &actual);
-    if (status == ZX_OK) {
-      return zx::ok(std::string(data.data(), actual));
-    }
-    return zx::error(status);
-  }
-
   zx::result<std::vector<uint8_t>> LoadFirmware(std::string_view path) {
     size_t actual;
     zx::vmo fw;
@@ -421,66 +411,6 @@ TEST(MockDdk, SetConfigVmo) {
   vmo_result = test_device->GetConfigVmo();
   ASSERT_TRUE(vmo_result.is_ok());
   ASSERT_EQ(*vmo_result, config_vmo_handle);
-}
-
-TEST(MockDdk, SetVariable) {
-  auto parent = MockDevice::FakeRootParent();  // Hold on to the parent during the test.
-  auto result = TestDevice::Bind(parent.get());
-  ASSERT_TRUE(result.is_ok());
-  TestDevice* test_device = result.value();
-
-  constexpr char kFakeVarName[] = "foo";
-  constexpr char kFakeVarName2[] = "bar";
-  constexpr size_t kFakeVarSize = 10;
-
-  // As expected, there is no default variable available in devices:
-  auto variable_result = test_device->GetVariable(kFakeVarName, kFakeVarSize);
-  ASSERT_FALSE(variable_result.is_ok());
-
-  // If your driver requires variable, you can add it to the parent:
-  // (This could be done before the device is added)
-  const char kSource[] = "test";
-  parent->SetVariable(kFakeVarName, kSource);
-
-  variable_result = test_device->GetVariable(kFakeVarName, kFakeVarSize);
-  ASSERT_TRUE(variable_result.is_ok());
-  EXPECT_EQ(variable_result.value().size(), sizeof(kSource) - 1);
-  ASSERT_BYTES_EQ(variable_result.value().data(), kSource, sizeof(kSource));
-
-  // Setting variable allows the variable to be accessed when querying for that type only:
-  auto bad_variable_result = test_device->GetVariable("", kFakeVarSize);
-  ASSERT_FALSE(bad_variable_result.is_ok());
-
-  // Multiple variable blobs can be loaded, but they overwrite previously loaded variable
-  // with the same name.
-
-  // Add a different blob to a different type:
-  const char kSource2[] = "Hello";
-  parent->SetVariable(kFakeVarName2, kSource2);
-
-  // Add a different blob to a the same type, but lower in the tree:
-  const char kSource3[] = "World";
-  test_device->zxdev()->SetVariable(kFakeVarName, kSource3);
-
-  // Now the devices each have two variable blobs available,
-  variable_result = test_device->GetVariable(kFakeVarName, kFakeVarSize);
-  ASSERT_TRUE(variable_result.is_ok());
-  ASSERT_EQ(variable_result.value().size(), sizeof(kSource) - 1);
-  ASSERT_BYTES_EQ(variable_result.value().data(), kSource, sizeof(kSource));
-
-  variable_result = test_device->GetVariable(kFakeVarName2, kFakeVarSize);
-  ASSERT_TRUE(variable_result.is_ok());
-  ASSERT_EQ(variable_result.value().size(), sizeof(kSource2) - 1);
-  ASSERT_BYTES_EQ(variable_result.value().data(), kSource2, sizeof(kSource2));
-
-  // but test_device_1 has a different value for kFakeVarName.
-  result = test_device->AddChild();
-  ASSERT_TRUE(result.is_ok());
-  auto* test_device_1 = result.value();
-  variable_result = test_device_1->GetVariable(kFakeVarName, kFakeVarSize);
-  ASSERT_TRUE(variable_result.is_ok());
-  ASSERT_EQ(variable_result.value().size(), sizeof(kSource3) - 1);
-  ASSERT_BYTES_EQ(variable_result.value().data(), kSource3, sizeof(kSource3));
 }
 
 struct test_math_protocol_ops {

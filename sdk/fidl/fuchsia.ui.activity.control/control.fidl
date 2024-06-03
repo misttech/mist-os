@@ -24,6 +24,9 @@ closed protocol Control {
     ///
     /// Typically, state transitions should occur minutes apart (e.g.
     /// transition from ACTIVE to IDLE after 15 minutes of inactivity).
+    @available(
+            deprecated=9,
+            note="Instead report activity via `fuchsia.input.interaction.observation.Aggregator`")
     strict SetState(struct {
         state fuchsia.ui.activity.State;
     });

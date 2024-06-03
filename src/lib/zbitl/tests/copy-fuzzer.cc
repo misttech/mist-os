@@ -19,21 +19,35 @@
 
 namespace {
 
+// This value subdivides the following enum value space: values greater or equal
+// to this one correspond strictly to copy-creation codepaths.
+constexpr uint8_t kMinCreationCopyCodepath = 0xf;
+
 // Corresponds to a particular `Copy` `View` method. See usage below for the
 // exact mapping.
-enum class CopyCodepath {
+enum class CopyCodepath : uint8_t {
   kDirectRawItem,
   kDirectRawItemWithHeader,
   kDirectStorageItem,
   kDirectIteratorRange,
   kDirectByteRange,
-  kCreationRawItem,
+
+  //
+  // Only copy-creation codepaths past this point (with the exception of
+  // kMaxValue).
+  //
+  kCreationRawItem = kMinCreationCopyCodepath,
   kCreationRawItemWithHeader,
   kCreationStorageItem,
   kCreationIteratorRange,
   kCreationByteRange,
+
   kMaxValue,  // Required by FuzzedDataProvider::ConsumeEnum().
 };
+
+constexpr bool IsCreationCopyCodepath(CopyCodepath codepath) {
+  return static_cast<uint8_t>(codepath) >= kMinCreationCopyCodepath;
+}
 
 template <typename Storage>
 int Fuzz(FuzzedDataProvider& provider) {
@@ -59,12 +73,22 @@ int Fuzz(FuzzedDataProvider& provider) {
   if (codepath == CopyCodepath::kDirectByteRange) {
     static_cast<void>(view.Copy(to, from_offset, from_length, to_offset));
     return 0;
-  } else if (codepath == CopyCodepath::kCreationByteRange) {
+  }
+  if (codepath == CopyCodepath::kCreationByteRange) {
     static_cast<void>(view.Copy(from_offset, from_length, to_offset));
     return 0;
   }
 
   for (auto it = view.begin(); it != view.end(); ++it) {
+    // If we are dealing with a copy-creation codepath with a pathological
+    // header length, skip the copy altogether to avoid a potentially excessive
+    // allocation of that same size. In contrast, the direct copy codepaths can
+    // gracefully fail in such cases without any allocation side-effects.
+    if (IsCreationCopyCodepath(codepath) &&
+        it->header->length > view.size_bytes() - it.item_offset()) {
+      continue;
+    }
+
     switch (codepath) {
       case CopyCodepath::kDirectRawItem:
         static_cast<void>(view.CopyRawItem(to, it));

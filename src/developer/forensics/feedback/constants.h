@@ -44,7 +44,8 @@ constexpr char kEnableLimitInspectDataKey[] = "enable_limit_inspect_data";
 constexpr char kPreviousGracefulRebootReasonFile[] = "/tmp/graceful_reboot_reason.txt";
 constexpr char kCurrentGracefulRebootReasonFile[] = "/data/graceful_reboot_reason.txt";
 
-// TODO(https://fxbug.dev/42166055): Stop attempting to read from the /cache file once it no longer exists.
+// TODO(https://fxbug.dev/42166055): Stop attempting to read from the /cache file once it no longer
+// exists.
 constexpr char kLegacyGracefulRebootReasonFile[] = "/cache/graceful_reboot_reason.txt";
 
 constexpr char kNotAFdrFile[] = "/data/not_a_fdr.txt";

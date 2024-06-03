@@ -367,6 +367,51 @@ def expand_paths_from_files(files: Iterable[Path]) -> Iterable[Path]:
                         yield Path(p.replace(" ", "\\ "))  # preserve escape
 
 
+def read_config_file_lines(lines: Iterable[str]) -> Dict[str, str]:
+    """Parser for reading RBE config files.
+
+    RBE config files are text files with lines of "VAR=VALUE"
+    (ignoring whole-line #-comments and blank lines).
+    Spec details can be found at:
+    https://github.com/bazelbuild/reclient/blob/main/internal/pkg/rbeflag/rbeflag.go
+
+    Args:
+      lines: lines of config from a file
+
+    Returns:
+      dictionary of key-value pairs read from the config file.
+    """
+    result = {}
+    for line in lines:
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#"):
+            key, sep, value = stripped.partition("=")
+            if sep == "=":
+                result[key] = value
+    return result
+
+
+def values_dict_to_config_value(
+    values: Dict[str, str], eq: str = "=", sep: str = ","
+) -> str:
+    """Return a string representation of a dictionary for config lines.
+
+    It is assumed that the order among different keys is inconsequential,
+    so we sort the output by keys for determinism.
+
+    Args:
+      values: arbitrary string dictionary of key-values
+      eq: string to join keys and values
+      sep: string to join key-value pairs
+
+    Returns:
+      Joined string representation, ordered by keys (deterministic).
+    """
+    # Keys are unique, so this effectively sorts (key, value) pairs
+    # by key without regard to value.
+    return sep.join(k + eq + v for k, v in sorted(values.items()))
+
+
 def keyed_flags_to_values_dict(
     flags: Iterable[str], convert_type: Callable[[str], Any] = None
 ) -> Dict[str, Sequence[str]]:

@@ -6,7 +6,7 @@ use crate::{
     Index, InstanceId, InstanceIdError, PersistedIndex, PersistedIndexEntry, ValidationError,
 };
 use fidl_fuchsia_component_internal as fcomponent_internal;
-use moniker::{Moniker, MonikerBase, MonikerError};
+use moniker::{Moniker, MonikerError};
 use thiserror::Error;
 
 #[derive(Error, Clone, Debug, PartialEq)]

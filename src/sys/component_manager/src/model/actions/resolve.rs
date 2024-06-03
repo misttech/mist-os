@@ -160,7 +160,7 @@ pub mod tests {
         cm_rust_testing::ComponentDeclBuilder,
         errors::{ActionError, ResolveActionError},
         futures::{channel::oneshot, FutureExt},
-        moniker::{Moniker, MonikerBase},
+        moniker::Moniker,
     };
 
     #[fuchsia::test]

@@ -7,7 +7,6 @@
 #include <endian.h>
 #include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
 #include <fidl/fuchsia.hardware.interrupt/cpp/wire.h>
-#include <fuchsia/hardware/hidbus/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
@@ -18,7 +17,6 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/device-protocol/i2c-channel.h>
-#include <lib/fake-hidbus-ifc/fake-hidbus-ifc.h>
 #include <lib/fake-i2c/fake-i2c.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/clock.h>
@@ -42,6 +40,8 @@
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace i2c_hid {
+
+namespace fhidbus = fuchsia_hardware_hidbus;
 
 // Ids were chosen arbitrarily.
 static constexpr uint16_t kHidVendorId = 0xabcd;
@@ -76,12 +76,15 @@ class FakeI2cHid : public fake_i2c::FakeI2c {
       report_len_ = len;
       irq_.trigger(0, zx::clock::get_monotonic());
     }
-    sync_completion_wait_deadline(&report_read_, zx::time::infinite().get());
+    mock_ddk::GetDriverRuntime()->PerformBlockingWork(
+        [this]() { sync_completion_wait_deadline(&report_read_, zx::time::infinite().get()); });
     sync_completion_reset(&report_read_);
   }
 
-  zx_status_t WaitUntilReset() {
-    return sync_completion_wait_deadline(&is_reset_, zx::time::infinite().get());
+  void WaitUntilReset() {
+    mock_ddk::GetDriverRuntime()->PerformBlockingWork([this]() {
+      ASSERT_OK(sync_completion_wait_deadline(&is_reset_, zx::time::infinite().get()));
+    });
   }
 
  private:
@@ -312,14 +315,37 @@ class I2cHidTest : public zxtest::Test {
     EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(device_->zxdev()));
   }
 
-  void StartHidBus() { device_->HidbusStart(fake_hid_bus_.GetProto()); }
+  fidl::WireSyncClient<fhidbus::Hidbus> ConnectFidl() {
+    auto [client, server] = fidl::Endpoints<fhidbus::Hidbus>::Create();
+    device_->binding().emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server),
+                               device_, fidl::kIgnoreBindingClosure);
+    return fidl::WireSyncClient<fhidbus::Hidbus>(std::move(client));
+  }
+
+  class HidbusEventHandler : public fidl::WireSyncEventHandler<fhidbus::Hidbus> {
+   public:
+    void OnReportReceived(fidl::WireEvent<fhidbus::Hidbus::OnReportReceived>* event) override {
+      ASSERT_FALSE(expected_reports_.empty());
+      auto expected = std::move(expected_reports_.front());
+      expected_reports_.pop();
+      auto report = event->buf;
+      ASSERT_EQ(report.count(), expected.size());
+      for (size_t i = 0; i < report.count(); i++) {
+        EXPECT_EQ(report[i], expected[i]);
+      }
+    }
+
+    void ExpectReport(std::vector<uint8_t>& report) { expected_reports_.push(report); }
+
+   private:
+    std::queue<std::vector<uint8_t>> expected_reports_;
+  };
 
  protected:
   acpi::mock::Device acpi_device_;
   I2cHidbus* device_;
   std::shared_ptr<MockDevice> parent_;
   FakeI2cHid fake_i2c_hid_;
-  fake_hidbus_ifc::FakeHidbusIfc fake_hid_bus_;
   fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c_;
   async::Loop loop_;
   async_patterns::DispatcherBound<MockComponent> mock_component_{loop_.dispatcher()};
@@ -335,20 +361,29 @@ TEST_F(I2cHidTest, HidTestBind) {
 TEST_F(I2cHidTest, HidTestQuery) {
   ASSERT_OK(device_->Bind(std::move(i2c_)));
   device_->zxdev()->InitOp();
-  ASSERT_OK(fake_i2c_hid_.WaitUntilReset());
+  fake_i2c_hid_.WaitUntilReset();
 
-  StartHidBus();
+  auto hidbus = ConnectFidl();
+  mock_ddk::GetDriverRuntime()->PerformBlockingWork([&hidbus]() {
+    {
+      auto result = hidbus->Start();
+      ASSERT_TRUE(result.ok());
+      ASSERT_TRUE(result->is_ok());
+    }
 
-  hid_info_t info = {};
-  ASSERT_OK(device_->HidbusQuery(0, &info));
-  ASSERT_EQ(kHidVendorId, info.vendor_id);
-  ASSERT_EQ(kHidProductId, info.product_id);
-  ASSERT_EQ(kHidVersion, info.version);
+    {
+      auto result = hidbus->Query();
+      ASSERT_TRUE(result.ok());
+      ASSERT_TRUE(result->is_ok());
+      auto info = result->value()->info;
+      ASSERT_EQ(kHidVendorId, info.vendor_id());
+      ASSERT_EQ(kHidProductId, info.product_id());
+      ASSERT_EQ(kHidVersion, info.version());
+    }
+  });
 }
 
 TEST_F(I2cHidTest, HidTestReadReportDesc) {
-  uint8_t returned_report_desc[HID_MAX_DESC_LEN];
-  size_t returned_report_desc_len;
   std::vector<uint8_t> report_desc(4);
   report_desc[0] = 1;
   report_desc[1] = 100;
@@ -359,19 +394,23 @@ TEST_F(I2cHidTest, HidTestReadReportDesc) {
   ASSERT_OK(device_->Bind(std::move(i2c_)));
   device_->zxdev()->InitOp();
 
-  ASSERT_OK(device_->HidbusGetDescriptor(HID_DESCRIPTION_TYPE_REPORT, returned_report_desc,
-                                         sizeof(returned_report_desc), &returned_report_desc_len));
-  ASSERT_EQ(returned_report_desc_len, report_desc.size());
-  for (size_t i = 0; i < returned_report_desc_len; i++) {
-    ASSERT_EQ(returned_report_desc[i], report_desc[i]);
-  }
+  auto hidbus = ConnectFidl();
+  mock_ddk::GetDriverRuntime()->PerformBlockingWork([&hidbus, &report_desc]() {
+    auto result = hidbus->GetDescriptor(fhidbus::wire::HidDescriptorType::kReport);
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    auto report = result->value()->data;
+    ASSERT_EQ(report.count(), report_desc.size());
+    for (size_t i = 0; i < report.count(); i++) {
+      ASSERT_EQ(report[i], report_desc[i]);
+    }
+  });
 }
 
 TEST(I2cHidTest, HidTestReportDescFailureLifetimeTest) {
   I2cHidbus* device_;
   std::shared_ptr<MockDevice> parent = MockDevice::FakeRootParent();
   FakeI2cHid fake_i2c_hid_;
-  fake_hidbus_ifc::FakeHidbusIfc fake_hid_bus_;
   ddk::I2cChannel channel_;
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
@@ -404,9 +443,14 @@ TEST(I2cHidTest, HidTestReportDescFailureLifetimeTest) {
 TEST_F(I2cHidTest, HidTestReadReport) {
   ASSERT_OK(device_->Bind(std::move(i2c_)));
   device_->zxdev()->InitOp();
-  ASSERT_OK(fake_i2c_hid_.WaitUntilReset());
+  fake_i2c_hid_.WaitUntilReset();
 
-  StartHidBus();
+  auto hidbus = ConnectFidl();
+  mock_ddk::GetDriverRuntime()->PerformBlockingWork([&hidbus]() {
+    auto result = hidbus->Start();
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+  });
 
   // Any arbitrary values or vector length could be used here.
   std::vector<uint8_t> rpt(4);
@@ -416,21 +460,23 @@ TEST_F(I2cHidTest, HidTestReadReport) {
   rpt[3] = 5;
   fake_i2c_hid_.SendReport(rpt);
 
-  std::vector<uint8_t> returned_rpt;
-  ASSERT_OK(fake_hid_bus_.WaitUntilNextReport(&returned_rpt));
-
-  ASSERT_EQ(returned_rpt.size(), rpt.size());
-  for (size_t i = 0; i < returned_rpt.size(); i++) {
-    EXPECT_EQ(returned_rpt[i], rpt[i]);
-  }
+  HidbusEventHandler event_handler;
+  event_handler.ExpectReport(rpt);
+  mock_ddk::GetDriverRuntime()->PerformBlockingWork(
+      [&hidbus, &event_handler]() { ASSERT_OK(hidbus.HandleOneEvent(event_handler)); });
 }
 
 TEST_F(I2cHidTest, HidTestBadReportLen) {
   ASSERT_OK(device_->Bind(std::move(i2c_)));
   device_->zxdev()->InitOp();
-  ASSERT_OK(fake_i2c_hid_.WaitUntilReset());
+  fake_i2c_hid_.WaitUntilReset();
 
-  StartHidBus();
+  auto hidbus = ConnectFidl();
+  mock_ddk::GetDriverRuntime()->PerformBlockingWork([&hidbus]() {
+    auto result = hidbus->Start();
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+  });
 
   // Send a report with a length that's too long.
   std::vector<uint8_t> too_long_rpt{0xAA};
@@ -440,16 +486,12 @@ TEST_F(I2cHidTest, HidTestBadReportLen) {
   std::vector<uint8_t> normal_rpt{0xBB};
   fake_i2c_hid_.SendReport(normal_rpt);
 
-  // Wait until the reports are in.
-  std::vector<uint8_t> returned_rpt;
-  ASSERT_OK(fake_hid_bus_.WaitUntilNextReport(&returned_rpt));
-
+  HidbusEventHandler event_handler;
   // We should've only seen one report since the too long report will cause an error.
-  ASSERT_EQ(fake_hid_bus_.NumReportsSeen(), 1);
-
   // Double check that the returned report is the normal one.
-  ASSERT_EQ(returned_rpt.size(), normal_rpt.size());
-  ASSERT_EQ(returned_rpt[0], normal_rpt[0]);
+  event_handler.ExpectReport(normal_rpt);
+  mock_ddk::GetDriverRuntime()->PerformBlockingWork(
+      [&hidbus, &event_handler]() { ASSERT_OK(hidbus.HandleOneEvent(event_handler)); });
 }
 
 TEST_F(I2cHidTest, HidTestReadReportNoIrq) {
@@ -459,9 +501,14 @@ TEST_F(I2cHidTest, HidTestReadReportNoIrq) {
 
   ASSERT_OK(device_->Bind(std::move(i2c_)));
   device_->zxdev()->InitOp();
-  ASSERT_OK(fake_i2c_hid_.WaitUntilReset());
+  fake_i2c_hid_.WaitUntilReset();
 
-  StartHidBus();
+  auto hidbus = ConnectFidl();
+  mock_ddk::GetDriverRuntime()->PerformBlockingWork([&hidbus]() {
+    auto result = hidbus->Start();
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+  });
 
   // Any arbitrary values or vector length could be used here.
   std::vector<uint8_t> rpt(4);
@@ -471,13 +518,10 @@ TEST_F(I2cHidTest, HidTestReadReportNoIrq) {
   rpt[3] = 5;
   fake_i2c_hid_.SendReport(rpt);
 
-  std::vector<uint8_t> returned_rpt;
-  ASSERT_OK(fake_hid_bus_.WaitUntilNextReport(&returned_rpt));
-
-  ASSERT_EQ(returned_rpt.size(), rpt.size());
-  for (size_t i = 0; i < returned_rpt.size(); i++) {
-    EXPECT_EQ(returned_rpt[i], rpt[i]);
-  }
+  HidbusEventHandler event_handler;
+  event_handler.ExpectReport(rpt);
+  mock_ddk::GetDriverRuntime()->PerformBlockingWork(
+      [&hidbus, &event_handler]() { ASSERT_OK(hidbus.HandleOneEvent(event_handler)); });
 }
 
 TEST_F(I2cHidTest, HidTestDedupeReportsNoIrq) {
@@ -487,9 +531,14 @@ TEST_F(I2cHidTest, HidTestDedupeReportsNoIrq) {
 
   ASSERT_OK(device_->Bind(std::move(i2c_)));
   device_->zxdev()->InitOp();
-  ASSERT_OK(fake_i2c_hid_.WaitUntilReset());
+  fake_i2c_hid_.WaitUntilReset();
 
-  StartHidBus();
+  auto hidbus = ConnectFidl();
+  mock_ddk::GetDriverRuntime()->PerformBlockingWork([&hidbus]() {
+    auto result = hidbus->Start();
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+  });
 
   // Send three reports.
   std::vector<uint8_t> rpt1(4);
@@ -501,16 +550,11 @@ TEST_F(I2cHidTest, HidTestDedupeReportsNoIrq) {
   fake_i2c_hid_.SendReport(rpt1);
   fake_i2c_hid_.SendReport(rpt1);
 
-  std::vector<uint8_t> returned_rpt1;
-  ASSERT_OK(fake_hid_bus_.WaitUntilNextReport(&returned_rpt1));
-
+  HidbusEventHandler event_handler;
   // We should've only seen one report since the repeats should have been deduped.
-  ASSERT_EQ(fake_hid_bus_.NumReportsSeen(), 1);
-
-  ASSERT_EQ(returned_rpt1.size(), rpt1.size());
-  for (size_t i = 0; i < returned_rpt1.size(); i++) {
-    EXPECT_EQ(returned_rpt1[i], rpt1[i]);
-  }
+  event_handler.ExpectReport(rpt1);
+  mock_ddk::GetDriverRuntime()->PerformBlockingWork(
+      [&hidbus, &event_handler]() { ASSERT_OK(hidbus.HandleOneEvent(event_handler)); });
 
   // Send three different reports.
   std::vector<uint8_t> rpt2(4);
@@ -522,16 +566,10 @@ TEST_F(I2cHidTest, HidTestDedupeReportsNoIrq) {
   fake_i2c_hid_.SendReport(rpt2);
   fake_i2c_hid_.SendReport(rpt2);
 
-  std::vector<uint8_t> returned_rpt2;
-  ASSERT_OK(fake_hid_bus_.WaitUntilNextReport(&returned_rpt2));
-
-  // We should've only seen two report since the repeats should have been deduped.
-  ASSERT_EQ(fake_hid_bus_.NumReportsSeen(), 2);
-
-  ASSERT_EQ(returned_rpt2.size(), rpt2.size());
-  for (size_t i = 0; i < returned_rpt2.size(); i++) {
-    EXPECT_EQ(returned_rpt2[i], rpt2[i]);
-  }
+  // We should've only seen one more report since the repeats should have been deduped.
+  event_handler.ExpectReport(rpt2);
+  mock_ddk::GetDriverRuntime()->PerformBlockingWork(
+      [&hidbus, &event_handler]() { ASSERT_OK(hidbus.HandleOneEvent(event_handler)); });
 
   // Send a report with different length.
   std::vector<uint8_t> rpt3(5);
@@ -542,36 +580,40 @@ TEST_F(I2cHidTest, HidTestDedupeReportsNoIrq) {
   rpt3[4] = 10;
   fake_i2c_hid_.SendReport(rpt3);
 
-  std::vector<uint8_t> returned_rpt3;
-  ASSERT_OK(fake_hid_bus_.WaitUntilNextReport(&returned_rpt3));
-
-  ASSERT_EQ(fake_hid_bus_.NumReportsSeen(), 3);
-
-  ASSERT_EQ(returned_rpt3.size(), rpt3.size());
-  for (size_t i = 0; i < returned_rpt3.size(); i++) {
-    EXPECT_EQ(returned_rpt3[i], rpt3[i]);
-  }
+  event_handler.ExpectReport(rpt3);
+  mock_ddk::GetDriverRuntime()->PerformBlockingWork(
+      [&hidbus, &event_handler]() { ASSERT_OK(hidbus.HandleOneEvent(event_handler)); });
 }
 
 TEST_F(I2cHidTest, HidTestSetReport) {
   ASSERT_OK(device_->Bind(std::move(i2c_)));
   device_->zxdev()->InitOp();
-  ASSERT_OK(fake_i2c_hid_.WaitUntilReset());
+  fake_i2c_hid_.WaitUntilReset();
 
-  // Any arbitrary values or vector length could be used here.
-  uint8_t report_data[4] = {1, 100, 255, 5};
+  auto hidbus = ConnectFidl();
+  mock_ddk::GetDriverRuntime()->PerformBlockingWork([&hidbus]() {
+    // Any arbitrary values or vector length could be used here.
+    uint8_t report_data[4] = {1, 100, 255, 5};
 
-  ASSERT_OK(
-      device_->HidbusSetReport(HID_REPORT_TYPE_FEATURE, 0x1, report_data, sizeof(report_data)));
+    {
+      auto result = hidbus->SetReport(
+          fuchsia_hardware_input::wire::ReportType::kFeature, 0x1,
+          fidl::VectorView<uint8_t>::FromExternal(report_data, sizeof(report_data)));
+      ASSERT_TRUE(result.ok());
+      ASSERT_TRUE(result->is_ok());
+    }
 
-  uint8_t received_data[4] = {};
-  size_t out_len;
-  ASSERT_OK(device_->HidbusGetReport(HID_REPORT_TYPE_FEATURE, 0x1, received_data,
-                                     sizeof(received_data), &out_len));
-  ASSERT_EQ(out_len, 4);
-  for (size_t i = 0; i < out_len; i++) {
-    EXPECT_EQ(received_data[i], report_data[i]);
-  }
+    {
+      auto result = hidbus->GetReport(fuchsia_hardware_input::wire::ReportType::kFeature, 0x1, 4);
+      ASSERT_TRUE(result.ok());
+      ASSERT_TRUE(result->is_ok());
+      auto report = result->value()->data;
+      ASSERT_EQ(report.count(), 4);
+      for (size_t i = 0; i < report.count(); i++) {
+        EXPECT_EQ(report[i], report_data[i]);
+      }
+    }
+  });
 }
 
 }  // namespace i2c_hid

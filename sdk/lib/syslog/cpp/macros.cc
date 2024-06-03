@@ -102,14 +102,14 @@ bool LogEveryNSecondsState::ShouldLogInternal(uint32_t n) {
 uint32_t LogEveryNSecondsState::GetCounter() { return counter_; }
 
 uint8_t GetVlogVerbosity() {
-  LogSeverity min_level = GetMinLogLevel();
-  if (min_level < LOG_INFO && min_level > LOG_DEBUG) {
-    return LOG_INFO - min_level;
+  LogSeverity min_severity = GetMinLogSeverity();
+  if (min_severity < LOG_INFO && min_severity > LOG_DEBUG) {
+    return LOG_INFO - min_severity;
   }
   return 0;
 }
 
-bool ShouldCreateLogMessage(LogSeverity severity) { return severity >= GetMinLogLevel(); }
+bool ShouldCreateLogMessage(LogSeverity severity) { return severity >= GetMinLogSeverity(); }
 
 }  // namespace fuchsia_logging
 

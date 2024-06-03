@@ -7,7 +7,15 @@ use crate::{
     task::CurrentTask,
     vfs::socket::{iptables_utils, SocketDomain, SocketHandle, SocketType},
 };
-use starnix_logging::{log_warn, track_stub};
+use fidl_fuchsia_net_filter as fnet_filter;
+use fidl_fuchsia_net_filter_ext::{
+    sync::Controller, Change, CommitError, ControllerCreationError, ControllerId, Namespace,
+    PushChangesError, Resource, ResourceId, Routine,
+};
+use fuchsia_component::client::connect_to_protocol_sync;
+use fuchsia_zircon as zx;
+use itertools::Itertools;
+use starnix_logging::{log_debug, log_warn, track_stub};
 use starnix_uapi::{
     c_char, errno, error, errors::Errno, ip6t_get_entries, ip6t_getinfo, ip6t_replace,
     ipt_get_entries, ipt_getinfo, ipt_replace, nf_inet_hooks_NF_INET_NUMHOOKS,
@@ -17,7 +25,10 @@ use starnix_uapi::{
     IPT_SO_SET_ADD_COUNTERS, IPT_SO_SET_REPLACE, SOL_IP, SOL_IPV6,
 };
 use std::collections::HashMap;
+use thiserror::Error;
 use zerocopy::{AsBytes, FromBytes};
+
+const NAMESPACE_ID_PREFIX: &str = "starnix";
 
 /// Stores information about IP packet filter rules. Used to return information for
 /// IPT_SO_GET_INFO and IPT_SO_GET_ENTRIES.
@@ -40,11 +51,37 @@ type IpTablesName = [c_char; 32usize];
 pub struct IpTables {
     ipv4: HashMap<IpTablesName, IpTable>,
     ipv6: HashMap<IpTablesName, IpTable>,
+
+    // Controller to configure net filtering state.
+    //
+    // Initialized lazily with `get_controller`.
+    controller: Option<Controller>,
+}
+
+#[derive(Debug, Error)]
+enum GetControllerError {
+    #[error("failed to connect to protocol: {0}")]
+    ConnectToProtocol(anyhow::Error),
+    #[error("failed to create controller: {0}")]
+    ControllerCreation(ControllerCreationError),
 }
 
 impl IpTables {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    fn get_controller(&mut self) -> Result<&mut Controller, GetControllerError> {
+        Ok(self.controller.get_or_insert({
+            let control_proxy = connect_to_protocol_sync::<fnet_filter::ControlMarker>()
+                .map_err(GetControllerError::ConnectToProtocol)?;
+            Controller::new(
+                &control_proxy,
+                &ControllerId(NAMESPACE_ID_PREFIX.to_string()),
+                zx::Time::INFINITE,
+            )
+            .map_err(GetControllerError::ControllerCreation)?
+        }))
     }
 
     /// Returns `true` if the sockopt can be handled by [`IpTables`].
@@ -175,6 +212,7 @@ impl IpTables {
                 revision.revision = u8::MAX;
                 Ok(revision.as_bytes().to_vec())
             }
+
             _ => {
                 track_stub!(TODO("https://fxbug.dev/322875228"), "optname for network sockets");
                 Ok(vec![])
@@ -194,21 +232,7 @@ impl IpTables {
             // Replaces the [`IpTable`] specified by `user_opt`.
             IPT_SO_SET_REPLACE => {
                 if socket.domain == SocketDomain::Inet {
-                    let table = iptables_utils::parse_ipt_replace(&*bytes)?;
-
-                    let entry = IpTable {
-                        valid_hooks: table.ipt_replace.valid_hooks,
-                        hook_entry: table.ipt_replace.hook_entry,
-                        underflow: table.ipt_replace.underflow,
-                        num_entries: table.ipt_replace.num_entries,
-                        size: table.ipt_replace.size,
-                        entries: bytes[std::mem::size_of::<ipt_replace>()..].to_vec(),
-                        num_counters: table.ipt_replace.num_counters,
-                        counters: vec![],
-                    };
-                    self.ipv4.insert(table.ipt_replace.name, entry);
-
-                    Ok(())
+                    self.replace_ipv4_table(bytes)
                 } else {
                     let table =
                         ip6t_replace::read_from_prefix(&*bytes).ok_or_else(|| errno!(EINVAL))?;
@@ -252,7 +276,106 @@ impl IpTables {
                 }
                 error!(EINVAL)
             }
+
             _ => Ok(()),
         }
+    }
+
+    fn create_changes(
+        namespace: Namespace,
+        routines: Vec<Routine>,
+    ) -> impl Iterator<Item = Change> {
+        let namespace_changes = [
+            // Firstly, remove the existing table, along with all of its routines and rules.
+            // We will call Commit with idempotent=true so that this would succeed even if
+            // the table does not exist.
+            Change::Remove(ResourceId::Namespace(namespace.id.clone())),
+            // Recreate the table.
+            Change::Create(Resource::Namespace(namespace)),
+        ]
+        .into_iter();
+
+        let routine_changes = routines.into_iter().map(Resource::Routine).map(Change::Create);
+
+        namespace_changes.chain(routine_changes)
+    }
+
+    fn replace_ipv4_table(&mut self, bytes: Vec<u8>) -> Result<(), Errno> {
+        let table = iptables_utils::parse_ipt_replace(&bytes)?;
+        let changes = Self::create_changes(table.namespace, table.routines);
+
+        match self.get_controller() {
+            Err(e) => {
+                log_warn!(
+                    "IpTables: could not connect to fuchsia.net.filter.NamespaceController: {e}"
+                );
+            }
+            Ok(controller) => {
+                for chunk in &changes.chunks(fnet_filter::MAX_BATCH_SIZE as usize) {
+                    match controller.push_changes(chunk.collect(), zx::Time::INFINITE) {
+                        Ok(()) => {}
+                        Err(
+                            e @ (PushChangesError::CallMethod(_)
+                            | PushChangesError::TooManyChanges
+                            | PushChangesError::FidlConversion(_)),
+                        ) => {
+                            log_debug!(
+                                "IpTables: failed to call \
+                                fuchsia.net.filter.NamespaceController/PushChanges: {e}"
+                            );
+                            return error!(ECOMM);
+                        }
+                        Err(e @ PushChangesError::ErrorOnChange(_)) => {
+                            log_debug!(
+                                "IpTables: fuchsia.net.filter.NamespaceController/PushChanges \
+                                returned error: {e}"
+                            );
+                            return error!(EINVAL);
+                        }
+                    }
+                }
+
+                match controller.commit_idempotent(zx::Time::INFINITE) {
+                    Ok(()) => {}
+                    Err(e @ (CommitError::CallMethod(_) | CommitError::FidlConversion(_))) => {
+                        log_debug!(
+                            "IpTables: failed to call \
+                            fuchsia.net.filter.NamespaceController/Commit: {e}"
+                        );
+                        return error!(ECOMM);
+                    }
+                    Err(
+                        e @ (CommitError::RuleWithInvalidMatcher(_)
+                        | CommitError::RuleWithInvalidAction(_)
+                        | CommitError::TransparentProxyWithInvalidMatcher(_)
+                        | CommitError::CyclicalRoutineGraph(_)
+                        | CommitError::RedirectWithInvalidMatcher(_)
+                        | CommitError::ErrorOnChange(_)),
+                    ) => {
+                        log_debug!(
+                            "IpTables: fuchsia.net.filter.NamespaceController/Commit \
+                            returned error: {e}"
+                        );
+                        return error!(EINVAL);
+                    }
+                }
+            }
+        };
+
+        self.ipv4.insert(
+            table.ipt_replace.name,
+            IpTable {
+                valid_hooks: table.ipt_replace.valid_hooks,
+                hook_entry: table.ipt_replace.hook_entry,
+                underflow: table.ipt_replace.underflow,
+                num_entries: table.ipt_replace.num_entries,
+                size: table.ipt_replace.size,
+                entries: bytes[std::mem::size_of::<ipt_replace>()..].to_vec(),
+                num_counters: table.ipt_replace.num_counters,
+                counters: vec![],
+            },
+        );
+
+        Ok(())
     }
 }

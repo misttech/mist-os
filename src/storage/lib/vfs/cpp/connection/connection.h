@@ -63,7 +63,7 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   void Bind(zx::channel channel, OnUnbound on_unbound) {
     ZX_DEBUG_ASSERT(channel);
     ZX_DEBUG_ASSERT(vfs()->dispatcher());
-    ZX_DEBUG_ASSERT_MSG(InContainer(), "Connection must be managed by Vfs!");
+    ZX_DEBUG_ASSERT_MSG(this->InContainer(), "Connection must be managed by Vfs!");
     BindImpl(std::move(channel), std::move(on_unbound));
   }
 
@@ -73,9 +73,10 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   virtual zx::result<> Unbind() = 0;
 
   // Invokes |handler| with the Representation event for this connection. |query| specifies which
-  // attributes, if any, should be included with the event.
+  // attributes, if any, should be included with the event. Returns the result of |handler| once
+  // the given |query| is satisfied.
   virtual zx::result<> WithRepresentation(
-      fit::callback<void(fuchsia_io::wire::Representation)> handler,
+      fit::callback<zx::result<>(fuchsia_io::wire::Representation)> handler,
       std::optional<fuchsia_io::NodeAttributesQuery> query) const = 0;
 
   // Invokes |handler| with the NodeInfoDeprecated event for this connection.
@@ -94,7 +95,7 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   // |rights| are the resulting rights for this connection.
   Connection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, fuchsia_io::Rights rights);
 
-  fuchsia_io::Rights rights() const { return rights_; }
+  const fuchsia_io::Rights& rights() const { return rights_; }
 
   FuchsiaVfs* vfs() { return vfs_; }
 

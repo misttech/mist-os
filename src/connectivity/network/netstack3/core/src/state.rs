@@ -9,16 +9,10 @@ use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
 use crate::{
     api::CoreApi,
     context::{BuildableCoreContext, ContextProvider, CoreTimerContext, CtxPair},
-    device::{
-        arp::ArpCounters, DeviceCounters, DeviceId, DeviceLayerState, EthernetDeviceCounters,
-        PureIpDeviceCounters, WeakDeviceId,
-    },
+    device::{DeviceId, DeviceLayerState, WeakDeviceId},
     ip::{
-        self,
-        device::SlaacCounters,
-        icmp::{IcmpState, NdpCounters},
-        nud::NudCounters,
-        IpCounters, IpLayerIpExt, IpLayerTimerId, IpStateInner, Ipv4State, Ipv6State,
+        self, icmp::IcmpState, nud::NudCounters, IpLayerIpExt, IpLayerTimerId, IpStateInner,
+        Ipv4State, Ipv6State,
     },
     socket::datagram,
     time::TimerId,
@@ -35,15 +29,13 @@ pub struct StackStateBuilder {
 }
 
 impl StackStateBuilder {
-    #[cfg(test)]
     /// Get the builder for the transport layer state.
-    pub(crate) fn transport_builder(&mut self) -> &mut transport::TransportStateBuilder {
+    pub fn transport_builder(&mut self) -> &mut transport::TransportStateBuilder {
         &mut self.transport
     }
 
-    #[cfg(test)]
     /// Get the builder for the IPv4 state.
-    pub(crate) fn ipv4_builder(&mut self) -> &mut ip::Ipv4StateBuilder {
+    pub fn ipv4_builder(&mut self) -> &mut ip::Ipv4StateBuilder {
         &mut self.ipv4
     }
 
@@ -56,7 +48,7 @@ impl StackStateBuilder {
             transport: self.transport.build_with_ctx(bindings_ctx),
             ipv4: self.ipv4.build::<StackState<BC>, _, _>(bindings_ctx),
             ipv6: self.ipv6.build::<StackState<BC>, _, _>(bindings_ctx),
-            device: DeviceLayerState::new(),
+            device: Default::default(),
         }
     }
 }
@@ -85,45 +77,12 @@ impl<BT: BindingsTypes> StackState<BT> {
         CoreApi::new(CtxPair { core_ctx: CoreCtx::new(self), bindings_ctx })
     }
 
-    #[cfg(test)]
-    pub(crate) fn context(&self) -> crate::context::UnlockedCoreCtx<'_, BT> {
-        crate::context::UnlockedCoreCtx::new(self)
-    }
-
-    pub(crate) fn ip_counters<I: IpLayerIpExt>(&self) -> &IpCounters<I> {
-        I::map_ip(
-            IpInvariant(self),
-            |IpInvariant(state)| state.ipv4.as_ref().counters(),
-            |IpInvariant(state)| state.ipv6.as_ref().counters(),
-        )
-    }
-
     pub(crate) fn nud_counters<I: Ip>(&self) -> &NudCounters<I> {
         I::map_ip(
             IpInvariant(self),
             |IpInvariant(state)| state.device.nud_counters::<Ipv4>(),
             |IpInvariant(state)| state.device.nud_counters::<Ipv6>(),
         )
-    }
-
-    pub(crate) fn ndp_counters(&self) -> &NdpCounters {
-        &self.ipv6.icmp.ndp_counters
-    }
-
-    pub(crate) fn device_counters(&self) -> &DeviceCounters {
-        &self.device.counters()
-    }
-
-    pub(crate) fn ethernet_device_counters(&self) -> &EthernetDeviceCounters {
-        &self.device.ethernet_counters()
-    }
-
-    pub(crate) fn pure_ip_device_counters(&self) -> &PureIpDeviceCounters {
-        &self.device.pure_ip_counters()
-    }
-
-    pub(crate) fn arp_counters(&self) -> &ArpCounters {
-        &self.device.arp_counters()
     }
 
     pub(crate) fn udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
@@ -134,10 +93,6 @@ impl<BT: BindingsTypes> StackState<BT> {
         &self.transport.tcp_counters::<I>()
     }
 
-    pub(crate) fn slaac_counters(&self) -> &SlaacCounters {
-        &self.ipv6.slaac_counters
-    }
-
     pub(crate) fn inner_ip_state<I: IpLayerIpExt>(&self) -> &IpStateInner<I, DeviceId<BT>, BT> {
         I::map_ip((), |()| &self.ipv4.inner, |()| &self.ipv6.inner)
     }
@@ -146,6 +101,43 @@ impl<BT: BindingsTypes> StackState<BT> {
         &self,
     ) -> &IcmpState<I, WeakDeviceId<BT>, BT> {
         I::map_ip((), |()| &self.ipv4.icmp.inner, |()| &self.ipv6.icmp.inner)
+    }
+}
+
+// Stack state accessors for use in tests.
+// We don't want bindings using this directly.
+#[cfg(any(test, feature = "testutils"))]
+
+impl<BT: BindingsTypes> StackState<BT> {
+    /// Accessor for transport state.
+    pub fn transport(&self) -> &TransportLayerState<BT> {
+        &self.transport
+    }
+    /// Accessor for IPv4 state.
+    pub fn ipv4(&self) -> &Ipv4State<DeviceId<BT>, BT> {
+        &self.ipv4
+    }
+    /// Accessor for IPv6 state.
+    pub fn ipv6(&self) -> &Ipv6State<DeviceId<BT>, BT> {
+        &self.ipv6
+    }
+    /// Accessor for device state.
+    pub fn device(&self) -> &DeviceLayerState<BT> {
+        &self.device
+    }
+    /// Gets the core context.
+    pub fn context(&self) -> crate::context::UnlockedCoreCtx<'_, BT> {
+        crate::context::UnlockedCoreCtx::new(self)
+    }
+    /// Accessor for common IP state for `I`.
+    pub fn common_ip<I: IpLayerIpExt>(&self) -> &IpStateInner<I, DeviceId<BT>, BT> {
+        self.inner_ip_state::<I>()
+    }
+    /// Accessor for common ICMP state for `I`.
+    pub fn common_icmp<I: ip::IpExt + datagram::DualStackIpExt>(
+        &self,
+    ) -> &IcmpState<I, WeakDeviceId<BT>, BT> {
+        self.inner_icmp_state::<I>()
     }
 }
 

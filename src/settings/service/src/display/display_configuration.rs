@@ -8,6 +8,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::config::default_settings::DefaultSetting;
+
 /// Possible theme modes that can be found in
 /// `/config/data/display_configuration.json`.
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
@@ -37,20 +39,20 @@ pub struct ThemeConfiguration {
     pub theme_type: ConfigurationThemeType,
 }
 
+pub fn build_display_default_settings() -> DefaultSetting<DisplayConfiguration, &'static str> {
+    DefaultSetting::new(None, "/config/data/display_configuration.json")
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::config::default_settings::DefaultSetting;
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_display_configuration() {
-        let default_value = DefaultSetting::<DisplayConfiguration, &str>::new(
-            None,
-            "/config/data/display_configuration.json",
-        )
-        .load_default_value()
-        .expect("Invalid display configuration")
-        .expect("Unable to parse configuration");
+        let default_value = build_display_default_settings()
+            .load_default_value()
+            .expect("Invalid display configuration")
+            .expect("Unable to parse configuration");
 
         assert_eq!(default_value.theme.theme_mode, vec![ConfigurationThemeMode::Auto]);
         assert_eq!(default_value.theme.theme_type, ConfigurationThemeType::Light);

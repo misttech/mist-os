@@ -52,7 +52,7 @@ FlatlandScreenshot::FlatlandScreenshot(
       client_(std::move(client)),
       destroy_instance_function_(std::move(destroy_instance_function)),
       weak_factory_(this) {
-  zx_status_t status = fdio_service_connect("/svc/fuchsia.sysmem.Allocator",
+  zx_status_t status = fdio_service_connect("/svc/fuchsia.sysmem2.Allocator",
                                             sysmem_allocator_.NewRequest().TakeChannel().release());
   FX_DCHECK(status == ZX_OK);
 
@@ -66,6 +66,7 @@ FlatlandScreenshot::FlatlandScreenshot(
 
   // Create event and wait for initialization purposes.
   status = zx::event::create(0, &init_event_);
+  FX_DCHECK(status == ZX_OK);
   init_wait_ = std::make_shared<async::WaitOnce>(init_event_.get(), ZX_EVENT_SIGNALED);
 
   // Do all sysmem initialization up front.
@@ -73,32 +74,47 @@ FlatlandScreenshot::FlatlandScreenshot(
       allocation::BufferCollectionImportExportTokens::New();
 
   // Create sysmem tokens.
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr local_token;
-  sysmem_allocator_->AllocateSharedCollection(local_token.NewRequest());
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr local_token;
+  fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
+  allocate_shared_request.set_token_request(local_token.NewRequest());
+  sysmem_allocator_->AllocateSharedCollection(std::move(allocate_shared_request));
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr dup_token;
+  fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest dup_request;
+  dup_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
+  dup_request.set_token_request(dup_token.NewRequest());
+  status = local_token->Duplicate(std::move(dup_request));
   FX_DCHECK(status == ZX_OK);
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr dup_token;
-  status = local_token->Duplicate(std::numeric_limits<uint32_t>::max(), dup_token.NewRequest());
+  fuchsia::sysmem2::Node_Sync_Result sync_result;
+  status = local_token->Sync(&sync_result);
   FX_DCHECK(status == ZX_OK);
-  status = local_token->Sync();
-  FX_DCHECK(status == ZX_OK);
+  FX_DCHECK(sync_result.is_response());
 
-  fuchsia::sysmem::BufferCollectionPtr buffer_collection;
-  sysmem_allocator_->BindSharedCollection(std::move(local_token), buffer_collection.NewRequest());
+  fuchsia::sysmem2::BufferCollectionPtr buffer_collection;
+  fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.set_token(std::move(local_token));
+  bind_shared_request.set_buffer_collection_request(buffer_collection.NewRequest());
+  sysmem_allocator_->BindSharedCollection(std::move(bind_shared_request));
 
   if (display_rotation_ == 90 || display_rotation_ == 270) {
     std::swap(display_size_.width, display_size_.height);
   }
 
   // We only need 1 buffer since it gets re-used on every Take() call.
-  buffer_collection->SetConstraints(
-      true, utils::CreateDefaultConstraints(/*buffer_count=*/1, display_size_.width,
-                                            display_size_.height));
-  buffer_collection->SetName(/*priority=*/11u, "FlatlandScreenshotMemory");
+  fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  set_constraints_request.set_constraints(utils::CreateDefaultConstraints(
+      /*buffer_count=*/1, display_size_.width, display_size_.height));
+  buffer_collection->SetConstraints(std::move(set_constraints_request));
+
+  fuchsia::sysmem2::NodeSetNameRequest set_name_request;
+  set_name_request.set_priority(11u);
+  set_name_request.set_name("FlatlandScreenshotMemory");
+  buffer_collection->SetName(std::move(set_name_request));
 
   // Initialize Flatland allocator state.
   fuchsia::ui::composition::RegisterBufferCollectionArgs args = {};
   args.set_export_token(std::move(ref_pair.export_token));
-  args.set_buffer_collection_token(std::move(dup_token));
+  args.set_buffer_collection_token(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
+      dup_token.Unbind().TakeChannel()));
   args.set_usages(fuchsia::ui::composition::RegisterBufferCollectionUsages::SCREENSHOT);
 
   flatland_allocator_->RegisterBufferCollection(
@@ -133,16 +149,18 @@ FlatlandScreenshot::FlatlandScreenshot(
       FX_LOGS(ERROR) << "Invalid display rotation value: " << display_rotation_;
   }
 
-  buffer_collection->WaitForBuffersAllocated(
+  buffer_collection->WaitForAllBuffersAllocated(
       [weak_ptr = weak_factory_.GetWeakPtr(), buffer_collection = std::move(buffer_collection),
-       sc_args = std::move(sc_args)](zx_status_t status,
-                                     fuchsia::sysmem::BufferCollectionInfo_2 info) mutable {
+       sc_args =
+           std::move(sc_args)](fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result
+                                   wait_result) mutable {
         if (!weak_ptr) {
           return;
         }
-        FX_DCHECK(status == ZX_OK);
-        weak_ptr->buffer_collection_info_ = std::move(info);
-        buffer_collection->Close();
+        FX_DCHECK(wait_result.is_response());
+        weak_ptr->buffer_collection_info_ =
+            std::move(*wait_result.response().mutable_buffer_collection_info());
+        buffer_collection->Release();
 
         weak_ptr->screen_capturer_->Configure(
             std::move(sc_args),
@@ -271,24 +289,25 @@ zx::vmo FlatlandScreenshot::HandleFrameRender() {
   // which is not a multiple of 64. The next multiple would be 2432, which would mean the buffer
   // is actually a 608x1024 "pixel" buffer, since 2432/4=608. We must account for that 8 byte
   // padding when copying the bytes over to be inspected.
-  FX_CHECK(ZX_OK == buffer_collection_info_.buffers[kBufferIndex].vmo.op_range(
+  FX_CHECK(ZX_OK == buffer_collection_info_.buffers()[kBufferIndex].vmo().op_range(
                         ZX_VMO_OP_CACHE_CLEAN_INVALIDATE, 0,
-                        buffer_collection_info_.settings.buffer_settings.size_bytes, nullptr, 0));
+                        buffer_collection_info_.settings().buffer_settings().size_bytes(), nullptr,
+                        0));
 
-  FX_DCHECK(kBytesPerPixel == utils::GetBytesPerPixel(buffer_collection_info_.settings));
+  FX_DCHECK(kBytesPerPixel == utils::GetBytesPerPixel(buffer_collection_info_.settings()));
   const uint32_t pixels_per_row =
-      utils::GetPixelsPerRow(buffer_collection_info_.settings, display_size_.width);
+      utils::GetPixelsPerRow(buffer_collection_info_.settings(), display_size_.width);
   uint32_t bytes_per_row = pixels_per_row * kBytesPerPixel;
   uint32_t valid_bytes_per_row = display_size_.width * kBytesPerPixel;
 
   // SL4Fs requires vmo to be readable for transfer, so we need to copy into a new one.
   std::vector<uint8_t> buf(4, 0);
   const bool vmo_is_readable =
-      (buffer_collection_info_.buffers[kBufferIndex].vmo.read(buf.data(), 0, 1) == ZX_OK);
+      (buffer_collection_info_.buffers()[kBufferIndex].vmo().read(buf.data(), 0, 1) == ZX_OK);
 
   zx::vmo response_vmo;
   if (vmo_is_readable && bytes_per_row == valid_bytes_per_row) {
-    zx_status_t status = buffer_collection_info_.buffers[kBufferIndex].vmo.duplicate(
+    zx_status_t status = buffer_collection_info_.buffers()[kBufferIndex].vmo().duplicate(
         ZX_RIGHT_READ | ZX_RIGHT_MAP | ZX_RIGHT_TRANSFER | ZX_RIGHT_GET_PROPERTY, &response_vmo);
     FX_DCHECK(status == ZX_OK);
   } else {

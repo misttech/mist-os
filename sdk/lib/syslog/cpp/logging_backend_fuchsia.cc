@@ -433,7 +433,7 @@ void SetLogSettings(const fuchsia_logging::LogSettings& settings,
   LogState::Set(settings, tags, lock);
 }
 
-fuchsia_logging::LogSeverity GetMinLogLevel() {
+fuchsia_logging::LogSeverity GetMinLogSeverity() {
   GlobalStateLock lock;
   return lock->min_severity();
 }

@@ -25,15 +25,17 @@ pub enum OvernetConnectionError {
     NonFatal(#[source] anyhow::Error),
 }
 
-pub(crate) trait OvernetConnector: Debug {
+pub trait OvernetConnector: Debug {
     /// Attempts a connection to an Overnet device. This function, if it fails and returns a
     /// `NonFatal` error, should be capable of running again. It will be the caller's responsibility
     /// to determine whether and how often to re-attempt connecting when receiving a NonFatal
     /// error.
-    async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError>;
+    fn connect(
+        &mut self,
+    ) -> impl Future<Output = Result<OvernetConnection, OvernetConnectionError>>;
 }
 
-pub(crate) struct OvernetConnection {
+pub struct OvernetConnection {
     // Currently because of the implementation of ffx_ssh::parse::parse_ssh_output's
     // implementation, this needs to be a buffered reader.
     pub(crate) output: Box<dyn AsyncBufRead + Unpin>,

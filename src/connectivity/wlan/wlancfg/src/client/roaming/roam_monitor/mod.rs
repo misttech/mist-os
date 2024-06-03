@@ -62,12 +62,11 @@ impl RoamMonitorApi for RoamMonitor {
         stats: fidl_internal::SignalReportIndication,
     ) -> Result<u8, anyhow::Error> {
         self.connection_data.signal_data.update_with_new_measurement(stats.rssi_dbm, stats.snr_db);
-        // Update velocity using the smoothed RSSI, to reduce noise.
+
+        // Update velocity with EWMA signal, to smooth out noise.
         self.connection_data.rssi_velocity.update(self.connection_data.signal_data.ewma_rssi.get());
 
-        // Send RSSI and RSSI velocity metrics
-        self.telemetry_sender.send(TelemetryEvent::OnSignalReport {
-            ind: stats,
+        self.telemetry_sender.send(TelemetryEvent::OnSignalVelocityUpdate {
             rssi_velocity: self.connection_data.rssi_velocity.get(),
         });
 
@@ -148,11 +147,10 @@ mod test {
     use {
         super::*,
         crate::{
-            client::connection_selection::EWMA_SMOOTHING_FACTOR,
+            telemetry::EWMA_SMOOTHING_FACTOR_FOR_METRICS,
             util::{pseudo_energy::RssiVelocity, testing::generate_connect_selection},
         },
         fidl_fuchsia_wlan_internal as fidl_internal,
-        fuchsia_async::TestExecutor,
         test_util::{assert_gt, assert_lt},
         wlan_common::{assert_variant, channel},
     };
@@ -163,7 +161,7 @@ mod test {
             EwmaSignalData::new(
                 LOCAL_ROAM_THRESHOLD_RSSI_2G - 1.0,
                 LOCAL_ROAM_THRESHOLD_SNR_2G - 1.0,
-                EWMA_SMOOTHING_FACTOR,
+                EWMA_SMOOTHING_FACTOR_FOR_METRICS,
             ),
             0.0,
             channel::Channel::new(11, channel::Cbw::Cbw20),
@@ -175,7 +173,7 @@ mod test {
             EwmaSignalData::new(
                 LOCAL_ROAM_THRESHOLD_RSSI_2G + 1.0,
                 LOCAL_ROAM_THRESHOLD_SNR_2G + 1.0,
-                EWMA_SMOOTHING_FACTOR,
+                EWMA_SMOOTHING_FACTOR_FOR_METRICS,
             ),
             0.0,
             channel::Channel::new(11, channel::Cbw::Cbw20),
@@ -189,7 +187,7 @@ mod test {
             EwmaSignalData::new(
                 LOCAL_ROAM_THRESHOLD_RSSI_5G - 1.0,
                 LOCAL_ROAM_THRESHOLD_SNR_5G - 1.0,
-                EWMA_SMOOTHING_FACTOR,
+                EWMA_SMOOTHING_FACTOR_FOR_METRICS,
             ),
             0.0,
             channel::Channel::new(36, channel::Cbw::Cbw80),
@@ -201,7 +199,7 @@ mod test {
             EwmaSignalData::new(
                 LOCAL_ROAM_THRESHOLD_RSSI_5G + 1.0,
                 LOCAL_ROAM_THRESHOLD_SNR_5G + 1.0,
-                EWMA_SMOOTHING_FACTOR,
+                EWMA_SMOOTHING_FACTOR_FOR_METRICS,
             ),
             0.0,
             channel::Channel::new(36, channel::Cbw::Cbw80),
@@ -246,7 +244,8 @@ mod test {
         let init_rssi = -75;
         let init_snr = 15;
         let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
-        let mut signal_data = EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR);
+        let mut signal_data =
+            EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR_FOR_METRICS);
         let connection_data = ConnectionData {
             currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
             signal_data,
@@ -280,30 +279,27 @@ mod test {
             assert_eq!(req.connection_data.signal_data, signal_data);
         });
 
-        // Verify that a telemerty event is sent for the RSSI and RSSI velocity
-        assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::OnSignalReport {ind, rssi_velocity})) => {
-            assert_eq!(ind, signal_report);
-            // verify that RSSI velocity is negative since the signal report RSSI is lower.
-            assert_lt!(rssi_velocity, 0.0);
-        });
+        // Verify that a telemetry event is sent for the RSSI velocity
+        assert_variant!(
+            test_values.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::OnSignalVelocityUpdate { .. }))
+        );
     }
 
     #[fuchsia::test]
-    fn test_roam_monitor_tracks_signal_velocity_and_sends_telemetry_events() {
-        // RoamMonitor should keep track of the RSSI velocity which will be used to evaluate
-        // connection quality and be sent to telemetry.
-        let mut _exec = TestExecutor::new();
+    fn test_roam_monitor_sends_velocity_telemetry_events() {
+        let mut _exec = fasync::TestExecutor::new();
         let mut test_values = roam_monitor_test_setup();
 
-        let init_rssi = -70;
-        let init_snr = 20;
+        let init_rssi = -40;
+        let init_snr = 50;
         let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
-        let signal_data = EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR);
+        let signal_data = EwmaSignalData::new(init_rssi, init_snr, 1);
 
         let connection_data = ConnectionData {
             currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
             signal_data,
-            rssi_velocity: RssiVelocity::new(0.0),
+            rssi_velocity: RssiVelocity::new(-40),
             roam_decision_data: roam_data,
         };
         let mut roam_monitor = RoamMonitor::new(
@@ -322,9 +318,8 @@ mod test {
             .handle_connection_stats(signal_report_1)
             .expect("Failed to get connection stats");
 
-        // Verify that a telemerty event is sent for the RSSI and RSSI velocity
-        assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::OnSignalReport {ind, rssi_velocity})) => {
-            assert_eq!(ind, signal_report_1);
+        // Verify that a telemetry event is sent for the RSSI velocity
+        assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::OnSignalVelocityUpdate {rssi_velocity})) => {
             // verify that RSSI velocity is negative since the signal report RSSI is lower.
             assert_lt!(rssi_velocity, 0.0);
         });
@@ -339,8 +334,7 @@ mod test {
             .handle_connection_stats(signal_report_2)
             .expect("Failed to get connection stats");
 
-        assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::OnSignalReport {ind, rssi_velocity})) => {
-            assert_eq!(ind, signal_report_2);
+        assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::OnSignalVelocityUpdate {rssi_velocity})) => {
             // verify that RSSI velocity is negative since the signal report RSSI is lower.
             assert_gt!(rssi_velocity, 0.0);
         });
@@ -357,7 +351,8 @@ mod test {
         let init_rssi = -80;
         let init_snr = 10;
         let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
-        let signal_data = EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR);
+        let signal_data =
+            EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR_FOR_METRICS);
         let connection_data = ConnectionData {
             currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
             signal_data,

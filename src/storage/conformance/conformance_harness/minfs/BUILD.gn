@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components.gni")
+import("//src/storage/conformance/storage_conformance_test.gni")
 
 executable("bin") {
   testonly = true
@@ -27,19 +27,7 @@ executable("bin") {
   ]
 }
 
-fuchsia_component("minfs-harness") {
-  testonly = true
-  manifest = "meta/minfs_harness.cml"
-  deps = [ ":bin" ]
-}
-
-fuchsia_component("minfs-test") {
-  testonly = true
-  manifest = "//src/storage/conformance/meta/minfs_io1_conformance_test.cml"
-  deps = [ "//src/storage/conformance:io1_conformance_test" ]
-}
-
-fuchsia_test_package("minfs-io1-conformance-test") {
-  test_components = [ ":minfs-test" ]
-  deps = [ ":minfs-harness" ]
+storage_conformance_test("minfs") {
+  harness_manifest = "meta/minfs_harness.cml"
+  harness_binary = ":bin"
 }

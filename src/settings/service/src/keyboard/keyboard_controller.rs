@@ -11,14 +11,17 @@ use crate::handler::setting_handler::{
 use crate::keyboard::types::{KeyboardInfo, KeymapId};
 use crate::trace;
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
-use settings_storage::storage_factory::StorageAccess;
+use settings_storage::storage_factory::{NoneT, StorageAccess};
 
 use async_trait::async_trait;
 
 impl DeviceStorageCompatible for KeyboardInfo {
+    type Loader = NoneT;
     const KEY: &'static str = "keyboard_info";
+}
 
-    fn default_value() -> Self {
+impl Default for KeyboardInfo {
+    fn default() -> Self {
         // The US_QWERTY keymap is the default if no settings are ever applied.
         KeyboardInfo { keymap: Some(KeymapId::UsQwerty), autorepeat: None }
     }
@@ -36,7 +39,8 @@ pub struct KeyboardController {
 
 impl StorageAccess for KeyboardController {
     type Storage = DeviceStorage;
-    const STORAGE_KEYS: &'static [&'static str] = &[KeyboardInfo::KEY];
+    type Data = KeyboardInfo;
+    const STORAGE_KEY: &'static str = KeyboardInfo::KEY;
 }
 
 #[async_trait]

@@ -24,7 +24,7 @@ use {
     fuchsia_async::TestExecutor,
     fuchsia_sync as fsync, fuchsia_zircon as zx,
     futures::{channel::mpsc, pin_mut, StreamExt},
-    moniker::{Moniker, MonikerBase},
+    moniker::Moniker,
     router_error::{DowncastErrorForTest, RouterError},
     routing::{error::RoutingError, RouteRequest},
     std::path::Path,

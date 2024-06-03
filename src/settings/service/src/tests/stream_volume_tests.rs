@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::audio::build_audio_default_settings;
+use crate::audio::types::AudioInfo;
 use crate::audio::types::AudioStreamType;
 #[cfg(test)]
 use crate::audio::{create_default_audio_stream, StreamVolumeControl};
@@ -16,11 +18,20 @@ use futures::lock::Mutex;
 use futures::StreamExt;
 use std::sync::Arc;
 
+fn default_audio_info() -> AudioInfo {
+    let mut audio_configuration = build_audio_default_settings();
+    audio_configuration
+        .load_default_value()
+        .expect("config should exist and parse for test")
+        .unwrap()
+}
+
 // Returns a registry populated with the AudioCore service.
 async fn create_service() -> Arc<Mutex<ServiceRegistry>> {
     let service_registry = ServiceRegistry::create();
-    let audio_core_service_handle =
-        audio_core_service::Builder::new().set_suppress_client_errors(true).build();
+    let audio_core_service_handle = audio_core_service::Builder::new(default_audio_info())
+        .set_suppress_client_errors(true)
+        .build();
     service_registry.lock().await.register_service(audio_core_service_handle.clone());
     service_registry
 }
@@ -74,8 +85,9 @@ async fn test_drop_thread() {
 #[fuchsia::test(allow_stalls = false)]
 async fn test_detect_early_exit() {
     let service_registry = ServiceRegistry::create();
-    let audio_core_service_handle =
-        audio_core_service::Builder::new().set_suppress_client_errors(true).build();
+    let audio_core_service_handle = audio_core_service::Builder::new(default_audio_info())
+        .set_suppress_client_errors(true)
+        .build();
     service_registry.lock().await.register_service(audio_core_service_handle.clone());
 
     let service_context = ServiceContext::new(Some(ServiceRegistry::serve(service_registry)), None);

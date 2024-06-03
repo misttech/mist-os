@@ -19,13 +19,15 @@ namespace scenic_impl {
 bool ImportBufferCollection(
     allocation::GlobalBufferCollectionId buffer_collection_id,
     const fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
-    fuchsia::sysmem::BufferCollectionTokenSyncPtr token,
+    fuchsia::sysmem2::BufferCollectionTokenSyncPtr token,
     const fuchsia::hardware::display::types::ImageBufferUsage& image_buffer_usage) {
   const fuchsia::hardware::display::BufferCollectionId display_buffer_collection_id =
       allocation::ToDisplayBufferCollectionId(buffer_collection_id);
   fuchsia::hardware::display::Coordinator_ImportBufferCollection_Result result;
-  zx_status_t status = display_coordinator->ImportBufferCollection(display_buffer_collection_id,
-                                                                   std::move(token), &result);
+  zx_status_t status = display_coordinator->ImportBufferCollection(
+      display_buffer_collection_id,
+      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(token.Unbind().TakeChannel()),
+      &result);
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to call FIDL ImportBufferCollection: "
                    << zx_status_get_string(status);

@@ -567,7 +567,7 @@ mod tests {
     use super::{MetricConfig, SamplerConfigBuilder};
     use crate::ComponentIdInfo;
     use component_id_index::InstanceId;
-    use moniker::{Moniker, MonikerBase};
+    use moniker::Moniker;
     use std::fs;
 
     #[fuchsia::test]

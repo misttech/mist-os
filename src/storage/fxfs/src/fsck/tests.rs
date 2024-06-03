@@ -479,7 +479,7 @@ async fn test_allocation_mismatch() {
             let layer_set = allocator.tree().layer_set();
             let mut merger = layer_set.merger();
             let iter = allocator
-                .filter(merger.seek(Bound::Unbounded).await.expect("seek failed"))
+                .filter(merger.seek(Bound::Unbounded).await.expect("seek failed"), false)
                 .await
                 .expect("iter failed");
             let ItemRef { key: AllocatorKey { device_range }, .. } =
@@ -559,7 +559,7 @@ async fn test_volume_allocation_mismatch() {
             let layer_set = allocator.tree().layer_set();
             let mut merger = layer_set.merger();
             let mut iter = allocator
-                .filter(merger.seek(Bound::Unbounded).await.expect("seek failed"))
+                .filter(merger.seek(Bound::Unbounded).await.expect("seek failed"), false)
                 .await
                 .expect("iter failed");
             loop {
@@ -613,7 +613,7 @@ async fn test_missing_allocation() {
             let layer_set = allocator.tree().layer_set();
             let mut merger = layer_set.merger();
             let iter = allocator
-                .filter(merger.seek(Bound::Unbounded).await.expect("seek failed"))
+                .filter(merger.seek(Bound::Unbounded).await.expect("seek failed"), false)
                 .await
                 .expect("iter failed");
             let iter = CoalescingIterator::new(iter).await.expect("filter failed");

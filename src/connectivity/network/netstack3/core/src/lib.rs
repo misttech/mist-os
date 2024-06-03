@@ -22,9 +22,6 @@
 // this module.
 extern crate fakealloc as alloc;
 
-// TODO(https://github.com/dtolnay/thiserror/pull/64): remove this module.
-extern crate fakestd as std;
-
 mod api;
 mod context;
 mod counters;
@@ -33,84 +30,49 @@ mod marker;
 mod state;
 mod time;
 mod transport;
-mod uninstantiable;
 
 #[cfg(any(test, benchmark))]
 pub mod benchmarks;
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil;
 
-pub(crate) mod algorithm {
-    pub(crate) use netstack3_base::{simple_randomized_port_alloc, PortAllocImpl};
-}
-pub(crate) mod convert {
-    pub(crate) use netstack3_base::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};
-}
-
-pub(crate) mod data_structures {
-    pub(crate) mod ref_counted_hash_map {
-        pub(crate) use netstack3_base::ref_counted_hash_map::{
-            InsertResult, RefCountedHashSet, RemoveResult,
-        };
-    }
-    pub(crate) mod socketmap {
-        pub(crate) use netstack3_base::socketmap::{IterShadows, SocketMap, Tagged};
-    }
-    pub(crate) mod token_bucket {
-        pub(crate) use netstack3_base::TokenBucket;
-    }
-}
-
 /// The device layer.
 pub mod device {
-    pub(crate) mod api;
-    pub(crate) mod arp;
-    pub(crate) mod base;
-    pub(crate) mod config;
-    pub(crate) mod ethernet;
-    pub(crate) mod id;
-    pub(crate) mod integration;
-    pub(crate) mod loopback;
-    pub(crate) mod pure_ip;
-    pub(crate) mod queue;
-    pub(crate) mod socket;
-    mod state;
+    #[path = "."]
+    pub(crate) mod integration {
+        mod base;
+        mod ethernet;
+        mod loopback;
+        mod pure_ip;
+        mod socket;
 
-    pub(crate) mod link {
-        pub(crate) use netstack3_base::LinkDevice;
-        #[cfg(test)]
-        pub(crate) mod testutil {
-            pub(crate) use netstack3_base::testutil::{FakeLinkDevice, FakeLinkDeviceId};
-        }
+        pub(crate) use base::{
+            with_device_state, with_device_state_and_core_ctx, with_ip_device_state,
+            with_ip_device_state_and_core_ctx,
+        };
     }
 
-    #[cfg(test)]
-    mod integration_tests;
-
-    pub(crate) use base::*;
-    pub(crate) use id::*;
+    // TODO(https://fxbug.dev/342685842): Remove this re-export.
+    pub(crate) use netstack3_device::*;
 
     // Re-exported types.
-    pub use base::{
-        DeviceClassMatcher, DeviceIdAndNameMatcher, DeviceLayerEventDispatcher,
-        DeviceLayerStateTypes, DeviceSendFrameError,
-    };
-    pub use config::{
-        ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration, DeviceConfigurationUpdate,
-        DeviceConfigurationUpdateError, NdpConfiguration, NdpConfigurationUpdate,
-    };
     pub use ethernet::{
-        EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize, RecvEthernetFrameMeta,
+        EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
+        MaxEthernetFrameSize, RecvEthernetFrameMeta,
     };
-    pub use id::{DeviceId, DeviceProvider, EthernetDeviceId, EthernetWeakDeviceId, WeakDeviceId};
     pub use loopback::{LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId};
+    pub use netstack3_device::{
+        ArpConfiguration, ArpConfigurationUpdate, DeviceClassMatcher, DeviceConfiguration,
+        DeviceConfigurationUpdate, DeviceConfigurationUpdateError, DeviceId,
+        DeviceIdAndNameMatcher, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceProvider,
+        DeviceSendFrameError, NdpConfiguration, NdpConfigurationUpdate, WeakDeviceId,
+    };
     pub use pure_ip::{
         PureIpDevice, PureIpDeviceCreationProperties, PureIpDeviceId,
         PureIpDeviceReceiveFrameMetadata, PureIpHeaderParams, PureIpWeakDeviceId,
     };
     pub use queue::{
-        rx::ReceiveQueueBindingsContext,
-        tx::{TransmitQueueBindingsContext, TransmitQueueConfiguration},
+        ReceiveQueueBindingsContext, TransmitQueueBindingsContext, TransmitQueueConfiguration,
     };
 }
 
@@ -144,7 +106,6 @@ pub mod filter {
     };
     pub(crate) use netstack3_filter::{
         FilterContext, FilterImpl, FilterIpContext, IpPacket, NatContext, State,
-        TransportPacketSerializer,
     };
 }
 
@@ -160,32 +121,17 @@ pub mod icmp {
 
 /// The Internet Protocol, versions 4 and 6.
 pub mod ip {
-    #[path = "device/integration.rs"]
-    pub(crate) mod device_integration;
-    mod integration;
-    #[path = "raw/integration.rs"]
-    mod raw_integration;
+    #[path = "."]
+    pub(crate) mod integration {
+        mod base;
+        mod device;
+        mod raw;
 
+        pub(crate) use device::{CoreCtxWithIpDeviceConfiguration, IpAddrCtxSpec};
+    }
+
+    // TODO(https://fxbug.dev/342685842): Remove this re-export.
     pub(crate) use netstack3_ip::*;
-
-    #[cfg(test)]
-    #[path = "device/integration_tests"]
-    mod device_integration_tests {
-        mod base;
-        mod ndp;
-        mod nud;
-        mod route_discovery;
-        mod slaac;
-    }
-
-    #[cfg(test)]
-    mod integration_tests {
-        mod base;
-        mod forwarding;
-        mod gmp;
-        mod icmp;
-        mod socket;
-    }
 
     // Re-exported types.
     pub use device::{
@@ -198,8 +144,8 @@ pub mod ip {
     };
     pub use netstack3_ip::{IpLayerEvent, ResolveRouteError};
     pub use raw::{
-        RawIpSocketId, RawIpSocketProtocol, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes,
-        WeakRawIpSocketId,
+        RawIpSocketId, RawIpSocketProtocol, RawIpSocketSendToError, RawIpSocketsBindingsContext,
+        RawIpSocketsBindingsTypes, WeakRawIpSocketId,
     };
     pub use socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError};
 }
@@ -225,18 +171,9 @@ pub mod routes {
 
 /// Common types for dealing with sockets.
 pub mod socket {
+    // TODO(https://fxbug.dev/342685842): Remove these re-exports.
+    pub(crate) use netstack3_base::socket::{MaybeDualStack, SocketIpAddr};
     pub(crate) use netstack3_ip::datagram;
-
-    pub(crate) use netstack3_base::socket::{
-        AddrEntry, AddrVec, AddrVecIter, Bound, BoundSocketMap, ConnAddr, ConnInfoAddr, ConnIpAddr,
-        DualStackIpExt, DualStackListenerIpAddr, DualStackLocalIp, DualStackRemoteIp, EitherStack,
-        FoundSockets, IncompatibleError, InsertError, Inserter, ListenerAddr, ListenerAddrInfo,
-        ListenerIpAddr, MaybeDualStack, RemoveResult, SocketAddrType, SocketDeviceUpdate,
-        SocketDeviceUpdateNotAllowedError, SocketIpAddr, SocketIpAddrExt, SocketIpExt,
-        SocketMapAddrSpec, SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec,
-        SocketMapConflictPolicy, SocketMapStateSpec, SocketMapUpdateSharingPolicy,
-        SocketZonedAddrExt, UpdateSharingError,
-    };
 
     pub use datagram::{
         ConnInfo, ConnectError, ExpectedConnError, ExpectedUnboundError, ListenerInfo,
@@ -269,18 +206,12 @@ pub mod sync {
 
 /// Methods for dealing with TCP sockets.
 pub mod tcp {
-    pub use crate::transport::tcp::{
-        buffer::{
-            Buffer, BufferLimits, IntoBuffers, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload,
-        },
-        segment::Payload,
-        socket::{
-            AcceptError, BindError, BoundInfo, ConnectError, ConnectionInfo, ListenError,
-            ListenerNotifier, NoConnection, SetDeviceError, SetReuseAddrError, SocketAddr,
-            SocketInfo, TcpBindingsTypes, TcpSocketId, UnboundInfo,
-        },
-        state::Takeable,
-        BufferSizes, ConnectionError, SocketOptions, DEFAULT_FIN_WAIT2_TIMEOUT,
+    pub use netstack3_tcp::{
+        AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
+        ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
+        Payload, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload, SetDeviceError,
+        SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, Takeable, TcpBindingsTypes,
+        TcpSocketId, UnboundInfo, DEFAULT_FIN_WAIT2_TIMEOUT,
     };
 }
 
@@ -291,7 +222,7 @@ pub mod types {
 
 /// Methods for dealing with UDP sockets.
 pub mod udp {
-    pub use crate::transport::udp::{
+    pub use netstack3_udp::{
         SendError, SendToError, UdpBindingsTypes, UdpReceiveBindingsContext, UdpRemotePort,
         UdpSocketId,
     };
@@ -309,5 +240,5 @@ pub use state::{StackState, StackStateBuilder};
 pub use time::{Instant, TimerId};
 
 // Re-export useful macros.
-pub(crate) use netstack3_base::trace_duration;
+pub use netstack3_device::for_any_device_id;
 pub use netstack3_macros::context_ip_bounds;

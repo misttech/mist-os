@@ -53,6 +53,36 @@ func TestStrippedBuildIDs(t *testing.T) {
 	}
 }
 
+func TestEtRelBuildIDs(t *testing.T) {
+	testfile := filepath.Join(*testDataDir, "cycle.elf")
+	f, err := os.Open(testfile)
+	if err != nil {
+		t.Fatal("from os.Open: ", err)
+	}
+	buildIDs, err := GetBuildIDs(testfile, f)
+	if err != nil {
+		t.Fatal("from GetBuildIDs: ", err)
+	}
+	if len(buildIDs) != 0 {
+		t.Fatal("expected no build IDs but got ", buildIDs)
+	}
+}
+
+func TestEmptyEtRelBuildIDs(t *testing.T) {
+	testfile := filepath.Join(*testDataDir, "empty-relocatable.elf")
+	f, err := os.Open(testfile)
+	if err != nil {
+		t.Fatal("from os.Open: ", err)
+	}
+	buildIDs, err := GetBuildIDs(testfile, f)
+	if err != nil {
+		t.Fatal("from GetBuildIDs: ", err)
+	}
+	if len(buildIDs) != 0 {
+		t.Fatal("expected no build IDs but got ", buildIDs)
+	}
+}
+
 func TestHasMagic(t *testing.T) {
 	{
 		buff := []byte("\177ELF...")

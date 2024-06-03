@@ -23,7 +23,7 @@ pub struct RawIpSocketLockedState<I: Ip, D: WeakDeviceIdentifier> {
     /// not obstruct removal of the device.
     pub(crate) bound_device: Option<D>,
     // TODO(https://fxbug.dev/42175797): Remove once IP fields are held.
-    _delete_me: IpVersionMarker<I>,
+    pub(crate) _marker: IpVersionMarker<I>,
 }
 
 /// State held by a raw IP socket.

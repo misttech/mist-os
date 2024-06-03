@@ -239,7 +239,6 @@ mod test {
     use {
         super::*, assert_matches::assert_matches, fidl::endpoints::create_proxy_and_stream,
         fidl::HandleBased, fidl_fuchsia_process as fprocess, futures::TryStreamExt,
-        moniker::MonikerBase,
     };
 
     fn lifecycle_create_instance(

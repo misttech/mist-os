@@ -71,9 +71,11 @@ class UsbHidbus : public DeviceType,
   zx_status_t Bind(ddk::UsbProtocolClient usbhid);
 
  private:
+  void Stop();
+
   component::OutgoingDirectory outgoing_;
-  fidl::ServerBindingGroup<fuchsia_hardware_hidbus::Hidbus> binding_;
-  std::atomic_uint32_t start_ = 0;
+  std::optional<fidl::ServerBinding<fuchsia_hardware_hidbus::Hidbus>> binding_;
+  std::atomic_bool started_ = false;
 
   std::optional<usb::InterfaceList> usb_interface_list_;
 

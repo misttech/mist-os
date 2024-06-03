@@ -62,6 +62,9 @@ class ClockDevice : public ClockDeviceType, public fidl::WireServer<fuchsia_hard
   void GetNumInputs(GetNumInputsCompleter::Sync& completer) override;
   void GetInput(GetInputCompleter::Sync& completer) override;
 
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_clock::Clock> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
+
   const ClockImplProxy clock_;
   const uint32_t id_;
 

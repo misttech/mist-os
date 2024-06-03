@@ -11,20 +11,28 @@ mod data;
 mod dict;
 mod directory;
 mod handle;
-mod open;
 mod receiver;
-mod registry;
 mod router;
 mod unit;
 
-pub use self::capability::{Capability, CapabilityTrait, ConversionError, RemoteError};
+// TODO(340891837): open only builds on target due to its reliance on the vfs library. There's no
+// point investing time into reducing that reliance, as open is going to be deleted.
+#[cfg(target_os = "fuchsia")]
+mod open;
+
+#[cfg(target_os = "fuchsia")]
+mod registry;
+
+pub use self::capability::{Capability, ConversionError, RemoteError};
 pub use self::component::{WeakComponentToken, WeakComponentTokenAny};
 pub use self::connector::{Connectable, Connector, Message};
 pub use self::data::Data;
 pub use self::dict::{Dict, Key as DictKey};
 pub use self::directory::Directory;
 pub use self::handle::OneShotHandle;
-pub use self::open::Open;
 pub use self::receiver::Receiver;
 pub use self::router::{Request, Routable, Router};
 pub use self::unit::Unit;
+
+#[cfg(target_os = "fuchsia")]
+pub use {capability::CapabilityTrait, open::Open};

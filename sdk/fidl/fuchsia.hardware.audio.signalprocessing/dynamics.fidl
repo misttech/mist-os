@@ -64,7 +64,7 @@ type DynamicsSupportedControls = flexible bits : uint64 {
     LINKED_CHANNELS = 0x80;
 
     /// If included, the `threshold_type` parameter can be changed.
-    @available(removed=20)
+    @available(replaced=20, renamed="THRESHOLD_TYPE")
     THREDSHOLD_TYPE = 0x100;
 
     /// If included, the `threshold_type` parameter can be changed.

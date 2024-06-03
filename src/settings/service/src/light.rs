@@ -6,3 +6,5 @@ pub mod light_controller;
 pub mod light_fidl_handler;
 pub mod light_hardware_configuration;
 pub mod types;
+
+pub use light_hardware_configuration::build_light_default_settings;

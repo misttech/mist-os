@@ -9,12 +9,12 @@ use {
         context::ModelContext,
         environment::Environment,
         start::Start,
-        structured_dict::ComponentInput,
         token::InstanceRegistry,
     },
     cm_config::RuntimeConfig,
     cm_types::Url,
     errors::ModelError,
+    routing::bedrock::structured_dict::ComponentInput,
     std::sync::Arc,
     tracing::warn,
 };
@@ -137,7 +137,6 @@ pub mod tests {
         crate::model::{
             actions::{ShutdownAction, ShutdownType},
             model::{ActionsManager, Model},
-            structured_dict::ComponentInput,
             testing::test_helpers::{TestEnvironmentBuilder, TestModelResult},
         },
         async_trait::async_trait,
@@ -145,6 +144,7 @@ pub mod tests {
         errors::ModelError,
         hooks::{Event, EventType, Hook, HooksRegistration},
         moniker::Moniker,
+        routing::bedrock::structured_dict::ComponentInput,
         std::sync::{Arc, Weak},
     };
 

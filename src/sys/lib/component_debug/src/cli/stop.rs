@@ -33,11 +33,8 @@ pub async fn stop_cmd<W: std::io::Write>(
 #[cfg(test)]
 mod test {
     use {
-        super::*,
-        crate::test_utils::serve_realm_query_instances,
-        fidl::endpoints::create_proxy_and_stream,
-        futures::TryStreamExt,
-        moniker::{Moniker, MonikerBase},
+        super::*, crate::test_utils::serve_realm_query_instances,
+        fidl::endpoints::create_proxy_and_stream, futures::TryStreamExt, moniker::Moniker,
     };
 
     fn setup_fake_lifecycle_controller(

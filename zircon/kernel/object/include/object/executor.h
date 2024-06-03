@@ -40,6 +40,8 @@ class Executor {
     return memory_watchdog_.GetMemPressureEvent(kind);
   }
 
+  MemoryWatchdog& GetMemoryWatchdog() { return memory_watchdog_; }
+
   // Start watching the root job, taking a system-level action (such as restart) if
   // all its children are removed.
   //

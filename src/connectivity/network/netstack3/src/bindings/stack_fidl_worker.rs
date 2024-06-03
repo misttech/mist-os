@@ -126,7 +126,7 @@ impl StackFidlWorker {
         self.netstack
             .ctx
             .bindings_ctx()
-            .apply_main_table_route_change_either(routes::ChangeEither::global_add(entry))
+            .apply_route_change_either(routes::ChangeEither::global_add(entry))
             .await
             .map_err(|err| match err {
                 routes::ChangeError::DeviceRemoved => fidl_net_stack::Error::InvalidArgs,
@@ -150,7 +150,7 @@ impl StackFidlWorker {
         let bindings_ctx = self.netstack.ctx.bindings_ctx();
         if let Ok(subnet) = subnet.try_into_core() {
             bindings_ctx
-                .apply_main_table_route_change_either(match subnet {
+                .apply_route_change_either(match subnet {
                     net_types::ip::SubnetEither::V4(subnet) => routes::Change::RouteOp(
                         routes::RouteOp::RemoveToSubnet(subnet),
                         routes::SetMembership::Global,

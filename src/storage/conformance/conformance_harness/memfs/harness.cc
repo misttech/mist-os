@@ -76,18 +76,17 @@ class TestHarness : public fidl::Server<fio_test::Io1Harness> {
     fio_test::Io1Config config;
 
     // Supported options
+    config.supports_open2(true);
     config.supports_get_backing_memory(true);
     config.supports_get_token(true);
-    config.supports_create(true);
-    config.supports_rename(true);
-    config.supports_link(true);
-    config.supports_unlink(true);
-    config.supports_directory_watchers(true);
     config.supports_append(true);
+    config.supports_modify_directory(true);
     config.supported_attributes(
         fio::NodeAttributesQuery::kCreationTime | fio::NodeAttributesQuery::kModificationTime |
         fio::NodeAttributesQuery::kContentSize | fio::NodeAttributesQuery::kStorageSize |
-        fio::NodeAttributesQuery::kId | fio::NodeAttributesQuery::kLinkCount);
+        fio::NodeAttributesQuery::kId | fio::NodeAttributesQuery::kLinkCount |
+        fio::NodeAttributesQuery::kMode | fio::NodeAttributesQuery::kUid |
+        fio::NodeAttributesQuery::kGid);
 
     completer.Reply(config);
   }

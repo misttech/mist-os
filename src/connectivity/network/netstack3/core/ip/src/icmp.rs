@@ -3637,7 +3637,7 @@ mod tests {
             body: S,
             mtu: Option<u32>,
             options: &O,
-        ) -> Result<(), (S, IpSockSendError)>
+        ) -> Result<(), IpSockSendError>
         where
             S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,

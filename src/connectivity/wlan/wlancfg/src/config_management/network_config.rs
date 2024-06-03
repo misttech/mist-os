@@ -7,10 +7,7 @@ use fidl_fuchsia_wlan_common_security as fidl_security;
 use {
     crate::{
         client::types as client_types,
-        util::{
-            historical_list::{HistoricalList, Timestamped},
-            pseudo_energy::EwmaSignalData,
-        },
+        util::historical_list::{HistoricalList, Timestamped},
     },
     arbitrary::Arbitrary,
     fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_async as fasync, fuchsia_zircon as zx,
@@ -135,7 +132,7 @@ pub struct PastConnectionData {
     /// Cause of disconnect or failure to connect
     pub disconnect_reason: client_types::DisconnectReason,
     /// Final signal strength measure before disconnect
-    pub signal_data_at_disconnect: EwmaSignalData,
+    pub signal_at_disconnect: client_types::Signal,
     /// Average phy rate over connection duration
     pub average_tx_rate: u32,
 }
@@ -148,7 +145,7 @@ impl PastConnectionData {
         disconnect_time: fasync::Time,
         connection_uptime: zx::Duration,
         disconnect_reason: client_types::DisconnectReason,
-        signal_data_at_disconnect: EwmaSignalData,
+        signal_at_disconnect: client_types::Signal,
         average_tx_rate: u32,
     ) -> Self {
         Self {
@@ -158,7 +155,7 @@ impl PastConnectionData {
             disconnect_time,
             connection_uptime,
             disconnect_reason,
-            signal_data_at_disconnect,
+            signal_at_disconnect,
             average_tx_rate,
         }
     }

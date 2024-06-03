@@ -1303,4 +1303,5 @@ class MainTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    remote_action.init_from_main_once()
     unittest.main()

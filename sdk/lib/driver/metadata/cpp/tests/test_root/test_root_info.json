@@ -1,0 +1,9 @@
+{
+    "short_description": "Test driver that creates two nodes for the test parent drivers to bind to.",
+    "manufacturer": "",
+    "families": [],
+    "models": [],
+    "areas": [
+        "DriverFramework"
+    ]
+}

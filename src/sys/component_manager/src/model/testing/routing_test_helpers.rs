@@ -41,7 +41,7 @@ use {
     fuchsia_inspect as inspect, fuchsia_zircon as zx,
     futures::{channel::oneshot, prelude::*},
     hooks::HooksRegistration,
-    moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
+    moniker::{ChildName, Moniker},
     std::{
         collections::{HashMap, HashSet},
         fs,

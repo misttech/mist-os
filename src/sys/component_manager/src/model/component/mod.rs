@@ -54,7 +54,7 @@ use {
         StopOutcomeWithEscrow,
     },
     manager::ComponentManagerInstance,
-    moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
+    moniker::{ChildName, Moniker},
     router_error::{Explain, RouterError},
     sandbox::{Capability, Dict, Open, Request, Routable, Router},
     std::{
@@ -485,6 +485,7 @@ impl ComponentInstance {
         };
 
         let child_input = state
+            .sandbox
             .collection_inputs
             .get(&Name::new(&collection_name).unwrap())
             .expect("dict missing for declared collection")
@@ -495,11 +496,11 @@ impl ComponentInstance {
             let fidl_capability = fsandbox::Capability::Dictionary(dictionary_client_end);
             let any: Capability =
                 fidl_capability.try_into().map_err(|_| AddDynamicChildError::InvalidDictionary)?;
-            let mut dict = match any {
+            let dict = match any {
                 Capability::Dictionary(d) => d,
                 _ => return Err(AddDynamicChildError::InvalidDictionary),
             };
-            let mut child_dict_entries = child_input.capabilities();
+            let child_dict_entries = child_input.capabilities();
             for (key, value) in dict.drain() {
                 // The child/collection Dict normally contains Routers created by component manager.
                 // ChildArgs.dict may contain capabilities created by an external client.
@@ -666,7 +667,7 @@ impl ComponentInstance {
         {
             let mut state = self.lock_state().await;
             if let Some(resolved_state) = state.get_resolved_state_mut() {
-                resolved_state.program_input_dict_additions = None;
+                let _ = resolved_state.program_input_dict_additions.drain();
             };
         }
 
@@ -972,7 +973,7 @@ impl ComponentInstance {
 
     /// Obtains the program output dict.
     pub async fn get_program_output_dict(self: &Arc<Self>) -> Result<Dict, RouterError> {
-        Ok(self.lock_resolved_state().await?.program_output_dict.clone())
+        Ok(self.lock_resolved_state().await?.sandbox.program_output_dict.clone())
     }
 
     /// Returns a router that delegates to the program output dict.
@@ -999,7 +1000,7 @@ impl ComponentInstance {
 
     /// Obtains the component output dict.
     pub async fn get_component_output_dict(self: &Arc<Self>) -> Result<Dict, RouterError> {
-        Ok(self.lock_resolved_state().await?.component_output_dict.clone())
+        Ok(self.lock_resolved_state().await?.sandbox.component_output_dict.clone())
     }
 
     /// Returns a router that delegates to the component output dict.
@@ -1357,7 +1358,7 @@ pub mod testing {
     use crate::model::events::stream::EventStream;
     use fuchsia_zircon as zx;
     use hooks::EventType;
-    use moniker::{Moniker, MonikerBase};
+    use moniker::Moniker;
 
     pub async fn wait_until_event_get_timestamp(
         event_stream: &mut EventStream,
@@ -1375,7 +1376,6 @@ pub mod tests {
         crate::model::{
             actions::{shutdown, test_utils::is_discovered, StopAction},
             events::registry::EventSubscription,
-            structured_dict::ComponentInput,
             testing::{
                 mocks::ControllerActionResponse,
                 out_dir::OutDir,
@@ -1383,7 +1383,7 @@ pub mod tests {
                 test_helpers::{component_decl_with_test_runner, ActionsTest, ComponentInfo},
             },
         },
-        ::routing::resolving::ComponentAddress,
+        ::routing::{bedrock::structured_dict::ComponentInput, resolving::ComponentAddress},
         assert_matches::assert_matches,
         cm_fidl_validator::error::DeclType,
         cm_rust::{

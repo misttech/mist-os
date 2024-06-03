@@ -15,110 +15,8 @@ use fuchsia_component_test::{
 };
 use fuchsia_runtime::HandleType;
 use fuchsia_zircon as zx;
-use futures_util::{future::BoxFuture, FutureExt};
-use std::{collections::HashMap, sync::Arc};
-
-/// Attribute resource given the set of resources at the root of the system,
-/// and a protocol to attribute resources under different principals.
-fn attribute_memory<'a>(
-    name: String,
-    attribution_provider: fattribution::ProviderProxy,
-    introspector: &'a fcomponent::IntrospectorProxy,
-) -> BoxFuture<'a, Node> {
-    async move {
-        // Otherwise, check if there are attribution information.
-        let attributions = attribution_provider
-            .get()
-            .await
-            .unwrap_or_else(|e| panic!("Failed to get AttributionResponse for {name}: {e}"))
-            .unwrap_or_else(|e| panic!("Failed call to AttributionResponse for {name}: {e:?}"))
-            .attributions
-            .unwrap_or_else(|| panic!("Failed memory attribution for {name}"));
-
-        let mut node = Node::new(name);
-
-        // If there are children, resources assigned to this node by its parent
-        // will be re-assigned to children if applicable.
-        let mut children = HashMap::<String, Node>::new();
-        for attribution in attributions {
-            // Recursively attribute memory in this child principal.
-            match attribution {
-                fattribution::AttributionUpdate::Add(new_principal) => {
-                    let identifier =
-                        get_identifier_string(new_principal.identifier, &node.name, introspector)
-                            .await;
-                    let child = if let Some(client) = new_principal.detailed_attribution {
-                        attribute_memory(identifier, client.into_proxy().unwrap(), introspector)
-                            .await
-                    } else {
-                        Node::new(identifier)
-                    };
-                    children.insert(child.name.clone(), child);
-                }
-                fattribution::AttributionUpdate::Update(updated_principal) => {
-                    let identifier = get_identifier_string(
-                        updated_principal.identifier,
-                        &node.name,
-                        introspector,
-                    )
-                    .await;
-
-                    let child = children.get_mut(&identifier).unwrap();
-                    match updated_principal.resources.unwrap() {
-                        fattribution::Resources::Data(d) => {
-                            child.resources = d
-                                .into_iter()
-                                .filter_map(|r| {
-                                    if let fattribution::Resource::KernelObject(koid) = r {
-                                        Some(koid)
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .collect();
-                        }
-                        _ => todo!("unimplemented"),
-                    };
-                }
-                fattribution::AttributionUpdate::Remove(_) => todo!(),
-                _ => panic!("Unimplemented"),
-            };
-        }
-        node.children.extend(children.into_values());
-        node
-    }
-    .boxed()
-}
-
-async fn get_identifier_string(
-    identifier: Option<fattribution::Identifier>,
-    name: &String,
-    introspector: &fcomponent::IntrospectorProxy,
-) -> String {
-    match identifier.unwrap() {
-        fattribution::Identifier::Self_(_) => todo!("self attribution not supported"),
-        fattribution::Identifier::Component(c) => introspector
-            .get_moniker(c)
-            .await
-            .expect("Inspector call failed")
-            .expect("Inspector::GetMoniker call failed"),
-        fattribution::Identifier::Part(sc) => format!("{}/{}", name, sc).to_owned(),
-        _ => todo!(),
-    }
-}
-
-#[derive(Debug)]
-struct Node {
-    name: String,
-    resources: Vec<u64>,
-    children: Vec<Node>,
-}
-
-impl Node {
-    pub fn new(identifier: String) -> Node {
-        Node { name: identifier, resources: vec![], children: vec![] }
-    }
-}
+use futures_util::{FutureExt, StreamExt};
+use std::sync::Arc;
 
 #[fuchsia::test]
 async fn test_attribute_memory() {
@@ -232,12 +130,20 @@ async fn test_attribute_memory() {
     assert!(!colocated_component_vmos.is_empty());
 
     // Starting from the ELF runner, ask about the resource usage.
-    let elf_runner = attribute_memory(
+    let mut mem = attribution_testing::attribute_memory(
         "elf_runner.cm".to_owned(),
         capabilities.attribution_provider,
-        &capabilities.introspector,
-    )
-    .await;
+        capabilities.introspector,
+    );
+
+    // Stream memory attribution data until the full tree shows up.
+    let mut elf_runner: attribution_testing::Principal;
+    loop {
+        elf_runner = mem.next().await.unwrap();
+        if elf_runner.children.len() == 1 && elf_runner.children[0].children.len() == 1 {
+            break;
+        }
+    }
 
     // We should get the following tree:
     //
@@ -255,6 +161,6 @@ async fn test_attribute_memory() {
     assert_eq!(&elf_runner.children[0].children[0].name, "collection:colocated-component");
     let resource = &elf_runner.children[0].children[0].resources;
     for vmo_koid in colocated_component_vmos {
-        assert!(resource.contains(&vmo_koid));
+        assert!(resource.contains(&zx::Koid::from_raw(vmo_koid)));
     }
 }

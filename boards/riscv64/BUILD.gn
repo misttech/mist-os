@@ -27,6 +27,13 @@ board_configuration("riscv64") {
     "//boards/emulation/virtio",
   ]
 
+  hardware_info = {
+    name = "qemu-riscv64"
+    product_id = 1
+    vendor_id = 1
+    revision = 1
+  }
+
   filesystems = {
     fvm = {
       sparse_output = {

@@ -24,18 +24,51 @@
 
 namespace {
 
+static constexpr size_t kMaxEPSize =
+    ktl::max(sizeof(smbios::EntryPoint2_1), sizeof(smbios::EntryPoint3_0));
+
 smbios::EntryPointVersion kEpVersion = smbios::EntryPointVersion::Unknown;
 union {
-  const uint8_t* raw;
+  const void* raw;
   const smbios::EntryPoint2_1* ep2_1;
 } kEntryPoint;
 uintptr_t kStructBase = 0;  // Address of first SMBIOS struct
 
-zx_status_t FindEntryPoint(const uint8_t** base, smbios::EntryPointVersion* version) {
+zx::result<ktl::pair<fbl::RefPtr<VmMapping>, void*>> MapRange(uint64_t paddr, size_t len) {
+  fbl::RefPtr<VmObjectPhysical> vmo;
+  const uint64_t paddr_base = ROUNDDOWN(paddr, PAGE_SIZE);
+  const uint64_t paddr_top = ROUNDUP(paddr + len, PAGE_SIZE);
+  zx_status_t status = VmObjectPhysical::Create(paddr_base, paddr_top - paddr_base, &vmo);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  zx::result<VmAddressRegion::MapResult> mapping_result =
+      VmAspace::kernel_aspace()->RootVmar()->CreateVmMapping(
+          0, len, 0, 0 /* vmar_flags */, ktl::move(vmo), 0,
+          ARCH_MMU_FLAG_CACHED | ARCH_MMU_FLAG_PERM_READ, "smbios");
+  if (mapping_result.is_error()) {
+    return mapping_result.take_error();
+  }
+  // Prepopulate the mapping's page tables so there are no page faults taken.
+  status = mapping_result->mapping->MapRange(0, len, true);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  const uintptr_t vaddr = mapping_result->base + (paddr - paddr_base);
+  ktl::pair<fbl::RefPtr<VmMapping>, void*> ret = {ktl::move(mapping_result->mapping),
+                                                  reinterpret_cast<void*>(vaddr)};
+  return zx::ok(ktl::move(ret));
+}
+
+zx_status_t FindEntryPoint(const void** base, smbios::EntryPointVersion* version) {
   // See if the ZBI told us where the table is.
   if (gPhysHandoff->smbios_phys) {
     uint64_t smbios = gPhysHandoff->smbios_phys.value();
-    const uint8_t* p = reinterpret_cast<const uint8_t*>(paddr_to_physmap(smbios));
+    auto result = MapRange(smbios, kMaxEPSize);
+    if (result.is_error()) {
+      return result.status_value();
+    }
+    auto [mapping, p] = ktl::move(*result);
     if (!memcmp(p, SMBIOS2_ANCHOR, strlen(SMBIOS2_ANCHOR))) {
       *base = p;
       *version = smbios::EntryPointVersion::V2_1;
@@ -47,11 +80,19 @@ zx_status_t FindEntryPoint(const uint8_t** base, smbios::EntryPointVersion* vers
       gSmbiosPhys = smbios;
       return ZX_OK;
     }
+    mapping->Destroy();
   }
 
   // Fallback to non-EFI SMBIOS search if we haven't found it yet
-  for (paddr_t target = 0x000f0000; target < 0x00100000; target += 16) {
-    const uint8_t* p = reinterpret_cast<const uint8_t*>(paddr_to_physmap(target));
+  constexpr uint64_t kSearchBase = 0x000f0000;
+  constexpr uint64_t kSearchEnd = 0x00100000;
+  auto result = MapRange(kSearchBase, kSearchEnd - kSearchBase);
+  if (result.is_error()) {
+    return result.status_value();
+  }
+  auto [mapping, vaddr] = ktl::move(*result);
+  for (paddr_t target = kSearchBase; target < kSearchEnd; target += 16) {
+    const uint8_t* p = reinterpret_cast<const uint8_t*>(vaddr) + (target - kSearchBase);
     if (!memcmp(p, SMBIOS2_ANCHOR, strlen(SMBIOS2_ANCHOR))) {
       *base = p;
       *version = smbios::EntryPointVersion::V2_1;
@@ -66,36 +107,19 @@ zx_status_t FindEntryPoint(const uint8_t** base, smbios::EntryPointVersion* vers
     }
   }
 
+  mapping->Destroy();
   return ZX_ERR_NOT_FOUND;
 }
 
 zx_status_t MapStructs2_1(const smbios::EntryPoint2_1* ep, fbl::RefPtr<VmMapping>* mapping,
                           uintptr_t* struct_table_virt) {
-  paddr_t base = ep->struct_table_phys;
-  paddr_t end = base + ep->struct_table_length;
-  const size_t subpage_offset = base & (PAGE_SIZE - 1);
-  base -= subpage_offset;
-  size_t len = ROUNDUP(end - base, PAGE_SIZE);
-
-  auto vmar = VmAspace::kernel_aspace()->RootVmar();
-  fbl::RefPtr<VmObjectPhysical> vmo;
-  zx_status_t status = VmObjectPhysical::Create(base, len, &vmo);
-  if (status != ZX_OK) {
-    return status;
+  auto result = MapRange(ep->struct_table_phys, ep->struct_table_length);
+  if (result.is_error()) {
+    return result.status_value();
   }
-  zx::result<VmAddressRegion::MapResult> mapping_result =
-      vmar->CreateVmMapping(0, len, 0, 0 /* vmar_flags */, ktl::move(vmo), 0,
-                            ARCH_MMU_FLAG_CACHED | ARCH_MMU_FLAG_PERM_READ, "smbios");
-  if (mapping_result.is_error()) {
-    return mapping_result.status_value();
-  }
-  // Prepopulate the mapping's page tables so there are no page faults taken.
-  status = mapping_result->mapping->MapRange(0, len, true);
-  if (status != ZX_OK) {
-    return status;
-  }
-  *struct_table_virt = mapping_result->base + subpage_offset;
-  *mapping = ktl::move(mapping_result->mapping);
+  auto [map, base] = ktl::move(*result);
+  *mapping = ktl::move(map);
+  *struct_table_virt = reinterpret_cast<uintptr_t>(base);
   return ZX_OK;
 }
 
@@ -123,7 +147,7 @@ void pc_init_smbios() {
     }
   });
 
-  const uint8_t* start = nullptr;
+  const void* start = nullptr;
   auto version = smbios::EntryPointVersion::Unknown;
   uintptr_t struct_table_virt = 0;
 

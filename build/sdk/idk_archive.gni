@@ -38,7 +38,7 @@ template("idk_archive") {
     _archive_output_name = invoker.output_name
   }
 
-  labels = {
+  targets = {
     tarmaker_manifest = "${target_name}.tarmaker"
   }
 
@@ -50,7 +50,7 @@ template("idk_archive") {
   }
 
   # Walks the exported IDK directory and generates a manifest of its contents.
-  python_action(labels.tarmaker_manifest) {
+  python_action(targets.tarmaker_manifest) {
     forward_variables_from(invoker, [ "testonly" ])
 
     inputs = []  # Directories don't count as inputs.
@@ -82,7 +82,7 @@ template("idk_archive") {
       "--use-parallel-gzip=false",
     ]
     deps = [
-      ":${labels.tarmaker_manifest}",
+      ":${targets.tarmaker_manifest}",
       invoker.idk,
     ]
 

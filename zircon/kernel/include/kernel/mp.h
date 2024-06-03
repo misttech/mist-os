@@ -120,6 +120,10 @@ static inline bool mp_is_cpu_online(cpu_num_t cpu) {
 }
 
 // tracks if a cpu is active and schedulable
+//
+// Note: this is not the function you are looking for.  Mutations of the active
+// bit for CPU X needs to synchronize with internals of Scheduler X's behavior.
+// Users should call through `Scheduler::SetCurrCpuActive` instead.
 static inline void mp_set_curr_cpu_active(bool active) {
   if (active) {
     mp.active_cpus.fetch_or(cpu_num_to_mask(arch_curr_cpu_num()));

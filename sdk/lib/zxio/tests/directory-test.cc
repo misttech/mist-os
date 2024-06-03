@@ -87,6 +87,10 @@ class TestDirectoryServer : public zxio_tests::TestDirectoryServerBase {
     completer.Reply(ZX_OK, std::move(dup));
   }
 
+  void GetAttr(GetAttrCompleter::Sync& completer) final {
+    completer.Reply(0, fuchsia_io::wire::NodeAttributes{});
+  }
+
   void Unlink(UnlinkRequestView request, UnlinkCompleter::Sync& completer) final {
     unlinks_.emplace_back(request->name.get());
     completer.ReplySuccess();
@@ -163,6 +167,12 @@ class Directory : public zxtest::Test {
   TestDirectoryServer directory_server_;
   zxio_storage_t directory_storage_;
 };
+
+TEST_F(Directory, Attr) {
+  zxio_node_attributes_t attr = {.has = {.object_type = true}};
+  ASSERT_OK(zxio_attr_get(directory(), &attr));
+  EXPECT_EQ(ZXIO_OBJECT_TYPE_DIR, attr.object_type);
+}
 
 TEST_F(Directory, Open) {
   fuchsia_io::wire::OpenFlags flags = fuchsia_io::wire::OpenFlags::kRightReadable;

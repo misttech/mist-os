@@ -44,11 +44,12 @@ one-way channel call can take up to 10 microseconds.
 A dispatcher does not make a call be inlined if any of the following
 conditions apply:
 
-- **The dispatcher allows blocking calls**.
+- **The dispatcher allows blocking calls but the sender does not**.
 
   Calls are not made inlined if the target dispatcher has the
-  [`ALLOW_SYNC_CALLS`][allow-sync-calls] option set. This is to prevent
-  blocking a non-blocking dispatcher in the same call stack.
+  [`ALLOW_SYNC_CALLS`][allow-sync-calls] option set, but the sender
+  dispatcher does not. This is to prevent blocking a non-blocking
+  dispatcher in the same call stack.
 
 - **The dispatcher is synchronized and is not idle**.
 

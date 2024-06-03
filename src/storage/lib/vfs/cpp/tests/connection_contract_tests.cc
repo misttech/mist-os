@@ -43,11 +43,11 @@ class NoOpVfsGood : public NoOpVfs {
   using NoOpVfs::NoOpVfs;
 
  private:
-  zx_status_t RegisterConnection(std::unique_ptr<fs::internal::Connection> connection,
-                                 zx::channel server_end) final {
+  zx::result<> RegisterConnection(std::unique_ptr<fs::internal::Connection> connection,
+                                  zx::channel& server_end) final {
     connections_.push_back(std::move(connection));
     connections_.back().Bind(std::move(server_end), [](fs::internal::Connection*) {});
-    return ZX_OK;
+    return zx::ok();
   }
 };
 
@@ -59,11 +59,11 @@ class NoOpVfsBad : public NoOpVfs {
   using NoOpVfs::NoOpVfs;
 
  private:
-  zx_status_t RegisterConnection(std::unique_ptr<fs::internal::Connection> connection,
-                                 zx::channel server_end) final {
+  zx::result<> RegisterConnection(std::unique_ptr<fs::internal::Connection> connection,
+                                  zx::channel& server_end) final {
     connection->Bind(std::move(server_end), [](fs::internal::Connection*) {});
     connections_.push_back(std::move(connection));
-    return ZX_OK;
+    return zx::ok();
   }
 };
 

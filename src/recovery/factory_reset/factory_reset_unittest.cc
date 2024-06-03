@@ -41,7 +41,7 @@ constexpr uint32_t kBlockSize = 512;
 constexpr uint32_t kSliceSize = (1 << 20);
 constexpr uint32_t kDeviceSize = kBlockCount * kBlockSize;
 constexpr std::string_view kDataName = "fdr-data";
-constexpr char kRamCtlPath[] = "sys/platform/00:00:2d/ramctl";
+constexpr char kRamCtlPath[] = "sys/platform/ram-disk/ramctl";
 constexpr size_t kKeyBytes = 32;  // Generate a 256-bit key for the zxcrypt volume
 
 class MockAdmin : public fidl::testing::WireTestBase<fuchsia_hardware_power_statecontrol::Admin> {

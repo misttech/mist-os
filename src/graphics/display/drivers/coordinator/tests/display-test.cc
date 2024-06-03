@@ -60,9 +60,8 @@ TEST(DisplayTest, ClientVSyncOk) {
       fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
   auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
 
-  Controller controller(std::move(engine_driver_client));
   auto [dispatcher, shutdown_completion] = CreateDispatcherAndShutdownCompletionForTesting();
-  controller.SetDispatcherForTesting(std::move(dispatcher));
+  Controller controller(std::move(engine_driver_client), dispatcher.borrow());
 
   ClientProxy clientproxy(&controller, ClientPriority::kPrimary, ClientId(1),
                           std::move(server_end));
@@ -102,7 +101,7 @@ TEST(DisplayTest, ClientVSyncOk) {
 
   clientproxy.CloseTest();
 
-  controller.ShutdownDispatcherForTesting();
+  dispatcher.ShutdownAsync();
   shutdown_completion->Wait();
 }
 
@@ -115,9 +114,8 @@ TEST(DisplayTest, ClientVSynPeerClosed) {
       fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
   auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
 
-  Controller controller(std::move(engine_driver_client));
   auto [dispatcher, shutdown_completion] = CreateDispatcherAndShutdownCompletionForTesting();
-  controller.SetDispatcherForTesting(std::move(dispatcher));
+  Controller controller(std::move(engine_driver_client), dispatcher.borrow());
 
   ClientProxy clientproxy(&controller, ClientPriority::kPrimary, ClientId(1),
                           std::move(server_end));
@@ -127,7 +125,7 @@ TEST(DisplayTest, ClientVSynPeerClosed) {
   EXPECT_OK(clientproxy.OnDisplayVsync(kInvalidDisplayId, 0, kInvalidConfigStamp));
   clientproxy.CloseTest();
 
-  controller.ShutdownDispatcherForTesting();
+  dispatcher.ShutdownAsync();
   shutdown_completion->Wait();
 }
 
@@ -140,9 +138,8 @@ TEST(DisplayTest, ClientVSyncNotSupported) {
       fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
   auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
 
-  Controller controller(std::move(engine_driver_client));
   auto [dispatcher, shutdown_completion] = CreateDispatcherAndShutdownCompletionForTesting();
-  controller.SetDispatcherForTesting(std::move(dispatcher));
+  Controller controller(std::move(engine_driver_client), dispatcher.borrow());
 
   ClientProxy clientproxy(&controller, ClientPriority::kPrimary, ClientId(1),
                           std::move(server_end));
@@ -151,7 +148,7 @@ TEST(DisplayTest, ClientVSyncNotSupported) {
                 clientproxy.OnDisplayVsync(kInvalidDisplayId, 0, kInvalidConfigStamp));
   clientproxy.CloseTest();
 
-  controller.ShutdownDispatcherForTesting();
+  dispatcher.ShutdownAsync();
   shutdown_completion->Wait();
 }
 
@@ -168,9 +165,8 @@ TEST(DisplayTest, ClientMustDrainPendingStamps) {
       fdf::Endpoints<fuchsia_hardware_display_engine::Engine>::Create();
   auto engine_driver_client = std::make_unique<EngineDriverClient>(std::move(engine_client_end));
 
-  Controller controller(std::move(engine_driver_client));
   auto [dispatcher, shutdown_completion] = CreateDispatcherAndShutdownCompletionForTesting();
-  controller.SetDispatcherForTesting(std::move(dispatcher));
+  Controller controller(std::move(engine_driver_client), dispatcher.borrow());
 
   ClientProxy clientproxy(&controller, ClientPriority::kPrimary, ClientId(1),
                           std::move(server_end));
@@ -195,7 +191,7 @@ TEST(DisplayTest, ClientMustDrainPendingStamps) {
 
   clientproxy.CloseTest();
 
-  controller.ShutdownDispatcherForTesting();
+  dispatcher.ShutdownAsync();
   shutdown_completion->Wait();
 }
 

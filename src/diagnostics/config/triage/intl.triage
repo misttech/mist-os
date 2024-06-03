@@ -15,7 +15,7 @@
             type: "Warning",
             trigger: "SyslogHas('ICU error:.*')",
             print: "INTL: Internal ICU error.",
-        }
+        },
     },
     test: {
         test_tzdata_config_absent: {

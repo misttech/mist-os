@@ -6,7 +6,6 @@
 
 #![cfg(any(test, feature = "testutils"))]
 
-#[cfg(test)]
 use alloc::vec;
 use alloc::{borrow::ToOwned, collections::HashMap, sync::Arc, vec::Vec};
 use assert_matches::assert_matches;
@@ -17,49 +16,44 @@ use core::{
     ffi::CStr,
     fmt::Debug,
     hash::Hash,
-    num::NonZeroU64,
     ops::{Deref, DerefMut},
     time::Duration,
 };
 
 use derivative::Derivative;
 use lock_order::wrap::prelude::*;
-#[cfg(test)]
-use net_types::MulticastAddr;
 use net_types::{
     ethernet::Mac,
     ip::{
         AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion,
         Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu, Subnet, SubnetEither,
     },
-    SpecifiedAddr, UnicastAddr, Witness as _,
+    MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
+use netstack3_base::{FrameDestination, LinkDevice, RemoveResourceResult};
 use netstack3_filter::FilterTimerId;
 use packet::{Buf, BufferMut};
 use zerocopy::ByteSlice;
 
-#[cfg(test)]
-use crate::context::testutil::{FakeNetwork, FakeNetworkLinks, FakeNetworkSpec};
 use crate::{
     context::{
         testutil::{
-            FakeFrameCtx, FakeInstant, FakeTimerCtx, FakeTimerCtxExt, WithFakeFrameContext,
-            WithFakeTimerContext,
+            FakeFrameCtx, FakeInstant, FakeNetwork, FakeNetworkLinks, FakeNetworkSpec,
+            FakeTimerCtx, FakeTimerCtxExt, WithFakeFrameContext, WithFakeTimerContext,
         },
         CtxPair, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes,
         InstantContext, ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext,
         TimerHandler, TracingContext, UnlockedCoreCtx,
     },
     device::{
-        ethernet::MaxEthernetFrameSize,
-        ethernet::{EthernetCreationProperties, EthernetLinkDevice},
-        link::LinkDevice,
-        loopback::LoopbackDeviceId,
-        DeviceClassMatcher, DeviceId, DeviceIdAndNameMatcher, DeviceLayerEventDispatcher,
-        DeviceLayerStateTypes, DeviceLayerTypes, DeviceSendFrameError, EthernetDeviceId,
-        EthernetWeakDeviceId, LoopbackCreationProperties, LoopbackDevice, PureIpDeviceId,
-        PureIpWeakDeviceId, ReceiveQueueBindingsContext, TransmitQueueBindingsContext,
-        WeakDeviceId,
+        ethernet::{
+            EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
+        },
+        loopback::{LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId},
+        pure_ip::{PureIpDeviceId, PureIpWeakDeviceId},
+        queue::{ReceiveQueueBindingsContext, TransmitQueueBindingsContext},
+        DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceLayerTypes,
+        DeviceSendFrameError, WeakDeviceId,
     },
     filter::FilterBindingsTypes,
     ip::{
@@ -79,12 +73,8 @@ use crate::{
     time::{TimerId, TimerIdInner},
     transport::{
         tcp::{
-            buffer::{
-                testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer},
-                RingBuffer,
-            },
-            socket::TcpBindingsTypes,
-            BufferSizes,
+            testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer},
+            BufferSizes, RingBuffer, TcpBindingsTypes,
         },
         udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId},
     },
@@ -92,10 +82,14 @@ use crate::{
     BindingsContext, BindingsTypes,
 };
 
+// TODO(https://fxbug.dev/342685842): Remove all re-exports from foreign crates.
+
 pub use netstack3_base::testutil::{
     assert_empty, new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng,
     MonotonicIdentifier, TestAddrs, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
 };
+
+pub use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 
 /// NDP test utilities.
 pub mod ndp {
@@ -108,8 +102,15 @@ pub mod context {
     pub use crate::context::testutil::*;
 }
 
+/// TCP test utilities.
+pub mod tcp {
+    pub use crate::transport::tcp::testutil::{
+        ClientBuffers, ProvidedBuffers, WriteBackClientBuffers,
+    };
+}
+
 /// The default interface routing metric for test interfaces.
-pub(crate) const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
+pub const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
 
 /// Context available during the execution of the netstack.
 pub type Ctx<BT> = CtxPair<StackState<BT>, BT>;
@@ -217,7 +218,6 @@ where
 
     /// Joins the multicast group `multicast_addr` for `device`.
     #[netstack3_macros::context_ip_bounds(A::Version, BC, crate)]
-    #[cfg(test)]
     pub fn join_ip_multicast<A: IpAddress>(
         &mut self,
         device: &DeviceId<BC>,
@@ -235,7 +235,6 @@ where
     }
 
     /// Leaves the multicast group `multicast_addr` for `device`.
-    #[cfg(test)]
     #[netstack3_macros::context_ip_bounds(A::Version, BC, crate)]
     pub fn leave_ip_multicast<A: IpAddress>(
         &mut self,
@@ -254,7 +253,6 @@ where
     }
 
     /// Returns whether `device` is in the multicast group `addr`.
-    #[cfg(test)]
     #[netstack3_macros::context_ip_bounds(A::Version, BC, crate)]
     pub fn is_in_ip_multicast<A: IpAddress>(
         &mut self,
@@ -303,11 +301,10 @@ where
     ///
     /// `receive_ip_packet` injects a packet directly at the IP layer for this
     /// context.
-    #[cfg(test)]
     pub fn receive_ip_packet<I: Ip, B: BufferMut>(
         &mut self,
         device: &DeviceId<BC>,
-        frame_dst: Option<crate::device::FrameDestination>,
+        frame_dst: Option<FrameDestination>,
         buffer: B,
     ) {
         let (core_ctx, bindings_ctx) = self.contexts();
@@ -324,7 +321,7 @@ where
     /// Add a route directly to the forwarding table.
     pub fn add_route(
         &mut self,
-        entry: AddableEntryEither<crate::device::DeviceId<BC>>,
+        entry: AddableEntryEither<DeviceId<BC>>,
     ) -> Result<(), AddRouteError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         match entry {
@@ -355,7 +352,7 @@ where
     }
 
     /// Deletes all routes targeting `device`.
-    pub(crate) fn del_device_routes(&mut self, device: &DeviceId<BC>) {
+    pub fn del_device_routes(&mut self, device: &DeviceId<BC>) {
         let (core_ctx, bindings_ctx) = self.contexts();
         ip::testutil::del_device_routes::<Ipv4, _, _>(core_ctx, bindings_ctx, device);
         ip::testutil::del_device_routes::<Ipv6, _, _>(core_ctx, bindings_ctx, device);
@@ -364,15 +361,14 @@ where
     /// Removes all of the routes through the device, then removes the device.
     pub fn clear_routes_and_remove_ethernet_device(
         &mut self,
-        ethernet_device: crate::device::EthernetDeviceId<BC>,
+        ethernet_device: EthernetDeviceId<BC>,
     ) {
         let device_id = ethernet_device.into();
         self.del_device_routes(&device_id);
-        let ethernet_device =
-            assert_matches!(device_id, crate::device::DeviceId::Ethernet(id) => id);
+        let ethernet_device = assert_matches!(device_id, DeviceId::Ethernet(id) => id);
         match self.core_api().device().remove_device(ethernet_device) {
-            crate::sync::RemoveResourceResult::Removed(_external_state) => {}
-            crate::sync::RemoveResourceResult::Deferred(_reference_receiver) => {
+            RemoveResourceResult::Removed(_external_state) => {}
+            RemoveResourceResult::Deferred(_reference_receiver) => {
                 panic!("failed to remove ethernet device")
             }
         }
@@ -497,8 +493,10 @@ pub struct FakeBindingsCtxState {
         HashMap<UdpSocketId<Ipv4, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>, Vec<Vec<u8>>>,
     udpv6_received:
         HashMap<UdpSocketId<Ipv6, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>, Vec<Vec<u8>>>,
-    pub(crate) rx_available: Vec<LoopbackDeviceId<FakeBindingsCtx>>,
-    pub(crate) tx_available: Vec<DeviceId<FakeBindingsCtx>>,
+    /// IDs with rx queue signaled available.
+    pub rx_available: Vec<LoopbackDeviceId<FakeBindingsCtx>>,
+    /// IDs with tx queue signaled available.
+    pub tx_available: Vec<DeviceId<FakeBindingsCtx>>,
 }
 
 impl FakeBindingsCtxState {
@@ -589,8 +587,8 @@ impl FakeBindingsCtx {
         f(&mut *locked)
     }
 
-    #[cfg(test)]
-    pub(crate) fn timer_ctx(&self) -> impl Deref<Target = FakeTimerCtx<TimerId<Self>>> + '_ {
+    /// Gets the fake timer context.
+    pub fn timer_ctx(&self) -> impl Deref<Target = FakeTimerCtx<TimerId<Self>>> + '_ {
         // NB: Helper function is required to satisfy lifetime requirements of
         // borrow.
         fn get_timers<'a>(
@@ -601,7 +599,8 @@ impl FakeBindingsCtx {
         Wrapper(self.0.lock(), get_timers, ())
     }
 
-    pub(crate) fn state_mut(&mut self) -> impl DerefMut<Target = FakeBindingsCtxState> + '_ {
+    /// Returns a mutable reference guard to [`FakeBindingsCtxState`].
+    pub fn state_mut(&mut self) -> impl DerefMut<Target = FakeBindingsCtxState> + '_ {
         // NB: Helper functions are required to satisfy lifetime requirements of
         // borrow.
         fn get_state<'a>(i: &'a InnerFakeBindingsCtx) -> &'a FakeBindingsCtxState {
@@ -618,7 +617,6 @@ impl FakeBindingsCtx {
     /// # Panics
     ///
     /// Panics if the there are non-Ethernet frames stored.
-    #[cfg(test)]
     pub fn copy_ethernet_frames(
         &mut self,
     ) -> Vec<(EthernetWeakDeviceId<FakeBindingsCtx>, Vec<u8>)> {
@@ -674,14 +672,13 @@ impl FakeBindingsCtx {
         })
     }
 
-    #[cfg(test)]
-    pub(crate) fn take_events(&mut self) -> Vec<DispatchedEvent> {
+    /// Takes all the events stored in the fake context.
+    pub fn take_events(&mut self) -> Vec<DispatchedEvent> {
         self.with_inner_mut(|ctx| ctx.events.take())
     }
 
     /// Takes all the received ICMP replies for a given `conn`.
-    #[cfg(test)]
-    pub(crate) fn take_icmp_replies<I: crate::IpExt>(
+    pub fn take_icmp_replies<I: crate::IpExt>(
         &mut self,
         conn: &IcmpSocketId<I, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>,
     ) -> Vec<Vec<u8>> {
@@ -694,8 +691,8 @@ impl FakeBindingsCtx {
         .unwrap_or_else(Vec::default)
     }
 
-    #[cfg(test)]
-    pub(crate) fn take_udp_received<I: crate::IpExt>(
+    /// Takes all received UDP frames from the fake bindings context.
+    pub fn take_udp_received<I: crate::IpExt>(
         &mut self,
         conn: &UdpSocketId<I, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>,
     ) -> Vec<Vec<u8>> {
@@ -705,12 +702,6 @@ impl FakeBindingsCtx {
 
 impl FilterBindingsTypes for FakeBindingsCtx {
     type DeviceClass = ();
-}
-
-impl DeviceClassMatcher<()> for () {
-    fn device_class_matches(&self, (): &()) -> bool {
-        unimplemented!()
-    }
 }
 
 impl WithFakeTimerContext<TimerId<FakeBindingsCtx>> for FakeBindingsCtx {
@@ -956,8 +947,7 @@ impl FakeCtxBuilder {
     ///
     /// `add_device_with_config` is like `add_device`, except that it takes an
     /// IPv4 and IPv6 configuration to apply to the device when it is enabled.
-    #[cfg(test)]
-    pub(crate) fn add_device_with_config(
+    pub fn add_device_with_config(
         &mut self,
         mac: UnicastAddr<Mac>,
         ipv4_config: Ipv4DeviceConfigurationUpdate,
@@ -1002,8 +992,7 @@ impl FakeCtxBuilder {
     /// takes an associated IP address and subnet to assign to the device, as
     /// well as IPv4 and IPv6 configurations to apply to the device when it is
     /// enabled.
-    #[cfg(test)]
-    pub(crate) fn add_device_with_ip_and_config<A: IpAddress>(
+    pub fn add_device_with_ip_and_config<A: IpAddress>(
         &mut self,
         mac: UnicastAddr<Mac>,
         ip: A,
@@ -1070,7 +1059,7 @@ impl FakeCtxBuilder {
     /// `build_with_modifications` is equivalent to `build`, except that after
     /// the `StackStateBuilder` is initialized, it is passed to `f` for further
     /// modification before the `Ctx` is constructed.
-    pub(crate) fn build_with_modifications<F: FnOnce(&mut StackStateBuilder)>(
+    pub fn build_with_modifications<F: FnOnce(&mut StackStateBuilder)>(
         self,
         f: F,
     ) -> (FakeCtx, Vec<EthernetDeviceId<FakeBindingsCtx>>) {
@@ -1154,10 +1143,11 @@ impl FakeCtxBuilder {
     }
 }
 
-#[cfg(test)]
-pub(crate) enum FakeCtxNetworkSpec {}
+/// The fake network spec to use in integration tests.
+///
+/// It creates an Ethernet network.
+pub enum FakeCtxNetworkSpec {}
 
-#[cfg(test)]
 impl FakeNetworkSpec for FakeCtxNetworkSpec {
     type Context = FakeCtx;
     type TimerId = TimerId<FakeBindingsCtx>;
@@ -1319,9 +1309,10 @@ pub enum DispatchedEvent {
 /// A tuple of device ID and IP version.
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""))]
+#[allow(missing_docs)]
 pub struct PureIpDeviceAndIpVersion<BT: DeviceLayerTypes> {
-    pub(crate) device: PureIpWeakDeviceId<BT>,
-    pub(crate) version: IpVersion,
+    pub device: PureIpWeakDeviceId<BT>,
+    pub version: IpVersion,
 }
 
 /// A frame that's been dispatched to Bindings to be sent out the device driver.
@@ -1357,26 +1348,12 @@ impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeBindingsCtx>, I, FakeInsta
     }
 }
 
-pub(crate) const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: MaxEthernetFrameSize =
-    const_unwrap::const_unwrap_option(MaxEthernetFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU));
-
-impl DeviceIdAndNameMatcher for MonotonicIdentifier {
-    fn id_matches(&self, _id: &NonZeroU64) -> bool {
-        unimplemented!()
-    }
-
-    fn name_matches(&self, _name: &str) -> bool {
-        unimplemented!()
-    }
-}
-
 /// Creates a new [`FakeNetwork`] of [`Ctx`]s in a simple two-host
 /// configuration.
 ///
 /// Two hosts are created with the given names. Packets emitted by one
 /// arrive at the other and vice-versa.
-#[cfg(test)]
-pub(crate) fn new_simple_fake_network<CtxId: Copy + Debug + Hash + Eq>(
+pub fn new_simple_fake_network<CtxId: Copy + Debug + Hash + Eq>(
     a_id: CtxId,
     a: FakeCtx,
     a_device_id: EthernetWeakDeviceId<FakeBindingsCtx>,

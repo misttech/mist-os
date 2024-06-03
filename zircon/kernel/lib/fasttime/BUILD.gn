@@ -6,10 +6,12 @@ import("//build/cpp/library_headers.gni")
 
 library_headers("headers") {
   headers = [
-    "lib/fasttime.h",
-    "lib/time-values-abi.h",
+    "lib/fasttime/time.h",
+    "lib/fasttime/internal/abi.h",
+    "lib/fasttime/internal/time.h",
   ]
   public_deps = [
+    "//zircon/kernel/lib/arch",
     "//zircon/system/public",
     "//zircon/system/ulib/affine",
   ]

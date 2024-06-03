@@ -38,7 +38,6 @@ build-info-service
 ?font-server
 ?fonts
 forensics
-?full-resolver
 ?http-client
 ?httpsdate-time-source-pull
 ?hwinfo

@@ -17,9 +17,11 @@ namespace {
 
 class LogSettingsFixture : public ::testing::Test {
  public:
-  LogSettingsFixture() : old_severity_(GetMinLogLevel()), old_stderr_(dup(STDERR_FILENO)) {}
+  LogSettingsFixture() : old_severity_(GetMinLogSeverity()), old_stderr_(dup(STDERR_FILENO)) {}
   ~LogSettingsFixture() {
-    SetLogSettings({.min_log_level = old_severity_});
+    LogSettingsBuilder builder;
+    builder.WithMinLogSeverity(old_severity_);
+    builder.BuildAndInitialize();
     dup2(old_stderr_.get(), STDERR_FILENO);
   }
 
@@ -35,34 +37,36 @@ TEST(LogSettings, DefaultOptions) {
 }
 
 TEST_F(LogSettingsFixture, SetAndGet) {
-  LogSettings new_settings;
-  new_settings.min_log_level = -20;
-  SetLogSettings(new_settings);
-  EXPECT_EQ(new_settings.min_log_level, GetMinLogLevel());
+  LogSettingsBuilder builder;
+  builder.WithMinLogSeverity(-20);
+  builder.BuildAndInitialize();
+  EXPECT_EQ(-20, GetMinLogSeverity());
 }
 
 TEST_F(LogSettingsFixture, SetValidLogFile) {
   const char kTestMessage[] = "TEST MESSAGE";
 
-  LogSettings new_settings;
   files::ScopedTempDir temp_dir;
-  ASSERT_TRUE(temp_dir.NewTempFile(&new_settings.log_file));
-  SetLogSettings(new_settings);
-
+  std::string log_file;
+  ASSERT_TRUE(temp_dir.NewTempFile(&log_file));
+  LogSettingsBuilder builder;
+  builder.WithLogFile(log_file);
+  builder.BuildAndInitialize();
   FX_LOGS(INFO) << kTestMessage;
 
-  ASSERT_EQ(0, access(new_settings.log_file.c_str(), R_OK));
+  ASSERT_EQ(0, access(log_file.c_str(), R_OK));
   std::string log;
-  ASSERT_TRUE(files::ReadFileToString(new_settings.log_file, &log));
+  ASSERT_TRUE(files::ReadFileToString(log_file, &log));
   EXPECT_TRUE(log.find(kTestMessage) != std::string::npos);
 }
 
 TEST_F(LogSettingsFixture, SetInvalidLogFile) {
-  LogSettings new_settings;
-  new_settings.log_file = "\\\\//invalid-path";
-  SetLogSettings(new_settings);
+  std::string invalid_path = "\\\\//invalid-path";
+  LogSettingsBuilder builder;
+  builder.WithLogFile(invalid_path);
+  builder.BuildAndInitialize();
 
-  EXPECT_NE(0, access(new_settings.log_file.c_str(), R_OK));
+  EXPECT_NE(0, access(invalid_path.c_str(), R_OK));
 }
 #endif
 

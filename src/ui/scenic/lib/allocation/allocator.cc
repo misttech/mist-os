@@ -34,26 +34,35 @@ RegisterBufferCollectionUsages UsageToUsages(
 }
 
 bool BufferCollectionTokenIsValid(
-    fuchsia::sysmem::AllocatorSyncPtr& sysmem_allocator,
-    const fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>& token) {
-  bool is_known = false;
-  const auto status = sysmem_allocator->ValidateBufferCollectionToken(
-      fsl::GetRelatedKoid(token.channel().get()), &is_known);
-  return status == ZX_OK && is_known;
+    fuchsia::sysmem2::AllocatorSyncPtr& sysmem_allocator,
+    const fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>& token) {
+  fuchsia::sysmem2::AllocatorValidateBufferCollectionTokenRequest validate_request;
+  validate_request.set_token_server_koid(fsl::GetRelatedKoid(token.channel().get()));
+  fuchsia::sysmem2::Allocator_ValidateBufferCollectionToken_Result validate_result;
+  const auto status = sysmem_allocator->ValidateBufferCollectionToken(std::move(validate_request),
+                                                                      &validate_result);
+  return status == ZX_OK && validate_result.is_response() &&
+         validate_result.response().has_is_known() && validate_result.response().is_known();
 }
 
 // Creates a vector of |num_tokens| duplicates of BufferCollectionTokenSyncPtr.
 // Returns an empty vector if creation failed.
-std::vector<fuchsia::sysmem::BufferCollectionTokenSyncPtr> CreateVectorOfTokens(
-    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token, const size_t num_tokens) {
+std::vector<fuchsia::sysmem2::BufferCollectionTokenSyncPtr> CreateVectorOfTokens(
+    fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token, const size_t num_tokens) {
   FX_DCHECK(num_tokens > 0);
-  std::vector<fuchsia::sysmem::BufferCollectionTokenSyncPtr> tokens;
+  std::vector<fuchsia::sysmem2::BufferCollectionTokenSyncPtr> tokens;
   tokens.emplace_back(token.BindSync());
 
-  std::vector<fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>> dup_tokens;
-  if (tokens.front()->DuplicateSync(std::vector<zx_rights_t>(num_tokens - 1, ZX_RIGHT_SAME_RIGHTS),
-                                    &dup_tokens) == ZX_OK) {
-    for (auto& token : dup_tokens) {
+  fuchsia::sysmem2::BufferCollectionTokenDuplicateSyncRequest dup_sync_request;
+  dup_sync_request.set_rights_attenuation_masks(
+      std::vector<zx_rights_t>(num_tokens - 1, ZX_RIGHT_SAME_RIGHTS));
+  fuchsia::sysmem2::BufferCollectionToken_DuplicateSync_Result dup_sync_result;
+  if (tokens.front()->DuplicateSync(std::move(dup_sync_request), &dup_sync_result) == ZX_OK &&
+      dup_sync_result.is_response()) {
+    // if is_response(), sysmem always fills out tokens vector (can be 0 length if we passed
+    // 0-length rights_attenuation_masks above)
+    FX_DCHECK(dup_sync_result.response().has_tokens());
+    for (auto& token : *dup_sync_result.response().mutable_tokens()) {
       tokens.emplace_back(token.BindSync());
     }
   } else {
@@ -67,7 +76,7 @@ struct ParsedArgs {
   zx_koid_t koid;
   RegisterBufferCollectionUsages buffer_collection_usages;
   fuchsia::ui::composition::BufferCollectionExportToken export_token;
-  fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> buffer_collection_token;
+  fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> buffer_collection_token;
 };
 
 // Parses the FIDL struct, validating the arguments. Logs an error and returns std::nullopt on
@@ -118,7 +127,8 @@ std::optional<ParsedArgs> ParseArgs(fuchsia::ui::composition::RegisterBufferColl
       .koid = koid,
       .buffer_collection_usages = buffer_collection_usages,
       .export_token = std::move(*args.mutable_export_token()),
-      .buffer_collection_token = std::move(*args.mutable_buffer_collection_token()),
+      .buffer_collection_token = fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>(
+          args.mutable_buffer_collection_token()->TakeChannel()),
   };
 }
 
@@ -129,7 +139,7 @@ Allocator::Allocator(sys::ComponentContext* app_context,
                          default_buffer_collection_importers,
                      const std::vector<std::shared_ptr<BufferCollectionImporter>>&
                          screenshot_buffer_collection_importers,
-                     fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator)
+                     fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator)
     : dispatcher_(async_get_default_dispatcher()),
       default_buffer_collection_importers_(default_buffer_collection_importers),
       screenshot_buffer_collection_importers_(screenshot_buffer_collection_importers),

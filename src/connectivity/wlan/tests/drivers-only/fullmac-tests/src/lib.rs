@@ -12,6 +12,7 @@ use {
 
 mod client;
 mod query;
+mod telemetry;
 
 /// Fixture that holds all the relevant data and proxies for the fullmac driver.
 /// This can be shared among the different types of tests (client, telemetry, AP).

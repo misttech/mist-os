@@ -654,8 +654,6 @@ fit::result<fit::failed, Pool::mutable_iterator> Pool::InsertSubrange(
   //     <-----------------*it------------------>
   ZX_DEBUG_ASSERT(it->addr < range.addr);
   ZX_DEBUG_ASSERT(range.end() < containing_end);
-  it->size = range.addr - it->addr;
-  InsertNodeAt(node, next);
 
   Range after = {
       .addr = range.end(),
@@ -665,6 +663,11 @@ fit::result<fit::failed, Pool::mutable_iterator> Pool::InsertSubrange(
   if (auto result = NewNode(after); result.is_error()) {
     return result.take_error();
   } else {
+    // Save modifications until we know we have sufficient nodes to actually
+    // perform the insertion.
+    it->size = range.addr - it->addr;
+    InsertNodeAt(node, next);
+
     node = std::move(result).value();
     ZX_DEBUG_ASSERT(node);
     InsertNodeAt(node, next);

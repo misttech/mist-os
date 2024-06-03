@@ -118,11 +118,6 @@ __EXPORT zx_status_t device_connect_fidl_protocol(zx_device_t* device, const cha
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-__EXPORT zx_status_t device_get_variable(zx_device_t* device, const char* name, char* out,
-                                         size_t out_size, size_t* size_actual) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 __EXPORT zx_status_t device_add_composite_spec(zx_device_t* dev, const char* name,
                                                const composite_node_spec_t* spec) {
   return ZX_ERR_NOT_SUPPORTED;

@@ -46,12 +46,12 @@ class InactiveCpuGuard {
  public:
   InactiveCpuGuard() : was_active_(mp_is_cpu_active(arch_curr_cpu_num())) {
     if (was_active_) {
-      mp_set_curr_cpu_active(false);
+      Scheduler::SetCurrCpuActive(false);
     }
   }
   ~InactiveCpuGuard() {
     if (was_active_) {
-      mp_set_curr_cpu_active(was_active_);
+      Scheduler::SetCurrCpuActive(was_active_);
     }
   }
 

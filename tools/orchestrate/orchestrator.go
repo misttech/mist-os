@@ -266,7 +266,19 @@ func (r *TestOrchestrator) flashDevice(productDir string) error {
 }
 
 func (r *TestOrchestrator) startEmulator(productDir string) error {
-	if _, err := r.ffx.RunCmdSync("emu", "start", productDir, "--net", "user", "--headless"); err != nil {
+	// Wait up to 5 minutes for the emulator to start up.
+	// This helps with local test reproduction workflows where the host machine
+	// does not have kvm enabled.
+	if _, err := r.ffx.RunCmdSync(
+		"emu",
+		"start",
+		productDir,
+		"--net",
+		"user",
+		"--headless",
+		"--startup-timeout",
+		"300",
+	); err != nil {
 		return fmt.Errorf("ffx emu start: %w", err)
 	}
 	return nil

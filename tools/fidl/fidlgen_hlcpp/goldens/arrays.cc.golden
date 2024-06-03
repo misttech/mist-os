@@ -400,6 +400,7 @@ void UnionSmallArray::Decode(::fidl::Decoder* _decoder, UnionSmallArray* value, 
 
   switch (value->tag_) {
     case ::test::arrays::UnionSmallArray::Tag::kA: {
+      value->a_.~decltype(value->a_)();
       new (&value->a_)::std::array<uint32_t, 2>();
       ::fidl::Decode(_decoder, &value->a_, value_offset);
       break;
@@ -550,6 +551,7 @@ void UnionLargeArray::Decode(::fidl::Decoder* _decoder, UnionLargeArray* value, 
 
   switch (value->tag_) {
     case ::test::arrays::UnionLargeArray::Tag::kA: {
+      value->a_.~decltype(value->a_)();
       new (&value->a_)::std::array<uint32_t, 100>();
       ::fidl::Decode(_decoder, &value->a_, value_offset);
       break;

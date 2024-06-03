@@ -82,7 +82,7 @@ template("product_bundle") {
 
   product_name = invoker.name
 
-  labels = {
+  targets = {
     hermetic_inputs = "${target_name}_hermetic_inputs"
     product_bundle = "${target_name}_product_bundle"
     transfer_manifest = "${target_name}_transfer_manifest"
@@ -110,7 +110,7 @@ template("product_bundle") {
     skip_transfer_manifest = invoker.skip_transfer_manifest
   }
 
-  python_action(labels.hermetic_inputs) {
+  python_action(targets.hermetic_inputs) {
     forward_variables_from(invoker,
                            [
                              "deps",
@@ -153,7 +153,7 @@ template("product_bundle") {
     }
   }
 
-  ffx_action(labels.product_bundle) {
+  ffx_action(targets.product_bundle) {
     no_output_dir_leaks = false
     forward_variables_from(invoker,
                            [
@@ -191,7 +191,7 @@ template("product_bundle") {
       }
     }
 
-    hermetic_inputs_target = ":${labels.hermetic_inputs}"
+    hermetic_inputs_target = ":${targets.hermetic_inputs}"
     hermetic_inputs_file = files.hermetic_inputs
     hermetic_action_ignored_prefixes = [
       "${files.outdir}/blobs",
@@ -311,13 +311,13 @@ template("product_bundle") {
   }
 
   if (!skip_transfer_manifest) {
-    product_bundle_transfer_manifest(labels.transfer_manifest) {
+    product_bundle_transfer_manifest(targets.transfer_manifest) {
       forward_variables_from(invoker,
                              [
                                "testonly",
                                "visibility",
                              ])
-      product_bundle_target = ":${labels.product_bundle}"
+      product_bundle_target = ":${targets.product_bundle}"
 
       product_bundle_dir = files.outdir
       outputs = [ files.transfer_manifest ]
@@ -331,9 +331,9 @@ template("product_bundle") {
                              "visibility",
                            ])
 
-    public_deps = [ ":${labels.product_bundle}" ]
+    public_deps = [ ":${targets.product_bundle}" ]
     if (!skip_transfer_manifest) {
-      public_deps += [ ":${labels.transfer_manifest}" ]
+      public_deps += [ ":${targets.transfer_manifest}" ]
     }
 
     # This value can be set (e.g. for testing) with `--args sdk_id=1234` on the

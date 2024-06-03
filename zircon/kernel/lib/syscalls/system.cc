@@ -577,6 +577,10 @@ zx_status_t sys_system_set_performance_info(zx_handle_t resource, uint32_t topic
     return validate_status;
   }
 
+  if (topic == ZX_PROCESSOR_POWER_LEVEL) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
   if (topic != ZX_CPU_PERF_SCALE) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -674,8 +678,9 @@ zx_status_t sys_system_suspend_enter(zx_handle_t resource, zx_time_t resume_dead
 
 zx_status_t sys_system_set_processor_power_level_domain(
     zx_handle_t resource, uint64_t options, user_in_ptr<const zx_cpu_set_t> cpus,
-    user_in_ptr<const zx_processor_power_level_t> power_levels, size_t num_power_levels,
-    user_in_ptr<const zx_processor_power_level_transition_t> transitions, size_t num_transitions) {
+    uint64_t power_domain_id, user_in_ptr<const zx_processor_power_level_t> power_levels,
+    size_t num_power_levels, user_in_ptr<const zx_processor_power_level_transition_t> transitions,
+    size_t num_transitions) {
   zx_status_t status =
       validate_ranged_resource(resource, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_CPU_BASE, 1);
   if (status != ZX_OK) {
@@ -687,5 +692,21 @@ zx_status_t sys_system_set_processor_power_level_domain(
     return ZX_ERR_OUT_OF_RANGE;
   }
 
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
+zx_status_t sys_system_create_processor_power_level_transition_handler(zx_handle_t resource,
+                                                                       uint32_t options,
+                                                                       uint64_t control,
+                                                                       zx_handle_t* out_port) {
+  zx_status_t status =
+      validate_ranged_resource(resource, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_CPU_BASE, 1);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  if (options != 0) {
+    return ZX_ERR_INVALID_ARGS;
+  }
   return ZX_ERR_NOT_SUPPORTED;
 }

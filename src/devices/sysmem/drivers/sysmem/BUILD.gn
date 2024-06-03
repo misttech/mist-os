@@ -30,6 +30,12 @@ driver_bind_rules("sysmem_bind") {
 declare_args() {
   driver_sysmem_protected_memory_size_override = -1
   driver_sysmem_contiguous_memory_size_override = -1
+  driver_sysmem_contiguous_guard_pages_fatal = false
+  driver_sysmem_contiguous_guard_pages_internal = false
+  driver_sysmem_contiguous_guard_pages_unused = true
+  driver_sysmem_contiguous_guard_pages_unused_cycle_seconds_override = -1
+  driver_sysmem_contiguous_guard_page_count_override = -1
+  driver_sysmem_protected_ranges_disable_dynamic = false
 }
 
 fuchsia_component_manifest("manifest") {
@@ -81,6 +87,7 @@ source_set("sysmem_common_srcs") {
     # TODO(b/42113093): Remove this dep on AmLogic-specific heap names in sysmem code. The dep is
     # currently needed for secure heap names only, which is why a dep for goldfish heap names isn't
     # here.
+    ":config_cpp_elf_lib",
     "//src/devices/bind/fuchsia.amlogic.platform.sysmem.heap:fuchsia.amlogic.platform.sysmem.heap_cpp",
     "//src/devices/sysmem/metrics",
     "//src/lib/ddk",
@@ -101,7 +108,6 @@ source_set("sysmem_common_srcs") {
   ]
 
   deps = [
-    ":config_cpp_elf_lib",
     "//zircon/system/ulib/image-format",
     "//zircon/system/ulib/region-alloc",
     "//zircon/third_party/ulib/safemath",
@@ -146,6 +152,16 @@ fuchsia_structured_config_values("config_values") {
         driver_sysmem_protected_memory_size_override
     contiguous_memory_size_override =
         driver_sysmem_contiguous_memory_size_override
+    contiguous_guard_pages_fatal = driver_sysmem_contiguous_guard_pages_fatal
+    contiguous_guard_pages_internal =
+        driver_sysmem_contiguous_guard_pages_internal
+    contiguous_guard_pages_unused = driver_sysmem_contiguous_guard_pages_unused
+    contiguous_guard_pages_unused_cycle_seconds_override =
+        driver_sysmem_contiguous_guard_pages_unused_cycle_seconds_override
+    contiguous_guard_page_count_override =
+        driver_sysmem_contiguous_guard_page_count_override
+    protected_ranges_disable_dynamic =
+        driver_sysmem_protected_ranges_disable_dynamic
   }
 }
 

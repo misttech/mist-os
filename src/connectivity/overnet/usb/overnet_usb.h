@@ -30,8 +30,8 @@
 #include <variant>
 
 #include <bind/fuchsia/google/platform/usb/cpp/bind.h>
-#include <ddktl/device.h>
 #include <fbl/mutex.h>
+#include <usb-endpoint/usb-endpoint-client.h>
 #include <usb/request-cpp.h>
 #include <usb/usb-request.h>
 #include <usb/usb.h>
@@ -51,7 +51,8 @@ class OvernetUsb : public fdf::DriverBase,
   explicit OvernetUsb(fdf::DriverStartArgs start_args,
                       fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : DriverBase("overnet-usb", std::move(start_args), std::move(driver_dispatcher)),
-        devfs_connector_(fit::bind_member<&OvernetUsb::FidlConnect>(this)) {}
+        devfs_connector_(fit::bind_member<&OvernetUsb::FidlConnect>(this)),
+        endpoint_dispatcher_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
   zx::result<> Start() override;
   void PrepareStop(fdf::PrepareStopCompleter Completer) override;
@@ -252,11 +253,14 @@ class OvernetUsb : public fdf::DriverBase,
     }
   }
 
+  // Whether there are any pending requests.
+  bool HasPendingRequests() { return bulk_in_ep_.RequestsEmpty() || bulk_out_ep_.RequestsEmpty(); }
+
   // Get an IN request ready for use.
-  std::optional<usb::Request<>> PrepareTx() __TA_REQUIRES(lock_);
+  std::optional<usb::FidlRequest> PrepareTx() __TA_REQUIRES(lock_);
 
   // Send a 16-byte magic packet to the host.
-  void SendMagicReply(usb::Request<> request) __TA_REQUIRES(lock_);
+  void SendMagicReply(usb::FidlRequest request) __TA_REQUIRES(lock_);
   // Handle when RCS connects to us and is ready to receive a socket, or when we have a socket and
   // need to hand it to RCS.
   void HandleSocketAvailable() __TA_REQUIRES(lock_);
@@ -271,9 +275,9 @@ class OvernetUsb : public fdf::DriverBase,
   void ShutdownComplete() __TA_EXCLUDES(lock_);
 
   // Handle the completion of an outstanding USB read request.
-  void ReadComplete(usb_request_t* request);
+  void ReadComplete(fuchsia_hardware_usb_endpoint::Completion completion);
   // Handle the completion of an outstanding USB write request.
-  void WriteComplete(usb_request_t* request);
+  void WriteComplete(fuchsia_hardware_usb_endpoint::Completion completion);
 
   // Endpoint address of our IN endpoint.
   uint8_t BulkInAddress() const { return descriptors_.in_ep.b_endpoint_address; }
@@ -328,35 +332,14 @@ class OvernetUsb : public fdf::DriverBase,
   fidl::ServerBindingGroup<fuchsia_hardware_overnet::Device> device_binding_group_;
 
   ddk::UsbFunctionProtocolClient function_;
-  size_t usb_request_size_;
 
   fbl::Mutex lock_;
   State state_ __TA_GUARDED(lock_) = Unconfigured();
 
-  usb::RequestPool<> free_read_pool_ __TA_GUARDED(lock_);
-  usb::RequestPool<> free_write_pool_ __TA_GUARDED(lock_);
-
-  size_t pending_requests_ __TA_GUARDED(lock_) = 0;
-
-  usb_request_complete_callback_t read_request_complete_ = {
-      .callback =
-          [](void* ctx, usb_request_t* request) {
-            auto overnet_usb = reinterpret_cast<OvernetUsb*>(ctx);
-            async::PostTask(overnet_usb->dispatcher_,
-                            [overnet_usb, request]() { overnet_usb->ReadComplete(request); });
-          },
-      .ctx = this,
-  };
-
-  usb_request_complete_callback_t write_request_complete_ = {
-      .callback =
-          [](void* ctx, usb_request_t* request) {
-            auto overnet_usb = reinterpret_cast<OvernetUsb*>(ctx);
-            async::PostTask(overnet_usb->dispatcher_,
-                            [overnet_usb, request]() { overnet_usb->WriteComplete(request); });
-          },
-      .ctx = this,
-  };
+  usb_endpoint::UsbEndpoint<OvernetUsb> bulk_out_ep_{usb::EndpointType::BULK, this,
+                                                     std::mem_fn(&OvernetUsb::ReadComplete)};
+  usb_endpoint::UsbEndpoint<OvernetUsb> bulk_in_ep_{usb::EndpointType::BULK, this,
+                                                    std::mem_fn(&OvernetUsb::WriteComplete)};
 
   struct {
     usb_interface_descriptor_t data_interface;
@@ -394,6 +377,7 @@ class OvernetUsb : public fdf::DriverBase,
       }};
 
   async_dispatcher_t* dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+  async::Loop endpoint_dispatcher_;
 };
 
 #endif  // SRC_CONNECTIVITY_OVERNET_USB_OVERNET_USB_H_

@@ -51,11 +51,13 @@ sdk_source_set("cpp") {
       "//sdk/lib/stdcompat",
       "//sdk/lib/syslog/structured_backend",
       "//zircon/system/ulib/async:async-cpp",
-      "//zircon/system/ulib/async-loop:async-loop-cpp",
       "//zircon/system/ulib/sync",
     ]
 
-    public_deps += [ "//zircon/system/ulib/zx" ]
+    public_deps += [
+      "//zircon/system/ulib/async-loop:async-loop-cpp",
+      "//zircon/system/ulib/zx",
+    ]
   } else {
     sources += [
       "host/encoder.cc",

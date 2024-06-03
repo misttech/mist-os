@@ -74,6 +74,7 @@ class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framewo
   void EncodeCommand(EncodeCommandRequestView request,
                      EncodeCommandCompleter::Sync& completer) override;
   void OpenHci(OpenHciCompleter::Sync& completer) override;
+  void OpenHciTransport(OpenHciTransportCompleter::Sync& completer) override {}
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
@@ -101,10 +102,6 @@ class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framewo
   // Helper function for fuchsia.hardware.bluetooth.Emulator.Publish that adds bt-hci-device as a
   // child of EmulatorDevice device node
   zx_status_t AddHciDeviceChildNode();
-
-  // Helper function for fuchsia.hardware.bluetooth.Vendor.EncodeCommand
-  void EncodeSetAclPriorityCommand(
-      fuchsia_hardware_bluetooth::wire::VendorSetAclPriorityParams params, void* out_buffer);
 
   // Helper function used to initialize BR/EDR and LE peers
   void AddPeer(std::unique_ptr<EmulatedPeer> peer);

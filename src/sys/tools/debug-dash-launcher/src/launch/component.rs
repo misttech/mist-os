@@ -13,7 +13,7 @@ use fidl_fuchsia_io as fio;
 use fidl_fuchsia_sys2 as fsys;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon as zx;
-use moniker::{Moniker, MonikerBase};
+use moniker::Moniker;
 use tracing::warn;
 
 pub async fn explore_over_socket(

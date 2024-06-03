@@ -3,28 +3,26 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
-#include <lib/fasttime.h>
+#include <lib/fasttime/time.h>
 #include <lib/fdio/io.h>
 #include <lib/fzl/owned-vmo-mapper.h>
-#include <lib/time-values-abi.h>
 #include <lib/zx/clock.h>
+#include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
+#include <zircon/syscalls.h>
 #include <zircon/time.h>
 #include <zircon/types.h>
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
-#include "lib/zx/time.h"
-#include "zircon/syscalls.h"
-
 namespace {
 
 constexpr char kVmoFileDir[] = "/boot/kernel";
 
 TEST(FasttimeTest, UnaccessibleTicks) {
-  constexpr internal::TimeValues values = {
-      .version = internal::kFasttimeVersion,
+  constexpr fasttime::internal::TimeValues values = {
+      .version = fasttime::internal::kFasttimeVersion,
       .ticks_per_second = 100000,
       .raw_ticks_to_ticks_offset = 12345678,
       .ticks_to_mono_numerator = 125000,
@@ -38,9 +36,11 @@ TEST(FasttimeTest, UnaccessibleTicks) {
   EXPECT_EQ(compute_monotonic_ticks(values), ZX_TIME_INFINITE_PAST);
 
   // Test that the unchecked variants of these calls do not return the sential value.
-  EXPECT_NE(internal::compute_monotonic_time<internal::FasttimeVerificationMode::kSkip>(values),
+  EXPECT_NE(fasttime::internal::compute_monotonic_time<
+                fasttime::internal::FasttimeVerificationMode::kSkip>(values),
             ZX_TIME_INFINITE_PAST);
-  EXPECT_NE(internal::compute_monotonic_ticks<internal::FasttimeVerificationMode::kSkip>(values),
+  EXPECT_NE(fasttime::internal::compute_monotonic_ticks<
+                fasttime::internal::FasttimeVerificationMode::kSkip>(values),
             ZX_TIME_INFINITE_PAST);
 
   // Check that the functions exposed in the fasttime namespace return the sentinel value.
@@ -50,8 +50,8 @@ TEST(FasttimeTest, UnaccessibleTicks) {
 }
 
 TEST(FasttimeTest, MismatchedVersions) {
-  constexpr internal::TimeValues values = {
-      .version = internal::kFasttimeVersion + 1,
+  constexpr fasttime::internal::TimeValues values = {
+      .version = fasttime::internal::kFasttimeVersion + 1,
       .ticks_per_second = 100000,
       .raw_ticks_to_ticks_offset = 12345678,
       .ticks_to_mono_numerator = 125000,
@@ -67,9 +67,11 @@ TEST(FasttimeTest, MismatchedVersions) {
   EXPECT_EQ(compute_monotonic_ticks(values), ZX_TIME_INFINITE_PAST);
 
   // Test that the unchecked variants of these calls do not return the sential value.
-  EXPECT_NE(internal::compute_monotonic_time<internal::FasttimeVerificationMode::kSkip>(values),
+  EXPECT_NE(fasttime::internal::compute_monotonic_time<
+                fasttime::internal::FasttimeVerificationMode::kSkip>(values),
             ZX_TIME_INFINITE_PAST);
-  EXPECT_NE(internal::compute_monotonic_ticks<internal::FasttimeVerificationMode::kSkip>(values),
+  EXPECT_NE(fasttime::internal::compute_monotonic_ticks<
+                fasttime::internal::FasttimeVerificationMode::kSkip>(values),
             ZX_TIME_INFINITE_PAST);
 
   // Check that the functions exposed in the fasttime namespace return the sentinel value.

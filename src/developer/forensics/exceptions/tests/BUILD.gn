@@ -239,10 +239,7 @@ fuchsia_component("process_launch_failure_unittest") {
 }
 
 fuchsia_unittest_component("wake_lease_unittest") {
-  deps = [
-    ":wake_lease_unittest_exe",
-    "//src/sys/test_runners/gtest:death_test",
-  ]
+  deps = [ ":wake_lease_unittest_exe" ]
 }
 
 ###############################################################################

@@ -13,7 +13,10 @@
 #include <object/memory_watchdog.h>
 #include <platform/halt_helper.h>
 #include <platform/halt_token.h>
+#include <pretty/cpp/sizes.h>
 #include <vm/scanner.h>
+
+using pretty::FormattedBytes;
 
 namespace {
 
@@ -152,19 +155,6 @@ fbl::RefPtr<EventDispatcher> MemoryWatchdog::GetMemPressureEvent(uint32_t kind) 
   }
 }
 
-// Callback used with |pmm_init_reclamation|.
-// This is a very minimal save idx and signal an event as we are called under the pmm lock and must
-// avoid causing any additional allocations.
-void MemoryWatchdog::AvailableStateUpdatedCallback(void* context, uint8_t idx) {
-  MemoryWatchdog* watchdog = reinterpret_cast<MemoryWatchdog*>(context);
-  watchdog->AvailableStateUpdate(idx);
-}
-
-void MemoryWatchdog::AvailableStateUpdate(uint8_t idx) {
-  mem_event_idx_ = PressureLevel(idx);
-  mem_state_signal_.Signal();
-}
-
 void MemoryWatchdog::EvictionTriggerCallback(Timer* timer, zx_time_t now, void* arg) {
   MemoryWatchdog* watchdog = reinterpret_cast<MemoryWatchdog*>(arg);
   watchdog->EvictionTrigger();
@@ -231,8 +221,7 @@ void MemoryWatchdog::WorkerThread() {
   while (true) {
     // If we've hit OOM level perform some immediate synchronous eviction to attempt to avoid OOM.
     if (mem_event_idx_ == PressureLevel::kOutOfMemory) {
-      // Count kOutOfMemory explicitly and not mem_event_idx_, as reading it is racy.
-      CountPressureEvent(PressureLevel::kOutOfMemory);
+      CountPressureEvent(mem_event_idx_);
       printf("memory-pressure: free memory is %zuMB, evicting pages to prevent OOM...\n",
              pmm_count_free_pages() * PAGE_SIZE / MB);
       pmm_page_queues()->Dump();
@@ -246,6 +235,7 @@ void MemoryWatchdog::WorkerThread() {
           printf("memory-pressure: found no pages to evict\n");
           break;
         }
+        mem_event_idx_ = CalculatePressureLevel();
       }
       printf("memory-pressure: free memory after OOM eviction is %zuMB\n",
              pmm_count_free_pages() * PAGE_SIZE / MB);
@@ -259,28 +249,24 @@ void MemoryWatchdog::WorkerThread() {
       pmm_print_physical_page_borrowing_stats();
     }
 
-    // Get a local copy of the atomic. It's possible by the time we read this that we've already
-    // exited the last observed state, but that's fine as we don't necessarily need to signal every
-    // transient state.
-    PressureLevel idx = mem_event_idx_;
-
     // Check to see if the PMM has failed any allocations.  If the PMM has ever failed to allocate
     // because it was out of memory, then escalate the pressure level to trigger an OOM response
     // immediately.  The idea here is that usermode processes may not be able to handle allocation
     // failure and therefore could have become wedged in some way.
     if (gBootOptions->oom_trigger_on_alloc_failure && pmm_has_alloc_failed_no_mem()) {
       printf("memory-pressure: pmm failed one or more alloc calls, escalating to oom...\n");
-      idx = PressureLevel::kOutOfMemory;
+      mem_event_idx_ = PressureLevel::kOutOfMemory;
     }
 
     auto time_now = current_time();
 
-    if (IsSignalDue(idx, time_now)) {
-      CountPressureEvent(idx);
-      printf("memory-pressure: memory availability state - %s\n", PressureLevelToString(idx));
+    if (IsSignalDue(mem_event_idx_, time_now)) {
+      CountPressureEvent(mem_event_idx_);
+      printf("memory-pressure: memory availability state - %s\n",
+             PressureLevelToString(mem_event_idx_));
       pmm_page_queues()->Dump();
 
-      if (IsEvictionRequired(idx)) {
+      if (IsEvictionRequired(mem_event_idx_)) {
         // Clear any previous eviction trigger. Once Cancel completes we know that we will not race
         // with the callback and are free to update the targets. Cancel will return true if the
         // timer was canceled before it was scheduled on a cpu, i.e. an eviction was outstanding.
@@ -306,7 +292,8 @@ void MemoryWatchdog::WorkerThread() {
             EvictionTriggerCallback, this);
         printf("memory-pressure: set target memory to evict %zuMB (free memory is %zuMB)\n",
                min_free_target_ / MB, free_mem / MB);
-      } else if (eviction_strategy_ == EvictionStrategy::Continuous && idx > max_eviction_level_) {
+      } else if (eviction_strategy_ == EvictionStrategy::Continuous &&
+                 mem_event_idx_ > max_eviction_level_) {
         // If we're out of the max configured eviction-eligible memory pressure level, disable
         // continuous eviction.
 
@@ -326,33 +313,132 @@ void MemoryWatchdog::WorkerThread() {
       }
 
       // Signal event corresponding to the new memory state.
-      status = mem_pressure_events_[idx]->user_signal_self(0, ZX_EVENT_SIGNALED);
+      status = mem_pressure_events_[mem_event_idx_]->user_signal_self(0, ZX_EVENT_SIGNALED);
       if (status != ZX_OK) {
-        panic("memory-pressure: signal memory event %s failed: %d\n", PressureLevelToString(idx),
-              status);
+        panic("memory-pressure: signal memory event %s failed: %d\n",
+              PressureLevelToString(mem_event_idx_), status);
       }
-      prev_mem_event_idx_ = idx;
+      prev_mem_event_idx_ = mem_event_idx_;
       prev_mem_state_eval_time_ = time_now;
 
       // If we're below the out-of-memory watermark, trigger OOM behavior.
-      if (idx == PressureLevel::kOutOfMemory) {
+      if (mem_event_idx_ == PressureLevel::kOutOfMemory) {
         pmm_page_queues()->Dump();
         OnOom();
       }
 
       // Wait for the memory state to change again.
-      mem_state_signal_.Wait(Deadline::infinite());
+      WaitForMemChange(Deadline::infinite());
 
     } else {
       prev_mem_state_eval_time_ = time_now;
 
       // We are ignoring this memory state transition. Wait for only |hysteresis_seconds_|, and then
       // re-evaluate the memory state. Otherwise we could remain stuck at the lower memory state if
-      // mem_avail_state_updated_cb() is not invoked.
-      mem_state_signal_.Wait(
-          Deadline::no_slack(zx_time_add_duration(time_now, hysteresis_seconds_)));
+      // mem_state_signal_ is not signaled.
+      WaitForMemChange(Deadline::no_slack(zx_time_add_duration(time_now, hysteresis_seconds_)));
     }
   }
+}
+
+void MemoryWatchdog::WaitForMemChange(const Deadline& deadline) {
+  const PressureLevel prev = mem_event_idx_;
+  zx_status_t status = ZX_OK;
+  int iterations = 0;
+  do {
+    if (iterations++ == 10) {
+      printf("WARNING: %s has iterated %d times, possible bug", __FUNCTION__, iterations);
+    }
+    auto [lower, upper] = FreeMemBoundsForLevel(mem_event_idx_);
+    const uint64_t delay_alloc_level =
+        mem_event_idx_ == PressureLevel::kOutOfMemory
+            ? UINT64_MAX
+            : (mem_watermarks_[PressureLevel::kOutOfMemory] - watermark_debounce_) / PAGE_SIZE;
+    if (pmm_set_free_memory_signal(lower / PAGE_SIZE, upper / PAGE_SIZE, delay_alloc_level,
+                                   &mem_state_signal_)) {
+      // After having successfully set the event check again for any allocation failures. This is to
+      // ensure that if an allocation failure happened while we did not have an event set that it is
+      // not missed.
+      if (gBootOptions->oom_trigger_on_alloc_failure && pmm_has_alloc_failed_no_mem()) {
+        return;
+      }
+      status = mem_state_signal_.Wait(deadline);
+    } else {
+      // Setting failed, must've raced. Fall through and compute the new pressure level.
+    }
+    mem_event_idx_ = CalculatePressureLevel();
+    // In the case where we raced with additional pmm actions keep looping unless the deadline was
+    // reached.
+  } while (mem_event_idx_ == prev && status == ZX_OK);
+}
+
+ktl::pair<uint64_t, uint64_t> MemoryWatchdog::FreeMemBoundsForLevel(PressureLevel level) const {
+  // Calculate the range, including debounce, for the current memory level.
+  uint64_t lower = 0;
+  uint64_t upper = UINT64_MAX;
+  if (level > PressureLevel::kOutOfMemory) {
+    lower = mem_watermarks_[level - 1] - watermark_debounce_;
+  }
+  if (level < kNumWatermarks) {
+    upper = mem_watermarks_[level] + watermark_debounce_;
+  }
+  return {lower, upper};
+}
+
+MemoryWatchdog::PressureLevel MemoryWatchdog::CalculatePressureLevel() const {
+  // Get the bounds for the current level, this is inclusive of the debounce.
+  auto [lower, upper] = FreeMemBoundsForLevel(mem_event_idx_);
+
+  // Retrieve current free memory.
+  const uint64_t free_mem = pmm_count_free_pages() * PAGE_SIZE;
+
+  // Check if still inside the bounds.
+  if (free_mem >= lower && free_mem <= upper) {
+    // No change.
+    return mem_event_idx_;
+  }
+
+  // Determine the new level using a simple O(N).
+  uint8_t new_level = PressureLevel::kOutOfMemory;
+  while (new_level < kNumWatermarks && free_mem > mem_watermarks_[new_level]) {
+    new_level++;
+  }
+  DEBUG_ASSERT(new_level != mem_event_idx_);
+  return static_cast<PressureLevel>(new_level);
+}
+
+uint64_t MemoryWatchdog::DebugNumBytesTillPressureLevel(PressureLevel level) {
+  // Check we have been initialized.
+  DEBUG_ASSERT(executor_);
+  if (mem_event_idx_ <= level) {
+    // Already in level, or in a state with less available memory than level
+    return 0;
+  }
+  // We need to either get free_pages below mem_watermarks[level] or, if we are
+  // in state (level + 1), we also need to clear the debounce amount. For simplicity we just
+  // always allocate the debounce amount as well.
+  uint64_t trigger = mem_watermarks_[level] - watermark_debounce_;
+  uint64_t free_count = pmm_count_free_pages() * PAGE_SIZE;
+  // Handle races in the current pressure level.
+  if (free_count < trigger) {
+    return 0;
+  }
+  return free_count - trigger;
+}
+
+void MemoryWatchdog::Dump() {
+  printf("watermarks: [");
+  for (uint8_t i = 0; i < kNumWatermarks; i++) {
+    printf("%s%s", FormattedBytes(mem_watermarks_[i]).c_str(),
+           i + 1 == kNumWatermarks ? "]\n" : ", ");
+  }
+  const PressureLevel current = mem_event_idx_;
+  auto [lower, upper] = FreeMemBoundsForLevel(current);
+  printf("debounce: %s\n", FormattedBytes(watermark_debounce_).c_str());
+  printf("current state: %u\n", mem_event_idx_.load());
+  printf("current bounds: [%s, %s]\n", FormattedBytes(lower).c_str(),
+         FormattedBytes(upper).c_str());
+  printf("free memory: %s\n", FormattedBytes(pmm_count_free_pages() * PAGE_SIZE).c_str());
 }
 
 void MemoryWatchdog::Init(Executor* executor) {
@@ -373,43 +459,44 @@ void MemoryWatchdog::Init(Executor* executor) {
   }
 
   if (gBootOptions->oom_enabled) {
-    constexpr auto kNumWatermarks = PressureLevel::kNumLevels - 1;
-    ktl::array<uint64_t, kNumWatermarks> mem_watermarks;
-
     // TODO(rashaeqbal): The watermarks chosen below are arbitrary. Tune them based on memory usage
     // patterns. Consider moving to percentages of total memory instead of absolute numbers - will
     // be easier to maintain across platforms.
-    mem_watermarks[PressureLevel::kOutOfMemory] =
+    mem_watermarks_[PressureLevel::kOutOfMemory] =
         (gBootOptions->oom_out_of_memory_threshold_mb) * MB;
-    mem_watermarks[PressureLevel::kImminentOutOfMemory] =
-        mem_watermarks[PressureLevel::kOutOfMemory] +
+    mem_watermarks_[PressureLevel::kImminentOutOfMemory] =
+        mem_watermarks_[PressureLevel::kOutOfMemory] +
         (gBootOptions->oom_imminent_oom_delta_mb) * MB;
-    mem_watermarks[PressureLevel::kCritical] = (gBootOptions->oom_critical_threshold_mb) * MB;
-    mem_watermarks[PressureLevel::kWarning] = (gBootOptions->oom_warning_threshold_mb) * MB;
+    mem_watermarks_[PressureLevel::kCritical] = (gBootOptions->oom_critical_threshold_mb) * MB;
+    mem_watermarks_[PressureLevel::kWarning] = (gBootOptions->oom_warning_threshold_mb) * MB;
 
-    uint64_t watermark_debounce = gBootOptions->oom_debounce_mb * MB;
+    watermark_debounce_ = gBootOptions->oom_debounce_mb * MB;
     if (gBootOptions->oom_evict_at_warning) {
       max_eviction_level_ = PressureLevel::kWarning;
     }
+
+    // Validate our watermarks and debounce settings makes sense.
+    for (uint8_t j = 0; j < kNumWatermarks; j++) {
+      uint64_t prev = j == 0 ? 0 : mem_watermarks_[j - 1];
+      uint64_t next = (j == kNumWatermarks - 1) ? UINT64_MAX : mem_watermarks_[j + 1];
+      ASSERT(mem_watermarks_[j] > prev);
+      ASSERT(mem_watermarks_[j] < next);
+      ASSERT(mem_watermarks_[j] - prev > watermark_debounce_);
+      ASSERT(next - mem_watermarks_[j] > watermark_debounce_);
+    }
+
     // Set our eviction target to be such that we try to get completely out of the max eviction
     // level, taking into account the debounce.
-    free_mem_target_ = mem_watermarks[max_eviction_level_] + watermark_debounce;
+    free_mem_target_ = mem_watermarks_[max_eviction_level_] + watermark_debounce_;
 
     hysteresis_seconds_ = ZX_SEC(gBootOptions->oom_hysteresis_seconds);
-
-    zx_status_t status =
-        pmm_init_reclamation(&mem_watermarks[PressureLevel::kOutOfMemory], kNumWatermarks,
-                             watermark_debounce, this, &AvailableStateUpdatedCallback);
-    if (status != ZX_OK) {
-      panic("memory-pressure: failed to initialize pmm reclamation: %d\n", status);
-    }
 
     printf(
         "memory-pressure: memory watermarks - OutOfMemory: %zuMB, Critical: %zuMB, Warning: %zuMB, "
         "Debounce: %zuMB\n",
-        mem_watermarks[PressureLevel::kOutOfMemory] / MB,
-        mem_watermarks[PressureLevel::kCritical] / MB, mem_watermarks[PressureLevel::kWarning] / MB,
-        watermark_debounce / MB);
+        mem_watermarks_[PressureLevel::kOutOfMemory] / MB,
+        mem_watermarks_[PressureLevel::kCritical] / MB,
+        mem_watermarks_[PressureLevel::kWarning] / MB, watermark_debounce_ / MB);
 
     printf("memory-pressure: eviction trigger level - %s\n",
            PressureLevelToString(max_eviction_level_));
@@ -425,7 +512,7 @@ void MemoryWatchdog::Init(Executor* executor) {
     printf("memory-pressure: hysteresis interval - %ld seconds\n", hysteresis_seconds_ / ZX_SEC(1));
 
     printf("memory-pressure: ImminentOutOfMemory watermark - %zuMB\n",
-           mem_watermarks[PressureLevel::kImminentOutOfMemory] / MB);
+           mem_watermarks_[PressureLevel::kImminentOutOfMemory] / MB);
 
     auto memory_worker_thread = [](void* arg) -> int {
       MemoryWatchdog* watchdog = reinterpret_cast<MemoryWatchdog*>(arg);

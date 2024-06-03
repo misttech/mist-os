@@ -479,6 +479,8 @@ TEST_F(TcpSocketTest, PollNoEvents) {
   EXPECT_EQ(poll(pfds, std::size(pfds), 5), 0, "error: %s", strerror(errno));
 }
 
+TEST_F(TcpSocketTest, GetFlags) { ASSERT_GE(fcntl(client_fd().get(), F_GETFL), 0); }
+
 using UdpSocketTest = BaseTest<ZX_SOCKET_DATAGRAM>;
 TEST_F(UdpSocketTest, DatagramSendMsg) {
   ASSERT_NO_FATAL_FAILURE(set_connected());
@@ -544,6 +546,8 @@ TEST_F(UdpSocketTest, Shutdown) {
   ASSERT_EQ(shutdown(client_fd().get(), SHUT_RD), 0, "%s", strerror(errno));
   ASSERT_EQ(server().ShutdownCount(), 1);
 }
+
+TEST_F(UdpSocketTest, GetFlags) { ASSERT_GE(fcntl(client_fd().get(), F_GETFL), 0); }
 
 class TcpSocketTimeoutTest : public TcpSocketTest {
  protected:

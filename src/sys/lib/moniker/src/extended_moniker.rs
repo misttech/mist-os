@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        error::MonikerError,
-        moniker::{Moniker, MonikerBase},
-    },
+    crate::{error::MonikerError, moniker::Moniker},
     core::cmp::Ord,
     std::fmt,
 };

@@ -541,6 +541,105 @@ TEST_F(DispatcherTest, AllowSyncCallsDoesNotDirectlyCall) {
   WaitUntilIdle(blocking_dispatcher);
 }
 
+// Tests that dispatchers that allow sync calls can do inlined (direct) calls between each
+// other.
+TEST_F(DispatcherTest, AllowSyncCallsDirectCalls) {
+  const void* driver_a = CreateFakeDriver();
+  const void* driver_b = CreateFakeDriver();
+  const void* driver_c = CreateFakeDriver();
+
+  fdf_dispatcher_t* dispatcher_a;
+  fdf_dispatcher_t* dispatcher_b;
+  fdf_dispatcher_t* dispatcher_c;
+  // With direct calls we should bypass the async loop, so create unmanaged dispatchers.
+  ASSERT_NO_FATAL_FAILURE(CreateUnmanagedDispatcher(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS,
+                                                    __func__, driver_a, &dispatcher_a));
+  ASSERT_NO_FATAL_FAILURE(CreateUnmanagedDispatcher(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS,
+                                                    __func__, driver_b, &dispatcher_b));
+  ASSERT_NO_FATAL_FAILURE(CreateUnmanagedDispatcher(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS,
+                                                    __func__, driver_c, &dispatcher_c));
+
+  // Set up channels for [driver A to driver B], and [driver B to driver C].
+  auto channels_ab = fdf::ChannelPair::Create(0);
+  ASSERT_OK(channels_ab.status_value());
+  auto channels_bc = fdf::ChannelPair::Create(0);
+  ASSERT_OK(channels_bc.status_value());
+
+  // Message that driver C will send to driver B.
+  const uint32_t expected_msg = 7;
+  // The Channel::Call requires additional space allocated for the message's transaction id.
+  const uint32_t expected_num_bytes = sizeof(fdf_txid_t) + sizeof(expected_msg);
+
+  // On reading a message from driver A, driver B will call into driver C, then reply to driver A
+  // with driver C's message.
+  auto channel_read = std::make_unique<fdf::ChannelRead>(
+      channels_ab->end1.get(), 0,
+      [driver_c_ch = channels_bc->end0.borrow(), expected_num_bytes](
+          fdf_dispatcher_t* dispatcher, fdf::ChannelRead* channel_read, zx_status_t status) {
+        fdf::UnownedChannel channel(channel_read->channel());
+        auto read = channel->Read(0);
+        ASSERT_OK(read.status_value());
+        // Store the received Channel::Call txid.
+        ASSERT_EQ(sizeof(fdf_txid_t), read->num_bytes);
+        fdf_txid_t txid;
+        memcpy(&txid, read->data, read->num_bytes);
+
+        // Call into driver C.
+        auto call = driver_c_ch->Call(0, zx::time::infinite(), read->arena, read->data,
+                                      read->num_bytes, cpp20::span<zx_handle_t>());
+        ASSERT_OK(call.status_value());
+        ASSERT_EQ(expected_num_bytes, call->num_bytes);
+
+        // Reply to driver A with the message from driver C. We can just reuse the
+        // received buffer and overwrite the txid.
+        memcpy(call->data, &txid, sizeof(txid));
+        auto write =
+            channel->Write(0, call->arena, call->data, call->num_bytes, cpp20::span<zx_handle_t>());
+        ASSERT_OK(write.status_value());
+      });
+  ASSERT_OK(channel_read->Begin(dispatcher_b));
+
+  // On reading a message from driver B, driver C will reply with the |expected_msg|.
+  auto channel_read2 = std::make_unique<fdf::ChannelRead>(
+      channels_bc->end1.get(), 0,
+      [expected_msg](fdf_dispatcher_t* dispatcher, fdf::ChannelRead* channel_read,
+                     zx_status_t status) {
+        fdf::UnownedChannel channel(channel_read->channel());
+        auto read = channel->Read(0);
+        ASSERT_OK(read.status_value());
+        // Store the received Channel::Call txid.
+        ASSERT_EQ(sizeof(fdf_txid_t), read->num_bytes);
+        fdf_txid_t txid;
+        memcpy(&txid, read->data, read->num_bytes);
+
+        // Reply to driver B with the same txid, and expected test data.
+        fdf::Arena arena = fdf::Arena('TEST');
+        uint8_t* send_bytes = static_cast<uint8_t*>(arena.Allocate(sizeof(expected_num_bytes)));
+        memcpy(send_bytes, &txid, sizeof(txid));
+        memcpy(send_bytes + sizeof(fdf_txid_t), &expected_msg, sizeof(expected_msg));
+        ASSERT_OK(
+            channel->Write(0, arena, send_bytes, expected_num_bytes, cpp20::span<zx_handle_t>()));
+      });
+  ASSERT_OK(channel_read2->Begin(dispatcher_c));
+
+  {
+    // Simulate a driver writing a message to the driver with the blocking dispatcher.
+    driver_context::PushDriver(driver_a, dispatcher_a);
+    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+
+    // Allocate space for the runtime to write the txid.
+    fdf::Arena arena = fdf::Arena('TEST');
+    uint8_t* send_bytes = static_cast<uint8_t*>(arena.Allocate(sizeof(fdf_txid_t)));
+    auto call = channels_ab->end0.Call(0, zx::time::infinite(), arena, send_bytes,
+                                       sizeof(fdf_txid_t), cpp20::span<zx_handle_t>());
+
+    ASSERT_OK(call.status_value());
+    ASSERT_EQ(expected_num_bytes, call->num_bytes);
+    ASSERT_EQ(0, memcmp(&expected_msg, static_cast<uint8_t*>(call->data) + sizeof(fdf_txid_t),
+                        sizeof(expected_msg)));
+  }
+}
+
 // Tests that a blocking dispatcher will not directly call into the next driver, but after sealing
 // the allow_sync option, it will.
 TEST_F(DispatcherTest, AllowSyncCallsDoesNotDirectlyCallUntilSealed) {
@@ -1227,7 +1326,9 @@ TEST_F(DispatcherTest, ShutdownCallbackIsNotReentrant) {
 
   libsync::Completion completion;
   auto destructed_handler = [&](fdf_dispatcher_t* dispatcher) {
-    { fbl::AutoLock lock(&driver_lock); }
+    {
+      fbl::AutoLock lock(&driver_lock);
+    }
     completion.Signal();
   };
 

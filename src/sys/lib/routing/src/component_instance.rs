@@ -14,7 +14,7 @@ use {
     cm_rust::{CapabilityDecl, CollectionDecl, ExposeDecl, OfferDecl, OfferSource, UseDecl},
     cm_types::{Name, Url},
     derivative::Derivative,
-    moniker::{ChildName, ExtendedMoniker, Moniker, MonikerBase},
+    moniker::{ChildName, ExtendedMoniker, Moniker},
     std::{
         clone::Clone,
         sync::{Arc, Weak},

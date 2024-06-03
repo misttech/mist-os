@@ -1,0 +1,69 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+//! Device queues.
+
+use alloc::collections::VecDeque;
+
+use netstack3_base::WorkQueueReport;
+
+use crate::internal::base::DeviceSendFrameError;
+
+pub(crate) mod api;
+mod fifo;
+pub(crate) mod rx;
+pub(crate) mod tx;
+
+/// The maximum number of elements that can be in the RX queue.
+const MAX_RX_QUEUED_LEN: usize = 10000;
+/// The maximum number of elements that can be in the TX queue.
+const MAX_TX_QUEUED_LEN: usize = 10000;
+const MAX_BATCH_SIZE: usize = 100;
+
+/// Error returned when the receive queue is full.
+#[derive(Debug, PartialEq, Eq)]
+pub struct ReceiveQueueFullError<T>(pub T);
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum TransmitQueueFrameError<S> {
+    NoQueue(DeviceSendFrameError<()>),
+    QueueFull(S),
+    SerializeError(S),
+}
+
+/// The state used to dequeue and handle frames from the device queue.
+pub struct DequeueState<Meta, Buffer> {
+    dequeued_frames: VecDeque<(Meta, Buffer)>,
+}
+
+impl<Meta, Buffer> Default for DequeueState<Meta, Buffer> {
+    fn default() -> DequeueState<Meta, Buffer> {
+        DequeueState {
+            // Make sure we can dequeue up to `MAX_BATCH_SIZE` frames without
+            // needing to reallocate.
+            dequeued_frames: VecDeque::with_capacity(MAX_BATCH_SIZE),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum EnqueueResult {
+    QueueWasPreviouslyEmpty,
+    QueuePreviouslyWasOccupied,
+}
+
+#[derive(Debug)]
+enum DequeueResult {
+    MoreStillQueued,
+    NoMoreLeft,
+}
+
+impl From<DequeueResult> for WorkQueueReport {
+    fn from(value: DequeueResult) -> Self {
+        match value {
+            DequeueResult::MoreStillQueued => Self::Pending,
+            DequeueResult::NoMoreLeft => Self::AllDone,
+        }
+    }
+}

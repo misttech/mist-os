@@ -26,7 +26,7 @@ use fuchsia_trace as ftrace;
 use futures::channel::mpsc;
 use futures::prelude::*;
 use lazy_static::lazy_static;
-use moniker::{Moniker, MonikerBase};
+use moniker::Moniker;
 use selectors::SelectorExt;
 use std::{
     collections::{BTreeMap, HashMap},

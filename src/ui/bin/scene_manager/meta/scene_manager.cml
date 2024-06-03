@@ -74,6 +74,7 @@
         },
     ],
     config: {
+        idle_threshold_ms: { type: "uint64" },
         supported_input_devices: {
             type: "vector",
             element: {

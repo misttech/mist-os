@@ -35,11 +35,16 @@ rustc_test("bin") {
   source_root = "main.rs"
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
+    "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
     "//src/lib/diagnostics/reader/rust",
     "//src/lib/diagnostics/selectors",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component-test",
+    "//src/performance/memory/attribution/testing",
     "//src/sys/lib/moniker",
+    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",
   ]
 

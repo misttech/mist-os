@@ -178,7 +178,7 @@ impl TestDevice {
     /// Creates a new device as a child of the emulator controller device
     async fn create(dev_directory: DirectoryProxy) -> Result<TestDevice, Error> {
         // 0x30 => fuchsia.platform.BIND_PLATFORM_DEV_DID.BT_HCI_EMULATOR
-        let emulator_device_path: &str = "sys/platform/00:00:30";
+        let emulator_device_path: &str = "sys/platform/bt-hci-emulator";
         let virtual_controller_device_path: String =
             emulator_device_path.to_owned() + "/bt_hci_virtual";
 

@@ -9,9 +9,11 @@
 #include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/hlcpp_conversion.h>
 #include <lib/fdio/directory.h>
 #include <lib/image-format/image_format.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/trace/event.h>
 
 #include <fbl/algorithm.h>
@@ -99,11 +101,11 @@ std::vector<zx_koid_t> ExtractKoids(const std::vector<zx::event>& events) {
   return result;
 }
 
-fuchsia::sysmem::AllocatorSyncPtr CreateSysmemAllocatorSyncPtr(
+fuchsia::sysmem2::AllocatorSyncPtr CreateSysmemAllocatorSyncPtr(
     const std::string& debug_name_suffix) {
   FX_CHECK(!debug_name_suffix.empty());
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator;
-  zx_status_t status = fdio_service_connect("/svc/fuchsia.sysmem.Allocator",
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator;
+  zx_status_t status = fdio_service_connect("/svc/fuchsia.sysmem2.Allocator",
                                             sysmem_allocator.NewRequest().TakeChannel().release());
   FX_DCHECK(status == ZX_OK);
   auto debug_name = fsl::GetCurrentProcessName() + " " + debug_name_suffix;
@@ -112,25 +114,15 @@ fuchsia::sysmem::AllocatorSyncPtr CreateSysmemAllocatorSyncPtr(
       << "Sysmem client debug name exceeded max length of " << kMaxNameLength << " (\""
       << debug_name << "\")";
 
-  sysmem_allocator->SetDebugClientInfo(std::move(debug_name), fsl::GetCurrentProcessKoid());
+  fuchsia::sysmem2::AllocatorSetDebugClientInfoRequest set_debug_request;
+  set_debug_request.set_name(std::move(debug_name));
+  set_debug_request.set_id(fsl::GetCurrentProcessKoid());
+  sysmem_allocator->SetDebugClientInfo(std::move(set_debug_request));
+
   return sysmem_allocator;
 }
 
-SysmemTokens CreateSysmemTokens(fuchsia::sysmem::Allocator_Sync* sysmem_allocator) {
-  FX_DCHECK(sysmem_allocator);
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr local_token;
-  zx_status_t status = sysmem_allocator->AllocateSharedCollection(local_token.NewRequest());
-  FX_DCHECK(status == ZX_OK);
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr dup_token;
-  status = local_token->Duplicate(std::numeric_limits<uint32_t>::max(), dup_token.NewRequest());
-  FX_DCHECK(status == ZX_OK);
-  status = local_token->Sync();
-  FX_DCHECK(status == ZX_OK);
-
-  return {std::move(local_token), std::move(dup_token)};
-}
-
-Sysmem2Tokens CreateSysmemTokens(fuchsia::sysmem2::Allocator_Sync* sysmem_allocator) {
+SysmemTokens CreateSysmemTokens(fuchsia::sysmem2::Allocator_Sync* sysmem_allocator) {
   FX_DCHECK(sysmem_allocator);
   fuchsia::sysmem2::BufferCollectionTokenSyncPtr local_token;
   fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest allocate_request;
@@ -151,38 +143,9 @@ Sysmem2Tokens CreateSysmemTokens(fuchsia::sysmem2::Allocator_Sync* sysmem_alloca
   return {std::move(local_token), std::move(dup_token)};
 }
 
-fuchsia::sysmem::BufferCollectionConstraints CreateDefaultConstraints(uint32_t buffer_count,
-                                                                      uint32_t width,
-                                                                      uint32_t height) {
-  fuchsia::sysmem::BufferCollectionConstraints constraints;
-  constraints.has_buffer_memory_constraints = true;
-  constraints.buffer_memory_constraints.cpu_domain_supported = true;
-  constraints.buffer_memory_constraints.ram_domain_supported = true;
-  constraints.usage.cpu = fuchsia::sysmem::cpuUsageReadOften | fuchsia::sysmem::cpuUsageWriteOften;
-  constraints.min_buffer_count = buffer_count;
-
-  constraints.image_format_constraints_count = 1;
-  auto& image_constraints = constraints.image_format_constraints[0];
-  image_constraints.color_spaces_count = 1;
-  image_constraints.color_space[0] =
-      fuchsia::sysmem::ColorSpace{.type = fuchsia::sysmem::ColorSpaceType::SRGB};
-  image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::BGRA32;
-  image_constraints.pixel_format.has_format_modifier = true;
-  image_constraints.pixel_format.format_modifier.value = fuchsia::sysmem::FORMAT_MODIFIER_LINEAR;
-
-  image_constraints.required_min_coded_width = width;
-  image_constraints.required_min_coded_height = height;
-  image_constraints.required_max_coded_width = width;
-  image_constraints.required_max_coded_height = height;
-
-  image_constraints.bytes_per_row_divisor = 4;
-
-  return constraints;
-}
-
-fuchsia::sysmem2::BufferCollectionConstraints CreateDefaultConstraints2(uint32_t buffer_count,
-                                                                        uint32_t width,
-                                                                        uint32_t height) {
+fuchsia::sysmem2::BufferCollectionConstraints CreateDefaultConstraints(uint32_t buffer_count,
+                                                                       uint32_t width,
+                                                                       uint32_t height) {
   fuchsia::sysmem2::BufferCollectionConstraints constraints;
   constraints.mutable_buffer_memory_constraints()->set_cpu_domain_supported(true);
   constraints.mutable_buffer_memory_constraints()->set_ram_domain_supported(true);
@@ -190,8 +153,7 @@ fuchsia::sysmem2::BufferCollectionConstraints CreateDefaultConstraints2(uint32_t
                                        fuchsia::sysmem2::CPU_USAGE_WRITE_OFTEN);
   constraints.set_min_buffer_count(buffer_count);
 
-  constraints.mutable_image_format_constraints()->reserve(1);
-  auto& image_constraints = constraints.mutable_image_format_constraints()->at(0);
+  auto& image_constraints = constraints.mutable_image_format_constraints()->emplace_back();
   image_constraints.mutable_color_spaces()->push_back(fuchsia::images2::ColorSpace::SRGB);
   image_constraints.set_pixel_format(fuchsia::images2::PixelFormat::B8G8R8A8);
   image_constraints.set_pixel_format_modifier(fuchsia::images2::PixelFormatModifier::LINEAR);
@@ -239,6 +201,14 @@ float GetOrientationAngle(fuchsia::ui::composition::Orientation orientation) {
 
 namespace {
 
+uint32_t GetBytesPerRow(const fuchsia::sysmem2::ImageFormatConstraints& image_format_constraints,
+                        uint32_t image_width, uint32_t bytes_per_pixel) {
+  uint32_t bytes_per_row_divisor = image_format_constraints.bytes_per_row_divisor();
+  uint32_t min_bytes_per_row = image_format_constraints.min_bytes_per_row();
+  uint32_t bytes_per_row = fbl::round_up(std::max(image_width * bytes_per_pixel, min_bytes_per_row),
+                                         bytes_per_row_divisor);
+  return bytes_per_row;
+}
 uint32_t GetBytesPerRow(const fuchsia::sysmem::ImageFormatConstraints& image_format_constraints,
                         uint32_t image_width, uint32_t bytes_per_pixel) {
   uint32_t bytes_per_row_divisor = image_format_constraints.bytes_per_row_divisor;
@@ -250,10 +220,26 @@ uint32_t GetBytesPerRow(const fuchsia::sysmem::ImageFormatConstraints& image_for
 
 }  // namespace
 
+uint32_t GetBytesPerPixel(const fuchsia::sysmem2::SingleBufferSettings& settings) {
+  return GetBytesPerPixel(settings.image_format_constraints());
+}
 uint32_t GetBytesPerPixel(const fuchsia::sysmem::SingleBufferSettings& settings) {
   return GetBytesPerPixel(settings.image_format_constraints);
 }
 
+uint32_t GetBytesPerPixel(
+    const fuchsia::sysmem2::ImageFormatConstraints& image_format_constraints) {
+  fuchsia::images2::PixelFormat pixel_format = image_format_constraints.pixel_format();
+  fuchsia::images2::PixelFormatModifier pixel_format_modifier;
+  if (image_format_constraints.has_pixel_format_modifier()) {
+    pixel_format_modifier = image_format_constraints.pixel_format_modifier();
+  } else {
+    pixel_format_modifier = fuchsia::images2::PixelFormatModifier::LINEAR;
+  }
+  PixelFormatAndModifier pixel_format_and_modifier(fidl::HLCPPToNatural(pixel_format),
+                                                   fidl::HLCPPToNatural(pixel_format_modifier));
+  return ImageFormatStrideBytesPerWidthPixel(pixel_format_and_modifier);
+}
 uint32_t GetBytesPerPixel(const fuchsia::sysmem::ImageFormatConstraints& image_format_constraints) {
   auto hlcpp_pixel_format = image_format_constraints.pixel_format;
   fidl::Arena arena;
@@ -261,15 +247,29 @@ uint32_t GetBytesPerPixel(const fuchsia::sysmem::ImageFormatConstraints& image_f
   return ImageFormatStrideBytesPerWidthPixel(wire_pixel_format);
 }
 
+uint32_t GetBytesPerRow(const fuchsia::sysmem2::SingleBufferSettings& settings,
+                        uint32_t image_width) {
+  return GetBytesPerRow(settings.image_format_constraints(), image_width);
+}
 uint32_t GetBytesPerRow(const fuchsia::sysmem::SingleBufferSettings& settings,
                         uint32_t image_width) {
   return GetBytesPerRow(settings.image_format_constraints, image_width);
 }
 
+uint32_t GetBytesPerRow(const fuchsia::sysmem2::ImageFormatConstraints& image_format_constraints,
+                        uint32_t image_width) {
+  uint32_t bytes_per_pixel = GetBytesPerPixel(image_format_constraints);
+  return GetBytesPerRow(image_format_constraints, image_width, bytes_per_pixel);
+}
 uint32_t GetBytesPerRow(const fuchsia::sysmem::ImageFormatConstraints& image_format_constraints,
                         uint32_t image_width) {
   uint32_t bytes_per_pixel = GetBytesPerPixel(image_format_constraints);
   return GetBytesPerRow(image_format_constraints, image_width, bytes_per_pixel);
+}
+
+uint32_t GetPixelsPerRow(const fuchsia::sysmem2::SingleBufferSettings& settings,
+                         uint32_t image_width) {
+  return GetPixelsPerRow(settings.image_format_constraints(), image_width);
 }
 
 uint32_t GetPixelsPerRow(const fuchsia::sysmem::SingleBufferSettings& settings,
@@ -277,6 +277,11 @@ uint32_t GetPixelsPerRow(const fuchsia::sysmem::SingleBufferSettings& settings,
   return GetPixelsPerRow(settings.image_format_constraints, image_width);
 }
 
+uint32_t GetPixelsPerRow(const fuchsia::sysmem2::ImageFormatConstraints& image_format_constraints,
+                         uint32_t image_width) {
+  uint32_t bytes_per_pixel = GetBytesPerPixel(image_format_constraints);
+  return GetBytesPerRow(image_format_constraints, image_width, bytes_per_pixel) / bytes_per_pixel;
+}
 uint32_t GetPixelsPerRow(const fuchsia::sysmem::ImageFormatConstraints& image_format_constraints,
                          uint32_t image_width) {
   uint32_t bytes_per_pixel = GetBytesPerPixel(image_format_constraints);

@@ -18,6 +18,13 @@ board_configuration("arm64") {
     "//boards/emulation/virtio",
   ]
 
+  hardware_info = {
+    name = "qemu-arm64"
+    product_id = 1
+    vendor_id = 1
+    revision = 1
+  }
+
   filesystems = {
     vbmeta = {
       key = "//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"
@@ -84,4 +91,8 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/pl031-rtc.cm" ]
     },
   ]
+
+  # Flag controlling kernel's uart implementation.
+  # TODO(https://fxbug.dev/326669461): Remove when migration is complete.
+  kernel_cmdline = [ "kernel.experimental.serial_migration=true" ]
 }

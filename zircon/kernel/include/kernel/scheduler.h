@@ -21,6 +21,7 @@
 #include <fbl/wavl_tree_best_node_observer.h>
 #include <ffl/fixed.h>
 #include <kernel/auto_lock.h>
+#include <kernel/mp.h>
 #include <kernel/owned_wait_queue.h>
 #include <kernel/scheduler_state.h>
 #include <kernel/spinlock.h>
@@ -351,6 +352,16 @@ class Scheduler {
     }
   }
 
+  // Set/clears the current cpu's bit in the global mp_active_mask.  Holds the
+  // scheduler's queue lock while the bit is changed, enforcing the invariant
+  // that a scheduler's active bit can only ever change while holding that
+  // scheduler's lock.
+  static void SetCurrCpuActive(bool is_active) {
+    Scheduler& scheduler = *Get();
+    Guard<MonitoredSpinLock, IrqSave> guard{&scheduler.queue_lock_, SOURCE_TAG};
+    scheduler.SetCpuActive(is_active);
+  }
+
  private:
   // fwd decl of a helper class used for PI Join/Split operations
   template <typename T>
@@ -469,6 +480,19 @@ class Scheduler {
   // or wait queue lock.
   static cpu_num_t FindTargetCpu(Thread* thread, FindTargetCpuReason reason)
       TA_REQ_SHARED(thread->get_lock());
+
+  // Change this scheduler's CPU's active state in the global mp_active_mask.
+  // We require that the scheduler's queue_lock be held during the operation.
+  // This enforces the invariant that "the scheduler's active bit only changes
+  // while holding the scheduler's queue lock".
+  //
+  // This means that things like "FindTargetCpu" are free to check the global
+  // active mask to see whether or not we _think_ that a given scheduler is
+  // likely to be active for selection purposes, but when it comes time to
+  // actually add a thread to a scheduler's queues, we check the active state of
+  // the scheduler's assigned CPU from within the safety of the queue lock, fo
+  void SetCpuActive(bool is_active) TA_REQ(queue_lock_) { mp_set_curr_cpu_active(is_active); }
+  bool IsCpuActive() TA_REQ(queue_lock_) { return mp_is_cpu_active(this_cpu_); }
 
   // Handle all of the common tasks associated with each of the possible PI
   // interactions.  The outline of this is:

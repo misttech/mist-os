@@ -35,6 +35,8 @@ fbl::RefPtr<EventDispatcher> GetMemPressureEvent(uint32_t kind) {
   return gExecutor.GetMemPressureEvent(kind);
 }
 
+MemoryWatchdog& GetMemoryWatchdog() { return gExecutor.GetMemoryWatchdog(); }
+
 void StartRootJobObserver() { gExecutor.StartRootJobObserver(); }
 
 static void object_init(uint level) TA_NO_THREAD_SAFETY_ANALYSIS {

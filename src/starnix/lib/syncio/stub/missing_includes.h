@@ -10,68 +10,39 @@
 
 #include <lib/zxio/types.h>
 
-const zxio_shutdown_options_t _ZXIO_SHUTDOWN_OPTIONS_READ = ZXIO_SHUTDOWN_OPTIONS_READ;
-#undef ZXIO_SHUTDOWN_OPTIONS_READ
-const zxio_shutdown_options_t ZXIO_SHUTDOWN_OPTIONS_READ = _ZXIO_SHUTDOWN_OPTIONS_READ;
+// generate.py will remove __bindgen_missing_ from the start of constant names.
+#define C(t, x) const t __bindgen_missing_##x = x
 
-const zxio_shutdown_options_t _ZXIO_SHUTDOWN_OPTIONS_WRITE = ZXIO_SHUTDOWN_OPTIONS_WRITE;
-#undef ZXIO_SHUTDOWN_OPTIONS_WRITE
-const zxio_shutdown_options_t ZXIO_SHUTDOWN_OPTIONS_WRITE = _ZXIO_SHUTDOWN_OPTIONS_WRITE;
-
-const zxio_node_protocols_t _ZXIO_NODE_PROTOCOL_NONE = ZXIO_NODE_PROTOCOL_NONE;
-#undef ZXIO_NODE_PROTOCOL_NONE
-const zxio_node_protocols_t ZXIO_NODE_PROTOCOL_NONE = _ZXIO_NODE_PROTOCOL_NONE;
-
-const zxio_node_protocols_t _ZXIO_NODE_PROTOCOL_CONNECTOR = ZXIO_NODE_PROTOCOL_CONNECTOR;
-#undef ZXIO_NODE_PROTOCOL_CONNECTOR
-const zxio_node_protocols_t ZXIO_NODE_PROTOCOL_CONNECTOR = _ZXIO_NODE_PROTOCOL_CONNECTOR;
-
-const zxio_node_protocols_t _ZXIO_NODE_PROTOCOL_DIRECTORY = ZXIO_NODE_PROTOCOL_DIRECTORY;
-#undef ZXIO_NODE_PROTOCOL_DIRECTORY
-const zxio_node_protocols_t ZXIO_NODE_PROTOCOL_DIRECTORY = _ZXIO_NODE_PROTOCOL_DIRECTORY;
-
-const zxio_node_protocols_t _ZXIO_NODE_PROTOCOL_FILE = ZXIO_NODE_PROTOCOL_FILE;
-#undef ZXIO_NODE_PROTOCOL_FILE
-const zxio_node_protocols_t ZXIO_NODE_PROTOCOL_FILE = _ZXIO_NODE_PROTOCOL_FILE;
-
-const zxio_node_protocols_t _ZXIO_NODE_PROTOCOL_SYMLINK = ZXIO_NODE_PROTOCOL_SYMLINK;
-#undef ZXIO_NODE_PROTOCOL_SYMLINK
-const zxio_node_protocols_t ZXIO_NODE_PROTOCOL_SYMLINK = _ZXIO_NODE_PROTOCOL_SYMLINK;
-
-const zxio_seek_origin_t _ZXIO_SEEK_ORIGIN_START = ZXIO_SEEK_ORIGIN_START;
-#undef ZXIO_SEEK_ORIGIN_START
-const zxio_seek_origin_t ZXIO_SEEK_ORIGIN_START = _ZXIO_SEEK_ORIGIN_START;
-
-const zxio_seek_origin_t _ZXIO_SEEK_ORIGIN_CURRENT = ZXIO_SEEK_ORIGIN_CURRENT;
-#undef ZXIO_SEEK_ORIGIN_CURRENT
-const zxio_seek_origin_t ZXIO_SEEK_ORIGIN_CURRENT = _ZXIO_SEEK_ORIGIN_CURRENT;
-
-const zxio_seek_origin_t _ZXIO_SEEK_ORIGIN_END = ZXIO_SEEK_ORIGIN_END;
-#undef ZXIO_SEEK_ORIGIN_END
-const zxio_seek_origin_t ZXIO_SEEK_ORIGIN_END = _ZXIO_SEEK_ORIGIN_END;
-
-const zxio_allocate_mode_t _ZXIO_ALLOCATE_KEEP_SIZE = ZXIO_ALLOCATE_KEEP_SIZE;
-#undef ZXIO_ALLOCATE_KEEP_SIZE
-const zxio_allocate_mode_t ZXIO_ALLOCATE_KEEP_SIZE = _ZXIO_ALLOCATE_KEEP_SIZE;
-
-const zxio_allocate_mode_t _ZXIO_ALLOCATE_UNSHARE_RANGE = ZXIO_ALLOCATE_UNSHARE_RANGE;
-#undef ZXIO_ALLOCATE_UNSHARE_RANGE
-const zxio_allocate_mode_t ZXIO_ALLOCATE_UNSHARE_RANGE = _ZXIO_ALLOCATE_UNSHARE_RANGE;
-
-const zxio_allocate_mode_t _ZXIO_ALLOCATE_PUNCH_HOLE = ZXIO_ALLOCATE_PUNCH_HOLE;
-#undef ZXIO_ALLOCATE_PUNCH_HOLE
-const zxio_allocate_mode_t ZXIO_ALLOCATE_PUNCH_HOLE = _ZXIO_ALLOCATE_PUNCH_HOLE;
-
-const zxio_allocate_mode_t _ZXIO_ALLOCATE_COLLAPSE_RANGE = ZXIO_ALLOCATE_COLLAPSE_RANGE;
-#undef ZXIO_ALLOCATE_COLLAPSE_RANGE
-const zxio_allocate_mode_t ZXIO_ALLOCATE_COLLAPSE_RANGE = _ZXIO_ALLOCATE_COLLAPSE_RANGE;
-
-const zxio_allocate_mode_t _ZXIO_ALLOCATE_ZERO_RANGE = ZXIO_ALLOCATE_ZERO_RANGE;
-#undef ZXIO_ALLOCATE_ZERO_RANGE
-const zxio_allocate_mode_t ZXIO_ALLOCATE_ZERO_RANGE = _ZXIO_ALLOCATE_ZERO_RANGE;
-
-const zxio_allocate_mode_t _ZXIO_ALLOCATE_INSERT_RANGE = ZXIO_ALLOCATE_INSERT_RANGE;
-#undef ZXIO_ALLOCATE_INSERT_RANGE
-const zxio_allocate_mode_t ZXIO_ALLOCATE_INSERT_RANGE = _ZXIO_ALLOCATE_INSERT_RANGE;
+C(zxio_shutdown_options_t, ZXIO_SHUTDOWN_OPTIONS_READ);
+C(zxio_shutdown_options_t, ZXIO_SHUTDOWN_OPTIONS_WRITE);
+C(zxio_node_protocols_t, ZXIO_NODE_PROTOCOL_NONE);
+C(zxio_node_protocols_t, ZXIO_NODE_PROTOCOL_CONNECTOR);
+C(zxio_node_protocols_t, ZXIO_NODE_PROTOCOL_DIRECTORY);
+C(zxio_node_protocols_t, ZXIO_NODE_PROTOCOL_FILE);
+C(zxio_node_protocols_t, ZXIO_NODE_PROTOCOL_SYMLINK);
+C(zxio_seek_origin_t, ZXIO_SEEK_ORIGIN_START);
+C(zxio_seek_origin_t, ZXIO_SEEK_ORIGIN_CURRENT);
+C(zxio_seek_origin_t, ZXIO_SEEK_ORIGIN_END);
+C(zxio_allocate_mode_t, ZXIO_ALLOCATE_KEEP_SIZE);
+C(zxio_allocate_mode_t, ZXIO_ALLOCATE_UNSHARE_RANGE);
+C(zxio_allocate_mode_t, ZXIO_ALLOCATE_PUNCH_HOLE);
+C(zxio_allocate_mode_t, ZXIO_ALLOCATE_COLLAPSE_RANGE);
+C(zxio_allocate_mode_t, ZXIO_ALLOCATE_ZERO_RANGE);
+C(zxio_allocate_mode_t, ZXIO_ALLOCATE_INSERT_RANGE);
+C(zxio_object_type_t, ZXIO_OBJECT_TYPE_NONE);
+C(zxio_object_type_t, ZXIO_OBJECT_TYPE_NODE);
+C(zxio_object_type_t, ZXIO_OBJECT_TYPE_DIR);
+C(zxio_object_type_t, ZXIO_OBJECT_TYPE_SERVICE);
+C(zxio_object_type_t, ZXIO_OBJECT_TYPE_FILE);
+C(zxio_object_type_t, ZXIO_OBJECT_TYPE_TTY);
+C(zxio_object_type_t, ZXIO_OBJECT_TYPE_VMO);
+C(zxio_object_type_t, ZXIO_OBJECT_TYPE_DEBUGLOG);
+C(zxio_object_type_t, ZXIO_OBJECT_TYPE_PIPE);
+C(zxio_object_type_t, ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET);
+C(zxio_object_type_t, ZXIO_OBJECT_TYPE_STREAM_SOCKET);
+C(zxio_object_type_t, ZXIO_OBJECT_TYPE_RAW_SOCKET);
+C(zxio_object_type_t, ZXIO_OBJECT_TYPE_PACKET_SOCKET);
+C(zxio_object_type_t, ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET);
+C(zxio_object_type_t, ZXIO_OBJECT_TYPE_SYMLINK);
 
 #endif  // SRC_STARNIX_LIB_SYNCIO_STUB_MISSING_INCLUDES_H_

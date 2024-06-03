@@ -9,14 +9,14 @@ use {
         },
         component::instance::InstanceState,
         component::ComponentInstance,
-        structured_dict::ComponentInput,
     },
-    ::routing::component_instance::ExtendedInstanceInterface,
+    ::routing::{
+        bedrock::structured_dict::ComponentInput, component_instance::ExtendedInstanceInterface,
+    },
     async_trait::async_trait,
     errors::{ActionError, DestroyActionError},
     futures::{future::join_all, Future},
     hooks::EventPayload,
-    moniker::MonikerBase,
     std::{
         pin::{pin, Pin},
         sync::Arc,

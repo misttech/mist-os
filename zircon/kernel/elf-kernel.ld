@@ -55,6 +55,8 @@ SECTIONS {
   .gnu.hash : { *(.gnu.hash) }
   .dynsym : { *(.dynsym) }
   .dynstr : { *(.dynstr) }
+  .relr.auth.dyn : { *(.relr.auth.dyn) }
+  ASSERT(SIZEOF(.relr.auth.dyn) == 0, ".relr.auth.dyn is not supported")
   .relr.dyn : { *(.relr.dyn) }
   .rela.dyn : { *(.rela*) }
   .rel.dyn : { *(.rel*) }

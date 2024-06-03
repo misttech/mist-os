@@ -157,11 +157,13 @@ mod tests {
             component::StartReason,
             context::ModelContext,
             model::{Model, ModelParams},
-            structured_dict::ComponentInput,
             testing::mocks::MockResolver,
             token::InstanceRegistry,
         },
-        ::routing::{environment::DebugRegistration, policy::PolicyError},
+        ::routing::{
+            bedrock::structured_dict::ComponentInput, environment::DebugRegistration,
+            policy::PolicyError,
+        },
         assert_matches::assert_matches,
         cm_config::{
             AllowlistEntryBuilder, CapabilityAllowlistSource, DebugCapabilityAllowlistEntry,
@@ -175,7 +177,7 @@ mod tests {
         errors::{ActionError, ModelError, ResolveActionError},
         fidl_fuchsia_component as fcomponent,
         maplit::hashmap,
-        moniker::{Moniker, MonikerBase},
+        moniker::Moniker,
         std::collections::{HashMap, HashSet},
     };
 
