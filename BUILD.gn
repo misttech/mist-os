@@ -111,13 +111,16 @@ group("default") {
   deps = [
     "//:tests",
     "//bundles/boot_tests",
-    "//examples/nolibc",
-    "//zircon/kernel/lib/mistos/starnix/examples/hello_starnix",
-    "//zircon/kernel/lib/mistos/userloader/example:tests",
+    "//src/starnix_lite:tests",
 
     #
     "//zircon/tools:tests",
   ]
+}
+
+# Generate ZBIs used to run on target
+group("zbi") {
+  deps = [ "//src/starnix_lite" ]
 }
 
 # A GN pool matching the special Ninja 'console' pool. Any action() that
