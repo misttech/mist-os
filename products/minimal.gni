@@ -61,3 +61,4 @@ cipd_assembly_artifact_targets = [
 ]
 
 use_bazel_images_only = true
+assembly_board_configs = [ "//boards" ]
