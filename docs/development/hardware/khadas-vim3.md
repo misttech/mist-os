@@ -32,14 +32,6 @@ You'll need all of the following hardware and software:
 * A desktop or laptop computer that's running Linux and has 2 USB ports
   available. This computer is called the **host**.
 
-  Caution: A macOS host may work but these instructions have not been validated
-  with macOS. Building Fuchsia on a remote Linux computer and then attempting to
-  flash Fuchsia onto the VIM3 with a local macOS host is known to not work.
-
-  <!-- Context from kayce@: Local macOS host + remote Linux workstation doesn't
-       work because when you run `fx pave` you get an error about a mismatch
-       between the local host OS and the remote workstation OS. -->
-
 * A power supply of at least 24W to your host. The VIM3 can draw that much power
   when [DVFS] is enabled.
 

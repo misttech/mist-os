@@ -17,7 +17,7 @@ low-level software development.
 
 All of the Fuchsia hardware testing workflows in this guide assume
 that your **Fuchsia device** is connected to a **test host**. The
-test host is a laptop or desktop running macOS, Linux, or Windows.
+test host is a laptop or desktop running Linux or Windows.
 To test a hardware subsystem of your Fuchsia device you run a command
 like `adb shell gpioutil list` on the test host. The first part of the command,
 `adb shell`, is the **transport system** that handles communication between
@@ -61,12 +61,6 @@ host OS and transport system are supported:
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>macOS</td>
-      <td><span style="color:green" class="material-icons">check_circle</span></td>
-      <td><span style="color:green" class="material-icons">check_circle</span></td>
-      <td><span style="color:green" class="material-icons">check_circle</span></td>
-    </tr>
     <tr>
       <td>Linux</td>
       <td><span style="color:green" class="material-icons">check_circle</span></td>
