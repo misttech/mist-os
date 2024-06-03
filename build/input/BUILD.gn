@@ -14,7 +14,6 @@ group("bootfs") {
   deps = [
     "board:bootfs_labels",
     "dev:bootfs_labels",
-    "product:bootfs_labels",
   ]
 }
 

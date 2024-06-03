@@ -24,12 +24,4 @@ if (is_host) {
     # is running on.
     deps = product_host_labels
   }
-} else {
-  ## These should only be in the default toolchain.
-  assert(current_toolchain == default_toolchain)
-
-  group("bootfs_labels") {
-    testonly = fuchsia_zbi_testonly
-    deps = product_bootfs_labels
-  }
 }
