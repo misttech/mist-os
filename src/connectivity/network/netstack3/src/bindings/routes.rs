@@ -22,7 +22,7 @@ use assert_matches::assert_matches;
 use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
 use futures::{
     channel::{mpsc, oneshot},
-    stream, Future, FutureExt as _, StreamExt as _,
+    stream, Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
 };
 use net_types::{
     ip::{
@@ -50,6 +50,7 @@ type DeviceId = netstack3_core::device::DeviceId<crate::bindings::BindingsCtx>;
 
 #[derive(GenericOverIp, Debug)]
 #[generic_over_ip(A, IpAddress)]
+#[derive(Clone)]
 pub(crate) enum RouteOp<A: IpAddress> {
     Add(netstack3_core::routes::AddableEntry<A, WeakDeviceId>),
     RemoveToSubnet(Subnet<A>),
@@ -69,6 +70,7 @@ pub(crate) enum TableOp<I: Ip> {
 
 #[derive(GenericOverIp, Debug)]
 #[generic_over_ip(A, IpAddress)]
+#[derive(Clone)]
 pub(crate) enum Change<A: IpAddress> {
     RouteOp(RouteOp<A>, WeakSetMembership<A::Version>),
     RemoveSet(WeakUserRouteSet<A::Version>),
@@ -164,7 +166,7 @@ enum TableModifyResult<T> {
     TableChanged(T),
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ChangeOutcome {
     NoChange,
     Changed,
@@ -543,34 +545,16 @@ fn to_entry<I: netstack3_core::IpExt>(
 }
 
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
-async fn handle_route_change<I>(
-    tables: &mut HashMap<TableId<I>, Table<I::Addr>>,
-    ctx: &mut Ctx,
+async fn handle_single_table_route_change<I>(
+    table: &mut Table<I::Addr>,
+    table_id: TableId<I>,
+    mut ctx: Ctx,
     change: Change<I::Addr>,
     route_update_dispatcher: &crate::bindings::routes::state::RouteUpdateDispatcher<I>,
 ) -> Result<ChangeOutcome, ChangeError>
 where
     I: IpExt + FidlRouteAdminIpExt,
 {
-    tracing::debug!("routes::handle_change {change:?}");
-
-    let table_id = match &change {
-        Change::RouteOp(_, SetMembership::User(weak_set)) | Change::RemoveSet(weak_set) => {
-            weak_set.upgrade().ok_or(ChangeError::SetRemoved)?.table()
-        }
-        // TODO(https://fxbug.dev/337065118): Remove all routes across route
-        // tables.
-        Change::RemoveMatchingDevice(_)
-        // The following routes set memberships refer to the main table.
-        | Change::RouteOp(_, SetMembership::Global)
-        | Change::RouteOp(_, SetMembership::CoreNdp)
-        | Change::RouteOp(_, SetMembership::InitialDeviceRoutes)
-        | Change::RouteOp(_, SetMembership::Loopback) => main_table_id::<I>(),
-        Change::RemoveTable(table_id) => *table_id,
-    };
-
-    let table = tables.get_mut(&table_id).expect("missing table {table_id:?}");
-
     enum TableChange<I: Ip, Iter> {
         Add(netstack3_core::routes::Entry<I::Addr, DeviceId>),
         Remove(Iter),
@@ -585,7 +569,7 @@ where
                 TableModifyResult::NoChange => return Ok(ChangeOutcome::NoChange),
                 TableModifyResult::SetChanged => return Ok(ChangeOutcome::Changed),
                 TableModifyResult::TableChanged((addable_entry, _generation)) => {
-                    TableChange::Add(to_entry::<I>(ctx, addable_entry))
+                    TableChange::Add(to_entry::<I>(&mut ctx, addable_entry))
                 }
             }
         }
@@ -717,6 +701,74 @@ where
     };
 
     Ok(ChangeOutcome::Changed)
+}
+
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+async fn handle_route_change<I>(
+    tables: &mut HashMap<TableId<I>, Table<I::Addr>>,
+    ctx: &mut Ctx,
+    change: Change<I::Addr>,
+    route_update_dispatcher: &crate::bindings::routes::state::RouteUpdateDispatcher<I>,
+) -> Result<ChangeOutcome, ChangeError>
+where
+    I: IpExt + FidlRouteAdminIpExt,
+{
+    tracing::debug!("routes::handle_change {change:?}");
+
+    fn one_table<I: Ip>(
+        tables: &mut HashMap<TableId<I>, Table<I::Addr>>,
+        table_id: TableId<I>,
+    ) -> std::iter::Once<(TableId<I>, &'_ mut Table<I::Addr>)> {
+        let table = tables.get_mut(&table_id).expect("missing table {table_id:?}");
+        std::iter::once((table_id, table))
+    }
+
+    let tables = match &change {
+        Change::RouteOp(_, SetMembership::User(weak_set)) | Change::RemoveSet(weak_set) => {
+            itertools::Either::Left(one_table(
+                tables,
+                weak_set.upgrade().ok_or(ChangeError::SetRemoved)?.table(),
+            ))
+        }
+        Change::RemoveMatchingDevice(_) => {
+            itertools::Either::Right(tables.iter_mut().map(|(k, v)| (k.clone(), v)))
+        }
+        // The following routes set memberships refer to the main table.
+        // TODO(https://fxbug.dev/339567592): GlobalRouteSet should be aware of
+        // the route table as well.
+        Change::RouteOp(_, SetMembership::Global)
+        | Change::RouteOp(_, SetMembership::CoreNdp)
+        | Change::RouteOp(_, SetMembership::InitialDeviceRoutes)
+        | Change::RouteOp(_, SetMembership::Loopback) => {
+            itertools::Either::Left(one_table(tables, main_table_id::<I>()))
+        }
+        Change::RemoveTable(table_id) => itertools::Either::Left(one_table(tables, *table_id)),
+    };
+
+    stream::iter(tables)
+        .map(Ok)
+        .try_fold(ChangeOutcome::NoChange, {
+            move |change_so_far, (table_id, table)| {
+                handle_single_table_route_change(
+                    table,
+                    table_id,
+                    ctx.clone(),
+                    change.clone(),
+                    route_update_dispatcher,
+                )
+                .map_ok(move |current_change| {
+                    match (change_so_far, current_change) {
+                        (ChangeOutcome::NoChange, ChangeOutcome::NoChange) => {
+                            ChangeOutcome::NoChange
+                        }
+                        (ChangeOutcome::Changed, _) | (_, ChangeOutcome::Changed) => {
+                            ChangeOutcome::Changed
+                        }
+                    }
+                })
+            }
+        })
+        .await
 }
 
 async fn notify_removed_routes<I: Ip>(

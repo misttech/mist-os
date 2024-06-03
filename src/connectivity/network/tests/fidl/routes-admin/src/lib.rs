@@ -1700,3 +1700,85 @@ async fn add_route_in_user_table<I: net_types::ip::Ip + FidlRouteAdminIpExt + Fi
     .await
     .expect("should succeed");
 }
+
+#[netstack_test]
+async fn interface_removal_remove_routes_in_all_tables<
+    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    // We don't support multiple route tables in netstack2.
+    let TestSetup {
+        realm,
+        network: _network,
+        interface,
+        route_table,
+        global_route_table: _,
+        state,
+    } = TestSetup::<I>::new::<Netstack3>(&sandbox, name).await;
+    let route_table_provider = realm
+        .connect_to_protocol::<I::RouteTableProviderMarker>()
+        .expect("connect to main route table");
+    let user_route_table =
+        fnet_routes_ext::admin::new_route_table::<I>(&route_table_provider, None)
+            .expect("create new user table");
+    let user_route_set = fnet_routes_ext::admin::new_route_set::<I>(&user_route_table)
+        .expect("failed to create a new user route set");
+    let main_route_set = fnet_routes_ext::admin::new_route_set::<I>(&route_table)
+        .expect("failed to create a new main route set");
+    let main_table_id =
+        fnet_routes_ext::admin::get_table_id::<I>(&route_table).await.expect("get table id");
+    let user_table_id =
+        fnet_routes_ext::admin::get_table_id::<I>(&user_route_table).await.expect("get table id");
+
+    let route_to_add =
+        test_route::<I>(&interface, fnet_routes::SpecifiedMetric::ExplicitMetric(10));
+
+    for route_set in [&main_route_set, &user_route_set] {
+        let grant = interface.get_authorization().await.expect("getting grant should succeed");
+        let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
+        fnet_routes_ext::admin::authenticate_for_interface::<I>(&route_set, proof)
+            .await
+            .expect("no FIDL error")
+            .expect("authentication should succeed");
+
+        assert!(fnet_routes_ext::admin::add_route::<I>(
+            &route_set,
+            &route_to_add.try_into().expect("convert to FIDL")
+        )
+        .await
+        .expect("no FIDL error")
+        .expect("add route"));
+    }
+
+    let routes_stream =
+        fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
+    let mut routes_stream = pin!(routes_stream);
+
+    let mut routes =
+        fnet_routes_ext::collect_routes_until_idle::<I, HashSet<_>>(&mut routes_stream)
+            .await
+            .expect("collect routes should succeed");
+
+    assert_eq!(
+        routes
+            .iter()
+            .filter_map(|installed_route| (&installed_route.route == &route_to_add)
+                .then_some(installed_route.table_id))
+            .collect::<HashSet<_>>(),
+        HashSet::from([main_table_id, user_table_id])
+    );
+
+    drop(interface);
+
+    // The route should be removed across all tables.
+    fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
+        routes.iter().all(|installed_route| {
+            !installed_route.matches_route_and_table_id(&route_to_add, user_table_id)
+                && !installed_route.matches_route_and_table_id(&route_to_add, main_table_id)
+        })
+    })
+    .await
+    .expect("should succeed");
+}
