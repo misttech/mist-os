@@ -24,8 +24,8 @@ toc:
     path: /docs/development/testing/ctf/test_collection.md
   - title: "Testing Guidelines"
     path: /docs/development/testing/ctf/testing_guidelines.md
-  - title: "Diagnosing Test Failures"
-    path: /docs/development/testing/ctf/diagnosing_test_failures.md
+  - title: "CTF Troubleshooting Guide"
+    path: /docs/development/testing/ctf/troubleshooting.md
 - title: "Platform Surface Area (Plasa)"
   path: /docs/development/testing/ctf/plasa_overview.md
   section:
