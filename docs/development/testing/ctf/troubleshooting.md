@@ -271,7 +271,7 @@ The above example skips thawing the entire artifact at F15. If you
 do not want to skip all tests, see the previous section for how to
 skip individual test cases on the release branch.
 
-### Example: Major refactor to diagnostics subsystem
+#### Example: Major refactor to diagnostics subsystem
 
 https://fxrev.dev/1019042 deleted support for the `DirectoryReady`
 component event, which is no longer in use. Its primary use was to
