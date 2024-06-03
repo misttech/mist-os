@@ -6,7 +6,6 @@
 
 import abc
 from dataclasses import dataclass
-from typing import ClassVar
 
 
 @dataclass(frozen=True)
@@ -28,18 +27,8 @@ class ResumeMode(abc.ABC):
 
 
 @dataclass(frozen=True)
-class AutomaticResume(ResumeMode):
-    """Automatically resume after 5sec"""
-
-    duration: ClassVar[int] = 5
-
-    def __str__(self) -> str:
-        return f"AutomaticResume after {self.duration}sec"
-
-
-@dataclass(frozen=True)
 class TimerResume(ResumeMode):
-    """Automatically resume after the given duration"""
+    """Resume after the given duration"""
 
     duration: int
 
@@ -60,10 +49,6 @@ class SystemPowerStateController(abc.ABC):
 
     # List all the public methods
 
-    # Note - Creating this method based on the current understanding.
-    # Once we learn more about suspend-resume feature, if needed we can update
-    # this interface (such as splitting this API into multiple etc) accordingly
-    # to meet the feature needs.
     @abc.abstractmethod
     def suspend_resume(
         self,
@@ -83,21 +68,6 @@ class SystemPowerStateController(abc.ABC):
             errors.SystemPowerStateControllerError: In case of failure
             errors.NotSupportedError: If any of the suspend_state or resume_type
                 is not yet supported
-        """
-
-    @abc.abstractmethod
-    def idle_suspend_auto_resume(
-        self,
-        verify: bool = True,
-    ) -> None:
-        """Perform idle-suspend and auto-resume operation on the device.
-
-        Args:
-            verify: Whether or not to verify if suspend-resume operation
-                performed successfully. Optional and default is True.
-
-        Raises:
-            errors.SystemPowerStateControllerError: In case of failure
         """
 
     @abc.abstractmethod

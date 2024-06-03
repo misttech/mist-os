@@ -36,8 +36,6 @@ class FuchsiaDeviceOperation(enum.StrEnum):
 
     POWER_CYCLE = "power-cycle"
 
-    IDLE_SUSPEND_AUTO_RESUME = "idle-suspend-auto-resume"
-
     IDLE_SUSPEND_TIMER_RESUME = "idle-suspend-timer-resume"
 
 
@@ -142,11 +140,6 @@ class TestCaseRevive(fuchsia_base_test.FuchsiaBaseTest):
 
         for fuchsia_device in self.fuchsia_devices:
             if (
-                fuchsia_device_operation
-                == FuchsiaDeviceOperation.IDLE_SUSPEND_AUTO_RESUME
-            ):
-                fuchsia_device.system_power_state_controller.idle_suspend_auto_resume()
-            elif (
                 fuchsia_device_operation
                 == FuchsiaDeviceOperation.IDLE_SUSPEND_TIMER_RESUME
             ):
