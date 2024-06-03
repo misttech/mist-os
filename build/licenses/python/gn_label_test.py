@@ -11,7 +11,7 @@ import unittest
 
 
 class GnLabelTest(unittest.TestCase):
-    def test_from_str(self):
+    def test_from_str(self) -> None:
         label = GnLabel.from_str("//path/to/foo")
         self.assertEqual(label.gn_str, "//path/to/foo")
         self.assertEqual(label.path_str, "path/to/foo")
@@ -19,7 +19,7 @@ class GnLabelTest(unittest.TestCase):
         self.assertFalse(label.is_local_name)
         self.assertIsNone(label.toolchain)
 
-    def test_from_str_with_toolchain(self):
+    def test_from_str_with_toolchain(self) -> None:
         toolchain = GnLabel.from_str("//some/toolchain")
         label = GnLabel.from_str("//path/to/foo(//some/toolchain)")
         self.assertEqual(label.gn_str, "//path/to/foo(//some/toolchain)")
@@ -27,7 +27,7 @@ class GnLabelTest(unittest.TestCase):
         self.assertEqual(label.name, "foo")
         self.assertEqual(label.toolchain, toolchain)
 
-    def test_from_str_with_local_name(self):
+    def test_from_str_with_local_name(self) -> None:
         label = GnLabel.from_str("//path/to/foo:bar")
         self.assertEqual(label.gn_str, "//path/to/foo:bar")
         self.assertEqual(label.path_str, "path/to/foo")
@@ -35,7 +35,7 @@ class GnLabelTest(unittest.TestCase):
         self.assertTrue(label.is_local_name)
         self.assertIsNone(label.toolchain)
 
-    def test_from_str_with_redundant_local_name(self):
+    def test_from_str_with_redundant_local_name(self) -> None:
         label = GnLabel.from_str("//path/to/foo:foo")
         self.assertEqual(label.gn_str, "//path/to/foo:foo")
         self.assertEqual(label.path_str, "path/to/foo")
@@ -43,7 +43,7 @@ class GnLabelTest(unittest.TestCase):
         self.assertTrue(label.is_local_name)
         self.assertIsNone(label.toolchain)
 
-    def test_from_str_with_local_name_and_toolchain(self):
+    def test_from_str_with_local_name_and_toolchain(self) -> None:
         toolchain = GnLabel.from_str("//some/toolchain")
         label = GnLabel.from_str("//path/to/foo:bar(//some/toolchain)")
         self.assertEqual(label.gn_str, "//path/to/foo:bar(//some/toolchain)")
@@ -51,7 +51,7 @@ class GnLabelTest(unittest.TestCase):
         self.assertEqual(label.name, "bar")
         self.assertEqual(label.toolchain, toolchain)
 
-    def test_from_str_with_dot_dot(self):
+    def test_from_str_with_dot_dot(self) -> None:
         toolchain = GnLabel.from_str("//some/toolchain")
         label = GnLabel.from_str("//path/to/foo/../bar:baz(//some/toolchain)")
         self.assertEqual(label.gn_str, "//path/to/bar:baz(//some/toolchain)")
@@ -59,40 +59,40 @@ class GnLabelTest(unittest.TestCase):
         self.assertEqual(label.name, "baz")
         self.assertEqual(label.toolchain, toolchain)
 
-    def test_from_str_root_path(self):
+    def test_from_str_root_path(self) -> None:
         label = GnLabel.from_str("//")
         self.assertEqual(label.gn_str, "//")
         self.assertEqual(label.path_str, "")
         self.assertEqual(label.name, "")
         self.assertIsNone(label.toolchain)
 
-    def test_from_root_path(self):
+    def test_from_root_path(self) -> None:
         label = GnLabel.from_path(Path(""))
         self.assertEqual(label.gn_str, "//")
         self.assertEqual(label.path_str, "")
         self.assertEqual(label.name, "")
         self.assertIsNone(label.toolchain)
 
-    def test_from_path(self):
+    def test_from_path(self) -> None:
         label = GnLabel.from_path(Path("path/to/foo"))
         self.assertEqual(label.gn_str, "//path/to/foo")
         self.assertEqual(label.path_str, "path/to/foo")
         self.assertEqual(label.name, "foo")
         self.assertIsNone(label.toolchain)
 
-    def test_parent_label(self):
+    def test_parent_label(self) -> None:
         label = GnLabel.from_str("//path/to/foo")
         self.assertTrue(label.has_parent_label())
         self.assertEqual(label.parent_label(), GnLabel.from_str("//path/to"))
 
-    def test_parent_label_for_local_name(self):
+    def test_parent_label_for_local_name(self) -> None:
         label = GnLabel.from_str("//path/to/foo:name")
         self.assertTrue(label.has_parent_label())
         self.assertEqual(
             label.parent_label(), GnLabel.from_str("//path/to/foo")
         )
 
-    def test_parent_label_for_redundant_local(self):
+    def test_parent_label_for_redundant_local(self) -> None:
         label = GnLabel.from_str("//path/to/foo:foo")
         self.assertTrue(label.is_local_name)
         self.assertTrue(label.has_parent_label())
@@ -100,7 +100,7 @@ class GnLabelTest(unittest.TestCase):
             label.parent_label(), GnLabel.from_str("//path/to/foo")
         )
 
-    def test_parent_label_of_root_label(self):
+    def test_parent_label_of_root_label(self) -> None:
         label = GnLabel.from_str("//")
         self.assertEqual(label.gn_str, "//")
         self.assertFalse(label.has_parent_label())
@@ -109,25 +109,25 @@ class GnLabelTest(unittest.TestCase):
             label.parent_label()
         self.assertEqual("// has no parent label", str(context.exception))
 
-    def test_parent_label_of_label_created_from_path(self):
+    def test_parent_label_of_label_created_from_path(self) -> None:
         label = GnLabel.from_path(Path("path/to/foo"))
         self.assertTrue(label.has_parent_label())
         self.assertEqual(label.parent_label(), GnLabel.from_str("//path/to"))
 
-    def test_without_toolchain(self):
+    def test_without_toolchain(self) -> None:
         label = GnLabel.from_str(
             "//path/to/foo(//some:toolchain)"
         ).without_toolchain()
         self.assertEqual(label, GnLabel.from_str("//path/to/foo"))
 
-    def test_ensure_toolchain(self):
+    def test_ensure_toolchain(self) -> None:
         toolchain = GnLabel.from_str("//some/toolchain")
         label = GnLabel.from_str("//path/to/foo").ensure_toolchain(toolchain)
         self.assertEqual(
             label, GnLabel.from_str("//path/to/foo(//some/toolchain)")
         )
 
-    def test_ensure_toolchain_does_not_replace(self):
+    def test_ensure_toolchain_does_not_replace(self) -> None:
         toolchain = GnLabel.from_str("//some/toolchain")
         label = GnLabel.from_str(
             "//path/to/foo(//some/other/toolchain)"
@@ -136,21 +136,21 @@ class GnLabelTest(unittest.TestCase):
             label, GnLabel.from_str("//path/to/foo(//some/other/toolchain)")
         )
 
-    def test_rebase_package_path(self):
+    def test_rebase_package_path(self) -> None:
         path = GnLabel.from_str("//path/to/foo").rebased_path(
             Path("rebase/dir")
         )
         self.assertEqual(path, Path("rebase/dir/path/to/foo"))
 
-    def test_code_search_url(self):
+    def test_code_search_url(self) -> None:
         url = GnLabel.from_str("//path/to/foo:bar").code_search_url()
         self.assertEqual(
             url,
             "https://cs.opensource.google/fuchsia/fuchsia/+/main:path/to/foo",
         )
 
-    def test_is_host_target(self):
-        def is_host_target(s):
+    def test_is_host_target(self) -> None:
+        def is_host_target(s: str) -> bool:
             return GnLabel.from_str(s).is_host_target()
 
         self.assertFalse(is_host_target("//host_:foo"))
@@ -158,8 +158,8 @@ class GnLabelTest(unittest.TestCase):
         self.assertTrue(is_host_target("//foo:bar(//host_baz)"))
         self.assertFalse(is_host_target("//foo:bar(//not_host)"))
 
-    def test_is_third_party(self):
-        def is_3p(s):
+    def test_is_third_party(self) -> None:
+        def is_3p(s: str) -> bool:
             return GnLabel.from_str(s).is_3rd_party()
 
         self.assertFalse(is_3p("//foo:bar"))
@@ -168,19 +168,19 @@ class GnLabelTest(unittest.TestCase):
         self.assertTrue(is_3p("//foo:third_party"))
         self.assertTrue(is_3p("//foo/third_party/bar"))
 
-    def test_is_prebuilt(self):
+    def test_is_prebuilt(self) -> None:
         self.assertFalse(GnLabel.from_str("//foo:bar").is_prebuilt())
         self.assertTrue(GnLabel.from_str("//prebuilt/foo:bar").is_prebuilt())
         self.assertTrue(GnLabel.from_str("//foo/prebuilt/bar").is_prebuilt())
         self.assertTrue(GnLabel.from_str("//foo/bar:prebuilt").is_prebuilt())
 
-    def test_is_3p_rust_crate(self):
+    def test_is_3p_rust_crate(self) -> None:
         self.assertFalse(GnLabel.from_str("//foo:bar").is_3p_rust_crate())
         self.assertTrue(
             GnLabel.from_str("//third_party/rust_crates:foo").is_3p_rust_crate()
         )
 
-    def test_is_3p_golib(self):
+    def test_is_3p_golib(self) -> None:
         self.assertFalse(GnLabel.from_str("//foo:bar").is_3p_golib())
         self.assertTrue(
             GnLabel.from_str("//third_party/golibs:foo").is_3p_golib()
@@ -191,7 +191,7 @@ class GnLabelTest(unittest.TestCase):
             ).is_3p_golib()
         )
 
-    def test_is_spdx_json_document(self):
+    def test_is_spdx_json_document(self) -> None:
         self.assertFalse(GnLabel.from_str("//foo:bar").is_spdx_json_document())
         self.assertTrue(
             GnLabel.from_str("//foo:bar.spdx.json").is_spdx_json_document()
@@ -200,19 +200,19 @@ class GnLabelTest(unittest.TestCase):
             GnLabel.from_str("//foo.spdx.json").is_spdx_json_document()
         )
 
-    def test_create_child_from_str(self):
+    def test_create_child_from_str(self) -> None:
         parent = GnLabel.from_str("//path1/to/foo:bar(//toolchain)")
         child = parent.create_child_from_str("path2/to/child:baz")
         self.assertEqual(
             child, GnLabel.from_str("//path1/to/foo/path2/to/child:baz")
         )
 
-    def test_create_child_from_absolute_str(self):
+    def test_create_child_from_absolute_str(self) -> None:
         parent = GnLabel.from_str("//path1/to/foo:bar(//toolchain)")
         child = parent.create_child_from_str("//path2/to/child:baz")
         self.assertEqual(child, GnLabel.from_str("//path2/to/child:baz"))
 
-    def test_create_child_from_str_with_dot_dot(self):
+    def test_create_child_from_str_with_dot_dot(self) -> None:
         parent = GnLabel.from_str("//path/to/foo")
         self.assertEqual(parent.parent_label(), GnLabel.from_str("//path/to"))
 
@@ -257,7 +257,7 @@ class GnLabelTest(unittest.TestCase):
             str(context.exception),
         )
 
-    def test_create_child_from_str_with_dot_dot_with_local_name(self):
+    def test_create_child_from_str_with_dot_dot_with_local_name(self) -> None:
         parent = GnLabel.from_str("//path/to/foo:bar")
         self.assertEqual(
             parent.parent_label(), GnLabel.from_str("//path/to/foo")
@@ -278,7 +278,7 @@ class GnLabelTest(unittest.TestCase):
             GnLabel.from_str("//baz:qux"),
         )
 
-    def test_create_child_from_str_with_colon(self):
+    def test_create_child_from_str_with_colon(self) -> None:
         self.assertEqual(
             GnLabel.from_str("//path/to/foo").create_child_from_str(":bar"),
             GnLabel.from_str("//path/to/foo:bar"),
@@ -291,7 +291,7 @@ class GnLabelTest(unittest.TestCase):
             str(context.exception),
         )
 
-    def test_gt(self):
+    def test_gt(self) -> None:
         # Testing greater_than indirectly by sorting
         sorted_labels = sorted(
             [

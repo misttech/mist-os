@@ -4,7 +4,8 @@
 # found in the LICENSE file.
 
 import json
-from typing import Any, Callable, List, Set
+from pathlib import Path
+from typing import Any, Callable, Set
 from gn_label import GnLabel
 import dataclasses
 import os
@@ -14,7 +15,7 @@ import os
 class FileAccess:
     """Manages access to the real file system, while keeping track of depfiles."""
 
-    fuchsia_source_path_str: str
+    fuchsia_source_path_str: str | Path
     visited_files: Set[str] = dataclasses.field(default_factory=set)
 
     def read_text(self, label: GnLabel) -> str:
@@ -52,7 +53,7 @@ class FileAccess:
 
     def search_directory(
         self, label: GnLabel, path_predicate: Callable[[str], bool]
-    ) -> List[GnLabel]:
+    ) -> list[GnLabel]:
         """Lists the files in a directory corresponding with `label` (including files in subdirs) matching `path_predicate`"""
         GnLabel.check_type(label)
         path = os.path.join(self.fuchsia_source_path_str, label.path_str)
@@ -76,7 +77,7 @@ class FileAccess:
 
         return output
 
-    def write_depfile(self, dep_file_path: str, main_entry: str) -> None:
+    def write_depfile(self, dep_file_path: Path | str, main_entry: str) -> None:
         os.makedirs(os.path.dirname(dep_file_path), exist_ok=True)
         with open(dep_file_path, "w") as dep_file:
             dep_file.write(f"{main_entry}:\\\n")

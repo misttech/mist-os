@@ -14,7 +14,7 @@ import unittest
 
 
 class FileAccessTest(unittest.TestCase):
-    temp_dir: tempfile.TemporaryDirectory
+    temp_dir: tempfile.TemporaryDirectory[str]
     temp_dir_path: Path
     file_access: FileAccess
 
@@ -44,14 +44,14 @@ class FileAccessTest(unittest.TestCase):
         self.temp_dir.cleanup()
         return super().tearDown()
 
-    def test_file_exists(self):
+    def test_file_exists(self) -> None:
         self.assertTrue(self.file_access.file_exists(GnLabel.from_str("//foo")))
         self.assertTrue(self.file_access.file_exists(GnLabel.from_str("//bar")))
         self.assertFalse(
             self.file_access.file_exists(GnLabel.from_str("//baz"))
         )
 
-    def test_directory_exists(self):
+    def test_directory_exists(self) -> None:
         self.assertTrue(
             self.file_access.directory_exists(GnLabel.from_str("//"))
         )
@@ -59,7 +59,7 @@ class FileAccessTest(unittest.TestCase):
             self.file_access.file_exists(GnLabel.from_str("//baz"))
         )
 
-    def test_search_directory(self):
+    def test_search_directory(self) -> None:
         children = self.file_access.search_directory(
             GnLabel.from_str("//"), path_predicate=lambda _: True
         )
@@ -74,7 +74,7 @@ class FileAccessTest(unittest.TestCase):
             ],
         )
 
-    def test_search_directory_with_predicate(self):
+    def test_search_directory_with_predicate(self) -> None:
         children = self.file_access.search_directory(
             GnLabel.from_str("//"),
             path_predicate=lambda path: os.path.basename(path) == "bar",
@@ -82,7 +82,7 @@ class FileAccessTest(unittest.TestCase):
         children.sort()
         self.assertEqual(children, [GnLabel.from_str("//bar")])
 
-    def test_read_file(self):
+    def test_read_file(self) -> None:
         self.assertEqual(
             self.file_access.read_text(GnLabel.from_str("//foo")), "FOO"
         )
@@ -90,13 +90,13 @@ class FileAccessTest(unittest.TestCase):
             self.file_access.read_text(GnLabel.from_str("//bar")), "BAR"
         )
 
-    def test_read_json(self):
+    def test_read_json(self) -> None:
         self.assertEqual(
             self.file_access.read_json(GnLabel.from_str("//json")),
             {"key": "value"},
         )
 
-    def _assert_depfile(self, expected_content):
+    def _assert_depfile(self, expected_content: str) -> None:
         depfile_path = self.temp_dir_path / "depfile"
         self.file_access.write_depfile(
             dep_file_path=depfile_path, main_entry="main"
@@ -104,23 +104,23 @@ class FileAccessTest(unittest.TestCase):
         actual_depfile_contents = depfile_path.read_text()
         self.assertEqual(actual_depfile_contents, expected_content)
 
-    def test_write_depfile_after_read_text(self):
+    def test_write_depfile_after_read_text(self) -> None:
         self.file_access.read_text(GnLabel.from_str("//foo"))
         self._assert_depfile(f"""main:\\\n    {self.temp_dir_path}/foo""")
 
-    def test_write_depfile_after_read_json(self):
+    def test_write_depfile_after_read_json(self) -> None:
         self.file_access.read_text(GnLabel.from_str("//json"))
         self._assert_depfile(f"""main:\\\n    {self.temp_dir_path}/json""")
 
-    def test_write_depfile_after_file_exists(self):
+    def test_write_depfile_after_file_exists(self) -> None:
         self.file_access.file_exists(GnLabel.from_str("//bar"))
         self._assert_depfile(f"""main:\\\n    {self.temp_dir_path}/bar""")
 
-    def test_write_depfile_after_directory_exists(self):
+    def test_write_depfile_after_directory_exists(self) -> None:
         self.file_access.directory_exists(GnLabel.from_str("//"))
         self._assert_depfile(f"""main:\\\n    {self.temp_dir_path}/""")
 
-    def test_write_depfile_after_search_directory(self):
+    def test_write_depfile_after_search_directory(self) -> None:
         self.file_access.search_directory(
             GnLabel.from_str("//"), path_predicate=lambda _: True
         )
