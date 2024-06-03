@@ -5,13 +5,13 @@
 """Provides some basic helper functions for printing."""
 
 
-def yellow(message):
+def yellow(message: str) -> str:
     return "\033[1;33;40m%s\033[0m" % (message)
 
 
-def white(message):
+def white(message: str) -> str:
     return "\033[37;1;40m%s\033[0m" % (message)
 
 
-def red(message):
+def red(message: str) -> str:
     return "\033[1;31;40m%s\033[0m" % (message)
