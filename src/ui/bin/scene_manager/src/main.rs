@@ -262,8 +262,9 @@ async fn inner_main() -> Result<(), Error> {
     };
 
     // Create Activity Manager.
+    let suspend_enabled = false;
     let activity_manager =
-        ActivityManager::new(zx::Duration::from_millis(idle_threshold_ms as i64));
+        ActivityManager::new(zx::Duration::from_millis(idle_threshold_ms as i64), suspend_enabled);
 
     // Create and register a ColorTransformManager.
     let color_converter = connect_to_protocol::<color::ConverterMarker>()?;
