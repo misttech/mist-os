@@ -37,29 +37,6 @@ Make sure that you select the drive rather than a specific partition. For
 example, a specific partition has a number at the end of the path such as
 `/dev/sdc1`.
 
-### macOS
-
-To determine the correct path to your USB drive:
-
-```posix-terminal
-diskutil list | grep external
-```
-
-Drives are usually in the form `/dev/disk[n]` such as `/dev/disk2`.
-
-Note: If you see `ERROR: Can't open /dev/disk[n]: Resource busy` then you will
-have to unmount the USB drive. To do this, run:
-
-```posix-terminal
-hdiutil unmount /dev/disk[n]
-```
-
-If this does not fix the error, try reformatting the drive:
-
-```posix-terminal
-diskutil eraseDisk JHFSX <name_of_the_usb_stick> /dev/disk[n]
-```
-
 ## Build and deploy Fuchsia
 
 To perform an initial build and deploy of Fuchsia with `fx`, do the following:
@@ -136,12 +113,6 @@ To rebuild and redeploy with `fx`:
     ```
 
     This command builds Zircon and then the rest of Fuchsia.
-
-1.  (Only for macOS users) Set up firewall rules:
-
-    ```posix-terminal
-    fx setup-macos
-    ```
 
 1.  From your host, start a development package server:
 

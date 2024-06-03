@@ -25,12 +25,8 @@ development environment on your host machine.
 
 ### Hardware requirements {#hardware-requirements}
 
-You can build Fuchsia on a host machine with one of the following
-architectures:
-
-- x86-64 Linux (Debian-based distributions only)
-- x86-64 macOS
-- ARM64 macOS
+You can build Fuchsia on a host machine with the x86-64 Linux architecture
+(Debian-based distributions only).
 
 **Windows is not supported.**
 
@@ -81,18 +77,11 @@ Note: This step is **not required** for building Fuchsia.
 To accelerate the Fuchsia build locally, use [`ccache`][ccache]{:.external}
 to cache C and C++ artifacts from previous builds.
 
-* {Linux}
+Install the `ccache` package:
 
-  To use `ccache` on Linux, install the following package:
-
-  ```posix-terminal
-  sudo apt install ccache
-  ```
-* {macOS}
-
-  For macOS, see
-  [Using CCache on Mac](https://chromium.googlesource.com/chromium/src.git/+/HEAD/docs/ccache_mac.md){:.external}
-  for installation instructions.
+```posix-terminal
+sudo apt install ccache
+```
 
 `ccache` is enabled automatically if your `CCACHE_DIR` environment variable
 refers to an existing directory.
