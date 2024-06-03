@@ -717,6 +717,10 @@ config("default_warnings") {
     "-Wno-cast-function-type-strict",
     "-Wno-cast-function-type-mismatch",
     "-Wno-unknown-warning-option",
+
+    # TODO(https://fxbug.dev/344080745): After the issue is fixed,
+    # remove "-Wno-missing-template-arg-list-after-template-kw".
+    "-Wno-missing-template-arg-list-after-template-kw",
   ]
 
   cflags_cc = []
