@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components.gni")
+import("//src/storage/conformance/storage_conformance_test.gni")
 
 executable("bin") {
   testonly = true
@@ -20,19 +20,7 @@ executable("bin") {
   ]
 }
 
-fuchsia_component("sdkcpp-harness") {
-  testonly = true
-  manifest = "meta/sdkcpp_harness.cml"
-  deps = [ ":bin" ]
-}
-
-fuchsia_component("sdkcpp-test") {
-  testonly = true
-  manifest = "//src/storage/conformance/meta/sdkcpp_conformance_test.cml"
-  deps = [ "//src/storage/conformance:io1_conformance_test" ]
-}
-
-fuchsia_test_package("sdkcpp-conformance-test") {
-  test_components = [ ":sdkcpp-test" ]
-  deps = [ ":sdkcpp-harness" ]
+storage_conformance_test("sdkcpp") {
+  harness_manifest = "meta/sdkcpp_harness.cml"
+  harness_binary = ":bin"
 }

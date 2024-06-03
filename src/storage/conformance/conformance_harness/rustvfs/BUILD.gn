@@ -2,8 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//src/storage/conformance/storage_conformance_test.gni")
 
 rustc_binary("bin") {
   testonly = true
@@ -23,19 +23,7 @@ rustc_binary("bin") {
   sources = [ "src/main.rs" ]
 }
 
-fuchsia_component("rustvfs-harness") {
-  testonly = true
-  manifest = "meta/rustvfs_harness.cml"
-  deps = [ ":bin" ]
-}
-
-fuchsia_component("rustvfs-test") {
-  testonly = true
-  manifest = "//src/storage/conformance/meta/rustvfs_io1_conformance_test.cml"
-  deps = [ "//src/storage/conformance:io1_conformance_test" ]
-}
-
-fuchsia_test_package("rustvfs-io1-conformance-test") {
-  test_components = [ ":rustvfs-test" ]
-  deps = [ ":rustvfs-harness" ]
+storage_conformance_test("rustvfs") {
+  harness_manifest = "meta/rustvfs_harness.cml"
+  harness_binary = ":bin"
 }

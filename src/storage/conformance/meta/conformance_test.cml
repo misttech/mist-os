@@ -1,4 +1,4 @@
-// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
@@ -8,14 +8,12 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "bin/io1_conformance_test",
+        binary: "bin/conformance_test",
     },
     children: [
         {
-            // TODO(https://fxbug.dev/42109125): Don't hardcode the URL here. This
-            // needs to work for all the different filesystem test harnesses.
             name: "fs_test",
-            url: "fuchsia-pkg://fuchsia.com/fxfs-conformance-test#meta/fxfs-harness.cm",
+            url: "#meta/harness.cm",
         },
     ],
     use: [
