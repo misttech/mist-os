@@ -23,10 +23,13 @@ use {
     parsed_policy::ParsedPolicy,
     parser::ByValue,
     parser::{ByRef, ParseStrategy},
-    selinux_common::{self as sc, ClassPermission as _, FileClass, ObjectClass},
+    selinux_common::{self as sc, FileClass, ObjectClass},
     std::{fmt::Debug, marker::PhantomData, num::NonZeroU32, ops::Deref},
     zerocopy::{little_endian as le, ByteSlice, FromBytes, NoCell, Ref, Unaligned},
 };
+
+#[cfg(feature = "selinux_policy_test_api")]
+use selinux_common::ClassPermission as _;
 
 /// Maximum SELinux policy version supported by this implementation.
 pub const SUPPORTED_POLICY_VERSION: u32 = 33;
@@ -227,6 +230,7 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// # Panics
     /// If supplied with type Ids not previously obtained from the `Policy` itself; validation
     /// ensures that all such Ids have corresponding definitions.
+    #[cfg(feature = "selinux_policy_test_api")]
     pub fn is_explicitly_allowed(
         &self,
         source_type: TypeId,
@@ -252,6 +256,7 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// # Panics
     /// If supplied with type Ids not previously obtained from the `Policy` itself; validation
     /// ensures that all such Ids have corresponding definitions.
+    #[cfg(feature = "selinux_policy_test_api")]
     pub fn is_explicitly_allowed_custom(
         &self,
         source_type: TypeId,
