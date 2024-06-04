@@ -5,11 +5,10 @@
 use {
     crate::{
         meta_as_dir::MetaAsDir,
-        meta_as_file::MetaAsFile,
         meta_file::{MetaFile, MetaFileLocation},
         meta_subdir::MetaSubdir,
         non_meta_subdir::NonMetaSubdir,
-        Error,
+        usize_to_u64_safe, Error,
     },
     anyhow::Context as _,
     async_trait::async_trait,
@@ -30,6 +29,7 @@ use {
             traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
+        file::vmo::VmoFile,
         immutable_attributes,
         path::Path as VfsPath,
         CreationMode, ObjectRequestRef, ProtocolsExt as _, ToObjectRequest,
@@ -230,6 +230,17 @@ impl<S: crate::NonMetaStorage> RootDir<S> {
             .await
     }
 
+    /// Creates a file that contains the package's hash.
+    fn create_meta_as_file(&self) -> Result<Arc<VmoFile>, zx::Status> {
+        let file_contents = self.hash.to_string();
+        let vmo = zx::Vmo::create(usize_to_u64_safe(file_contents.len()))?;
+        let () = vmo.write(file_contents.as_bytes(), 0)?;
+        Ok(VmoFile::new_with_inode(
+            vmo, /*readable*/ true, /*writable*/ false, /*executable*/ false,
+            /*inode*/ 1,
+        ))
+    }
+
     /// Creates and returns a `MetaFile` if one exists at `path`.
     pub(crate) fn get_meta_file(self: &Arc<Self>, path: &str) -> Option<Arc<MetaFile<S>>> {
         let location = self.meta_files.get(path)?;
@@ -390,7 +401,11 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
             // MetaAsDir. See the MetaAsDir::open impl for more.
             if open_meta_as_file(flags) {
                 flags.to_object_request(server_end).handle(|object_request| {
-                    vfs::file::serve(MetaAsFile::new(self), scope, &flags, object_request)
+                    let file = self.create_meta_as_file().map_err(|e| {
+                        error!("Error creating the meta file: {:?}", e);
+                        zx::Status::INTERNAL
+                    })?;
+                    vfs::file::serve(file, scope, &flags, object_request)
                 });
             } else {
                 let () = MetaAsDir::new(self).open(scope, flags, VfsPath::dot(), server_end);
@@ -474,7 +489,11 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
             // This branch is done here instead of in MetaAsDir so that Clone'ing MetaAsDir yields
             // MetaAsDir. See the MetaAsDir::open impl for more.
             return if open_meta_as_file(&protocols) {
-                vfs::file::serve(MetaAsFile::new(self), scope, &protocols, object_request)
+                let file = self.create_meta_as_file().map_err(|e| {
+                    error!("Error creating the meta file: {:?}", e);
+                    zx::Status::INTERNAL
+                })?;
+                vfs::file::serve(file, scope, &protocols, object_request)
             } else if protocols.is_node() || protocols.is_dir_allowed() {
                 MetaAsDir::new(self).open2(scope, VfsPath::dot(), protocols, object_request)
             } else {

@@ -99,11 +99,12 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
                     return Err(zx::Status::NOT_SUPPORTED);
                 }
 
-                // Only MetaAsDir can be obtained from Open calls to MetaAsDir. To obtain MetaAsFile,
-                // the Open call must be made on RootDir. This is consistent with pkgfs behavior and is
-                // needed so that Clone'ing MetaAsDir results in MetaAsDir, because VFS handles Clone
-                // by calling Open with a path of ".", a mode of 0, and mostly unmodified flags and
-                // that combination of arguments would normally result in MetaAsFile being used.
+                // Only MetaAsDir can be obtained from Open calls to MetaAsDir. To obtain the "meta"
+                // file, the Open call must be made on RootDir. This is consistent with pkgfs
+                // behavior and is needed so that Clone'ing MetaAsDir results in MetaAsDir, because
+                // VFS handles Clone by calling Open with a path of ".", a mode of 0, and mostly
+                // unmodified flags and that combination of arguments would normally result in the
+                // file being used.
                 object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
             });
             return;
@@ -155,11 +156,11 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
                 }
             }
 
-            // Only MetaAsDir can be obtained from Open calls to MetaAsDir. To obtain MetaAsFile,
-            // the Open call must be made on RootDir. This is consistent with pkgfs behavior and is
-            // needed so that Clone'ing MetaAsDir results in MetaAsDir, because VFS handles Clone
-            // by calling Open with a path of ".", a mode of 0, and mostly unmodified flags and
-            // that combination of arguments would normally result in MetaAsFile being used.
+            // Only MetaAsDir can be obtained from Open calls to MetaAsDir. To obtain the "meta"
+            // file, the Open call must be made on RootDir. This is consistent with pkgfs behavior
+            // and is needed so that Clone'ing MetaAsDir results in MetaAsDir, because VFS handles
+            // Clone by calling Open with a path of ".", a mode of 0, and mostly unmodified flags
+            // and that combination of arguments would normally result in the file being used.
             //
             // Note that `ImmutableConnection::create` will check that protocols contain
             // directory-only protocols.
