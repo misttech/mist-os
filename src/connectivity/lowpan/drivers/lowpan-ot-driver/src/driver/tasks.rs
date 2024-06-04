@@ -136,7 +136,45 @@ where
                     Ok(x) => Some(Ok(x)),
                     Err(x) => {
                         error!("dhcp_v6_pd stream has terminated, reason: {:?}", x);
-                        // TODO (jiamingw): create a crash report via `CrashReporterMarker`
+                        // Create a crash report via `CrashReporterMarker`. We are not crashing
+                        // lowpan for PD related errors as most Thread features work without
+                        // PD. A crash report should be filed to not masking the error, while we
+                        // should ensure the stability of Thread stack in fuchsia.
+                        fasync::Task::spawn(async move {
+                            let report = fidl_fuchsia_feedback::CrashReport {
+                                program_name: Some(
+                                    "fuchsia-pkg://fuchsia.com/lowpan-ot-driver#meta/lowpan-ot-driver.cm"
+                                    .to_string()
+                                ),
+                                crash_signature: Some(
+                                    "fuchsia-thread_dhcp_v6_pd_stream_ended"
+                                    .to_string()
+                                ),
+                                is_fatal: Some(false),
+                                ..Default::default()
+                            };
+                            let proxy = fuchsia_component::client::connect_to_protocol::<
+                                fidl_fuchsia_feedback::CrashReporterMarker,
+                            >();
+                            if let Err(e) = proxy {
+                                warn!(
+                                    "dhcp_v6_pd: failed to connect to CrashReporterMarker, {:?}",
+                                    e
+                                );
+                                return;
+                            }
+                            if let Err(e) = proxy
+                                .unwrap()
+                                .file_report(report)
+                                .await
+                                .map_err(|e| format_err!("IPC error: {}", e))
+                            {
+                                warn!("dhcp_v6_pd: error filing crash report, {}", e);
+                            } else {
+                                info!("dhcp_v6_pd: successfully filed crash report");
+                            }
+                        })
+                        .detach();
                         None
                     }
                 }
