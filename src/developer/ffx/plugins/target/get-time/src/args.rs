@@ -10,7 +10,12 @@ use ffx_core::ffx_command;
 #[argh(
     subcommand,
     name = "get-time",
-    description = "Gets the monotonic time on the target device",
+    description = r#"Returns the current time in the system monotonic clock.
+This is the number of nanoseconds since the system was powered on.
+It does not always reset on reboot and does not adjust during sleep,
+and thus should not be used as a reliable source of uptime.
+
+See https://fuchsia.dev/reference/syscalls/clock_get_monotonic"#,
     example = "To get the target time:
 
     $ ffx target get-time
