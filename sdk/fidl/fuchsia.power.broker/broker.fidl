@@ -261,6 +261,8 @@ open protocol LeaseControl {
     /// If last_status is UNKNOWN, the call will return immediately
     /// with the current status. Otherwise, the call will block
     /// until the current status differs from last_status.
+    // TODO(b/333947976): Remove this method once unused.
+    @available(deprecated=HEAD, note="Use CurrentLevel/RequiredLevel interface instead.")
     flexible WatchStatus(struct {
         last_status LeaseStatus;
     }) -> (struct {
