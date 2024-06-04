@@ -48,39 +48,32 @@ environment variables can be specified:
 
 Here are some of the best practices that should be followed while contributing
 to Honeydew:
-* If contribution involves adding a new host target interaction method or class,
-  you would need to update the [interfaces] definitions.
-* Ensure there is [unit tests] and [functional tests] coverage and that you have
-  run the impacted [functional tests] (either locally or in infra) to make sure
-  contributions are working.
-* If a new unit test is added,
+* Ensure code is compliant with
+  [Honeydew code guidelines][Honeydew code guidelines] by running
+  `conformance.sh`.
+* Ensure there is [unit tests][unit tests] and
+  [functional tests][functional tests] coverage and that you have run the
+  impacted [functional tests][functional tests] (either locally or in infra) to
+  make sure contributions are working.
+* If a new unit test module is added,
   * ensure this new test is included in `group("tests")` section in the
     `BUILD.gn` file (located in the same directory as unit test).
   * ensure this new test is included in `group("tests")` section in the
-    [top level Honeydew unit tests BUILD] file.
-  * ensure instructions specified in [unit tests README] are sufficient to
-    run this new test locally.
-* If a new functional test is added,
-  * ensure instructions specified in [functional tests README] are sufficient to
+    [top level Honeydew unit tests BUILD][top level Honeydew unit tests BUILD]
+    file.
+  * ensure instructions specified in [unit tests README][unit tests README]
+    are sufficient to run this new test locally.
+* If a new functional test module is added,
+  * ensure instructions specified in
+    [functional tests README][functional tests README] are sufficient to
     run this new test locally.
   * ensure this new test is included in `group("tests")` section in the
-    [top level Honeydew functional tests BUILD] file.
-  * follow [how to add a new test to run in infra].
-* Ensure code is meeting all the [Honeydew code guidelines].
-* Before merging the CL, ensure CL does not introduce any regressions by
-  successfully running **all** of the Lacewing self tests staging builders using
-  try-jobs.
-  * To find these builders, look for `lacewing-self-staging` in the try-job name
-    reg-ex filter field.
-  * While selecting these `lacewing-self-staging` builders, do not select the
-    ones with `-subbuild` suffix.
-  * To know how to run try jobs refer to
-    [example Lacewing self tests staging builders using try-jobs]. Please note
-    that this screenshot is just for demonstration purpose. Actual builders may
-    be different from the time this screenshot was taken.
-* At least one of the [Honeydew OWNERS] should be added as a reviewer.
-* If CL touches an existing affordance, then corresponding [Affordance OWNER]
-  should be added as a reviewer.
+    [top level Honeydew functional tests BUILD][top level Honeydew functional tests BUILD]
+    file.
+  * follow
+    [how to add a new test to run in infra][how to add a new test to run in infra].
+* If contribution involves adding a new host target interaction method or class,
+  you would need to update the [interfaces][interfaces] definitions.
 * If CL introduces a new affordance, then add yourself as [Affordance OWNER].
 
 ### Honeydew code guidelines
@@ -105,21 +98,18 @@ following:
 INFO: Honeydew code has passed all of the conformance steps
 ```
 
-**These guidelines need to be run at the least on the following patchsets:**
-1. Initial patchset just before adding reviewers
-2. Final patchset just before merging the CL
-On all other patchsets, it is recommended but optional to run these guidelines.
-
 ### Code Review Expectations
 
-Here are some of the things to follow during Honeydew CL review process as a
-CL author/contributor (or) CL reviewer/approver:
+If you are making non-superficial changes to Honeydew, refer to Honeydew's
+[Best Practices][Best Practices] for general guidances.
+
+Additionally, please follow Honeydew's CL review process as detailed below:
 
 #### Author
 
 * On the initial patchset where reviewers will be added, do the following before
   starting the review:
-  1. Make sure you have followed all of the [Best Practices]
+  1. Ensure [conformance.sh][Honeydew code conformance scripts] passes
   2. Include the following information at the end of the commit message:
     ```
     Verified the following on Patchset: <initial patchset number>
@@ -128,9 +118,13 @@ CL author/contributor (or) CL reviewer/approver:
     ```
 * On final patchset that will be used for merging, do the following before
   merging the CL:
-  1. Re-run the [Honeydew code conformance scripts]
+  1. Ensure [conformance.sh][Honeydew code conformance scripts] passes
   2. Ensure CL does not introduce any regressions by successfully running
-    **all** of the Honeydew builders using try-jobs
+    **all** of the Honeydew staging builders using try-jobs
+    * Look for `lacewing-self-staging` in the try-job name reg-ex filter field
+      (exclude `-subbuild` builders).
+    * For reference, see
+      [screenshot][example Lacewing self tests staging builders using try-jobs]
   3. Update the commit message with the final patchset number:
     ```
     Verified the following on Patchset: <final patchset number>
@@ -164,7 +158,7 @@ If you like to use Honeydew in an interactive Python terminal refer to
 
 [Honeydew code conformance scripts]: #honeydew-code-guidelines
 
-[interfaces]: interfaces/
+[interfaces]: honeydew/interfaces/
 
 [unit tests]: tests/unit_tests/
 
