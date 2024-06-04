@@ -933,7 +933,7 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
       if (!parent->is_hidden_locked()) {
         // Parent must be root & pager-backed.
         DEBUG_ASSERT(!parent->parent_);
-        DEBUG_ASSERT(parent->debug_is_user_pager_backed());
+        DEBUG_ASSERT(parent->is_source_preserving_page_content());
         break;
       }
 
@@ -1418,7 +1418,7 @@ uint64_t VmCowPages::CountAttributedAncestorBytesLocked(uint64_t offset, uint64_
     if (!parent->is_hidden_locked()) {
       // Parent must be root & pager-backed.
       DEBUG_ASSERT(!parent->parent_);
-      DEBUG_ASSERT(parent->debug_is_user_pager_backed());
+      DEBUG_ASSERT(parent->is_source_preserving_page_content());
       break;
     }
 
@@ -3543,7 +3543,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
         // checked for can_see_parent just now and contiguous VMOs do not support (non-slice)
         // clones. Besides, if the slot was empty we should have moved on when we found the gap in
         // the page list traversal as the contiguous page source zeroes supplied pages by default.
-        DEBUG_ASSERT(!debug_is_contiguous());
+        DEBUG_ASSERT(!is_source_supplying_specific_physical_pages());
 
         // Allocate a new page, it will be zeroed in the process.
         vm_page_t* p;
@@ -3579,7 +3579,8 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
     }
 
     DEBUG_ASSERT(parent_ && parent_has_content(offset));
-    DEBUG_ASSERT(!debug_is_contiguous());
+    // Validate we can insert our own pages/content.
+    DEBUG_ASSERT(!is_source_supplying_specific_physical_pages());
 
     // We are able to insert a marker, but if our page content is from a hidden owner we need to
     // perform slightly more complex cow forking.
@@ -4364,7 +4365,7 @@ void VmCowPages::ReleaseCowParentPagesLocked(uint64_t start, uint64_t end,
       if (!parent->is_hidden_locked()) {
         // Parent must be root & pager-backed.
         DEBUG_ASSERT(!parent->parent_);
-        DEBUG_ASSERT(parent->debug_is_user_pager_backed());
+        DEBUG_ASSERT(parent->is_source_preserving_page_content());
         break;
       }
       bool left = cur == &parent->left_child_locked();
