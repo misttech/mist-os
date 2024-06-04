@@ -13,6 +13,7 @@
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/fidl/cpp/wire/traits.h>
 #include <lib/fidl_driver/cpp/transport.h>
+#include <zircon/availability.h>
 
 #include <string_view>
 
@@ -25,7 +26,7 @@ fuchsia_component_decl::wire::Offer MakeOffer(
     fidl::AnyArena& arena, std::string_view service_name,
     std::string_view instance_name = component::kDefaultInstance);
 
-#if __Fuchsia_API_level__ <= 18
+#if FUCHSIA_API_LEVEL_AT_MOST(18)
 
 template <typename Service>
 fuchsia_component_decl::Offer MakeOffer(
@@ -41,9 +42,9 @@ fuchsia_component_decl::wire::Offer MakeOffer(
   return MakeOffer(arena, Service::Name, instance_name);
 }
 
-#endif  // __Fuchsia_API_level__ <= 18
+#endif  // FUCHSIA_API_LEVEL_AT_MOST(18)
 
-#if __Fuchsia_API_level__ >= 18
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
 
 template <typename Service>
 fuchsia_driver_framework::Offer MakeOffer2(
@@ -77,7 +78,7 @@ fuchsia_driver_framework::wire::Offer MakeOffer2(
   }
 }
 
-#endif  //  __Fuchsia_API_level__ >= 18
+#endif  //  FUCHSIA_API_LEVEL_AT_LEAST(18)
 
 inline fuchsia_driver_framework::NodeProperty MakeProperty(uint32_t key, uint32_t value) {
   return fuchsia_driver_framework::NodeProperty{

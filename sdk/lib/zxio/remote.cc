@@ -657,8 +657,9 @@ zx_status_t AttributesGetCommon(const fidl::WireSyncClient<Protocol>& client,
   if (zx_status_t status = zxio_attr_from_wire(*attributes, inout_attr); status != ZX_OK)
     return status;
   return ZX_OK;
-#endif
+#else
   return ZX_ERR_NOT_SUPPORTED;
+#endif  //  FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 }
 
 template <typename Protocol, typename ToIo1ModePermissions>
@@ -739,7 +740,7 @@ zx_status_t AttributesSetCommon(const fidl::WireSyncClient<Protocol>& client,
   return ZX_OK;
 #else
   return ZX_ERR_NOT_SUPPORTED;
-#endif
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 }
 
 template <typename Protocol, zxio_object_type_t kObjectType>
@@ -1137,7 +1138,7 @@ zx_status_t Remote<Protocol, kObjectType>::Open2(const char* path, size_t path_l
         fidl::ObjectView<fio::wire::NodeProtocols>::FromExternal(&node_protocols));
 
     // -- mode --
-#if __Fuchsia_API_level__ >= 19
+#if FUCHSIA_API_LEVEL_AT_LEAST(19)
     node_options_builder.mode(fio::wire::CreationMode(
         options->mode == ZXIO_CREATION_MODE_NEVER_DEPRECATED ? ZXIO_CREATION_MODE_NEVER
                                                              : options->mode));
@@ -1145,7 +1146,7 @@ zx_status_t Remote<Protocol, kObjectType>::Open2(const char* path, size_t path_l
     node_options_builder.mode(fio::wire::OpenMode(options->mode == ZXIO_CREATION_MODE_NEVER
                                                       ? ZXIO_CREATION_MODE_NEVER_DEPRECATED
                                                       : options->mode));
-#endif
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(19)
 
     // -- rights --
     if (rights != fio::Operations(0)) {
@@ -1254,7 +1255,7 @@ zx_status_t Remote<Protocol, kObjectType>::Open2(const char* path, size_t path_l
   return zxio_create_with_on_representation(client_end.release(), inout_attr, storage);
 #else
   return ZX_ERR_NOT_SUPPORTED;
-#endif
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 }
 
 template <typename Protocol, zxio_object_type_t kObjectType>
@@ -1336,7 +1337,7 @@ template <typename Protocol, zxio_object_type_t kObjectType>
 zx_status_t Remote<Protocol, kObjectType>::LinkInto(zx_handle_t dst_token_handle,
                                                     const char* dst_path, size_t dst_path_len) {
   zx::event dst_token(dst_token_handle);
-#if __Fuchsia_API_level__ >= 18
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
   const fidl::WireResult result = client()->LinkInto(
       std::move(dst_token), fidl::StringView::FromExternal(dst_path, dst_path_len));
   if (!result.ok()) {
@@ -1349,7 +1350,7 @@ zx_status_t Remote<Protocol, kObjectType>::LinkInto(zx_handle_t dst_token_handle
   return ZX_OK;
 #else
   return ZX_ERR_NOT_SUPPORTED;
-#endif
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
 }
 
 template <typename Protocol, zxio_object_type_t kObjectType>
@@ -1423,7 +1424,7 @@ zx_status_t Remote<Protocol, kObjectType>::SetWindowSize(uint32_t width, uint32_
 template <typename Protocol, zxio_object_type_t kObjectType>
 zx_status_t Remote<Protocol, kObjectType>::XattrList(
     void (*callback)(void* context, const uint8_t* name, size_t name_len), void* context) {
-#if __Fuchsia_API_level__ >= 18
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
   if (!client().is_valid()) {
     return ZX_ERR_BAD_STATE;
   }
@@ -1455,7 +1456,7 @@ zx_status_t Remote<Protocol, kObjectType>::XattrList(
   return ZX_OK;
 #else
   return ZX_ERR_NOT_SUPPORTED;
-#endif
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
 }
 
 template <typename Protocol, zxio_object_type_t kObjectType>
@@ -1463,7 +1464,7 @@ zx_status_t Remote<Protocol, kObjectType>::XattrGet(const uint8_t* name, size_t 
                                                     zx_status_t (*callback)(void* context,
                                                                             zxio_xattr_data_t data),
                                                     void* context) {
-#if __Fuchsia_API_level__ >= 18
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
   if (!client().is_valid()) {
     return ZX_ERR_BAD_STATE;
   }
@@ -1504,14 +1505,14 @@ zx_status_t Remote<Protocol, kObjectType>::XattrGet(const uint8_t* name, size_t 
   return callback(context, data);
 #else
   return ZX_ERR_NOT_SUPPORTED;
-#endif
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
 }
 
 template <typename Protocol, zxio_object_type_t kObjectType>
 zx_status_t Remote<Protocol, kObjectType>::XattrSet(const uint8_t* name, size_t name_len,
                                                     const uint8_t* value, size_t value_len,
                                                     zxio_xattr_set_mode_t mode) {
-#if __Fuchsia_API_level__ >= 18
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
   if (!client().is_valid()) {
     return ZX_ERR_BAD_STATE;
   }
@@ -1561,12 +1562,12 @@ zx_status_t Remote<Protocol, kObjectType>::XattrSet(const uint8_t* name, size_t 
   return ZX_OK;
 #else
   return ZX_ERR_NOT_SUPPORTED;
-#endif
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
 }
 
 template <typename Protocol, zxio_object_type_t kObjectType>
 zx_status_t Remote<Protocol, kObjectType>::XattrRemove(const uint8_t* name, size_t name_len) {
-#if __Fuchsia_API_level__ >= 18
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
   if (!client().is_valid()) {
     return ZX_ERR_BAD_STATE;
   }
@@ -1584,7 +1585,7 @@ zx_status_t Remote<Protocol, kObjectType>::XattrRemove(const uint8_t* name, size
   return ZX_OK;
 #else
   return ZX_ERR_NOT_SUPPORTED;
-#endif
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
 }
 
 template <typename Protocol, zxio_object_type_t kObjectType>
@@ -1620,7 +1621,7 @@ zx_status_t Remote<Protocol, kObjectType>::Allocate(uint64_t offset, uint64_t le
   return ZX_OK;
 #else
   return ZX_ERR_NOT_SUPPORTED;
-#endif
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 }
 
 class Node : public Remote<fio::Node, ZXIO_OBJECT_TYPE_NODE> {
@@ -1786,7 +1787,7 @@ class Directory : public Remote<fio::Directory, ZXIO_OBJECT_TYPE_DIR> {
 
   zx_status_t CreateSymlink(const char* name, size_t name_len, const uint8_t* target,
                             size_t target_len, zxio_storage_t* storage) {
-#if __Fuchsia_API_level__ >= 18
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
     fidl::Endpoints<fio::Symlink> endpoints;
     if (storage) {
       if (auto result = fidl::CreateEndpoints<fio::Symlink>(); result.is_error()) {
@@ -1818,7 +1819,7 @@ class Directory : public Remote<fio::Directory, ZXIO_OBJECT_TYPE_DIR> {
     return ZX_OK;
 #else
     return ZX_ERR_NOT_SUPPORTED;
-#endif
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
   }
 
   static const zxio_ops_t kOps;
@@ -1904,7 +1905,7 @@ class File : public Remote<fio::File, ZXIO_OBJECT_TYPE_FILE> {
     return ZX_OK;
 #else
     return ZX_ERR_NOT_SUPPORTED;
-#endif
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   }
 
   void WaitBegin(zxio_signals_t zxio_signals, zx_handle_t* out_handle,
@@ -2030,7 +2031,7 @@ constexpr zxio_ops_t File::kOps = ([]() {
   return ops;
 })();
 
-#if __Fuchsia_API_level__ >= 18
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
 
 class Symlink : public Remote<fio::Symlink, ZXIO_OBJECT_TYPE_SYMLINK> {
  public:
@@ -2072,7 +2073,7 @@ constexpr zxio_ops_t Symlink::kOps = ([]() {
   return ops;
 })();
 
-#endif  // #if __Fuchsia_API_level__ >= 18
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
 
 }  // namespace
 
@@ -2098,7 +2099,7 @@ zx_status_t zxio_pty_init(zxio_storage_t* storage, zx::eventpair event,
   return ZX_OK;
 }
 
-#if __Fuchsia_API_level__ >= 18
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
 zx_status_t zxio_symlink_init(zxio_storage_t* storage, fidl::ClientEnd<fio::Symlink> client,
                               std::vector<uint8_t> target) {
   new (storage) Symlink(std::move(client), std::move(target));
@@ -2239,4 +2240,4 @@ zx_status_t zxio_attr_from_wire(const fio::wire::NodeAttributes2& in, zxio_node_
 
   return ZX_OK;
 }
-#endif
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)

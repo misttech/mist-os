@@ -4,6 +4,7 @@
 
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/inspect/component/cpp/component.h>
+#include <zircon/availability.h>
 
 #include <mutex>
 
@@ -34,7 +35,7 @@ DriverBase::DriverBase(std::string_view name, DriverStartArgs start_args,
   ZX_ASSERT(outgoing_request.has_value());
   InitializeAndServe(std::move(incoming), std::move(outgoing_request.value()));
 
-#if __Fuchsia_API_level__ >= 19
+#if FUCHSIA_API_LEVEL_AT_LEAST(19)
   const auto& node_properties = start_args_.node_properties();
   if (node_properties.has_value()) {
     for (const auto& entry : node_properties.value()) {
@@ -54,7 +55,7 @@ void DriverBase::InitializeAndServe(
 
 void DriverBase::InitInspectorExactlyOnce(inspect::Inspector inspector) {
   std::call_once(init_inspector_once_, [&] {
-#if __Fuchsia_API_level__ >= 16
+#if FUCHSIA_API_LEVEL_AT_LEAST(16)
     inspector_.emplace(
         dispatcher(), inspect::PublishOptions{
                           .inspector = std::move(inspector),
@@ -76,7 +77,7 @@ cpp20::span<const fuchsia_driver_framework::NodeProperty> DriverBase::node_prope
   return {it->second};
 }
 
-#if __Fuchsia_API_level__ >= 18
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
 
 zx::result<OwnedChildNode> DriverBase::AddOwnedChild(std::string_view node_name) {
   return fdf::AddOwnedChild(node(), logger(), node_name);
@@ -100,7 +101,7 @@ zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> DriverBase
   return fdf::AddChild(node(), logger(), node_name, devfs_args, properties, offers);
 }
 
-#endif  // __Fuchsia_API_level__ >= 18
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
 
 DriverBase::~DriverBase() { Logger::SetGlobalInstance(nullptr); }
 

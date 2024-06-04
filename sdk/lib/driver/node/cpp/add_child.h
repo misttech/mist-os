@@ -5,7 +5,9 @@
 #ifndef LIB_DRIVER_NODE_CPP_ADD_CHILD_H_
 #define LIB_DRIVER_NODE_CPP_ADD_CHILD_H_
 
-#if __Fuchsia_API_level__ >= 18
+#include <zircon/availability.h>
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <lib/driver/logging/cpp/logger.h>
@@ -77,6 +79,6 @@ zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddChild(
 
 }  // namespace fdf
 
-#endif
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
 
 #endif  // LIB_DRIVER_NODE_CPP_ADD_CHILD_H_

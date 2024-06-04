@@ -15,6 +15,7 @@
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/inspect/component/cpp/component.h>
+#include <zircon/availability.h>
 
 #include <unordered_map>
 
@@ -219,7 +220,7 @@ class DriverBase {
   // To avoid data races, subsequent calls are ignored are not an error.
   void InitInspectorExactlyOnce(inspect::Inspector inspector);
 
-#if __Fuchsia_API_level__ >= 18
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
 
   // Creates an owned child node on the node that the driver is bound to. The driver framework will
   // NOT try to match and bind a driver to this child as it is owned by the current driver.
@@ -256,7 +257,7 @@ class DriverBase {
       const fuchsia_driver_framework::NodePropertyVector& properties,
       const std::vector<fuchsia_driver_framework::Offer>& offers);
 
-#endif  // __Fuchsia_API_level__ >= 18
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
 
  private:
   void InitializeAndServe(Namespace incoming,

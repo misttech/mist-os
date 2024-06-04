@@ -431,7 +431,7 @@ zx_status_t zxio_create_with_nodeinfo(fidl::ClientEnd<fio::Node> node,
     case fio::wire::NodeInfoDeprecated::Tag::kService: {
       return zxio_node_init(storage, std::move(node));
     }
-#if __Fuchsia_API_level__ >= 18
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
     case fio::wire::NodeInfoDeprecated::Tag::kSymlink: {
       fio::wire::SymlinkObject& symlink = info.symlink();
       const auto& span = symlink.target.get();

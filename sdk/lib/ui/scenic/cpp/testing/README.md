@@ -48,13 +48,13 @@ should be careful when making changes to the internal data structures exposed
 from the fakes to not break out-of-tree dependencies.
 
 * Evolve the fakes as the protocols evolve. Align changes with the
-corresponding fidl additions and deprecations. Use the C++ availability macros
-such as `__Fuchsia_API_level__` to mark the availability. i.e. referencing a
-type from FIDL that was added in 15 and removed at 17, you'd have to use
-`#if __Fuchsia_API_level__ >= 15 && __Fuchsia_API_level__ < 17`.
+corresponding FIDL additions and deprecations. Use the C++ availability macros
+in `<zircon/availability.h>` to mark the availability. For example, to reference
+a FIDL type that was added in 15 and removed at 17, you'd have to use
+`#if FUCHSIA_API_LEVEL_AT_LEAST(15) && FUCHSIA_API_LEVEL_LESS_THAN(17)`.
 * Adding a new field should be seamless for the clients using non-piecewise
 matchers, such as testing::Field().
 * Removing a field can cause breakages. Make sure there are no expectations
 looking for these fields before deprecating. If you are removing a field that
-is also deprecated from fidl, use the C++ availability macros.
+is also deprecated from FIDL, use the C++ availability macros.
 * Avoid renaming fields when possible.

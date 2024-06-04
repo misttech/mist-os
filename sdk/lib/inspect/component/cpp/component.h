@@ -11,11 +11,12 @@
 #include <lib/inspect/component/cpp/tree_handler_settings.h>
 #include <lib/inspect/cpp/health.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <zircon/availability.h>
 
 #include <string>
 
 namespace inspect {
-#if __Fuchsia_API_level__ >= 16
+#if FUCHSIA_API_LEVEL_AT_LEAST(16)
 /// Options for a published `ComponentInspector`.
 ///
 /// The default constructor is acceptable for many components, and will cause a default
@@ -55,7 +56,7 @@ struct VmoOptions {
 /// Publish a VMO according to `opts`.
 void PublishVmo(async_dispatcher_t* dispatcher, zx::vmo vmo, VmoOptions opts);
 
-#endif
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(16)
 
 /// ComponentInspector is an instance of an Inspector that
 /// serves its Inspect data via the fuchsia.inspect.Tree protocol.
@@ -84,7 +85,7 @@ void PublishVmo(async_dispatcher_t* dispatcher, zx::vmo vmo, VmoOptions opts);
 /// ```
 class ComponentInspector final {
  public:
-#if __Fuchsia_API_level__ >= 16
+#if FUCHSIA_API_LEVEL_AT_LEAST(16)
   /// Construct a `ComponentInspector` with the provided `PublishOptions`.
   /// This `ComponentInspector` will be published via `fuchsia.inspect.InspectSink`.
   ComponentInspector(async_dispatcher_t* dispatcher, PublishOptions opts);
@@ -95,7 +96,7 @@ class ComponentInspector final {
   ComponentInspector(component::OutgoingDirectory& outgoing_directory,
                      async_dispatcher_t* dispatcher, Inspector inspector = {},
                      TreeHandlerSettings settings = {});
-#endif  // __Fuchsia_API_level__
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(16)
 
   ComponentInspector(ComponentInspector&&) = default;
   ComponentInspector& operator=(ComponentInspector&&) = default;

@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/zxio/types.h>
+#include <zircon/availability.h>
 
 namespace {
 
@@ -31,7 +32,7 @@ static_assert(ZXIO_OPERATION_MODIFY_DIRECTORY ==
               static_cast<uint64_t>(Operations::kModifyDirectory));
 static_assert(ZXIO_OPERATION_ALL == static_cast<uint64_t>(Operations::kMask));
 
-#if __Fuchsia_API_level__ >= 19
+#if FUCHSIA_API_LEVEL_AT_LEAST(19)
 using fio::CreationMode;
 static_assert(ZXIO_CREATION_MODE_NEVER == static_cast<uint32_t>(CreationMode::kNever));
 static_assert(ZXIO_CREATION_MODE_NEVER_DEPRECATED ==
