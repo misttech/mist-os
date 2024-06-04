@@ -235,9 +235,9 @@ inline zx_ticks_t platform_current_raw_ticks() {
 template <GetTicksSyncFlag Flags>
 inline zx_ticks_t platform_current_ticks() {
   while (true) {
-    // Since the raw_ticks_to_ticks_offset is only updated either early in boot or during resume,
-    // both of which occur when we're running on a single core with interrupts disabled, we don't
-    // need to worry about thread synchronization so memory_order_relaxed is sufficient.
+    // Since the raw_ticks_to_ticks_offset is only updated early in boot when we're running on a
+    // single core with interrupts disabled, we don't need to worry about thread synchronization so
+    // memory_order_relaxed is sufficient.
     const zx_ticks_t off1 = raw_ticks_to_ticks_offset.load(ktl::memory_order_relaxed);
     const zx_ticks_t raw_ticks = ::internal::platform_current_raw_ticks<Flags>();
     const zx_ticks_t off2 = raw_ticks_to_ticks_offset.load(ktl::memory_order_relaxed);
@@ -302,10 +302,9 @@ zx_time_t convert_raw_tsc_timestamp_to_clock_monotonic(int64_t ts) {
     // If TSC is being used as our clock monotonic reference, then conversion is
     // simple.  We just need to convert from the raw TSC timestamps to a ticks
     // timestamp by adding the offset, then scale by the ticks -> mono ratio.
-    // As the offset is only updated early during boot or during resume, both of
-    // which occur when we're running on a single core with interrupts disabled,
-    // we don't need to worry about thread synchronization so
-    // memory_order_relaxed is sufficient.
+    // As the offset is only updated early during boot when we're running on a
+    // single core with interrupts disabled, we don't need to worry about thread
+    // synchronization so memory_order_relaxed is sufficient.
     int64_t abs_ticks = ts + raw_ticks_to_ticks_offset.load(ktl::memory_order_relaxed);
     return rdtsc_ticks_to_clock_monotonic.Scale(abs_ticks);
   } else {
@@ -699,9 +698,8 @@ static void pc_init_timer(uint level) {
     // to define the zero point on our ticks timeline moving forward.
     platform_set_ticks_to_time_ratio(rdtsc_ticks_to_clock_monotonic);
     // At this point in boot we are running on a single core without interrupts
-    // or exceptions. In addition on x86 it is not possible to suspend until
-    // much later after boot (userspace is required). So memory_order_relaxed is
-    // sufficient. This goes for the load of the offset below as well.
+    // or exceptions, so memory_order_relaxed is sufficient. This goes for the load of the
+    // offset below as well.
     raw_ticks_to_ticks_offset.store(-current_ticks_rdtsc(), ktl::memory_order_relaxed);
 
     // A note about this casting operation.  There is a technical risk of UB
@@ -738,9 +736,7 @@ static void pc_init_timer(uint level) {
       // transformation from ticks to clock monotonic.
       platform_set_ticks_to_time_ratio(hpet_ticks_to_clock_monotonic);
       // At this point in boot we are running on a single core without
-      // interrupts or exceptions. In addition on x86 it is not possible to
-      // suspend until much later after boot (userspace is required). So
-      // memory_order_relaxed is sufficient.
+      // interrupts or exceptions, so memory_order_relaxed is sufficient.
       raw_ticks_to_ticks_offset.store(0, ktl::memory_order_relaxed);
 
       // Explicitly set the value of the HPET to zero, then make sure it is
@@ -787,10 +783,8 @@ static void pc_init_timer(uint level) {
       // ticks.
       //
       // At this point in boot we are running on a single core without
-      // interrupts or exceptions. In addition on x86 it is not possible to
-      // suspend until much later after boot (userspace is required). So
-      // memory_order_relaxed is sufficient. This goes for the load below as
-      // well.
+      // interrupts or exceptions, so memory_order_relaxed is sufficient.
+      // This goes for the load below as well.
       raw_ticks_to_ticks_offset.store(-current_ticks_pit(), ktl::memory_order_relaxed);
       const zx_ticks_t tsc_reference = current_ticks_rdtsc();
 
@@ -834,9 +828,9 @@ zx_status_t platform_set_oneshot_timer(zx_time_t deadline) {
 
     // We rounded up to the tick after above.
     //
-    // As the ticks offset is only updated early during boot or during resume, both of which occur
-    // when we're running on a single core with interrupts disabled, we don't need to worry about
-    // thread synchronization so memory_order_relaxed is sufficient.
+    // As the ticks offset is only updated early during boot when we're running on a single core
+    // with interrupts disabled, we don't need to worry about thread synchronization so
+    // memory_order_relaxed is sufficient.
     const uint64_t tsc_deadline = u64_mul_u64_fp32_64(deadline, tsc_per_ns) -
                                   raw_ticks_to_ticks_offset.load(ktl::memory_order_relaxed);
     LTRACEF("Scheduling oneshot timer: %" PRIu64 " deadline\n", tsc_deadline);
@@ -921,20 +915,3 @@ zx_ticks_t platform_convert_early_ticks(arch::EarlyTicks sample) {
 // have an invariant TSC which is accessible from usermode.  For now, we just
 // take the syscall hit instead of attempting to get more fancy.
 bool platform_usermode_can_access_tick_registers(void) { return (wall_clock == CLOCK_TSC); }
-
-static zx_ticks_t saved_ticks_val;
-void pc_prep_suspend_timer(void) { saved_ticks_val = platform_current_ticks(); }
-
-void pc_resume_timer(void) {
-  zx_ticks_t offset = saved_ticks_val - platform_current_raw_ticks();
-  // At this point in resume we are running on a single core with interrupts disabled so we
-  // don't need to worry about synchronizing between threads and memory_order_relaxed is
-  // sufficient.
-  raw_ticks_to_ticks_offset.store(offset, ktl::memory_order_relaxed);
-  if (wall_clock == CLOCK_PIT) {
-    set_pit_frequency(1000);  // ~1ms granularity
-
-    uint32_t irq = apic_io_isa_to_global(ISA_IRQ_PIT);
-    unmask_interrupt(irq);
-  }
-}

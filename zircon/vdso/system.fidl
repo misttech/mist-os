@@ -793,42 +793,9 @@ closed protocol System {
     ///
     /// ### ZX_SYSTEM_POWERCTL_ACPI_TRANSITION_S_STATE
     ///
-    /// Only defined for x86-64.
+    /// Only defined for x86-64, but is no longer supported.
     ///
-    /// Currently only transitions to the S3 state are supported.
-    ///
-    /// Before calling this syscall the following steps should be taken:
-    /// 1. Enter ACPICA noncontested mode
-    /// 2. Shut down the secondary CPUs
-    /// 3. Execute the `_PTS` control method
-    /// 4. (Optional) Execute the `_SST` control method
-    /// 5. Clear the ACPI wake status bit register
-    /// 6. Disable all ACPI GPEs
-    /// 7. Enabled all ACPI wakeup GPEs
-    ///
-    /// *arg* type: `zx_system_powerctl_arg_t` with only the `acpi_transition_s_state`
-    /// union element considered valid.
-    ///
-    /// ```
-    /// struct {
-    ///     uint8_t target_s_state;  // Value between 1 and 5 indicating which S-state
-    ///     uint8_t sleep_type_a;    // Value from ACPI VM (SLP_TYPa)
-    ///     uint8_t sleep_type_b;    // Value from ACPI VM (SLP_TYPb)
-    /// } acpi_transition_s_state;
-    /// ```
-    ///
-    /// Returns `ZX_ERR_INVALID_ARGS` if the target S state is not in the range 1-5.
-    ///
-    /// Returns `ZX_ERR_NOT_SUPPORTED` if transitioning to the target S state is not
-    /// supported.
-    ///
-    /// Returns `ZX_ERR_BAD_STATE` if the target S state is not 5 and the secondary
-    /// CPUs have not been shut down.
-    ///
-    /// Returns `ZX_ERR_NO_MEMORY` if there are not enough resources to run the
-    /// thread.
-    ///
-    /// Returns `ZX_ERR_INTERNAL` if the S state transition fails.
+    /// Returns `ZX_ERR_NOT_SUPPORTED`.
     ///
     /// ### ZX_SYSTEM_POWERCTL_X86_SET_PKG_PL1
     ///

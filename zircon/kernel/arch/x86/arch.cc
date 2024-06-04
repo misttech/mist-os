@@ -170,27 +170,6 @@ void arch_enter_uspace(iframe_t* iframe) {
   __UNREACHABLE;
 }
 
-void arch_prep_suspend(void) {
-  DEBUG_ASSERT(arch_ints_disabled());
-  apic_io_save();
-}
-
-void arch_resume(void) {
-  DEBUG_ASSERT(arch_ints_disabled());
-
-  x86_init_percpu(0);
-  x86_mmu_percpu_init();
-  mp_set_curr_cpu_online(true);
-  x86_pat_sync(cpu_num_to_mask(0));
-
-  apic_local_init();
-
-  // Ensure the CPU that resumed was assigned the correct percpu object.
-  DEBUG_ASSERT(apic_local_id() == x86_get_percpu()->apic_id);
-
-  apic_io_restore();
-}
-
 [[noreturn, gnu::noinline]] static void finish_secondary_entry(
     ktl::atomic<unsigned int>* aps_still_booting, Thread* thread, uint cpu_num) {
   // Mark this cpu as online so MP code can try to deliver IPIs.

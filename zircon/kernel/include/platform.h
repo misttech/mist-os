@@ -60,14 +60,6 @@ void platform_specific_halt(platform_halt_action suggested_action, zircon_crash_
 /* optionally stop the current cpu in a way the platform finds appropriate */
 void platform_halt_cpu();
 
-// Called just before initiating a system suspend to give the platform layer a
-// chance to save state.  Must be called with interrupts disabled.
-void platform_prep_suspend();
-
-// Called immediately after resuming from a system suspend to let the platform layer
-// reinitialize arch components.  Must be called with interrupts disabled.
-void platform_resume();
-
 // Returns true if this system has a debug serial port that is enabled
 bool platform_serial_enabled();
 
