@@ -24,11 +24,8 @@ use {
     tracing::warn,
     vfs::{
         directory::{
-            entry::DirectoryEntry,
-            entry_container::Directory,
-            helper::DirectlyMutable,
-            immutable::{connection::ImmutableConnection, simple::simple},
-            simple::Simple,
+            entry::DirectoryEntry, entry_container::Directory, helper::DirectlyMutable,
+            immutable::Simple as PseudoDir,
         },
         execution_scope::ExecutionScope,
         file::vmo::VmoFile,
@@ -63,7 +60,7 @@ pub struct ServiceFs<ServiceObjTy: ServiceObjTrait> {
     scope: ExecutionScope,
 
     // The root directory.
-    dir: Arc<Simple<ImmutableConnection>>,
+    dir: Arc<PseudoDir>,
 
     // New connections are sent via an mpsc. The tuple is (index, channel) where index is the index
     // into the `services` member.
@@ -108,7 +105,7 @@ impl<'a, Output: 'a> ServiceFs<ServiceObj<'a, Output>> {
 /// Services and subdirectories can be added to it.
 pub struct ServiceFsDir<'a, ServiceObjTy: ServiceObjTrait> {
     fs: &'a mut ServiceFs<ServiceObjTy>,
-    dir: Arc<Simple<ImmutableConnection>>,
+    dir: Arc<PseudoDir>,
 }
 
 /// A `Service` implementation that proxies requests
@@ -558,8 +555,8 @@ impl<ServiceObjTy: ServiceObjTrait> ServiceFs<ServiceObjTy> {
     }
 }
 
-fn new_simple_dir() -> Arc<Simple<ImmutableConnection>> {
-    let dir = simple();
+fn new_simple_dir() -> Arc<PseudoDir> {
+    let dir = PseudoDir::new();
     dir.clone().set_not_found_handler(Box::new(move |path| {
         warn!(
             "ServiceFs received request to `{}` but has not been configured to serve this path.",
