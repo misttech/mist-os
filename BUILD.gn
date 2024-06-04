@@ -312,10 +312,7 @@ build_api_module("package-repositories") {
 build_api_module("archives") {
   testonly = true
   data_keys = [ "archives" ]
-  deps = [
-    "//build/gn:archives",
-    "//build/images/archive",
-  ]
+  deps = [ "//build/images/archive" ]
 }
 
 # TODO(crbug.com/gn/132): Remove when GN emits the equivalent information
@@ -1912,11 +1909,6 @@ group("developer_host_tools") {
     full_label = get_label_info(label, "label_no_toolchain")
     public_deps += [ "$full_label($host_toolchain)" ]
   }
-}
-
-group("package_archive") {
-  testonly = true
-  public_deps = [ "//build/gn:package_archive" ]
 }
 
 # IMPORTANT: This target is only provided for the benefit of the `fx bazel`
