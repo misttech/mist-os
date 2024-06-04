@@ -16,6 +16,7 @@ import("//build/sdk/sdk_collection.gni")
 import("//build/sdk/sdk_documentation.gni")
 import("//build/sdk/sdk_final_manifest_golden.gni")
 import("//build/sdk/sdk_molecule.gni")
+import("//build/sdk/sdk_version_history.gni")
 import("//tools/check-licenses/build/license_data.gni")
 import("config.gni")
 
@@ -312,7 +313,7 @@ if (override_target_api_level == "PLATFORM") {
       ":core_data",
       ":core_documentation",
       ":core_licenses",
-      ":version_history",
+      ":version_history_sdk",
       "//sdk/devices",
       "//sdk/docs",
     ]
@@ -358,15 +359,11 @@ group("tests") {
   ]
 }
 
-sdk_atom("version_history") {
+sdk_version_history("version_history") {
+  visibility += [ "*" ]
   id = "sdk://version_history"
   category = "partner"
-  meta = {
-    dest = "version_history.json"
-    source = "version_history.json"
-    schema = "version_history-22rnd667"
-    type = "version_history"
-  }
+  source = "version_history.json"
 }
 
 # License/rights related information for the SDK.
@@ -794,7 +791,7 @@ sdk_molecule("platform_libs") {
   visibility += [ ":platform" ]
   category = "internal"
   deps = [
-    ":version_history",
+    ":version_history_sdk",
     "//sdk/lib/driver/devicetree/manager:manager_sdk",
     "//sdk/lib/driver/devicetree/testing:board-test-helper_sdk",
     "//sdk/lib/driver/devicetree/visitors:driver-visitor_sdk",

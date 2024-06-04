@@ -1,0 +1,70 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_action.gni")
+import("//build/sdk/sdk_atom.gni")
+
+# Defines an atom for version_history.json.
+#
+# In practice, there will probably only be one instance of this rule, at
+# //sdk:version_history, but we'll give it its own template for tidiness.
+#
+# Parameters
+#
+#   source (required)
+#     path to version_history.json to preprocess.
+#
+#   id, category, assert_no_deps
+#     Forwarded to sdk_atom.
+template("sdk_version_history") {
+  _labels = {
+    compile = target_name
+    sdk = "${target_name}_sdk"
+  }
+
+  _files = {
+    compiled = "${target_out_dir}/${target_name}.json"
+  }
+
+  # Preprocess version_history.json
+  python_action(_labels.compile) {
+    forward_variables_from(invoker,
+                           [
+                             "assert_no_deps",
+                             "testonly",
+                             "visibility",
+                           ])
+
+    binary_label = "//build/sdk/generate_version_history"
+
+    inputs = [ invoker.source ]
+
+    outputs = [ _files.compiled ]
+
+    args = [
+      "--input",
+      rebase_path(inputs[0], root_build_dir),
+      "--output",
+      rebase_path(outputs[0], root_build_dir),
+    ]
+  }
+
+  # SDK metadata.
+  sdk_atom(_labels.sdk) {
+    forward_variables_from(invoker,
+                           [
+                             "id",
+                             "category",
+                             "assert_no_deps",
+                             "testonly",
+                           ])
+    meta = {
+      dest = "version_history.json"
+      source = _files.compiled
+      schema = "version_history-22rnd667"
+      type = "version_history"
+    }
+    non_sdk_deps = [ ":${_labels.compile}" ]
+  }
+}
