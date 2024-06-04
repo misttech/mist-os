@@ -74,7 +74,8 @@ zx_status_t StartComponent() {
 }  // namespace
 
 int main(int argc, char** argv) {
-  fuchsia_logging::SetLogSettings({}, {"blobfs"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.BuildAndInitializeWithTags({"blobfs"});
 
   if (zx_status_t status = StartComponent(); status != ZX_OK) {
     return EXIT_FAILURE;
