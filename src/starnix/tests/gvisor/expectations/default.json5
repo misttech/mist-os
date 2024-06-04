@@ -498,7 +498,6 @@
                 "MMapFileTest.MapLastPositivePage",
                 "MMapFileTest.MapSecondToLastNegativePage",
                 "MMapTest.ExceedLimitAS",
-                "MMapTest.ExceedLimitDataPrlimitPID",
                 "MMapTest.MapLocked",
                 "MMapTest.MprotectHugeLength",
 

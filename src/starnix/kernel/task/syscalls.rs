@@ -5,6 +5,7 @@
 use fuchsia_zircon as zx;
 use once_cell::sync::Lazy;
 use starnix_sync::{LockBefore, Locked, RwLock, Unlocked};
+use starnix_uapi::auth::CAP_SYS_RESOURCE;
 use static_assertions::const_assert;
 use std::{cmp, ffi::CString, sync::Arc};
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
@@ -1229,16 +1230,32 @@ pub fn sys_prlimit64(
     user_new_limit: UserRef<rlimit>,
     user_old_limit: UserRef<rlimit>,
 ) -> Result<(), Errno> {
-    if pid != 0 {
-        track_stub!(TODO("https://fxbug.dev/322874217"), "prlimit64 with non 0 pid");
-        return error!(ENOSYS);
+    let weak = get_task_or_current(current_task, pid);
+    let target_task = Task::from_weak(&weak)?;
+
+    // To get or set the resource of a process other than itself, the caller must have either:
+    // * the CAP_SYS_RESOURCE
+    // * the same `uid`, `euid`, `saved_uid`, `gid`, `egid`, `saved_gid` as the target.
+    if current_task.get_pid() != target_task.get_pid() {
+        let current_creds = current_task.creds();
+        if !current_creds.has_capability(CAP_SYS_RESOURCE) {
+            let target_creds = target_task.creds();
+            let creds_match = current_creds.uid == target_creds.uid
+                && current_creds.euid == target_creds.euid
+                && current_creds.saved_uid == target_creds.saved_uid
+                && current_creds.gid == target_creds.gid
+                && current_creds.egid == target_creds.egid
+                && current_creds.saved_gid == target_creds.saved_gid;
+            if !creds_match {
+                return error!(EPERM);
+            }
+        }
     }
-    let task = &current_task.task;
 
     let resource = Resource::from_raw(user_resource)?;
 
     let maybe_new_limit = if !user_new_limit.is_null() {
-        let new_limit = current_task.read_object(user_new_limit)?;
+        let new_limit = target_task.read_object(user_new_limit)?;
         if new_limit.rlim_cur > new_limit.rlim_max {
             return error!(EINVAL);
         }
@@ -1259,11 +1276,11 @@ pub fn sys_prlimit64(
             // The stack size is fixed at the moment, but
             // if MAP_GROWSDOWN is implemented this should
             // report the limit that it can be grown.
-            let mm_state = task.mm().state.read();
+            let mm_state = target_task.mm().state.read();
             let stack_size = mm_state.stack_size as u64;
             rlimit { rlim_cur: stack_size, rlim_max: stack_size }
         }
-        _ => task.thread_group.adjust_rlimits(current_task, resource, maybe_new_limit)?,
+        _ => target_task.thread_group.adjust_rlimits(current_task, resource, maybe_new_limit)?,
     };
 
     if !user_old_limit.is_null() {
