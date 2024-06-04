@@ -179,7 +179,7 @@ inline SuperFooResponse& SuperFooResponse::y(int64_t value) {
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_inheritance::SuperFooRequest> : public std::true_type {};
+struct IsFidlType<::test_inheritance::SuperFooRequest> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_inheritance::SuperFooRequest> {
@@ -191,14 +191,14 @@ struct TypeTraits<::test_inheritance::SuperFooRequest> {
 };
 
 template <>
-struct IsStruct<::test_inheritance::SuperFooRequest> : public std::true_type {};
+struct IsStruct<::test_inheritance::SuperFooRequest> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_inheritance::SuperFooRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_inheritance::SuperFooRequest, 16> {};
 
 template <>
-struct IsFidlType<::test_inheritance::SuperFooResponse> : public std::true_type {};
+struct IsFidlType<::test_inheritance::SuperFooResponse> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_inheritance::SuperFooResponse> {
@@ -210,7 +210,7 @@ struct TypeTraits<::test_inheritance::SuperFooResponse> {
 };
 
 template <>
-struct IsStruct<::test_inheritance::SuperFooResponse> : public std::true_type {};
+struct IsStruct<::test_inheritance::SuperFooResponse> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_inheritance::SuperFooResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final

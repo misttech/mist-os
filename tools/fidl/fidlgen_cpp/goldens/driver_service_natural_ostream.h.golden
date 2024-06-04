@@ -22,14 +22,18 @@ namespace test_driverservice {
 template <>
 struct fidl::ostream::Formatter<::fdf::ClientEnd<::test_driverservice::SomeDriverProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fdf::ClientEnd<::test_driverservice::SomeDriverProtocol>& value) {
-    return os << "ClientEnd<" << "test_driverservice::SomeDriverProtocol" << ">(" << value.channel().get() << ")";
+    return os << "ClientEnd<"
+              << "test_driverservice::SomeDriverProtocol"
+              << ">(" << value.channel().get() << ")";
   }
 };
 
 template <>
 struct fidl::ostream::Formatter<::fdf::ServerEnd<::test_driverservice::SomeDriverProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fdf::ServerEnd<::test_driverservice::SomeDriverProtocol>& value) {
-    return os << "ServerEnd<" << "test_driverservice::SomeDriverProtocol" << ">(" << value.channel().get() << ")";
+    return os << "ServerEnd<"
+              << "test_driverservice::SomeDriverProtocol"
+              << ">(" << value.channel().get() << ")";
   }
 };
 

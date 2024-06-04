@@ -102,7 +102,7 @@ inline Foo& Foo::field(::test_dependent::MyEnum value) {
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_structdefaultvalueenumlibraryreference::Foo> : public std::true_type {};
+struct IsFidlType<::test_structdefaultvalueenumlibraryreference::Foo> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_structdefaultvalueenumlibraryreference::Foo> {
@@ -114,7 +114,7 @@ struct TypeTraits<::test_structdefaultvalueenumlibraryreference::Foo> {
 };
 
 template <>
-struct IsStruct<::test_structdefaultvalueenumlibraryreference::Foo> : public std::true_type {};
+struct IsStruct<::test_structdefaultvalueenumlibraryreference::Foo> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_structdefaultvalueenumlibraryreference::Foo, ::fidl::internal::NaturalCodingConstraintEmpty> final

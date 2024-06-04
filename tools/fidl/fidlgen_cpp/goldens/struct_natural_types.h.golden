@@ -224,7 +224,7 @@ inline BasicStruct& BasicStruct::y(::std::string value) {
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_struct::Simple> : public std::true_type {};
+struct IsFidlType<::test_struct::Simple> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_struct::Simple> {
@@ -236,14 +236,14 @@ struct TypeTraits<::test_struct::Simple> {
 };
 
 template <>
-struct IsStruct<::test_struct::Simple> : public std::true_type {};
+struct IsStruct<::test_struct::Simple> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_struct::Simple, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_struct::Simple, 2> {};
 
 template <>
-struct IsFidlType<::test_struct::BasicStruct> : public std::true_type {};
+struct IsFidlType<::test_struct::BasicStruct> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_struct::BasicStruct> {
@@ -255,7 +255,7 @@ struct TypeTraits<::test_struct::BasicStruct> {
 };
 
 template <>
-struct IsStruct<::test_struct::BasicStruct> : public std::true_type {};
+struct IsStruct<::test_struct::BasicStruct> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_struct::BasicStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final

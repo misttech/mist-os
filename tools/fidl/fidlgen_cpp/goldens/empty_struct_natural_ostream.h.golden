@@ -52,14 +52,18 @@ std::ostream& operator<<(std::ostream& os, const ::test_emptystruct::EmptyProtoc
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_emptystruct::EmptyProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_emptystruct::EmptyProtocol>& value) {
-    return os << "ClientEnd<" << "test_emptystruct::EmptyProtocol" << ">(" << value.channel().get() << ")";
+    return os << "ClientEnd<"
+              << "test_emptystruct::EmptyProtocol"
+              << ">(" << value.channel().get() << ")";
   }
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_emptystruct::EmptyProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_emptystruct::EmptyProtocol>& value) {
-    return os << "ServerEnd<" << "test_emptystruct::EmptyProtocol" << ">(" << value.channel().get() << ")";
+    return os << "ServerEnd<"
+              << "test_emptystruct::EmptyProtocol"
+              << ">(" << value.channel().get() << ")";
   }
 };
 

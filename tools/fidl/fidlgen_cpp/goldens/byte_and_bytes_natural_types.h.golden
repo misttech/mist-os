@@ -101,7 +101,7 @@ inline ByteAndBytes& ByteAndBytes::single_byte(uint8_t value) {
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_byteandbytes::ByteAndBytes> : public std::true_type {};
+struct IsFidlType<::test_byteandbytes::ByteAndBytes> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_byteandbytes::ByteAndBytes> {
@@ -113,7 +113,7 @@ struct TypeTraits<::test_byteandbytes::ByteAndBytes> {
 };
 
 template <>
-struct IsStruct<::test_byteandbytes::ByteAndBytes> : public std::true_type {};
+struct IsStruct<::test_byteandbytes::ByteAndBytes> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_byteandbytes::ByteAndBytes, ::fidl::internal::NaturalCodingConstraintEmpty> final

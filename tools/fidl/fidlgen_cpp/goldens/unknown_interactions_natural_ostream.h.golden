@@ -701,79 +701,103 @@ std::ostream& operator<<(std::ostream& os, const ::test_unknowninteractions::Unk
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_unknowninteractions::UnknownInteractionsProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_unknowninteractions::UnknownInteractionsProtocol>& value) {
-    return os << "ClientEnd<" << "test_unknowninteractions::UnknownInteractionsProtocol" << ">(" << value.channel().get() << ")";
+    return os << "ClientEnd<"
+              << "test_unknowninteractions::UnknownInteractionsProtocol"
+              << ">(" << value.channel().get() << ")";
   }
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_unknowninteractions::UnknownInteractionsProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_unknowninteractions::UnknownInteractionsProtocol>& value) {
-    return os << "ServerEnd<" << "test_unknowninteractions::UnknownInteractionsProtocol" << ">(" << value.channel().get() << ")";
+    return os << "ServerEnd<"
+              << "test_unknowninteractions::UnknownInteractionsProtocol"
+              << ">(" << value.channel().get() << ")";
   }
 };
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_unknowninteractions::UnknownInteractionsAjarProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_unknowninteractions::UnknownInteractionsAjarProtocol>& value) {
-    return os << "ClientEnd<" << "test_unknowninteractions::UnknownInteractionsAjarProtocol" << ">(" << value.channel().get() << ")";
+    return os << "ClientEnd<"
+              << "test_unknowninteractions::UnknownInteractionsAjarProtocol"
+              << ">(" << value.channel().get() << ")";
   }
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_unknowninteractions::UnknownInteractionsAjarProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_unknowninteractions::UnknownInteractionsAjarProtocol>& value) {
-    return os << "ServerEnd<" << "test_unknowninteractions::UnknownInteractionsAjarProtocol" << ">(" << value.channel().get() << ")";
+    return os << "ServerEnd<"
+              << "test_unknowninteractions::UnknownInteractionsAjarProtocol"
+              << ">(" << value.channel().get() << ")";
   }
 };
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_unknowninteractions::UnknownInteractionsClosedProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_unknowninteractions::UnknownInteractionsClosedProtocol>& value) {
-    return os << "ClientEnd<" << "test_unknowninteractions::UnknownInteractionsClosedProtocol" << ">(" << value.channel().get() << ")";
+    return os << "ClientEnd<"
+              << "test_unknowninteractions::UnknownInteractionsClosedProtocol"
+              << ">(" << value.channel().get() << ")";
   }
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_unknowninteractions::UnknownInteractionsClosedProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_unknowninteractions::UnknownInteractionsClosedProtocol>& value) {
-    return os << "ServerEnd<" << "test_unknowninteractions::UnknownInteractionsClosedProtocol" << ">(" << value.channel().get() << ")";
+    return os << "ServerEnd<"
+              << "test_unknowninteractions::UnknownInteractionsClosedProtocol"
+              << ">(" << value.channel().get() << ")";
   }
 };
 template <>
 struct fidl::ostream::Formatter<::fdf::ClientEnd<::test_unknowninteractions::UnknownInteractionsDriverProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fdf::ClientEnd<::test_unknowninteractions::UnknownInteractionsDriverProtocol>& value) {
-    return os << "ClientEnd<" << "test_unknowninteractions::UnknownInteractionsDriverProtocol" << ">(" << value.channel().get() << ")";
+    return os << "ClientEnd<"
+              << "test_unknowninteractions::UnknownInteractionsDriverProtocol"
+              << ">(" << value.channel().get() << ")";
   }
 };
 
 template <>
 struct fidl::ostream::Formatter<::fdf::ServerEnd<::test_unknowninteractions::UnknownInteractionsDriverProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fdf::ServerEnd<::test_unknowninteractions::UnknownInteractionsDriverProtocol>& value) {
-    return os << "ServerEnd<" << "test_unknowninteractions::UnknownInteractionsDriverProtocol" << ">(" << value.channel().get() << ")";
+    return os << "ServerEnd<"
+              << "test_unknowninteractions::UnknownInteractionsDriverProtocol"
+              << ">(" << value.channel().get() << ")";
   }
 };
 template <>
 struct fidl::ostream::Formatter<::fdf::ClientEnd<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fdf::ClientEnd<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>& value) {
-    return os << "ClientEnd<" << "test_unknowninteractions::UnknownInteractionsAjarDriverProtocol" << ">(" << value.channel().get() << ")";
+    return os << "ClientEnd<"
+              << "test_unknowninteractions::UnknownInteractionsAjarDriverProtocol"
+              << ">(" << value.channel().get() << ")";
   }
 };
 
 template <>
 struct fidl::ostream::Formatter<::fdf::ServerEnd<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fdf::ServerEnd<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol>& value) {
-    return os << "ServerEnd<" << "test_unknowninteractions::UnknownInteractionsAjarDriverProtocol" << ">(" << value.channel().get() << ")";
+    return os << "ServerEnd<"
+              << "test_unknowninteractions::UnknownInteractionsAjarDriverProtocol"
+              << ">(" << value.channel().get() << ")";
   }
 };
 template <>
 struct fidl::ostream::Formatter<::fdf::ClientEnd<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fdf::ClientEnd<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>& value) {
-    return os << "ClientEnd<" << "test_unknowninteractions::UnknownInteractionsClosedDriverProtocol" << ">(" << value.channel().get() << ")";
+    return os << "ClientEnd<"
+              << "test_unknowninteractions::UnknownInteractionsClosedDriverProtocol"
+              << ">(" << value.channel().get() << ")";
   }
 };
 
 template <>
 struct fidl::ostream::Formatter<::fdf::ServerEnd<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fdf::ServerEnd<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>& value) {
-    return os << "ServerEnd<" << "test_unknowninteractions::UnknownInteractionsClosedDriverProtocol" << ">(" << value.channel().get() << ")";
+    return os << "ServerEnd<"
+              << "test_unknowninteractions::UnknownInteractionsClosedDriverProtocol"
+              << ">(" << value.channel().get() << ")";
   }
 };
 
