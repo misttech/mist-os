@@ -200,7 +200,6 @@ local_repository(
 # buildifier: disable=load-on-top
 load(
     "//:build/bazel/repository_rules.bzl",
-    "bazel_inputs_repository",
     "boringssl_repository",
     "fuchsia_build_info_repository",
     "gn_targets_repository",
@@ -230,11 +229,6 @@ googletest_repository(
 boringssl_repository(
     name = "boringssl",
     content_hash_file = "fuchsia_build_generated/boringssl.hash",
-)
-
-bazel_inputs_repository(
-    name = "legacy_ninja_build_outputs",
-    inputs_manifest = "//:bazel_inputs_manifest.json",
 )
 
 gn_targets_repository(

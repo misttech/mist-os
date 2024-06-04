@@ -1943,8 +1943,6 @@ group("bazel_workspace") {
 group("root_targets") {
   testonly = true
   deps = [
-    "//build/bazel:legacy_ninja_build_outputs",
-
     # These are only required by the core.x64-sdk_source_sets_and_shlibs-apiXX-build_only
     # builders. TODO(https://fxbug.dev/42082833): Remove these lines once these builders are
     # removed since they seem no longer necessary.

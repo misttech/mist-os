@@ -4,7 +4,6 @@
 
 import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/bazel_workspace.gni")
-import("//build/bazel/legacy_ninja_build_outputs.gni")
 import("//build/bazel/logging.gni")
 import("//build/bazel/remote_services.gni")
 import("//build/config/compiler.gni")
@@ -435,11 +434,6 @@ template("bazel_action") {
 
     script = "//build/bazel/scripts/bazel_action.py"
 
-    # NOTE: Do not add bazel_inputs_manifest to the list of inputs
-    # because *nothing* should depend on the target that generates
-    # it. Moreoever, it is testonly=true, which would prevent
-    # non-testonly bazel_action() from being added to the GN graph.
-    # This is "safe" because the file is generated at GN gen time.
     inputs = [ bazel_launcher ] + _bazel_build_files
 
     inputs += [ _ninja_inputs_manifest ]
@@ -474,8 +468,6 @@ template("bazel_action") {
              invoker.command,
              "--gn-target-label",
              get_label_info(":$target_name", "label_no_toolchain"),
-             "--legacy-inputs-manifest",
-             rebase_path(bazel_inputs_manifest, root_build_dir),
              "--ninja-inputs-manifest",
              rebase_path(_ninja_inputs_manifest, root_build_dir),
              "--gn-targets-repository-manifest",

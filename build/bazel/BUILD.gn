@@ -16,38 +16,6 @@ assert(
     current_toolchain == default_toolchain,
     "This BUILD.gn file should only be parsed in the default toolchain, to prevent generating Bazel workspace multiple times.")
 
-# A GN target used to generate at GN-gen time a bazel inputs manifest file
-# under the following path which is hard-coded in toplevel.WORKSPACE.bazel:
-#
-# $BAZEL_TOPDIR/legacy_ninja_build_outputs.inputs_manifest.json
-#
-# See bazel_inputs.gni comments for details on the manifest file format,
-# and repository_rules.bzl:bazel_inputs_repository() to see how it is parsed
-# to generate an external repository for the Bazel project.
-#
-# It is possible to build this target to ensure that all Ninja outputs seen
-# by the Bazel workspace are properly generated, as in:
-#
-#    fx build build/bazel:legacy_ninja_build_outputs
-#
-# IMPORTANT: Nothing in the GN graph should depend on this directly, except
-# the top-level //:root_targets group in //BUILD.gn, to ensure
-# that its output is generated at gn-gen time.
-#
-# Doing so allows breaking the testonly boundary, as required to allow
-# non-testonly bazel_action() targets to depend on
-# :generate_main_workspace below, without depending on this target.
-#
-generate_bazel_inputs_manifest("legacy_ninja_build_outputs") {
-  testonly = true
-
-  output = bazel_inputs_manifest
-
-  # IMPORTANT: All bazel_input_xxx() targets must be reachable from this
-  # dependencies list!
-  inputs_deps = gn_labels_for_bazel_inputs + extra_gn_labels_for_bazel_inputs
-}
-
 action("generate_main_workspace") {
   script = "//build/bazel/scripts/update_workspace.py"
 
