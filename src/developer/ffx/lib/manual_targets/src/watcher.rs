@@ -6,6 +6,7 @@ use crate::Config;
 use crate::ManualTargets;
 
 use anyhow::{anyhow, Context as _, Result};
+use async_net::TcpStream;
 use async_trait::async_trait;
 use ffx_fastboot_interface::fastboot_interface::Fastboot;
 use ffx_fastboot_interface::fastboot_proxy::FastbootProxy;
@@ -265,13 +266,13 @@ where
 //
 
 /// Creates a FastbootProxy over TCP for a device at the given SocketAddr
-async fn tcp_proxy(addr: &SocketAddr) -> Result<FastbootProxy<TcpNetworkInterface>> {
+async fn tcp_proxy(addr: &SocketAddr) -> Result<FastbootProxy<TcpNetworkInterface<TcpStream>>> {
     let mut factory = OneshotTcpFactory::new(*addr);
     let interface = factory
         .open()
         .await
         .with_context(|| format!("connecting via TCP to Fastboot address: {addr}"))?;
-    Ok(FastbootProxy::<TcpNetworkInterface>::new(addr.to_string(), interface, factory))
+    Ok(FastbootProxy::<TcpNetworkInterface<TcpStream>>::new(addr.to_string(), interface, factory))
 }
 
 #[derive(Debug, Clone)]
@@ -286,8 +287,8 @@ impl OneshotTcpFactory {
 }
 
 #[async_trait(?Send)]
-impl InterfaceFactoryBase<TcpNetworkInterface> for OneshotTcpFactory {
-    async fn open(&mut self) -> Result<TcpNetworkInterface, InterfaceFactoryError> {
+impl InterfaceFactoryBase<TcpNetworkInterface<TcpStream>> for OneshotTcpFactory {
+    async fn open(&mut self) -> Result<TcpNetworkInterface<TcpStream>, InterfaceFactoryError> {
         let interface = open_once(&self.addr, Duration::from_secs(1))
             .await
             .with_context(|| format!("connecting via TCP to Fastboot address: {}", self.addr))?;
@@ -304,7 +305,7 @@ impl InterfaceFactoryBase<TcpNetworkInterface> for OneshotTcpFactory {
     }
 }
 
-impl InterfaceFactory<TcpNetworkInterface> for OneshotTcpFactory {}
+impl InterfaceFactory<TcpNetworkInterface<TcpStream>> for OneshotTcpFactory {}
 
 ///////////////////////////////////////////////////////////////////////////////
 // Tests

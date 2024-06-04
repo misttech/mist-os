@@ -19,24 +19,28 @@ const FB_HANDSHAKE: [u8; 4] = *b"FB01";
 // TcpNetworkInterface
 //
 
-pub struct TcpNetworkInterface {
-    stream: TcpStream,
+pub struct TcpNetworkInterface<T> {
+    stream: T,
     read_avail_bytes: Option<u64>,
     /// Returns a tuple of (avail_bytes, bytes_read, bytes)
     read_task: Option<Pin<Box<dyn Future<Output = std::io::Result<(u64, usize, Vec<u8>)>>>>>,
     write_task: Option<Pin<Box<dyn Future<Output = std::io::Result<usize>>>>>,
+    wrote_header: bool,
+    write_header_task: Option<Pin<Box<dyn Future<Output = std::io::Result<()>>>>>,
 }
 
-impl fmt::Debug for TcpNetworkInterface {
+impl<T> fmt::Debug for TcpNetworkInterface<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TcpNetworkInterface")
-            .field("stream", &self.stream)
             .field("read_avail_bytes", &self.read_avail_bytes)
             .finish()
     }
 }
 
-impl AsyncRead for TcpNetworkInterface {
+impl<T> AsyncRead for TcpNetworkInterface<T>
+where
+    T: AsyncRead + AsyncWrite + std::marker::Unpin + Clone + 'static,
+{
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -88,16 +92,47 @@ impl AsyncRead for TcpNetworkInterface {
     }
 }
 
-impl AsyncWrite for TcpNetworkInterface {
+impl<T> AsyncWrite for TcpNetworkInterface<T>
+where
+    T: AsyncWrite + std::marker::Unpin + Clone + 'static,
+{
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
-        if self.write_task.is_none() {
+        if self.write_header_task.is_none() && !self.wrote_header {
+            tracing::debug!("About to start header task");
             let mut stream = self.stream.clone();
             let mut data = vec![];
             data.extend(TryInto::<u64>::try_into(buf.len()).unwrap().to_be_bytes());
+            self.write_header_task.replace(Box::pin(async move { stream.write_all(&data).await }));
+        }
+
+        if self.write_header_task.is_some() {
+            tracing::debug!("Checking header task status");
+            let task = self.write_header_task.as_mut().unwrap();
+            let res = match task.as_mut().poll(cx) {
+                Poll::Ready(Ok(())) => {
+                    self.write_header_task = None;
+                    self.wrote_header = true;
+                    cx.waker().clone().wake();
+                    Poll::Pending
+                }
+                Poll::Ready(Err(e)) => {
+                    self.write_header_task = None;
+                    self.wrote_header = true;
+                    Poll::Ready(Err(e))
+                }
+                Poll::Pending => Poll::Pending,
+            };
+            tracing::debug!("Header Check: returning: {:#?}", res);
+            return res;
+        }
+
+        if self.write_task.is_none() {
+            let mut stream = self.stream.clone();
+            let mut data = vec![];
             data.extend(buf);
             self.write_task.replace(Box::pin(async move {
                 let mut start = 0;
@@ -122,13 +157,20 @@ impl AsyncWrite for TcpNetworkInterface {
         match task.as_mut().poll(cx) {
             Poll::Ready(Ok(s)) => {
                 self.write_task = None;
+                self.wrote_header = false;
+                self.write_header_task = None;
                 Poll::Ready(Ok(s))
             }
             Poll::Ready(Err(e)) => {
                 self.write_task = None;
+                self.wrote_header = false;
+                self.write_header_task = None;
                 Poll::Ready(Err(e))
             }
-            Poll::Pending => Poll::Pending,
+            Poll::Pending => {
+                cx.waker().clone().wake();
+                Poll::Pending
+            }
         }
     }
 
@@ -141,7 +183,7 @@ impl AsyncWrite for TcpNetworkInterface {
     }
 }
 
-async fn handshake(stream: &mut TcpStream) -> Result<()> {
+async fn handshake<T: AsyncWrite + AsyncRead + std::marker::Unpin>(stream: &mut T) -> Result<()> {
     stream.write(&FB_HANDSHAKE).await.context("Sending handshake")?;
     let mut response = [0; 4];
     stream.read_exact(&mut response).await.context("Receiving handshake response")?;
@@ -161,7 +203,7 @@ pub const HANDSHAKE_TIMEOUT_MILLIS: u64 = 1000;
 pub async fn open_once(
     target: &SocketAddr,
     handshake_timeout: Duration,
-) -> Result<TcpNetworkInterface> {
+) -> Result<TcpNetworkInterface<TcpStream>> {
     let mut addr: SocketAddr = target.clone();
     if addr.port() == 0 {
         tracing::debug!(
@@ -179,7 +221,75 @@ pub async fn open_once(
             read_avail_bytes: None,
             read_task: None,
             write_task: None,
+            write_header_task: None,
+            wrote_header: false,
         })
     })
     .await?
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use pretty_assertions::assert_eq;
+    use std::sync::{Arc, Mutex};
+
+    #[derive(Clone)]
+    struct TestInnerWriter {
+        inner: Arc<Mutex<Vec<u8>>>,
+    }
+
+    impl AsyncWrite for TestInnerWriter {
+        fn poll_write(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            buf: &[u8],
+        ) -> Poll<std::io::Result<usize>> {
+            futures::executor::block_on(async {
+                self.inner.lock().unwrap().write_all(buf).await.expect("Writing should work")
+            });
+            Poll::Ready(Ok(buf.len()))
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+            unimplemented!();
+        }
+
+        fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+            unimplemented!();
+        }
+    }
+
+    impl AsyncRead for TestInnerWriter {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            _buf: &mut [u8],
+        ) -> Poll<std::io::Result<usize>> {
+            unimplemented!();
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_async_write_includes_header() -> Result<()> {
+        let inner = Arc::new(Mutex::new(vec![]));
+        let stream = TestInnerWriter { inner: inner.clone() };
+        let mut interface = TcpNetworkInterface {
+            stream,
+            read_avail_bytes: None,
+            read_task: None,
+            write_task: None,
+            write_header_task: None,
+            wrote_header: false,
+        };
+
+        let bytes = vec![0, 1, 2];
+        interface.write_all(&bytes).await?;
+        assert_eq!(
+            *inner.lock().unwrap(),
+            vec![0, 0, 0, 0, 0, 0, 0, 3, 0, 1, 2],
+            "stream contents"
+        );
+        Ok(())
+    }
 }

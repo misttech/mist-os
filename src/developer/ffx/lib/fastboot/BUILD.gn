@@ -26,6 +26,7 @@ if (is_host) {
       "//src/storage/lib/sparse/rust:lib",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:async-fs",
+      "//third_party/rust_crates:async-net",
       "//third_party/rust_crates:async-trait",
       "//third_party/rust_crates:base64",
       "//third_party/rust_crates:byteorder",
@@ -78,6 +79,9 @@ if (is_host) {
 
   group("tests") {
     testonly = true
-    deps = [ ":lib_test" ]
+    deps = [
+      ":lib_test",
+      "./transport/interface:tests",
+    ]
   }
 }

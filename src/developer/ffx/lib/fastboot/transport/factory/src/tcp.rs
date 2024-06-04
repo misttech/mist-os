@@ -4,6 +4,7 @@
 
 use crate::helpers::rediscover_helper;
 use anyhow::{Context as _, Result};
+use async_net::TcpStream;
 use async_trait::async_trait;
 use discovery::{FastbootConnectionState, TargetFilter, TargetHandle, TargetState};
 use ffx_fastboot_interface::interface_factory::{
@@ -46,8 +47,8 @@ impl Drop for TcpFactory {
 }
 
 #[async_trait(?Send)]
-impl InterfaceFactoryBase<TcpNetworkInterface> for TcpFactory {
-    async fn open(&mut self) -> Result<TcpNetworkInterface, InterfaceFactoryError> {
+impl InterfaceFactoryBase<TcpNetworkInterface<TcpStream>> for TcpFactory {
+    async fn open(&mut self) -> Result<TcpNetworkInterface<TcpStream>, InterfaceFactoryError> {
         let wait_duration = Duration::from_secs(self.retry_wait_seconds);
         for i in 1..self.open_retries {
             match open_once(&self.addr, Duration::from_secs(1)).await.with_context(|| {
@@ -92,7 +93,7 @@ impl InterfaceFactoryBase<TcpNetworkInterface> for TcpFactory {
     }
 }
 
-impl InterfaceFactory<TcpNetworkInterface> for TcpFactory {}
+impl InterfaceFactory<TcpNetworkInterface<TcpStream>> for TcpFactory {}
 
 pub struct TcpTargetFilter {
     node_name: String,
