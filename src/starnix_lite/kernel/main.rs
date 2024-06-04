@@ -3,12 +3,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_runtime::{job_default, process_self},
-    fuchsia_zircon::JobCriticalOptions,
-};
+#![recursion_limit = "256"]
+#![allow(clippy::too_many_arguments)]
+// TODO(https://fxbug.dev/42073005): Remove this allow once the lint is fixed.
+#![allow(unknown_lints, clippy::extra_unused_type_parameters)]
+
+// Avoid unused crate warnings on non-test/non-debug builds because this needs to be an
+// unconditional dependency for rustdoc generation.
+use tracing_mutex as _;
 
 use ::mistos_logger::klog;
+use fuchsia_runtime as fruntime;
+use fuchsia_zircon as zx;
 use starnix_logging::log_info;
 
 extern "C" {
@@ -18,12 +24,11 @@ extern "C" {
 }
 
 fn main() {
-    // Set ourselves as critical to our job. If we do not fail gracefully, our
-    // job will be killed.
-    if let Err(err) =
-        job_default().set_critical(JobCriticalOptions::RETCODE_NONZERO, &process_self())
+    // Make sure that if this process panics in normal mode that the whole kernel's job is killed.
+    if let Err(err) = fruntime::job_default()
+        .set_critical(zx::JobCriticalOptions::RETCODE_NONZERO, &*fruntime::process_self())
     {
-        panic!("Component manager failed to set itself as critical: {}", err);
+        panic!("Starnix Lite failed to set itself as critical: {}", err);
     }
 
     // Close any loader service passed to component manager so that the service session can be

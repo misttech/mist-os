@@ -51,6 +51,7 @@ rustc_binary("starnix_kernel_bin") {
     "//src/lib/fuchsia-runtime",
     "//src/lib/mistos-logger",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//third_party/rust_crates:tracing-mutex",
   ]
 
   non_rust_deps = [ ":restricted_trampoline" ]
