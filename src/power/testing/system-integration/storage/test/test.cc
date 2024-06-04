@@ -184,12 +184,12 @@ TEST_F(PowerSystemIntegration, StorageSuspendResumeTest) {
       "topology", core_sdmmc_element_id.value(),
       "meta",     "current_level"};
 
-  const std::string aml_sdmmc_moniker = "bootstrap/boot-drivers:dev.sys.platform.05_00_8.aml_emmc";
+  const std::string aml_sdmmc_moniker = "bootstrap/boot-drivers:dev.sys.platform.aml_emmc.aml_emmc";
   const std::vector<std::string> aml_sdmmc_suspended = {"root", "aml-sdmmc-portC",
                                                         "power_suspended"};
 
   const std::string core_sdmmc_moniker =
-      "bootstrap/boot-drivers:dev.sys.platform.05_00_8.aml_emmc.aml-sd-emmc";
+      "bootstrap/boot-drivers:dev.sys.platform.aml_emmc.aml_emmc.aml-sd-emmc";
   const std::vector<std::string> core_sdmmc_suspended = {"root", "sdmmc_core", "power_suspended"};
 
   // Verify boot complete state using inspect data:

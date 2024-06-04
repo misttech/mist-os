@@ -324,16 +324,13 @@ zx_status_t PlatformDevice::Start() {
       "i2c-0",             // 05:00:2
       "i2c-2",             // 05:00:2:2
       "vim3-sdio",         // 05:00:6
-      "aml_emmc",          // 05:00:8
       "aml-sdio",          // 05:00:6,05:00:7
       "aml-ram-ctl",       // 05:05:24,05:03:24,05:04:24
       "aml-thermal-pll",   // 05:05:a,05:03:a,05:04:a
-      "nelson-emmc",       // 05:00:8
       "thermistor",        // 03:0a:27
       "i2c-1",             // 05:00:2:1
       "raw_nand",          // 05:00:f
       "aml-thermal-ddr",   // 05:03:28,05:04:28
-      "sherlock-emmc",     // 05:00:8
       "sherlock-sd-emmc",  // 05:00:6
       "pll-temp-sensor",   // 05:06:39
       "sysmem",            // 00:00:1b
