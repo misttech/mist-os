@@ -20,6 +20,7 @@ zx_library("vm") {
     "kstack.cc",
     "loan_sweeper.cc",
     "lz4_compressor.cc",
+    "mem_command.cc",
     "page.cc",
     "page_queues.cc",
     "page_source.cc",

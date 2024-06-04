@@ -48,7 +48,7 @@ func TestOOMSignal(t *testing.T) {
 	i.WaitForLogMessages(initMsgs)
 
 	// Trigger a simulated OOM, without leaking any memory.
-	i.RunCommand("k pmm oom signal")
+	i.RunCommand("k mem oom signal")
 
 	// Sometimes fshost shut down so quickly, its messages are printed
 	// before the memory-pressure ones.
@@ -88,7 +88,7 @@ func TestOOMSignalBeforeCriticalProcess(t *testing.T) {
 	i.WaitForLogMessages(initMsgs)
 
 	// Trigger a simulated OOM, without leaking any memory.
-	i.RunCommand("k pmm oom signal")
+	i.RunCommand("k mem oom signal")
 	i.WaitForLogMessage("memory-pressure: memory availability state - OutOfMemory")
 
 	// See that we're committed to the OOM.
@@ -152,7 +152,7 @@ func TestOOM(t *testing.T) {
 	// we have a separate test |TestOOMSignal| to verify that a simulated OOM signal, i.e. an
 	// OOM signal without actually leaking any memory, results in the expected sequence of
 	// events.
-	testOOMCommon(t, cmdlineCommon, "k pmm oom", stateTransitionString)
+	testOOMCommon(t, cmdlineCommon, "k mem oom", stateTransitionString)
 }
 
 // Similar to |TestOOM| this test will trigger an out of memory situation and verify the system
@@ -163,12 +163,12 @@ func TestOOM(t *testing.T) {
 func TestOOMHard(t *testing.T) {
 	// This command will keep on trying to allocate even after all memory is exhausted (and
 	// allocations have failed).
-	testOOMCommon(t, cmdlineCommon, "k pmm oom hard", stateTransitionString)
+	testOOMCommon(t, cmdlineCommon, "k mem oom hard", stateTransitionString)
 }
 
 // See that failing to allocate will trigger an OOM reboot.
 func TestOOMDip(t *testing.T) {
-	testOOMCommon(t, cmdlineCommon, "k pmm oom dip", stateTransitionString)
+	testOOMCommon(t, cmdlineCommon, "k mem oom dip", stateTransitionString)
 }
 
 func execDir(t *testing.T) string {
