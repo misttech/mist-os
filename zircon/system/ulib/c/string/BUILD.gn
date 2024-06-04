@@ -97,8 +97,21 @@ foreach(funcs,
     configs = [ ":no-builtin-${funcs[0]}" ]
 
     # These also need to stick to the basic machine ABI so that dynlink.c can
-    # use them early.
+    # use them early.  This requires hermetic_source_set() to contain any
+    # COMDAT code, so the exported symbols must be named here.
     basic_abi = true
+    global_symbols = []
+    foreach(func, funcs) {
+      global_symbols += [
+        func,
+        "__libc_$func",
+        "__asan_$func",
+        "__hwasan_$func",
+      ]
+      if (unsanitized_funcs + [ func ] - [ func ] != unsanitized_funcs) {
+        global_symbols += [ "__unsanitized_$func" ]
+      }
+    }
 
     non_test_vars = {
       # The user.basic environment doesn't export the symbols it defines.

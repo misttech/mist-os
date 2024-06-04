@@ -3299,6 +3299,16 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
 }
 _built_in_target_types_without_public_wrapper -= [ "shared_library" ]
 
+# This is used by special-case target logic to avoid all the normal machinery,
+# such as variant selection, defaults, and metadata.  Defining this template
+# before the executable() template means it binds to the simple internal
+# wrapper around the built-in executable() target instead of that template.
+template("basic_executable") {
+  _executable_internal_wrapper(target_name) {
+    forward_variables_from(invoker, "*")
+  }
+}
+
 # This wraps the built-in GN executable() template, adding a few more features:
 #
 # - Perform variant-based toolchain selection using variant_target(). See its

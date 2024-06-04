@@ -288,20 +288,6 @@ if (zircon_toolchain == false) {
     ]
   }
 
-  config("libc-shlib.config") {
-    visibility = [ ":*" ]
-
-    # Don't link against the shared libc++.
-    configs = [ "//build/config/zircon:static-libc++" ]
-
-    # This directory contains just a libc++.a file that is a stub input linker
-    # script to prevent the real libc++.a from being found by the linker.
-    # Instead, it will find the empty file and any references to symbols
-    # defined in the real libc++.a (which includes libc++abi) will cause the
-    # link to fail.
-    lib_dirs = [ "libc++-stub" ]
-  }
-
   # This builds the actual shared library.  It's only used indirectly via the
   # "libc" target, see below.
   shared_library("libc.so") {
@@ -316,8 +302,6 @@ if (zircon_toolchain == false) {
     # for variant toolchains.
     configs -= default_shared_library_configs
     configs += default_common_binary_configs
-
-    configs += [ ":libc-shlib.config" ]
 
     # At link time and in DT_SONAME, musl is known as libc.so.  But the
     # (only) place it needs to be installed at runtime is where the

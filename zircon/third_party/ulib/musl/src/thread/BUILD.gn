@@ -4,6 +4,7 @@
 
 source_set("thread") {
   deps = [
+    "//src/zircon/lib/zircon",
     "//zircon/system/ulib/sync",
     "//zircon/third_party/ulib/musl:musl_internal",
   ]

@@ -29,7 +29,10 @@ source_set("start-main") {
 
   sources = [ "__libc_start_main.c" ]
 
-  deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
+  deps = [
+    "//zircon/system/ulib/processargs",
+    "//zircon/third_party/ulib/musl:musl_internal",
+  ]
 
   # Make sure this code is compiled with frame pointers so the outermost few
   # frames seen in user backtraces are always coherent and consistent between

@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 source_set("time") {
-  deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
   sources = [
     "__asctime.c",
     "__map_file.c",
@@ -40,6 +39,11 @@ source_set("time") {
     "timespec_get.c",
     "utime.c",
     "wcsftime.c",
+  ]
+  deps = [
+    "//src/zircon/lib/zircon",
+    "//zircon/system/ulib/zircon-internal",
+    "//zircon/third_party/ulib/musl:musl_internal",
   ]
 
   configs -= [ "//build/config:symbol_visibility_hidden" ]
