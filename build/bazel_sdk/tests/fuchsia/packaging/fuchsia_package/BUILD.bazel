@@ -21,10 +21,19 @@ fuchsia_package_checker_test(
         "data/text_file.txt": "text_file.txt",
 
         # Common files that should automatically be added
+
+        # From SDK sysroot
         "lib/ld.so.1": "ld.so.1_stripped",
+
+        # From Clang toolchain runtimes
         "lib/libc++.so.2": "libc++.so.2_stripped",
         "lib/libc++abi.so.1": "libc++abi.so.1_stripped",
         "lib/libunwind.so.1": "libunwind.so.1_stripped",
+
+        # From SDK prebuilt libraries (implicit dependencies).
+        # TODO(https://fxbug.dev/342560609): Uncomment the following
+        # once the bug is fixed.
+        # "lib/libfdio.so": "libfdio.so_stripped",
     },
     manifests = [
         "meta/cc_component.cm",
@@ -44,10 +53,19 @@ fuchsia_package_checker_test(
         "data/text_file.txt": "text_file.txt",
 
         # Common files that should automatically be added
+
+        # From SDK sysroot
         "lib/ld.so.1": "ld.so.1_stripped",
+
+        # From Clang toolchain runtimes
         "lib/libc++.so.2": "libc++.so.2_stripped",
         "lib/libc++abi.so.1": "libc++abi.so.1_stripped",
         "lib/libunwind.so.1": "libunwind.so.1_stripped",
+
+        # From SDK prebuilt libraries (implicit dependencies).
+        # TODO(https://fxbug.dev/342560609): Uncomment the following
+        # once the bug is fixed.
+        # "lib/libfdio.so": "libfdio.so_stripped",
     },
     manifests = [
         "meta/cc_component.cm",

@@ -33,6 +33,7 @@ _SDK_TEMPLATES = {
     "cc_prebuilt_library": "//fuchsia/workspace/sdk_templates:cc_prebuilt_library.BUILD.template",
     "cc_prebuilt_library_linklib": "//fuchsia/workspace/sdk_templates:cc_prebuilt_library_linklib_sub.BUILD.template",
     "cc_prebuilt_library_distlib": "//fuchsia/workspace/sdk_templates:cc_prebuilt_library_distlib_sub.BUILD.template",
+    "cc_prebuilt_library_distlib_unstripped": "//fuchsia/workspace/sdk_templates:cc_prebuilt_library_distlib_sub_unstripped.BUILD.template",
     "companion_host_tool": "//fuchsia/workspace/sdk_templates:companion_host_tool.BUILD.template",
     "component_manifest": "//fuchsia/workspace/sdk_templates:component_manifest.BUILD.template",
     "component_manifest_collection": "//fuchsia/workspace/sdk_templates:component_manifest_collection.BUILD.template",
@@ -616,16 +617,33 @@ def _generate_cc_prebuilt_library_build_rules(ctx, meta, relative_dir, build_fil
         process_context.files_to_copy[meta["_meta_sdk_root"]].append(variant.link_lib)
 
         if variant.has_dist_lib:
-            _merge_template(
-                ctx,
-                per_arch_x_api_build_file,
-                _sdk_template_path(ctx, "cc_prebuilt_library_distlib"),
-                {
-                    "{{dist_lib}}": "//:" + variant.dist_lib,
-                    "{{dist_path}}": variant.dist_lib_dest,
-                },
-            )
-            process_context.files_to_copy[meta["_meta_sdk_root"]].append(variant.dist_lib)
+            dist_lib = variant.dist_lib
+            process_context.files_to_copy[meta["_meta_sdk_root"]].append(dist_lib)
+
+            debug_lib = variant.debug if variant.has_debug else dist_lib
+            if debug_lib.startswith(".build-id/"):
+                _merge_template(
+                    ctx,
+                    per_arch_x_api_build_file,
+                    _sdk_template_path(ctx, "cc_prebuilt_library_distlib"),
+                    {
+                        "{{dist_lib}}": "//:" + dist_lib,
+                        "{{dist_path}}": variant.dist_lib_dest,
+                    },
+                )
+            else:
+                _merge_template(
+                    ctx,
+                    per_arch_x_api_build_file,
+                    _sdk_template_path(ctx, "cc_prebuilt_library_distlib_unstripped"),
+                    {
+                        "{{stripped_file}}": "//:" + dist_lib,
+                        "{{unstripped_file}}": "//:" + debug_lib,
+                        "{{dist_path}}": variant.dist_lib_dest,
+                    },
+                )
+                if debug_lib != dist_lib:
+                    process_context.files_to_copy[meta["_meta_sdk_root"]].append(debug_lib)
 
     # add all supported architectures to the select, even if they are not available in the current SDK,
     # so that SDKs for different architectures can be composed by a simple directory merge.
@@ -651,12 +669,33 @@ def _generate_cc_prebuilt_library_build_rules(ctx, meta, relative_dir, build_fil
 
         if "dist" in meta["binaries"][arch]:
             has_distlibs = True
-            distlib = meta["binaries"][arch]["dist"]
-            _merge_template(ctx, per_arch_build_file, _sdk_template_path(ctx, "cc_prebuilt_library_distlib"), {
-                "{{dist_lib}}": "//:" + distlib,
-                "{{dist_path}}": meta["binaries"][arch]["dist_path"],
-            })
-            process_context.files_to_copy[meta["_meta_sdk_root"]].append(distlib)
+            dist_lib = meta["binaries"][arch]["dist"]
+            process_context.files_to_copy[meta["_meta_sdk_root"]].append(dist_lib)
+
+            debug_lib = meta["binaries"][arch].get("debug", dist_lib)
+            if debug_lib.startswith(".build-id/"):
+                _merge_template(
+                    ctx,
+                    per_arch_build_file,
+                    _sdk_template_path(ctx, "cc_prebuilt_library_distlib"),
+                    {
+                        "{{dist_lib}}": "//:" + dist_lib,
+                        "{{dist_path}}": meta["binaries"][arch]["dist_path"],
+                    },
+                )
+            else:
+                _merge_template(
+                    ctx,
+                    per_arch_build_file,
+                    _sdk_template_path(ctx, "cc_prebuilt_library_distlib_unstripped"),
+                    {
+                        "{{stripped_file}}": "//:" + dist_lib,
+                        "{{unstripped_file}}": "//:" + debug_lib,
+                        "{{dist_path}}": meta["binaries"][arch]["dist_path"],
+                    },
+                )
+                if debug_lib != dist_lib:
+                    process_context.files_to_copy[meta["_meta_sdk_root"]].append(debug_lib)
 
     prebuilt_select_str = "fuchsia_select(" + _get_starlark_dict(prebuilt_select) + ")"
 
