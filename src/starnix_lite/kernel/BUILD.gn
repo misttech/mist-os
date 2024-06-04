@@ -47,7 +47,9 @@ rustc_binary("starnix_kernel_bin") {
 
   source_root = "main.rs"
   deps = [
+    ":starnix_logging",
     "//src/lib/fuchsia-runtime",
+    "//src/lib/mistos-logger",
     "//src/lib/zircon/rust:fuchsia-zircon",
   ]
 

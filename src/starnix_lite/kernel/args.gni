@@ -4,10 +4,10 @@
 
 declare_args() {
   # Whether or not logging is disabled globally.
-  starnix_disable_logging = true
+  starnix_disable_logging = false
 
   # Whether or not tracing is enabled globally.
-  starnix_enable_tracing = false
+  starnix_enable_tracing = true
 
   # Whether or not high-throughput tracing (e.g. per-syscall) is enabled globally.
   starnix_enable_tracing_firehose = false

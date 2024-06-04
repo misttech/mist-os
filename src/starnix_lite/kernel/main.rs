@@ -1,4 +1,5 @@
 // Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -6,6 +7,9 @@ use {
     fuchsia_runtime::{job_default, process_self},
     fuchsia_zircon::JobCriticalOptions,
 };
+
+use ::mistos_logger::klog;
+use starnix_logging::log_info;
 
 extern "C" {
     fn dl_set_loader_service(
@@ -32,4 +36,8 @@ fn main() {
         ))
     };
     drop(ldsvc);
+
+    klog::KernelLogger::init();
+
+    log_info!("Starnix Lite is starting up...");
 }
