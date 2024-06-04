@@ -15,7 +15,11 @@ namespace vm_unittest {
 // is not possible with the global pmm node.
 class TestPmmNode {
  public:
-  TestPmmNode() : evictor_(&node_, pmm_page_queues()) { evictor_.EnableEviction(true); }
+  explicit TestPmmNode(bool discardable)
+      : evictor_(&node_, pmm_page_queues(),
+                 discardable ? Evictor::kEvictDiscardable : Evictor::kEvictPagerBacked) {
+    evictor_.EnableEviction(true);
+  }
 
   ~TestPmmNode() {
     // Pages that were evicted are being held in |node_|'s free list.
@@ -47,8 +51,6 @@ class TestPmmNode {
     return evictor_.DebugGetOneShotEvictionTarget();
   }
 
-  void SetMinDiscardableAge(zx_time_t age) { evictor_.DebugSetMinDiscardableAge(age); }
-
   uint64_t FreePages() const { return node_.CountFreePages(); }
 
   Evictor* evictor() { return &evictor_; }
@@ -62,7 +64,7 @@ class TestPmmNode {
 static bool evictor_set_target_test() {
   BEGIN_TEST;
 
-  TestPmmNode node;
+  TestPmmNode node(false);
 
   auto expected = Evictor::EvictionTarget{
       .pending = static_cast<bool>(rand() % 2),
@@ -88,7 +90,7 @@ static bool evictor_set_target_test() {
 static bool evictor_combine_targets_test() {
   BEGIN_TEST;
 
-  TestPmmNode node;
+  TestPmmNode node(false);
 
   static constexpr int kNumTargets = 5;
   Evictor::EvictionTarget targets[kNumTargets];
@@ -204,9 +206,7 @@ static bool evictor_pager_backed_test() {
   // Promote the pages for eviction.
   vmo->HintRange(0, kNumPages * PAGE_SIZE, VmObject::EvictionHint::DontNeed);
 
-  TestPmmNode node;
-  // Only evict from pager backed vmos.
-  node.evictor()->SetDiscardableEvictionsPercent(0);
+  TestPmmNode node(false);
 
   auto target = Evictor::EvictionTarget{
       .pending = true,
@@ -281,10 +281,13 @@ static zx_status_t create_committed_unlocked_discardable_vmo(uint64_t size,
     return status;
   }
 
-  // Unlock the vmo so that it can be discarded.
+  // Unlock the vmo and move it out of the active queues so that it can be discarded.
   status = vmo->UnlockRange(0, size);
   if (status != ZX_OK) {
     return status;
+  }
+  for (size_t i = 0; i < PageQueues::kNumActiveQueues; i++) {
+    pmm_page_queues()->RotateReclaimQueues();
   }
 
   *vmo_out = ktl::move(vmo);
@@ -301,11 +304,7 @@ static bool evictor_discardable_test() {
   static constexpr size_t kNumPages = 22;
   ASSERT_EQ(ZX_OK, create_committed_unlocked_discardable_vmo(kNumPages * PAGE_SIZE, &vmo));
 
-  TestPmmNode node;
-  // Only evict from discardable vmos.
-  node.evictor()->SetDiscardableEvictionsPercent(100);
-  // Set min discardable age to 0 to that the vmo is eligible for eviction.
-  node.SetMinDiscardableAge(0);
+  TestPmmNode node(true);
 
   auto target = Evictor::EvictionTarget{
       .pending = true,
@@ -368,88 +367,6 @@ static bool evictor_discardable_test() {
   END_TEST;
 }
 
-// Test that the evictor can evict out of both discardable and pager backed vmos simultaneously.
-static bool evictor_pager_backed_and_discardable_test() {
-  BEGIN_TEST;
-  AutoVmScannerDisable scanner_disable;
-
-  // Create a pager backed and a discardable vmo to share the eviction load.
-  static constexpr uint64_t kNumPages = 11;
-  fbl::RefPtr<VmObjectPaged> vmo_pager, vmo_discardable;
-  ASSERT_EQ(ZX_OK, create_precommitted_pager_backed_vmo(kNumPages * PAGE_SIZE, &vmo_pager));
-  ASSERT_EQ(ZX_OK,
-            create_committed_unlocked_discardable_vmo(kNumPages * PAGE_SIZE, &vmo_discardable));
-
-  // Promote the pages for eviction.
-  vmo_pager->HintRange(0, kNumPages * PAGE_SIZE, VmObject::EvictionHint::DontNeed);
-
-  TestPmmNode node;
-  // Half the pages will be evicted from pager backed and the other half from discardable vmos.
-  node.evictor()->SetDiscardableEvictionsPercent(50);
-  // Set min discardable age to 0 to that the discardable vmo is eligible for eviction.
-  node.SetMinDiscardableAge(0);
-
-  auto target = Evictor::EvictionTarget{
-      .pending = true,
-      .free_pages_target = 20,
-      .min_pages_to_free = 10,
-      .level = Evictor::EvictionLevel::IncludeNewest,
-  };
-
-  // The node starts off with zero pages.
-  uint64_t free_count = node.FreePages();
-  EXPECT_EQ(free_count, 0u);
-
-  node.evictor()->SetOneShotEvictionTarget(target);
-  auto counts = node.evictor()->EvictOneShotFromPreloadedTarget();
-
-  // It's hard to check for equality with discardable vmos in the picture. Refer to the comments in
-  // evictor_discardable_test regarding this. Perform some basic sanity checks on the number of
-  // pages evicted.
-  uint64_t expected_pages_freed = ktl::max(target.free_pages_target, target.min_pages_to_free);
-  EXPECT_GE(counts.discardable + counts.pager_backed, expected_pages_freed);
-  EXPECT_GE(counts.discardable, 0u);
-  EXPECT_GE(counts.pager_backed, 0u);
-
-  // The node has the desired number of free pages now, and a minimum of min pages have been freed.
-  free_count = node.FreePages();
-  EXPECT_GE(free_count, target.free_pages_target);
-  EXPECT_GE(free_count, target.min_pages_to_free);
-
-  // Reset the vmos and try with a different target.
-  vmo_pager.reset();
-  vmo_discardable.reset();
-  ASSERT_EQ(ZX_OK, create_precommitted_pager_backed_vmo(kNumPages * PAGE_SIZE, &vmo_pager));
-  ASSERT_EQ(ZX_OK,
-            create_committed_unlocked_discardable_vmo(kNumPages * PAGE_SIZE, &vmo_discardable));
-  // Promote the pages for eviction.
-  vmo_pager->HintRange(0, kNumPages * PAGE_SIZE, VmObject::EvictionHint::DontNeed);
-
-  target = Evictor::EvictionTarget{
-      .pending = true,
-      .free_pages_target = 10,
-      .min_pages_to_free = 20,
-      .level = Evictor::EvictionLevel::IncludeNewest,
-  };
-
-  node.evictor()->SetOneShotEvictionTarget(target);
-  counts = node.evictor()->EvictOneShotFromPreloadedTarget();
-
-  // It's hard to check for equality with discardable vmos in the picture. Refer to the comments in
-  // evictor_discardable_test regarding this. Perform some basic sanity checks on the number of
-  // pages evicted.
-  expected_pages_freed = ktl::max(target.free_pages_target, target.min_pages_to_free);
-  EXPECT_GE(counts.discardable + counts.pager_backed, expected_pages_freed);
-  EXPECT_GE(counts.discardable, 0u);
-  EXPECT_GE(counts.pager_backed, 0u);
-
-  // The node has the desired number of free pages now, and a minimum of min pages have been freed.
-  EXPECT_GE(node.FreePages(), target.free_pages_target);
-  EXPECT_GE(node.FreePages(), free_count + target.min_pages_to_free);
-
-  END_TEST;
-}
-
 // Test that eviction meets the required free and min target as expected.
 static bool evictor_free_target_test() {
   BEGIN_TEST;
@@ -463,9 +380,8 @@ static bool evictor_free_target_test() {
   // Promote the pages for eviction.
   vmo->HintRange(0, kNumPages * PAGE_SIZE, VmObject::EvictionHint::DontNeed);
 
-  TestPmmNode node;
   // Only evict from pager backed vmos.
-  node.evictor()->SetDiscardableEvictionsPercent(0);
+  TestPmmNode node(false);
 
   auto target = Evictor::EvictionTarget{
       .pending = true,
@@ -560,7 +476,7 @@ static bool evictor_continuous_test() {
   // Promote the pages for eviction.
   vmo->HintRange(0, kNumPages * PAGE_SIZE, VmObject::EvictionHint::DontNeed);
 
-  TestPmmNode node;
+  TestPmmNode node(false);
 
   // Evict every 10 milliseconds.
   node.evictor()->SetContinuousEvictionInterval(ZX_MSEC(10));
@@ -615,7 +531,7 @@ static bool evictor_continuous_combine_targets_test() {
   // Promote the pages for eviction.
   vmo->HintRange(0, kNumPages * PAGE_SIZE, VmObject::EvictionHint::DontNeed);
 
-  TestPmmNode node;
+  TestPmmNode node(false);
 
   // Evict every 10 milliseconds.
   node.evictor()->SetContinuousEvictionInterval(ZX_MSEC(10));
@@ -692,7 +608,7 @@ static bool evictor_continuous_repeated_test() {
   // Promote the pages for eviction.
   vmo->HintRange(0, kNumPages * PAGE_SIZE, VmObject::EvictionHint::DontNeed);
 
-  TestPmmNode node;
+  TestPmmNode node(false);
 
   // Evict every 10 milliseconds.
   node.evictor()->SetContinuousEvictionInterval(ZX_MSEC(10));
@@ -823,9 +739,7 @@ static bool evictor_dont_need_pager_backed_test() {
   // i.e. they will be considered for eviction only after vmo1's pages.
   vmo2->HintRange(0, kNumPages * PAGE_SIZE, VmObject::EvictionHint::DontNeed);
 
-  TestPmmNode node;
-  // Only evict from pager backed vmos.
-  node.evictor()->SetDiscardableEvictionsPercent(0);
+  TestPmmNode node(false);
 
   auto target = Evictor::EvictionTarget{
       .pending = true,
@@ -878,9 +792,8 @@ static bool evictor_evicted_pages_are_freed_test() {
     pmm_page_queues()->RotateReclaimQueues();
   }
 
-  TestPmmNode node;
   // Only evict from pager backed vmos.
-  node.evictor()->SetDiscardableEvictionsPercent(0);
+  TestPmmNode node(false);
 
   auto target = Evictor::EvictionTarget{
       .pending = true,
@@ -931,7 +844,6 @@ VM_UNITTEST(evictor_set_target_test)
 VM_UNITTEST(evictor_combine_targets_test)
 VM_UNITTEST(evictor_pager_backed_test)
 VM_UNITTEST(evictor_discardable_test)
-VM_UNITTEST(evictor_pager_backed_and_discardable_test)
 VM_UNITTEST(evictor_free_target_test)
 VM_UNITTEST(evictor_continuous_test)
 VM_UNITTEST(evictor_continuous_combine_targets_test)

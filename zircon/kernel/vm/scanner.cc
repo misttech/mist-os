@@ -152,7 +152,9 @@ int scanner_request_thread(void*) {
       disabled = true;
       pmm_page_queues()->DisableAging();
       // Grab the harvester lock to wait for any in progress scans to complete.
-      { Guard<Mutex> guard{accessed_scanner_lock::Get()}; }
+      {
+        Guard<Mutex> guard{accessed_scanner_lock::Get()};
+      }
       scanner_disabled_event.Signal();
     }
     if (disabled) {
@@ -383,8 +385,6 @@ static void scanner_init_func(uint level) {
   if (gBootOptions->page_scanner_enable_eviction) {
     pmm_evictor()->EnableEviction(gBootOptions->compression_at_memory_pressure);
   }
-  pmm_evictor()->SetDiscardableEvictionsPercent(
-      gBootOptions->page_scanner_discardable_evictions_percent);
   zx_time_t eviction_interval = ZX_SEC(gBootOptions->page_scanner_eviction_interval_seconds);
   pmm_evictor()->SetContinuousEvictionInterval(eviction_interval);
 

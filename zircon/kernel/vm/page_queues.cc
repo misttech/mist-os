@@ -31,6 +31,7 @@ KCOUNTER(pq_aging_blocked_on_lru, "pq.aging.blocked_on_lru")
 KCOUNTER(pq_lru_spurious_wakeup, "pq.lru.spurious_wakeup")
 KCOUNTER(pq_lru_pages_evicted, "pq.lru.pages_evicted")
 KCOUNTER(pq_lru_pages_compressed, "pq.lru.pages_compressed")
+KCOUNTER(pq_lru_pages_discarded, "pq.lru.pages_discarded")
 KCOUNTER(pq_accessed_normal, "pq.accessed.normal")
 KCOUNTER(pq_accessed_normal_same_queue, "pq.accessed.normal_same_queue")
 KCOUNTER(pq_accessed_deferred_count, "pq.accessed.deferred")
@@ -80,7 +81,8 @@ class PageQueues::LruIsolate {
     fbl::RefPtr<VmCowPages> cow_ref = fbl::MakeRefPtrUpgradeFromRaw(cow, pq->get_lock());
     DEBUG_ASSERT(cow_ref);
     if (lru_action_ == LruAction::EvictAndCompress ||
-        (cow_ref->can_evict() == (lru_action_ == LruAction::EvictOnly))) {
+        ((cow_ref->can_evict() || cow_ref->is_discardable()) ==
+         (lru_action_ == LruAction::EvictOnly))) {
       AddInternal(ktl::move(cow_ref), page, ListAction::Reclaim);
     } else {
       // Must not let the cow refptr get dropped till after the lock, so even if not
@@ -135,6 +137,8 @@ class PageQueues::LruIsolate {
             count > 0) {
           if (backlink.cow->can_evict()) {
             pq_lru_pages_evicted.Add(count);
+          } else if (backlink.cow->is_discardable()) {
+            pq_lru_pages_discarded.Add(count);
           } else {
             pq_lru_pages_compressed.Add(count);
           }

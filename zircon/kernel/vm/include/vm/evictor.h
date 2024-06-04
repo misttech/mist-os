@@ -83,7 +83,6 @@ class Evictor {
   ~Evictor();
 
   // Called from the scanner with kernel cmdline values.
-  void SetDiscardableEvictionsPercent(uint32_t discardable_percent);
   void SetContinuousEvictionInterval(zx_time_t eviction_interval);
   // Called from the scanner to enable eviction if required. Creates an eviction thread to process
   // asynchronous eviction requests (both one-shot and continuous).
@@ -161,12 +160,15 @@ class Evictor {
   static EvictorStats GetGlobalStats();
 
  private:
+  static constexpr uint8_t kEvictPagerBacked = 0b1;
+  static constexpr uint8_t kEvictAnonymous = 0b10;
+  static constexpr uint8_t kEvictDiscardable = 0b100;
+  static constexpr uint8_t kEvictAll = kEvictPagerBacked | kEvictAnonymous | kEvictDiscardable;
   // Private constructor for test code to specify |queues| not owned by |node|.
-  Evictor(PmmNode *node, PageQueues *queues);
+  Evictor(PmmNode *node, PageQueues *queues, uint8_t eviction_types);
 
   // Helpers for testing.
   EvictionTarget DebugGetOneShotEvictionTarget() const;
-  void DebugSetMinDiscardableAge(zx_time_t age);
 
   friend class vm_unittest::TestPmmNode;
 
@@ -177,12 +179,8 @@ class Evictor {
   EvictedPageCounts EvictUntilTargetsMet(uint64_t min_pages_to_evict, uint64_t free_pages_target,
                                          EvictionLevel level) TA_EXCL(lock_);
 
-  // Evict the requested number of |target_pages| from discardable vmos. The return value is the
-  // number of pages evicted. This may acquire arbitrary vmo and aspace locks.
-  uint64_t EvictDiscardable(uint64_t target_pages) const TA_EXCL(lock_);
-
   // Evict the requested number of |target_pages| from vmos by querying the page queues. The
-  // returned struct has the number of pages evicted (discardable will be 0). The |eviction_level|
+  // returned struct has the number of pages evicted. The |eviction_level|
   // is a rough control that maps to how old a page needs to be for being considered for eviction.
   // This may acquire arbitrary vmo and aspace locks.
   EvictedPageCounts EvictPageQueues(uint64_t target_pages, EvictionLevel eviction_level) const
@@ -236,13 +234,9 @@ class Evictor {
   bool eviction_enabled_ TA_GUARDED(lock_) = false;
   // Whether eviction should attempt compression.
   bool use_compression_ TA_GUARDED(lock_) = false;
-  // A rough percentage of page evictions that should be satisfied from discardable vmos (as opposed
-  // to pager-backed vmos). Will require tuning when discardable vmos start being used. Currently
-  // sets the number of discardable pages to evict to 0, putting all the burden of eviction on
-  // pager-backed pages.
-  uint32_t discardable_evictions_percent_ TA_GUARDED(lock_) = 0;
-  // The minimum interval a discardable VMO has to be unlocked for to be considered for eviction.
-  zx_time_t min_discardable_age_ TA_GUARDED(lock_) = ZX_SEC(10);
+  // Control of what kinds of evictions to perform. This is const as it is designed only to
+  // facilitate testing and must be set at construction.
+  const uint8_t eviction_types_;
   // Default continuous eviction interval. Set to 10s to match the scanner aging interval, since we
   // won't find any new pages to evict before the next aging round.
   zx_time_t default_eviction_interval_ TA_GUARDED(lock_) = ZX_SEC(10);

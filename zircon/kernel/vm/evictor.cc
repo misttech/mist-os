@@ -56,9 +56,10 @@ Evictor::EvictorStats Evictor::GetGlobalStats() {
   return stats;
 }
 
-Evictor::Evictor(PmmNode* node) : pmm_node_(node), page_queues_(node->GetPageQueues()) {}
+Evictor::Evictor(PmmNode* node) : Evictor(node, node->GetPageQueues(), kEvictAll) {}
 
-Evictor::Evictor(PmmNode* node, PageQueues* queues) : pmm_node_(node), page_queues_(queues) {}
+Evictor::Evictor(PmmNode* node, PageQueues* queues, uint8_t eviction_types)
+    : pmm_node_(node), page_queues_(queues), eviction_types_(eviction_types) {}
 
 Evictor::~Evictor() { DisableEviction(); }
 
@@ -123,18 +124,6 @@ void Evictor::DisableEviction() {
     eviction_enabled_ = false;
     eviction_thread_exiting_ = false;
   }
-}
-
-void Evictor::SetDiscardableEvictionsPercent(uint32_t discardable_percent) {
-  Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
-  if (discardable_percent <= 100) {
-    discardable_evictions_percent_ = discardable_percent;
-  }
-}
-
-void Evictor::DebugSetMinDiscardableAge(zx_time_t age) {
-  Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
-  min_discardable_age_ = age;
 }
 
 void Evictor::SetContinuousEvictionInterval(zx_time_t eviction_interval) {
@@ -274,72 +263,22 @@ Evictor::EvictedPageCounts Evictor::EvictUntilTargetsMet(uint64_t min_pages_to_e
       break;
     }
 
-    // Compute the desired number of discardable pages to free (vs pager-backed).
-    uint64_t pages_to_free_discardable = 0;
-    if (level == EvictionLevel::IncludeNewest) {
-      // If we're including newest pages too, first try to reclaim as much from discardable VMOs as
-      // possible.
-      pages_to_free_discardable = pages_to_free;
-    } else {
-      Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
-      DEBUG_ASSERT(discardable_evictions_percent_ <= 100);
-      pages_to_free_discardable = pages_to_free * discardable_evictions_percent_ / 100;
-    }
-
-    uint64_t pages_freed = EvictDiscardable(pages_to_free_discardable);
-    total_evicted_counts.discardable += pages_freed;
-    total_non_loaned_pages_freed += pages_freed;
-
-    // If we've already met the current target, continue to the next iteration of the loop.
-    if (pages_freed >= pages_to_free) {
-      continue;
-    }
-    DEBUG_ASSERT(pages_to_free > pages_freed);
-    // Free pager backed memory to get to |pages_to_free|.
-    uint64_t pages_to_free_pager_backed = pages_to_free - pages_freed;
-
-    EvictedPageCounts pages_freed_pager_backed = EvictPageQueues(pages_to_free_pager_backed, level);
+    EvictedPageCounts pages_freed = EvictPageQueues(pages_to_free, level);
     const uint64_t non_loaned_evicted =
-        pages_freed_pager_backed.pager_backed + pages_freed_pager_backed.compressed;
-    total_evicted_counts.pager_backed += pages_freed_pager_backed.pager_backed;
-    total_evicted_counts.pager_backed_loaned += pages_freed_pager_backed.pager_backed_loaned;
-    total_evicted_counts.compressed += pages_freed_pager_backed.compressed;
+        pages_freed.pager_backed + pages_freed.compressed + pages_freed.discardable;
+    total_evicted_counts.pager_backed += pages_freed.pager_backed;
+    total_evicted_counts.pager_backed_loaned += pages_freed.pager_backed_loaned;
+    total_evicted_counts.discardable += pages_freed.discardable;
+    total_evicted_counts.compressed += pages_freed.compressed;
     total_non_loaned_pages_freed += non_loaned_evicted;
 
-    pages_freed += non_loaned_evicted;
-
     // Should we fail to free any pages then we give up and consider the eviction request complete.
-    if (pages_freed == 0) {
+    if (non_loaned_evicted == 0) {
       break;
     }
   }
 
   return total_evicted_counts;
-}
-
-uint64_t Evictor::EvictDiscardable(uint64_t target_pages) const {
-  if (!IsEvictionEnabled()) {
-    return 0;
-  }
-
-  list_node_t freed_list;
-  list_initialize(&freed_list);
-
-  // Reclaim |target_pages| from discardable vmos that have been reclaimable for at least
-  // |min_discardable_age_|.
-  zx_time_t min_age;
-  {
-    Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
-    min_age = min_discardable_age_;
-  }
-  uint64_t count =
-      DiscardableVmoTracker::ReclaimPagesFromDiscardableVmos(target_pages, min_age, &freed_list);
-
-  DEBUG_ASSERT(pmm_node_);
-  pmm_node_->FreeList(&freed_list);
-
-  discardable_pages_evicted.Add(count);
-  return count;
 }
 
 Evictor::EvictedPageCounts Evictor::EvictPageQueues(uint64_t target_pages,
@@ -388,6 +327,23 @@ Evictor::EvictedPageCounts Evictor::EvictPageQueues(uint64_t target_pages,
       if (!backlink->cow) {
         continue;
       }
+
+      // The expectation is that the only reason not to have all kinds of eviction enabled is if
+      // running a unittest and so have an efficient pre-check.
+      if (unlikely((eviction_types_ & kEvictAll) != kEvictAll)) {
+        uint8_t required = 0;
+        if (backlink->cow->is_discardable()) {
+          required |= kEvictDiscardable;
+        } else if (backlink->cow->can_evict()) {
+          required |= kEvictPagerBacked;
+        } else {
+          required |= kEvictAnonymous;
+        }
+        if (!(eviction_types_ & required)) {
+          pmm_page_queues()->MarkAccessed(backlink->page);
+          continue;
+        }
+      }
       if (compression_instance) {
         zx_status_t status = compression_instance->Arm();
         if (status != ZX_OK) {
@@ -408,6 +364,8 @@ Evictor::EvictedPageCounts Evictor::EvictPageQueues(uint64_t target_pages,
               counts.pager_backed++;
             }
           }
+        } else if (backlink->cow->is_discardable()) {
+          counts.discardable += count;
         } else {
           // If the cow wasn't evictable, then the reclamation must have succeeded due to
           // compression.

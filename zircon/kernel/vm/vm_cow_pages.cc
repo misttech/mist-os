@@ -65,6 +65,7 @@ KCOUNTER(vm_vmo_always_need, "vm.vmo.always_need")
 KCOUNTER(vm_vmo_always_need_skipped_reclaim, "vm.vmo.always_need_skipped_reclaim")
 KCOUNTER(vm_vmo_compression_zero_slot, "vm.vmo.compression.zero_empty_slot")
 KCOUNTER(vm_vmo_compression_marker, "vm.vmo.compression_zero_marker")
+KCOUNTER(vm_vmo_discardable_failed_reclaim, "vm.vmo.discardable_failed_reclaim")
 
 void ZeroPage(paddr_t pa) {
   void* ptr = paddr_to_physmap(pa);
@@ -3778,6 +3779,8 @@ void VmCowPages::MoveToNotPinnedLocked(vm_page_t* page, uint64_t offset) {
         // If anonymous pages are reclaimable, and this VMO is high priority, then places our pages
         // in the high priority queue instead of the anonymous one to avoid reclamation.
         pq->MoveToHighPriority(page);
+      } else if (is_discardable()) {
+        pq->MoveToReclaim(page);
       } else {
         pq->MoveToAnonymous(page);
       }
@@ -3814,6 +3817,8 @@ void VmCowPages::SetNotPinnedLocked(vm_page_t* page, uint64_t offset) {
         // If anonymous pages are reclaimable, and this VMO is high priority, then places our pages
         // in the high priority queue instead of the anonymous one to avoid reclamation.
         pq->SetHighPriority(page, this, offset);
+      } else if (is_discardable()) {
+        pq->SetReclaim(page, this, offset);
       } else {
         pq->SetAnonymous(page, this, offset);
       }
@@ -6278,6 +6283,18 @@ uint64_t VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintA
     return single_page_wrapper(RemovePageForEvictionLocked(page, offset, hint_action));
   } else if (compressor && !page_source_ && !discardable_tracker_) {
     return single_page_wrapper(RemovePageForCompressionLocked(page, offset, compressor, guard));
+  } else if (discardable_tracker_) {
+    // On any errors touch the page so we stop trying to reclaim it. In particular for discardable
+    // reclamation attempts, if the page we are passing is not the first page in the discardable
+    // VMO then the discard will fail, so touching it will stop us from continuously trying to
+    // trigger a discard with it.
+    auto result = ReclaimDiscardableLocked(page, offset, freed_list);
+    if (result.is_error()) {
+      pmm_page_queues()->MarkAccessed(page);
+      vm_vmo_discardable_failed_reclaim.Add(1);
+      return 0;
+    }
+    return *result;
   }
   // No other reclamation strategies, so to avoid this page remaining in a reclamation list we
   // simulate an access. Do not want to place it in the ReclaimFailed queue since our failure was
@@ -6935,7 +6952,25 @@ zx_status_t VmCowPages::UnlockRangeLocked(uint64_t offset, uint64_t len) {
   }
 
   discardable_tracker_->assert_cow_pages_locked();
-  return discardable_tracker_->UnlockDiscardableLocked();
+  zx_status_t status = discardable_tracker_->UnlockDiscardableLocked();
+  if (status != ZX_OK) {
+    return status;
+  }
+  if (discardable_tracker_->IsEligibleForReclamationLocked()) {
+    // Simulate an access to the first page. We use the first page as the discardable trigger, so by
+    // simulating an access we ensure that an unlocked VMO is treated as recently accessed
+    // equivalent to all other pages. Touching just the first page, instead of all pages, is an
+    // optimization as we can simply ignore any attempts to trigger discard from those other pages.
+    page_list_.ForEveryPage([](auto* p, uint64_t offset) {
+      // Skip over any markers.
+      if (!p->IsPage()) {
+        return ZX_ERR_NEXT;
+      }
+      pmm_page_queues()->MarkAccessed(p->Page());
+      return ZX_ERR_STOP;
+    });
+  }
+  return status;
 }
 
 uint64_t VmCowPages::DebugGetPageCountLocked() const {
@@ -7044,20 +7079,23 @@ VmCowPages::DiscardablePageCounts VmCowPages::DebugGetDiscardablePageCounts() co
   return counts;
 }
 
-uint64_t VmCowPages::DiscardPages(zx_duration_t min_duration_since_reclaimable,
-                                  list_node_t* freed_list) {
+uint64_t VmCowPages::DiscardPages(list_node_t* freed_list) {
   canary_.Assert();
 
+  Guard<CriticalMutex> guard{lock()};
+  // Discard any errors and overlap a 0 return value for errors.
+  return DiscardPagesLocked(freed_list).value_or(0);
+}
+
+zx::result<uint64_t> VmCowPages::DiscardPagesLocked(list_node_t* freed_list) {
   // Not a discardable VMO.
   if (!discardable_tracker_) {
-    return 0;
+    return zx::error(ZX_ERR_BAD_STATE);
   }
 
-  Guard<CriticalMutex> guard{lock()};
-
   discardable_tracker_->assert_cow_pages_locked();
-  if (!discardable_tracker_->IsEligibleForReclamationLocked(min_duration_since_reclaimable)) {
-    return 0;
+  if (!discardable_tracker_->IsEligibleForReclamationLocked()) {
+    return zx::error(ZX_ERR_BAD_STATE);
   }
 
   // Remove all pages.
@@ -7065,7 +7103,8 @@ uint64_t VmCowPages::DiscardPages(zx_duration_t min_duration_since_reclaimable,
   zx_status_t status = UnmapAndRemovePagesLocked(0, size_, freed_list, &pages_freed);
 
   if (status != ZX_OK) {
-    return pages_freed;
+    ASSERT(pages_freed == 0);
+    return zx::error(status);
   }
 
   reclamation_event_count_++;
@@ -7074,7 +7113,26 @@ uint64_t VmCowPages::DiscardPages(zx_duration_t min_duration_since_reclaimable,
   // Set state to discarded.
   discardable_tracker_->SetDiscardedLocked();
 
-  return pages_freed;
+  return zx::ok(pages_freed);
+}
+
+zx::result<uint64_t> VmCowPages::ReclaimDiscardableLocked(vm_page_t* page, uint64_t offset,
+                                                          list_node_t* freed_list) {
+  DEBUG_ASSERT(discardable_tracker_);
+  // Check if this is the first page.
+  bool first = false;
+  page_list_.ForEveryPage([&first, &offset, &page](auto* p, uint64_t off) {
+    if (!p->IsPage()) {
+      return ZX_ERR_NEXT;
+    }
+    first = (p->Page() == page) && off == offset;
+    return ZX_ERR_STOP;
+  });
+  if (!first) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  return DiscardPagesLocked(freed_list);
 }
 
 void VmCowPages::CopyPageForReplacementLocked(vm_page_t* dst_page, vm_page_t* src_page) {

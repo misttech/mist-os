@@ -210,17 +210,10 @@ bool DiscardableVmoTracker::DebugIsDiscarded() const {
   return DebugIsInDiscardableListLocked(/*reclaim_candidate=*/false);
 }
 
-bool DiscardableVmoTracker::IsEligibleForReclamationLocked(
-    zx_duration_t min_duration_since_reclaimable) const {
+bool DiscardableVmoTracker::IsEligibleForReclamationLocked() const {
   // We've raced with a lock operation. Bail without doing anything. The lock operation will have
   // already moved it to the unreclaimable list.
   if (discardable_state_ != DiscardableVmoTracker::DiscardableState::kReclaimable) {
-    return false;
-  }
-
-  // If the vmo was unlocked less than |min_duration_since_reclaimable| in the past, do not discard
-  // from it yet.
-  if (zx_time_sub_time(current_time(), last_unlock_timestamp_) < min_duration_since_reclaimable) {
     return false;
   }
 
@@ -276,49 +269,4 @@ DiscardableVmoTracker::DiscardablePageCounts DiscardableVmoTracker::DebugDiscard
   }
 
   return total_counts;
-}
-
-// static
-uint64_t DiscardableVmoTracker::ReclaimPagesFromDiscardableVmos(
-    uint64_t target_pages, zx_duration_t min_duration_since_reclaimable, list_node_t* freed_list) {
-  uint64_t total_pages_discarded = 0;
-  Guard<CriticalMutex> guard{DiscardableVmosLock::Get()};
-
-  Cursor cursor(DiscardableVmosLock::Get(), discardable_reclaim_candidates_,
-                discardable_vmos_cursors_);
-  AssertHeld(cursor.lock_ref());
-
-  while (total_pages_discarded < target_pages) {
-    DiscardableVmoTracker* discardable = cursor.Next();
-    // No vmos to reclaim pages from.
-    if (discardable == nullptr) {
-      break;
-    }
-
-    // It is safe to reference |discardable->cow_| like this because we found |discardable| in a
-    // discardable list, which means that even if the |cow_| was in process of being destroyed it
-    // hasn't made it far enough to have removed |discardable| from the discardable list and reset
-    // |cow_|, which requires the |DiscardableVmosLock|.
-    fbl::RefPtr<VmCowPages> cow_ref = fbl::MakeRefPtrUpgradeFromRaw(discardable->cow_, guard);
-    if (cow_ref) {
-      // We obtained the RefPtr above under the |DiscardableVmosLock|, so we know the object is
-      // valid. We could not have raced with destruction, since the object is removed from the
-      // discardable list on the destruction path, which requires the |DiscardableVmosLock|.
-      //
-      // DiscardPages() will acquire the VmCowPages |lock_|, so it needs to be called outside of
-      // the |DiscardableVmosLock|. This preserves lock ordering constraints between the two locks
-      // - |DiscardableVmosLock| can be acquired while holding the VmCowPages |lock_|, but not the
-      // other way around.
-      guard.CallUnlocked([&total_pages_discarded, min_duration_since_reclaimable, &freed_list,
-                          cow_ref = ktl::move(cow_ref)]() mutable {
-        total_pages_discarded += cow_ref->DiscardPages(min_duration_since_reclaimable, freed_list);
-
-        // Explicitly reset the RefPtr to force any destructor to run right now and not in the
-        // cleanup of the lambda, which might happen after the |DiscardableVmosLock| has been
-        // re-acquired.
-        cow_ref.reset();
-      });
-    }
-  }
-  return total_pages_discarded;
 }

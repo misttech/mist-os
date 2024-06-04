@@ -121,6 +121,8 @@ class VmCowPages final : public VmHierarchyBase,
     return parent_ && parent_locked().is_hidden_locked();
   }
 
+  bool is_discardable() const { return !!discardable_tracker_; }
+
   bool can_evict() const {
     canary_.Assert();
     bool result = page_source_ && page_source_->properties().is_preserving_page_content;
@@ -568,15 +570,11 @@ class VmCowPages final : public VmHierarchyBase,
 
   bool DebugIsHighMemoryPriority() const TA_EXCL(lock());
 
-  // Discard all the pages from a discardable vmo in the |kReclaimable| state. For this call to
-  // succeed, the vmo should have been in the reclaimable state for at least
-  // |min_duration_since_reclaimable|. If successful, the |discardable_state_| is set to
-  // |kDiscarded|, and the vmo is moved from the reclaim candidates list. The pages are removed /
-  // discarded from the vmo and appended to the |freed_list| passed in; the caller takes ownership
-  // of the removed pages and is responsible for freeing them. Returns the number of pages
-  // discarded.
-  uint64_t DiscardPages(zx_duration_t min_duration_since_reclaimable, list_node_t* freed_list)
-      TA_EXCL(lock());
+  // Discard all the pages from a discardable vmo in the |kReclaimable| state. If successful, the
+  // |discardable_state_| is set to |kDiscarded|. The pages are removed from the vmo and appended to
+  // the |freed_list| passed in; the caller takes ownership of the removed pages and is responsible
+  // for freeing them. Returns the number of pages discarded.
+  uint64_t DiscardPages(list_node_t* freed_list) TA_EXCL(lock());
 
   // See DiscardableVmoTracker::DebugDiscardablePageCounts().
   struct DiscardablePageCounts {
@@ -1189,6 +1187,17 @@ class VmCowPages final : public VmHierarchyBase,
   // Borrows the guard for |lock_| and may drop the lock temporarily during execution.
   bool RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset, VmCompressor* compressor,
                                       Guard<CriticalMutex>& guard) TA_REQ(lock());
+
+  // Internal helper for performing reclamation against a discardable VMO. Assumes that the page is
+  // owned by this VMO at the specified offset. If any discarding happens |freed_list| is given
+  // ownership of any reclaimed pages and the number of pages is returned. The passed in |page|
+  // must be the first page in the discardable VMO to trigger a discard, otherwise it will fail.
+  zx::result<uint64_t> ReclaimDiscardableLocked(vm_page_t* page, uint64_t offset,
+                                                list_node_t* freed_list) TA_REQ(lock());
+
+  // Internal helper for discarding a VMO. Will discard if VMO is unlocked, putting pages in
+  // |freed_list| and returning the count.
+  zx::result<uint64_t> DiscardPagesLocked(list_node_t* freed_list) TA_REQ(lock());
 
   // Internal helper for modifying just this value of high_priority_count_ without performing any
   // propagating.
