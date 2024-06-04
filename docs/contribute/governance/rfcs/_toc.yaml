@@ -514,4 +514,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0248_rfc_problem_statement.md
   - title: "RFC-0249: crosvm support in the platform"
     path: /docs/contribute/governance/rfcs/0249_crosvm_support_in_the_platform.md
-
+  - title: "RFC-0250: Power topology"
+    path: /docs/contribute/governance/rfcs/0250_power_topology.md

@@ -3258,3 +3258,15 @@
   submitted: '2024-04-24'
   reviewed: '2024-05-31'
 
+- name: 'RFC-0250'
+  title: 'Power topology'
+  short_description: 'Describes the model for interdependent state management to be used by system power management.'
+  authors: ['claridge@google.com']
+  file: '0250_power_topology.md'
+  area: ['Power']
+  issue: ['']
+  gerrit_change_id: ['1004754']
+  status: 'Draft'
+  reviewers: ['kgong@google.com', 'mbrunson@google.com', 'jmatt@google.com', 'harshanv@google.com', 'andresoportus@google.com']
+  submitted: '2024-03-09'
+  reviewed: ''
