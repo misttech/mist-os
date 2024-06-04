@@ -86,9 +86,9 @@ def command_args_to_string(
 
 def run_command(
     args: List,
+    capture_output: bool = False,
     env: Optional[Dict[str, str]] = None,
     cwd: Optional[Path | str] = None,
-    capture_output: bool = False,
 ):
     """Run a command.
 
@@ -115,6 +115,7 @@ def run_command(
 
 def run_checked_command(
     args: List,
+    capture_output: bool,
     env: Optional[Dict[str, str]] = None,
     cwd: Optional[Path | str] = None,
 ):
@@ -129,7 +130,7 @@ def run_checked_command(
         stdout + stderr, then return False.
     """
     try:
-        ret = run_command(args, env=env, cwd=cwd, capture_output=True)
+        ret = run_command(args, env=env, cwd=cwd, capture_output=capture_output)
         if ret.returncode == 0:
             return True
     except KeyboardInterrupt:
@@ -323,6 +324,7 @@ def main():
                 "gen",
                 build_dir,
             ],
+            capture_output=not args.verbose,
         ):
             return 1
 
@@ -346,6 +348,7 @@ def main():
             args.max_load_average,
             sdk_label_to_ninja_target(args.sdk_collection_label),
         ],
+        capture_output=not args.verbose,
         env=os.environ | ninja_env,
     ):
         return 1
