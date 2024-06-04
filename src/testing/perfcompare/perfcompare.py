@@ -375,6 +375,24 @@ def CompareIntervals(stats_before, stats_after):
     return DIRECTION_MAP[direction], factor_range
 
 
+def CheckSampleSize(expected_sample_size, results_maps):
+    # Check that the sample size for each metric matches the
+    # "--expected_sample_size" argument (if given).
+    if expected_sample_size is None:
+        return
+    mismatches = []
+    for results_map in results_maps:
+        for label, stats in sorted(results_map.items()):
+            if stats.sample_size != expected_sample_size:
+                mismatches.append("%s (got %d)" % (label, stats.sample_size))
+    if len(mismatches) != 0:
+        raise AssertionError(
+            "The following metrics had an unexpected sample size"
+            " (expected %d):\n%s"
+            % (expected_sample_size, "\n".join(mismatches))
+        )
+
+
 def ComparePerf(args, out_fh):
     results_maps = [
         StatsFromMultiBootDataset(MultiBootDataset(dir_path))
@@ -404,6 +422,9 @@ def ComparePerf(args, out_fh):
                 )
             rows.append(row)
         FormatTable(heading_row, rows, out_fh)
+        # We apply this check after outputting the table so that the
+        # results will still be visible even if the check fails.
+        CheckSampleSize(args.expected_sample_size, results_maps)
         return
 
     counts = {
@@ -465,25 +486,9 @@ def ComparePerf(args, out_fh):
 
     out_fh.write("Results from all test cases:\n\n")
     FormatTable(heading_row, all_rows, out_fh)
-
-    # Check that the sample size for each metric matches the
-    # "--expected_sample_size" argument (if given).  We apply this check
-    # after outputting the table so that the results will still be visible
-    # even if the check fails.
-    if args.expected_sample_size is not None:
-        mismatches = []
-        for results_map in results_maps:
-            for label, stats in sorted(results_map.items()):
-                if stats.sample_size != args.expected_sample_size:
-                    mismatches.append(
-                        "%s (got %d)" % (label, stats.sample_size)
-                    )
-        if len(mismatches) != 0:
-            raise AssertionError(
-                "The following metrics had an unexpected sample size"
-                " (expected %d):\n%s"
-                % (args.expected_sample_size, "\n".join(mismatches))
-            )
+    # We apply this check after outputting the table so that the
+    # results will still be visible even if the check fails.
+    CheckSampleSize(args.expected_sample_size, results_maps)
 
 
 def PrintMultibootDatasetTable(multiboot_dataset, out_fh):

@@ -405,13 +405,13 @@ class StatisticsTest(TempDirTestCase):
         dir2_path = self.DirOfData([[[10]], [[20]], [[30]]])
         # Check that we get a descriptive error if the actual sample
         # sizes do not match the "--expected_sample_size" argument.
+        stdout = io.StringIO()
         error = (
             "^The following metrics had an unexpected sample size"
             " \(expected 99\):\n"
             "example_suite: ExampleTest \(got 2\)\n"
             "example_suite: ExampleTest \(got 3\)$"
         )
-        stdout = io.StringIO()
         with self.assertRaisesRegex(AssertionError, error):
             perfcompare.Main(
                 [
@@ -419,6 +419,21 @@ class StatisticsTest(TempDirTestCase):
                     "--expected_sample_size=99",
                     dir1_path,
                     dir2_path,
+                ],
+                stdout,
+            )
+        # We should get a similar error if we pass only one directory.
+        error = (
+            "^The following metrics had an unexpected sample size"
+            " \(expected 99\):\n"
+            "example_suite: ExampleTest \(got 2\)$"
+        )
+        with self.assertRaisesRegex(AssertionError, error):
+            perfcompare.Main(
+                [
+                    "compare_perf",
+                    "--expected_sample_size=99",
+                    dir1_path,
                 ],
                 stdout,
             )
