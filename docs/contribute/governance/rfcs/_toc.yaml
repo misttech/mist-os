@@ -510,5 +510,8 @@ toc:
     path: /docs/contribute/governance/rfcs/0246_api_levels_are_32_bits.md
   - title: "RFC-0247: Enabling LTO in Fuchsia"
     path: /docs/contribute/governance/rfcs/0247_enabling_lto_in_fuchsia.md
+  - title: "RFC-0248: Problem Statement"
+    path: /docs/contribute/governance/rfcs/0248_rfc_problem_statement.md
   - title: "RFC-0249: crosvm support in the platform"
     path: /docs/contribute/governance/rfcs/0249_crosvm_support_in_the_platform.md
+
