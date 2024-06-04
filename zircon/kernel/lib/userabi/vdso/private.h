@@ -10,15 +10,6 @@
 #include <zircon/syscalls.h>
 #include <zircon/testonly-syscalls.h>
 
-// This defines the struct shared with the kernel.
-#include <lib/userabi/vdso-constants.h>
-
-// This defines the struct used by libfasttime and the time syscalls.
-#include <lib/fasttime/internal/abi.h>
-
-extern __LOCAL const struct vdso_constants DATA_CONSTANTS;
-extern __LOCAL const fasttime::internal::TimeValues DATA_TIME_VALUES;
-
 extern "C" {
 
 // This declares the VDSO_zx_* aliases for the vDSO entry points.

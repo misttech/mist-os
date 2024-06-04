@@ -5,6 +5,7 @@
 #include <zircon/compiler.h>
 #include <zircon/syscalls.h>
 
+#include "data-constants.h"
 #include "private.h"
 
 __EXPORT uint32_t _zx_system_get_num_cpus(void) { return DATA_CONSTANTS.max_num_cpus; }

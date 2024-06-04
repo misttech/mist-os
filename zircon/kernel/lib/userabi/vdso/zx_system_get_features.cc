@@ -7,6 +7,7 @@
 #include <zircon/features.h>
 #include <zircon/syscalls.h>
 
+#include "data-constants.h"
 #include "private.h"
 
 __EXPORT zx_status_t _zx_system_get_features(uint32_t kind, uint32_t* features) {

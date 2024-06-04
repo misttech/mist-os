@@ -4,6 +4,7 @@
 
 #include <lib/fasttime/internal/time.h>
 
+#include "data-time-values.h"
 #include "private.h"
 
 __EXPORT zx_ticks_t _zx_ticks_get(void) {

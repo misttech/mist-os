@@ -4,6 +4,7 @@
 
 #include <zircon/syscalls.h>
 
+#include "data-constants.h"
 #include "private.h"
 
 __EXPORT zx_string_view_t _zx_system_get_version_string() {
