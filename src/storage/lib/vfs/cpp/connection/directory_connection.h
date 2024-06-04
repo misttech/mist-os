@@ -9,6 +9,8 @@
 #error "Fuchsia-only header"
 #endif
 
+#include <zircon/availability.h>
+
 #include "src/storage/lib/vfs/cpp/connection/connection.h"
 #include "src/storage/lib/vfs/cpp/vfs.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"

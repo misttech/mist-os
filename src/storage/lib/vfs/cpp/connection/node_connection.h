@@ -10,6 +10,7 @@
 #endif
 
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <zircon/availability.h>
 
 #include "src/storage/lib/vfs/cpp/connection/connection.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
