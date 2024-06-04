@@ -1350,9 +1350,10 @@ impl Task {
             return true;
         }
 
-        // TODO(lindkvist): This check should also verify that the sessions are the same.
         if Signal::try_from(unchecked_signal) == Ok(SIGCONT) {
-            return true;
+            let target_session = target.thread_group.read().process_group.session.leader;
+            let self_session = self.thread_group.read().process_group.session.leader;
+            return target_session == self_session;
         }
 
         false
