@@ -164,7 +164,8 @@ class DebugAgentLegacyLauncher : public fidl::Server<fuchsia_debugger::DebugAgen
 
 int main() {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  fuchsia_logging::SetLogSettings(fuchsia_logging::LogSettings{});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.BuildAndInitialize();
 
   component::OutgoingDirectory outgoing = component::OutgoingDirectory(loop.dispatcher());
 
