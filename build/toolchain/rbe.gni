@@ -239,7 +239,7 @@ declare_args() {
   #   * "racing": Race local vs. remote execution, take the first to finish.
   #
   #   (There are other rewrapper options that are not exposed.)
-  link_rbe_exec_strategy = "remote"
+  link_rbe_exec_strategy = "remote_local_fallback"
 
   # Run one of the more expensive checks, intended for CI.
   # All of these require link_rbe_enable=true.
