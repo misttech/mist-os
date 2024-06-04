@@ -16,7 +16,6 @@ use core::{
 use lock_order::{
     lock::{LockLevelFor, UnlockedAccess, UnlockedAccessMarkerFor},
     relation::LockBefore,
-    wrap::prelude::*,
 };
 use net_types::{
     ip::{AddrSubnet, Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu},
@@ -33,6 +32,7 @@ use packet_formats::icmp::{
 };
 
 use crate::{
+    context::{prelude::*, WrapLockLevel},
     device::{DeviceId, WeakDeviceId},
     filter::FilterImpl,
     ip::{
@@ -41,8 +41,8 @@ use crate::{
             self, add_ip_addr_subnet_with_config, del_ip_addr_inner, get_ipv6_hop_limit,
             is_ip_device_enabled, is_ip_forwarding_enabled, join_ip_multicast_with_config,
             leave_ip_multicast_with_config, AddressRemovedReason, DadAddressContext,
-            DadAddressStateRef, DadContext, DadEvent, DadHandler, DadStateRef, DadTimerId,
-            DefaultHopLimit, DelIpAddr, DualStackIpDeviceState, IpAddressId, IpAddressIdSpec,
+            DadAddressStateRef, DadContext, DadEvent, DadStateRef, DadTimerId, DefaultHopLimit,
+            DelIpAddr, DualStackIpDeviceState, IpAddressId, IpAddressIdSpec,
             IpAddressIdSpecContext, IpAddressState, IpDeviceAddr, IpDeviceAddresses,
             IpDeviceConfiguration, IpDeviceEvent, IpDeviceFlags, IpDeviceIpExt,
             IpDeviceMulticastGroups, IpDeviceStateBindingsTypes, IpDeviceStateContext,
@@ -51,12 +51,12 @@ use crate::{
             Ipv6AddressState, Ipv6DadState, Ipv6DeviceAddr, Ipv6DeviceConfiguration,
             Ipv6DeviceTimerId, Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext,
             Ipv6NetworkLearnedParameters, Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState,
-            RsContext, RsHandler, RsState, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses,
+            RsContext, RsState, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses,
             SlaacAddrsMutAndConfig, SlaacConfig, SlaacContext, SlaacCounters, SlaacState,
         },
         gmp::{
-            self, GmpHandler, GmpQueryHandler, GmpStateRef, IgmpContext, IgmpGroupState, IgmpState,
-            IgmpStateContext, MldContext, MldGroupState, MldStateContext, MulticastGroupSet,
+            GmpQueryHandler, GmpStateRef, IgmpContext, IgmpGroupState, IgmpState, IgmpStateContext,
+            MldContext, MldGroupState, MldStateContext, MulticastGroupSet,
         },
         nud::{self, ConfirmationFlags, NudCounters, NudIpHandler},
         socket::SasCandidate,
@@ -70,7 +70,7 @@ pub struct SlaacAddrs<'a, BC: BindingsContext> {
     pub(crate) core_ctx: CoreCtxWithIpDeviceConfiguration<
         'a,
         &'a Ipv6DeviceConfiguration,
-        crate::lock_ordering::Ipv6DeviceSlaac,
+        WrapLockLevel<crate::lock_ordering::Ipv6DeviceSlaac>,
         BC,
     >,
     pub(crate) device_id: DeviceId<BC>,
@@ -83,7 +83,7 @@ pub struct SlaacAddrs<'a, BC: BindingsContext> {
 /// it's the only way to satisfy the GAT bounds on `SlaacAddresses`' associated
 /// type.
 pub struct SlaacAddrsIter<'x, BC: BindingsContext> {
-    core_ctx: CoreCtx<'x, BC, crate::lock_ordering::IpDeviceAddresses<Ipv6>>,
+    core_ctx: CoreCtx<'x, BC, WrapLockLevel<crate::lock_ordering::IpDeviceAddresses<Ipv6>>>,
     addrs: ip::device::AddressIdIter<'x, Ipv6, BC>,
     device_id: &'x DeviceId<BC>,
 }
@@ -533,33 +533,21 @@ pub struct CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC: BindingsContext> 
     pub core_ctx: CoreCtx<'a, BC, L>,
 }
 
+#[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<'a, I: gmp::IpExt + IpDeviceIpExt, BC: BindingsContext>
     device::WithIpDeviceConfigurationMutInner<I, BC>
     for CoreCtxWithIpDeviceConfiguration<
         'a,
-        &mut I::Configuration,
-        crate::lock_ordering::IpDeviceConfiguration<I>,
+        &mut <I as IpDeviceIpExt>::Configuration,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<I>>,
         BC,
     >
-where
-    CoreCtx<'a, BC, crate::lock_ordering::IpDeviceConfiguration<I>>:
-        device::IpDeviceStateContext<I, BC, DeviceId = DeviceId<BC>>,
-    for<'s> CoreCtxWithIpDeviceConfiguration<
-        's,
-        &'s I::Configuration,
-        crate::lock_ordering::IpDeviceConfiguration<I>,
-        BC,
-    >: IpDeviceStateContext<I, BC, DeviceId = Self::DeviceId>
-        + GmpHandler<I, BC>
-        + NudIpHandler<I, BC>,
-    crate::lock_ordering::IpDeviceConfiguration<I>:
-        LockBefore<crate::lock_ordering::IpDeviceFlags<I>>,
 {
-    type IpDeviceStateCtx<'s> = CoreCtxWithIpDeviceConfiguration<'s, &'s I::Configuration, crate::lock_ordering::IpDeviceConfiguration<I>, BC> where Self: 's;
+    type IpDeviceStateCtx<'s> = CoreCtxWithIpDeviceConfiguration<'s, &'s <I as IpDeviceIpExt>::Configuration, WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<I>>, BC> where Self: 's;
 
     fn ip_device_configuration_and_ctx(
         &mut self,
-    ) -> (&I::Configuration, Self::IpDeviceStateCtx<'_>) {
+    ) -> (&<I as IpDeviceIpExt>::Configuration, Self::IpDeviceStateCtx<'_>) {
         let Self { config, core_ctx } = self;
         let config = &**config;
         (config, CoreCtxWithIpDeviceConfiguration { config, core_ctx: core_ctx.as_owned() })
@@ -567,7 +555,7 @@ where
 
     fn with_configuration_and_flags_mut<
         O,
-        F: FnOnce(&mut I::Configuration, &mut IpDeviceFlags) -> O,
+        F: FnOnce(&mut <I as IpDeviceIpExt>::Configuration, &mut IpDeviceFlags) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,
@@ -585,22 +573,11 @@ impl<'a, BC: BindingsContext> device::WithIpv6DeviceConfigurationMutInner<BC>
     for CoreCtxWithIpDeviceConfiguration<
         'a,
         &mut Ipv6DeviceConfiguration,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>,
         BC,
     >
-where
-    for<'s> CoreCtxWithIpDeviceConfiguration<
-        's,
-        &'s Ipv6DeviceConfiguration,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
-        BC,
-    >: IpDeviceStateContext<Ipv6, BC, DeviceId = Self::DeviceId>
-        + GmpHandler<Ipv6, BC>
-        + NudIpHandler<Ipv6, BC>
-        + DadHandler<Ipv6, BC>
-        + RsHandler<BC>,
 {
-    type Ipv6DeviceStateCtx<'s> = CoreCtxWithIpDeviceConfiguration<'s, &'s Ipv6DeviceConfiguration,crate::lock_ordering::IpDeviceConfiguration<Ipv6>, BC> where Self: 's;
+    type Ipv6DeviceStateCtx<'s> = CoreCtxWithIpDeviceConfiguration<'s, &'s Ipv6DeviceConfiguration, WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>, BC> where Self: 's;
 
     fn ipv6_device_configuration_and_ctx(
         &mut self,
@@ -622,7 +599,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
     for CoreCtxWithIpDeviceConfiguration<
         'a,
         Config,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>,
         BC,
     >
 {
@@ -768,7 +745,7 @@ impl<
     type DadAddressCtx<'b> = CoreCtxWithIpDeviceConfiguration<
         'b,
         &'b Ipv6DeviceConfiguration,
-        crate::lock_ordering::Ipv6DeviceAddressDad,
+        WrapLockLevel<crate::lock_ordering::Ipv6DeviceAddressDad>,
         BC,
     >;
 
@@ -831,11 +808,15 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
     for CoreCtxWithIpDeviceConfiguration<
         'a,
         Config,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>,
         BC,
     >
 {
-    type LinkLayerAddr = <CoreCtx<'a, BC,  crate::lock_ordering::IpDeviceConfiguration<Ipv6>> as device::Ipv6DeviceContext<BC>>::LinkLayerAddr;
+    type LinkLayerAddr = <CoreCtx<
+        'a,
+        BC,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>,
+    > as device::Ipv6DeviceContext<BC>>::LinkLayerAddr;
 
     fn with_rs_state_mut_and_max<O, F: FnOnce(&mut RsState<BC>, Option<NonZeroU8>) -> O>(
         &mut self,
@@ -909,7 +890,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
 }
 
 impl<BC: BindingsContext> Ipv6DiscoveredRoutesContext<BC>
-    for CoreCtx<'_, BC, crate::lock_ordering::Ipv6DeviceRouteDiscovery>
+    for CoreCtx<'_, BC, WrapLockLevel<crate::lock_ordering::Ipv6DeviceRouteDiscovery>>
 {
     fn add_discovered_ipv6_route(
         &mut self,
@@ -962,12 +943,12 @@ impl<'a, Config, BC: BindingsContext> Ipv6RouteDiscoveryContext<BC>
     for CoreCtxWithIpDeviceConfiguration<
         'a,
         Config,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>,
         BC,
     >
 {
     type WithDiscoveredRoutesMutCtx<'b> =
-        CoreCtx<'b, BC, crate::lock_ordering::Ipv6DeviceRouteDiscovery>;
+        CoreCtx<'b, BC, WrapLockLevel<crate::lock_ordering::Ipv6DeviceRouteDiscovery>>;
 
     fn with_discovered_routes_mut<
         O,
@@ -996,11 +977,15 @@ impl<'a, Config, BC: BindingsContext> device::Ipv6DeviceContext<BC>
     for CoreCtxWithIpDeviceConfiguration<
         'a,
         Config,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>,
         BC,
     >
 {
-    type LinkLayerAddr = <CoreCtx<'a, BC,  crate::lock_ordering::IpDeviceConfiguration<Ipv6>> as device::Ipv6DeviceContext<BC>>::LinkLayerAddr;
+    type LinkLayerAddr = <CoreCtx<
+        'a,
+        BC,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>,
+    > as device::Ipv6DeviceContext<BC>>::LinkLayerAddr;
 
     fn get_link_layer_addr_bytes(
         &mut self,
@@ -1190,7 +1175,7 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpConte
     for CoreCtxWithIpDeviceConfiguration<
         'a,
         Config,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv4>,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>,
         BC,
     >
 {
@@ -1289,15 +1274,10 @@ impl<
     }
 }
 
-impl<'a, Config, I: IpDeviceIpExt, BC: BindingsContext> NudIpHandler<I, BC>
-    for CoreCtxWithIpDeviceConfiguration<
-        'a,
-        Config,
-        crate::lock_ordering::IpDeviceConfiguration<I>,
-        BC,
-    >
+impl<'a, Config, I: IpDeviceIpExt, BC: BindingsContext, L> NudIpHandler<I, BC>
+    for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 where
-    CoreCtx<'a, BC, crate::lock_ordering::IpDeviceConfiguration<I>>: NudIpHandler<I, BC>,
+    CoreCtx<'a, BC, L>: NudIpHandler<I, BC>,
 {
     fn handle_neighbor_probe(
         &mut self,

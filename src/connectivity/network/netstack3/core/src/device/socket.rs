@@ -8,10 +8,10 @@
 use lock_order::{
     lock::{DelegatedOrderedLockAccess, LockLevelFor},
     relation::LockBefore,
-    wrap::prelude::*,
 };
 
 use crate::{
+    context::{prelude::*, WrapLockLevel},
     device::{
         self, for_any_device_id,
         socket::{
@@ -41,7 +41,8 @@ impl<BT: BindingsTypes, L> DeviceSocketContextTypes<BT> for CoreCtx<'_, BT, L> {
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
     DeviceSocketContext<BC> for CoreCtx<'_, BC, L>
 {
-    type SocketTablesCoreCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::AnyDeviceSockets>;
+    type SocketTablesCoreCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::AnyDeviceSockets>>;
 
     fn with_all_device_sockets_mut<F: FnOnce(&mut AllSockets<Self::SocketId>) -> R, R>(
         &mut self,
@@ -108,7 +109,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocketState>
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSockets>>
     DeviceSocketAccessor<BC> for CoreCtx<'_, BC, L>
 {
-    type DeviceSocketCoreCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::DeviceSockets>;
+    type DeviceSocketCoreCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::DeviceSockets>>;
 
     fn with_device_sockets<
         F: FnOnce(&DeviceSockets<Self::SocketId>, &mut Self::DeviceSocketCoreCtx<'_>) -> R,

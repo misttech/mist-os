@@ -88,8 +88,6 @@ pub(crate) type CoreCtxAndResource<'a, BT, R, L> =
 /// An alias for an unlocked [`CoreCtx`].
 pub type UnlockedCoreCtx<'a, BT> = CoreCtx<'a, BT, Unlocked>;
 
-pub(crate) use locked::Locked;
-
 impl<'a, BT, L> ContextProvider for CoreCtx<'a, BT, L>
 where
     BT: BindingsTypes,
@@ -99,6 +97,16 @@ where
     fn context(&mut self) -> &mut Self::Context {
         self
     }
+}
+
+pub(crate) use locked::{Locked, WrapLockLevel};
+
+/// Prelude import to enable the lock wrapper traits.
+pub(crate) mod prelude {
+    #[cfg(no_lock_order)]
+    pub(crate) use lock_order::wrap::disable::prelude::*;
+    #[cfg(not(no_lock_order))]
+    pub(crate) use lock_order::wrap::prelude::*;
 }
 
 /// Provides a crate-local wrapper for `[lock_order::Locked]`.
@@ -113,6 +121,9 @@ mod locked {
 
     /// A crate-local wrapper on [`lock_order::Locked`].
     pub struct Locked<T, L>(ExternalLocked<T, L>);
+
+    // SAFETY: This is only compiled when lock ordering is disabled.
+    unsafe impl<T, L> lock_order::wrap::disable::DisabledLockWrapper for Locked<T, L> {}
 
     impl<T, L> LockedWrapper<T, L> for Locked<T, L>
     where
@@ -178,6 +189,28 @@ mod locked {
             crate::CoreCtx::<BT, L>::wrap(locked.cast_with(|c| c.left()))
         }
     }
+
+    /// Enables the [`WrapLockLevel`] type alias.
+    pub trait WrappedLockLevel {
+        type LockLevel;
+    }
+
+    impl<L> WrappedLockLevel for L {
+        /// All lock levels are actually [`Unlocked`].
+        #[cfg(no_lock_order)]
+        type LockLevel = Unlocked;
+        /// All lock levels are themselves.
+        #[cfg(not(no_lock_order))]
+        type LockLevel = L;
+    }
+
+    /// Wraps lock level `L` in [`WrappedLockLevel::LockLevel`], which allows
+    /// lock ordering to be disabled by build configuration.
+    ///
+    /// Whenever using a concrete instantiation of a lock level (i.e. not in a
+    /// `LockBefore` trait bound) it must be wrapped in `WrapLockLevel` for
+    /// compilation with `cfg(no_lock_order)` to succeed.
+    pub(crate) type WrapLockLevel<L> = <L as WrappedLockLevel>::LockLevel;
 }
 
 /// Fake implementations of context traits.

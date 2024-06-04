@@ -10,12 +10,12 @@ use alloc::vec::Vec;
 use lock_order::{
     lock::{LockLevelFor, UnlockedAccessMarkerFor},
     relation::LockBefore,
-    wrap::prelude::*,
 };
 use netstack3_base::DeviceIdContext;
 use packet::Buf;
 
 use crate::{
+    context::{prelude::*, WrapLockLevel},
     device::{
         self,
         ethernet::EthernetDeviceCounters,
@@ -67,7 +67,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackRxDequeue>>
     ReceiveDequeContext<LoopbackDevice, BC> for CoreCtx<'_, BC, L>
 {
-    type ReceiveQueueCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::LoopbackRxDequeue>;
+    type ReceiveQueueCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::LoopbackRxDequeue>>;
 
     fn with_dequed_frames_and_rx_queue_ctx<
         O,
@@ -155,7 +156,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxDequeue>>
     TransmitDequeueContext<LoopbackDevice, BC> for CoreCtx<'_, BC, L>
 {
-    type TransmitQueueCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::LoopbackTxDequeue>;
+    type TransmitQueueCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::LoopbackTxDequeue>>;
 
     fn with_dequed_packets_and_tx_queue_ctx<
         O,

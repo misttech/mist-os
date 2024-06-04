@@ -346,3 +346,266 @@ where
     O: LockedWrapper<T, L>,
 {
 }
+
+pub mod disable {
+    use core::{marker::PhantomData, ops::Deref};
+
+    use super::LockedWrapper;
+    use crate::{
+        LockBefore, LockFor, Locked, OwnedTupleWrapper, RwLockFor, TupleWrapper, Unlocked,
+    };
+
+    /// A prelude to include all the *disabled* wrapper traits into scope and
+    /// thus wrappers can be used as if they were raw [`Locked`] instances.
+    pub mod prelude {
+        pub use super::{super::LockedWrapperUnlockedApi as _, LockedDisabledWrapperApi as _};
+    }
+
+    /// A trait enabling [`LockedDisabledWrapperApi`].
+    ///
+    /// # Safety
+    ///
+    /// This is marked as unsafe to steer careful usage of the lock ordering
+    /// types. Any type implementing this must take care to use the appropriate
+    /// wrapper API and have alternative compilation configurations that enforce
+    /// the lock order.
+    pub unsafe trait DisabledLockWrapper {}
+
+    fn disabled<T, L>(Locked(t, PhantomData): Locked<T, L>) -> Locked<T, Unlocked> {
+        Locked(t, PhantomData)
+    }
+
+    /// Provides an API with the same shape as [`Locked`] for any type
+    /// implementing [`LockedWrapper`] *that effectively disables lock ordering
+    /// checks*.
+    pub trait LockedDisabledWrapperApi<T, L>: LockedWrapper<T, L> + DisabledLockWrapper
+    where
+        T: Deref,
+        T::Target: Sized,
+    {
+        /// Like [`Locked::lock`].
+        fn lock<'a, M>(&'a mut self) -> <T::Target as LockFor<M>>::Guard<'a>
+        where
+            T: 'a,
+            T::Target: LockFor<M>,
+            L: LockBefore<M> + 'a,
+        {
+            self.get_mut().lock::<M>()
+        }
+
+        /// Like [`Locked::lock_and`].
+        fn lock_and<'a, M>(
+            &'a mut self,
+        ) -> (<T::Target as LockFor<M>>::Guard<'_>, Self::AtLockLevel<'_, Unlocked>)
+        where
+            T::Target: LockFor<M>,
+            L: LockBefore<M> + 'a,
+        {
+            let (guard, locked) = self.get_mut().lock_and::<M>();
+            (guard, Self::wrap(disabled(locked)))
+        }
+
+        /// Like [`Locked::lock_with`].
+        fn lock_with<'a, M, X>(&'a mut self, f: impl FnOnce(&T::Target) -> &X) -> X::Guard<'a>
+        where
+            T: 'a,
+            X: LockFor<M>,
+            L: LockBefore<M> + 'a,
+        {
+            self.get_mut().lock_with::<M, X>(f)
+        }
+
+        /// Like [`Locked::lock_with_and`].
+        fn lock_with_and<'a, M, X>(
+            &'a mut self,
+            f: impl FnOnce(&T::Target) -> &X,
+        ) -> (X::Guard<'_>, Self::AtLockLevel<'_, Unlocked>)
+        where
+            X: LockFor<M>,
+            L: LockBefore<M> + 'a,
+        {
+            let (guard, locked) = self.get_mut().lock_with_and::<M, X>(f);
+            (guard, Self::wrap(disabled(locked)))
+        }
+
+        /// Like [`Locked::read_lock`].
+        fn read_lock<'a, M>(&'a mut self) -> <T::Target as RwLockFor<M>>::ReadGuard<'a>
+        where
+            T: 'a,
+            T::Target: RwLockFor<M>,
+            L: LockBefore<M> + 'a,
+        {
+            self.get_mut().read_lock::<M>()
+        }
+
+        /// Like [`Locked::read_lock_and`].
+        fn read_lock_and<'a, M>(
+            &'a mut self,
+        ) -> (<T::Target as RwLockFor<M>>::ReadGuard<'_>, Self::AtLockLevel<'_, Unlocked>)
+        where
+            T::Target: RwLockFor<M>,
+            L: LockBefore<M> + 'a,
+        {
+            let (guard, locked) = self.get_mut().read_lock_and::<M>();
+            (guard, Self::wrap(disabled(locked)))
+        }
+
+        /// Like [`Locked::read_lock_with`].
+        fn read_lock_with<'a, M, X>(
+            &'a mut self,
+            f: impl FnOnce(&T::Target) -> &X,
+        ) -> X::ReadGuard<'a>
+        where
+            T: 'a,
+            X: RwLockFor<M>,
+            L: LockBefore<M> + 'a,
+        {
+            self.get_mut().read_lock_with::<M, X>(f)
+        }
+
+        /// Like [`Locked::read_lock_with_and`].
+        fn read_lock_with_and<'a, M, X>(
+            &'a mut self,
+            f: impl FnOnce(&T::Target) -> &X,
+        ) -> (X::ReadGuard<'_>, Self::AtLockLevel<'_, Unlocked>)
+        where
+            X: RwLockFor<M>,
+            L: LockBefore<M> + 'a,
+        {
+            let (guard, locked) = self.get_mut().read_lock_with_and::<M, X>(f);
+            (guard, Self::wrap(disabled(locked)))
+        }
+
+        /// Like [`Locked::write_lock`].
+        fn write_lock<'a, M>(&'a mut self) -> <T::Target as RwLockFor<M>>::WriteGuard<'a>
+        where
+            T: 'a,
+            T::Target: RwLockFor<M>,
+            L: LockBefore<M> + 'a,
+        {
+            self.get_mut().write_lock::<M>()
+        }
+
+        /// Like [`Locked::write_lock_and`].
+        fn write_lock_and<'a, M>(
+            &'a mut self,
+        ) -> (<T::Target as RwLockFor<M>>::WriteGuard<'_>, Self::AtLockLevel<'_, Unlocked>)
+        where
+            T::Target: RwLockFor<M>,
+            L: LockBefore<M> + 'a,
+        {
+            let (guard, locked) = self.get_mut().write_lock_and::<M>();
+            (guard, Self::wrap(disabled(locked)))
+        }
+
+        /// Like [`Locked::write_lock_with`].
+        fn write_lock_with<'a, M, X>(
+            &'a mut self,
+            f: impl FnOnce(&T::Target) -> &X,
+        ) -> X::WriteGuard<'a>
+        where
+            T: 'a,
+            X: RwLockFor<M>,
+            L: LockBefore<M> + 'a,
+        {
+            self.get_mut().write_lock_with::<M, X>(f)
+        }
+
+        /// Like [`Locked::write_lock_with_and`].
+        fn write_lock_with_and<'a, M, X>(
+            &'a mut self,
+            f: impl FnOnce(&T::Target) -> &X,
+        ) -> (X::WriteGuard<'_>, Self::AtLockLevel<'_, Unlocked>)
+        where
+            X: RwLockFor<M>,
+            L: LockBefore<M> + 'a,
+        {
+            let (guard, locked) = self.get_mut().write_lock_with_and::<M, X>(f);
+            (guard, Self::wrap(disabled(locked)))
+        }
+
+        /// Like [`Locked::as_owned`].
+        fn as_owned(&mut self) -> Self::AtLockLevel<'_, L> {
+            Self::wrap(self.get_mut().cast_with(|s| s))
+        }
+
+        /// Like [`Locked::cast`].
+        fn cast<'a, R>(&'a mut self) -> Self::CastWrapper<&'a R>
+        where
+            T: 'a,
+            L: 'a,
+            T::Target: AsRef<R>,
+        {
+            Self::wrap_cast(self.get_mut().cast_with(AsRef::as_ref))
+        }
+
+        /// Like [`Locked::cast_with`]
+        fn cast_with<'a, R>(&'a mut self, f: impl FnOnce(&T::Target) -> &R) -> Self::CastWrapper<&R>
+        where
+            T: 'a,
+            L: 'a,
+        {
+            Self::wrap_cast(self.get_mut().cast_with::<R>(f))
+        }
+
+        /// Like [`Locked::cast_locked`].
+        fn cast_locked<'a, M>(&'a mut self) -> Self::AtLockLevel<'_, Unlocked>
+        where
+            L: LockBefore<M> + 'a,
+        {
+            Self::wrap(disabled(self.get_mut().cast_locked::<M>()))
+        }
+
+        /// Like [`Locked::copied`].
+        fn copied(&self) -> T::Target
+        where
+            T::Target: Copy,
+        {
+            self.get().copied()
+        }
+
+        /// Like [`Locked::adopt`].
+        fn adopt<'a, N>(
+            &'a mut self,
+            n: &'a N,
+        ) -> Self::CastWrapper<OwnedTupleWrapper<&'a T::Target, &'a N>>
+        where
+            T: 'a,
+            L: 'a,
+        {
+            Self::wrap_cast(self.get_mut().adopt(n))
+        }
+
+        /// Like [`Locked::cast_left`].
+        fn cast_left<'a, X, A: Deref + 'a, B: Deref + 'a, F: FnOnce(&A::Target) -> &X>(
+            &'a mut self,
+            f: F,
+        ) -> Self::CastWrapper<OwnedTupleWrapper<&X, &B::Target>>
+        where
+            L: 'a,
+            T: Deref<Target = TupleWrapper<A, B>> + 'a,
+        {
+            Self::wrap_cast(self.get_mut().cast_left(f))
+        }
+
+        /// Like [`Locked::cast_right`].
+        fn cast_right<'a, X, A: Deref + 'a, B: Deref + 'a, F: FnOnce(&B::Target) -> &X>(
+            &'a mut self,
+            f: F,
+        ) -> Self::CastWrapper<OwnedTupleWrapper<&A::Target, &X>>
+        where
+            L: 'a,
+            T: Deref<Target = TupleWrapper<A, B>> + 'a,
+        {
+            Self::wrap_cast(self.get_mut().cast_right(f))
+        }
+    }
+
+    impl<T, L, O> LockedDisabledWrapperApi<T, L> for O
+    where
+        T: Deref,
+        T::Target: Sized,
+        O: LockedWrapper<T, L> + DisabledLockWrapper,
+    {
+    }
+}

@@ -9,7 +9,6 @@ use alloc::vec::Vec;
 use lock_order::{
     lock::{LockLevelFor, UnlockedAccessMarkerFor},
     relation::LockBefore,
-    wrap::prelude::*,
 };
 
 use net_types::{
@@ -30,7 +29,7 @@ use packet_formats::{
 };
 
 use crate::{
-    context::{CoreTimerContext, CounterContext},
+    context::{prelude::*, CoreTimerContext, CounterContext, WrapLockLevel},
     device::{
         self,
         ethernet::{
@@ -132,11 +131,15 @@ impl<BT: BindingsTypes, L> CoreTimerContext<EthernetTimerId<EthernetWeakDeviceId
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>>
     NudContext<Ipv6, EthernetLinkDevice, BC> for CoreCtx<'_, BC, L>
 {
-    type ConfigCtx<'a> =
-        CoreCtxWithDeviceId<'a, CoreCtx<'a, BC, crate::lock_ordering::EthernetIpv6Nud>>;
+    type ConfigCtx<'a> = CoreCtxWithDeviceId<
+        'a,
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::EthernetIpv6Nud>>,
+    >;
 
-    type SenderCtx<'a> =
-        CoreCtxWithDeviceId<'a, CoreCtx<'a, BC, crate::lock_ordering::EthernetIpv6Nud>>;
+    type SenderCtx<'a> = CoreCtxWithDeviceId<
+        'a,
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::EthernetIpv6Nud>>,
+    >;
 
     fn with_nud_state_mut_and_sender_ctx<
         O,
@@ -326,11 +329,15 @@ impl<'a, BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSocke
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
     ArpContext<EthernetLinkDevice, BC> for CoreCtx<'_, BC, L>
 {
-    type ConfigCtx<'a> =
-        CoreCtxWithDeviceId<'a, CoreCtx<'a, BC, crate::lock_ordering::EthernetIpv4Arp>>;
+    type ConfigCtx<'a> = CoreCtxWithDeviceId<
+        'a,
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::EthernetIpv4Arp>>,
+    >;
 
-    type ArpSenderCtx<'a> =
-        CoreCtxWithDeviceId<'a, CoreCtx<'a, BC, crate::lock_ordering::EthernetIpv4Arp>>;
+    type ArpSenderCtx<'a> = CoreCtxWithDeviceId<
+        'a,
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::EthernetIpv4Arp>>,
+    >;
 
     fn with_arp_state_mut_and_sender_ctx<
         O,
@@ -538,7 +545,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetTxDequeue>>
     TransmitDequeueContext<EthernetLinkDevice, BC> for CoreCtx<'_, BC, L>
 {
-    type TransmitQueueCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::EthernetTxDequeue>;
+    type TransmitQueueCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::EthernetTxDequeue>>;
 
     fn with_dequed_packets_and_tx_queue_ctx<
         O,

@@ -9,7 +9,6 @@ use core::{fmt::Debug, num::NonZeroU8, ops::Deref as _};
 use lock_order::{
     lock::{DelegatedOrderedLockAccess, LockLevelFor, UnlockedAccess, UnlockedAccessMarkerFor},
     relation::LockBefore,
-    wrap::prelude::*,
 };
 use net_types::{
     ethernet::Mac,
@@ -25,8 +24,8 @@ use packet_formats::ethernet::EthernetIpExt;
 
 use crate::{
     context::{
-        CoreCtxAndResource, CounterContext, Locked, ReceivableFrameMeta,
-        ReferenceNotifiersExt as _, ResourceCounterContext,
+        prelude::*, CoreCtxAndResource, CounterContext, Locked, ReceivableFrameMeta,
+        ReferenceNotifiersExt as _, ResourceCounterContext, WrapLockLevel,
     },
     device::{
         ethernet::{
@@ -239,17 +238,17 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
     type WithIpDeviceConfigurationInnerCtx<'s> = CoreCtxWithIpDeviceConfiguration<
         's,
         &'s Ipv4DeviceConfiguration,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv4>,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>,
         BC,
     >;
     type WithIpDeviceConfigurationMutInner<'s> = CoreCtxWithIpDeviceConfiguration<
         's,
         &'s mut Ipv4DeviceConfiguration,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv4>,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>,
         BC,
     >;
     type DeviceAddressAndGroupsAccessor<'s> =
-        CoreCtx<'s, BC, crate::lock_ordering::DeviceLayerState>;
+        CoreCtx<'s, BC, WrapLockLevel<crate::lock_ordering::DeviceLayerState>>;
 
     fn with_ip_device_configuration<
         O,
@@ -353,7 +352,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv4DeviceAddressS
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<Ipv4>>>
     IpDeviceStateContext<Ipv4, BC> for CoreCtx<'_, BC, L>
 {
-    type IpDeviceAddressCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IpDeviceAddresses<Ipv4>>;
+    type IpDeviceAddressCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IpDeviceAddresses<Ipv4>>>;
 
     fn with_ip_device_flags<O, F: FnOnce(&IpDeviceFlags) -> O>(
         &mut self,
@@ -475,13 +475,13 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
     type Ipv6DeviceStateCtx<'s> = CoreCtxWithIpDeviceConfiguration<
         's,
         &'s Ipv6DeviceConfiguration,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>,
         BC,
     >;
     type WithIpv6DeviceConfigurationMutInner<'s> = CoreCtxWithIpDeviceConfiguration<
         's,
         &'s mut Ipv6DeviceConfiguration,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>,
         BC,
     >;
 
@@ -517,17 +517,17 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
     type WithIpDeviceConfigurationInnerCtx<'s> = CoreCtxWithIpDeviceConfiguration<
         's,
         &'s Ipv6DeviceConfiguration,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>,
         BC,
     >;
     type WithIpDeviceConfigurationMutInner<'s> = CoreCtxWithIpDeviceConfiguration<
         's,
         &'s mut Ipv6DeviceConfiguration,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>,
         BC,
     >;
     type DeviceAddressAndGroupsAccessor<'s> =
-        CoreCtx<'s, BC, crate::lock_ordering::DeviceLayerState>;
+        CoreCtx<'s, BC, WrapLockLevel<crate::lock_ordering::DeviceLayerState>>;
 
     fn with_ip_device_configuration<
         O,
@@ -629,7 +629,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceAddressS
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<Ipv6>>>
     IpDeviceStateContext<Ipv6, BC> for CoreCtx<'_, BC, L>
 {
-    type IpDeviceAddressCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IpDeviceAddresses<Ipv6>>;
+    type IpDeviceAddressCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IpDeviceAddresses<Ipv6>>>;
 
     fn with_ip_device_flags<O, F: FnOnce(&IpDeviceFlags) -> O>(
         &mut self,

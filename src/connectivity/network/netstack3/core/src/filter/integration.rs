@@ -5,7 +5,6 @@
 use lock_order::{
     lock::{DelegatedOrderedLockAccess, LockLevelFor},
     relation::LockBefore,
-    wrap::prelude::*,
 };
 use net_types::{
     ip::{Ip, Ipv4, Ipv6},
@@ -13,6 +12,7 @@ use net_types::{
 };
 
 use crate::{
+    context::{prelude::*, WrapLockLevel},
     device::DeviceId,
     filter::{FilterContext, FilterImpl, FilterIpContext, NatContext, State},
     ip::{FilterHandlerProvider, IpDeviceStateContext, IpLayerIpExt, IpStateInner},
@@ -34,7 +34,7 @@ impl<'a, I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::Filt
 impl<I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<I>>>
     FilterIpContext<I, BC> for CoreCtx<'_, BC, L>
 {
-    type NatCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::FilterState<I>>;
+    type NatCtx<'a> = CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::FilterState<I>>>;
 
     fn with_filter_state_and_nat_ctx<O, F: FnOnce(&State<I, BC>, &mut Self::NatCtx<'_>) -> O>(
         &mut self,

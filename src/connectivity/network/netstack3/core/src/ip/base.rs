@@ -9,21 +9,18 @@ use core::sync::atomic::AtomicU16;
 use lock_order::{
     lock::{DelegatedOrderedLockAccess, LockLevelFor, UnlockedAccess},
     relation::LockBefore,
-    wrap::prelude::*,
 };
 use net_types::{
     ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr},
     MulticastAddr, SpecifiedAddr,
 };
-use netstack3_base::{
-    AnyDevice, CounterContext, DeviceIdContext, TokenBucket, UninstantiableWrapper,
-    WeakDeviceIdentifier,
-};
+use netstack3_base::{CounterContext, TokenBucket, UninstantiableWrapper, WeakDeviceIdentifier};
 use packet::BufferMut;
 use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
 use tracing::trace;
 
 use crate::{
+    context::{prelude::*, WrapLockLevel},
     device::{DeviceId, WeakDeviceId},
     ip::{
         self,
@@ -34,9 +31,8 @@ use crate::{
             Icmpv6ErrorCode, InnerIcmpContext, InnerIcmpv4Context, NdpCounters,
         },
         raw::RawIpSocketMap,
-        ForwardingTable, FragmentContext, IpCounters, IpDeviceStateContext,
-        IpForwardingDeviceContext, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt,
-        IpPacketFragmentCache, IpStateContext, IpStateInner, IpTransportContext,
+        ForwardingTable, FragmentContext, IpCounters, IpLayerBindingsContext, IpLayerContext,
+        IpLayerIpExt, IpPacketFragmentCache, IpStateContext, IpStateInner, IpTransportContext,
         IpTransportDispatchContext, MulticastMembershipHandler, PmtuCache, PmtuContext,
         ResolveRouteError, TransparentLocalDelivery, TransportReceiveError,
     },
@@ -211,21 +207,15 @@ impl<BT: BindingsTypes, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::Ip
     }
 }
 
+#[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<I, BC, L> IpStateContext<I, BC> for CoreCtx<'_, BC, L>
 where
     I: IpLayerIpExt,
     BC: BindingsContext,
     L: LockBefore<crate::lock_ordering::IpStateRoutingTable<I>>,
-
-    // These bounds ensure that we can fulfill all the traits for the associated
-    // type `IpDeviceIdCtx` below and keep the compiler happy where we don't
-    // have implementations that are generic on Ip.
-    for<'a> CoreCtx<'a, BC, crate::lock_ordering::IpStateRoutingTable<I>>:
-        DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
-            + IpForwardingDeviceContext<I>
-            + IpDeviceStateContext<I, BC>,
 {
-    type IpDeviceIdCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IpStateRoutingTable<I>>;
+    type IpDeviceIdCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IpStateRoutingTable<I>>>;
 
     fn with_ip_routing_table<
         O,
@@ -381,7 +371,8 @@ impl<
             + LockBefore<crate::lock_ordering::UdpAllSocketsSet<Ipv4>>,
     > InnerIcmpContext<Ipv4, BC> for CoreCtx<'_, BC, L>
 {
-    type IpSocketsCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IcmpBoundMap<Ipv4>>;
+    type IpSocketsCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IcmpBoundMap<Ipv4>>>;
     type DualStackContext = UninstantiableWrapper<Self>;
 
     fn receive_icmp_error(
@@ -475,7 +466,8 @@ impl<
             + LockBefore<crate::lock_ordering::UdpAllSocketsSet<Ipv6>>,
     > InnerIcmpContext<Ipv6, BC> for CoreCtx<'_, BC, L>
 {
-    type IpSocketsCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IcmpBoundMap<Ipv6>>;
+    type IpSocketsCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IcmpBoundMap<Ipv6>>>;
     type DualStackContext = UninstantiableWrapper<Self>;
     fn receive_icmp_error(
         &mut self,
@@ -572,7 +564,8 @@ impl<
             + LockBefore<crate::lock_ordering::UdpBoundMap<I>>,
     > icmp::IcmpSocketStateContext<I, BC> for CoreCtx<'_, BC, L>
 {
-    type SocketStateCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IcmpSocketState<I>>;
+    type SocketStateCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IcmpSocketState<I>>>;
 
     fn with_all_sockets_mut<O, F: FnOnce(&mut IcmpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
         &mut self,
@@ -622,7 +615,7 @@ impl<
         &mut self,
         cb: F,
     ) -> O {
-        cb(&mut self.cast_locked())
+        cb(&mut self.cast_locked::<crate::lock_ordering::IcmpSocketState<I>>())
     }
 
     fn for_each_socket<

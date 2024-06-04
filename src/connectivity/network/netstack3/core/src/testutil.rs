@@ -21,7 +21,6 @@ use core::{
 };
 
 use derivative::Derivative;
-use lock_order::wrap::prelude::*;
 use net_types::{
     ethernet::Mac,
     ip::{
@@ -37,6 +36,7 @@ use zerocopy::ByteSlice;
 
 use crate::{
     context::{
+        prelude::*,
         testutil::{
             FakeFrameCtx, FakeInstant, FakeNetwork, FakeNetworkLinks, FakeNetworkSpec,
             FakeTimerCtx, FakeTimerCtxExt, WithFakeFrameContext, WithFakeTimerContext,
