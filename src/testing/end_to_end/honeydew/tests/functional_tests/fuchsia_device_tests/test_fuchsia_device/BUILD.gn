@@ -38,10 +38,7 @@ if (is_host) {
     ]
     params_source = "params_x64.yaml"
     transport = "fuchsia-controller"
-    environments = [
-      nuc7_env,
-      nuc11_env,
-    ]
+    environments = [ nuc11_env ]
   }
 
   # For local runs to test "fuchsia-controller-preferred" class

@@ -21,6 +21,7 @@ python_mobly_test("run_wo_test_case_revive_fc") {
   environments = [
     emu_env,
     vim3_env,
+    nuc11_env,
   ]
 }
 
@@ -55,6 +56,7 @@ python_mobly_test("test_case_revive_with_soft_reboot_fc") {
   environments = [
     emu_env,
     vim3_env,
+    nuc11_env,
   ]
 }
 
@@ -71,8 +73,8 @@ python_mobly_test("test_case_revive_with_hard_reboot_fc") {
     fuchsia_device_operation = "Hard-Reboot"
   }
   environments = [
-    emu_env,
     vim3_env,
+    nuc11_env,
   ]
 }
 

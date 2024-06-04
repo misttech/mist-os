@@ -21,7 +21,6 @@ python_mobly_test("soft_reboot_test_fc") {
     # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
     aemu_env,
     vim3_env,
-    nuc7_env,
     nuc11_env,
   ]
 }
@@ -30,6 +29,8 @@ python_mobly_test("soft_reboot_test_fc") {
 # It uses "fuchsia-controller" to reboot the device. However, once device comes
 # back up, it starts SL4F server and sends an SL4F request.
 # Thus this test will ensure SL4F functionality in Honeydew is still working.
+
+# Note - To run this test in CQ, ensure builder config has SL4F as dependency.
 python_mobly_test("soft_reboot_test_fc_preferred") {
   main_source = "test_soft_reboot.py"
   libraries = [

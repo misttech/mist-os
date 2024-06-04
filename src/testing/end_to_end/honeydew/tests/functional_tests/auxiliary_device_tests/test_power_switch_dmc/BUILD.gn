@@ -14,7 +14,10 @@ python_mobly_test("power_switch_dmc_test_fc") {
     "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
   ]
   transport = "fuchsia-controller"
-  environments = [ vim3_env ]
+  environments = [
+    vim3_env,
+    nuc11_env,
+  ]
 }
 
 # Group containing all of the PowerSwitchDmc functional test cases.
