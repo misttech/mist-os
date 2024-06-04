@@ -255,6 +255,8 @@ DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
   std::mt19937 gen(rd());
   std::uniform_int_distribution<> distrib(0, 1000);
   next_driver_host_id_ = distrib(gen);
+
+  bootup_tracker_ = std::make_shared<BootupTracker>(&bind_manager_, dispatcher);
 }
 
 void DriverRunner::BindNodesForCompositeNodeSpec() { TryBindAllAvailable(); }
@@ -358,12 +360,16 @@ void DriverRunner::PublishComponentRunner(component::OutgoingDirectory& outgoing
   result = outgoing.AddUnmanagedProtocol<fdf::CompositeNodeManager>(
       manager_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
+
+  result = outgoing.AddUnmanagedProtocol<fdd::BootupWatcher>(bootup_tracker_->GetHandler());
+  ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
 }
 
 zx::result<> DriverRunner::StartRootDriver(std::string_view url) {
   fdf::DriverPackageType package = cpp20::starts_with(url, kBootScheme)
                                        ? fdf::DriverPackageType::kBoot
                                        : fdf::DriverPackageType::kBase;
+  bootup_tracker_->Start();
   return StartDriver(*root_node_, url, package);
 }
 
@@ -404,9 +410,14 @@ zx::result<> DriverRunner::StartDriver(Node& node, std::string_view url,
   node.set_driver_package_type(package_type);
 
   std::weak_ptr node_weak = node.shared_from_this();
+
+  auto moniker = node.MakeComponentMoniker();
+  bootup_tracker_->NotifyNewStartRequest(moniker, std::string(url.data(), url.size()));
+
   runner_.StartDriverComponent(
-      node.MakeComponentMoniker(), url, CollectionName(node.collection()).get(), node.offers(),
-      [node_weak](zx::result<driver_manager::Runner::StartedComponent> component) {
+      moniker, url, CollectionName(node.collection()).get(), node.offers(),
+      [node_weak, moniker, bootup_tracker = std::weak_ptr<BootupTracker>(bootup_tracker_)](
+          zx::result<driver_manager::Runner::StartedComponent> component) {
         std::shared_ptr node = node_weak.lock();
         if (!node) {
           return;
@@ -414,13 +425,22 @@ zx::result<> DriverRunner::StartDriver(Node& node, std::string_view url,
 
         if (component.is_error()) {
           node->CompleteBind(component.take_error());
+          if (auto tracker_ptr = bootup_tracker.lock(); tracker_ptr) {
+            tracker_ptr->NotifyStartComplete(moniker);
+          }
           return;
         }
+
         fidl::Arena arena;
         node->StartDriver(fidl::ToWire(arena, std::move(component->info)),
-                          std::move(component->controller), [node_weak](zx::result<> result) {
+                          std::move(component->controller),
+                          [node_weak, moniker, bootup_tracker](zx::result<> result) {
                             if (std::shared_ptr node = node_weak.lock(); node) {
                               node->CompleteBind(result);
+                            }
+
+                            if (auto tracker_ptr = bootup_tracker.lock(); tracker_ptr) {
+                              tracker_ptr->NotifyStartComplete(moniker);
                             }
                           });
       });

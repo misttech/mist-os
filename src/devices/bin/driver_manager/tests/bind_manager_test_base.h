@@ -216,6 +216,8 @@ class BindManagerTestBase : public DriverManagerTestBase {
 
   void VerifyPendingBindRequestCount(size_t expected);
 
+  TestBindManager* bind_manager() { return bind_manager_.get(); }
+
  protected:
   std::unordered_map<std::string, std::shared_ptr<driver_manager::Node>> nodes() const {
     return nodes_;

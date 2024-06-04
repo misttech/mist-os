@@ -71,6 +71,8 @@ class BindManagerBridge {
       fuchsia_driver_index::wire::MatchDriverArgs args,
       fit::callback<void(fidl::WireUnownedResult<fuchsia_driver_index::DriverIndex::MatchDriver>&)>
           match_callback) = 0;
+
+  virtual void OnBindingStateChanged() {}
 };
 
 // This class is responsible for managing driver binding.
@@ -93,6 +95,8 @@ class BindManager {
 
   // Exposed for testing.
   size_t NumOrphanedNodes() const { return bind_node_set_.NumOfOrphanedNodes(); }
+
+  bool HasOngoingBind() const { return bind_node_set_.is_bind_ongoing(); }
 
  protected:
   // Exposed for testing.

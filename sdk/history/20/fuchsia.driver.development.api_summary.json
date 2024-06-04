@@ -6,6 +6,19 @@
         "value": "10"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.driver.development/BootupWatcher.WaitForBootup",
+        "strictness": "strict",
+        "ordinal": "4310444003172266361",
+        "direction": "two_way"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.driver.development/BootupWatcher",
+        "openness": "open",
+        "transport": "channel"
+    },
+    {
         "kind": "union/member",
         "name": "fuchsia.driver.development/CompositeInfo.composite",
         "ordinal": "2",

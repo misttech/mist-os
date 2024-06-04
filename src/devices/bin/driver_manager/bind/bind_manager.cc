@@ -14,7 +14,9 @@ namespace driver_manager {
 
 BindManager::BindManager(BindManagerBridge* bridge, NodeManager* node_manager,
                          async_dispatcher_t* dispatcher)
-    : bridge_(bridge) {}
+    : bridge_(bridge) {
+  bind_node_set_.set_on_bind_state_changed([bridge]() { bridge->OnBindingStateChanged(); });
+}
 
 void BindManager::TryBindAllAvailable(NodeBindingInfoResultCallback result_callback) {
   // If there's an ongoing process to bind all orphans, queue up this callback. Once

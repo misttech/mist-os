@@ -43,6 +43,10 @@ class BindNodeSet {
     return multibind_nodes_;
   }
 
+  void set_on_bind_state_changed(fit::function<void()> callback) {
+    on_bind_state_changed_ = std::move(callback);
+  }
+
   size_t NumOfOrphanedNodes() const { return orphaned_nodes_.size(); }
   size_t NumOfAvailableNodes() const { return orphaned_nodes_.size() + multibind_nodes_.size(); }
 
@@ -52,6 +56,8 @@ class BindNodeSet {
   // Completes the current bind process by applying all the new changes to |orphaned_nodes_| and
   // |multibind_nodes_|. Must only be called when |is_bind_ongoing_| is true.
   void CompleteOngoingBind();
+
+  void NotifyBindState();
 
   // Orphaned nodes are nodes that have failed to bind to a driver, either
   // because no matching driver could be found, or because the matching driver
@@ -69,6 +75,8 @@ class BindNodeSet {
   // CompleteOngoingBind() is called, the changes transferred over to them.
   std::unordered_map<std::string, std::weak_ptr<Node>> new_orphaned_nodes_;
   std::unordered_map<std::string, std::weak_ptr<Node>> new_multibind_nodes_;
+
+  fit::function<void()> on_bind_state_changed_;
 
   // True when a bind process is ongoing. Set to true by StartNextBindProcess() and false by
   // EndBindProcess().

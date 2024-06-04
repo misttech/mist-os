@@ -257,6 +257,27 @@ fuchsia_unittest_component("composite-node-spec-manager-test") {
   deps = [ ":composite_node_spec_manager_test" ]
 }
 
+test("bootup_tracker_test") {
+  sources = [
+    "bind_manager_test_base.cc",
+    "bind_manager_test_base.h",
+    "bootup_tracker_test.cc",
+  ]
+
+  deps = [
+    ":driver_manager_test_base",
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+    "//sdk/fidl/fuchsia.driver.index:fuchsia.driver.index_cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/lib/testing/loop_fixture",
+  ]
+}
+
+fuchsia_unittest_component("bootup-tracker-test") {
+  deps = [ ":bootup_tracker_test" ]
+}
+
 fuchsia_test_package("driver-manager-tests") {
   test_specs = {
     log_settings = {
@@ -266,6 +287,7 @@ fuchsia_test_package("driver-manager-tests") {
 
   test_components = [
     ":composite-node-spec-manager-test",
+    ":bootup-tracker-test",
     ":driver-host-loader-service-test",
     ":driver-manager-devfs-test",
   ]
