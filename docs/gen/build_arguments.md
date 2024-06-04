@@ -4543,7 +4543,7 @@ One of:
 
   (There are other rewrapper options that are not exposed.)
 
-**Current value (from the default):** `"remote"`
+**Current value (from the default):** `"remote_local_fallback"`
 
 From //build/toolchain/rbe.gni:242
 
