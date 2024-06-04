@@ -1126,6 +1126,10 @@ impl DynamicFileSource for StatusFile {
 
         if let Some(task) = task {
             writeln!(sink, "Umask:\t0{:03o}", task.fs().umask().bits())?;
+            let task_state = task.read();
+            writeln!(sink, "SigBlk:\t{:x}", task_state.signal_mask().0)?;
+            writeln!(sink, "SigPnd:\t{:x}", task_state.task_specific_pending_signals().0)?;
+            writeln!(sink, "ShdPnd:\t{:x}", task.thread_group.pending_signals.lock().pending().0)?;
         }
 
         let state_code =

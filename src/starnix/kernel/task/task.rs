@@ -677,9 +677,16 @@ impl TaskMutableState<Base = Task> {
             || self.base.thread_group.pending_signals.lock().has_queued(signal)
     }
 
-    /// The set of pending signals for the task.
+    /// The set of pending signals for the task, including the signals pending for the thread
+    /// group.
     pub fn pending_signals(&self) -> SigSet {
         self.signals.pending() | self.base.thread_group.pending_signals.lock().pending()
+    }
+
+    /// The set of pending signals for the task specifically, not including the signals pending
+    /// for the thread group.
+    pub fn task_specific_pending_signals(&self) -> SigSet {
+        self.signals.pending()
     }
 
     /// Returns true if any currently pending signal is allowed by `mask`.
