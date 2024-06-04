@@ -38,10 +38,10 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       "sys/platform/raw_nand/raw_nand/aml-raw_nand/nand/sys-config/skip-block",
       "sys/platform/raw_nand/raw_nand/aml-raw_nand/nand/migration/skip-block",
       "sys/platform/raw_nand/raw_nand/aml-raw_nand/nand/fvm/ftl/block",
-      "sys/platform/05:00:7/aml_sdio/aml-sd-emmc/sdmmc",
-      "sys/platform/05:00:7/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio",
-      "sys/platform/05:00:7/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
-      "sys/platform/05:00:7/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
+      "sys/platform/aml-sdio/aml_sdio/aml-sd-emmc/sdmmc",
+      "sys/platform/aml-sdio/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio",
+      "sys/platform/aml-sdio/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
+      "sys/platform/aml-sdio/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
 
       "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
       "sys/platform/astro-clk/clocks",
@@ -87,8 +87,8 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       "sys/platform/05:03:e/aml_video",
 
       // WLAN
-      "sys/platform/05:00:7/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl",
-      "sys/platform/05:00:7/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl/wlanphy",
+      "sys/platform/aml-sdio/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl",
+      "sys/platform/aml-sdio/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl/wlanphy",
 #endif
 
   };

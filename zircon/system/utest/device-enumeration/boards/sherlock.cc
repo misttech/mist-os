@@ -41,8 +41,8 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/sherlock-emmc/sherlock_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-008/block",
       "sys/platform/sherlock-emmc/sherlock_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-009/block",
       "sys/platform/sherlock-emmc/sherlock_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-010/block",
-      "sys/platform/05:00:6/sherlock_sd_emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
-      "sys/platform/05:00:6/sherlock_sd_emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
+      "sys/platform/sherlock-sd-emmc/sherlock_sd_emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
+      "sys/platform/sherlock-sd-emmc/sherlock_sd_emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
 
       "sys/platform/aml-nna/aml_nna",
       "sys/platform/pwm",  // pwm
@@ -109,8 +109,8 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/gpio-c/aml-gpio/gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0/nrf52840_radio/ot-radio",
 
       // WLAN
-      "sys/platform/05:00:6/sherlock_sd_emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl",
-      "sys/platform/05:00:6/sherlock_sd_emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl/wlanphy",
+      "sys/platform/sherlock-sd-emmc/sherlock_sd_emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl",
+      "sys/platform/sherlock-sd-emmc/sherlock_sd_emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl/wlanphy",
 
       "sys/platform/mipi-csi2/aml-mipi/imx227_sensor/imx227/isp",
       "sys/platform/mipi-csi2/aml-mipi/imx227_sensor/imx227/isp/arm-isp/camera_controller",

@@ -68,10 +68,10 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/pwm/aml-pwm-device/pwm-7",
       "sys/platform/pwm/aml-pwm-device/pwm-8",
       "sys/platform/pwm/aml-pwm-device/pwm-9",
-      "sys/platform/05:00:6/aml_sdio/aml-sd-emmc/sdmmc",
-      "sys/platform/05:00:6/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio",
-      "sys/platform/05:00:6/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
-      "sys/platform/05:00:6/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
+      "sys/platform/aml-sdio/aml_sdio/aml-sd-emmc/sdmmc",
+      "sys/platform/aml-sdio/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio",
+      "sys/platform/aml-sdio/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
+      "sys/platform/aml-sdio/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
 
       "sys/platform/display/display/amlogic-display/display-coordinator",
       "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-73/ti_ina231_mlb/ti-ina231",
@@ -106,8 +106,8 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/gpio-c/aml-gpio/gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0/nrf52811_radio/ot-radio",
 
       // WLAN
-      "sys/platform/05:00:6/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl",
-      "sys/platform/05:00:6/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl/wlanphy",
+      "sys/platform/aml-sdio/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl",
+      "sys/platform/aml-sdio/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl/wlanphy",
 #endif
 
   };
