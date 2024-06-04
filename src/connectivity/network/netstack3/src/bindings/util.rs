@@ -55,6 +55,9 @@ use crate::bindings::{
     BindingsCtx,
 };
 
+mod result_ext;
+pub(crate) use result_ext::*;
+
 /// The value used to specify that a `ForwardingEntry.metric` is unset, and the
 /// entry's metric should track the interface's routing metric.
 const UNSET_FORWARDING_ENTRY_METRIC: u32 = 0;

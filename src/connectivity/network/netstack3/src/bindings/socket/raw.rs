@@ -39,8 +39,8 @@ use crate::bindings::{
         IntoErrno, IpSockAddrExt, SockAddr,
     },
     util::{
-        AllowBindingIdFromWeak, RemoveResourceResultExt, TryFromFidl, TryFromFidlWithContext,
-        TryIntoFidlWithContext,
+        AllowBindingIdFromWeak, RemoveResourceResultExt, ResultExt as _, TryFromFidl,
+        TryFromFidlWithContext, TryIntoFidlWithContext,
     },
     BindingsCtx, Ctx,
 };
@@ -186,28 +186,6 @@ impl<I: IpExt + IpSockAddrExt> SocketWorkerHandler for SocketWorkerState<I> {
     }
 }
 
-/// On Error, logs the `Errno` with additional debugging context.
-///
-/// The provided result is passed through unchanged.
-///
-/// Implemented as a macro to avoid erasing the callsite information.
-macro_rules! maybe_log_error {
-    ($operation:expr, $result:expr) => {
-        match $result {
-            Ok(val) => Ok(val),
-            Err(errno) => {
-                crate::bindings::socket::log_errno!(
-                    errno,
-                    "raw IP socket failed to handle {}: {:?}",
-                    $operation,
-                    errno
-                );
-                Err(errno)
-            }
-        }
-    };
-}
-
 struct RequestHandler<'a, I: IpExt> {
     ctx: &'a mut Ctx,
     data: &'a mut SocketWorkerState<I>,
@@ -241,14 +219,12 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
                 return ControlFlow::Continue(Some(stream));
             }
             fpraw::SocketRequest::Describe { responder } => {
-                responder
-                    .send(Self::describe(data))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(Self::describe(data)).unwrap_or_log("failed to respond");
             }
             fpraw::SocketRequest::Close { responder } => return ControlFlow::Break(responder),
             fpraw::SocketRequest::Query { responder } => responder
                 .send(fpraw::SOCKET_PROTOCOL_NAME.as_bytes())
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
+                .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::SetReuseAddress { value: _, responder } => {
                 respond_not_supported!("raw::SetReuseAddress", responder)
             }
@@ -310,16 +286,11 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
                 respond_not_supported!("raw::GetAcceptConn", responder)
             }
             fpraw::SocketRequest::SetBindToDevice { value, responder } => responder
-                .send(maybe_log_error!(
-                    "set_bindtodevice",
-                    handle_set_device::<I>(ctx, data, value)
-                ))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
+                .send(handle_set_device::<I>(ctx, data, value).log_error("raw::SetBindToDevice"))
+                .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::GetBindToDevice { responder } => {
                 let name = handle_get_device(ctx, data);
-                responder
-                    .send(Ok(name.as_deref().unwrap_or("")))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(Ok(name.as_deref().unwrap_or(""))).unwrap_or_log("failed to respond")
             }
             fpraw::SocketRequest::SetBindToInterfaceIndex { value: _, responder } => {
                 respond_not_supported!("raw::SetBindToInterfaceIndex", responder)
@@ -488,21 +459,19 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
                 flags,
                 responder,
             } => {
-                let result = maybe_log_error!(
-                    "recvmsg",
-                    handle_recvmsg(ctx, data, want_addr, data_len, want_control, flags)
-                );
+                let result = handle_recvmsg(ctx, data, want_addr, data_len, want_control, flags)
+                    .log_error("raw::RecvMsg");
                 responder
                     .send(result.as_ref().map(RecvMsgResponse::borrowed).map_err(|e| *e))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                    .unwrap_or_log("failed to respond")
             }
             fpraw::SocketRequest::SendMsg { addr, data: msg, control, flags, responder } => {
                 responder
-                    .send(maybe_log_error!(
-                        "sendmsg",
+                    .send(
                         handle_sendmsg(ctx, data, addr, msg, control, flags)
-                    ))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                            .log_error("raw::SendMsg"),
+                    )
+                    .unwrap_or_log("failed to respond")
             }
             fpraw::SocketRequest::GetInfo { responder } => {
                 respond_not_supported!("raw::GetInfo", responder)
@@ -561,11 +530,11 @@ pub(crate) async fn serve(
             };
             match req {
                 fpraw::ProviderRequest::Socket { responder, domain, proto } => responder
-                    .send(maybe_log_error!(
-                        "create",
+                    .send(
                         handle_create_socket(ctx.clone(), domain, proto, &spawner)
-                    ))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
+                            .log_error("raw::create"),
+                    )
+                    .unwrap_or_log("failed to respond"),
             }
         })
         .collect::<()>()

@@ -4,7 +4,6 @@
 
 use std::collections::{HashMap, VecDeque};
 
-use super::{devices::BindingId, util::IntoFidl};
 use fidl::prelude::*;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces::{
@@ -19,6 +18,11 @@ use futures::{
 };
 use net_types::ip::{AddrSubnetEither, IpAddr, IpVersion};
 use netstack3_core::ip::IpAddressState;
+
+use crate::bindings::{
+    devices::BindingId,
+    util::{IntoFidl, ResultExt as _},
+};
 
 /// Possible errors when serving `fuchsia.net.interfaces/State`.
 #[derive(thiserror::Error, Debug)]
@@ -166,9 +170,7 @@ impl Future for Watcher {
             let next_request = self.as_mut().stream.poll_next_unpin(cx)?;
             match ready!(next_request) {
                 Some(WatcherRequest::Watch { responder }) => match self.events.pop_front() {
-                    Some(e) => responder
-                        .send(&e)
-                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}")),
+                    Some(e) => responder.send(&e).unwrap_or_log("failed to respond"),
                     None => match &self.responder {
                         Some(existing) => {
                             existing

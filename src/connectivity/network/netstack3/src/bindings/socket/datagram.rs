@@ -50,7 +50,7 @@ use crate::bindings::{
     },
     trace_duration,
     util::{
-        DeviceNotFoundError, IntoCore as _, IntoFidl, RemoveResourceResultExt as _,
+        DeviceNotFoundError, IntoCore as _, IntoFidl, RemoveResourceResultExt as _, ResultExt as _,
         TryFromFidlWithContext, TryIntoCore, TryIntoCoreWithContext, TryIntoFidl,
         TryIntoFidlWithContext,
     },
@@ -1194,35 +1194,30 @@ where
         // Implemented as a macro to avoid erasing the callsite information.
         macro_rules! maybe_log_error {
             ($operation:expr, $result:expr) => {
-                match $result {
-                    Ok(_) => {}
-                    Err(errno) => crate::bindings::socket::log_errno!(
-                        errno,
-                        "{:?} {} failed to handle {}: {:?}",
-                        <T as Transport<I>>::PROTOCOL,
-                        I::NAME,
-                        $operation,
-                        errno
-                    ),
-                }
+                $result.inspect_log_error(std::format_args!(
+                    "{:?} {} {}",
+                    <T as Transport<I>>::PROTOCOL,
+                    I::NAME,
+                    $operation,
+                ))
             };
         }
 
         type Request = fposix_socket::SynchronousDatagramSocketRequest;
 
         match request {
-            Request::Describe { responder } => responder
-                .send(self.describe())
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
+            Request::Describe { responder } => {
+                responder.send(self.describe()).unwrap_or_log("failed to respond")
+            }
             Request::Connect { addr, responder } => {
                 let result = self.connect(addr);
                 maybe_log_error!("connect", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::Disconnect { responder } => {
                 let result = self.disconnect();
                 maybe_log_error!("disconnect", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::Clone2 { request, control_handle: _ } => {
                 let channel = fidl::AsyncChannel::from_channel(request.into_channel());
@@ -1236,31 +1231,27 @@ where
             Request::Bind { addr, responder } => {
                 let result = self.bind(addr);
                 maybe_log_error!("bind", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::Query { responder } => {
                 responder
                     .send(fposix_socket::SYNCHRONOUS_DATAGRAM_SOCKET_PROTOCOL_NAME.as_bytes())
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
             }
             Request::GetSockName { responder } => {
                 let result = self.get_sock_name();
                 maybe_log_error!("get_sock_name", &result);
-                responder
-                    .send(result.as_ref().map_err(|e| *e))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(result.as_ref().map_err(|e| *e)).unwrap_or_log("failed to respond");
             }
             Request::GetPeerName { responder } => {
                 let result = self.get_peer_name();
                 maybe_log_error!("get_peer_name", &result);
-                responder
-                    .send(result.as_ref().map_err(|e| *e))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(result.as_ref().map_err(|e| *e)).unwrap_or_log("failed to respond");
             }
             Request::Shutdown { mode, responder } => {
                 let result = self.shutdown(mode);
                 maybe_log_error!("shutdown", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::RecvMsg { want_addr, data_len, want_control, flags, responder } => {
                 let result = self.recv_msg(want_addr, data_len as usize, want_control, flags);
@@ -1272,54 +1263,50 @@ where
                         }
                         Err(err) => Err(err),
                     })
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::SendMsg { addr, data, control: _, flags: _, responder } => {
                 // TODO(https://fxbug.dev/42094933): handle control.
                 let result = self.send_msg(addr.map(|addr| *addr), data);
                 maybe_log_error!("sendmsg", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::GetInfo { responder } => {
                 let result = self.get_sock_info();
                 maybe_log_error!("get_info", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::GetTimestamp { responder } => {
                 let result = self.get_timestamp_option();
                 maybe_log_error!("get_timestamp", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::SetTimestamp { value, responder } => {
                 let result = self.set_timestamp_option(value);
                 maybe_log_error!("set_timestamp", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::GetOriginalDestination { responder } => {
-                responder
-                    .send(Err(fposix::Errno::Enoprotoopt))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(Err(fposix::Errno::Enoprotoopt)).unwrap_or_log("failed to respond");
             }
             Request::GetError { responder } => {
                 tracing::debug!("syncudp::GetError is not implemented, returning Ok");
                 // Pretend that we don't have any errors to report.
                 // TODO(https://fxbug.dev/322214321): Actually implement SO_ERROR.
-                responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
             Request::SetSendBuffer { value_bytes: _, responder } => {
                 // TODO(https://fxbug.dev/42074004): Actually implement SetSendBuffer.
                 //
                 // Currently, UDP sending in Netstack3 is synchronous, so it's not clear what a
                 // sensible implementation would look like.
-                responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
             Request::GetSendBuffer { responder } => {
                 // TODO(https://fxbug.dev/42074004): Actually implement SetSendBuffer.
                 // Until then we return the default buffer size used on Linux.
                 const DEFAULT_SEND_BUFFER: u64 = 212992;
-                responder
-                    .send(Ok(DEFAULT_SEND_BUFFER))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(Ok(DEFAULT_SEND_BUFFER)).unwrap_or_log("failed to respond");
             }
             Request::SetReceiveBuffer { value_bytes, responder } => {
                 responder
@@ -1327,32 +1314,28 @@ where
                         self.set_max_receive_buffer_size(value_bytes);
                         Ok(())
                     })
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
             }
             Request::GetReceiveBuffer { responder } => {
                 responder
                     .send(Ok(self.get_max_receive_buffer_size()))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
             }
             Request::SetReuseAddress { value, responder } => {
                 let result = self.set_reuse_addr(value);
                 maybe_log_error!("set_reuse_addr", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::GetReuseAddress { responder } => {
-                responder
-                    .send(Ok(self.get_reuse_addr()))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(Ok(self.get_reuse_addr())).unwrap_or_log("failed to respond");
             }
             Request::SetReusePort { value, responder } => {
                 let result = self.set_reuse_port(value);
                 maybe_log_error!("set_reuse_port", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::GetReusePort { responder } => {
-                responder
-                    .send(Ok(self.get_reuse_port()))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(Ok(self.get_reuse_port())).unwrap_or_log("failed to respond");
             }
             Request::GetAcceptConn { responder } => {
                 respond_not_supported!("syncudp::GetAcceptConn", responder)
@@ -1361,7 +1344,7 @@ where
                 let identifier = (!value.is_empty()).then_some(value.as_str());
                 let result = self.bind_to_device(identifier);
                 maybe_log_error!("set_bind_to_device", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::GetBindToDevice { responder } => {
                 let result = self.get_bound_device();
@@ -1371,12 +1354,12 @@ where
                         Ok(ref d) => Ok(d.as_deref().unwrap_or("")),
                         Err(e) => Err(e),
                     })
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::SetBindToInterfaceIndex { value, responder } => {
                 let result = self.bind_to_device_index(value);
                 maybe_log_error!("set_bind_to_if_index", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::GetBindToInterfaceIndex { responder } => {
                 let result = self.get_bound_device_index();
@@ -1386,7 +1369,7 @@ where
                         Ok(d) => Ok(d.map(|d| d.get()).unwrap_or(0)),
                         Err(e) => Err(e),
                     })
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::SetBroadcast { value, responder } => {
                 // We allow a no-op since the core does not yet support limiting
@@ -1396,7 +1379,7 @@ where
                 //
                 // TODO(https://fxbug.dev/42077065): Actually implement SO_BROADCAST.
                 let response = if value { Ok(()) } else { Err(fposix::Errno::Eopnotsupp) };
-                responder.send(response).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(response).unwrap_or_log("failed to respond");
             }
             Request::GetBroadcast { responder } => {
                 respond_not_supported!("syncudp::GetBroadcast", responder)
@@ -1412,9 +1395,7 @@ where
             }
             Request::GetLinger { responder } => {
                 tracing::debug!("syncudp::GetLinger is not supported, returning Ok((false, 0))");
-                responder
-                    .send(Ok((false, 0)))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(Ok((false, 0))).unwrap_or_log("failed to respond")
             }
             Request::SetOutOfBandInline { value: _, responder } => {
                 respond_not_supported!("syncudp::SetOutOfBandInline", responder)
@@ -1431,12 +1412,12 @@ where
             Request::SetIpv6Only { value, responder } => {
                 let result = self.set_dual_stack_enabled(!value);
                 maybe_log_error!("set_ipv6_only", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::GetIpv6Only { responder } => {
                 let result = self.get_dual_stack_enabled().map(|enabled| !enabled);
                 maybe_log_error!("get_ipv6_only", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::SetIpv6TrafficClass { value: _, responder } => {
                 respond_not_supported!("syncudp::SetIpv6TrafficClass", responder)
@@ -1447,86 +1428,86 @@ where
             Request::SetIpv6MulticastInterface { value, responder } => {
                 let result = self.set_multicast_interface_ipv6(NonZeroU64::new(value));
                 maybe_log_error!("set_ipv6_multicast_interface", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::GetIpv6MulticastInterface { responder } => {
                 let result = self
                     .get_multicast_interface_ipv6()
                     .map(|v| v.map(NonZeroU64::get).unwrap_or(0));
                 maybe_log_error!("get_ipv6_multicast_interface", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::SetIpv6UnicastHops { value, responder } => {
                 let result = self.set_unicast_hop_limit(Ipv6::VERSION, value);
                 maybe_log_error!("set_ipv6_unicast_hops", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::GetIpv6UnicastHops { responder } => {
                 let result = self.get_unicast_hop_limit(Ipv6::VERSION);
                 maybe_log_error!("get_ipv6_unicast_hops", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::SetIpv6MulticastHops { value, responder } => {
                 let result = self.set_multicast_hop_limit(Ipv6::VERSION, value);
                 maybe_log_error!("set_ipv6_multicast_hops", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::GetIpv6MulticastHops { responder } => {
                 let result = self.get_multicast_hop_limit(Ipv6::VERSION);
                 maybe_log_error!("get_ipv6_multicast_hops", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::SetIpv6MulticastLoopback { value, responder } => {
                 let result = self.set_multicast_loop(Ipv6::VERSION, value);
                 maybe_log_error!("set_ipv6_multicast_loop", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::GetIpv6MulticastLoopback { responder } => {
                 let result = self.get_multicast_loop(Ipv6::VERSION);
                 maybe_log_error!("get_ipv6_multicast_loop", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::SetIpTtl { value, responder } => {
                 let result = self.set_unicast_hop_limit(Ipv4::VERSION, value);
                 maybe_log_error!("set_ip_ttl", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::GetIpTtl { responder } => {
                 let result = self.get_unicast_hop_limit(Ipv4::VERSION);
                 maybe_log_error!("get_ip_ttl", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::SetIpMulticastTtl { value, responder } => {
                 let result = self.set_multicast_hop_limit(Ipv4::VERSION, value);
                 maybe_log_error!("set_ip_multicast_ttl", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::GetIpMulticastTtl { responder } => {
                 let result = self.get_multicast_hop_limit(Ipv4::VERSION);
                 maybe_log_error!("get_ip_multicast_ttl", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::SetIpMulticastInterface { iface, address, responder } => {
                 let result = self.set_multicast_interface_ipv4(NonZeroU64::new(iface), address);
                 maybe_log_error!("set_multicast_interface", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::GetIpMulticastInterface { responder } => {
                 let result = self.get_multicast_interface_ipv4();
                 maybe_log_error!("get_ip_multicast_interface", &result);
                 responder
                     .send(result.as_ref().map_err(|e| e.clone()))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::SetIpMulticastLoopback { value, responder } => {
                 let result = self.set_multicast_loop(Ipv4::VERSION, value);
                 maybe_log_error!("set_ip_multicast_loop", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::GetIpMulticastLoopback { responder } => {
                 let result = self.get_multicast_loop(Ipv4::VERSION);
                 maybe_log_error!("get_ip_multicast_loop", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::SetIpTypeOfService { value: _, responder } => {
                 respond_not_supported!("syncudp::SetIpTypeOfService", responder)
@@ -1537,41 +1518,39 @@ where
             Request::AddIpMembership { membership, responder } => {
                 let result = self.set_multicast_membership(membership, true);
                 maybe_log_error!("add_ip_membership", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::DropIpMembership { membership, responder } => {
                 let result = self.set_multicast_membership(membership, false);
                 maybe_log_error!("drop_ip_membership", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::SetIpTransparent { value, responder } => {
                 let result = self.set_ip_transparent(value).map_err(IntoErrno::into_errno);
                 maybe_log_error!("set_ip_transparent", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::GetIpTransparent { responder } => {
-                responder
-                    .send(Ok(self.get_ip_transparent()))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(Ok(self.get_ip_transparent())).unwrap_or_log("failed to respond");
             }
             Request::SetIpReceiveOriginalDestinationAddress { value, responder } => {
                 self.data.ip_receive_original_destination_address = value;
-                responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
             Request::GetIpReceiveOriginalDestinationAddress { responder } => {
                 responder
                     .send(Ok(self.data.ip_receive_original_destination_address))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
             }
             Request::AddIpv6Membership { membership, responder } => {
                 let result = self.set_multicast_membership(membership, true);
                 maybe_log_error!("add_ipv6_membership", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::DropIpv6Membership { membership, responder } => {
                 let result = self.set_multicast_membership(membership, false);
                 maybe_log_error!("drop_ipv6_membership", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::SetIpv6ReceiveTrafficClass { value: _, responder } => {
                 respond_not_supported!("syncudp::SetIpv6ReceiveTrafficClass", responder)
@@ -1594,12 +1573,12 @@ where
             Request::SetIpv6ReceivePacketInfo { value, responder } => {
                 let result = self.set_ipv6_recv_pkt_info(value);
                 maybe_log_error!("set_ipv6_recv_pkt_info", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::GetIpv6ReceivePacketInfo { responder } => {
                 let result = self.get_ipv6_recv_pkt_info();
                 maybe_log_error!("get_ipv6_recv_pkt_info", &result);
-                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::SetIpReceiveTtl { value: _, responder } => {
                 respond_not_supported!("syncudp::SetIpReceiveTtl", responder)
@@ -1609,22 +1588,18 @@ where
             }
             Request::SetIpPacketInfo { value: _, responder } => {
                 tracing::debug!("syncudp::SetIpPacketInfo is not supported, returning Ok(())");
-                responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
             Request::GetIpPacketInfo { responder } => {
                 respond_not_supported!("syncudp::GetIpPacketInfo", responder)
             }
             Request::SetMark { domain: _, mark: _, responder } => {
                 // TODO(https://fxbug.dev/337134565): Implement socket marks.
-                responder
-                    .send(Err(fposix::Errno::Eopnotsupp))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(Err(fposix::Errno::Eopnotsupp)).unwrap_or_log("failed to respond")
             }
             Request::GetMark { domain: _, responder } => {
                 // TODO(https://fxbug.dev/337134565): Implement socket marks.
-                responder
-                    .send(Err(fposix::Errno::Eopnotsupp))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(Err(fposix::Errno::Eopnotsupp)).unwrap_or_log("failed to respond")
             }
         }
         ControlFlow::Continue(None)

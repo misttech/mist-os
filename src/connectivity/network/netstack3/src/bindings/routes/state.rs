@@ -34,7 +34,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::bindings::{
     routes,
-    util::{ConversionContext as _, IntoCore as _, IntoFidl as _},
+    util::{ConversionContext as _, IntoCore as _, IntoFidl as _, ResultExt as _},
     BindingsCtx, Ctx, IpExt,
 };
 
@@ -77,7 +77,7 @@ pub(crate) async fn serve_state(rs: fnet_routes::StateRequestStream, ctx: Ctx) {
                 let result = resolve(destination, ctx.clone()).await;
                 responder
                     .send(result.as_ref().map_err(|e| e.into_raw()))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
                 Ok(())
             }
             fnet_routes::StateRequest::GetRouteTableName { table_id: _, responder: _ } => {

@@ -4,7 +4,7 @@
 
 //! Socket features exposed by netstack3.
 
-use std::{convert::Infallible as Never, num::NonZeroU64};
+use std::{convert::Infallible as Never, num::NonZeroU64, panic::Location};
 
 use const_unwrap::const_unwrap_option;
 use either::Either;
@@ -34,16 +34,27 @@ use crate::bindings::{
         BindingId, DeviceIdAndName, DeviceSpecificInfo, Devices, DynamicCommonInfo,
         DynamicEthernetInfo, DynamicNetdeviceInfo,
     },
-    util::{DeviceNotFoundError, IntoCore as _, IntoFidl as _, TryIntoCoreWithContext},
+    util::{
+        DeviceNotFoundError, IntoCore as _, IntoFidl as _, ResultExt as _, TryIntoCoreWithContext,
+    },
     Ctx, DeviceIdExt as _,
 };
 
+#[track_caller]
+fn log_not_supported(name: &str) {
+    let location = Location::caller();
+    // TODO(https://fxbug.dev/343992493): don't embed location in the log
+    // message when better track_caller support is available.
+    tracing::debug!("{location}: {} not supported", name);
+}
+
 macro_rules! respond_not_supported {
     ($name:expr, $responder:expr) => {{
-        tracing::debug!("{} not supported", $name);
-        $responder
-            .send(Err(fidl_fuchsia_posix::Errno::Eopnotsupp))
-            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"))
+        crate::bindings::socket::log_not_supported($name);
+        crate::bindings::util::ResultExt::unwrap_or_log(
+            $responder.send(Err(fidl_fuchsia_posix::Errno::Eopnotsupp)),
+            "failed to respond",
+        )
     }};
 }
 
@@ -97,7 +108,7 @@ pub(crate) async fn serve(
                     };
                     responder
                         .send(response.as_deref().map_err(|e| *e))
-                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                        .unwrap_or_log("failed to respond");
                 }
                 psocket::ProviderRequest::InterfaceNameToIndex { name, responder } => {
                     let response = {
@@ -109,21 +120,17 @@ pub(crate) async fn serve(
                             .ok_or(zx::Status::NOT_FOUND.into_raw());
                         result
                     };
-                    responder
-                        .send(response)
-                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                    responder.send(response).unwrap_or_log("failed to respond");
                 }
                 psocket::ProviderRequest::InterfaceNameToFlags { name, responder } => {
                     responder
                         .send(get_interface_flags(&ctx, &name))
-                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                        .unwrap_or_log("failed to respond");
                 }
                 psocket::ProviderRequest::StreamSocket { domain, proto, responder } => {
                     let (client, request_stream) = create_request_stream();
                     stream::spawn_worker(domain, proto, ctx.clone(), request_stream, &task_spawner);
-                    responder
-                        .send(Ok(client))
-                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                    responder.send(Ok(client)).unwrap_or_log("failed to respond");
                 }
                 psocket::ProviderRequest::DatagramSocketDeprecated { domain, proto, responder } => {
                     let (client, request_stream) = create_request_stream();
@@ -136,9 +143,7 @@ pub(crate) async fn serve(
                         &task_spawner,
                     )
                     .map(|()| client);
-                    responder
-                        .send(response)
-                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                    responder.send(response).unwrap_or_log("failed to respond");
                 }
                 psocket::ProviderRequest::DatagramSocket { domain, proto, responder } => {
                     let (client, request_stream) = create_request_stream();
@@ -153,14 +158,12 @@ pub(crate) async fn serve(
                     .map(|()| {
                         psocket::ProviderDatagramSocketResponse::SynchronousDatagramSocket(client)
                     });
-                    responder
-                        .send(response)
-                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                    responder.send(response).unwrap_or_log("failed to respond");
                 }
                 psocket::ProviderRequest::GetInterfaceAddresses { responder } => {
                     responder
                         .send(&get_interface_addresses(&mut ctx))
-                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                        .unwrap_or_log("failed to respond");
                 }
             }
         })
@@ -659,34 +662,3 @@ impl IntoErrno for NotDualStackCapableError {
         Errno::Enoprotoopt
     }
 }
-
-/// Logs the errno, tailoring the log level to the error's severity.
-///
-/// # Syntax
-///
-/// log_errno!(errno, fmt_str, fmt_arg1, fmt_arg2, ...);
-///
-///   - errno: The error used to determine the log level. Must be an
-///     [`fidl_fuchsia_posix::Errno`].
-///   - fmt_str: An `&str` format string, e.g. "Foo Op failed: {:?}".
-///   - fmt_arg1 ... fmt_arg n: A variable length list of arguments to `fmt_st`.
-///
-/// Which is expanded into the appropriate [`tracing`] macro invocation as
-/// follows: debug!(fmt_string, fmt_arg1, fmt_arg2, ...)
-macro_rules! log_errno {
-    ($errno:expr, $fmt_str:expr, $($arg:tt)*) => {
-        match $errno {
-            // Errnos that indicate the socket API is being called incorrectly.
-            fidl_fuchsia_posix::Errno::Einval
-            | fidl_fuchsia_posix::Errno::Eafnosupport
-            | fidl_fuchsia_posix::Errno::Enoprotoopt => tracing::warn!($fmt_str, $($arg)*),
-            // Errnos that may occur under normal operation and are quite noisy.
-            fidl_fuchsia_posix::Errno::Enetunreach
-            | fidl_fuchsia_posix::Errno::Ehostunreach
-            | fidl_fuchsia_posix::Errno::Eagain => tracing::trace!($fmt_str, $($arg)*),
-            // All other errnos.
-            _ => tracing::debug!($fmt_str, $($arg)*),
-        }
-    };
-}
-pub(crate) use log_errno;

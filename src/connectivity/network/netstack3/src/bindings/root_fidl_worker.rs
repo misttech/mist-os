@@ -17,7 +17,7 @@ use crate::bindings::{
     devices::{BindingId, DeviceSpecificInfo, LOOPBACK_MAC},
     interfaces_admin,
     routes::admin::{serve_route_set, GlobalRouteSet},
-    util::{IntoFidl as _, TaskWaitGroupSpawner},
+    util::{IntoFidl as _, ResultExt as _, TaskWaitGroupSpawner},
     DeviceIdExt as _, Netstack,
 };
 
@@ -36,7 +36,7 @@ pub(crate) async fn serve_interfaces(
             fnet_root::InterfacesRequest::GetMac { id, responder } => {
                 responder
                     .send(handle_get_mac(&ns, id).as_ref().map(Option::as_deref).map_err(|e| *e))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
             }
         }
         Ok(())

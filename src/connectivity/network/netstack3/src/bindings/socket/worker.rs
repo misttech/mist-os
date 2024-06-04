@@ -9,7 +9,7 @@ use fidl::endpoints::{ControlHandle, RequestStream};
 use futures::StreamExt as _;
 use tracing::error;
 
-use crate::bindings::{socket::SocketWorkerProperties, Ctx};
+use crate::bindings::{socket::SocketWorkerProperties, util::ResultExt as _, Ctx};
 
 pub(crate) struct SocketWorker<Data> {
     ctx: Ctx,
@@ -240,9 +240,7 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
                 }
                 ControlFlow::Break(close_responder) => {
                     let respond_close = move || {
-                        close_responder
-                            .send(Ok(()))
-                            .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                        close_responder.send(Ok(())).unwrap_or_log("failed to respond");
                         request_stream.control_handle().shutdown();
                     };
                     if request_streams.is_empty() {
