@@ -207,6 +207,50 @@ async fn test_start_bss_fail_bad_channel() {
 }
 
 #[fuchsia::test]
+async fn test_stop_bss() {
+    let (ap_sme_proxy, mut fullmac_driver, _generic_sme_proxy) =
+        setup_test_bss_started(FullmacDriverConfig::default_ap(), &DEFAULT_OPEN_AP_CONFIG).await;
+
+    let ap_fut = ap_sme_proxy.stop();
+    let driver_fut = async {
+        assert_variant!(fullmac_driver.request_stream.next().await,
+           fidl_fullmac::WlanFullmacImplBridgeRequest::StopBss { payload: _, responder } => {
+               responder.send().expect("Could not respond to StopBss");
+        });
+
+        fullmac_driver
+            .ifc_proxy
+            .stop_conf(&fidl_fullmac::WlanFullmacStopConfirm {
+                result_code: fidl_fullmac::WlanStopResult::Success,
+            })
+            .await
+            .expect("Could not send StopConf");
+
+        assert_variant!(fullmac_driver.request_stream.next().await,
+            fidl_fullmac::WlanFullmacImplBridgeRequest::OnLinkStateChanged { online:_ , responder } => {
+                responder.send().expect("Could not respond to OnLinkStateChanged");
+        });
+    };
+
+    let (ap_stop_result, _) = futures::join!(ap_fut, driver_fut);
+    assert_eq!(
+        ap_stop_result.expect("SME error when calling stop"),
+        fidl_sme::StopApResultCode::Success
+    );
+
+    let fullmac_request_history = fullmac_driver.request_stream.history();
+    assert_eq!(
+        fullmac_request_history[0],
+        FullmacRequest::StopBss(fidl_fullmac::WlanFullmacImplBaseStopBssRequest {
+            ssid: Some(vec_to_cssid(&DEFAULT_OPEN_AP_CONFIG.ssid)),
+            ..Default::default()
+        })
+    );
+
+    assert_eq!(fullmac_request_history[1], FullmacRequest::OnLinkStateChanged(false));
+}
+
+#[fuchsia::test]
 async fn test_remote_client_connected_open() {
     let (ap_sme_proxy, mut fullmac_driver, _generic_sme_proxy) =
         setup_test_bss_started(FullmacDriverConfig::default_ap(), &DEFAULT_OPEN_AP_CONFIG).await;
