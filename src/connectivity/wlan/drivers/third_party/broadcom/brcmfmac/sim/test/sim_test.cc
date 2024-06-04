@@ -581,6 +581,19 @@ zx_status_t SimTest::Init() {
   return ZX_OK;
 }
 
+zx_status_t SimTest::CreateFactoryClient() {
+  // Connect to the service (device connector) provided by the devfs node
+  zx::result conn_status = node_server_.SyncCall([](fdf_testing::TestNode* root_node) {
+    return root_node->children().at("factory-broadcom").ConnectToDevice();
+  });
+  EXPECT_EQ(ZX_OK, conn_status.status_value());
+  // Bind to the client end
+  fidl::ClientEnd<fuchsia_factory_wlan::Iovar> client_end(std::move(conn_status.value()));
+  factory_client_.Bind(std::move(client_end));
+  EXPECT_EQ(true, factory_client_.is_valid());
+  return ZX_OK;
+}
+
 zx_status_t SimTest::StartInterface(wlan_common::WlanMacRole role, SimInterface* sim_ifc,
                                     std::optional<common::MacAddr> mac_addr) {
   zx_status_t status;

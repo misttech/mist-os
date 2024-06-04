@@ -72,7 +72,10 @@ fuchsia_wlan_common::wire::WlanMacRole GetMacRoleForInterfaceId(uint16_t interfa
 
 }  // namespace
 
-Device::Device() : brcmf_pub_(std::make_unique<brcmf_pub>()), network_device_(this) {
+Device::Device()
+    : brcmf_pub_(std::make_unique<brcmf_pub>()),
+      network_device_(this),
+      devfs_connector_(fit::bind_member<&Device::ServeFactory>(this)) {
   brcmf_pub_->device = this;
   for (auto& entry : brcmf_pub_->if2bss) {
     entry = BRCMF_BSSIDX_INVALID;
@@ -137,10 +140,8 @@ zx_status_t Device::InitWlanPhyImpl() {
   fidl::VectorView<fuchsia_driver_framework::wire::Offer> offers(arena, 1);
   offers[0] = fdf::MakeOffer2<fuchsia_wlan_phyimpl::Service>(arena);
 
-  auto args = fdf::wire::NodeAddArgs::Builder(arena)
-                  .name("brcmfmac-wlanphyimpl")
-                  .offers2(offers)
-                  .Build();
+  auto args =
+      fdf::wire::NodeAddArgs::Builder(arena).name("brcmfmac-wlanphyimpl").offers2(offers).Build();
 
   auto endpoints = fidl::CreateEndpoints<fdf::NodeController>();
   if (endpoints.is_error()) {
@@ -205,7 +206,60 @@ void Device::InitPhyDevice() {
     NetDevInitReply(status);
     return;
   }
+  if (AddFactoryNode() != ZX_OK) {
+    BRCMF_ERR("Unable to add Factory node");
+    // Ignore this error as external tool support is a debug functionality. We do not want to
+    // prevent the driver from loading because of this error.
+  }
   NetDevInitReply(ZX_OK);
+}
+
+zx_status_t Device::AddFactoryNode() {
+  zx::result connector =
+      devfs_connector_.Bind(fdf_dispatcher_get_async_dispatcher(GetDriverDispatcher()));
+  if (connector.is_error()) {
+    BRCMF_ERR("Failed to bind devfs connecter to dispatcher: %s", connector.status_string());
+    return connector.error_value();
+  }
+
+  fidl::Arena args_arena;
+  auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(args_arena)
+                   .connector(std::move(connector.value()))
+                   .class_name("wlan-factory")
+                   .Build();
+
+  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(args_arena)
+                  .name("factory-broadcom")
+                  .devfs_args(devfs)
+                  .Build();
+
+  auto controller_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  if (controller_endpoints.is_error()) {
+    BRCMF_ERR("Create node controller end points failed: %s",
+              zx_status_get_string(controller_endpoints.error_value()));
+    return controller_endpoints.error_value();
+  }
+
+  // Create the endpoints of fuchsia_driver_framework::Node protocol for the child node, and hold
+  // the client end of it, because no driver will bind to the child node.
+  auto child_node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
+  if (child_node_endpoints.is_error()) {
+    BRCMF_ERR("Create child node end points failed: %s",
+              zx_status_get_string(child_node_endpoints.error_value()));
+    return child_node_endpoints.error_value();
+  }
+
+  // Add factory-broadcom child node.
+  auto result =
+      GetParentNode().sync()->AddChild(std::move(args), std::move(controller_endpoints->server),
+                                       std::move(child_node_endpoints->server));
+  if (!result.ok()) {
+    BRCMF_ERR("Failed to add factory child, status: %s", result.status_string());
+    return result.status();
+  }
+  factory_controller_node_.Bind(std::move(controller_endpoints->client));
+  factory_node_.Bind(std::move(child_node_endpoints->client));
+  return ZX_OK;
 }
 
 brcmf_pub* Device::drvr() { return brcmf_pub_.get(); }
@@ -608,6 +662,28 @@ std::unique_ptr<WlanInterface>* Device::GetInterfaceForId(uint16_t interface_id)
       return &ap_interface_;
     default:
       return nullptr;
+  }
+}
+
+void Device::Get(GetRequestView request, GetCompleter::Sync& completer) {
+  zx_status_t status =
+      brcmf_send_cmd_to_firmware(brcmf_pub_.get(), request->iface_idx, request->cmd,
+                                 (void*)request->request.data(), request->request.count(), false);
+  if (status == ZX_OK) {
+    completer.ReplySuccess(request->request);
+  } else {
+    completer.ReplyError(status);
+  }
+}
+
+void Device::Set(SetRequestView request, SetCompleter::Sync& completer) {
+  zx_status_t status =
+      brcmf_send_cmd_to_firmware(brcmf_pub_.get(), request->iface_idx, request->cmd,
+                                 (void*)request->request.data(), request->request.count(), true);
+  if (status == ZX_OK) {
+    completer.ReplySuccess();
+  } else {
+    completer.ReplyError(status);
   }
 }
 
