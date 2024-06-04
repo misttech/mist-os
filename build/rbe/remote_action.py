@@ -777,7 +777,6 @@ class DownloadStubInfo(object):
         e.g. the build system guarantees that action outputs
         are exclusive.  If exclusion is needed, use download_from_stub_path().
 
-
         Args:
           downloader: 'remotetool' instance to use to download.
           working_dir_abs: working dir.
@@ -853,7 +852,10 @@ def path_to_download_stub(stub_path: Path) -> Optional[DownloadStubInfo]:
 
 
 def download_from_stub_path(
-    stub_path: Path, downloader: remotetool.RemoteTool, working_dir_abs: Path
+    stub_path: Path,
+    downloader: remotetool.RemoteTool,
+    working_dir_abs: Path,
+    verbose: bool = False,
 ) -> cl_utils.SubprocessResult:
     """Possibly downloads a file over a stub link.
 
@@ -865,6 +867,7 @@ def download_from_stub_path(
       stub_path: is a path to a possible download stub.
       downloader: remotetool instance used to download.
       working_dir_abs: current working dir.
+      verbose: if True, print extra debug information.
 
     Returns:
       download exit status, or 0 if there is nothing to download.
@@ -882,7 +885,14 @@ def download_from_stub_path(
 
         stub_info = path_to_download_stub(stub_path)
         if not stub_info:
+            if verbose:
+                msg(
+                    f"    {stub_path} already exists as a normal file (not downloading)"
+                )
             return ok_result
+
+        if verbose:
+            msg(f"Downloading {stub_path}")
 
         return stub_info.download(
             downloader=downloader,
@@ -1606,6 +1616,10 @@ exec "${{cmd[@]}}"
         """Downloading inputs is useful for running local actions whose inputs
         may have come from the outputs of remote actions that opted to
         not download their outputs.
+
+        Returns:
+          Mapping of path to status.
+          Failures are always included, but successes are optional.
         """
         stub_paths = [
             path
@@ -2217,9 +2231,9 @@ def _download_input_for_mp(
 ) -> Tuple[Path, cl_utils.SubprocessResult]:
     path, downloader, working_dir_abs, verbose = packed_args
     if verbose:
-        msg(f"  Downloading input {path}")
+        msg(f"  Considering input {path}")
 
-    status = download_from_stub_path(path, downloader, working_dir_abs)
+    status = download_from_stub_path(path, downloader, working_dir_abs, verbose)
     if status.returncode != 0:  # alert, but do not fail
         msg(f"Unable to download input {path}.")
 
@@ -2254,13 +2268,22 @@ def download_input_stub_paths_batch(
     parallel: bool = True,
     verbose: bool = False,
 ) -> Dict[Path, cl_utils.SubprocessResult]:
-    """Downloads artifacts from a collection of stubs in parallel."""
+    """Downloads artifacts from a collection of stubs in parallel.
+
+    Returns:
+      Mapping of paths to status, which includes failures,
+      but not necessarily successes.
+    """
+    if verbose:
+        msg(f"Downloading potentially {len(stub_paths)} artifacts")
     download_args = [
         # args for _download_input_for_mp
         (stub_path, downloader, working_dir_abs, verbose)
         for stub_path in stub_paths
     ]
     if not download_args:
+        if verbose:
+            msg("  Nothing to download.")
         return {}
 
     if parallel:
@@ -2271,9 +2294,9 @@ def download_input_stub_paths_batch(
             if (e.errno == errno.EPERM and e.filename == "/dev/shm") or (
                 e.errno == errno.EROFS
             ):
-                if len(download_args) > 1:
+                if len(download_args) > 1 and verbose:
                     msg(
-                        "Warning: downloading sequentially instead of in parallel."
+                        f"Warning: downloading sequentially instead of in parallel: {stub_paths}."
                     )
                 statuses = map(_download_input_for_mp, download_args)
             else:
