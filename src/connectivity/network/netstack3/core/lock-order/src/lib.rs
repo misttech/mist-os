@@ -592,6 +592,14 @@ where
         let Self(t, PhantomData) = self;
         Locked(Deref::deref(t).cast_right(f), PhantomData)
     }
+
+    /// Replaces the internal type entirely but keeps the lock level.
+    ///
+    /// This does not break ordering because the new `Locked` takes a
+    /// mutable borrow on the current one.
+    pub fn replace<'a, N>(&'a mut self, n: &'a N) -> Locked<&'a N, L> {
+        Locked::new_locked(n)
+    }
 }
 
 /// An owned wrapper for `T` that implements [`Deref`].

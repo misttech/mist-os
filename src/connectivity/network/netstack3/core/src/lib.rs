@@ -47,8 +47,7 @@ pub mod device {
         mod socket;
 
         pub(crate) use base::{
-            with_device_state, with_device_state_and_core_ctx, with_ip_device_state,
-            with_ip_device_state_and_core_ctx,
+            device_state, device_state_and_core_ctx, ip_device_state, ip_device_state_and_core_ctx,
         };
     }
 

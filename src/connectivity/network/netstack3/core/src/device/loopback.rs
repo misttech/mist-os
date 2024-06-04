@@ -57,10 +57,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
         device_id: &LoopbackDeviceId<BC>,
         cb: F,
     ) -> O {
-        device::integration::with_device_state(self, device_id, |mut state| {
-            let mut x = state.lock::<crate::lock_ordering::LoopbackRxQueue>();
-            cb(&mut x)
-        })
+        let mut state = device::integration::device_state(self, device_id);
+        let mut x = state.lock::<crate::lock_ordering::LoopbackRxQueue>();
+        cb(&mut x)
     }
 }
 
@@ -81,16 +80,11 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackRxDequeue>
         device_id: &LoopbackDeviceId<BC>,
         cb: F,
     ) -> O {
-        device::integration::with_device_state_and_core_ctx(
-            self,
-            device_id,
-            |mut core_ctx_and_resource| {
-                let (mut x, mut locked) =
-                    core_ctx_and_resource
-                        .lock_with_and::<crate::lock_ordering::LoopbackRxDequeue, _>(|c| c.right());
-                cb(&mut x, &mut locked.cast_core_ctx())
-            },
-        )
+        let mut core_ctx_and_resource =
+            device::integration::device_state_and_core_ctx(self, device_id);
+        let (mut x, mut locked) = core_ctx_and_resource
+            .lock_with_and::<crate::lock_ordering::LoopbackRxDequeue, _>(|c| c.right());
+        cb(&mut x, &mut locked.cast_core_ctx())
     }
 }
 
@@ -120,10 +114,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
         device_id: &LoopbackDeviceId<BC>,
         cb: F,
     ) -> O {
-        device::integration::with_device_state(self, device_id, |mut state| {
-            let mut x = state.lock::<crate::lock_ordering::LoopbackTxQueue>();
-            cb(&mut x)
-        })
+        let mut state = device::integration::device_state(self, device_id);
+        let mut x = state.lock::<crate::lock_ordering::LoopbackTxQueue>();
+        cb(&mut x)
     }
 
     fn send_frame(
@@ -167,16 +160,11 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxDequeue>
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        device::integration::with_device_state_and_core_ctx(
-            self,
-            device_id,
-            |mut core_ctx_and_resource| {
-                let (mut x, mut locked) =
-                    core_ctx_and_resource
-                        .lock_with_and::<crate::lock_ordering::LoopbackTxDequeue, _>(|c| c.right());
-                cb(&mut x, &mut locked.cast_core_ctx())
-            },
-        )
+        let mut core_ctx_and_resource =
+            device::integration::device_state_and_core_ctx(self, device_id);
+        let (mut x, mut locked) = core_ctx_and_resource
+            .lock_with_and::<crate::lock_ordering::LoopbackTxDequeue, _>(|c| c.right());
+        cb(&mut x, &mut locked.cast_core_ctx())
     }
 }
 

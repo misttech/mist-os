@@ -17,6 +17,7 @@ use packet::Buf;
 
 use crate::{
     device::{
+        self,
         pure_ip::{
             DynamicPureIpDeviceState, PureIpDevice, PureIpDeviceCounters, PureIpDeviceId,
             PureIpDeviceStateContext, PureIpDeviceTxQueueFrameMetadata, PureIpPrimaryDeviceId,
@@ -109,10 +110,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceTxQueu
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        crate::device::integration::with_device_state(self, device_id, |mut state| {
-            let mut x = state.lock::<crate::lock_ordering::PureIpDeviceTxQueue>();
-            cb(&mut x)
-        })
+        let mut state = device::integration::device_state(self, device_id);
+        let mut x = state.lock::<crate::lock_ordering::PureIpDeviceTxQueue>();
+        cb(&mut x)
     }
 
     fn send_frame(
@@ -143,17 +143,11 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceTxDequ
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        crate::device::integration::with_device_state_and_core_ctx(
-            self,
-            device_id,
-            |mut core_ctx_and_resource| {
-                let (mut x, mut locked) = core_ctx_and_resource
-                    .lock_with_and::<crate::lock_ordering::PureIpDeviceTxDequeue, _>(
-                    |c| c.right(),
-                );
-                cb(&mut x, &mut locked.cast_core_ctx())
-            },
-        )
+        let mut core_ctx_and_resource =
+            device::integration::device_state_and_core_ctx(self, device_id);
+        let (mut x, mut locked) = core_ctx_and_resource
+            .lock_with_and::<crate::lock_ordering::PureIpDeviceTxDequeue, _>(|c| c.right());
+        cb(&mut x, &mut locked.cast_core_ctx())
     }
 }
 
@@ -193,10 +187,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceDynami
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        crate::device::integration::with_device_state(self, device_id, |mut state| {
-            let dynamic_state = state.read_lock::<crate::lock_ordering::PureIpDeviceDynamicState>();
-            cb(&dynamic_state)
-        })
+        let mut state = device::integration::device_state(self, device_id);
+        let dynamic_state = state.read_lock::<crate::lock_ordering::PureIpDeviceDynamicState>();
+        cb(&dynamic_state)
     }
 
     fn with_pure_ip_state_mut<O, F: FnOnce(&mut DynamicPureIpDeviceState) -> O>(
@@ -204,10 +197,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceDynami
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        crate::device::integration::with_device_state(self, device_id, |mut state| {
-            let mut dynamic_state =
-                state.write_lock::<crate::lock_ordering::PureIpDeviceDynamicState>();
-            cb(&mut dynamic_state)
-        })
+        let mut state = device::integration::device_state(self, device_id);
+        let mut dynamic_state =
+            state.write_lock::<crate::lock_ordering::PureIpDeviceDynamicState>();
+        cb(&mut dynamic_state)
     }
 }

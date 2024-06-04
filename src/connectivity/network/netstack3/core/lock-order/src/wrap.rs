@@ -337,6 +337,15 @@ where
     {
         Self::wrap_cast(self.get_mut().cast_right(f))
     }
+
+    /// Like [`Locked::replace`].
+    fn replace<'a, N>(&'a mut self, n: &'a N) -> Self::CastWrapper<&'a N>
+    where
+        L: 'a,
+        T: 'a,
+    {
+        Self::wrap_cast(self.get_mut().replace(n))
+    }
 }
 
 impl<T, L, O> LockedWrapperApi<T, L> for O
@@ -598,6 +607,15 @@ pub mod disable {
             T: Deref<Target = TupleWrapper<A, B>> + 'a,
         {
             Self::wrap_cast(self.get_mut().cast_right(f))
+        }
+
+        /// Like [`Locked::replace`].
+        fn replace<'a, N>(&'a mut self, n: &'a N) -> Self::CastWrapper<&'a N>
+        where
+            L: 'a,
+            T: 'a,
+        {
+            Self::wrap_cast(self.get_mut().replace(n))
         }
     }
 

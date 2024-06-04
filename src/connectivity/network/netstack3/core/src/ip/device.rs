@@ -131,28 +131,23 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
     fn for_each_addr_mut<F: FnMut(SlaacAddressEntryMut<'_, BC::Instant>)>(&mut self, mut cb: F) {
         let SlaacAddrs { core_ctx, device_id, config: _ } = self;
         let CoreCtxWithIpDeviceConfiguration { config: _, core_ctx } = core_ctx;
-        crate::device::integration::with_ip_device_state(core_ctx, device_id, |mut state| {
-            let (addrs, mut locked) =
-                state.read_lock_and::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>();
-            addrs.iter().for_each(|entry| {
-                let addr_sub = *entry.addr_sub();
-                let mut locked = locked.adopt(&**entry);
-                let mut state = locked
-                    .write_lock_with::<crate::lock_ordering::Ipv6DeviceAddressState, _>(|c| {
-                        c.right()
-                    });
-                let Ipv6AddressState {
-                    config,
-                    flags: Ipv6AddressFlags { deprecated, assigned: _ },
-                } = &mut *state;
+        let mut state = crate::device::integration::ip_device_state(core_ctx, device_id);
+        let (addrs, mut locked) =
+            state.read_lock_and::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>();
+        addrs.iter().for_each(|entry| {
+            let addr_sub = *entry.addr_sub();
+            let mut locked = locked.adopt(&**entry);
+            let mut state = locked
+                .write_lock_with::<crate::lock_ordering::Ipv6DeviceAddressState, _>(|c| c.right());
+            let Ipv6AddressState { config, flags: Ipv6AddressFlags { deprecated, assigned: _ } } =
+                &mut *state;
 
-                match config {
-                    Some(Ipv6AddrConfig::Slaac(config)) => {
-                        cb(SlaacAddressEntryMut { addr_sub, config, deprecated })
-                    }
-                    None | Some(Ipv6AddrConfig::Manual(_)) => {}
+            match config {
+                Some(Ipv6AddrConfig::Slaac(config)) => {
+                    cb(SlaacAddressEntryMut { addr_sub, config, deprecated })
                 }
-            })
+                None | Some(Ipv6AddrConfig::Manual(_)) => {}
+            }
         })
     }
 
@@ -249,11 +244,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>
         device: &Self::DeviceId,
         cb: F,
     ) -> O {
-        crate::device::integration::with_ip_device_state(self, device, |mut state| {
-            let state = state.read_lock::<crate::lock_ordering::IpDeviceGmp<Ipv4>>();
-            let IpDeviceMulticastGroups { groups, .. } = &*state;
-            cb(groups)
-        })
+        let mut state = crate::device::integration::ip_device_state(self, device);
+        let state = state.read_lock::<crate::lock_ordering::IpDeviceGmp<Ipv4>>();
+        let IpDeviceMulticastGroups { groups, .. } = &*state;
+        cb(groups)
     }
 }
 
@@ -268,11 +262,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>
         device: &Self::DeviceId,
         cb: F,
     ) -> O {
-        crate::device::integration::with_ip_device_state(self, device, |mut state| {
-            let state = state.read_lock::<crate::lock_ordering::IpDeviceGmp<Ipv6>>();
-            let IpDeviceMulticastGroups { groups, .. } = &*state;
-            cb(&groups)
-        })
+        let mut state = crate::device::integration::ip_device_state(self, device);
+        let state = state.read_lock::<crate::lock_ordering::IpDeviceGmp<Ipv6>>();
+        let IpDeviceMulticastGroups { groups, .. } = &*state;
+        cb(&groups)
     }
 }
 
@@ -562,10 +555,9 @@ impl<'a, I: gmp::IpExt + IpDeviceIpExt, BC: BindingsContext>
         cb: F,
     ) -> O {
         let Self { config, core_ctx } = self;
-        crate::device::integration::with_ip_device_state(core_ctx, device_id, |mut state| {
-            let mut flags = state.lock::<crate::lock_ordering::IpDeviceFlags<I>>();
-            cb(*config, &mut *flags)
-        })
+        let mut state = crate::device::integration::ip_device_state(core_ctx, device_id);
+        let mut flags = state.lock::<crate::lock_ordering::IpDeviceFlags<I>>();
+        cb(*config, &mut *flags)
     }
 }
 
@@ -635,30 +627,25 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
             ip_config: _,
         } = *config;
 
-        crate::device::integration::with_ip_device_state_and_core_ctx(
-            core_ctx,
-            device_id,
-            |mut core_ctx_and_resource| {
-                let (mut state, mut locked) =
-                    core_ctx_and_resource
-                        .lock_with_and::<crate::lock_ordering::Ipv6DeviceSlaac, _>(|x| x.right());
-                let core_ctx =
-                    CoreCtxWithIpDeviceConfiguration { config, core_ctx: locked.cast_core_ctx() };
+        let mut core_ctx_and_resource =
+            crate::device::integration::ip_device_state_and_core_ctx(core_ctx, device_id);
+        let (mut state, mut locked) = core_ctx_and_resource
+            .lock_with_and::<crate::lock_ordering::Ipv6DeviceSlaac, _>(|x| x.right());
+        let core_ctx =
+            CoreCtxWithIpDeviceConfiguration { config, core_ctx: locked.cast_core_ctx() };
 
-                let mut addrs = SlaacAddrs { core_ctx, device_id: device_id.clone(), config };
+        let mut addrs = SlaacAddrs { core_ctx, device_id: device_id.clone(), config };
 
-                cb(
-                    SlaacAddrsMutAndConfig {
-                        addrs: &mut addrs,
-                        config: slaac_config,
-                        dad_transmits,
-                        retrans_timer,
-                        interface_identifier,
-                        _marker: PhantomData,
-                    },
-                    &mut state,
-                )
+        cb(
+            SlaacAddrsMutAndConfig {
+                addrs: &mut addrs,
+                config: slaac_config,
+                dad_transmits,
+                retrans_timer,
+                interface_identifier,
+                _marker: PhantomData,
             },
+            &mut state,
         )
     }
 }
@@ -824,10 +811,9 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
         cb: F,
     ) -> O {
         let Self { config, core_ctx } = self;
-        crate::device::integration::with_ip_device_state(core_ctx, device_id, |mut state| {
-            let mut state = state.lock::<crate::lock_ordering::Ipv6DeviceRouterSolicitations>();
-            cb(&mut state, Borrow::borrow(&*config).max_router_solicitations)
-        })
+        let mut state = crate::device::integration::ip_device_state(core_ctx, device_id);
+        let mut state = state.lock::<crate::lock_ordering::Ipv6DeviceRouterSolicitations>();
+        cb(&mut state, Borrow::borrow(&*config).max_router_solicitations)
     }
 
     fn get_link_layer_addr_bytes(
@@ -959,17 +945,13 @@ impl<'a, Config, BC: BindingsContext> Ipv6RouteDiscoveryContext<BC>
         cb: F,
     ) -> O {
         let Self { config: _, core_ctx } = self;
-        crate::device::integration::with_ip_device_state_and_core_ctx(
-            core_ctx,
-            device_id,
-            |mut core_ctx_and_resource| {
-                let (mut state, mut locked) = core_ctx_and_resource
-                    .lock_with_and::<crate::lock_ordering::Ipv6DeviceRouteDiscovery, _>(
-                    |x| x.right(),
-                );
-                cb(&mut state, &mut locked.cast_core_ctx())
-            },
-        )
+        let mut core_ctx_and_resource =
+            crate::device::integration::ip_device_state_and_core_ctx(core_ctx, device_id);
+
+        let (mut state, mut locked) =
+            core_ctx_and_resource
+                .lock_with_and::<crate::lock_ordering::Ipv6DeviceRouteDiscovery, _>(|x| x.right());
+        cb(&mut state, &mut locked.cast_core_ctx())
     }
 }
 
@@ -1194,18 +1176,17 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpConte
             ip_config: IpDeviceConfiguration { gmp_enabled, forwarding_enabled: _ },
         } = Borrow::borrow(&*config);
 
-        crate::device::integration::with_ip_device_state(core_ctx, device, |mut state| {
-            // Note that changes to `ip_enabled` is not possible in this context
-            // since IP enabled changes are only performed while the IP device
-            // configuration lock is held exclusively. Since we have access to
-            // the IP device configuration here (`config`), we know changes to
-            // IP enabled are not possible.
-            let ip_enabled = state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv4>>().ip_enabled;
-            let mut state = state.write_lock::<crate::lock_ordering::IpDeviceGmp<Ipv4>>();
-            let IpDeviceMulticastGroups { groups, gmp, gmp_proto } = &mut *state;
-            let enabled = ip_enabled && *gmp_enabled;
-            cb(GmpStateRef { enabled, groups, gmp }, gmp_proto)
-        })
+        let mut state = crate::device::integration::ip_device_state(core_ctx, device);
+        // Note that changes to `ip_enabled` is not possible in this context
+        // since IP enabled changes are only performed while the IP device
+        // configuration lock is held exclusively. Since we have access to
+        // the IP device configuration here (`config`), we know changes to
+        // IP enabled are not possible.
+        let ip_enabled = state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv4>>().ip_enabled;
+        let mut state = state.write_lock::<crate::lock_ordering::IpDeviceGmp<Ipv4>>();
+        let IpDeviceMulticastGroups { groups, gmp, gmp_proto } = &mut *state;
+        let enabled = ip_enabled && *gmp_enabled;
+        cb(GmpStateRef { enabled, groups, gmp }, gmp_proto)
     }
 
     fn get_ip_addr_subnet(&mut self, device: &Self::DeviceId) -> Option<AddrSubnet<Ipv4Addr>> {
@@ -1234,13 +1215,12 @@ impl<
             ip_config: IpDeviceConfiguration { gmp_enabled, forwarding_enabled: _ },
         } = Borrow::borrow(&*config);
 
-        crate::device::integration::with_ip_device_state(core_ctx, device, |mut state| {
-            let ip_enabled = state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv6>>().ip_enabled;
-            let mut state = state.write_lock::<crate::lock_ordering::IpDeviceGmp<Ipv6>>();
-            let IpDeviceMulticastGroups { groups, gmp, .. } = &mut *state;
-            let enabled = ip_enabled && *gmp_enabled;
-            cb(GmpStateRef { enabled, groups, gmp })
-        })
+        let mut state = crate::device::integration::ip_device_state(core_ctx, device);
+        let ip_enabled = state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv6>>().ip_enabled;
+        let mut state = state.write_lock::<crate::lock_ordering::IpDeviceGmp<Ipv6>>();
+        let IpDeviceMulticastGroups { groups, gmp, .. } = &mut *state;
+        let enabled = ip_enabled && *gmp_enabled;
+        cb(GmpStateRef { enabled, groups, gmp })
     }
 
     fn get_ipv6_link_local_addr(

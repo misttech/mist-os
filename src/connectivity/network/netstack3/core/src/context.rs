@@ -179,11 +179,6 @@ mod locked {
         T: Deref<Target = TupleWrapper<&'a StackState<BT>, &'a R>>,
         BT: BindingsTypes,
     {
-        pub(crate) fn cast_resource(&mut self) -> Locked<&'_ R, L> {
-            let Self(locked) = self;
-            Locked(locked.cast_with(|c| c.right()))
-        }
-
         pub(crate) fn cast_core_ctx(&mut self) -> CoreCtx<'_, BT, L> {
             let Self(locked) = self;
             crate::CoreCtx::<BT, L>::wrap(locked.cast_with(|c| c.left()))

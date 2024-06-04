@@ -123,17 +123,15 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSockets>>
         for_any_device_id!(
             DeviceId,
             device,
-            device => device::integration::with_device_state_and_core_ctx(
-                self,
-                device,
-                |mut core_ctx_and_resource| {
-                    let (device_sockets, mut locked) = core_ctx_and_resource
-                        .read_lock_with_and::<crate::lock_ordering::DeviceSockets, _>(
-                        |c| c.right(),
-                    );
-                    cb(&*device_sockets, &mut locked.cast_core_ctx())
-                },
-            )
+            device => {
+                let mut core_ctx_and_resource =
+                    device::integration::device_state_and_core_ctx(self, device);
+                let (device_sockets, mut locked) = core_ctx_and_resource
+                    .read_lock_with_and::<crate::lock_ordering::DeviceSockets, _>(
+                    |c| c.right(),
+                );
+                cb(&*device_sockets, &mut locked.cast_core_ctx())
+            }
         )
     }
 
@@ -148,17 +146,15 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSockets>>
         for_any_device_id!(
             DeviceId,
             device,
-            device => device::integration::with_device_state_and_core_ctx(
-                self,
-                device,
-                |mut core_ctx_and_resource| {
-                    let (mut device_sockets, mut locked) = core_ctx_and_resource
-                        .write_lock_with_and::<crate::lock_ordering::DeviceSockets, _>(
-                        |c| c.right(),
-                    );
-                    cb(&mut *device_sockets, &mut locked.cast_core_ctx())
-                },
-            )
+            device => {
+                let mut core_ctx_and_resource =
+                    device::integration::device_state_and_core_ctx(self, device);
+                let (mut device_sockets, mut locked) = core_ctx_and_resource
+                    .write_lock_with_and::<crate::lock_ordering::DeviceSockets, _>(
+                    |c| c.right(),
+                );
+                cb(&mut *device_sockets, &mut locked.cast_core_ctx())
+            }
         )
     }
 }
