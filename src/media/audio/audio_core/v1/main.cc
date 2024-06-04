@@ -25,7 +25,8 @@ namespace media::audio {
 constexpr char kProcessConfigPath[] = "/config/data/audio_core_config.json";
 
 static int StartAudioCore(const fxl::CommandLine& cl) {
-  fuchsia_logging::SetLogSettings({.min_log_level = fuchsia_logging::LOG_INFO}, {"audio_core"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithMinLogSeverity(fuchsia_logging::LOG_INFO).BuildAndInitializeWithTags({"audio_core"});
 
   FX_LOGS(INFO) << "AudioCore starting up";
 
