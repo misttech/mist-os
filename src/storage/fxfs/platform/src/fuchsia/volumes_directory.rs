@@ -120,27 +120,25 @@ impl MountedVolumesGuard<'_> {
             !self.mounted_volumes.contains_key(&store.store_object_id()),
             FxfsError::AlreadyBound
         );
-        if as_blob {
-            let volume = self
-                .mount_store::<BlobDirectory>(name, store, MemoryPressureConfig::default())
-                .await?;
-            if let Some((profile_name, _)) = &(*self.volumes_directory.profiling_state.lock().await)
-            {
-                if let Err(e) = volume
-                    .volume()
-                    .record_or_replay_profile(new_profile_state(true), profile_name)
-                    .await
-                {
-                    error!(
-                        "Failed to record or replay profile '{}' for volume {}: {:?}",
-                        profile_name, name, e
-                    );
-                }
-            }
-            Ok(volume)
+        let volume = if as_blob {
+            self.mount_store::<BlobDirectory>(name, store, MemoryPressureConfig::default()).await?
         } else {
-            self.mount_store::<FxDirectory>(name, store, MemoryPressureConfig::default()).await
+            self.mount_store::<FxDirectory>(name, store, MemoryPressureConfig::default()).await?
+        };
+        // If there is an ongoing profile activity, we should apply it to the mounted volume.
+        if let Some((profile_name, _)) = &(*self.volumes_directory.profiling_state.lock().await) {
+            if let Err(e) = volume
+                .volume()
+                .record_or_replay_profile(new_profile_state(as_blob), profile_name)
+                .await
+            {
+                error!(
+                    "Failed to record or replay profile '{}' for volume {}: {:?}",
+                    profile_name, name, e
+                );
+            }
         }
+        Ok(volume)
     }
 
     // Mounts the given store.  A lock *must* be held on the volume directory.
@@ -309,18 +307,18 @@ impl VolumesDirectory {
         let mut state = self.profiling_state.lock().await;
         if state.is_none() {
             for (_, (volume_name, volume_and_root)) in &*volumes {
-                if volume_and_root.root().clone().into_any().downcast::<BlobDirectory>().is_ok() {
-                    // Just log the errors, don't stop half-way.
-                    if let Err(e) = volume_and_root
-                        .volume()
-                        .record_or_replay_profile(new_profile_state(true), &name)
-                        .await
-                    {
-                        error!(
-                            "Failed to record or replay profile '{}' for volume {}: {:?}",
-                            &name, volume_name, e
-                        );
-                    }
+                let is_blob =
+                    volume_and_root.root().clone().into_any().downcast::<BlobDirectory>().is_ok();
+                // Just log the errors, don't stop half-way.
+                if let Err(e) = volume_and_root
+                    .volume()
+                    .record_or_replay_profile(new_profile_state(is_blob), &name)
+                    .await
+                {
+                    error!(
+                        "Failed to record or replay profile '{}' for volume {}: {:?}",
+                        &name, volume_name, e
+                    );
                 }
             }
             let this = self.clone();
@@ -1828,7 +1826,7 @@ mod tests {
             volumes_directory
                 .delete_profile(PREMOUNT_NOBLOB, RECORDING_NAME)
                 .await
-                .expect_err("Profile should not exist");
+                .expect("Finding profile to delete.");
             volumes_directory
                 .delete_profile(LIVE_BLOB, RECORDING_NAME)
                 .await
@@ -1836,7 +1834,7 @@ mod tests {
             volumes_directory
                 .delete_profile(LIVE_NOBLOB, RECORDING_NAME)
                 .await
-                .expect_err("Profile should not exist");
+                .expect("Finding profile to delete.");
 
             volumes_directory.terminate().await;
         }
