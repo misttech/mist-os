@@ -240,13 +240,20 @@ template("generate_fuchsia-hwinfo-tests") {
 
 template("generate_pkgdir-tests") {
   forward_variables_from(invoker, [ "test_info" ])
-  fuchsia_package_with_test(target_name) {
-    subpackages = [
-      test_info.target_label,
-      "//src/sys/pkg/tests/pkgdir/test_realm_proxy",
-    ]
-    test_component = "//src/sys/pkg/tests/pkgdir:test-root"
-    test_component_name = "test-root.cm"
+  if (defined(invoker.api_level) && invoker.api_level == "15") {
+    # TODO(https://fxbug.dev/335307425): Remove this when F15 is no longer supported.
+    not_needed([ "test_info" ])
+    group(target_name) {
+    }
+  } else {
+    fuchsia_package_with_test(target_name) {
+      subpackages = [
+        test_info.target_label,
+        "//src/sys/pkg/tests/pkgdir/test_realm_proxy",
+      ]
+      test_component = "//src/sys/pkg/tests/pkgdir:test-root"
+      test_component_name = "test-root.cm"
+    }
   }
 }
 
