@@ -15,7 +15,7 @@ use crate::{
     task::{CurrentTask, ExitStatus, StopState, Task, TaskFlags, TaskWriteGuard},
 };
 use extended_pstate::ExtendedPstateState;
-use starnix_logging::{log_error, log_trace, log_warn};
+use starnix_logging::{log_trace, log_warn};
 use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
@@ -298,14 +298,6 @@ pub fn deliver_signal(
                 return Some(ExitStatus::Kill(siginfo));
             }
             DeliveryAction::CoreDump => {
-                if task.kernel().features.log_dump_on_exit {
-                    log_error!(
-                        "DUMP_ON_EXIT from signal (siginfo: {:?}) (registers: {:?})",
-                        siginfo,
-                        registers
-                    );
-                    debug::backtrace_request_current_thread();
-                }
                 task_state.set_flags(TaskFlags::DUMP_ON_EXIT, true);
                 drop(task_state);
                 return Some(ExitStatus::CoreDump(siginfo));

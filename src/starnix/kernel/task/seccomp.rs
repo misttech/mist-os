@@ -20,7 +20,7 @@ use ebpf::{
     program::EbpfProgram,
 };
 use starnix_lifecycle::AtomicU64Counter;
-use starnix_logging::{log_error, log_warn, track_stub};
+use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked, WriteOps};
 use starnix_syscalls::{decls::Syscall, SyscallArg, SyscallResult};
 use starnix_uapi::{
@@ -424,10 +424,6 @@ impl SeccompState {
                 let mut task_state = current_task.write();
 
                 if is_last_thread {
-                    if current_task.kernel().features.log_dump_on_exit {
-                        log_error!("DUMP_ON_EXIT from SECCOMP kill-thread");
-                        debug::backtrace_request_current_thread();
-                    }
                     task_state.set_flags(TaskFlags::DUMP_ON_EXIT, true);
                     task_state.set_exit_status_if_not_already(ExitStatus::CoreDump(siginfo));
                 } else {

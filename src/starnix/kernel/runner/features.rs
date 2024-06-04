@@ -99,7 +99,6 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             ("magma", _) => features.magma = true,
             ("gfxstream", _) => features.gfxstream = true,
             ("bpf", Some(version)) => features.kernel.bpf_v2 = version == "v2",
-            ("log_dump_on_exit", _) => features.kernel.log_dump_on_exit = true,
             ("perfetto", Some(socket_path)) => {
                 features.perfetto = Some(socket_path.into());
             }
