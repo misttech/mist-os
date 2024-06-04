@@ -535,7 +535,6 @@ mod test {
     }
 
     #[fasync::run_singlethreaded(test)]
-    #[ignore = "TODO(https://fxbug.dev/344009079): Learn cause of whitespace difference and fix"]
     async fn test_package_list_including_components() {
         let tmp = tempfile::tempdir().unwrap();
         let env = setup_repo(tmp.path()).await;
@@ -568,9 +567,11 @@ mod test {
         assert_eq!(
             stdout,
             format!(
-                " NAME        SIZE      HASH         MODIFIED                         COMPONENTS \n \
+                " NAME        SIZE      HASH         {:1$}  COMPONENTS \n \
                 package1/0  24.03 KB  {pkg1_hash}  {pkg1_modified}  meta/package1.cm \n \
                 package2/0  24.03 KB  {pkg2_hash}  {pkg2_modified}  meta/package2.cm \n",
+                "MODIFIED",
+                pkg1_modified.len().max(pkg2_modified.len())
             ),
         );
 
