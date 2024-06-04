@@ -3226,6 +3226,8 @@ static bool vmo_lookup_compressed_pages_test() {
 static bool vmo_write_does_not_commit_test() {
   BEGIN_TEST;
 
+  AutoVmScannerDisable scanner_disable;
+
   // Create a vmo and commit a page to it.
   fbl::RefPtr<VmObjectPaged> vmo;
   zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE, &vmo);
