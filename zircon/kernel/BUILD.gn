@@ -857,7 +857,7 @@ if (is_kernel) {
     testonly = true
 
     script = "big-kernel.py"
-    outputs = [ "$target_gen_dir/$target_name" ]
+    outputs = [ "$target_out_dir/$target_name" ]
     depfile = "${outputs[0]}.d"
     deps = [ ":zbizircon.rsp" ]
     sources = get_target_outputs(deps[0])

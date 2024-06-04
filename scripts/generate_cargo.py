@@ -220,6 +220,11 @@ def get_cfgs(rustflags):
             # of no use to cargo.
             if match.group(1) != "__rust_toolchain":
                 cfgs.append(f"{match.group(1)}={match.group(2)}")
+        elif flag.startswith("@"):
+            with open(flag[1:]) as f:
+                for line in f:
+                    if line.startswith("--cfg="):
+                        cfgs.append(line[len("--cfg=") :])
         elif flag.startswith("--cfg="):
             cfgs.append(flag[len("--cfg=") :])
     return cfgs
