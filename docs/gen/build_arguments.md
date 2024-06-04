@@ -398,7 +398,7 @@ to stdout/stderr during the Ninja build.
 
 **Current value (from the default):** `false`
 
-From //build/bazel/bazel_action.gni:19
+From //build/bazel/bazel_action.gni:18
 
 ### bazel_upload_build_events
 
@@ -7529,7 +7529,7 @@ From //sdk/config.gni:13
 
 Identifier for the Core SDK.
 
-**Current value (from the default):** `"20.99991231.0.1"`
+**Current value (from the default):** `"21.99991231.0.1"`
 
 From //sdk/config.gni:7
 
@@ -8415,7 +8415,7 @@ From //build/toolchain/goma.gni:13
 
 **Current value (from the default):** `false`
 
-From //zircon/system/ulib/c/libc.gni:18
+From //zircon/system/ulib/c/libc.gni:19
 
 ### use_null_vulkan_on_host
 
