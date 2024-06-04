@@ -10,12 +10,12 @@
 #include <lib/async/dispatcher.h>
 #include <lib/fpromise/barrier.h>
 #include <lib/fpromise/promise.h>
+#include <lib/fpromise/scope.h>
 
 #include <memory>
 #include <string>
 
 #include "src/developer/forensics/utils/errors.h"
-#include "src/lib/fxl/memory/weak_ptr.h"
 
 namespace forensics::exceptions::handler {
 
@@ -38,6 +38,10 @@ class WakeLease {
   fpromise::promise<fidl::ClientEnd<::fuchsia_power_broker::LeaseControl>, Error> Acquire();
 
  private:
+  // "Unsafe" because it does not have scoping to prevent |this| from being accessed in promise
+  // continutations.
+  fpromise::promise<fidl::ClientEnd<::fuchsia_power_broker::LeaseControl>, Error> UnsafeAcquire();
+
   // Adds a power element to the topology that passively depends on ExecutionState. The promise
   // returned needs scheduled on an executor and will complete ok if the power element is
   // successfully added to the topology. If there is an error, the promise will return an error
@@ -64,7 +68,9 @@ class WakeLease {
   fidl::ClientEnd<fuchsia_power_broker::ElementControl> element_control_channel_;
   fidl::Client<fuchsia_power_broker::Lessor> lessor_;
 
-  fxl::WeakPtrFactory<WakeLease> ptr_factory_{this};
+  // Enables this to be safely captured in promises returned by Acquire. Any public method that
+  // returns a promise must wrap it with |scope_|.
+  fpromise::scope scope_;
 };
 
 }  // namespace forensics::exceptions::handler

@@ -81,20 +81,16 @@ WakeLease::WakeLease(async_dispatcher_t* dispatcher, const std::string& power_el
       topology_(std::move(topology_client_end), dispatcher_, topology_event_handler_.get()) {}
 
 fpromise::promise<fidl::ClientEnd<fpb::LeaseControl>, Error> WakeLease::Acquire() {
+  return UnsafeAcquire().wrap_with(scope_);
+}
+
+fpromise::promise<fidl::ClientEnd<fpb::LeaseControl>, Error> WakeLease::UnsafeAcquire() {
   if (add_power_element_called_) {
     return DoAcquireLease();
   }
 
-  auto self = ptr_factory_.GetWeakPtr();
   return AddPowerElement()
-      .and_then([self]() -> fpromise::promise<fidl::ClientEnd<fpb::LeaseControl>, Error> {
-        if (!self) {
-          return fpromise::make_result_promise<fidl::ClientEnd<fpb::LeaseControl>, Error>(
-              fpromise::error(Error::kLogicError));
-        }
-
-        return self->DoAcquireLease();
-      })
+      .and_then([this]() { return DoAcquireLease(); })
       .or_else([](const Error& add_element_error) {
         return fpromise::make_result_promise<fidl::ClientEnd<fpb::LeaseControl>, Error>(
             fpromise::error(add_element_error));
@@ -111,14 +107,9 @@ fpromise::promise<void, Error> WakeLease::AddPowerElement() {
   //
   // TODO(https://fxbug.dev/341104129): connect to SAG here instead of injecting the connection in
   // the constructor. Disconnect once no longer needed.
-  auto self = ptr_factory_.GetWeakPtr();
   sag_->GetPowerElements().Then(
-      [self, completer = std::move(bridge.completer)](
+      [this, completer = std::move(bridge.completer)](
           fidl::Result<fps::ActivityGovernor::GetPowerElements>& result) mutable {
-        if (!self) {
-          return;
-        }
-
         if (result.is_error()) {
           FX_LOGS(ERROR) << "Failed to retrieve power elements: "
                          << result.error_value().FormatDescription();
@@ -142,29 +133,25 @@ fpromise::promise<void, Error> WakeLease::AddPowerElement() {
 
         fpb::ElementSchema schema =
             BuildSchema(std::move(result->execution_state()->passive_dependency_token()).value(),
-                        std::move(endpoints->server), self->power_element_name_);
+                        std::move(endpoints->server), power_element_name_);
 
         // TODO(https://fxbug.dev/341104129): connect to topology here instead of injecting the
         // connection in the constructor. Disconnect once no longer needed.
-        self->topology_->AddElement(std::move(schema))
-            .Then([self, completer = std::move(completer),
-                   client_end = std::move(endpoints->client)](
-                      fidl::Result<fpb::Topology::AddElement>& result) mutable {
-              if (!self) {
-                return;
-              }
+        topology_->AddElement(std::move(schema))
+            .Then(
+                [this, completer = std::move(completer), client_end = std::move(endpoints->client)](
+                    fidl::Result<fpb::Topology::AddElement>& result) mutable {
+                  if (result.is_error()) {
+                    FX_LOGS(ERROR) << "Failed to add element to topology: "
+                                   << result.error_value().FormatDescription();
+                    completer.complete_error(Error::kBadValue);
+                    return;
+                  }
 
-              if (result.is_error()) {
-                FX_LOGS(ERROR) << "Failed to add element to topology: "
-                               << result.error_value().FormatDescription();
-                completer.complete_error(Error::kBadValue);
-                return;
-              }
-
-              self->element_control_channel_ = std::move(result.value().element_control_channel());
-              self->lessor_ = fidl::Client<fpb::Lessor>(std::move(client_end), self->dispatcher_);
-              completer.complete_ok();
-            });
+                  element_control_channel_ = std::move(result.value().element_control_channel());
+                  lessor_ = fidl::Client<fpb::Lessor>(std::move(client_end), dispatcher_);
+                  completer.complete_ok();
+                });
       });
 
   return bridge.consumer.promise_or(fpromise::error(Error::kLogicError))
@@ -172,23 +159,17 @@ fpromise::promise<void, Error> WakeLease::AddPowerElement() {
 }
 
 fpromise::promise<fidl::ClientEnd<fpb::LeaseControl>, Error> WakeLease::DoAcquireLease() {
-  auto self = ptr_factory_.GetWeakPtr();
   return add_power_element_barrier_.sync().then(
-      [self](const fpromise::result<>& result) mutable
+      [this](const fpromise::result<>& result) mutable
       -> fpromise::promise<fidl::ClientEnd<fpb::LeaseControl>, Error> {
-        if (!self) {
-          return fpromise::make_result_promise<fidl::ClientEnd<fpb::LeaseControl>, Error>(
-              fpromise::error(Error::kLogicError));
-        }
-
-        if (!self->lessor_.is_valid()) {
+        if (!lessor_.is_valid()) {
           // Power element addition must have failed.
           FX_LOGS(ERROR) << "Failed to acquire wake lease because Lessor client is not valid.";
           return fpromise::make_result_promise<fidl::ClientEnd<fpb::LeaseControl>, Error>(
               fpromise::error(Error::kBadValue));
         }
 
-        return fidl_fpromise::as_promise(self->lessor_->Lease(kPowerLevelActive))
+        return fidl_fpromise::as_promise(lessor_->Lease(kPowerLevelActive))
             .and_then([](fpb::LessorLeaseResponse& result) {
               // TODO(https://fxbug.dev/341104129): Call LeaseControl::WatchStatus to wait until
               // LeaseStatus is SATISFIED.
