@@ -81,6 +81,8 @@ if (is_host) {
     testonly = true
     deps = [
       ":lib_test",
+      "./interface:tests",
+      "./transport/factory:tests",
       "./transport/interface:tests",
     ]
   }

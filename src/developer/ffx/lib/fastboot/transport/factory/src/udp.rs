@@ -143,7 +143,7 @@ mod test {
             node_name: Some("jod".to_string()),
             state: TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "".to_string(),
-                connection_state: FastbootConnectionState::Udp(addr)
+                connection_state: FastbootConnectionState::Udp(vec![addr])
             })
         }));
         // Fails: wrong name
@@ -151,7 +151,7 @@ mod test {
             node_name: Some("Wake".to_string()),
             state: TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "".to_string(),
-                connection_state: FastbootConnectionState::Udp(addr)
+                connection_state: FastbootConnectionState::Udp(vec![addr])
             })
         }));
         // Fails: wrong state
@@ -159,7 +159,7 @@ mod test {
             node_name: Some("jod".to_string()),
             state: TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "".to_string(),
-                connection_state: FastbootConnectionState::Tcp(addr)
+                connection_state: FastbootConnectionState::Tcp(vec![addr])
             })
         }));
         // Fails: Bad name
@@ -167,7 +167,7 @@ mod test {
             node_name: None,
             state: TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "".to_string(),
-                connection_state: FastbootConnectionState::Udp(addr)
+                connection_state: FastbootConnectionState::Udp(vec![addr])
             })
         }));
         Ok(())

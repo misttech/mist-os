@@ -150,33 +150,32 @@ impl InterfaceFactory<AsyncInterface> for UsbFactory {}
 mod test {
     use super::*;
     use anyhow::anyhow;
-    use std::sync::{Arc, Mutex};
 
     ///////////////////////////////////////////////////////////////////////////////
     // UsbTargetHandler
     //
 
-    #[test]
-    fn handle_target_test() -> Result<()> {
+    #[fuchsia::test]
+    async fn handle_target_test() -> Result<()> {
         let target_serial = "1234567890".to_string();
 
         let (tx, mut rx) = channel::<()>();
         let mut handler = UsbTargetHandler { tx: Some(tx), target_serial: target_serial.clone() };
 
         //Lost our serial
-        handler.handle_event(Ok(FastbootEvent::Lost(target_serial.clone())));
+        handler.handle_event(Ok(FastbootEvent::Lost(target_serial.clone()))).await;
         assert!(rx.try_recv().unwrap().is_none());
         // Lost a different serial
-        handler.handle_event(Ok(FastbootEvent::Lost("1234asdf".to_string())));
+        handler.handle_event(Ok(FastbootEvent::Lost("1234asdf".to_string()))).await;
         assert!(rx.try_recv().unwrap().is_none());
         // Found a new serial
-        handler.handle_event(Ok(FastbootEvent::Discovered("1234asdf".to_string())));
+        handler.handle_event(Ok(FastbootEvent::Discovered("1234asdf".to_string()))).await;
         assert!(rx.try_recv().unwrap().is_none());
         // Error
-        handler.handle_event(Err(anyhow!("Hello there friends")));
+        handler.handle_event(Err(anyhow!("Hello there friends"))).await;
         assert!(rx.try_recv().unwrap().is_none());
         // Found our serial
-        handler.handle_event(Ok(FastbootEvent::Discovered(target_serial.clone())));
+        handler.handle_event(Ok(FastbootEvent::Discovered(target_serial.clone()))).await;
         assert!(rx.try_recv().unwrap().is_some());
 
         Ok(())

@@ -514,7 +514,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::interface_factory::InterfaceFactoryBase;
+    use crate::interface_factory::{InterfaceFactoryBase, InterfaceFactoryError};
     use fastboot::test_transport::TestTransport;
     use pretty_assertions::assert_eq;
     use rand::{rngs::SmallRng, RngCore, SeedableRng};
@@ -531,11 +531,15 @@ mod test {
 
     #[async_trait(?Send)]
     impl InterfaceFactoryBase<TestTransport> for TestTransportFactory {
-        async fn open(&mut self) -> Result<TestTransport> {
+        async fn open(&mut self) -> Result<TestTransport, InterfaceFactoryError> {
             Ok(TestTransport::new())
         }
 
         async fn close(&self) {}
+
+        async fn rediscover(&mut self) -> Result<(), InterfaceFactoryError> {
+            Ok(())
+        }
     }
 
     impl InterfaceFactory<TestTransport> for TestTransportFactory {}
@@ -544,7 +548,7 @@ mod test {
     //  get_var
     //
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_var() -> Result<()> {
         {
             let mut test_transport = TestTransport::new();
@@ -588,7 +592,7 @@ mod test {
     //  get_all_vars
     //
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_all_vars() -> Result<()> {
         let (var_client, mut var_server): (Sender<Variable>, Receiver<Variable>) = mpsc::channel(3);
         let mut test_transport = TestTransport::new();
@@ -620,7 +624,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_all_vars_error() -> Result<()> {
         let (var_client, mut var_server): (Sender<Variable>, Receiver<Variable>) = mpsc::channel(2);
         let mut test_transport = TestTransport::new();
@@ -644,7 +648,7 @@ mod test {
     // oem
     //
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_oem_ok() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Okay("done".to_string()));
@@ -658,7 +662,7 @@ mod test {
         fastboot_client.oem("version").await?;
         Ok(())
     }
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_oem_fail() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Fail("this command failed".to_string()));
@@ -673,7 +677,7 @@ mod test {
 
         Ok(())
     }
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_oem_bail_unexpected_response() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Data(1234));
@@ -693,7 +697,7 @@ mod test {
     // erase
     //
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_erase_ok() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Okay("done".to_string()));
@@ -708,7 +712,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_erase_fail() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Fail("could not erase".to_string()));
@@ -722,7 +726,7 @@ mod test {
 
         Ok(())
     }
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_erase_bail_unexpected_response() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Data(1234));
@@ -741,7 +745,7 @@ mod test {
     // boot
     //
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_boot_ok() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Okay("done".to_string()));
@@ -756,7 +760,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_boot_fail() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Fail("could not boot".to_string()));
@@ -770,7 +774,8 @@ mod test {
 
         Ok(())
     }
-    #[fuchsia_async::run_singlethreaded(test)]
+
+    #[fuchsia::test]
     async fn test_boot_unexpected_response() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Data(1234));
@@ -789,7 +794,7 @@ mod test {
     // reboot
     //
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_reboot_ok() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Okay("done".to_string()));
@@ -804,7 +809,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_reboot_fail() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Fail("could not reboot".to_string()));
@@ -818,7 +823,7 @@ mod test {
 
         Ok(())
     }
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_reboot_unexpected_response() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Data(1234));
@@ -837,7 +842,7 @@ mod test {
     // reboot_bootloader
     //
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_reboot_bootloader_ok() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Okay("done".to_string()));
@@ -857,7 +862,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_reboot_bootloader_fail() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Fail("could not reboot bootloader".to_string()));
@@ -875,7 +880,7 @@ mod test {
 
         Ok(())
     }
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_reboot_bootloader_unexpected_response() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Data(1234));
@@ -898,7 +903,7 @@ mod test {
     // continue_boot
     //
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_continue_boot_ok() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Okay("done".to_string()));
@@ -912,7 +917,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_continue_boot_fail() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Fail("could not continue boot".to_string()));
@@ -926,7 +931,7 @@ mod test {
 
         Ok(())
     }
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_continue_boot_unexpected_response() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Data(1234));
@@ -945,7 +950,7 @@ mod test {
     // set_active
     //
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_set_active_ok() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Okay("done".to_string()));
@@ -960,7 +965,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_set_active_fail() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Fail("could not set active".to_string()));
@@ -974,7 +979,7 @@ mod test {
 
         Ok(())
     }
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_set_active_bail_unexpected_response() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Data(1234));
@@ -993,7 +998,7 @@ mod test {
     // get_staged
     //
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_staged_ok() -> Result<()> {
         let tmpdir = TempDir::new().unwrap();
 
@@ -1020,7 +1025,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_staged_fail() -> Result<()> {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Fail("could not get staged".to_string()));
@@ -1039,10 +1044,9 @@ mod test {
     // stage
     //
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_stage_ok() -> Result<()> {
         let tmpdir = TempDir::new().unwrap();
-
         // Generate a large temporary file
         let (mut file, temp_path) = NamedTempFile::new_in(&tmpdir).unwrap().into_parts();
         let mut rng = SmallRng::from_entropy();
@@ -1052,7 +1056,6 @@ mod test {
         file.write_all(&buf).unwrap();
         file.flush().unwrap();
         file.seek(SeekFrom::Start(0)).unwrap();
-
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Okay("done".to_string())); // Download Okay
         test_transport.push(Reply::Data(4096)); // Download Response
@@ -1063,18 +1066,22 @@ mod test {
         };
 
         let (var_client, mut var_server): (Sender<UploadProgress>, Receiver<UploadProgress>) =
-            mpsc::channel(2);
+            mpsc::channel(3);
 
         fastboot_client.stage(temp_path.to_str().unwrap(), var_client).await?;
 
         assert!(matches!(var_server.recv().await, Some(UploadProgress::OnStarted { size: 4096 })));
+        assert!(matches!(
+            var_server.recv().await,
+            Some(UploadProgress::OnProgress { bytes_written: 4096 })
+        ));
         assert!(matches!(var_server.recv().await, Some(UploadProgress::OnFinished)));
         assert!(var_server.recv().await.is_none());
 
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_stage_fail() -> Result<()> {
         let tmpdir = TempDir::new().unwrap();
 
@@ -1110,7 +1117,7 @@ mod test {
     // flash
     //
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_flash_ok() -> Result<()> {
         let _env = ffx_config::test_init().await?;
 
@@ -1138,17 +1145,21 @@ mod test {
         };
 
         let (var_client, mut var_server): (Sender<UploadProgress>, Receiver<UploadProgress>) =
-            mpsc::channel(100);
+            mpsc::channel(3);
 
         fastboot_client.flash("partition1", temp_path.to_str().unwrap(), var_client).await?;
 
         assert!(matches!(var_server.recv().await, Some(UploadProgress::OnStarted { size: 4096 })));
+        assert!(matches!(
+            var_server.recv().await,
+            Some(UploadProgress::OnProgress { bytes_written: 4096 })
+        ));
         assert!(matches!(var_server.recv().await, Some(UploadProgress::OnFinished)));
         assert!(var_server.recv().await.is_none());
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_flash_fail() -> Result<()> {
         let tmpdir = TempDir::new().unwrap();
 

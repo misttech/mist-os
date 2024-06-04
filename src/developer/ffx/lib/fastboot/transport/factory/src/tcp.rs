@@ -134,7 +134,7 @@ mod test {
     // TcpTargetFilter
     //
 
-    #[test]
+    #[fuchsia::test]
     fn filter_target_test() -> Result<()> {
         let node_name = "jod".to_string();
         let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
@@ -147,7 +147,7 @@ mod test {
             node_name: Some("jod".to_string()),
             state: TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "".to_string(),
-                connection_state: FastbootConnectionState::Tcp(addr)
+                connection_state: FastbootConnectionState::Tcp(vec![addr])
             })
         }));
         // Fails: wrong name
@@ -155,7 +155,7 @@ mod test {
             node_name: Some("Wake".to_string()),
             state: TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "".to_string(),
-                connection_state: FastbootConnectionState::Tcp(addr)
+                connection_state: FastbootConnectionState::Tcp(vec![addr])
             })
         }));
         // Fails: wrong state
@@ -163,7 +163,7 @@ mod test {
             node_name: Some("jod".to_string()),
             state: TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "".to_string(),
-                connection_state: FastbootConnectionState::Udp(addr)
+                connection_state: FastbootConnectionState::Udp(vec![addr])
             })
         }));
         // Fails: Bad name
@@ -171,7 +171,7 @@ mod test {
             node_name: None,
             state: TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "".to_string(),
-                connection_state: FastbootConnectionState::Tcp(addr)
+                connection_state: FastbootConnectionState::Tcp(vec![addr])
             })
         }));
         Ok(())
