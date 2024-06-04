@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -56,7 +57,7 @@ impl<S: Subscriber> Layer<S> for KernelLogger {
 
             // msg always has a leading space
             msg = msg.trim_start().to_string();
-            let msg_prefix = format!("[component_manager] {}: ", level);
+            let msg_prefix = format!("[mistos] {}: ", level);
 
             while msg.len() > 0 {
                 // TODO(https://fxbug.dev/42108144): zx_debuglog_write also accepts options and the possible options include
@@ -123,20 +124,42 @@ mod tests {
     use {
         super::*,
         anyhow::Context,
-        fidl_fuchsia_boot as fboot,
-        fuchsia_component::client::connect_channel_to_protocol,
-        fuchsia_zircon::HandleBased,
+        fuchsia_runtime::{take_startup_handle, HandleType},
+        fuchsia_zircon::{self as zx, HandleBased},
         rand::Rng,
         std::panic,
         tracing::{error, info, warn},
     };
 
     fn get_readonlylog() -> zx::DebugLog {
-        let (client_end, server_end) = zx::Channel::create();
-        connect_channel_to_protocol::<fboot::ReadOnlyLogMarker>(server_end).unwrap();
-        let service = fboot::ReadOnlyLogSynchronousProxy::new(client_end);
-        let log = service.get(zx::Time::INFINITE).expect("couldn't get read only log");
-        log
+        let system_resource_handle =
+            take_startup_handle(HandleType::SystemResource.into()).map(zx::Resource::from);
+
+        let debuglog_resource = system_resource_handle
+            .as_ref()
+            .map(|handle| {
+                match handle.create_child(
+                    zx::ResourceKind::SYSTEM,
+                    None,
+                    zx::sys::ZX_RSRC_SYSTEM_DEBUGLOG_BASE,
+                    1,
+                    b"debuglog",
+                ) {
+                    Ok(resource) => Some(resource),
+                    Err(_) => None,
+                }
+            })
+            .flatten()
+            .unwrap();
+
+        let debuglog = zx::DebugLog::create(&debuglog_resource, zx::DebugLogOpts::READABLE)
+            .context("Failed to create readonly debuglog object")
+            .unwrap();
+
+        let readonly = debuglog
+            .replace_handle(zx::Rights::BASIC | zx::Rights::READ | zx::Rights::SIGNAL)
+            .unwrap();
+        readonly
     }
 
     // expect_message_in_debuglog will read the last 10000 messages in zircon's debuglog, looking
@@ -190,7 +213,7 @@ mod tests {
         init();
         info!("log_test {}", logged_value);
 
-        expect_message_in_debuglog(format!("[component_manager] INFO: log_test {}", logged_value));
+        expect_message_in_debuglog(format!("[mistos] INFO: log_test {}", logged_value));
     }
 
     #[test]
@@ -201,7 +224,7 @@ mod tests {
         init();
         warn!("log_test {}", logged_value);
 
-        expect_message_in_debuglog(format!("[component_manager] WARN: log_test {}", logged_value));
+        expect_message_in_debuglog(format!("[mistos] WARN: log_test {}", logged_value));
     }
 
     #[test]
@@ -212,7 +235,7 @@ mod tests {
         init();
         error!("log_test {}", logged_value);
 
-        expect_message_in_debuglog(format!("[component_manager] ERROR: log_test {}", logged_value));
+        expect_message_in_debuglog(format!("[mistos] ERROR: log_test {}", logged_value));
     }
 
     #[test]
@@ -229,7 +252,7 @@ mod tests {
             // This will panic again if the message is not found,
             // and the message will not include "panic_test".
             old_hook(info);
-            expect_message_in_debuglog(format!("[component_manager] PANIC: panicked at"));
+            expect_message_in_debuglog(format!("[mistos] PANIC: panicked at"));
             expect_message_in_debuglog(format!("panic_test {logged_value}"));
         }));
 
