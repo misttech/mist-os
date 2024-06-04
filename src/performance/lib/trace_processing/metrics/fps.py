@@ -77,7 +77,7 @@ class FpsMetricsProcessor(trace_metrics.MetricsProcessor):
 
         if len(vsync_events) < 2:
             _LOGGER.info(
-                "Less than two vsync events are present. Perhaps the trace "
+                "Fewer than two vsync events are present. Perhaps the trace "
                 "duration is too short to provide fps information"
             )
             return []

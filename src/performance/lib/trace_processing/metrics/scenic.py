@@ -61,7 +61,9 @@ class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
         )
 
         all_events: Iterator[trace_model.Event] = model.all_events()
-        scenic_start_events: list[trace_model.Event] = list(
+        # Since `filter_events()` returns an Iterator, make a local copy so we can iterate over the
+        # events more than once.
+        scenic_start_events = list(
             trace_utils.filter_events(
                 all_events,
                 category=_EVENT_CATEGORY,

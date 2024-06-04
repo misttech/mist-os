@@ -96,7 +96,7 @@ class AppRenderLatencyMetricsProcessor(trace_metrics.MetricsProcessor):
             vsync_events.append(vsync)
 
         if len(vsync_events) == 0:
-            _LOGGER.fatal(f"Not enough valid vsyncs")
+            _LOGGER.fatal("Not enough valid vsyncs")
 
         present_latency_mean: float = statistics.mean(present_latencies)
         _LOGGER.info(f"Average Present Latency: {present_latency_mean}")
