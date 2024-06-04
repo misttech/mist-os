@@ -125,6 +125,13 @@ Use the following approach in deciding whether to run the test case in CQ/CI/FYI
   * If infra has limited testbeds (that is needed to run this test) to run this
     test then it can be promoted to CI.
 
+Once your test case is ready to be promoted to CI/CQ:
+* If a corresponding `stable`
+  [Honeydew Infra Test Groups][Honeydew Infra Test Groups] exists, and that
+  test group is already enabled in a CQ builder, simply move your test target
+  from `unstable` to `stable`.
+* Otherwise, reach out to the Lacewing team for further assistance.
+
 Accordingly, we have created the following:
 * Test groups:
   * Test group naming scheme: `<PRODUCT>_<BOARD>_<STABILITY>[ |_sl4f]_tests`
