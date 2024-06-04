@@ -35,8 +35,6 @@ lazy_static! {
 pub enum SendError {
     #[error("timed out reading a reply from device")]
     Timeout,
-    #[error("Did not write correct number of bytes. Got {:?}. Want {}", written, expected)]
-    ShortWrite { written: usize, expected: usize },
 }
 
 #[derive(Debug, Error)]
@@ -181,10 +179,7 @@ pub async fn send_with_listener<T: AsyncRead + AsyncWrite + Unpin>(
     let _lock = SEND_LOCK.lock().await;
     let bytes = Vec::<u8>::try_from(&cmd)?;
     tracing::debug!("Fastboot: writing command {cmd:?}: {}", String::from_utf8_lossy(&bytes));
-    let written = interface.write(&bytes).await?;
-    if written < bytes.len() {
-        return Err(anyhow!(SendError::ShortWrite { written, expected: bytes.len() }));
-    }
+    interface.write_all(&bytes).await?;
     read(interface, listener).await
 }
 
@@ -196,10 +191,7 @@ pub async fn send<T: AsyncRead + AsyncWrite + Unpin>(
     let _lock = SEND_LOCK.lock().await;
     let bytes = Vec::<u8>::try_from(&cmd)?;
     tracing::debug!("Fastboot: writing command {cmd:?}: {}", String::from_utf8_lossy(&bytes));
-    let written = interface.write(&bytes).await?;
-    if written < bytes.len() {
-        return Err(anyhow!(SendError::ShortWrite { written, expected: bytes.len() }));
-    }
+    interface.write_all(&bytes).await?;
     read_and_log_info(interface).await
 }
 
@@ -211,10 +203,7 @@ pub async fn send_with_timeout<T: AsyncRead + AsyncWrite + Unpin>(
     let _lock = SEND_LOCK.lock().await;
     let bytes = Vec::<u8>::try_from(&cmd)?;
     tracing::debug!("Fastboot: writing command {cmd:?}: {}", String::from_utf8_lossy(&bytes));
-    let written = interface.write(&bytes).await?;
-    if written < bytes.len() {
-        return Err(anyhow!(SendError::ShortWrite { written, expected: bytes.len() }));
-    }
+    interface.write_all(&bytes).await?;
     read_with_timeout(interface, &LogInfoListener {}, timeout).await
 }
 
@@ -264,20 +253,14 @@ pub async fn upload_with_read_timeout<T: AsyncRead + AsyncWrite + Unpin, R: Read
                         if n == 0 {
                             break;
                         }
-                        match interface.write(&bytes[..n]).await {
+                        match interface.write_all(&bytes[..n]).await {
                             Err(e) => {
                                 let err = UploadError::CouldNotWriteToInterface(e);
                                 tracing::error!(%err);
                                 listener.on_error(&err).await?;
                                 bail!(err);
                             }
-                            Ok(written) => {
-                                if written < n {
-                                    return Err(anyhow!(SendError::ShortWrite {
-                                        written,
-                                        expected: n
-                                    }));
-                                }
+                            Ok(()) => {
                                 listener.on_progress(n.try_into().unwrap()).await?;
                                 tracing::trace!("fastboot: wrote {} bytes", n);
                             }
