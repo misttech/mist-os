@@ -76,12 +76,6 @@ build_uefi_disk = true
 use_gigaboot = true
 assembly_generate_fvm_fastboot = true
 
-# Some users leave a USB key (containing zedboot) plugged into their
-# device at all times. To avoid unintentionally breaking remote workflows,
-# we permit multiple GPT devices.
-board_fshost_config.gpt_all = true
-board_zedboot_fshost_config.gpt_all = true
-
 zircon_a_partition = "zircon-a"
 zircon_b_partition = "zircon-b"
 zircon_r_partition = "zircon-r"
