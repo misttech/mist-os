@@ -607,6 +607,8 @@ ssize_t interface_write(UsbInterface *interface, const void *data, ssize_t len) 
   return interface->Write(data, len);
 }
 
-void interface_close(UsbInterface *interface) { interface->Close(); }
+void interface_close(UsbInterface *interface) {
+  delete interface;
+}
 
 void interface_wait_for_disconnect(UsbInterface *interface) { interface->WaitForDisconnect(); }
