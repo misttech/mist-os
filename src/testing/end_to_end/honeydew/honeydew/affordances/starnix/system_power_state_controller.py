@@ -453,7 +453,11 @@ class SystemPowerStateController(
         """
         output: str
         error: str
-        output, error = proc.communicate(timeout=resume_mode.duration)
+        # For timer to end, wait for minimum of that duration. Otherwise, there
+        # is a chance that proc.communicate() timeout can happen right at the
+        # same time as timer expires
+        timeout: float = resume_mode.duration + 1
+        output, error = proc.communicate(timeout=timeout)
 
         if proc.returncode != 0:
             message: str = (
