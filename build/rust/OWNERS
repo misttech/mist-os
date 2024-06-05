@@ -5,3 +5,4 @@ aaronwood@google.com
 
 per-file rustc_fuzzer.gni=aarongreen@google.com
 per-file fidl_rust.gni = file: /src/fidl/OWNERS
+per-file bindgen.py=qsr@google.com,adamperry@google.com,ypomortsev@google.com

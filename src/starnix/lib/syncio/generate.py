@@ -11,7 +11,17 @@
 
 import os, sys
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
+sys.path.append(
+    os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "..",
+        "..",
+        "..",
+        "..",
+        "build",
+        "rust",
+    )
+)
 from bindgen import Bindgen
 
 bindgen = Bindgen()
@@ -25,6 +35,8 @@ bindgen.include_dirs = [
     "zircon/third_party/ulib/musl/include",
     "zircon/system/public",
 ]
+
+bindgen.enable_stdlib_include_dirs = False
 
 bindgen.function_allowlist = ["zxio_.*"]
 bindgen.var_allowlist = [

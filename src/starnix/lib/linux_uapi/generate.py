@@ -11,7 +11,17 @@
 
 import os, sys
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
+sys.path.append(
+    os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "..",
+        "..",
+        "..",
+        "..",
+        "build",
+        "rust",
+    )
+)
 from bindgen import Bindgen
 
 RAW_LINES = """
@@ -227,6 +237,7 @@ bindgen.set_replacements(REPLACEMENTS)
 bindgen.ignore_functions = True
 bindgen.no_debug_types = NO_DEBUG_TYPES
 bindgen.no_copy_types = NO_COPY_TYPES
+bindgen.enable_stdlib_include_dirs = False
 
 for arch in ARCH_INFO:
     bindgen.c_types_prefix = "crate::types"

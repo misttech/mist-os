@@ -10,9 +10,9 @@ import sys
 import datetime
 
 # All other paths are relative to here (main changes to this directory on startup).
-ROOT_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..")
+ROOT_PATH = os.path.join(os.path.dirname(__file__), "..", "..")
 
-RUST_DIR = "prebuilt/third_party/rust/linux-x64/bin"
+RUSTFMT_PATH = "prebuilt/third_party/rust/linux-x64/bin/rustfmt"
 BINDGEN_PATH = "prebuilt/third_party/rust_bindgen/linux-x64/bindgen"
 FX_PATH = "scripts/fx"
 
@@ -35,22 +35,61 @@ BASE_REPLACEMENTS = [
     (re.compile(r"pub _bitfield_align_[0-9]*: \[u8; 0\],\n"), ""),
 ]
 
+# The `HEAD` API level.
+#
+# NOTE(hjfreyer): It's not totally clear that the value of HEAD is the
+# right value here. If some parts of the C structures are missing,
+# we may want to investigate setting this to a different value like
+# `PLATFORM`.
+FUCHSIA_API_LEVEL_HEAD = 4292870144
+
 
 class Bindgen:
     def __init__(self):
-        self.clang_target = "x86_64-pc-linux-gnu"
+        # Clang: Compilation target (`--target`)
+        self.clang_target = "x86_64-unknown-linux-gnu"
+        # Use the given PREFIX before raw types instead of ::std::os::raw.
         self.c_types_prefix = ""
+        # Additional raw lines of Rust code to add to the beginning of the generated output.
         self.raw_lines = ""
+        # Mark types as an an opaque blob of bytes with a size and alignment.
         self.opaque_types = []
+        # Clang: Include directories (`-I`)
         self.include_dirs = []
+        # Add extra traits to derive on generated structs/unions.
+        # Only applies to `pub struct`/`pub union` that already have a #[derive()] line.
         self.auto_derive_traits = []
+        # Pairs of (regex, str) replacements to apply to generated output.
         self.replacements = BASE_REPLACEMENTS
+        # Do not generate bindings for given functions or methods.
         self.ignore_functions = False
+        # Allowlist all the free-standing functions matching regexes.
+        # Other non-allowlisted functions will not be generated.
         self.function_allowlist = []
+        # Allowlist all the free-standing variables matching regexes.
+        # Other non-allowlisted variables will not be generated.
         self.var_allowlist = []
+        # Allowlist all the free-standing types matching regexes.
+        # Other non-allowlisted types will not be generated.
         self.type_allowlist = []
+        # Mark functions as hidden, to omit them from generated code.
+        self.function_blocklist = []
+        # Mark variables as hidden, to omit them from generated code.
+        self.var_blocklist = []
+        # Mark types as hidden, to omit them from generated code.
+        self.type_blocklist = []
+        # Avoid deriving/implementing Debug for types matching regexes.
         self.no_debug_types = []
+        # Avoid deriving/implementing Copy for types matching regexes.
         self.no_copy_types = []
+        # Avoid deriving/implementing Default for types matching regexes.
+        self.no_default_types = []
+        # Use types from Rust core instead of std.
+        self.use_core = False
+        # Clang: Enable standard #include directories for the C++ standard library
+        self.enable_stdlib_include_dirs = True
+        # Clang: Define `__Fuchsia_API_level__`.
+        self.fuchsia_api_level = ""
 
     def set_auto_derive_traits(self, traits_map):
         self.auto_derive_traits = [(re.compile(x[0]), x[1]) for x in traits_map]
@@ -79,12 +118,19 @@ class Bindgen:
         if self.c_types_prefix:
             args.append("--ctypes-prefix=" + self.c_types_prefix)
 
+        if self.use_core:
+            args.append("--use-core")
+
         args += ["--allowlist-function=" + x for x in self.function_allowlist]
         args += ["--allowlist-var=" + x for x in self.var_allowlist]
         args += ["--allowlist-type=" + x for x in self.type_allowlist]
+        args += ["--blocklist-function=" + x for x in self.function_blocklist]
+        args += ["--blocklist-var=" + x for x in self.var_blocklist]
+        args += ["--blocklist-type=" + x for x in self.type_blocklist]
         args += ["--opaque-type=" + x for x in self.opaque_types]
         args += ["--no-debug=" + x for x in self.no_debug_types]
         args += ["--no-copy=" + x for x in self.no_copy_types]
+        args += ["--no-default=" + x for x in self.no_default_types]
 
         args += [input_file]
 
@@ -93,23 +139,21 @@ class Bindgen:
             "--",
             "-target",
             self.clang_target,
-            "-nostdlibinc",
-            # Use the `HEAD` API level.
-            #
-            # NOTE(hjfreyer): It's not totally clear that the value of HEAD is the
-            # right value here. If some parts of the C structures are missing,
-            # we may want to investigate setting this to a different value like
-            # `PLATFORM`.
-            "-D__Fuchsia_API_level__=4292870144",
             "-DIS_BINDGEN=1",
         ]
+
+        if not self.enable_stdlib_include_dirs:
+            args += ["-nostdlibinc"]
+
+        if self.fuchsia_api_level:
+            args += [f"-D__Fuchsia_API_level__={self.fuchsia_api_level}"]
+
         for i in self.include_dirs:
             args += ["-I", i]
         args += ["-I", "."]
 
-        # Need to set the PATH to the prebuilt binary location for it to find rustfmt.
         env = os.environ.copy()
-        env["PATH"] = "%s:%s" % (os.path.abspath(RUST_DIR), env["PATH"])
+        env["RUSTFMT"] = os.path.abspath(RUSTFMT_PATH)
         subprocess.check_call(args, env=env)
 
     def get_auto_derive_traits(self, line):
