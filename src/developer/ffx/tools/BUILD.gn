@@ -68,6 +68,10 @@ group("tests") {
     deps += [ "$tool:tests" ]
   }
 
+  # Playground is experimental so it's not in _tools but we still want to run
+  # the tests.
+  deps += [ "playground:tests" ]
+
   if (ffx_build_dual_mode_plugins_as_subtools) {
     deps += dual_mode_subtool_tests  # from config.gni
   }
