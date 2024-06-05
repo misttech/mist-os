@@ -5,6 +5,7 @@
 import("//build/assembly/assembly_input_bundle.gni")
 import("//build/assembly/assembly_resources_directory.gni")
 import("//build/assembly/kernel_aib.gni")
+import("//build/assembly/platform_artifacts.gni")
 import("//build/bazel/bazel_inputs.gni")
 import("//build/config/clang/clang.gni")
 import("//build/icu/icu_assembly_input_bundle.gni")
@@ -58,7 +59,7 @@ assert(is_fuchsia,
        "Assembly Input Bundles can only be in the Fuchsia toolchain")
 
 # All of the platform assembly input bundles.
-group("assembly") {
+platform_artifacts("assembly") {
   testonly = true
 
   # eng_platform_aib_labels come from //bundles/assembly/platform_aibs.gni.

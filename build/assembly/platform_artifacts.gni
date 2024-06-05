@@ -1,0 +1,85 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_action.gni")
+
+# Creates a directory of platform artifacts that can be shipped to out-of-tree
+# customers.
+#
+# Arguments
+#
+#   deps (optional)
+#     [list] Deps to metadata walk to find the platform artifacts which will
+#     be copied into the output directory.
+#
+template("platform_artifacts") {
+  files = {
+    aib_list = "$target_out_dir/$target_name/aib_list.json"
+    platform_artifacts = "$target_out_dir/$target_name/platform_artifacts"
+    depfile = "$target_out_dir/$target_name.depfile"
+  }
+
+  labels = {
+    aib_list = "${target_name}.aib_list"
+    platform_artifacts = "${target_name}.platform_artifacts"
+  }
+
+  generated_file(labels.aib_list) {
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "testonly",
+                             "visibility",
+                           ])
+
+    outputs = [ files.aib_list ]
+    data_keys = [ "assembly_input_bundles" ]
+    walk_keys = [ "assembly_input_bundles_barrier" ]
+    output_conversion = "json"
+  }
+
+  python_action(labels.platform_artifacts) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+
+    hermetic_deps = false
+    hermetic_action_ignored_prefixes = [ "${files.platform_artifacts}" ]
+
+    binary_label = "//build/assembly/scripts:generate_platform_artifacts"
+    outputs = [ "${files.platform_artifacts}/stamp" ]
+    deps = [ ":${labels.aib_list}" ]
+    depfile = files.depfile
+
+    args = [
+      "--aib-list",
+      rebase_path(files.aib_list, root_build_dir),
+      "--outdir",
+      rebase_path(files.platform_artifacts, root_build_dir),
+      "--depfile",
+      rebase_path(files.depfile, root_build_dir),
+    ]
+  }
+
+  group(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+
+    deps = [ ":${labels.platform_artifacts}" ]
+
+    metadata = {
+      platform_artifacts = [
+        {
+          path = rebase_path(files.platform_artifacts, root_build_dir)
+          label = get_label_info(target_name, "label_no_toolchain")
+        },
+      ]
+    }
+  }
+}

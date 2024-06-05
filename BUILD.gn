@@ -214,6 +214,7 @@ build_api_module("api") {
     ":licenses",
     ":package-repositories",
     ":package_archives",
+    ":platform_artifacts",
     ":platforms",
     ":prebuilt_binaries",
     ":prebuilt_package_flavors",
@@ -1454,6 +1455,26 @@ build_api_module("assembly_input_archives") {
     # The legacy bundle for the main product assembly.
     "//build/images:main_assembly",
   ]
+}
+
+# Describes the location of the directory of platform artifacts that can be
+# shipped and consumed by out-of-tree customers.
+#
+# Type: list(scope)
+#
+#   path
+#     Required: Path to the directory that contains all the AIBs.
+#     Type: path relative to $root_build_dir
+#
+#   label
+#     Required: label that created the archive
+#     Type: GN Label
+#
+build_api_module("platform_artifacts") {
+  testonly = true
+  data_keys = [ "platform_artifacts" ]
+  walk_keys = [ "platform_artifacts_barrier" ]
+  deps = [ "//bundles/assembly" ]
 }
 
 # size_report.json contains a list (size 0 or 1) of gerrit size reports

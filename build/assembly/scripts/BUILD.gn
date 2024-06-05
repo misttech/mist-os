@@ -20,6 +20,11 @@ python_binary("generate_scrutiny_configs") {
   ]
 }
 
+python_binary("generate_platform_artifacts") {
+  main_source = "generate_platform_artifacts.py"
+  deps = [ "//build/python/modules/depfile" ]
+}
+
 python_binary("generated_assembly_inputs") {
   main_source = "generated_assembly_inputs.py"
   deps = [ "//build/python/modules/assembly" ]
