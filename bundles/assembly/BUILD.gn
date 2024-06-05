@@ -637,7 +637,6 @@ assembly_input_bundle("kernel_args_user") {
     "kernel.enable-debugging-syscalls=false",
     "kernel.enable-serial-syscalls=false",
     "netsvc.disable=true",
-    "kernel.serial=none",
   ]
 }
 
@@ -3910,6 +3909,11 @@ assembly_input_bundle("kernel_oom_reboot_timeout_low") {
 # Enables jobkilling when the device runs out-of-memory.
 assembly_input_bundle("kernel_oom_behavior_jobkill") {
   kernel_cmdline = [ "kernel.oom.behavior=jobkill" ]
+}
+
+# Enables log output to legacy serial console.
+assembly_input_bundle("kernel_serial_legacy") {
+  kernel_cmdline = [ "kernel.serial=legacy" ]
 }
 
 # Enables in kernel compression of anonymous memory with some common configuration options.

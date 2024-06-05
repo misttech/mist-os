@@ -15,6 +15,10 @@ board_configuration("x64") {
     name = "default-board"
   }
 
+  kernel = {
+    serial_mode = "legacy"
+  }
+
   provided_features = [
     "fuchsia::pmm_checker_auto",
     "fuchsia::wlan_softmac",

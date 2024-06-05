@@ -69,6 +69,7 @@ BOOTSTRAP_ENG_PLATFORM_AIB_NAMES = [
     "kernel_oom_behavior_jobkill",
     "kernel_pmm_checker_enabled",
     "kernel_pmm_checker_enabled_auto",
+    "kernel_serial_legacy",
     "power_framework_testing_sag",
 ]
 

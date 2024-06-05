@@ -115,6 +115,7 @@ bootstrap_eng_platform_aib_names = [
   "kernel_oom_behavior_jobkill",
   "kernel_pmm_checker_enabled",
   "kernel_pmm_checker_enabled_auto",
+  "kernel_serial_legacy",
 
   # Power Framework
   "power_framework_testing_sag",

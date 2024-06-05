@@ -4,6 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::{ensure, Context};
+use assembly_config_schema::board_config::SerialMode;
 use assembly_config_schema::platform_config::kernel_config::{
     MemorySize, OOMBehavior, OOMRebootTimeout, PlatformKernelConfig,
 };
@@ -25,6 +26,15 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             }
             (&BuildType::UserDebug | &BuildType::User, _) => {
                 anyhow::bail!("'kernel.oom_behavior' can only be set on 'build_type=\"eng\"");
+            }
+        }
+        match (&context.board_info.kernel.serial_mode, &context.build_type) {
+            (SerialMode::NoOutput, _) => {}
+            (SerialMode::Legacy, &BuildType::UserDebug | &BuildType::User) => {
+                println!("Serial cannot be enabled on user or userdebug builds. Not enabling.");
+            }
+            (SerialMode::Legacy, &BuildType::Eng) => {
+                builder.platform_bundle("kernel_serial_legacy")
             }
         }
         if kernel_config.lru_memory_compression && !kernel_config.memory_compression {
