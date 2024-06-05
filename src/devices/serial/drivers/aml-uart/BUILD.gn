@@ -195,6 +195,7 @@ test("aml-uart-dfv2-test-bin") {
   sources = [
     "tests/aml-uart-dfv2-test.cc",
     "tests/device_state.h",
+    "tests/fake_timer.cc",
   ]
   deps = [
     ":aml-uart-dfv2-source",

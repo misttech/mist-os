@@ -7,6 +7,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/power/cpp/element-description-builder.h>
 #include <lib/driver/power/cpp/power-support.h>
 
 namespace serial {
@@ -50,7 +51,8 @@ void AmlUartV2::PrepareStop(fdf::PrepareStopCompleter completer) {
     prepare_stop_completer_.emplace(std::move(completer));
     irq_dispatcher_->ShutdownAsync();
   } else {
-    // No irq_dispatcher_, just reply to the PrepareStopCompleter.
+    // No irq_dispatcher_, just reply to the PrepareStopCompleter, timer_dispatcher_ is created
+    // after irq_dispatcher_, so we assume that there's no timer_dispatcher_ either.
     completer(zx::ok());
   }
 }
@@ -58,10 +60,6 @@ void AmlUartV2::PrepareStop(fdf::PrepareStopCompleter completer) {
 AmlUart& AmlUartV2::aml_uart_for_testing() {
   ZX_ASSERT(aml_uart_.has_value());
   return aml_uart_.value();
-}
-
-fidl::ClientEnd<fuchsia_power_broker::ElementControl>& AmlUartV2::element_control_for_testing() {
-  return element_control_client_end_;
 }
 
 void AmlUartV2::OnReceivedMetadata(
@@ -163,11 +161,9 @@ zx_status_t AmlUartV2::GetPowerConfiguration(
     return ZX_ERR_INTERNAL;
   }
 
-  zx::result lessor_endpoints = fidl::CreateEndpoints<fuchsia_power_broker::Lessor>();
-
-  auto result_add_element =
-      fdf_power::AddElement(power_broker.value(), config, std::move(tokens.value()), {}, {}, {},
-                            std::move(lessor_endpoints->server));
+  fdf_power::ElementDesc description =
+      fdf_power::ElementDescBuilder(config, std::move(tokens.value())).Build();
+  auto result_add_element = fdf_power::AddElement(power_broker.value(), description);
   if (result_add_element.is_error()) {
     FDF_LOG(ERROR, "Failed to add power element: %u",
             static_cast<uint8_t>(result_add_element.error_value()));
@@ -175,8 +171,9 @@ zx_status_t AmlUartV2::GetPowerConfiguration(
   }
 
   element_control_client_end_ = std::move(result_add_element->element_control_channel());
-  lessor_client_end_ = std::move(lessor_endpoints->client);
-
+  lessor_client_end_ = std::move(*description.lessor_client_);
+  current_level_client_end_ = std::move(*description.current_level_client_);
+  required_level_client_end_ = std::move(*description.required_level_client_);
   return ZX_OK;
 }
 
@@ -216,6 +213,11 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
 
   zx::result irq_dispatcher_result =
       fdf::SynchronizedDispatcher::Create({}, "aml_uart_irq", [this](fdf_dispatcher_t*) {
+        // Shutdown timer dispatcher if there is one, otherwise call prepare_stop_completer_.
+        if (timer_dispatcher_) {
+          timer_dispatcher_->ShutdownAsync();
+          return;
+        }
         if (prepare_stop_completer_.has_value()) {
           fdf::PrepareStopCompleter completer = std::move(prepare_stop_completer_.value());
           prepare_stop_completer_.reset();
@@ -229,8 +231,27 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
   }
 
   irq_dispatcher_.emplace(std::move(irq_dispatcher_result.value()));
+
+  zx::result timer_dispatcher_result =
+      fdf::SynchronizedDispatcher::Create({}, "aml_uart_timer", [this](fdf_dispatcher_t*) {
+        if (prepare_stop_completer_.has_value()) {
+          fdf::PrepareStopCompleter completer = std::move(prepare_stop_completer_.value());
+          prepare_stop_completer_.reset();
+          completer(zx::ok());
+        }
+      });
+  if (timer_dispatcher_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to create timer dispatcher: %s",
+            timer_dispatcher_result.status_string());
+    CompleteStart(timer_dispatcher_result.take_error());
+    return;
+  }
+
+  timer_dispatcher_.emplace(std::move(timer_dispatcher_result.value()));
   aml_uart_.emplace(std::move(pdev), serial_port_info_, std::move(mmio.value()),
-                    irq_dispatcher_->borrow(), std::move(lessor_client_end_));
+                    irq_dispatcher_->borrow(), timer_dispatcher_->borrow(),
+                    std::move(lessor_client_end_), std::move(current_level_client_end_),
+                    std::move(required_level_client_end_), std::move(element_control_client_end_));
 
   // Default configuration for the case that serial_impl_config is not called.
   constexpr uint32_t kDefaultBaudRate = 115200;
