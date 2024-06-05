@@ -66,6 +66,8 @@ KCOUNTER(vm_vmo_always_need_skipped_reclaim, "vm.vmo.always_need_skipped_reclaim
 KCOUNTER(vm_vmo_compression_zero_slot, "vm.vmo.compression.zero_empty_slot")
 KCOUNTER(vm_vmo_compression_marker, "vm.vmo.compression_zero_marker")
 KCOUNTER(vm_vmo_discardable_failed_reclaim, "vm.vmo.discardable_failed_reclaim")
+KCOUNTER(vm_vmo_range_update_from_parent_skipped, "vm.vmo.range_updated_from_parent.skipped")
+KCOUNTER(vm_vmo_range_update_from_parent_performed, "vm.vmo.range_updated_from_parent.performed")
 
 void ZeroPage(paddr_t pa) {
   void* ptr = paddr_to_physmap(pa);
@@ -6001,9 +6003,39 @@ void VmCowPages::RangeChangeUpdateFromParentLocked(const uint64_t offset, const 
 
   LTRACEF("new offset %#" PRIx64 " new len %#" PRIx64 "\n", offset_new, len_new);
 
+  // Check if there are any gaps in this range where we would actually see the parent.
+  uint64_t first_gap_start = UINT64_MAX;
+  uint64_t last_gap_end = 0;
+  page_list_.ForEveryPageAndGapInRange(
+      [](auto page, uint64_t offset) {
+        // For anything in the page list we know we do not see the parent for this offset, so
+        // regardless of what it is just keep looking for a gap. Additionally any children that we
+        // have will see this content instead of our parents, and so we know it is also safe to skip
+        // them as well.
+        return ZX_ERR_NEXT;
+      },
+      [&first_gap_start, &last_gap_end](uint64_t start, uint64_t end) {
+        first_gap_start = ktl::min(first_gap_start, start);
+        last_gap_end = ktl::max(last_gap_end, end);
+        return ZX_ERR_NEXT;
+      },
+      offset_new, offset_new + len_new);
+
+  if (first_gap_start >= last_gap_end) {
+    // Entire range was traversed and no gaps found. Neither us, nor our children, can see the
+    // parents content for this range and so we can skip the range update.
+    vm_vmo_range_update_from_parent_skipped.Add(1);
+    return;
+  }
+
+  // Construct a new, potentially smaller, range that covers the gaps. This will still result in
+  // potentially processing pages that are locally covered, but are limited to a single range here.
+  offset_new = first_gap_start;
+  len_new = last_gap_end - first_gap_start;
+  vm_vmo_range_update_from_parent_performed.Add(1);
+
   // pass it on. to prevent unbounded recursion we package up our desired offset and len and add
   // ourselves to the list. UpdateRangeLocked will then get called on it later.
-  // TODO: optimize by not passing on ranges that are completely covered by pages local to this vmo
   range_change_offset_ = offset_new;
   range_change_len_ = len_new;
   list->push_front(this);

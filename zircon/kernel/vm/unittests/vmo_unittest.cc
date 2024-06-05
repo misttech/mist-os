@@ -4272,6 +4272,99 @@ static bool vmo_prefetch_compressed_pages_test() {
   END_TEST;
 }
 
+// Check that committed ranges in children correctly have range updates skipped.
+static bool vmo_skip_range_update_test() {
+  BEGIN_TEST;
+
+  AutoVmScannerDisable scanner_disable;
+  constexpr uint64_t kNumPages = 16;
+
+  fbl::RefPtr<VmObjectPaged> vmo;
+  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, PAGE_SIZE * kNumPages, &vmo));
+
+  EXPECT_OK(vmo->CommitRange(0, PAGE_SIZE * kNumPages));
+
+  fbl::RefPtr<VmObject> child;
+  ASSERT_OK(vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0u,
+                             PAGE_SIZE * kNumPages, false, &child));
+
+  // Fork some pages into the child to have some regions that should be able to avoid range updates.
+  for (auto page : {4, 5, 6, 10, 11, 12}) {
+    uint64_t data = 42;
+    EXPECT_OK(child->Write(&data, PAGE_SIZE * page, sizeof(data)));
+  }
+
+  // Create a user memory mapping to check if unmaps do and do not get performed.
+  ktl::unique_ptr<testing::UserMemory> user_memory = testing::UserMemory::Create(child, 0, 0);
+  ASSERT_TRUE(user_memory);
+
+  // Reach into the hidden parent so we can directly perform range updates.
+  fbl::RefPtr<VmCowPages> hidden_parent = vmo->DebugGetCowPages()->DebugGetParent();
+  ASSERT_TRUE(hidden_parent);
+
+  struct {
+    uint64_t page_start;
+    uint64_t num_pages;
+    ktl::array<int, kNumPages> unmapped;
+  } test_ranges[] = {
+      // Simple range that is not covered in the child should get unmapped
+      {0, 1, {0, -1}},
+      // Various ranges fully covered by the child should have no unmappings
+      {4, 1, {-1}},
+      {4, 3, {-1}},
+      {6, 1, {-1}},
+      // Ranges that partially touch a single committed range should get trimmed
+      {3, 2, {3, -1}},
+      {6, 2, {7, -1}},
+      // Range that spans a single gap that sees the parent should get trimmed at both ends to just
+      // that gap.
+      {4, 9, {7, 8, 9, -1}},
+      // Spanning across a committed range causes us to still have to unnecessarily unmap.
+      {3, 10, {3, 4, 5, 6, 7, 8, 9, -1}},
+      {4, 10, {7, 8, 9, 10, 11, 12, 13, -1}},
+      {3, 11, {3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, -1}},
+  };
+
+  for (auto& range : test_ranges) {
+    // Ensure all the mappings start populated.
+    for (uint64_t i = 0; i < kNumPages; i++) {
+      user_memory->get<char>(i * PAGE_SIZE);
+      paddr_t paddr;
+      uint mmu_flags;
+      EXPECT_OK(user_memory->aspace()->arch_aspace().Query(user_memory->base() + i * PAGE_SIZE,
+                                                           &paddr, &mmu_flags));
+    }
+    // Perform the requested range update.
+    {
+      Guard<CriticalMutex> guard{hidden_parent->lock()};
+      hidden_parent->RangeChangeUpdateLocked(range.page_start * PAGE_SIZE,
+                                             range.num_pages * PAGE_SIZE,
+                                             VmCowPages::RangeChangeOp::Unmap);
+    }
+    // Check all the mappings are either there or not there as expected.
+    bool expected[kNumPages];
+    for (uint64_t i = 0; i < kNumPages; i++) {
+      expected[i] = true;
+    }
+    for (auto page : range.unmapped) {
+      // page of -1 is a sentinel as we cannot use the default 0 as sentinel.
+      if (page == -1) {
+        break;
+      }
+      expected[page] = false;
+    }
+    for (uint64_t i = 0; i < kNumPages; i++) {
+      paddr_t paddr;
+      uint mmu_flags;
+      zx_status_t status = user_memory->aspace()->arch_aspace().Query(
+          user_memory->base() + i * PAGE_SIZE, &paddr, &mmu_flags);
+      EXPECT_EQ(expected[i] ? ZX_OK : ZX_ERR_NOT_FOUND, status);
+    }
+  }
+
+  END_TEST;
+}
+
 UNITTEST_START_TESTCASE(vmo_tests)
 VM_UNITTEST(vmo_create_test)
 VM_UNITTEST(vmo_create_maximum_size)
@@ -4335,6 +4428,7 @@ VM_UNITTEST(vmo_high_priority_reclaim_test)
 VM_UNITTEST(vmo_snapshot_modified_test)
 VM_UNITTEST(vmo_pin_race_loaned_test)
 VM_UNITTEST(vmo_prefetch_compressed_pages_test)
+VM_UNITTEST(vmo_skip_range_update_test)
 UNITTEST_END_TESTCASE(vmo_tests, "vmo", "VmObject tests")
 
 }  // namespace vm_unittest
