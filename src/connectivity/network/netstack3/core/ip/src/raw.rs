@@ -521,7 +521,7 @@ mod test {
     use test_case::test_case;
 
     use crate::{
-        internal::{base::testutil::FakeIpDeviceIdCtx, socket::testutil::FakeIpSocketCtx},
+        internal::socket::testutil::{FakeIpSocketCtx, InnerFakeIpSocketCtx},
         socket::testutil::FakeDeviceConfig,
         SendIpPacketMeta,
     };
@@ -552,28 +552,14 @@ mod test {
         // as the outer `FakeCoreCtx` is mutably borrowed (Required to implement
         // `RawIpSocketMapContext::with_socket_map_and_state_ctx`).
         socket_map: Rc<RefCell<RawIpSocketMap<I, D::Weak, FakeBindingsCtx<D>>>>,
-        /// An inner fake implementation of `DeviceIdContext`.
-        device_id_ctx: FakeIpDeviceIdCtx<D>,
         /// An inner fake implementation of `IpSocketHandler`. By implementing
-        /// `AsRef` and `AsMut` below, the `FakeCoreCtx` will be eligible for a
-        /// blanket impl of `IpSocketHandler`.
+        /// `InnerFakeIpSocketCtx` below, the `FakeCoreCtx` will be eligible for
+        /// a blanket impl of `IpSocketHandler`.
         ip_socket_ctx: FakeIpSocketCtx<I, D>,
     }
 
-    impl<I: IpExt, D: FakeStrongDeviceId> AsRef<FakeIpDeviceIdCtx<D>> for FakeCoreCtxState<I, D> {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<D> {
-            &self.device_id_ctx
-        }
-    }
-
-    impl<I: IpExt, D: FakeStrongDeviceId> AsRef<FakeIpSocketCtx<I, D>> for FakeCoreCtxState<I, D> {
-        fn as_ref(&self) -> &FakeIpSocketCtx<I, D> {
-            &self.ip_socket_ctx
-        }
-    }
-
-    impl<I: IpExt, D: FakeStrongDeviceId> AsMut<FakeIpSocketCtx<I, D>> for FakeCoreCtxState<I, D> {
-        fn as_mut(&mut self) -> &mut FakeIpSocketCtx<I, D> {
+    impl<I: IpExt, D: FakeStrongDeviceId> InnerFakeIpSocketCtx<I, D> for FakeCoreCtxState<I, D> {
+        fn fake_ip_socket_ctx_mut(&mut self) -> &mut FakeIpSocketCtx<I, D> {
             &mut self.ip_socket_ctx
         }
     }
@@ -698,7 +684,6 @@ mod test {
             });
         let state = FakeCoreCtxState {
             socket_map: Default::default(),
-            device_id_ctx: Default::default(),
             ip_socket_ctx: FakeIpSocketCtx::new(device_configs),
         };
 

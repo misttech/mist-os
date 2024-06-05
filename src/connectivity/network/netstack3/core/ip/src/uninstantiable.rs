@@ -8,14 +8,14 @@ use netstack3_base::{socket::SocketIpAddr, EitherDeviceId, UninstantiableWrapper
 use packet::{BufferMut, Serializer};
 
 use crate::internal::{
-    base::{HopLimits, IpExt, IpLayerIpExt, TransportIpContext},
+    base::{BaseTransportIpContext, HopLimits, IpExt, IpLayerIpExt},
     socket::{
         DeviceIpSocketHandler, IpSock, IpSockCreationError, IpSockSendError, IpSocketHandler, Mms,
         MmsError, SendOptions,
     },
 };
 
-impl<I: IpExt, C, P: TransportIpContext<I, C>> TransportIpContext<I, C>
+impl<I: IpExt, C, P: BaseTransportIpContext<I, C>> BaseTransportIpContext<I, C>
     for UninstantiableWrapper<P>
 {
     type DevicesWithAddrIter<'s> = P::DevicesWithAddrIter<'s> where P: 's;

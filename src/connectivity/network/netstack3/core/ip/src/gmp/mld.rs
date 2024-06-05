@@ -441,7 +441,7 @@ mod tests {
 
     use super::*;
     use crate::internal::{
-        base::{self, testutil::FakeIpDeviceIdCtx, IpLayerPacketMetadata, SendIpPacketMeta},
+        base::{self, IpLayerPacketMetadata, SendIpPacketMeta},
         gmp::{
             GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
             QueryReceivedActions, QueryReceivedGenericAction,
@@ -470,7 +470,6 @@ mod tests {
         gmp_state: GmpState<Ipv6, FakeBindingsCtxImpl>,
         mld_enabled: bool,
         ipv6_link_local: Option<LinkLocalUnicastAddr<Ipv6Addr>>,
-        ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
     }
 
     fn new_context() -> FakeCtxImpl {
@@ -483,15 +482,8 @@ mod tests {
                 ),
                 mld_enabled: true,
                 ipv6_link_local: None,
-                ip_device_id_ctx: Default::default(),
             })
         })
-    }
-
-    impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeMldCtx {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
-            &self.ip_device_id_ctx
-        }
     }
 
     type FakeCtxImpl = CtxPair<FakeCoreCtxImpl, FakeBindingsCtxImpl>;

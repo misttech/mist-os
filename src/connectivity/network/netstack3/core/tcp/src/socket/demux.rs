@@ -21,7 +21,8 @@ use netstack3_base::{
 use netstack3_filter::TransportPacketSerializer;
 use netstack3_ip::{
     socket::{IpSockCreationError, MmsError},
-    IpTransportContext, TransparentLocalDelivery, TransportIpContext, TransportReceiveError,
+    BaseTransportIpContext, IpTransportContext, TransparentLocalDelivery, TransportIpContext,
+    TransportReceiveError,
 };
 use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder as _, Serializer};
 use packet_formats::{
@@ -620,7 +621,7 @@ where
     let mut confirm_reachable = || {
         let remote_ip = *ip_sock.remote_ip();
         let device = ip_sock.device().and_then(|weak| weak.upgrade());
-        <DC as TransportIpContext<WireI, _>>::confirm_reachable_with_destination(
+        <DC as BaseTransportIpContext<WireI, _>>::confirm_reachable_with_destination(
             core_ctx,
             bindings_ctx,
             remote_ip.into(),

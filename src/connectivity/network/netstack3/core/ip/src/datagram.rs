@@ -48,7 +48,8 @@ use thiserror::Error;
 
 use crate::internal::{
     base::{
-        self as ip, HopLimits, MulticastMembershipHandler, ResolveRouteError, TransportIpContext,
+        self as ip, BaseTransportIpContext, HopLimits, MulticastMembershipHandler,
+        ResolveRouteError, TransportIpContext,
     },
     icmp,
     socket::{
@@ -2236,10 +2237,11 @@ fn try_pick_bound_address<I: IpExt, CC: TransportIpContext<I, BC>, BC, LI>(
             // Other addresses can only be bound to if they are assigned
             // to the device.
             if !addr.addr().is_multicast() {
-                let mut assigned_to = TransportIpContext::<I, _>::get_devices_with_assigned_addr(
-                    core_ctx,
-                    addr.into(),
-                );
+                let mut assigned_to =
+                    BaseTransportIpContext::<I, _>::get_devices_with_assigned_addr(
+                        core_ctx,
+                        addr.into(),
+                    );
                 if let Some(device) = &device {
                     if !assigned_to.any(|d| device == &EitherDeviceId::Strong(d)) {
                         return Err(LocalAddressError::AddressMismatch);
@@ -4473,10 +4475,11 @@ where
 {
     core_ctx.with_transport_context(|core_ctx| match source_addr {
         Some(source_addr) => {
-            let mut devices = TransportIpContext::<A::Version, _>::get_devices_with_assigned_addr(
-                core_ctx,
-                source_addr,
-            );
+            let mut devices =
+                BaseTransportIpContext::<A::Version, _>::get_devices_with_assigned_addr(
+                    core_ctx,
+                    source_addr,
+                );
             if let Some(d) = devices.next() {
                 if devices.next() == None {
                     return Ok(d);
@@ -4760,9 +4763,12 @@ pub fn get_ip_hop_limits<
         let (options, device) = get_options_device(core_ctx, state);
         let device = device.as_ref().and_then(|d| d.upgrade());
         DatagramBoundStateContext::<I, _, _>::with_transport_context(core_ctx, |core_ctx| {
-            options.socket_options.hop_limits.get_limits_with_defaults(
-                &TransportIpContext::<I, _>::get_default_hop_limits(core_ctx, device.as_ref()),
-            )
+            options.socket_options.hop_limits.get_limits_with_defaults(&BaseTransportIpContext::<
+                I,
+                _,
+            >::get_default_hop_limits(
+                core_ctx, device.as_ref()
+            ))
         })
     })
 }
@@ -4863,7 +4869,7 @@ pub fn with_other_stack_ip_options_and_default_hop_limits<
                     DualStackDatagramBoundStateContext::<I, _, _>::with_transport_context(
                         ds,
                         |sync_ctx| {
-                            TransportIpContext::<I, _>::get_default_hop_limits(
+                            BaseTransportIpContext::<I, _>::get_default_hop_limits(
                                 sync_ctx,
                                 device.as_ref(),
                             )

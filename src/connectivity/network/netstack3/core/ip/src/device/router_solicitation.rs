@@ -250,20 +250,12 @@ mod tests {
     use test_case::test_case;
 
     use super::*;
-    use crate::internal::base::testutil::FakeIpDeviceIdCtx;
 
     struct FakeRsContext {
         max_router_solicitations: Option<NonZeroU8>,
         rs_state: RsState<FakeBindingsCtxImpl>,
         source_address: Option<UnicastAddr<Ipv6Addr>>,
         link_layer_bytes: Option<Vec<u8>>,
-        ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
-    }
-
-    impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeRsContext {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
-            &self.ip_device_id_ctx
-        }
     }
 
     #[derive(Debug, PartialEq)]
@@ -325,7 +317,6 @@ mod tests {
                     ),
                     source_address: None,
                     link_layer_bytes: None,
-                    ip_device_id_ctx: Default::default(),
                 })
             });
         RsHandler::start_router_solicitation(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId);
@@ -390,7 +381,6 @@ mod tests {
                     ),
                     source_address,
                     link_layer_bytes,
-                    ip_device_id_ctx: Default::default(),
                 })
             });
         RsHandler::start_router_solicitation(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId);

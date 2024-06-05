@@ -1735,7 +1735,6 @@ mod tests {
     use test_case::test_case;
 
     use super::*;
-    use crate::internal::base::testutil::FakeIpDeviceIdCtx;
 
     struct FakeSlaacContext {
         config: SlaacConfiguration,
@@ -1743,14 +1742,7 @@ mod tests {
         retrans_timer: Duration,
         iid: [u8; 8],
         slaac_addrs: FakeSlaacAddrs,
-        ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
         slaac_state: SlaacState<FakeBindingsCtxImpl>,
-    }
-
-    impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeSlaacContext {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
-            &self.ip_device_id_ctx
-        }
     }
 
     type FakeCoreCtxImpl = FakeCoreCtx<FakeSlaacContext, (), FakeDeviceId>;
@@ -1905,7 +1897,6 @@ mod tests {
                 retrans_timer,
                 iid: IID,
                 slaac_addrs,
-                ip_device_id_ctx: Default::default(),
                 slaac_state: SlaacState::new::<_, IntoCoreTimerCtx>(
                     bindings_ctx,
                     FakeWeakDeviceId(FakeDeviceId),

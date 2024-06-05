@@ -5054,7 +5054,7 @@ mod tests {
             IpSockSendError, Mms, MmsError, SendOptions,
         },
         testutil::DualStackSendIpPacketMeta,
-        HopLimits, IpTransportContext,
+        BaseTransportIpContext, HopLimits, IpTransportContext,
     };
     use packet::{Buf, BufferMut, ParseBuffer as _};
     use packet_formats::{
@@ -5185,9 +5185,12 @@ mod tests {
         }
     }
 
+    type InnerCoreCtx<D> =
+        FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>;
+
     struct TcpCoreCtx<D: FakeStrongDeviceId, BT: TcpBindingsTypes> {
         tcp: FakeDualStackTcpState<D, BT>,
-        ip_socket_ctx: FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,
+        ip_socket_ctx: InnerCoreCtx<D>,
     }
 
     impl<D: FakeStrongDeviceId, BT: TcpBindingsTypes> ContextProvider for TcpCoreCtx<D, BT> {
@@ -5418,31 +5421,27 @@ mod tests {
     }
 
     /// Delegate implementation to inner context.
-    impl<I, D, BC> TransportIpContext<I, BC> for TcpCoreCtx<D, BC>
+    impl<I, D, BC> BaseTransportIpContext<I, BC> for TcpCoreCtx<D, BC>
     where
         I: TcpTestIpExt,
         D: FakeStrongDeviceId,
         BC: TcpTestBindingsTypes<D>,
-        FakeDualStackIpSocketCtx<D>: TransportIpContext<I, BC, DeviceId = Self::DeviceId>,
     {
-        type DevicesWithAddrIter<'a> = <FakeDualStackIpSocketCtx<D> as TransportIpContext<I, BC>>::DevicesWithAddrIter<'a>
+        type DevicesWithAddrIter<'a> = <InnerCoreCtx<D> as BaseTransportIpContext<I, BC>>::DevicesWithAddrIter<'a>
             where Self: 'a;
 
         fn get_devices_with_assigned_addr(
             &mut self,
             addr: SpecifiedAddr<I::Addr>,
         ) -> Self::DevicesWithAddrIter<'_> {
-            TransportIpContext::<I, BC>::get_devices_with_assigned_addr(
-                &mut self.ip_socket_ctx.state,
+            BaseTransportIpContext::<I, BC>::get_devices_with_assigned_addr(
+                &mut self.ip_socket_ctx,
                 addr,
             )
         }
 
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
-            TransportIpContext::<I, BC>::get_default_hop_limits(
-                &mut self.ip_socket_ctx.state,
-                device,
-            )
+            BaseTransportIpContext::<I, BC>::get_default_hop_limits(&mut self.ip_socket_ctx, device)
         }
 
         fn confirm_reachable_with_destination(
@@ -5451,8 +5450,8 @@ mod tests {
             dst: SpecifiedAddr<I::Addr>,
             device: Option<&Self::DeviceId>,
         ) {
-            TransportIpContext::<I, BC>::confirm_reachable_with_destination(
-                &mut self.ip_socket_ctx.state,
+            BaseTransportIpContext::<I, BC>::confirm_reachable_with_destination(
+                &mut self.ip_socket_ctx,
                 bindings_ctx,
                 dst,
                 device,

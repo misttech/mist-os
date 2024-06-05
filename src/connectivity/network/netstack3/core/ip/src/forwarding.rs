@@ -296,7 +296,7 @@ pub(crate) mod testutil {
     use netstack3_base::{testutil::FakeCoreCtx, NotFoundError, StrongDeviceIdentifier};
 
     use crate::internal::{
-        base::{testutil::FakeIpDeviceIdCtx, IpStateContext},
+        base::IpStateContext,
         types::{AddableMetric, Generation, Metric},
     };
 
@@ -419,25 +419,12 @@ pub(crate) mod testutil {
     #[derivative(Default(bound = ""))]
     pub(crate) struct FakeIpForwardingContext<D> {
         disabled_devices: HashSet<D>,
-        ip_device_id_ctx: FakeIpDeviceIdCtx<D>,
     }
 
     impl<D> FakeIpForwardingContext<D> {
         #[cfg(test)]
         pub(crate) fn disabled_devices_mut(&mut self) -> &mut HashSet<D> {
             &mut self.disabled_devices
-        }
-    }
-
-    impl<D> AsRef<FakeIpDeviceIdCtx<D>> for FakeIpForwardingContext<D> {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<D> {
-            &self.ip_device_id_ctx
-        }
-    }
-
-    impl<D> AsMut<FakeIpDeviceIdCtx<D>> for FakeIpForwardingContext<D> {
-        fn as_mut(&mut self) -> &mut FakeIpDeviceIdCtx<D> {
-            &mut self.ip_device_id_ctx
         }
     }
 

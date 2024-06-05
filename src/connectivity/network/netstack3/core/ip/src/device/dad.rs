@@ -433,25 +433,15 @@ mod tests {
     use packet_formats::icmp::ndp::Options;
 
     use super::*;
-    use crate::internal::{
-        base::testutil::FakeIpDeviceIdCtx,
-        device::{testutil::FakeWeakAddressId, Ipv6DeviceAddr},
-    };
+    use crate::internal::device::{testutil::FakeWeakAddressId, Ipv6DeviceAddr};
 
     struct FakeDadAddressContext {
         addr: UnicastAddr<Ipv6Addr>,
         assigned: bool,
         groups: HashMap<MulticastAddr<Ipv6Addr>, usize>,
-        ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
     }
 
     type FakeAddressCtxImpl = FakeCoreCtx<FakeDadAddressContext, (), FakeDeviceId>;
-
-    impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeDadAddressContext {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
-            &self.ip_device_id_ctx
-        }
-    }
 
     impl IpDeviceAddressIdContext<Ipv6> for FakeAddressCtxImpl {
         type AddressId = AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>;
@@ -511,12 +501,6 @@ mod tests {
     struct DadMessageMeta {
         dst_ip: MulticastAddr<Ipv6Addr>,
         message: NeighborSolicitation,
-    }
-
-    impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeDadContext {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
-            &self.address_ctx.state.ip_device_id_ctx
-        }
     }
 
     type TestDadTimerId = DadTimerId<
@@ -608,7 +592,6 @@ mod tests {
                     addr: DAD_ADDRESS,
                     assigned: false,
                     groups: HashMap::default(),
-                    ip_device_id_ctx: Default::default(),
                 }),
             }));
         TimerHandler::handle_timer(&mut core_ctx, &mut bindings_ctx, dad_timer_id());
@@ -629,7 +612,6 @@ mod tests {
                         addr: DAD_ADDRESS,
                         assigned: false,
                         groups: HashMap::default(),
-                        ip_device_id_ctx: Default::default(),
                     }),
                 })
             });
@@ -707,7 +689,6 @@ mod tests {
                     addr: DAD_ADDRESS,
                     assigned: false,
                     groups: HashMap::default(),
-                    ip_device_id_ctx: Default::default(),
                 }),
             })
         });
@@ -759,7 +740,6 @@ mod tests {
                         addr: DAD_ADDRESS,
                         assigned: false,
                         groups: HashMap::default(),
-                        ip_device_id_ctx: Default::default(),
                     }),
                 })
             });

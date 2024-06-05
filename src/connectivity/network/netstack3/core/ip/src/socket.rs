@@ -962,41 +962,36 @@ pub(crate) mod testutil {
 
     use super::*;
     use crate::internal::{
-        base::{
-            testutil::FakeIpDeviceIdCtx, HopLimits, MulticastMembershipHandler, TransportIpContext,
-            DEFAULT_HOP_LIMITS,
-        },
+        base::{BaseTransportIpContext, HopLimits, MulticastMembershipHandler, DEFAULT_HOP_LIMITS},
         forwarding::{self, testutil::FakeIpForwardingCtx, ForwardingTable},
         types::{Destination, Entry, Metric, RawMetric},
     };
 
-    /// A fake implementation of [`IpSocketContext`].
-    ///
-    /// `IpSocketContext` is implemented for `FakeIpSocketCtx` and any
-    /// `FakeCtx<S>` where `S` implements `AsRef` and `AsMut` for
-    /// `FakeIpSocketCtx`.
+    /// A fake implementation of the traits required by the transport layer from
+    /// the IP layer.
     #[derive(Derivative, GenericOverIp)]
     #[generic_over_ip(I, Ip)]
     #[derivative(Default(bound = ""))]
-    pub(crate) struct FakeIpSocketCtx<I: Ip, D> {
+    pub struct FakeIpSocketCtx<I: Ip, D> {
         pub(crate) table: ForwardingTable<I, D>,
         forwarding: FakeIpForwardingCtx<D>,
         devices: HashMap<D, FakeDeviceState<I>>,
     }
 
-    impl<I: Ip, D> AsRef<Self> for FakeIpSocketCtx<I, D> {
-        fn as_ref(&self) -> &Self {
+    /// A trait enabling [`FakeIpSockeCtx`]'s implementations for
+    /// [`FakeCoreCtx`] with types that hold a [`FakeIpSocketCtx`] internally,
+    pub trait InnerFakeIpSocketCtx<I: Ip, D> {
+        /// Gets a mutable reference to the inner fake context.
+        fn fake_ip_socket_ctx_mut(&mut self) -> &mut FakeIpSocketCtx<I, D>;
+    }
+
+    impl<I: Ip, D> InnerFakeIpSocketCtx<I, D> for FakeIpSocketCtx<I, D> {
+        fn fake_ip_socket_ctx_mut(&mut self) -> &mut FakeIpSocketCtx<I, D> {
             self
         }
     }
 
-    impl<I: Ip, D> AsMut<Self> for FakeIpSocketCtx<I, D> {
-        fn as_mut(&mut self) -> &mut Self {
-            self
-        }
-    }
-
-    impl<I: IpExt, D: FakeStrongDeviceId, BC> TransportIpContext<I, BC> for FakeIpSocketCtx<I, D> {
+    impl<I: IpExt, D: FakeStrongDeviceId, BC> BaseTransportIpContext<I, BC> for FakeIpSocketCtx<I, D> {
         fn get_default_hop_limits(&mut self, device: Option<&D>) -> HopLimits {
             device.map_or(DEFAULT_HOP_LIMITS, |device| {
                 let hop_limit = self.get_device_state(device).default_hop_limit;
@@ -1025,71 +1020,25 @@ pub(crate) mod testutil {
     }
 
     impl<I: IpExt, D: FakeStrongDeviceId> DeviceIdContext<AnyDevice> for FakeIpSocketCtx<I, D> {
-        type DeviceId = <FakeIpDeviceIdCtx<D> as DeviceIdContext<AnyDevice>>::DeviceId;
-        type WeakDeviceId = <FakeIpDeviceIdCtx<D> as DeviceIdContext<AnyDevice>>::WeakDeviceId;
+        type DeviceId = D;
+        type WeakDeviceId = D::Weak;
     }
 
-    impl<I, D, BC> IpSocketHandler<I, BC> for FakeIpSocketCtx<I, D>
+    impl<I: IpExt, State: InnerFakeIpSocketCtx<I, D>, Meta, D: FakeStrongDeviceId, BC>
+        IpSocketHandler<I, BC> for FakeCoreCtx<State, Meta, D>
     where
-        I: IpExt,
-        D: FakeStrongDeviceId,
-    {
-        fn new_ip_socket(
-            &mut self,
-            _bindings_ctx: &mut BC,
-            device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-            local_ip: Option<SocketIpAddr<I::Addr>>,
-            remote_ip: SocketIpAddr<I::Addr>,
-            proto: I::Proto,
-        ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
-            let device = device
-                .as_ref()
-                .map(|d| d.as_strong_ref().ok_or(ResolveRouteError::Unreachable))
-                .transpose()?;
-            let device = device.as_ref().map(|d| d.as_ref());
-            let resolved_route = self.lookup_route(device, local_ip, remote_ip)?;
-            Ok(new_ip_socket(device, resolved_route, remote_ip, proto))
-        }
-
-        fn send_ip_packet<S, O>(
-            &mut self,
-            _bindings_ctx: &mut BC,
-            _socket: &IpSock<I, Self::WeakDeviceId>,
-            _body: S,
-            _mtu: Option<u32>,
-            _options: &O,
-        ) -> Result<(), IpSockSendError>
-        where
-            S: TransportPacketSerializer<I>,
-            S::Buffer: BufferMut,
-            O: SendOptions<I>,
-        {
-            panic!("FakeIpSocketCtx can't send packets, wrap it in a FakeCoreCtx instead");
-        }
-    }
-
-    impl<
-            I: IpExt,
-            State: AsRef<FakeIpSocketCtx<I, DeviceId>>
-                + AsMut<FakeIpSocketCtx<I, DeviceId>>
-                + AsRef<FakeIpDeviceIdCtx<DeviceId>>,
-            Meta,
-            DeviceId: FakeStrongDeviceId,
-            BC,
-        > IpSocketHandler<I, BC> for FakeCoreCtx<State, Meta, DeviceId>
-    where
-        FakeCoreCtx<State, Meta, DeviceId>:
+        FakeCoreCtx<State, Meta, D>:
             SendFrameContext<BC, SendIpPacketMeta<I, Self::DeviceId, SpecifiedAddr<I::Addr>>>,
     {
         fn new_ip_socket(
             &mut self,
-            bindings_ctx: &mut BC,
+            _bindings_ctx: &mut BC,
             device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
             local_ip: Option<SocketIpAddr<I::Addr>>,
             remote_ip: SocketIpAddr<I::Addr>,
             proto: I::Proto,
         ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
-            self.state.as_mut().new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto)
+            self.state.fake_ip_socket_ctx_mut().new_ip_socket(device, local_ip, remote_ip, proto)
         }
 
         fn send_ip_packet<S, O>(
@@ -1105,7 +1054,8 @@ pub(crate) mod testutil {
             S::Buffer: BufferMut,
             O: SendOptions<I>,
         {
-            let meta = self.state.as_mut().resolve_send_meta(socket, mtu, options)?;
+            let meta =
+                self.state.fake_ip_socket_ctx_mut().resolve_send_meta(socket, mtu, options)?;
             self.send_frame(bindings_ctx, meta, body).map_err(|_s| IpSockSendError::Mtu)
         }
     }
@@ -1146,26 +1096,31 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I, BC, D, State, Meta> TransportIpContext<I, BC> for FakeCoreCtx<State, Meta, D>
+    impl<I, BC, D, State, Meta> BaseTransportIpContext<I, BC> for FakeCoreCtx<State, Meta, D>
     where
         I: IpExt,
-        BC: InstantContext + TracingContext + FilterBindingsContext,
         D: FakeStrongDeviceId,
-        State: TransportIpContext<I, BC, DeviceId = D>,
+        State: InnerFakeIpSocketCtx<I, D>,
         Self: IpSocketHandler<I, BC, DeviceId = D, WeakDeviceId = FakeWeakDeviceId<D>>,
     {
-        type DevicesWithAddrIter<'a> = State::DevicesWithAddrIter<'a>
+        type DevicesWithAddrIter<'a> = Box<dyn Iterator<Item = D> + 'a>
             where Self: 'a;
 
         fn get_devices_with_assigned_addr(
             &mut self,
             addr: SpecifiedAddr<I::Addr>,
         ) -> Self::DevicesWithAddrIter<'_> {
-            TransportIpContext::<I, BC>::get_devices_with_assigned_addr(&mut self.state, addr)
+            BaseTransportIpContext::<I, BC>::get_devices_with_assigned_addr(
+                self.state.fake_ip_socket_ctx_mut(),
+                addr,
+            )
         }
 
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
-            TransportIpContext::<I, BC>::get_default_hop_limits(&mut self.state, device)
+            BaseTransportIpContext::<I, BC>::get_default_hop_limits(
+                self.state.fake_ip_socket_ctx_mut(),
+                device,
+            )
         }
 
         fn confirm_reachable_with_destination(
@@ -1174,8 +1129,8 @@ pub(crate) mod testutil {
             dst: SpecifiedAddr<I::Addr>,
             device: Option<&Self::DeviceId>,
         ) {
-            TransportIpContext::<I, BC>::confirm_reachable_with_destination(
-                &mut self.state,
+            BaseTransportIpContext::<I, BC>::confirm_reachable_with_destination(
+                self.state.fake_ip_socket_ctx_mut(),
                 bindings_ctx,
                 dst,
                 device,
@@ -1225,7 +1180,8 @@ pub(crate) mod testutil {
             Self { v4: FakeIpSocketCtx::new(v4), v6: FakeIpSocketCtx::new(v6) }
         }
 
-        fn inner_mut<I: Ip>(&mut self) -> &mut FakeIpSocketCtx<I, D> {
+        /// Returns the [`FakeIpSocketCtx`] for IP version `I`.
+        pub fn inner_mut<I: Ip>(&mut self) -> &mut FakeIpSocketCtx<I, D> {
             I::map_ip(IpInvariant(self), |IpInvariant(s)| &mut s.v4, |IpInvariant(s)| &mut s.v6)
         }
 
@@ -1286,97 +1242,8 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<D: FakeStrongDeviceId> AsRef<Self> for FakeDualStackIpSocketCtx<D> {
-        fn as_ref(&self) -> &Self {
-            self
-        }
-    }
-
-    impl<D: FakeStrongDeviceId> DeviceIdContext<AnyDevice> for FakeDualStackIpSocketCtx<D> {
-        type DeviceId = D;
-        type WeakDeviceId = D::Weak;
-    }
-
-    impl<I: IpExt, D: FakeStrongDeviceId, BC> IpSocketHandler<I, BC> for FakeDualStackIpSocketCtx<D> {
-        fn new_ip_socket(
-            &mut self,
-            bindings_ctx: &mut BC,
-            device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-            local_ip: Option<SocketIpAddr<I::Addr>>,
-            remote_ip: SocketIpAddr<I::Addr>,
-            proto: I::Proto,
-        ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
-            IpSocketHandler::<I, BC>::new_ip_socket(
-                self.inner_mut::<I>(),
-                bindings_ctx,
-                device,
-                local_ip,
-                remote_ip,
-                proto,
-            )
-        }
-
-        fn send_ip_packet<S, O>(
-            &mut self,
-            bindings_ctx: &mut BC,
-            socket: &IpSock<I, Self::WeakDeviceId>,
-            body: S,
-            mtu: Option<u32>,
-            options: &O,
-        ) -> Result<(), IpSockSendError>
-        where
-            S: TransportPacketSerializer<I>,
-            S::Buffer: BufferMut,
-            O: SendOptions<I>,
-        {
-            IpSocketHandler::<I, BC>::send_ip_packet(
-                self.inner_mut::<I>(),
-                bindings_ctx,
-                socket,
-                body,
-                mtu,
-                options,
-            )
-        }
-    }
-
-    impl<I: IpExt, Meta, DeviceId: FakeStrongDeviceId, BC> IpSocketHandler<I, BC>
-        for FakeCoreCtx<FakeDualStackIpSocketCtx<DeviceId>, Meta, DeviceId>
-    where
-        FakeCoreCtx<FakeDualStackIpSocketCtx<DeviceId>, Meta, DeviceId>:
-            SendFrameContext<BC, SendIpPacketMeta<I, Self::DeviceId, SpecifiedAddr<I::Addr>>>,
-    {
-        fn new_ip_socket(
-            &mut self,
-            bindings_ctx: &mut BC,
-            device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-            local_ip: Option<SocketIpAddr<I::Addr>>,
-            remote_ip: SocketIpAddr<I::Addr>,
-            proto: I::Proto,
-        ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
-            self.state.new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto)
-        }
-
-        fn send_ip_packet<S, O>(
-            &mut self,
-            bindings_ctx: &mut BC,
-            socket: &IpSock<I, Self::WeakDeviceId>,
-            body: S,
-            mtu: Option<u32>,
-            options: &O,
-        ) -> Result<(), IpSockSendError>
-        where
-            S: TransportPacketSerializer<I>,
-            S::Buffer: BufferMut,
-            O: SendOptions<I>,
-        {
-            let meta = self.state.inner_mut::<I>().resolve_send_meta(socket, mtu, options)?;
-            self.send_frame(bindings_ctx, meta, body).map_err(|_s| IpSockSendError::Mtu)
-        }
-    }
-
-    impl<I: IpExt, D: FakeStrongDeviceId, BC> MulticastMembershipHandler<I, BC>
-        for FakeDualStackIpSocketCtx<D>
+    impl<I: IpExt, S: InnerFakeIpSocketCtx<I, D>, Meta, D: FakeStrongDeviceId, BC>
+        MulticastMembershipHandler<I, BC> for FakeCoreCtx<S, Meta, D>
     {
         fn join_multicast_group(
             &mut self,
@@ -1385,7 +1252,7 @@ pub(crate) mod testutil {
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
             MulticastMembershipHandler::<I, BC>::join_multicast_group(
-                self.inner_mut::<I>(),
+                self.state.fake_ip_socket_ctx_mut(),
                 bindings_ctx,
                 device,
                 addr,
@@ -1399,7 +1266,7 @@ pub(crate) mod testutil {
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
             MulticastMembershipHandler::<I, BC>::leave_multicast_group(
-                self.inner_mut::<I>(),
+                self.state.fake_ip_socket_ctx_mut(),
                 bindings_ctx,
                 device,
                 addr,
@@ -1411,40 +1278,23 @@ pub(crate) mod testutil {
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) -> Result<Self::DeviceId, ResolveRouteError> {
             MulticastMembershipHandler::<I, BC>::select_device_for_multicast_group(
-                self.inner_mut::<I>(),
+                self.state.fake_ip_socket_ctx_mut(),
                 addr,
             )
         }
     }
 
-    impl<I: IpExt, D: FakeStrongDeviceId, BC> TransportIpContext<I, BC>
-        for FakeDualStackIpSocketCtx<D>
+    impl<I: Ip, D, State: InnerFakeIpSocketCtx<I, D>, Meta> InnerFakeIpSocketCtx<I, D>
+        for FakeCoreCtx<State, Meta, D>
     {
-        fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
-            TransportIpContext::<I, BC>::get_default_hop_limits(self.inner_mut::<I>(), device)
+        fn fake_ip_socket_ctx_mut(&mut self) -> &mut FakeIpSocketCtx<I, D> {
+            self.state.fake_ip_socket_ctx_mut()
         }
+    }
 
-        type DevicesWithAddrIter<'a> = alloc::boxed::Box<dyn Iterator<Item = D> + 'a>;
-
-        fn get_devices_with_assigned_addr(
-            &mut self,
-            addr: SpecifiedAddr<<I>::Addr>,
-        ) -> Self::DevicesWithAddrIter<'_> {
-            TransportIpContext::<I, BC>::get_devices_with_assigned_addr(self.inner_mut::<I>(), addr)
-        }
-
-        fn confirm_reachable_with_destination(
-            &mut self,
-            bindings_ctx: &mut BC,
-            dst: SpecifiedAddr<<I>::Addr>,
-            device: Option<&Self::DeviceId>,
-        ) {
-            TransportIpContext::<I, BC>::confirm_reachable_with_destination(
-                self.inner_mut::<I>(),
-                bindings_ctx,
-                dst,
-                device,
-            )
+    impl<I: Ip, D: FakeStrongDeviceId> InnerFakeIpSocketCtx<I, D> for FakeDualStackIpSocketCtx<D> {
+        fn fake_ip_socket_ctx_mut(&mut self) -> &mut FakeIpSocketCtx<I, D> {
+            self.inner_mut::<I>()
         }
     }
 
@@ -1523,6 +1373,22 @@ pub(crate) mod testutil {
                 })
                 .flatten()
                 .collect()
+        }
+
+        fn new_ip_socket(
+            &mut self,
+            device: Option<EitherDeviceId<&D, &D::Weak>>,
+            local_ip: Option<SocketIpAddr<I::Addr>>,
+            remote_ip: SocketIpAddr<I::Addr>,
+            proto: I::Proto,
+        ) -> Result<IpSock<I, D::Weak>, IpSockCreationError> {
+            let device = device
+                .as_ref()
+                .map(|d| d.as_strong_ref().ok_or(ResolveRouteError::Unreachable))
+                .transpose()?;
+            let device = device.as_ref().map(|d| d.as_ref());
+            let resolved_route = self.lookup_route(device, local_ip, remote_ip)?;
+            Ok(new_ip_socket(device, resolved_route, remote_ip, proto))
         }
 
         fn lookup_route(

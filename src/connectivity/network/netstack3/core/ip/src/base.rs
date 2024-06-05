@@ -273,10 +273,9 @@ impl<I: IpExt, BC, CC: DeviceIdContext<AnyDevice> + ?Sized> IpTransportContext<I
     }
 }
 
-/// The execution context provided by the IP layer to transport layer protocols.
-pub trait TransportIpContext<I: IpExt, BC>:
-    DeviceIdContext<AnyDevice> + IpSocketHandler<I, BC>
-{
+/// The base execution context provided by the IP layer to transport layer
+/// protocols.
+pub trait BaseTransportIpContext<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     /// The iterator returned by
     /// [`TransportIpContext::get_devices_with-assigned_addr`].
     type DevicesWithAddrIter<'s>: Iterator<Item = Self::DeviceId>
@@ -310,6 +309,20 @@ pub trait TransportIpContext<I: IpExt, BC>:
         dst: SpecifiedAddr<I::Addr>,
         device: Option<&Self::DeviceId>,
     );
+}
+
+/// A marker trait for the traits required by the transport layer from the IP
+/// layer.
+pub trait TransportIpContext<I: IpExt, BC>:
+    BaseTransportIpContext<I, BC> + IpSocketHandler<I, BC>
+{
+}
+
+impl<I, CC, BC> TransportIpContext<I, BC> for CC
+where
+    I: IpExt,
+    CC: BaseTransportIpContext<I, BC> + IpSocketHandler<I, BC>,
+{
 }
 
 /// Abstraction over the ability to join and leave multicast groups.
@@ -364,21 +377,20 @@ pub trait MulticastMembershipHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
 /// of `TransportIpContext` given the other requirements are met.
 pub trait UseTransportIpContextBlanket {}
 
-#[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<
-        I: IpExt,
+        I: IpLayerIpExt,
         BC,
         CC: IpDeviceContext<I, BC>
             + IpSocketHandler<I, BC>
             + IpStateContext<I, BC>
             + UseTransportIpContextBlanket,
-    > TransportIpContext<I, BC> for CC
+    > BaseTransportIpContext<I, BC> for CC
 {
     type DevicesWithAddrIter<'s> = <Vec<CC::DeviceId> as IntoIterator>::IntoIter where CC: 's;
 
     fn get_devices_with_assigned_addr(
         &mut self,
-        addr: SpecifiedAddr<<I as Ip>::Addr>,
+        addr: SpecifiedAddr<I::Addr>,
     ) -> Self::DevicesWithAddrIter<'_> {
         self.with_address_statuses(addr, |it| {
             it.filter_map(|(device, state)| is_unicast_assigned::<I>(&state).then_some(device))
@@ -400,7 +412,7 @@ impl<
     fn confirm_reachable_with_destination(
         &mut self,
         bindings_ctx: &mut BC,
-        dst: SpecifiedAddr<<I as Ip>::Addr>,
+        dst: SpecifiedAddr<I::Addr>,
         device: Option<&Self::DeviceId>,
     ) {
         match self
@@ -3052,14 +3064,8 @@ pub trait FilterHandlerProvider<I: packet_formats::ip::IpExt, BC: FilterBindings
 pub(crate) mod testutil {
     use super::*;
 
-    use core::marker::PhantomData;
-
-    use derivative::Derivative;
     use net_types::ip::IpInvariant;
-    use netstack3_base::{
-        testutil::{FakeCoreCtx, FakeInstant, FakeStrongDeviceId, FakeWeakDeviceId},
-        RngContext, SendFrameContext, SendableFrameMeta,
-    };
+    use netstack3_base::{testutil::FakeCoreCtx, SendFrameContext, SendableFrameMeta};
 
     /// A [`SendIpPacketMeta`] for dual stack contextx.
     #[derive(Debug, GenericOverIp)]
@@ -3144,51 +3150,6 @@ pub(crate) mod testutil {
                 },
             );
             dual_stack.ok_or(WrongIpVersion)
-        }
-    }
-
-    #[derive(Derivative)]
-    #[derivative(Default(bound = ""))]
-    pub(crate) struct FakeIpDeviceIdCtx<D>(PhantomData<D>);
-
-    impl<DeviceId: FakeStrongDeviceId> DeviceIdContext<AnyDevice> for FakeIpDeviceIdCtx<DeviceId> {
-        type DeviceId = DeviceId;
-        type WeakDeviceId = FakeWeakDeviceId<DeviceId>;
-    }
-
-    impl<
-            I: Ip,
-            BC: RngContext + InstantContext<Instant = FakeInstant>,
-            D: FakeStrongDeviceId,
-            State: MulticastMembershipHandler<I, BC, DeviceId = D>,
-            Meta,
-        > MulticastMembershipHandler<I, BC> for FakeCoreCtx<State, Meta, D>
-    where
-        Self: DeviceIdContext<AnyDevice, DeviceId = D>,
-    {
-        fn join_multicast_group(
-            &mut self,
-            bindings_ctx: &mut BC,
-            device: &Self::DeviceId,
-            addr: MulticastAddr<<I as Ip>::Addr>,
-        ) {
-            self.state.join_multicast_group(bindings_ctx, device, addr)
-        }
-
-        fn leave_multicast_group(
-            &mut self,
-            bindings_ctx: &mut BC,
-            device: &Self::DeviceId,
-            addr: MulticastAddr<<I as Ip>::Addr>,
-        ) {
-            self.state.leave_multicast_group(bindings_ctx, device, addr)
-        }
-
-        fn select_device_for_multicast_group(
-            &mut self,
-            addr: MulticastAddr<<I as Ip>::Addr>,
-        ) -> Result<Self::DeviceId, ResolveRouteError> {
-            self.state.select_device_for_multicast_group(addr)
         }
     }
 

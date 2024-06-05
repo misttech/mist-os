@@ -575,7 +575,7 @@ mod tests {
 
     use super::*;
     use crate::internal::{
-        base::{self, testutil::FakeIpDeviceIdCtx, IpLayerPacketMetadata, SendIpPacketMeta},
+        base::{self, IpLayerPacketMetadata, SendIpPacketMeta},
         gmp::{
             GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
             QueryReceivedActions, ReportReceivedActions, ReportTimerExpiredActions,
@@ -605,13 +605,6 @@ mod tests {
         igmp_state: IgmpState<FakeBindingsCtx>,
         igmp_enabled: bool,
         addr_subnet: Option<AddrSubnet<Ipv4Addr>>,
-        ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
-    }
-
-    impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeIgmpCtx {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
-            &self.ip_device_id_ctx
-        }
     }
 
     type FakeCtx = CtxPair<FakeCoreCtx, FakeBindingsCtx>;
@@ -869,7 +862,6 @@ mod tests {
                 ),
                 igmp_enabled: true,
                 addr_subnet: None,
-                ip_device_id_ctx: Default::default(),
             })
         });
         ctx.bindings_ctx.seed_rng(seed);
