@@ -110,5 +110,6 @@ group("tests") {
   deps = [
     ":netstack3-core-icmp-echo-test",
     ":netstack3-icmp-echo-instrumented_test($host_toolchain)",
+    "tests",
   ]
 }
