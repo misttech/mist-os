@@ -520,26 +520,6 @@ void TimerQueue::TransitionOffCpu(TimerQueue& source) {
   source.next_timer_deadline_ = ZX_TIME_INFINITE;
 }
 
-void TimerQueue::ThawPercpu(void) {
-  DEBUG_ASSERT(arch_ints_disabled());
-  Guard<MonitoredSpinLock, NoIrqSave> guard{TimerLock::Get(), SOURCE_TAG};
-
-  // Reset next_timer_deadline_ so that UpdatePlatformTimer will reconfigure the timer.
-  next_timer_deadline_ = ZX_TIME_INFINITE;
-  zx_time_t deadline = preempt_timer_deadline_;
-
-  if (!timer_list_.is_empty()) {
-    Timer& t = timer_list_.front();
-    if (t.scheduled_time_ < deadline) {
-      deadline = t.scheduled_time_;
-    }
-  }
-
-  guard.Release();
-
-  UpdatePlatformTimer(deadline);
-}
-
 void TimerQueue::PrintTimerQueues(char* buf, size_t len) {
   size_t ptr = 0;
   zx_time_t now = current_time();
