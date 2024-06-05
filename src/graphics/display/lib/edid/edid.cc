@@ -163,22 +163,19 @@ fit::result<const char*> Edid::Init(void* ctx, ddc_i2c_transact transact) {
   return Initialize();
 }
 
-fit::result<const char*> Edid::Init(const uint8_t* bytes, uint16_t len) {
-  // The maximum size of an edid is 255 * 128 bytes, so any 16 bit multiple is fine.
-  if (len == 0 || len % kBlockSize != 0) {
+fit::result<const char*> Edid::Init(cpp20::span<const uint8_t> bytes) {
+  if (bytes.empty() || bytes.size() % kBlockSize != 0) {
     return fit::error("Invalid edid length");
   }
 
   bytes_ = fbl::Vector<uint8_t>();
 
   fbl::AllocChecker alloc_checker;
-  bytes_.resize(len, 0, &alloc_checker);
+  bytes_.resize(bytes.size(), 0, &alloc_checker);
   if (!alloc_checker.check()) {
     return fit::error("Failed to allocate memory for EDID");
   }
-
-  cpp20::span<const uint8_t> bytes_span(bytes, len);
-  std::copy(bytes_span.begin(), bytes_span.end(), bytes_.begin());
+  std::copy(bytes.begin(), bytes.end(), bytes_.begin());
 
   return Initialize();
 }

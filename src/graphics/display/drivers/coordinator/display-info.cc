@@ -84,8 +84,7 @@ fit::result<const char*, DisplayInfo::Edid> InitEdidFromBytes(cpp20::span<const 
   ZX_DEBUG_ASSERT(bytes.size() <= std::numeric_limits<uint16_t>::max());
 
   DisplayInfo::Edid edid;
-  fit::result<const char*> result =
-      edid.base.Init(bytes.data(), static_cast<uint16_t>(bytes.size()));
+  fit::result<const char*> result = edid.base.Init(bytes);
   if (result.is_ok()) {
     return fit::ok(std::move(edid));
   }

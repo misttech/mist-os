@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_LIB_EDID_EDID_H_
 
 #include <lib/fit/result.h>
+#include <lib/stdcompat/span.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -329,7 +330,7 @@ class Edid {
   //
   // On error, returns a `const char*` string of static storage duration
   // containing the error message.
-  fit::result<const char*> Init(const uint8_t* bytes, uint16_t len);
+  fit::result<const char*> Init(cpp20::span<const uint8_t> bytes);
 
   void Print(void (*print_fn)(const char* str)) const;
 

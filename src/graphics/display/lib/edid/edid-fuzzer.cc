@@ -15,7 +15,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     return 0;
   }
 
-  fit::result<const char*> result = edid.Init(data, static_cast<uint16_t>(size));
+  fit::result<const char*> result = edid.Init(cpp20::span(data, size));
   if (!result.is_ok()) {
     return 0;
   }
