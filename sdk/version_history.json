@@ -70,6 +70,10 @@
             "20": {
                 "abi_revision": "0xDB83211C067E1052",
                 "status": "supported"
+            },
+            "21": {
+                "abi_revision": "0x9C462E1B5EF9AE5F",
+                "status": "in-development"
             }
         },
         "special_api_levels": {
