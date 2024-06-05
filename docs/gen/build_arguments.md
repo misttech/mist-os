@@ -350,7 +350,7 @@ From //build/images/args.gni:205
 
 **Current value for `target_cpu = "x64"`:** `"x64"`
 
-From //boards/x64.gni:40
+From //boards/x64.gni:31
 
 **Overridden from the default:** `false`
 
@@ -512,7 +512,7 @@ From //boards/arm64.gni:23
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:83
+From //build/board.gni:67
 
 **Current value for `target_cpu = "x64"`:** `"//boards/x64"`
 
@@ -520,7 +520,7 @@ From //boards/x64.gni:23
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:83
+From //build/board.gni:67
 
 ### board_core_realm_shards
 
@@ -529,7 +529,7 @@ context.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:65
+From //build/board.gni:49
 
 ### board_description
 
@@ -584,23 +584,7 @@ board's fastboot protocol.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:69
-
-### board_fshost_config
-
-A list of fshost options to add to the fshost config.
-
-**Current value (from the default):** `{ }`
-
 From //build/board.gni:53
-
-### board_host_labels
-
-A list of binary host tool labels to also build.
-
-**Current value (from the default):** `[]`
-
-From //build/board.gni:39
 
 ### board_is_emu
 
@@ -614,15 +598,15 @@ From //boards/arm64.gni:29
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:88
+From //build/board.gni:72
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:38
+From //boards/x64.gni:29
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:88
+From //build/board.gni:72
 
 ### board_is_phys
 
@@ -632,11 +616,11 @@ From //boards/arm64.gni:30
 
 **Overridden from the default:** `true`
 
-From //build/board.gni:89
+From //build/board.gni:73
 
 **Current value (from the default):** `true`
 
-From //build/board.gni:89
+From //build/board.gni:73
 
 ### board_name
 
@@ -673,7 +657,7 @@ A list of binary labels to include in the recovery ZBI.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:50
+From //build/board.gni:42
 
 ### board_recovery_package_labels
 
@@ -690,7 +674,7 @@ A list of binary labels to include in the system_image package.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:61
+From //build/board.gni:45
 
 ### board_tools
 
@@ -706,7 +690,7 @@ any kind of stable contract for users of the archive.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:80
+From //build/board.gni:64
 
 ### board_zedboot_bootfs_labels
 
@@ -714,25 +698,7 @@ A list of binary labels to include in the zedboot ZBI.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:47
-
-### board_zedboot_cmdline_args
-
-List of kernel command line arguments to bake into the zedboot image that are
-required by this board. See also zedboot_cmdline_args in
-//build/images/zedboot/BUILD.gn
-
-**Current value (from the default):** `[]`
-
-From //build/board.gni:44
-
-### board_zedboot_fshost_config
-
-A list of fshost options to add to the fshost config in the zedboot image.
-
-**Current value (from the default):** `{ }`
-
-From //build/board.gni:57
+From //build/board.gni:39
 
 ### bootfs_only
 
@@ -1434,7 +1400,7 @@ Controls whether to promote warnings to errors.
 
 **Current value (from the default):** `true`
 
-From //build/config/BUILD.gn:37
+From //build/config/BUILD.gn:38
 
 ### dev_bootfs_labels
 
@@ -2874,7 +2840,7 @@ remove this option when the issues are addressed.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILD.gn:33
+From //build/config/BUILD.gn:34
 
 ### enable_grpc_ares
 
@@ -5443,7 +5409,7 @@ From //boards/arm64.gni:42
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:94
+From //build/board.gni:78
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
@@ -5451,7 +5417,7 @@ From //boards/common/x64-common.gni:63
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:94
+From //build/board.gni:78
 
 ### partitions_config_label
 
@@ -5464,7 +5430,7 @@ From //boards/arm64.gni:41
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:93
+From //build/board.gni:77
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
@@ -5472,7 +5438,7 @@ From //boards/common/x64-common.gni:62
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:93
+From //build/board.gni:77
 
 ### perfetto_build_with_android
 
@@ -5634,7 +5600,7 @@ Example:
 
 **Current value (from the default):** `[]`
 
-From //build/assembly/developer_overrides.gni:284
+From //build/assembly/developer_overrides.gni:331
 
 ### product_bootfs_packages
 
