@@ -349,6 +349,8 @@
     </p>
   examples:
     - fidl: 'fuchsia.element'
+    - fidl: 'fuchsia.session'
+    - fidl: 'fuchsia.session.power'
 
 - name: 'Software Delivery'
   api_primary: 'kevinwells@google.com'
