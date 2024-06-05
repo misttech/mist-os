@@ -9,7 +9,7 @@ use assembly_config_schema::{
     assembly_config::{AssemblyInputBundle, CompiledPackageDefinition, ShellCommands},
     board_config::{BoardInputBundle, HardwareInfo},
     common::PackagedDriverDetails,
-    developer_overrides::{DeveloperOnlyOptions, KernelOptions},
+    developer_overrides::{DeveloperOnlyOptions, DeveloperOverrides},
     image_assembly_config::{BoardDriverArguments, KernelConfig},
     platform_config::BuildType,
     product_config::{ProductConfigData, ProductPackageDetails, ProductPackagesConfig},
@@ -112,16 +112,23 @@ impl ImageAssemblyConfigBuilder {
     /// Add developer overrides to the builder
     pub fn add_developer_overrides(
         &mut self,
-        developer_only_options: DeveloperOnlyOptions,
-        kernel_options: KernelOptions,
-        packages: Vec<PackageDetails>,
-        packages_to_compile: Vec<CompiledPackageDefinition>,
+        developer_overrides: DeveloperOverrides,
     ) -> Result<()> {
+        let DeveloperOverrides {
+            target_name: _,
+            developer_only_options,
+            kernel,
+            platform: _,
+            packages,
+            packages_to_compile,
+            shell_commands,
+        } = developer_overrides;
+
         // Set the developer-only options for the buidler to use.
         self.developer_only_options = Some(developer_only_options);
 
         // Add the kernel command line args from the developer
-        self.kernel_args.extend(kernel_options.command_line_args.into_iter());
+        self.kernel_args.extend(kernel.command_line_args.into_iter());
 
         // Add packages specified by the developer
         for package_details in packages {
@@ -137,6 +144,12 @@ impl ImageAssemblyConfigBuilder {
                     compiled_package_def.name
                 )
             })?;
+        }
+
+        for (package, binaries) in shell_commands {
+            for binary in binaries {
+                self.add_shell_command_entry(&package, binary)?;
+            }
         }
 
         Ok(())

@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/product_assembly_config_file_impl.gni")
-import("//build/group_with_inputs.gni")
+import("//build/python/python_action.gni")
 
 # Define developer overrides for product assembly
 #
@@ -64,6 +64,19 @@ import("//build/group_with_inputs.gni")
 #    cause an error like:
 #      "no dependency provides the input <package_name>/bootfs_files.json"
 #
+#  shell_commands (optional; default: empty)
+#    [list of scopes] A list of scopes that describe the shell commands for each
+#    listed package (the packages need to be separately included in the desired
+#    package set).
+#
+#    Example:
+#    shell_commands = [
+#      {
+#        "package_name = "//third_party/sbase"
+#        components = [ "ls" ]
+#      },
+#    ]
+#
 #  compiled_packages [optional]
 #     [list of GN scopes] List of GN scopes of `CompiledPackageDefinition`s
 #     that describe packages that are to be built dynamically by Assembly, for
@@ -108,17 +121,21 @@ template("assembly_developer_overrides") {
     # So it can be reused.
     target_name = target_name
 
-    assembly_overrides = "${target_name}.product_assembly_overrides.json"
+    assembly_overrides_intermediate =
+        "${target_name}.product_assembly_overrides.intermediate.json"
 
     # This is a second target created by the product_assembly_config_file()
     # template that wraps up all the input file labels found in the product and
     # platform config with the deps that are passed to this template.
-    assembly_overrides_inputs = "${assembly_overrides}.inputs"
+    assembly_overrides_intermediate_inputs =
+        "${assembly_overrides_intermediate}.inputs"
   }
 
   files = {
     outdir = "$target_out_dir/$target_name"
     assembly_config_file = "$outdir/product_assembly_overrides.json"
+    assembly_config_file_intermediate =
+        "$outdir/product_assembly_overrides.intermediate.json"
   }
 
   creation_inputs = []
@@ -190,20 +207,39 @@ template("assembly_developer_overrides") {
 
       # Gather the core shards as input files
       if (defined(package.components)) {
-        components = []
+        _components = []
         foreach(entry, package.components) {
           creation_inputs += entry.shards
-          components += [
+          _components += [
             {
               forward_variables_from(entry, "*", [ "shards" ])
               shards = rebase_path(entry.shards, root_build_dir)
             },
           ]
         }
-        _package.components = components
+        _package.components = _components
       }
 
       _compiled_packages += [ _package ]
+    }
+  }
+
+  _shell_commands = []
+  if (defined(invoker.shell_commands)) {
+    foreach(shell_command, invoker.shell_commands) {
+      assert(
+          defined(shell_command.package),
+          "shell_command entries must specify a package name: ${shell_command}")
+      assert(
+          defined(shell_command.components),
+          "shell_command components must be a list of strings pointing to binaries that are components in the package that make up the package: ${shell_command}")
+      _package_name = get_label_info(shell_command.package, "name")
+      _shell_commands += [
+        {
+          package = _package_name
+          components = shell_command.components
+        },
+      ]
     }
   }
 
@@ -217,6 +253,7 @@ template("assembly_developer_overrides") {
                            ])
     packages = _packages
     packages_to_compile = _compiled_packages
+    shell_commands = _shell_commands
   }
 
   # Generate the overrides configuration file itself.
@@ -226,7 +263,7 @@ template("assembly_developer_overrides") {
   # converted from GN paths into rebased file paths.  See the template's file
   # for more information on those paths.
   #
-  product_assembly_config_file(labels.assembly_overrides) {
+  product_assembly_config_file(labels.assembly_overrides_intermediate) {
     forward_variables_from(invoker,
                            [
                              "deps",
@@ -234,23 +271,33 @@ template("assembly_developer_overrides") {
                              "testonly",
                            ])
     visibility = [ ":${labels.target_name}" ]
-    outputs = [ files.assembly_config_file ]
+    outputs = [ files.assembly_config_file_intermediate ]
     product_assembly_config = _assembly_overrides
   }
 
-  group_with_inputs(labels.target_name) {
+  python_action(labels.target_name) {
     forward_variables_from(invoker,
                            [
                              "testonly",
                              "visibility",
                            ])
+    binary_label = "//build/assembly/scripts:developer_overrides"
+
     public_deps = [
-      ":${labels.assembly_overrides_inputs}",
-      ":${labels.assembly_overrides}",
+      ":${labels.assembly_overrides_intermediate_inputs}",
+      ":${labels.assembly_overrides_intermediate}",
     ]
 
-    inputs = creation_inputs
+    inputs = creation_inputs + [ files.assembly_config_file_intermediate ]
     deps = creation_deps
+    outputs = [ files.assembly_config_file ]
+
+    args = [
+      "--input",
+      rebase_path(files.assembly_config_file_intermediate, root_build_dir),
+      "--output",
+      rebase_path(files.assembly_config_file, root_build_dir),
+    ]
 
     # Block all metadata walks for packages, distribution entries, etc.  These
     # inputs should not exist in metadata walks, as they are added via the paths

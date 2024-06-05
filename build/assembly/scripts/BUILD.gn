@@ -124,6 +124,11 @@ python_binary("validate_config_data_is_empty") {
   deps = [ "//build/python/modules/serialization" ]
 }
 
+python_binary("developer_overrides") {
+  main_source = "developer_overrides.py"
+  deps = [ "//build/python/modules/serialization" ]
+}
+
 group("tests") {
   testonly = true
   deps = [
