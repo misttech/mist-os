@@ -44,7 +44,7 @@ use crate::bindings::{
     devices::{BindingId, Devices},
     routes,
     util::{ConversionContext as _, IntoFidl as _, TryIntoFidlWithContext as _},
-    Ctx, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
+    Ctx, InspectPublisher, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
 };
 
 struct LogFormatter;
@@ -266,8 +266,10 @@ impl TestStack {
         let inspector = Arc::new(fuchsia_inspect::Inspector::default());
         let netstack = seed.netstack.clone();
         let inspector_cloned = inspector.clone();
-        let task =
-            fasync::Task::spawn(async move { seed.serve(services, &inspector_cloned).await });
+        let task = fasync::Task::spawn(async move {
+            let inspect_publisher = InspectPublisher::new_for_test(&inspector_cloned);
+            seed.serve(services, inspect_publisher).await
+        });
 
         Self {
             netstack,

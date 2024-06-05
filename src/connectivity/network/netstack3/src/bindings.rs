@@ -65,6 +65,7 @@ use devices::{
 use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceUpdate};
 use resource_removal::{ResourceRemovalSink, ResourceRemovalWorker};
 
+use crate::bindings::{interfaces_watcher::AddressPropertiesUpdate, util::TaskWaitGroup};
 use net_types::{
     ethernet::Mac,
     ip::{AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv6, Mtu},
@@ -93,6 +94,8 @@ use netstack3_core::{
     ReferenceNotifiers, RngContext, StackState, TimerBindingsTypes, TimerContext, TimerId,
     TracingContext,
 };
+
+pub(crate) use inspect::InspectPublisher;
 
 mod ctx {
     use super::*;
@@ -219,8 +222,6 @@ mod ctx {
 }
 
 pub(crate) use ctx::{BindingsCtx, Ctx, NetstackSeed};
-
-use crate::bindings::{interfaces_watcher::AddressPropertiesUpdate, util::TaskWaitGroup};
 
 /// Extends the methods available to [`DeviceId`].
 trait DeviceIdExt {
@@ -1171,7 +1172,7 @@ impl NetstackSeed {
     pub(crate) async fn serve<S: futures::Stream<Item = Service>>(
         self,
         services: S,
-        inspector: &fuchsia_inspect::Inspector,
+        inspect_publisher: InspectPublisher<'_>,
     ) {
         info!("serving netstack with netstack3");
 
@@ -1263,6 +1264,7 @@ impl NetstackSeed {
         }
         .fuse();
 
+        let inspector = inspect_publisher.inspector();
         let inspect_nodes = {
             // The presence of the health check node is useful even though the
             // status will always be OK because the same node exists
@@ -1536,6 +1538,10 @@ impl NetstackSeed {
                 })
                 .await
         };
+
+        // We just let this be destroyed on drop because it's effectively tied
+        // to the lifecycle of the entire component.
+        let _inspect_task = inspect_publisher.publish();
 
         {
             let services_fut = services_fut.fuse();
