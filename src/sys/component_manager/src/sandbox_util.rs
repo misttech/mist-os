@@ -4,12 +4,14 @@
 
 use {
     crate::model::{
-        component::{ComponentInstance, WeakComponentInstance},
+        component::{
+            ComponentInstance, ExtendedInstance, WeakComponentInstance, WeakExtendedInstance,
+        },
         routing::router_ext::{RouterExt, WeakComponentTokenExt},
     },
     ::routing::{
         capability_source::CapabilitySource, component_instance::ComponentInstanceInterface,
-        error::RoutingError, policy::GlobalPolicyChecker,
+        error::ComponentInstanceError, error::RoutingError, policy::GlobalPolicyChecker,
     },
     async_trait::async_trait,
     cm_util::WeakTaskGroup,
@@ -60,6 +62,10 @@ impl std::fmt::Debug for LaunchTaskOnReceive {
     }
 }
 
+fn cm_unexpected() -> RouterError {
+    RoutingError::from(ComponentInstanceError::ComponentManagerInstanceUnexpected {}).into()
+}
+
 impl LaunchTaskOnReceive {
     pub fn new(
         task_group: WeakTaskGroup,
@@ -103,7 +109,10 @@ impl LaunchTaskOnReceive {
         #[async_trait]
         impl Routable for LaunchTaskRouter {
             async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-                Ok(self.inner.clone().into_sender(request.target.to_instance()).into())
+                let WeakExtendedInstance::Component(target) = request.target.to_instance() else {
+                    return Err(cm_unexpected());
+                };
+                Ok(self.inner.clone().into_sender(target).into())
             }
         }
         Router::new(LaunchTaskRouter { inner: Arc::new(self) })
@@ -200,8 +209,11 @@ impl<T: Routable + 'static> RoutableExt for T {
         #[async_trait]
         impl Routable for OnReadableRouter {
             async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-                let target =
-                    request.target.clone().to_instance().upgrade().map_err(RoutingError::from)?;
+                let ExtendedInstance::Component(target) =
+                    request.target.clone().to_instance().upgrade().map_err(RoutingError::from)?
+                else {
+                    return Err(cm_unexpected());
+                };
                 let entry = self.router.clone().into_directory_entry(
                     request,
                     self.entry_type,
@@ -488,7 +500,7 @@ pub mod tests {
         let capability = router
             .route(Request {
                 availability: Availability::Required,
-                target: WeakComponentToken::new(component.as_weak()),
+                target: WeakComponentToken::new_component(component.as_weak()),
             })
             .await
             .unwrap();
@@ -539,7 +551,7 @@ pub mod tests {
         let capability = router
             .route(Request {
                 availability: Availability::Required,
-                target: WeakComponentToken::new(component.as_weak()),
+                target: WeakComponentToken::new_component(component.as_weak()),
             })
             .await
             .unwrap();

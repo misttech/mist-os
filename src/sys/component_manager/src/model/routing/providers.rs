@@ -52,7 +52,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
                 // request to run hooks.
                 Request {
                     availability: Availability::Transitional,
-                    target: WeakComponentToken::new(self.target.clone()),
+                    target: WeakComponentToken::new_component(self.target.clone()),
                 },
             )
             .await?

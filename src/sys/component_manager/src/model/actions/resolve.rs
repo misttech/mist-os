@@ -137,7 +137,7 @@ async fn do_resolve(
         state.set(InstanceState::Resolved(resolved_state));
     }
 
-    let weak = sandbox::WeakComponentToken::new(WeakComponentInstance::new(component));
+    let weak = sandbox::WeakComponentToken::new_component(WeakComponentInstance::new(component));
     let event = component
         .new_event(EventPayload::Resolved { component: weak, decl: component_info.decl.clone() });
     component.hooks.dispatch(&event).await;

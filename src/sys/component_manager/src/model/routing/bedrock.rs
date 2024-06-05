@@ -37,7 +37,7 @@ impl UseRouteRequest {
             Self::UseProtocol(decl) => {
                 let request = Request {
                     availability: decl.availability,
-                    target: WeakComponentToken::new(target.clone()),
+                    target: WeakComponentToken::new_component(target.clone()),
                 };
                 let Some(capability) = program_input_dict.get_capability(&decl.target_path) else {
                     panic!(

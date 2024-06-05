@@ -12,8 +12,8 @@ use {
         model::{
             actions::{shutdown, ActionsManager, DiscoverAction, StopAction},
             component::{
-                Component, ComponentInstance, IncarnationId, Package, StartReason,
-                WeakComponentInstance, WeakExtendedInstance,
+                Component, ComponentInstance, ExtendedInstance, IncarnationId, Package,
+                StartReason, WeakComponentInstance, WeakExtendedInstance,
             },
             context::ModelContext,
             environment::Environment,
@@ -44,6 +44,7 @@ use {
         component_instance::{
             ComponentInstanceInterface, ResolvedInstanceInterface, ResolvedInstanceInterfaceExt,
         },
+        error::ComponentInstanceError,
         resolving::{ComponentAddress, ComponentResolutionContext},
         DictExt,
     },
@@ -68,7 +69,8 @@ use {
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::future::BoxFuture,
     hooks::{CapabilityReceiver, EventPayload},
-    moniker::{ChildName, Moniker},
+    moniker::{ChildName, ExtendedMoniker, Moniker},
+    router_error::RouterError,
     sandbox::{
         Capability, CapabilityTrait, Dict, Open, Request, Routable, Router, WeakComponentToken,
     },
@@ -610,7 +612,7 @@ impl ResolvedInstanceState {
     /// so allocation cost is paid only when called.
     pub async fn make_exposed_dict(&self) -> Dict {
         let dict = Router::dict_routers_to_open(
-            &WeakComponentToken::new(self.weak_component.clone()),
+            &WeakComponentToken::new_component(self.weak_component.clone()),
             &self.weak_component.upgrade().unwrap().execution_scope,
             &self.sandbox.component_output_dict,
         );
@@ -1267,15 +1269,26 @@ struct CapabilityRequestedHook {
 
 #[async_trait]
 impl Routable for CapabilityRequestedHook {
-    async fn route(&self, request: Request) -> Result<Capability, router_error::RouterError> {
+    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
+        fn cm_unexpected() -> RouterError {
+            RoutingError::from(ComponentInstanceError::ComponentManagerInstanceUnexpected {}).into()
+        }
+
+        let ExtendedMoniker::ComponentInstance(target_moniker) = request.target.moniker() else {
+            return Err(cm_unexpected());
+        };
         self.source
             .ensure_started(&StartReason::AccessCapability {
-                target: request.target.moniker().clone(),
+                target: target_moniker,
                 name: self.name.clone(),
             })
             .await?;
         let source = self.source.upgrade().map_err(RoutingError::from)?;
-        let target = request.target.upgrade().map_err(RoutingError::from)?;
+        let ExtendedInstance::Component(target) =
+            request.target.upgrade().map_err(RoutingError::from)?
+        else {
+            return Err(cm_unexpected());
+        };
         let (receiver, sender) = CapabilityReceiver::new();
         let event = target.new_event(EventPayload::CapabilityRequested {
             source_moniker: source.moniker.clone(),

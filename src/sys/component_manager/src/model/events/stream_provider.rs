@@ -184,11 +184,7 @@ impl Hook for EventStreamProvider {
                 self.on_component_destroyed(target_moniker).await;
             }
             EventPayload::Resolved { decl, component, .. } => {
-                self.on_component_resolved(
-                    &WeakExtendedInstance::Component(component.clone().to_instance()),
-                    decl,
-                )
-                .await?;
+                self.on_component_resolved(component.as_ref(), decl).await?;
             }
             _ => {}
         }

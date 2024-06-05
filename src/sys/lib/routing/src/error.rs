@@ -25,6 +25,8 @@ pub enum ComponentInstanceError {
     InstanceNotFound { moniker: Moniker },
     #[error("component manager instance unavailable")]
     ComponentManagerInstanceUnavailable {},
+    #[error("expected a component instance, but got component manager's instance")]
+    ComponentManagerInstanceUnexpected {},
     #[error("malformed url {} for component instance {}", url, moniker)]
     MalformedUrl { url: String, moniker: Moniker },
     #[error("url {} for component {} does not resolve to an absolute url", url, moniker)]
@@ -47,7 +49,10 @@ impl ComponentInstanceError {
             | ComponentInstanceError::InstanceNotFound { .. }
             | ComponentInstanceError::ComponentManagerInstanceUnavailable {}
             | ComponentInstanceError::NoAbsoluteUrl { .. } => zx::Status::NOT_FOUND,
-            ComponentInstanceError::MalformedUrl { .. } => zx::Status::INTERNAL,
+            ComponentInstanceError::MalformedUrl { .. }
+            | ComponentInstanceError::ComponentManagerInstanceUnexpected { .. } => {
+                zx::Status::INTERNAL
+            }
         }
     }
 

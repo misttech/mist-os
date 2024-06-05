@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::capability::CapabilitySource;
-use crate::model::component::ComponentInstance;
-use crate::model::component::WeakComponentInstance;
+use crate::model::component::ExtendedInstance;
+use crate::model::component::{WeakComponentInstance, WeakExtendedInstance};
 use ::routing::{
     error::{ComponentInstanceError, RoutingError},
     policy::GlobalPolicyChecker,
@@ -13,6 +13,7 @@ use async_trait::async_trait;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use futures::future::BoxFuture;
+use moniker::ExtendedMoniker;
 use router_error::{Explain, RouterError};
 use sandbox::Capability;
 use sandbox::Dict;
@@ -212,10 +213,13 @@ impl PolicyCheckRouter {
 #[async_trait]
 impl Routable for PolicyCheckRouter {
     async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-        match self
-            .policy_checker
-            .can_route_capability(&self.capability_source, &request.target.moniker())
-        {
+        let ExtendedMoniker::ComponentInstance(moniker) = request.target.moniker() else {
+            return Err(RoutingError::from(
+                ComponentInstanceError::ComponentManagerInstanceUnexpected {},
+            )
+            .into());
+        };
+        match self.policy_checker.can_route_capability(&self.capability_source, &moniker) {
             Ok(()) => self.router.route(request).await,
             Err(policy_error) => Err(RoutingError::PolicyError(policy_error).into()),
         }
@@ -225,24 +229,29 @@ impl Routable for PolicyCheckRouter {
 /// A trait to add functions WeakComponentInstancethat know about the component
 /// manager types.
 pub trait WeakComponentTokenExt {
-    /// Create a new token.
-    fn new(instance: WeakComponentInstance) -> WeakComponentToken;
+    /// Create a new token for a component instance or component_manager.
+    fn new(instance: WeakExtendedInstance) -> WeakComponentToken;
+
+    /// Create a new token for a component instance.
+    fn new_component(instance: WeakComponentInstance) -> WeakComponentToken {
+        WeakComponentToken::new(WeakExtendedInstance::Component(instance))
+    }
 
     /// Upgrade this token to the underlying instance.
-    fn to_instance(self) -> WeakComponentInstance;
+    fn to_instance(self) -> WeakExtendedInstance;
 
     /// Get a reference to the underlying instance.
-    fn as_ref(&self) -> &WeakComponentInstance;
+    fn as_ref(&self) -> &WeakExtendedInstance;
 
     /// Get a strong reference to the underlying instance.
-    fn upgrade(&self) -> Result<Arc<ComponentInstance>, ComponentInstanceError>;
+    fn upgrade(&self) -> Result<ExtendedInstance, ComponentInstanceError>;
 
     /// Get the moniker for this component.
-    fn moniker(&self) -> moniker::Moniker;
+    fn moniker(&self) -> moniker::ExtendedMoniker;
 
     #[cfg(test)]
     fn invalid() -> WeakComponentToken {
-        WeakComponentToken::new(WeakComponentInstance::invalid())
+        WeakComponentToken::new_component(WeakComponentInstance::invalid())
     }
 }
 
@@ -250,7 +259,7 @@ pub trait WeakComponentTokenExt {
 // crate so we can't implement WeakComponentTokenAny for it.
 #[derive(Debug)]
 pub struct WeakComponentInstanceExt {
-    inner: WeakComponentInstance,
+    inner: WeakExtendedInstance,
 }
 impl sandbox::WeakComponentTokenAny for WeakComponentInstanceExt {
     fn as_any(&self) -> &dyn std::any::Any {
@@ -259,26 +268,26 @@ impl sandbox::WeakComponentTokenAny for WeakComponentInstanceExt {
 }
 
 impl WeakComponentTokenExt for WeakComponentToken {
-    fn new(instance: WeakComponentInstance) -> WeakComponentToken {
-        WeakComponentToken { inner: Arc::new(WeakComponentInstanceExt { inner: instance }) }
+    fn new(instance: WeakExtendedInstance) -> Self {
+        Self { inner: Arc::new(WeakComponentInstanceExt { inner: instance }) }
     }
 
-    fn to_instance(self) -> WeakComponentInstance {
+    fn to_instance(self) -> WeakExtendedInstance {
         self.as_ref().clone()
     }
 
-    fn as_ref(&self) -> &WeakComponentInstance {
+    fn as_ref(&self) -> &WeakExtendedInstance {
         match self.inner.as_any().downcast_ref::<WeakComponentInstanceExt>() {
             Some(instance) => &instance.inner,
             None => panic!(),
         }
     }
 
-    fn upgrade(&self) -> Result<Arc<ComponentInstance>, ComponentInstanceError> {
+    fn upgrade(&self) -> Result<ExtendedInstance, ComponentInstanceError> {
         self.as_ref().upgrade()
     }
 
-    fn moniker(&self) -> moniker::Moniker {
-        self.as_ref().moniker.clone()
+    fn moniker(&self) -> moniker::ExtendedMoniker {
+        self.as_ref().extended_moniker()
     }
 }
