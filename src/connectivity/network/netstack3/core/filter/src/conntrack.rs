@@ -223,8 +223,15 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
         bindings_ctx: &BC,
         packet: &P,
     ) -> Option<Connection<I, BC, E>> {
-        let tuple = Tuple::from_packet(packet)?;
+        Tuple::from_packet(packet)
+            .map(|t| self.get_connection_for_tuple_and_update(bindings_ctx, t))
+    }
 
+    fn get_connection_for_tuple_and_update(
+        &self,
+        bindings_ctx: &BC,
+        tuple: Tuple<I>,
+    ) -> Connection<I, BC, E> {
         let mut connection = match self.inner.lock().table.get(&tuple) {
             Some(connection) => Connection::Shared(connection.clone()),
             None => {
@@ -233,7 +240,7 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
         };
 
         match connection.update(bindings_ctx, &tuple) {
-            Ok(()) => Some(connection),
+            Ok(()) => connection,
             Err(e) => match e {
                 ConnectionUpdateError::NonMatchingTuple => {
                     panic!(

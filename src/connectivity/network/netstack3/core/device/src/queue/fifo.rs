@@ -7,11 +7,9 @@
 use alloc::collections::VecDeque;
 
 use derivative::Derivative;
-use packet::{GrowBufferMut, ParseBuffer, Serializer};
 
 use crate::internal::queue::{
-    DequeueResult, EnqueueResult, ReceiveQueueFullError, TransmitQueueFrameError,
-    MAX_RX_QUEUED_LEN, MAX_TX_QUEUED_LEN,
+    DequeueResult, EnqueueResult, ReceiveQueueFullError, MAX_RX_QUEUED_LEN, MAX_TX_QUEUED_LEN,
 };
 
 /// A FiFo (First In, First Out) queue.
@@ -59,7 +57,7 @@ impl<Meta, Buffer> Queue<Meta, Buffer> {
     }
 }
 
-impl<Meta, Buffer: ParseBuffer> Queue<Meta, Buffer> {
+impl<Meta, Buffer> Queue<Meta, Buffer> {
     /// Attempts to add the RX frame to the queue.
     pub(super) fn queue_rx_frame(
         &mut self,
@@ -83,31 +81,35 @@ impl<Meta, Buffer: ParseBuffer> Queue<Meta, Buffer> {
     }
 }
 
-impl<Meta, Buffer: GrowBufferMut> Queue<Meta, Buffer> {
+impl<Meta, Buffer> Queue<Meta, Buffer> {
     /// Attempts to add the tx frame to the queue.
-    pub(crate) fn queue_tx_frame<
-        S: Serializer,
-        F: FnOnce(S) -> Result<Buffer, TransmitQueueFrameError<S>>,
-    >(
-        &mut self,
-        meta: Meta,
-        body: S,
-        get_buffer: F,
-    ) -> Result<EnqueueResult, TransmitQueueFrameError<S>> {
+    ///
+    /// The returned `QueueTxInserter` can insert a single entry into the queue.
+    pub(crate) fn tx_inserter(&mut self) -> Option<QueueTxInserter<'_, Meta, Buffer>> {
         let Self { items } = self;
-
         let len = items.len();
-        if len == MAX_TX_QUEUED_LEN {
-            return Err(TransmitQueueFrameError::QueueFull(body));
-        }
+        (len < MAX_TX_QUEUED_LEN).then(|| QueueTxInserter { queue: self, len })
+    }
+}
 
-        items.push_back((meta, get_buffer(body)?));
+/// A type witnessing that a [`Queue`] has insertion space.
+pub(super) struct QueueTxInserter<'a, Meta, Buffer> {
+    /// The queue we're inserting into.
+    queue: &'a mut Queue<Meta, Buffer>,
+    /// The length of the `queue` upon `QueueTxInserter`'s creation.
+    len: usize,
+}
 
-        Ok(if len == 0 {
+impl<'a, Meta, Buffer> QueueTxInserter<'a, Meta, Buffer> {
+    /// Inserts a single entry in the queue.
+    pub(crate) fn insert(self, meta: Meta, buffer: Buffer) -> EnqueueResult {
+        let Self { queue: Queue { items }, len } = self;
+        items.push_back((meta, buffer));
+        if len == 0 {
             EnqueueResult::QueueWasPreviouslyEmpty
         } else {
             EnqueueResult::QueuePreviouslyWasOccupied
-        })
+        }
     }
 }
 

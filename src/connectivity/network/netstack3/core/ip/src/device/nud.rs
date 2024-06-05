@@ -6,7 +6,7 @@
 
 use alloc::{
     collections::{
-        hash_map::{Entry, HashMap},
+        hash_map::{self, Entry, HashMap},
         BinaryHeap, VecDeque,
     },
     vec::Vec,
@@ -27,9 +27,9 @@ use net_types::{
 use netstack3_base::{
     socket::{SocketIpAddr, SocketIpAddrExt as _},
     AddressResolutionFailed, AnyDevice, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
-    EventContext, HandleableTimer, Instant, InstantBindingsTypes, LinkAddress, LinkDevice,
-    LinkUnicastAddress, LocalTimerHeap, StrongDeviceIdentifier, TimerBindingsTypes, TimerContext,
-    WeakDeviceIdentifier,
+    DeviceIdentifier, EventContext, HandleableTimer, Instant, InstantBindingsTypes, LinkAddress,
+    LinkDevice, LinkUnicastAddress, LocalTimerHeap, StrongDeviceIdentifier, TimerBindingsTypes,
+    TimerContext, WeakDeviceIdentifier,
 };
 use packet::{
     Buf, BufferMut, GrowBuffer as _, ParsablePacket as _, ParseBufferMut as _, Serializer,
@@ -405,12 +405,11 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
         }
     }
 
-    fn new_with_pending_frame<I, CC, BC, DeviceId>(
+    fn new<I, CC, BC, DeviceId>(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         timers: &mut TimerHeap<I, BC>,
         neighbor: SpecifiedAddr<I::Addr>,
-        frame: Buf<Vec<u8>>,
     ) -> Self
     where
         I: Ip,
@@ -421,7 +420,7 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
     {
         let mut this = Incomplete {
             transmit_counter: Some(core_ctx.max_multicast_solicit()),
-            pending_frames: [frame].into(),
+            pending_frames: VecDeque::new(),
             notifiers: Vec::new(),
             _marker: PhantomData,
         };
@@ -1632,11 +1631,19 @@ pub struct NudState<I: Ip, D: LinkDevice, BT: NudBindingsTypes<D>> {
     timer_heap: TimerHeap<I, BT>,
 }
 
-#[cfg(any(test, feature = "testutils"))]
 impl<I: Ip, D: LinkDevice, BT: NudBindingsTypes<D>> NudState<I, D, BT> {
     /// Returns current neighbors.
+    #[cfg(any(test, feature = "testutils"))]
     pub fn neighbors(&self) -> &HashMap<SpecifiedAddr<I::Addr>, NeighborState<D, BT>> {
         &self.neighbors
+    }
+
+    fn entry_and_timer_heap(
+        &mut self,
+        addr: SpecifiedAddr<I::Addr>,
+    ) -> (Entry<'_, SpecifiedAddr<I::Addr>, NeighborState<D, BT>>, &mut TimerHeap<I, BT>) {
+        let Self { neighbors, timer_heap, .. } = self;
+        (neighbors.entry(addr), timer_heap)
     }
 }
 
@@ -2371,16 +2378,14 @@ impl<
                             //   7.3.3.
                             //
                             // [RFC 4861 section 7.2.3]: https://tools.ietf.org/html/rfc4861#section-7.2.3
-                            let state = e.insert(NeighborState::Dynamic(
-                                DynamicNeighborState::Stale(Stale { link_address }),
-                            ));
-                            let event = Event::added(
+                            insert_new_entry(
+                                bindings_ctx,
                                 device_id,
-                                state.to_event_state(),
-                                neighbor,
-                                bindings_ctx.now(),
+                                e,
+                                NeighborState::Dynamic(DynamicNeighborState::Stale(Stale {
+                                    link_address,
+                                })),
                             );
-                            bindings_ctx.on_event(event);
 
                             // This entry is not currently in active use; if we are currently over
                             // the maximum amount of entries, schedule garbage collection.
@@ -2456,31 +2461,20 @@ impl<
         S: Serializer,
         S::Buffer: BufferMut,
     {
-        let do_multicast_solicit = self.with_nud_state_mut_and_sender_ctx(
-            device_id,
-            |NudState { neighbors, last_gc: _, timer_heap }, core_ctx| {
-                match neighbors.entry(lookup_addr) {
+        let do_multicast_solicit =
+            self.with_nud_state_mut_and_sender_ctx(device_id, |state, core_ctx| {
+                let (entry, timer_heap) = state.entry_and_timer_heap(lookup_addr);
+                match entry {
                     Entry::Vacant(e) => {
-                        let state = e.insert(NeighborState::Dynamic(
-                            DynamicNeighborState::Incomplete(Incomplete::new_with_pending_frame(
-                                core_ctx,
-                                bindings_ctx,
-                                timer_heap,
-                                lookup_addr,
-                                body.serialize_vec_outer()
-                                    .map_err(|(_err, s)| s)?
-                                    .map_a(|b| Buf::new(b.as_ref().to_vec(), ..))
-                                    .into_inner(),
-                            )),
-                        ));
-                        let event = Event::added(
+                        let mut incomplete =
+                            Incomplete::new(core_ctx, bindings_ctx, timer_heap, lookup_addr);
+                        incomplete.queue_packet(body)?;
+                        insert_new_entry(
+                            bindings_ctx,
                             device_id,
-                            state.to_event_state(),
-                            lookup_addr,
-                            bindings_ctx.now(),
+                            e,
+                            NeighborState::Dynamic(DynamicNeighborState::Incomplete(incomplete)),
                         );
-                        bindings_ctx.on_event(event);
-
                         Ok(true)
                     }
                     Entry::Occupied(e) => {
@@ -2516,8 +2510,7 @@ impl<
                         }
                     }
                 }
-            },
-        )?;
+            })?;
 
         if do_multicast_solicit {
             self.send_neighbor_solicitation(
@@ -2530,6 +2523,23 @@ impl<
 
         Ok(())
     }
+}
+
+fn insert_new_entry<
+    I: Ip,
+    D: LinkDevice,
+    DeviceId: DeviceIdentifier,
+    BC: NudBindingsContext<I, D, DeviceId>,
+>(
+    bindings_ctx: &mut BC,
+    device_id: &DeviceId,
+    vacant: hash_map::VacantEntry<'_, SpecifiedAddr<I::Addr>, NeighborState<D, BC>>,
+    entry: NeighborState<D, BC>,
+) {
+    let lookup_addr = *vacant.key();
+    let state = vacant.insert(entry);
+    let event = Event::added(device_id, state.to_event_state(), lookup_addr, bindings_ctx.now());
+    bindings_ctx.on_event(event);
 }
 
 /// Confirm upper-layer forward reachability to the specified neighbor through

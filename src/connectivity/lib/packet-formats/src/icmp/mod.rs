@@ -453,12 +453,10 @@ impl<B: ByteSlice, I: IcmpIpExt, M: IcmpMessage<I>> ParsablePacket<B, ()>
     }
 
     fn parse<BV: BufferView<B>>(mut buffer: BV, _args: ()) -> ParseResult<Self> {
-        let header = buffer
-            .take_obj_front::<Header<M>>()
-            .ok_or_else(debug_err_fn!(ParseError::Format, "too few bytes for header"))?;
+        let header = buffer.take_obj_front::<Header<M>>().ok_or(ParseError::Format)?;
         let message_body = buffer.into_rest();
         if header.prefix.msg_type != M::TYPE.into() {
-            return debug_err!(Err(ParseError::NotExpected), "unexpected message type");
+            return Err(ParseError::NotExpected);
         }
         Ok(IcmpPacketRaw { header, message_body, _marker: PhantomData })
     }
@@ -475,17 +473,13 @@ impl<B: ByteSlice, I: IcmpIpExt, M: IcmpMessage<I>>
     ) -> ParseResult<Self> {
         let IcmpPacketRaw { header, message_body, _marker } = raw;
         if !M::EXPECTS_BODY && !message_body.is_empty() {
-            return debug_err!(Err(ParseError::Format), "unexpected message body");
+            return Err(ParseError::Format);
         }
-        let _: M::Code = M::code_from_u8(header.prefix.code).ok_or_else(debug_err_fn!(
-            ParseError::Format,
-            "unrecognized code: {}",
-            header.prefix.code
-        ))?;
+        let _: M::Code = M::code_from_u8(header.prefix.code).ok_or(ParseError::Format)?;
         let checksum = Self::compute_checksum(&header, &message_body, args.src_ip, args.dst_ip)
-            .ok_or_else(debug_err_fn!(ParseError::Format, "packet too large"))?;
+            .ok_or(ParseError::Format)?;
         if checksum != [0, 0] {
-            return debug_err!(Err(ParseError::Checksum), "invalid checksum");
+            return Err(ParseError::Checksum);
         }
         let message_body = M::Body::parse(message_body)?;
         Ok(IcmpPacket { header, message_body, _marker })

@@ -29,7 +29,7 @@ use crate::internal::{
         IpLayerPacketMetadata, ResolveRouteError, SendIpPacketMeta,
     },
     device::{state::IpDeviceStateIpExt, IpDeviceAddr},
-    types::{ResolvedRoute, RoutableIpAddr},
+    types::{NextHop, ResolvedRoute, RoutableIpAddr},
 };
 
 /// An execution context defining a type of IP socket.
@@ -496,7 +496,7 @@ fn send_ip_packet<I, S, BC, CC, O>(
     options: &O,
 ) -> Result<(), IpSockSendError>
 where
-    I: IpExt + IpDeviceStateIpExt + packet_formats::ip::IpExt,
+    I: IpExt + IpDeviceStateIpExt,
     S: TransportPacketSerializer<I>,
     S::Buffer: BufferMut,
     BC: IpSocketBindingsContext,
@@ -506,22 +506,39 @@ where
 {
     trace_duration!(bindings_ctx, c"ip::send_packet");
 
-    let IpSock { definition: IpSockDefinition { remote_ip, local_ip, device, proto } } = socket;
-    let device = match device.as_ref().map(|d| d.upgrade()) {
-        Some(Some(device)) => Some(device),
-        Some(None) => return Err(ResolveRouteError::Unreachable.into()),
-        None => None,
-    };
-
-    let ResolvedRoute { src_addr: got_local_ip, local_delivery_device: _, device, next_hop } =
-        core_ctx
+    // Extracted to a function without the serializer parameter to ease code
+    // generation.
+    fn resolve<
+        I: IpExt + IpDeviceStateIpExt,
+        CC: IpSocketContext<I, BC>,
+        BC: IpSocketBindingsContext,
+    >(
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
+        socket: &IpSock<I, CC::WeakDeviceId>,
+    ) -> Result<(ResolvedRoute<I, CC::DeviceId>, SocketIpAddr<I::Addr>, I::Proto), IpSockSendError>
+    {
+        let IpSock { definition: IpSockDefinition { remote_ip, local_ip, device, proto } } = socket;
+        let device = match device.as_ref().map(|d| d.upgrade()) {
+            Some(Some(device)) => Some(device),
+            Some(None) => return Err(ResolveRouteError::Unreachable.into()),
+            None => None,
+        };
+        let route = core_ctx
             .lookup_route(bindings_ctx, device.as_ref(), Some(*local_ip), *remote_ip)
             .map_err(|e| IpSockSendError::Unroutable(e))?;
-    assert_eq!(local_ip, &got_local_ip);
+        assert_eq!(local_ip, &route.src_addr);
+        Ok((route, *remote_ip, *proto))
+    }
+    let (
+        ResolvedRoute { src_addr: local_ip, local_delivery_device: _, device, next_hop },
+        remote_ip,
+        proto,
+    ) = resolve(core_ctx, bindings_ctx, socket)?;
 
     // TODO(https://fxbug.dev/318717702): when we implement NAT, perform re-routing
     // after the LOCAL_EGRESS hook since the packet may have been changed.
-    let mut packet = filter::TxPacket::new(local_ip.addr(), remote_ip.addr(), *proto, &mut body);
+    let mut packet = filter::TxPacket::new(local_ip.addr(), remote_ip.addr(), proto, &mut body);
 
     let mut packet_metadata = IpLayerPacketMetadata::default();
     match core_ctx.filter_handler().local_egress_hook(
@@ -537,32 +554,47 @@ where
         filter::Verdict::Accept => {}
     }
 
-    let Some(local_ip) = SpecifiedAddr::new(packet.src_addr()) else {
-        return Err(IpSockSendError::Unroutable(ResolveRouteError::NoSrcAddr));
-    };
-    let Some(remote_ip) = SpecifiedAddr::new(packet.dst_addr()) else {
-        return Err(IpSockSendError::Unroutable(ResolveRouteError::Unreachable));
-    };
-
-    let (next_hop, broadcast) = next_hop.into_next_hop_and_broadcast_marker(remote_ip);
-
-    IpSocketContext::send_ip_packet(
-        core_ctx,
-        bindings_ctx,
-        SendIpPacketMeta {
-            device: &device,
+    // Extracted to a function without the serializer parameter to ease code
+    // generation.
+    fn resolve_metadata<I: IpExt, O: SendOptions<I> + ?Sized, D>(
+        local_ip: I::Addr,
+        remote_ip: I::Addr,
+        next_hop: NextHop<I::Addr>,
+        options: &O,
+        mtu: Option<u32>,
+        device: D,
+        proto: I::Proto,
+    ) -> Result<SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>, IpSockSendError> {
+        let Some(local_ip) = SpecifiedAddr::new(local_ip) else {
+            return Err(IpSockSendError::Unroutable(ResolveRouteError::NoSrcAddr));
+        };
+        let Some(remote_ip) = SpecifiedAddr::new(remote_ip) else {
+            return Err(IpSockSendError::Unroutable(ResolveRouteError::Unreachable));
+        };
+        let (next_hop, broadcast) = next_hop.into_next_hop_and_broadcast_marker(remote_ip);
+        Ok(SendIpPacketMeta {
+            device,
             src_ip: local_ip,
             dst_ip: remote_ip,
             broadcast,
             next_hop,
             ttl: options.hop_limit(&remote_ip),
-            proto: *proto,
+            proto,
             mtu,
-        },
-        body,
-        packet_metadata,
-    )
-    .map_err(|_s| IpSockSendError::Mtu)
+        })
+    }
+
+    let meta = resolve_metadata(
+        packet.src_addr(),
+        packet.dst_addr(),
+        next_hop,
+        options,
+        mtu,
+        &device,
+        proto,
+    )?;
+    IpSocketContext::send_ip_packet(core_ctx, bindings_ctx, meta, body, packet_metadata)
+        .map_err(|_s| IpSockSendError::Mtu)
 }
 
 /// Enables a blanket implementation of [`DeviceIpSocketHandler`].

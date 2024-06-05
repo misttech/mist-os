@@ -88,6 +88,47 @@ pub(crate) enum RoutineResult<I: IpExt> {
     },
 }
 
+impl<I: IpExt> RoutineResult<I> {
+    fn is_terminal(&self) -> bool {
+        match self {
+            RoutineResult::Accept
+            | RoutineResult::Drop
+            | RoutineResult::TransparentLocalDelivery { .. }
+            | RoutineResult::Redirect { .. } => true,
+            RoutineResult::Return => false,
+        }
+    }
+}
+
+fn apply_transparent_proxy<I: IpExt, P: MaybeTransportPacket>(
+    proxy: &TransparentProxy<I>,
+    dst_addr: I::Addr,
+    maybe_transport_packet: P,
+) -> RoutineResult<I> {
+    let (addr, port) = match proxy {
+        TransparentProxy::LocalPort(port) => (dst_addr, *port),
+        TransparentProxy::LocalAddr(addr) => {
+            let Some(transport_packet) = maybe_transport_packet.transport_packet() else {
+                // We ensure that TransparentProxy rules are always accompanied by a
+                // TCP or UDP matcher when filtering state is provided to Core, but
+                // given this invariant is enforced far from here, we log an error
+                // and drop the packet, which would likely happen at the transport
+                // layer anyway.
+                error!(
+                    "transparent proxy action is only valid on a rule that matches \
+                    on transport protocol, but this packet has no transport header",
+                );
+                return RoutineResult::Drop;
+            };
+            let port = NonZeroU16::new(transport_packet.dst_port())
+                .expect("TCP and UDP destination port is always non-zero");
+            (*addr, port)
+        }
+        TransparentProxy::LocalAddrAndPort(addr, port) => (*addr, *port),
+    };
+    RoutineResult::TransparentLocalDelivery { addr, port }
+}
+
 fn check_routine<I, P, D, DeviceClass>(
     Routine { rules }: &Routine<I, DeviceClass, ()>,
     packet: &P,
@@ -106,38 +147,19 @@ where
                 Action::Drop => return RoutineResult::Drop,
                 // TODO(https://fxbug.dev/332739892): enforce some kind of maximum depth on the
                 // routine graph to prevent a stack overflow here.
-                Action::Jump(target) => match check_routine(target.get(), packet, interfaces) {
-                    result @ (RoutineResult::Accept
-                    | RoutineResult::Drop
-                    | RoutineResult::TransparentLocalDelivery { .. }
-                    | RoutineResult::Redirect { .. }) => return result,
-                    RoutineResult::Return => continue,
-                },
+                Action::Jump(target) => {
+                    let result = check_routine(target.get(), packet, interfaces);
+                    if result.is_terminal() {
+                        return result;
+                    }
+                    continue;
+                }
                 Action::TransparentProxy(proxy) => {
-                    let (addr, port) = match proxy {
-                        TransparentProxy::LocalPort(port) => (packet.dst_addr(), *port),
-                        TransparentProxy::LocalAddr(addr) => {
-                            let maybe_transport_packet = packet.transport_packet();
-                            let Some(transport_packet) = maybe_transport_packet.transport_packet()
-                            else {
-                                // We ensure that TransparentProxy rules are always accompanied by a
-                                // TCP or UDP matcher when filtering state is provided to Core, but
-                                // given this invariant is enforced far from here, we log an error
-                                // and drop the packet, which would likely happen at the transport
-                                // layer anyway.
-                                error!(
-                                    "transparent proxy action is only valid on a rule that matches \
-                                    on transport protocol, but this packet has no transport header",
-                                );
-                                return RoutineResult::Drop;
-                            };
-                            let port = NonZeroU16::new(transport_packet.dst_port())
-                                .expect("TCP and UDP destination port is always non-zero");
-                            (*addr, port)
-                        }
-                        TransparentProxy::LocalAddrAndPort(addr, port) => (*addr, *port),
-                    };
-                    return RoutineResult::TransparentLocalDelivery { addr, port };
+                    return apply_transparent_proxy(
+                        proxy,
+                        packet.dst_addr(),
+                        packet.transport_packet(),
+                    );
                 }
                 Action::Redirect { dst_port } => {
                     return RoutineResult::Redirect { dst_port: dst_port.clone() }
