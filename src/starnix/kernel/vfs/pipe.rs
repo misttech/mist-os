@@ -9,8 +9,8 @@ use crate::{
     vfs::{
         buffers::{
             Buffer, InputBuffer, InputBufferCallback, MessageData, MessageQueue, OutputBuffer,
-            OutputBufferCallback, PeekBufferSegmentsCallback, UserBuffersInputBuffer,
-            UserBuffersOutputBuffer,
+            OutputBufferCallback, PeekBufferSegmentsCallback, PipeMessageData,
+            UserBuffersInputBuffer, UserBuffersOutputBuffer,
         },
         default_fcntl, default_ioctl, fileops_impl_nonseekable, CacheMode, FileHandle, FileObject,
         FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeInfo, FsStr,
@@ -45,7 +45,7 @@ fn round_up(value: usize, increment: usize) -> usize {
 
 #[derive(Debug)]
 pub struct Pipe {
-    messages: MessageQueue,
+    messages: MessageQueue<PipeMessageData>,
 
     waiters: WaitQueue,
 
@@ -556,7 +556,7 @@ impl<'a> OutputBuffer for SpliceOutputBuffer<'a> {
         }?;
         let bytes_len = bytes.len();
         if bytes_len > 0 {
-            self.pipe.messages.write_message(bytes.into());
+            self.pipe.messages.write_message(PipeMessageData::from(bytes).into());
             self.pipe.notify_write();
             self.available -= bytes_len;
         }
@@ -575,7 +575,7 @@ impl<'a> OutputBuffer for SpliceOutputBuffer<'a> {
         let bytes = vec![0; self.available];
         let len = bytes.len();
         if len > 0 {
-            self.pipe.messages.write_message(bytes.into());
+            self.pipe.messages.write_message(PipeMessageData::from(bytes).into());
             self.pipe.notify_write();
             self.available -= len;
         }
@@ -894,7 +894,7 @@ impl PipeFileObject {
 
         let bytes_transferred = data.read_each(&mut |bytes| {
             let actual = std::cmp::min(bytes.len(), available);
-            pipe.messages.write_message(bytes[0..actual].to_vec().into());
+            pipe.messages.write_message(PipeMessageData::from(bytes[0..actual].to_vec()).into());
             available -= actual;
             Ok(actual)
         })?;

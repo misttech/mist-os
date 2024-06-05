@@ -454,3 +454,66 @@ impl MessageData for Vec<u8> {
         self.truncate(limit)
     }
 }
+
+#[derive(Debug)]
+pub enum PipeMessageData {
+    Owned(Vec<u8>),
+}
+
+impl From<Vec<u8>> for PipeMessageData {
+    fn from(v: Vec<u8>) -> Self {
+        Self::Owned(v)
+    }
+}
+
+impl MessageData for PipeMessageData {
+    fn copy_from_user(data: &mut dyn InputBuffer, limit: usize) -> Result<Self, Errno> {
+        data.read_to_vec_exact(limit).map(Self::Owned)
+    }
+
+    fn ptr(&self) -> *const u8 {
+        match self {
+            Self::Owned(d) => d.as_ptr(),
+        }
+    }
+
+    fn with_bytes<O, F: FnMut(&[u8]) -> O>(&self, mut f: F) -> O {
+        match self {
+            Self::Owned(d) => f(d),
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Self::Owned(d) => d.len(),
+        }
+    }
+
+    fn split_off(&mut self, index: usize) -> Option<Self> {
+        if index < self.len() {
+            match self {
+                Self::Owned(d) => Some(Self::Owned(d.split_off(index))),
+            }
+        } else {
+            None
+        }
+    }
+
+    fn copy_to_user(&self, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
+        match self {
+            Self::Owned(d) => data.write(d.as_ref()),
+        }
+    }
+
+    fn clone_at_most(&self, limit: usize) -> Self {
+        match self {
+            Self::Owned(d) => Self::Owned(d[0..std::cmp::min(self.len(), limit)].to_vec()),
+        }
+    }
+
+    fn truncate(&mut self, limit: usize) {
+        match self {
+            Self::Owned(d) => d.truncate(limit),
+        }
+    }
+}
