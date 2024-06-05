@@ -92,6 +92,7 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
     // Completer saved to reply to a StartAndWait power aware FIDL call.
     std::optional<StartAndWaitCompleter::Async> power_enabled_wait_completer;
     uint64_t start_ticks_left = 0;
+    uint64_t last_ticks = 0;
   };
 
   static constexpr size_t kNumberOfTimers = 9;

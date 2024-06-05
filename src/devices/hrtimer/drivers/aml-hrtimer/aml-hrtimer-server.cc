@@ -92,18 +92,19 @@ void AmlHrtimerServer::Timer::HandleIrq(async_dispatcher_t* dispatcher, async::I
                                         zx_status_t status,
                                         const zx_packet_interrupt_t* interrupt) {
   // Do not log canceled cases; these happen particularly frequently in certain test cases.
-  if (status != ZX_ERR_CANCELED) {
-    FDF_LOG(INFO, "Timer IRQ triggered: %s", zx_status_get_string(status));
+  if (status != ZX_ERR_CANCELED && status != ZX_OK) {
+    FDF_LOG(INFO, "IRQ timer id: %zu triggered: %s", properties.id, zx_status_get_string(status));
   }
 
   if (properties.extend_max_ticks && start_ticks_left > std::numeric_limits<uint16_t>::max()) {
-    start_ticks_left -= std::numeric_limits<uint16_t>::max();
     // Log re-triggering since it may wakeup the system.
-    FDF_LOG(INFO, "Re-trigger timer ticks left: %lu", start_ticks_left);
+    FDF_LOG(INFO, "Timer id: %zu IRQ re-trigger, start ticks left: %lu", properties.id,
+            start_ticks_left);
+    start_ticks_left -= std::numeric_limits<uint16_t>::max();
     size_t timer_index = TimerIndexFromId(properties.id);
     auto start_result = parent.StartHardware(timer_index);
     if (start_result.is_error()) {
-      FDF_LOG(ERROR, "Could not restart the hardware for timer index: %zu", timer_index);
+      FDF_LOG(ERROR, "Could not restart the hardware for timer id: %zu", properties.id);
       if (power_enabled_wait_completer) {
         power_enabled_wait_completer->Reply(
             zx::error(fuchsia_hardware_hrtimer::DriverError::kBadState));
@@ -111,6 +112,9 @@ void AmlHrtimerServer::Timer::HandleIrq(async_dispatcher_t* dispatcher, async::I
       }
     }
   } else {
+    ZX_ASSERT(last_ticks == start_ticks_left);
+    FDF_LOG(INFO, "Timer id: %zu IRQ%s triggered, last ticks: %lu", properties.id,
+            power_enabled_wait_completer ? " w/wait" : "", last_ticks);
     if (power_enabled_wait_completer) {
       // Before we ack the irq we take a lease to prevent the system from suspending while we
       // notify any clients.
@@ -311,7 +315,7 @@ void AmlHrtimerServer::Start(StartRequest& request, StartCompleter::Sync& comple
   }
   timers_[timer_index].start_ticks_left = request.ticks();
   if (!request.resolution().duration()) {
-    FDF_LOG(ERROR, "Invalid resolution, no duration for timer index: %zu", timer_index);
+    FDF_LOG(ERROR, "Invalid resolution, no duration for timer id: %zu", request.id());
     completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kInvalidArgs));
     return;
   }
@@ -324,7 +328,7 @@ void AmlHrtimerServer::Start(StartRequest& request, StartCompleter::Sync& comple
   if (timers_[timer_index].irq.is_valid()) {
     zx_status_t status = timers_[timer_index].irq_handler.Begin(dispatcher_);
     if (status == ZX_ERR_ALREADY_EXISTS) {
-      FDF_LOG(WARNING, "IRQ handler already started for timer id: %lu", request.id());
+      FDF_LOG(DEBUG, "IRQ handler already setup for timer id: %lu", request.id());
     }
   }
   completer.Reply(zx::ok());
@@ -362,7 +366,7 @@ void AmlHrtimerServer::StartAndWait(StartAndWaitRequest& request,
   }
   timers_[timer_index].start_ticks_left = request.ticks();
   if (!request.resolution().duration()) {
-    FDF_LOG(ERROR, "Invalid resolution, no duration for timer index: %zu", timer_index);
+    FDF_LOG(ERROR, "Invalid resolution, no duration for timer id: %zu", request.id());
     completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kInvalidArgs));
     return;
   }
@@ -375,31 +379,31 @@ void AmlHrtimerServer::StartAndWait(StartAndWaitRequest& request,
   timers_[timer_index].power_enabled_wait_completer.emplace(completer.ToAsync());
   zx_status_t status = timers_[timer_index].irq_handler.Begin(dispatcher_);
   if (status == ZX_ERR_ALREADY_EXISTS) {
-    FDF_LOG(WARNING, "IRQ handler already started for timer id: %lu", request.id());
+    FDF_LOG(DEBUG, "IRQ handler already setup for timer id: %lu", request.id());
   }
 }
 
 fit::result<const fuchsia_hardware_hrtimer::DriverError> AmlHrtimerServer::StartHardware(
     size_t timer_index) {
-  uint32_t count_16bits_max = 0;
-  const uint64_t ticks = timers_[timer_index].start_ticks_left;
+  const uint64_t start_ticks = timers_[timer_index].start_ticks_left;
+  uint32_t current_ticks = 0;
+  uint64_t id = timers_properties_[timer_index].id;
   switch (timers_properties_[timer_index].max_ticks_support) {
     case MaxTicks::k16Bit:
       if (timers_properties_[timer_index].extend_max_ticks &&
-          ticks > std::numeric_limits<uint16_t>::max()) {
-        count_16bits_max = std::numeric_limits<uint16_t>::max();
+          start_ticks > std::numeric_limits<uint16_t>::max()) {
+        current_ticks = std::numeric_limits<uint16_t>::max();
       } else {
-        if (ticks > std::numeric_limits<uint16_t>::max()) {
-          FDF_LOG(ERROR, "Invalid ticks range: %lu for timer index: %zu", ticks, timer_index);
+        if (start_ticks > std::numeric_limits<uint16_t>::max()) {
+          FDF_LOG(ERROR, "Invalid ticks range: %lu for timer id: %zu", start_ticks, id);
           return fit::error(fuchsia_hardware_hrtimer::DriverError::kInvalidArgs);
         }
-        count_16bits_max = static_cast<uint32_t>(ticks);
+        current_ticks = static_cast<uint32_t>(start_ticks);
       }
       break;
     case MaxTicks::k64Bit:
       break;
   }
-  FDF_LOG(TRACE, "Timer index: %zu ticks: %lu", timer_index, ticks);
   uint32_t input_clock_selection = 0;
   const uint64_t resolution_nsecs = timers_[timer_index].resolution_nsecs;
   if (timers_properties_[timer_index].supports_1usec &&
@@ -414,11 +418,10 @@ fit::result<const fuchsia_hardware_hrtimer::DriverError> AmlHrtimerServer::Start
       case zx::msec(1).to_nsecs():   input_clock_selection = 3; break;
         // clang-format on
       default:
-        FDF_LOG(ERROR, "Invalid resolution: %lu nsecs for timer index: %zu", resolution_nsecs,
-                timer_index);
+        FDF_LOG(ERROR, "Invalid resolution: %lu nsecs for timer id: %zu", resolution_nsecs, id);
         return fit::error(fuchsia_hardware_hrtimer::DriverError::kInvalidArgs);
     }
-    FDF_LOG(TRACE, "Timer index: %zu resolution: %lu nsecs", timer_index, resolution_nsecs);
+    FDF_LOG(TRACE, "Timer id: %zu resolution: %lu nsecs", id, resolution_nsecs);
   } else if (timers_properties_[timer_index].supports_1usec &&
              timers_properties_[timer_index].supports_10usecs &&
              timers_properties_[timer_index].supports_100usecs) {
@@ -429,23 +432,18 @@ fit::result<const fuchsia_hardware_hrtimer::DriverError> AmlHrtimerServer::Start
           case zx::usec(100).to_nsecs(): input_clock_selection = 3; break;
         // clang-format on
       default:
-        FDF_LOG(ERROR, "Invalid resolution: %lu nsecs for timer index: %zu", resolution_nsecs,
-                timer_index);
+        FDF_LOG(ERROR, "Invalid resolution: %lu nsecs for timer id: %zu", resolution_nsecs, id);
         return fit::error(fuchsia_hardware_hrtimer::DriverError::kInvalidArgs);
     }
-    FDF_LOG(TRACE, "Timer index: %zu resolution: %lu nsecs", timer_index, resolution_nsecs);
+    FDF_LOG(TRACE, "Timer id: %zu resolution: %lu nsecs", id, resolution_nsecs);
   } else {
-    FDF_LOG(ERROR, "Invalid resolution state, unsupported combination for timer index: %zu",
-            timer_index);
+    FDF_LOG(ERROR, "Invalid resolution state, unsupported combination for timer id: %zu", id);
     return fit::error(fuchsia_hardware_hrtimer::DriverError::kInternalError);
   }
 
   switch (timer_index) {
     case 0:
-      IsaTimerA::Get()
-          .ReadFrom(&*mmio_)
-          .set_starting_count_value(count_16bits_max)
-          .WriteTo(&*mmio_);
+      IsaTimerA::Get().ReadFrom(&*mmio_).set_starting_count_value(current_ticks).WriteTo(&*mmio_);
       IsaTimerMux::Get()
           .ReadFrom(&*mmio_)
           .set_TIMERA_EN(true)
@@ -454,10 +452,7 @@ fit::result<const fuchsia_hardware_hrtimer::DriverError> AmlHrtimerServer::Start
           .WriteTo(&*mmio_);
       break;
     case 1:
-      IsaTimerB::Get()
-          .ReadFrom(&*mmio_)
-          .set_starting_count_value(count_16bits_max)
-          .WriteTo(&*mmio_);
+      IsaTimerB::Get().ReadFrom(&*mmio_).set_starting_count_value(current_ticks).WriteTo(&*mmio_);
       IsaTimerMux::Get()
           .ReadFrom(&*mmio_)
           .set_TIMERB_EN(true)
@@ -466,10 +461,7 @@ fit::result<const fuchsia_hardware_hrtimer::DriverError> AmlHrtimerServer::Start
           .WriteTo(&*mmio_);
       break;
     case 2:
-      IsaTimerC::Get()
-          .ReadFrom(&*mmio_)
-          .set_starting_count_value(count_16bits_max)
-          .WriteTo(&*mmio_);
+      IsaTimerC::Get().ReadFrom(&*mmio_).set_starting_count_value(current_ticks).WriteTo(&*mmio_);
       IsaTimerMux::Get()
           .ReadFrom(&*mmio_)
           .set_TIMERC_EN(true)
@@ -478,10 +470,7 @@ fit::result<const fuchsia_hardware_hrtimer::DriverError> AmlHrtimerServer::Start
           .WriteTo(&*mmio_);
       break;
     case 3:
-      IsaTimerD::Get()
-          .ReadFrom(&*mmio_)
-          .set_starting_count_value(count_16bits_max)
-          .WriteTo(&*mmio_);
+      IsaTimerD::Get().ReadFrom(&*mmio_).set_starting_count_value(current_ticks).WriteTo(&*mmio_);
       IsaTimerMux::Get()
           .ReadFrom(&*mmio_)
           .set_TIMERD_EN(true)
@@ -497,10 +486,7 @@ fit::result<const fuchsia_hardware_hrtimer::DriverError> AmlHrtimerServer::Start
       IsaTimerE::Get().ReadFrom(&*mmio_).set_current_count_value(0).WriteTo(&*mmio_);
       break;
     case 5:
-      IsaTimerF::Get()
-          .ReadFrom(&*mmio_)
-          .set_starting_count_value(count_16bits_max)
-          .WriteTo(&*mmio_);
+      IsaTimerF::Get().ReadFrom(&*mmio_).set_starting_count_value(current_ticks).WriteTo(&*mmio_);
       IsaTimerMux1::Get()
           .ReadFrom(&*mmio_)
           .set_TIMERF_EN(true)
@@ -509,10 +495,7 @@ fit::result<const fuchsia_hardware_hrtimer::DriverError> AmlHrtimerServer::Start
           .WriteTo(&*mmio_);
       break;
     case 6:
-      IsaTimerG::Get()
-          .ReadFrom(&*mmio_)
-          .set_starting_count_value(count_16bits_max)
-          .WriteTo(&*mmio_);
+      IsaTimerG::Get().ReadFrom(&*mmio_).set_starting_count_value(current_ticks).WriteTo(&*mmio_);
       IsaTimerMux1::Get()
           .ReadFrom(&*mmio_)
           .set_TIMERG_EN(true)
@@ -521,10 +504,7 @@ fit::result<const fuchsia_hardware_hrtimer::DriverError> AmlHrtimerServer::Start
           .WriteTo(&*mmio_);
       break;
     case 7:
-      IsaTimerH::Get()
-          .ReadFrom(&*mmio_)
-          .set_starting_count_value(count_16bits_max)
-          .WriteTo(&*mmio_);
+      IsaTimerH::Get().ReadFrom(&*mmio_).set_starting_count_value(current_ticks).WriteTo(&*mmio_);
       IsaTimerMux1::Get()
           .ReadFrom(&*mmio_)
           .set_TIMERH_EN(true)
@@ -533,10 +513,7 @@ fit::result<const fuchsia_hardware_hrtimer::DriverError> AmlHrtimerServer::Start
           .WriteTo(&*mmio_);
       break;
     case 8:
-      IsaTimerI::Get()
-          .ReadFrom(&*mmio_)
-          .set_starting_count_value(count_16bits_max)
-          .WriteTo(&*mmio_);
+      IsaTimerI::Get().ReadFrom(&*mmio_).set_starting_count_value(current_ticks).WriteTo(&*mmio_);
       IsaTimerMux1::Get()
           .ReadFrom(&*mmio_)
           .set_TIMERI_EN(true)
@@ -545,9 +522,12 @@ fit::result<const fuchsia_hardware_hrtimer::DriverError> AmlHrtimerServer::Start
           .WriteTo(&*mmio_);
       break;
     default:
-      FDF_LOG(ERROR, "Invalid internal state for timer index: %zu", timer_index);
+      FDF_LOG(ERROR, "Invalid internal state for timer id: %zu", id);
       return fit::error(fuchsia_hardware_hrtimer::DriverError::kInternalError);
   }
+  timers_[timer_index].last_ticks = current_ticks;
+  FDF_LOG(DEBUG, "Timer id: %zu started, start ticks left: %lu last ticks: %lu", id,
+          timers_[timer_index].start_ticks_left, timers_[timer_index].last_ticks);
   return fit::success();
 }
 
