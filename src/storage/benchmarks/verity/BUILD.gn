@@ -98,10 +98,10 @@ fuchsia_test_package("verity-benchmarks") {
     "//src/starnix/containers/debian:debian_package",
   ]
 
-  # We don't enable this test on Astro because of the potential for it to cause extra flash wear
-  # on that device type.
+  # Prevent this test from being run as a target-side test, because it
+  # is run by a host-side wrapper.
   test_specs = {
-    environments = performance_testing_environments - [ astro_env ]
+    environments = []
   }
 }
 
