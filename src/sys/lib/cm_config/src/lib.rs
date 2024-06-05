@@ -347,30 +347,18 @@ pub enum CompatibilityCheckError {
     AbiRevisionInvalid(#[from] AbiRevisionError),
 }
 
-/// The enforcement and validation policy to apply to component target ABI revisions.
-/// Defaults to `AllowAll`
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum AbiRevisionPolicy {
-    AllowAll,
-    EnforcePresenceOnly,
-    EnforcePresenceAndCompatibility,
-}
-
-symmetrical_enums!(
-    AbiRevisionPolicy,
-    component_internal::AbiRevisionPolicy,
-    AllowAll,
-    EnforcePresenceOnly,
-    EnforcePresenceAndCompatibility
-);
-
-impl Default for AbiRevisionPolicy {
-    fn default() -> Self {
-        AbiRevisionPolicy::EnforcePresenceAndCompatibility
-    }
+/// The enforcement and validation policy to apply to component target ABI
+/// revisions. By default, enforce ABI compatibility for all components.
+#[derive(Debug, PartialEq, Eq, Default, Clone)]
+pub struct AbiRevisionPolicy {
+    allowlist: Vec<AllowlistEntry>,
 }
 
 impl AbiRevisionPolicy {
+    pub fn new(allowlist: Vec<AllowlistEntry>) -> Self {
+        Self { allowlist }
+    }
+
     /// Check if the abi_revision, if present, is supported by the platform and compatible with the
     /// `AbiRevisionPolicy`. Regardless of the enforcement policy, log a warning if the
     /// ABI revision is missing or not supported by the platform.
@@ -380,9 +368,11 @@ impl AbiRevisionPolicy {
         moniker: &Moniker,
         abi_revision: Option<AbiRevision>,
     ) -> Result<(), CompatibilityCheckError> {
+        let only_warn = self.allowlist.iter().any(|matcher| matcher.matches(moniker));
+
         let Some(abi_revision) = abi_revision else {
-            return if let AbiRevisionPolicy::AllowAll = self {
-                warn!("Ignoring missing ABI revision in {} due to AllowAll policy.", moniker);
+            return if only_warn {
+                warn!("Ignoring missing ABI revision in {} because it is allowlisted.", moniker);
                 Ok(())
             } else {
                 Err(CompatibilityCheckError::AbiRevisionAbsent)
@@ -393,25 +383,23 @@ impl AbiRevisionPolicy {
             return Ok(());
         };
 
-        match self {
-            AbiRevisionPolicy::AllowAll => {
-                warn!(
-                    "Ignoring AbiRevisionError in {} due to AllowAll policy: {}",
-                    moniker, abi_error
-                );
-                Ok(())
-            }
-            AbiRevisionPolicy::EnforcePresenceOnly => {
-                warn!(
-                    "Ignoring AbiRevisionError in {} due to EnforcePresenceOnly policy: {}",
-                    moniker, abi_error
-                );
-                Ok(())
-            }
-            AbiRevisionPolicy::EnforcePresenceAndCompatibility => {
-                Err(CompatibilityCheckError::AbiRevisionInvalid(abi_error))
-            }
+        if only_warn {
+            warn!(
+                "Ignoring AbiRevisionError in {} because it is allowlisted: {}",
+                moniker, abi_error
+            );
+            Ok(())
+        } else {
+            Err(CompatibilityCheckError::AbiRevisionInvalid(abi_error))
         }
+    }
+}
+
+impl TryFrom<component_internal::AbiRevisionPolicy> for AbiRevisionPolicy {
+    type Error = Error;
+
+    fn try_from(abi_revision_policy: component_internal::AbiRevisionPolicy) -> Result<Self, Error> {
+        Ok(Self::new(parse_allowlist_entries(&abi_revision_policy.allowlist)?))
     }
 }
 
@@ -620,8 +608,12 @@ impl TryFrom<component_internal::Config> for RuntimeConfig {
             .context("Unable to parse security policy")?
             .unwrap_or_default();
 
-        let abi_revision_policy =
-            config.abi_revision_policy.map(AbiRevisionPolicy::from).unwrap_or_default();
+        let abi_revision_policy = config
+            .abi_revision_policy
+            .map(AbiRevisionPolicy::try_from)
+            .transpose()
+            .context("Unable to parse ABI revision policy")?
+            .unwrap_or_default();
 
         let vmex_source = config.vmex_source.map(VmexSource::from).unwrap_or_default();
 
@@ -1009,12 +1001,18 @@ mod tests {
                 log_all_events: Some(true),
                 builtin_boot_resolver: Some(component_internal::BuiltinBootResolver::None),
                 realm_builder_resolver_and_runner: Some(component_internal::RealmBuilderResolverAndRunner::None),
-                abi_revision_policy: Some(component_internal::AbiRevisionPolicy::AllowAll),
+                abi_revision_policy: Some(component_internal::AbiRevisionPolicy{
+                    allowlist: Some(vec!["/baz".to_string(), "/qux/**".to_string()]),
+                    ..Default::default()
+                }),
                 vmex_source: Some(component_internal::VmexSource::Namespace),
                 ..Default::default()
             },
             RuntimeConfig {
-                abi_revision_policy: AbiRevisionPolicy::AllowAll,
+                abi_revision_policy: AbiRevisionPolicy::new(vec![
+                    AllowlistEntryBuilder::new().exact("baz").build(),
+                    AllowlistEntryBuilder::new().exact("qux").any_descendant(),
+                ]),
                 debug: true,
                 enable_introspection: true,
                 list_children_batch_size: 42,
@@ -1291,7 +1289,7 @@ mod tests {
     }
 
     #[test]
-    fn abi_revision_policy_check_compatibility() -> Result<(), Error> {
+    fn abi_revision_policy_check_compatibility_empty_allowlist() -> Result<(), Error> {
         const UNKNOWN_ABI: AbiRevision = AbiRevision::from_u64(0x404);
         const UNSUPPORTED_ABI: AbiRevision = AbiRevision::from_u64(0x15);
         const SUPPORTED_ABI: AbiRevision = AbiRevision::from_u64(0x16);
@@ -1310,51 +1308,137 @@ mod tests {
         ];
         let version_history = VersionHistory::new(&VERSIONS);
 
-        let test_scenarios = vec![
-            (AbiRevisionPolicy::AllowAll, None, Ok(())),
-            (AbiRevisionPolicy::AllowAll, Some(UNKNOWN_ABI), Ok(())),
-            (AbiRevisionPolicy::AllowAll, Some(UNSUPPORTED_ABI), Ok(())),
-            (AbiRevisionPolicy::AllowAll, Some(SUPPORTED_ABI), Ok(())),
-            (
-                AbiRevisionPolicy::EnforcePresenceOnly,
-                None,
-                Err(CompatibilityCheckError::AbiRevisionAbsent),
+        let policy = AbiRevisionPolicy::new(vec![]);
+
+        assert_eq!(
+            policy.check_compatibility(&version_history, &Moniker::parse_str("/foo")?, None),
+            Err(CompatibilityCheckError::AbiRevisionAbsent)
+        );
+        assert_eq!(
+            policy.check_compatibility(
+                &version_history,
+                &Moniker::parse_str("/foo")?,
+                Some(UNKNOWN_ABI)
             ),
-            (AbiRevisionPolicy::EnforcePresenceOnly, Some(UNKNOWN_ABI), Ok(())),
-            (AbiRevisionPolicy::EnforcePresenceOnly, Some(UNSUPPORTED_ABI), Ok(())),
-            (AbiRevisionPolicy::EnforcePresenceOnly, Some(SUPPORTED_ABI), Ok(())),
-            (
-                AbiRevisionPolicy::EnforcePresenceAndCompatibility,
-                None,
-                Err(CompatibilityCheckError::AbiRevisionAbsent),
+            Err(CompatibilityCheckError::AbiRevisionInvalid(AbiRevisionError::Unknown {
+                abi_revision: UNKNOWN_ABI,
+                supported_versions: vec![VERSIONS[1].clone()],
+            })),
+        );
+        assert_eq!(
+            policy.check_compatibility(
+                &version_history,
+                &Moniker::parse_str("/foo")?,
+                Some(UNSUPPORTED_ABI)
             ),
-            (
-                AbiRevisionPolicy::EnforcePresenceAndCompatibility,
-                Some(UNKNOWN_ABI),
-                Err(CompatibilityCheckError::AbiRevisionInvalid(AbiRevisionError::Unknown {
-                    abi_revision: UNKNOWN_ABI,
-                    supported_versions: vec![VERSIONS[1].clone()],
-                })),
+            Err(CompatibilityCheckError::AbiRevisionInvalid(AbiRevisionError::Unsupported {
+                version: VERSIONS[0].clone(),
+                supported_versions: vec![VERSIONS[1].clone()],
+            })),
+        );
+        assert_eq!(
+            policy.check_compatibility(
+                &version_history,
+                &Moniker::parse_str("/foo")?,
+                Some(SUPPORTED_ABI)
             ),
-            (
-                AbiRevisionPolicy::EnforcePresenceAndCompatibility,
-                Some(UNSUPPORTED_ABI),
-                Err(CompatibilityCheckError::AbiRevisionInvalid(AbiRevisionError::Unsupported {
-                    version: VERSIONS[0].clone(),
-                    supported_versions: vec![VERSIONS[1].clone()],
-                })),
-            ),
-            (AbiRevisionPolicy::EnforcePresenceAndCompatibility, Some(SUPPORTED_ABI), Ok(())),
+            Ok(())
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn abi_revision_policy_check_compatibility_allowlist() -> Result<(), Error> {
+        const UNKNOWN_ABI: AbiRevision = AbiRevision::from_u64(0x404);
+        const UNSUPPORTED_ABI: AbiRevision = AbiRevision::from_u64(0x15);
+        const SUPPORTED_ABI: AbiRevision = AbiRevision::from_u64(0x16);
+
+        const VERSIONS: &[Version] = &[
+            Version {
+                api_level: ApiLevel::from_u32(5),
+                abi_revision: UNSUPPORTED_ABI,
+                status: version_history::Status::Unsupported,
+            },
+            Version {
+                api_level: ApiLevel::from_u32(6),
+                abi_revision: SUPPORTED_ABI,
+                status: version_history::Status::Supported,
+            },
         ];
-        for (policy, abi, expected_res) in test_scenarios {
-            println!(
-                "Test {:?} policy against the ABI revision {:?} produces {:?} result",
-                policy, abi, expected_res
-            );
-            let res =
-                policy.check_compatibility(&version_history, &"/foo".try_into().unwrap(), abi);
-            assert_eq!(res, expected_res);
-        }
+        let version_history = VersionHistory::new(&VERSIONS);
+
+        let policy = AbiRevisionPolicy::new(vec![AllowlistEntryBuilder::new()
+            .exact("foo")
+            .any_child()
+            .build()]);
+
+        // "/bar" isn't on the allowlist, so bad usage should fail.
+        assert_eq!(
+            policy.check_compatibility(&version_history, &Moniker::parse_str("/bar")?, None),
+            Err(CompatibilityCheckError::AbiRevisionAbsent)
+        );
+        assert_eq!(
+            policy.check_compatibility(
+                &version_history,
+                &Moniker::parse_str("/bar")?,
+                Some(UNKNOWN_ABI)
+            ),
+            Err(CompatibilityCheckError::AbiRevisionInvalid(AbiRevisionError::Unknown {
+                abi_revision: UNKNOWN_ABI,
+                supported_versions: vec![VERSIONS[1].clone()],
+            })),
+        );
+        assert_eq!(
+            policy.check_compatibility(
+                &version_history,
+                &Moniker::parse_str("/bar")?,
+                Some(UNSUPPORTED_ABI)
+            ),
+            Err(CompatibilityCheckError::AbiRevisionInvalid(AbiRevisionError::Unsupported {
+                version: VERSIONS[0].clone(),
+                supported_versions: vec![VERSIONS[1].clone()],
+            })),
+        );
+        assert_eq!(
+            policy.check_compatibility(
+                &version_history,
+                &Moniker::parse_str("/bar")?,
+                Some(SUPPORTED_ABI)
+            ),
+            Ok(())
+        );
+
+        // "/foo/baz" is on the allowlist. Allow whatever.
+        assert_eq!(
+            policy.check_compatibility(&version_history, &Moniker::parse_str("/foo/baz")?, None),
+            Ok(())
+        );
+        assert_eq!(
+            policy.check_compatibility(
+                &version_history,
+                &Moniker::parse_str("/foo/baz")?,
+                Some(UNKNOWN_ABI)
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            policy.check_compatibility(
+                &version_history,
+                &Moniker::parse_str("/foo/baz")?,
+                Some(UNSUPPORTED_ABI)
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            policy.check_compatibility(
+                &version_history,
+                &Moniker::parse_str("/foo/baz")?,
+                Some(SUPPORTED_ABI)
+            ),
+            Ok(())
+        );
+
         Ok(())
     }
 

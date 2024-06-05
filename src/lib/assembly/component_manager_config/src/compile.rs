@@ -150,21 +150,20 @@ symmetrical_enums!(
     Namespace
 );
 
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "snake_case")]
-pub enum AbiRevisionPolicy {
-    AllowAll,
-    EnforcePresenceOnly,
-    EnforcePresenceAndCompatibility,
+#[derive(Deserialize, Debug, Default)]
+#[serde(deny_unknown_fields)]
+pub struct AbiRevisionPolicy {
+    allowlist: Option<Vec<String>>,
 }
 
-symmetrical_enums!(
-    AbiRevisionPolicy,
-    component_internal::AbiRevisionPolicy,
-    AllowAll,
-    EnforcePresenceOnly,
-    EnforcePresenceAndCompatibility
-);
+impl Into<component_internal::AbiRevisionPolicy> for AbiRevisionPolicy {
+    fn into(self) -> component_internal::AbiRevisionPolicy {
+        component_internal::AbiRevisionPolicy {
+            allowlist: self.allowlist.clone(),
+            ..component_internal::AbiRevisionPolicy::default()
+        }
+    }
+}
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]

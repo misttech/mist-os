@@ -11,7 +11,7 @@
         binary: "bin/component_manager",
         args: [
             "--config",
-            "/pkg/data/component_manager_allow_all_config",
+            "/pkg/data/cm_config",
         ],
     },
     capabilities: [
