@@ -6,15 +6,16 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include "lib/syslog/cpp/log_settings.h"
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/strings/string_number_conversions.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace fxl {
 
-bool ParseLogSettings(const fxl::CommandLine& command_line,
-                      fuchsia_logging::LogSettings* out_settings) {
-  fuchsia_logging::LogSettings settings = *out_settings;
+template <typename T>
+bool ParseLogSettingsInternal(const fxl::CommandLine& command_line, T* out_settings) {
+  T settings = *out_settings;
 
   // Don't clobber existing settings, but ensure min log level is initialized.
   // Note that legacy INFO level is also 0.
@@ -98,24 +99,69 @@ bool ParseLogSettings(const fxl::CommandLine& command_line,
   return true;
 }
 
+bool ParseLogSettings(const fxl::CommandLine& command_line, fxl::LogSettings* out_settings) {
+  return ParseLogSettingsInternal(command_line, out_settings);
+}
+
+bool ParseLogSettings(const fxl::CommandLine& command_line,
+                      fuchsia_logging::LogSettings* out_settings) {
+  return ParseLogSettingsInternal(command_line, out_settings);
+}
+
 bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line) {
-  fuchsia_logging::LogSettings settings;
+  LogSettings settings;
   if (!ParseLogSettings(command_line, &settings))
     return false;
-  SetLogSettings(settings);
+  fuchsia_logging::LogSettingsBuilder builder;
+  if (settings.disable_interest_listener) {
+    builder.DisableInterestListener();
+  }
+  if (!settings.wait_for_initial_interest) {
+    builder.DisableWaitForInitialInterest();
+  }
+  builder.WithMinLogSeverity(settings.min_log_level);
+#ifndef __Fuchsia__
+  builder.WithLogFile(settings.log_file);
+#else
+  if (settings.single_threaded_dispatcher) {
+    builder.WithDispatcher(settings.single_threaded_dispatcher);
+  }
+  if (settings.log_sink) {
+    builder.WithLogSink(settings.log_sink);
+  }
+#endif
+  builder.BuildAndInitialize();
   return true;
 }
 
 bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line,
                                    const std::initializer_list<std::string>& tags) {
-  fuchsia_logging::LogSettings settings;
+  LogSettings settings;
   if (!ParseLogSettings(command_line, &settings))
     return false;
-  SetLogSettings(settings, tags);
+  fuchsia_logging::LogSettingsBuilder builder;
+  if (settings.disable_interest_listener) {
+    builder.DisableInterestListener();
+  }
+  if (!settings.wait_for_initial_interest) {
+    builder.DisableWaitForInitialInterest();
+  }
+  builder.WithMinLogSeverity(settings.min_log_level);
+#ifndef __Fuchsia__
+  builder.WithLogFile(settings.log_file);
+#else
+  if (settings.single_threaded_dispatcher) {
+    builder.WithDispatcher(settings.single_threaded_dispatcher);
+  }
+  if (settings.log_sink) {
+    builder.WithLogSink(settings.log_sink);
+  }
+#endif
+  builder.BuildAndInitializeWithTags(tags);
   return true;
 }
 
-std::vector<std::string> LogSettingsToArgv(const fuchsia_logging::LogSettings& settings) {
+std::vector<std::string> LogSettingsToArgv(const LogSettings& settings) {
   std::vector<std::string> result;
 
   if (settings.min_log_level != fuchsia_logging::LOG_INFO) {
