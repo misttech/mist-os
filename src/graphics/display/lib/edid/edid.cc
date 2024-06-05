@@ -170,13 +170,15 @@ fit::result<const char*> Edid::Init(const uint8_t* bytes, uint16_t len) {
   }
   bytes_ = bytes;
   len_ = len;
-  if (!(base_edid_ = GetBlock<BaseEdid>(0)) || !base_edid_->validate()) {
+
+  const BaseEdid& base = base_edid();
+  if (!base.validate()) {
     return fit::error("Failed to validate base edid");
   }
-  if (((base_edid_->num_extensions + 1) * kBlockSize) != len) {
+  if (((base.num_extensions + 1) * kBlockSize) != len) {
     return fit::error("Bad extension count");
   }
-  if (!base_edid_->digital()) {
+  if (!base.digital()) {
     return fit::error("Analog displays not supported");
   }
 
@@ -214,14 +216,13 @@ fit::result<const char*> Edid::Init(const uint8_t* bytes, uint16_t len) {
 
   // If we didn't find a valid serial descriptor, use the base serial number
   if (monitor_serial_[0] == '\0') {
-    sprintf(monitor_serial_, "%d", base_edid_->serial_number);
+    sprintf(monitor_serial_, "%d", base.serial_number);
   }
 
-  uint8_t c1 = static_cast<uint8_t>(((base_edid_->manufacturer_id1 & 0x7c) >> 2) + 'A' - 1);
+  uint8_t c1 = static_cast<uint8_t>(((base.manufacturer_id1 & 0x7c) >> 2) + 'A' - 1);
   uint8_t c2 = static_cast<uint8_t>(
-      (((base_edid_->manufacturer_id1 & 0x03) << 3) | (base_edid_->manufacturer_id2 & 0xe0) >> 5) +
-      'A' - 1);
-  uint8_t c3 = static_cast<uint8_t>(((base_edid_->manufacturer_id2 & 0x1f)) + 'A' - 1);
+      (((base.manufacturer_id1 & 0x03) << 3) | (base.manufacturer_id2 & 0xe0) >> 5) + 'A' - 1);
+  uint8_t c3 = static_cast<uint8_t>(((base.manufacturer_id2 & 0x1f)) + 'A' - 1);
 
   manufacturer_id_[0] = c1;
   manufacturer_id_[1] = c2;
@@ -411,13 +412,13 @@ void timing_iterator::Advance() {
   }
 
   if (state_ == kStds) {
-    while (++state_index_ < std::size(edid_->base_edid_->standard_timings)) {
-      const StandardTimingDescriptor* desc = edid_->base_edid_->standard_timings + state_index_;
+    while (++state_index_ < std::size(edid_->base_edid().standard_timings)) {
+      const StandardTimingDescriptor* desc = edid_->base_edid().standard_timings + state_index_;
       if (desc->byte1 == 0x01 && desc->byte2 == 0x01) {
         continue;
       }
       std::optional<display::DisplayTiming> display_timing =
-          StandardTimingDescriptorToDisplayTiming(*edid_->base_edid_, *desc);
+          StandardTimingDescriptorToDisplayTiming(edid_->base_edid(), *desc);
       if (display_timing.has_value()) {
         display_timing_ = *display_timing;
       }

@@ -18,8 +18,8 @@ descriptor_iterator& descriptor_iterator::operator++() {
   if (block_idx_ == 0) {
     descriptor_idx_++;
 
-    if (descriptor_idx_ < std::size(edid_->base_edid_->detailed_descriptors)) {
-      descriptor_ = edid_->base_edid_->detailed_descriptors + descriptor_idx_;
+    if (descriptor_idx_ < std::size(edid_->base_edid().detailed_descriptors)) {
+      descriptor_ = edid_->base_edid().detailed_descriptors + descriptor_idx_;
       if (descriptor_->timing.pixel_clock_10khz != 0 || descriptor_->monitor.type != 0x10) {
         return *this;
       }

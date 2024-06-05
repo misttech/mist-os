@@ -336,19 +336,21 @@ class Edid {
   const uint8_t* edid_bytes() const { return bytes_; }
   uint16_t edid_length() const { return len_; }
 
-  uint16_t product_code() const { return base_edid_->product_code; }
+  uint16_t product_code() const { return base_edid().product_code; }
   uint16_t manufacturer_name_code() const {
-    return static_cast<uint16_t>(base_edid_->manufacturer_id1 << 8 | base_edid_->manufacturer_id2);
+    return static_cast<uint16_t>(base_edid().manufacturer_id1 << 8 | base_edid().manufacturer_id2);
   }
-  bool is_standard_rgb() const { return base_edid_->standard_srgb(); }
+  bool is_standard_rgb() const { return base_edid().standard_srgb(); }
   bool supports_basic_audio() const;
   const char* manufacturer_id() const { return manufacturer_id_; }
   const char* manufacturer_name() const { return manufacturer_name_; }
   const char* monitor_name() const { return monitor_name_; }
   const char* monitor_serial() const { return monitor_serial_; }
-  uint32_t horizontal_size_mm() const { return (base_edid_->horizontal_size_cm * 10); }
-  uint32_t vertical_size_mm() const { return (base_edid_->vertical_size_cm * 10); }
+  uint32_t horizontal_size_mm() const { return (base_edid().horizontal_size_cm * 10); }
+  uint32_t vertical_size_mm() const { return (base_edid().vertical_size_cm * 10); }
   bool is_hdmi() const;
+
+  const BaseEdid& base_edid() const { return *reinterpret_cast<const BaseEdid*>(bytes_); }
 
  private:
   friend class internal::data_block_iterator;
@@ -362,9 +364,6 @@ class Edid {
   // Edid bytes and length
   const uint8_t* bytes_;
   uint16_t len_;
-
-  // Ptr to base edid structure in bytes_
-  const BaseEdid* base_edid_;
 
   // Contains the edid bytes if they are owned by this object. |bytes_| should generally
   // be used, since this will be empty if something else owns the edid bytes.
