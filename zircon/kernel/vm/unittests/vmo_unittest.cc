@@ -1514,6 +1514,71 @@ static bool vmo_clones_of_compressed_pages_test() {
   END_TEST;
 }
 
+// Test that CoW clones mapped into the kernel behave correctly if a 'parent' page gets compressed.
+static bool vmo_clone_kernel_mapped_compressed_test() {
+  BEGIN_TEST;
+
+  // Need a compressor.
+  auto compression = pmm_page_compression();
+  if (!compression) {
+    END_TEST;
+  }
+
+  auto compressor = compression->AcquireCompressor();
+
+  AutoVmScannerDisable scanner_disable;
+
+  // Create a VMO and write to its page to commit it.
+  fbl::RefPtr<VmObjectPaged> vmo;
+  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, PAGE_SIZE, &vmo);
+  ASSERT_OK(status);
+
+  uint64_t data = 42;
+  EXPECT_OK(vmo->Write(&data, 0, sizeof(data)));
+
+  // Now create a child of the VMO and fork the page into it.
+  fbl::RefPtr<VmObject> clone;
+  ASSERT_OK(vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, true,
+                             &clone));
+  data = 41;
+  EXPECT_OK(clone->Write(&data, 0, sizeof(data)));
+
+  // Pin and map the clone into the kernel aspace.
+  PinnedVmObject pinned_vmo;
+  ASSERT_OK(PinnedVmObject::Create(clone, 0, PAGE_SIZE, true, &pinned_vmo));
+  fbl::RefPtr<VmMapping> mapping;
+  auto result = VmAspace::kernel_aspace()->RootVmar()->CreateVmMapping(
+      0, PAGE_SIZE, 0, VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE, clone, 0,
+      ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, "pin clone map");
+  ASSERT_TRUE(result.is_ok());
+  mapping = ktl::move(result->mapping);
+  auto cleanup = fit::defer([&]() { mapping->Destroy(); });
+  ASSERT_OK(mapping->MapRange(0, PAGE_SIZE, true));
+  volatile uint64_t* ptr = reinterpret_cast<volatile uint64_t*>(result->base);
+
+  // Should be able to use ptr without a fault.
+  EXPECT_EQ(*ptr, 41u);
+
+  // Compress the parent page by reaching into the hidden VMO parent.
+  fbl::RefPtr<VmCowPages> hidden_root = vmo->DebugGetCowPages()->DebugGetParent();
+  ASSERT_NONNULL(hidden_root);
+  vm_page_t* page = hidden_root->DebugGetPage(0);
+  ASSERT_NONNULL(page);
+  ASSERT_OK(compressor.get().Arm());
+  // Attempt to reclaim the page in the hidden parent. As the clone is a fully committed and mapped
+  // VMO this should *not* cause any of its pages to be unmapped. If it did this violate the
+  // requirement that kernel mappings are always pinned and mapped.
+  uint64_t reclaimed =
+      reclaim_page(hidden_root, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get());
+  EXPECT_EQ(reclaimed, 1u);
+  page = nullptr;
+
+  // Should still be able to touch the ptr;
+  EXPECT_EQ(*ptr, 41u);
+
+  END_TEST;
+}
+
 static bool vmo_move_pages_on_access_test() {
   BEGIN_TEST;
 
@@ -4394,6 +4459,7 @@ VM_UNITTEST(vmo_lookup_slice_test)
 VM_UNITTEST(vmo_lookup_clone_test)
 VM_UNITTEST(vmo_clone_removes_write_test)
 VM_UNITTEST(vmo_clones_of_compressed_pages_test)
+VM_UNITTEST(vmo_clone_kernel_mapped_compressed_test)
 VM_UNITTEST(vmo_move_pages_on_access_test)
 VM_UNITTEST(vmo_eviction_hints_test)
 VM_UNITTEST(vmo_always_need_evicts_loaned_test)
