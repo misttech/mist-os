@@ -118,7 +118,7 @@ pub mod tests {
 
     #[test]
     fn test_get_driver_alias() {
-        let mut topo_path = "/dev/sys/platform/05:04:28/thermal";
+        let mut topo_path = "/dev/sys/platform/aml-thermal-ddr/thermal";
         let mut topo_suffix_to_alias = HashMap::from([
             ("/thermal".to_string(), "soc_ddr".to_string()),
             ("/aml-thermal-pll/thermal".to_string(), "soc_pll".to_string()),

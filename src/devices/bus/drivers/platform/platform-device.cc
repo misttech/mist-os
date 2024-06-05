@@ -327,7 +327,6 @@ zx_status_t PlatformDevice::Start() {
       "aml-thermal-pll",  // 05:05:a,05:03:a,05:04:a
       "thermistor",       // 03:0a:27
       "i2c-1",            // 05:00:2:1
-      "aml-thermal-ddr",  // 05:03:28,05:04:28
       "pll-temp-sensor",  // 05:06:39
       "sysmem",           // 00:00:1b
       "gpio",             // 05:04:1,05:03:1,05:05:1,05:06:1

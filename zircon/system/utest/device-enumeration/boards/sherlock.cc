@@ -70,7 +70,7 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
 
       // Thermal devices.
       "sys/platform/05:04:a",
-      "sys/platform/05:04:28",
+      "sys/platform/aml-thermal-ddr",
       "class/thermal/000",
       "class/thermal/001",
 

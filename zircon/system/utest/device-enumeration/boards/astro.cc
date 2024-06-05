@@ -67,7 +67,7 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
 
       // Thermal
       "sys/platform/05:03:a/thermal",
-      "sys/platform/05:03:28/thermal",
+      "sys/platform/aml-thermal-ddr/thermal",
       "class/thermal/000",
       "class/thermal/001",
 
