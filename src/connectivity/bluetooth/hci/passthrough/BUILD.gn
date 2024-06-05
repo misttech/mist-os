@@ -12,23 +12,29 @@ driver_bind_rules("bt_hci_passthrough_bind") {
   deps = [ "//src/devices/bind/fuchsia.bluetooth" ]
 }
 
-fuchsia_driver("fuchsia_driver") {
-  output_name = "bt-hci-passthrough"
-
-  sources = [ "passthrough.cc" ]
+source_set("passthrough_sources") {
+  sources = [
+    "passthrough.cc",
+    "passthrough.h",
+  ]
 
   deps = [
     ":bt_hci_passthrough_bind",
-    "//sdk/banjo/fuchsia.hardware.bt.hci:fuchsia.hardware.bt.hci_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/devfs/cpp:cpp",
     "//sdk/lib/fidl",
     "//src/devices/lib/driver",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//src/devices/lib/driver:driver_runtime",
     "//zircon/system/ulib/zx",
   ]
 
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
+}
+
+fuchsia_driver("fuchsia_driver") {
+  output_name = "bt-hci-passthrough"
+  deps = [ ":passthrough_sources" ]
 }
 
 fuchsia_driver_component("driver") {
@@ -42,7 +48,43 @@ fuchsia_driver_package("passthrough") {
   driver_components = [ ":driver" ]
 }
 
+executable("tests_executable") {
+  testonly = true
+  output_name = "bt-hci-passthrough-tests"
+  sources = [ "passthrough_test.cc" ]
+
+  deps = [
+    ":passthrough_sources",
+    "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/fidl/cpp",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+fuchsia_unittest_package("bt-hci-passthrough-tests") {
+  deps = [ ":tests_executable" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
 group("tests") {
   testonly = true
-  deps = [ ":bt_hci_passthrough_bind_test" ]
+  deps = [
+    ":bt-hci-passthrough-tests",
+    ":bt_hci_passthrough_bind_test",
+  ]
 }
