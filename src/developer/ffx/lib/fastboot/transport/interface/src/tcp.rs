@@ -25,7 +25,20 @@ pub struct TcpNetworkInterface<T> {
     /// Returns a tuple of (avail_bytes, bytes_read, bytes)
     read_task: Option<Pin<Box<dyn Future<Output = std::io::Result<(u64, usize, Vec<u8>)>>>>>,
     write_task: Option<Pin<Box<dyn Future<Output = std::io::Result<usize>>>>>,
+    /// Flag to indicate if the header for a given Write operation was completed
     wrote_header: bool,
+    /// Task to write the "header" for the Fastboot over TCP message
+    /// In TCP mode the Fastboot Protocol expects the first 8 bytes (sizeof u64)
+    /// to be prepended to any write operation. These bytes indicate the total
+    /// size in bytes of the message that is about to be sent.
+    ///
+    /// These bytes must be sent in their entirety before execution of `write_task`
+    /// in order to follow the `AsyncWrite` contract correctly. For example, if we
+    /// are writing a `16` byte message, in reality the entirety of the message being
+    /// sent is `16` bytes AND the header, but the total written bytes returned to
+    /// `AsyncWrite` will still only be `16`. If we keep all this in a single task,
+    /// then the total bytes will be larger than intended, causing `AsyncWrite`
+    /// operations like `write_all` to fail in confusing ways.
     write_header_task: Option<Pin<Box<dyn Future<Output = std::io::Result<()>>>>>,
 }
 
