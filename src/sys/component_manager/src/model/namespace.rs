@@ -7,24 +7,27 @@ use {
         constants::PKG_PATH,
         model::{
             component::{ComponentInstance, Package, WeakComponentInstance},
-            routing::router_ext::{RouterExt, WeakComponentTokenExt},
-            routing::{self, route_and_open_capability_with_reporting},
+            routing::{
+                self, report_routing_failure, route_and_open_capability_with_reporting,
+                router_ext::RouterExt, BedrockUseRouteRequest,
+            },
         },
     },
     ::routing::{
         component_instance::ComponentInstanceInterface, mapper::NoopRouteMapper, rights::Rights,
-        route_to_storage_decl, verify_instance_in_component_id_index, DictExt, RouteRequest,
+        route_to_storage_decl, verify_instance_in_component_id_index, RouteRequest,
     },
     cm_rust::{ComponentDecl, UseDecl, UseEventStreamDecl, UseStorageDecl},
     errors::CreateNamespaceError,
     fidl::{endpoints::ClientEnd, prelude::*},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    futures::FutureExt,
     futures::{
         channel::mpsc::{unbounded, UnboundedSender},
-        FutureExt, StreamExt,
+        StreamExt,
     },
     router_error::{Explain, RouterError},
-    sandbox::{Capability, Dict, Directory, Open, Request, WeakComponentToken},
+    sandbox::{Capability, Dict, Directory, Open},
     serve_processargs::NamespaceBuilder,
     std::{collections::HashSet, sync::Arc},
     tracing::{error, warn},
@@ -296,45 +299,25 @@ fn service_or_protocol_use(
     match use_ {
         // Bedrock routing.
         UseDecl::Protocol(use_protocol_decl) => {
-            let request = Request {
-                availability: use_protocol_decl.availability.clone(),
-                target: WeakComponentToken::new(component.as_weak()),
-            };
-            let Some(capability) =
-                program_input_dict.get_capability(&use_protocol_decl.target_path)
-            else {
-                panic!(
-                    "router for capability {:?} is missing from program input dictionary for \
-                     component {}",
-                    use_protocol_decl.target_path, component.moniker
-                );
-            };
-            let Capability::Router(router) = &capability else {
-                panic!(
-                    "program input dictionary for component {} had an entry with an unexpected \
-                     type: {:?}",
-                    component.moniker, capability
-                );
-            };
-            let router = router.clone();
-            let legacy_request = RouteRequest::UseProtocol(use_protocol_decl.clone());
+            let (router, request) = BedrockUseRouteRequest::UseProtocol(use_protocol_decl.clone())
+                .into_router(component.as_weak(), program_input_dict);
 
             // When there are router errors, they are sent to the error handler, which reports
             // errors.
-            let weak_component = component.as_weak();
-
+            let weak_target = component.as_weak();
+            let legacy_request = RouteRequest::UseProtocol(use_protocol_decl);
             Open::new(router.into_directory_entry(
                 request,
                 fio::DirentType::Service,
                 component.execution_scope.clone(),
                 move |error: &RouterError| {
-                    let Ok(target) = weak_component.upgrade() else {
+                    let Ok(target) = weak_target.upgrade() else {
                         return None;
                     };
                     let legacy_request = legacy_request.clone();
                     Some(
                         async move {
-                            routing::report_routing_failure(&legacy_request, &target, error).await
+                            report_routing_failure(&legacy_request, &target, error).await
                         }
                         .boxed(),
                     )

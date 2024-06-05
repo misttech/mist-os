@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod bedrock;
 pub mod open;
 pub mod providers;
 pub mod router_ext;
@@ -32,6 +33,7 @@ use {
 
 pub type RouteRequest = ::routing::RouteRequest;
 pub type RouteSource = ::routing::RouteSource<ComponentInstance>;
+pub use bedrock::UseRouteRequest as BedrockUseRouteRequest;
 
 #[async_trait]
 pub trait Route {
