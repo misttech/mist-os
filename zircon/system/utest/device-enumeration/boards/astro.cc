@@ -58,7 +58,7 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       // LED.
       "sys/platform/gpio-light/aml_light",
       // RAM (DDR) control.
-      "sys/platform/05:03:24/ram",
+      "sys/platform/aml-ram-ctl/ram",
 
       // Power Device.
       "sys/platform/aml-power-impl-composite/aml-power-impl-composite",

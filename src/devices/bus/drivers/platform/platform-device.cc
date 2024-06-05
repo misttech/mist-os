@@ -323,7 +323,6 @@ zx_status_t PlatformDevice::Start() {
       "ram-nand",         // 00:00:2e
       "i2c-0",            // 05:00:2
       "i2c-2",            // 05:00:2:2
-      "aml-ram-ctl",      // 05:05:24,05:03:24,05:04:24
       "aml-thermal-pll",  // 05:05:a,05:03:a,05:04:a
       "thermistor",       // 03:0a:27
       "i2c-1",            // 05:00:2:1

@@ -23,7 +23,7 @@ constexpr ram_info::RamDeviceInfo
         {
             {
                 // Astro
-                .devfs_path = "/dev/sys/platform/05:03:24/ram",
+                .devfs_path = "/dev/sys/platform/aml-ram-ctl/ram",
                 .default_cycles_to_measure = 456000000 / 20,  // 456 Mhz, 50 ms.
                 .default_channels =
                     {
@@ -35,7 +35,7 @@ constexpr ram_info::RamDeviceInfo
             },
             {
                 // Sherlock
-                .devfs_path = "/dev/sys/platform/05:04:24/ram",
+                .devfs_path = "/dev/sys/platform/aml-ram-ctl/ram",
                 .default_cycles_to_measure = 792000000 / 20,  // 792 Mhz, 50 ms.
                 .default_channels =
                     {
@@ -47,7 +47,7 @@ constexpr ram_info::RamDeviceInfo
             },
             {
                 // Nelson
-                .devfs_path = "/dev/sys/platform/05:05:24/ram",
+                .devfs_path = "/dev/sys/platform/aml-ram-ctl/ram",
                 .default_cycles_to_measure = 456000000 / 20,  // 456 Mhz, 50 ms.
                 .default_channels =
                     {
