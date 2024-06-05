@@ -69,6 +69,14 @@ class TestArgs(unittest.TestCase):
                 ["--ffx-output-directory", GLOBAL_FILE_NAME],
             ),
             (
+                "cannot output to a file (artifact flag)",
+                ["--artifact-output-directory", GLOBAL_FILE_NAME],
+            ),
+            (
+                "cannot output to a file (outdir flag)",
+                ["--outdir", GLOBAL_FILE_NAME],
+            ),
+            (
                 "cannot set a negative --parallel",
                 ["--parallel", "-1"],
             ),
