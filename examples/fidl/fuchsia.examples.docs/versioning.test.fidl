@@ -31,12 +31,12 @@ protocol Versioned {
 
 // [START deprecation]
 protocol Example {
-    // (Description of the method.)
-    //
-    // # Deprecation
-    //
-    // (Detailed explanation of why the method is deprecated, the timeline for
-    // removing it, and what should be used instead.)
+    /// (Description of the method.)
+    ///
+    /// # Deprecation
+    ///
+    /// (Detailed explanation of why the method is deprecated, the timeline for
+    /// removing it, and what should be used instead.)
     @available(deprecated=5, removed=6, note="use Replacement")
     Deprecated();
 

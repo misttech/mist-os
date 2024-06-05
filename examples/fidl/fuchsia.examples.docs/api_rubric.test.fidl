@@ -353,9 +353,9 @@ type Token = struct {
 };
 
 protocol TokenBasedGetter {
-    // If token is null, fetch the first N entries. If token is not null, return
-    // the N items starting at token. Returns as many entries as it can in
-    // results and populates next_token if more entries are available.
+    /// If token is null, fetch the first N entries. If token is not null,
+    /// return the N items starting at token. Returns as many entries as it can
+    /// in results and populates next_token if more entries are available.
     GetEntries(struct {
         token box<Token>;
     }) -> (struct {
