@@ -234,7 +234,7 @@ impl Broker {
     }
 
     #[cfg(test)]
-    pub fn get_required_level(&mut self, element_id: &ElementID) -> Option<PowerLevel> {
+    pub fn get_required_level(&self, element_id: &ElementID) -> Option<PowerLevel> {
         self.required.get(element_id)
     }
 
@@ -1414,6 +1414,7 @@ mod tests {
     const OFF: PowerLevel = BinaryPowerLevel::Off.into_primitive();
     const ON: PowerLevel = BinaryPowerLevel::On.into_primitive();
 
+    #[track_caller]
     fn assert_lease_cleaned_up(catalog: &Catalog, lease_id: &LeaseID) {
         assert!(!catalog.leases.contains_key(lease_id));
         assert!(catalog.lease_status.get(lease_id).is_none());
@@ -2050,6 +2051,28 @@ mod tests {
         }}}});
     }
 
+    struct RequiredLevelMatcher {
+        elements: HashMap<ElementID, PowerLevel>,
+    }
+
+    impl RequiredLevelMatcher {
+        fn new() -> Self {
+            Self { elements: HashMap::new() }
+        }
+
+        fn update(&mut self, id: &ElementID, required_level: PowerLevel) {
+            self.elements.insert(id.clone(), required_level);
+        }
+
+        #[track_caller]
+        fn assert_matches(&self, broker: &Broker) {
+            for (id, expected) in &self.elements {
+                let rl = broker.get_required_level(id).unwrap();
+                assert_eq!(rl, *expected, "get_required_level({id}) = {rl}, expected = {expected}");
+            }
+        }
+    }
+
     #[fuchsia::test]
     fn test_broker_lease_direct() {
         // Create a topology of a child element with two direct active dependencies.
@@ -2112,21 +2135,14 @@ mod tests {
                 vec![],
             )
             .expect("add_element failed");
-        assert_eq!(
-            broker.get_required_level(&parent1).unwrap(),
-            OFF,
-            "Parent 1 should start with required level OFF"
-        );
-        assert_eq!(
-            broker.get_required_level(&parent2).unwrap(),
-            OFF,
-            "Parent 2 should start with required level OFF"
-        );
-        assert_eq!(
-            broker.get_required_level(&child).unwrap(),
-            OFF,
-            "Child should start with required level OFF"
-        );
+        let mut required_levels = RequiredLevelMatcher::new();
+
+        // All elements should start with required level OFF.
+        required_levels.update(&parent1, OFF);
+        required_levels.update(&parent2, OFF);
+        required_levels.update(&child, OFF);
+        required_levels.assert_matches(&broker);
+
         let v01: Vec<u64> = BINARY_POWER_LEVELS.iter().map(|&v| v as u64).collect();
         assert_data_tree!(inspect, root: {
             test: {
@@ -2188,61 +2204,26 @@ mod tests {
         // for each dependency.
         // The lease should be Pending.
         let lease = broker.acquire_lease(&child, ON).expect("acquire failed");
-        assert_eq!(
-            broker.get_required_level(&parent1).unwrap(),
-            ON,
-            "Parent 1's required level should become ON from direct claim"
-        );
-        assert_eq!(
-            broker.get_required_level(&parent2).unwrap(),
-            ON,
-            "Parent 2's required level should become ON from direct claim"
-        );
-        assert_eq!(
-            broker.get_required_level(&child).unwrap(),
-            OFF,
-            "Child should have required level OFF until its dependencies are satisfied"
-        );
+        // Parent 1's required level should become ON from direct claim
+        required_levels.update(&parent1, ON);
+        // Parent 2's required level should become ON from direct claim
+        required_levels.update(&parent2, ON);
+        required_levels.assert_matches(&broker);
         assert_eq!(broker.get_lease_status(&lease.id), Some(LeaseStatus::Pending));
 
         // Update P1's current level to ON.
         // The lease should still be Pending.
         broker.update_current_level(&parent1, ON);
-        assert_eq!(
-            broker.get_required_level(&parent1).unwrap(),
-            ON,
-            "Parent 1's required level should remain ON"
-        );
-        assert_eq!(
-            broker.get_required_level(&parent2).unwrap(),
-            ON,
-            "Parent 2's required level should remain ON"
-        );
-        assert_eq!(
-            broker.get_required_level(&child).unwrap(),
-            OFF,
-            "Child should have still required level OFF -- P2 is not yet ON"
-        );
+        // No required levels should change.
+        required_levels.assert_matches(&broker);
         assert_eq!(broker.get_lease_status(&lease.id), Some(LeaseStatus::Pending));
 
         // Update P2's current level to ON.
         // The lease should now be Satisfied.
         broker.update_current_level(&parent2, ON);
-        assert_eq!(
-            broker.get_required_level(&parent1).unwrap(),
-            ON,
-            "Parent 1's required level should remain ON"
-        );
-        assert_eq!(
-            broker.get_required_level(&parent2).unwrap(),
-            ON,
-            "Parent 2's required level should remain ON"
-        );
-        assert_eq!(
-            broker.get_required_level(&child).unwrap(),
-            ON,
-            "Child's required level should become ON"
-        );
+        // Child's required level should become ON
+        required_levels.update(&child, ON);
+        required_levels.assert_matches(&broker);
         assert_eq!(broker.get_lease_status(&lease.id), Some(LeaseStatus::Satisfied));
         assert_data_tree!(inspect, root: {
             test: {
@@ -2304,40 +2285,19 @@ mod tests {
 
         // Update Child's current level to ON.
         broker.update_current_level(&child, ON);
-        assert_eq!(
-            broker.get_required_level(&parent1).unwrap(),
-            ON,
-            "Parent 1's required level should remain ON"
-        );
-        assert_eq!(
-            broker.get_required_level(&parent2).unwrap(),
-            ON,
-            "Parent 2's required level should remain ON"
-        );
-        assert_eq!(
-            broker.get_required_level(&child).unwrap(),
-            ON,
-            "Child's required level should remain ON"
-        );
+        // No required levels should change.
+        required_levels.assert_matches(&broker);
         assert_eq!(broker.get_lease_status(&lease.id), Some(LeaseStatus::Satisfied));
 
         // Now drop the lease and verify both claims are also dropped.
         broker.drop_lease(&lease.id).expect("drop failed");
-        assert_eq!(
-            broker.get_required_level(&parent1).unwrap(),
-            OFF,
-            "Parent 1's required level should become OFF from dropped claim"
-        );
-        assert_eq!(
-            broker.get_required_level(&parent2).unwrap(),
-            OFF,
-            "Parent 2's required level should become OFF from dropped claim"
-        );
-        assert_eq!(
-            broker.get_required_level(&child).unwrap(),
-            OFF,
-            "Child's required level should become OFF"
-        );
+        // Parent 1's required level should become OFF from dropped claim
+        required_levels.update(&parent1, OFF);
+        // Parent 2's required level should become OFF from dropped claim
+        required_levels.update(&parent2, OFF);
+        // Child's required level should become OFF
+        required_levels.update(&child, OFF);
+        required_levels.assert_matches(&broker);
 
         // Try dropping the lease one more time, which should result in an error.
         let extra_drop = broker.drop_lease(&lease.id);
@@ -2411,139 +2371,61 @@ mod tests {
                 ON,
             )
             .expect("add_dependency failed");
-        assert_eq!(
-            broker.get_required_level(&parent).unwrap(),
-            OFF,
-            "Parent should start with required level OFF"
-        );
-        assert_eq!(
-            broker.get_required_level(&grandparent).unwrap(),
-            OFF,
-            "Grandparent should start with required level OFF"
-        );
-        assert_eq!(
-            broker.get_required_level(&child).unwrap(),
-            OFF,
-            "Child should start with required level OFF"
-        );
+        let mut required_levels = RequiredLevelMatcher::new();
+
+        // All elements should start with required level OFF.
+        required_levels.update(&parent, OFF);
+        required_levels.update(&grandparent, OFF);
+        required_levels.update(&child, OFF);
+        required_levels.assert_matches(&broker);
 
         // Acquire the lease, which should result in two claims, one
         // for the direct parent dependency, and one for the transitive
         // grandparent dependency.
         let lease = broker.acquire_lease(&child, ON).expect("acquire failed");
-        assert_eq!(
-            broker.get_required_level(&parent).unwrap(),
-            OFF,
-            "Parent's required level should become OFF, waiting on Grandparent to turn ON"
-        );
-        assert_eq!(
-            broker.get_required_level(&grandparent).unwrap(),
-            ON,
-            "Grandparent's required level should become ON because it has no dependencies"
-        );
-        assert_eq!(
-            broker.get_required_level(&child).unwrap(),
-            OFF,
-            "Child should have required level OFF"
-        );
+        // Parent's required level should remain OFF, waiting on Grandparent to turn ON
+        // Grandparent's required level should become ON because it has no dependencies
+        required_levels.update(&grandparent, ON);
+        required_levels.assert_matches(&broker);
         assert_eq!(broker.get_lease_status(&lease.id), Some(LeaseStatus::Pending));
 
         // Raise Grandparent power level to ON, now Parent claim should be active.
         broker.update_current_level(&grandparent, ON);
-        assert_eq!(
-            broker.get_required_level(&parent).unwrap(),
-            ON,
-            "Parent's required level should become ON"
-        );
-        assert_eq!(
-            broker.get_required_level(&grandparent).unwrap(),
-            ON,
-            "Grandparent's required level should become ON"
-        );
-        assert_eq!(
-            broker.get_required_level(&child).unwrap(),
-            OFF,
-            "Child's required level should remain OFF"
-        );
+        assert_eq!(broker.get_required_level(&parent).unwrap(), ON,);
+        // Parent's required level should become ON because Grandparent is now ON.
+        required_levels.update(&parent, ON);
+        required_levels.assert_matches(&broker);
         assert_eq!(broker.get_lease_status(&lease.id), Some(LeaseStatus::Pending));
 
         // Raise Parent power level to ON, now lease should be Satisfied.
         broker.update_current_level(&parent, ON);
-        assert_eq!(
-            broker.get_required_level(&parent).unwrap(),
-            ON,
-            "Parent's required level should become ON"
-        );
-        assert_eq!(
-            broker.get_required_level(&grandparent).unwrap(),
-            ON,
-            "Grandparent's required level should become ON"
-        );
-        assert_eq!(
-            broker.get_required_level(&child).unwrap(),
-            ON,
-            "Child's required level should become ON"
-        );
+        // Child's required level should become ON now that the lease is satisfied.
+        required_levels.update(&child, ON);
+        required_levels.assert_matches(&broker);
         assert_eq!(broker.get_lease_status(&lease.id), Some(LeaseStatus::Satisfied));
 
         // Raise Child power level to ON.
         // All required levels should still be ON.
         // Lease should still be Satisfied.
         broker.update_current_level(&parent, ON);
-        assert_eq!(
-            broker.get_required_level(&parent).unwrap(),
-            ON,
-            "Parent's required level should become ON"
-        );
-        assert_eq!(
-            broker.get_required_level(&grandparent).unwrap(),
-            ON,
-            "Grandparent's required level should become ON"
-        );
-        assert_eq!(
-            broker.get_required_level(&child).unwrap(),
-            ON,
-            "Child's required level should become ON"
-        );
+        required_levels.assert_matches(&broker);
         assert_eq!(broker.get_lease_status(&lease.id), Some(LeaseStatus::Satisfied));
 
         // Now drop the lease and verify Parent claim is dropped, but
         // Grandparent claim is not yet dropped.
         broker.drop_lease(&lease.id).expect("drop failed");
-        assert_eq!(
-            broker.get_required_level(&parent).unwrap(),
-            OFF,
-            "Parent's required level should become OFF after lease drop"
-        );
-        assert_eq!(
-            broker.get_required_level(&grandparent).unwrap(),
-            ON,
-            "Grandparent's required level should remain ON"
-        );
-        assert_eq!(
-            broker.get_required_level(&child).unwrap(),
-            OFF,
-            "Child's required level should become OFF"
-        );
+        // Parent's required level should become OFF after lease drop
+        // Grandparent's required level should remain ON
+        // Child's required level should become OFF.
+        required_levels.update(&parent, OFF);
+        required_levels.update(&child, OFF);
+        required_levels.assert_matches(&broker);
 
         // Lower Parent power level to OFF, now Grandparent claim should be
         // dropped and should have required level OFF.
         broker.update_current_level(&parent, OFF);
-        assert_eq!(
-            broker.get_required_level(&parent).unwrap(),
-            OFF,
-            "Parent should have required level OFF"
-        );
-        assert_eq!(
-            broker.get_required_level(&grandparent).unwrap(),
-            OFF,
-            "Grandparent's required level should become OFF"
-        );
-        assert_eq!(
-            broker.get_required_level(&child).unwrap(),
-            OFF,
-            "Child's required level should remain OFF"
-        );
+        required_levels.update(&grandparent, OFF);
+        required_levels.assert_matches(&broker);
 
         assert_lease_cleaned_up(&broker.catalog, &lease.id);
     }
@@ -2648,28 +2530,15 @@ mod tests {
             )
             .expect("add_element failed");
 
-        // Initially, Grandparent should have a default required level of 10
-        // and Parent should have a default required level of 0.
-        assert_eq!(
-            broker.get_required_level(&parent).unwrap(),
-            0,
-            "Parent should start with required level 0"
-        );
-        assert_eq!(
-            broker.get_required_level(&grandparent).unwrap(),
-            10,
-            "Grandparent should start with required level at its default of 10"
-        );
-        assert_eq!(
-            broker.get_required_level(&child1).unwrap(),
-            0,
-            "Child 1 should start with required level 0"
-        );
-        assert_eq!(
-            broker.get_required_level(&child2).unwrap(),
-            0,
-            "Child 2 should start with required level 0"
-        );
+        // Initially, all elements should be at their default required levels.
+        // Grandparent should have a default required level of 10
+        // and all others should have a default required level of 0.
+        let mut required_levels = RequiredLevelMatcher::new();
+        required_levels.update(&parent, 0);
+        required_levels.update(&grandparent, 10);
+        required_levels.update(&child1, 0);
+        required_levels.update(&child2, 0);
+        required_levels.assert_matches(&broker);
 
         // Acquire lease for Child 1. Initially, Grandparent should have
         // required level 200 and Parent should have required level 0
@@ -4208,77 +4077,73 @@ mod tests {
                 vec![],
             )
             .expect("add_element failed");
+        let mut required_levels = RequiredLevelMatcher::new();
 
         // Initial required level for all elements should be 0.
         // Set all current levels to 0.
-        assert_eq!(broker.get_required_level(&element_a), Some(0));
-        assert_eq!(broker.get_required_level(&element_b), Some(0));
-        assert_eq!(broker.get_required_level(&element_c), Some(0));
-        assert_eq!(broker.get_required_level(&element_d), Some(0));
+        required_levels.update(&element_a, 0);
+        required_levels.update(&element_b, 0);
+        required_levels.update(&element_c, 0);
+        required_levels.update(&element_d, 0);
+        required_levels.assert_matches(&broker);
         broker.update_current_level(&element_a, 0);
         broker.update_current_level(&element_b, 0);
         broker.update_current_level(&element_c, 0);
         broker.update_current_level(&element_d, 0);
 
         // Lease C.
+        let lease_c = broker.acquire_lease(&element_c, 1).expect("acquire failed");
+        let lease_c_id = lease_c.id.clone();
         // A's required level should remain 0 despite C's passive claim.
         // B's required level should remain 0.
         // C's required level should remain 0 because its lease is pending and contingent.
         // D's required level should remain 0.
+        required_levels.assert_matches(&broker);
         // Lease C should be pending and contingent on its passive claim.
-        let lease_c = broker.acquire_lease(&element_c, 1).expect("acquire failed");
-        let lease_c_id = lease_c.id.clone();
-        assert_eq!(broker.get_required_level(&element_a), Some(0));
-        assert_eq!(broker.get_required_level(&element_b), Some(0));
-        assert_eq!(broker.get_required_level(&element_c), Some(0));
-        assert_eq!(broker.get_required_level(&element_d), Some(0));
         assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
         assert_eq!(broker.is_lease_contingent(&lease_c.id), true);
 
         // Lease B.
+        let lease_b = broker.acquire_lease(&element_b, 1).expect("acquire failed");
+        let lease_b_id = lease_b.id.clone();
         // A's required level should become 3 because of B's active claim.
         // B's required level should remain 0 because its dependency is not yet satisfied.
         // C's required level should remain 0 because its dependency is not yet satisfied.
         // D's required level should remain 0.
+        required_levels.update(&element_a, 3);
+        required_levels.assert_matches(&broker);
         // Lease B should be pending.
         // Lease C should remain pending but no longer contingent because
         // B's active claim would satisfy C's passive claim.
-        let lease_b = broker.acquire_lease(&element_b, 1).expect("acquire failed");
-        let lease_b_id = lease_b.id.clone();
-        assert_eq!(broker.get_required_level(&element_a), Some(3));
-        assert_eq!(broker.get_required_level(&element_b), Some(0));
-        assert_eq!(broker.get_required_level(&element_c), Some(0));
-        assert_eq!(broker.get_required_level(&element_d), Some(0));
         assert_eq!(broker.get_lease_status(&lease_b.id), Some(LeaseStatus::Pending));
         assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
         assert_eq!(broker.is_lease_contingent(&lease_c.id), false);
 
         // Update A's current level to 3.
+        broker.update_current_level(&element_a, 3);
         // A's required level should remain 3.
         // B's required level should become 1 because its dependency is now satisfied.
         // C's required level should become 1 because its dependency is now satisfied.
         // D's required level should remain 0.
+        required_levels.update(&element_b, 1);
+        required_levels.update(&element_c, 1);
+        required_levels.assert_matches(&broker);
         // Lease B & C should become satisfied.
-        broker.update_current_level(&element_a, 3);
-        assert_eq!(broker.get_required_level(&element_a), Some(3));
-        assert_eq!(broker.get_required_level(&element_b), Some(1));
-        assert_eq!(broker.get_required_level(&element_c), Some(1));
-        assert_eq!(broker.get_required_level(&element_d), Some(0));
         assert_eq!(broker.get_lease_status(&lease_b.id), Some(LeaseStatus::Satisfied));
         assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Satisfied));
         assert_eq!(broker.is_lease_contingent(&lease_c.id), false);
 
         // Drop Lease on B.
+        broker.drop_lease(&lease_b.id).expect("drop_lease failed");
         // A's required level should drop to 2 until C drops its passive claim.
         // B's required level should become 0 because it is no longer leased.
         // C's required level should become 0 because it is now pending and contingent.
         // D's required level should remain 0.
+        required_levels.update(&element_a, 2);
+        required_levels.update(&element_b, 0);
+        required_levels.update(&element_c, 0);
+        required_levels.assert_matches(&broker);
         // Lease C should now be pending and contingent.
-        broker.drop_lease(&lease_b.id).expect("drop_lease failed");
-        assert_eq!(broker.get_required_level(&element_a), Some(2));
-        assert_eq!(broker.get_required_level(&element_b), Some(0));
-        assert_eq!(broker.get_required_level(&element_c), Some(0));
-        assert_eq!(broker.get_required_level(&element_d), Some(0));
         assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
         assert_eq!(broker.is_lease_contingent(&lease_c.id), true);
 
@@ -4287,98 +4152,81 @@ mod tests {
         // B's required level should remain 0.
         // C's required level should remain 0.
         // D's required level should remain 0.
+        required_levels.assert_matches(&broker);
         // Lease C should still be pending and contingent.
-        broker.update_current_level(&element_a, 2);
-        assert_eq!(broker.get_required_level(&element_a), Some(2));
-        assert_eq!(broker.get_required_level(&element_b), Some(0));
-        assert_eq!(broker.get_required_level(&element_c), Some(0));
-        assert_eq!(broker.get_required_level(&element_d), Some(0));
         assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
         assert_eq!(broker.is_lease_contingent(&lease_c.id), true);
 
         // Drop Lease on C.
+        broker.drop_lease(&lease_c.id).expect("drop_lease failed");
         // A's required level should become 0.
         // B's required level should remain 0.
         // C's required level should remain 0.
         // D's required level should remain 0.
-        broker.drop_lease(&lease_c.id).expect("drop_lease failed");
-        assert_eq!(broker.get_required_level(&element_a), Some(0));
-        assert_eq!(broker.get_required_level(&element_b), Some(0));
-        assert_eq!(broker.get_required_level(&element_c), Some(0));
-        assert_eq!(broker.get_required_level(&element_d), Some(0));
+        required_levels.update(&element_a, 0);
+        required_levels.assert_matches(&broker);
 
         // Reacquire Lease on C.
+        // The lease on C should remain Pending even though A's current level is 2.
+        let lease_c_reacquired = broker.acquire_lease(&element_c, 1).expect("acquire failed");
+        let lease_c_reacquired_id = lease_c_reacquired.id.clone();
         // A's required level should remain 0 despite C's new passive claim.
         // B's required level should remain 0.
         // C's required level should remain 0.
         // D's required level should remain 0.
-        // The lease on C should remain Pending even though A's current level is 2.
-        let lease_c_reacquired = broker.acquire_lease(&element_c, 1).expect("acquire failed");
-        let lease_c_reacquired_id = lease_c_reacquired.id.clone();
-        assert_eq!(broker.get_required_level(&element_a), Some(0));
-        assert_eq!(broker.get_required_level(&element_b), Some(0));
-        assert_eq!(broker.get_required_level(&element_c), Some(0));
-        assert_eq!(broker.get_required_level(&element_d), Some(0));
+        required_levels.assert_matches(&broker);
         assert_eq!(broker.get_lease_status(&lease_c_reacquired.id), Some(LeaseStatus::Pending));
         assert_eq!(broker.is_lease_contingent(&lease_c_reacquired.id), true);
 
         // Acquire Lease on D.
+        let lease_d = broker.acquire_lease(&element_d, 1).expect("acquire failed");
+        let lease_d_id = lease_d.id.clone();
         // A's required level should become 1, but this is not enough to
         // satisfy C's passive claim.
         // B's required level should remain 0.
         // C's required level should remain 0 even though A's current level is 2.
         // D's required level should become 1 immediately because its dependency is already satisfied.
+        required_levels.update(&element_a, 1);
+        required_levels.update(&element_d, 1);
+        required_levels.assert_matches(&broker);
         // The lease on D should immediately be satisfied by A's current level of 2.
         // The lease on C should remain Pending even though A's current level is 2.
-        let lease_d = broker.acquire_lease(&element_d, 1).expect("acquire failed");
-        let lease_d_id = lease_d.id.clone();
-        assert_eq!(broker.get_required_level(&element_a), Some(1));
-        assert_eq!(broker.get_required_level(&element_b), Some(0));
-        assert_eq!(broker.get_required_level(&element_c), Some(0));
-        assert_eq!(broker.get_required_level(&element_d), Some(1));
         assert_eq!(broker.get_lease_status(&lease_c_reacquired.id), Some(LeaseStatus::Pending));
         assert_eq!(broker.get_lease_status(&lease_d.id), Some(LeaseStatus::Satisfied));
         assert_eq!(broker.is_lease_contingent(&lease_c_reacquired.id), true);
 
         // Update A's current level to 1.
+        broker.update_current_level(&element_a, 1);
         // A's required level should remain 1.
         // B's required level should remain 0.
         // C's required level should remain 0.
         // D's required level should remain 1.
+        required_levels.assert_matches(&broker);
         // The lease on C should remain Pending.
         // The lease on D should still be satisfied.
-        broker.update_current_level(&element_a, 1);
-        assert_eq!(broker.get_required_level(&element_a), Some(1));
-        assert_eq!(broker.get_required_level(&element_b), Some(0));
-        assert_eq!(broker.get_required_level(&element_c), Some(0));
-        assert_eq!(broker.get_required_level(&element_d), Some(1));
         assert_eq!(broker.get_lease_status(&lease_c_reacquired.id), Some(LeaseStatus::Pending));
         assert_eq!(broker.is_lease_contingent(&lease_c_reacquired.id), true);
         assert_eq!(broker.get_lease_status(&lease_d.id), Some(LeaseStatus::Satisfied));
 
         // Drop reacquired lease on C.
+        broker.drop_lease(&lease_c_reacquired.id).expect("drop_lease failed");
         // A's required level should remain 1.
         // B's required level should remain 0.
         // C's required level should remain 0.
         // D's required level should remain 1.
+        required_levels.assert_matches(&broker);
         // The lease on D should still be satisfied.
-        broker.drop_lease(&lease_c_reacquired.id).expect("drop_lease failed");
-        assert_eq!(broker.get_required_level(&element_a), Some(1));
-        assert_eq!(broker.get_required_level(&element_b), Some(0));
-        assert_eq!(broker.get_required_level(&element_c), Some(0));
-        assert_eq!(broker.get_required_level(&element_d), Some(1));
         assert_eq!(broker.get_lease_status(&lease_d.id), Some(LeaseStatus::Satisfied));
 
         // Drop lease on D.
+        broker.drop_lease(&lease_d.id).expect("drop_lease failed");
         // A's required level should become 0.
         // B's required level should remain 0.
         // C's required level should remain 0.
         // D's required level should become 0 because it is no longer leased.
-        broker.drop_lease(&lease_d.id).expect("drop_lease failed");
-        assert_eq!(broker.get_required_level(&element_a), Some(0));
-        assert_eq!(broker.get_required_level(&element_b), Some(0));
-        assert_eq!(broker.get_required_level(&element_c), Some(0));
-        assert_eq!(broker.get_required_level(&element_d), Some(0));
+        required_levels.update(&element_a, 0);
+        required_levels.update(&element_d, 0);
+        required_levels.assert_matches(&broker);
 
         // All leases should be cleaned up.
         assert_lease_cleaned_up(&broker.catalog, &lease_b_id);
