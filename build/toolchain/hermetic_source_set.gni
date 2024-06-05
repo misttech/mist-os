@@ -13,6 +13,7 @@ template("hermetic_source_set") {
   export_target = target_name
   link_target = "_hermetic_source_set.$target_name.link"
   link_rspfile_target = "$link_target.rsp"
+  libs_target = "_hermetic_source_set.$target_name.libs"
   hermetic_target = "_hermetic_source_set.$target_name.hermetic"
   link_output_name = "$target_name.link"
   link_rspfile = "$target_gen_dir/$link_output_name.link.rsp"
@@ -37,7 +38,10 @@ template("hermetic_source_set") {
                            ])
 
     libs = [ hermetic_output_file ]
-    deps = [ ":$hermetic_target" ]
+    deps = [
+      ":$hermetic_target",
+      ":$libs_target",
+    ]
   }
 
   # A basic_executable() is just the original GN executable() with no wrapper
@@ -113,6 +117,10 @@ template("hermetic_source_set") {
       }
     }
 
+    # Don't link in any ET_DYN files, which aren't allowed with ld -r.
+    # This will be handled via libs_target instead.
+    configs += [ "//build/config:ifs-as-needed" ]
+
     # Set the metadata for link_output_rspfile() to collect.
     output_file = "$output_name.$output_extension"
     if (zircon_toolchain == false) {
@@ -137,6 +145,17 @@ template("hermetic_source_set") {
     visibility = [ ":$hermetic_target" ]
     outputs = [ link_rspfile ]
     deps = [ ":$link_target" ]
+  }
+
+  # This will provide the ET_DYN files (via AS_NEEDED wrapper input linker
+  # scripts) from `.as-needed` targets in the deps graph to the outer link.
+  ifs_shared_library_libs(libs_target) {
+    visibility = [ ":$export_target" ]
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "testonly",
+                           ])
   }
 
   toolchain_utils_action(hermetic_target) {

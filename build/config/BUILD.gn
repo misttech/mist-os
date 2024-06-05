@@ -13,6 +13,7 @@ import("//build/config/lto/config.gni")
 import("//build/toolchain/ccache.gni")
 import("//build/toolchain/concurrent_jobs.gni")
 import("//build/toolchain/goma.gni")
+import("//build/toolchain/ifs_shared_library.gni")
 import("//build/toolchain/rbe.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/variant.gni")
@@ -1491,4 +1492,12 @@ config("no-tlsdesc") {
 # warns for deprecated std::errc constants.
 config("Wno-deprecated-pragma") {
   cflags = [ "-Wno-deprecated-pragma" ]
+}
+
+# Adding this config directly to a linking target ensures that any deps on
+# ifs_shared_library() `.as-needed` targets don't bring link stubs into the
+# link.  This should be used for a relocatable link, along with a metadata
+# collection across ifs_shared_library_ldscript as an input linker script.
+config("ifs-as-needed") {
+  lib_dirs = [ ifs_shared_library_as_needed_dir ]
 }
