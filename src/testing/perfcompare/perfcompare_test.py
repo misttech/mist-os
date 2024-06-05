@@ -218,6 +218,21 @@ def GenerateTestData(mean, stddev):
 SLOW_INITIAL_RUN = [1e6]
 
 
+# Returns the output of the "compare_perf" subcommand when run on the
+# given directories.
+def ComparePerf(dir_paths, expected_sample_size=100):
+    stdout = io.StringIO()
+    perfcompare.Main(
+        [
+            "compare_perf",
+            "--expected_sample_size=%d" % expected_sample_size,
+        ]
+        + dir_paths,
+        stdout,
+    )
+    return stdout.getvalue()
+
+
 class FormatConfidenceIntervalTest(unittest.TestCase):
     def test_confidence_interval_formatting(self):
         Format = perfcompare.FormatConfidenceInterval
@@ -392,12 +407,7 @@ class StatisticsTest(TempDirTestCase):
     # the CIs are zero-width (as tested here).
     def test_comparing_equal_zero_width_confidence_intervals(self):
         dir_path = self.DirOfData([[[200]], [[200]]])
-        stdout = io.StringIO()
-        perfcompare.Main(
-            ["compare_perf", "--expected_sample_size=2", dir_path, dir_path],
-            stdout,
-        )
-        output = stdout.getvalue()
+        output = ComparePerf([dir_path, dir_path], expected_sample_size=2)
         GOLDEN.AssertCaseEq("comparison_no_change_zero_width_ci", output)
 
     def test_sample_size_check(self):
@@ -405,7 +415,6 @@ class StatisticsTest(TempDirTestCase):
         dir2_path = self.DirOfData([[[10]], [[20]], [[30]]])
         # Check that we get a descriptive error if the actual sample
         # sizes do not match the "--expected_sample_size" argument.
-        stdout = io.StringIO()
         error = (
             "^The following metrics had an unexpected sample size"
             " \(expected 99\):\n"
@@ -413,15 +422,7 @@ class StatisticsTest(TempDirTestCase):
             "example_suite: ExampleTest \(got 3\)$"
         )
         with self.assertRaisesRegex(AssertionError, error):
-            perfcompare.Main(
-                [
-                    "compare_perf",
-                    "--expected_sample_size=99",
-                    dir1_path,
-                    dir2_path,
-                ],
-                stdout,
-            )
+            ComparePerf([dir1_path, dir2_path], expected_sample_size=99)
         # We should get a similar error if we pass only one directory.
         error = (
             "^The following metrics had an unexpected sample size"
@@ -429,16 +430,10 @@ class StatisticsTest(TempDirTestCase):
             "example_suite: ExampleTest \(got 2\)$"
         )
         with self.assertRaisesRegex(AssertionError, error):
-            perfcompare.Main(
-                [
-                    "compare_perf",
-                    "--expected_sample_size=99",
-                    dir1_path,
-                ],
-                stdout,
-            )
+            ComparePerf([dir1_path], expected_sample_size=99)
         # There should be no check for the sample sizes if the
         # "--expected_sample_size" argument is not given.
+        stdout = io.StringIO()
         perfcompare.Main(["compare_perf", dir1_path, dir2_path], stdout)
 
 
@@ -523,20 +518,6 @@ class PerfCompareTest(TempDirTestCase):
             results[test_name].FormatConfidenceInterval(), "992 +/- 26 ns"
         )
 
-    # Returns the output of compare_perf when run on the given directories.
-    def ComparePerf(self, before_dir, after_dir):
-        stdout = io.StringIO()
-        perfcompare.Main(
-            [
-                "compare_perf",
-                "--expected_sample_size=100",
-                before_dir,
-                after_dir,
-            ],
-            stdout,
-        )
-        return stdout.getvalue()
-
     def test_mean_and_stddev(self):
         values = [10, 5, 15]
         mean_val, stddev_val = perfcompare.MeanAndStddev(values)
@@ -567,28 +548,28 @@ class PerfCompareTest(TempDirTestCase):
     def test_comparison_no_change(self):
         before_dir = self.ExampleDataDir()
         after_dir = self.ExampleDataDir()
-        output = self.ComparePerf(before_dir, after_dir)
+        output = ComparePerf([before_dir, after_dir])
         GOLDEN.AssertCaseEq("comparison_no_change", output)
 
     # Test a regression that is large enough to be flagged.
     def test_comparison_regression(self):
         before_dir = self.ExampleDataDir(mean=1500, stddev=100)
         after_dir = self.ExampleDataDir(mean=1600, stddev=100)
-        output = self.ComparePerf(before_dir, after_dir)
+        output = ComparePerf([before_dir, after_dir])
         GOLDEN.AssertCaseEq("comparison_regression", output)
 
     # Test an improvement that is large enough to be flagged.
     def test_comparison_improvement(self):
         before_dir = self.ExampleDataDir(mean=1500, stddev=100)
         after_dir = self.ExampleDataDir(mean=1400, stddev=100)
-        output = self.ComparePerf(before_dir, after_dir)
+        output = ComparePerf([before_dir, after_dir])
         GOLDEN.AssertCaseEq("comparison_improvement", output)
 
     # Test an improvement that is not large enough to be flagged.
     def test_comparison_improvement_small(self):
         before_dir = self.ExampleDataDir(mean=1500, stddev=100)
         after_dir = self.ExampleDataDir(mean=1450, stddev=100)
-        output = self.ComparePerf(before_dir, after_dir)
+        output = ComparePerf([before_dir, after_dir])
         GOLDEN.AssertCaseEq("comparison_improvement_small", output)
 
     # Test a decrease that is a regression (in contrast to the default
@@ -597,7 +578,7 @@ class PerfCompareTest(TempDirTestCase):
         unit = "bytes/second"
         before_dir = self.ExampleDataDir(mean=1500, stddev=100, unit=unit)
         after_dir = self.ExampleDataDir(mean=1400, stddev=100, unit=unit)
-        output = self.ComparePerf(before_dir, after_dir)
+        output = ComparePerf([before_dir, after_dir])
         GOLDEN.AssertCaseEq("comparison_regression_biggerisbetter", output)
 
     # Test an increase that is an improvement (in contrast to the default
@@ -606,28 +587,24 @@ class PerfCompareTest(TempDirTestCase):
         unit = "bytes/second"
         before_dir = self.ExampleDataDir(mean=1400, stddev=100, unit=unit)
         after_dir = self.ExampleDataDir(mean=1500, stddev=100, unit=unit)
-        output = self.ComparePerf(before_dir, after_dir)
+        output = ComparePerf([before_dir, after_dir])
         GOLDEN.AssertCaseEq("comparison_improvement_biggerisbetter", output)
 
     def test_adding_test(self):
         before_dir = self.ExampleDataDir(drop_one=True)
         after_dir = self.ExampleDataDir()
-        output = self.ComparePerf(before_dir, after_dir)
+        output = ComparePerf([before_dir, after_dir])
         GOLDEN.AssertCaseEq("adding_test", output)
 
     def test_removing_test(self):
         before_dir = self.ExampleDataDir()
         after_dir = self.ExampleDataDir(drop_one=True)
-        output = self.ComparePerf(before_dir, after_dir)
+        output = ComparePerf([before_dir, after_dir])
         GOLDEN.AssertCaseEq("removing_test", output)
 
     def test_display_single_dataset(self):
         dataset_dir = self.ExampleDataDir()
-        stdout = io.StringIO()
-        perfcompare.Main(
-            ["compare_perf", "--expected_sample_size=100", dataset_dir], stdout
-        )
-        output = stdout.getvalue()
+        output = ComparePerf([dataset_dir])
         GOLDEN.AssertCaseEq("display_single_dataset", output)
 
     def test_display_three_datasets(self):
@@ -636,22 +613,13 @@ class PerfCompareTest(TempDirTestCase):
             self.ExampleDataDir(mean=2000, drop_one=True),
             self.ExampleDataDir(mean=3000),
         ]
-        stdout = io.StringIO()
-        perfcompare.Main(
-            ["compare_perf", "--expected_sample_size=100"] + dataset_dirs,
-            stdout,
-        )
-        output = stdout.getvalue()
+        output = ComparePerf(dataset_dirs)
         GOLDEN.AssertCaseEq("display_three_datasets", output)
 
     # Test printing a table of point estimates.
     def test_display_single_boot_single_dataset(self):
         dataset_dir = self.ExampleDataDir(single_boot=True)
-        stdout = io.StringIO()
-        perfcompare.Main(
-            ["compare_perf", "--expected_sample_size=1", dataset_dir], stdout
-        )
-        output = stdout.getvalue()
+        output = ComparePerf([dataset_dir], expected_sample_size=1)
         GOLDEN.AssertCaseEq("display_single_boot_single_dataset", output)
 
     # Test printing a table of point estimates.
@@ -660,11 +628,7 @@ class PerfCompareTest(TempDirTestCase):
             self.ExampleDataDir(mean=1000, single_boot=True),
             self.ExampleDataDir(mean=2000, single_boot=True, drop_one=True),
         ]
-        stdout = io.StringIO()
-        perfcompare.Main(
-            ["compare_perf", "--expected_sample_size=1"] + dataset_dirs, stdout
-        )
-        output = stdout.getvalue()
+        output = ComparePerf(dataset_dirs, expected_sample_size=1)
         GOLDEN.AssertCaseEq("display_single_boot_two_datasets", output)
 
     def test_factor_range_formatting(self):
