@@ -430,6 +430,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             }
         }
 
+        tracing::debug!("Spawning emulator with {emulator_cmd:?}");
         let shared_process = SharedChild::spawn(&mut emulator_cmd)
             .map_err(|e| bug!("Cannot spawn emulator: {e}"))?;
         let child_arc = Arc::new(shared_process);
