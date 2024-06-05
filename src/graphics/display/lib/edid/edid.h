@@ -318,14 +318,14 @@ class audio_data_block_iterator;
 
 class Edid {
  public:
-  // Creates an Edid from the EdidDdcSource. Does not retain a reference to the source.
+  // Reads the EDID bytes from the EdidDdcSource and creates an Edid object
+  // from them.
   //
   // On error, returns a `const char*` string of static storage duration
   // containing the error message.
   fit::result<const char*> Init(void* ctx, ddc_i2c_transact edid_source);
 
-  // Creates an Edid from raw bytes. The bytes array must remain valid for the duration
-  // of the Edid object's lifetime.
+  // Creates an Edid from raw bytes.
   //
   // On error, returns a `const char*` string of static storage duration
   // containing the error message.
@@ -333,8 +333,8 @@ class Edid {
 
   void Print(void (*print_fn)(const char* str)) const;
 
-  const uint8_t* edid_bytes() const { return bytes_; }
-  uint16_t edid_length() const { return len_; }
+  const uint8_t* edid_bytes() const { return bytes_.data(); }
+  size_t edid_length() const { return bytes_.size(); }
 
   uint16_t product_code() const { return base_edid().product_code; }
   uint16_t manufacturer_name_code() const {
@@ -350,7 +350,7 @@ class Edid {
   uint32_t vertical_size_mm() const { return (base_edid().vertical_size_cm * 10); }
   bool is_hdmi() const;
 
-  const BaseEdid& base_edid() const { return *reinterpret_cast<const BaseEdid*>(bytes_); }
+  const BaseEdid& base_edid() const { return *reinterpret_cast<const BaseEdid*>(bytes_.data()); }
 
  private:
   friend class internal::data_block_iterator;
@@ -361,13 +361,9 @@ class Edid {
   template <typename T>
   const T* GetBlock(uint8_t block_num) const;
 
-  // Edid bytes and length
-  const uint8_t* bytes_;
-  uint16_t len_;
+  fit::result<const char*> Initialize();
 
-  // Contains the edid bytes if they are owned by this object. |bytes_| should generally
-  // be used, since this will be empty if something else owns the edid bytes.
-  fbl::Vector<uint8_t> edid_bytes_;
+  fbl::Vector<uint8_t> bytes_;
 
   char manufacturer_id_[sizeof(Descriptor::Monitor::data) + 1];
   char monitor_name_[sizeof(Descriptor::Monitor::data) + 1];
@@ -377,7 +373,7 @@ class Edid {
 
 template <typename T>
 const T* Edid::GetBlock(uint8_t block_num) const {
-  const uint8_t* bytes = bytes_ + block_num * kBlockSize;
+  const uint8_t* bytes = bytes_.data() + block_num * kBlockSize;
   return bytes[0] == T::kTag ? reinterpret_cast<const T*>(bytes) : nullptr;
 }
 

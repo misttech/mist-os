@@ -29,7 +29,8 @@ descriptor_iterator& descriptor_iterator::operator++() {
     descriptor_idx_ = UINT32_MAX;
   }
 
-  while (block_idx_ < (edid_->len_ / kBlockSize)) {
+  const int num_blocks = static_cast<int>(edid_->bytes_.size() / kBlockSize);
+  while (block_idx_ < num_blocks) {
     auto cea_extn_block = edid_->GetBlock<CeaEdidTimingExtension>(block_idx_);
     size_t offset = sizeof(CeaEdidTimingExtension::payload);
     if (cea_extn_block &&
@@ -70,7 +71,8 @@ data_block_iterator& data_block_iterator::operator++() {
     return *this;
   }
 
-  while (block_idx_ < (edid_->len_ / kBlockSize)) {
+  const int num_blocks = static_cast<int>(edid_->bytes_.size() / kBlockSize);
+  while (block_idx_ < num_blocks) {
     auto cea_extn_block = edid_->GetBlock<CeaEdidTimingExtension>(block_idx_);
     size_t dbc_end = 0;
     if (cea_extn_block &&

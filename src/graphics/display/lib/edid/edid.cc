@@ -159,8 +159,8 @@ fit::result<const char*> Edid::Init(void* ctx, ddc_i2c_transact transact) {
   if (read_edid_result.is_error()) {
     return read_edid_result.take_error();
   }
-  edid_bytes_ = std::move(read_edid_result).value();
-  return Init(edid_bytes_.data(), static_cast<uint16_t>(edid_bytes_.size()));
+  bytes_ = std::move(read_edid_result).value();
+  return Initialize();
 }
 
 fit::result<const char*> Edid::Init(const uint8_t* bytes, uint16_t len) {
@@ -168,21 +168,34 @@ fit::result<const char*> Edid::Init(const uint8_t* bytes, uint16_t len) {
   if (len == 0 || len % kBlockSize != 0) {
     return fit::error("Invalid edid length");
   }
-  bytes_ = bytes;
-  len_ = len;
 
+  bytes_ = fbl::Vector<uint8_t>();
+
+  fbl::AllocChecker alloc_checker;
+  bytes_.resize(len, 0, &alloc_checker);
+  if (!alloc_checker.check()) {
+    return fit::error("Failed to allocate memory for EDID");
+  }
+
+  cpp20::span<const uint8_t> bytes_span(bytes, len);
+  std::copy(bytes_span.begin(), bytes_span.end(), bytes_.begin());
+
+  return Initialize();
+}
+
+fit::result<const char*> Edid::Initialize() {
   const BaseEdid& base = base_edid();
   if (!base.validate()) {
     return fit::error("Failed to validate base edid");
   }
-  if (((base.num_extensions + 1) * kBlockSize) != len) {
+  if (((base.num_extensions + 1) * kBlockSize) != bytes_.size()) {
     return fit::error("Bad extension count");
   }
   if (!base.digital()) {
     return fit::error("Analog displays not supported");
   }
 
-  for (uint8_t i = 1; i < len / kBlockSize; i++) {
+  for (uint8_t i = 1; i < bytes_.size() / kBlockSize; i++) {
     if (bytes_[i * kBlockSize] == CeaEdidTimingExtension::kTag) {
       if (!GetBlock<CeaEdidTimingExtension>(i)->validate()) {
         return fit::error("Failed to validate extensions");
@@ -448,11 +461,11 @@ audio_data_block_iterator& audio_data_block_iterator::operator++() {
 void Edid::Print(void (*print_fn)(const char* str)) const {
   char str_buf[128];
   print_fn("Raw edid:\n");
-  for (auto i = 0; i < edid_length(); i++) {
+  for (size_t i = 0; i < edid_length(); i++) {
     constexpr int kBytesPerLine = 16;
     char* b = str_buf;
     if (i % kBytesPerLine == 0) {
-      b += sprintf(b, "%04x: ", i);
+      b += sprintf(b, "%04zx: ", i);
     }
     sprintf(b, "%02x%s", edid_bytes()[i], i % kBytesPerLine == kBytesPerLine - 1 ? "\n" : " ");
     print_fn(str_buf);
@@ -461,7 +474,8 @@ void Edid::Print(void (*print_fn)(const char* str)) const {
 
 bool Edid::supports_basic_audio() const {
   uint8_t block_idx = 1;  // Skip block 1, since it can't be a CEA block
-  while (block_idx < (len_ / kBlockSize)) {
+  const int num_blocks = static_cast<int>(bytes_.size() / kBlockSize);
+  while (block_idx < num_blocks) {
     auto cea_extn_block = GetBlock<CeaEdidTimingExtension>(block_idx);
     if (cea_extn_block && cea_extn_block->revision_number >= 2) {
       return cea_extn_block->basic_audio();
