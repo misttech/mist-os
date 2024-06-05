@@ -1326,7 +1326,7 @@ pub(crate) mod testutil {
     impl<I: IpExt, D: FakeStrongDeviceId> FakeIpSocketCtx<I, D> {
         /// Creates a new `FakeIpSocketCtx` with the given device
         /// configs.
-        pub(crate) fn new(
+        pub fn new(
             device_configs: impl IntoIterator<Item = FakeDeviceConfig<D, SpecifiedAddr<I::Addr>>>,
         ) -> Self {
             let mut table = ForwardingTable::default();

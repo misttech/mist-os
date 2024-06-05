@@ -149,11 +149,6 @@ pub mod gmp {
 
 /// The Internet Control Message Protocol (ICMP).
 pub mod icmp {
-    pub use crate::internal::icmp::socket::{
-        BoundSockets, IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpEchoBoundStateContext,
-        IcmpEchoContextMarker, IcmpEchoIpTransportContext, IcmpEchoSocketApi, IcmpEchoStateContext,
-        IcmpSocketId, IcmpSocketSet, IcmpSocketState, IcmpSockets,
-    };
     pub use crate::internal::icmp::{
         send_icmpv4_host_unreachable, send_icmpv6_address_unreachable, send_ndp_packet,
         EchoTransportContextMarker, IcmpBindingsContext, IcmpBindingsTypes, IcmpErrorCode,

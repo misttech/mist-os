@@ -31,6 +31,7 @@ use net_types::{
 };
 use netstack3_base::{FrameDestination, LinkDevice, RemoveResourceResult};
 use netstack3_filter::FilterTimerId;
+use netstack3_icmp_echo::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId};
 use packet::{Buf, BufferMut};
 use zerocopy::ByteSlice;
 
@@ -62,7 +63,6 @@ use crate::{
             IpDeviceConfigurationUpdate, IpDeviceEvent, Ipv4DeviceConfigurationUpdate,
             Ipv6DeviceConfigurationUpdate,
         },
-        icmp::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId},
         nud::{self, LinkResolutionContext, LinkResolutionNotifier},
         raw::{RawIpSocketId, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes},
         AddRouteError, AddableEntryEither, AddableMetric, IpDeviceConfiguration, IpLayerEvent,

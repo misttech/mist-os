@@ -385,6 +385,25 @@ impl<WireI: IpExt, SocketI: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpe
         let Shutdown { receive, send: _ } = shutdown;
         !*receive
     }
+
+    /// Returns the bound addresses for the connection.
+    pub fn addr(
+        &self,
+    ) -> &ConnAddr<
+        ConnIpAddr<
+            WireI::Addr,
+            <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+            <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
+        >,
+        D,
+    > {
+        &self.addr
+    }
+
+    /// Returns the extra opaque information kept in connected state.
+    pub fn extra(&self) -> &S::ConnStateExtra {
+        &self.extra
+    }
 }
 
 /// Connection state belong to either this-stack or the other-stack.

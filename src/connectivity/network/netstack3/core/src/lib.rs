@@ -115,7 +115,7 @@ pub mod inspect {
 
 /// Methods for dealing with ICMP sockets.
 pub mod icmp {
-    pub use netstack3_ip::icmp::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId};
+    pub use netstack3_icmp_echo::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId};
 }
 
 /// The Internet Protocol, versions 4 and 6.

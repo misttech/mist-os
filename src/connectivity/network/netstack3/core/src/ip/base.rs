@@ -15,6 +15,11 @@ use net_types::{
     MulticastAddr, SpecifiedAddr,
 };
 use netstack3_base::{CounterContext, TokenBucket, WeakDeviceIdentifier};
+use netstack3_icmp_echo::{
+    self as icmp_echo, IcmpEchoBoundStateContext, IcmpEchoContextMarker,
+    IcmpEchoIpTransportContext, IcmpEchoStateContext, IcmpSocketId, IcmpSocketSet, IcmpSocketState,
+    IcmpSockets,
+};
 use packet::BufferMut;
 use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
 use tracing::trace;
@@ -26,9 +31,7 @@ use crate::{
         self,
         device::{self, IpDeviceBindingsContext, IpDeviceIpExt},
         icmp::{
-            self, IcmpEchoBoundStateContext, IcmpEchoContextMarker, IcmpEchoIpTransportContext,
-            IcmpEchoStateContext, IcmpIpTransportContext, IcmpRxCounters, IcmpSocketId,
-            IcmpSocketSet, IcmpSocketState, IcmpSockets, IcmpState, IcmpTxCounters,
+            self, IcmpIpTransportContext, IcmpRxCounters, IcmpState, IcmpTxCounters,
             Icmpv4ErrorCode, Icmpv6ErrorCode, InnerIcmpContext, InnerIcmpv4Context, NdpCounters,
         },
         raw::RawIpSocketMap,
@@ -615,7 +618,7 @@ impl<I, BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpBoundMap<I>
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &mut icmp::BoundSockets<I, Self::WeakDeviceId, BC>,
+            &mut icmp_echo::BoundSockets<I, Self::WeakDeviceId, BC>,
         ) -> O,
     >(
         &mut self,
@@ -688,7 +691,8 @@ impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
 }
 
 impl<I: datagram::DualStackIpExt, BT: BindingsTypes>
-    DelegatedOrderedLockAccess<icmp::BoundSockets<I, WeakDeviceId<BT>, BT>> for StackState<BT>
+    DelegatedOrderedLockAccess<icmp_echo::BoundSockets<I, WeakDeviceId<BT>, BT>>
+    for StackState<BT>
 {
     type Inner = IcmpSockets<I, WeakDeviceId<BT>, BT>;
     fn delegate_ordered_lock_access(&self) -> &Self::Inner {
@@ -699,7 +703,7 @@ impl<I: datagram::DualStackIpExt, BT: BindingsTypes>
 impl<I: datagram::DualStackIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
     for crate::lock_ordering::IcmpBoundMap<I>
 {
-    type Data = icmp::BoundSockets<I, WeakDeviceId<BT>, BT>;
+    type Data = icmp_echo::BoundSockets<I, WeakDeviceId<BT>, BT>;
 }
 
 impl<I: datagram::DualStackIpExt, BT: BindingsTypes>

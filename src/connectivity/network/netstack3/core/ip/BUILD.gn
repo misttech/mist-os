@@ -32,7 +32,6 @@ rustc_library_with_features("netstack3-ip") {
     "src/gmp/igmp.rs",
     "src/gmp/mld.rs",
     "src/icmp.rs",
-    "src/icmp/socket.rs",
     "src/ipv6.rs",
     "src/lib.rs",
     "src/path_mtu.rs",

@@ -13,7 +13,7 @@ use core::{
     num::{NonZeroU16, NonZeroU8},
     ops::ControlFlow,
 };
-use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
+use lock_order::lock::{DelegatedOrderedLockAccess, OrderedLockAccess, OrderedLockRef};
 
 use derivative::Derivative;
 use either::Either;
@@ -34,14 +34,7 @@ use netstack3_base::{
     LocalAddressError, PortAllocImpl, ReferenceNotifiers, RemoveResourceResultWithContext,
     RngContext, SocketError, StrongDeviceIdentifier, UninstantiableWrapper, WeakDeviceIdentifier,
 };
-use packet::{BufferMut, ParsablePacket as _, ParseBuffer as _, Serializer};
-use packet_formats::{
-    icmp::{IcmpEchoReply, IcmpEchoRequest, IcmpPacketBuilder, IcmpPacketRaw},
-    ip::{IpProtoExt, Ipv4Proto, Ipv6Proto},
-};
-use tracing::{debug, trace};
-
-use crate::{
+use netstack3_ip::{
     datagram::{
         self, DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSet, DatagramSocketSpec,
         DatagramSpecBoundStateContext, DatagramSpecStateContext, DatagramStateContext,
@@ -52,6 +45,12 @@ use crate::{
     IpTransportContext, MulticastMembershipHandler, TransparentLocalDelivery, TransportIpContext,
     TransportReceiveError,
 };
+use packet::{BufferMut, ParsablePacket as _, ParseBuffer as _, Serializer};
+use packet_formats::{
+    icmp::{IcmpEchoReply, IcmpEchoRequest, IcmpPacketBuilder, IcmpPacketRaw},
+    ip::{IpProtoExt, Ipv4Proto, Ipv6Proto},
+};
+use tracing::{debug, trace};
 
 /// A marker trait for all IP extensions required by ICMP sockets.
 pub trait IpExt: datagram::IpExt + IcmpIpExt {}
@@ -147,7 +146,7 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes> IcmpSocketId<
     #[cfg(any(test, feature = "testutils"))]
     pub fn state(&self) -> &RwLock<IcmpSocketState<I, D, BT>> {
         let Self(rc) = self;
-        &rc.state
+        rc.state()
     }
 
     /// Returns a means to debug outstanding references to this socket.
@@ -165,17 +164,17 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes> IcmpSocketId<
     /// Returns external data associated with this socket.
     pub fn external_data(&self) -> &BT::ExternalData<I> {
         let Self(rc) = self;
-        &rc.external_data
+        rc.external_data()
     }
 }
 
 impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes>
-    OrderedLockAccess<IcmpSocketState<I, D, BT>> for IcmpSocketId<I, D, BT>
+    DelegatedOrderedLockAccess<IcmpSocketState<I, D, BT>> for IcmpSocketId<I, D, BT>
 {
-    type Lock = RwLock<IcmpSocketState<I, D, BT>>;
-    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+    type Inner = datagram::ReferenceState<I, D, Icmp<BT>>;
+    fn delegate_ordered_lock_access(&self) -> &Self::Inner {
         let Self(rc) = self;
-        OrderedLockRef::new(&rc.state)
+        &*rc
     }
 }
 
@@ -430,8 +429,10 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
     type ConnStateExtra = u16;
 
     fn conn_info_from_state<I: IpExt, D: WeakDeviceIdentifier>(
-        datagram::ConnState { addr: ConnAddr { ip, device }, extra, .. }: &Self::ConnState<I, D>,
+        state: &Self::ConnState<I, D>,
     ) -> datagram::ConnInfo<I::Addr, D> {
+        let ConnAddr { ip, device } = state.addr();
+        let extra = state.extra();
         let ConnInfoAddr { local: (local_ip, local_identifier), remote: (remote_ip, ()) } =
             ip.clone().into();
         datagram::ConnInfo::new(local_ip, local_identifier, remote_ip, *extra, || {
@@ -1193,14 +1194,14 @@ mod tests {
         testutil::{FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeWeakDeviceId, TestIpExt},
         CtxPair,
     };
+    use netstack3_ip::{
+        socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx, InnerFakeIpSocketCtx},
+        SendIpPacketMeta,
+    };
     use packet::Buf;
     use packet_formats::icmp::{IcmpPacket, IcmpParseArgs, IcmpUnusedCode};
 
     use super::*;
-    use crate::{
-        socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx, InnerFakeIpSocketCtx},
-        SendIpPacketMeta,
-    };
 
     const REMOTE_ID: u16 = 27;
     const ICMP_ID: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(10));

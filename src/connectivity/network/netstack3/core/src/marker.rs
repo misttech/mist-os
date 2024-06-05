@@ -12,6 +12,7 @@ use netstack3_base::{
     AnyDevice, CounterContext, DeviceIdContext, InstantBindingsTypes, ReferenceNotifiers,
     RngContext, TimerBindingsTypes, TracingContext,
 };
+use netstack3_icmp_echo::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpEchoStateContext};
 
 use crate::{
     device::{
@@ -26,9 +27,7 @@ use crate::{
             IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceConfigurationHandler,
             IpDeviceIpExt,
         },
-        icmp::{
-            IcmpBindingsContext, IcmpBindingsTypes, IcmpEchoBindingsContext, IcmpEchoBindingsTypes,
-        },
+        icmp::{IcmpBindingsContext, IcmpBindingsTypes},
         nud::{NudBindingsContext, NudContext},
         raw::{
             RawIpSocketMapContext, RawIpSocketStateContext, RawIpSocketsBindingsContext,
@@ -77,7 +76,7 @@ pub trait CoreContext<I, BC>:
     transport::udp::StateContext<I, BC>
     + CounterContext<UdpCounters<I>>
     + TcpContext<I, BC>
-    + ip::icmp::IcmpEchoStateContext<I, BC>
+    + IcmpEchoStateContext<I, BC>
     + ip::icmp::IcmpStateContext
     + IpLayerContext<I, BC>
     + NudContext<I, EthernetLinkDevice, BC>
@@ -104,7 +103,7 @@ where
     O: transport::udp::StateContext<I, BC>
         + CounterContext<UdpCounters<I>>
         + TcpContext<I, BC>
-        + ip::icmp::IcmpEchoStateContext<I, BC>
+        + IcmpEchoStateContext<I, BC>
         + ip::icmp::IcmpStateContext
         + IpLayerContext<I, BC>
         + NudContext<I, EthernetLinkDevice, BC>

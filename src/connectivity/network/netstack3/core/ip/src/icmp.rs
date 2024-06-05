@@ -60,9 +60,6 @@ use crate::internal::{
     socket::{DefaultSendOptions, IpSocketHandler},
 };
 
-// TODO(https://fxbug.dev/339425395): Extract to a separate crate.
-pub(crate) mod socket;
-
 /// The IP packet hop limit for all NDP packets.
 ///
 /// See [RFC 4861 section 4.1], [RFC 4861 section 4.2], [RFC 4861 section 4.2],

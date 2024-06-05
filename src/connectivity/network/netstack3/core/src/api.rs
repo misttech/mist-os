@@ -5,6 +5,7 @@
 ///! Defines the main API entry objects for the exposed API from core.
 use lock_order::Unlocked;
 use net_types::ip::Ip;
+use netstack3_icmp_echo::IcmpEchoSocketApi;
 
 use crate::{
     context::{ContextPair as _, ContextProvider, CoreCtx, CtxPair, TimerHandler as _},
@@ -17,7 +18,6 @@ use crate::{
     filter::FilterApi,
     ip::{
         device::{DeviceIpAnyApi, DeviceIpApi},
-        icmp::IcmpEchoSocketApi,
         nud::NeighborApi,
         raw::RawIpSocketApi,
         RoutesAnyApi, RoutesApi,
