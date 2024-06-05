@@ -90,7 +90,10 @@ pub trait Node: IsDirectory + IntoAny + Send + Sync + 'static {
         scope: ExecutionScope,
         options: NodeOptions,
         object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), Status> {
+    ) -> Result<(), Status>
+    where
+        Self: Sized,
+    {
         self.will_open_as_node()?;
         scope.spawn(node::Connection::create(scope.clone(), self, options, object_request)?);
         Ok(())
@@ -98,7 +101,7 @@ pub trait Node: IsDirectory + IntoAny + Send + Sync + 'static {
 }
 
 /// Represents a FIDL (limited) node connection.
-pub struct Connection<N: Node + ?Sized> {
+pub struct Connection<N: Node> {
     // Execution scope this connection and any async operations and connections it creates will
     // use.
     scope: ExecutionScope,
@@ -120,7 +123,7 @@ enum ConnectionState {
     Closed,
 }
 
-impl<N: Node + ?Sized> Connection<N> {
+impl<N: Node> Connection<N> {
     pub fn create(
         scope: ExecutionScope,
         node: Arc<N>,
@@ -279,7 +282,7 @@ impl<N: Node + ?Sized> Connection<N> {
     }
 }
 
-impl<N: Node + ?Sized> Representation for Connection<N> {
+impl<N: Node> Representation for Connection<N> {
     type Protocol = fio::NodeMarker;
 
     async fn get_representation(
@@ -302,23 +305,23 @@ impl<N: Node + ?Sized> Representation for Connection<N> {
 }
 
 /// This struct is a RAII wrapper around a node that will call close() on it when dropped.
-pub struct OpenNode<T: Node + ?Sized> {
+pub struct OpenNode<T: Node> {
     node: Arc<T>,
 }
 
-impl<T: Node + ?Sized> OpenNode<T> {
+impl<T: Node> OpenNode<T> {
     pub fn new(node: Arc<T>) -> Self {
         Self { node }
     }
 }
 
-impl<T: Node + ?Sized> Drop for OpenNode<T> {
+impl<T: Node> Drop for OpenNode<T> {
     fn drop(&mut self) {
         self.node.clone().close();
     }
 }
 
-impl<T: Node + ?Sized> std::ops::Deref for OpenNode<T> {
+impl<T: Node> std::ops::Deref for OpenNode<T> {
     type Target = Arc<T>;
 
     fn deref(&self) -> &Self::Target {

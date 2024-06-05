@@ -10,7 +10,7 @@ use crate::{
         extended_attributes_sender,
     },
     directory::{
-        connection::{BaseConnection, ConnectionState, DerivedConnection},
+        connection::{BaseConnection, ConnectionState},
         entry_container::MutableDirectory,
     },
     execution_scope::ExecutionScope,
@@ -33,26 +33,22 @@ use {
 };
 
 #[pin_project]
-pub struct MutableConnection {
-    base: BaseConnection<Self>,
+pub struct MutableConnection<DirectoryType: MutableDirectory> {
+    base: BaseConnection<DirectoryType>,
 }
 
-impl DerivedConnection for MutableConnection {
-    type Directory = dyn MutableDirectory;
-}
-
-impl MutableConnection {
+impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
     pub fn create(
         scope: ExecutionScope,
-        directory: Arc<impl MutableDirectory>,
+        directory: Arc<DirectoryType>,
         protocols: impl ProtocolsExt,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<impl Future<Output = ()>, Status> {
         // Ensure we close the directory if we fail to prepare the connection.
-        let directory = OpenNode::new(directory as Arc<dyn MutableDirectory>);
+        let directory = OpenNode::new(directory);
 
         let connection = MutableConnection {
-            base: BaseConnection::<Self>::new(scope, directory, protocols.to_directory_options()?),
+            base: BaseConnection::new(scope, directory, protocols.to_directory_options()?),
         };
 
         let object_request = object_request.take();
@@ -324,7 +320,7 @@ impl MutableConnection {
     }
 }
 
-impl TokenInterface for MutableConnection {
+impl<DirectoryType: MutableDirectory> TokenInterface for MutableConnection<DirectoryType> {
     fn get_node_and_flags(&self) -> (Arc<dyn MutableDirectory>, fio::OpenFlags) {
         (self.base.directory.clone(), self.base.options.to_io1())
     }

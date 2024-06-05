@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    common::{inherit_rights_for_clone, send_on_open_with_error, CreationMode, IntoAny as _},
+    common::{inherit_rights_for_clone, send_on_open_with_error, CreationMode},
     directory::{
         common::check_child_connection_flags,
         entry_container::{Directory, DirectoryWatcher},
@@ -12,7 +12,7 @@ use crate::{
         DirectoryOptions,
     },
     execution_scope::{yield_to_executor, ExecutionScope},
-    node::{Node as _, OpenNode},
+    node::OpenNode,
     object_request::Representation,
     path::Path,
     ObjectRequestRef, ProtocolsExt, ToObjectRequest,
@@ -27,7 +27,7 @@ use {
     storage_trace::{self as trace, TraceFutureExt},
 };
 
-/// Return type for `BaseConnection::handle_request` and [`DerivedConnection::handle_request`].
+/// Return type for `BaseConnection::handle_request`.
 pub enum ConnectionState {
     /// Connection is still alive.
     Alive,
@@ -35,25 +35,16 @@ pub enum ConnectionState {
     Closed,
 }
 
-/// This is an API a derived directory connection needs to implement, in order for the
-/// `BaseConnection` to be able to interact with it.
-pub trait DerivedConnection: Send + Sync {
-    type Directory: Directory + ?Sized;
-}
-
 /// Handles functionality shared between mutable and immutable FIDL connections to a directory.  A
 /// single directory may contain multiple connections.  Instances of the `BaseConnection`
 /// will also hold any state that is "per-connection".  Currently that would be the access flags
 /// and the seek position.
-pub(in crate::directory) struct BaseConnection<Connection>
-where
-    Connection: DerivedConnection + 'static,
-{
+pub(in crate::directory) struct BaseConnection<DirectoryType: Directory> {
     /// Execution scope this connection and any async operations and connections it creates will
     /// use.
     pub(in crate::directory) scope: ExecutionScope,
 
-    pub(in crate::directory) directory: OpenNode<Connection::Directory>,
+    pub(in crate::directory) directory: OpenNode<DirectoryType>,
 
     /// Flags set on this connection when it was opened or cloned.
     pub(in crate::directory) options: DirectoryOptions,
@@ -75,16 +66,13 @@ where
     seek: TraversalPosition,
 }
 
-impl<Connection> BaseConnection<Connection>
-where
-    Connection: DerivedConnection,
-{
+impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
     /// Constructs an instance of `BaseConnection` - to be used by derived connections, when they
     /// need to create a nested `BaseConnection` "sub-object".  But when implementing
     /// `create_connection`, derived connections should use the [`create_connection`] call.
     pub(in crate::directory) fn new(
         scope: ExecutionScope,
-        directory: OpenNode<Connection::Directory>,
+        directory: OpenNode<DirectoryType>,
         options: DirectoryOptions,
     ) -> Self {
         BaseConnection { scope, directory, options, seek: Default::default() }
@@ -478,7 +466,7 @@ where
     }
 }
 
-impl<T: DerivedConnection + 'static> Representation for BaseConnection<T> {
+impl<DirectoryType: Directory> Representation for BaseConnection<DirectoryType> {
     type Protocol = fio::DirectoryMarker;
 
     async fn get_representation(

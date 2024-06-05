@@ -336,7 +336,7 @@ pub trait FileLike: Node {
 
 /// Helper to open a file or node as required.
 pub fn serve(
-    file: Arc<impl FileLike + ?Sized>,
+    file: Arc<impl FileLike>,
     scope: ExecutionScope,
     protocols: &impl ProtocolsExt,
     object_request: ObjectRequestRef<'_>,

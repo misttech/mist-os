@@ -7,8 +7,8 @@
 
 use crate::{
     directory::{
-        connection::{BaseConnection, ConnectionState, DerivedConnection},
-        entry_container,
+        connection::{BaseConnection, ConnectionState},
+        entry_container::Directory,
     },
     execution_scope::ExecutionScope,
     node::OpenNode,
@@ -23,11 +23,11 @@ use {
     std::{future::Future, sync::Arc},
 };
 
-pub struct ImmutableConnection {
-    base: BaseConnection<Self>,
+pub struct ImmutableConnection<DirectoryType: Directory> {
+    base: BaseConnection<DirectoryType>,
 }
 
-impl ImmutableConnection {
+impl<DirectoryType: Directory> ImmutableConnection<DirectoryType> {
     async fn handle_requests<RS>(mut self, mut requests: RS)
     where
         RS: futures::stream::TryStream<Ok = DirectoryRequest, Error = fidl::Error> + Unpin,
@@ -42,7 +42,7 @@ impl ImmutableConnection {
 
     pub fn create(
         scope: ExecutionScope,
-        directory: Arc<impl entry_container::Directory>,
+        directory: Arc<DirectoryType>,
         protocols: impl ProtocolsExt,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<impl Future<Output = ()>, Status> {
@@ -61,7 +61,7 @@ impl ImmutableConnection {
     /// Try not to use this function for other purposes.
     pub fn create_transform_stream<Transform, RS>(
         scope: ExecutionScope,
-        directory: Arc<impl entry_container::Directory>,
+        directory: Arc<DirectoryType>,
         protocols: impl ProtocolsExt,
         object_request: ObjectRequestRef<'_>,
         transform: Transform,
@@ -71,10 +71,10 @@ impl ImmutableConnection {
         RS: futures::stream::TryStream<Ok = DirectoryRequest, Error = fidl::Error> + Unpin,
     {
         // Ensure we close the directory if we fail to create the connection.
-        let directory = OpenNode::new(directory as Arc<dyn entry_container::Directory>);
+        let directory = OpenNode::new(directory);
 
         let connection = ImmutableConnection {
-            base: BaseConnection::<Self>::new(scope, directory, protocols.to_directory_options()?),
+            base: BaseConnection::new(scope, directory, protocols.to_directory_options()?),
         };
 
         // If we fail to send the task to the executor, it is probably shut down or is in the
@@ -88,8 +88,4 @@ impl ImmutableConnection {
             }
         })
     }
-}
-
-impl DerivedConnection for ImmutableConnection {
-    type Directory = dyn entry_container::Directory;
 }

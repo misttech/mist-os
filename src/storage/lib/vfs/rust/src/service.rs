@@ -156,7 +156,7 @@ impl Node for Service {
 
 /// Helper to open a service or node as required.
 pub fn serve(
-    service: Arc<impl ServiceLike + ?Sized>,
+    service: Arc<impl ServiceLike>,
     scope: ExecutionScope,
     protocols: &impl ProtocolsExt,
     object_request: ObjectRequestRef<'_>,
