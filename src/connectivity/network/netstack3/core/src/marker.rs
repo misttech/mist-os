@@ -12,6 +12,7 @@ use netstack3_base::{
     AnyDevice, CounterContext, DeviceIdContext, InstantBindingsTypes, ReferenceNotifiers,
     RngContext, TimerBindingsTypes, TracingContext,
 };
+use netstack3_datagram as datagram;
 use netstack3_icmp_echo::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpEchoStateContext};
 
 use crate::{
@@ -36,7 +37,6 @@ use crate::{
         socket::IpSocketContext,
         IpLayerBindingsContext, IpLayerContext, IpLayerIpExt,
     },
-    socket,
     transport::{
         self,
         tcp::{TcpBindingsContext, TcpBindingsTypes, TcpContext},
@@ -52,7 +52,7 @@ pub trait IpExt:
     + ip::icmp::IcmpIpExt
     + ip::device::IpDeviceIpExt
     + transport::tcp::DualStackIpExt
-    + socket::datagram::DualStackIpExt
+    + datagram::DualStackIpExt
 {
 }
 
@@ -62,7 +62,7 @@ impl<O> IpExt for O where
         + ip::icmp::IcmpIpExt
         + ip::device::IpDeviceIpExt
         + transport::tcp::DualStackIpExt
-        + socket::datagram::DualStackIpExt
+        + datagram::DualStackIpExt
 {
 }
 

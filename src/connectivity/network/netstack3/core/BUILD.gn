@@ -30,6 +30,11 @@ _all_core_crates = [
   "device:netstack3-device-instrumented",
   "device:netstack3-device-loom",
   "device:netstack3-device-testutils",
+  "datagram:netstack3-datagram",
+  "datagram:netstack3-datagram-benchmarks",
+  "datagram:netstack3-datagram-instrumented",
+  "datagram:netstack3-datagram-loom",
+  "datagram:netstack3-datagram-testutils",
   "tcp:netstack3-tcp",
   "tcp:netstack3-tcp-benchmarks",
   "tcp:netstack3-tcp-instrumented",
@@ -112,6 +117,7 @@ rustc_library_with_features("netstack3-core") {
       features = []
       deps += [
         "base:netstack3-base",
+        "datagram:netstack3-datagram",
         "device:netstack3-device",
         "filter:netstack3-filter",
         "icmp_echo:netstack3-icmp-echo",
@@ -131,6 +137,7 @@ rustc_library_with_features("netstack3-core") {
       with_unit_tests = true
       non_test_deps = [
         "base:netstack3-base-instrumented",
+        "datagram:netstack3-datagram-instrumented",
         "device:netstack3-device-instrumented",
         "filter:netstack3-filter-instrumented",
         "icmp_echo:netstack3-icmp-echo-instrumented",
@@ -141,6 +148,7 @@ rustc_library_with_features("netstack3-core") {
       ]
       test_deps = [
         "base:netstack3-base-testutils",
+        "datagram:netstack3-datagram-testutils",
         "device:netstack3-device-testutils",
         "filter:netstack3-filter-testutils",
         "icmp_echo:netstack3-icmp-echo-testutils",
@@ -166,6 +174,7 @@ rustc_library_with_features("netstack3-core") {
 
       _core_deps = [
         "base:netstack3-base-testutils",
+        "datagram:netstack3-datagram-testutils",
         "device:netstack3-device-testutils",
         "filter:netstack3-filter-testutils",
         "icmp_echo:netstack3-icmp-echo-testutils",
@@ -191,6 +200,7 @@ rustc_library_with_features("netstack3-core") {
 
       _core_deps = [
         "base:netstack3-base-benchmarks",
+        "datagram:netstack3-datagram-benchmarks",
         "device:netstack3-device-benchmarks",
         "filter:netstack3-filter-benchmarks",
         "icmp_echo:netstack3-icmp-echo-benchmarks",
@@ -223,6 +233,7 @@ rustc_library_with_features("netstack3-core") {
         ]
         _core_deps = [
           "base:netstack3-base-loom",
+          "datagram:netstack3-datagram-loom",
           "device:netstack3-device-loom",
           "filter:netstack3-filter-loom",
           "icmp_echo:netstack3-icmp-echo-loom",
@@ -322,6 +333,7 @@ group("tests") {
     ":netstack3-core-instrumented_test($host_toolchain)",
     ":netstack3-core-test-package",
     "base:tests",
+    "datagram:tests",
     "device:tests",
     "filter:tests",
     "icmp_echo:tests",

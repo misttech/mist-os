@@ -10,11 +10,12 @@ use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
 use netstack3_base::{
     CoreTimerContext, CounterContext, Uninstantiable, UninstantiableWrapper, WeakDeviceIdentifier,
 };
+use netstack3_datagram as datagram;
 
 use crate::{
     context::{prelude::*, WrapLockLevel},
     device::WeakDeviceId,
-    socket::{datagram, MaybeDualStack},
+    socket::MaybeDualStack,
     transport::{
         tcp::{
             self, IsnGenerator, TcpContext, TcpCounters, TcpDemuxContext, TcpDualStackContext,

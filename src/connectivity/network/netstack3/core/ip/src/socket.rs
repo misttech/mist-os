@@ -199,7 +199,10 @@ pub enum IpSockCreateAndSendError {
     Create(#[from] IpSockCreationError),
 }
 
+/// The error returned by
+/// [`IpSocketHandler::send_oneshot_ip_packet_with_fallible_serializer`].
 #[derive(Debug)]
+#[allow(missing_docs)]
 pub enum SendOneShotIpPacketError<E> {
     CreateAndSendError { err: IpSockCreateAndSendError },
     SerializeError(E),
@@ -315,8 +318,8 @@ impl<I: IpExt, D> IpSock<I, D> {
     pub fn device(&self) -> Option<&D> {
         self.definition.device.as_ref()
     }
-
-    pub(crate) fn proto(&self) -> I::Proto {
+    /// Returns the socket's protocol.
+    pub fn proto(&self) -> I::Proto {
         self.definition.proto
     }
 }
@@ -1226,11 +1229,8 @@ pub(crate) mod testutil {
             );
         }
 
-        #[cfg(test)]
-        pub(crate) fn get_device_state_mut<I: IpExt>(
-            &mut self,
-            device: &D,
-        ) -> &mut FakeDeviceState<I> {
+        /// Returns a mutable reference to fake device state.
+        pub fn get_device_state_mut<I: IpExt>(&mut self, device: &D) -> &mut FakeDeviceState<I> {
             self.inner_mut::<I>().get_device_state_mut(device)
         }
 
@@ -1310,14 +1310,18 @@ pub(crate) mod testutil {
         pub remote_ips: Vec<A>,
     }
 
-    pub(crate) struct FakeDeviceState<I: Ip> {
+    /// State associated with a fake device in [`FakeIpSocketCtx`].
+    pub struct FakeDeviceState<I: Ip> {
+        /// The default hop limit used by the device.
         pub default_hop_limit: NonZeroU8,
+        /// The assigned device addresses.
         pub addresses: Vec<SpecifiedAddr<I::Addr>>,
+        /// The joined multicast groups.
         pub multicast_groups: HashMap<MulticastAddr<I::Addr>, usize>,
     }
 
     impl<I: Ip> FakeDeviceState<I> {
-        #[cfg(test)]
+        /// Returns whether this fake device has joined multicast group `addr`.
         pub fn is_in_multicast_group(&self, addr: &MulticastAddr<I::Addr>) -> bool {
             self.multicast_groups.get(addr).is_some_and(|v| *v != 0)
         }
@@ -1353,11 +1357,13 @@ pub(crate) mod testutil {
             Self { table, devices, forwarding: Default::default() }
         }
 
-        pub(crate) fn get_device_state(&self, device: &D) -> &FakeDeviceState<I> {
+        /// Returns an immutable reference to the fake device state.
+        pub fn get_device_state(&self, device: &D) -> &FakeDeviceState<I> {
             self.devices.get(device).unwrap_or_else(|| panic!("no device {device:?}"))
         }
 
-        pub(crate) fn get_device_state_mut(&mut self, device: &D) -> &mut FakeDeviceState<I> {
+        /// Returns a mutable reference to the fake device state.
+        pub fn get_device_state_mut(&mut self, device: &D) -> &mut FakeDeviceState<I> {
             self.devices.get_mut(device).unwrap_or_else(|| panic!("no device {device:?}"))
         }
 

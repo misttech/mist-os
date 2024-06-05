@@ -37,21 +37,20 @@ use netstack3_base::{
     PortAllocImpl, ReferenceNotifiers, RemoveResourceResultWithContext, RngContext, SocketError,
     StrongDeviceIdentifier, TracingContext, WeakDeviceIdentifier, ZonedAddressError,
 };
+use netstack3_datagram::{
+    self as datagram, BoundSocketState as DatagramBoundSocketState,
+    BoundSocketStateType as DatagramBoundSocketStateType, BoundSockets as DatagramBoundSockets,
+    ConnectError, DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec,
+    DatagramSocketOptions, DatagramSocketSet, DatagramSocketSpec, DatagramSpecBoundStateContext,
+    DatagramSpecStateContext, DatagramStateContext, DualStackConnState, DualStackConverter,
+    DualStackDatagramBoundStateContext, DualStackDatagramSpecBoundStateContext, DualStackIpExt,
+    EitherIpSocket, ExpectedConnError, ExpectedUnboundError, InUseError, IpExt, IpOptions,
+    MulticastMembershipInterfaceSelector, NonDualStackConverter,
+    NonDualStackDatagramBoundStateContext, NonDualStackDatagramSpecBoundStateContext,
+    SendError as DatagramSendError, SetMulticastMembershipError, SocketHopLimits, SocketInfo,
+    SocketState as DatagramSocketState, WrapOtherStackIpOptions, WrapOtherStackIpOptionsMut,
+};
 use netstack3_ip::{
-    datagram::{
-        self, BoundSocketState as DatagramBoundSocketState,
-        BoundSocketStateType as DatagramBoundSocketStateType, BoundSockets as DatagramBoundSockets,
-        ConnectError, DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec,
-        DatagramSocketOptions, DatagramSocketSet, DatagramSocketSpec,
-        DatagramSpecBoundStateContext, DatagramSpecStateContext, DatagramStateContext,
-        DualStackConnState, DualStackConverter, DualStackDatagramBoundStateContext,
-        DualStackDatagramSpecBoundStateContext, DualStackIpExt, EitherIpSocket, ExpectedConnError,
-        ExpectedUnboundError, InUseError, IpExt, IpOptions, MulticastMembershipInterfaceSelector,
-        NonDualStackConverter, NonDualStackDatagramBoundStateContext,
-        NonDualStackDatagramSpecBoundStateContext, SendError as DatagramSendError,
-        SetMulticastMembershipError, SocketHopLimits, SocketInfo,
-        SocketState as DatagramSocketState, WrapOtherStackIpOptions, WrapOtherStackIpOptionsMut,
-    },
     socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError},
     HopLimits, IpTransportContext, MulticastMembershipHandler, TransparentLocalDelivery,
     TransportIpContext, TransportReceiveError,
@@ -2655,8 +2654,8 @@ mod tests {
         },
         CtxPair, RemoteAddressError, UninstantiableWrapper,
     };
+    use netstack3_datagram::MulticastInterfaceSelector;
     use netstack3_ip::{
-        datagram::MulticastInterfaceSelector,
         device::IpDeviceStateIpExt,
         socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
         testutil::DualStackSendIpPacketMeta,

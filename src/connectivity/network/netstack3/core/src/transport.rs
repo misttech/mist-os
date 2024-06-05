@@ -59,12 +59,12 @@ mod integration;
 
 use derivative::Derivative;
 use net_types::ip::{Ip, Ipv4, Ipv6};
+use netstack3_datagram as datagram;
 use netstack3_icmp_echo::IcmpSockets;
 
 use crate::{
     context::{HandleableTimer, TimerHandler},
     device::WeakDeviceId,
-    socket::datagram,
     transport::{
         tcp::{TcpCounters, TcpState, TcpTimerId},
         udp::{UdpCounters, UdpState, UdpStateBuilder},

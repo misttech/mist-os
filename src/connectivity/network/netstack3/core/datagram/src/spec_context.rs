@@ -12,15 +12,13 @@
 //! * The boilerplate around the mirror traits is mostly out of the way.
 
 use netstack3_base::{socket::MaybeDualStack, AnyDevice, DeviceIdContext};
+use netstack3_ip::{MulticastMembershipHandler, TransportIpContext};
 
-use crate::internal::{
-    base::{MulticastMembershipHandler, TransportIpContext},
-    datagram::{
-        BoundSocketsFromSpec, DatagramBoundStateContext, DatagramSocketMapSpec,
-        DatagramSocketOptions, DatagramSocketSet, DatagramSocketSpec, DatagramStateContext,
-        DualStackConverter, DualStackDatagramBoundStateContext, DualStackIpExt, IpExt, IpOptions,
-        NonDualStackConverter, NonDualStackDatagramBoundStateContext, SocketState,
-    },
+use crate::internal::datagram::{
+    BoundSocketsFromSpec, DatagramBoundStateContext, DatagramSocketMapSpec, DatagramSocketOptions,
+    DatagramSocketSet, DatagramSocketSpec, DatagramStateContext, DualStackConverter,
+    DualStackDatagramBoundStateContext, DualStackIpExt, IpExt, IpOptions, NonDualStackConverter,
+    NonDualStackDatagramBoundStateContext, SocketState,
 };
 
 /// A mirror trait of [`DatagramStateContext`] allowing foreign crates to

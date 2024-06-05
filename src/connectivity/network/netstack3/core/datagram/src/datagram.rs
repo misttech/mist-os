@@ -42,24 +42,18 @@ use netstack3_base::{
     StrongDeviceIdentifier as _, WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_filter::TransportPacketSerializer;
-use packet::BufferMut;
-use packet_formats::ip::IpProtoExt;
-use thiserror::Error;
-
-use crate::internal::{
-    base::{
-        self as ip, BaseTransportIpContext, HopLimits, MulticastMembershipHandler,
-        ResolveRouteError, TransportIpContext,
-    },
-    icmp,
+use netstack3_ip::{
+    self as ip, icmp,
     socket::{
         IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSockSendError, IpSocketHandler,
         SendOneShotIpPacketError, SendOptions,
     },
+    BaseTransportIpContext, HopLimits, MulticastMembershipHandler, ResolveRouteError,
+    TransportIpContext,
 };
-
-pub(crate) mod spec_context;
-mod uninstantiable;
+use packet::BufferMut;
+use packet_formats::ip::IpProtoExt;
+use thiserror::Error;
 
 /// Datagram demultiplexing map.
 pub type BoundSockets<I, D, A, S> = BoundSocketMap<I, D, A, S>;
@@ -678,7 +672,7 @@ pub trait DatagramStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
 }
 
 /// A convenient alias for the BoundSockets type to shorten type signatures.
-type BoundSocketsFromSpec<I, CC, S> = BoundSockets<
+pub(crate) type BoundSocketsFromSpec<I, CC, S> = BoundSockets<
     I,
     <CC as DeviceIdContext<AnyDevice>>::WeakDeviceId,
     <S as DatagramSocketSpec>::AddrSpec,
@@ -5058,8 +5052,7 @@ pub(crate) mod testutil {
         testutil::{FakeStrongDeviceId, TestIpExt},
         CtxPair,
     };
-
-    use crate::internal::socket::testutil::FakeDeviceConfig;
+    use netstack3_ip::socket::testutil::FakeDeviceConfig;
 
     /// Helper function to ensure the Fake CoreCtx and BindingsCtx are setup
     /// with [`FakeDeviceConfig`] (one per provided device), with remote/local
@@ -5134,17 +5127,18 @@ mod test {
         },
         CtxPair, UninstantiableWrapper,
     };
+    use netstack3_ip::{
+        device::IpDeviceStateIpExt,
+        socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx, FakeIpSocketCtx},
+        testutil::DualStackSendIpPacketMeta,
+        DEFAULT_HOP_LIMITS,
+    };
     use packet::{Buf, Serializer as _};
     use packet_formats::ip::{Ipv4Proto, Ipv6Proto};
     use test_case::test_case;
 
-    use crate::internal::{
-        base::{testutil::DualStackSendIpPacketMeta, DEFAULT_HOP_LIMITS},
-        device::state::IpDeviceStateIpExt,
-        socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx, FakeIpSocketCtx},
-    };
-
     use super::*;
+    use crate::internal::spec_context;
 
     trait DatagramIpExt<D: FakeStrongDeviceId>:
         Ip + IpExt + IpDeviceStateIpExt + TestIpExt + DualStackIpExt + DualStackContextsIpExt<D>

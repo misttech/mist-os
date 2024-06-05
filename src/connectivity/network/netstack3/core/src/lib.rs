@@ -173,9 +173,8 @@ pub mod routes {
 pub mod socket {
     // TODO(https://fxbug.dev/342685842): Remove these re-exports.
     pub(crate) use netstack3_base::socket::{MaybeDualStack, SocketIpAddr};
-    pub(crate) use netstack3_ip::datagram;
 
-    pub use datagram::{
+    pub use netstack3_datagram::{
         ConnInfo, ConnectError, ExpectedConnError, ExpectedUnboundError, ListenerInfo,
         MulticastInterfaceSelector, MulticastMembershipInterfaceSelector, SendError, SendToError,
         SetMulticastMembershipError, SocketInfo,

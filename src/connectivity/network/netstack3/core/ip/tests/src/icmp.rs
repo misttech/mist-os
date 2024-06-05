@@ -37,7 +37,7 @@ use netstack3_core::{
     },
     IpExt, StackStateBuilder,
 };
-use netstack3_ip::{datagram, icmp::Icmpv4StateBuilder};
+use netstack3_ip::icmp::Icmpv4StateBuilder;
 
 const REMOTE_ID: u16 = 1;
 
@@ -62,7 +62,7 @@ enum IcmpSendType {
 #[test_case(IcmpConnectionType::Remote, IcmpSendType::Send, false)]
 #[test_case(IcmpConnectionType::Remote, IcmpSendType::SendTo, false)]
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn test_icmp_connection<I: Ip + TestIpExt + datagram::IpExt + IpExt>(
+fn test_icmp_connection<I: Ip + TestIpExt + IpExt>(
     conn_type: IcmpConnectionType,
     send_type: IcmpSendType,
     bind_to_device: bool,

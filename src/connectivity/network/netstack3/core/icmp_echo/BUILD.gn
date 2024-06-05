@@ -32,6 +32,7 @@ rustc_library_with_features("netstack3-icmp-echo") {
       features = []
       deps += [
         "//src/connectivity/network/netstack3/core/base:netstack3-base",
+        "//src/connectivity/network/netstack3/core/datagram:netstack3-datagram",
         "//src/connectivity/network/netstack3/core/ip:netstack3-ip",
       ]
     },
@@ -45,6 +46,7 @@ rustc_library_with_features("netstack3-icmp-echo") {
       ]
       deps += [
         "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
+        "//src/connectivity/network/netstack3/core/datagram:netstack3-datagram-testutils",
         "//src/connectivity/network/netstack3/core/ip:netstack3-ip-testutils",
       ]
     },
@@ -54,6 +56,7 @@ rustc_library_with_features("netstack3-icmp-echo") {
       features = [ "testutils" ]
       deps += [
         "//src/connectivity/network/netstack3/core/base:netstack3-base-benchmarks",
+        "//src/connectivity/network/netstack3/core/datagram:netstack3-datagram-benchmarks",
         "//src/connectivity/network/netstack3/core/ip:netstack3-ip-benchmarks",
       ]
       configs += [ "//src/connectivity/network/netstack3/core:benchmark" ]
@@ -64,12 +67,14 @@ rustc_library_with_features("netstack3-icmp-echo") {
       features = [ "instrumented" ]
       non_test_deps = [
         "//src/connectivity/network/netstack3/core/base:netstack3-base-instrumented",
+        "//src/connectivity/network/netstack3/core/datagram:netstack3-datagram-instrumented",
         "//src/connectivity/network/netstack3/core/ip:netstack3-ip-instrumented",
       ]
       test_deps = [
         "//src/connectivity/lib/ip-test-macro",
         "//src/connectivity/lib/net-declare",
         "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
+        "//src/connectivity/network/netstack3/core/datagram:netstack3-datagram-testutils",
         "//src/connectivity/network/netstack3/core/ip:netstack3-ip-testutils",
         "//src/lib/const-unwrap",
         "//third_party/rust_crates:assert_matches",
@@ -87,6 +92,7 @@ rustc_library_with_features("netstack3-icmp-echo") {
         testonly = true
         deps += [
           "//src/connectivity/network/netstack3/core/base:netstack3-base-loom",
+          "//src/connectivity/network/netstack3/core/datagram:netstack3-datagram-loom",
           "//src/connectivity/network/netstack3/core/ip:netstack3-ip-loom",
         ]
         configs += [ "//src/connectivity/network/netstack3/core:loom" ]

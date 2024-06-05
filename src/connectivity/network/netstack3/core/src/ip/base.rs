@@ -15,6 +15,7 @@ use net_types::{
     MulticastAddr, SpecifiedAddr,
 };
 use netstack3_base::{CounterContext, TokenBucket, WeakDeviceIdentifier};
+use netstack3_datagram as datagram;
 use netstack3_icmp_echo::{
     self as icmp_echo, IcmpEchoBoundStateContext, IcmpEchoContextMarker,
     IcmpEchoIpTransportContext, IcmpEchoStateContext, IcmpSocketId, IcmpSocketSet, IcmpSocketState,
@@ -41,7 +42,7 @@ use crate::{
         ResolveRouteError, TransparentLocalDelivery, TransportReceiveError,
     },
     routes::ResolvedRoute,
-    socket::{datagram, SocketIpAddr},
+    socket::SocketIpAddr,
     transport::{tcp::TcpIpTransportContext, udp::UdpIpTransportContext},
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };

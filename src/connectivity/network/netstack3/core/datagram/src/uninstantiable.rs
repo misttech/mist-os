@@ -5,17 +5,18 @@
 use explicit::UnreachableExt as _;
 use netstack3_base::{socket::MaybeDualStack, Uninstantiable, UninstantiableWrapper};
 
-use crate::internal::datagram::{
-    self,
+use crate::internal::{
+    datagram::{
+        BoundSockets, DatagramBoundStateContext, DatagramSocketMapSpec, DatagramSocketOptions,
+        DatagramSocketSpec, DualStackConverter, IpExt, IpOptions, NonDualStackConverter,
+    },
     spec_context::{
         DatagramSpecBoundStateContext, DualStackDatagramSpecBoundStateContext,
         NonDualStackDatagramSpecBoundStateContext,
     },
-    DatagramBoundStateContext, DatagramSocketMapSpec, DatagramSocketOptions, DatagramSocketSpec,
-    DualStackConverter, NonDualStackConverter,
 };
 
-impl<I: datagram::IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
+impl<I: IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
     DatagramSpecBoundStateContext<I, UninstantiableWrapper<P>, C> for S
 {
     type IpSocketsCtx<'a> = P::IpSocketsCtx<'a>;
@@ -30,7 +31,7 @@ impl<I: datagram::IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, 
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &datagram::BoundSockets<
+            &BoundSockets<
                 I,
                 P::WeakDeviceId,
                 <S as DatagramSocketSpec>::AddrSpec,
@@ -47,7 +48,7 @@ impl<I: datagram::IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, 
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &mut datagram::BoundSockets<
+            &mut BoundSockets<
                 I,
                 P::WeakDeviceId,
                 <S as DatagramSocketSpec>::AddrSpec,
@@ -68,7 +69,7 @@ impl<I: datagram::IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, 
     }
 }
 
-impl<I: datagram::IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
+impl<I: IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
     NonDualStackDatagramSpecBoundStateContext<I, UninstantiableWrapper<P>, C> for S
 {
     fn nds_converter(
@@ -78,21 +79,21 @@ impl<I: datagram::IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, 
     }
 }
 
-impl<I: datagram::IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
+impl<I: IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
     DualStackDatagramSpecBoundStateContext<I, UninstantiableWrapper<P>, C> for S
 {
     type IpSocketsCtx<'a> = UninstantiableWrapper<P::IpSocketsCtx<'a>>;
 
     fn dual_stack_enabled(
         core_ctx: &UninstantiableWrapper<P>,
-        _state: &impl AsRef<datagram::IpOptions<I, P::WeakDeviceId, S>>,
+        _state: &impl AsRef<IpOptions<I, P::WeakDeviceId, S>>,
     ) -> bool {
         core_ctx.uninstantiable_unreachable()
     }
 
     fn to_other_socket_options<'a>(
         core_ctx: &UninstantiableWrapper<P>,
-        _state: &'a datagram::IpOptions<I, P::WeakDeviceId, S>,
+        _state: &'a IpOptions<I, P::WeakDeviceId, S>,
     ) -> &'a DatagramSocketOptions<I::OtherVersion, P::WeakDeviceId> {
         core_ctx.uninstantiable_unreachable()
     }
@@ -118,13 +119,8 @@ impl<I: datagram::IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, 
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &mut datagram::BoundSockets<
-                I,
-                P::WeakDeviceId,
-                S::AddrSpec,
-                S::SocketMapSpec<I, P::WeakDeviceId>,
-            >,
-            &mut datagram::BoundSockets<
+            &mut BoundSockets<I, P::WeakDeviceId, S::AddrSpec, S::SocketMapSpec<I, P::WeakDeviceId>>,
+            &mut BoundSockets<
                 I::OtherVersion,
                 P::WeakDeviceId,
                 S::AddrSpec,
@@ -142,7 +138,7 @@ impl<I: datagram::IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, 
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &mut datagram::BoundSockets<
+            &mut BoundSockets<
                 I::OtherVersion,
                 P::WeakDeviceId,
                 S::AddrSpec,

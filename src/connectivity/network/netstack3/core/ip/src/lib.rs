@@ -19,7 +19,6 @@ mod internal {
 
     pub(super) mod api;
     pub(super) mod base;
-    pub(super) mod datagram;
     pub(super) mod device;
     pub(super) mod forwarding;
     pub(super) mod gmp;
@@ -30,43 +29,6 @@ mod internal {
     pub(super) mod socket;
     pub(super) mod types;
     pub(super) mod uninstantiable;
-}
-
-/// Shared code for implementing datagram sockets.
-// TODO(https://fxbug.dev/339531757): Split this into its own crate so it
-// doesn't have to be part of the IP module. It's currently here because ICMP
-// echo sockets depend on it.
-pub mod datagram {
-    pub use crate::internal::datagram::spec_context::{
-        DatagramSpecBoundStateContext, DatagramSpecStateContext,
-        DualStackDatagramSpecBoundStateContext, NonDualStackDatagramSpecBoundStateContext,
-    };
-    pub use crate::internal::datagram::{
-        close, collect_all_sockets, connect, create, disconnect_connected, get_bound_device,
-        get_info, get_ip_hop_limits, get_ip_transparent, get_multicast_interface,
-        get_multicast_loop, get_options_device, get_sharing, get_shutdown_connected, listen,
-        send_conn, send_to, set_device, set_ip_transparent, set_multicast_interface,
-        set_multicast_loop, set_multicast_membership, shutdown_connected, update_ip_hop_limit,
-        update_sharing, with_other_stack_ip_options,
-        with_other_stack_ip_options_and_default_hop_limits, with_other_stack_ip_options_mut,
-        with_other_stack_ip_options_mut_if_unbound, BoundSocketState, BoundSocketStateType,
-        BoundSockets, ConnInfo, ConnState, ConnectError, DatagramBoundStateContext, DatagramFlowId,
-        DatagramSocketMapSpec, DatagramSocketOptions, DatagramSocketSet, DatagramSocketSpec,
-        DatagramStateContext, DualStackConnState, DualStackConverter,
-        DualStackDatagramBoundStateContext, DualStackIpExt, EitherIpSocket, ExpectedConnError,
-        ExpectedUnboundError, InUseError, IpExt, IpOptions, ListenerInfo,
-        MulticastInterfaceSelector, MulticastMembershipInterfaceSelector, NonDualStackConverter,
-        NonDualStackDatagramBoundStateContext, ReferenceState, SendError, SendToError,
-        SetMulticastMembershipError, SocketHopLimits, SocketInfo, SocketState, StrongRc, WeakRc,
-        WrapOtherStackIpOptions, WrapOtherStackIpOptionsMut,
-    };
-
-    /// Datagram socket test utilities.
-    #[cfg(any(test, feature = "testutils"))]
-    pub mod testutil {
-        pub use crate::internal::datagram::create_primary_id;
-        pub use crate::internal::datagram::testutil::setup_fake_ctx_with_dualstack_conn_addrs;
-    }
 }
 
 /// Definitions for devices at the IP layer.
@@ -207,7 +169,7 @@ pub mod socket {
     pub use crate::internal::socket::{
         DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError,
         IpSockCreationError, IpSockDefinition, IpSockSendError, IpSocketBindingsContext,
-        IpSocketContext, IpSocketHandler, Mms, MmsError, SendOptions,
+        IpSocketContext, IpSocketHandler, Mms, MmsError, SendOneShotIpPacketError, SendOptions,
     };
 
     /// IP Socket test utilities.

@@ -34,13 +34,13 @@ use netstack3_base::{
     LocalAddressError, PortAllocImpl, ReferenceNotifiers, RemoveResourceResultWithContext,
     RngContext, SocketError, StrongDeviceIdentifier, UninstantiableWrapper, WeakDeviceIdentifier,
 };
+use netstack3_datagram::{
+    self as datagram, DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSet, DatagramSocketSpec,
+    DatagramSpecBoundStateContext, DatagramSpecStateContext, DatagramStateContext,
+    ExpectedUnboundError, NonDualStackConverter, NonDualStackDatagramSpecBoundStateContext,
+    SocketHopLimits,
+};
 use netstack3_ip::{
-    datagram::{
-        self, DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSet, DatagramSocketSpec,
-        DatagramSpecBoundStateContext, DatagramSpecStateContext, DatagramStateContext,
-        ExpectedUnboundError, NonDualStackConverter, NonDualStackDatagramSpecBoundStateContext,
-        SocketHopLimits,
-    },
     icmp::{EchoTransportContextMarker, IcmpIpExt, IcmpRxCounters},
     IpTransportContext, MulticastMembershipHandler, TransparentLocalDelivery, TransportIpContext,
     TransportReceiveError,
