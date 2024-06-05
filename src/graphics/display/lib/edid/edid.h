@@ -5,6 +5,8 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_EDID_EDID_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_EDID_EDID_H_
 
+#include <lib/fit/result.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -301,29 +303,12 @@ static constexpr uint8_t kDdcDataI2cAddress = 0x50;
 // Returned string is a statically allocated constant. Returns NULL if no match is found.
 const char* GetEisaVendorName(uint16_t manufacturer_name_code);
 
-struct ReadEdidResult {
- public:
-  static ReadEdidResult MakeError(const char* error_message) {
-    return {
-        .is_error = true,
-        .error_message = error_message,
-    };
-  }
+using ReadEdidResult = fit::result<const char*, fbl::Vector<uint8_t>>;
 
-  static ReadEdidResult MakeEdidBytes(fbl::Vector<uint8_t>&& edid_bytes) {
-    return {
-        .is_error = false,
-        .edid_bytes = std::move(edid_bytes),
-    };
-  }
-
-  bool is_error = false;
-  fbl::Vector<uint8_t> edid_bytes;
-  const char* error_message = nullptr;
-};
-
-// Read EDID bytes over DDC I2C bus using `transact()` function.
-// If any error occurs, returns an ReadEdidResult::ErrorMessageType;
+// Reads EDID bytes over DDC I2C bus using `transact()` function.
+//
+// On error, returns a `const char*` string of static storage duration
+// containing the error message.
 // Otherwise, returns the vector containing the raw EDID bytes, including all
 // extension blocks.
 ReadEdidResult ReadEdidFromDdcForTesting(void* ctx, ddc_i2c_transact transact);
@@ -334,10 +319,17 @@ class audio_data_block_iterator;
 class Edid {
  public:
   // Creates an Edid from the EdidDdcSource. Does not retain a reference to the source.
-  bool Init(void* ctx, ddc_i2c_transact edid_source, const char** err_msg);
+  //
+  // On error, returns a `const char*` string of static storage duration
+  // containing the error message.
+  fit::result<const char*> Init(void* ctx, ddc_i2c_transact edid_source);
+
   // Creates an Edid from raw bytes. The bytes array must remain valid for the duration
   // of the Edid object's lifetime.
-  bool Init(const uint8_t* bytes, uint16_t len, const char** err_msg);
+  //
+  // On error, returns a `const char*` string of static storage duration
+  // containing the error message.
+  fit::result<const char*> Init(const uint8_t* bytes, uint16_t len);
 
   void Print(void (*print_fn)(const char* str)) const;
 

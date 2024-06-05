@@ -15,8 +15,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     return 0;
   }
 
-  const char* err_msg;
-  if (!edid.Init(data, static_cast<uint16_t>(size), &err_msg)) {
+  fit::result<const char*> result = edid.Init(data, static_cast<uint16_t>(size));
+  if (!result.is_ok()) {
     return 0;
   }
 

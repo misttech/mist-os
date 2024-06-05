@@ -4,6 +4,8 @@
 
 #include "src/graphics/display/lib/edid/edid.h"
 
+#include <lib/fit/result.h>
+
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
@@ -117,10 +119,10 @@ ReadEdidResult ReadEdidFromDdcForTesting(void* ctx, ddc_i2c_transact transact) {
   // I2C command patterns (segment write always precedes data read), though the
   // chance is rare.
   if (!transact(ctx, msgs + 1, 2)) {
-    return ReadEdidResult::MakeError("Failed to read base edid");
+    return fit::error("Failed to read base edid");
   }
   if (!base_edid.validate()) {
-    return ReadEdidResult::MakeError("Failed to validate base edid");
+    return fit::error("Failed to validate base edid");
   }
 
   uint16_t edid_length = static_cast<uint16_t>((base_edid.num_extensions + 1) * kBlockSize);
@@ -129,7 +131,7 @@ ReadEdidResult ReadEdidFromDdcForTesting(void* ctx, ddc_i2c_transact transact) {
   fbl::Vector<uint8_t> edid;
   edid.resize(edid_length, &ac);
   if (!ac.check()) {
-    return ReadEdidResult::MakeError("Failed to allocate edid storage");
+    return fit::error("Failed to allocate edid storage");
   }
 
   memcpy(edid.data(), reinterpret_cast<void*>(&base_edid), kBlockSize);
@@ -145,50 +147,43 @@ ReadEdidResult ReadEdidFromDdcForTesting(void* ctx, ddc_i2c_transact transact) {
 
     bool transact_success = include_segment ? transact(ctx, msgs, 3) : transact(ctx, msgs + 1, 2);
     if (!transact_success) {
-      return ReadEdidResult::MakeError("Failed to read full edid");
+      return fit::error("Failed to read full edid");
     }
   }
 
-  return ReadEdidResult::MakeEdidBytes(std::move(edid));
+  return fit::ok(std::move(edid));
 }
 
-bool Edid::Init(void* ctx, ddc_i2c_transact transact, const char** err_msg) {
+fit::result<const char*> Edid::Init(void* ctx, ddc_i2c_transact transact) {
   auto read_edid_result = ReadEdidFromDdcForTesting(ctx, transact);
-  if (read_edid_result.is_error) {
-    ZX_DEBUG_ASSERT(read_edid_result.error_message != nullptr);
-    *err_msg = read_edid_result.error_message;
-    return false;
+  if (read_edid_result.is_error()) {
+    return read_edid_result.take_error();
   }
-  edid_bytes_ = std::move(read_edid_result.edid_bytes);
-  return Init(edid_bytes_.data(), static_cast<uint16_t>(edid_bytes_.size()), err_msg);
+  edid_bytes_ = std::move(read_edid_result).value();
+  return Init(edid_bytes_.data(), static_cast<uint16_t>(edid_bytes_.size()));
 }
 
-bool Edid::Init(const uint8_t* bytes, uint16_t len, const char** err_msg) {
+fit::result<const char*> Edid::Init(const uint8_t* bytes, uint16_t len) {
   // The maximum size of an edid is 255 * 128 bytes, so any 16 bit multiple is fine.
   if (len == 0 || len % kBlockSize != 0) {
-    *err_msg = "Invalid edid length";
-    return false;
+    return fit::error("Invalid edid length");
   }
   bytes_ = bytes;
   len_ = len;
   if (!(base_edid_ = GetBlock<BaseEdid>(0)) || !base_edid_->validate()) {
-    *err_msg = "Failed to validate base edid";
-    return false;
+    return fit::error("Failed to validate base edid");
   }
   if (((base_edid_->num_extensions + 1) * kBlockSize) != len) {
-    *err_msg = "Bad extension count";
-    return false;
+    return fit::error("Bad extension count");
   }
   if (!base_edid_->digital()) {
-    *err_msg = "Analog displays not supported";
-    return false;
+    return fit::error("Analog displays not supported");
   }
 
   for (uint8_t i = 1; i < len / kBlockSize; i++) {
     if (bytes_[i * kBlockSize] == CeaEdidTimingExtension::kTag) {
       if (!GetBlock<CeaEdidTimingExtension>(i)->validate()) {
-        *err_msg = "Failed to validate extensions";
-        return false;
+        return fit::error("Failed to validate extensions");
       }
     }
   }
@@ -234,7 +229,7 @@ bool Edid::Init(const uint8_t* bytes, uint16_t len, const char** err_msg) {
   manufacturer_id_[3] = '\0';
   manufacturer_name_ = lookup_eisa_vid(EISA_ID(c1, c2, c3));
 
-  return true;
+  return fit::ok();
 }
 
 template <typename T>

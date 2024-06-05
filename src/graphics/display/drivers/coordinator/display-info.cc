@@ -75,7 +75,13 @@ fit::result<const char*, DisplayInfo::Edid> InitEdidFromI2c(ddk::I2cImplProtocol
       zx_nanosleep(zx_deadline_after(ZX_MSEC(5)));
     }
     edid_attempt++;
-    success = edid.base.Init(&i2c, ddc_tx, &error);
+
+    fit::result<const char*> result = edid.base.Init(&i2c, ddc_tx);
+    if (result.is_ok()) {
+      success = true;
+      break;
+    }
+    error = result.error_value();
   } while (!success && edid_attempt < kEdidRetries);
 
   if (success) {
@@ -88,12 +94,12 @@ fit::result<const char*, DisplayInfo::Edid> InitEdidFromBytes(cpp20::span<const 
   ZX_DEBUG_ASSERT(bytes.size() <= std::numeric_limits<uint16_t>::max());
 
   DisplayInfo::Edid edid;
-  const char* error = kDefaultEdidError;
-  bool success = edid.base.Init(bytes.data(), static_cast<uint16_t>(bytes.size()), &error);
-  if (success) {
+  fit::result<const char*> result =
+      edid.base.Init(bytes.data(), static_cast<uint16_t>(bytes.size()));
+  if (result.is_ok()) {
     return fit::ok(std::move(edid));
   }
-  return fit::error(error);
+  return result.take_error();
 }
 
 }  // namespace

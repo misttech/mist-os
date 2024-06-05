@@ -203,10 +203,11 @@ TEST(EdidTest, ReadEdid_OneBlockOneSegment) {
 
   edid::ReadEdidResult result =
       edid::ReadEdidFromDdcForTesting(&fake_ddc_memory, FakeDdcMemory::i2c_transact);
-  ASSERT_FALSE(result.is_error) << "Error while reading EDID: " << result.error_message;
+  ASSERT_FALSE(result.is_error()) << "Error while reading EDID: " << result.error_value();
 
+  fbl::Vector<uint8_t> edid_bytes = std::move(result).value();
   EXPECT_EQ(std::vector(edid::kHpZr30wEdid.begin(), edid::kHpZr30wEdid.end()),
-            std::vector(result.edid_bytes.begin(), result.edid_bytes.end()));
+            std::vector(edid_bytes.begin(), edid_bytes.end()));
 
   EXPECT_EQ(fake_ddc_memory.total_segment_write(), 0u);
   EXPECT_EQ(fake_ddc_memory.total_offset_write(), 1u);
@@ -219,10 +220,12 @@ TEST(EdidTest, ReadEdid_TwoBlocksOneSegment) {
 
   edid::ReadEdidResult result =
       edid::ReadEdidFromDdcForTesting(&fake_ddc_memory, FakeDdcMemory::i2c_transact);
-  ASSERT_FALSE(result.is_error) << "Error while reading EDID: " << result.error_message;
 
+  ASSERT_FALSE(result.is_error()) << "Error while reading EDID: " << result.error_value();
+
+  fbl::Vector<uint8_t> edid_bytes = std::move(result).value();
   EXPECT_EQ(std::vector(edid::kDellP2719hEdid.begin(), edid::kDellP2719hEdid.end()),
-            std::vector(result.edid_bytes.begin(), result.edid_bytes.end()));
+            std::vector(edid_bytes.begin(), edid_bytes.end()));
 
   EXPECT_EQ(fake_ddc_memory.total_segment_write(), 0u);
   EXPECT_EQ(fake_ddc_memory.total_offset_write(), 2u);
@@ -235,10 +238,11 @@ TEST(EdidTest, ReadEdid_MultiSegment) {
 
   edid::ReadEdidResult result =
       edid::ReadEdidFromDdcForTesting(&fake_ddc_memory, FakeDdcMemory::i2c_transact);
-  ASSERT_FALSE(result.is_error) << "Error while reading EDID: " << result.error_message;
+  ASSERT_FALSE(result.is_error()) << "Error while reading EDID: " << result.error_value();
 
+  fbl::Vector<uint8_t> edid_bytes = std::move(result).value();
   EXPECT_EQ(std::vector(edid::kSamsungCrg9Edid.begin(), edid::kSamsungCrg9Edid.end()),
-            std::vector(result.edid_bytes.begin(), result.edid_bytes.end()));
+            std::vector(edid_bytes.begin(), edid_bytes.end()));
 
   EXPECT_EQ(fake_ddc_memory.total_segment_write(), 2u);
   EXPECT_EQ(fake_ddc_memory.total_offset_write(), 4u);
