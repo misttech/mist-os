@@ -4,7 +4,7 @@
 
 use anyhow::{format_err, Context as _, Error};
 use fidl::endpoints::Proxy;
-use fidl_fuchsia_bluetooth_snoop::{PacketType, SnoopPacket as FidlSnoopPacket, Timestamp};
+use fidl_fuchsia_bluetooth_snoop::{PacketFormat, SnoopPacket as FidlSnoopPacket};
 use fidl_fuchsia_hardware_bluetooth::VendorMarker as HardwareVendorMarker;
 use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_async as fasync;
@@ -25,8 +25,7 @@ impl HciFlags {
     const IS_RECEIVED: u8 = 0b100;
     const PACKET_TYPE_CMD: u8 = 0b00;
     const PACKET_TYPE_EVENT: u8 = 0b01;
-    // Included for completeness. Used in tests
-    #[allow(dead_code)]
+    #[cfg(test)]
     const PACKET_TYPE_DATA: u8 = 0b10;
 
     /// Does the packet represent an HCI event sent from the controller to the host?
@@ -34,22 +33,19 @@ impl HciFlags {
         self.0 & HciFlags::IS_RECEIVED == HciFlags::IS_RECEIVED
     }
     /// Returns the packet type.
-    fn hci_packet_type(&self) -> PacketType {
+    fn hci_packet_type(&self) -> PacketFormat {
         match self.0 & 0b11 {
-            HciFlags::PACKET_TYPE_CMD => PacketType::Cmd,
-            HciFlags::PACKET_TYPE_EVENT => PacketType::Event,
-            _ => PacketType::Data,
+            HciFlags::PACKET_TYPE_CMD => PacketFormat::Command,
+            HciFlags::PACKET_TYPE_EVENT => PacketFormat::Event,
+            _ => PacketFormat::AclData,
         }
     }
 }
 
 pub struct SnoopPacket {
     pub is_received: bool,
-    pub type_: PacketType,
-    // Clock monotonic timestamp.
-    // Not exposed in the public API so that it is not used without
-    // a ClockTransformation being applied.
-    timestamp: zx::Time,
+    pub format: PacketFormat,
+    pub timestamp: zx::Time,
     pub original_len: usize,
     pub payload: Vec<u8>,
 }
@@ -57,41 +53,22 @@ pub struct SnoopPacket {
 impl SnoopPacket {
     pub fn new(
         is_received: bool,
-        type_: PacketType,
-        monotonic_timestamp: zx::Time,
+        format: PacketFormat,
+        timestamp: zx::Time,
         payload: Vec<u8>,
     ) -> Self {
-        Self {
-            is_received,
-            type_,
-            timestamp: monotonic_timestamp,
-            original_len: payload.len(),
-            payload,
-        }
+        Self { is_received, format, timestamp, original_len: payload.len(), payload }
     }
 
-    pub fn timestamp_parts(&self, clock_xform: Option<&zx::ClockTransformation>) -> (i64, i32) {
-        let nanos = if let Some(xform) = clock_xform {
-            xform.apply(self.timestamp)
-        } else {
-            self.timestamp
-        }
-        .into_nanos();
-        let seconds = nanos / 1_000_000_000;
-        let nanos = nanos % 1_000_000_000;
-        (seconds, nanos as i32)
-    }
-
-    /// Create a FidlSnoopPacket. Use `clock` to transform the timestamp
-    /// to the correct synthetic Clock.
-    pub fn to_fidl(&self, clock_xform: Option<&zx::ClockTransformation>) -> FidlSnoopPacket {
-        let (seconds, subsec_nanos) = self.timestamp_parts(clock_xform);
+    /// Create a FidlSnoopPacket
+    pub fn to_fidl(&self) -> FidlSnoopPacket {
         FidlSnoopPacket {
-            is_received: self.is_received,
-            type_: self.type_,
-            timestamp: Timestamp { subsec_nanos: subsec_nanos as u32, seconds: seconds as u64 },
-            original_len: self.original_len as u32,
-            payload: self.payload.clone(),
+            is_received: Some(self.is_received),
+            format: Some(self.format),
+            timestamp: Some(self.timestamp.into_nanos()),
+            length: Some(self.original_len as u32),
+            data: Some(self.payload.clone()),
+            ..Default::default()
         }
     }
 }
@@ -104,8 +81,7 @@ impl SizeOf for SnoopPacket {
 
 impl CreatedAt for SnoopPacket {
     fn created_at(&self) -> Duration {
-        let (secs, nanos) = self.timestamp_parts(None);
-        Duration::new(secs as u64, nanos as u32)
+        Duration::from_nanos(self.timestamp.into_nanos() as u64)
     }
 }
 
@@ -213,14 +189,14 @@ mod tests {
         assert!(pkt.is_received);
         assert!(pkt.payload.is_empty());
         assert!(pkt.timestamp.into_nanos() > 0);
-        assert_eq!(pkt.type_, PacketType::Cmd);
+        assert_eq!(pkt.format, PacketFormat::Command);
 
         let flags = HciFlags::PACKET_TYPE_DATA;
         let buf = MessageBuf::new_with(vec![flags, 0, 1, 2], vec![]);
         let pkt = Snooper::build_pkt(buf).unwrap();
         assert!(!pkt.is_received);
         assert_eq!(pkt.payload, vec![0, 1, 2]);
-        assert_eq!(pkt.type_, PacketType::Data);
+        assert_eq!(pkt.format, PacketFormat::AclData);
     }
 
     #[test]

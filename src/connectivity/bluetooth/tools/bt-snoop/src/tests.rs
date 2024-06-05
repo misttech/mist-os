@@ -6,8 +6,11 @@ use argh::FromArgs;
 use async_utils::PollExt;
 use diagnostics_assertions::assert_data_tree;
 use fidl::{endpoints::RequestStream, Error as FidlError};
-use fidl_fuchsia_bluetooth_snoop::{PacketType, SnoopMarker, SnoopProxy, SnoopRequestStream};
-use fuchsia_async::{self as fasync, Channel, TestExecutor};
+use fidl_fuchsia_bluetooth_snoop::{
+    PacketFormat, PacketObserverMarker, PacketObserverRequestStream, SnoopMarker, SnoopProxy,
+    SnoopRequestStream, SnoopStartRequest,
+};
+use fuchsia_async::{Channel, TestExecutor};
 use fuchsia_inspect::Inspector;
 use fuchsia_zircon as zx;
 use futures::StreamExt;
@@ -46,14 +49,14 @@ fn setup() -> (
     )
 }
 
-#[test]
+#[fuchsia::test]
 fn test_id_generator() {
     let mut id_gen = IdGenerator::new();
     assert_eq!(id_gen.next(), ClientId(0));
     assert_eq!(id_gen.next(), ClientId(1));
 }
 
-#[test]
+#[fuchsia::test]
 fn test_register_new_client() {
     let (_exec, _snoopers, _logs, _subscribers, mut requests, _inspect) = setup();
     assert_eq!(requests.len(), 0);
@@ -65,9 +68,21 @@ fn test_register_new_client() {
 }
 
 fn fidl_endpoints() -> (SnoopProxy, SnoopRequestStream) {
-    let (proxy, server) = fidl::endpoints::create_proxy::<SnoopMarker>().unwrap();
-    let request_stream = server.into_stream().unwrap();
-    (proxy, request_stream)
+    fidl::endpoints::create_proxy_and_stream::<SnoopMarker>().unwrap()
+}
+
+fn client_request(host_device: Option<String>) -> (SnoopStartRequest, PacketObserverRequestStream) {
+    let (client, stream) =
+        fidl::endpoints::create_request_stream::<PacketObserverMarker>().unwrap();
+    (
+        SnoopStartRequest {
+            follow: Some(true),
+            host_device,
+            client: Some(client),
+            ..Default::default()
+        },
+        stream,
+    )
 }
 
 fn unwrap_request<T, E>(request: Poll<Option<Result<T, E>>>) -> T {
@@ -77,14 +92,7 @@ fn unwrap_request<T, E>(request: Poll<Option<Result<T, E>>>) -> T {
     panic!("Failed to receive request");
 }
 
-fn unwrap_response<T, E>(response: Poll<Result<T, E>>) -> T {
-    if let Poll::Ready(Ok(response)) = response {
-        return response;
-    }
-    panic!("Failed to receive response");
-}
-
-#[test]
+#[fuchsia::test]
 fn test_snoop_default_command_line_args() {
     let args = Args::from_args(&["bt-snoop-v2"], &[]).expect("Args created from empty args");
     assert_eq!(args.log_size_soft_kib, 32);
@@ -94,7 +102,7 @@ fn test_snoop_default_command_line_args() {
     assert_eq!(args.truncate_payload, None);
 }
 
-#[test]
+#[fuchsia::test]
 fn test_snoop_command_line_args() {
     let log_size_kib = 1;
     let log_time_seconds = 2;
@@ -120,7 +128,7 @@ fn test_snoop_command_line_args() {
     assert_eq!(args.truncate_payload, Some(truncate_payload));
 }
 
-#[fasync::run_until_stalled(test)]
+#[fuchsia::test]
 async fn test_packet_logs_inspect() {
     // This is a test that basic inspect data is plumbed through from the inspect root.
     // More comprehensive testing of possible permutations of packet log inspect data
@@ -156,21 +164,21 @@ async fn test_packet_logs_inspect() {
     });
 
     let ts = zx::Time::from_nanos(123 * 1_000_000_000);
-    let packet = SnoopPacket::new(false, PacketType::Data, ts, vec![3, 2, 1]);
+    let packet = SnoopPacket::new(false, PacketFormat::AclData, ts, vec![3, 2, 1]);
 
     // write pcap header and packet data to expected_data buffer
     let mut expected_data = vec![];
     write_pcap_header(&mut expected_data).expect("write to succeed");
-    append_pcap(&mut expected_data, &packet, None).expect("write to succeed");
+    append_pcap(&mut expected_data, &packet).expect("write to succeed");
 
-    packet_logs.log_packet(&id_1, packet).await;
+    packet_logs.log_packet(&id_1, packet);
 
     assert_data_tree!(inspect, root: {
         runtime_metrics: {
             logging_active_for_devices: "\"001\"",
             device_0: {
                 hci_device_name: "001",
-                byte_len: 51u64,
+                byte_len: 59u64,
                 number_of_items: 1u64,
                 data: expected_data,
             },
@@ -180,7 +188,7 @@ async fn test_packet_logs_inspect() {
     drop(packet_logs);
 }
 
-#[test]
+#[fuchsia::test]
 fn test_snoop_config_inspect() {
     let args = Args {
         log_size_soft_kib: 1,
@@ -209,11 +217,11 @@ fn test_snoop_config_inspect() {
 // stalls before a request is returned.
 fn pump_request_stream(
     exec: &mut TestExecutor,
-    mut request_stream: SnoopRequestStream,
+    request_stream: &mut SnoopRequestStream,
     id: ClientId,
 ) -> ClientRequest {
     let request = unwrap_request(exec.run_until_stalled(&mut request_stream.next()));
-    (id, (Some(Ok(request)), request_stream))
+    (id, Some(Ok(request)))
 }
 
 // Helper that pumps the the handle_client_request until stalled, panicking if the future
@@ -221,94 +229,150 @@ fn pump_request_stream(
 fn pump_handle_client_request(
     exec: &mut TestExecutor,
     request: ClientRequest,
+    request_stream: SnoopRequestStream,
     client_requests: &mut ConcurrentClientRequestFutures,
     subscribers: &mut SubscriptionManager,
     packet_logs: &PacketLogs,
 ) {
-    let mut handler =
-        pin!(handle_client_request(request, client_requests, subscribers, packet_logs));
-    exec.run_until_stalled(&mut handler)
+    let client_id = request.0;
+    let mut handler = pin!(handle_client_request(request, subscribers, packet_logs));
+    if exec
+        .run_until_stalled(&mut handler)
         .expect("Handler future to complete")
-        .expect("Client channel to accept response");
+        .expect("Client channel to accept response")
+    {
+        register_new_client(request_stream, client_requests, client_id);
+    }
 }
 
-#[test]
+#[fuchsia::test]
 fn test_handle_client_request() {
     let (mut exec, mut _snoopers, mut logs, mut subscribers, mut requests, _inspect) = setup();
 
     // unrecognized device returns an error to the client
-    let (proxy, request_stream) = fidl_endpoints();
-    let mut client_fut = proxy.start(true, Some(""));
-    let _ = exec.run_until_stalled(&mut client_fut);
-    let request = pump_request_stream(&mut exec, request_stream, ClientId(0));
-    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &logs);
-    let response = unwrap_response(exec.run_until_stalled(&mut client_fut));
-    assert!(response.error.is_some());
+    let (proxy, mut request_stream) = fidl_endpoints();
+    let (client_req, mut client_stream1) = client_request(Some(String::from("unrecognized")));
+    proxy.start(client_req).unwrap();
+    let request = pump_request_stream(&mut exec, &mut request_stream, ClientId(0));
+    pump_handle_client_request(
+        &mut exec,
+        request,
+        request_stream,
+        &mut requests,
+        &mut subscribers,
+        &logs,
+    );
+    let mut item_fut = client_stream1.next();
+    let expected_error =
+        exec.run_until_stalled(&mut item_fut).expect("ready").expect("some").expect("ok");
+    assert!(expected_error.into_error().is_some());
     assert_eq!(subscribers.number_of_subscribers(), 0);
+    // client should be closed after error
+    let mut item_fut = client_stream1.next();
+    let expected_none = exec.run_until_stalled(&mut item_fut).expect("ready");
+    assert!(expected_none.is_none());
 
     // valid device returns no errors to a client subscribed to that device
-    let (proxy, request_stream) = fidl_endpoints();
+    let (proxy, mut request_stream) = fidl_endpoints();
+    let (client_req, mut client_stream2) = client_request(Some(String::from("")));
     assert!(logs.add_device(String::new()).is_none(), "shouldn't have evicted a device log");
-    let mut client_fut = proxy.start(true, Some(""));
-    let _ = exec.run_until_stalled(&mut client_fut);
-    let request = pump_request_stream(&mut exec, request_stream, ClientId(1));
-    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &logs);
-    let response = unwrap_response(exec.run_until_stalled(&mut client_fut));
-    assert!(response.error.is_none());
+    proxy.start(client_req).unwrap();
+    let request = pump_request_stream(&mut exec, &mut request_stream, ClientId(1));
+    pump_handle_client_request(
+        &mut exec,
+        request,
+        request_stream,
+        &mut requests,
+        &mut subscribers,
+        &logs,
+    );
+    let mut item_fut = client_stream2.next();
+    exec.run_until_stalled(&mut item_fut).expect_pending("held open");
     assert_eq!(subscribers.number_of_subscribers(), 1);
 
     // valid device returns no errors to a client subscribed globally
-    let (proxy, request_stream) = fidl_endpoints();
-    let mut client_fut = proxy.start(true, None);
-    let _ = exec.run_until_stalled(&mut client_fut);
-    let request = pump_request_stream(&mut exec, request_stream, ClientId(2));
-    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &logs);
-    let response = unwrap_response(exec.run_until_stalled(&mut client_fut));
-    assert!(response.error.is_none());
+    let (proxy, mut request_stream) = fidl_endpoints();
+    let (client_req, mut client_stream3) = client_request(None);
+    proxy.start(client_req).unwrap();
+    let request = pump_request_stream(&mut exec, &mut request_stream, ClientId(2));
+    pump_handle_client_request(
+        &mut exec,
+        request,
+        request_stream,
+        &mut requests,
+        &mut subscribers,
+        &logs,
+    );
+    let mut item_fut = client_stream3.next();
+    exec.run_until_stalled(&mut item_fut).expect_pending("held open");
     assert_eq!(subscribers.number_of_subscribers(), 2);
 
-    // second request by the same client returns an error
-    let (proxy, request_stream) = fidl_endpoints();
-    let mut client_fut = proxy.start(true, None);
-    let _ = exec.run_until_stalled(&mut client_fut);
-    let request = pump_request_stream(&mut exec, request_stream, ClientId(2));
-    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &logs);
-    let response = unwrap_response(exec.run_until_stalled(&mut client_fut));
-    assert!(response.error.is_some());
-    assert_eq!(subscribers.number_of_subscribers(), 2);
+    // second request by the same client also works.
+    let (proxy, mut request_stream) = fidl_endpoints();
+    let (client_req, mut client_stream4) = client_request(None);
+    proxy.start(client_req).unwrap();
+    let request = pump_request_stream(&mut exec, &mut request_stream, ClientId(2));
+    pump_handle_client_request(
+        &mut exec,
+        request,
+        request_stream,
+        &mut requests,
+        &mut subscribers,
+        &logs,
+    );
+    let mut item_fut = client_stream4.next();
+    exec.run_until_stalled(&mut item_fut).expect_pending("held open");
+    assert_eq!(subscribers.number_of_subscribers(), 3);
 
     // valid device returns no errors to a client requesting a dump
-    let (proxy, request_stream) = fidl_endpoints();
-    let mut client_fut = proxy.start(false, None);
-    let _ = exec.run_until_stalled(&mut client_fut);
-    let request = pump_request_stream(&mut exec, request_stream, ClientId(3));
-    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &logs);
-    let response = unwrap_response(exec.run_until_stalled(&mut client_fut));
-    assert!(response.error.is_none());
-    assert_eq!(subscribers.number_of_subscribers(), 2);
+    let (proxy, mut request_stream) = fidl_endpoints();
+    let (client, mut client_stream5) =
+        fidl::endpoints::create_request_stream::<PacketObserverMarker>().unwrap();
+    let client_req = SnoopStartRequest {
+        host_device: Some(String::from("")),
+        client: Some(client),
+        ..Default::default()
+    };
+    proxy.start(client_req).unwrap();
+    let request = pump_request_stream(&mut exec, &mut request_stream, ClientId(2));
+    pump_handle_client_request(
+        &mut exec,
+        request,
+        request_stream,
+        &mut requests,
+        &mut subscribers,
+        &logs,
+    );
+    let mut item_fut = client_stream5.next();
+    // Should be no error, but since there's no logs, closes immediately.
+    let expected_none = exec.run_until_stalled(&mut item_fut).expect("ready");
+    assert!(expected_none.is_none());
+    assert_eq!(subscribers.number_of_subscribers(), 3);
 }
 
-#[test]
+#[fuchsia::test]
 fn test_handle_bad_client_request() {
     let (mut exec, mut _snoopers, logs, mut subscribers, mut requests, _inspect) = setup();
 
     let id = ClientId(0);
     let err = Some(Err(FidlError::Invalid));
-    let (_proxy, req_stream) = fidl_endpoints();
-    let handle = req_stream.control_handle();
-    let request = (id, (err, req_stream));
-    subscribers.register(id, handle, None, None).unwrap();
+    let (client, _client_req_stream) =
+        fidl::endpoints::create_proxy::<PacketObserverMarker>().unwrap();
+    let request = (id, err);
+    let (_, stream) = fidl::endpoints::create_request_stream::<SnoopMarker>().unwrap();
+    subscribers.register(id, client, None).unwrap();
     assert!(subscribers.is_registered(&id));
-    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &logs);
+    pump_handle_client_request(&mut exec, request, stream, &mut requests, &mut subscribers, &logs);
     assert!(!subscribers.is_registered(&id));
 
     let id = ClientId(1);
     let err = Some(Err(FidlError::Invalid));
-    let (_proxy, req_stream) = fidl_endpoints();
-    let handle = req_stream.control_handle();
-    let request = (id, (err, req_stream));
-    subscribers.register(id, handle, None, None).unwrap();
+    let (client, _client_req_stream) =
+        fidl::endpoints::create_proxy::<PacketObserverMarker>().unwrap();
+    let request = (id, err);
+    subscribers.register(id, client, None).unwrap();
     assert!(subscribers.is_registered(&id));
-    pump_handle_client_request(&mut exec, request, &mut requests, &mut subscribers, &logs);
+    let (_, stream) = fidl::endpoints::create_request_stream::<SnoopMarker>().unwrap();
+    pump_handle_client_request(&mut exec, request, stream, &mut requests, &mut subscribers, &logs);
     assert!(!subscribers.is_registered(&id));
 }

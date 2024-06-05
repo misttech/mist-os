@@ -2,41 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    byteorder::{BigEndian, WriteBytesExt},
-    fidl_fuchsia_bluetooth_snoop::PacketType,
-    fuchsia_inspect::{self as inspect, Property},
-    fuchsia_zircon as zx,
-    futures::{
-        future::{BoxFuture, FutureExt},
-        lock::Mutex,
-    },
-    inspect_format::constants::MINIMUM_VMO_SIZE_BYTES,
-    itertools::Itertools,
-    std::{
-        collections::{
-            vec_deque::{Iter as VecDequeIter, VecDeque},
-            HashMap,
-        },
-        io::Write,
-        sync::Arc,
-        time::Duration,
-    },
-    tracing::warn,
-};
+use anyhow::Error;
+use byteorder::{BigEndian, WriteBytesExt};
+use fidl_fuchsia_bluetooth_snoop::PacketFormat;
+use fuchsia_inspect::{self as inspect, Property};
+use fuchsia_sync::Mutex;
+use futures::future::{BoxFuture, FutureExt};
+use inspect_format::constants::MINIMUM_VMO_SIZE_BYTES;
+use itertools::Itertools;
+use std::collections::vec_deque::{Iter as VecDequeIter, VecDeque};
+use std::collections::HashMap;
+use std::io::Write;
+use std::sync::Arc;
+use std::time::Duration;
+use tracing::warn;
 
-use crate::{
-    bounded_queue::BoundedQueue, clock::utc_clock_transformation, snooper::SnoopPacket, DeviceId,
-};
+use crate::{bounded_queue::BoundedQueue, snooper::SnoopPacket, DeviceId};
 
 fn generate_lazy_values_for_packet_log(
     device_name: String,
     packet_log: Arc<Mutex<PacketLog>>,
 ) -> BoxFuture<'static, Result<inspect::Inspector, Error>> {
     async move {
-        let mut guard = packet_log.lock().await;
-        let utc_xform = utc_clock_transformation();
+        let mut guard = packet_log.lock();
 
         let log: &mut PacketLog = &mut *guard;
         let byte_len = log.byte_len();
@@ -44,7 +32,7 @@ fn generate_lazy_values_for_packet_log(
         let mut data = Vec::with_capacity(byte_len);
         write_pcap_header(&mut data)?;
         for pkt in log.iter_mut() {
-            append_pcap(&mut data, &pkt, utc_xform.as_ref())?;
+            append_pcap(&mut data, &pkt)?;
         }
         drop(guard);
 
@@ -176,17 +164,19 @@ impl PacketLogs {
 
     /// Log a packet for a given device. If the device is not being logged, the packet is
     /// dropped.
-    pub async fn log_packet(&mut self, device: &DeviceId, packet: SnoopPacket) {
+    pub fn log_packet(&mut self, device: &DeviceId, packet: SnoopPacket) {
         // If the packet log has been removed, there's not much we can do with the packet.
         if let Some(packet_log) = self.device_logs.get_mut(device) {
-            packet_log.0.lock().await.insert(packet);
+            packet_log.0.lock().insert(packet);
         }
     }
 }
 
 const PCAP_CMD: u8 = 0x01;
-const PCAP_DATA: u8 = 0x02;
+const PCAP_ACL_DATA: u8 = 0x02;
+const PCAP_SCO_DATA: u8 = 0x03;
 const PCAP_EVENT: u8 = 0x04;
+const PCAP_ISO_DATA: u8 = 0x05;
 
 // Format described in https://wiki.wireshark.org/Development/LibpcapFileFormat#Global_Header
 pub(crate) fn write_pcap_header<W: Write>(mut buffer: W) -> Result<(), Error> {
@@ -200,29 +190,30 @@ pub(crate) fn write_pcap_header<W: Write>(mut buffer: W) -> Result<(), Error> {
     Ok(())
 }
 
+const MICROS_PER_SEC: u128 = Duration::from_secs(1).as_micros();
+
 // Format described in
 // https://wiki.wireshark.org/Development/LibpcapFileFormat#Record_.28Packet.29_Header
-pub(crate) fn append_pcap<W: Write>(
-    mut buffer: W,
-    pkt: &SnoopPacket,
-    clock_xform: Option<&zx::ClockTransformation>,
-) -> Result<(), Error> {
-    let (seconds, nanos) = pkt.timestamp_parts(clock_xform);
+pub(crate) fn append_pcap<W: Write>(mut buffer: W, pkt: &SnoopPacket) -> Result<(), Error> {
+    let timestamp = Duration::from_nanos(pkt.timestamp.into_nanos() as u64);
+    let (seconds, microseconds) = (timestamp.as_secs(), timestamp.as_micros() % MICROS_PER_SEC);
     // timestamp seconds
     buffer.write_u32::<BigEndian>(seconds as u32)?;
-    // timestamp microseconds
-    let microseconds = (nanos / 1_000) as u32;
-    buffer.write_u32::<BigEndian>(microseconds)?;
+    buffer.write_u32::<BigEndian>(microseconds as u32)?;
     // number of octets of packet saved
     // length is len(payload) + 4 octets for is_received + 1 octet for packet type
     buffer.write_u32::<BigEndian>((pkt.payload.len() + 5) as u32)?;
     // actual length of packet
     buffer.write_u32::<BigEndian>((pkt.original_len + 5) as u32)?;
+    // H4 Header now: is_received and then the packet indicator
     buffer.write_u32::<BigEndian>(pkt.is_received as u32)?;
-    match pkt.type_ {
-        PacketType::Cmd => buffer.write_u8(PCAP_CMD)?,
-        PacketType::Data => buffer.write_u8(PCAP_DATA)?,
-        PacketType::Event => buffer.write_u8(PCAP_EVENT)?,
+    match pkt.format {
+        PacketFormat::Command => buffer.write_u8(PCAP_CMD)?,
+        PacketFormat::AclData => buffer.write_u8(PCAP_ACL_DATA)?,
+        PacketFormat::SynchronousData => buffer.write_u8(PCAP_SCO_DATA)?,
+        PacketFormat::Event => buffer.write_u8(PCAP_EVENT)?,
+        PacketFormat::IsoData => buffer.write_u8(PCAP_ISO_DATA)?,
+        _ => buffer.write_u8(PCAP_ACL_DATA)?,
     }
     let written = buffer.write(&pkt.payload)?;
     if written != pkt.payload.len() {
@@ -233,11 +224,14 @@ pub(crate) fn append_pcap<W: Write>(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, diagnostics_assertions::assert_data_tree, fuchsia_async as fasync};
+    use super::*;
+
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_zircon as zx;
 
     /// An empty log tests that the most basic inspect data is plumbed through the lazy generation
     /// function. See top level tests module for more integrated tests.
-    #[fasync::run_until_stalled(test)]
+    #[fuchsia::test]
     async fn test_generated_inspect_values_for_empty_log() {
         let log = Arc::new(Mutex::new(PacketLog::new(
             3 * std::mem::size_of::<SnoopPacket>(),
@@ -263,28 +257,28 @@ mod tests {
     fn test_pcap_formatting() {
         // cmd packet
         let ts = zx::Time::from_nanos(123 * 1_000_000_000);
-        let pkt = SnoopPacket::new(false, PacketType::Cmd, ts, vec![0, 1, 2, 3, 4]);
+        let pkt = SnoopPacket::new(false, PacketFormat::Command, ts, vec![0, 1, 2, 3, 4]);
         let mut output = vec![];
-        append_pcap(&mut output, &pkt, None).expect("write to succeed");
+        append_pcap(&mut output, &pkt).expect("write to succeed");
         let expected =
             vec![0, 0, 0, 123, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 10, 0, 0, 0, 0, 1, 0, 1, 2, 3, 4];
         assert_eq!(output, expected);
 
         // truncated data packet
         let ts = zx::Time::from_nanos(0);
-        let mut pkt = SnoopPacket::new(false, PacketType::Data, ts, vec![0, 1, 2, 3, 4]);
+        let mut pkt = SnoopPacket::new(false, PacketFormat::AclData, ts, vec![0, 1, 2, 3, 4]);
         pkt.original_len = 10;
         let mut output = vec![];
-        append_pcap(&mut output, &pkt, None).expect("write to succeed");
+        append_pcap(&mut output, &pkt).expect("write to succeed");
         let expected =
             vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 15, 0, 0, 0, 0, 2, 0, 1, 2, 3, 4];
         assert_eq!(output, expected);
 
         // empty event packet
         let ts = zx::Time::from_nanos(10i64.pow(9) - 1);
-        let pkt = SnoopPacket::new(false, PacketType::Event, ts, vec![]);
+        let pkt = SnoopPacket::new(false, PacketFormat::Event, ts, vec![]);
         let mut output = vec![];
-        append_pcap(&mut output, &pkt, None).expect("write to succeed");
+        append_pcap(&mut output, &pkt).expect("write to succeed");
         let expected = vec![0, 0, 0, 0, 0, 15, 66, 63, 0, 0, 0, 5, 0, 0, 0, 5, 0, 0, 0, 0, 4];
         assert_eq!(output, expected);
     }

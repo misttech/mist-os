@@ -5,8 +5,8 @@
 use {
     crate::emulator::EMULATOR_ROOT_DRIVER_URL,
     anyhow::{format_err, Error},
-    fidl_fuchsia_bluetooth as fbt, fidl_fuchsia_bluetooth_bredr as fbredr,
-    fidl_fuchsia_bluetooth_gatt as fbgatt, fidl_fuchsia_bluetooth_le as fble,
+    fidl_fuchsia_bluetooth_bredr as fbredr, fidl_fuchsia_bluetooth_gatt as fbgatt,
+    fidl_fuchsia_bluetooth_le as fble,
     fidl_fuchsia_bluetooth_snoop::SnoopMarker,
     fidl_fuchsia_bluetooth_sys as fbsys,
     fidl_fuchsia_device::NameProviderMarker,
@@ -94,9 +94,10 @@ impl CoreRealm {
                 constants::mock_snoop::MONIKER,
                 |handles| {
                     stateless_mock_responder::<SnoopMarker, _>(handles, |req| {
-                        let (_, _, responder) =
+                        // just drop the request, should be sufficient
+                        let _ =
                             req.into_start().ok_or(format_err!("got unexpected SnoopRequest"))?;
-                        Ok(responder.send(&fbt::Status { error: None })?)
+                        Ok(())
                     })
                     .boxed()
                 },
