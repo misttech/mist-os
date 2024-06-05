@@ -5,15 +5,17 @@
 //! Declares types related to the protocols of raw IP sockets.
 
 use net_types::ip::{GenericOverIp, Ip};
-use packet_formats::ip::{IpProto, IpProtoExt, Ipv4Proto, Ipv6Proto};
+use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
+
+use crate::internal::base::IpExt;
 
 /// A witness type enforcing that the contained protocol is not the
 /// "reserved" IANA Internet protocol.
 #[derive(Clone, Copy, Debug, Eq, GenericOverIp, Ord, PartialEq, PartialOrd)]
 #[generic_over_ip(I, Ip)]
-pub struct Protocol<I: IpProtoExt>(I::Proto);
+pub struct Protocol<I: IpExt>(I::Proto);
 
-impl<I: IpProtoExt> Protocol<I> {
+impl<I: IpExt> Protocol<I> {
     fn new(proto: I::Proto) -> Option<Protocol<I>> {
         I::map_ip(
             proto,
@@ -31,7 +33,7 @@ impl<I: IpProtoExt> Protocol<I> {
 
 /// The supported protocols of raw IP sockets.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum RawIpSocketProtocol<I: IpProtoExt> {
+pub enum RawIpSocketProtocol<I: IpExt> {
     /// Analogous to `IPPROTO_RAW` on Linux.
     ///
     /// This configures the socket as send only (no packets will be received).
@@ -42,7 +44,7 @@ pub enum RawIpSocketProtocol<I: IpProtoExt> {
     Proto(Protocol<I>),
 }
 
-impl<I: IpProtoExt> RawIpSocketProtocol<I> {
+impl<I: IpExt> RawIpSocketProtocol<I> {
     /// Construct a new [`RawIpSocketProtocol`] from the given IP protocol.
     pub fn new(proto: I::Proto) -> RawIpSocketProtocol<I> {
         Protocol::new(proto).map_or(RawIpSocketProtocol::Raw, RawIpSocketProtocol::Proto)
@@ -53,6 +55,14 @@ impl<I: IpProtoExt> RawIpSocketProtocol<I> {
         match self {
             RawIpSocketProtocol::Raw => IpProto::Reserved.into(),
             RawIpSocketProtocol::Proto(Protocol(proto)) => *proto,
+        }
+    }
+
+    /// True, if the protocol is ICMP for the associated IP version `I`.
+    pub fn is_icmp(&self) -> bool {
+        match self {
+            RawIpSocketProtocol::Raw => false,
+            RawIpSocketProtocol::Proto(Protocol(p)) => *p == I::ICMP_IP_PROTO,
         }
     }
 }
@@ -67,17 +77,30 @@ mod test {
     #[ip_test]
     #[test_case(IpProto::Udp, Some(Protocol(IpProto::Udp.into())); "valid")]
     #[test_case(IpProto::Reserved, None; "reserved")]
-    fn new_protocol<I: Ip + IpProtoExt>(p: IpProto, expected: Option<Protocol<I>>) {
+    fn new_protocol<I: Ip + IpExt>(p: IpProto, expected: Option<Protocol<I>>) {
         assert_eq!(Protocol::new(p.into()), expected);
     }
 
     #[ip_test]
     #[test_case(IpProto::Udp, RawIpSocketProtocol::Proto(Protocol(IpProto::Udp.into())); "valid")]
     #[test_case(IpProto::Reserved, RawIpSocketProtocol::Raw; "reserved")]
-    fn new_raw_ip_socket_protocol<I: Ip + IpProtoExt>(
-        p: IpProto,
-        expected: RawIpSocketProtocol<I>,
-    ) {
+    fn new_raw_ip_socket_protocol<I: Ip + IpExt>(p: IpProto, expected: RawIpSocketProtocol<I>) {
         assert_eq!(RawIpSocketProtocol::new(p.into()), expected);
+    }
+
+    #[test_case(Ipv4Proto::Icmp, true; "icmpv4")]
+    #[test_case(Ipv4Proto::Other(58), false; "icmpv6")]
+    #[test_case(Ipv4Proto::Proto(IpProto::Udp), false; "udp")]
+    #[test_case(Ipv4Proto::Proto(IpProto::Reserved), false; "reserved")]
+    fn is_icmpv4(proto: Ipv4Proto, expected_result: bool) {
+        assert_eq!(RawIpSocketProtocol::<Ipv4>::new(proto).is_icmp(), expected_result)
+    }
+
+    #[test_case(Ipv6Proto::Icmpv6, true; "icmpv6")]
+    #[test_case(Ipv6Proto::Other(1), false; "icmpv4")]
+    #[test_case(Ipv6Proto::Proto(IpProto::Udp), false; "udp")]
+    #[test_case(Ipv6Proto::Proto(IpProto::Reserved), false; "reserved")]
+    fn is_icmpv6(proto: Ipv6Proto, expected_result: bool) {
+        assert_eq!(RawIpSocketProtocol::<Ipv6>::new(proto).is_icmp(), expected_result)
     }
 }

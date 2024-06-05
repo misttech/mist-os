@@ -15,12 +15,13 @@ use fidl_fuchsia_posix_socket_raw as fpraw;
 use fuchsia_zircon as zx;
 use futures::StreamExt as _;
 use net_types::{
-    ip::{Ip, IpVersion, Ipv4, Ipv6},
+    ip::{Ip, IpInvariant, IpVersion, Ipv4, Ipv6},
     SpecifiedAddr,
 };
 use netstack3_core::{
     ip::{
-        IpSockCreateAndSendError, IpSockSendError, RawIpSocketProtocol, RawIpSocketSendToError,
+        IpSockCreateAndSendError, IpSockSendError, RawIpSocketIcmpFilter,
+        RawIpSocketIcmpFilterError, RawIpSocketProtocol, RawIpSocketSendToError,
         RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes,
     },
     socket::StrictlyZonedAddr,
@@ -39,8 +40,8 @@ use crate::bindings::{
         IntoErrno, IpSockAddrExt, SockAddr,
     },
     util::{
-        AllowBindingIdFromWeak, RemoveResourceResultExt, ResultExt as _, TryFromFidl,
-        TryFromFidlWithContext, TryIntoFidlWithContext,
+        AllowBindingIdFromWeak, IntoCore, IntoFidl, RemoveResourceResultExt, ResultExt as _,
+        TryFromFidl, TryFromFidlWithContext, TryIntoFidlWithContext,
     },
     BindingsCtx, Ctx,
 };
@@ -482,11 +483,12 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
             fpraw::SocketRequest::GetIpHeaderIncluded { responder } => {
                 respond_not_supported!("raw::GetIpHeaderIncluded", responder)
             }
-            fpraw::SocketRequest::SetIcmpv6Filter { filter: _, responder } => {
-                respond_not_supported!("raw::SetIcmpv6Filter", responder)
-            }
+            fpraw::SocketRequest::SetIcmpv6Filter { filter, responder } => responder
+                .send(handle_set_icmpv6_filter(ctx, data, filter).log_error("raw::SetIcmpv6Filter"))
+                .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::GetIcmpv6Filter { responder } => {
-                respond_not_supported!("raw::GetIcmpv6Filter", responder)
+                let result = handle_get_icmpv6_filter(ctx, data).log_error("raw::GetIcmpv6Filter");
+                responder.send(result.as_ref().map_err(|e| *e)).unwrap_or_log("failed to respond");
             }
             fpraw::SocketRequest::SetIpv6Checksum { config: _, responder } => {
                 respond_not_supported!("raw::SetIpv6Checksum", responder)
@@ -717,6 +719,43 @@ fn handle_get_device<I: IpExt>(ctx: &mut Ctx, socket: &SocketWorkerState<I>) -> 
     device.map(|core_id| core_id.bindings_id().name.clone())
 }
 
+/// Handler for a [`fpraw::SocketRequest::SetIcmpv6Filter`] request.
+fn handle_set_icmpv6_filter<I: IpExt>(
+    ctx: &mut Ctx,
+    socket: &SocketWorkerState<I>,
+    filter: fpraw::Icmpv6Filter,
+) -> Result<(), fposix::Errno> {
+    I::map_ip::<_, Result<(), IpInvariant<fposix::Errno>>>(
+        (IpInvariant(filter), &socket.id),
+        |_| Err(IpInvariant(fposix::Errno::Enoprotoopt)),
+        |(IpInvariant(filter), id)| {
+            let _old_filter = ctx
+                .api()
+                .raw_ip_socket()
+                .set_icmp_filter(id, Some(filter.into_core()))
+                .map_err(|e| IpInvariant(e.into_errno()))?;
+            Ok(())
+        },
+    )
+    .map_err(|IpInvariant(e)| e)
+}
+
+/// Handler for a [`fpraw::SocketRequest::GetIcmpv6Filter`] request.
+fn handle_get_icmpv6_filter<I: IpExt>(
+    ctx: &mut Ctx,
+    socket: &SocketWorkerState<I>,
+) -> Result<fpraw::Icmpv6Filter, fposix::Errno> {
+    let IpInvariant(result) = I::map_ip(
+        (IpInvariant(ctx), &socket.id),
+        |_| IpInvariant(Err(fposix::Errno::Enoprotoopt)),
+        |(IpInvariant(ctx), id)| match ctx.api().raw_ip_socket().get_icmp_filter(id) {
+            Err(e) => IpInvariant(Err(e.into_errno())),
+            Ok(filter) => IpInvariant(Ok(filter.into_fidl())),
+        },
+    );
+    result
+}
+
 impl<I: IpExt> TryFromFidl<fpraw::ProtocolAssociation> for RawIpSocketProtocol<I> {
     type Error = fposix::Errno;
 
@@ -731,6 +770,58 @@ impl<I: IpExt> TryFromFidl<fpraw::ProtocolAssociation> for RawIpSocketProtocol<I
                 }
             }
         }
+    }
+}
+
+mod icmp_filter_conversion_constants {
+    // NB: An ICMP filter is a 256 bit value where bit `n` determines if
+    // ICMP messages with type `n` should be filtered. The FIDL types
+    // represent this as 8 u32s, while the core types represent this as
+    // 32 u8s.
+    pub(super) const NUM_FIDL_ELEMENTS: usize = 8;
+    pub(super) const NUM_CORE_ELEMENTS: usize = 32;
+    pub(super) const CORE_FIDL_ELEMENT_RATIO: usize = NUM_CORE_ELEMENTS / NUM_FIDL_ELEMENTS;
+}
+
+impl IntoCore<RawIpSocketIcmpFilter<Ipv6>> for fpraw::Icmpv6Filter {
+    fn into_core(self) -> RawIpSocketIcmpFilter<Ipv6> {
+        use icmp_filter_conversion_constants::*;
+        let mut core_filter = [0u8; NUM_CORE_ELEMENTS];
+        // NB: Chunk the core_filter up so that each chunk has enough bytes
+        // for a FIDL element.
+        let filter_chunks = core_filter.chunks_exact_mut(CORE_FIDL_ELEMENT_RATIO);
+        for (i, chunk) in filter_chunks.enumerate() {
+            // NB: Use little endian byte order here, as returned by the
+            // `RawIpSocketIcmpFilter` type.
+            chunk.clone_from_slice(&self.blocked_types[i].to_le_bytes());
+        }
+        RawIpSocketIcmpFilter::new(core_filter)
+    }
+}
+
+impl IntoFidl<fpraw::Icmpv6Filter> for Option<RawIpSocketIcmpFilter<Ipv6>> {
+    fn into_fidl(self) -> fpraw::Icmpv6Filter {
+        use icmp_filter_conversion_constants::*;
+        let mut fidl_filter = fpraw::Icmpv6Filter { blocked_types: [0; NUM_FIDL_ELEMENTS] };
+        if let Some(core_filter) = self {
+            let core_filter: [u8; NUM_CORE_ELEMENTS] = core_filter.into_bytes();
+            // NB: Chunk the core_filter up so that each chunk has enough bytes
+            // for a FIDL element.
+            let filter_chunks = core_filter.chunks_exact(CORE_FIDL_ELEMENT_RATIO);
+            debug_assert!(filter_chunks.remainder().is_empty());
+            for (i, chunk) in filter_chunks.enumerate() {
+                // NB: The bytes from `core_filter` that correspond to the FIDL
+                // element at index `i`.
+                let bytes: [u8; CORE_FIDL_ELEMENT_RATIO] =
+                    chunk.try_into().unwrap_or_else(|_: core::array::TryFromSliceError| {
+                        unreachable!("the slice must have {CORE_FIDL_ELEMENT_RATIO} bytes")
+                    });
+                // NB: Use little endian byte order here, as returned by the
+                // `RawIpSocketIcmpFilter` type.
+                fidl_filter.blocked_types[i] = u32::from_le_bytes(bytes)
+            }
+        }
+        fidl_filter
     }
 }
 
@@ -749,6 +840,14 @@ impl IntoErrno for RawIpSocketSendToError {
                 IpSockCreateAndSendError::Create(inner) => inner.into_errno(),
             },
             RawIpSocketSendToError::Zone(inner) => inner.into_errno(),
+        }
+    }
+}
+
+impl IntoErrno for RawIpSocketIcmpFilterError {
+    fn into_errno(self) -> fposix::Errno {
+        match self {
+            RawIpSocketIcmpFilterError::ProtocolNotIcmp => fposix::Errno::Eopnotsupp,
         }
     }
 }
@@ -792,5 +891,32 @@ mod tests {
                 .proto(),
             expected_proto.into(),
         );
+    }
+
+    #[test_case(
+        [
+            u32::from_le_bytes([0, 1, 2, 3]), u32::from_le_bytes([4, 5, 6, 7 ]),
+            u32::from_le_bytes([8, 9, 10, 11]), u32::from_le_bytes([12, 13, 14, 15]),
+            u32::from_le_bytes([16, 17, 18, 19]), u32::from_le_bytes([20, 21, 22, 23]),
+            u32::from_le_bytes([24, 25, 26, 27]), u32::from_le_bytes([28, 29, 30, 31]),
+        ],
+        [
+             0,  1,  2,  3,  4,  5,  6,  7,
+             8,  9, 10, 11, 12, 13, 14, 15,
+            16, 17, 18, 19, 20, 21, 22, 23,
+            24, 25, 26, 27, 28, 29, 30, 31
+        ]
+    )]
+    fn icmp_filter_to_from_fidl(fidl_raw: [u32; 8], core_raw: [u8; 32]) {
+        let fidl = fpraw::Icmpv6Filter { blocked_types: fidl_raw };
+        let core: RawIpSocketIcmpFilter<Ipv6> = fidl.into_core();
+        assert_eq!(core.clone().into_bytes(), core_raw);
+        assert_eq!(Some(core).into_fidl().blocked_types, fidl_raw);
+    }
+
+    #[test]
+    fn icmp_filter_from_none() {
+        let core_filter: Option<RawIpSocketIcmpFilter<Ipv6>> = None;
+        assert_eq!(core_filter.into_fidl().blocked_types, [0; 8])
     }
 }

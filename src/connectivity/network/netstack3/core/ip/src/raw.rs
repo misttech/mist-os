@@ -8,7 +8,7 @@ use alloc::collections::{btree_map::Entry, BTreeMap, HashMap};
 use core::fmt::Debug;
 use derivative::Derivative;
 use net_types::{
-    ip::{Ip, IpVersionMarker},
+    ip::{GenericOverIp, Ip, IpVersionMarker},
     SpecifiedAddr, ZonedAddr,
 };
 use netstack3_base::{
@@ -20,7 +20,7 @@ use netstack3_base::{
 };
 use netstack3_filter::RawIpBody;
 use packet::BufferMut;
-use packet_formats::ip::IpPacket;
+use packet_formats::{icmp, ip::IpPacket};
 use tracing::debug;
 use zerocopy::ByteSlice;
 
@@ -28,6 +28,7 @@ use crate::{
     internal::{
         base::IpExt,
         raw::{
+            filter::RawIpSocketIcmpFilter,
             protocol::RawIpSocketProtocol,
             state::{RawIpSocketLockedState, RawIpSocketState},
         },
@@ -35,6 +36,7 @@ use crate::{
     socket::{DefaultSendOptions, IpSockCreateAndSendError, IpSocketHandler},
 };
 
+pub(crate) mod filter;
 pub(crate) mod protocol;
 pub(crate) mod state;
 
@@ -207,6 +209,38 @@ where
     ) -> Option<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
         self.core_ctx().with_locked_state(id, |state| state.bound_device.clone())
     }
+
+    /// Sets the socket's ICMP filter, returning the original value.
+    ///
+    /// Note, if the socket's protocol is not compatible (e.g. ICMPv4 for an
+    /// IPv4 socket, or ICMPv6 for an IPv6 socket), an error is returned.
+    pub fn set_icmp_filter(
+        &mut self,
+        id: &RawIpApiSocketId<I, C>,
+        filter: Option<RawIpSocketIcmpFilter<I>>,
+    ) -> Result<Option<RawIpSocketIcmpFilter<I>>, RawIpSocketIcmpFilterError> {
+        debug!("setting ICMP Filter on {id:?}: {filter:?}");
+        if !id.protocol().is_icmp() {
+            return Err(RawIpSocketIcmpFilterError::ProtocolNotIcmp);
+        }
+        Ok(self
+            .core_ctx()
+            .with_locked_state_mut(id, |state| core::mem::replace(&mut state.icmp_filter, filter)))
+    }
+
+    /// Gets the socket's ICMP
+    ///
+    /// Note, if the socket's protocol is not compatible (e.g. ICMPv4 for an
+    /// IPv4 socket, or ICMPv6 for an IPv6 socket), an error is returned.
+    pub fn get_icmp_filter(
+        &mut self,
+        id: &RawIpApiSocketId<I, C>,
+    ) -> Result<Option<RawIpSocketIcmpFilter<I>>, RawIpSocketIcmpFilterError> {
+        if !id.protocol().is_icmp() {
+            return Err(RawIpSocketIcmpFilterError::ProtocolNotIcmp);
+        }
+        Ok(self.core_ctx().with_locked_state(id, |state| state.icmp_filter.clone()))
+    }
 }
 
 /// Errors that may occur when calling [`RawIpSocketApi::send_to`].
@@ -225,6 +259,13 @@ pub enum RawIpSocketSendToError {
     Ip(IpSockCreateAndSendError),
 }
 
+/// Errors that may occur getting/setting the ICMP filter for a raw IP socket.
+#[derive(Debug, PartialEq)]
+pub enum RawIpSocketIcmpFilterError {
+    /// The socket's protocol does not allow ICMP filters.
+    ProtocolNotIcmp,
+}
+
 /// The owner of socket state.
 struct PrimaryRawIpSocketId<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes>(
     PrimaryRc<RawIpSocketState<I, D, BT>>,
@@ -240,8 +281,9 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes> Debug
 }
 
 /// Reference to the state of a live socket.
-#[derive(Derivative)]
+#[derive(Derivative, GenericOverIp)]
 #[derivative(Clone(bound = ""), Eq(bound = ""), Hash(bound = ""), PartialEq(bound = ""))]
+#[generic_over_ip(I, Ip)]
 pub struct RawIpSocketId<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes>(
     StrongRc<RawIpSocketState<I, D, BT>>,
 );
@@ -493,13 +535,40 @@ where
 
 /// Returns 'True' if the given packet should be delivered to the given socket.
 fn should_deliver_to_socket<I: IpExt, D: StrongDeviceIdentifier, B: ByteSlice>(
-    _packet: &I::Packet<B>,
+    packet: &I::Packet<B>,
     device: &D,
     socket: &RawIpSocketLockedState<I, D::Weak>,
 ) -> bool {
-    // TODO(https://fxbug.dev/337816586): Check ICMPv6 Filters.
-    let RawIpSocketLockedState { bound_device, _marker } = socket;
-    bound_device.as_ref().map_or(true, |bound_device| bound_device == device)
+    let RawIpSocketLockedState { bound_device, icmp_filter } = socket;
+    // Verify the received device matches the socket's bound device, if any.
+    if bound_device.as_ref().is_some_and(|bound_device| bound_device != device) {
+        return false;
+    }
+
+    // Verify the packet passes the socket's icmp_filter, if any.
+    if icmp_filter.as_ref().is_some_and(|icmp_filter| {
+        // NB: If the socket has an icmp_filter, its protocol must be ICMP.
+        // That means the packet must be ICMP, because we're considering
+        // delivering it to this socket.
+        debug_assert!(RawIpSocketProtocol::<I>::new(packet.proto()).is_icmp());
+        match icmp::peek_message_type(packet.body()) {
+            // NB: The peek call above will fail if 1) the body doesn't have
+            // enough bytes to be an ICMP header, or if 2) the message_type from
+            // the header is unrecognized. In either case, don't deliver the
+            // packet. This is consistent with Linux in the first case, but not
+            // the second (e.g. linux *will* deliver the packet if it has an
+            // invalid ICMP message type). This divergence is not expected to be
+            // problematic for clients, and as such it is kept for the improved
+            // type safety when operating on a known to be valid ICMP message
+            // type.
+            Err(_) => true,
+            Ok(message_type) => !icmp_filter.allows_type(message_type),
+        }
+    }) {
+        return false;
+    }
+
+    true
 }
 
 #[cfg(test)]
@@ -517,7 +586,10 @@ mod test {
         ContextProvider, CtxPair,
     };
     use packet::{Buf, InnerPacketBuilder as _, ParseBuffer as _, Serializer as _};
-    use packet_formats::ip::{IpPacketBuilder, IpProto, IpProtoExt};
+    use packet_formats::{
+        icmp::{IcmpEchoReply, IcmpMessage, IcmpPacketBuilder, IcmpUnusedCode},
+        ip::{IpPacketBuilder, IpProto, IpProtoExt},
+    };
     use test_case::test_case;
 
     use crate::{
@@ -694,15 +766,34 @@ mod test {
     const IP_BODY: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
     /// Constructs a buffer containing an IP packet with sensible defaults.
-    fn new_ip_packet_buf<I: IpExt>(ip_body: &[u8], proto: I::Proto) -> impl AsRef<[u8]> {
+    fn new_ip_packet_buf<I: IpExt + TestIpExt>(
+        ip_body: &[u8],
+        proto: I::Proto,
+    ) -> impl AsRef<[u8]> {
         const TTL: u8 = 255;
         ip_body
             .into_serializer()
             .encapsulate(I::PacketBuilder::new(
-                *I::LOOPBACK_ADDRESS,
-                *I::LOOPBACK_ADDRESS,
+                *I::TEST_ADDRS.local_ip,
+                *I::TEST_ADDRS.remote_ip,
                 TTL,
                 proto,
+            ))
+            .serialize_vec_outer()
+            .unwrap()
+    }
+
+    /// Construct a buffer containing an ICMP message with sensible defaults.
+    fn new_icmp_message_buf<I: IpExt + TestIpExt, M: IcmpMessage<I> + Debug>(
+        message: M,
+        code: M::Code,
+    ) -> impl AsRef<[u8]> {
+        [].into_serializer()
+            .encapsulate(IcmpPacketBuilder::new(
+                *I::TEST_ADDRS.local_ip,
+                *I::TEST_ADDRS.remote_ip,
+                code,
+                message,
             ))
             .serialize_vec_outer()
             .unwrap()
@@ -735,6 +826,30 @@ mod test {
     }
 
     #[ip_test]
+    fn set_icmp_filter<I: Ip + IpExt + DualStackIpExt + TestIpExt>() {
+        let filter1 = RawIpSocketIcmpFilter::<I>::new([123; 32]);
+        let filter2 = RawIpSocketIcmpFilter::<I>::new([234; 32]);
+        let mut api = new_raw_ip_socket_api::<I>();
+
+        let sock = api.create(RawIpSocketProtocol::new(I::ICMP_IP_PROTO), Default::default());
+        assert_eq!(api.get_icmp_filter(&sock), Ok(None));
+        assert_eq!(api.set_icmp_filter(&sock, Some(filter1.clone())), Ok(None));
+        assert_eq!(api.get_icmp_filter(&sock), Ok(Some(filter1.clone())));
+        assert_eq!(api.set_icmp_filter(&sock, Some(filter2.clone())), Ok(Some(filter1.clone())));
+        assert_eq!(api.get_icmp_filter(&sock), Ok(Some(filter2.clone())));
+        assert_eq!(api.set_icmp_filter(&sock, None), Ok(Some(filter2)));
+        assert_eq!(api.get_icmp_filter(&sock), Ok(None));
+
+        // Sockets created with a non ICMP protocol cannot set an ICMP filter.
+        let sock = api.create(RawIpSocketProtocol::new(IpProto::Udp.into()), Default::default());
+        assert_eq!(
+            api.set_icmp_filter(&sock, Some(filter1)),
+            Err(RawIpSocketIcmpFilterError::ProtocolNotIcmp)
+        );
+        assert_eq!(api.get_icmp_filter(&sock), Err(RawIpSocketIcmpFilterError::ProtocolNotIcmp));
+    }
+
+    #[ip_test]
     fn receive_ip_packet<I: Ip + IpExt + DualStackIpExt + TestIpExt>() {
         let mut api = new_raw_ip_socket_api::<I>();
 
@@ -764,13 +879,14 @@ mod test {
             api.close(wrong_sock).into_removed();
 
         // Expect delivery to the two right sockets, but not the wrong socket.
-        for ReceivedIpPacket { data, device } in
-            [sock1_packets.lock().pop().unwrap(), sock2_packets.lock().pop().unwrap()]
-        {
+        for packets in [sock1_packets, sock2_packets] {
+            let lock_guard = packets.lock();
+            let ReceivedIpPacket { data, device } =
+                assert_matches!(&lock_guard[..], [packet] => packet);
             assert_eq!(&data[..], buf.as_ref());
-            assert_eq!(device, DEVICE);
+            assert_eq!(*device, DEVICE);
         }
-        assert_eq!(wrong_sock_packets.lock().pop(), None);
+        assert_matches!(&wrong_sock_packets.lock()[..], []);
     }
 
     // Verify that sockets created with `RawIpSocketProtocol::Raw` cannot
@@ -797,7 +913,7 @@ mod test {
         }
 
         let FakeExternalSocketState { received_packets } = api.close(sock).into_removed();
-        assert_eq!(received_packets.lock().pop(), None);
+        assert_matches!(&received_packets.lock()[..], []);
     }
 
     #[ip_test]
@@ -827,11 +943,50 @@ mod test {
         // Verify the packet was/wasn't received, as expected.
         let FakeExternalSocketState { received_packets } = api.close(sock).into_removed();
         if should_deliver {
-            let ReceivedIpPacket { data, device } = received_packets.lock().pop().unwrap();
+            let lock_guard = received_packets.lock();
+            let ReceivedIpPacket { data, device } =
+                assert_matches!(&lock_guard[..], [packet] => packet);
             assert_eq!(&data[..], buf.as_ref());
-            assert_eq!(device, send_dev);
+            assert_eq!(*device, send_dev);
         } else {
-            assert_eq!(received_packets.lock().pop(), None);
+            assert_matches!(&received_packets.lock()[..], []);
+        }
+    }
+
+    #[ip_test]
+    // NB: Don't bother testing for individual ICMP codes. The `filter` sub
+    // module already covers that extensively.
+    #[test_case(None, true; "no_filter")]
+    #[test_case(Some(RawIpSocketIcmpFilter::<I>::ALLOW_ALL), true; "allow_all")]
+    #[test_case(Some(RawIpSocketIcmpFilter::<I>::DENY_ALL), false; "deny_all")]
+    fn receive_ip_packet_with_icmp_filter<I: Ip + IpExt + DualStackIpExt + TestIpExt>(
+        filter: Option<RawIpSocketIcmpFilter<I>>,
+        should_deliver: bool,
+    ) {
+        let mut api = new_raw_ip_socket_api::<I>();
+        let sock = api.create(RawIpSocketProtocol::new(I::ICMP_IP_PROTO), Default::default());
+
+        assert_matches!(api.set_icmp_filter(&sock, filter), Ok(None));
+
+        // Deliver an arbitrary ICMP message.
+        let icmp_body = new_icmp_message_buf::<I, _>(IcmpEchoReply::new(0, 0), IcmpUnusedCode);
+        let buf = new_ip_packet_buf::<I>(icmp_body.as_ref(), I::ICMP_IP_PROTO);
+        let mut buf_ref = buf.as_ref();
+        let packet = buf_ref.parse::<I::Packet<_>>().expect("parse should succeed");
+        {
+            let (core_ctx, bindings_ctx) = api.ctx.contexts();
+            core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet, &MultipleDevicesId::A);
+        }
+
+        // Verify the packet was/wasn't received, as expected.
+        let FakeExternalSocketState { received_packets } = api.close(sock).into_removed();
+        if should_deliver {
+            let lock_guard = received_packets.lock();
+            let ReceivedIpPacket { data, device: _ } =
+                assert_matches!(&lock_guard[..], [packet] => packet);
+            assert_eq!(&data[..], buf.as_ref());
+        } else {
+            assert_matches!(&received_packets.lock()[..], []);
         }
     }
 

@@ -66,8 +66,6 @@
                 "RawSocketICMPTest.IPv6ChecksumNotSupported",
                 "RawSocketICMPTest.SendAndReceiveViaConnect",
                 "RawSocketICMPTest.SetAndGetSocketLinger",
-                "RawSocketICMPv6Test.GetPartialFilterSucceeds",
-                "RawSocketICMPv6Test.InitialFilterPassesAll",
                 "RawSocketICMPv6Test.MsgTooSmallToFillChecksumFailsSend",
                 "RawSocketICMPv6Test.PingSuccessfully",
                 "RawSocketICMPv6Test.SetSockOptIPv6ChecksumFails",

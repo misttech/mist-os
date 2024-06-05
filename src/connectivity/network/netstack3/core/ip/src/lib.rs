@@ -221,12 +221,13 @@ pub mod socket {
 
 /// Raw IP sockets.
 pub mod raw {
+    pub use crate::internal::raw::filter::RawIpSocketIcmpFilter;
     pub use crate::internal::raw::protocol::RawIpSocketProtocol;
     pub use crate::internal::raw::state::{RawIpSocketLockedState, RawIpSocketState};
     pub use crate::internal::raw::{
-        RawIpSocketApi, RawIpSocketId, RawIpSocketMap, RawIpSocketMapContext,
-        RawIpSocketSendToError, RawIpSocketStateContext, RawIpSocketsBindingsContext,
-        RawIpSocketsBindingsTypes, WeakRawIpSocketId,
+        RawIpSocketApi, RawIpSocketIcmpFilterError, RawIpSocketId, RawIpSocketMap,
+        RawIpSocketMapContext, RawIpSocketSendToError, RawIpSocketStateContext,
+        RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes, WeakRawIpSocketId,
     };
 }
 

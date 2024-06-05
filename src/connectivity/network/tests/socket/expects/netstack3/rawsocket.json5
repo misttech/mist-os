@@ -21,7 +21,6 @@
             matchers: [
                 // TODO(https://fxbug.dev/42058079): Support raw sockets.
                 "RawSocketTest.SendtoRecvfrom",
-                "RawSocketICMPv6Test.GetSetFilterSucceeds",
                 "RawSocketICMPv6Test.FilterICMPPackets",
                 "RawSocketICMPv6Test.NegativeIPv6ChecksumsFoldToNegativeOne",
                 "RawSocketICMPv6Test.SetIPv6ChecksumErrorForOddValues",

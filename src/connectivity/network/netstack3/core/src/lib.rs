@@ -143,8 +143,9 @@ pub mod ip {
     };
     pub use netstack3_ip::{IpLayerEvent, ResolveRouteError};
     pub use raw::{
-        RawIpSocketId, RawIpSocketProtocol, RawIpSocketSendToError, RawIpSocketsBindingsContext,
-        RawIpSocketsBindingsTypes, WeakRawIpSocketId,
+        RawIpSocketIcmpFilter, RawIpSocketIcmpFilterError, RawIpSocketId, RawIpSocketProtocol,
+        RawIpSocketSendToError, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes,
+        WeakRawIpSocketId,
     };
     pub use socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError};
 }

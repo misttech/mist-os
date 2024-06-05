@@ -6,28 +6,32 @@
 
 use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
-use net_types::ip::{Ip, IpVersionMarker};
 use netstack3_base::{sync::RwLock, WeakDeviceIdentifier};
-use packet_formats::ip::IpProtoExt;
 
-use crate::internal::raw::{protocol::RawIpSocketProtocol, RawIpSocketsBindingsTypes};
+use crate::{
+    internal::raw::{
+        filter::RawIpSocketIcmpFilter, protocol::RawIpSocketProtocol, RawIpSocketsBindingsTypes,
+    },
+    IpExt,
+};
 
 /// State for a raw IP socket that can be modified, and is lock protected.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub struct RawIpSocketLockedState<I: Ip, D: WeakDeviceIdentifier> {
+pub struct RawIpSocketLockedState<I: IpExt, D: WeakDeviceIdentifier> {
     /// The socket's bound device. When set, the socket will only be able to
     /// send/receive packets via this device.
     ///
     /// Held as a weak identifier, because binding a socket to a device should
     /// not obstruct removal of the device.
     pub(crate) bound_device: Option<D>,
-    // TODO(https://fxbug.dev/42175797): Remove once IP fields are held.
-    pub(crate) _marker: IpVersionMarker<I>,
+    /// The socket's ICMP filters. When set, all received ICMP packets will need
+    /// to pass the filter, in order to be delivered to the socket.
+    pub(crate) icmp_filter: Option<RawIpSocketIcmpFilter<I>>,
 }
 
 /// State held by a raw IP socket.
-pub struct RawIpSocketState<I: IpProtoExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes> {
+pub struct RawIpSocketState<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes> {
     /// The bindings state associated with this socket.
     external_state: BT::RawIpSocketState<I>,
     /// The IANA Internet Protocol of this socket.
@@ -38,9 +42,7 @@ pub struct RawIpSocketState<I: IpProtoExt, D: WeakDeviceIdentifier, BT: RawIpSoc
     locked_state: RwLock<RawIpSocketLockedState<I, D>>,
 }
 
-impl<I: IpProtoExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes>
-    RawIpSocketState<I, D, BT>
-{
+impl<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes> RawIpSocketState<I, D, BT> {
     pub(super) fn new(
         protocol: RawIpSocketProtocol<I>,
         external_state: BT::RawIpSocketState<I>,
@@ -64,7 +66,7 @@ impl<I: IpProtoExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes>
     }
 }
 
-impl<I: IpProtoExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes>
+impl<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes>
     OrderedLockAccess<RawIpSocketLockedState<I, D>> for RawIpSocketState<I, D, BT>
 {
     type Lock = RwLock<RawIpSocketLockedState<I, D>>;
