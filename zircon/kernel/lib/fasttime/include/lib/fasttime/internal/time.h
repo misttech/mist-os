@@ -66,7 +66,7 @@ inline zx_ticks_t compute_monotonic_ticks(const TimeValues& tvalues) {
       return ZX_TIME_INFINITE_PAST;
     }
   }
-  return internal::get_raw_ticks(tvalues) + tvalues.raw_ticks_to_ticks_offset;
+  return internal::get_raw_ticks(tvalues) + tvalues.mono_ticks_offset;
 }
 
 template <FasttimeVerificationMode kVerificationMode = FasttimeVerificationMode::kNormal>

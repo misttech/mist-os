@@ -25,8 +25,8 @@ struct TimeValues {
   // Conversion factor for zx_ticks_get return values to seconds.
   const zx_ticks_t ticks_per_second;
 
-  // Offset for converting from the raw system timer to zx_ticks_t
-  const zx_ticks_t raw_ticks_to_ticks_offset;
+  // Offset for converting from the raw system timer to monotonic ticks.
+  const zx_ticks_t mono_ticks_offset;
 
   // Ratio which relates ticks (zx_ticks_get) to clock monotonic (zx_clock_get_monotonic).
   // Specifically...

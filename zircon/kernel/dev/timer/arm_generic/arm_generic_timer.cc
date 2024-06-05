@@ -84,7 +84,8 @@ uint32_t event_stream_freq;
 
 // TODO(https://fxbug.dev/42173294): Make this ktl::atomic when we start to mutate the offset to
 // deal with suspend.
-uint64_t raw_ticks_to_ticks_offset{0};
+// Offset between the raw ticks counter and the monotonic ticks timeline.
+uint64_t mono_ticks_offset{0};
 
 }  // anonymous namespace
 
@@ -188,7 +189,7 @@ struct timer_reg_procs {
   void (*write_cval)(uint64_t val);
   void (*write_tval)(int32_t val);
   uint64_t (*read_ct)();
-  uint64_t arch::EarlyTicks::*early_ticks;
+  uint64_t arch::EarlyTicks::* early_ticks;
 };
 
 [[maybe_unused]] static const struct timer_reg_procs cntp_procs = {
@@ -312,7 +313,7 @@ inline zx_ticks_t platform_current_ticks() {
   // TODO(https://fxbug.dev/42173294): switch to the ABA method of reading the offset when we start
   // to allow the offset to be changed as a result of coming out of system
   // suspend.
-  return platform_current_raw_ticks<Flags>() + raw_ticks_to_ticks_offset;
+  return platform_current_raw_ticks<Flags>() + mono_ticks_offset;
 }
 
 }  // namespace internal
@@ -354,16 +355,16 @@ EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(14);
 EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(15);
 #undef EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED
 
-zx_ticks_t platform_get_raw_ticks_to_ticks_offset() {
+zx_ticks_t platform_get_mono_ticks_offset() {
   // TODO(https://fxbug.dev/42173294): consider the memory order semantics of this load when the
   // time comes.
-  return raw_ticks_to_ticks_offset;
+  return mono_ticks_offset;
 }
 
 zx_ticks_t platform_convert_early_ticks(arch::EarlyTicks sample) {
   // Early tick timestamps are always raw ticks.  We need to convert back to
   // ticks by subtracting the raw_ticks to ticks offset.
-  return sample.*reg_procs.early_ticks + raw_ticks_to_ticks_offset;
+  return sample.*reg_procs.early_ticks + mono_ticks_offset;
 }
 
 zx_status_t platform_set_oneshot_timer(zx_time_t deadline) {
@@ -381,7 +382,7 @@ zx_status_t platform_set_oneshot_timer(zx_time_t deadline) {
   // manage fixing up the timer when coming out of suspend, we need to come back
   // here and reconsider memory order issues.
   const affine::Ratio time_to_ticks = platform_get_ticks_to_time_ratio().Inverse();
-  const uint64_t cntpct_deadline = time_to_ticks.Scale(deadline) + 1 - raw_ticks_to_ticks_offset;
+  const uint64_t cntpct_deadline = time_to_ticks.Scale(deadline) + 1 - mono_ticks_offset;
 
   // Even if the deadline has already passed, the ARMv8-A timer will fire the
   // interrupt.
@@ -557,7 +558,7 @@ void ArmGenericTimerInit(const zbi_dcfg_arm_generic_timer_driver_t& config) {
   // We cannot actually reset the value on the ticks timer, so instead we use
   // the time of clock selection (now) to define the zero point on our ticks
   // timeline moving forward.
-  raw_ticks_to_ticks_offset = -reg_procs.read_ct();
+  mono_ticks_offset = -reg_procs.read_ct();
   arch::ThreadMemoryBarrier();
 
   dprintf(INFO, "arm generic timer using %s timer, irq %d\n", timer_str, timer_irq);

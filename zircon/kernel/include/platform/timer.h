@@ -40,19 +40,19 @@ bool platform_usermode_can_access_tick_registers();
 zx_ticks_t platform_current_raw_ticks();
 zx_ticks_t platform_current_ticks();
 
-// high-precision timer current_ticks
+// The current monotonic time in ticks.
 inline zx_ticks_t current_ticks() { return platform_current_ticks(); }
 
-// Access the platform specific offset from the raw ticks timeline to the ticks
+// Access the platform specific offset from the raw ticks timeline to the monotonic ticks
 // timeline.  The only current legit uses for this function are when
 // initializing the RO data for the VDSO, and when fixing up timer values during
 // vmexit on ARM (see arch/arm64/hypervisor/vmexit.cc).
-zx_ticks_t platform_get_raw_ticks_to_ticks_offset();
+zx_ticks_t platform_get_mono_ticks_offset();
 
-// current time in nanoseconds
+// Current monotonic time in nanoseconds.
 zx_time_t current_time();
 
-// high-precision timer ticks per second
+// High-precision timer ticks per second.
 zx_ticks_t ticks_per_second();
 
 namespace affine {

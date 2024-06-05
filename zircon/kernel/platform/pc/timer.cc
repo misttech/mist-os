@@ -138,7 +138,8 @@ static struct fp_32_64 ns_per_hpet;
 static uint32_t ns_per_hpet_rounded_up;
 affine::Ratio hpet_ticks_to_clock_monotonic;  // Non-static so that hpet_init has access
 
-static ktl::atomic<uint64_t> raw_ticks_to_ticks_offset{0};
+// Offset between the raw ticks counter and the monotonic ticks timeline.
+static ktl::atomic<uint64_t> mono_ticks_offset{0};
 
 // An affine transformation from times sampled from the EarlyTicks timeline to
 // the chosen ticks timeline.  By default, this transformation is set up as:
@@ -235,12 +236,12 @@ inline zx_ticks_t platform_current_raw_ticks() {
 template <GetTicksSyncFlag Flags>
 inline zx_ticks_t platform_current_ticks() {
   while (true) {
-    // Since the raw_ticks_to_ticks_offset is only updated early in boot when we're running on a
+    // Since the mono_ticks_offset is only updated early in boot when we're running on a
     // single core with interrupts disabled, we don't need to worry about thread synchronization so
     // memory_order_relaxed is sufficient.
-    const zx_ticks_t off1 = raw_ticks_to_ticks_offset.load(ktl::memory_order_relaxed);
+    const zx_ticks_t off1 = mono_ticks_offset.load(ktl::memory_order_relaxed);
     const zx_ticks_t raw_ticks = ::internal::platform_current_raw_ticks<Flags>();
-    const zx_ticks_t off2 = raw_ticks_to_ticks_offset.load(ktl::memory_order_relaxed);
+    const zx_ticks_t off2 = mono_ticks_offset.load(ktl::memory_order_relaxed);
     if (off1 == off2) {
       return raw_ticks + off1;
     }
@@ -286,11 +287,11 @@ EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(14);
 EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(15);
 #undef EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED
 
-zx_ticks_t platform_get_raw_ticks_to_ticks_offset() {
-  // On x86 this is only used to load the vDSO constant raw_ticks_to_ticks_offset. This happens
+zx_ticks_t platform_get_mono_ticks_offset() {
+  // On x86 this is only used to load the vDSO constant mono_ticks_offset. This happens
   // later during boot than when the value of the offset is set so memory_order_relaxed is
   // sufficient.
-  return raw_ticks_to_ticks_offset.load(ktl::memory_order_relaxed);
+  return mono_ticks_offset.load(ktl::memory_order_relaxed);
 }
 
 zx_duration_t convert_raw_tsc_duration_to_nanoseconds(int64_t duration) {
@@ -305,7 +306,7 @@ zx_time_t convert_raw_tsc_timestamp_to_clock_monotonic(int64_t ts) {
     // As the offset is only updated early during boot when we're running on a
     // single core with interrupts disabled, we don't need to worry about thread
     // synchronization so memory_order_relaxed is sufficient.
-    int64_t abs_ticks = ts + raw_ticks_to_ticks_offset.load(ktl::memory_order_relaxed);
+    int64_t abs_ticks = ts + mono_ticks_offset.load(ktl::memory_order_relaxed);
     return rdtsc_ticks_to_clock_monotonic.Scale(abs_ticks);
   } else {
     // If we are using something other than TSC as our monotonic reference, then
@@ -700,17 +701,17 @@ static void pc_init_timer(uint level) {
     // At this point in boot we are running on a single core without interrupts
     // or exceptions, so memory_order_relaxed is sufficient. This goes for the load of the
     // offset below as well.
-    raw_ticks_to_ticks_offset.store(-current_ticks_rdtsc(), ktl::memory_order_relaxed);
+    mono_ticks_offset.store(-current_ticks_rdtsc(), ktl::memory_order_relaxed);
 
     // A note about this casting operation.  There is a technical risk of UB
-    // here, in the case that -raw_ticks_to_ticks_offset is a value too large to
+    // here, in the case that -mono_ticks_offset is a value too large to
     // fit into a signed 64 bit integer.  UBSAN builds _might_ technically
-    // assert if the value -raw_ticks_to_ticks_offset is >= 2^63 during this
+    // assert if the value -mono_ticks_offset is >= 2^63 during this
     // cast.
     //
     // This _should_ never happen, however.  This offset is the two's compliment
     // of what the TSC read when we decided that the ticks timeline should be
-    // zero.  For -raw_ticks_to_ticks_offset to be >= 2^63, the TSC counter
+    // zero.  For -mono_ticks_offset to be >= 2^63, the TSC counter
     // value itself would have needed to be >= 2^63 in the line above where it
     // was sampled.  Assuming that the TSC started to count from 0 at cold power
     // on time, and assuming that the TSC was running extremely quickly (say,
@@ -720,9 +721,7 @@ static void pc_init_timer(uint level) {
     // years of uptime).  So, for now, we perform the cast and take
     // the risk, assuming that nothing bad will happen.
     early_ticks_to_ticks = affine::Transform{
-        static_cast<int64_t>(-raw_ticks_to_ticks_offset.load(ktl::memory_order_relaxed)),
-        0,
-        {1, 1}};
+        static_cast<int64_t>(-mono_ticks_offset.load(ktl::memory_order_relaxed)), 0, {1, 1}};
     wall_clock = CLOCK_TSC;
   } else {
     if (constant_tsc || invariant_tsc) {
@@ -737,7 +736,7 @@ static void pc_init_timer(uint level) {
       platform_set_ticks_to_time_ratio(hpet_ticks_to_clock_monotonic);
       // At this point in boot we are running on a single core without
       // interrupts or exceptions, so memory_order_relaxed is sufficient.
-      raw_ticks_to_ticks_offset.store(0, ktl::memory_order_relaxed);
+      mono_ticks_offset.store(0, ktl::memory_order_relaxed);
 
       // Explicitly set the value of the HPET to zero, then make sure it is
       // started.  Take a correspondence pair between HPET and TSC by observing
@@ -785,7 +784,7 @@ static void pc_init_timer(uint level) {
       // At this point in boot we are running on a single core without
       // interrupts or exceptions, so memory_order_relaxed is sufficient.
       // This goes for the load below as well.
-      raw_ticks_to_ticks_offset.store(-current_ticks_pit(), ktl::memory_order_relaxed);
+      mono_ticks_offset.store(-current_ticks_pit(), ktl::memory_order_relaxed);
       const zx_ticks_t tsc_reference = current_ticks_rdtsc();
 
       affine::Ratio rdtsc_ticks_to_pit_ticks = affine::Ratio::Product(
@@ -795,8 +794,7 @@ static void pc_init_timer(uint level) {
       // to be reasonably safe to perform the static cast from unsigned to
       // signed here.
       early_ticks_to_ticks = affine::Transform{
-          tsc_reference,
-          static_cast<int64_t>(-raw_ticks_to_ticks_offset.load(ktl::memory_order_relaxed)),
+          tsc_reference, static_cast<int64_t>(-mono_ticks_offset.load(ktl::memory_order_relaxed)),
           rdtsc_ticks_to_pit_ticks};
 
       // PIT is now our chosen "ticks" reference.
@@ -832,7 +830,7 @@ zx_status_t platform_set_oneshot_timer(zx_time_t deadline) {
     // with interrupts disabled, we don't need to worry about thread synchronization so
     // memory_order_relaxed is sufficient.
     const uint64_t tsc_deadline = u64_mul_u64_fp32_64(deadline, tsc_per_ns) -
-                                  raw_ticks_to_ticks_offset.load(ktl::memory_order_relaxed);
+                                  mono_ticks_offset.load(ktl::memory_order_relaxed);
     LTRACEF("Scheduling oneshot timer: %" PRIu64 " deadline\n", tsc_deadline);
     apic_timer_set_tsc_deadline(tsc_deadline, false /* unmasked */);
     kcounter_add(platform_timer_set_counter, 1);

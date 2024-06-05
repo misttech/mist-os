@@ -14,7 +14,8 @@
 arch::EarlyTicks kernel_entry_ticks;
 arch::EarlyTicks kernel_virtual_entry_ticks;
 
-zx_ticks_t raw_ticks_to_ticks_offset{0};
+// Offset between the raw ticks counter and the monotonic ticks timeline.
+zx_ticks_t mono_ticks_offset{0};
 
 namespace internal {
 
@@ -29,10 +30,10 @@ inline zx_ticks_t platform_current_ticks() {
 
 }  // namespace internal
 
-zx_ticks_t platform_get_raw_ticks_to_ticks_offset() { return raw_ticks_to_ticks_offset; }
+zx_ticks_t platform_get_mono_ticks_offset() { return mono_ticks_offset; }
 
 zx_ticks_t platform_convert_early_ticks(arch::EarlyTicks sample) {
-  return sample.time + raw_ticks_to_ticks_offset;
+  return sample.time + mono_ticks_offset;
 }
 
 zx_status_t platform_set_oneshot_timer(zx_time_t deadline) {
