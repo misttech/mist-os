@@ -1172,10 +1172,12 @@ BufferCollectionToken* Device::FindTokenByServerChannelKoid(zx_koid_t token_serv
   std::lock_guard checker(*loop_checker_);
   auto iter = tokens_by_koid_.find(token_server_koid);
   if (iter == tokens_by_koid_.end()) {
-    unfound_token_koids_.push_back(token_server_koid);
-    constexpr uint32_t kMaxUnfoundTokenCount = 8;
-    while (unfound_token_koids_.size() > kMaxUnfoundTokenCount) {
-      unfound_token_koids_.pop_front();
+    if (token_server_koid != 0) {
+      unfound_token_koids_.push_back(token_server_koid);
+      constexpr uint32_t kMaxUnfoundTokenCount = 8;
+      while (unfound_token_koids_.size() > kMaxUnfoundTokenCount) {
+        unfound_token_koids_.pop_front();
+      }
     }
     return nullptr;
   }
