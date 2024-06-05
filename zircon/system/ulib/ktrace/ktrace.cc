@@ -36,7 +36,7 @@ class KTrace : public fuchsia::tracing::kernel::Controller,
   zx_status_t BindController(zx::channel channel, async_dispatcher_t* dispatcher);
 
   // fuchsia.tracing.kernel.Reader methods
-  void ReadAt(uint64_t count, uint64_t offset, ReadAtCallback callback) override;
+  void ReadAt(uint64_t count, uint32_t offset, ReadAtCallback callback) override;
   void GetBytesWritten(GetBytesWrittenCallback callback) override;
 
   zx_status_t BindReader(zx::channel channel, async_dispatcher_t* dispatcher);
@@ -95,7 +95,7 @@ void KTrace::GetBytesWritten(GetBytesWrittenCallback callback) {
   callback(status, size);
 }
 
-void KTrace::ReadAt(uint64_t count, uint64_t offset, ReadAtCallback callback) {
+void KTrace::ReadAt(uint64_t count, uint32_t offset, ReadAtCallback callback) {
   size_t length;
   std::vector<uint8_t> buf(count);
   zx_status_t status =
