@@ -1872,7 +1872,6 @@ group("host") {
   # TODO(https://fxbug.dev/42160904) investigate removing testonly here
   testonly = true
   public_deps = [
-    "//build/input/board:host($host_toolchain)",
     "//build/input/product:host($host_toolchain)",
 
     # Static analysis tools used by shac should always be built so that
