@@ -9,12 +9,11 @@ use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
 use crate::{
     api::CoreApi,
     context::{BuildableCoreContext, ContextProvider, CoreTimerContext, CtxPair},
-    device::{DeviceId, DeviceLayerState, WeakDeviceId},
+    device::{DeviceId, DeviceLayerState},
     ip::{
         self, icmp::IcmpState, nud::NudCounters, IpLayerIpExt, IpLayerTimerId, IpStateInner,
         Ipv4State, Ipv6State,
     },
-    socket::datagram,
     time::TimerId,
     transport::{self, tcp::TcpCounters, udp::UdpCounters, TransportLayerState},
     BindingsContext, BindingsTypes, CoreCtx,
@@ -97,9 +96,7 @@ impl<BT: BindingsTypes> StackState<BT> {
         I::map_ip((), |()| &self.ipv4.inner, |()| &self.ipv6.inner)
     }
 
-    pub(crate) fn inner_icmp_state<I: ip::IpExt + datagram::DualStackIpExt>(
-        &self,
-    ) -> &IcmpState<I, WeakDeviceId<BT>, BT> {
+    pub(crate) fn inner_icmp_state<I: ip::IpExt>(&self) -> &IcmpState<I, BT> {
         I::map_ip((), |()| &self.ipv4.icmp.inner, |()| &self.ipv6.icmp.inner)
     }
 }
@@ -134,9 +131,7 @@ impl<BT: BindingsTypes> StackState<BT> {
         self.inner_ip_state::<I>()
     }
     /// Accessor for common ICMP state for `I`.
-    pub fn common_icmp<I: ip::IpExt + datagram::DualStackIpExt>(
-        &self,
-    ) -> &IcmpState<I, WeakDeviceId<BT>, BT> {
+    pub fn common_icmp<I: ip::IpExt>(&self) -> &IcmpState<I, BT> {
         self.inner_icmp_state::<I>()
     }
 }

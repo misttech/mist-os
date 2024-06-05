@@ -63,6 +63,7 @@ use net_types::ip::{Ip, Ipv4, Ipv6};
 use crate::{
     context::{HandleableTimer, TimerHandler},
     device::WeakDeviceId,
+    ip::icmp::IcmpSockets,
     socket::datagram,
     transport::{
         tcp::{TcpCounters, TcpState, TcpTimerId},
@@ -104,6 +105,8 @@ impl TransportStateBuilder {
             udpv6: self.udp.build(),
             tcpv4: TcpState::new(now, &mut rng),
             tcpv6: TcpState::new(now, &mut rng),
+            icmp_echo_v4: Default::default(),
+            icmp_echo_v6: Default::default(),
         }
     }
 }
@@ -114,6 +117,8 @@ pub struct TransportLayerState<BT: BindingsTypes> {
     udpv6: UdpState<Ipv6, WeakDeviceId<BT>, BT>,
     tcpv4: TcpState<Ipv4, WeakDeviceId<BT>, BT>,
     tcpv6: TcpState<Ipv6, WeakDeviceId<BT>, BT>,
+    icmp_echo_v4: IcmpSockets<Ipv4, WeakDeviceId<BT>, BT>,
+    icmp_echo_v6: IcmpSockets<Ipv6, WeakDeviceId<BT>, BT>,
 }
 
 impl<BT: BindingsTypes> TransportLayerState<BT> {
@@ -123,6 +128,12 @@ impl<BT: BindingsTypes> TransportLayerState<BT> {
 
     fn udp_state<I: datagram::IpExt>(&self) -> &UdpState<I, WeakDeviceId<BT>, BT> {
         I::map_ip((), |()| &self.udpv4, |()| &self.udpv6)
+    }
+
+    pub(crate) fn icmp_echo_state<I: datagram::IpExt>(
+        &self,
+    ) -> &IcmpSockets<I, WeakDeviceId<BT>, BT> {
+        I::map_ip((), |()| &self.icmp_echo_v4, |()| &self.icmp_echo_v6)
     }
 
     pub(crate) fn udp_counters<I: Ip>(&self) -> &UdpCounters<I> {

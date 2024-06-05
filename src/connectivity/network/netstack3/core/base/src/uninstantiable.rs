@@ -73,3 +73,11 @@ impl<D: Device, C: DeviceIdContext<D>> DeviceIdContext<D> for UninstantiableWrap
     type DeviceId = C::DeviceId;
     type WeakDeviceId = C::WeakDeviceId;
 }
+
+impl<A: Iterator> Iterator for UninstantiableWrapper<A> {
+    type Item = A::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.uninstantiable_unreachable()
+    }
+}

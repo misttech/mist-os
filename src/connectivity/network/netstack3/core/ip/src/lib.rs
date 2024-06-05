@@ -50,7 +50,7 @@ pub mod datagram {
         update_sharing, with_other_stack_ip_options,
         with_other_stack_ip_options_and_default_hop_limits, with_other_stack_ip_options_mut,
         with_other_stack_ip_options_mut_if_unbound, BoundSocketState, BoundSocketStateType,
-        BoundSockets, ConnInfo, ConnectError, DatagramBoundStateContext, DatagramFlowId,
+        BoundSockets, ConnInfo, ConnState, ConnectError, DatagramBoundStateContext, DatagramFlowId,
         DatagramSocketMapSpec, DatagramSocketOptions, DatagramSocketSet, DatagramSocketSpec,
         DatagramStateContext, DualStackConnState, DualStackConverter,
         DualStackDatagramBoundStateContext, DualStackIpExt, EitherIpSocket, ExpectedConnError,
@@ -150,17 +150,17 @@ pub mod gmp {
 /// The Internet Control Message Protocol (ICMP).
 pub mod icmp {
     pub use crate::internal::icmp::socket::{
-        BoundSockets, IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpEchoSocketApi,
+        BoundSockets, IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpEchoBoundStateContext,
+        IcmpEchoContextMarker, IcmpEchoIpTransportContext, IcmpEchoSocketApi, IcmpEchoStateContext,
         IcmpSocketId, IcmpSocketSet, IcmpSocketState, IcmpSockets,
-        StateContext as IcmpSocketStateContext,
     };
     pub use crate::internal::icmp::{
         send_icmpv4_host_unreachable, send_icmpv6_address_unreachable, send_ndp_packet,
-        IcmpBindingsContext, IcmpBindingsTypes, IcmpErrorCode, IcmpIpExt, IcmpIpTransportContext,
-        IcmpRxCounters, IcmpRxCountersInner, IcmpState, IcmpStateContext, IcmpTxCounters,
-        IcmpTxCountersInner, Icmpv4ErrorCode, Icmpv4StateBuilder, Icmpv6ErrorCode,
-        InnerIcmpContext, InnerIcmpv4Context, NdpCounters, NdpRxCounters, NdpTxCounters,
-        REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
+        EchoTransportContextMarker, IcmpBindingsContext, IcmpBindingsTypes, IcmpErrorCode,
+        IcmpIpExt, IcmpIpTransportContext, IcmpRxCounters, IcmpRxCountersInner, IcmpState,
+        IcmpStateContext, IcmpTxCounters, IcmpTxCountersInner, Icmpv4ErrorCode, Icmpv4StateBuilder,
+        Icmpv6ErrorCode, InnerIcmpContext, InnerIcmpv4Context, NdpCounters, NdpRxCounters,
+        NdpTxCounters, REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
     };
 
     /// ICMP test utilities.
@@ -218,7 +218,9 @@ pub mod socket {
     /// IP Socket test utilities.
     #[cfg(any(test, feature = "testutils"))]
     pub mod testutil {
-        pub use crate::internal::socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx};
+        pub use crate::internal::socket::testutil::{
+            FakeDeviceConfig, FakeDualStackIpSocketCtx, FakeIpSocketCtx, InnerFakeIpSocketCtx,
+        };
     }
 }
 

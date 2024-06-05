@@ -170,7 +170,7 @@ pub trait IpExt: packet_formats::ip::IpExt + IcmpIpExt + IpTypesIpExt + IpProtoE
     /// [`IpTransportContext::receive_ip_packet`].
     ///
     /// For IPv4, this is `Ipv4Addr`. For IPv6, this is [`Ipv6SourceAddr`].
-    type RecvSrcAddr: Into<Self::Addr>;
+    type RecvSrcAddr: Into<Self::Addr> + TryFrom<Self::Addr, Error: Debug> + Copy + Clone;
     /// The length of an IP header without any IP options.
     const IP_HEADER_LENGTH: NonZeroU32;
     /// The maximum payload size an IP payload can have.
@@ -1182,7 +1182,7 @@ pub struct Ipv4State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindings
     /// The common inner IP layer state.
     pub inner: IpStateInner<Ipv4, StrongDeviceId, BT>,
     /// The ICMP state.
-    pub icmp: Icmpv4State<StrongDeviceId::Weak, BT>,
+    pub icmp: Icmpv4State<BT>,
     /// The atomic counter providing IPv4 packet identifiers.
     pub next_packet_id: AtomicU16,
 }
@@ -1209,7 +1209,7 @@ pub struct Ipv6State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindings
     /// The common inner IP layer state.
     pub inner: IpStateInner<Ipv6, StrongDeviceId, BT>,
     /// ICMPv6 state.
-    pub icmp: Icmpv6State<StrongDeviceId::Weak, BT>,
+    pub icmp: Icmpv6State<BT>,
     /// Stateless address autoconfiguration counters.
     pub slaac_counters: SlaacCounters,
 }

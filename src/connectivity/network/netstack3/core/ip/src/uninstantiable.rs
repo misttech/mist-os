@@ -4,7 +4,9 @@
 
 use explicit::UnreachableExt as _;
 use net_types::SpecifiedAddr;
-use netstack3_base::{socket::SocketIpAddr, EitherDeviceId, UninstantiableWrapper};
+use netstack3_base::{
+    socket::SocketIpAddr, AnyDevice, DeviceIdContext, EitherDeviceId, UninstantiableWrapper,
+};
 use packet::{BufferMut, Serializer};
 
 use crate::internal::{
@@ -15,10 +17,12 @@ use crate::internal::{
     },
 };
 
-impl<I: IpExt, C, P: BaseTransportIpContext<I, C>> BaseTransportIpContext<I, C>
+impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> BaseTransportIpContext<I, C>
     for UninstantiableWrapper<P>
 {
-    type DevicesWithAddrIter<'s> = P::DevicesWithAddrIter<'s> where P: 's;
+    type DevicesWithAddrIter<'s> = UninstantiableWrapper<core::iter::Empty<P::DeviceId>>
+    where
+        Self: 's;
     fn get_devices_with_assigned_addr(
         &mut self,
         _addr: SpecifiedAddr<I::Addr>,
@@ -38,7 +42,9 @@ impl<I: IpExt, C, P: BaseTransportIpContext<I, C>> BaseTransportIpContext<I, C>
     }
 }
 
-impl<I: IpExt, C, P: IpSocketHandler<I, C>> IpSocketHandler<I, C> for UninstantiableWrapper<P> {
+impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> IpSocketHandler<I, C>
+    for UninstantiableWrapper<P>
+{
     fn new_ip_socket(
         &mut self,
         _ctx: &mut C,

@@ -294,6 +294,7 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> AsRef<IpOptions<I
     }
 }
 
+/// State associated with a connected socket.
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
 pub struct ConnState<

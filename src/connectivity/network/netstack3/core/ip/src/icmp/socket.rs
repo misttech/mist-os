@@ -11,46 +11,46 @@ use core::{
     fmt::Debug,
     marker::PhantomData,
     num::{NonZeroU16, NonZeroU8},
+    ops::ControlFlow,
 };
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 
 use derivative::Derivative;
 use either::Either;
-
 use net_types::{
-    ip::{GenericOverIp, Ip, IpAddress, IpVersionMarker},
+    ip::{GenericOverIp, Ip, IpVersionMarker},
     SpecifiedAddr, ZonedAddr,
 };
 use netstack3_base::{
     socket::{
-        self, AddrVec, ConnAddr, ConnInfoAddr, ConnIpAddr, IncompatibleError, InsertError,
-        ListenerAddrInfo, MaybeDualStack, ShutdownType, SocketMapAddrSpec, SocketMapAddrStateSpec,
-        SocketMapConflictPolicy, SocketMapStateSpec,
+        self, AddrIsMappedError, AddrVec, AddrVecIter, ConnAddr, ConnInfoAddr, ConnIpAddr,
+        IncompatibleError, InsertError, ListenerAddrInfo, MaybeDualStack, ShutdownType,
+        SocketIpAddr, SocketMapAddrSpec, SocketMapAddrStateSpec, SocketMapConflictPolicy,
+        SocketMapStateSpec,
     },
     socketmap::{IterShadows as _, SocketMap},
     sync::{RwLock, StrongRc},
-    AnyDevice, ContextPair, DeviceIdContext, Inspector, InspectorDeviceExt, LocalAddressError,
-    PortAllocImpl, RemoveResourceResultWithContext, RngContext, SocketError,
-    StrongDeviceIdentifier, WeakDeviceIdentifier,
+    AnyDevice, ContextPair, CounterContext, DeviceIdContext, Inspector, InspectorDeviceExt,
+    LocalAddressError, PortAllocImpl, ReferenceNotifiers, RemoveResourceResultWithContext,
+    RngContext, SocketError, StrongDeviceIdentifier, UninstantiableWrapper, WeakDeviceIdentifier,
 };
-use packet::{BufferMut, Serializer};
+use packet::{BufferMut, ParsablePacket as _, ParseBuffer as _, Serializer};
 use packet_formats::{
-    icmp::{IcmpEchoRequest, IcmpPacketBuilder},
+    icmp::{IcmpEchoReply, IcmpEchoRequest, IcmpPacketBuilder, IcmpPacketRaw},
     ip::{IpProtoExt, Ipv4Proto, Ipv6Proto},
 };
+use tracing::{debug, trace};
 
-use crate::internal::{
+use crate::{
     datagram::{
-        self,
-        spec_context::{
-            DatagramSpecBoundStateContext, DatagramSpecStateContext,
-            NonDualStackDatagramSpecBoundStateContext,
-        },
-        DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSet, DatagramSocketSpec,
-        DatagramStateContext, ExpectedUnboundError, NonDualStackConverter, SocketHopLimits,
+        self, DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSet, DatagramSocketSpec,
+        DatagramSpecBoundStateContext, DatagramSpecStateContext, DatagramStateContext,
+        ExpectedUnboundError, NonDualStackConverter, NonDualStackDatagramSpecBoundStateContext,
+        SocketHopLimits,
     },
-    icmp::{IcmpAddr, IcmpBindingsContext, IcmpIpExt, IcmpStateContext, InnerIcmpContext},
-    socket::IpSock,
+    icmp::{EchoTransportContextMarker, IcmpIpExt, IcmpRxCounters},
+    IpTransportContext, MulticastMembershipHandler, TransparentLocalDelivery, TransportIpContext,
+    TransportReceiveError,
 };
 
 /// A marker trait for all IP extensions required by ICMP sockets.
@@ -58,8 +58,9 @@ pub trait IpExt: datagram::IpExt + IcmpIpExt {}
 impl<O: datagram::IpExt + IcmpIpExt> IpExt for O {}
 
 /// Holds the stack's ICMP echo sockets.
-#[derive(Derivative)]
+#[derive(Derivative, GenericOverIp)]
 #[derivative(Default(bound = ""))]
+#[generic_over_ip(I, Ip)]
 pub struct IcmpSockets<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes> {
     bound_and_id_allocator: RwLock<BoundSockets<I, D, BT>>,
     // Destroy all_sockets last so the strong references in the demux are
@@ -216,29 +217,10 @@ pub type IcmpSocketSet<I, D, BT> = DatagramSocketSet<I, D, Icmp<BT>>;
 /// The state of an ICMP socket.
 pub type IcmpSocketState<I, D, BT> = datagram::SocketState<I, D, Icmp<BT>>;
 
-#[derive(Clone)]
-pub(crate) struct IcmpConn<S> {
-    icmp_id: u16,
-    ip: S,
-}
-
-impl<'a, A: IpAddress, D> From<&'a IcmpConn<IpSock<A::Version, D>>> for IcmpAddr<A>
-where
-    A::Version: IpExt,
-{
-    fn from(conn: &'a IcmpConn<IpSock<A::Version, D>>) -> IcmpAddr<A> {
-        IcmpAddr {
-            local_addr: *conn.ip.local_ip(),
-            remote_addr: *conn.ip.remote_ip(),
-            icmp_id: conn.icmp_id,
-        }
-    }
-}
-
 /// The context required by the ICMP layer in order to deliver events related to
 /// ICMP sockets.
 pub trait IcmpEchoBindingsContext<I: IpExt, D: StrongDeviceIdentifier>:
-    IcmpEchoBindingsTypes
+    IcmpEchoBindingsTypes + ReferenceNotifiers + RngContext
 {
     /// Receives an ICMP echo reply.
     fn receive_icmp_echo_reply<B: BufferMut>(
@@ -269,14 +251,39 @@ pub trait IcmpEchoBindingsTypes: Sized + 'static {
     type ExternalData<I: Ip>: Debug + Send + Sync + 'static;
 }
 
+/// Resolve coherence issues by requiring a trait implementation with no type
+/// parameters, which makes the blanket implementations for the datagram specs
+/// viable.
+pub trait IcmpEchoContextMarker {}
+
 /// A Context that provides access to the sockets' states.
-pub trait StateContext<I: IcmpIpExt + IpExt, BC: IcmpBindingsContext<I, Self::DeviceId>>:
-    DeviceIdContext<AnyDevice>
+pub trait IcmpEchoBoundStateContext<I: IcmpIpExt + IpExt, BC: IcmpEchoBindingsTypes>:
+    DeviceIdContext<AnyDevice> + IcmpEchoContextMarker
+{
+    /// The inner context providing IP socket access.
+    type IpSocketsCtx<'a>: TransportIpContext<I, BC>
+        + MulticastMembershipHandler<I, BC>
+        + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
+        + CounterContext<IcmpRxCounters<I>>;
+
+    /// Calls the function with a mutable reference to `IpSocketsCtx` and
+    /// a mutable reference to ICMP sockets.
+    fn with_icmp_ctx_and_sockets_mut<
+        O,
+        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut BoundSockets<I, Self::WeakDeviceId, BC>) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O;
+}
+
+/// A Context that provides access to the sockets' states.
+pub trait IcmpEchoStateContext<I: IcmpIpExt + IpExt, BC: IcmpEchoBindingsTypes>:
+    DeviceIdContext<AnyDevice> + IcmpEchoContextMarker
 {
     /// The inner socket context.
-    type SocketStateCtx<'a>: InnerIcmpContext<I, BC>
-        + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
-        + IcmpStateContext;
+    type SocketStateCtx<'a>: IcmpEchoBoundStateContext<I, BC>
+        + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>;
 
     /// Calls the function with mutable access to the set with all ICMP
     /// sockets.
@@ -377,9 +384,6 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
         >,
     ) -> Result<Self::Serializer<I, B>, Self::SerializeError> {
         let ConnIpAddr { local: (local_ip, id), remote: (remote_ip, ()) } = addr;
-        // TODO(https://fxbug.dev/42124055): Instead of panic, make this trait
-        // method fallible so that the caller can return errors. This will
-        // become necessary once we use the datagram module for sending.
         let icmp_echo: packet_formats::icmp::IcmpPacketRaw<I, &[u8], IcmpEchoRequest> =
             body.parse()?;
         let icmp_builder = IcmpPacketBuilder::<I, _>::new(
@@ -498,8 +502,8 @@ pub struct BoundSockets<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsT
 impl<I, BC, CC> NonDualStackDatagramSpecBoundStateContext<I, CC, BC> for Icmp<BC>
 where
     I: IpExt + datagram::DualStackIpExt,
-    BC: IcmpBindingsContext<I, CC::DeviceId>,
-    CC: InnerIcmpContext<I, BC> + IcmpStateContext,
+    BC: IcmpEchoBindingsContext<I, CC::DeviceId>,
+    CC: DeviceIdContext<AnyDevice> + IcmpEchoContextMarker,
 {
     fn nds_converter(_core_ctx: &CC) -> impl NonDualStackConverter<I, CC::WeakDeviceId, Self> {
         ()
@@ -509,13 +513,13 @@ where
 impl<I, BC, CC> DatagramSpecBoundStateContext<I, CC, BC> for Icmp<BC>
 where
     I: IpExt + datagram::DualStackIpExt,
-    BC: IcmpBindingsContext<I, CC::DeviceId>,
-    CC: InnerIcmpContext<I, BC> + IcmpStateContext,
+    BC: IcmpEchoBindingsContext<I, CC::DeviceId>,
+    CC: IcmpEchoBoundStateContext<I, BC> + IcmpEchoContextMarker,
 {
     type IpSocketsCtx<'a> = CC::IpSocketsCtx<'a>;
 
     // ICMP sockets doesn't support dual-stack operations.
-    type DualStackContext = CC::DualStackContext;
+    type DualStackContext = UninstantiableWrapper<CC>;
 
     type NonDualStackContext = CC;
 
@@ -526,7 +530,7 @@ where
         core_ctx: &mut CC,
         cb: F,
     ) -> O {
-        InnerIcmpContext::with_icmp_ctx_and_sockets_mut(
+        IcmpEchoBoundStateContext::with_icmp_ctx_and_sockets_mut(
             core_ctx,
             |ctx, BoundSockets { socket_map }| cb(ctx, &socket_map),
         )
@@ -539,7 +543,7 @@ where
         core_ctx: &mut CC,
         cb: F,
     ) -> O {
-        InnerIcmpContext::with_icmp_ctx_and_sockets_mut(
+        IcmpEchoBoundStateContext::with_icmp_ctx_and_sockets_mut(
             core_ctx,
             |ctx, BoundSockets { socket_map }| cb(ctx, socket_map),
         )
@@ -555,15 +559,15 @@ where
         core_ctx: &mut CC,
         cb: F,
     ) -> O {
-        InnerIcmpContext::with_icmp_ctx_and_sockets_mut(core_ctx, |ctx, _sockets| cb(ctx))
+        IcmpEchoBoundStateContext::with_icmp_ctx_and_sockets_mut(core_ctx, |ctx, _sockets| cb(ctx))
     }
 }
 
 impl<I, BC, CC> DatagramSpecStateContext<I, CC, BC> for Icmp<BC>
 where
     I: IpExt + datagram::DualStackIpExt,
-    BC: IcmpBindingsContext<I, CC::DeviceId>,
-    CC: StateContext<I, BC> + IcmpStateContext,
+    BC: IcmpEchoBindingsContext<I, CC::DeviceId>,
+    CC: IcmpEchoStateContext<I, BC>,
 {
     type SocketsStateCtx<'a> = CC::SocketStateCtx<'a>;
 
@@ -571,14 +575,14 @@ where
         core_ctx: &mut CC,
         cb: F,
     ) -> O {
-        StateContext::with_all_sockets_mut(core_ctx, cb)
+        IcmpEchoStateContext::with_all_sockets_mut(core_ctx, cb)
     }
 
     fn with_all_sockets<O, F: FnOnce(&IcmpSocketSet<I, CC::WeakDeviceId, BC>) -> O>(
         core_ctx: &mut CC,
         cb: F,
     ) -> O {
-        StateContext::with_all_sockets(core_ctx, cb)
+        IcmpEchoStateContext::with_all_sockets(core_ctx, cb)
     }
 
     fn with_socket_state<
@@ -589,7 +593,7 @@ where
         id: &IcmpSocketId<I, CC::WeakDeviceId, BC>,
         cb: F,
     ) -> O {
-        StateContext::with_socket_state(core_ctx, id, cb)
+        IcmpEchoStateContext::with_socket_state(core_ctx, id, cb)
     }
 
     fn with_socket_state_mut<
@@ -600,7 +604,7 @@ where
         id: &IcmpSocketId<I, CC::WeakDeviceId, BC>,
         cb: F,
     ) -> O {
-        StateContext::with_socket_state_mut(core_ctx, id, cb)
+        IcmpEchoStateContext::with_socket_state_mut(core_ctx, id, cb)
     }
 
     fn for_each_socket<
@@ -613,7 +617,7 @@ where
         core_ctx: &mut CC,
         cb: F,
     ) {
-        StateContext::for_each_socket(core_ctx, cb)
+        IcmpEchoStateContext::for_each_socket(core_ctx, cb)
     }
 }
 
@@ -739,13 +743,12 @@ impl<I, C> IcmpEchoSocketApi<I, C>
 where
     I: datagram::IpExt,
     C: ContextPair,
-    C::CoreContext: StateContext<I, C::BindingsContext>
-        + IcmpStateContext
+    C::CoreContext: IcmpEchoStateContext<I, C::BindingsContext>
         // NB: This bound is somewhat redundant to StateContext but it helps the
         // compiler know we're using ICMP datagram sockets.
         + DatagramStateContext<I, C::BindingsContext, Icmp<C::BindingsContext>>,
     C::BindingsContext:
-        IcmpBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+        IcmpEchoBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
         let Self(pair, IpVersionMarker { .. }) = self;
@@ -985,8 +988,198 @@ where
     }
 }
 
+/// An [`IpTransportContext`] implementation for handling ICMP Echo replies.
+///
+/// This special implementation will panic if it receives any packets that are
+/// not ICMP echo replies and any error that are not originally an ICMP Echo
+/// request.
+pub enum IcmpEchoIpTransportContext {}
+
+impl EchoTransportContextMarker for IcmpEchoIpTransportContext {}
+
+impl<
+        I: IpExt,
+        BC: IcmpEchoBindingsContext<I, CC::DeviceId>,
+        CC: IcmpEchoBoundStateContext<I, BC>,
+    > IpTransportContext<I, BC, CC> for IcmpEchoIpTransportContext
+{
+    fn receive_icmp_error(
+        core_ctx: &mut CC,
+        _bindings_ctx: &mut BC,
+        _device: &CC::DeviceId,
+        original_src_ip: Option<SpecifiedAddr<I::Addr>>,
+        original_dst_ip: SpecifiedAddr<I::Addr>,
+        mut original_body: &[u8],
+        err: I::ErrorCode,
+    ) {
+        let echo_request = original_body
+            .parse::<IcmpPacketRaw<I, _, IcmpEchoRequest>>()
+            .expect("received non-echo request");
+
+        let original_src_ip = match original_src_ip {
+            Some(ip) => ip,
+            None => {
+                trace!("IcmpIpTransportContext::receive_icmp_error: unspecified source IP address");
+                return;
+            }
+        };
+        let original_src_ip: SocketIpAddr<_> = match original_src_ip.try_into() {
+            Ok(ip) => ip,
+            Err(AddrIsMappedError {}) => {
+                trace!("IcmpIpTransportContext::receive_icmp_error: mapped source IP address");
+                return;
+            }
+        };
+        let original_dst_ip: SocketIpAddr<_> = match original_dst_ip.try_into() {
+            Ok(ip) => ip,
+            Err(AddrIsMappedError {}) => {
+                trace!("IcmpIpTransportContext::receive_icmp_error: mapped destination IP address");
+                return;
+            }
+        };
+
+        let id = echo_request.message().id();
+
+        core_ctx.with_icmp_ctx_and_sockets_mut(|core_ctx, sockets| {
+            if let Some(conn) = sockets.socket_map.conns().get_by_addr(&ConnAddr {
+                ip: ConnIpAddr {
+                    local: (original_src_ip, NonZeroU16::new(id).unwrap()),
+                    remote: (original_dst_ip, ()),
+                },
+                device: None,
+            }) {
+                // NB: At the moment bindings has no need to consume ICMP
+                // errors, so we swallow them here.
+                debug!(
+                    "ICMP received ICMP error {:?} from {:?}, to {:?} on socket {:?}",
+                    err, original_dst_ip, original_src_ip, conn
+                );
+                core_ctx
+                    .increment(|counters: &IcmpRxCounters<I>| &counters.error_delivered_to_socket)
+            } else {
+                trace!(
+                    "IcmpIpTransportContext::receive_icmp_error: Got ICMP error message for \
+                    nonexistent ICMP echo socket; either the socket responsible has since been \
+                    removed, or the error message was sent in error or corrupted"
+                );
+            }
+        })
+    }
+
+    fn receive_ip_packet<B: BufferMut>(
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
+        device: &CC::DeviceId,
+        src_ip: I::RecvSrcAddr,
+        dst_ip: SpecifiedAddr<I::Addr>,
+        mut buffer: B,
+        transport_override: Option<TransparentLocalDelivery<I>>,
+    ) -> Result<(), (B, TransportReceiveError)> {
+        if let Some(delivery) = transport_override {
+            unreachable!(
+                "cannot perform transparent local delivery {delivery:?} to an ICMP socket; \
+                transparent proxy rules can only be configured for TCP and UDP packets"
+            );
+        }
+        // NB: We're doing raw parsing here just to extract the ID and body to
+        // send up to bindings. The IP layer has performed full validation
+        // including checksum for us.
+        let echo_reply =
+            buffer.parse::<IcmpPacketRaw<I, _, IcmpEchoReply>>().expect("received non-echo reply");
+        // We never generate requests with ID zero due to local socket map.
+        let Some(id) = NonZeroU16::new(echo_reply.message().id()) else { return Ok(()) };
+
+        // Undo parse so we give out the full ICMP header.
+        let meta = echo_reply.parse_metadata();
+        buffer.undo_parse(meta);
+
+        let src_ip = match SpecifiedAddr::new(src_ip.into()) {
+            Some(src_ip) => src_ip,
+            None => {
+                trace!("receive_icmp_echo_reply: unspecified source address");
+                return Ok(());
+            }
+        };
+        let src_ip: SocketIpAddr<_> = match src_ip.try_into() {
+            Ok(src_ip) => src_ip,
+            Err(AddrIsMappedError {}) => {
+                trace!("receive_icmp_echo_reply: mapped source address");
+                return Ok(());
+            }
+        };
+        let dst_ip: SocketIpAddr<_> = match dst_ip.try_into() {
+            Ok(dst_ip) => dst_ip,
+            Err(AddrIsMappedError {}) => {
+                trace!("receive_icmp_echo_reply: mapped destination address");
+                return Ok(());
+            }
+        };
+
+        core_ctx.with_icmp_ctx_and_sockets_mut(|_core_ctx, sockets| {
+            let mut addrs_to_search = AddrVecIter::<I, CC::WeakDeviceId, IcmpAddrSpec>::with_device(
+                ConnIpAddr { local: (dst_ip, id), remote: (src_ip, ()) }.into(),
+                device.downgrade(),
+            );
+            let socket = match addrs_to_search.try_for_each(|addr_vec| {
+                match addr_vec {
+                    AddrVec::Conn(c) => {
+                        if let Some(id) = sockets.socket_map.conns().get_by_addr(&c) {
+                            return ControlFlow::Break(id);
+                        }
+                    }
+                    AddrVec::Listen(l) => {
+                        if let Some(id) = sockets.socket_map.listeners().get_by_addr(&l) {
+                            return ControlFlow::Break(id);
+                        }
+                    }
+                }
+                ControlFlow::Continue(())
+            }) {
+                ControlFlow::Continue(()) => None,
+                ControlFlow::Break(id) => Some(id),
+            };
+            if let Some(socket) = socket {
+                trace!("receive_icmp_echo_reply: Received echo reply for local socket");
+                bindings_ctx.receive_icmp_echo_reply(
+                    socket,
+                    device,
+                    src_ip.addr(),
+                    dst_ip.addr(),
+                    id.get(),
+                    buffer,
+                );
+                return;
+            }
+            // TODO(https://fxbug.dev/42124755): Neither the ICMPv4 or ICMPv6 RFCs
+            // explicitly state what to do in case we receive an "unsolicited"
+            // echo reply. We only expose the replies if we have a registered
+            // connection for the IcmpAddr of the incoming reply for now. Given
+            // that a reply should only be sent in response to a request, an
+            // ICMP unreachable-type message is probably not appropriate for
+            // unsolicited replies. However, it's also possible that we sent a
+            // request and then closed the socket before receiving the reply, so
+            // this doesn't necessarily indicate a buggy or malicious remote
+            // host. We should figure this out definitively.
+            //
+            // If we do decide to send an ICMP error message, the appropriate
+            // thing to do is probably to have this function return a `Result`,
+            // and then have the top-level implementation of
+            // `IpTransportContext::receive_ip_packet` return the
+            // appropriate error.
+            trace!("receive_icmp_echo_reply: Received echo reply with no local socket");
+        });
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use alloc::rc::Rc;
+    use alloc::vec;
+    use core::{
+        cell::RefCell,
+        ops::{Deref, DerefMut},
+    };
 
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
@@ -995,14 +1188,216 @@ mod tests {
         ip::{Ipv4, Ipv6},
         Witness,
     };
-    use netstack3_base::{socket::StrictlyZonedAddr, testutil::TestIpExt};
+    use netstack3_base::{
+        socket::StrictlyZonedAddr,
+        testutil::{FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeWeakDeviceId, TestIpExt},
+        CtxPair,
+    };
     use packet::Buf;
-    use packet_formats::icmp::IcmpUnusedCode;
+    use packet_formats::icmp::{IcmpPacket, IcmpParseArgs, IcmpUnusedCode};
 
     use super::*;
-    use crate::internal::icmp::tests::FakeIcmpCtx;
+    use crate::{
+        socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx, InnerFakeIpSocketCtx},
+        SendIpPacketMeta,
+    };
 
-    const REMOTE_ID: u16 = 1;
+    const REMOTE_ID: u16 = 27;
+    const ICMP_ID: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(10));
+    const SEQ_NUM: u16 = 0xF0;
+
+    /// Utilities for accessing locked internal state in tests.
+    impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes> IcmpSocketId<I, D, BT> {
+        fn get(&self) -> impl Deref<Target = IcmpSocketState<I, D, BT>> + '_ {
+            self.state().read()
+        }
+
+        fn get_mut(&self) -> impl DerefMut<Target = IcmpSocketState<I, D, BT>> + '_ {
+            self.state().write()
+        }
+    }
+
+    struct FakeIcmpCoreCtxState<I: IpExt> {
+        bound_sockets:
+            Rc<RefCell<BoundSockets<I, FakeWeakDeviceId<FakeDeviceId>, FakeIcmpBindingsCtx<I>>>>,
+        all_sockets: IcmpSocketSet<I, FakeWeakDeviceId<FakeDeviceId>, FakeIcmpBindingsCtx<I>>,
+        ip_socket_ctx: FakeIpSocketCtx<I, FakeDeviceId>,
+        rx_counters: IcmpRxCounters<I>,
+    }
+
+    impl<I: IpExt> InnerFakeIpSocketCtx<I, FakeDeviceId> for FakeIcmpCoreCtxState<I> {
+        fn fake_ip_socket_ctx_mut(&mut self) -> &mut FakeIpSocketCtx<I, FakeDeviceId> {
+            &mut self.ip_socket_ctx
+        }
+    }
+
+    impl<I: IpExt + TestIpExt> Default for FakeIcmpCoreCtxState<I> {
+        fn default() -> Self {
+            Self {
+                bound_sockets: Default::default(),
+                all_sockets: Default::default(),
+                ip_socket_ctx: FakeIpSocketCtx::new(core::iter::once(FakeDeviceConfig {
+                    device: FakeDeviceId,
+                    local_ips: vec![I::TEST_ADDRS.local_ip],
+                    remote_ips: vec![I::TEST_ADDRS.remote_ip],
+                })),
+                rx_counters: Default::default(),
+            }
+        }
+    }
+
+    type FakeIcmpCoreCtx<I> = FakeCoreCtx<
+        FakeIcmpCoreCtxState<I>,
+        SendIpPacketMeta<I, FakeDeviceId, SpecifiedAddr<<I as Ip>::Addr>>,
+        FakeDeviceId,
+    >;
+    type FakeIcmpBindingsCtx<I> = FakeBindingsCtx<(), (), FakeIcmpBindingsCtxState<I>, ()>;
+    type FakeIcmpCtx<I> = CtxPair<FakeIcmpCoreCtx<I>, FakeIcmpBindingsCtx<I>>;
+
+    #[derive(Default)]
+    struct FakeIcmpBindingsCtxState<I: IpExt> {
+        received: Vec<ReceivedEchoPacket<I>>,
+    }
+
+    #[derive(Debug)]
+    struct ReceivedEchoPacket<I: IpExt> {
+        src_ip: I::Addr,
+        dst_ip: I::Addr,
+        socket: IcmpSocketId<I, FakeWeakDeviceId<FakeDeviceId>, FakeIcmpBindingsCtx<I>>,
+        id: u16,
+        data: Vec<u8>,
+    }
+
+    impl<I: IpExt> IcmpEchoContextMarker for FakeIcmpCoreCtx<I> {}
+
+    impl<I: IpExt> CounterContext<IcmpRxCounters<I>> for FakeIcmpCoreCtxState<I> {
+        fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
+            cb(&self.rx_counters)
+        }
+    }
+
+    impl<I: IpExt> IcmpEchoBoundStateContext<I, FakeIcmpBindingsCtx<I>> for FakeIcmpCoreCtx<I> {
+        type IpSocketsCtx<'a> = Self;
+
+        fn with_icmp_ctx_and_sockets_mut<
+            O,
+            F: FnOnce(
+                &mut Self::IpSocketsCtx<'_>,
+                &mut BoundSockets<I, Self::WeakDeviceId, FakeIcmpBindingsCtx<I>>,
+            ) -> O,
+        >(
+            &mut self,
+            cb: F,
+        ) -> O {
+            let bound_sockets = self.state.bound_sockets.clone();
+            let mut bound_sockets = bound_sockets.borrow_mut();
+            cb(self, &mut bound_sockets)
+        }
+    }
+
+    impl<I: IpExt> IcmpEchoStateContext<I, FakeIcmpBindingsCtx<I>> for FakeIcmpCoreCtx<I> {
+        type SocketStateCtx<'a> = Self;
+
+        fn with_all_sockets_mut<
+            O,
+            F: FnOnce(&mut IcmpSocketSet<I, Self::WeakDeviceId, FakeIcmpBindingsCtx<I>>) -> O,
+        >(
+            &mut self,
+            cb: F,
+        ) -> O {
+            cb(&mut self.state.all_sockets)
+        }
+
+        fn with_all_sockets<
+            O,
+            F: FnOnce(&IcmpSocketSet<I, Self::WeakDeviceId, FakeIcmpBindingsCtx<I>>) -> O,
+        >(
+            &mut self,
+            cb: F,
+        ) -> O {
+            cb(&self.state.all_sockets)
+        }
+
+        fn with_socket_state<
+            O,
+            F: FnOnce(
+                &mut Self::SocketStateCtx<'_>,
+                &IcmpSocketState<I, Self::WeakDeviceId, FakeIcmpBindingsCtx<I>>,
+            ) -> O,
+        >(
+            &mut self,
+            id: &IcmpSocketId<I, Self::WeakDeviceId, FakeIcmpBindingsCtx<I>>,
+            cb: F,
+        ) -> O {
+            cb(self, &id.get())
+        }
+
+        fn with_socket_state_mut<
+            O,
+            F: FnOnce(
+                &mut Self::SocketStateCtx<'_>,
+                &mut IcmpSocketState<I, Self::WeakDeviceId, FakeIcmpBindingsCtx<I>>,
+            ) -> O,
+        >(
+            &mut self,
+            id: &IcmpSocketId<I, Self::WeakDeviceId, FakeIcmpBindingsCtx<I>>,
+            cb: F,
+        ) -> O {
+            cb(self, &mut id.get_mut())
+        }
+
+        fn with_bound_state_context<O, F: FnOnce(&mut Self::SocketStateCtx<'_>) -> O>(
+            &mut self,
+            cb: F,
+        ) -> O {
+            cb(self)
+        }
+
+        fn for_each_socket<
+            F: FnMut(
+                &mut Self::SocketStateCtx<'_>,
+                &IcmpSocketId<I, Self::WeakDeviceId, FakeIcmpBindingsCtx<I>>,
+                &IcmpSocketState<I, Self::WeakDeviceId, FakeIcmpBindingsCtx<I>>,
+            ),
+        >(
+            &mut self,
+            mut cb: F,
+        ) {
+            let socks = self
+                .state
+                .all_sockets
+                .keys()
+                .map(|id| IcmpSocketId::from(id.clone()))
+                .collect::<Vec<_>>();
+            for id in socks {
+                cb(self, &id, &id.get());
+            }
+        }
+    }
+
+    impl<I: IpExt> IcmpEchoBindingsContext<I, FakeDeviceId> for FakeIcmpBindingsCtx<I> {
+        fn receive_icmp_echo_reply<B: BufferMut>(
+            &mut self,
+            socket: &IcmpSocketId<I, FakeWeakDeviceId<FakeDeviceId>, FakeIcmpBindingsCtx<I>>,
+            _device_id: &FakeDeviceId,
+            src_ip: I::Addr,
+            dst_ip: I::Addr,
+            id: u16,
+            data: B,
+        ) {
+            self.state.received.push(ReceivedEchoPacket {
+                src_ip,
+                dst_ip,
+                id,
+                data: data.to_flattened_vec(),
+                socket: socket.clone(),
+            })
+        }
+    }
+
+    impl<I: IpExt> IcmpEchoBindingsTypes for FakeIcmpBindingsCtx<I> {
+        type ExternalData<II: Ip> = ();
+    }
 
     #[test]
     fn test_connect_dual_stack_fails() {
@@ -1024,7 +1419,7 @@ mod tests {
     }
 
     #[ip_test]
-    fn send_invalid_icmp_echo<I: Ip + TestIpExt + datagram::IpExt>() {
+    fn send_invalid_icmp_echo<I: Ip + TestIpExt + IpExt>() {
         let mut ctx = FakeIcmpCtx::<I>::default();
         let mut api = IcmpEchoSocketApi::<I, _>::new(ctx.as_mut());
         let conn = api.create();
@@ -1049,10 +1444,9 @@ mod tests {
     }
 
     #[ip_test]
-    fn get_info<I: Ip + TestIpExt + datagram::IpExt>() {
+    fn get_info<I: Ip + TestIpExt + IpExt>() {
         let mut ctx = FakeIcmpCtx::<I>::default();
         let mut api = IcmpEchoSocketApi::<I, _>::new(ctx.as_mut());
-        const ICMP_ID: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(1));
 
         let id = api.create();
         assert_eq!(api.get_info(&id), datagram::SocketInfo::Unbound);
@@ -1076,5 +1470,123 @@ mod tests {
                 remote_identifier: REMOTE_ID,
             })
         );
+    }
+
+    #[ip_test]
+    fn send<I: Ip + TestIpExt + IpExt>() {
+        let mut ctx = FakeIcmpCtx::<I>::default();
+        let mut api = IcmpEchoSocketApi::<I, _>::new(ctx.as_mut());
+        let sock = api.create();
+
+        api.bind(&sock, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), Some(ICMP_ID)).unwrap();
+        api.connect(&sock, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), REMOTE_ID).unwrap();
+
+        let packet = Buf::new([1u8, 2, 3, 4], ..)
+            .encapsulate(IcmpPacketBuilder::<I, _>::new(
+                I::UNSPECIFIED_ADDRESS,
+                I::UNSPECIFIED_ADDRESS,
+                IcmpUnusedCode,
+                // Use 0 here to show that this is filled by the API.
+                IcmpEchoRequest::new(0, SEQ_NUM),
+            ))
+            .serialize_vec_outer()
+            .unwrap()
+            .unwrap_b();
+        api.send(&sock, Buf::new(packet, ..)).unwrap();
+        let frames = ctx.core_ctx.frames.take_frames();
+        let (SendIpPacketMeta { device: _, src_ip, dst_ip, .. }, body) =
+            assert_matches!(&frames[..], [f] => f);
+        assert_eq!(dst_ip, &I::TEST_ADDRS.remote_ip);
+
+        let mut body = &body[..];
+        let echo_req: IcmpPacket<I, _, IcmpEchoRequest> =
+            body.parse_with(IcmpParseArgs::new(src_ip.get(), dst_ip.get())).unwrap();
+        assert_eq!(echo_req.message().id(), ICMP_ID.get());
+        assert_eq!(echo_req.message().seq(), SEQ_NUM);
+    }
+
+    #[ip_test]
+    fn receive<I: Ip + TestIpExt + IpExt>() {
+        let mut ctx = FakeIcmpCtx::<I>::default();
+        let mut api = IcmpEchoSocketApi::<I, _>::new(ctx.as_mut());
+        let sock = api.create();
+
+        api.bind(&sock, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), Some(ICMP_ID)).unwrap();
+
+        let reply = Buf::new([1u8, 2, 3, 4], ..)
+            .encapsulate(IcmpPacketBuilder::<I, _>::new(
+                // Use whatever here this is not validated by this module.
+                I::UNSPECIFIED_ADDRESS,
+                I::UNSPECIFIED_ADDRESS,
+                IcmpUnusedCode,
+                IcmpEchoReply::new(ICMP_ID.get(), SEQ_NUM),
+            ))
+            .serialize_vec_outer()
+            .unwrap();
+
+        let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
+        let src_ip = I::TEST_ADDRS.remote_ip;
+        let dst_ip = I::TEST_ADDRS.local_ip;
+        <IcmpEchoIpTransportContext as IpTransportContext<I, _, _>>::receive_ip_packet(
+            core_ctx,
+            bindings_ctx,
+            &FakeDeviceId,
+            src_ip.get().try_into().unwrap(),
+            dst_ip,
+            reply.clone(),
+            None,
+        )
+        .unwrap();
+
+        let received = core::mem::take(&mut bindings_ctx.state.received);
+        let ReceivedEchoPacket {
+            src_ip: got_src_ip,
+            dst_ip: got_dst_ip,
+            socket: got_socket,
+            id: got_id,
+            data: got_data,
+        } = assert_matches!(&received[..], [f] => f);
+        assert_eq!(got_src_ip, &src_ip.get());
+        assert_eq!(got_dst_ip, &dst_ip.get());
+        assert_eq!(got_socket, &sock);
+        assert_eq!(got_id, &ICMP_ID.get());
+        assert_eq!(&got_data[..], reply.as_ref());
+    }
+
+    #[ip_test]
+    fn receive_no_socket<I: Ip + TestIpExt + IpExt>() {
+        let mut ctx = FakeIcmpCtx::<I>::default();
+        let mut api = IcmpEchoSocketApi::<I, _>::new(ctx.as_mut());
+        let sock = api.create();
+
+        const BIND_ICMP_ID: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(10));
+        const OTHER_ICMP_ID: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(16));
+
+        api.bind(&sock, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), Some(BIND_ICMP_ID))
+            .unwrap();
+
+        let reply = Buf::new(&mut [], ..)
+            .encapsulate(IcmpPacketBuilder::<I, _>::new(
+                // Use whatever here this is not validated by this module.
+                I::UNSPECIFIED_ADDRESS,
+                I::UNSPECIFIED_ADDRESS,
+                IcmpUnusedCode,
+                IcmpEchoReply::new(OTHER_ICMP_ID.get(), SEQ_NUM),
+            ))
+            .serialize_vec_outer()
+            .unwrap();
+
+        let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
+        <IcmpEchoIpTransportContext as IpTransportContext<I, _, _>>::receive_ip_packet(
+            core_ctx,
+            bindings_ctx,
+            &FakeDeviceId,
+            I::TEST_ADDRS.remote_ip.get().try_into().unwrap(),
+            I::TEST_ADDRS.local_ip,
+            reply,
+            None,
+        )
+        .unwrap();
+        assert_matches!(&bindings_ctx.state.received[..], []);
     }
 }

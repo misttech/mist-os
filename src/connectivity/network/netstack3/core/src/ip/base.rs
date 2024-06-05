@@ -14,7 +14,7 @@ use net_types::{
     ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr},
     MulticastAddr, SpecifiedAddr,
 };
-use netstack3_base::{CounterContext, TokenBucket, UninstantiableWrapper, WeakDeviceIdentifier};
+use netstack3_base::{CounterContext, TokenBucket, WeakDeviceIdentifier};
 use packet::BufferMut;
 use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
 use tracing::trace;
@@ -26,9 +26,10 @@ use crate::{
         self,
         device::{self, IpDeviceBindingsContext, IpDeviceIpExt},
         icmp::{
-            self, IcmpIpTransportContext, IcmpRxCounters, IcmpSocketId, IcmpSocketSet,
-            IcmpSocketState, IcmpSockets, IcmpState, IcmpTxCounters, Icmpv4ErrorCode,
-            Icmpv6ErrorCode, InnerIcmpContext, InnerIcmpv4Context, NdpCounters,
+            self, IcmpEchoBoundStateContext, IcmpEchoContextMarker, IcmpEchoIpTransportContext,
+            IcmpEchoStateContext, IcmpIpTransportContext, IcmpRxCounters, IcmpSocketId,
+            IcmpSocketSet, IcmpSocketState, IcmpSockets, IcmpState, IcmpTxCounters,
+            Icmpv4ErrorCode, Icmpv6ErrorCode, InnerIcmpContext, InnerIcmpv4Context, NdpCounters,
         },
         raw::RawIpSocketMap,
         ForwardingTable, FragmentContext, IpCounters, IpLayerBindingsContext, IpLayerContext,
@@ -371,9 +372,7 @@ impl<
             + LockBefore<crate::lock_ordering::UdpAllSocketsSet<Ipv4>>,
     > InnerIcmpContext<Ipv4, BC> for CoreCtx<'_, BC, L>
 {
-    type IpSocketsCtx<'a> =
-        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IcmpBoundMap<Ipv4>>>;
-    type DualStackContext = UninstantiableWrapper<Self>;
+    type EchoTransportContext = IcmpEchoIpTransportContext;
 
     fn receive_icmp_error(
         &mut self,
@@ -436,21 +435,6 @@ impl<
         }
     }
 
-    fn with_icmp_ctx_and_sockets_mut<
-        O,
-        F: FnOnce(
-            &mut Self::IpSocketsCtx<'_>,
-            &mut icmp::BoundSockets<Ipv4, Self::WeakDeviceId, BC>,
-        ) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        let (mut sockets, mut core_ctx) =
-            self.write_lock_and::<crate::lock_ordering::IcmpBoundMap<Ipv4>>();
-        cb(&mut core_ctx, &mut sockets)
-    }
-
     fn with_error_send_bucket_mut<O, F: FnOnce(&mut TokenBucket<BC::Instant>) -> O>(
         &mut self,
         cb: F,
@@ -466,9 +450,8 @@ impl<
             + LockBefore<crate::lock_ordering::UdpAllSocketsSet<Ipv6>>,
     > InnerIcmpContext<Ipv6, BC> for CoreCtx<'_, BC, L>
 {
-    type IpSocketsCtx<'a> =
-        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IcmpBoundMap<Ipv6>>>;
-    type DualStackContext = UninstantiableWrapper<Self>;
+    type EchoTransportContext = IcmpEchoIpTransportContext;
+
     fn receive_icmp_error(
         &mut self,
         bindings_ctx: &mut BC,
@@ -530,21 +513,6 @@ impl<
         }
     }
 
-    fn with_icmp_ctx_and_sockets_mut<
-        O,
-        F: FnOnce(
-            &mut Self::IpSocketsCtx<'_>,
-            &mut icmp::BoundSockets<Ipv6, Self::WeakDeviceId, BC>,
-        ) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        let (mut sockets, mut core_ctx) =
-            self.write_lock_and::<crate::lock_ordering::IcmpBoundMap<Ipv6>>();
-        cb(&mut core_ctx, &mut sockets)
-    }
-
     fn with_error_send_bucket_mut<O, F: FnOnce(&mut TokenBucket<BC::Instant>) -> O>(
         &mut self,
         cb: F,
@@ -555,14 +523,11 @@ impl<
 
 impl<L, BC: BindingsContext> icmp::IcmpStateContext for CoreCtx<'_, BC, L> {}
 
+impl<BT: BindingsTypes, L> IcmpEchoContextMarker for CoreCtx<'_, BT, L> {}
+
 #[netstack3_macros::instantiate_ip_impl_block(I)]
-impl<
-        I,
-        BC: BindingsContext,
-        L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<I>>
-            + LockBefore<crate::lock_ordering::TcpDemux<I>>
-            + LockBefore<crate::lock_ordering::UdpBoundMap<I>>,
-    > icmp::IcmpSocketStateContext<I, BC> for CoreCtx<'_, BC, L>
+impl<I, BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<I>>>
+    IcmpEchoStateContext<I, BC> for CoreCtx<'_, BC, L>
 {
     type SocketStateCtx<'a> =
         CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IcmpSocketState<I>>>;
@@ -641,6 +606,27 @@ impl<
     }
 }
 
+#[netstack3_macros::instantiate_ip_impl_block(I)]
+impl<I, BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpBoundMap<I>>>
+    IcmpEchoBoundStateContext<I, BC> for CoreCtx<'_, BC, L>
+{
+    type IpSocketsCtx<'a> = CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IcmpBoundMap<I>>>;
+    fn with_icmp_ctx_and_sockets_mut<
+        O,
+        F: FnOnce(
+            &mut Self::IpSocketsCtx<'_>,
+            &mut icmp::BoundSockets<I, Self::WeakDeviceId, BC>,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let (mut sockets, mut core_ctx) =
+            self.write_lock_and::<crate::lock_ordering::IcmpBoundMap<I>>();
+        cb(&mut core_ctx, &mut sockets)
+    }
+}
+
 impl<I: IpLayerIpExt, BT: BindingsTypes> DelegatedOrderedLockAccess<IpPacketFragmentCache<I, BT>>
     for StackState<BT>
 {
@@ -706,7 +692,7 @@ impl<I: datagram::DualStackIpExt, BT: BindingsTypes>
 {
     type Inner = IcmpSockets<I, WeakDeviceId<BT>, BT>;
     fn delegate_ordered_lock_access(&self) -> &Self::Inner {
-        &self.inner_icmp_state().sockets
+        &self.transport.icmp_echo_state()
     }
 }
 
@@ -721,7 +707,7 @@ impl<I: datagram::DualStackIpExt, BT: BindingsTypes>
 {
     type Inner = IcmpSockets<I, WeakDeviceId<BT>, BT>;
     fn delegate_ordered_lock_access(&self) -> &Self::Inner {
-        &self.inner_icmp_state().sockets
+        &self.transport.icmp_echo_state()
     }
 }
 
@@ -734,7 +720,7 @@ impl<I: datagram::DualStackIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>
 impl<I: datagram::DualStackIpExt, BT: BindingsTypes>
     DelegatedOrderedLockAccess<IpMarked<I, TokenBucket<BT::Instant>>> for StackState<BT>
 {
-    type Inner = IcmpState<I, WeakDeviceId<BT>, BT>;
+    type Inner = IcmpState<I, BT>;
     fn delegate_ordered_lock_access(&self) -> &Self::Inner {
         self.inner_icmp_state()
     }

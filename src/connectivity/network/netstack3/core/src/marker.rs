@@ -26,7 +26,9 @@ use crate::{
             IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceConfigurationHandler,
             IpDeviceIpExt,
         },
-        icmp::{IcmpBindingsContext, IcmpBindingsTypes},
+        icmp::{
+            IcmpBindingsContext, IcmpBindingsTypes, IcmpEchoBindingsContext, IcmpEchoBindingsTypes,
+        },
         nud::{NudBindingsContext, NudContext},
         raw::{
             RawIpSocketMapContext, RawIpSocketStateContext, RawIpSocketsBindingsContext,
@@ -75,7 +77,7 @@ pub trait CoreContext<I, BC>:
     transport::udp::StateContext<I, BC>
     + CounterContext<UdpCounters<I>>
     + TcpContext<I, BC>
-    + ip::icmp::IcmpSocketStateContext<I, BC>
+    + ip::icmp::IcmpEchoStateContext<I, BC>
     + ip::icmp::IcmpStateContext
     + IpLayerContext<I, BC>
     + NudContext<I, EthernetLinkDevice, BC>
@@ -102,7 +104,7 @@ where
     O: transport::udp::StateContext<I, BC>
         + CounterContext<UdpCounters<I>>
         + TcpContext<I, BC>
-        + ip::icmp::IcmpSocketStateContext<I, BC>
+        + ip::icmp::IcmpEchoStateContext<I, BC>
         + ip::icmp::IcmpStateContext
         + IpLayerContext<I, BC>
         + NudContext<I, EthernetLinkDevice, BC>
@@ -126,6 +128,7 @@ pub trait BindingsTypes:
     + DeviceLayerTypes
     + TcpBindingsTypes
     + FilterBindingsTypes
+    + IcmpEchoBindingsTypes
     + IcmpBindingsTypes
     + RawIpSocketsBindingsTypes
     + UdpBindingsTypes
@@ -138,6 +141,7 @@ impl<O> BindingsTypes for O where
         + DeviceLayerTypes
         + TcpBindingsTypes
         + FilterBindingsTypes
+        + IcmpEchoBindingsTypes
         + IcmpBindingsTypes
         + RawIpSocketsBindingsTypes
         + UdpBindingsTypes
@@ -152,7 +156,8 @@ pub trait IpBindingsContext<I: IpExt>:
     + UdpBindingsContext<I, DeviceId<Self>>
     + TcpBindingsContext
     + FilterBindingsContext
-    + IcmpBindingsContext<I, DeviceId<Self>>
+    + IcmpBindingsContext
+    + IcmpEchoBindingsContext<I, DeviceId<Self>>
     + RawIpSocketsBindingsContext<I, DeviceId<Self>>
     + IpDeviceBindingsContext<I, DeviceId<Self>>
     + IpLayerBindingsContext<I, DeviceId<Self>>
@@ -173,7 +178,8 @@ where
         + UdpBindingsContext<I, DeviceId<Self>>
         + TcpBindingsContext
         + FilterBindingsContext
-        + IcmpBindingsContext<I, DeviceId<Self>>
+        + IcmpBindingsContext
+        + IcmpEchoBindingsContext<I, DeviceId<Self>>
         + RawIpSocketsBindingsContext<I, DeviceId<Self>>
         + IpDeviceBindingsContext<I, DeviceId<Self>>
         + IpLayerBindingsContext<I, DeviceId<Self>>

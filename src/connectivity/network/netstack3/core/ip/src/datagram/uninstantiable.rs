@@ -5,17 +5,14 @@
 use explicit::UnreachableExt as _;
 use netstack3_base::{socket::MaybeDualStack, Uninstantiable, UninstantiableWrapper};
 
-use crate::internal::{
-    base::TransportIpContext,
-    datagram::{
-        self,
-        spec_context::{
-            DatagramSpecBoundStateContext, DualStackDatagramSpecBoundStateContext,
-            NonDualStackDatagramSpecBoundStateContext,
-        },
-        DatagramBoundStateContext, DatagramSocketMapSpec, DatagramSocketOptions,
-        DatagramSocketSpec, DualStackConverter, NonDualStackConverter,
+use crate::internal::datagram::{
+    self,
+    spec_context::{
+        DatagramSpecBoundStateContext, DualStackDatagramSpecBoundStateContext,
+        NonDualStackDatagramSpecBoundStateContext,
     },
+    DatagramBoundStateContext, DatagramSocketMapSpec, DatagramSocketOptions, DatagramSocketSpec,
+    DualStackConverter, NonDualStackConverter,
 };
 
 impl<I: datagram::IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
@@ -83,10 +80,8 @@ impl<I: datagram::IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, 
 
 impl<I: datagram::IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
     DualStackDatagramSpecBoundStateContext<I, UninstantiableWrapper<P>, C> for S
-where
-    for<'a> P::IpSocketsCtx<'a>: TransportIpContext<I::OtherVersion, C>,
 {
-    type IpSocketsCtx<'a> = P::IpSocketsCtx<'a>;
+    type IpSocketsCtx<'a> = UninstantiableWrapper<P::IpSocketsCtx<'a>>;
 
     fn dual_stack_enabled(
         core_ctx: &UninstantiableWrapper<P>,
