@@ -16,7 +16,7 @@ __BEGIN_CDECLS
 typedef Elf64_Ehdr Ehdr;
 typedef Elf64_Phdr Phdr;
 typedef Elf64_Sym Sym;
-#define R_TYPE(x) ((x)&0x7fffffff)
+#define R_TYPE(x) ((x) & 0x7fffffff)
 #define R_SYM(x) ((x) >> 32)
 #define R_INFO ELF64_R_INFO
 
@@ -79,6 +79,10 @@ void _dl_unlock(void) ATTR_LIBC_VISIBILITY;
 
 void _dl_locked_report_globals(sanitizer_memory_snapshot_callback_t* callback,
                                void* callback_arg) ATTR_LIBC_VISIBILITY;
+
+void _dl_phdr_report_globals(sanitizer_memory_snapshot_callback_t* callback, void* callback_arg,
+                             size_t load_bias, const Phdr* phdrs,
+                             size_t phnum) ATTR_LIBC_VISIBILITY;
 
 __attribute__((__visibility__("hidden"))) void _dl_iterate_loaded_libs(void);
 
