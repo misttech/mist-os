@@ -19,7 +19,7 @@
 #include <hwreg/bitfields.h>
 
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
-#include "src/graphics/display/lib/edid/timings.h"
+#include "src/graphics/display/lib/edid/internal/iterators.h"
 
 namespace edid {
 
@@ -351,55 +351,13 @@ class Edid {
   bool is_hdmi() const;
 
  private:
+  friend class internal::data_block_iterator;
+  friend class internal::descriptor_iterator;
+  friend class timing_iterator;
+  friend class audio_data_block_iterator;
+
   template <typename T>
   const T* GetBlock(uint8_t block_num) const;
-
-  class descriptor_iterator {
-   public:
-    explicit descriptor_iterator(const Edid* edid) : edid_(edid) { ++(*this); }
-
-    descriptor_iterator& operator++();
-    bool is_valid() const { return edid_ != nullptr; }
-
-    uint8_t block_idx() const { return block_idx_; }
-    const Descriptor* operator->() const { return descriptor_; }
-    const Descriptor* get() const { return descriptor_; }
-
-   private:
-    // Set to null when the iterator is exhausted.
-    const Edid* edid_;
-    // The block index in which we're looking for descriptors.
-    uint8_t block_idx_ = 0;
-    // The index of the current descriptor in the current block.
-    uint32_t descriptor_idx_ = UINT32_MAX;
-
-    const Descriptor* descriptor_;
-  };
-
-  class data_block_iterator {
-   public:
-    explicit data_block_iterator(const Edid* edid);
-
-    data_block_iterator& operator++();
-    bool is_valid() const { return edid_ != nullptr; }
-
-    // Only valid if |is_valid()| is true
-    uint8_t cea_revision() const { return cea_revision_; }
-
-    const DataBlock* operator->() const { return db_; }
-
-   private:
-    // Set to null when the iterator is exhausted.
-    const Edid* edid_;
-    // The block index in which we're looking for descriptors. No dbs in the 1st block.
-    uint8_t block_idx_ = 1;
-    // The index of the current descriptor in the current block.
-    uint32_t db_idx_ = UINT32_MAX;
-
-    const DataBlock* db_;
-
-    uint8_t cea_revision_;
-  };
 
   // Edid bytes and length
   const uint8_t* bytes_;
@@ -416,10 +374,13 @@ class Edid {
   char monitor_name_[sizeof(Descriptor::Monitor::data) + 1];
   char monitor_serial_[sizeof(Descriptor::Monitor::data) + 1];
   const char* manufacturer_name_ = nullptr;
-
-  friend timing_iterator;
-  friend audio_data_block_iterator;
 };
+
+template <typename T>
+const T* Edid::GetBlock(uint8_t block_num) const {
+  const uint8_t* bytes = bytes_ + block_num * kBlockSize;
+  return bytes[0] == T::kTag ? reinterpret_cast<const T*>(bytes) : nullptr;
+}
 
 // Iterator that returns all of the timing modes of the display. The iterator
 // **does not** filter out duplicates.
@@ -457,8 +418,8 @@ class timing_iterator {
   const Edid* edid_;
   uint8_t state_;
   uint16_t state_index_;
-  Edid::descriptor_iterator descriptors_;
-  Edid::data_block_iterator dbs_;
+  internal::descriptor_iterator descriptors_;
+  internal::data_block_iterator dbs_;
 };
 
 class audio_data_block_iterator {
@@ -478,7 +439,7 @@ class audio_data_block_iterator {
  private:
   const Edid* edid_;
   uint8_t sad_idx_;
-  Edid::data_block_iterator dbs_;
+  internal::data_block_iterator dbs_;
 
   ShortAudioDescriptor descriptor_;
 };

@@ -13,6 +13,8 @@ source_set("edid") {
     "edid.cc",
     "edid.h",
     "eisa_vid_lut.cc",
+    "internal/iterators.cc",
+    "internal/iterators.h",
     "timings.cc",
     "timings.h",
   ]

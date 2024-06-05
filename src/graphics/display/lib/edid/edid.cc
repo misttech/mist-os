@@ -189,7 +189,7 @@ fit::result<const char*> Edid::Init(const uint8_t* bytes, uint16_t len) {
   }
 
   monitor_serial_[0] = monitor_name_[0] = '\0';
-  for (auto it = descriptor_iterator(this); it.is_valid(); ++it) {
+  for (auto it = internal::descriptor_iterator(this); it.is_valid(); ++it) {
     char* dest;
     if (it->timing.pixel_clock_10khz != 0) {
       continue;
@@ -232,14 +232,8 @@ fit::result<const char*> Edid::Init(const uint8_t* bytes, uint16_t len) {
   return fit::ok();
 }
 
-template <typename T>
-const T* Edid::GetBlock(uint8_t block_num) const {
-  const uint8_t* bytes = bytes_ + block_num * kBlockSize;
-  return bytes[0] == T::kTag ? reinterpret_cast<const T*>(bytes) : nullptr;
-}
-
 bool Edid::is_hdmi() const {
-  data_block_iterator dbs(this);
+  internal::data_block_iterator dbs(this);
   if (!dbs.is_valid() || dbs.cea_revision() < 0x03) {
     return false;
   }
@@ -444,96 +438,6 @@ audio_data_block_iterator& audio_data_block_iterator::operator++() {
     }
     descriptor_ = dbs_->payload.audio[sad_idx_];
     return *this;
-  }
-
-  edid_ = nullptr;
-  return *this;
-}
-
-Edid::descriptor_iterator& Edid::descriptor_iterator::operator++() {
-  if (!edid_) {
-    return *this;
-  }
-
-  if (block_idx_ == 0) {
-    descriptor_idx_++;
-
-    if (descriptor_idx_ < std::size(edid_->base_edid_->detailed_descriptors)) {
-      descriptor_ = edid_->base_edid_->detailed_descriptors + descriptor_idx_;
-      if (descriptor_->timing.pixel_clock_10khz != 0 || descriptor_->monitor.type != 0x10) {
-        return *this;
-      }
-    }
-
-    block_idx_++;
-    descriptor_idx_ = UINT32_MAX;
-  }
-
-  while (block_idx_ < (edid_->len_ / kBlockSize)) {
-    auto cea_extn_block = edid_->GetBlock<CeaEdidTimingExtension>(block_idx_);
-    size_t offset = sizeof(CeaEdidTimingExtension::payload);
-    if (cea_extn_block &&
-        cea_extn_block->dtd_start_idx > offsetof(CeaEdidTimingExtension, payload)) {
-      offset = cea_extn_block->dtd_start_idx - offsetof(CeaEdidTimingExtension, payload);
-    }
-
-    descriptor_idx_++;
-    offset += sizeof(Descriptor) * descriptor_idx_;
-
-    // Return if the descriptor is within bounds and either a timing descriptor or not
-    // a dummy monitor descriptor, otherwise advance to the next block
-    if (offset + sizeof(DetailedTimingDescriptor) <= sizeof(CeaEdidTimingExtension::payload)) {
-      descriptor_ = reinterpret_cast<const Descriptor*>(cea_extn_block->payload + offset);
-      if (descriptor_->timing.pixel_clock_10khz != 0 ||
-          descriptor_->monitor.type != Descriptor::Monitor::kDummyType) {
-        return *this;
-      }
-    }
-
-    block_idx_++;
-    descriptor_idx_ = UINT32_MAX;
-  }
-
-  edid_ = nullptr;
-  return *this;
-}
-
-Edid::data_block_iterator::data_block_iterator(const Edid* edid) : edid_(edid) {
-  ++(*this);
-  if (is_valid()) {
-    cea_revision_ = edid_->GetBlock<CeaEdidTimingExtension>(block_idx_)->revision_number;
-  }
-}
-
-Edid::data_block_iterator& Edid::data_block_iterator::operator++() {
-  if (!edid_) {
-    return *this;
-  }
-
-  while (block_idx_ < (edid_->len_ / kBlockSize)) {
-    auto cea_extn_block = edid_->GetBlock<CeaEdidTimingExtension>(block_idx_);
-    size_t dbc_end = 0;
-    if (cea_extn_block &&
-        cea_extn_block->dtd_start_idx > offsetof(CeaEdidTimingExtension, payload)) {
-      dbc_end = cea_extn_block->dtd_start_idx - offsetof(CeaEdidTimingExtension, payload);
-    }
-
-    db_idx_++;
-    uint32_t db_to_skip = db_idx_;
-
-    uint32_t offset = 0;
-    while (offset < dbc_end) {
-      auto* dblk = reinterpret_cast<const DataBlock*>(cea_extn_block->payload + offset);
-      if (db_to_skip == 0) {
-        db_ = dblk;
-        return *this;
-      }
-      db_to_skip--;
-      offset += (dblk->length() + 1);  // length doesn't include the data block header byte
-    }
-
-    block_idx_++;
-    db_idx_ = UINT32_MAX;
   }
 
   edid_ = nullptr;
