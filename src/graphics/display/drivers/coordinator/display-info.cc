@@ -8,6 +8,7 @@
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
+#include <lib/zx/time.h>
 #include <zircon/assert.h>
 #include <zircon/device/audio.h>
 #include <zircon/errors.h>
@@ -60,34 +61,23 @@ inline void audio_stream_format_fidl_from_banjo(
   destination->flags = source.flags;
 }
 
-const char* const kDefaultEdidError = "unknown error";
-
 fit::result<const char*, DisplayInfo::Edid> InitEdidFromI2c(ddk::I2cImplProtocolClient& i2c) {
-  bool success = false;
-  const char* error = kDefaultEdidError;
-
   DisplayInfo::Edid edid;
-  int edid_attempt = 0;
-  static constexpr int kEdidRetries = 3;
-  do {
-    if (edid_attempt != 0) {
-      zxlogf(DEBUG, "Error %d/%d initializing edid: \"%s\"", edid_attempt, kEdidRetries, error);
-      zx_nanosleep(zx_deadline_after(ZX_MSEC(5)));
-    }
-    edid_attempt++;
+  const char* last_error = nullptr;
 
+  static constexpr int kMaxEdidAttempts = 3;
+  for (int attempt = 1; attempt <= kMaxEdidAttempts; attempt++) {
     fit::result<const char*> result = edid.base.Init(&i2c, ddc_tx);
     if (result.is_ok()) {
-      success = true;
-      break;
+      return fit::ok(std::move(edid));
     }
-    error = result.error_value();
-  } while (!success && edid_attempt < kEdidRetries);
-
-  if (success) {
-    return fit::ok(std::move(edid));
+    last_error = result.error_value();
+    zxlogf(WARNING, "Error %d/%d initializing edid: \"%s\"", attempt, kMaxEdidAttempts, last_error);
+    zx::nanosleep(zx::deadline_after(zx::msec(5)));
   }
-  return fit::error(error);
+
+  ZX_DEBUG_ASSERT(last_error != nullptr);
+  return fit::error(last_error);
 }
 
 fit::result<const char*, DisplayInfo::Edid> InitEdidFromBytes(cpp20::span<const uint8_t> bytes) {
