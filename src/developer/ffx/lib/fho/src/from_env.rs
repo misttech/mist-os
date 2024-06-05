@@ -216,9 +216,7 @@ impl TryFromEnv for ffx_fidl::TargetInfo {
     /// lab environments.
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         let targets = Vec::<Self>::try_from_env(env).await?;
-        if targets.is_empty() {
-            return_user_error!("Could not discover any targets.");
-        } else if targets.len() > 1 {
+        if targets.len() > 1 {
             return_user_error!("Found more than one target: {targets:#?}.");
         } else {
             Ok(targets[0].clone())
@@ -238,9 +236,13 @@ impl TryFromEnv for Vec<ffx_fidl::TargetInfo> {
             .await
             .bug_context("getting ffx target")?
             .user_message("A target must either be set as default or explicitly provided.")?;
-        let targets = resolve_target_query_to_info(TargetInfoQuery::from(target), &env.context)
-            .await
-            .bug_context("resolving target")?;
+        let targets =
+            resolve_target_query_to_info(TargetInfoQuery::from(target.clone()), &env.context)
+                .await
+                .bug_context("resolving target")?;
+        if targets.is_empty() {
+            return_user_error!("Could not discover any targets for specifier '{target}'.");
+        }
         Ok(targets)
     }
 }
