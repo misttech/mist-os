@@ -9,7 +9,6 @@
 use crate::{
     common::{rights_to_posix_mode_bits, send_on_open_with_error, CreationMode},
     directory::{
-        connection::DerivedConnection,
         dirents_sink,
         entry::{DirectoryEntry, EntryInfo, OpenRequest},
         entry_container::{Directory, DirectoryWatcher},
@@ -37,7 +36,6 @@ use {
     std::{
         collections::{btree_map::Entry, BTreeMap},
         iter,
-        marker::PhantomData,
         sync::{Arc, Mutex},
     },
 };
@@ -46,13 +44,11 @@ use {
 /// allowing the server to add or remove entries via the
 /// [`crate::directory::helper::DirectlyMutable::add_entry()`] and
 /// [`crate::directory::helper::DirectlyMutable::remove_entry`] methods.
-pub struct Simple<Connection> {
+pub struct Simple {
     inner: Mutex<Inner>,
 
     // The inode for this directory. This should either be unique within this VFS, or INO_UNKNOWN.
     inode: u64,
-
-    _connection: PhantomData<Connection>,
 
     not_found_handler: Mutex<Option<Box<dyn FnMut(&str) + Send + Sync + 'static>>>,
 }
@@ -63,10 +59,7 @@ struct Inner {
     watchers: Watchers,
 }
 
-impl<Connection> Simple<Connection>
-where
-    Connection: DerivedConnection + 'static,
-{
+impl Simple {
     pub fn new() -> Arc<Self> {
         Self::new_with_inode(fio::INO_UNKNOWN)
     }
@@ -74,7 +67,6 @@ where
     pub(crate) fn new_with_inode(inode: u64) -> Arc<Self> {
         Arc::new(Simple {
             inner: Mutex::new(Inner { entries: BTreeMap::new(), watchers: Watchers::new() }),
-            _connection: PhantomData,
             inode,
             not_found_handler: Mutex::new(None),
         })
@@ -186,10 +178,7 @@ where
     }
 }
 
-impl<Connection> DirectoryEntry for Simple<Connection>
-where
-    Connection: DerivedConnection + 'static,
-{
+impl DirectoryEntry for Simple {
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(self.inode, fio::DirentType::Directory)
     }
@@ -200,7 +189,7 @@ where
 }
 
 #[async_trait]
-impl<Connection: DerivedConnection + 'static> Node for Simple<Connection> {
+impl Node for Simple {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         Ok(fio::NodeAttributes {
             mode: fio::MODE_TYPE_DIRECTORY
@@ -237,10 +226,7 @@ impl<Connection: DerivedConnection + 'static> Node for Simple<Connection> {
 }
 
 #[async_trait]
-impl<Connection> Directory for Simple<Connection>
-where
-    Connection: DerivedConnection + 'static,
-{
+impl Directory for Simple {
     fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
@@ -429,10 +415,7 @@ where
     }
 }
 
-impl<Connection> DirectlyMutable for Simple<Connection>
-where
-    Connection: DerivedConnection + 'static,
-{
+impl DirectlyMutable for Simple {
     fn add_entry_impl(
         &self,
         name: Name,
