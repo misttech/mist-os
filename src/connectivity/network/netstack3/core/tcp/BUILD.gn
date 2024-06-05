@@ -48,8 +48,6 @@ rustc_library_with_features("netstack3-tcp") {
     "//src/connectivity/network/netstack3/core/fakestd",
   ]
 
-  _testutils_deps = []
-
   configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
 
   feature_sets = [
@@ -69,7 +67,6 @@ rustc_library_with_features("netstack3-tcp") {
         "testutils",
         "instrumented",
       ]
-      deps += _testutils_deps
       deps += [
         "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
         "//src/connectivity/network/netstack3/core/filter:netstack3-filter-testutils",
@@ -80,7 +77,6 @@ rustc_library_with_features("netstack3-tcp") {
       target_name = "netstack3-tcp-benchmarks"
       testonly = true
       features = [ "testutils" ]
-      deps += _testutils_deps
       deps += [
         "//src/connectivity/network/netstack3/core/base:netstack3-base-benchmarks",
         "//src/connectivity/network/netstack3/core/filter:netstack3-filter-benchmarks",
@@ -107,7 +103,6 @@ rustc_library_with_features("netstack3-tcp") {
         "//third_party/rust_crates:proptest",
         "//third_party/rust_crates:test-case",
       ]
-      test_deps += _testutils_deps
     },
   ]
   if (is_host) {
@@ -119,7 +114,6 @@ rustc_library_with_features("netstack3-tcp") {
           "instrumented",
         ]
         testonly = true
-        deps += _testutils_deps
         deps += [
           "//src/connectivity/network/netstack3/core/base:netstack3-base-loom",
           "//src/connectivity/network/netstack3/core/filter:netstack3-filter-loom",
