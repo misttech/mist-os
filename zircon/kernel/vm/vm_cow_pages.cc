@@ -192,6 +192,7 @@ class BatchPQRemove {
 zx_status_t VmCowPages::AllocateCopyPage(paddr_t parent_paddr, list_node_t* alloc_list,
                                          LazyPageRequest* request, vm_page_t** clone) {
   DEBUG_ASSERT(request || !(pmm_alloc_flags_ & PMM_ALLOC_FLAG_CAN_WAIT));
+  DEBUG_ASSERT(!is_source_supplying_specific_physical_pages());
 
   vm_page_t* p_clone = nullptr;
   if (alloc_list) {
