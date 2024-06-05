@@ -360,6 +360,15 @@ const VDso* VDso::Create(KernelHandle<VmObjectDispatcher>* vmo_kernel_handles,
        ++v)
     vdso->CreateVariant(static_cast<Variant>(v), &vmo_kernel_handles[v]);
 
+  // Map and pin the time values VMO for each variant. We do this after having created all of the
+  // variants to avoid any issues with pinning pages in a VMO prior to snapshotting it.
+  for (size_t v = static_cast<size_t>(Variant::STABLE); v < static_cast<size_t>(Variant::COUNT);
+       ++v) {
+    Variant var = static_cast<Variant>(v);
+    zx_status_t status = vdso->MapTimeValuesVmo(var, vdso->variant_vmo_[variant_index(var)]->vmo());
+    ASSERT(status == ZX_OK);
+  }
+
   instance_ = vdso;
   return instance_;
 }
@@ -385,6 +394,22 @@ void VDso::CreateTimeValuesVmo(KernelHandle<VmObjectDispatcher>* time_values_han
   status =
       time_values_handle->dispatcher()->set_name(kTimeValuesVmoName, strlen(kTimeValuesVmoName));
   ASSERT(status == ZX_OK);
+}
+
+zx_status_t VDso::MapTimeValuesVmo(Variant variant, const fbl::RefPtr<VmObject>& vdso_vmo) {
+  size_t variant_idx = variant_index(variant);
+  zx_status_t status = variant_time_mappings_[variant_idx].Init(
+      vdso_vmo, VDSO_DATA_TIME_VALUES, VDSO_DATA_TIME_VALUES_SIZE, "vdso time values");
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  // Store the pointer to the actual TimeValues structure to avoid having to call base_locking every
+  // time. We can do this because the mappings are not changed once created.
+  time_values_[variant_index(variant)] = reinterpret_cast<fasttime::internal::TimeValues*>(
+      variant_time_mappings_[variant_idx].base_locking());
+
+  return ZX_OK;
 }
 
 // Each vDSO variant VMO is made via a COW clone of the next vDSO

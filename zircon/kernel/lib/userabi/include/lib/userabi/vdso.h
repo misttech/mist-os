@@ -7,6 +7,8 @@
 #ifndef ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_VDSO_H_
 #define ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_VDSO_H_
 
+#include <lib/fasttime/internal/abi.h>
+#include <lib/instrumentation/kernel-mapped-vmo.h>
 #include <lib/userabi/rodso.h>
 #include <lib/userabi/userboot.h>
 
@@ -58,6 +60,7 @@ class VDso : public RoDso {
   VDso(KernelHandle<VmObjectDispatcher>* vmo_kernel_handles);
   void CreateVariant(Variant, KernelHandle<VmObjectDispatcher>* vmo_kernel_handle);
   void CreateTimeValuesVmo(KernelHandle<VmObjectDispatcher>* time_values_handle);
+  zx_status_t MapTimeValuesVmo(Variant, const fbl::RefPtr<VmObject>& vdso_vmo);
 
   bool vmo_is_vdso_impl(const fbl::RefPtr<VmObject>& vmo_ref) const {
     if (vmo_ref == vmo()->vmo())
@@ -75,6 +78,8 @@ class VDso : public RoDso {
   }
 
   fbl::RefPtr<VmObjectDispatcher> variant_vmo_[static_cast<size_t>(Variant::COUNT)];
+  KernelMappedVmo variant_time_mappings_[static_cast<size_t>(Variant::COUNT)];
+  fasttime::internal::TimeValues* time_values_[static_cast<size_t>(Variant::COUNT)];
 
   static const VDso* instance_;
 };
