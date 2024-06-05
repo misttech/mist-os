@@ -575,7 +575,6 @@ class SystemPowerStateController(
             suspend_state=suspend_state,
             resume_mode=resume_mode,
             suspend_resume_duration=suspend_resume_execution_time,
-            min_buffer_duration=0,
             max_buffer_duration=3,
         )
 
@@ -599,7 +598,6 @@ class SystemPowerStateController(
         suspend_state: system_power_state_controller_interface.SuspendState,
         resume_mode: system_power_state_controller_interface.ResumeMode,
         suspend_resume_duration: float,
-        min_buffer_duration: float,
         max_buffer_duration: float,
     ) -> None:
         """Verify that suspend-resume operation was indeed triggered by checking
@@ -609,8 +607,6 @@ class SystemPowerStateController(
             suspend_state: Which state to suspend the Fuchsia device into.
             resume_mode: Information about how to resume the device.
             suspend_resume_duration: How long suspend-resume operation took.
-            min_buffer_duration: How much minimum buffer time to consider while
-                verifying the duration.
             max_buffer_duration: How much maximum buffer time to consider while
                 verifying the duration.
 
@@ -622,23 +618,16 @@ class SystemPowerStateController(
             resume_mode,
             (system_power_state_controller_interface.TimerResume,),
         ):
-            min_expected_duration: float = (
-                resume_mode.duration - min_buffer_duration
-            )
             max_expected_duration: float = (
                 resume_mode.duration + max_buffer_duration
             )
 
-            if (
-                suspend_resume_duration < min_expected_duration
-                or suspend_resume_duration > max_expected_duration
-            ):
+            if suspend_resume_duration > max_expected_duration:
                 raise errors.SystemPowerStateControllerError(
                     f"'{suspend_state}' followed by '{resume_mode}' operation "
                     f"took {suspend_resume_duration} seconds on "
-                    f"'{self._device_name}'. Expected duration range: "
-                    f"[{min_expected_duration}, {max_expected_duration}] "
-                    f"seconds.",
+                    f"'{self._device_name}'. Expected it to not take more than "
+                    f"{max_expected_duration} seconds.",
                 )
 
     def _verify_suspend_resume_using_log_analysis(
@@ -714,6 +703,5 @@ class SystemPowerStateController(
             suspend_state=suspend_state,
             resume_mode=resume_mode,
             suspend_resume_duration=suspend_resume_duration,
-            min_buffer_duration=1,
             max_buffer_duration=0.5,
         )

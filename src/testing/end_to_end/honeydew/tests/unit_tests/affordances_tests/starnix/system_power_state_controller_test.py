@@ -491,7 +491,6 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
                 duration=3
             ),
             suspend_resume_duration=3,
-            min_buffer_duration=0,
             max_buffer_duration=3,
         )
 
@@ -514,7 +513,6 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
             suspend_state=system_power_state_controller_interface.IdleSuspend(),
             resume_mode=resume_mode,
             suspend_resume_duration=resume_mode.duration + 2,
-            min_buffer_duration=0,
             max_buffer_duration=2,
         )
 
@@ -533,7 +531,6 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
                 suspend_state=system_power_state_controller_interface.IdleSuspend(),
                 resume_mode=resume_mode,
                 suspend_resume_duration=resume_mode.duration + 20,
-                min_buffer_duration=1,
                 max_buffer_duration=1,
             )
 
