@@ -1234,16 +1234,10 @@ option has no effect.
 
 **Default:** `0x20`
 
-This option caps the number of CPUs to initialize.  It cannot be greater than *SMP\_MAX\_CPUS* 
+This option caps the number of CPUs to initialize.  It cannot be greater than *SMP\_MAX\_CPUS*
 for a specific architecture.
 
 Note: The default value may vary for each architecture.
-
-### kernel.enable_suspend=\<bool>
-
-**Default:** `false`
-
-Enable the kernel to go to the S3 (Suspend to RAM) ACPI power state.
 
 ### kernel.wallclock=\[auto | tsc | pit | hpet\]
 
