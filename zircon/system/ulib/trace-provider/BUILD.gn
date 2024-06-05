@@ -79,11 +79,6 @@ template("trace_provider_library") {
   }
 }
 
-trace_provider_fdio_connect_sources = [
-  "export.h",
-  "fdio_connect.cc",
-]
-
 trace_provider_fdio_sources = [
   "fdio_connect.cc",
   "provider_with_fdio.cc",
@@ -168,16 +163,6 @@ zx_library("trace-handler") {
     "//zircon/system/ulib/trace-engine:trace-engine-headersonly",
   ]
   sources = [ "handler.cc" ]
-}
-
-# A helper library for clients that want to use fdio to connect to
-# trace manager, outside of the regular libraries.
-# This is for special cases where the client is choosing its engine separately.
-zx_library("trace-provider-fdio-connect") {
-  sdk = "static"
-  sdk_headers = trace_provider_fdio_connect_headers
-  sources = trace_provider_fdio_connect_sources
-  deps = trace_provider_fdio_connect_source_deps
 }
 
 group("tests") {
