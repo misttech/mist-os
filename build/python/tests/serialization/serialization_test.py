@@ -20,7 +20,7 @@ from serialization import (
 class SerializeFieldsTest(unittest.TestCase):
     """Validate that fields of different kinds are properly serialized."""
 
-    def test_serialize_simple_class(self):
+    def test_serialize_simple_class(self) -> None:
         @dataclass
         class SimpleClass:
             int_field: int
@@ -32,7 +32,7 @@ class SerializeFieldsTest(unittest.TestCase):
             {"int_field": 42, "str_field": "a string"},
         )
 
-    def test_deserialize_simple_class(self):
+    def test_deserialize_simple_class(self) -> None:
         @dataclass
         class SimpleClass:
             int_field: int
@@ -43,7 +43,7 @@ class SerializeFieldsTest(unittest.TestCase):
             instance_from_dict(SimpleClass, value), SimpleClass(42, "a string")
         )
 
-    def test_deserialize_simple_class_with_default_value(self):
+    def test_deserialize_simple_class_with_default_value(self) -> None:
         @dataclass
         class SimpleClass:
             int_field: int
@@ -55,7 +55,7 @@ class SerializeFieldsTest(unittest.TestCase):
             SimpleClass(42, "a default value"),
         )
 
-    def test_deserialize_simple_class_with_default_factory(self):
+    def test_deserialize_simple_class_with_default_factory(self) -> None:
         @dataclass
         class SimpleClass:
             int_field: int
@@ -66,7 +66,7 @@ class SerializeFieldsTest(unittest.TestCase):
             instance_from_dict(SimpleClass, value), SimpleClass(42, [])
         )
 
-    def test_serialize_int_value_0(self):
+    def test_serialize_int_value_0(self) -> None:
         @dataclass
         class SimpleClass:
             int_field: int
@@ -78,7 +78,7 @@ class SerializeFieldsTest(unittest.TestCase):
             {"int_field": 0, "str_field": "a string"},
         )
 
-    def test_serialize_optional_field_with_value(self):
+    def test_serialize_optional_field_with_value(self) -> None:
         @dataclass
         class SimpleClassWithOptionalField:
             int_field: Optional[int]
@@ -90,7 +90,7 @@ class SerializeFieldsTest(unittest.TestCase):
             {"int_field": 21, "str_field": "some value"},
         )
 
-    def test_serialize_optional_field_without_value(self):
+    def test_serialize_optional_field_without_value(self) -> None:
         @dataclass
         class SimpleClassWithOptionalField:
             int_field: Optional[int]
@@ -101,7 +101,7 @@ class SerializeFieldsTest(unittest.TestCase):
             instance_to_dict(instance), {"str_field": "some value"}
         )
 
-    def test_serialize_list_fields(self):
+    def test_serialize_list_fields(self) -> None:
         @dataclass
         class SimpleClassWithList:
             int_field: List[int] = field(default_factory=list)
@@ -113,7 +113,7 @@ class SerializeFieldsTest(unittest.TestCase):
             {"int_field": [1, 2, 3, 4, 5], "str_field": "foo"},
         )
 
-    def test_serialize_empty_list_fields(self):
+    def test_serialize_empty_list_fields(self) -> None:
         @dataclass
         class SimpleClassWithList:
             int_field: List[int] = field(default_factory=list)
@@ -124,7 +124,7 @@ class SerializeFieldsTest(unittest.TestCase):
             instance_to_dict(instance), {"int_field": [], "str_field": "foo"}
         )
 
-    def test_deserialize_list_fields(self):
+    def test_deserialize_list_fields(self) -> None:
         @dataclass
         class SimpleClassWithList:
             int_field: List[int] = field(default_factory=list)
@@ -139,7 +139,7 @@ class SerializeFieldsTest(unittest.TestCase):
             instance,
         )
 
-    def test_deserialize_empty_list_fields(self):
+    def test_deserialize_empty_list_fields(self) -> None:
         @dataclass
         class SimpleClassWithList:
             int_field: List[int] = field(default_factory=list)
@@ -153,7 +153,7 @@ class SerializeFieldsTest(unittest.TestCase):
             instance,
         )
 
-    def test_deserialize_missing_list_fields_empty(self):
+    def test_deserialize_missing_list_fields_empty(self) -> None:
         @dataclass
         class SimpleClassWithList:
             int_field: List[int] = field(default_factory=list)
@@ -165,7 +165,7 @@ class SerializeFieldsTest(unittest.TestCase):
             instance,
         )
 
-    def test_serialize_set_fields(self):
+    def test_serialize_set_fields(self) -> None:
         # Note that this also tests that sets are serialized into sorted-order
         @dataclass
         class SimpleClassWithSet:
@@ -178,7 +178,7 @@ class SerializeFieldsTest(unittest.TestCase):
             {"int_field": [1, 2, 3, 4, 5], "str_field": "foo"},
         )
 
-    def test_serialize_empty_set_fields(self):
+    def test_serialize_empty_set_fields(self) -> None:
         @dataclass
         class SimpleClassWithSet:
             int_field: Set[int] = field(default_factory=set)
@@ -189,7 +189,7 @@ class SerializeFieldsTest(unittest.TestCase):
             instance_to_dict(instance), {"int_field": [], "str_field": "foo"}
         )
 
-    def test_deserialize_set_fields(self):
+    def test_deserialize_set_fields(self) -> None:
         @dataclass
         class SimpleClassWithSet:
             int_field: Set[int] = field(default_factory=set)
@@ -204,7 +204,7 @@ class SerializeFieldsTest(unittest.TestCase):
             instance,
         )
 
-    def test_deserialize_empty_set_fields(self):
+    def test_deserialize_empty_set_fields(self) -> None:
         @dataclass
         class SimpleClassWithSet:
             int_field: Set[int] = field(default_factory=set)
@@ -218,7 +218,7 @@ class SerializeFieldsTest(unittest.TestCase):
             instance,
         )
 
-    def test_deserialize_missing_set_fields_empty(self):
+    def test_deserialize_missing_set_fields_empty(self) -> None:
         @dataclass
         class SimpleClassWithSet:
             str_field: str = "foo"
@@ -230,7 +230,7 @@ class SerializeFieldsTest(unittest.TestCase):
             instance,
         )
 
-    def test_serialize_dict_fields(self):
+    def test_serialize_dict_fields(self) -> None:
         @dataclass
         class SimpleClassWithDict:
             dict_field: Dict[str, int]
@@ -241,7 +241,7 @@ class SerializeFieldsTest(unittest.TestCase):
             {"dict_field": {"one": 1, "two": 2, "three": 3}},
         )
 
-    def test_serialize_fields_as(self):
+    def test_serialize_fields_as(self) -> None:
         @dataclass
         @serialize_fields_as(int_field=str)
         class SimpleClassWithMetdata:
@@ -257,7 +257,7 @@ class SerializeFieldsTest(unittest.TestCase):
             },
         )
 
-    def test_serialize_fields_as_with_callable(self):
+    def test_serialize_fields_as_with_callable(self) -> None:
         def my_serializer(value: int) -> str:
             return f"The value is {value}."
 
@@ -276,7 +276,7 @@ class SerializeFieldsTest(unittest.TestCase):
             },
         )
 
-    def test_serialize_class_with_superclass(self):
+    def test_serialize_class_with_superclass(self) -> None:
         @dataclass
         class SimpleBaseClass:
             int_field_base: int
@@ -303,7 +303,7 @@ class SerializeFieldsTest(unittest.TestCase):
             },
         )
 
-    def test_deserialize_class_with_superclass(self):
+    def test_deserialize_class_with_superclass(self) -> None:
         @dataclass
         class SimpleBaseClass:
             int_field_base: int
@@ -334,7 +334,7 @@ class SerializeFieldsTest(unittest.TestCase):
             instance,
         )
 
-    def test_serialize_class_with_multiple_superclasses(self):
+    def test_serialize_class_with_multiple_superclasses(self) -> None:
         @dataclass
         class RootClass:
             int_field_root: int
@@ -374,7 +374,7 @@ class SerializeFieldsTest(unittest.TestCase):
             },
         )
 
-    def test_deserialize_class_with_multiple_superclasses(self):
+    def test_deserialize_class_with_multiple_superclasses(self) -> None:
         @dataclass
         class RootClass:
             int_field_root: int
@@ -417,7 +417,7 @@ class SerializeFieldsTest(unittest.TestCase):
             instance,
         )
 
-    def test_deserialize_class_with_union_fields_first_type(self):
+    def test_deserialize_class_with_union_fields_first_type(self) -> None:
         @dataclass
         class SimpleClass:
             int_field: int
@@ -430,7 +430,7 @@ class SerializeFieldsTest(unittest.TestCase):
             ),
         )
 
-    def test_deserialize_class_with_union_fields_second_type(self):
+    def test_deserialize_class_with_union_fields_second_type(self) -> None:
         @dataclass
         class SimpleClass:
             int_field: int
@@ -443,7 +443,9 @@ class SerializeFieldsTest(unittest.TestCase):
             ),
         )
 
-    def test_deserialize_class_with_optional_fields_new_syntax_with_value(self):
+    def test_deserialize_class_with_optional_fields_new_syntax_with_value(
+        self,
+    ) -> None:
         @dataclass
         class SimpleClass:
             int_field: int
@@ -458,7 +460,7 @@ class SerializeFieldsTest(unittest.TestCase):
 
     def test_deserialize_class_with_optional_fields_new_syntax_without_value(
         self,
-    ):
+    ) -> None:
         @dataclass
         class SimpleClass:
             int_field: int
@@ -471,7 +473,7 @@ class SerializeFieldsTest(unittest.TestCase):
 
     def test_deserialize_class_with_optional_fields_new_syntax_with_explicit_none_value(
         self,
-    ):
+    ) -> None:
         @dataclass
         class SimpleClass:
             int_field: int
@@ -490,7 +492,9 @@ class SerializeFieldsTest(unittest.TestCase):
             instance_from_dict(SimpleClass, {"int_field": 42}),
         )
 
-    def test_deserialize_class_with_union_fields_new_syntax_first_type(self):
+    def test_deserialize_class_with_union_fields_new_syntax_first_type(
+        self,
+    ) -> None:
         @dataclass
         class SimpleClass:
             int_field: int
@@ -503,7 +507,9 @@ class SerializeFieldsTest(unittest.TestCase):
             ),
         )
 
-    def test_deserialize_class_with_union_fields_new_syntax_second_type(self):
+    def test_deserialize_class_with_union_fields_new_syntax_second_type(
+        self,
+    ) -> None:
         @dataclass
         class SimpleClass:
             int_field: int
@@ -516,7 +522,9 @@ class SerializeFieldsTest(unittest.TestCase):
             ),
         )
 
-    def test_deserialize_class_with_union_fields_mixed_syntax_second_type(self):
+    def test_deserialize_class_with_union_fields_mixed_syntax_second_type(
+        self,
+    ) -> None:
         @dataclass
         class SimpleClass:
             int_field: int
@@ -531,7 +539,7 @@ class SerializeFieldsTest(unittest.TestCase):
 
     def test_deserialize_class_with_optional_union_fields_new_syntax_first_type(
         self,
-    ):
+    ) -> None:
         @dataclass
         class SimpleClass:
             int_field: int
@@ -546,7 +554,7 @@ class SerializeFieldsTest(unittest.TestCase):
 
     def test_deserialize_class_with_optional_union_fields_new_syntax_second_type(
         self,
-    ):
+    ) -> None:
         @dataclass
         class SimpleClass:
             int_field: int
@@ -561,7 +569,7 @@ class SerializeFieldsTest(unittest.TestCase):
 
     def test_deserialize_class_with_optional_union_fields_new_syntax_with_no_value(
         self,
-    ):
+    ) -> None:
         @dataclass
         class SimpleClass:
             int_field: int
@@ -574,7 +582,7 @@ class SerializeFieldsTest(unittest.TestCase):
 
     def test_deserialize_class_with_optional_union_fields_new_syntax_with_explicit_none_value(
         self,
-    ):
+    ) -> None:
         @dataclass
         class SimpleClass:
             int_field: int
@@ -587,7 +595,7 @@ class SerializeFieldsTest(unittest.TestCase):
             ),
         )
 
-    def test_serialize_nested_classes(self):
+    def test_serialize_nested_classes(self) -> None:
         @dataclass
         class Inner:
             int_field: int
@@ -601,7 +609,7 @@ class SerializeFieldsTest(unittest.TestCase):
             instance_to_dict(Outer(Inner(43))),
         )
 
-    def test_deserialize_nested_classes(self):
+    def test_deserialize_nested_classes(self) -> None:
         @dataclass
         class Inner:
             int_field: int
@@ -623,7 +631,7 @@ class SerializeToDictDecorator(unittest.TestCase):
     PyRight, so they don't have proper static analysis and IDE type-checking.
     """
 
-    def test_to_dict_decorator(self):
+    def test_to_dict_decorator(self) -> None:
         @dataclass
         @serialize_dict
         class SimpleClass:
@@ -632,10 +640,10 @@ class SerializeToDictDecorator(unittest.TestCase):
 
         instance = SimpleClass(8, "some value")
         self.assertEqual(
-            instance.to_dict(), {"int_field": 8, "str_field": "some value"}
+            instance.to_dict(), {"int_field": 8, "str_field": "some value"}  # type: ignore[attr-defined]
         )
 
-    def test_from_dict_decorator(self):
+    def test_from_dict_decorator(self) -> None:
         @dataclass
         @serialize_dict
         class SimpleClass:
@@ -644,7 +652,8 @@ class SerializeToDictDecorator(unittest.TestCase):
 
         raw = {"int_field": 8, "str_field": "some value"}
         self.assertEqual(
-            SimpleClass.from_dict(raw), SimpleClass(8, "some value")
+            SimpleClass.from_dict(raw),  # type: ignore[attr-defined]
+            SimpleClass(8, "some value"),
         )
 
 
@@ -655,7 +664,7 @@ class SerializeToJsonDecorator(unittest.TestCase):
     PyRight, so they don't have proper static analysis and IDE type-checking.
     """
 
-    def test_to_json_decorator(self):
+    def test_to_json_decorator(self) -> None:
         @dataclass
         @serialize_json
         class SimpleClass:
@@ -663,7 +672,7 @@ class SerializeToJsonDecorator(unittest.TestCase):
             str_field: str
 
         instance = SimpleClass(8, "some value")
-        result = instance.json_dumps(indent=6)
+        result = instance.json_dumps(indent=6)  # type: ignore[attr-defined]
         self.assertEqual(
             result,
             """{
@@ -672,7 +681,7 @@ class SerializeToJsonDecorator(unittest.TestCase):
 }""",
         )
 
-    def test_from_json_decorator(self):
+    def test_from_json_decorator(self) -> None:
         @dataclass
         @serialize_json
         class SimpleClass:
@@ -683,10 +692,10 @@ class SerializeToJsonDecorator(unittest.TestCase):
         raw_json = json.dumps(raw)
 
         self.assertEqual(
-            SimpleClass.json_loads(raw_json), SimpleClass(8, "some value")
+            SimpleClass.json_loads(raw_json), SimpleClass(8, "some value")  # type: ignore[attr-defined]
         )
 
-    def test_to_json_decorator_with_field_serializer(self):
+    def test_to_json_decorator_with_field_serializer(self) -> None:
         def my_serializer(value: int) -> str:
             return f"my value is {value}."
 
@@ -698,7 +707,7 @@ class SerializeToJsonDecorator(unittest.TestCase):
             str_field: str
 
         instance = SimpleClass(8, "some value")
-        result = instance.json_dumps(indent=6)
+        result = instance.json_dumps(indent=6)  # type: ignore[attr-defined]
         self.assertEqual(
             result,
             """{
