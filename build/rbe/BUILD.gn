@@ -73,11 +73,11 @@ if (is_host) {
       _cl_utils_sources + _remote_action_sources
 
   python_library("bbtool") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _bbtool_sources
   }
   python_host_test("bbtool_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "bbtool_test.py"
     sources = _bbtool_sources
   }

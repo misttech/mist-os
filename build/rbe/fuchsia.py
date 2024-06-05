@@ -14,7 +14,7 @@ import os
 import platform
 import sys
 from pathlib import Path
-from typing import Callable, FrozenSet, Iterable, Optional, Sequence
+from typing import Callable, FrozenSet, Iterable, List, Optional, Sequence
 
 _SCRIPT_PATH = Path(__file__)
 _SCRIPT_BASENAME = _SCRIPT_PATH.name
@@ -136,11 +136,11 @@ _CHECK_DETERMINISM_SCRIPT = Path("build", "tracer", "output_cacher.py")
 def check_determinism_command(
     exec_root: Path,
     outputs: Sequence[Path],
-    command: Sequence[Path] = None,
-    max_attempts: int = None,
-    miscomparison_export_dir: Path = None,
-    label: str = None,
-) -> Sequence[str]:
+    command: Optional[Iterable[Path]] = None,
+    max_attempts: Optional[int] = None,
+    miscomparison_export_dir: Optional[Path] = None,
+    label: Optional[str] = None,
+) -> List[str]:
     """Returns a command that checks for output determinism.
 
     The check runs locally twice, moving outputs out of the way temporarily,
@@ -154,7 +154,7 @@ def check_determinism_command(
       miscomparison_export_dir: location to store mismatched outputs.
       label: build system identifier for diagnostics.
     """
-    return (
+    return list(
         [
             sys.executable,  # same Python interpreter
             "-S",
@@ -175,7 +175,7 @@ def check_determinism_command(
         ]
         + [str(p) for p in outputs]
         + ["--"]
-        + (command or [])
+        + ([str(c) for c in command] if command else [])
     )
 
 
@@ -199,18 +199,20 @@ def remote_rustc_shlibs(root_rel: Path) -> Iterable[Path]:
 
 def clang_runtime_libdirs(
     clang_dir_rel: Path, target_triple: str
-) -> Sequence[Path]:
+) -> List[Path]:
     """Locate clang runtime libdir from the given toolchain directory."""
-    return (clang_dir_rel / "lib" / "clang").glob(
-        os.path.join(
-            "*",  # a clang version number, like '14.0.0' or '17'
-            "lib",
-            target_triple,
+    return list(
+        (clang_dir_rel / "lib" / "clang").glob(
+            os.path.join(
+                "*",  # a clang version number, like '14.0.0' or '17'
+                "lib",
+                target_triple,
+            )
         )
     )
 
 
-def clang_libcxx_static(clang_dir_rel: Path, clang_lib_triple: str) -> str:
+def clang_libcxx_static(clang_dir_rel: Path, clang_lib_triple: str) -> Path:
     """Location of libc++.a"""
     return clang_dir_rel / "lib" / clang_lib_triple / "libc++.a"
 
@@ -267,7 +269,7 @@ def gcc_support_tools(
         yield lib_base / "crtbegin.o"  # arbitrary unused file, just to setup its dir
 
 
-def rust_stdlib_subdir(target_triple: str) -> str:
+def rust_stdlib_subdir(target_triple: str) -> Path:
     """Location of rustlib standard libraries relative to rust --sysroot.
 
     This depends on where target libdirs live relative to the rustc compiler.
@@ -346,7 +348,7 @@ _REMOTE_RUST_LLD_RELPATH = Path(
 )
 
 
-def remote_rustc_to_rust_lld_path(rustc: Path) -> str:
+def remote_rustc_to_rust_lld_path(rustc: Path) -> Path:
     # remote is only linux-64
     rust_lld = rustc.parent / _REMOTE_RUST_LLD_RELPATH
     return rust_lld  # already normalized by Path construction
@@ -473,7 +475,7 @@ def remote_clang_linker_toolchain_inputs(
 def remote_gcc_linker_toolchain_inputs(
     gcc_path_rel: Path,
 ) -> Iterable[Path]:
-    return
+    return []
 
 
 # Built lib/{sysroot_triple}/... files
@@ -546,11 +548,9 @@ def c_sysroot_files(
             [f_path for f_path in maybe_scripts if f_path.is_file()]
         )
 
-        for f in [
-            sysroot_dir / "usr/lib" / sysroot_triple / "libmvec.a",
-        ]:
-            if f.is_file():
-                yield f
+        libmvec_path = sysroot_dir / "usr/lib" / sysroot_triple / "libmvec.a"
+        if libmvec_path.is_file():
+            yield libmvec_path
 
         if with_libgcc:
             yield from [

@@ -23,13 +23,18 @@ import platform
 
 from pathlib import Path
 from typing import (
+    IO,
     Any,
     Callable,
     Dict,
     FrozenSet,
+    Generator,
     Iterable,
+    Iterator,
+    List,
     Optional,
     Sequence,
+    TextIO,
     Tuple,
 )
 
@@ -40,7 +45,7 @@ _SCRIPT_BASENAME = Path(__file__).name
 _ENV = "/usr/bin/env"
 
 
-def msg(text: str):
+def msg(text: str) -> None:
     print(f"[{_SCRIPT_BASENAME}] {text}")
 
 
@@ -48,7 +53,7 @@ def tfmt(t: datetime.datetime) -> str:
     return f"{t.hour:02.0f}:{t.minute:02.0f}:{t.second:02.0f}.{t.microsecond:06.0f}"
 
 
-def tmsg(dt: datetime.datetime, text: str):
+def tmsg(dt: datetime.datetime, text: str) -> None:
     print(f"[{tfmt(dt)}] {text}")
 
 
@@ -57,7 +62,7 @@ _ENABLE_TIMERS = False
 
 
 @contextlib.contextmanager
-def timer_cm(text: str):
+def timer_cm(text: str) -> Generator[Any, Any, Any]:
     """Times execution of a body of code for profiling performance.
 
     Globally enabled/disabled with _ENABLE_TIMERS.
@@ -74,7 +79,7 @@ def timer_cm(text: str):
             tmsg(end_time, "end  : " + text + f" (elapsed: {elapsed})")
 
 
-def auto_env_prefix_command(command: Sequence[str]) -> Sequence[str]:
+def auto_env_prefix_command(command: List[str]) -> List[str]:
     if not command:
         return []
     if "=" in command[0]:
@@ -101,7 +106,7 @@ def bool_golang_flag(value: str) -> bool:
     }[value.lower()]
 
 
-def copy_preserve_subpath(src: Path, dest_dir: Path):
+def copy_preserve_subpath(src: Path, dest_dir: Path) -> None:
     """Like copy(), but preserves the relative path of src in the destination.
 
     Example: src='foo/bar/baz.txt', dest_dir='save/stuff/here' will result in
@@ -171,7 +176,7 @@ def split_into_subsequences(
     Returns:
       sequence of subsequences between occurrences of the separator.
     """
-    subseq = []
+    subseq: List[Any] = []
     for elem in seq:
         if elem == sep:
             yield subseq
@@ -231,7 +236,7 @@ def remove_hash_comments(lines: Iterable[str]) -> Iterable[str]:
 
 
 def expand_response_files(
-    command: Iterable[str], rspfiles: Sequence[Path]
+    command: Iterable[str], rspfiles: List[Path]
 ) -> Iterable[str]:
     """Expand response files in a command into tokens contained therein.
 
@@ -322,12 +327,24 @@ def fuse_expanded_flags(
 class StringSetAdd(argparse.Action):
     """An argparse.Action for adding an element to a set of strings."""
 
-    def __init__(self, option_strings, dest, nargs=None, **kwargs):
+    def __init__(
+        self,
+        option_strings: Sequence[str],
+        dest: str,
+        nargs: Optional[Any] = None,
+        **kwargs: Any,
+    ) -> None:
         if nargs is not None:
             raise ValueError("nargs not allowed")
         super().__init__(option_strings, dest, **kwargs)
 
-    def __call__(self, parser, namespace, values, option_string=None):
+    def __call__(
+        self,
+        parser: Any,
+        namespace: Any,
+        values: Any,
+        option_string: Optional[str] = None,
+    ) -> None:
         collection = getattr(namespace, self.dest).copy()
         collection.add(values)
         setattr(namespace, self.dest, collection)
@@ -336,12 +353,24 @@ class StringSetAdd(argparse.Action):
 class StringSetRemove(argparse.Action):
     """An argparse.Action for removing an element from a set of strings."""
 
-    def __init__(self, option_strings, dest, nargs=None, **kwargs):
+    def __init__(
+        self,
+        option_strings: Sequence[str],
+        dest: str,
+        nargs: Optional[Any] = None,
+        **kwargs: Any,
+    ) -> None:
         if nargs is not None:
             raise ValueError("nargs not allowed")
         super().__init__(option_strings, dest, **kwargs)
 
-    def __call__(self, parser, namespace, values, option_string=None):
+    def __call__(
+        self,
+        parser: Any,
+        namespace: Any,
+        values: Any,
+        option_string: Optional[str] = None,
+    ) -> None:
         collection = getattr(namespace, self.dest).copy()
         # special case: values == "all", clear entire set
         if values == "all":
@@ -413,8 +442,8 @@ def values_dict_to_config_value(
 
 
 def keyed_flags_to_values_dict(
-    flags: Iterable[str], convert_type: Callable[[str], Any] = None
-) -> Dict[str, Sequence[str]]:
+    flags: Iterable[str], convert_type: Optional[Callable[[str], Any]] = None
+) -> Dict[str, List[str]]:
     """Convert a series of key[=value]s into a dictionary.
 
     All dictionary values are accumulated sequences of 'value's,
@@ -596,7 +625,7 @@ class FlagForwarder(object):
 
 
 @contextlib.contextmanager
-def chdir_cm(d: Path):
+def chdir_cm(d: Path) -> Iterator[None]:
     """FIXME: replace with contextlib.chdir(), once Python 3.11 is default."""
     save_dir = os.getcwd()
     os.chdir(d)  # could raise OSError
@@ -623,7 +652,7 @@ def relpath(path: Path, start: Path) -> Path:
     return Path(os.path.relpath(path, start=start))
 
 
-def symlink_relative(dest: Path, src: Path):
+def symlink_relative(dest: Path, src: Path) -> None:
     """Create a relative-path symlink from src to dest.
 
     Like os.symlink(), but using relative path.
@@ -701,15 +730,17 @@ class BlockingFileLock(object):
 
     def __init__(self, lockfile: Path):
         self._lockfile: Path = lockfile
-        self._lockfile_fd = None
+        self._lockfile_fd: Optional[int] = None
 
-    def _acquire(self):
+    def _acquire(self) -> None:
         lockfile_fd = os.open(self._lockfile, os.O_RDWR | os.O_CREAT, 0o644)
         fcntl.flock(lockfile_fd, fcntl.LOCK_EX)  # Blocking
         self._lockfile_fd = lockfile_fd
 
-    def _release(self):
+    def _release(self) -> None:
         lockfile_fd = self._lockfile_fd
+        if not lockfile_fd:
+            return
         self._lockfile_fd = None
         fcntl.flock(lockfile_fd, fcntl.LOCK_UN)
         os.close(lockfile_fd)
@@ -720,7 +751,7 @@ class BlockingFileLock(object):
         self._acquire()
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
         self._release()
 
 
@@ -733,10 +764,10 @@ class SubprocessResult(object):
     def __init__(
         self,
         returncode: int,
-        stdout: Sequence[str] = None,  # lines
-        stderr: Sequence[str] = None,  # lines
+        stdout: Optional[Sequence[str]] = None,  # lines
+        stderr: Optional[Sequence[str]] = None,  # lines
         # The process id may come in handy when looking for logs
-        pid: int = None,
+        pid: Optional[int] = None,
     ):
         self.returncode = returncode
         self.stdout = stdout or []
@@ -752,7 +783,11 @@ class SubprocessResult(object):
         return "\n".join(self.stderr)
 
 
-async def _read_stream(stream: io.TextIOBase, callback: Callable[[str], None]):
+async def _read_stream(
+    stream: Optional[asyncio.StreamReader], callback: Callable[[bytes], None]
+) -> None:
+    if not stream:
+        return
     while True:
         line = await stream.readline()
         if line:
@@ -763,13 +798,13 @@ async def _read_stream(stream: io.TextIOBase, callback: Callable[[str], None]):
 
 async def _stream_subprocess(
     cmd: Sequence[str],
-    stdin: io.TextIOBase = None,
-    stdout: io.TextIOBase = None,
-    stderr: io.TextIOBase = None,
+    stdin: Optional[IO[Any]] = None,
+    stdout: Optional[TextIO] = None,
+    stderr: Optional[TextIO] = None,
     quiet: bool = False,
-    **kwargs,
+    **kwargs: Any,
 ) -> SubprocessResult:
-    popen_kwargs = {}
+    popen_kwargs: Any = {}
     if platform.system() == "Windows":
         platform_settings = {"env": os.environ}
     else:
@@ -790,14 +825,14 @@ async def _stream_subprocess(
     )
     pid = p.pid
 
-    out_text = []
-    err_text = []
+    out_text: List[str] = []
+    err_text: List[str] = []
 
-    def tee(line: str, sink: Sequence[str], pipe: io.TextIOBase):
-        line = line.decode("utf-8").rstrip()
-        sink.append(line)
+    def tee(line: bytes, sink: List[str], pipe: TextIO) -> None:
+        line_str = line.decode("utf-8").rstrip()
+        sink.append(line_str)
         if not quiet:
-            print(line, file=pipe)
+            print(line_str, file=pipe)
 
     out_task = asyncio.create_task(
         _read_stream(p.stdout, lambda l: tee(l, out_text, stdout or sys.stdout))
@@ -818,11 +853,11 @@ async def _stream_subprocess(
 
 def subprocess_call(
     cmd: Sequence[str],
-    stdin: io.TextIOBase = None,
-    stdout: io.TextIOBase = None,
-    stderr: io.TextIOBase = None,
+    stdin: Optional[IO[Any]] = None,
+    stdout: Optional[TextIO] = None,
+    stderr: Optional[TextIO] = None,
     quiet: bool = False,
-    **kwargs,
+    **kwargs: Any,
 ) -> SubprocessResult:
     """Similar to subprocess.call(), but records stdout/stderr.
 
@@ -858,7 +893,7 @@ def subprocess_call(
 
 
 def subprocess_communicate(
-    cmd: Sequence[str], input_text: str, **kwargs
+    cmd: Sequence[str], input_text: str, **kwargs: Any
 ) -> SubprocessResult:
     """Pipes text through an external program.
 

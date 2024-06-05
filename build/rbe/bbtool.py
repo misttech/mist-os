@@ -24,13 +24,13 @@ _SCRIPT_BASENAME = Path(__file__).name
 _SCRIPT_DIR = Path(__file__).parent
 
 PROJECT_ROOT = fuchsia.project_root_dir()
-PROJECT_ROOT_REL = cl_utils.relpath(PROJECT_ROOT, start=os.curdir)
+PROJECT_ROOT_REL = cl_utils.relpath(PROJECT_ROOT, Path(start=os.curdir))
 
 # default path to `bb` buildbucket tool
 _BB_TOOL = PROJECT_ROOT_REL / "prebuilt" / "tools" / "buildbucket" / "bb"
 
 
-def msg(text: str):
+def msg(text: str) -> None:
     print(f"[{_SCRIPT_BASENAME}] {text}")
 
 
@@ -42,7 +42,7 @@ class BBError(RuntimeError):
 
 
 class BuildBucketTool(object):
-    def __init__(self, bb: Path = None):
+    def __init__(self, bb: Optional[Path] = None):
         self.bb = bb or _BB_TOOL
 
     def get_json_fields(self, bbid: str) -> Dict[str, Any]:
@@ -149,7 +149,7 @@ class BuildBucketTool(object):
 
 def fetch_reproxy_log_from_bbid(
     bbpath: Path, bbid: str, verbose: bool = False
-) -> Path:
+) -> Optional[Path]:
     bb = BuildBucketTool(bbpath)
 
     # Get the build that actually used RBE, and has an reproxy log.
