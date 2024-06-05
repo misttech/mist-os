@@ -8,7 +8,7 @@ use crate::{
     task::{CurrentTask, EventHandler, Kernel, WaitCallback, WaitCanceler, WaitQueue, Waiter},
     vfs::{
         buffers::{
-            Buffer, InputBuffer, InputBufferCallback, MessageQueue, OutputBuffer,
+            Buffer, InputBuffer, InputBufferCallback, MessageData, MessageQueue, OutputBuffer,
             OutputBufferCallback, PeekBufferSegmentsCallback, UserBuffersInputBuffer,
             UserBuffersOutputBuffer,
         },
@@ -335,7 +335,7 @@ impl Pipe {
                 // The `from` pipe is empty.
                 break;
             };
-            if let Some(data) = message.data.split_off(limit) {
+            if let Some(data) = MessageData::split_off(&mut message.data, limit) {
                 // Some data is left in the message. Push it back.
                 assert!(data.len() > 0);
                 from.messages.write_front(data.into());
@@ -607,10 +607,9 @@ impl<'a> Buffer for SpliceInputBuffer<'a> {
         let mut available = self.available;
         for message in self.pipe.messages.messages() {
             let to_read = std::cmp::min(available, message.len());
-            let buffer = &message.data.bytes()[0..to_read];
             callback(&UserBuffer {
-                address: UserAddress::from(buffer.as_ptr() as u64),
-                length: buffer.len(),
+                address: UserAddress::from(message.data.ptr() as u64),
+                length: to_read,
             });
             available -= to_read;
         }
@@ -624,7 +623,7 @@ impl<'a> InputBuffer for SpliceInputBuffer<'a> {
         let mut available = self.available;
         for message in self.pipe.messages.messages() {
             let to_read = std::cmp::min(available, message.len());
-            let result = callback(&message.data.bytes()[0..to_read])?;
+            let result = message.data.with_bytes(|bytes| callback(&bytes[0..to_read]))?;
             if result > to_read {
                 return error!(EINVAL);
             }
@@ -660,7 +659,7 @@ impl<'a> InputBuffer for SpliceInputBuffer<'a> {
         }
         self.available -= length;
         while let Some(mut message) = self.pipe.messages.read_message() {
-            if let Some(data) = message.data.split_off(length) {
+            if let Some(data) = MessageData::split_off(&mut message.data, length) {
                 // Some data is left in the message. Push it back.
                 self.pipe.messages.write_front(data.into());
             }

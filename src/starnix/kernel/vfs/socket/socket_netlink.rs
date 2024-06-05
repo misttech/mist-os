@@ -434,8 +434,8 @@ impl SocketOps for BaseNetlinkSocket {
         match msg {
             Some(message) => {
                 // Mark the message as complete and return it.
-                let mut nl_msg = nlmsghdr::read_from_prefix(message.data.bytes())
-                    .ok_or_else(|| errno!(EINVAL))?;
+                let mut nl_msg =
+                    nlmsghdr::read_from_prefix(&message.data).ok_or_else(|| errno!(EINVAL))?;
                 nl_msg.nlmsg_type = NLMSG_DONE as u16;
                 nl_msg.nlmsg_flags &= NLM_F_MULTI as u16;
                 let msg_bytes = nl_msg.as_bytes();
@@ -1364,7 +1364,7 @@ mod tests {
         });
 
         assert_eq!(
-            data.map(|data| NetlinkMessage::<RouteNetlinkMessage>::deserialize(data.bytes())
+            data.map(|data| NetlinkMessage::<RouteNetlinkMessage>::deserialize(&data)
                 .expect("message should deserialize into RtnlMessage")),
             expected_message
         )

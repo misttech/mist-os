@@ -30,11 +30,11 @@ impl MessageReadInfo {
 
 /// A `MessageQueue` stores a FIFO sequence of messages.
 #[derive(Debug)]
-pub struct MessageQueue {
+pub struct MessageQueue<D: MessageData = Vec<u8>> {
     /// The messages stored in the message queue.
     ///
     /// Writes are added at the end of the queue. Reads consume from the front of the queue.
-    messages: VecDeque<Message>,
+    messages: VecDeque<Message<D>>,
 
     /// The total number of bytes currently in the message queue.
     length: usize,
@@ -43,8 +43,8 @@ pub struct MessageQueue {
     capacity: usize,
 }
 
-impl MessageQueue {
-    pub fn new(capacity: usize) -> MessageQueue {
+impl<D: MessageData> MessageQueue<D> {
+    pub fn new(capacity: usize) -> Self {
         MessageQueue { messages: VecDeque::default(), length: 0, capacity }
     }
 
@@ -60,7 +60,7 @@ impl MessageQueue {
         self.capacity
     }
 
-    pub fn messages(&self) -> impl Iterator<Item = &Message> {
+    pub fn messages(&self) -> impl Iterator<Item = &Message<D>> {
         self.messages.iter()
     }
 
@@ -86,7 +86,7 @@ impl MessageQueue {
         self.length
     }
 
-    fn update_address(message: &Message, address: &mut Option<SocketAddress>) -> bool {
+    fn update_address(message: &Message<D>, address: &mut Option<SocketAddress>) -> bool {
         if message.address.is_some() && *address != message.address {
             if address.is_some() {
                 return false;
@@ -218,19 +218,19 @@ impl MessageQueue {
     }
 
     /// Reads the next message in the buffer, if such a message exists.
-    pub fn read_message(&mut self) -> Option<Message> {
+    pub fn read_message(&mut self) -> Option<Message<D>> {
         self.messages.pop_front().map(|message| {
             self.length -= message.len();
             message
         })
     }
 
-    pub fn peek_queue(&self) -> &VecDeque<Message> {
+    pub fn peek_queue(&self) -> &VecDeque<Message<D>> {
         &self.messages
     }
 
     /// Peeks the next message in the buffer, if such a message exists.
-    fn peek_message(&self) -> Option<&Message> {
+    fn peek_message(&self) -> Option<&Message<D>> {
         self.messages.front()
     }
 
@@ -266,7 +266,7 @@ impl MessageQueue {
         data: &mut dyn InputBuffer,
         address: Option<SocketAddress>,
         ancillary_data: &mut Vec<AncillaryData>,
-        filter: impl FnOnce(Message) -> Option<Message>,
+        filter: impl FnOnce(Message<D>) -> Option<Message<D>>,
     ) -> Result<usize, Errno> {
         let actual = std::cmp::min(self.available_capacity(), data.available());
         if actual == 0 && data.available() > 0 {
@@ -312,7 +312,7 @@ impl MessageQueue {
         data: &mut dyn InputBuffer,
         address: Option<SocketAddress>,
         ancillary_data: &mut Vec<AncillaryData>,
-        filter: impl FnOnce(Message) -> Option<Message>,
+        filter: impl FnOnce(Message<D>) -> Option<Message<D>>,
     ) -> Result<usize, Errno> {
         let actual = data.available();
         if actual > self.capacity() {
@@ -330,14 +330,14 @@ impl MessageQueue {
     }
 
     /// Writes a message to the front of the message queue.
-    pub fn write_front(&mut self, message: Message) {
+    pub fn write_front(&mut self, message: Message<D>) {
         self.length += message.len();
         debug_assert!(self.length <= self.capacity);
         self.messages.push_front(message);
     }
 
     /// Writes a message to the back of the message queue.
-    pub fn write_message(&mut self, message: Message) {
+    pub fn write_message(&mut self, message: Message<D>) {
         self.length += message.len();
         debug_assert!(self.length <= self.capacity);
         self.messages.push_back(message);

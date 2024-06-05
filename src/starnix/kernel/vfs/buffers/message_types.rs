@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::fmt::Debug;
+
 use byteorder::{ByteOrder, NativeEndian};
 use zerocopy::{AsBytes, FromBytes};
 
@@ -23,9 +25,9 @@ use starnix_uapi::{
 /// A `Message` represents a typed segment of bytes within a `MessageQueue`.
 #[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
-pub struct Message {
+pub struct Message<D: MessageData = Vec<u8>> {
     /// The data contained in the message.
-    pub data: MessageData,
+    pub data: D,
 
     /// The address from which the message was sent.
     pub address: Option<SocketAddress>,
@@ -34,10 +36,10 @@ pub struct Message {
     pub ancillary_data: Vec<AncillaryData>,
 }
 
-impl Message {
+impl<D: MessageData> Message<D> {
     /// Creates a a new message with the provided message and ancillary data.
     pub fn new(
-        data: MessageData,
+        data: D,
         address: Option<SocketAddress>,
         ancillary_data: Vec<AncillaryData>,
     ) -> Self {
@@ -51,11 +53,9 @@ impl Message {
         self.data.len()
     }
 
-    pub fn clone_at_most(&self, limit: usize) -> Message {
+    pub fn clone_at_most(&self, limit: usize) -> Self {
         Message {
-            data: MessageData {
-                bytes: self.data.bytes[0..std::cmp::min(self.len(), limit)].to_vec(),
-            },
+            data: self.data.clone_at_most(limit),
             address: self.address.clone(),
             ancillary_data: self.ancillary_data.clone(),
         }
@@ -65,19 +65,13 @@ impl Message {
     ///
     /// If `limit` is greater or equal to the current data length, this has no effect.
     pub fn truncate(&mut self, limit: usize) {
-        self.data.bytes.truncate(limit);
+        self.data.truncate(limit);
     }
 }
 
-impl From<MessageData> for Message {
-    fn from(data: MessageData) -> Self {
+impl<D: MessageData> From<D> for Message<D> {
+    fn from(data: D) -> Self {
         Message { data, address: None, ancillary_data: Vec::new() }
-    }
-}
-
-impl From<Vec<u8>> for Message {
-    fn from(data: Vec<u8>) -> Self {
-        Self { data: data.into(), address: None, ancillary_data: Vec::new() }
     }
 }
 
@@ -388,52 +382,75 @@ impl UnixControlData {
     }
 }
 
-/// A `Packet` stores an arbitrary sequence of bytes.
-#[derive(Clone, Eq, PartialEq, Debug, Default)]
-pub struct MessageData {
-    /// The bytes in this packet.
-    bytes: Vec<u8>,
-}
-
-impl MessageData {
+/// Stores an arbitrary sequence of bytes.
+pub trait MessageData: Sized {
     /// Copies data from user memory into a new MessageData object.
-    pub fn copy_from_user(data: &mut dyn InputBuffer, limit: usize) -> Result<MessageData, Errno> {
-        data.read_to_vec_exact(limit).map(Into::into)
-    }
+    fn copy_from_user(data: &mut dyn InputBuffer, limit: usize) -> Result<Self, Errno>;
+
+    /// Returns a pointer to this data.
+    fn ptr(&self) -> *const u8;
+
+    /// Calls the provided function with this data's bytes.
+    fn with_bytes<O, F: FnMut(&[u8]) -> O>(&self, f: F) -> O;
 
     /// Returns the number of bytes in the message.
-    pub fn len(&self) -> usize {
-        self.bytes.len()
-    }
+    fn len(&self) -> usize;
 
     /// Splits the message data at `index`.
     ///
     /// After this call returns, at most `at` bytes will be stored in this `MessageData`, and any
     /// remaining bytes will be moved to the returned `MessageData`.
-    pub fn split_off(&mut self, index: usize) -> Option<Self> {
+    fn split_off(&mut self, index: usize) -> Option<Self>;
+
+    /// Copies the message out to the output buffer.
+    ///
+    /// Returns the number of bytes that were read into the buffer.
+    fn copy_to_user(&self, data: &mut dyn OutputBuffer) -> Result<usize, Errno>;
+
+    /// Clones this data up to a limit.
+    fn clone_at_most(&self, limit: usize) -> Self;
+
+    /// Truncates this data to the specified limit.
+    ///
+    /// Does nothing if the limit is larger than the data's size.
+    fn truncate(&mut self, limit: usize);
+}
+
+impl MessageData for Vec<u8> {
+    fn copy_from_user(data: &mut dyn InputBuffer, limit: usize) -> Result<Self, Errno> {
+        data.read_to_vec_exact(limit)
+    }
+
+    fn ptr(&self) -> *const u8 {
+        self.as_ptr()
+    }
+
+    fn with_bytes<O, F: FnMut(&[u8]) -> O>(&self, mut f: F) -> O {
+        f(self)
+    }
+
+    fn len(&self) -> usize {
+        Vec::<u8>::len(self)
+    }
+
+    fn split_off(&mut self, index: usize) -> Option<Self> {
         if index < self.len() {
-            let message_data = MessageData { bytes: self.bytes.split_off(index) };
-            Some(message_data)
+            let bytes = self.split_off(index);
+            Some(bytes)
         } else {
             None
         }
     }
 
-    /// Returns a reference to the bytes in the packet.
-    pub fn bytes(&self) -> &[u8] {
-        &self.bytes
+    fn copy_to_user(&self, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
+        data.write(self.as_ref())
     }
 
-    /// Copies the message out to the output buffer.
-    ///
-    /// Returns the number of bytes that were read into the buffer.
-    pub fn copy_to_user(&self, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
-        data.write(self.bytes())
+    fn clone_at_most(&self, limit: usize) -> Self {
+        self[0..std::cmp::min(self.len(), limit)].to_vec()
     }
-}
 
-impl From<Vec<u8>> for MessageData {
-    fn from(bytes: Vec<u8>) -> Self {
-        Self { bytes }
+    fn truncate(&mut self, limit: usize) {
+        self.truncate(limit)
     }
 }
