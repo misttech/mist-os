@@ -519,8 +519,7 @@ impl<'a> Fsck<'a> {
                 previous_allocation_end = r.end;
             }
 
-            *observed_owner_allocated_bytes.entry(owner_object_id).or_insert(0) +=
-                (r.end - r.start) as i64;
+            *observed_owner_allocated_bytes.entry(owner_object_id).or_insert(0) += r.end - r.start;
             if !store_object_ids.contains(&owner_object_id) {
                 if filesystem.object_manager().store(owner_object_id).is_none() {
                     self.error(FsckError::AllocationForNonexistentOwner(allocation.into()))?;
@@ -571,7 +570,7 @@ impl<'a> Fsck<'a> {
             observed_allocations.advance().await?;
             continue;
         }
-        let expected_allocated_bytes = observed_owner_allocated_bytes.values().sum::<i64>() as u64;
+        let expected_allocated_bytes = observed_owner_allocated_bytes.values().sum::<u64>();
         self.verbose(format!(
             "Found {} bytes allocated (expected {} bytes). Total device size is {} bytes.",
             allocator.get_allocated_bytes(),

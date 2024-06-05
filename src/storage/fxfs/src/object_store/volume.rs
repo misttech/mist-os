@@ -343,8 +343,8 @@ mod tests {
                     .allocator()
                     .get_owner_allocated_bytes()
                     .get(&store_object_id)
-                    .unwrap_or(&0i64),
-                &0i64,
+                    .unwrap_or(&0),
+                &0,
             );
             // Confirm volume entry is gone.
             root_volume

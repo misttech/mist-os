@@ -552,7 +552,7 @@ impl FxFilesystem {
     pub fn get_info(&self) -> Info {
         Info {
             total_bytes: self.device.size(),
-            used_bytes: self.object_manager().allocator().get_used_bytes(),
+            used_bytes: self.object_manager().allocator().get_used_bytes().0,
         }
     }
 

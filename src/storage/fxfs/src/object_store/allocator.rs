@@ -134,6 +134,7 @@ use {
         collections::{BTreeMap, HashSet, VecDeque},
         hash::Hash,
         marker::PhantomData,
+        num::Saturating,
         ops::{Bound, Range},
         sync::{
             atomic::{AtomicU64, Ordering},
@@ -451,8 +452,11 @@ pub struct Allocator {
 struct ByteTracking {
     /// This value is the up-to-date count of the number of allocated bytes per owner_object_id
     /// whereas the value in `Info::allocated_bytes` is the value as it was when we last flushed.
-    /// This is i64 because it can be negative during replay.
-    allocated_bytes: i64,
+    /// This field should be regarded as *untrusted*; it can be invalid due to filesystem
+    /// inconsistencies, and this is why it is `Saturating<u64>` rather than just `u64`.  Any
+    /// computations that use this value should typically propagate `Saturating` so that it is clear
+    /// the value is *untrusted*.
+    allocated_bytes: Saturating<u64>,
 
     /// This value is the number of bytes allocated to uncommitted allocations.
     /// (Bytes allocated, but not yet persisted to disk)
@@ -470,24 +474,24 @@ struct ByteTracking {
 impl ByteTracking {
     // Returns the total number of bytes that are taken either from reservations, allocations or
     // uncommitted allocations.
-    fn used_bytes(&self) -> u64 {
-        self.allocated_bytes as u64 + self.uncommitted_allocated_bytes + self.reserved_bytes
+    fn used_bytes(&self) -> Saturating<u64> {
+        self.allocated_bytes + Saturating(self.uncommitted_allocated_bytes + self.reserved_bytes)
     }
 
     // Returns the amount that is not available to be allocated, which includes actually allocated
     // bytes, bytes that have been allocated for a transaction but the transaction hasn't committed
     // yet, and bytes that have been deallocated, but the device hasn't been flushed yet so we can't
     // reuse those bytes yet.
-    fn unavailable_bytes(&self) -> u64 {
-        self.allocated_bytes as u64
-            + self.uncommitted_allocated_bytes
-            + self.committed_deallocated_bytes
+    fn unavailable_bytes(&self) -> Saturating<u64> {
+        self.allocated_bytes
+            + Saturating(self.uncommitted_allocated_bytes)
+            + Saturating(self.committed_deallocated_bytes)
     }
 
     // Like `unavailable_bytes`, but treats as available the bytes which have been deallocated and
     // require a device flush to be reused.
-    fn unavailable_after_sync_bytes(&self) -> u64 {
-        self.allocated_bytes as u64 + self.uncommitted_allocated_bytes
+    fn unavailable_after_sync_bytes(&self) -> Saturating<u64> {
+        self.allocated_bytes + Saturating(self.uncommitted_allocated_bytes)
     }
 }
 
@@ -567,16 +571,21 @@ struct Inner {
     rebuild_strategy_trigger_histogram: [u64; 64],
 
     /// This is distinct from the set contained in `info`.  New entries are inserted *after* a
-    /// device has been flushed.  It is not safe to ignore deleted volumes until that has happened.
+    /// device has been flushed (it is not safe to reuse the space taken by a deleted volume prior
+    /// to this) and are removed after a major compaction.
     marked_for_deletion: HashSet<u64>,
 
-    /// The count of volumes deleted that are waiting for a sync.
+    /// The set of volumes deleted that are waiting for a sync.
     volumes_deleted_pending_sync: HashSet<u64>,
 }
 
 impl Inner {
-    fn allocated_bytes(&self) -> i64 {
-        self.owner_bytes.values().map(|x| &x.allocated_bytes).sum()
+    fn allocated_bytes(&self) -> Saturating<u64> {
+        let mut total = Saturating(0);
+        for (_, bytes) in &self.owner_bytes {
+            total += bytes.allocated_bytes;
+        }
+        total
     }
 
     fn uncommitted_allocated_bytes(&self) -> u64 {
@@ -597,43 +606,49 @@ impl Inner {
 
     fn owner_id_bytes_left(&self, owner_object_id: u64) -> u64 {
         let limit = self.owner_id_limit_bytes(owner_object_id);
-        let used = match self.owner_bytes.get(&owner_object_id) {
-            Some(b) => b.used_bytes(),
-            None => 0,
-        };
-        if limit > used {
-            limit - used
-        } else {
-            0
-        }
+        let used = self.owner_bytes.get(&owner_object_id).map_or(Saturating(0), |b| b.used_bytes());
+        (Saturating(limit) - used).0
     }
 
     // Returns the amount that is not available to be allocated, which includes actually allocated
     // bytes, bytes that have been allocated for a transaction but the transaction hasn't committed
     // yet, and bytes that have been deallocated, but the device hasn't been flushed yet so we can't
     // reuse those bytes yet.
-    fn unavailable_bytes(&self) -> u64 {
-        self.owner_bytes.values().map(|x| x.unavailable_bytes()).sum::<u64>()
+    fn unavailable_bytes(&self) -> Saturating<u64> {
+        let mut total = Saturating(0);
+        for (_, bytes) in &self.owner_bytes {
+            total += bytes.unavailable_bytes();
+        }
+        total
     }
 
     // Returns the total number of bytes that are taken either from reservations, allocations or
     // uncommitted allocations.
-    fn used_bytes(&self) -> u64 {
-        self.owner_bytes.values().map(|x| x.used_bytes()).sum::<u64>()
-            + self.unattributed_reserved_bytes
+    fn used_bytes(&self) -> Saturating<u64> {
+        let mut total = Saturating(0);
+        for (_, bytes) in &self.owner_bytes {
+            total += bytes.used_bytes();
+        }
+        total + Saturating(self.unattributed_reserved_bytes)
     }
 
     // Like `unavailable_bytes`, but treats as available the bytes which have been deallocated and
     // require a device flush to be reused.
-    fn unavailable_after_sync_bytes(&self) -> u64 {
-        self.owner_bytes.values().map(|x| x.unavailable_after_sync_bytes()).sum::<u64>()
+    fn unavailable_after_sync_bytes(&self) -> Saturating<u64> {
+        let mut total = Saturating(0);
+        for (_, bytes) in &self.owner_bytes {
+            total += bytes.unavailable_after_sync_bytes();
+        }
+        total
     }
 
     // Returns the number of bytes which will be available after the current batch of trimming
     // completes.
     fn bytes_available_not_being_trimmed(&self, device_size: u64) -> Result<u64, Error> {
         device_size
-            .checked_sub(self.unavailable_after_sync_bytes() + self.trim_reserved_bytes)
+            .checked_sub(
+                (self.unavailable_after_sync_bytes() + Saturating(self.trim_reserved_bytes)).0,
+            )
             .ok_or(anyhow!(FxfsError::Inconsistent))
     }
 
@@ -804,10 +819,8 @@ impl Allocator {
         Ok(())
     }
 
-    // Ensures the allocator is open.  If empty, create the object in the root object store,
-    // otherwise load and initialise the LSM tree.  This is not thread-safe; this should be called
-    // after the journal has been replayed. Any entries in the LSMTree mutable layer
-    // that were written during replay will be preserved.
+    // Opens the allocator.  This is not thread-safe; this should be called prior to
+    // replaying the allocator's mutations.
     pub async fn open(self: &Arc<Self>) -> Result<(), Error> {
         let filesystem = self.filesystem.upgrade().unwrap();
         let root_store = filesystem.root_store();
@@ -816,9 +829,6 @@ impl Allocator {
             let mut inner = self.inner.lock().unwrap();
 
             inner.strategy = Box::new(strategy::BestFit::default());
-
-            // We can assume the device has been flushed.
-            inner.volumes_deleted_pending_sync.clear();
         }
 
         let handle =
@@ -832,10 +842,11 @@ impl Allocator {
                 .await
                 .context("Failed to read AllocatorInfo")?;
             let mut cursor = std::io::Cursor::new(serialized_info);
-            let (mut info, _version) = AllocatorInfo::deserialize_with_version(&mut cursor)
+            let (info, _version) = AllocatorInfo::deserialize_with_version(&mut cursor)
                 .context("Failed to deserialize AllocatorInfo")?;
 
             let mut handles = Vec::new();
+            let mut layer_file_sizes = Vec::new();
             let mut total_size = 0;
             for object_id in &info.layers {
                 let handle = ObjectStore::open_object(
@@ -846,70 +857,35 @@ impl Allocator {
                 )
                 .await
                 .context("Failed to open allocator layer file")?;
-                total_size += handle.get_size();
+
+                let size = handle.get_size();
+                layer_file_sizes.push(size);
+                total_size += size;
                 handles.push(handle);
             }
+
             {
                 let mut inner = self.inner.lock().unwrap();
-                // After replaying, allocated_bytes should include all the deltas since the time
-                // the allocator was last flushed, so here we just need to add whatever is
-                // recorded in info.
-                for (owner_object_id, bytes) in &info.allocated_bytes {
-                    let amount: i64 = (*bytes).try_into().map_err(|_| {
-                        anyhow!(FxfsError::Inconsistent).context(format!(
-                            "Allocated bytes inconsistent info={:?}",
-                            info.allocated_bytes
-                        ))
-                    })?;
-                    let allocated_bytes =
-                        &mut inner.owner_bytes.entry(*owner_object_id).or_default().allocated_bytes;
-                    match allocated_bytes.checked_add(amount) {
-                        None => bail!(anyhow!(FxfsError::Inconsistent).context(format!(
-                            "Allocated bytes overflow info={:?}, owner_bytes={:?}",
-                            info.allocated_bytes, inner.owner_bytes
-                        ))),
-                        Some(value) => *allocated_bytes = value,
-                    }
-                }
 
-                // Merge `marked_for_deletion`.
-                info.marked_for_deletion.extend(inner.info.marked_for_deletion.iter());
-
-                // Don't continue tracking bytes for anything that has been marked for deletion.
-                let AllocatorInfo { marked_for_deletion, limit_bytes, .. } = &mut info;
-                for owner_id in marked_for_deletion.iter() {
-                    limit_bytes.remove(owner_id);
-                    // There shouldn't be anything in `owner_bytes`, but just to be safe...
-                    inner.owner_bytes.remove(owner_id);
-                }
-
-                // Check all allocated_bytes are valid and fit within the device.
-                let mut device_bytes = self.device_size as i64;
-                for (_, ByteTracking { allocated_bytes, .. }) in &inner.owner_bytes {
+                // Check allocated_bytes fits within the device.
+                let mut device_bytes = self.device_size;
+                for (&owner_object_id, &bytes) in &info.allocated_bytes {
                     ensure!(
-                        *allocated_bytes >= 0 && *allocated_bytes <= self.device_size as i64,
-                        anyhow!(FxfsError::Inconsistent)
-                            .context(format!("Bad allocated bytes: {:?}", inner.owner_bytes))
-                    );
-                    ensure!(
-                        *allocated_bytes <= device_bytes,
+                        bytes <= device_bytes,
                         anyhow!(FxfsError::Inconsistent).context(format!(
                             "Allocated bytes exceeds device size: {:?}",
-                            inner.owner_bytes
+                            info.allocated_bytes
                         ))
                     );
-                    device_bytes -= *allocated_bytes;
+                    device_bytes -= bytes;
+
+                    inner.owner_bytes.entry(owner_object_id).or_default().allocated_bytes =
+                        Saturating(bytes);
                 }
-
-                // Merge in current data which has picked up the deltas on top of the snapshot.
-                info.limit_bytes.extend(inner.info.limit_bytes.iter());
-
-                inner.marked_for_deletion = info.marked_for_deletion.clone();
 
                 inner.info = info;
             }
-            let layer_file_sizes =
-                handles.iter().map(ReadObjectHandle::get_size).collect::<Vec<u64>>();
+
             self.counters.lock().unwrap().persistent_layer_file_sizes = layer_file_sizes;
             self.tree.append_layers(handles).await.context("Failed to append allocator layers")?;
             self.filesystem.upgrade().unwrap().object_manager().update_reservation(
@@ -917,6 +893,18 @@ impl Allocator {
                 tree::reservation_amount_from_layer_size(total_size),
             );
         }
+
+        Ok(())
+    }
+
+    pub async fn on_replay_complete(self: &Arc<Self>) -> Result<(), Error> {
+        // We can assume the device has been flushed.
+        {
+            let mut inner = self.inner.lock().unwrap();
+            inner.volumes_deleted_pending_sync.clear();
+            inner.marked_for_deletion = inner.info.marked_for_deletion.clone();
+        }
+
         // Build free extent structure from disk. For now, we expect disks to have *some* free
         // space at all times. This may change if we ever support mounting of read-only
         // redistributable filesystem images.
@@ -1075,7 +1063,8 @@ impl Allocator {
             inner.trim_listener = Some(listener);
             inner.trim_reserved_bytes = bytes;
             debug_assert!(
-                inner.trim_reserved_bytes + inner.unavailable_bytes() <= self.device_size
+                (Saturating(inner.trim_reserved_bytes) + inner.unavailable_bytes()).0
+                    <= self.device_size
             );
         }
         Ok(result)
@@ -1097,7 +1086,7 @@ impl Allocator {
     pub fn owner_allocation_info(&self, owner_object_id: u64) -> (u64, Option<u64>) {
         let inner = self.inner.lock().unwrap();
         (
-            inner.owner_bytes.get(&owner_object_id).map(|b| b.used_bytes()).unwrap_or(0u64),
+            inner.owner_bytes.get(&owner_object_id).map(|b| b.used_bytes().0).unwrap_or(0u64),
             inner.info.limit_bytes.get(&owner_object_id).copied(),
         )
     }
@@ -1113,7 +1102,7 @@ impl Allocator {
         // happens to be a lot of deallocated bytes as that might mean we can fully satisfy
         // allocation requests.
         let inner = self.inner.lock().unwrap();
-        inner.unavailable_bytes() >= self.device_size
+        inner.unavailable_bytes().0 >= self.device_size
     }
 
     fn is_system_store(&self, owner_object_id: u64) -> bool {
@@ -1151,10 +1140,10 @@ impl Allocator {
                         // TODO(https://fxbug.dev/42069513): Push-back or rate-limit to prevent DoS.
                         let inner = this.inner.lock().unwrap();
                         (
-                            inner.allocated_bytes().try_into().unwrap_or(0u64),
+                            inner.allocated_bytes().0,
                             inner.reserved_bytes(),
-                            inner.used_bytes(),
-                            inner.unavailable_bytes(),
+                            inner.used_bytes().0,
+                            inner.unavailable_bytes().0,
                         )
                     };
                     root.record_uint("bytes_allocated", allocated);
@@ -1286,7 +1275,8 @@ impl Allocator {
             let device_used = inner.used_bytes();
             let owner_bytes_left = inner.owner_id_bytes_left(owner_object_id);
             // We must take care not to use up space that might be reserved.
-            let limit = std::cmp::min(owner_bytes_left, self.device_size - device_used);
+            let limit =
+                std::cmp::min(owner_bytes_left, (Saturating(self.device_size) - device_used).0);
             len = round_down(std::cmp::min(len, limit), self.block_size);
             let owner_entry = inner.owner_bytes.entry(owner_object_id).or_default();
             owner_entry.reserved_bytes += len;
@@ -1374,7 +1364,7 @@ impl Allocator {
             // trimming to complete before proceeding.
             let avail = self
                 .device_size
-                .checked_sub(inner.unavailable_bytes())
+                .checked_sub(inner.unavailable_bytes().0)
                 .ok_or(FxfsError::Inconsistent)?;
             let free_and_not_being_trimmed =
                 inner.bytes_available_not_being_trimmed(self.device_size)?;
@@ -1477,7 +1467,7 @@ impl Allocator {
             let owner_entry = inner.owner_bytes.entry(owner_object_id).or_default();
             ensure!(
                 device_range.end <= self.device_size
-                    && self.device_size - device_used >= len
+                    && (Saturating(self.device_size) - device_used).0 >= len
                     && owner_id_bytes_left >= len,
                 FxfsError::NoSpace
             );
@@ -1649,7 +1639,7 @@ impl Allocator {
         {
             let mut inner = self.inner.lock().unwrap();
 
-            let device_free = self.device_size.checked_sub(inner.used_bytes()).unwrap();
+            let device_free = (Saturating(self.device_size) - inner.used_bytes()).0;
 
             let limit = match owner_object_id {
                 Some(id) => std::cmp::min(inner.owner_id_bytes_left(id), device_free),
@@ -1672,12 +1662,12 @@ impl Allocator {
     ) -> Reservation {
         {
             let mut inner = self.inner.lock().unwrap();
+
+            let device_free = (Saturating(self.device_size) - inner.used_bytes()).0;
+
             let limit = match owner_object_id {
-                Some(id) => std::cmp::min(
-                    inner.owner_id_bytes_left(id),
-                    self.device_size - inner.used_bytes(),
-                ),
-                None => self.device_size - inner.used_bytes(),
+                Some(id) => std::cmp::min(inner.owner_id_bytes_left(id), device_free),
+                None => device_free,
             };
             amount = std::cmp::min(limit, amount);
             inner.add_reservation(owner_object_id, amount);
@@ -1687,7 +1677,7 @@ impl Allocator {
 
     /// Returns the total number of allocated bytes.
     pub fn get_allocated_bytes(&self) -> u64 {
-        self.inner.lock().unwrap().allocated_bytes() as u64
+        self.inner.lock().unwrap().allocated_bytes().0
     }
 
     /// Returns the size of bytes available to allocate.
@@ -1698,18 +1688,18 @@ impl Allocator {
     /// Returns the total number of allocated bytes per owner_object_id.
     /// Note that this is quite an expensive operation as it copies the collection.
     /// This is intended for use in fsck() and friends, not general use code.
-    pub fn get_owner_allocated_bytes(&self) -> BTreeMap<u64, i64> {
+    pub fn get_owner_allocated_bytes(&self) -> BTreeMap<u64, u64> {
         self.inner
             .lock()
             .unwrap()
             .owner_bytes
             .iter()
-            .map(|(k, v)| (*k, v.allocated_bytes))
+            .map(|(k, v)| (*k, v.allocated_bytes.0))
             .collect()
     }
 
     /// Returns the number of allocated and reserved bytes.
-    pub fn get_used_bytes(&self) -> u64 {
+    pub fn get_used_bytes(&self) -> Saturating<u64> {
         let inner = self.inner.lock().unwrap();
         inner.used_bytes()
     }
@@ -1755,7 +1745,7 @@ impl JournalingObject for Allocator {
                 self.tree.merge_into(item, &lower_bound);
                 let mut inner = self.inner.lock().unwrap();
                 let entry = inner.owner_bytes.entry(owner_object_id).or_default();
-                entry.allocated_bytes = entry.allocated_bytes.saturating_add(len as i64);
+                entry.allocated_bytes += len;
                 if let ApplyMode::Live(transaction) = context.mode {
                     entry.uncommitted_allocated_bytes -= len;
                     // Note that we cannot drop entries from temporary_allocations without holding
@@ -1783,7 +1773,7 @@ impl JournalingObject for Allocator {
                     let mut inner = self.inner.lock().unwrap();
                     {
                         let entry = inner.owner_bytes.entry(owner_object_id).or_default();
-                        entry.allocated_bytes = entry.allocated_bytes.saturating_sub(len as i64);
+                        entry.allocated_bytes -= len;
                         if context.mode.is_live() {
                             entry.committed_deallocated_bytes += len;
                         }
@@ -1820,26 +1810,10 @@ impl JournalingObject for Allocator {
                 // info file when flush completes.
                 let mut inner = self.inner.lock().unwrap();
                 let allocated_bytes =
-                    inner.owner_bytes.iter().map(|(k, v)| (*k, v.allocated_bytes as u64)).collect();
+                    inner.owner_bytes.iter().map(|(k, v)| (*k, v.allocated_bytes.0)).collect();
                 inner.info.allocated_bytes = allocated_bytes;
             }
-            Mutation::EndFlush => {
-                if context.mode.is_replay() {
-                    self.tree.reset_immutable_layers();
-
-                    // AllocatorInfo is written in the same transaction and will contain the count
-                    // at the point BeginFlush was applied, so we need to adjust allocated_bytes so
-                    // that it just covers the delta from that point.  Later, when we properly open
-                    // the allocator, we'll add this back.
-                    let mut inner = self.inner.lock().unwrap();
-                    let allocated_bytes: Vec<(u64, i64)> =
-                        inner.info.allocated_bytes.iter().map(|(k, v)| (*k, *v as i64)).collect();
-                    for (k, v) in allocated_bytes {
-                        let entry = inner.owner_bytes.entry(k).or_default();
-                        entry.allocated_bytes -= v as i64;
-                    }
-                }
-            }
+            Mutation::EndFlush => {}
             _ => bail!("unexpected mutation: {:?}", mutation),
         }
         Ok(())
@@ -2536,7 +2510,7 @@ mod tests {
         // We will just check that we have the right size for the owner we care about.
 
         assert!(!allocator.get_owner_allocated_bytes().contains_key(&STORE_OBJECT_ID));
-        assert_eq!(*allocator.get_owner_allocated_bytes().get(&100).unwrap() as u64, target_bytes,);
+        assert_eq!(*allocator.get_owner_allocated_bytes().get(&100).unwrap(), target_bytes,);
     }
 
     async fn create_file(store: &Arc<ObjectStore>, size: usize) {
@@ -2694,7 +2668,7 @@ mod tests {
 
         assert_eq!(
             fs.block_size() * 3000,
-            *allocator.get_owner_allocated_bytes().entry(STORE_OBJECT_ID).or_default() as u64
+            *allocator.get_owner_allocated_bytes().entry(STORE_OBJECT_ID).or_default()
         );
 
         // Delete it all.
@@ -2705,10 +2679,7 @@ mod tests {
         }
         transaction.commit().await.expect("commit failed");
 
-        assert_eq!(
-            0,
-            *allocator.get_owner_allocated_bytes().entry(STORE_OBJECT_ID).or_default() as u64
-        );
+        assert_eq!(0, *allocator.get_owner_allocated_bytes().entry(STORE_OBJECT_ID).or_default());
 
         // Allocate some more stuff. Due to storage pressure, this requires us to flush device
         // before reusing the above space
@@ -2728,7 +2699,7 @@ mod tests {
 
         assert_eq!(
             fs.block_size() * 1500,
-            *allocator.get_owner_allocated_bytes().entry(STORE_OBJECT_ID).or_default() as u64
+            *allocator.get_owner_allocated_bytes().entry(STORE_OBJECT_ID).or_default()
         );
     }
 

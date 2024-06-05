@@ -269,7 +269,7 @@ impl ObjectStore {
         end_transaction
             .commit_with_callback(|_| {
                 let mut store_info = self.store_info.lock().unwrap();
-                let info = store_info.info_mut().unwrap();
+                let info = store_info.as_mut().unwrap();
                 info.layers = new_store_info.layers;
                 info.encrypted_mutations_object_id = new_store_info.encrypted_mutations_object_id;
                 info.mutations_cipher_offset = new_store_info.mutations_cipher_offset;

@@ -224,7 +224,7 @@ impl FsckWarning {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum FsckError {
-    AllocatedBytesMismatch(Vec<(u64, i64)>, Vec<(u64, i64)>),
+    AllocatedBytesMismatch(Vec<(u64, u64)>, Vec<(u64, u64)>),
     AllocatedSizeMismatch(u64, u64, u64, u64),
     AllocationForNonexistentOwner(Allocation),
     AllocationMismatch(Allocation, Allocation),
