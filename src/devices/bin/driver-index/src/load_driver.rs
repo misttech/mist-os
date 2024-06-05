@@ -53,7 +53,7 @@ pub async fn load_base_drivers(
     .map_err(log_error)?;
     for resolved_driver in &resolved_drivers {
         let mut composite_node_spec_manager = indexer.composite_node_spec_manager.borrow_mut();
-        composite_node_spec_manager.new_driver_available(resolved_driver.clone());
+        composite_node_spec_manager.new_driver_available(resolved_driver);
     }
     indexer.load_base_repo(resolved_drivers);
     Ok(())

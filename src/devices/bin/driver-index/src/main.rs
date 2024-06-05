@@ -2602,7 +2602,7 @@ mod tests {
             {
                 let mut composite_node_spec_manager =
                     index.composite_node_spec_manager.borrow_mut();
-                composite_node_spec_manager.new_driver_available(ResolvedDriver {
+                composite_node_spec_manager.new_driver_available(&ResolvedDriver {
                     component_url: url.clone(),
                     bind_rules: rules,
                     bind_bytecode: vec![],
@@ -2807,7 +2807,7 @@ mod tests {
             {
                 let mut composite_node_spec_manager =
                     index.composite_node_spec_manager.borrow_mut();
-                composite_node_spec_manager.new_driver_available(ResolvedDriver {
+                composite_node_spec_manager.new_driver_available(&ResolvedDriver {
                     component_url: url.clone(),
                     bind_rules: rules,
                     bind_bytecode: vec![],
@@ -3021,7 +3021,7 @@ mod tests {
             {
                 let mut composite_node_spec_manager =
                     index.composite_node_spec_manager.borrow_mut();
-                composite_node_spec_manager.new_driver_available(ResolvedDriver {
+                composite_node_spec_manager.new_driver_available(&ResolvedDriver {
                     component_url: url.clone(),
                     bind_rules: rules,
                     bind_bytecode: vec![],

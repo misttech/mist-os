@@ -189,16 +189,14 @@ impl Indexer {
         self: Rc<Self>,
         mut receiver: futures::channel::mpsc::UnboundedReceiver<Vec<ResolvedDriver>>,
     ) {
-        while let Some(drivers) = receiver.next().await {
-            let mut drivers_clone = drivers.clone();
-            self.boot_repo.borrow_mut().append(&mut drivers_clone);
+        while let Some(mut drivers) = receiver.next().await {
             tracing::info!("Loaded drivers into the driver index:");
-            for driver in drivers {
+            for driver in &drivers {
                 tracing::info!("     {}", driver.component_url);
                 let mut composite_node_spec_manager = self.composite_node_spec_manager.borrow_mut();
                 composite_node_spec_manager.new_driver_available(driver);
             }
-
+            self.boot_repo.borrow_mut().append(&mut drivers);
             self.report_driver_load();
         }
     }
@@ -427,7 +425,7 @@ impl Indexer {
         let resolved_driver = resolve.unwrap();
 
         let mut composite_node_spec_manager = self.composite_node_spec_manager.borrow_mut();
-        composite_node_spec_manager.new_driver_available(resolved_driver.clone());
+        composite_node_spec_manager.new_driver_available(&resolved_driver);
 
         let mut ephemeral_drivers = self.ephemeral_drivers.borrow_mut();
         let existing = ephemeral_drivers.insert(component_url.clone(), resolved_driver);

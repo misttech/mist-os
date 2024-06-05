@@ -168,7 +168,7 @@ impl CompositeNodeSpecManager {
         Some(fdi::MatchDriverResult::CompositeParents(composite_parents_result))
     }
 
-    pub fn new_driver_available(&mut self, resolved_driver: ResolvedDriver) {
+    pub fn new_driver_available(&mut self, resolved_driver: &ResolvedDriver) {
         // Only composite drivers should be matched against composite node specs.
         if matches!(resolved_driver.bind_rules, DecodedRules::Normal(_)) {
             return;
@@ -180,7 +180,7 @@ impl CompositeNodeSpecManager {
             }
 
             let parents = composite_info.spec.as_ref().unwrap().parents.as_ref().unwrap();
-            let matched_composite_result = match_composite_properties(&resolved_driver, parents);
+            let matched_composite_result = match_composite_properties(resolved_driver, parents);
             if let Ok(Some(matched_composite)) = matched_composite_result {
                 tracing::info!(
                     "Matched '{}' to composite node spec '{}'",
