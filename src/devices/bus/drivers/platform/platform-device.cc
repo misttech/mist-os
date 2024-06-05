@@ -330,7 +330,6 @@ zx_status_t PlatformDevice::Start() {
       "aml-thermal-ddr",  // 05:03:28,05:04:28
       "pll-temp-sensor",  // 05:06:39
       "sysmem",           // 00:00:1b
-      "fake-battery",     // 00:00:33
       "gpio",             // 05:04:1,05:03:1,05:05:1,05:06:1
   };
 
