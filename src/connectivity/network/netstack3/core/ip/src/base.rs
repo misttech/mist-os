@@ -19,7 +19,7 @@ use net_types::{
     ip::{
         GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu, Subnet,
     },
-    MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
+    MulticastAddr, SpecifiedAddr, SpecifiedAddress as _, UnicastAddr, Witness,
 };
 use netstack3_base::{
     socket::SocketIpAddrExt as _,
@@ -2044,13 +2044,14 @@ pub fn receive_ipv4_packet<
         _ => return, // TODO(joshlf): Do something with ICMP here?
     };
 
-    let dst_ip = match SpecifiedAddr::new(packet.dst_ip()) {
-        Some(ip) => ip,
-        None => {
-            core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_destination);
-            debug!("receive_ipv4_packet: Received packet with unspecified destination IP address; dropping");
-            return;
-        }
+    // We verify this later by actually creating the `SpecifiedAddr` witness
+    // type after the INGRESS filtering hook, but we keep this check here as an
+    // optimization to return early if the packet has an unspecified
+    // destination.
+    if !packet.dst_ip().is_specified() {
+        core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_destination);
+        debug!("receive_ipv4_packet: Received packet with unspecified destination IP; dropping");
+        return;
     };
 
     // TODO(ghanan): Act upon options.
@@ -2070,7 +2071,7 @@ pub fn receive_ipv4_packet<
 
             let Some(addr) = SpecifiedAddr::new(addr) else {
                 core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_destination);
-                debug!("receive_ipv4_packet: Received packet with unspecified destination IP address; dropping");
+                debug!("cannot perform transparent delivery to unspecified destination; dropping");
                 return;
             };
 
@@ -2095,6 +2096,12 @@ pub fn receive_ipv4_packet<
     // Drop the filter handler since it holds a mutable borrow of `core_ctx`, which
     // we need below.
     drop(filter);
+
+    let Some(dst_ip) = SpecifiedAddr::new(packet.dst_ip()) else {
+        core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_destination);
+        debug!("receive_ipv4_packet: Received packet with unspecified destination IP; dropping");
+        return;
+    };
 
     match receive_ipv4_packet_action(core_ctx, bindings_ctx, device, dst_ip) {
         ReceivePacketAction::Deliver => {
@@ -2324,25 +2331,21 @@ pub fn receive_ipv6_packet<
 
     // TODO(ghanan): Act upon extension headers.
 
-    let src_ip = match packet.src_ipv6() {
-        Some(ip) => ip,
-        None => {
-            debug!(
-                "receive_ipv6_packet: received packet from non-unicast source {}; dropping",
-                packet.src_ip()
-            );
-            core_ctx
-                .increment(|counters: &IpCounters<Ipv6>| &counters.version_rx.non_unicast_source);
-            return;
-        }
+    // We verify these properties later by actually creating the corresponding
+    // witness types after the INGRESS filtering hook, but we keep these checks
+    // here as an optimization to return early and save some work.
+    if packet.src_ipv6().is_none() {
+        debug!(
+            "receive_ipv6_packet: received packet from non-unicast source {}; dropping",
+            packet.src_ip()
+        );
+        core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.version_rx.non_unicast_source);
+        return;
     };
-    let dst_ip = match SpecifiedAddr::new(packet.dst_ip()) {
-        Some(ip) => ip,
-        None => {
-            core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.unspecified_destination);
-            debug!("receive_ipv6_packet: Received packet with unspecified destination IP address; dropping");
-            return;
-        }
+    if !packet.dst_ip().is_specified() {
+        core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.unspecified_destination);
+        debug!("receive_ipv6_packet: Received packet with unspecified destination IP; dropping");
+        return;
     };
 
     let mut packet_metadata = IpLayerPacketMetadata::default();
@@ -2360,7 +2363,7 @@ pub fn receive_ipv6_packet<
 
             let Some(addr) = SpecifiedAddr::new(addr) else {
                 core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.unspecified_destination);
-                debug!("receive_ipv6_packet: Received packet with unspecified destination IP address; dropping");
+                debug!("cannot perform transparent delivery to unspecified destination; dropping");
                 return;
             };
 
@@ -2385,6 +2388,20 @@ pub fn receive_ipv6_packet<
     // Drop the filter handler since it holds a mutable borrow of `core_ctx`, which
     // we need below.
     drop(filter);
+
+    let Some(src_ip) = packet.src_ipv6() else {
+        debug!(
+            "receive_ipv6_packet: received packet from non-unicast source {}; dropping",
+            packet.src_ip()
+        );
+        core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.version_rx.non_unicast_source);
+        return;
+    };
+    let Some(dst_ip) = SpecifiedAddr::new(packet.dst_ip()) else {
+        core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.unspecified_destination);
+        debug!("receive_ipv6_packet: Received packet with unspecified destination IP; dropping");
+        return;
+    };
 
     match receive_ipv6_packet_action(core_ctx, bindings_ctx, device, dst_ip) {
         ReceivePacketAction::Deliver => {

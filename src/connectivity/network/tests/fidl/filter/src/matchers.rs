@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![cfg(test)]
-
 use std::{fmt::Debug, num::NonZeroU64, ops::RangeInclusive};
 
 use fidl_fuchsia_net_ext as fnet_ext;

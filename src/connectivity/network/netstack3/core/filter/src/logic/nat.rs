@@ -4,10 +4,6 @@
 
 //! Network Address Translation.
 
-// TODO(https://fxbug.dev/333419001): call into this module from the IP
-// filtering hooks.
-#![allow(dead_code)]
-
 use core::{
     fmt::Debug,
     num::NonZeroU16,
@@ -19,7 +15,7 @@ use netstack3_base::Inspectable;
 use once_cell::sync::OnceCell;
 use packet_formats::ip::IpExt;
 use rand::Rng as _;
-use tracing::error;
+use tracing::{error, warn};
 
 use crate::{
     conntrack::{Connection, ConnectionDirection, Table, Tuple},
@@ -139,7 +135,6 @@ impl<I: IpExt> NatHook<I> for IngressHook {
         ingress: Option<&CC::DeviceId>,
     ) -> Option<I::Addr>
     where
-        I: IpExt,
         P: IpPacket<I>,
         CC: NatContext<I, BT>,
         BT: FilterBindingsTypes,
@@ -148,6 +143,13 @@ impl<I: IpExt> NatHook<I> for IngressHook {
         core_ctx
             .get_local_addr_for_remote(interface, SpecifiedAddr::new(packet.src_addr()))
             .map(|addr| addr.get())
+            .or_else(|| {
+                warn!(
+                    "cannot redirect because there is no address assigned to the incoming \
+                    interface {interface:?}; dropping packet",
+                );
+                None
+            })
     }
 }
 
@@ -205,7 +207,6 @@ impl<I: IpExt> NatHook<I> for LocalEgressHook {
 
     fn redirect_addr<P, CC, BT>(_: &mut CC, _: &P, _: Option<&CC::DeviceId>) -> Option<I::Addr>
     where
-        I: IpExt,
         P: IpPacket<I>,
         CC: NatContext<I, BT>,
         BT: FilterBindingsTypes,
@@ -444,34 +445,36 @@ where
             let (new_dst_addr, new_dst_port) = (tuple.src_addr, tuple.src_port_or_id);
 
             packet.set_dst_addr(new_dst_addr);
+            let proto = packet.protocol();
             let mut transport = packet.transport_packet_mut();
-            let Some(mut packet) = transport.transport_packet_mut() else {
+            let Some(mut transport) = transport.transport_packet_mut() else {
                 return Verdict::Accept;
             };
             let Some(new_dst_port) = NonZeroU16::new(new_dst_port) else {
                 // TODO(https://fxbug.dev/341128580): allow rewriting port to zero if allowed by
                 // the transport-layer protocol.
-                error!("cannot rewrite dst port to unspecified; dropping packet");
+                error!("cannot rewrite dst port to unspecified; dropping {proto} packet",);
                 return Verdict::Drop;
             };
-            packet.set_dst_port(new_dst_port);
+            transport.set_dst_port(new_dst_port);
         }
         ConnectionDirection::Reply => {
             let tuple = conn.original_tuple();
             let (new_src_addr, new_src_port) = (tuple.dst_addr, tuple.dst_port_or_id);
 
             packet.set_src_addr(new_src_addr);
+            let proto = packet.protocol();
             let mut transport = packet.transport_packet_mut();
-            let Some(mut packet) = transport.transport_packet_mut() else {
+            let Some(mut transport) = transport.transport_packet_mut() else {
                 return Verdict::Accept;
             };
             let Some(new_src_port) = NonZeroU16::new(new_src_port) else {
                 // TODO(https://fxbug.dev/341128580): allow rewriting port to zero if allowed by
                 // the transport-layer protocol.
-                error!("cannot rewrite src port to unspecified; dropping packet");
+                error!("cannot rewrite src port to unspecified; dropping {proto} packet",);
                 return Verdict::Drop;
             };
-            packet.set_src_port(new_src_port);
+            transport.set_src_port(new_src_port);
         }
     }
     Verdict::Accept

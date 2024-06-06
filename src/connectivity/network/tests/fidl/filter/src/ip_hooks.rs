@@ -4,8 +4,6 @@
 
 //! Tests for the IP filtering hooks.
 
-#![cfg(test)]
-
 use std::{
     num::NonZeroU64,
     sync::atomic::{AtomicU32, Ordering},
@@ -17,8 +15,9 @@ use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_filter as fnet_filter;
 use fidl_fuchsia_net_filter_ext::{
-    Action, Change, Controller, ControllerId, Domain, InstalledIpRoutine, InterfaceMatcher, IpHook,
-    Namespace, NamespaceId, Resource, ResourceId, Routine, RoutineId, RoutineType, Rule, RuleId,
+    Action, Change, Controller, ControllerId, Domain, InstalledIpRoutine, InstalledNatRoutine,
+    InterfaceMatcher, IpHook, Namespace, NamespaceId, NatHook, Resource, ResourceId, Routine,
+    RoutineId, RoutineType, Rule, RuleId,
 };
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
@@ -540,33 +539,33 @@ impl SocketType for IcmpSocket {
 
 #[derive(Clone, Copy)]
 pub(crate) struct Realms<'a> {
-    client: &'a netemul::TestRealm<'a>,
-    server: &'a netemul::TestRealm<'a>,
+    pub client: &'a netemul::TestRealm<'a>,
+    pub server: &'a netemul::TestRealm<'a>,
 }
 
 pub(crate) struct Addrs {
-    client: fnet::IpAddress,
-    server: fnet::IpAddress,
+    pub client: fnet::IpAddress,
+    pub server: fnet::IpAddress,
 }
 
 pub(crate) struct Sockets<S: SocketType + ?Sized> {
-    client: S::Client,
-    server: S::Server,
+    pub client: S::Client,
+    pub server: S::Server,
 }
 
 #[derive(Clone, Copy)]
 pub(crate) struct SockAddrs {
-    client: std::net::SocketAddr,
-    server: std::net::SocketAddr,
+    pub client: std::net::SocketAddr,
+    pub server: std::net::SocketAddr,
 }
 
 impl SockAddrs {
-    fn client_ports(&self) -> Ports {
+    pub(crate) fn client_ports(&self) -> Ports {
         let Self { client, server } = self;
         Ports { src: client.port(), dst: server.port() }
     }
 
-    fn server_ports(&self) -> Ports {
+    pub(crate) fn server_ports(&self) -> Ports {
         let Self { client, server } = self;
         Ports { src: server.port(), dst: client.port() }
     }
@@ -624,13 +623,15 @@ pub(crate) struct Ports {
     pub dst: u16,
 }
 
-trait TestIpExt: ping::FuchsiaIpExt {
+pub(crate) trait TestIpExt: ping::FuchsiaIpExt {
     /// The client netstack's IP address and subnet prefix. The client and server
     /// are on the same subnet.
     const CLIENT_ADDR_WITH_PREFIX: fnet::Subnet;
     /// The server netstack's IP address and subnet prefix. The client and server
     /// are on the same subnet.
     const SERVER_ADDR_WITH_PREFIX: fnet::Subnet;
+    /// Another IP address in the same subnet as the client and server.
+    const OTHER_ADDR_WITH_PREFIX: fnet::Subnet;
     /// An unrelated subnet on which neither netstack has an assigned IP address;
     /// defined for the purpose of exercising inverse subnet and address range
     /// match.
@@ -640,32 +641,36 @@ trait TestIpExt: ping::FuchsiaIpExt {
 impl TestIpExt for Ipv4 {
     const CLIENT_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("192.0.2.1/24");
     const SERVER_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("192.0.2.2/24");
+    const OTHER_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("192.0.2.3/24");
     const OTHER_SUBNET: fnet::Subnet = fidl_subnet!("192.0.3.0/24");
 }
 
 impl TestIpExt for Ipv6 {
     const CLIENT_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("2001:db8::1/64");
     const SERVER_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("2001:db8::2/64");
+    const OTHER_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("2001:db8::3/64");
     const OTHER_SUBNET: fnet::Subnet = fidl_subnet!("2001:db81::/64");
 }
 
-struct TestNet<'a> {
-    client: TestRealm<'a>,
-    server: TestRealm<'a>,
+pub(crate) struct TestNet<'a> {
+    pub client: TestRealm<'a>,
+    pub server: TestRealm<'a>,
 }
 
 impl<'a> TestNet<'a> {
-    async fn new<I: TestIpExt>(
+    pub(crate) async fn new<I: TestIpExt>(
         sandbox: &'a netemul::TestSandbox,
         network: &'a netemul::TestNetwork<'a>,
         name: &str,
-        hook: IpHook,
+        ip_hook: Option<IpHook>,
+        nat_hook: Option<NatHook>,
     ) -> Self {
         let client_name = format!("{name}_client");
         let client = TestRealm::new::<I>(
             &sandbox,
             network,
-            hook,
+            ip_hook,
+            nat_hook,
             client_name,
             I::CLIENT_ADDR_WITH_PREFIX,
             I::SERVER_ADDR_WITH_PREFIX,
@@ -675,7 +680,8 @@ impl<'a> TestNet<'a> {
         let server = TestRealm::new::<I>(
             &sandbox,
             network,
-            hook,
+            ip_hook,
+            nat_hook,
             server_name,
             I::SERVER_ADDR_WITH_PREFIX,
             I::CLIENT_ADDR_WITH_PREFIX,
@@ -685,16 +691,16 @@ impl<'a> TestNet<'a> {
         Self { client, server }
     }
 
-    fn realms(&'a self) -> Realms<'a> {
+    pub(crate) fn realms(&'a self) -> Realms<'a> {
         let Self { client, server } = self;
         Realms { client: &client.realm, server: &server.realm }
     }
 
-    fn addrs(&self) -> Addrs {
+    pub(crate) fn addrs(&self) -> Addrs {
         Addrs { client: self.client.local_subnet.addr, server: self.server.local_subnet.addr }
     }
 
-    async fn run_test<I, S>(&mut self, expected_connectivity: ExpectedConnectivity)
+    pub(crate) async fn run_test<I, S>(&mut self, expected_connectivity: ExpectedConnectivity)
     where
         I: TestIpExt,
         S: SocketType,
@@ -711,7 +717,7 @@ impl<'a> TestNet<'a> {
     /// implies the bound.
     ///
     /// See https://stackoverflow.com/a/72673740 for a more thorough explanation.
-    async fn run_test_with<'params, I, S, F>(
+    pub(crate) async fn run_test_with<'params, I, S, F>(
         &'params mut self,
         expected_connectivity: ExpectedConnectivity,
         setup: F,
@@ -730,21 +736,23 @@ impl<'a> TestNet<'a> {
     }
 }
 
-struct TestRealm<'a> {
-    realm: netemul::TestRealm<'a>,
-    interface: netemul::TestInterface<'a>,
-    controller: Controller,
+pub(crate) struct TestRealm<'a> {
+    pub realm: netemul::TestRealm<'a>,
+    pub interface: netemul::TestInterface<'a>,
+    pub controller: Controller,
     namespace: NamespaceId,
-    routine: RoutineId,
+    ip_routine: Option<RoutineId>,
+    pub nat_routine: Option<RoutineId>,
     local_subnet: fnet::Subnet,
     remote_subnet: fnet::Subnet,
 }
 
 impl<'a> TestRealm<'a> {
-    async fn new<I: TestIpExt>(
+    pub async fn new<I: TestIpExt>(
         sandbox: &'a netemul::TestSandbox,
         network: &'a netemul::TestNetwork<'a>,
-        hook: IpHook,
+        ip_hook: Option<IpHook>,
+        nat_hook: Option<NatHook>,
         name: String,
         local_subnet: fnet::Subnet,
         remote_subnet: fnet::Subnet,
@@ -762,28 +770,65 @@ impl<'a> TestRealm<'a> {
             .await
             .expect("create controller");
         let namespace = NamespaceId(name.clone());
-        let routine = RoutineId { namespace: namespace.clone(), name: format!("{hook:?}") };
+        let ip_routine = ip_hook.map(|hook| {
+            (hook, RoutineId { namespace: namespace.clone(), name: format!("{hook:?}") })
+        });
+        let nat_routine = nat_hook.map(|hook| {
+            (hook, RoutineId { namespace: namespace.clone(), name: format!("{hook:?}") })
+        });
         controller
-            .push_changes(vec![
-                Change::Create(Resource::Namespace(Namespace {
+            .push_changes(
+                [Change::Create(Resource::Namespace(Namespace {
                     id: namespace.clone(),
                     domain: Domain::AllIp,
-                })),
-                Change::Create(Resource::Routine(Routine {
-                    id: routine.clone(),
-                    routine_type: RoutineType::Ip(Some(InstalledIpRoutine { hook, priority: 0 })),
-                })),
-            ])
+                }))]
+                .into_iter()
+                .chain(ip_routine.clone().map(|(hook, routine)| {
+                    Change::Create(Resource::Routine(Routine {
+                        id: routine.clone(),
+                        routine_type: RoutineType::Ip(Some(InstalledIpRoutine {
+                            hook,
+                            priority: 0,
+                        })),
+                    }))
+                }))
+                .chain(nat_routine.clone().map(|(hook, routine)| {
+                    Change::Create(Resource::Routine(Routine {
+                        id: routine.clone(),
+                        routine_type: RoutineType::Nat(Some(InstalledNatRoutine {
+                            hook,
+                            priority: 0,
+                        })),
+                    }))
+                }))
+                .collect(),
+            )
             .await
             .expect("push changes");
         controller.commit().await.expect("commit changes");
 
-        Self { realm, interface, controller, namespace, routine, local_subnet, remote_subnet }
+        Self {
+            realm,
+            interface,
+            controller,
+            namespace,
+            ip_routine: ip_routine.map(|(_hook, routine)| routine),
+            nat_routine: nat_routine.map(|(_hook, routine)| routine),
+            local_subnet,
+            remote_subnet,
+        }
     }
 
-    async fn install_rule<I: TestIpExt, M: Matcher>(
-        controller: &mut Controller,
+    pub(crate) fn incoming_subnets<I: TestIpExt>(&self) -> Subnets {
+        Subnets { src: self.remote_subnet, dst: self.local_subnet, other: I::OTHER_SUBNET }
+    }
 
+    pub(crate) fn outgoing_subnets<I: TestIpExt>(&self) -> Subnets {
+        Subnets { src: self.local_subnet, dst: self.remote_subnet, other: I::OTHER_SUBNET }
+    }
+
+    pub(crate) async fn install_rule<I: TestIpExt, M: Matcher>(
+        controller: &mut Controller,
         rule_id: RuleId,
         matcher: &M,
         interfaces: Interfaces<'_>,
@@ -810,10 +855,10 @@ impl<'a> TestRealm<'a> {
         ports: Ports,
         action: Action,
     ) {
-        let Self { controller, routine, interface, local_subnet, remote_subnet, .. } = self;
+        let Self { controller, ip_routine, interface, local_subnet, remote_subnet, .. } = self;
         Self::install_rule::<I, M>(
             controller,
-            RuleId { routine: routine.clone(), index },
+            RuleId { routine: ip_routine.clone().expect("IP routine should be installed"), index },
             matcher,
             Interfaces { ingress: Some(&interface), egress: None },
             // We are installing a filter on the INGRESS or LOCAL_INGRESS hook, which
@@ -834,14 +879,14 @@ impl<'a> TestRealm<'a> {
         ports: Ports,
         action: Action,
     ) {
-        let Self { controller, routine, interface, local_subnet, remote_subnet, .. } = self;
+        let Self { controller, ip_routine, interface, local_subnet, remote_subnet, .. } = self;
         Self::install_rule::<I, M>(
             controller,
-            RuleId { routine: routine.clone(), index },
+            RuleId { routine: ip_routine.clone().expect("IP routine should be installed"), index },
             matcher,
             Interfaces { ingress: None, egress: Some(&interface) },
             // We are installing a filter on the EGRESS or LOCAL_EGRESS hook, which means we
-            // are dealing with incoming traffic. This means the source address of this
+            // are dealing with outgoing traffic. This means the source address of this
             // traffic will be the local subnet, and the destination address will be the
             // remote's subnet.
             Subnets { src: *local_subnet, dst: *remote_subnet, other: I::OTHER_SUBNET },
@@ -850,7 +895,56 @@ impl<'a> TestRealm<'a> {
         )
         .await;
     }
-    async fn clear_filter(&mut self) {
+
+    pub(crate) async fn install_nat_rule_for_incoming_traffic<I: TestIpExt, M: Matcher>(
+        &mut self,
+        index: u32,
+        matcher: &M,
+        subnets: Subnets,
+        ports: Ports,
+        action: Action,
+    ) {
+        let Self { controller, nat_routine, interface, .. } = self;
+        Self::install_rule::<I, M>(
+            controller,
+            RuleId {
+                routine: nat_routine.clone().expect("NAT routine should be installed"),
+                index,
+            },
+            matcher,
+            Interfaces { ingress: Some(&interface), egress: None },
+            subnets,
+            ports,
+            action,
+        )
+        .await;
+    }
+
+    pub(crate) async fn install_nat_rule_for_outgoing_traffic<I: TestIpExt, M: Matcher>(
+        &mut self,
+        index: u32,
+        matcher: &M,
+        subnets: Subnets,
+        ports: Ports,
+        action: Action,
+    ) {
+        let Self { controller, nat_routine, interface, .. } = self;
+        Self::install_rule::<I, M>(
+            controller,
+            RuleId {
+                routine: nat_routine.clone().expect("NAT routine should be installed"),
+                index,
+            },
+            matcher,
+            Interfaces { ingress: None, egress: Some(&interface) },
+            subnets,
+            ports,
+            action,
+        )
+        .await;
+    }
+
+    pub(crate) async fn clear_filter(&mut self) {
         self.controller
             .push_changes(vec![Change::Remove(ResourceId::Namespace(self.namespace.clone()))])
             .await
@@ -859,9 +953,9 @@ impl<'a> TestRealm<'a> {
     }
 }
 
-const LOW_RULE_PRIORITY: u32 = 2;
-const MEDIUM_RULE_PRIORITY: u32 = 1;
-const HIGH_RULE_PRIORITY: u32 = 0;
+pub(crate) const LOW_RULE_PRIORITY: u32 = 2;
+pub(crate) const MEDIUM_RULE_PRIORITY: u32 = 1;
+pub(crate) const HIGH_RULE_PRIORITY: u32 = 0;
 
 #[derive(Debug)]
 enum IncomingHook {
@@ -882,10 +976,11 @@ async fn drop_incoming<I: net_types::ip::Ip + TestIpExt, M: Matcher>(
         &sandbox,
         &network,
         &name,
-        match hook {
+        Some(match hook {
             IncomingHook::Ingress => IpHook::Ingress,
             IncomingHook::LocalIngress => IpHook::LocalIngress,
-        },
+        }),
+        None, /* nat_hook */
     )
     .await;
 
@@ -996,10 +1091,11 @@ async fn drop_outgoing<I: net_types::ip::Ip + TestIpExt, M: Matcher>(
         &sandbox,
         &network,
         &name,
-        match hook {
+        Some(match hook {
             OutgoingHook::LocalEgress => IpHook::LocalEgress,
             OutgoingHook::Egress => IpHook::Egress,
-        },
+        }),
+        None, /* nat_hook */
     )
     .await;
 
@@ -1095,7 +1191,7 @@ generate_test_cases_for_all_matchers!(drop_outgoing, OutgoingHook::Egress, egres
 // TODO(https://github.com/rust-lang/rustfmt/issues/5321): remove when rustfmt
 // handles these supertrait bounds correctly.
 #[rustfmt::skip]
-trait RouterTestIpExt:
+pub(crate) trait RouterTestIpExt:
     ping::FuchsiaIpExt
     + fnet_routes_ext::FidlRouteIpExt
     + fnet_routes_ext::admin::FidlRouteAdminIpExt

@@ -324,12 +324,12 @@ where
         M: FilterIpMetadata<I, BC>,
     {
         let Self(this) = self;
-        this.with_filter_state(|state| {
+        this.with_filter_state_and_nat_ctx(|state, core_ctx| {
             // There isn't going to be an existing connection in the metadata
             // before this hook, so we don't have to look.
             let conn = state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet);
 
-            let verdict = match check_routines_for_ingress(
+            let mut verdict = match check_routines_for_ingress(
                 &state.installed_routines.get().ip.ingress,
                 packet,
                 Interfaces { ingress: Some(interface), egress: None },
@@ -339,7 +339,29 @@ where
                 | v @ IngressVerdict::TransparentLocalDelivery { .. } => v,
             };
 
-            if let Some(conn) = conn {
+            if let Some(mut conn) = conn {
+                // TODO(https://fxbug.dev/343683914): provide a way to run filter routines
+                // post-NAT, but in the same hook. Currently all filter routines are run before
+                // all NAT routines in the same hook.
+                match nat::perform_nat::<nat::IngressHook, _, _, _, _>(
+                    core_ctx,
+                    bindings_ctx,
+                    &state.conntrack,
+                    &mut conn,
+                    &state.installed_routines.get().nat.ingress,
+                    packet,
+                    Interfaces { ingress: Some(interface), egress: None },
+                ) {
+                    // NB: we only overwrite the verdict returned from the IP routines if it is
+                    // `TransparentLocalDelivery`; in case of an `Accept` verdict from the NAT
+                    // routines, we do not change the existing verdict.
+                    v @ IngressVerdict::Verdict(Verdict::Drop) => return v,
+                    IngressVerdict::Verdict(Verdict::Accept) => {}
+                    v @ IngressVerdict::TransparentLocalDelivery { .. } => {
+                        verdict = v;
+                    }
+                }
+
                 let res = metadata.replace_conntrack_connection(conn);
                 debug_assert!(res.is_none());
             }
@@ -422,7 +444,7 @@ where
         M: FilterIpMetadata<I, BC>,
     {
         let Self(this) = self;
-        this.with_filter_state(|state| {
+        this.with_filter_state_and_nat_ctx(|state, core_ctx| {
             // There isn't going to be an existing connection in the metadata
             // before this hook, so we don't have to look.
             let conn = state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet);
@@ -436,7 +458,23 @@ where
                 Verdict::Accept => Verdict::Accept,
             };
 
-            if let Some(conn) = conn {
+            if let Some(mut conn) = conn {
+                // TODO(https://fxbug.dev/343683914): provide a way to run filter routines
+                // post-NAT, but in the same hook. Currently all filter routines are run before
+                // all NAT routines in the same hook.
+                match nat::perform_nat::<nat::LocalEgressHook, _, _, _, _>(
+                    core_ctx,
+                    bindings_ctx,
+                    &state.conntrack,
+                    &mut conn,
+                    &state.installed_routines.get().nat.local_egress,
+                    packet,
+                    Interfaces { ingress: None, egress: Some(interface) },
+                ) {
+                    Verdict::Drop => return Verdict::Drop,
+                    Verdict::Accept => {}
+                }
+
                 let res = metadata.replace_conntrack_connection(conn);
                 debug_assert!(res.is_none());
             }
