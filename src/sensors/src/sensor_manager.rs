@@ -3,11 +3,13 @@
 // found in the LICENSE file.
 use {
     anyhow::{Context as _, Error},
+    fidl::endpoints::ControlHandle,
     fidl::endpoints::RequestStream,
     fidl_fuchsia_hardware_sensors as playback_fidl,
     fidl_fuchsia_sensors::*,
     fidl_fuchsia_sensors_types::*,
     fuchsia_component::server::ServiceFs,
+    futures::{channel::mpsc, select, stream::FusedStream, SinkExt},
     futures_util::{StreamExt, TryStreamExt},
     itertools::Itertools,
     std::collections::HashMap,
@@ -117,29 +119,55 @@ async fn handle_sensors_request(
 }
 
 async fn sensor_event_sender(
-    handle: ManagerControlHandle,
+    mut receiver: mpsc::UnboundedReceiver<ManagerControlHandle>,
     mut event_stream: playback_fidl::DriverEventStream,
 ) {
+    let mut clients: HashMap<u8, ManagerControlHandle> = HashMap::new();
+    let mut client_id: u8 = 0;
+
     loop {
-        match event_stream.next().await {
-            Some(Ok(playback_fidl::DriverEvent::OnSensorEvent { event })) => {
-                if let Err(e) = handle.send_on_sensor_event(&event) {
-                    tracing::warn!("Failed to send sensor event: {:#?}", e);
+        if event_stream.is_terminated() {
+            tracing::error!("Driver event stream was terminated.");
+            break;
+        }
+        select! {
+            sensor_event = event_stream.next() => {
+                match sensor_event {
+                    Some(Ok(playback_fidl::DriverEvent::OnSensorEvent { event })) => {
+                        for (id, client) in clients.clone().into_iter() {
+                            if !client.is_closed() {
+                                if let Err(e) = client.send_on_sensor_event(&event) {
+                                    tracing::warn!("Failed to send sensor event: {:#?}", e);
+                                }
+                            } else {
+                                tracing::error!("Client was PEER_CLOSED! Removing from clients list");
+                                clients.remove(&id);
+                            }
+                        }
+                    }
+                    Some(Ok(playback_fidl::DriverEvent::_UnknownEvent { ordinal, .. })) => {
+                        tracing::warn!(
+                            "SensorManager received an UnknownEvent with ordinal: {:#?}",
+                            ordinal
+                        );
+                    }
+                    Some(Err(e)) => {
+                        tracing::error!("Received an error from sensor driver: {:#?}", e);
+                        break;
+                    }
+                    None => {
+                        tracing::error!("Got None from driver");
+                        break;
+                    }
                 }
-            }
-            Some(Ok(playback_fidl::DriverEvent::_UnknownEvent { ordinal, .. })) => {
-                tracing::warn!(
-                    "SensorManager received an UnknownEvent with ordinal: {:#?}",
-                    ordinal
-                );
-            }
-            Some(Err(e)) => {
-                tracing::error!("Received an error from sensor driver: {:#?}", e);
-            }
-            None => {
-                tracing::error!("Got None from driver");
-            }
-        };
+            },
+            new_control_handle = receiver.next() => {
+                if let Some(control_handle) = new_control_handle {
+                    clients.insert(client_id, control_handle);
+                    client_id += 1;
+                }
+            },
+        }
     }
 }
 
@@ -147,13 +175,6 @@ async fn handle_sensor_manager_request_stream(
     mut stream: ManagerRequestStream,
     manager: &mut SensorManager,
 ) -> Result<(), Error> {
-    let control_handle = stream.control_handle();
-    let event_stream = manager.driver_proxy.take_event_stream();
-    fuchsia_async::Task::spawn(async move {
-        sensor_event_sender(control_handle, event_stream).await;
-    })
-    .detach();
-
     while let Some(request) =
         stream.try_next().await.context("Error handling SensorManager events")?
     {
@@ -183,14 +204,27 @@ impl SensorManager {
             }
         }
 
+        let (sender, receiver) = mpsc::unbounded::<ManagerControlHandle>();
+        let event_stream = self.driver_proxy.take_event_stream();
+        fuchsia_async::Task::spawn(async move {
+            sensor_event_sender(receiver, event_stream).await;
+        })
+        .detach();
+
         let mut fs = ServiceFs::new_local();
         fs.dir("svc").add_fidl_service(IncomingRequest::SensorManager);
         fs.take_and_serve_directory_handle()?;
         fs.for_each_concurrent(None, move |request: IncomingRequest| {
             let mut manager = self.clone();
+            let mut handle_sender = sender.clone();
             async move {
                 match request {
                     IncomingRequest::SensorManager(stream) => {
+                        // When there is a new client, add the handle to the list of clients that
+                        // are receiving sensor events.
+                        if let Err(e) = handle_sender.send(stream.control_handle().clone()).await {
+                            tracing::warn!("Failed to send id to sensor_event_sender: {:#?}", e);
+                        }
                         handle_sensor_manager_request_stream(stream, &mut manager)
                             .await
                             .expect("Failed to serve sensor requests");
@@ -263,12 +297,21 @@ mod tests {
     }
 
     async fn setup_manager() -> ManagerProxy {
+        let (mut sender, receiver) = mpsc::unbounded::<ManagerControlHandle>();
+
         let driver_proxy =
             fuchsia_component::client::connect_to_protocol::<playback_fidl::DriverMarker>()
                 .unwrap();
+        let driver_event_stream = driver_proxy.take_event_stream();
 
         let mut manager = SensorManager::new(driver_proxy);
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ManagerMarker>().unwrap();
+
+        fuchsia_async::Task::spawn(async move {
+            sensor_event_sender(receiver, driver_event_stream).await;
+        })
+        .detach();
+        let _ = sender.send(stream.control_handle()).await;
 
         fuchsia_async::Task::spawn(async move {
             handle_sensor_manager_request_stream(stream, &mut manager)
@@ -392,6 +435,14 @@ mod tests {
         let id = get_test_sensor().sensor_id.unwrap();
         let _ = proxy.activate(id).await;
 
+        let config = SensorRateConfig {
+            sampling_period_ns: Some(0),
+            max_reporting_latency_ns: Some(0),
+            ..Default::default()
+        };
+
+        assert!(proxy.configure_sensor_rates(id, &config.clone()).await.unwrap().is_ok());
+
         let mut event_stream = proxy.take_event_stream();
         let mut events: Vec<SensorEvent> = Vec::new();
         for _i in 1..4 {
@@ -404,6 +455,8 @@ mod tests {
 
             events.push(event);
         }
+
+        assert_eq!(events.len(), 3);
 
         let test_events = get_test_events();
         for event in events {
