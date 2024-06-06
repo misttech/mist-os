@@ -1305,7 +1305,8 @@ impl ThreadGroup {
     /// where rights are to be checked but no signal is actually sent.
     ///
     /// # Returns
-    /// Returns Ok(()) if at least the signal was sent, otherwise the last error that was encountered.
+    /// Returns Ok(()) if the signal was sent, or the permission checks passed with a 0 signal, otherwise
+    /// the error that was encountered.
     pub fn send_signal_unchecked(
         self: &Arc<Self>,
         current_task: &CurrentTask,
@@ -1336,7 +1337,8 @@ impl ThreadGroup {
     /// - `siginfo_ref`: The siginfo that will be enqueued.
     ///
     /// # Returns
-    /// Returns Ok(()) if at least the signal was sent, otherwise the last error that was encountered.
+    /// Returns Ok(()) if the signal was sent, or the permission checks passed with a 0 signal, otherwise
+    /// the error that was encountered.
     pub fn send_signal_unchecked_with_info(
         self: &Arc<Self>,
         current_task: &CurrentTask,
