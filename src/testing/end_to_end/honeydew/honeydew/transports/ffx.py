@@ -43,6 +43,11 @@ _FFX_CONFIG_CMDS: dict[str, list[str]] = {
         "set",
         "ffx.subtool-search-paths",
     ],
+    "PROXY_TIMEOUT": [
+        "config",
+        "set",
+        "proxy.timeout_secs",
+    ],
     "DAEMON_ECHO": [
         "daemon",
         "echo",
@@ -63,6 +68,8 @@ _FFX_CMDS: dict[str, list[str]] = {
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 _FFX_LOGS_LEVEL: str = "debug"
+
+_PROXY_TIMEOUT_SECS: int = 30
 
 _DEVICE_NOT_CONNECTED: str = "Timeout attempting to reach target"
 
@@ -130,6 +137,14 @@ class FfxConfig:
         self._run(_FFX_CONFIG_CMDS["LOG_DIR"] + [self._logs_dir])
         self._run(_FFX_CONFIG_CMDS["LOG_LEVEL"] + [self._logs_level])
         self._run(_FFX_CONFIG_CMDS["MDNS"] + [str(self._mdns_enabled).lower()])
+
+        # Setting this based on the recommendation from awdavies@ for below
+        # FuchsiaController error:
+        #   FFX Library Error: Timeout attempting to reach target
+        self._run(
+            _FFX_CONFIG_CMDS["PROXY_TIMEOUT"] + [str(_PROXY_TIMEOUT_SECS)]
+        )
+
         if self.subtools_search_path:
             self._run(
                 _FFX_CONFIG_CMDS["SUB_TOOLS_PATH"] + [self.subtools_search_path]
