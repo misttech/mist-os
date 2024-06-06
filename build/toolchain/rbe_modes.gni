@@ -1,0 +1,197 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Defines the standard configurations for RBE and override options that can be
+# used by developers.
+
+# This file will be processed in every toolchain, so detect when it's being
+# processed in the default_toolchain.  As this file is imported by
+# BUILDCONFIG.gn, `default_toolchain` hasn't yet been set, and while
+# `current_toolchain` _is_ set, it's an empty string while in the context of
+# the default toolchain.
+_print_warnings = current_toolchain == ""
+
+declare_args() {
+  ###############################
+  ### RBE modes and overrides ###
+  ###############################
+
+  # The overall mode for RBE to be operating in.  The valid values are:
+  #  * 'off' => RBE is fully disabled. This is suitable for offline building
+  #             using only local resources.
+  #  * 'default' => The standard RBE configuration used if not otherwise
+  #                 specified. This contains a mix of enabled/disabled remote
+  #                 services.
+  #  * 'cloudtop' => An RBE configuration that's optimized for running on a
+  #                  cloudtop. Suitable for high-bandwidth connections to
+  #                  remote services.
+  #  * 'infra' => The RBE configuration used by CI/CQ bots. Also high-bandwidth.
+  #  * 'low_bandwidth' => An RBE configuration for developers that have a
+  #                       powerful workstations, but low bandwidth.
+  rbe_mode = "default"
+
+  # Overridden settings for the RBE mode.  This is a set of override values for
+  # variables whose default values are set by the chosen RBE mode (above).
+  rbe_settings_overrides = {
+  }
+}
+
+# These are default values for experimental options (usually disabled)
+_all_experimental_option_defaults = {
+}
+
+# These are the values for _stable_ options that all RBE modes start with.
+_all_modes_defaults = {
+  forward_variables_from(_all_experimental_option_defaults, "*")
+
+  # cxx defaults
+  cxx_exec_strategy = "remote_local_fallback"
+  cxx_download_objects = true
+
+  # link defaults
+  link_exec_strategy = "remote_local_fallback"
+  link_download_unstripped_binaries = true
+
+  # rust defaults
+  rust_exec_strategy = "remote"
+  rust_download_rlibs = true
+  rust_download_unstripped_binaries = true
+
+  # TODO(fangism@) - Add Bazel options
+}
+
+_default_rbe_settings = {
+  off = {
+    forward_variables_from(_all_modes_defaults, "*")
+    cxx_enable = false
+    link_enable = false
+    rust_enable = false
+  }
+
+  default = {
+    forward_variables_from(_all_modes_defaults, "*")
+    cxx_enable = true
+    link_enable = true
+    rust_enable = false
+  }
+
+  cloudtop = {
+    forward_variables_from(_all_modes_defaults, "*")
+    cxx_enable = true
+    link_enable = true
+    rust_enable = true
+    rust_exec_strategy = "remote"
+  }
+
+  infra = {
+    forward_variables_from(_all_modes_defaults, "*")
+    cxx_enable = true
+    link_enable = true
+    rust_enable = true
+    rust_exec_strategy = "remote"
+  }
+
+  # This mode itself is experimental.
+  low_bandwidth_remote = {
+    forward_variables_from(_all_modes_defaults, "*")
+    cxx_enable = true
+    cxx_download_objects = false
+    link_enable = true
+    link_download_unstripped_binaries = false
+    rust_enable = true
+    rust_exec_strategy = "remote"
+    rust_download_rlibs = false
+    rust_download_unstripped_binaries = false
+  }
+}
+
+# Validate that the chosen RBE mode is one of the valid modes
+assert(
+    defined(_default_rbe_settings[rbe_mode]),
+    "The specified RBE mode (${rbe_mode}) is not a valid option. They are: 'off', 'default', 'cloudtop', 'infra', and 'low_bandwidth_remote'")
+
+if (_print_warnings) {
+  _experimental_rbe_modes = [ "low_bandwidth_remote" ]
+  if (_experimental_rbe_modes + [ rbe_mode ] - [ rbe_mode ] !=
+      _experimental_rbe_modes) {
+    print("WARNING: You're using an experimental 'rbe_mode':  \"${rbe_mode}\"")
+  }
+}
+
+rbe_settings = {
+  # Set the RBE settings to use based on the chosen RBE mode
+  _settings_defaults = _default_rbe_settings[rbe_mode]
+  forward_variables_from(_settings_defaults, "*")
+
+  # Warn if the overridden settings are not at their default value for this
+  # compilation mode, or are using experimental flags
+  _experimental_options = [
+    "cxx_download_objects",
+    "link_download_unstripped_binaries",
+    "rust_download_unstripped_binaries",
+    "rust_download_rlibs",
+  ]
+
+  if (_print_warnings) {
+    foreach(_setting_name,
+            [
+              "cxx_enable",
+              "cxx_download_objects",
+              "link_enable",
+              "link_download_unstripped_binaries",
+              "rust_enable",
+              "rust_download_rlibs",
+              "rust_download_unstripped_binaries",
+              "rust_exec_strategy",
+            ]) {
+      if (defined(rbe_settings_overrides[_setting_name]) &&
+          rbe_settings_overrides[_setting_name] ==
+          _settings_defaults[_setting_name]) {
+        _default_value = _settings_defaults[_setting_name]
+        print(
+            "  WARNING:  You are setting '${_setting_name}' to the default value (${_default_value}) for this RBE mode (${rbe_mode}). This is unncessary.")
+      }
+    }
+
+    foreach(_setting_name, _experimental_options) {
+      if (defined(rbe_settings_overrides[_setting_name])) {
+        _value = rbe_settings_overrides[_setting_name]
+        print(
+            "  WARNING:  You are using an experimental RBE setting: ${_setting_name} = ${_value}")
+      }
+    }
+  }
+
+  # cxx overrides
+  if (defined(rbe_settings_overrides["cxx_enable"])) {
+    cxx_enable = rbe_settings_overrides["cxx_enable"]
+  }
+  if (defined(rbe_settings_overrides["cxx_download_objects"])) {
+    cxx_download_objects = rbe_settings_overrides["cxx_download_objects"]
+  }
+
+  # link overrides
+  if (defined(rbe_settings_overrides["link_enable"])) {
+    link_enable = rbe_settings_overrides["link_enable"]
+  }
+  if (defined(rbe_settings_overrides["link_download_unstripped_binaries"])) {
+    link_download_unstripped_binaries =
+        rbe_settings_overrides["link_download_unstripped_binaries"]
+  }
+
+  # rust overrides
+  if (defined(rbe_settings_overrides["rust_enable"])) {
+    rust_enable = rbe_settings_overrides["rust_enable"]
+  }
+  if (defined(rbe_settings_overrides["rust_download_rlibs"])) {
+    rust_download_rlibs = rbe_settings_overrides["rust_download_rlibs"]
+  }
+  if (defined(rbe_settings_overrides["rust_download_unstripped_binaries"])) {
+    rust_download_unstripped_binaries =
+        rbe_settings_overrides["rust_download_unstripped_binaries"]
+  }
+  if (defined(rbe_settings_overrides["rust_exec_strategy"])) {
+    rust_exec_strategy = rbe_settings_overrides["rust_exec_strategy"]
+  }
+}

@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/toolchain/rbe_modes.gni")
+
 # Defines the configuration of RBE and related global variables.
 
 _host_platform = "${host_os}-${host_cpu}"
@@ -84,7 +86,7 @@ declare_args() {
   #########################
 
   # Set to true to enable distributed compilation of Rust using RBE.
-  rust_rbe_enable = false
+  rust_rbe_enable = rbe_settings.rust_enable
 
   # One of:
   #
@@ -102,7 +104,7 @@ declare_args() {
   #   * "racing": Race local vs. remote execution, take the first to finish.
   #
   #   (There are other rewrapper options that are not exposed.)
-  rust_rbe_exec_strategy = "remote"
+  rust_rbe_exec_strategy = rbe_settings.rust_exec_strategy
 
   # Run one of the more expensive checks, intended for CI.
   # All of these require rust_rbe_enable=true.
@@ -135,7 +137,8 @@ declare_args() {
   # that be used to retrieve remote artifacts later using build/rbe/dlwrap.py.
   # TODO(b/284994230): This option is only available to developers,
   # and not restricted environments that lack direct network access.
-  rust_rbe_download_unstripped_binaries = true
+  rust_rbe_download_unstripped_binaries =
+      rbe_settings.rust_download_unstripped_binaries
 
   # Set to true to emit additional .rmeta files when compiling Rust rlibs.
   # The .rmeta metadata files can be used by downstream build actions
@@ -153,7 +156,7 @@ declare_args() {
 
   # Set to true to enable distributed compilation of C++ using RBE.
   # Enabling this takes precedence over `use_goma`.
-  cxx_rbe_enable = false
+  cxx_rbe_enable = rbe_settings.cxx_enable
 
   # Set to true to use a fast, minimalist wrapper, that lacks features
   # of the python-based wrapper.  Use with caution.
@@ -176,7 +179,7 @@ declare_args() {
   #   * "racing": Race local vs. remote execution, take the first to finish.
   #
   #   (There are other rewrapper options that are not exposed.)
-  cxx_rbe_exec_strategy = "remote_local_fallback"
+  cxx_rbe_exec_strategy = rbe_settings.cxx_exec_strategy
 
   # Run one of the more expensive checks, intended for CI.
   # All of these require cxx_rbe_enable=true.
@@ -221,7 +224,7 @@ declare_args() {
   # Set to true to enable remote linking using RBE.
   # This covers actions that use `ar`, or use `clang` to drive
   # linkers like `lld`.
-  link_rbe_enable = false
+  link_rbe_enable = rbe_settings.link_enable
 
   # One of:
   #
@@ -239,7 +242,7 @@ declare_args() {
   #   * "racing": Race local vs. remote execution, take the first to finish.
   #
   #   (There are other rewrapper options that are not exposed.)
-  link_rbe_exec_strategy = "remote_local_fallback"
+  link_rbe_exec_strategy = rbe_settings.link_exec_strategy
 
   # Run one of the more expensive checks, intended for CI.
   # All of these require link_rbe_enable=true.
@@ -264,7 +267,8 @@ declare_args() {
   # Controls whether or not to download (often large) unstripped linker
   # outputs.  When downloading is disabled, the build produces stubs
   # that be used to retrieve remote artifacts later using build/rbe/dlwrap.py.
-  link_rbe_download_unstripped_outputs = true
+  link_rbe_download_unstripped_outputs =
+      rbe_settings.link_download_unstripped_binaries
 }
 
 RBE_EXEC_STRATEGY_MAP = {
