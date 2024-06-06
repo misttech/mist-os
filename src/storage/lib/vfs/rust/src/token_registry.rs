@@ -8,7 +8,6 @@ use {
     crate::directory::entry_container::MutableDirectory,
     fidl::Handle,
     fidl::{Event, HandleBased, Rights},
-    fidl_fuchsia_io as fio,
     fuchsia_zircon_status::Status,
     pin_project::{pin_project, pinned_drop},
     std::{
@@ -81,10 +80,7 @@ impl TokenRegistry {
 
     /// Returns the information provided by get_node_and_flags for the given token.  Returns None if
     /// no such token exists (perhaps because the owner has been dropped).
-    pub fn get_owner(
-        &self,
-        token: Handle,
-    ) -> Result<Option<(Arc<dyn MutableDirectory>, fio::OpenFlags)>, Status> {
+    pub fn get_owner(&self, token: Handle) -> Result<Option<Arc<dyn MutableDirectory>>, Status> {
         let koid = token.get_koid()?;
         let this = self.inner.lock().unwrap();
 
@@ -92,7 +88,7 @@ impl TokenRegistry {
             Some(owner) => {
                 // SAFETY: This is safe because Tokenizable's drop will ensure that unregister is
                 // called to avoid any dangling pointers.
-                Ok(Some(unsafe { (**owner).get_node_and_flags() }))
+                Ok(Some(unsafe { (**owner).get_node() }))
             }
             None => Ok(None),
         }
@@ -114,7 +110,7 @@ pub trait TokenInterface: 'static {
     /// the `get_owner` method.  For now this always returns Arc<dyn MutableDirectory> but it should
     /// be possible to change this so that files can be represented in future if and when the need
     /// arises.
-    fn get_node_and_flags(&self) -> (Arc<dyn MutableDirectory>, fio::OpenFlags);
+    fn get_node(&self) -> Arc<dyn MutableDirectory>;
 
     /// Returns the token registry.
     fn token_registry(&self) -> &TokenRegistry;
@@ -209,7 +205,7 @@ mod tests {
                 // Note this ugly cast in place of `Arc::ptr_eq(&client, &res)` here is to ensure we
                 // don't compare vtable pointers, which are not strictly guaranteed to be the same
                 // across casts done in different code generation units at compilation time.
-                assert_eq!(Arc::as_ptr(&client.1) as *const (), Arc::as_ptr(&res.0) as *const ());
+                assert_eq!(Arc::as_ptr(&client.1) as *const (), Arc::as_ptr(&res) as *const ());
             }
 
             token
@@ -276,8 +272,8 @@ mod tests {
         pub(super) struct MockChannel(pub Arc<TokenRegistry>, pub Arc<MockDirectory>);
 
         impl TokenInterface for MockChannel {
-            fn get_node_and_flags(&self) -> (Arc<dyn MutableDirectory>, fio::OpenFlags) {
-                (self.1.clone(), fio::OpenFlags::RIGHT_READABLE)
+            fn get_node(&self) -> Arc<dyn MutableDirectory> {
+                self.1.clone()
             }
 
             fn token_registry(&self) -> &TokenRegistry {

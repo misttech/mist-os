@@ -254,11 +254,10 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
             return Err(Status::INVALID_ARGS);
         }
 
-        let (dst_parent, _flags) =
-            match self.base.scope.token_registry().get_owner(dst_parent_token)? {
-                None => return Err(Status::NOT_FOUND),
-                Some(entry) => entry,
-            };
+        let dst_parent = match self.base.scope.token_registry().get_owner(dst_parent_token)? {
+            None => return Err(Status::NOT_FOUND),
+            Some(entry) => entry,
+        };
 
         dst_parent.clone().rename(self.base.directory.clone(), src, dst).await
     }
@@ -321,8 +320,8 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
 }
 
 impl<DirectoryType: MutableDirectory> TokenInterface for MutableConnection<DirectoryType> {
-    fn get_node_and_flags(&self) -> (Arc<dyn MutableDirectory>, fio::OpenFlags) {
-        (self.base.directory.clone(), self.base.options.to_io1())
+    fn get_node(&self) -> Arc<dyn MutableDirectory> {
+        self.base.directory.clone()
     }
 
     fn token_registry(&self) -> &TokenRegistry {

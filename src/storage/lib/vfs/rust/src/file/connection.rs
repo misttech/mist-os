@@ -1036,7 +1036,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             return Err(Status::ACCESS_DENIED);
         }
 
-        let (target_parent, _flags) = self
+        let target_parent = self
             .scope
             .token_registry()
             .get_owner(target_parent_token.into())?

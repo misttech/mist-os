@@ -447,7 +447,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             return Err(Status::BAD_HANDLE);
         }
 
-        let (target_parent, _flags) = self
+        let target_parent = self
             .scope
             .token_registry()
             .get_owner(target_parent_token)?

@@ -233,7 +233,7 @@ impl<T: Symlink> Connection<T> {
     ) -> Result<(), Status> {
         let target_name = parse_name(target_name).map_err(|_| Status::INVALID_ARGS)?;
 
-        let (target_parent, _flags) = self
+        let target_parent = self
             .scope
             .token_registry()
             .get_owner(target_parent_token.into())?
