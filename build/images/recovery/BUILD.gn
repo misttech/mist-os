@@ -9,7 +9,6 @@ import("//build/board.gni")
 import("//build/images/args.gni")
 import("//build/images/paths.gni")
 import("//build/images/vboot/vboot.gni")
-import("//build/images/zedboot/zedboot_args.gni")
 import("//build/info/info.gni")
 import("//build/product.gni")
 import("//build/testing/host_test_data.gni")
@@ -53,8 +52,7 @@ if (is_fuchsia) {
     }
     board_config_label = board_configuration_label
 
-    additional_boot_args =
-        [ "virtcon.disable=true" ] + zedboot_additional_boot_args
+    additional_boot_args = [ "virtcon.disable=true" ]
 
     bootfs_labels = [ "//build/input:recovery_bootfs" ]
 

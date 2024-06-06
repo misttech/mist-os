@@ -5,7 +5,6 @@
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/board_configuration.gni")
 import("//build/assembly/product_assembly_configuration.gni")
-import("//build/images/zedboot/zedboot_args.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
 import("//src/sys/core/build/core.gni")
 
@@ -104,8 +103,7 @@ template("assemble_network_conformance_system") {
 
     core_realm_definition = ":core"
 
-    additional_boot_args =
-        [ "virtcon.disable=true" ] + zedboot_additional_boot_args
+    additional_boot_args = [ "virtcon.disable=true" ]
     cmdline = [ "kernel.halt-on-panic=true" ]
 
     bootfs_labels = [ "//build/input:recovery_bootfs" ]
