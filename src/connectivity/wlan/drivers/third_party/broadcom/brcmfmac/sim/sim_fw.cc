@@ -35,6 +35,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/brcm_hw_ids.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/brcmu_d11.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/common.h"
+#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/core.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/debug.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/fweh.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/fwil.h"
@@ -486,7 +487,13 @@ zx_status_t SimFirmware::BusTxCtl(unsigned char* msg, unsigned int len) {
             break;
           }
           common::MacAddr bssid(assoc_state_.opts->bssid);
-          ZX_ASSERT(bssid == *req_bssid);
+          const bool is_current_bss = *req_bssid == bssid;
+          bool is_target_bss = false;
+          if (assoc_state_.reassoc_opts) {
+            common::MacAddr target_bssid(assoc_state_.reassoc_opts->bssid);
+            is_target_bss = *req_bssid == target_bssid;
+          }
+          ZX_ASSERT(is_current_bss || is_target_bss);
           DisassocLocalClient(static_cast<wlan_ieee80211::ReasonCode>(scb_val->val));
         } else if (softap_ifidx_ != std::nullopt && softap_ifidx_ == ifidx) {
           BRCMF_ERR("This iovar is not expected to be used on softAP iface.");
@@ -699,6 +706,19 @@ zx_status_t SimFirmware::BusTxCtl(unsigned char* msg, unsigned int len) {
       memcpy(data + bssInfoOffset, &bss_info, sizeof(bss_info));
       break;
     }
+    case BRCMF_C_GET_BSSID: {
+      BRCMF_DBG(SIM, "GET_BSSID");
+      if (assoc_state_.state == AssocState::ASSOCIATED) {
+        memcpy(data, assoc_state_.opts->bssid.byte, ETH_ALEN);
+      } else {
+        // This matches how real firmware responds when not associated.
+        // There may be other behaviors we haven't seen yet.
+        dcmd->status = BCME_NOTASSOCIATED;
+        bcdc_response_.Set(msg, len);
+        return ZX_ERR_IO_REFUSED;
+      }
+      break;
+    }
 
     default:
       BRCMF_DBG(SIM, "Unimplemented firmware message %d", dcmd->cmd);
@@ -840,6 +860,20 @@ void SimFirmware::TriggerFirmwareDisassoc(wlan_ieee80211::ReasonCode reason) {
 
 void SimFirmware::TriggerFirmwareDeauth(wlan_ieee80211::ReasonCode reason) {
   DeauthLocalClient(reason);
+}
+
+void SimFirmware::TriggerFirmwareDisassocIndFromBssid(wlan_ieee80211::ReasonCode reason,
+                                                      const uint8_t bssid[ETH_ALEN]) {
+  common::MacAddr src{bssid};
+  SendEventToDriver(0, nullptr, BRCMF_E_DISASSOC_IND, BRCMF_E_STATUS_SUCCESS, kClientIfidx, 0, 0,
+                    fidl::ToUnderlying(reason), src);
+}
+
+void SimFirmware::TriggerFirmwareDeauthIndFromBssid(wlan_ieee80211::ReasonCode reason,
+                                                    const uint8_t bssid[ETH_ALEN]) {
+  common::MacAddr src{bssid};
+  SendEventToDriver(0, nullptr, BRCMF_E_DEAUTH_IND, BRCMF_E_STATUS_SUCCESS, kClientIfidx, 0, 0,
+                    fidl::ToUnderlying(reason), src);
 }
 
 // Process an RX CTL message. We simply pass back the results of the previous TX CTL

@@ -145,6 +145,61 @@ TEST_F(SimTest, DeauthFromApWhileNotConnectedIsIgnored) {
   EXPECT_EQ(client_ifc.stats_.deauth_indications.size(), 0U);
 }
 
+TEST_F(SimTest, DisassocFromUnexpectedBssWhileConnectedIsIgnored) {
+  simulation::FakeAp ap(env_.get(), kApBssid, kApSsid, kApChannel);
+
+  ASSERT_EQ(Init(), ZX_OK);
+
+  SimInterface client_ifc;
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc, kStaMacAddr), ZX_OK);
+  client_ifc.AssociateWith(ap, zx::sec(1));
+
+  // Simulate receipt of a disassoc ind from the AP by generating the appropriate event in
+  // firmware, rather than using the fake AP.
+  const auto disassoc_reason = wlan_ieee80211::ReasonCode::kUnspecifiedReason;
+  const uint8_t unexpected_bssid[ETH_ALEN]{0x34, 0x28, 0x47, 0xaa, 0xab, 0xc3};
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    SimFirmware& fw = *device->GetSim()->sim_fw;
+    env_->ScheduleNotification(
+        [&] { fw.TriggerFirmwareDisassocIndFromBssid(disassoc_reason, unexpected_bssid); },
+        zx::sec(2));
+  });
+
+  env_->Run(kTestDuration);
+
+  EXPECT_EQ(client_ifc.stats_.disassoc_indications.size(), 0U);
+  EXPECT_EQ(client_ifc.stats_.disassoc_results.size(), 0U);
+  EXPECT_EQ(client_ifc.stats_.deauth_results.size(), 0U);
+  EXPECT_EQ(client_ifc.stats_.deauth_indications.size(), 0U);
+}
+
+TEST_F(SimTest, DeauthFromUnexpectedBssWhileConnectedIsIgnored) {
+  simulation::FakeAp ap(env_.get(), kApBssid, kApSsid, kApChannel);
+
+  ASSERT_EQ(Init(), ZX_OK);
+
+  SimInterface client_ifc;
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc, kStaMacAddr), ZX_OK);
+  client_ifc.AssociateWith(ap, zx::sec(1));
+
+  // Simulate receipt of a deauth ind from the AP by generating the appropriate event in
+  // firmware, rather than using the fake AP.
+  const auto deauth_reason = wlan_ieee80211::ReasonCode::kUnspecifiedReason;
+  const uint8_t unexpected_bssid[ETH_ALEN]{0x34, 0x28, 0x47, 0xaa, 0xab, 0xc3};
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    SimFirmware& fw = *device->GetSim()->sim_fw;
+    env_->ScheduleNotification(
+        [&] { fw.TriggerFirmwareDeauthIndFromBssid(deauth_reason, unexpected_bssid); }, zx::sec(2));
+  });
+
+  env_->Run(kTestDuration);
+
+  EXPECT_EQ(client_ifc.stats_.disassoc_indications.size(), 0U);
+  EXPECT_EQ(client_ifc.stats_.disassoc_results.size(), 0U);
+  EXPECT_EQ(client_ifc.stats_.deauth_results.size(), 0U);
+  EXPECT_EQ(client_ifc.stats_.deauth_indications.size(), 0U);
+}
+
 TEST_F(SimTest, DisassocFromSmeWhileNotConnectedResultsInDisassocConf) {
   simulation::FakeAp ap(env_.get(), kApBssid, kApSsid, kApChannel);
 

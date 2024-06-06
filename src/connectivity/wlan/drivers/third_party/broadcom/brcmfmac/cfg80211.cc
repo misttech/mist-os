@@ -1384,9 +1384,29 @@ static void brcmf_notify_disassoc_ind(net_device* ndev, const uint8_t mac_addr[E
   }
 }
 
+// Does the given address match the current BSSID?
+static bool is_current_bss(brcmf_cfg80211_info* cfg, const uint8_t addr[ETH_ALEN]) {
+  struct net_device* ndev = cfg_to_ndev(cfg);
+  struct brcmf_cfg80211_profile* prof = ndev_to_prof(ndev);
+  return memcmp(prof->bssid, addr, ETH_ALEN) == 0;
+}
+
+// Does the given address match the target BSSID?
+// Always returns false if not currently roaming.
+static bool is_target_bss(brcmf_cfg80211_info* cfg, const uint8_t addr[ETH_ALEN]) {
+  struct brcmf_if* ifp = cfg_to_if(cfg);
+
+  if (!(cfg->target_bssid.has_value() &&
+        brcmf_test_bit(brcmf_vif_status_bit_t::ROAMING, &ifp->vif->sme_state))) {
+    return false;
+  }
+  return memcmp(cfg->target_bssid->data(), addr, ETH_ALEN) == 0;
+}
+
+// Send SME notification(s) after a disconnect event was received from firmware.
 static void cfg80211_disconnected(struct brcmf_cfg80211_vif* vif,
                                   fuchsia_wlan_ieee80211::ReasonCode reason_code,
-                                  uint16_t event_code) {
+                                  uint16_t event_code, const uint8_t event_addr[ETH_ALEN]) {
   struct net_device* ndev = vif->wdev.netdev;
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   if (!ndev->if_proto.is_valid()) {
@@ -1398,30 +1418,38 @@ static void cfg80211_disconnected(struct brcmf_cfg80211_vif* vif,
   BRCMF_DBG(CONN, "Link Down: address: " FMT_MAC ", SME reason: %d",
             FMT_MAC_ARGS(vif->profile.bssid), fidl::ToUnderlying(reason_code));
 
-  const bool sme_initiated_deauth =
-      cfg->disconnect_mode == BRCMF_DISCONNECT_DEAUTH &&
-      (event_code == BRCMF_E_DEAUTH || event_code == BRCMF_E_DISASSOC);
-  const bool sme_initiated_disassoc =
-      cfg->disconnect_mode == BRCMF_DISCONNECT_DISASSOC &&
-      (event_code == BRCMF_E_DEAUTH || event_code == BRCMF_E_DISASSOC);
-
-  if (sme_initiated_deauth) {
-    brcmf_notify_deauth(ndev, vif->profile.bssid);
-  } else if (sme_initiated_disassoc) {
-    brcmf_notify_disassoc(ndev, ZX_OK);
-  } else {
-    const bool locally_initiated = event_code == BRCMF_E_DEAUTH || event_code == BRCMF_E_DISASSOC ||
-                                   event_code == BRCMF_E_LINK;
-    // BRCMF_E_DEAUTH is unlikely if not SME-initiated
-    if (event_code == BRCMF_E_DEAUTH || event_code == BRCMF_E_DEAUTH_IND ||
-        event_code == BRCMF_E_LINK) {
-      brcmf_notify_deauth_ind(ndev, vif->profile.bssid, reason_code, locally_initiated);
-    } else {
-      // This is a catch-all case - could be E_DISASSOC, E_DISASSOC_IND or IF delete
-      brcmf_notify_disassoc_ind(ndev, vif->profile.bssid, reason_code, locally_initiated);
+  if (event_code == BRCMF_E_DEAUTH || event_code == BRCMF_E_DISASSOC) {
+    if (is_current_bss(cfg, event_addr) &&
+        brcmf_test_and_clear_bit(brcmf_disconnect_request_bit_t::DEAUTH_CURRENT_BSS,
+                                 &cfg->disconnect_request_state)) {
+      brcmf_notify_deauth(ndev, vif->profile.bssid);
+      return;
+    }
+    if (is_target_bss(cfg, event_addr) &&
+        brcmf_test_and_clear_bit(brcmf_disconnect_request_bit_t::DEAUTH_TARGET_BSS,
+                                 &cfg->disconnect_request_state)) {
+      brcmf_notify_deauth(ndev, cfg->target_bssid->data());
+      return;
+    }
+    if (brcmf_test_and_clear_bit(brcmf_disconnect_request_bit_t::DISASSOC,
+                                 &cfg->disconnect_request_state)) {
+      brcmf_notify_disassoc(ndev, ZX_OK);
+      return;
     }
   }
-  cfg->disconnect_mode = BRCMF_DISCONNECT_NONE;
+
+  // If we get this far, the disconnect is not SME-initiated. It might have come from
+  // an AP, or from the driver itself. Either way, it needs an indication.
+  const bool locally_initiated =
+      event_code == BRCMF_E_DEAUTH || event_code == BRCMF_E_DISASSOC || event_code == BRCMF_E_LINK;
+  // BRCMF_E_DEAUTH is unlikely if not SME-initiated
+  if (event_code == BRCMF_E_DEAUTH || event_code == BRCMF_E_DEAUTH_IND ||
+      event_code == BRCMF_E_LINK) {
+    brcmf_notify_deauth_ind(ndev, vif->profile.bssid, reason_code, locally_initiated);
+  } else {
+    // This is a catch-all case - could be E_DISASSOC, E_DISASSOC_IND or IF delete
+    brcmf_notify_disassoc_ind(ndev, vif->profile.bssid, reason_code, locally_initiated);
+  }
 }
 
 // Bring the IF down. Synaptics recommends using this to reset the IF after a
@@ -1443,8 +1471,10 @@ static zx_status_t brcmf_bss_reset(brcmf_if* ifp) {
   return status;
 }
 
+// If connected, disconnect and notify; regardless, clean up after link down.
 static void brcmf_link_down(struct brcmf_cfg80211_vif* vif,
-                            fuchsia_wlan_ieee80211::ReasonCode reason_code, uint16_t event_code) {
+                            fuchsia_wlan_ieee80211::ReasonCode reason_code, uint16_t event_code,
+                            const uint8_t event_addr[ETH_ALEN]) {
   struct brcmf_cfg80211_info* cfg = vif->ifp->drvr->config;
   zx_status_t err = ZX_OK;
 
@@ -1454,14 +1484,14 @@ static void brcmf_link_down(struct brcmf_cfg80211_vif* vif,
     BRCMF_INFO("Link down while connected.");
     bcme_status_t fwerr = BCME_OK;
 
-    // Calling WLC_DISASSOC to stop excess roaming
+    // Calling BRCMF_C_DISASSOC to stop excess roaming
     err = brcmf_fil_cmd_data_set(vif->ifp, BRCMF_C_DISASSOC, nullptr, 0, &fwerr);
     if (err != ZX_OK) {
-      BRCMF_ERR("WLC_DISASSOC failed: %s, fw err %s", zx_status_get_string(err),
+      BRCMF_ERR("BRCMF_C_DISASSOC failed: %s, fw err %s", zx_status_get_string(err),
                 brcmf_fil_get_errstr(fwerr));
     }
     if (vif->wdev.iftype == fuchsia_wlan_common_wire::WlanMacRole::kClient) {
-      cfg80211_disconnected(vif, reason_code, event_code);
+      cfg80211_disconnected(vif, reason_code, event_code, event_addr);
     }
   }
   brcmf_bss_reset(vif->ifp);
@@ -2077,6 +2107,7 @@ static zx_status_t brcmf_get_ctrl_channel(brcmf_if* ifp, uint16_t* chanspec_out,
 static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
   struct net_device* ndev = cfg_to_ndev(cfg);
   struct brcmf_if* ifp = ndev_to_if(ndev);
+  struct brcmf_cfg80211_profile* prof = ndev_to_prof(ndev);
   bcme_status_t fw_err;
   uint32_t is_up = 0;
   float periodic_err_rate_tx = 0.0, periodic_err_rate_rx = 0.0;
@@ -2281,7 +2312,7 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
                  BRCMF_MAX_DEAUTHS_PER_HOUR);
       // Reset the rx freeze count when deauth is triggered, waiting for the next trigger.
       ndev->stats.rx_freeze_count = 0;
-      brcmf_link_down(ifp->vif, deauth_reason_code.value(), BRCMF_E_DEAUTH);
+      brcmf_link_down(ifp->vif, deauth_reason_code.value(), BRCMF_E_DEAUTH, prof->bssid);
       deauth_times->push_back(current_log_count);
     }
   }
@@ -2345,6 +2376,8 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
   ndev->client_stats_log_count++;
 }
 
+// Cleanup after a disconnect, or after a disconnect timeout.
+// Any pending SME disconnect requests are considered serviced after this function.
 static void brcmf_disconnect_done(struct brcmf_cfg80211_info* cfg) {
   struct net_device* ndev = cfg_to_ndev(cfg);
   struct brcmf_if* ifp = ndev_to_if(ndev);
@@ -2354,13 +2387,25 @@ static void brcmf_disconnect_done(struct brcmf_cfg80211_info* cfg) {
 
   if (brcmf_test_and_clear_bit(brcmf_vif_status_bit_t::DISCONNECTING, &ifp->vif->sme_state)) {
     cfg->disconnect_timer->Stop();
-    if (cfg->disconnect_mode == BRCMF_DISCONNECT_DEAUTH) {
-      brcmf_notify_deauth(ndev, profile->bssid);
-    } else {
+    if (brcmf_test_and_clear_bit(brcmf_disconnect_request_bit_t::DISASSOC,
+                                 &cfg->disconnect_request_state)) {
       brcmf_notify_disassoc(ndev, ZX_OK);
     }
-    cfg->disconnect_mode = BRCMF_DISCONNECT_NONE;
+    if (brcmf_test_and_clear_bit(brcmf_disconnect_request_bit_t::DEAUTH_CURRENT_BSS,
+                                 &cfg->disconnect_request_state)) {
+      brcmf_notify_deauth(ndev, profile->bssid);
+    }
+    if (brcmf_test_and_clear_bit(brcmf_disconnect_request_bit_t::DEAUTH_TARGET_BSS,
+                                 &cfg->disconnect_request_state) &&
+        cfg->target_bssid.has_value()) {
+      brcmf_notify_deauth(ndev, cfg->target_bssid->data());
+    }
+    cfg->target_bssid.reset();
+    brcmf_clear_bit(brcmf_vif_status_bit_t::ROAMING, &ifp->vif->sme_state);
+  } else {
+    BRCMF_IFDBG(WLANIF, ndev, "Skipped notify deauth/disassoc because not DISCONNECTING");
   }
+
   if (!brcmf_feat_is_enabled(ifp, BRCMF_FEAT_MFG)) {
     cfg->signal_report_timer->Stop();
     // Log the client stats one last time before clearing out the counters
@@ -2494,31 +2539,40 @@ static void brcmf_roam_timeout(struct brcmf_cfg80211_info* cfg) {
   cfg->pub->irq_callback_lock.unlock();
 }
 
+// Send a disconnect command to firmware to service an SME disconnect request.
+// If the disconnect command fails, or the peer_sta_address is not the current/
+// target BSS:
+//   - this function will return an error status
+//   - and then the caller of this function is responsible for sending any
+//     notification to SME
 static zx_status_t brcmf_cfg80211_disconnect(struct net_device* ndev,
                                              const uint8_t peer_sta_address[ETH_ALEN],
                                              uint16_t reason_code, bool deauthenticate) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
-  struct brcmf_cfg80211_profile* profile = &ifp->vif->profile;
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
   struct brcmf_scb_val_le scbval;
   zx_status_t status = ZX_OK;
   bcme_status_t fw_err = BCME_OK;
 
   BRCMF_DBG(TRACE, "Enter. Reason code = %d", reason_code);
+
   if (!check_vif_up(ifp->vif)) {
     status = ZX_ERR_IO;
     goto done;
   }
 
   if (!brcmf_test_bit(brcmf_vif_status_bit_t::CONNECTED, &ifp->vif->sme_state) &&
-      !brcmf_test_bit(brcmf_vif_status_bit_t::CONNECTING, &ifp->vif->sme_state)) {
+      !brcmf_test_bit(brcmf_vif_status_bit_t::CONNECTING, &ifp->vif->sme_state) &&
+      !brcmf_test_bit(brcmf_vif_status_bit_t::ROAMING, &ifp->vif->sme_state)) {
     status = ZX_ERR_BAD_STATE;
+    BRCMF_INFO("Driver is not CONNECTED/CONNECTING/ROAMING, skipping disconnect");
     goto done;
   }
 
-  if (memcmp(peer_sta_address, profile->bssid, ETH_ALEN)) {
-    BRCMF_ERR("peer_sta_address is not matching bssid in brcmf_cfg80211_profile. ");
+  if (!(is_current_bss(cfg, peer_sta_address) || is_target_bss(cfg, peer_sta_address))) {
+    BRCMF_ERR("peer_sta_address does not match expected BSSID.");
 #if !defined(NDEBUG)
+    struct brcmf_cfg80211_profile* profile = &ifp->vif->profile;
     BRCMF_DBG(CONN, "  peer_sta_address:" FMT_MAC ", bssid in profile:" FMT_MAC "",
               FMT_MAC_ARGS(peer_sta_address), FMT_MAC_ARGS(profile->bssid));
 #endif /* !defined(NDEBUG) */
@@ -2528,8 +2582,32 @@ static zx_status_t brcmf_cfg80211_disconnect(struct net_device* ndev,
   // In case the connection is still in progress, stop the timer
   cfg->connect_timer->Stop();
 
+  // For now, we treat any SME disassoc request, or SME deauth request for current or target BSS, as
+  // a full client disconnect. There may be more nuance around this in the future.
+
+  // If roaming is in progress, and disconnect is for target BSS, roam has failed.
+  // Note: we don't clear the ROAMING bit here because it will get cleared after SME is notified of
+  // the roam failure.
+  if (brcmf_test_bit(brcmf_vif_status_bit_t::ROAMING, &ifp->vif->sme_state)) {
+    BRCMF_INFO("Roam has failed, SME requested disconnect while client was roaming");
+  }
+  brcmf_set_bit(brcmf_vif_status_bit_t::DISCONNECTING, &ifp->vif->sme_state);
   brcmf_clear_bit(brcmf_vif_status_bit_t::CONNECTED, &ifp->vif->sme_state);
   brcmf_clear_bit(brcmf_vif_status_bit_t::CONNECTING, &ifp->vif->sme_state);
+
+  // Keep track of when there are disconnect requests waiting for a firmware disconnect command to
+  // complete.
+  if (deauthenticate) {
+    if (is_target_bss(cfg, peer_sta_address)) {
+      brcmf_set_bit(brcmf_disconnect_request_bit_t::DEAUTH_TARGET_BSS,
+                    &cfg->disconnect_request_state);
+    } else {
+      brcmf_set_bit(brcmf_disconnect_request_bit_t::DEAUTH_CURRENT_BSS,
+                    &cfg->disconnect_request_state);
+    }
+  } else {
+    brcmf_set_bit(brcmf_disconnect_request_bit_t::DISASSOC, &cfg->disconnect_request_state);
+  }
 
   BRCMF_DBG(CONN, "Disconnecting");
 
@@ -2540,13 +2618,18 @@ static zx_status_t brcmf_cfg80211_disconnect(struct net_device* ndev,
 
   memcpy(&scbval.ea, peer_sta_address, ETH_ALEN);
   scbval.val = reason_code;
-  cfg->disconnect_mode = deauthenticate ? BRCMF_DISCONNECT_DEAUTH : BRCMF_DISCONNECT_DISASSOC;
-  brcmf_set_bit(brcmf_vif_status_bit_t::DISCONNECTING, &ifp->vif->sme_state);
+
   status = brcmf_fil_cmd_data_set(ifp, BRCMF_C_DISASSOC, &scbval, sizeof(scbval), &fw_err);
   if (status != ZX_OK) {
     BRCMF_ERR("Failed to disassociate: %s, fw err %s", zx_status_get_string(status),
               brcmf_fil_get_errstr(fw_err));
     brcmf_clear_bit(brcmf_vif_status_bit_t::DISCONNECTING, &ifp->vif->sme_state);
+    brcmf_clear_bit(brcmf_disconnect_request_bit_t::DEAUTH_CURRENT_BSS,
+                    &cfg->disconnect_request_state);
+    brcmf_clear_bit(brcmf_disconnect_request_bit_t::DEAUTH_TARGET_BSS,
+                    &cfg->disconnect_request_state);
+    brcmf_clear_bit(brcmf_disconnect_request_bit_t::DISASSOC, &cfg->disconnect_request_state);
+
     cfg->disconnect_timer->Stop();
   }
 
@@ -3907,6 +3990,7 @@ void brcmf_if_deauth_req(net_device* ndev,
               req->has_peer_sta_address(), req->has_reason_code());
     return;
   }
+  const auto& peer_sta_address = req->peer_sta_address().data();
   BRCMF_IFDBG(WLANIF, ndev, "Deauth request from SME. reason: %" PRIu16 "",
               fidl::ToUnderlying(req->reason_code()));
 
@@ -3914,7 +3998,7 @@ void brcmf_if_deauth_req(net_device* ndev,
     struct brcmf_scb_val_le scbval;
     bcme_status_t fw_err = BCME_OK;
 
-    memcpy(&scbval.ea, req->peer_sta_address().data(), ETH_ALEN);
+    memcpy(&scbval.ea, peer_sta_address, ETH_ALEN);
     // The FIDL reason code is defined in uint16_t, so no information will be lost.
     scbval.val = fidl::ToUnderlying(req->reason_code());
     zx_status_t status = brcmf_fil_cmd_data_set(ifp, BRCMF_C_SCB_DEAUTHENTICATE_FOR_REASON, &scbval,
@@ -3928,10 +4012,10 @@ void brcmf_if_deauth_req(net_device* ndev,
   }
 
   // Client IF processing
-  if (brcmf_cfg80211_disconnect(ndev, req->peer_sta_address().data(),
-                                fidl::ToUnderlying(req->reason_code()), true) != ZX_OK) {
+  if (brcmf_cfg80211_disconnect(ndev, peer_sta_address, fidl::ToUnderlying(req->reason_code()),
+                                true) != ZX_OK) {
     // Request to disconnect failed, so respond immediately
-    brcmf_notify_deauth(ndev, req->peer_sta_address().data());
+    brcmf_notify_deauth(ndev, peer_sta_address);
   }  // else wait for disconnect to complete before sending response
 
   // Workaround for https://fxbug.dev/42103512: allow time for disconnect to complete
@@ -5344,10 +5428,11 @@ void brcmf_free_net_device_vif(struct net_device* ndev) {
   }
 }
 
-// Returns true if client is connected (also includes CONNECTING and DISCONNECTING).
+// Returns true if client is connected (also includes CONNECTING, ROAMING, and DISCONNECTING).
 static bool brcmf_is_client_connected(brcmf_if* ifp) {
   return (brcmf_test_bit(brcmf_vif_status_bit_t::CONNECTED, &ifp->vif->sme_state) ||
           brcmf_test_bit(brcmf_vif_status_bit_t::CONNECTING, &ifp->vif->sme_state) ||
+          brcmf_test_bit(brcmf_vif_status_bit_t::ROAMING, &ifp->vif->sme_state) ||
           brcmf_test_bit(brcmf_vif_status_bit_t::DISCONNECTING, &ifp->vif->sme_state));
 }
 
@@ -5711,6 +5796,23 @@ static zx_status_t brcmf_bss_roam_done(brcmf_if* ifp, brcmf_connect_status_t con
         }
         break;
       }
+      case brcmf_connect_status_t::CONNECTING_TIMEOUT: {
+        BRCMF_INFO("Reassociation failed due to timeout, need to reset firmware state.");
+        const zx_status_t err = brcmf_clear_firmware_connection_state(ifp);
+        if (err != ZX_OK) {
+          BRCMF_ERR("Failed to clear firmware connection state.");
+        }
+        break;
+      }
+      case brcmf_connect_status_t::ROAM_INTERRUPTED: {
+        BRCMF_INFO("Reassociation failed because roam attempt was interrupted by SME.");
+        // SME has already issued the disconnect, so we just need to reset the interface.
+        const auto err = brcmf_bss_reset(ifp);
+        if (err != ZX_OK) {
+          BRCMF_ERR("Failed to clear firmware connection state.");
+        }
+        break;
+      }
       default: {
         BRCMF_WARN("Reassociation failed with connect_status %s, reassoc_result %d",
                    brcmf_get_connect_status_str(connect_status), static_cast<int>(reassoc_result));
@@ -5722,7 +5824,18 @@ static zx_status_t brcmf_bss_roam_done(brcmf_if* ifp, brcmf_connect_status_t con
         break;
       }
     }
-    brcmf_return_roam_result(ndev, cfg->target_bssid, reassoc_result);
+    if (!cfg->target_bssid.has_value()) {
+      BRCMF_ERR("Missing target BSSID, cannot notify SME of roam result");
+      return ZX_ERR_INTERNAL;
+    }
+    const auto target_bssid = static_cast<uint8_t*>(cfg->target_bssid->data());
+    brcmf_return_roam_result(ndev, target_bssid, reassoc_result);
+    // If roam failed due to a SME-issued deauth for the target BSS, we have to keep the
+    // target BSSID until the deauth handler cleans it up.
+    if (!brcmf_test_bit(brcmf_disconnect_request_bit_t::DEAUTH_TARGET_BSS,
+                        &cfg->disconnect_request_state)) {
+      cfg->target_bssid.reset();
+    }
   }
 
   BRCMF_DBG(TRACE, "Exit");
@@ -5938,7 +6051,9 @@ static zx_status_t brcmf_handle_reassoc_event(struct brcmf_if* ifp, const struct
 
   if (e->status == BRCMF_E_STATUS_ATTEMPT) {
     BRCMF_DBG(CONN, "REASSOC event: attempt");
-    memcpy(cfg->target_bssid, e->addr, ETH_ALEN);
+    std::array<uint8_t, ETH_ALEN> target_bssid;
+    memcpy(&target_bssid, e->addr, ETH_ALEN);
+    cfg->target_bssid = target_bssid;
     cfg->roam_timer->Start(BRCMF_ROAM_TIMER_DUR);
     brcmf_set_bit(brcmf_vif_status_bit_t::ROAMING, &vif->sme_state);
   } else if (e->status == BRCMF_E_STATUS_SUCCESS) {
@@ -6134,6 +6249,11 @@ static zx_status_t brcmf_indicate_client_disconnect(struct brcmf_if* ifp,
              brcmf_get_client_connect_state_string(ifp), ndev->last_known_rssi_dbm,
              ndev->last_known_snr_db);
   BRCMF_INFO_EVENT(ifp, e, "%d", [](uint32_t reason) { return reason; });
+  if (brcmf_test_bit(brcmf_vif_status_bit_t::ROAMING, &ifp->vif->sme_state)) {
+    // Disconnect happened during a roam attempt, so report that the roam failed.
+    brcmf_bss_roam_done(ifp, brcmf_connect_status_t::ROAM_INTERRUPTED,
+                        fuchsia_wlan_ieee80211_wire::StatusCode::kCanceled);
+  }
   brcmf_bss_connect_done(ifp, connect_status,
                          (connect_status == brcmf_connect_status_t::CONNECTED)
                              ? fuchsia_wlan_ieee80211_wire::StatusCode::kSuccess
@@ -6144,7 +6264,7 @@ static zx_status_t brcmf_indicate_client_disconnect(struct brcmf_if* ifp,
           ? fuchsia_wlan_ieee80211::ReasonCode::kMlmeLinkFailed
           : static_cast<fuchsia_wlan_ieee80211::ReasonCode>(e->reason);
   brcmf_disconnect_done(cfg);
-  brcmf_link_down(ifp->vif, reason_code, e->event_code);
+  brcmf_link_down(ifp->vif, reason_code, e->event_code, e->addr);
   brcmf_clear_profile_on_client_disconnect(ndev_to_prof(ndev));
   if (ndev != cfg_to_ndev(cfg)) {
     sync_completion_signal(&cfg->vif_disabled);
@@ -6155,6 +6275,27 @@ static zx_status_t brcmf_indicate_client_disconnect(struct brcmf_if* ifp,
   sync_completion_signal(&ifp->disconnect_done);
   BRCMF_DBG(TRACE, "Exit\n");
   return status;
+}
+
+// Check firmware connection state, typically to compare firmware state to driver state.
+static bool is_firmware_connected(struct brcmf_if* ifp) {
+  struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
+  bcme_status_t fw_err = BCME_OK;
+  uint8_t fw_bssid[ETH_ALEN];
+  const auto get_bssid_status =
+      brcmf_fil_cmd_data_get(ifp, BRCMF_C_GET_BSSID, &fw_bssid, ETH_ALEN, &fw_err);
+  if (get_bssid_status != ZX_OK) {
+    if (fw_err == BCME_NOTASSOCIATED) {
+      return false;
+    }
+    BRCMF_ERR("Could not get current BSSID from firmware: %s, fw err %s",
+              zx_status_get_string(get_bssid_status), brcmf_fil_get_errstr(fw_err));
+    return false;
+  }
+  if (is_current_bss(cfg, fw_bssid) || is_target_bss(cfg, fw_bssid)) {
+    return true;
+  }
+  return false;
 }
 
 static zx_status_t brcmf_process_link_event(struct brcmf_if* ifp, const struct brcmf_event_msg* e,
@@ -6202,6 +6343,8 @@ static zx_status_t brcmf_process_deauth_ind_event(struct brcmf_if* ifp,
                                                   const struct brcmf_event_msg* e, void* data) {
   BRCMF_DBG_EVENT(ifp, e, "%d", [](uint32_t reason) { return reason; });
 
+  struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
+
   brcmf_proto_delete_peer(ifp->drvr, ifp->ifidx, (uint8_t*)e->addr);
   if (brcmf_is_apmode(ifp->vif)) {
     brcmf_notify_deauth_ind(ifp->ndev, e->addr,
@@ -6210,13 +6353,47 @@ static zx_status_t brcmf_process_deauth_ind_event(struct brcmf_if* ifp,
   }
 
   // Sometimes FW sends E_DEAUTH when a unicast packet is received before association
-  // is complete. Ignore it.
+  // is complete. Ignore it. We are not sure if this is true for E_DEAUTH_IND as well,
+  // but this is the logic we have had for quite some time now.
   if (brcmf_test_bit(brcmf_vif_status_bit_t::CONNECTING, &ifp->vif->sme_state) &&
       e->reason == BRCMF_E_REASON_UCAST_FROM_UNASSOC_STA) {
-    BRCMF_DBG(EVENT, "E_DEAUTH because data rcvd before assoc...ignore");
+    BRCMF_DBG(EVENT, "E_DEAUTH_IND because data rcvd before assoc...ignore");
     return ZX_OK;
   }
-  return brcmf_indicate_client_disconnect(ifp, e, data, brcmf_connect_status_t::DEAUTHENTICATING);
+
+  const auto& peer_sta_address = e->addr;
+
+#if !defined(NDEBUG)
+  struct net_device* ndev = cfg_to_ndev(cfg);
+  if (is_current_bss(cfg, peer_sta_address)) {
+    BRCMF_IFDBG(WLANIF, ndev, "Received deauth indication from current BSS: " FMT_MAC "",
+                FMT_MAC_ARGS(peer_sta_address));
+  } else if (is_target_bss(cfg, peer_sta_address)) {
+    BRCMF_IFDBG(WLANIF, ndev, "Received deauth indication from target BSS: " FMT_MAC "",
+                FMT_MAC_ARGS(peer_sta_address));
+  }
+#endif /* !defined(NDEBUG) */
+
+  bool is_disconnect = false;
+  // While roaming, a deauth_ind from the target BSS is a roam failure, which currently means a
+  // disconnect too.
+  if (brcmf_test_bit(brcmf_vif_status_bit_t::ROAMING, &ifp->vif->sme_state)) {
+    is_disconnect = is_target_bss(cfg, peer_sta_address);
+  } else {
+    is_disconnect = is_current_bss(cfg, peer_sta_address);
+  }
+  if (is_disconnect) {
+    return brcmf_indicate_client_disconnect(ifp, e, data, brcmf_connect_status_t::DEAUTHENTICATING);
+  }
+  if (!is_firmware_connected(ifp)) {
+    BRCMF_WARN("Firmware not connected, received deauth ind from unexpected BSS");
+    return brcmf_indicate_client_disconnect(ifp, e, data, brcmf_connect_status_t::DEAUTHENTICATING);
+  }
+  BRCMF_INFO("Ignoring deauth indication from unexpected BSS");
+#if !defined(NDEBUG)
+  BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC "", FMT_MAC_ARGS(peer_sta_address));
+#endif /* !defined(NDEBUG) */
+  return ZX_OK;
 }
 
 static zx_status_t brcmf_process_deauth_event(struct brcmf_if* ifp, const struct brcmf_event_msg* e,
@@ -6236,6 +6413,26 @@ static zx_status_t brcmf_process_deauth_event(struct brcmf_if* ifp, const struct
     BRCMF_DBG(EVENT, "E_DEAUTH because data rcvd before assoc...ignore");
     return ZX_OK;
   }
+
+#if !defined(NDEBUG)
+  struct brcmf_cfg80211_profile* prof = &ifp->vif->profile;
+  struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
+  struct net_device* ndev = cfg_to_ndev(cfg);
+  const auto& peer_sta_address = e->addr;
+  if (memcmp(prof->bssid, peer_sta_address, ETH_ALEN) == 0) {
+    BRCMF_IFDBG(WLANIF, ndev, "Received deauth event for current BSS: " FMT_MAC "",
+                FMT_MAC_ARGS(peer_sta_address));
+  } else if (cfg->target_bssid.has_value() &&
+             memcmp(peer_sta_address, cfg->target_bssid->data(), ETH_ALEN) == 0) {
+    BRCMF_IFDBG(WLANIF, ndev, "Received deauth event for target BSS: " FMT_MAC "",
+                FMT_MAC_ARGS(peer_sta_address));
+  } else {
+    BRCMF_IFDBG(WLANIF, ndev, "Received deauth event for unexpected BSS: " FMT_MAC "",
+                FMT_MAC_ARGS(peer_sta_address));
+  }
+#endif /* !defined(NDEBUG) */
+
+  // For now, a deauth event incurs a full disconnect. This may change in the future.
   return brcmf_indicate_client_disconnect(ifp, e, data, brcmf_connect_status_t::DEAUTHENTICATING);
 }
 
@@ -6243,13 +6440,47 @@ static zx_status_t brcmf_process_disassoc_ind_event(struct brcmf_if* ifp,
                                                     const struct brcmf_event_msg* e, void* data) {
   BRCMF_DBG_EVENT(ifp, e, "%d", [](uint32_t reason) { return reason; });
 
+  struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
+
   brcmf_proto_delete_peer(ifp->drvr, ifp->ifidx, (uint8_t*)e->addr);
   if (brcmf_is_apmode(ifp->vif)) {
     brcmf_notify_disassoc_ind(ifp->ndev, e->addr,
                               static_cast<fuchsia_wlan_ieee80211::ReasonCode>(e->reason), false);
     return ZX_OK;
   }
-  return brcmf_indicate_client_disconnect(ifp, e, data, brcmf_connect_status_t::DISASSOCIATING);
+
+  const auto& peer_sta_address = e->addr;
+#if !defined(NDEBUG)
+  struct net_device* ndev = cfg_to_ndev(cfg);
+  if (is_current_bss(cfg, peer_sta_address)) {
+    BRCMF_IFDBG(WLANIF, ndev, "Received disassoc indication from current BSS: " FMT_MAC "",
+                FMT_MAC_ARGS(peer_sta_address));
+  } else if (is_target_bss(cfg, peer_sta_address)) {
+    BRCMF_IFDBG(WLANIF, ndev, "Received disassoc indication from target BSS: " FMT_MAC "",
+                FMT_MAC_ARGS(peer_sta_address));
+  }
+#endif /* !defined(NDEBUG) */
+
+  bool is_disconnect = false;
+  // While roaming, a disassoc_ind from the target BSS is a roam failure, which currently means a
+  // disconnect too.
+  if (brcmf_test_bit(brcmf_vif_status_bit_t::ROAMING, &ifp->vif->sme_state)) {
+    is_disconnect = is_target_bss(cfg, peer_sta_address);
+  } else {
+    is_disconnect = is_current_bss(cfg, peer_sta_address);
+  }
+  if (is_disconnect) {
+    return brcmf_indicate_client_disconnect(ifp, e, data, brcmf_connect_status_t::DISASSOCIATING);
+  }
+  if (!is_firmware_connected(ifp)) {
+    BRCMF_WARN("Firmware not connected, received disassoc ind from unexpected BSS");
+    return brcmf_indicate_client_disconnect(ifp, e, data, brcmf_connect_status_t::DISASSOCIATING);
+  }
+  BRCMF_INFO("Ignoring disassoc indication from unexpected BSS");
+#if !defined(NDEBUG)
+  BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC "", FMT_MAC_ARGS(peer_sta_address));
+#endif /* !defined(NDEBUG) */
+  return ZX_OK;
 }
 
 static zx_status_t brcmf_process_disassoc_event(struct brcmf_if* ifp,
@@ -6261,6 +6492,7 @@ static zx_status_t brcmf_process_disassoc_event(struct brcmf_if* ifp,
     brcmf_notify_disassoc(ifp->ndev, ZX_OK);
     return ZX_OK;
   }
+  // For now, any disassoc event incurs a full disconnect. This may change in the future.
   return brcmf_indicate_client_disconnect(ifp, e, data, brcmf_connect_status_t::DISASSOCIATING);
 }
 
@@ -6935,7 +7167,10 @@ static zx_status_t __brcmf_cfg80211_down(struct brcmf_if* ifp) {
    * from AP to save power
    */
   if (check_vif_up(ifp->vif)) {
-    brcmf_link_down(ifp->vif, fuchsia_wlan_ieee80211::ReasonCode::kUnspecifiedReason, 0);
+    auto ndev = cfg_to_ndev(cfg);
+    auto prof = ndev_to_prof(ndev);
+    brcmf_link_down(ifp->vif, fuchsia_wlan_ieee80211::ReasonCode::kUnspecifiedReason, 0,
+                    prof->bssid);
 
     /* Make sure WPA_Supplicant receives all the event
        generated due to DISASSOC call to the fw to keep
@@ -7039,6 +7274,7 @@ zx_status_t brcmf_cfg80211_wait_vif_event(struct brcmf_cfg80211_info* cfg, zx_du
 zx_status_t brcmf_cfg80211_del_iface(struct brcmf_cfg80211_info* cfg, struct wireless_dev* wdev) {
   struct net_device* ndev = wdev->netdev;
   struct brcmf_if* ifp = ndev_to_if(ndev);
+  struct brcmf_cfg80211_profile* prof = ndev_to_prof(ndev);
 
   /* vif event pending in firmware */
   if (brcmf_cfg80211_vif_event_armed(cfg)) {
@@ -7072,8 +7308,9 @@ zx_status_t brcmf_cfg80211_del_iface(struct brcmf_cfg80211_info* cfg, struct wir
       ndev->mlme_channel.reset();
       return brcmf_cfg80211_del_ap_iface(cfg, wdev);
     case fuchsia_wlan_common_wire::WlanMacRole::kClient:
-      // Dissconnect the client in an attempt to exit gracefully.
-      brcmf_link_down(ifp->vif, fuchsia_wlan_ieee80211::ReasonCode::kUnspecifiedReason, false);
+      // Disconnect the client in an attempt to exit gracefully.
+      brcmf_link_down(ifp->vif, fuchsia_wlan_ieee80211::ReasonCode::kUnspecifiedReason, false,
+                      prof->bssid);
       // The default client iface 0 is always assumed to exist by the driver, and is never
       // explicitly deleted.
       ndev->mlme_channel.reset();
