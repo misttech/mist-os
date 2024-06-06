@@ -95,13 +95,6 @@
 
 #endif  // defined(__clang__) && defined(__Fuchsia__)
 
-// To avoid mistakenly using a non-existent name or unpublished API level, the levels specified in
-// the following macros are converted to calls to a macro containing the specified API level in its
-// name. If the macro does not exist, the build will fail. See https://fxbug.dev/42084512.
-#define FUCHSIA_API_LEVEL_CAT_INDIRECT_(prefix, level) prefix##level##_
-#define FUCHSIA_API_LEVEL_CAT_(prefix, level) FUCHSIA_API_LEVEL_CAT_INDIRECT_(prefix, level)
-#define FUCHSIA_API_LEVEL_(level) (FUCHSIA_API_LEVEL_CAT_(FUCHSIA_INTERNAL_LEVEL_, level)())
-
 // Macros for conditionally compiling code based on the target API level.
 // Prefer the attribute macros above for declarations.
 //
@@ -127,6 +120,17 @@
 
 // The target API level is `level` or less.
 #define FUCHSIA_API_LEVEL_AT_MOST(level) (__Fuchsia_API_level__ <= FUCHSIA_API_LEVEL_(level))
+
+// ====================================================
+// Internal implementation details of the macros above.
+// ====================================================
+
+// To avoid mistakenly using a non-existent name or unpublished API level, the levels specified in
+// the following macros are converted to calls to a macro containing the specified API level in its
+// name. If the macro does not exist, the build will fail. See https://fxbug.dev/42084512.
+#define FUCHSIA_API_LEVEL_CAT_INDIRECT_(prefix, level) prefix##level##_
+#define FUCHSIA_API_LEVEL_CAT_(prefix, level) FUCHSIA_API_LEVEL_CAT_INDIRECT_(prefix, level)
+#define FUCHSIA_API_LEVEL_(level) (FUCHSIA_API_LEVEL_CAT_(FUCHSIA_INTERNAL_LEVEL_, level)())
 
 // The macros referenced by the output of `FUCHSIA_API_LEVEL_()` must be defined for each API level.
 // They are defined in the following file, which must be included after the macros above because it
