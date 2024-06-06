@@ -126,6 +126,7 @@ rustc_library("starnix_core") {
     "device/sync_fence_registry.rs",
     "device/sync_file.rs",
     "device/terminal.rs",
+    "device/touch_power_policy_device.rs",
     "device/tun.rs",
     "device/zram.rs",
     "dynamic_thread_spawner.rs",
