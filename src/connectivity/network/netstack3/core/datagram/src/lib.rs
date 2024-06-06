@@ -35,7 +35,7 @@ pub use internal::datagram::{
     ExpectedConnError, ExpectedUnboundError, InUseError, IpExt, IpOptions, ListenerInfo,
     MulticastInterfaceSelector, MulticastMembershipInterfaceSelector, NonDualStackConverter,
     NonDualStackDatagramBoundStateContext, ReferenceState, SendError, SendToError,
-    SetMulticastMembershipError, SocketHopLimits, SocketInfo, SocketState, StrongRc, WeakRc,
+    SetMulticastMembershipError, SocketInfo, SocketState, StrongRc, WeakRc,
     WrapOtherStackIpOptions, WrapOtherStackIpOptionsMut,
 };
 pub use internal::spec_context::{

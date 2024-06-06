@@ -22,7 +22,7 @@ use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use derivative::Derivative;
 use either::Either;
 use net_types::{
-    ip::{GenericOverIp, Ip, IpAddress, IpVersionMarker, Ipv4, Ipv6},
+    ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6},
     MulticastAddr, MulticastAddress as _, SpecifiedAddr, ZonedAddr,
 };
 use netstack3_base::{
@@ -46,7 +46,7 @@ use netstack3_ip::{
     self as ip, icmp,
     socket::{
         IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSockSendError, IpSocketHandler,
-        SendOneShotIpPacketError, SendOptions,
+        SendOneShotIpPacketError, SendOptions, SocketHopLimits,
     },
     BaseTransportIpContext, HopLimits, MulticastMembershipHandler, ResolveRouteError,
     TransportIpContext,
@@ -476,12 +476,7 @@ pub struct DatagramSocketOptions<I: IpExt, D: WeakDeviceIdentifier> {
 
 impl<I: IpExt, D: WeakDeviceIdentifier> SendOptions<I> for DatagramSocketOptions<I, D> {
     fn hop_limit(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
-        let Self { hop_limits: SocketHopLimits { unicast, multicast, version: _ }, .. } = self;
-        if destination.is_multicast() {
-            *multicast
-        } else {
-            *unicast
-        }
+        self.hop_limits.hop_limit_for_dst(destination)
     }
 
     fn multicast_loop(&self) -> bool {
@@ -515,41 +510,6 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> IpOptions<I, D, S
     /// Returns the transparent option.
     pub fn transparent(&self) -> bool {
         self.transparent
-    }
-}
-
-/// The configurable hop limits for a datagram socket.
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
-pub struct SocketHopLimits<I: Ip> {
-    /// Unicast hop limit.
-    pub unicast: Option<NonZeroU8>,
-    /// Multicast hop limit.
-    // TODO(https://fxbug.dev/42059735): Make this an Option<u8> to allow sending
-    // multicast packets destined only for the local machine.
-    pub multicast: Option<NonZeroU8>,
-    /// An unused marker type signifying the IP version for which these hop
-    /// limits are valid. Including this helps prevent using the wrong hop limits
-    /// when operating on dualstack sockets.
-    pub version: IpVersionMarker<I>,
-}
-
-impl<I: Ip> SocketHopLimits<I> {
-    /// Returns a function that updates the unicast hop limit.
-    pub fn set_unicast(value: Option<NonZeroU8>) -> impl FnOnce(&mut Self) {
-        move |limits| limits.unicast = value
-    }
-
-    /// Returns a function that updates the multicast hop limit.
-    pub fn set_multicast(value: Option<NonZeroU8>) -> impl FnOnce(&mut Self) {
-        move |limits| limits.multicast = value
-    }
-
-    fn get_limits_with_defaults(&self, defaults: &HopLimits) -> HopLimits {
-        let Self { unicast, multicast, version: _ } = self;
-        HopLimits {
-            unicast: unicast.unwrap_or(defaults.unicast),
-            multicast: multicast.unwrap_or(defaults.multicast),
-        }
     }
 }
 
@@ -5112,7 +5072,7 @@ mod test {
     use ip_test_macro::ip_test;
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::{
-        ip::{Ipv4Addr, Ipv6Addr},
+        ip::{IpVersionMarker, Ipv4Addr, Ipv6Addr},
         Witness,
     };
     use netstack3_base::{

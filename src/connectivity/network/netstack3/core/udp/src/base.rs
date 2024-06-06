@@ -47,11 +47,11 @@ use netstack3_datagram::{
     EitherIpSocket, ExpectedConnError, ExpectedUnboundError, InUseError, IpExt, IpOptions,
     MulticastMembershipInterfaceSelector, NonDualStackConverter,
     NonDualStackDatagramBoundStateContext, NonDualStackDatagramSpecBoundStateContext,
-    SendError as DatagramSendError, SetMulticastMembershipError, SocketHopLimits, SocketInfo,
+    SendError as DatagramSendError, SetMulticastMembershipError, SocketInfo,
     SocketState as DatagramSocketState, WrapOtherStackIpOptions, WrapOtherStackIpOptionsMut,
 };
 use netstack3_ip::{
-    socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError},
+    socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError, SocketHopLimits},
     HopLimits, IpTransportContext, MulticastMembershipHandler, TransparentLocalDelivery,
     TransportIpContext, TransportReceiveError,
 };

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::num::NonZeroU8;
 use std::ops::ControlFlow;
 
 use fidl::{
@@ -329,12 +330,18 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
             fpraw::SocketRequest::GetIpTypeOfService { responder } => {
                 respond_not_supported!("raw::GetIpTypeOfService", responder)
             }
-            fpraw::SocketRequest::SetIpTtl { value: _, responder } => {
-                respond_not_supported!("raw::SetIpTtl", responder)
-            }
-            fpraw::SocketRequest::GetIpTtl { responder } => {
-                respond_not_supported!("raw::GetIpTtl", responder)
-            }
+            fpraw::SocketRequest::SetIpTtl { value, responder } => responder
+                .send(
+                    handle_set_hop_limit(ctx, data, HopLimitType::Unicast, IpVersion::V4, value)
+                        .log_error("raw::SetIpTtl"),
+                )
+                .unwrap_or_log("failed to respond"),
+            fpraw::SocketRequest::GetIpTtl { responder } => responder
+                .send(
+                    handle_get_hop_limit(ctx, data, HopLimitType::Unicast, IpVersion::V4)
+                        .log_error("raw::GetIpTtl"),
+                )
+                .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::SetIpPacketInfo { value: _, responder } => {
                 respond_not_supported!("raw::SetIpPacketInfo", responder)
             }
@@ -359,12 +366,18 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
             fpraw::SocketRequest::GetIpMulticastInterface { responder } => {
                 respond_not_supported!("raw::GetIpMulticastInterface", responder)
             }
-            fpraw::SocketRequest::SetIpMulticastTtl { value: _, responder } => {
-                respond_not_supported!("raw::SetIpMulticastTtl", responder)
-            }
-            fpraw::SocketRequest::GetIpMulticastTtl { responder } => {
-                respond_not_supported!("raw::GetIpMulticastTtl", responder)
-            }
+            fpraw::SocketRequest::SetIpMulticastTtl { value, responder } => responder
+                .send(
+                    handle_set_hop_limit(ctx, data, HopLimitType::Multicast, IpVersion::V4, value)
+                        .log_error("raw::SetIpMulticastTtl"),
+                )
+                .unwrap_or_log("failed to respond"),
+            fpraw::SocketRequest::GetIpMulticastTtl { responder } => responder
+                .send(
+                    handle_get_hop_limit(ctx, data, HopLimitType::Multicast, IpVersion::V4)
+                        .log_error("raw::GetIpMulticastTtl"),
+                )
+                .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::SetIpMulticastLoopback { value: _, responder } => {
                 respond_not_supported!("raw::SetIpMulticastLoopback", responder)
             }
@@ -402,24 +415,36 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
             fpraw::SocketRequest::GetIpv6MulticastInterface { responder } => {
                 respond_not_supported!("raw::GetIpv6MulticastInterface", responder)
             }
-            fpraw::SocketRequest::SetIpv6UnicastHops { value: _, responder } => {
-                respond_not_supported!("raw::SetIpv6UnicastHops", responder)
-            }
-            fpraw::SocketRequest::GetIpv6UnicastHops { responder } => {
-                respond_not_supported!("raw::GetIpv6UnicastHops", responder)
-            }
+            fpraw::SocketRequest::SetIpv6UnicastHops { value, responder } => responder
+                .send(
+                    handle_set_hop_limit(ctx, data, HopLimitType::Unicast, IpVersion::V6, value)
+                        .log_error("raw::SetIpv6UnicastHops"),
+                )
+                .unwrap_or_log("failed to respond"),
+            fpraw::SocketRequest::GetIpv6UnicastHops { responder } => responder
+                .send(
+                    handle_get_hop_limit(ctx, data, HopLimitType::Unicast, IpVersion::V6)
+                        .log_error("raw::GetIpv6UnicastHops"),
+                )
+                .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::SetIpv6ReceiveHopLimit { value: _, responder } => {
                 respond_not_supported!("raw::SetIpv6ReceiveHopLimit", responder)
             }
             fpraw::SocketRequest::GetIpv6ReceiveHopLimit { responder } => {
                 respond_not_supported!("raw::GetIpv6ReceiveHopLimit", responder)
             }
-            fpraw::SocketRequest::SetIpv6MulticastHops { value: _, responder } => {
-                respond_not_supported!("raw::SetIpv6MulticastHops", responder)
-            }
-            fpraw::SocketRequest::GetIpv6MulticastHops { responder } => {
-                respond_not_supported!("raw::GetIpv6MulticastHops", responder)
-            }
+            fpraw::SocketRequest::SetIpv6MulticastHops { value, responder } => responder
+                .send(
+                    handle_set_hop_limit(ctx, data, HopLimitType::Multicast, IpVersion::V6, value)
+                        .log_error("raw::SetIpv6MulticastHops"),
+                )
+                .unwrap_or_log("failed to respond"),
+            fpraw::SocketRequest::GetIpv6MulticastHops { responder } => responder
+                .send(
+                    handle_get_hop_limit(ctx, data, HopLimitType::Multicast, IpVersion::V6)
+                        .log_error("raw::GetIpv6MulticastHops"),
+                )
+                .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::SetIpv6MulticastLoopback { value: _, responder } => {
                 respond_not_supported!("raw::SetIpv6MulticastLoopback", responder)
             }
@@ -754,6 +779,67 @@ fn handle_get_icmpv6_filter<I: IpExt>(
         },
     );
     result
+}
+
+/// The type of hop limit to set/get.
+enum HopLimitType {
+    Unicast,
+    Multicast,
+}
+
+/// Handler for the following requests:
+///  - [`fpraw::SocketRequest::SetIpTtl`]
+///  - [`fpraw::SocketRequest::SetIpMulticastTtl`]
+///  - [`fpraw::SocketRequest::SetIpv6UnicastHops`]
+///  - [`fpraw::SocketRequest::SetIpv6MulticastHops`]
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+fn handle_set_hop_limit<I: IpExt>(
+    ctx: &mut Ctx,
+    socket: &SocketWorkerState<I>,
+    hop_limit_type: HopLimitType,
+    ip_version: IpVersion,
+    value: fposix_socket::OptionalUint8,
+) -> Result<(), fposix::Errno> {
+    if I::VERSION != ip_version {
+        return Err(fposix::Errno::Enoprotoopt);
+    }
+    let value: Option<u8> = value.into_core();
+    let _old_value = match hop_limit_type {
+        HopLimitType::Unicast => ctx
+            .api()
+            .raw_ip_socket()
+            .set_unicast_hop_limit(&socket.id, value.and_then(NonZeroU8::new)),
+        HopLimitType::Multicast => ctx
+            .api()
+            .raw_ip_socket()
+            .set_multicast_hop_limit(&socket.id, value.and_then(NonZeroU8::new)),
+    };
+    Ok(())
+}
+
+/// Handler for the following requests:
+///  - [`fpraw::SocketRequest::GetIpTtl`]
+///  - [`fpraw::SocketRequest::GetIpMulticastTtl`]
+///  - [`fpraw::SocketRequest::GetIpv6UnicastHops`]
+///  - [`fpraw::SocketRequest::GetIpv6MulticastHops`]
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+fn handle_get_hop_limit<I: IpExt>(
+    ctx: &mut Ctx,
+    socket: &SocketWorkerState<I>,
+    hop_limit_type: HopLimitType,
+    ip_version: IpVersion,
+) -> Result<u8, fposix::Errno> {
+    if I::VERSION != ip_version {
+        return Err(fposix::Errno::Enoprotoopt);
+    }
+    match hop_limit_type {
+        HopLimitType::Unicast => {
+            Ok(ctx.api().raw_ip_socket().get_unicast_hop_limit(&socket.id).into())
+        }
+        HopLimitType::Multicast => {
+            Ok(ctx.api().raw_ip_socket().get_multicast_hop_limit(&socket.id).into())
+        }
+    }
 }
 
 impl<I: IpExt> TryFromFidl<fpraw::ProtocolAssociation> for RawIpSocketProtocol<I> {

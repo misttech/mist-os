@@ -170,6 +170,7 @@ pub mod socket {
         DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError,
         IpSockCreationError, IpSockDefinition, IpSockSendError, IpSocketBindingsContext,
         IpSocketContext, IpSocketHandler, Mms, MmsError, SendOneShotIpPacketError, SendOptions,
+        SocketHopLimits,
     };
 
     /// IP Socket test utilities.

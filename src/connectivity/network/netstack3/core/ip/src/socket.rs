@@ -9,8 +9,8 @@ use core::convert::Infallible;
 use core::num::{NonZeroU32, NonZeroU8};
 
 use net_types::{
-    ip::{Ip, Ipv6Addr, Ipv6SourceAddr, Mtu},
-    SpecifiedAddr,
+    ip::{Ip, IpVersionMarker, Ipv6Addr, Ipv6SourceAddr, Mtu},
+    MulticastAddress, SpecifiedAddr,
 };
 use netstack3_base::{
     socket::{SocketIpAddr, SocketIpAddrExt as _},
@@ -24,13 +24,16 @@ use netstack3_filter::{
 use packet::{BufferMut, SerializeError};
 use thiserror::Error;
 
-use crate::internal::{
-    base::{
-        FilterHandlerProvider, IpCounters, IpDeviceContext, IpExt, IpLayerIpExt,
-        IpLayerPacketMetadata, ResolveRouteError, SendIpPacketMeta,
+use crate::{
+    internal::{
+        base::{
+            FilterHandlerProvider, IpCounters, IpDeviceContext, IpExt, IpLayerIpExt,
+            IpLayerPacketMetadata, ResolveRouteError, SendIpPacketMeta,
+        },
+        device::{state::IpDeviceStateIpExt, IpDeviceAddr},
+        types::{ResolvedRoute, RoutableIpAddr},
     },
-    device::{state::IpDeviceStateIpExt, IpDeviceAddr},
-    types::{NextHop, ResolvedRoute, RoutableIpAddr},
+    HopLimits, NextHop,
 };
 
 /// An execution context defining a type of IP socket.
@@ -455,6 +458,52 @@ impl<I: Ip> SendOptions<I> for DefaultSendOptions {
 
     fn multicast_loop(&self) -> bool {
         false
+    }
+}
+
+/// The configurable hop limits for a socket.
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
+pub struct SocketHopLimits<I: Ip> {
+    /// Unicast hop limit.
+    pub unicast: Option<NonZeroU8>,
+    /// Multicast hop limit.
+    // TODO(https://fxbug.dev/42059735): Make this an Option<u8> to allow sending
+    // multicast packets destined only for the local machine.
+    pub multicast: Option<NonZeroU8>,
+    /// An unused marker type signifying the IP version for which these hop
+    /// limits are valid. Including this helps prevent using the wrong hop limits
+    /// when operating on dualstack sockets.
+    pub version: IpVersionMarker<I>,
+}
+
+impl<I: Ip> SocketHopLimits<I> {
+    /// Returns a function that updates the unicast hop limit.
+    pub fn set_unicast(value: Option<NonZeroU8>) -> impl FnOnce(&mut Self) {
+        move |limits| limits.unicast = value
+    }
+
+    /// Returns a function that updates the multicast hop limit.
+    pub fn set_multicast(value: Option<NonZeroU8>) -> impl FnOnce(&mut Self) {
+        move |limits| limits.multicast = value
+    }
+
+    /// Returns the hop limits, or the provided defaults if unset.
+    pub fn get_limits_with_defaults(&self, defaults: &HopLimits) -> HopLimits {
+        let Self { unicast, multicast, version: _ } = self;
+        HopLimits {
+            unicast: unicast.unwrap_or(defaults.unicast),
+            multicast: multicast.unwrap_or(defaults.multicast),
+        }
+    }
+
+    /// Returns the appropriate hop limit to use for the given destination addr.
+    pub fn hop_limit_for_dst(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
+        let Self { unicast, multicast, version: _ } = self;
+        if destination.is_multicast() {
+            *multicast
+        } else {
+            *unicast
+        }
     }
 }
 

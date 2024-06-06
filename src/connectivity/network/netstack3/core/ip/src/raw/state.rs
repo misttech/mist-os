@@ -9,8 +9,11 @@ use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use netstack3_base::{sync::RwLock, WeakDeviceIdentifier};
 
 use crate::{
-    internal::raw::{
-        filter::RawIpSocketIcmpFilter, protocol::RawIpSocketProtocol, RawIpSocketsBindingsTypes,
+    internal::{
+        raw::{
+            filter::RawIpSocketIcmpFilter, protocol::RawIpSocketProtocol, RawIpSocketsBindingsTypes,
+        },
+        socket::SocketHopLimits,
     },
     IpExt,
 };
@@ -28,6 +31,8 @@ pub struct RawIpSocketLockedState<I: IpExt, D: WeakDeviceIdentifier> {
     /// The socket's ICMP filters. When set, all received ICMP packets will need
     /// to pass the filter, in order to be delivered to the socket.
     pub(crate) icmp_filter: Option<RawIpSocketIcmpFilter<I>>,
+    /// The socket's hop limits.
+    pub(crate) hop_limits: SocketHopLimits<I>,
 }
 
 /// State held by a raw IP socket.

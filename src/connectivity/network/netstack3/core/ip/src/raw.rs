@@ -5,7 +5,7 @@
 //! Facilities backing raw IP sockets.
 
 use alloc::collections::{btree_map::Entry, BTreeMap, HashMap};
-use core::fmt::Debug;
+use core::{fmt::Debug, num::NonZeroU8};
 use derivative::Derivative;
 use net_types::{
     ip::{GenericOverIp, Ip, IpVersionMarker},
@@ -32,8 +32,10 @@ use crate::{
             protocol::RawIpSocketProtocol,
             state::{RawIpSocketLockedState, RawIpSocketState},
         },
+        socket::SocketHopLimits,
     },
-    socket::{DefaultSendOptions, IpSockCreateAndSendError, IpSocketHandler},
+    socket::{IpSockCreateAndSendError, IpSocketHandler, SendOptions},
+    DEFAULT_HOP_LIMITS,
 };
 
 pub(crate) mod filter;
@@ -158,14 +160,13 @@ where
         };
         let protocol = id.protocol().proto();
 
-        // TODO(https://fxbug.dev/337818855): Use the socket's send options.
-        let options = DefaultSendOptions::default();
-
         let (core_ctx, bindings_ctx) = self.contexts();
         core_ctx.with_locked_state_and_socket_handler(id, |state, core_ctx| {
-            let device = state.bound_device.clone();
-            let (remote_ip, device) =
-                remote_ip.resolve_addr_with_device(device).map_err(RawIpSocketSendToError::Zone)?;
+            let RawIpSocketLockedState { bound_device, icmp_filter: _, hop_limits } = state;
+            let (remote_ip, device) = remote_ip
+                .resolve_addr_with_device(bound_device.clone())
+                .map_err(RawIpSocketSendToError::Zone)?;
+            let send_options = RawIpSocketSendOptions { hop_limits: &hop_limits };
             core_ctx
                 .send_oneshot_ip_packet(
                     bindings_ctx,
@@ -173,7 +174,7 @@ where
                     local_ip,
                     remote_ip,
                     protocol,
-                    &options,
+                    &send_options,
                     |src_ip| RawIpBody::new(protocol, src_ip.addr(), remote_ip.addr(), body),
                     None,
                 )
@@ -240,6 +241,48 @@ where
             return Err(RawIpSocketIcmpFilterError::ProtocolNotIcmp);
         }
         Ok(self.core_ctx().with_locked_state(id, |state| state.icmp_filter.clone()))
+    }
+
+    /// Sets the socket's unicast hop limit, returning the original value.
+    ///
+    /// If `None` is provided, the hop limit will be restored to the system
+    /// default.
+    pub fn set_unicast_hop_limit(
+        &mut self,
+        id: &RawIpApiSocketId<I, C>,
+        new_limit: Option<NonZeroU8>,
+    ) -> Option<NonZeroU8> {
+        self.core_ctx().with_locked_state_mut(id, |state| {
+            core::mem::replace(&mut state.hop_limits.unicast, new_limit)
+        })
+    }
+
+    /// Gets the socket's unicast hop limit, or the system default, if unset.
+    pub fn get_unicast_hop_limit(&mut self, id: &RawIpApiSocketId<I, C>) -> NonZeroU8 {
+        self.core_ctx().with_locked_state(id, |state| {
+            state.hop_limits.get_limits_with_defaults(&DEFAULT_HOP_LIMITS).unicast
+        })
+    }
+
+    /// Sets the socket's multicast hop limit, returning the original value.
+    ///
+    /// If `None` is provided, the hop limit will be restored to the system
+    /// default.
+    pub fn set_multicast_hop_limit(
+        &mut self,
+        id: &RawIpApiSocketId<I, C>,
+        new_limit: Option<NonZeroU8>,
+    ) -> Option<NonZeroU8> {
+        self.core_ctx().with_locked_state_mut(id, |state| {
+            core::mem::replace(&mut state.hop_limits.multicast, new_limit)
+        })
+    }
+
+    /// Gets the socket's multicast hop limit, or the system default, if unset.
+    pub fn get_multicast_hop_limit(&mut self, id: &RawIpApiSocketId<I, C>) -> NonZeroU8 {
+        self.core_ctx().with_locked_state(id, |state| {
+            state.hop_limits.get_limits_with_defaults(&DEFAULT_HOP_LIMITS).multicast
+        })
     }
 }
 
@@ -539,7 +582,7 @@ fn should_deliver_to_socket<I: IpExt, D: StrongDeviceIdentifier, B: ByteSlice>(
     device: &D,
     socket: &RawIpSocketLockedState<I, D::Weak>,
 ) -> bool {
-    let RawIpSocketLockedState { bound_device, icmp_filter } = socket;
+    let RawIpSocketLockedState { bound_device, icmp_filter, hop_limits: _ } = socket;
     // Verify the received device matches the socket's bound device, if any.
     if bound_device.as_ref().is_some_and(|bound_device| bound_device != device) {
         return false;
@@ -571,6 +614,22 @@ fn should_deliver_to_socket<I: IpExt, D: StrongDeviceIdentifier, B: ByteSlice>(
     true
 }
 
+/// An implementation of [`SendOptions`] for raw IP sockets.
+struct RawIpSocketSendOptions<'a, I: Ip> {
+    hop_limits: &'a SocketHopLimits<I>,
+}
+
+impl<I: IpExt> SendOptions<I> for RawIpSocketSendOptions<'_, I> {
+    fn hop_limit(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
+        self.hop_limits.hop_limit_for_dst(destination)
+    }
+
+    fn multicast_loop(&self) -> bool {
+        // TODO(https://fxbug.dev/344645667): Support IP_MULTICAST_LOOP.
+        false
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -595,7 +654,7 @@ mod test {
     use crate::{
         internal::socket::testutil::{FakeIpSocketCtx, InnerFakeIpSocketCtx},
         socket::testutil::FakeDeviceConfig,
-        SendIpPacketMeta,
+        SendIpPacketMeta, DEFAULT_HOP_LIMITS,
     };
 
     #[derive(Derivative, Debug)]
@@ -850,6 +909,40 @@ mod test {
     }
 
     #[ip_test]
+    fn set_unicast_hop_limits<I: Ip + IpExt + DualStackIpExt + TestIpExt>() {
+        let mut api = new_raw_ip_socket_api::<I>();
+        let sock = api.create(RawIpSocketProtocol::new(IpProto::Udp.into()), Default::default());
+
+        let limit1 = NonZeroU8::new(1).unwrap();
+        let limit2 = NonZeroU8::new(2).unwrap();
+
+        assert_eq!(api.get_unicast_hop_limit(&sock), DEFAULT_HOP_LIMITS.unicast);
+        assert_eq!(api.set_unicast_hop_limit(&sock, Some(limit1)), None);
+        assert_eq!(api.get_unicast_hop_limit(&sock), limit1);
+        assert_eq!(api.set_unicast_hop_limit(&sock, Some(limit2)), Some(limit1));
+        assert_eq!(api.get_unicast_hop_limit(&sock), limit2);
+        assert_eq!(api.set_unicast_hop_limit(&sock, None), Some(limit2));
+        assert_eq!(api.get_unicast_hop_limit(&sock), DEFAULT_HOP_LIMITS.unicast);
+    }
+
+    #[ip_test]
+    fn set_multicast_hop_limit<I: Ip + IpExt + DualStackIpExt + TestIpExt>() {
+        let mut api = new_raw_ip_socket_api::<I>();
+        let sock = api.create(RawIpSocketProtocol::new(IpProto::Udp.into()), Default::default());
+
+        let limit1 = NonZeroU8::new(1).unwrap();
+        let limit2 = NonZeroU8::new(2).unwrap();
+
+        assert_eq!(api.get_multicast_hop_limit(&sock), DEFAULT_HOP_LIMITS.multicast);
+        assert_eq!(api.set_multicast_hop_limit(&sock, Some(limit1)), None);
+        assert_eq!(api.get_multicast_hop_limit(&sock), limit1);
+        assert_eq!(api.set_multicast_hop_limit(&sock, Some(limit2)), Some(limit1));
+        assert_eq!(api.get_multicast_hop_limit(&sock), limit2);
+        assert_eq!(api.set_multicast_hop_limit(&sock, None), Some(limit2));
+        assert_eq!(api.get_multicast_hop_limit(&sock), DEFAULT_HOP_LIMITS.multicast);
+    }
+
+    #[ip_test]
     fn receive_ip_packet<I: Ip + IpExt + DualStackIpExt + TestIpExt>() {
         let mut api = new_raw_ip_socket_api::<I>();
 
@@ -991,14 +1084,20 @@ mod test {
     }
 
     #[ip_test]
-    #[test_case(Some(MultipleDevicesId::A); "bound_to_dev")]
-    #[test_case(None; "not_bound_to_dev")]
-    fn send_to<I: Ip + IpExt + DualStackIpExt + TestIpExt>(bound_dev: Option<MultipleDevicesId>) {
+    #[test_case(None, None; "default_send")]
+    #[test_case(Some(MultipleDevicesId::A), None; "with_bound_dev")]
+    #[test_case(None, Some(123); "with_hop_limit")]
+    fn send_to<I: Ip + IpExt + DualStackIpExt + TestIpExt>(
+        bound_dev: Option<MultipleDevicesId>,
+        hop_limit: Option<u8>,
+    ) {
         const PROTO: IpProto = IpProto::Udp;
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::new(PROTO.into()), Default::default());
 
         assert_eq!(api.set_device(&sock, bound_dev.as_ref()), None);
+        let hop_limit = hop_limit.and_then(NonZeroU8::new);
+        assert_eq!(api.set_unicast_hop_limit(&sock, hop_limit), None);
 
         let remote_ip = ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip);
         assert_matches!(&api.ctx.core_ctx().take_frames()[..], []);
@@ -1015,7 +1114,7 @@ mod test {
         }
         assert_eq!(*proto, <I as IpProtoExt>::Proto::from(PROTO));
         assert_eq!(*mtu, None);
-        assert_eq!(*ttl, None);
+        assert_eq!(*ttl, hop_limit);
     }
 
     #[ip_test]

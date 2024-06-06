@@ -38,10 +38,10 @@ use netstack3_datagram::{
     self as datagram, DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSet, DatagramSocketSpec,
     DatagramSpecBoundStateContext, DatagramSpecStateContext, DatagramStateContext,
     ExpectedUnboundError, NonDualStackConverter, NonDualStackDatagramSpecBoundStateContext,
-    SocketHopLimits,
 };
 use netstack3_ip::{
     icmp::{EchoTransportContextMarker, IcmpIpExt, IcmpRxCounters},
+    socket::SocketHopLimits,
     IpTransportContext, MulticastMembershipHandler, TransparentLocalDelivery, TransportIpContext,
     TransportReceiveError,
 };
