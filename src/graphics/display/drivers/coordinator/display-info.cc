@@ -22,7 +22,6 @@
 #include <limits>
 #include <utility>
 
-#include <audio-proto-utils/format-utils.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/string_printf.h>
@@ -50,16 +49,6 @@ edid::ddc_i2c_transact ddc_tx = [](void* ctx, edid::ddc_i2c_msg_t* msgs, uint32_
   }
   return i2c->Transact(ops, count) == ZX_OK;
 };
-
-inline void audio_stream_format_fidl_from_banjo(
-    const audio_types_audio_stream_format_range_t& source, audio_stream_format_range* destination) {
-  destination->sample_formats = source.sample_formats;
-  destination->min_frames_per_second = source.min_frames_per_second;
-  destination->max_frames_per_second = source.max_frames_per_second;
-  destination->min_channels = source.min_channels;
-  destination->max_channels = source.max_channels;
-  destination->flags = source.flags;
-}
 
 fit::result<const char*, DisplayInfo::Edid> InitEdidFromI2c(ddk::I2cImplProtocolClient& i2c) {
   DisplayInfo::Edid edid;
@@ -178,19 +167,8 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_arg
     return zx::error(ZX_ERR_INTERNAL);
   }
   out->edid = std::move(edid_result).value();
-  out->PopulateDisplayAudio();
 
-  if (zxlog_level_enabled(DEBUG) && out->edid->audio.size()) {
-    zxlogf(DEBUG, "Supported audio formats:");
-    for (auto range : out->edid->audio) {
-      audio_stream_format_range temp_range;
-      audio_stream_format_fidl_from_banjo(range, &temp_range);
-      for (auto rate : audio::utils::FrameRateEnumerator(temp_range)) {
-        zxlogf(DEBUG, "  rate=%d, channels=[%d, %d], sample=%x", rate, range.min_channels,
-               range.max_channels, range.sample_formats);
-      }
-    }
-  }
+  // TODO(https://fxbug.dev/343872853): Parse audio information from EDID.
 
   if (zxlog_level_enabled(DEBUG)) {
     const auto& edid = out->edid->base;
@@ -244,104 +222,6 @@ std::string_view DisplayInfo::GetMonitorSerial() const {
   }
 
   return std::string_view(edid->base.monitor_serial());
-}
-
-void DisplayInfo::PopulateDisplayAudio() {
-  fbl::AllocChecker ac;
-
-  // Displays which support any audio are required to support basic
-  // audio, so just bail if that bit isn't set.
-  if (!edid->base.supports_basic_audio()) {
-    return;
-  }
-
-  // TODO(https://fxbug.dev/42107544): Revisit dedupe/merge logic once the audio API takes a stance.
-  // First, this code always adds the basic audio formats before processing the SADs, which is
-  // likely redundant on some hardware (the spec isn't clear about whether or not the basic audio
-  // formats should also be included in the SADs). Second, this code assumes that the SADs are
-  // compact and not redundant, which is not guaranteed.
-
-  // Add the range for basic audio support.
-  audio_types_audio_stream_format_range_t range;
-  range.min_channels = 2;
-  range.max_channels = 2;
-  range.sample_formats = AUDIO_SAMPLE_FORMAT_16BIT;
-  range.min_frames_per_second = 32000;
-  range.max_frames_per_second = 48000;
-  range.flags = ASF_RANGE_FLAG_FPS_48000_FAMILY | ASF_RANGE_FLAG_FPS_44100_FAMILY;
-
-  edid->audio.push_back(range, &ac);
-  if (!ac.check()) {
-    zxlogf(ERROR, "Out of memory attempting to construct supported format list.");
-    return;
-  }
-
-  for (auto it = edid::audio_data_block_iterator(&edid->base); it.is_valid(); ++it) {
-    if (it->format() != edid::ShortAudioDescriptor::kLPcm) {
-      // TODO(stevensd): Add compressed formats when audio format supports it
-      continue;
-    }
-    audio_types_audio_stream_format_range_t range;
-
-    constexpr audio_sample_format_t zero_format = static_cast<audio_sample_format_t>(0);
-    range.sample_formats = static_cast<audio_sample_format_t>(
-        (it->lpcm_24() ? AUDIO_SAMPLE_FORMAT_24BIT_PACKED | AUDIO_SAMPLE_FORMAT_24BIT_IN32
-                       : zero_format) |
-        (it->lpcm_20() ? AUDIO_SAMPLE_FORMAT_20BIT_PACKED | AUDIO_SAMPLE_FORMAT_20BIT_IN32
-                       : zero_format) |
-        (it->lpcm_16() ? AUDIO_SAMPLE_FORMAT_16BIT : zero_format));
-
-    range.min_channels = 1;
-    range.max_channels = static_cast<uint8_t>(it->num_channels_minus_1() + 1);
-
-    // Now build continuous ranges of sample rates in the each family
-    static constexpr struct {
-      const uint32_t flag, val;
-    } kRateLut[7] = {
-        {edid::ShortAudioDescriptor::kHz32, 32000},   {edid::ShortAudioDescriptor::kHz44, 44100},
-        {edid::ShortAudioDescriptor::kHz48, 48000},   {edid::ShortAudioDescriptor::kHz88, 88200},
-        {edid::ShortAudioDescriptor::kHz96, 96000},   {edid::ShortAudioDescriptor::kHz176, 176400},
-        {edid::ShortAudioDescriptor::kHz192, 192000},
-    };
-
-    for (uint32_t i = 0; i < std::size(kRateLut); ++i) {
-      if (!(it->sampling_frequencies & kRateLut[i].flag)) {
-        continue;
-      }
-      range.min_frames_per_second = kRateLut[i].val;
-
-      if (audio::utils::FrameRateIn48kFamily(kRateLut[i].val)) {
-        range.flags = ASF_RANGE_FLAG_FPS_48000_FAMILY;
-      } else {
-        range.flags = ASF_RANGE_FLAG_FPS_44100_FAMILY;
-      }
-
-      // We found the start of a range.  At this point, we are guaranteed
-      // to add at least one new entry into the set of format ranges.
-      // Find the end of this range.
-      uint32_t j;
-      for (j = i + 1; j < std::size(kRateLut); ++j) {
-        if (!(it->bitrate & kRateLut[j].flag)) {
-          break;
-        }
-
-        if (audio::utils::FrameRateIn48kFamily(kRateLut[j].val)) {
-          range.flags |= ASF_RANGE_FLAG_FPS_48000_FAMILY;
-        } else {
-          range.flags |= ASF_RANGE_FLAG_FPS_44100_FAMILY;
-        }
-      }
-
-      i = j - 1;
-      range.max_frames_per_second = kRateLut[i].val;
-
-      edid->audio.push_back(range, &ac);
-      if (!ac.check()) {
-        zxlogf(ERROR, "Out of memory attempting to construct supported format list.");
-        return;
-      }
-    }
-  }
 }
 
 }  // namespace display

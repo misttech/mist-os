@@ -68,7 +68,6 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
   struct Edid {
     edid::Edid base;
     fbl::Vector<display::DisplayTiming> timings;
-    fbl::Vector<audio_types_audio_stream_format_range_t> audio;
   };
 
   // Exactly one of `edid` and `mode` can be non-nullopt.
@@ -125,7 +124,6 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
 
  private:
   DisplayInfo();
-  void PopulateDisplayAudio();
   inspect::Node node;
   inspect::ValueList properties;
 };
