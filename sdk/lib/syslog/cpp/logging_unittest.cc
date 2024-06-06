@@ -60,7 +60,9 @@ class LoggingFixture : public ::testing::Test {
  public:
   LoggingFixture() : old_severity_(GetMinLogSeverity()), old_stderr_(dup(STDERR_FILENO)) {}
   ~LoggingFixture() {
-    SetLogSettings({.min_log_level = old_severity_, .wait_for_initial_interest = true});
+    LogSettingsBuilder builder;
+    builder.WithMinLogSeverity(old_severity_);
+    builder.BuildAndInitialize();
   }
 
  private:
@@ -109,8 +111,8 @@ static std::string RetrieveLogs(zx::channel channel) {
 
 #ifdef __Fuchsia__
 using LogState = zx::channel;
-static LogState SetupLogs(LogSettings new_settings = LogSettings()) {
-  return log_tester::SetupFakeLog(new_settings);
+static LogState SetupLogs(bool wait_for_initial_interest = true) {
+  return log_tester::SetupFakeLog(wait_for_initial_interest);
 }
 
 static std::string ReadLogs(zx::channel& remote) { return RetrieveLogs(std::move(remote)); }
@@ -123,11 +125,19 @@ struct TestLogState {
 
 using LogState = std::unique_ptr<TestLogState>;
 
-static LogState SetupLogs(LogSettings new_settings = LogSettings()) {
+static LogState SetupLogs(bool wait_for_initial_interest = true) {
   auto state = std::make_unique<TestLogState>();
-  state->temp_dir.NewTempFile(&new_settings.log_file);
-  state->log_file = new_settings.log_file;
-  SetLogSettings(new_settings);
+  {
+    std::string log_file_out;
+    state->temp_dir.NewTempFile(&log_file_out);
+    state->log_file = std::move(log_file_out);
+  }
+  LogSettingsBuilder builder;
+  builder.WithLogFile(state->log_file);
+  if (!wait_for_initial_interest) {
+    builder.DisableWaitForInitialInterest();
+  }
+  builder.BuildAndInitialize();
   return state;
 }
 
@@ -202,10 +212,7 @@ TEST_F(LoggingFixtureDeathTest, CheckFailed) { ASSERT_DEATH(FX_CHECK(false), "")
 
 #if defined(__Fuchsia__)
 TEST_F(LoggingFixture, Plog) {
-  LogSettings new_settings;
-  new_settings.wait_for_initial_interest = false;
-  EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
-  auto remote = log_tester::SetupFakeLog(new_settings);
+  auto remote = log_tester::SetupFakeLog();
 
   FX_PLOGS(ERROR, ZX_OK) << "should be ok";
   FX_PLOGS(ERROR, ZX_ERR_ACCESS_DENIED) << "got access denied";
@@ -217,10 +224,7 @@ TEST_F(LoggingFixture, Plog) {
 }
 
 TEST_F(LoggingFixture, PlogT) {
-  LogSettings new_settings;
-  new_settings.wait_for_initial_interest = false;
-  EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
-  auto remote = log_tester::SetupFakeLog(new_settings);
+  auto remote = log_tester::SetupFakeLog(false);
 
   int line1 = __LINE__ + 1;
   FX_PLOGST(ERROR, "abcd", ZX_OK) << "should be ok";
@@ -239,10 +243,7 @@ TEST_F(LoggingFixture, PlogT) {
 #endif  // defined(__Fuchsia__)
 
 TEST_F(LoggingFixture, SLog) {
-  LogSettings new_settings;
-  new_settings.wait_for_initial_interest = false;
-  EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
-  LogState state = SetupLogs(new_settings);
+  LogState state = SetupLogs(false);
   std::string log_id = uuid::Generate();
 
   int line1 = __LINE__ + 1;
@@ -286,10 +287,7 @@ TEST_F(LoggingFixture, SLog) {
 }
 
 TEST_F(LoggingFixture, BackendDirect) {
-  LogSettings new_settings;
-  new_settings.wait_for_initial_interest = false;
-  EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
-  LogState state = SetupLogs(new_settings);
+  LogState state = SetupLogs(false);
 
   syslog_runtime::LogBuffer buffer;
   syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_ERROR, "foo.cc", 42, "Log message",
@@ -310,10 +308,8 @@ TEST_F(LoggingFixture, BackendDirect) {
 }
 
 TEST_F(LoggingFixture, LogEveryN) {
-  LogSettings new_settings;
-  new_settings.wait_for_initial_interest = false;
-  EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
-  LogState state = SetupLogs(new_settings);
+  ;
+  LogState state = SetupLogs(false);
   int32_t counter = 0;
   auto emit_log = [&]() {
     FX_SLOG_EVERY_N_SECONDS(INFO, 5, "test", FX_KV("key", counter));
@@ -330,10 +326,7 @@ TEST_F(LoggingFixture, LogEveryN) {
 }
 
 TEST_F(LoggingFixture, LogEveryNWithCounter) {
-  LogSettings new_settings;
-  new_settings.wait_for_initial_interest = false;
-  EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
-  LogState state = SetupLogs(new_settings);
+  LogState state = SetupLogs(false);
   int32_t counter = 0;
   auto emit_log = [&]() {
     FX_SLOG_EVERY_N_SECONDS(INFO, 5, "test", FX_KV("key", COUNTER));
@@ -371,11 +364,13 @@ TEST(StructuredLogging, LOGS) {
 
 #ifndef __Fuchsia__
 TEST(StructuredLogging, Remaining) {
-  LogSettings new_settings;
-  new_settings.wait_for_initial_interest = false;
+  LogSettingsBuilder builder;
+  std::string log_file;
+  builder.DisableInterestListener();
   files::ScopedTempDir temp_dir;
-  ASSERT_TRUE(temp_dir.NewTempFile(&new_settings.log_file));
-  SetLogSettings(new_settings);
+  ASSERT_TRUE(temp_dir.NewTempFile(&log_file));
+  builder.WithLogFile(log_file);
+  builder.BuildAndInitialize();
   syslog_runtime::LogBuffer buffer;
   syslog_runtime::BeginRecord(&buffer, LOG_INFO, "test", 5, "test_msg", "");
   auto header = syslog_runtime::MsgHeader::CreatePtr(&buffer);

@@ -73,10 +73,6 @@ static_assert(std::is_copy_constructible<LogSettings>::value);
 // values which were overridden by the command-line.
 bool ParseLogSettings(const fxl::CommandLine& command_line, fxl::LogSettings* out_settings);
 
-// This overload is deprecated. Use fxl::LogSettings instead.
-bool ParseLogSettings(const fxl::CommandLine& command_line,
-                      fuchsia_logging::LogSettings* out_settings);
-
 // Parses and applies log settings from standard command-line options.
 // Returns false and leaves the active settings unchanged if there was an
 // error parsing the options.

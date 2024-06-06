@@ -27,6 +27,40 @@
 
 #include "lib/syslog/cpp/macros.h"
 
+namespace {
+// Settings which control the behavior of logging.
+struct LogSettings {
+  // The minimum logging level.
+  // Anything at or above this level will be logged (if applicable).
+  // Anything below this level will be silently ignored.
+  //
+  // The log level defaults to LOG_INFO.
+  //
+  // Log messages for FX_VLOGS(x) (from macros.h) log verbosities in
+  // the range between INFO and DEBUG
+  FuchsiaLogSeverity min_log_level = fuchsia_logging::DefaultLogLevel;
+  // Set to true to disable the interest listener. Changes to interest will not be
+  // applied to your log settings.
+  bool disable_interest_listener = false;
+  // A single-threaded dispatcher to use for change notifications.
+  // Must be single-threaded. Passing a dispatcher that has multiple threads
+  // will result in undefined behavior.
+  // This must be an async_dispatcher_t*.
+  // This can't be defined as async_dispatcher_t* since it is used
+  // from fxl which is a host+target library. This prevents us
+  // from adding a Fuchsia-specific dependency.
+  async_dispatcher_t* single_threaded_dispatcher = nullptr;
+  // Allows to define the LogSink handle to use. When no handle is provided, the default LogSink
+  // in the pogram incoming namespace will be used.
+  zx_handle_t log_sink = ZX_HANDLE_INVALID;
+
+  // When set to true, it will block log initialization on receiving the initial interest to define
+  // the minimum severity.
+  bool wait_for_initial_interest = true;
+};
+static_assert(std::is_copy_constructible<LogSettings>::value);
+}  // namespace
+
 namespace syslog_runtime {
 
 bool HasStructuredBackend() { return true; }
@@ -74,9 +108,9 @@ const char kTagFieldName[] = "tag";
 class GlobalStateLock;
 class LogState {
  public:
-  static void Set(const fuchsia_logging::LogSettings& settings, const GlobalStateLock& lock);
-  static void Set(const fuchsia_logging::LogSettings& settings,
-                  const std::initializer_list<std::string>& tags, const GlobalStateLock& lock);
+  static void Set(const LogSettings& settings, const GlobalStateLock& lock);
+  static void Set(const LogSettings& settings, const std::initializer_list<std::string>& tags,
+                  const GlobalStateLock& lock);
   void set_severity_handler(void (*callback)(void* context, fuchsia_logging::LogSeverity severity),
                             void* context) {
     handler_ = callback;
@@ -116,8 +150,7 @@ class LogState {
   }
 
  private:
-  LogState(const fuchsia_logging::LogSettings& settings,
-           const std::initializer_list<std::string>& tags);
+  LogState(const LogSettings& settings, const std::initializer_list<std::string>& tags);
 
   fidl::SharedClient<fuchsia_logger::LogSink> log_sink_;
   void (*handler_)(void* context, fuchsia_logging::LogSeverity severity);
@@ -146,7 +179,7 @@ class GlobalStateLock {
   GlobalStateLock() {
     FuchsiaLogAcquireState();
     if (!FuchsiaLogGetStateLocked()) {
-      LogState::Set(fuchsia_logging::LogSettings(), *this);
+      LogState::Set(LogSettings(), *this);
     }
   }
 
@@ -387,12 +420,12 @@ bool FlushRecord(LogBuffer* buffer) {
   return ret;
 }
 
-void LogState::Set(const fuchsia_logging::LogSettings& settings, const GlobalStateLock& lock) {
+void LogState::Set(const LogSettings& settings, const GlobalStateLock& lock) {
   Set(settings, {}, lock);
 }
 
-void LogState::Set(const fuchsia_logging::LogSettings& settings,
-                   const std::initializer_list<std::string>& tags, const GlobalStateLock& lock) {
+void LogState::Set(const LogSettings& settings, const std::initializer_list<std::string>& tags,
+                   const GlobalStateLock& lock) {
   auto old = *lock;
   lock.Set(new LogState(settings, tags));
   if (old) {
@@ -400,14 +433,13 @@ void LogState::Set(const fuchsia_logging::LogSettings& settings,
   }
 }
 
-LogState::LogState(const fuchsia_logging::LogSettings& in_settings,
-                   const std::initializer_list<std::string>& tags)
+LogState::LogState(const LogSettings& in_settings, const std::initializer_list<std::string>& tags)
     : loop_(&kAsyncLoopConfigNeverAttachToThread),
       executor_(loop_.dispatcher()),
       min_severity_(in_settings.min_log_level),
       default_severity_(in_settings.min_log_level),
       wait_for_initial_interest_(in_settings.wait_for_initial_interest) {
-  fuchsia_logging::LogSettings settings = in_settings;
+  LogSettings settings = in_settings;
   interest_listener_dispatcher_ =
       static_cast<async_dispatcher_t*>(settings.single_threaded_dispatcher);
   serve_interest_listener_ = !settings.disable_interest_listener;
@@ -422,13 +454,12 @@ LogState::LogState(const fuchsia_logging::LogSettings& in_settings,
   Connect();
 }
 
-void SetLogSettings(const fuchsia_logging::LogSettings& settings) {
+void SetLogSettings(const LogSettings& settings) {
   GlobalStateLock lock;
   LogState::Set(settings, lock);
 }
 
-void SetLogSettings(const fuchsia_logging::LogSettings& settings,
-                    const std::initializer_list<std::string>& tags) {
+void SetLogSettings(const LogSettings& settings, const std::initializer_list<std::string>& tags) {
   GlobalStateLock lock;
   LogState::Set(settings, tags, lock);
 }
@@ -439,3 +470,61 @@ fuchsia_logging::LogSeverity GetMinLogSeverity() {
 }
 
 }  // namespace syslog_runtime
+
+namespace fuchsia_logging {
+static_assert(sizeof(LogSettingsBuilder) >= sizeof(LogSettings));
+static_assert(std::alignment_of_v<LogSettingsBuilder> >= std::alignment_of_v<LogSettings>);
+LogSettings& GetSettings(uint64_t* value) { return *reinterpret_cast<LogSettings*>(value); }
+
+// Sets the default log severity. If not explicitly set,
+// this defaults to INFO, or to the value specified by Archivist.
+LogSettingsBuilder& LogSettingsBuilder::WithMinLogSeverity(LogSeverity min_log_level) {
+  GetSettings(settings_).min_log_level = min_log_level;
+  return *this;
+}
+
+LogSettingsBuilder::LogSettingsBuilder() { new (settings_) LogSettings(); }
+
+// Disables the interest listener.
+LogSettingsBuilder& LogSettingsBuilder::DisableInterestListener() {
+  GetSettings(settings_).disable_interest_listener = true;
+  return *this;
+}
+
+// Disables waiting for the initial interest from Archivist.
+// The level specified in SetMinLogSeverity or INFO will be used
+// as the default.
+LogSettingsBuilder& LogSettingsBuilder::DisableWaitForInitialInterest() {
+  GetSettings(settings_).wait_for_initial_interest = false;
+  return *this;
+}
+// Sets the log sink handle.
+LogSettingsBuilder& LogSettingsBuilder::WithLogSink(zx_handle_t log_sink) {
+  GetSettings(settings_).log_sink = log_sink;
+  return *this;
+}
+
+// Sets the dispatcher to use.
+LogSettingsBuilder& LogSettingsBuilder::WithDispatcher(async_dispatcher_t* dispatcher) {
+  GetSettings(settings_).single_threaded_dispatcher = dispatcher;
+  return *this;
+}
+
+// Configures the log settings with the specified tags.
+void LogSettingsBuilder::BuildAndInitializeWithTags(
+    const std::initializer_list<std::string>& tags) {
+  syslog_runtime::SetLogSettings(GetSettings(settings_), tags);
+}
+
+void SetTags(const std::initializer_list<std::string>& tags) {
+  syslog_runtime::SetLogSettings({.min_log_level = GetMinLogSeverity()}, tags);
+}
+
+// Configures the log settings.
+void LogSettingsBuilder::BuildAndInitialize() {
+  syslog_runtime::SetLogSettings(GetSettings(settings_));
+}
+
+fuchsia_logging::LogSeverity GetMinLogSeverity() { return syslog_runtime::GetMinLogSeverity(); }
+
+}  // namespace fuchsia_logging

@@ -8,9 +8,9 @@
 #include <iostream>
 
 int main(int argc, char** argv) {
-  fuchsia_logging::SetLogSettings(fuchsia_logging::LogSettings{
-      .disable_interest_listener = true,
-  });
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.DisableInterestListener();
+  builder.BuildAndInitialize();
   if (argc != 3) {
     std::cerr << "Usage: log [tag] [message]" << std::endl;
     return -1;

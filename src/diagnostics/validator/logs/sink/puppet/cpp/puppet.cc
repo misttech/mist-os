@@ -35,10 +35,10 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
   }
 
   void StopInterestListener(StopInterestListenerCallback callback) override {
-    fuchsia_logging::LogSettings settings;
-    settings.disable_interest_listener = true;
-    settings.min_log_level = fuchsia_logging::LOG_TRACE;
-    syslog_runtime::SetLogSettings(settings);
+    fuchsia_logging::LogSettingsBuilder builder;
+    builder.WithMinLogSeverity(fuchsia_logging::LOG_TRACE)
+        .DisableInterestListener()
+        .BuildAndInitialize();
     callback();
   }
 

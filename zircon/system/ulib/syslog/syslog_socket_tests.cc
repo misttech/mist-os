@@ -37,10 +37,8 @@ inline zx_status_t init_helper(zx_handle_t handle, const char** tags, size_t num
       .tags = tags,
       .num_tags = num_tags,
   };
-  fuchsia_logging::LogSettings settings;
-  settings.min_log_level = severity;
-  settings.disable_interest_listener = true;
-  syslog_runtime::SetLogSettings(settings);
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithMinLogSeverity(severity).DisableInterestListener().BuildAndInitialize();
   return fx_log_reconfigure(&config);
 }
 
@@ -265,10 +263,8 @@ TEST(SyslogSocketTests, TestLogVerbosity) {
   EXPECT_EQ(0u, outstanding_bytes);
 
   FX_LOG_SET_VERBOSITY(1);  // INFO - 1
-  fuchsia_logging::LogSettings settings;
-  settings.min_log_level = 1;
-  settings.disable_interest_listener = true;
-  fuchsia_logging::SetLogSettings(settings);
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithMinLogSeverity(1).DisableInterestListener().BuildAndInitialize();
   int line = __LINE__ + 1;
   FX_VLOGF(1, nullptr, "%d, %s", 10, "just some number");
   output_compare_helper(local, (FX_LOG_INFO - 1), "10, just some number", line);

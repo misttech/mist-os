@@ -30,12 +30,6 @@ class LogSettingsFixture : public ::testing::Test {
   fbl::unique_fd old_stderr_;
 };
 #ifndef __Fuchsia__
-TEST(LogSettings, DefaultOptions) {
-  LogSettings settings;
-  EXPECT_EQ(LOG_INFO, settings.min_log_level);
-  EXPECT_EQ(std::string(), settings.log_file);
-}
-
 TEST_F(LogSettingsFixture, SetAndGet) {
   LogSettingsBuilder builder;
   builder.WithMinLogSeverity(-20);

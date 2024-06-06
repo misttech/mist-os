@@ -103,11 +103,6 @@ bool ParseLogSettings(const fxl::CommandLine& command_line, fxl::LogSettings* ou
   return ParseLogSettingsInternal(command_line, out_settings);
 }
 
-bool ParseLogSettings(const fxl::CommandLine& command_line,
-                      fuchsia_logging::LogSettings* out_settings) {
-  return ParseLogSettingsInternal(command_line, out_settings);
-}
-
 bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line) {
   LogSettings settings;
   if (!ParseLogSettings(command_line, &settings))

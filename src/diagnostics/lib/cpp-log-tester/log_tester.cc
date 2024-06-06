@@ -145,8 +145,8 @@ void ParseFormattedContent(fuchsia::diagnostics::FormattedContent content,
 
 std::vector<fuchsia::logger::LogMessage> RetrieveLogsAsLogMessage(zx::channel remote) {
   // Close channel (reset to default Archivist)
-  fuchsia_logging::LogSettings settings;
-  fuchsia_logging::SetLogSettings(settings);
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.BuildAndInitialize();
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   std::vector<fuchsia::logger::LogMessage> ret;
   auto log_service = std::make_unique<FakeLogSink>(loop.dispatcher(), std::move(remote));
@@ -189,12 +189,14 @@ std::vector<diagnostics::reader::LogsData> RetrieveLogsAsLogMessage(const zx::so
   return ret;
 }
 
-zx::channel SetupFakeLog(fuchsia_logging::LogSettings settings) {
+zx::channel SetupFakeLog(bool wait_for_initial_interest, fuchsia_logging::LogSeverity severity) {
   zx::channel channels[2];
   zx::channel::create(0, &channels[0], &channels[1]);
-  settings.wait_for_initial_interest = false;
-  settings.log_sink = channels[0].release();
-  fuchsia_logging::SetLogSettings(settings);
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.DisableWaitForInitialInterest()
+      .WithMinLogSeverity(severity)
+      .WithLogSink(channels[0].release())
+      .BuildAndInitialize();
   return std::move(channels[1]);
 }
 }  // namespace log_tester

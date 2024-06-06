@@ -5,18 +5,4 @@
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/logging_backend.h>
 
-namespace fuchsia_logging {
-
-void SetLogSettings(const LogSettings& settings) { syslog_runtime::SetLogSettings(settings); }
-
-void SetLogSettings(const LogSettings& settings, const std::initializer_list<std::string>& tags) {
-  syslog_runtime::SetLogSettings(settings, tags);
-}
-
-void SetTags(const std::initializer_list<std::string>& tags) {
-  SetLogSettings({.min_log_level = GetMinLogSeverity()}, tags);
-}
-
-LogSeverity GetMinLogSeverity() { return syslog_runtime::GetMinLogSeverity(); }
-
-}  // namespace fuchsia_logging
+namespace fuchsia_logging {}  // namespace fuchsia_logging
