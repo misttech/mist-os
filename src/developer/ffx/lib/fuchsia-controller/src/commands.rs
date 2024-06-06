@@ -456,6 +456,14 @@ impl LibraryCommand {
                 responder.send(res).unwrap();
             }
             Self::TargetWait { env, timeout: timeout_float, responder } => {
+                let tc = match env.target_collection_proxy_factory().await {
+                    Ok(tc) => tc,
+                    Err(e) => {
+                        env.write_err(e);
+                        responder.send(zx_status::Status::INTERNAL).unwrap();
+                        return;
+                    }
+                };
                 // This target spec is the same one used in the target proxy factory -- we re-grab it
                 // just for the error message.
                 let target_spec = match ffx_target::get_target_specifier(&env.context).await {
@@ -473,8 +481,8 @@ impl LibraryCommand {
                 };
                 match ffx_target::wait_for_device(
                     duration,
-                    &env.context,
                     target_spec,
+                    &tc,
                     ffx_target::WaitFor::DeviceOnline,
                 )
                 .await
