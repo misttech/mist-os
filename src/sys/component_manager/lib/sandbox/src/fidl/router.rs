@@ -24,11 +24,7 @@ impl From<Request> for fsandbox::RouteRequest {
 }
 
 // TODO(b/314343346): Complete or remove the Router implementation of sandbox::Capability
-impl crate::RemotableCapability for Router {
-    fn into_fidl(self) -> fsandbox::Capability {
-        self.into()
-    }
-}
+impl crate::RemotableCapability for Router {}
 
 impl From<Router> for fsandbox::Capability {
     fn from(router: Router) -> Self {

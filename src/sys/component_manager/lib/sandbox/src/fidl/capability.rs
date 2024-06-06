@@ -22,7 +22,17 @@ fn try_from_handle_in_registry<'a>(handle_ref: HandleRef<'_>) -> Result<Capabili
 
 impl From<Capability> for fsandbox::Capability {
     fn from(capability: Capability) -> Self {
-        capability.into_fidl()
+        match capability {
+            Capability::Connector(s) => s.into(),
+            Capability::Open(s) => s.into(),
+            Capability::Router(s) => s.into(),
+            Capability::Dictionary(s) => s.into(),
+            Capability::Data(s) => s.into(),
+            Capability::Unit(s) => s.into(),
+            Capability::Directory(s) => s.into(),
+            Capability::OneShotHandle(s) => s.into(),
+            Capability::Component(s) => s.into(),
+        }
     }
 }
 
@@ -75,20 +85,6 @@ impl TryFrom<fsandbox::Capability> for Capability {
 }
 
 impl RemotableCapability for Capability {
-    fn into_fidl(self) -> fsandbox::Capability {
-        match self {
-            Self::Connector(s) => s.into_fidl(),
-            Self::Open(s) => s.into_fidl(),
-            Self::Router(s) => s.into_fidl(),
-            Self::Dictionary(s) => s.into_fidl(),
-            Self::Data(s) => s.into_fidl(),
-            Self::Unit(s) => s.into_fidl(),
-            Self::Directory(s) => s.into_fidl(),
-            Self::OneShotHandle(s) => s.into_fidl(),
-            Self::Component(s) => s.into_fidl(),
-        }
-    }
-
     fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         match self {
             Self::Connector(s) => s.try_into_directory_entry(),

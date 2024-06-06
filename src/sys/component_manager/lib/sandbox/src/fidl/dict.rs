@@ -43,7 +43,7 @@ impl Dict {
                         let key =
                             Key::new(key).map_err(|_| fsandbox::DictionaryError::InvalidKey)?;
                         match self.get(&key) {
-                            Some(cap) => Ok(cap.clone().into_fidl()),
+                            Some(cap) => Ok(cap.into()),
                             None => {
                                 (self.not_found)(key.as_str());
                                 Err(fsandbox::DictionaryError::NotFound)
@@ -57,7 +57,7 @@ impl Dict {
                         let key =
                             Key::new(key).map_err(|_| fsandbox::DictionaryError::InvalidKey)?;
                         match self.remove(&key) {
-                            Some(cap) => Ok(cap.into_fidl()),
+                            Some(cap) => Ok(cap.into()),
                             None => {
                                 (self.not_found)(key.as_str());
                                 Err(fsandbox::DictionaryError::NotFound)
@@ -184,7 +184,7 @@ async fn serve_dict_item_iterator(
                         .into_iter()
                         .map(|(key, value)| fsandbox::DictionaryItem {
                             key: key.to_string(),
-                            value: value.into_fidl(),
+                            value: value.into(),
                         })
                         .collect();
                     if let Err(_) = responder.send(items) {
@@ -276,7 +276,7 @@ mod tests {
         let server = dict.serve_dict(dict_stream);
 
         let client = async move {
-            let value = Unit::default().into_fidl();
+            let value = Unit::default().into();
             dict_proxy
                 .insert(CAP_KEY.as_str(), value)
                 .await
@@ -321,7 +321,7 @@ mod tests {
                 .expect("failed to remove");
 
             // The value should be the same one that was previously inserted.
-            assert_eq!(cap, Unit::default().into_fidl());
+            assert_eq!(cap, Unit::default().into());
 
             Ok(())
         };
@@ -354,7 +354,7 @@ mod tests {
                 .expect("failed to get");
 
             // The value should be the same one that was previously inserted.
-            assert_eq!(cap, Unit::default().into_fidl());
+            assert_eq!(cap, Unit::default().into());
 
             Ok(())
         };
@@ -379,14 +379,14 @@ mod tests {
         let client = async move {
             // Insert an entry.
             dict_proxy
-                .insert(CAP_KEY.as_str(), Unit::default().into_fidl())
+                .insert(CAP_KEY.as_str(), Unit::default().into())
                 .await
                 .expect("failed to call Insert")
                 .expect("failed to insert");
 
             // Inserting again should return an error.
             let result = dict_proxy
-                .insert(CAP_KEY.as_str(), Unit::default().into_fidl())
+                .insert(CAP_KEY.as_str(), Unit::default().into())
                 .await
                 .expect("failed to call Insert");
             assert_matches!(result, Err(fsandbox::DictionaryError::AlreadyExists));
@@ -483,7 +483,7 @@ mod tests {
             .expect("failed to remove");
 
         // The value should be the Unit that was previously inserted.
-        assert_eq!(cap, Unit::default().into_fidl());
+        assert_eq!(cap, Unit::default().into());
 
         // Convert the original Dict back to a Rust object.
         let fidl_capability =
@@ -513,8 +513,8 @@ mod tests {
         let mut data_caps: Vec<_> = (1..3).map(|i| Data::Int64(i)).collect();
 
         // Add the Data capabilities to the dict.
-        dict_proxy.insert("cap1", data_caps.remove(0).into_fidl()).await.unwrap().unwrap();
-        dict_proxy.insert("cap2", data_caps.remove(0).into_fidl()).await.unwrap().unwrap();
+        dict_proxy.insert("cap1", data_caps.remove(0).into()).await.unwrap().unwrap();
+        dict_proxy.insert("cap2", data_caps.remove(0).into()).await.unwrap().unwrap();
 
         // Now read the entries back.
         let (iterator, server_end) = endpoints::create_proxy().unwrap();
@@ -587,7 +587,7 @@ mod tests {
             assert_eq!(*expected_len, keys.len() as u32);
             num_got_items += items.len() as u32;
             for item in items {
-                assert_eq!(item.value, Unit::default().into_fidl());
+                assert_eq!(item.value, Unit::default().into());
             }
         }
 

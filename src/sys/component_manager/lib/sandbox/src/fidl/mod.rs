@@ -21,10 +21,6 @@ use {
 /// The trait which remotes Capabilities, either by turning them into
 /// FIDL or serving them in a VFS.
 pub trait RemotableCapability: Into<fsandbox::Capability> {
-    fn into_fidl(self) -> fsandbox::Capability {
-        self.into()
-    }
-
     /// Attempt to convert `self` to a DirectoryEntry which can be served in a
     /// VFS.
     ///
