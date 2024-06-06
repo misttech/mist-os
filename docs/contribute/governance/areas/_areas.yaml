@@ -251,7 +251,7 @@
     - fidl: 'fuchsia.mediacodec'
 
 - name: 'Metrics'
-  api_primary: 'camrdale@google.com'
+  api_primary: ''
   api_secondary: ''
   description: |
     The set of APIs that allow clients to log events that are associated with
