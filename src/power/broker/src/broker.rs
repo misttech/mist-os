@@ -123,12 +123,9 @@ impl Broker {
 
     pub fn update_current_level(&mut self, element_id: &ElementID, level: PowerLevel) {
         tracing::debug!("update_current_level({element_id}, {level:?})");
-        let prev_level = self.current.update(element_id, level);
+        let prev_level = self.update_current_level_internal(element_id, level);
         if prev_level.as_ref() == Some(&level) {
             return;
-        }
-        if let Ok(elem_inspect) = self.catalog.topology.inspect_for_element(element_id) {
-            elem_inspect.borrow_mut().meta().set("current_level", level);
         }
         if prev_level.is_none() || prev_level.unwrap() < level {
             // The level was increased, look for activated active or pending
@@ -233,6 +230,21 @@ impl Broker {
         self.current.subscribe(element_id)
     }
 
+    fn update_current_level_internal(
+        &mut self,
+        element_id: &ElementID,
+        level: PowerLevel,
+    ) -> Option<PowerLevel> {
+        let previous = self.current.update(&element_id, level);
+        // Only update inspect if the value has changed.
+        if previous != Some(level) {
+            if let Ok(elem_inspect) = self.catalog.topology.inspect_for_element(&element_id) {
+                elem_inspect.borrow_mut().meta().set("current_level", level);
+            }
+        }
+        previous
+    }
+
     #[cfg(test)]
     pub fn get_required_level(&self, element_id: &ElementID) -> Option<PowerLevel> {
         self.required.get(element_id)
@@ -243,6 +255,21 @@ impl Broker {
         element_id: &ElementID,
     ) -> UnboundedReceiver<Option<PowerLevel>> {
         self.required.subscribe(element_id)
+    }
+
+    fn update_required_level(
+        &mut self,
+        element_id: &ElementID,
+        level: PowerLevel,
+    ) -> Option<PowerLevel> {
+        let previous = self.required.update(element_id, level);
+        // Only update inspect if the value has changed.
+        if previous != Some(level) {
+            if let Ok(elem_inspect) = self.catalog.topology.inspect_for_element(element_id) {
+                elem_inspect.borrow_mut().meta().set("required_level", level);
+            }
+        }
+        previous
     }
 
     pub fn acquire_lease(
@@ -507,10 +534,7 @@ impl Broker {
         for element_id in element_ids {
             let new_required_level = self.catalog.calculate_required_level(element_id);
             tracing::debug!("update required level({:?}, {:?})", element_id, new_required_level);
-            self.required.update(element_id, new_required_level);
-            if let Ok(elem_inspect) = self.catalog.topology.inspect_for_element(element_id) {
-                elem_inspect.borrow_mut().meta().set("required_level", new_required_level);
-            }
+            self.update_required_level(element_id, new_required_level);
         }
     }
 
@@ -689,13 +713,9 @@ impl Broker {
             return Err(AddElementError::Invalid);
         }
         let id = self.catalog.topology.add_element(name, valid_levels.to_vec())?;
-        self.current.update(&id, initial_current_level);
+        self.update_current_level_internal(&id, initial_current_level);
         let minimum_level = self.catalog.topology.minimum_level(&id);
-        self.required.update(&id, minimum_level);
-        if let Ok(elem_inspect) = self.catalog.topology.inspect_for_element(&id) {
-            elem_inspect.borrow_mut().meta().set("current_level", initial_current_level);
-            elem_inspect.borrow_mut().meta().set("required_level", minimum_level);
-        }
+        self.update_required_level(&id, minimum_level);
         for dependency in level_dependencies {
             if let Err(err) = self.add_dependency(
                 &id,
@@ -1758,6 +1778,105 @@ mod tests {
                                 "event": "update_key",
                                 "key": "required_level",
                                 "update": 2u64,
+                            },
+                        },
+        }}}});
+    }
+
+    #[fuchsia::test]
+    fn test_current_required_level_inspect() {
+        let inspect = fuchsia_inspect::component::inspector();
+        let inspect_node = inspect.root().create_child("test");
+        let mut broker = Broker::new(inspect_node);
+        let latinum = broker
+            .add_element("Latinum", 2, vec![0, 1, 2], vec![], vec![], vec![])
+            .expect("add_element failed");
+        assert_eq!(broker.get_current_level(&latinum), Some(2));
+        assert_eq!(broker.get_required_level(&latinum), Some(0));
+
+        // Update required level to 1.
+        broker.update_required_level(&latinum, 1);
+
+        // Update required level to 1 again, should have no additional effect.
+        broker.update_required_level(&latinum, 1);
+
+        // Update current level to 1.
+        broker.update_current_level(&latinum, 1);
+
+        // Update current level to 1 again, should have no additional effect.
+        broker.update_current_level(&latinum, 1);
+
+        assert_data_tree!(inspect, root: {
+            test: {
+                leases: {},
+                topology: {
+                    "fuchsia.inspect.Graph": {
+                        topology: {
+                            broker.get_unsatisfiable_element_id().to_string() => {
+                                meta: {
+                                    name: broker.get_unsatisfiable_element_name(),
+                                    valid_levels: broker.get_unsatisfiable_element_levels(),
+                                    required_level: "unset",
+                                    current_level: "unset",
+                                },
+                                relationships: {}
+                            },
+                            latinum.to_string() => {
+                                meta: {
+                                    name: "Latinum",
+                                    valid_levels: vec![0u64, 1u64, 2u64],
+                                    current_level: 1u64,
+                                    required_level: 1u64,
+                                },
+                                relationships: {},
+                            },
+                        },
+                        "events": {
+                            "0": {
+                                "@time": AnyProperty,
+                                "vertex_id": broker.get_unsatisfiable_element_id().to_string(),
+                                "event": "add_vertex",
+                                "meta": {
+                                    "current_level": "unset",
+                                    "required_level": "unset",
+                                },
+                            },
+                            "1": {
+                                "@time": AnyProperty,
+                                "vertex_id": latinum.to_string(),
+                                "event": "add_vertex",
+                                "meta": {
+                                    "current_level": "unset",
+                                    "required_level": "unset",
+                                },
+                            },
+                            "2": {
+                                "@time": AnyProperty,
+                                "vertex_id": latinum.to_string(),
+                                "event": "update_key",
+                                "key": "current_level",
+                                "update": 2u64,
+                            },
+                            "3": {
+                                "@time": AnyProperty,
+                                "vertex_id": latinum.to_string(),
+                                "event": "update_key",
+                                "key": "required_level",
+                                "update": 0u64,
+                            },
+                            "4": {
+                                "@time": AnyProperty,
+                                "vertex_id": latinum.to_string(),
+                                "event": "update_key",
+                                "key": "required_level",
+                                "update": 1u64,
+                            },
+                            "5": {
+                                "@time": AnyProperty,
+                                "vertex_id": latinum.to_string(),
+                                "event": "update_key",
+                                "key": "current_level",
+                                "update": 1u64,
                             },
                         },
         }}}});
