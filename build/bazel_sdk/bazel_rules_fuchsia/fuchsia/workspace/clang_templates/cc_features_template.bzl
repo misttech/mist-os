@@ -155,6 +155,10 @@ _flag_groups = struct(
             "-Wstrict-prototypes",
             "-Wwrite-strings",
             "-Wthread-safety",
+            # TODO(https://fxbug.dev/344080745): After the issue is fixed,
+            # remove "-Wno-missing-template-arg-list-after-template-kw".
+            "-Wno-unknown-warning-option",
+            "-Wno-missing-template-arg-list-after-template-kw",
         ],
     ),
     werror = _make_flag_group_struct(
