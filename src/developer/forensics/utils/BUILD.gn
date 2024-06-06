@@ -100,6 +100,16 @@ source_set("previous_boot_file") {
   ]
 }
 
+source_set("promise_timeout") {
+  sources = [ "promise_timeout.h" ]
+
+  public_deps = [
+    ":errors",
+    "//sdk/lib/fit-promise",
+    "//zircon/system/ulib/async:async-cpp",
+  ]
+}
+
 source_set("regexp") {
   sources = [ "regexp.h" ]
   public_deps = [ "//third_party/re2" ]
