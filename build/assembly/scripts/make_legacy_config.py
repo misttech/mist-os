@@ -63,7 +63,6 @@ class ConfigDataEntryFromGN:
 def copy_to_assembly_input_bundle(
     base: List[FilePath],
     cache: List[FilePath],
-    system: List[FilePath],
     bootfs_packages: List[FilePath],
     kernel: KernelInfo,
     boot_args: List[str],
@@ -90,7 +89,6 @@ def copy_to_assembly_input_bundle(
     """
     aib_creator = AIBCreator(outdir)
 
-    aib_creator.system.update([PackageDetails(m, "system") for m in system])
     aib_creator.packages.update(
         [PackageDetails(m, "bootfs") for m in bootfs_packages]
     )
@@ -156,12 +154,6 @@ def main():
 
     parser.add_argument("--base-packages-list", type=argparse.FileType("r"))
     parser.add_argument("--cache-packages-list", type=argparse.FileType("r"))
-    parser.add_argument(
-        "--extra-files-packages-list", type=argparse.FileType("r")
-    )
-    parser.add_argument(
-        "--extra-deps-files-packages-list", type=argparse.FileType("r")
-    )
     parser.add_argument(
         "--kernel-cmdline", type=argparse.FileType("r"), required=True
     )
@@ -257,17 +249,6 @@ def main():
 
         cache = cache_packages_list
 
-    system = []
-    if args.extra_files_packages_list is not None:
-        extra_file_packages = json.load(args.extra_files_packages_list)
-        system.extend(extra_file_packages)
-    if args.extra_deps_files_packages_list is not None:
-        extra_deps_file_packages = json.load(
-            args.extra_deps_files_packages_list
-        )
-        for extra_dep in extra_deps_file_packages:
-            system.append(extra_dep["package_manifest"])
-
     kernel = KernelInfo()
     kernel.args.update(json.load(args.kernel_cmdline))
 
@@ -288,7 +269,6 @@ def main():
     ) = copy_to_assembly_input_bundle(
         base,
         cache,
-        system,
         bootfs_packages,
         kernel,
         boot_args,

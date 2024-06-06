@@ -18,11 +18,6 @@ group("recovery_bootfs_labels") {
   deps = board_recovery_bootfs_labels
 }
 
-group("system_image_deps") {
-  testonly = fuchsia_zbi_testonly
-  deps = board_system_image_deps
-}
-
 group("zedboot_bootfs_labels") {
   testonly = true
   deps = board_zedboot_bootfs_labels

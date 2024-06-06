@@ -16,11 +16,8 @@
 # of requirements for enabling a specific feature.
 
 _attr_list = [
-  "bootfs_labels",
   "base_packages",
   "cmdline_deps",
-  "system_image_deps",
-  "core_realm_shards",
 ]
 
 # Each input groups defines a set of attributes declaring the artifacts and how
@@ -34,26 +31,14 @@ _attr_list = [
 # `$target_name.attribute_name`.
 #
 # Supported attributes are:
-#     bootfs_labels (optional, default: [])
-#       [list of labels]
 #     base_packages (optional, default: [])
 #       [list of labels]
 #     cmdline_deps (optional, default: [])
 #       [list of labels]
-#     system_image_deps (optional, default: [])
-#       [list of labels]
-#     core_realm_shards (optional, default: [])
-#       [list of labels] Unlike other attributes, this is not a direct input to
-#       assembled system. This is used to generate a core and root realm. Both
-#       of these realms are input to assembled_system() as base_packages and
-#       bootfs_labels respectively.
 template("assembly_input_groups") {
   invoker_with_defaults = {
-    bootfs_labels = []
     base_packages = []
     cmdline_deps = []
-    system_image_deps = []
-    core_realm_shards = []
     testonly = true
 
     # Clobbers any existing variable defined by invoker in the current scope.

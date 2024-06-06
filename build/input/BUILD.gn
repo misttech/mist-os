@@ -29,11 +29,6 @@ group("recovery_bootfs") {
   ]
 }
 
-group("system_image") {
-  testonly = fuchsia_zbi_testonly
-  deps = [ "board:system_image_deps" ]
-}
-
 group("zedboot_bootfs") {
   testonly = true
   deps = [

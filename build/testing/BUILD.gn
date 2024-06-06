@@ -10,10 +10,6 @@ import("//src/sys/core/build/core.gni")
 core_realm_definition("cuckoo-core-realm") {
   testonly = true
   deps = board_core_realm_shards
-  foreach(input_group, cuckoo_kernel_zbi_test_params.input_groups) {
-    input_group_label = "//bundles/assembly_input_groups:${input_group}"
-    deps += [ "${input_group_label}.core_realm_shards" ]
-  }
 }
 
 # Generates a product_assembly_configuration for a cukoo tests with a set of
