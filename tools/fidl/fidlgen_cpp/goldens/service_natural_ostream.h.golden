@@ -21,35 +21,27 @@ namespace test_service {
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_service::FirstProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_service::FirstProtocol>& value) {
-    return os << "ClientEnd<"
-              << "test_service::FirstProtocol"
-              << ">(" << value.channel().get() << ")";
+    return os << "ClientEnd<" << "test_service::FirstProtocol" << ">(" << value.channel().get() << ")";
   }
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_service::FirstProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_service::FirstProtocol>& value) {
-    return os << "ServerEnd<"
-              << "test_service::FirstProtocol"
-              << ">(" << value.channel().get() << ")";
+    return os << "ServerEnd<" << "test_service::FirstProtocol" << ">(" << value.channel().get() << ")";
   }
 };
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_service::SecondProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_service::SecondProtocol>& value) {
-    return os << "ClientEnd<"
-              << "test_service::SecondProtocol"
-              << ">(" << value.channel().get() << ")";
+    return os << "ClientEnd<" << "test_service::SecondProtocol" << ">(" << value.channel().get() << ")";
   }
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_service::SecondProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_service::SecondProtocol>& value) {
-    return os << "ServerEnd<"
-              << "test_service::SecondProtocol"
-              << ">(" << value.channel().get() << ")";
+    return os << "ServerEnd<" << "test_service::SecondProtocol" << ">(" << value.channel().get() << ")";
   }
 };
 

@@ -82,35 +82,27 @@ std::ostream& operator<<(std::ostream& os, const ::test_driverhandle::HandlesInP
 template <>
 struct fidl::ostream::Formatter<::fdf::ClientEnd<::test_driverhandle::DriverProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fdf::ClientEnd<::test_driverhandle::DriverProtocol>& value) {
-    return os << "ClientEnd<"
-              << "test_driverhandle::DriverProtocol"
-              << ">(" << value.channel().get() << ")";
+    return os << "ClientEnd<" << "test_driverhandle::DriverProtocol" << ">(" << value.channel().get() << ")";
   }
 };
 
 template <>
 struct fidl::ostream::Formatter<::fdf::ServerEnd<::test_driverhandle::DriverProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fdf::ServerEnd<::test_driverhandle::DriverProtocol>& value) {
-    return os << "ServerEnd<"
-              << "test_driverhandle::DriverProtocol"
-              << ">(" << value.channel().get() << ")";
+    return os << "ServerEnd<" << "test_driverhandle::DriverProtocol" << ">(" << value.channel().get() << ")";
   }
 };
 template <>
 struct fidl::ostream::Formatter<::fdf::ClientEnd<::test_driverhandle::HandlesInProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fdf::ClientEnd<::test_driverhandle::HandlesInProtocol>& value) {
-    return os << "ClientEnd<"
-              << "test_driverhandle::HandlesInProtocol"
-              << ">(" << value.channel().get() << ")";
+    return os << "ClientEnd<" << "test_driverhandle::HandlesInProtocol" << ">(" << value.channel().get() << ")";
   }
 };
 
 template <>
 struct fidl::ostream::Formatter<::fdf::ServerEnd<::test_driverhandle::HandlesInProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fdf::ServerEnd<::test_driverhandle::HandlesInProtocol>& value) {
-    return os << "ServerEnd<"
-              << "test_driverhandle::HandlesInProtocol"
-              << ">(" << value.channel().get() << ")";
+    return os << "ServerEnd<" << "test_driverhandle::HandlesInProtocol" << ">(" << value.channel().get() << ")";
   }
 };
 

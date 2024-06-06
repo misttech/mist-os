@@ -100,18 +100,14 @@ std::ostream& operator<<(std::ostream& os, const ::test_anonymous::SomeProtocolS
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_anonymous::SomeProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_anonymous::SomeProtocol>& value) {
-    return os << "ClientEnd<"
-              << "test_anonymous::SomeProtocol"
-              << ">(" << value.channel().get() << ")";
+    return os << "ClientEnd<" << "test_anonymous::SomeProtocol" << ">(" << value.channel().get() << ")";
   }
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_anonymous::SomeProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_anonymous::SomeProtocol>& value) {
-    return os << "ServerEnd<"
-              << "test_anonymous::SomeProtocol"
-              << ">(" << value.channel().get() << ")";
+    return os << "ServerEnd<" << "test_anonymous::SomeProtocol" << ">(" << value.channel().get() << ")";
   }
 };
 

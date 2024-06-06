@@ -23,18 +23,14 @@ namespace test_foreigntypeinresponseusedthroughcompose {
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_foreigntypeinresponseusedthroughcompose::Top>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_foreigntypeinresponseusedthroughcompose::Top>& value) {
-    return os << "ClientEnd<"
-              << "test_foreigntypeinresponseusedthroughcompose::Top"
-              << ">(" << value.channel().get() << ")";
+    return os << "ClientEnd<" << "test_foreigntypeinresponseusedthroughcompose::Top" << ">(" << value.channel().get() << ")";
   }
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_foreigntypeinresponseusedthroughcompose::Top>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_foreigntypeinresponseusedthroughcompose::Top>& value) {
-    return os << "ServerEnd<"
-              << "test_foreigntypeinresponseusedthroughcompose::Top"
-              << ">(" << value.channel().get() << ")";
+    return os << "ServerEnd<" << "test_foreigntypeinresponseusedthroughcompose::Top" << ">(" << value.channel().get() << ")";
   }
 };
 
