@@ -80,8 +80,6 @@ class InitTests(unittest.TestCase):
 
         mock_fc_context.assert_called_once_with(
             config={
-                "log.dir": _INPUT_ARGS["ffx_config"].logs_dir,
-                "log.level": _INPUT_ARGS["ffx_config"].logs_level,
                 "daemon.autostart": "false",
             },
             isolate_dir=_INPUT_ARGS["ffx_config"].isolate_dir,
@@ -132,8 +130,6 @@ class InitTests(unittest.TestCase):
 
         mock_fc_context.assert_called_once_with(
             config={
-                "log.dir": _INPUT_ARGS["ffx_config"].logs_dir,
-                "log.level": _INPUT_ARGS["ffx_config"].logs_level,
                 "daemon.autostart": "false",
             },
             isolate_dir=_INPUT_ARGS["ffx_config"].isolate_dir,
