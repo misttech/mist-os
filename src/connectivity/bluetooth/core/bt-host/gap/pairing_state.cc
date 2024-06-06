@@ -10,13 +10,11 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/bredr_connection_manager.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/constants.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/util.h"
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/transport.h"
 
 namespace bt::gap {
 
 using pw::bluetooth::emboss::AuthenticationRequirements;
 using pw::bluetooth::emboss::IoCapability;
-using sm::util::IOCapabilityForHci;
 
 namespace {
 
@@ -534,11 +532,11 @@ void PairingState::OnLinkKeyNotification(
   }
 
   // Set Security Properties for this BR/EDR connection
-  set_security_properties(sec_props);
+  bredr_security_ = sec_props;
 
   // TODO(https://fxbug.dev/42082735): When in SC Only mode, all services
   // require security mode 4, level 4
-  if (security_mode() == BrEdrSecurityMode::SecureConnectionsOnly &&
+  if (security_mode_ == BrEdrSecurityMode::SecureConnectionsOnly &&
       security_properties().level() !=
           sm::SecurityLevel::kSecureAuthenticated) {
     bt_log(WARN,

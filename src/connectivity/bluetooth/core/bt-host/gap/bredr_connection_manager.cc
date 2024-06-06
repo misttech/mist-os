@@ -290,7 +290,7 @@ void BrEdrConnectionManager::SetPairingDelegate(
     PairingDelegate::WeakPtr delegate) {
   pairing_delegate_ = std::move(delegate);
   for (auto& [handle, connection] : connections_) {
-    connection.pairing_state().SetPairingDelegate(pairing_delegate_);
+    connection.pairing_state_manager().SetPairingDelegate(pairing_delegate_);
   }
 }
 
@@ -324,8 +324,8 @@ void BrEdrConnectionManager::Pair(PeerId peer_id,
                               auto, hci::Result<> status) {
     pair_callback(status);
   };
-  connection->pairing_state().InitiatePairing(security,
-                                              std::move(pairing_callback));
+  connection->pairing_state_manager().InitiatePairing(
+      security, std::move(pairing_callback));
 }
 
 void BrEdrConnectionManager::OpenL2capChannel(
@@ -773,7 +773,7 @@ void BrEdrConnectionManager::InitializeConnection(
   BT_ASSERT(success);
 
   BrEdrConnection& connection = conn_iter->second;
-  connection.pairing_state().SetPairingDelegate(pairing_delegate_);
+  connection.pairing_state_manager().SetPairingDelegate(pairing_delegate_);
   connection.set_security_mode(security_mode());
   connection.AttachInspect(inspect_properties_.connections_node_,
                            inspect_properties_.connections_node_.UniqueName(
@@ -923,7 +923,7 @@ BrEdrConnectionManager::OnAuthenticationComplete(
     return hci::CommandChannel::EventCallbackResult::kContinue;
   }
 
-  iter->second.pairing_state().OnAuthenticationComplete(status);
+  iter->second.pairing_state_manager().OnAuthenticationComplete(status);
   return hci::CommandChannel::EventCallbackResult::kContinue;
 }
 
@@ -1240,7 +1240,7 @@ BrEdrConnectionManager::OnIoCapabilityRequest(
     return hci::CommandChannel::EventCallbackResult::kContinue;
   }
   auto [handle, conn_ptr] = *conn_pair;
-  auto reply = conn_ptr->pairing_state().OnIoCapabilityRequest();
+  auto reply = conn_ptr->pairing_state_manager().OnIoCapabilityRequest();
 
   if (!reply) {
     SendIoCapabilityRequestNegativeReply(
@@ -1283,7 +1283,7 @@ BrEdrConnectionManager::OnIoCapabilityResponse(
            bt_str(addr));
     return hci::CommandChannel::EventCallbackResult::kContinue;
   }
-  conn_pair->second->pairing_state().OnIoCapabilityResponse(
+  conn_pair->second->pairing_state_manager().OnIoCapabilityResponse(
       params.io_capability().Read());
   return hci::CommandChannel::EventCallbackResult::kContinue;
 }
@@ -1314,7 +1314,7 @@ BrEdrConnectionManager::OnLinkKeyRequest(const hci::EmbossEventPacket& event) {
   }
   auto& [handle, conn] = *conn_pair;
 
-  auto link_key = conn->pairing_state().OnLinkKeyRequest();
+  auto link_key = conn->pairing_state_manager().OnLinkKeyRequest();
   if (!link_key.has_value()) {
     SendLinkKeyRequestNegativeReply(addr.value());
     return hci::CommandChannel::EventCallbackResult::kContinue;
@@ -1400,7 +1400,7 @@ BrEdrConnectionManager::OnLinkKeyNotification(
   } else {
     handle->second->link().set_link_key(
         hci_key, static_cast<hci_spec::LinkKeyType>(key_type));
-    handle->second->pairing_state().OnLinkKeyNotification(
+    handle->second->pairing_state_manager().OnLinkKeyNotification(
         key_value,
         static_cast<hci_spec::LinkKeyType>(key_type),
         local_secure_connections_supported_);
@@ -1434,7 +1434,8 @@ BrEdrConnectionManager::OnSimplePairingComplete(const hci::EventPacket& event) {
            bt_str(params.bd_addr));
     return hci::CommandChannel::EventCallbackResult::kContinue;
   }
-  conn_pair->second->pairing_state().OnSimplePairingComplete(params.status);
+  conn_pair->second->pairing_state_manager().OnSimplePairingComplete(
+      params.status);
   return hci::CommandChannel::EventCallbackResult::kContinue;
 }
 
@@ -1469,7 +1470,7 @@ BrEdrConnectionManager::OnUserConfirmationRequest(
       self->SendUserConfirmationRequestNegativeReply(bd_addr);
     }
   };
-  conn_pair->second->pairing_state().OnUserConfirmationRequest(
+  conn_pair->second->pairing_state_manager().OnUserConfirmationRequest(
       le32toh(params.numeric_value), std::move(confirm_cb));
   return hci::CommandChannel::EventCallbackResult::kContinue;
 }
@@ -1502,7 +1503,7 @@ BrEdrConnectionManager::OnUserPasskeyRequest(const hci::EventPacket& event) {
       self->SendUserPasskeyRequestNegativeReply(bd_addr);
     }
   };
-  conn_pair->second->pairing_state().OnUserPasskeyRequest(
+  conn_pair->second->pairing_state_manager().OnUserPasskeyRequest(
       std::move(passkey_cb));
   return hci::CommandChannel::EventCallbackResult::kContinue;
 }
@@ -1524,7 +1525,7 @@ BrEdrConnectionManager::OnUserPasskeyNotification(
            bt_str(params.bd_addr));
     return hci::CommandChannel::EventCallbackResult::kContinue;
   }
-  conn_pair->second->pairing_state().OnUserPasskeyNotification(
+  conn_pair->second->pairing_state_manager().OnUserPasskeyNotification(
       le32toh(params.numeric_value));
   return hci::CommandChannel::EventCallbackResult::kContinue;
 }

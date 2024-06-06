@@ -13,11 +13,10 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/gap.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/pairing_delegate.h"
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer_cache.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/types.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/bredr_connection.h"
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/smp.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/error.h"
 
@@ -269,16 +268,12 @@ class PairingState final {
   // Handler for hci::Connection::set_encryption_change_callback.
   void OnEncryptionChange(hci::Result<bool> result);
 
-  void set_security_properties(sm::SecurityProperties& security) {
-    bredr_security_ = security;
-  }
   sm::SecurityProperties& security_properties() { return bredr_security_; }
 
   // Sets the BR/EDR Security Mode of the pairing state - see enum definition
   // for details of each mode. If a security upgrade is in-progress, only takes
   // effect on the next security upgrade.
   void set_security_mode(gap::BrEdrSecurityMode mode) { security_mode_ = mode; }
-  gap::BrEdrSecurityMode security_mode() const { return security_mode_; }
 
   // Attach pairing state inspect node named |name| as a child of |parent|.
   void AttachInspect(inspect::Node& parent, std::string name);
