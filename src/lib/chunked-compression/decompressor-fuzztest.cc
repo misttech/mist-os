@@ -58,9 +58,8 @@ fbl::Array<uint8_t> CopyAndFixChecksum(const uint8_t *data, size_t size) {
 // Fuzz test which attempts to decompress |data| as a chunked archive.
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // Parse errors are logged at LOG_ERROR, so squelch them to avoid log spam.
-  fuchsia_logging::LogSettings settings;
-  settings.min_log_level = fuchsia_logging::LOG_FATAL;
-  fuchsia_logging::SetLogSettings(settings);
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithMinLogSeverity(fuchsia_logging::LOG_FATAL).BuildAndInitialize();
 
   if (size < kChunkArchiveMinHeaderSize) {
     return 0;
