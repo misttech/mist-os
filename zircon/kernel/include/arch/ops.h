@@ -49,8 +49,6 @@ void arch_sync_cache_range(vaddr_t start, size_t len);
 class MpUnplugEvent;
 void arch_flush_state_and_halt(MpUnplugEvent *flush_done) __NO_RETURN;
 
-void arch_idle_enter(zx_duration_t max_latency);
-
 // Arch optimized version of a page zero routine against a page aligned buffer.
 // Usually implemented in or called from assembly.
 extern "C" void arch_zero_page(void *);
@@ -72,6 +70,39 @@ inline void arch_set_blocking_disallowed(bool value) {
 }
 
 inline uint32_t arch_num_spinlocks_held() { return READ_PERCPU_FIELD(num_spinlocks); }
+
+class IdlePowerThread;  // fwd decl
+class ArchIdlePowerThread {
+ private:
+  friend class IdlePowerThread;
+
+  // ArchIdlePowerThread::EnterIdleState is a method which is closely coupled
+  // to the behavior of the IdlePowerThreads (one per CPU).  It should really
+  // never be used anywhere else but there (hence the extra effort to bury it as
+  // a private member of a trivial container class).
+  //
+  // When called from IdlePowerThread::Run, the rules are:
+  // 1) Preemption *must* be disabled.
+  // 2) Interrupts *must* be disabled.
+  // 3) Preemption will *not* be re-enabled at any point during the
+  //    EnterIdleState method.
+  // 4) Interrupts *may* be re-enabled as needed by the architecture specific
+  //    implementation, but this is not guaranteed to happen.  If they are
+  //    re-enabled, the will be disabled again before the function returns.
+  // 5) If an implementation needs to re-enable interrupts during its sequence,
+  //    it will *always* do so just before falling into the instruction which
+  //    waits for the interrupt intended to kick the system out of idle.  IOW -
+  //    if the final entry into the idle-but-waiting-for-irq state requires that
+  //    interrupts be re-enabled, the operation can be considered to be "atomic"
+  //    from the caller's perspective.  The wakeup interrupt will not be missed
+  //    because of a race.
+  //
+  // For callers, the primary takeaway from these rules is that users *must*
+  // disable IRQs, but *must not* rely on interrupts being disabled for the
+  // entire time to preserve any of their invariants.
+  //
+  static void EnterIdleState(zx_duration_t max_latency);
+};
 
 #endif  // !__ASSEMBLER__
 

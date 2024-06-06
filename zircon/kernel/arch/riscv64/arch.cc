@@ -103,4 +103,4 @@ void arch_late_init_percpu() {
   mp_set_curr_cpu_online(true);
 }
 
-void arch_idle_enter(zx_duration_t max_latency) { __wfi(); }
+void ArchIdlePowerThread::EnterIdleState(zx_duration_t max_latency) { __wfi(); }
