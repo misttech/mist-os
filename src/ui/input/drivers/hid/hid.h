@@ -53,7 +53,9 @@ class HidDevice : public HidDeviceType,
                   public fidl::WireAsyncEventHandler<fuchsia_hardware_hidbus::Hidbus> {
  public:
   using BanjoHidbusClient = ddk::HidbusProtocolClient;
-  using FidlHidbusClient = fidl::WireClient<fuchsia_hardware_hidbus::Hidbus>;
+  // TODO (rdzhuang): Use WireSharedClient to avoid thread synchronization errors when calling from
+  // Banjo methods. Change to fidl::WireClient when we've ripped out Banjo.
+  using FidlHidbusClient = fidl::WireSharedClient<fuchsia_hardware_hidbus::Hidbus>;
   using HidbusClient = std::variant<BanjoHidbusClient, FidlHidbusClient>;
 
   // Banjo Constructor
