@@ -13,7 +13,6 @@ fidl("fuchsia.boot") {
     "items.fidl",
     "log.fidl",
     "overview.fidl",
-    "root-resource.fidl",
     "svc-stash.fidl",
   ]
 
