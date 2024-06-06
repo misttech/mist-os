@@ -633,6 +633,13 @@ pub struct ConnectionShared<I: IpExt, BT: FilterBindingsTypes, E> {
     state: Mutex<ConnectionState<BT>>,
 }
 
+impl<I: IpExt, BT: FilterBindingsTypes, E> ConnectionShared<I, BT, E> {
+    pub(crate) fn external_data(&self) -> &E {
+        let ConnectionCommon { external_data, .. } = &self.inner;
+        external_data
+    }
+}
+
 #[derive(GenericOverIp)]
 #[generic_over_ip()]
 enum IpAgnosticTransportProtocol {

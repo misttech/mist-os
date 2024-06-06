@@ -251,32 +251,32 @@ where
     } else {
         // NAT has not yet been configured for this connection; traverse the installed
         // NAT routines in order to configure NAT.
-        let conn = match conn {
-            Connection::Exclusive(conn) => conn,
-            Connection::Shared(_) => {
-                // NAT is configured for every connection before it becomes a shared connection
-                // and is inserted in the conntrack table. (This is true whether or not NAT will
-                // actually be performed; the configuration could be `None`.)
-                unreachable!(
-                    "connections always have NAT configured before they are inserted in conntrack"
-                )
+        match conn {
+            Connection::Exclusive(conn) => {
+                let (reply_tuple, external_data) = conn.reply_tuple_and_external_data_mut();
+                let (verdict, config) = configure_nat::<N, _, _, _, _>(
+                    core_ctx,
+                    bindings_ctx,
+                    table,
+                    reply_tuple,
+                    hook,
+                    packet,
+                    interfaces,
+                );
+                if let ControlFlow::Break(()) = verdict.behavior() {
+                    return verdict;
+                }
+                external_data.config.set(config).expect("NAT should not have been configured yet");
+                config
             }
-        };
-        let (reply_tuple, external_data) = conn.reply_tuple_and_external_data_mut();
-        let (verdict, config) = configure_nat::<N, _, _, _, _>(
-            core_ctx,
-            bindings_ctx,
-            table,
-            reply_tuple,
-            hook,
-            packet,
-            interfaces,
-        );
-        if let ControlFlow::Break(()) = verdict.behavior() {
-            return verdict;
+            // TODO(https://fxbug.dev/345527706): This is a workaround to avoid
+            // crashing in ANVL tests that exercise fragment handling. Revert
+            // back to unreachable once we reassemble packets before filtering.
+            Connection::Shared(conn) => match conn.external_data().config.set(None) {
+                Ok(_) => None,
+                Err(v) => v,
+            },
         }
-        external_data.config.set(config).expect("NAT should not have been configured yet");
-        config
     };
 
     match (conn_nat, N::NAT_TYPE) {
