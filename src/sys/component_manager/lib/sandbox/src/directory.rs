@@ -7,12 +7,7 @@ use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
 
 #[cfg(target_os = "fuchsia")]
-use {
-    crate::CapabilityTrait,
-    fidl::handle::{AsHandleRef, Channel, Handle},
-    std::sync::Arc,
-    vfs::{directory::entry::DirectoryEntry, remote::RemoteLike},
-};
+use fidl::handle::{AsHandleRef, Channel, Handle};
 
 /// A capability that is a `fuchsia.io` directory.
 ///
@@ -30,13 +25,6 @@ impl Directory {
     /// * `client_end` - A `fuchsia.io/Directory` client endpoint.
     pub fn new(client_end: ClientEnd<fio::DirectoryMarker>) -> Self {
         Directory { client_end }
-    }
-
-    /// Turn the [Directory] into a remote VFS node.
-    #[cfg(target_os = "fuchsia")]
-    pub(crate) fn into_remote(self) -> Arc<impl RemoteLike + DirectoryEntry> {
-        let client_end = ClientEnd::<fio::DirectoryMarker>::from(self);
-        vfs::remote::remote_dir(client_end.into_proxy().unwrap())
     }
 }
 
@@ -75,9 +63,6 @@ impl Clone for Directory {
     }
 }
 
-#[cfg(target_os = "fuchsia")]
-impl CapabilityTrait for Directory {}
-
 impl From<ClientEnd<fio::DirectoryMarker>> for Directory {
     fn from(client_end: ClientEnd<fio::DirectoryMarker>) -> Self {
         Directory { client_end }
@@ -96,100 +81,5 @@ impl From<Directory> for ClientEnd<fio::DirectoryMarker> {
 impl From<Directory> for fsandbox::Capability {
     fn from(directory: Directory) -> Self {
         Self::Directory(directory.into())
-    }
-}
-
-// These tests only run on target because the vfs library is not generally available on host.
-#[cfg(target_os = "fuchsia")]
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::Open;
-    use fidl::endpoints::{create_endpoints, ServerEnd};
-    use fidl::handle::Status;
-    use fidl_fuchsia_io as fio;
-    use futures::channel::mpsc;
-    use futures::StreamExt;
-    use vfs::{
-        directory::{
-            entry::{EntryInfo, OpenRequest},
-            entry_container::Directory as VfsDirectory,
-        },
-        execution_scope::ExecutionScope,
-        path::Path,
-        pseudo_directory,
-    };
-
-    fn serve_vfs_dir(root: Arc<impl VfsDirectory>) -> ClientEnd<fio::DirectoryMarker> {
-        let scope = ExecutionScope::new();
-        let (client, server) = create_endpoints::<fio::DirectoryMarker>();
-        root.open(
-            scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE,
-            vfs::path::Path::dot(),
-            ServerEnd::new(server.into_channel()),
-        );
-        client
-    }
-
-    #[fuchsia::test]
-    async fn test_clone() {
-        let (open_tx, mut open_rx) = mpsc::channel::<()>(1);
-
-        struct MockDir(mpsc::Sender<()>);
-        impl DirectoryEntry for MockDir {
-            fn entry_info(&self) -> EntryInfo {
-                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-            }
-
-            fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
-                request.open_remote(self)
-            }
-        }
-        impl RemoteLike for MockDir {
-            fn open(
-                self: Arc<Self>,
-                _scope: ExecutionScope,
-                flags: fio::OpenFlags,
-                relative_path: Path,
-                _server_end: ServerEnd<fio::NodeMarker>,
-            ) {
-                assert_eq!(relative_path.into_string(), "");
-                assert_eq!(flags, fio::OpenFlags::DIRECTORY);
-                self.0.clone().try_send(()).unwrap();
-            }
-        }
-
-        let open = Open::new(Arc::new(MockDir(open_tx)));
-
-        let fs = pseudo_directory! {
-            "foo" => open.try_into_directory_entry().unwrap(),
-        };
-
-        // Create a Directory capability, and a clone.
-        let dir = Directory::from(serve_vfs_dir(fs));
-        let dir_clone = dir.clone();
-
-        // Open the original directory.
-        let client_end: ClientEnd<fio::DirectoryMarker> = dir.into();
-        let dir_proxy = client_end.into_proxy().unwrap();
-        let (_client_end, server_end) = create_endpoints::<fio::NodeMarker>();
-        dir_proxy
-            .open(fio::OpenFlags::DIRECTORY, fio::ModeType::empty(), "foo", server_end)
-            .unwrap();
-
-        // The Open capability should receive the Open request.
-        open_rx.next().await.unwrap();
-
-        // Open the clone.
-        let client_end: ClientEnd<fio::DirectoryMarker> = dir_clone.into();
-        let clone_proxy = client_end.into_proxy().unwrap();
-        let (_client_end, server_end) = create_endpoints::<fio::NodeMarker>();
-        clone_proxy
-            .open(fio::OpenFlags::DIRECTORY, fio::ModeType::empty(), "foo", server_end)
-            .unwrap();
-
-        // The Open capability should receive the Open request from the clone.
-        open_rx.next().await.unwrap();
     }
 }

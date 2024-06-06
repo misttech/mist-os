@@ -7,9 +7,6 @@ use std::fmt::Debug;
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Unit;
 
-#[cfg(target_os = "fuchsia")]
-impl crate::CapabilityTrait for Unit {}
-
 impl From<Unit> for fsandbox::Unit {
     fn from(_unit: Unit) -> Self {
         fsandbox::Unit {}

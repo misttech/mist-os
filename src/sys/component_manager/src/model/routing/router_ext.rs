@@ -15,13 +15,9 @@ use fuchsia_zircon as zx;
 use futures::future::BoxFuture;
 use moniker::ExtendedMoniker;
 use router_error::{Explain, RouterError};
-use sandbox::Capability;
-use sandbox::Dict;
-use sandbox::Open;
-use sandbox::Request;
-use sandbox::Routable;
-use sandbox::Router;
-use sandbox::WeakComponentToken;
+use sandbox::{
+    Capability, CapabilityTrait, Dict, Open, Request, Routable, Router, WeakComponentToken,
+};
 use std::sync::Arc;
 use vfs::directory::entry::{self, DirectoryEntry, DirectoryEntryAsync, EntryInfo};
 use vfs::execution_scope::ExecutionScope;

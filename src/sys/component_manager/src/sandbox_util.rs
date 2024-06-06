@@ -295,7 +295,7 @@ pub mod tests {
     use fuchsia_async::TestExecutor;
     use router_error::DowncastErrorForTest;
     use routing::{DictExt, LazyGet};
-    use sandbox::{Data, Dict, Receiver, WeakComponentToken};
+    use sandbox::{CapabilityTrait, Data, Dict, Receiver, WeakComponentToken};
     use std::{pin::pin, sync::Weak, task::Poll};
 
     #[fuchsia::test]

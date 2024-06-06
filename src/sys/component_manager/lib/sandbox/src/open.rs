@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{connector::Connectable, registry, CapabilityTrait, Connector, ConversionError};
+use crate::{connector::Connectable, fidl::registry, CapabilityTrait, Connector, ConversionError};
 use core::fmt;
 use fidl::endpoints::{create_request_stream, ClientEnd};
 use fidl::handle::{AsHandleRef, Channel, Status};
