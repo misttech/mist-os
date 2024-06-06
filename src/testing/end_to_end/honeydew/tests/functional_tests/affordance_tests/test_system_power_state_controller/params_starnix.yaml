@@ -1,1 +1,2 @@
 is_starnix_supported: !!bool yes
+verify_suspend_resume: !!bool yes

@@ -144,7 +144,8 @@ class TestCaseRevive(fuchsia_base_test.FuchsiaBaseTest):
                 == FuchsiaDeviceOperation.IDLE_SUSPEND_TIMER_RESUME
             ):
                 fuchsia_device.system_power_state_controller.idle_suspend_timer_based_resume(
-                    duration=self.user_params["resume_timer_duration_sec"]
+                    duration=self.user_params["resume_timer_duration_sec"],
+                    verify=self.user_params.get("verify_suspend_resume", False),
                 )
             elif fuchsia_device_operation == FuchsiaDeviceOperation.SOFT_REBOOT:
                 fuchsia_device.reboot()
@@ -252,18 +253,28 @@ class TestCaseRevive(fuchsia_base_test.FuchsiaBaseTest):
                 f"'{self._fuchsia_device_operation}' operation is not "
                 f"supported by 'TestCaseRevive'"
             ) from err
+
         if (
             self._fuchsia_device_operation_obj
             == FuchsiaDeviceOperation.IDLE_SUSPEND_TIMER_RESUME
-            and not isinstance(
-                self.user_params.get("resume_timer_duration_sec"), int
-            )
         ):
-            raise ValueError(
-                f"FuchsiaDeviceOperation: '{self._fuchsia_device_operation}' "
-                f"requires user to also pass 'resume_timer_duration_sec' key "
-                f"with int value in test prams"
+            if not isinstance(
+                self.user_params.get("resume_timer_duration_sec"), int
+            ):
+                raise ValueError(
+                    f"FuchsiaDeviceOperation: '{self._fuchsia_device_operation}' "
+                    f"requires user to also pass 'resume_timer_duration_sec' key "
+                    f"with int value in test prams"
+                )
+
+            verify_suspend_resume: object = self.user_params.get(
+                "verify_suspend_resume", False
             )
+            if not isinstance(verify_suspend_resume, bool):
+                raise ValueError(
+                    f"'verify_suspend_resume' user params key should be a bool."
+                    f"Received {type(verify_suspend_resume)}"
+                )
 
         self._test_method_execution_frequency: str = self.user_params.get(
             "test_method_execution_frequency",
