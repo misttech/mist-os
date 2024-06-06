@@ -3270,3 +3270,16 @@
   reviewers: ['kgong@google.com', 'mbrunson@google.com', 'jmatt@google.com', 'harshanv@google.com', 'andresoportus@google.com']
   submitted: '2024-03-09'
   reviewed: ''
+
+- name: 'RFC-0251'
+  title: 'No Root Access'
+  short_description: 'Access fine tuned resources in lieu of root resource'
+  authors: ['nolivia@google.com']
+  file: '0251_no_root_access.md'
+  area: ['Drivers']
+  issue: ['']
+  gerrit_change_id: ['949533']
+  status: 'Accepted'
+  reviewers: ['pesk@google.com', 'surajmalhotra@google.com', 'geb@google.com', 'maniscalco@google.com', 'cja@google.com']
+  submitted: '2023-11-20'
+  reviewed: '2024-06-05'

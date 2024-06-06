@@ -516,3 +516,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0249_crosvm_support_in_the_platform.md
   - title: "RFC-0250: Power topology"
     path: /docs/contribute/governance/rfcs/0250_power_topology.md
+  - title: "RFC-0251: No Root Access"
+    path: /docs/contribute/governance/rfcs/0251_no_root_access.md
