@@ -131,28 +131,25 @@ impl IntervalTimer {
 
             // Check on notify enum to determine the signal target.
             if let Some(thread_group) = thread_group.upgrade() {
-                let signal_target = match self.signal_event.notify {
-                    SignalEventNotify::Signal => self.signal_event.signo.and_then(|signal| {
-                        thread_group
-                            .read()
-                            .get_signal_target(signal.into())
-                            .map(TempRef::into_static)
-                    }),
-                    SignalEventNotify::None => None, // No need to do anything.
+                match self.signal_event.notify {
+                    SignalEventNotify::Signal => {
+                        if let Some(signal_info) = self.signal_info() {
+                            thread_group.write().send_signal(signal_info);
+                        }
+                    }
+                    SignalEventNotify::None => {}
                     SignalEventNotify::Thread { .. } => {
                         track_stub!(TODO("https://fxbug.dev/322875029"), "SIGEV_THREAD timer");
-                        None
                     }
                     SignalEventNotify::ThreadId(tid) => {
                         // Check if the target thread exists in the thread group.
-                        thread_group.read().get_task(tid).map(TempRef::into_static)
-                    }
-                };
-
-                if let Some(target) = &signal_target {
-                    if let Some(signal_info) = self.signal_info() {
-                        send_signal(target, signal_info)
-                            .unwrap_or_else(|e| log_warn!("Failed to queue timer signal: {}", e));
+                        thread_group.read().get_task(tid).map(TempRef::into_static).map(|target| {
+                            if let Some(signal_info) = self.signal_info() {
+                                send_signal(&target, signal_info).unwrap_or_else(|e| {
+                                    log_warn!("Failed to queue timer signal: {}", e)
+                                });
+                            }
+                        });
                     }
                 }
             }

@@ -509,7 +509,7 @@ mod test {
     use super::*;
     use crate::{mm::PAGE_SIZE, testing::*, time::utc::UtcClockOverrideGuard};
     use fuchsia_zircon::HandleBased;
-    use starnix_uapi::{ownership::TempRef, signals, user_address::UserAddress};
+    use starnix_uapi::{signals, user_address::UserAddress};
     use test_util::{assert_geq, assert_leq};
 
     #[::fuchsia::test]
@@ -603,16 +603,7 @@ mod test {
                 interruption_target.sleep();
                 if let Some(thread_group) = thread_group.upgrade() {
                     let signal = signals::SIGALRM;
-                    let signal_target = thread_group
-                        .read()
-                        .get_signal_target(signal.into())
-                        .map(TempRef::into_static);
-                    if let Some(task) = signal_target {
-                        crate::signals::send_standard_signal(
-                            &task,
-                            crate::signals::SignalInfo::default(signal),
-                        );
-                    }
+                    thread_group.write().send_signal(crate::signals::SignalInfo::default(signal));
                 }
             })
             .unwrap();

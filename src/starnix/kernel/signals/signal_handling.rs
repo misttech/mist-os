@@ -123,7 +123,7 @@ fn send_signal_prio(
 ///
 /// See https://man7.org/linux/man-pages/man7/signal.7.html.
 #[derive(Debug, PartialEq)]
-enum DeliveryAction {
+pub enum DeliveryAction {
     Ignore,
     CallHandler,
     Terminate,
@@ -146,7 +146,7 @@ impl DeliveryAction {
     }
 }
 
-fn action_for_signal(siginfo: &SignalInfo, sigaction: sigaction_t) -> DeliveryAction {
+pub fn action_for_signal(siginfo: &SignalInfo, sigaction: sigaction_t) -> DeliveryAction {
     let handler = if siginfo.force && sigaction.sa_handler == SIG_IGN {
         SIG_DFL
     } else {

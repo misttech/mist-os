@@ -128,15 +128,9 @@ pub fn process_completed_restricted_exit(
     loop {
         // Checking for a signal might cause the task to exit, so check before processing exit
         {
-            let flags = current_task.flags();
             {
-                if flags.contains(TaskFlags::TEMPORARY_SIGNAL_MASK)
-                    || (!flags.contains(TaskFlags::EXITED)
-                        && flags.contains(TaskFlags::SIGNALS_AVAILABLE))
-                {
-                    if !current_task.is_exitted() {
-                        dequeue_signal(current_task);
-                    }
+                if !current_task.is_exitted() {
+                    dequeue_signal(current_task);
                 }
                 // The syscall may need to restart for a non-signal-related
                 // reason. This call does nothing if we aren't restarting.

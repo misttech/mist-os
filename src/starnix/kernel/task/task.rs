@@ -567,9 +567,8 @@ impl TaskMutableState {
         self.signals.signal_wait.wait_async_fd_events(waiter, events, handler)
     }
 
-    #[cfg(test)]
-    pub fn queued_signal_count(&self, signal: Signal) -> usize {
-        self.signals.queued_count(signal)
+    pub fn notify_signal_waiters(&self) {
+        self.signals.signal_wait.notify_all();
     }
 }
 
@@ -692,6 +691,7 @@ impl TaskMutableState<Base = Task> {
     /// Returns true if any currently pending signal is allowed by `mask`.
     pub fn is_any_signal_allowed_by_mask(&self, mask: SigSet) -> bool {
         self.signals.is_any_allowed_by_mask(mask)
+            || self.base.thread_group.pending_signals.lock().is_any_allowed_by_mask(mask)
     }
 
     /// Returns whether or not a signal is pending for this task, taking the current
@@ -742,6 +742,12 @@ impl TaskMutableState<Base = Task> {
     pub fn take_signal_with_mask(&mut self, signal_mask: SigSet) -> Option<SignalInfo> {
         let predicate = |s: &SignalInfo| !signal_mask.has_signal(s.signal) || s.force;
         self.take_next_signal_where(predicate)
+    }
+
+    #[cfg(test)]
+    pub fn queued_signal_count(&self, signal: Signal) -> usize {
+        self.signals.queued_count(signal)
+            + self.base.thread_group.pending_signals.lock().queued_count(signal)
     }
 }
 

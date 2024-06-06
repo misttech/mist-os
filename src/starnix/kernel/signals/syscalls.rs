@@ -25,7 +25,7 @@ use starnix_uapi::{
     errno, error,
     errors::{Errno, ErrnoResultExt, EINTR, ETIMEDOUT},
     open_flags::OpenFlags,
-    ownership::{TempRef, WeakRef},
+    ownership::WeakRef,
     pid_t, rusage, sigaction, sigaltstack,
     signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS},
     time::{duration_from_timespec, timeval_from_duration},
@@ -400,21 +400,7 @@ pub fn sys_kill(
                 }
             };
 
-            let target_thread_group_lock = target_thread_group.read();
-            let target = match target_thread_group_lock.get_signal_target(unchecked_signal) {
-                Some(task) => task,
-
-                // The task is a zombine by now, so the signal can be dropped.
-                None => return Ok(()),
-            };
-
-            let target = TempRef::into_static(target);
-            std::mem::drop(target_thread_group_lock);
-
-            if !current_task.can_signal(&target, unchecked_signal) {
-                return error!(EPERM);
-            }
-            send_unchecked_signal(current_task, &target, unchecked_signal, SI_USER as i32)?;
+            target_thread_group.send_signal_unchecked(current_task, unchecked_signal)?;
         }
         pid if pid == -1 => {
             // "If pid equals -1, then sig is sent to every process for which
@@ -518,7 +504,7 @@ pub fn sys_rt_sigreturn(
     Ok(current_task.thread_state.registers.return_register().into())
 }
 
-fn read_siginfo(
+pub fn read_siginfo(
     current_task: &CurrentTask,
     signal: Signal,
     siginfo_ref: UserAddress,
@@ -545,13 +531,8 @@ pub fn sys_rt_sigqueueinfo(
     siginfo_ref: UserAddress,
 ) -> Result<(), Errno> {
     let weak_task = current_task.kernel().pids.read().get_task(tgid);
-    let thread_group = Task::from_weak(&weak_task)?.thread_group.clone();
-    let target = thread_group
-        .read()
-        .get_signal_target(unchecked_signal)
-        .map(TempRef::into_static)
-        .ok_or_else(|| errno!(ESRCH))?;
-    send_unchecked_signal_info(current_task, &target, unchecked_signal, siginfo_ref)
+    let task = &Task::from_weak(&weak_task)?;
+    task.thread_group.send_signal_unchecked_with_info(current_task, unchecked_signal, siginfo_ref)
 }
 
 pub fn sys_rt_tgsigqueueinfo(
@@ -615,17 +596,7 @@ where
     // This loop keeps track of whether a signal was sent, so that "on
     // success (at least one signal was sent), zero is returned."
     for thread_group in thread_groups {
-        let target = thread_group
-            .read()
-            .get_signal_target(unchecked_signal)
-            .map(TempRef::into_static)
-            .ok_or_else(|| errno!(ESRCH))?;
-        if !current_task.can_signal(&target, unchecked_signal) {
-            last_error = errno!(EPERM);
-            continue;
-        }
-
-        match send_unchecked_signal(current_task, &target, unchecked_signal, SI_USER as i32) {
+        match thread_group.send_signal_unchecked(current_task, unchecked_signal) {
             Ok(_) => sent_signal = true,
             Err(errno) => last_error = errno,
         }

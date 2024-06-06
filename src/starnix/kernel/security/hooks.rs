@@ -237,6 +237,24 @@ pub fn check_signal_access(
     })
 }
 
+/// Checks if sending a signal is allowed.
+pub fn check_signal_access_tg(
+    source: &CurrentTask,
+    target: &Arc<ThreadGroup>,
+    signal: Signal,
+) -> Result<(), Errno> {
+    check_if_selinux(source, |security_server| {
+        let source_sid = get_current_sid(&source.thread_group);
+        let target_sid = get_current_sid(target);
+        selinux_hooks::check_signal_access(
+            &security_server.as_permission_check(),
+            source_sid,
+            target_sid,
+            signal,
+        )
+    })
+}
+
 /// Checks if tracing the current task is allowed, and update the thread group SELinux state to
 /// store the tracer SID.
 pub fn check_ptrace_traceme_access_and_update_state(
