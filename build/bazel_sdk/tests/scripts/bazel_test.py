@@ -280,9 +280,14 @@ class BazelRepositoryMap(object):
     IGNORED_REPO = Path("IGNORED")
 
     def __init__(
-        self, fuchsia_source_dir: Path, workspace_dir: Path, output_base: Path
+        self,
+        fuchsia_source_dir: Path,
+        fuchsia_sdk_dir: Path,
+        workspace_dir: Path,
+        output_base: Path,
     ):
         self._fuchsia_source_dir = fuchsia_source_dir
+        self._fuchsia_sdk_dir = fuchsia_sdk_dir
         self._workspace_dir = workspace_dir
         self._output_base = output_base
 
@@ -311,10 +316,8 @@ class BazelRepositoryMap(object):
         # by the GN build_fuchsia_sdk_repository target which is an input
         # dependency for running this script.
         self._internal_overrides = self._overrides | {
-            "fuchsia_sdk_common": fuchsia_source_dir
-            / "build/bazel_sdk/bazel_rules_fuchsia/common",
-            "fuchsia_sdk": fuchsia_source_dir
-            / "build/bazel_sdk/bazel_rules_fuchsia",
+            "fuchsia_sdk_common": fuchsia_sdk_dir / "common",
+            "fuchsia_sdk": fuchsia_sdk_dir,
             "prebuilt_python": self.IGNORED_REPO,
             "fuchsia_clang": self.IGNORED_REPO,
             "bazel_tools": self.IGNORED_REPO,
@@ -406,6 +409,10 @@ def main() -> int:
     parser.add_argument(
         "--fuchsia_source_dir",
         help="Specify Fuchsia source directory (default is auto-detected).",
+    )
+    parser.add_argument(
+        "--fuchsia_sdk_dir",
+        help="Specify alternative @fuchsia_sdk source repository (default is $fuchsia_source_dir/build/bazel_sdk/bazel_rules_fuchsia)",
     )
     parser.add_argument(
         "--output_base", help="Use specific Bazel output base directory."
@@ -726,8 +733,16 @@ def main() -> int:
             )[0]
         )
 
+    if args.fuchsia_sdk_dir:
+        fuchsia_sdk_dir = Path(args.fuchsia_sdk_dir)
+    else:
+        fuchsia_sdk_dir = (
+            fuchsia_source_dir / "build/bazel_sdk/bazel_rules_fuchsia"
+        )
+
     bazel_repo_map = BazelRepositoryMap(
         fuchsia_source_dir=fuchsia_source_dir,
+        fuchsia_sdk_dir=fuchsia_sdk_dir,
         workspace_dir=workspace_dir,
         output_base=output_base,
     )
@@ -896,7 +911,7 @@ def main() -> int:
     command_args = []
 
     if args.command == "info":
-        command_args = bazel_start_args + ["info"] + extra_args
+        command_args = bazel_startup_args + ["info"] + extra_args
 
     elif args.command == "query":
         command_args = (
