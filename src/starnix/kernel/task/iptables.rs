@@ -5,7 +5,10 @@
 use crate::{
     mm::MemoryAccessorExt,
     task::CurrentTask,
-    vfs::socket::{iptables_utils, SocketDomain, SocketHandle, SocketType},
+    vfs::socket::{
+        iptables_utils::{self, write_string_to_ascii_buffer},
+        SocketDomain, SocketHandle, SocketType,
+    },
 };
 use fidl_fuchsia_net_filter as fnet_filter;
 use fidl_fuchsia_net_filter_ext::{
@@ -18,11 +21,11 @@ use itertools::Itertools;
 use starnix_logging::{log_debug, log_warn, track_stub};
 use starnix_uapi::{
     c_char, errno, error, errors::Errno, ip6t_get_entries, ip6t_getinfo, ip6t_replace,
-    ipt_get_entries, ipt_getinfo, ipt_replace, nf_inet_hooks_NF_INET_NUMHOOKS,
-    user_buffer::UserBuffer, xt_counters, xt_counters_info, xt_get_revision, IP6T_SO_GET_ENTRIES,
-    IP6T_SO_GET_INFO, IP6T_SO_GET_REVISION_MATCH, IP6T_SO_GET_REVISION_TARGET, IPT_SO_GET_ENTRIES,
-    IPT_SO_GET_INFO, IPT_SO_GET_REVISION_MATCH, IPT_SO_GET_REVISION_TARGET,
-    IPT_SO_SET_ADD_COUNTERS, IPT_SO_SET_REPLACE, SOL_IP, SOL_IPV6,
+    ipt_get_entries, ipt_getinfo, nf_inet_hooks_NF_INET_NUMHOOKS, user_buffer::UserBuffer,
+    xt_counters, xt_counters_info, xt_get_revision, IP6T_SO_GET_ENTRIES, IP6T_SO_GET_INFO,
+    IP6T_SO_GET_REVISION_MATCH, IP6T_SO_GET_REVISION_TARGET, IPT_SO_GET_ENTRIES, IPT_SO_GET_INFO,
+    IPT_SO_GET_REVISION_MATCH, IPT_SO_GET_REVISION_TARGET, IPT_SO_SET_ADD_COUNTERS,
+    IPT_SO_SET_REPLACE, SOL_IP, SOL_IPV6,
 };
 use std::collections::HashMap;
 use thiserror::Error;
@@ -301,7 +304,13 @@ impl IpTables {
     }
 
     fn replace_ipv4_table(&mut self, bytes: Vec<u8>) -> Result<(), Errno> {
-        let table = iptables_utils::parse_ipt_replace(&bytes)?;
+        let table = match iptables_utils::IpTable::from_ipt_replace(bytes) {
+            Ok(table) => table,
+            Err(e) => {
+                log_warn!("Iptables: encountered error while parsing rules: {e}");
+                return error!(EINVAL);
+            }
+        };
         let changes = Self::create_changes(table.namespace, table.routines);
 
         match self.get_controller() {
@@ -362,16 +371,21 @@ impl IpTables {
             }
         };
 
+        let entries = table.parser.entries_bytes().to_vec();
+        let replace_info = table.parser.replace_info;
+        let mut name: IpTablesName = [0; 32usize];
+        write_string_to_ascii_buffer(replace_info.name, &mut name).map_err(|_| errno!(EINVAL))?;
+
         self.ipv4.insert(
-            table.ipt_replace.name,
+            name,
             IpTable {
-                valid_hooks: table.ipt_replace.valid_hooks,
-                hook_entry: table.ipt_replace.hook_entry,
-                underflow: table.ipt_replace.underflow,
-                num_entries: table.ipt_replace.num_entries,
-                size: table.ipt_replace.size,
-                entries: bytes[std::mem::size_of::<ipt_replace>()..].to_vec(),
-                num_counters: table.ipt_replace.num_counters,
+                num_entries: replace_info.num_entries as u32,
+                size: replace_info.size as u32,
+                entries,
+                num_counters: replace_info.num_counters,
+                valid_hooks: replace_info.valid_hooks,
+                hook_entry: replace_info.hook_entry,
+                underflow: replace_info.underflow,
                 counters: vec![],
             },
         );
