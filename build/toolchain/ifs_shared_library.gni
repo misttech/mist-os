@@ -18,6 +18,11 @@ _llvm_ifs = "$clang_tool_dir/llvm-ifs"
 _common_gen_dir = get_label_info(".($default_toolchain)", "root_gen_dir")
 ifs_shared_library_as_needed_dir = "$_common_gen_dir/ifs-as-needed"
 
+# The metadata-generated linker scripts from ifs_shared_library_libs() all go
+# into this directory instead of $target_gen_dir.  See comments at the setting
+# of ifs_shared_library_ldscript metadata in ifs_shared_library().
+_gen_stub_ldscript_dir = "$root_gen_dir/ifs_shared_library_libs"
+
 # Define a linkable shared library built from a text ABI (.ifs) specification.
 #
 # This uses a `.ifs` file kept in the source tree to create a linkable ELF
@@ -110,14 +115,6 @@ template("ifs_shared_library") {
   gen_stub_as_needed_file = "$gen_dir.as-needed/lib$output_name.so"
   gen_as_needed_skip_target = gen_target_base + "as-needed.skip"
 
-  # The generated_file() in the ifs_shared_library_libs() target collects the
-  # ifs_shared_library_ldscript metadata to produce an input linker script.
-  # These input linker scripts will be at *that* target's $target_gen_dir
-  # location, which isn't known here.  For relative paths used in input linker
-  # scripts, the linker will first try relative to that script file's directory
-  # but then will try relative to its working directory, $root_build_dir.
-  build_relative_stub_file = rebase_path(gen_stub_file, root_build_dir)
-
   # This has the actual stub ELF file directly in libs, so lib_dirs searching.
   source_set(main_target) {
     forward_variables_from(invoker,
@@ -175,8 +172,34 @@ template("ifs_shared_library") {
       ":$gen_as_needed_skip_target.a($default_toolchain)",
       ":$gen_as_needed_skip_target.so($default_toolchain)",
       ":$gen_target.as-needed($default_toolchain)",
+
+      # gen_stub_as_needed_file points to the file this generates.
+      gen_label,
     ]
-    lib_dirs = [ get_path_info(gen_stub_as_needed_file, "dir") ]
+    lib_dirs = [
+      # This holds the "lib$output_name.so" that will be found if
+      # //build/config:ifs-as-needed is not preempting it.
+      get_path_info(gen_stub_as_needed_file, "dir"),
+    ]
+
+    # The generated_file() in the ifs_shared_library_libs() target collects the
+    # ifs_shared_library_ldscript metadata to produce an input linker script.
+    # For relative paths used in input linker scripts, the linker will try
+    # resolving that relative to directory containing that script file.
+    #
+    # Ordinarily that generated script would go in the $target_gen_dir of the
+    # ifs_shared_library_libs() target.  But that isn't known here, and can't
+    # be known: each ifs_shared_library_libs() will have the $target_gen_dir
+    # for its BUILD.gn file's directory; there is no correlation between the
+    # $target_gen_dir of that target and anything this ifs_shared_library()
+    # target can know.  So instead every ifs_shared_library_libs() target puts
+    # its metadata-collected linker script into $_gen_stub_ldscript_dir, a
+    # single directory for all targets (in the toolchain).  (To preserve
+    # uniqueness, the script's file name is generated so as to encode the full
+    # label without producing any slashes.)  Thus, the fragment here refers to
+    # the link stub's path relative to $_gen_stub_ldscript_dir.
+    ldscript_relative_gen_stub_file =
+        rebase_path(gen_stub_file, _gen_stub_ldscript_dir)
 
     metadata = {
       # This is a barrier like shared_library() would be.
@@ -188,7 +211,7 @@ template("ifs_shared_library") {
         " * uses this for indirect deps via //build/config:ifs-as-needed.",
         " * See ifs_shared_library_libs() documentation for details.",
         " */",
-        "INPUT(AS_NEEDED($build_relative_stub_file))",
+        "INPUT(AS_NEEDED($ldscript_relative_gen_stub_file))",
       ]
     }
   }
@@ -268,6 +291,9 @@ template("ifs_shared_library") {
         contents = [
           "/* $as_needed_label",
           " * uses this to link in the shared library only if referenced.",
+          " * This file is used for a deps path that reaches that",
+          " * without an intervening ifs_shared_library_libs() target.",
+          " * See ifs_shared_library_libs() documentation for details.",
           " */",
           "INPUT(AS_NEEDED($relative_stub_path))",
         ]
@@ -333,8 +359,18 @@ template("ifs_shared_library") {
 template("ifs_shared_library_libs") {
   libs_target = target_name
   gen_target = "_ifs_shared_library_libs.$target_name.gen"
-  gen_file = "$target_gen_dir/$target_name.ld"
   prologue_target = "_ifs_shared_library_libs.$target_name.prologue"
+
+  # See comment in metadata above.  All these scripts must go into a single
+  # common directory (for the toolchain), rather than $target_gen_dir.  This
+  # allows each input linker script fragment to use a script-relative path to
+  # its link stub file ($gen_stub_file in ifs_shared_library() implementation).
+  # To make sure the same $target_name in two ifs_shared_library_libs() targets
+  # in different directories doesn't result in a collision, each generated
+  # script's file name encodes its full label path rather than its path under
+  # $root_gen_dir to $target_gen_dir doing that implicitly.
+  gen_prefix = string_replace(rebase_path(".", "//"), "/", ".")
+  gen_file = "$_gen_stub_ldscript_dir/$gen_prefix$libs_target.ld"
 
   source_set(libs_target) {
     forward_variables_from(invoker,
