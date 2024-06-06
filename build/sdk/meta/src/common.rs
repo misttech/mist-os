@@ -192,7 +192,6 @@ display_impl!(AudioModel);
 #[derive(Serialize, Deserialize, Debug, Hash, PartialEq, Eq, Clone, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum ElementType {
-    BanjoLibrary,
     CcPrebuiltLibrary,
     CcSourceLibrary,
     CompanionHostTool,

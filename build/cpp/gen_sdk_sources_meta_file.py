@@ -76,14 +76,11 @@ def main():
         "sources": args.sources,
         "headers": args.headers,
         "include_dir": args.include_dir,
-        "banjo_deps": [],
         "stable": args.stable,
     }
 
     deps = []
-    banjo_deps = []
     fidl_deps = []
-    banjo_deps = []
     bind_deps = []
     fidl_layers = defaultdict(list)
     for idx, spec in enumerate(args.deps):
@@ -97,26 +94,22 @@ def main():
             deps.append(name)
         elif type == "fidl_library":
             dep_name = args.dep_names[idx]
-            if dep_name.endswith("banjo_cpp"):
-                banjo_deps.append(name)
+            # Layer here is defined to be "cpp" plus everything after
+            # "_cpp" in the dependency name
+            if "_cpp" in dep_name:
+                layer = "cpp" + dep_name.split("_cpp", maxsplit=1)[1]
+                fidl_layers[layer].append(name)
             else:
-                # Layer here is defined to be "cpp" plus everything after
-                # "_cpp" in the dependency name
-                if "_cpp" in dep_name:
-                    layer = "cpp" + dep_name.split("_cpp", maxsplit=1)[1]
-                    fidl_layers[layer].append(name)
-                else:
-                    # There was no suffix, so this is either non-cpp binding dep or it's an hlcpp dep.
-                    # this covers both of those bases.
-                    fidl_deps.append(name)
-                    fidl_layers["hlcpp"].append(name)
+                # There was no suffix, so this is either non-cpp binding dep or it's an hlcpp dep.
+                # this covers both of those bases.
+                fidl_deps.append(name)
+                fidl_layers["hlcpp"].append(name)
         elif type == "bind_library":
             bind_deps.append(name.replace("_cpp", ""))
         else:
             raise Exception("Unsupported dependency type: %s" % type)
 
     metadata["deps"] = sorted(set(deps))
-    metadata["banjo_deps"] = sorted(set(banjo_deps))
     metadata["bind_deps"] = sorted(set(bind_deps))
     metadata["fidl_deps"] = sorted(set(fidl_deps))
     metadata["plasa"] = resolve_plasa_files(args.plasa)

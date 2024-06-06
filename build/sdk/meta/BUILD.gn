@@ -11,7 +11,6 @@ import("//sdk/ctf/build/verify_json_schemas.gni")
 # This list should only contain schemas that are currently exported outside of
 # the Fuchsia source tree.
 schemas = [
-  # "banjo_library.json",
   "cc_prebuilt_library.json",
   "cc_source_library.json",
   "common.json",
