@@ -17,8 +17,6 @@
 #
 #   //boards/arm64/BUILD.gn
 
-import("//build/board.gni")
-
 has_board = true
 
 target_cpu = "arm64"
