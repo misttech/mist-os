@@ -162,8 +162,8 @@ int main(int argc, char* argv[]) {
       auto_cycle_interval = zx::msec(auto_cycle_interval_ms_value);
     }
   }
-
-  fuchsia_logging::SetLogSettings({.min_log_level = CAMERA_MIN_LOG_LEVEL}, {"camera-gym"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithMinLogSeverity(CAMERA_MIN_LOG_LEVEL).BuildAndInitializeWithTags({"camera-gym"});
 
   async::Loop buffer_collage_loop(&kAsyncLoopConfigAttachToCurrentThread);
   async::Loop cycler_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
