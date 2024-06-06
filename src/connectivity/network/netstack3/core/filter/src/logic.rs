@@ -7,12 +7,12 @@ pub(crate) mod nat;
 use core::{num::NonZeroU16, ops::RangeInclusive};
 
 use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
-use netstack3_base::HandleableTimer;
+use netstack3_base::{AnyDevice, DeviceIdContext, HandleableTimer};
 use packet_formats::ip::IpExt;
 use tracing::error;
 
 use crate::{
-    context::{FilterBindingsContext, FilterIpContext},
+    context::{FilterBindingsContext, FilterBindingsTypes, FilterIpContext},
     matchers::InterfaceProperties,
     packets::{IpPacket, MaybeTransportPacket, TransportPacket},
     state::{Action, FilterIpMetadata, Hook, Routine, Rule, TransparentProxy},
@@ -226,75 +226,72 @@ where
 
 /// An implementation of packet filtering logic, providing entry points at
 /// various stages of packet processing.
-pub trait FilterHandler<I: IpExt, BC: FilterBindingsContext> {
+pub trait FilterHandler<I: IpExt, BC: FilterBindingsTypes>:
+    DeviceIdContext<AnyDevice, DeviceId: InterfaceProperties<BC::DeviceClass>>
+{
     /// The ingress hook intercepts incoming traffic before a routing decision
     /// has been made.
-    fn ingress_hook<P, D, M>(
+    fn ingress_hook<P, M>(
         &mut self,
         bindings_ctx: &mut BC,
         packet: &mut P,
-        interface: &D,
+        interface: &Self::DeviceId,
         metadata: &mut M,
     ) -> IngressVerdict<I>
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BC::DeviceClass>,
         M: FilterIpMetadata<I, BC>;
 
     /// The local ingress hook intercepts incoming traffic that is destined for
     /// the local host.
-    fn local_ingress_hook<P, D, M>(
+    fn local_ingress_hook<P, M>(
         &mut self,
         bindings_ctx: &mut BC,
         packet: &mut P,
-        interface: &D,
+        interface: &Self::DeviceId,
         metadata: &mut M,
     ) -> Verdict
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BC::DeviceClass>,
         M: FilterIpMetadata<I, BC>;
 
     /// The forwarding hook intercepts incoming traffic that is destined for
     /// another host.
-    fn forwarding_hook<P, D, M>(
+    fn forwarding_hook<P, M>(
         &mut self,
         packet: &mut P,
-        in_interface: &D,
-        out_interface: &D,
+        in_interface: &Self::DeviceId,
+        out_interface: &Self::DeviceId,
         metadata: &mut M,
     ) -> Verdict
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BC::DeviceClass>,
         M: FilterIpMetadata<I, BC>;
 
     /// The local egress hook intercepts locally-generated traffic before a
     /// routing decision has been made.
-    fn local_egress_hook<P, D, M>(
+    fn local_egress_hook<P, M>(
         &mut self,
         bindings_ctx: &mut BC,
         packet: &mut P,
-        interface: &D,
+        interface: &Self::DeviceId,
         metadata: &mut M,
     ) -> Verdict
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BC::DeviceClass>,
         M: FilterIpMetadata<I, BC>;
 
     /// The egress hook intercepts all outgoing traffic after a routing decision
     /// has been made.
-    fn egress_hook<P, D, M>(
+    fn egress_hook<P, M>(
         &mut self,
         bindings_ctx: &mut BC,
         packet: &mut P,
-        interface: &D,
+        interface: &Self::DeviceId,
         metadata: &mut M,
     ) -> (Verdict, ProofOfEgressCheck)
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BC::DeviceClass>,
         M: FilterIpMetadata<I, BC>;
 }
 
@@ -304,19 +301,26 @@ pub trait FilterHandler<I: IpExt, BC: FilterBindingsContext> {
 /// [`FilterIpContext`].
 pub struct FilterImpl<'a, CC>(pub &'a mut CC);
 
-impl<I: IpExt, BC: FilterBindingsContext, CC: FilterIpContext<I, BC>> FilterHandler<I, BC>
-    for FilterImpl<'_, CC>
+impl<CC: DeviceIdContext<AnyDevice>> DeviceIdContext<AnyDevice> for FilterImpl<'_, CC> {
+    type DeviceId = CC::DeviceId;
+    type WeakDeviceId = CC::WeakDeviceId;
+}
+
+impl<I, BC, CC> FilterHandler<I, BC> for FilterImpl<'_, CC>
+where
+    I: IpExt,
+    BC: FilterBindingsContext,
+    CC: FilterIpContext<I, BC>,
 {
-    fn ingress_hook<P, D, M>(
+    fn ingress_hook<P, M>(
         &mut self,
         bindings_ctx: &mut BC,
         packet: &mut P,
-        interface: &D,
+        interface: &Self::DeviceId,
         metadata: &mut M,
     ) -> IngressVerdict<I>
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BC::DeviceClass>,
         M: FilterIpMetadata<I, BC>,
     {
         let Self(this) = self;
@@ -344,16 +348,15 @@ impl<I: IpExt, BC: FilterBindingsContext, CC: FilterIpContext<I, BC>> FilterHand
         })
     }
 
-    fn local_ingress_hook<P, D, M>(
+    fn local_ingress_hook<P, M>(
         &mut self,
         bindings_ctx: &mut BC,
         packet: &mut P,
-        interface: &D,
+        interface: &Self::DeviceId,
         metadata: &mut M,
     ) -> Verdict
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BC::DeviceClass>,
         M: FilterIpMetadata<I, BC>,
     {
         let Self(this) = self;
@@ -386,16 +389,15 @@ impl<I: IpExt, BC: FilterBindingsContext, CC: FilterIpContext<I, BC>> FilterHand
         })
     }
 
-    fn forwarding_hook<P, D, M>(
+    fn forwarding_hook<P, M>(
         &mut self,
         packet: &mut P,
-        in_interface: &D,
-        out_interface: &D,
+        in_interface: &Self::DeviceId,
+        out_interface: &Self::DeviceId,
         _metadata: &mut M,
     ) -> Verdict
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BC::DeviceClass>,
         M: FilterIpMetadata<I, BC>,
     {
         let Self(this) = self;
@@ -408,16 +410,15 @@ impl<I: IpExt, BC: FilterBindingsContext, CC: FilterIpContext<I, BC>> FilterHand
         })
     }
 
-    fn local_egress_hook<P, D, M>(
+    fn local_egress_hook<P, M>(
         &mut self,
         bindings_ctx: &mut BC,
         packet: &mut P,
-        interface: &D,
+        interface: &Self::DeviceId,
         metadata: &mut M,
     ) -> Verdict
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BC::DeviceClass>,
         M: FilterIpMetadata<I, BC>,
     {
         let Self(this) = self;
@@ -444,16 +445,15 @@ impl<I: IpExt, BC: FilterBindingsContext, CC: FilterIpContext<I, BC>> FilterHand
         })
     }
 
-    fn egress_hook<P, D, M>(
+    fn egress_hook<P, M>(
         &mut self,
         bindings_ctx: &mut BC,
         packet: &mut P,
-        interface: &D,
+        interface: &Self::DeviceId,
         metadata: &mut M,
     ) -> (Verdict, ProofOfEgressCheck)
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BC::DeviceClass>,
         M: FilterIpMetadata<I, BC>,
     {
         let Self(this) = self;
@@ -512,6 +512,10 @@ impl<I: IpExt, BC: FilterBindingsContext, CC: FilterIpContext<I, BC>> Handleable
 
 #[cfg(feature = "testutils")]
 pub mod testutil {
+    use core::marker::PhantomData;
+
+    use netstack3_base::testutil::{FakeStrongDeviceId, FakeWeakDeviceId};
+
     use super::*;
 
     /// A no-op implementation of packet filtering that accepts any packet that
@@ -520,67 +524,90 @@ pub mod testutil {
     /// test.
     ///
     /// Provides an implementation of [`FilterHandler`].
-    pub struct NoopImpl;
+    pub struct NoopImpl<DeviceId>(PhantomData<DeviceId>);
 
-    impl<I: IpExt, BC: FilterBindingsContext> FilterHandler<I, BC> for NoopImpl {
-        fn ingress_hook<P, D, M>(
+    impl<DeviceId> Default for NoopImpl<DeviceId> {
+        fn default() -> Self {
+            Self(PhantomData)
+        }
+    }
+
+    impl<DeviceId: FakeStrongDeviceId> DeviceIdContext<AnyDevice> for NoopImpl<DeviceId> {
+        type DeviceId = DeviceId;
+        type WeakDeviceId = FakeWeakDeviceId<DeviceId>;
+    }
+
+    impl<I, BC, DeviceId> FilterHandler<I, BC> for NoopImpl<DeviceId>
+    where
+        I: IpExt,
+        BC: FilterBindingsContext,
+        DeviceId: FakeStrongDeviceId + InterfaceProperties<BC::DeviceClass>,
+    {
+        fn ingress_hook<P, M>(
             &mut self,
             _: &mut BC,
             _: &mut P,
-            _: &D,
+            _: &Self::DeviceId,
             _: &mut M,
         ) -> IngressVerdict<I>
         where
             P: IpPacket<I>,
-            D: InterfaceProperties<BC::DeviceClass>,
             M: FilterIpMetadata<I, BC>,
         {
             Verdict::Accept.into()
         }
 
-        fn local_ingress_hook<P, D, M>(
+        fn local_ingress_hook<P, M>(
             &mut self,
             _: &mut BC,
             _: &mut P,
-            _: &D,
+            _: &Self::DeviceId,
             _: &mut M,
         ) -> Verdict
         where
             P: IpPacket<I>,
-            D: InterfaceProperties<BC::DeviceClass>,
             M: FilterIpMetadata<I, BC>,
         {
             Verdict::Accept
         }
 
-        fn forwarding_hook<P, D, M>(&mut self, _: &mut P, _: &D, _: &D, _: &mut M) -> Verdict
+        fn forwarding_hook<P, M>(
+            &mut self,
+            _: &mut P,
+            _: &Self::DeviceId,
+            _: &Self::DeviceId,
+            _: &mut M,
+        ) -> Verdict
         where
             P: IpPacket<I>,
-            D: InterfaceProperties<BC::DeviceClass>,
             M: FilterIpMetadata<I, BC>,
         {
             Verdict::Accept
         }
 
-        fn local_egress_hook<P, D, M>(&mut self, _: &mut BC, _: &mut P, _: &D, _: &mut M) -> Verdict
-        where
-            P: IpPacket<I>,
-            D: InterfaceProperties<BC::DeviceClass>,
-            M: FilterIpMetadata<I, BC>,
-        {
-            Verdict::Accept
-        }
-
-        fn egress_hook<P, D, M>(
+        fn local_egress_hook<P, M>(
             &mut self,
             _: &mut BC,
             _: &mut P,
-            _: &D,
+            _: &Self::DeviceId,
+            _: &mut M,
+        ) -> Verdict
+        where
+            P: IpPacket<I>,
+            M: FilterIpMetadata<I, BC>,
+        {
+            Verdict::Accept
+        }
+
+        fn egress_hook<P, M>(
+            &mut self,
+            _: &mut BC,
+            _: &mut P,
+            _: &Self::DeviceId,
             _: &mut M,
         ) -> (Verdict, ProofOfEgressCheck)
         where
             P: IpPacket<I>,
-            D: InterfaceProperties<BC::DeviceClass>,
             M: FilterIpMetadata<I, BC>,
         {
             (Verdict::Accept, ProofOfEgressCheck::forge_proof_for_test())

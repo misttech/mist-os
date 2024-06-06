@@ -46,8 +46,8 @@ impl<I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterSt
 }
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
-impl<I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<I>>> NatContext<I>
-    for CoreCtx<'_, BC, L>
+impl<I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<I>>>
+    NatContext<I, BC> for CoreCtx<'_, BC, L>
 {
     fn get_local_addr_for_remote(
         &mut self,

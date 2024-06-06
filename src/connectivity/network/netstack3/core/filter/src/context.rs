@@ -13,7 +13,7 @@ use netstack3_base::{
 };
 use packet_formats::ip::IpExt;
 
-use crate::state::State;
+use crate::{matchers::InterfaceProperties, state::State};
 
 /// Trait defining required types for filtering provided by bindings.
 ///
@@ -37,10 +37,12 @@ impl<BC: TimerContext + RngContext + FilterBindingsTypes> FilterBindingsContext 
 /// directly as an argument, because it allows Netstack3 Core to use lock
 /// ordering types to enforce that filtering state is only acquired at or before
 /// a given lock level, while keeping test code free of locking concerns.
-pub trait FilterIpContext<I: IpExt, BT: FilterBindingsTypes> {
+pub trait FilterIpContext<I: IpExt, BT: FilterBindingsTypes>:
+    DeviceIdContext<AnyDevice, DeviceId: InterfaceProperties<BT::DeviceClass>>
+{
     /// The execution context that allows the filtering engine to perform
     /// Network Address Translation (NAT).
-    type NatCtx<'a>: NatContext<I>;
+    type NatCtx<'a>: NatContext<I, BT, DeviceId = Self::DeviceId>;
 
     /// Calls the function with a reference to filtering state.
     fn with_filter_state<O, F: FnOnce(&State<I, BT>) -> O>(&mut self, cb: F) -> O {
@@ -56,7 +58,9 @@ pub trait FilterIpContext<I: IpExt, BT: FilterBindingsTypes> {
 }
 
 /// The execution context for Network Address Translation (NAT).
-pub trait NatContext<I: IpExt>: DeviceIdContext<AnyDevice> {
+pub trait NatContext<I: IpExt, BT: FilterBindingsTypes>:
+    DeviceIdContext<AnyDevice, DeviceId: InterfaceProperties<BT::DeviceClass>>
+{
     /// Returns the best local address for communicating with the remote.
     fn get_local_addr_for_remote(
         &mut self,
@@ -143,6 +147,11 @@ pub(crate) mod testutil {
         }
     }
 
+    impl<I: IpExt> DeviceIdContext<AnyDevice> for FakeCtx<I> {
+        type DeviceId = FakeDeviceId;
+        type WeakDeviceId = FakeWeakDeviceId<FakeDeviceId>;
+    }
+
     impl<I: IpExt> FilterIpContext<I, FakeBindingsCtx<I>> for FakeCtx<I> {
         type NatCtx<'a> = FakeNatCtx<I>;
 
@@ -163,7 +172,7 @@ pub(crate) mod testutil {
         type WeakDeviceId = FakeWeakDeviceId<FakeDeviceId>;
     }
 
-    impl<I: IpExt> NatContext<I> for FakeNatCtx<I> {
+    impl<I: IpExt> NatContext<I, FakeBindingsCtx<I>> for FakeNatCtx<I> {
         fn get_local_addr_for_remote(
             &mut self,
             device_id: &Self::DeviceId,

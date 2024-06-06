@@ -25,7 +25,6 @@ use crate::{
     conntrack::{Connection, ConnectionDirection, Table, Tuple},
     context::{FilterBindingsContext, FilterBindingsTypes, NatContext},
     logic::{IngressVerdict, Interfaces, RoutineResult, Verdict},
-    matchers::InterfaceProperties,
     packets::{IpPacket, MaybeTransportPacketMut as _, TransportPacketMut as _},
     state::Hook,
 };
@@ -63,29 +62,29 @@ pub(crate) trait NatHook<I: IpExt> {
 
     /// Evaluate the result of a given routine and returning the resulting control
     /// flow.
-    fn evaluate_result<P, D, CC, BC>(
+    fn evaluate_result<P, CC, BC>(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         table: &Table<I, BC, NatConfig>,
         reply_tuple: &mut Tuple<I>,
         packet: &P,
-        interfaces: &Interfaces<'_, D>,
+        interfaces: &Interfaces<'_, CC::DeviceId>,
         result: RoutineResult<I>,
     ) -> ControlFlow<(Self::Verdict, Option<NatType>)>
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BC::DeviceClass>,
-        CC: NatContext<I, DeviceId = D>,
+        CC: NatContext<I, BC>,
         BC: FilterBindingsContext;
 
-    fn redirect_addr<P, D, CC>(
+    fn redirect_addr<P, CC, BT>(
         core_ctx: &mut CC,
         packet: &P,
-        ingress: Option<&D>,
+        ingress: Option<&CC::DeviceId>,
     ) -> Option<I::Addr>
     where
         P: IpPacket<I>,
-        CC: NatContext<I, DeviceId = D>;
+        CC: NatContext<I, BT>,
+        BT: FilterBindingsTypes;
 }
 
 pub(crate) trait FilterVerdict: From<Verdict> + Debug + PartialEq {
@@ -99,19 +98,18 @@ impl<I: IpExt> NatHook<I> for IngressHook {
 
     const NAT_TYPE: NatType = NatType::Destination;
 
-    fn evaluate_result<P, D, CC, BC>(
+    fn evaluate_result<P, CC, BC>(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         table: &Table<I, BC, NatConfig>,
         reply_tuple: &mut Tuple<I>,
         packet: &P,
-        interfaces: &Interfaces<'_, D>,
+        interfaces: &Interfaces<'_, CC::DeviceId>,
         result: RoutineResult<I>,
     ) -> ControlFlow<(Self::Verdict, Option<NatType>)>
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BC::DeviceClass>,
-        CC: NatContext<I, DeviceId = D>,
+        CC: NatContext<I, BC>,
         BC: FilterBindingsContext,
     {
         match result {
@@ -121,7 +119,7 @@ impl<I: IpExt> NatHook<I> for IngressHook {
                 ControlFlow::Break((IngressVerdict::TransparentLocalDelivery { addr, port }, None))
             }
             RoutineResult::Redirect { dst_port } => {
-                let (verdict, nat_type) = configure_redirect_nat::<_, _, _, _, _, Self>(
+                let (verdict, nat_type) = configure_redirect_nat::<Self, _, _, _, _>(
                     core_ctx,
                     bindings_ctx,
                     table,
@@ -135,15 +133,16 @@ impl<I: IpExt> NatHook<I> for IngressHook {
         }
     }
 
-    fn redirect_addr<P, D, CC>(
+    fn redirect_addr<P, CC, BT>(
         core_ctx: &mut CC,
         packet: &P,
-        ingress: Option<&D>,
+        ingress: Option<&CC::DeviceId>,
     ) -> Option<I::Addr>
     where
         I: IpExt,
         P: IpPacket<I>,
-        CC: NatContext<I, DeviceId = D>,
+        CC: NatContext<I, BT>,
+        BT: FilterBindingsTypes,
     {
         let interface = ingress.expect("must have ingress interface in ingress hook");
         core_ctx
@@ -168,19 +167,18 @@ impl<I: IpExt> NatHook<I> for LocalEgressHook {
 
     const NAT_TYPE: NatType = NatType::Destination;
 
-    fn evaluate_result<P, D, CC, BC>(
+    fn evaluate_result<P, CC, BC>(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         table: &Table<I, BC, NatConfig>,
         reply_tuple: &mut Tuple<I>,
         packet: &P,
-        interfaces: &Interfaces<'_, D>,
+        interfaces: &Interfaces<'_, CC::DeviceId>,
         result: RoutineResult<I>,
     ) -> ControlFlow<(Self::Verdict, Option<NatType>)>
     where
         P: IpPacket<I>,
-        D: InterfaceProperties<BC::DeviceClass>,
-        CC: NatContext<I, DeviceId = D>,
+        CC: NatContext<I, BC>,
         BC: FilterBindingsContext,
     {
         match result {
@@ -192,7 +190,7 @@ impl<I: IpExt> NatHook<I> for LocalEgressHook {
                 )
             }
             RoutineResult::Redirect { dst_port } => {
-                ControlFlow::Break(configure_redirect_nat::<_, _, _, _, _, Self>(
+                ControlFlow::Break(configure_redirect_nat::<Self, _, _, _, _>(
                     core_ctx,
                     bindings_ctx,
                     table,
@@ -205,11 +203,12 @@ impl<I: IpExt> NatHook<I> for LocalEgressHook {
         }
     }
 
-    fn redirect_addr<P, D, CC>(_: &mut CC, _: &P, _: Option<&D>) -> Option<I::Addr>
+    fn redirect_addr<P, CC, BT>(_: &mut CC, _: &P, _: Option<&CC::DeviceId>) -> Option<I::Addr>
     where
         I: IpExt,
         P: IpPacket<I>,
-        CC: NatContext<I, DeviceId = D>,
+        CC: NatContext<I, BT>,
+        BT: FilterBindingsTypes,
     {
         Some(*I::LOOPBACK_ADDRESS)
     }
@@ -229,21 +228,20 @@ impl FilterVerdict for Verdict {
 /// This function configures NAT, if it has not yet been configured for the
 /// connection, and performs NAT on the provided packet based on the
 /// connection's NAT type.
-pub(crate) fn perform_nat<N, I, P, D, CC, BC>(
+pub(crate) fn perform_nat<N, I, P, CC, BC>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     table: &Table<I, BC, NatConfig>,
     conn: &mut Connection<I, BC, NatConfig>,
     hook: &Hook<I, BC::DeviceClass, ()>,
     packet: &mut P,
-    interfaces: Interfaces<'_, D>,
+    interfaces: Interfaces<'_, CC::DeviceId>,
 ) -> N::Verdict
 where
     N: NatHook<I>,
     I: IpExt,
     P: IpPacket<I>,
-    D: InterfaceProperties<BC::DeviceClass>,
-    CC: NatContext<I, DeviceId = D>,
+    CC: NatContext<I, BC>,
     BC: FilterBindingsContext,
 {
     let NatConfig { config } = conn.external_data();
@@ -264,7 +262,7 @@ where
             }
         };
         let (reply_tuple, external_data) = conn.reply_tuple_and_external_data_mut();
-        let (verdict, config) = configure_nat::<N, _, _, _, _, _>(
+        let (verdict, config) = configure_nat::<N, _, _, _, _>(
             core_ctx,
             bindings_ctx,
             table,
@@ -294,21 +292,20 @@ where
 /// matches the provided packet, configures NAT based on the rule's action. Note
 /// that because NAT routines can contain a superset of the rules filter
 /// routines can, it's possible for this packet to hit a non-NAT action.
-fn configure_nat<N, I, P, D, CC, BC>(
+fn configure_nat<N, I, P, CC, BC>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     table: &Table<I, BC, NatConfig>,
     reply_tuple: &mut Tuple<I>,
     hook: &Hook<I, BC::DeviceClass, ()>,
     packet: &P,
-    interfaces: Interfaces<'_, D>,
+    interfaces: Interfaces<'_, CC::DeviceId>,
 ) -> (N::Verdict, Option<NatType>)
 where
     N: NatHook<I>,
     I: IpExt,
     P: IpPacket<I>,
-    D: InterfaceProperties<BC::DeviceClass>,
-    CC: NatContext<I, DeviceId = D>,
+    CC: NatContext<I, BC>,
     BC: FilterBindingsContext,
 {
     let Hook { routines } = hook;
@@ -332,22 +329,21 @@ where
 
 /// Configure Redirect NAT, a special case of DNAT that redirects the packet to
 /// the local host.
-fn configure_redirect_nat<I, P, D, CC, BC, N>(
+fn configure_redirect_nat<N, I, P, CC, BC>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     table: &Table<I, BC, NatConfig>,
     reply_tuple: &mut Tuple<I>,
     packet: &P,
-    interfaces: &Interfaces<'_, D>,
+    interfaces: &Interfaces<'_, CC::DeviceId>,
     dst_port: Option<RangeInclusive<NonZeroU16>>,
 ) -> (Verdict, Option<NatType>)
 where
+    N: NatHook<I>,
     I: IpExt,
     P: IpPacket<I>,
-    D: InterfaceProperties<BC::DeviceClass>,
-    CC: NatContext<I, DeviceId = D>,
+    CC: NatContext<I, BC>,
     BC: FilterBindingsContext,
-    N: NatHook<I>,
 {
     // Choose an appropriate new destination address and, optionally, port. Then
     // rewrite the source address/port of the reply tuple for the connection to use
@@ -512,7 +508,7 @@ mod tests {
         let packet = FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value();
 
         assert_eq!(
-            configure_nat::<LocalEgressHook, _, _, _, _, _>(
+            configure_nat::<LocalEgressHook, _, _, _, _>(
                 &mut core_ctx,
                 &mut bindings_ctx,
                 &conntrack,
@@ -538,7 +534,7 @@ mod tests {
             }],
         };
         assert_eq!(
-            configure_nat::<LocalEgressHook, _, _, _, _, _>(
+            configure_nat::<LocalEgressHook, _, _, _, _>(
                 &mut core_ctx,
                 &mut bindings_ctx,
                 &conntrack,
@@ -568,7 +564,7 @@ mod tests {
             ],
         };
         assert_eq!(
-            configure_nat::<LocalEgressHook, _, _, _, _, _>(
+            configure_nat::<LocalEgressHook, _, _, _, _>(
                 &mut core_ctx,
                 &mut bindings_ctx,
                 &conntrack,
@@ -594,7 +590,7 @@ mod tests {
             ],
         };
         assert_eq!(
-            configure_nat::<LocalEgressHook, _, _, _, _, _>(
+            configure_nat::<LocalEgressHook, _, _, _, _>(
                 &mut core_ctx,
                 &mut bindings_ctx,
                 &conntrack,
@@ -632,7 +628,7 @@ mod tests {
         };
 
         assert_eq!(
-            configure_nat::<LocalEgressHook, _, _, _, _, _>(
+            configure_nat::<LocalEgressHook, _, _, _, _>(
                 &mut core_ctx,
                 &mut bindings_ctx,
                 &conntrack,
@@ -670,7 +666,7 @@ mod tests {
         };
 
         assert_eq!(
-            configure_nat::<IngressHook, _, _, _, _, _>(
+            configure_nat::<IngressHook, _, _, _, _>(
                 &mut core_ctx,
                 &mut bindings_ctx,
                 &conntrack,
@@ -711,7 +707,7 @@ mod tests {
         };
 
         assert_eq!(
-            configure_nat::<LocalEgressHook, _, _, _, _, _>(
+            configure_nat::<LocalEgressHook, _, _, _, _>(
                 &mut core_ctx,
                 &mut bindings_ctx,
                 &conntrack,
@@ -741,7 +737,7 @@ mod tests {
         };
 
         assert_eq!(
-            configure_nat::<IngressHook, _, _, _, _, _>(
+            configure_nat::<IngressHook, _, _, _, _>(
                 &mut core_ctx,
                 &mut bindings_ctx,
                 &conntrack,
@@ -825,7 +821,7 @@ mod tests {
                 )],
             }],
         };
-        let verdict = perform_nat::<N, _, _, _, _, _>(
+        let verdict = perform_nat::<N, _, _, _, _>(
             &mut core_ctx,
             &mut bindings_ctx,
             &conntrack,
@@ -871,7 +867,7 @@ mod tests {
                 rules: vec![Rule::new(PacketMatcher::default(), Action::Drop)],
             }],
         };
-        let verdict = perform_nat::<N::ReplyHook, _, _, _, _, _>(
+        let verdict = perform_nat::<N::ReplyHook, _, _, _, _>(
             &mut core_ctx,
             &mut bindings_ctx,
             &conntrack,

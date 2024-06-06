@@ -3050,9 +3050,11 @@ where
 }
 
 /// Abstracts access to a [`filter::FilterHandler`] for core contexts.
-pub trait FilterHandlerProvider<I: packet_formats::ip::IpExt, BC: FilterBindingsContext> {
+pub trait FilterHandlerProvider<I: packet_formats::ip::IpExt, BT: FilterBindingsTypes>:
+    DeviceIdContext<AnyDevice, DeviceId: filter::InterfaceProperties<BT::DeviceClass>>
+{
     /// The filter handler.
-    type Handler<'a>: filter::FilterHandler<I, BC>
+    type Handler<'a>: filter::FilterHandler<I, BT, DeviceId = Self::DeviceId>
     where
         Self: 'a;
 
@@ -3065,7 +3067,10 @@ pub(crate) mod testutil {
     use super::*;
 
     use net_types::ip::IpInvariant;
-    use netstack3_base::{testutil::FakeCoreCtx, SendFrameContext, SendableFrameMeta};
+    use netstack3_base::{
+        testutil::{FakeCoreCtx, FakeStrongDeviceId},
+        SendFrameContext, SendableFrameMeta,
+    };
 
     /// A [`SendIpPacketMeta`] for dual stack contextx.
     #[derive(Debug, GenericOverIp)]
@@ -3153,13 +3158,16 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: packet_formats::ip::IpExt, BC: FilterBindingsContext, S, Meta, DeviceId>
-        FilterHandlerProvider<I, BC> for FakeCoreCtx<S, Meta, DeviceId>
+    impl<I, BC, S, Meta, DeviceId> FilterHandlerProvider<I, BC> for FakeCoreCtx<S, Meta, DeviceId>
+    where
+        I: packet_formats::ip::IpExt,
+        BC: FilterBindingsContext,
+        DeviceId: FakeStrongDeviceId + filter::InterfaceProperties<BC::DeviceClass>,
     {
-        type Handler<'a> = filter::testutil::NoopImpl where Self: 'a;
+        type Handler<'a> = filter::testutil::NoopImpl<DeviceId> where Self: 'a;
 
         fn filter_handler(&mut self) -> Self::Handler<'_> {
-            filter::testutil::NoopImpl
+            filter::testutil::NoopImpl::default()
         }
     }
 }
