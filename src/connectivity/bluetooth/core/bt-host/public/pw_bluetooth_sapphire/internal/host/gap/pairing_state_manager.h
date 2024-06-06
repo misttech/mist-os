@@ -61,7 +61,7 @@ class PairingStateManager final {
   //
   // |link| must be valid for the lifetime of this object.
   PairingStateManager(Peer::WeakPtr peer,
-                      hci::BrEdrConnection* link,
+                      WeakPtr<hci::BrEdrConnection> link,
                       bool link_initiated,
                       fit::closure auth_cb,
                       StatusCallback status_cb);
@@ -164,7 +164,7 @@ class PairingStateManager final {
   Peer::WeakPtr peer_;
 
   // The BR/EDR link whose pairing is being driven by this object.
-  hci::BrEdrConnection* link_;
+  WeakPtr<hci::BrEdrConnection> link_;
 
   BT_DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(PairingStateManager);
 };
