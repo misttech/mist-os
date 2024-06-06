@@ -12,6 +12,7 @@
 
 #include "src/lib/files/file.h"
 #include "src/lib/fsl/types/type_converters.h"
+#include "src/lib/fxl/log_settings_command_line.h"
 #include "src/lib/fxl/strings/join_strings.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -19,7 +20,7 @@ namespace tracing {
 namespace test {
 
 void AppendLoggingArgs(std::vector<std::string>* argv, const char* prefix,
-                       const fuchsia_logging::LogSettings& log_settings) {
+                       const fxl::LogSettings& log_settings) {
   // Transfer our log settings to the subprogram.
   std::string log_file_arg;
   std::string verbose_or_quiet_arg;

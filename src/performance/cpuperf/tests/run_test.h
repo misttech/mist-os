@@ -13,6 +13,8 @@
 #include <string>
 #include <vector>
 
-bool RunSpec(const std::string& spec_file_path, const fuchsia_logging::LogSettings& log_settings);
+#include "src/lib/fxl/log_settings_command_line.h"
+
+bool RunSpec(const std::string& spec_file_path, const fxl::LogSettings& log_settings);
 
 #endif  // SRC_PERFORMANCE_CPUPERF_TESTS_RUN_TEST_H_

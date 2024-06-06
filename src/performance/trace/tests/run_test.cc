@@ -39,7 +39,6 @@ static bool BuildTraceProgramArgs(const std::string& app_path, const std::string
                                   const std::string& buffering_mode,
                                   std::initializer_list<std::string> additional_arguments,
                                   const std::string& relative_output_file_path,
-                                  const fuchsia_logging::LogSettings& log_settings,
                                   std::vector<std::string>* args) {
   // AppendLoggingArgs(args, "", log_settings);
   args->push_back("record");
@@ -68,7 +67,6 @@ static bool BuildTraceProgramArgs(const std::string& app_path, const std::string
 static bool BuildVerificationProgramArgs(const std::string& test_name, size_t buffer_size_in_mb,
                                          const std::string& buffering_mode,
                                          const std::string& output_file_path,
-                                         const fuchsia_logging::LogSettings& log_settings,
                                          std::vector<std::string>* args) {
   // AppendLoggingArgs(args, "", log_settings);
   args->push_back("verify");
@@ -153,11 +151,10 @@ bool RunIntegrationTest(const std::string& app_path, const std::string& test_nam
                         const std::string& categories, size_t buffer_size_in_mb,
                         const std::string& buffering_mode,
                         std::initializer_list<std::string> additional_arguments,
-                        const std::string& relative_output_file_path,
-                        const fuchsia_logging::LogSettings& log_settings) {
+                        const std::string& relative_output_file_path) {
   std::vector<std::string> args;
   BuildTraceProgramArgs(app_path, test_name, categories, buffer_size_in_mb, buffering_mode,
-                        additional_arguments, relative_output_file_path, log_settings, &args);
+                        additional_arguments, relative_output_file_path, &args);
 
   FX_LOGS(INFO) << "Running test " << test_name << " with " << buffer_size_in_mb << " MB "
                 << buffering_mode << " buffer, tracing categories " << categories
@@ -172,12 +169,11 @@ bool RunIntegrationTest(const std::string& app_path, const std::string& test_nam
 
 bool VerifyIntegrationTest(const std::string& app_path, const std::string& test_name,
                            size_t buffer_size_in_mb, const std::string& buffering_mode,
-                           const std::string& relative_output_file_path,
-                           const fuchsia_logging::LogSettings& log_settings) {
+                           const std::string& relative_output_file_path) {
   std::vector<std::string> args{app_path};
   BuildVerificationProgramArgs(test_name, buffer_size_in_mb, buffering_mode,
                                std::string(kSpawnedTestTmpPath) + "/" + relative_output_file_path,
-                               log_settings, &args);
+                               &args);
 
   FX_LOGS(INFO) << "Verifying test " << test_name << " with " << buffer_size_in_mb << " MB "
                 << buffering_mode << " buffer, output file " << relative_output_file_path;

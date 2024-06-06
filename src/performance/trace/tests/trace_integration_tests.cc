@@ -14,12 +14,13 @@
 
 #include <gtest/gtest.h>
 
+#include "src/lib/fxl/log_settings_command_line.h"
 #include "src/performance/lib/test_utils/run_program.h"
 #include "src/performance/trace/tests/integration_test_utils.h"
 #include "src/performance/trace/tests/run_test.h"
 
 // Defined in gtest_main.cc
-fuchsia_logging::LogSettings g_log_settings;
+fxl::LogSettings g_log_settings;
 
 namespace tracing::test {
 
@@ -35,9 +36,9 @@ void RunAndVerify(const std::string& app_path, const std::string& test_name,
                   const std::string& buffering_mode,
                   std::initializer_list<std::string> additional_arguments = {}) {
   ASSERT_TRUE(RunIntegrationTest(app_path, test_name, categories, buffer_size_in_mb, buffering_mode,
-                                 additional_arguments, kRelativeOutputFilePath, g_log_settings));
+                                 additional_arguments, kRelativeOutputFilePath));
   ASSERT_TRUE(VerifyIntegrationTest(app_path, test_name, buffer_size_in_mb, buffering_mode,
-                                    kRelativeOutputFilePath, g_log_settings));
+                                    kRelativeOutputFilePath));
 }
 
 TEST(Oneshot, FillBuffer) {

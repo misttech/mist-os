@@ -50,15 +50,13 @@ bool RunIntegrationTest(const std::string& app_path, const std::string& test_nam
                         const std::string& categories, size_t buffer_size_in_mb,
                         const std::string& buffering_mode,
                         std::initializer_list<std::string> additional_arguments,
-                        const std::string& relative_output_file_path,
-                        const fuchsia_logging::LogSettings& log_settings);
+                        const std::string& relative_output_file_path);
 
 // Runs integration test system app with verify command and given parameters. This verifies the
 // trace file resulting from a call to RunIntegrationTest using the test's verification method.
 bool VerifyIntegrationTest(const std::string& app_path, const std::string& test_name,
                            size_t buffer_size_in_mb, const std::string& buffering_mode,
-                           const std::string& relative_output_file_path,
-                           const fuchsia_logging::LogSettings& log_settings);
+                           const std::string& relative_output_file_path);
 
 }  // namespace tracing::test
 
