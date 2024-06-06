@@ -12,11 +12,6 @@
 // stabilized.
 #![allow(stable_features)]
 #![deny(missing_docs, unreachable_patterns, clippy::useless_conversion, clippy::redundant_clone)]
-// Turn off checks for dead code, but only when building for benchmarking.
-// benchmarking. This allows the benchmarks to be written as part of the crate,
-// with access to test utilities, without a bunch of build errors due to unused
-// code. These checks are turned back on in the 'benchmark' module.
-#![cfg_attr(benchmark, allow(dead_code, unused_imports, unused_macros))]
 
 // TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11): remove
 // this module.
@@ -31,8 +26,6 @@ mod state;
 mod time;
 mod transport;
 
-#[cfg(any(test, benchmark))]
-pub mod benchmarks;
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil;
 

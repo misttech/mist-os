@@ -253,6 +253,7 @@ group("tests") {
   testonly = true
   deps = [
     ":netstack3-tests",
+    "bench:tests",
     "core:tests",
   ]
 }

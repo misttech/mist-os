@@ -2,11 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// TODO(https://fxbug.dev/339502691): Return to the default limit once lock
+// ordering no longer causes overflows.
+#![recursion_limit = "256"]
+
 //! A benchmark runner for Netstack3, based on Criterion.
+//!
+//! Submodules contain integration benchmarks for netstack3, and the main
+//! function aggregates non-integration benchmarks split across the
+//! netstack3-crates.
+
+mod forwarding;
+
 use fuchsia_criterion::{criterion::Criterion, FuchsiaCriterion};
 
-pub(crate) fn main() {
-    let benches = netstack3_core::benchmarks::get_benchmark();
+fn main() {
+    let benches = forwarding::get_benchmark();
     let benches = netstack3_base::benchmarks::add_benches(benches);
 
     let mut c = FuchsiaCriterion::default();

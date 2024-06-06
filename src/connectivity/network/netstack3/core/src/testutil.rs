@@ -1039,7 +1039,7 @@ impl FakeCtxBuilder {
 
     /// Build a `Ctx` from the present configuration with a caller-provided
     /// dispatcher and `StackStateBuilder`.
-    pub(crate) fn build_with(
+    pub fn build_with(
         self,
         state_builder: StackStateBuilder,
     ) -> (FakeCtx, Vec<EthernetDeviceId<FakeBindingsCtx>>) {

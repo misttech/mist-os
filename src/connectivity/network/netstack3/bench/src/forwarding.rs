@@ -7,18 +7,12 @@
 //! This module contains microbenchmarks for the Netstack3 Core, built on top
 //! of Criterion.
 
-// Enable dead code warnings for benchmarks (disabled in `lib.rs`).
-#![warn(dead_code, unused_imports, unused_macros)]
-
-use alloc::vec;
-#[cfg(debug_assertions)]
-use assert_matches::assert_matches;
-
 use net_types::{ip::Ipv4, Witness as _};
 use netstack3_base::{bench, testutil::Bencher, testutil::TEST_ADDRS_V4};
-use netstack3_device::{
-    ethernet::{EthernetLinkDevice, RecvEthernetFrameMeta},
-    DeviceId,
+use netstack3_core::{
+    device::{DeviceId, EthernetLinkDevice, RecvEthernetFrameMeta},
+    testutil::{CtxPairExt as _, FakeCtxBuilder},
+    StackStateBuilder,
 };
 use packet::{Buf, InnerPacketBuilder, Serializer};
 use packet_formats::{
@@ -34,11 +28,6 @@ use packet_formats::{
         testutil::{IPV4_CHECKSUM_OFFSET, IPV4_MIN_HDR_LEN, IPV4_TTL_OFFSET},
         Ipv4PacketBuilder,
     },
-};
-
-use crate::{
-    state::StackStateBuilder,
-    testutil::{CtxPairExt as _, FakeCtxBuilder},
 };
 
 // NOTE: Extra tests that are too expensive to run during benchmarks can be
@@ -100,9 +89,9 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
             B::black_box(Buf::new(&mut buf[..], range.clone())),
         ));
 
-        #[cfg(debug_assertions)]
+        #[cfg(test)]
         {
-            assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
+            assert_matches::assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
         }
 
         // Since we modified the buffer in-place, it now has the wrong source
@@ -126,7 +115,6 @@ bench!(bench_forward_minimum_256, |b| bench_forward_minimum(b, 256));
 bench!(bench_forward_minimum_512, |b| bench_forward_minimum(b, 512));
 bench!(bench_forward_minimum_1024, |b| bench_forward_minimum(b, 1024));
 
-#[cfg(benchmark)]
 /// Returns a benchmark group for all Netstack3 Core microbenchmarks.
 pub fn get_benchmark() -> criterion::Benchmark {
     // TODO(https://fxbug.dev/42051624) Find an automatic way to add benchmark

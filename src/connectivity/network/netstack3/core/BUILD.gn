@@ -75,7 +75,6 @@ rustc_library_with_features("netstack3-core") {
 
   sources = [
     "src/api.rs",
-    "src/benchmarks.rs",
     "src/context.rs",
     "src/counters.rs",
     "src/device/base.rs",
@@ -210,7 +209,6 @@ rustc_library_with_features("netstack3-core") {
         "udp:netstack3-udp-benchmarks",
       ]
       deps += _core_deps
-      deps += [ "//third_party/rust_crates:criterion" ]
       deps += _testutils_deps
 
       # Guard against bad crate variants.

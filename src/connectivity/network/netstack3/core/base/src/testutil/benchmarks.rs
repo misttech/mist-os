@@ -6,14 +6,14 @@
 
 /// Declare a benchmark function.
 ///
-/// The function will be named `$name`. If the `benchmark` cfg is enabled, the
-/// provided `$fn` will be invoked with a `&mut criterion::Bencher` - in other
-/// words, a real benchmark. If the `benchmark` cfg is disabled, the function
-/// will be annotated with the `#[test]` attribute, and the provided `$fn` will
-/// be invoked with a `&mut TestBencher`, which has the effect of creating a
-/// test that runs the benchmarked function for a small, fixed number of
-/// iterations. This test allows the use of debug assertions to verify the
-/// correctness of the benchmark.
+/// If `cfg(benchmark)` is enabled, a function named `name` is emitted and it
+/// receives [`RealBencher`].
+///
+/// If `cfg(test)` is enabled, a module named `name` with a single test called
+/// `test_bench` is emitted and it receives [`TestBencher`].
+///
+/// This setup allows for all benchmarking functions to run in unit test mode,
+/// allowing problems to be noticed sooner.
 ///
 /// Note that `$fn` doesn't have to be a named function - it can also be an
 /// anonymous closure.
@@ -25,10 +25,13 @@ macro_rules! bench {
             $fn(b);
         }
 
-        #[cfg(not(benchmark))]
-        #[test]
-        fn $name() {
-            $fn(&mut $crate::testutil::TestBencher);
+        #[cfg(test)]
+        mod $name {
+            use super::*;
+            #[test]
+            fn test_bench() {
+                $fn(&mut $crate::testutil::TestBencher);
+            }
         }
     };
 }

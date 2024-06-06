@@ -44,7 +44,7 @@ measure Netstack3's performance in a production-like environment.
 5. Run the tests
 
     ```
-    fx test --e2e netstack3_benchmarks_test
+    fx test --e2e netstack3_benchmarks
     ```
 
 After completing, the tests will print the name of the
