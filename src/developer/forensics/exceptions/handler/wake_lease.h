@@ -35,12 +35,12 @@ class WakeLease {
   //
   // This function can be called many times. If the lease returned falls out of scope, the lease
   // will be dropped and can be later reacquired.
-  fpromise::promise<fidl::ClientEnd<::fuchsia_power_broker::LeaseControl>, Error> Acquire();
+  fpromise::promise<fidl::Client<::fuchsia_power_broker::LeaseControl>, Error> Acquire();
 
  private:
   // "Unsafe" because it does not have scoping to prevent |this| from being accessed in promise
   // continutations.
-  fpromise::promise<fidl::ClientEnd<::fuchsia_power_broker::LeaseControl>, Error> UnsafeAcquire();
+  fpromise::promise<fidl::Client<::fuchsia_power_broker::LeaseControl>, Error> UnsafeAcquire();
 
   // Adds a power element to the topology that passively depends on ExecutionState. The promise
   // returned needs scheduled on an executor and will complete ok if the power element is
@@ -50,7 +50,7 @@ class WakeLease {
   // This function must only be called once.
   fpromise::promise<void, Error> AddPowerElement();
 
-  fpromise::promise<fidl::ClientEnd<::fuchsia_power_broker::LeaseControl>, Error> DoAcquireLease();
+  fpromise::promise<fidl::Client<::fuchsia_power_broker::LeaseControl>, Error> DoAcquireLease();
 
   async_dispatcher_t* dispatcher_;
   std::string power_element_name_;
@@ -63,6 +63,9 @@ class WakeLease {
 
   std::unique_ptr<fidl::AsyncEventHandler<fuchsia_power_broker::Topology>> topology_event_handler_;
   fidl::Client<fuchsia_power_broker::Topology> topology_;
+
+  std::unique_ptr<fidl::AsyncEventHandler<fuchsia_power_broker::LeaseControl>>
+      lease_control_event_handler_;
 
   // Channels that will be valid and must be kept open once the element is added to the topology.
   fidl::ClientEnd<fuchsia_power_broker::ElementControl> element_control_channel_;

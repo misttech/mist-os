@@ -257,6 +257,8 @@ source_set("power_broker") {
 
   sources = [
     "power_broker_element_control.h",
+    "power_broker_lease_control.cc",
+    "power_broker_lease_control.h",
     "power_broker_lessor.cc",
     "power_broker_lessor.h",
     "power_broker_topology.cc",

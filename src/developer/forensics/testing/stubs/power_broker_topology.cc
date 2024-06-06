@@ -103,4 +103,12 @@ bool PowerBrokerTopologyBase::IsLeaseActive(const std::string& element_name) con
   return added_elements_.find(element_name)->second.lessor_server->IsActive();
 }
 
+void PowerBrokerTopologyBase::SetLeaseStatus(const std::string& element_name,
+                                             fuchsia_power_broker::LeaseStatus status) {
+  const auto element = added_elements_.find(element_name);
+  FX_CHECK(element != added_elements_.end());
+
+  element->second.lessor_server->SetLeaseStatus(status);
+}
+
 }  // namespace forensics::stubs

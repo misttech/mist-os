@@ -27,6 +27,8 @@ class PowerBrokerLessorBase : public fidl::testing::TestBase<fuchsia_power_broke
 
   virtual bool IsActive() const = 0;
 
+  void SetLeaseStatus(fuchsia_power_broker::LeaseStatus status);
+
   static void OnFidlClosed(const fidl::UnbindInfo error) { FX_LOGS(ERROR) << error; }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
@@ -38,15 +40,26 @@ class PowerBrokerLessorBase : public fidl::testing::TestBase<fuchsia_power_broke
     FX_NOTIMPLEMENTED() << "Method ordinal '" << metadata.method_ordinal << "' is not implemented";
   }
 
+ protected:
+  std::vector<std::unique_ptr<PowerBrokerLeaseControl>>& LeaseControls() { return lease_controls_; }
+
+  const std::vector<std::unique_ptr<PowerBrokerLeaseControl>>& LeaseControls() const {
+    return lease_controls_;
+  }
+
  private:
   fidl::ServerBinding<fuchsia_power_broker::Lessor> binding_;
+  std::vector<std::unique_ptr<PowerBrokerLeaseControl>> lease_controls_;
 };
 
 class PowerBrokerLessor : public PowerBrokerLessorBase {
  public:
   explicit PowerBrokerLessor(fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end,
-                             async_dispatcher_t* dispatcher)
-      : PowerBrokerLessorBase(std::move(server_end), dispatcher), dispatcher_(dispatcher) {}
+                             async_dispatcher_t* dispatcher,
+                             fuchsia_power_broker::LeaseStatus initial_status)
+      : PowerBrokerLessorBase(std::move(server_end), dispatcher),
+        dispatcher_(dispatcher),
+        initial_status_(initial_status) {}
 
   void Lease(LeaseRequest& request, LeaseCompleter::Sync& completer) override;
 
@@ -54,7 +67,7 @@ class PowerBrokerLessor : public PowerBrokerLessorBase {
 
  private:
   async_dispatcher_t* dispatcher_;
-  std::vector<std::unique_ptr<PowerBrokerLeaseControl>> lease_controls_;
+  fuchsia_power_broker::LeaseStatus initial_status_;
 };
 
 class PowerBrokerLessorClosesConnection : public PowerBrokerLessorBase {

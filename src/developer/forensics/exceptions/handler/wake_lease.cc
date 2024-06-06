@@ -43,6 +43,15 @@ class TopologyEventHandler : public fidl::AsyncEventHandler<fpb::Topology> {
   }
 };
 
+class LeaseControlEventHandler : public fidl::AsyncEventHandler<fpb::LeaseControl> {
+ public:
+  void on_fidl_error(const fidl::UnbindInfo error) override { FX_LOGS(ERROR) << error; }
+
+  void handle_unknown_event(const fidl::UnknownEventMetadata<fpb::LeaseControl> metadata) override {
+    FX_LOGS(ERROR) << "Unexpected event ordinal: " << metadata.event_ordinal;
+  }
+};
+
 fpb::ElementSchema BuildSchema(zx::event requires_token, fidl::ServerEnd<fpb::Lessor> server_end,
                                const std::string& element_name) {
   fpb::LevelDependency dependency(
@@ -67,6 +76,32 @@ fpb::ElementSchema BuildSchema(zx::event requires_token, fidl::ServerEnd<fpb::Le
   return schema;
 }
 
+fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> WaitForLeaseSatisfied(
+    fidl::Client<fpb::LeaseControl> lease_control, fpb::LeaseStatus last_status) {
+  return fidl_fpromise::as_promise(lease_control->WatchStatus(last_status))
+      .then([lease_control = std::move(lease_control)](
+                const fpromise::result<fuchsia_power_broker::LeaseControlWatchStatusResponse,
+                                       fidl::Status>& result) mutable
+            -> fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> {
+        if (result.is_error()) {
+          FX_LOGS(ERROR) << "Failed to watch lease status: " << result.error().FormatDescription();
+
+          // We failed to wait for the lease to become satisfied, but we'll optimistically hold onto
+          // the lease and hope it becomes satisfied in time to prevent a possible system
+          // suspension.
+          return fpromise::make_result_promise<fidl::Client<fpb::LeaseControl>, Error>(
+              fpromise::ok(std::move(lease_control)));
+        }
+
+        if (const fpb::LeaseStatus status = result.value().status();
+            status != fpb::LeaseStatus::kSatisfied) {
+          return WaitForLeaseSatisfied(std::move(lease_control), status);
+        }
+        return fpromise::make_result_promise<fidl::Client<fpb::LeaseControl>, Error>(
+            fpromise::ok(std::move(lease_control)));
+      });
+}
+
 }  // namespace
 
 WakeLease::WakeLease(async_dispatcher_t* dispatcher, const std::string& power_element_name,
@@ -78,13 +113,16 @@ WakeLease::WakeLease(async_dispatcher_t* dispatcher, const std::string& power_el
       sag_event_handler_(std::make_unique<SagEventHandler>()),
       sag_(std::move(sag_client_end), dispatcher_, sag_event_handler_.get()),
       topology_event_handler_(std::make_unique<TopologyEventHandler>()),
-      topology_(std::move(topology_client_end), dispatcher_, topology_event_handler_.get()) {}
+      topology_(std::move(topology_client_end), dispatcher_, topology_event_handler_.get()),
+      lease_control_event_handler_(std::make_unique<LeaseControlEventHandler>()) {}
 
-fpromise::promise<fidl::ClientEnd<fpb::LeaseControl>, Error> WakeLease::Acquire() {
+fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> WakeLease::Acquire() {
   return UnsafeAcquire().wrap_with(scope_);
 }
 
-fpromise::promise<fidl::ClientEnd<fpb::LeaseControl>, Error> WakeLease::UnsafeAcquire() {
+fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> WakeLease::UnsafeAcquire() {
+  // TODO(https://fxbug.dev/341104129): Timeout if lease doesn't become satisfied within a
+  // reasonable amount of time.
   if (add_power_element_called_) {
     return DoAcquireLease();
   }
@@ -92,7 +130,7 @@ fpromise::promise<fidl::ClientEnd<fpb::LeaseControl>, Error> WakeLease::UnsafeAc
   return AddPowerElement()
       .and_then([this]() { return DoAcquireLease(); })
       .or_else([](const Error& add_element_error) {
-        return fpromise::make_result_promise<fidl::ClientEnd<fpb::LeaseControl>, Error>(
+        return fpromise::make_result_promise<fidl::Client<fpb::LeaseControl>, Error>(
             fpromise::error(add_element_error));
       });
 }
@@ -158,29 +196,29 @@ fpromise::promise<void, Error> WakeLease::AddPowerElement() {
       .wrap_with(add_power_element_barrier_);
 }
 
-fpromise::promise<fidl::ClientEnd<fpb::LeaseControl>, Error> WakeLease::DoAcquireLease() {
+fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> WakeLease::DoAcquireLease() {
   return add_power_element_barrier_.sync().then(
       [this](const fpromise::result<>& result) mutable
-      -> fpromise::promise<fidl::ClientEnd<fpb::LeaseControl>, Error> {
+      -> fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> {
         if (!lessor_.is_valid()) {
           // Power element addition must have failed.
           FX_LOGS(ERROR) << "Failed to acquire wake lease because Lessor client is not valid.";
-          return fpromise::make_result_promise<fidl::ClientEnd<fpb::LeaseControl>, Error>(
+          return fpromise::make_result_promise<fidl::Client<fpb::LeaseControl>, Error>(
               fpromise::error(Error::kBadValue));
         }
 
         return fidl_fpromise::as_promise(lessor_->Lease(kPowerLevelActive))
-            .and_then([](fpb::LessorLeaseResponse& result) {
-              // TODO(https://fxbug.dev/341104129): Call LeaseControl::WatchStatus to wait until
-              // LeaseStatus is SATISFIED.
-              return fpromise::make_result_promise<fidl::ClientEnd<fpb::LeaseControl>,
-                                                   fidl::ErrorsIn<fpb::Lessor::Lease>>(
-                  fpromise::ok(std::move(result.lease_control())));
-            })
             .or_else([](const fidl::ErrorsIn<fpb::Lessor::Lease>& error) {
               FX_LOGS(ERROR) << "Failed to acquire wake lease: " << error.FormatDescription();
-              return fpromise::make_result_promise<fidl::ClientEnd<fpb::LeaseControl>, Error>(
+              return fpromise::make_result_promise<fpb::LessorLeaseResponse, Error>(
                   fpromise::error(Error::kBadValue));
+            })
+            .and_then([this](fpb::LessorLeaseResponse& result) {
+              fidl::Client<fpb::LeaseControl> lease_control(std::move(result.lease_control()),
+                                                            dispatcher_,
+                                                            lease_control_event_handler_.get());
+
+              return WaitForLeaseSatisfied(std::move(lease_control), fpb::LeaseStatus::kUnknown);
             });
       });
 }

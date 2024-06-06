@@ -50,6 +50,8 @@ class PowerBrokerTopologyBase : public fidl::testing::TestBase<fuchsia_power_bro
 
   bool IsLeaseActive(const std::string& element_name) const;
 
+  void SetLeaseStatus(const std::string& element_name, fuchsia_power_broker::LeaseStatus status);
+
  protected:
   explicit PowerBrokerTopologyBase(fidl::ServerEnd<fuchsia_power_broker::Topology> server_end,
                                    async_dispatcher_t* dispatcher,
