@@ -14,7 +14,7 @@ use {
     cm_util::TaskGroup,
     errors::{CapabilityProviderError, OpenError},
     router_error::RouterError,
-    sandbox::{CapabilityTrait, Request, WeakComponentToken},
+    sandbox::{RemotableCapability, Request, WeakComponentToken},
     std::sync::Arc,
     vfs::{directory::entry::OpenRequest, path::Path as VfsPath, remote::remote_dir},
 };

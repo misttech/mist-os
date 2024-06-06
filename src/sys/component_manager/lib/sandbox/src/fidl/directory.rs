@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{CapabilityTrait, Directory},
+    crate::{Directory, RemotableCapability},
     fidl::endpoints::ClientEnd,
     fidl_fuchsia_io as fio,
     std::sync::Arc,
@@ -18,7 +18,7 @@ impl Directory {
     }
 }
 
-impl CapabilityTrait for Directory {}
+impl RemotableCapability for Directory {}
 
 // These tests only run on target because the vfs library is not generally available on host.
 #[cfg(test)]

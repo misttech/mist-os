@@ -35,4 +35,4 @@ pub use self::router::{Request, Routable, Router};
 pub use self::unit::Unit;
 
 #[cfg(target_os = "fuchsia")]
-pub use {fidl::CapabilityTrait, open::Open};
+pub use {fidl::RemotableCapability, open::Open};

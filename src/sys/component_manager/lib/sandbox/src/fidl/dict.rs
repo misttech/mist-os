@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{dict::Key, fidl::registry, Capability, CapabilityTrait, ConversionError, Dict},
+    crate::{dict::Key, fidl::registry, Capability, ConversionError, Dict, RemotableCapability},
     fidl::endpoints::{self, create_request_stream, ClientEnd},
     fidl::handle::AsHandleRef,
     fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync,
@@ -140,7 +140,7 @@ impl From<Dict> for fsandbox::Capability {
     }
 }
 
-impl CapabilityTrait for Dict {
+impl RemotableCapability for Dict {
     fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         let dir = pfs::simple();
         for (key, value) in self.enumerate() {

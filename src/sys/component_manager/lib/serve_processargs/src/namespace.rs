@@ -6,7 +6,7 @@ use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_io as fio;
 use futures::channel::mpsc::{unbounded, UnboundedSender};
 use namespace::{Entry as NamespaceEntry, EntryError, Namespace, NamespaceError, Tree};
-use sandbox::{Capability, CapabilityTrait, Dict};
+use sandbox::{Capability, Dict, RemotableCapability};
 use thiserror::Error;
 use vfs::{directory::entry::serve_directory, execution_scope::ExecutionScope};
 

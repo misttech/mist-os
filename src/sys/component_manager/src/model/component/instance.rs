@@ -72,7 +72,7 @@ use {
     moniker::{ChildName, ExtendedMoniker, Moniker},
     router_error::RouterError,
     sandbox::{
-        Capability, CapabilityTrait, Dict, Open, Request, Routable, Router, WeakComponentToken,
+        Capability, Dict, Open, RemotableCapability, Request, Routable, Router, WeakComponentToken,
     },
     std::{
         collections::{HashMap, HashSet},

@@ -16,7 +16,7 @@ use futures::future::BoxFuture;
 use moniker::ExtendedMoniker;
 use router_error::{Explain, RouterError};
 use sandbox::{
-    Capability, CapabilityTrait, Dict, Open, Request, Routable, Router, WeakComponentToken,
+    Capability, Dict, Open, RemotableCapability, Request, Routable, Router, WeakComponentToken,
 };
 use std::sync::Arc;
 use vfs::directory::entry::{self, DirectoryEntry, DirectoryEntryAsync, EntryInfo};

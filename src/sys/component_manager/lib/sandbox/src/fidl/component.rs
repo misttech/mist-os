@@ -9,7 +9,7 @@ use {
     fuchsia_zircon::Koid,
 };
 
-impl crate::CapabilityTrait for WeakComponentToken {}
+impl crate::RemotableCapability for WeakComponentToken {}
 
 impl WeakComponentToken {
     async fn serve(server: EventPair) {

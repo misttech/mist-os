@@ -14,12 +14,13 @@ mod router;
 mod unit;
 
 use {
-    crate::ConversionError, fidl_fuchsia_component_sandbox as fsandbox, std::fmt::Debug,
-    std::sync::Arc, vfs::directory::entry::DirectoryEntry,
+    crate::ConversionError, fidl_fuchsia_component_sandbox as fsandbox, std::sync::Arc,
+    vfs::directory::entry::DirectoryEntry,
 };
 
-/// The capability trait, implemented by all capabilities.
-pub trait CapabilityTrait: Into<fsandbox::Capability> + Clone + Debug + Send + Sync {
+/// The trait which remotes Capabilities, either by turning them into
+/// FIDL or serving them in a VFS.
+pub trait RemotableCapability: Into<fsandbox::Capability> {
     fn into_fidl(self) -> fsandbox::Capability {
         self.into()
     }

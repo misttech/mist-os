@@ -17,7 +17,7 @@ use futures::{future::BoxFuture, Future, FutureExt, TryStreamExt};
 use namespace::{Namespace, NamespaceError};
 use routing::policy::ScopedPolicyChecker;
 use runner::component::{ChannelEpitaph, Controllable, Controller};
-use sandbox::{Capability, CapabilityTrait, Dict, Open};
+use sandbox::{Capability, Dict, Open, RemotableCapability};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::warn;

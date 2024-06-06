@@ -1,7 +1,9 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{connector::Connectable, fidl::registry, CapabilityTrait, Connector, ConversionError};
+use crate::{
+    connector::Connectable, fidl::registry, Connector, ConversionError, RemotableCapability,
+};
 use core::fmt;
 use fidl::endpoints::{create_request_stream, ClientEnd};
 use fidl::handle::{AsHandleRef, Channel, Status};
@@ -152,7 +154,7 @@ impl fmt::Debug for Open {
     }
 }
 
-impl CapabilityTrait for Open {
+impl RemotableCapability for Open {
     fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         Ok(self.entry)
     }

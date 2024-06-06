@@ -16,7 +16,7 @@ impl Connector {
     }
 }
 
-impl crate::CapabilityTrait for Connector {
+impl crate::RemotableCapability for Connector {
     fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         Ok(vfs::service::endpoint(move |_scope, server_end| {
             let _ = self.send_channel(server_end.into_zx_channel().into());

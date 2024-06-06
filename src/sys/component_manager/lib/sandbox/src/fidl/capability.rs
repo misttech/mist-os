@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{Capability, CapabilityTrait, ConversionError, RemoteError},
+    crate::{Capability, ConversionError, RemotableCapability, RemoteError},
     fidl::{AsHandleRef, HandleRef},
     fidl_fuchsia_component_sandbox as fsandbox,
     std::sync::Arc,
@@ -74,7 +74,7 @@ impl TryFrom<fsandbox::Capability> for Capability {
     }
 }
 
-impl CapabilityTrait for Capability {
+impl RemotableCapability for Capability {
     fn into_fidl(self) -> fsandbox::Capability {
         match self {
             Self::Connector(s) => s.into_fidl(),

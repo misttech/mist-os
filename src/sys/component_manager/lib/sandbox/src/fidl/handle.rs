@@ -7,7 +7,7 @@ use {
     fidl_fuchsia_component_sandbox as fsandbox,
 };
 
-impl crate::CapabilityTrait for OneShotHandle {}
+impl crate::RemotableCapability for OneShotHandle {}
 
 impl From<OneShotHandle> for fsandbox::OneShotHandle {
     fn from(value: OneShotHandle) -> Self {
