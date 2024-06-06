@@ -203,14 +203,14 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_arg
   return zx::ok(std::move(out));
 }
 
-uint32_t DisplayInfo::GetHorizontalSizeMm() const {
+int DisplayInfo::GetHorizontalSizeMm() const {
   if (!edid.has_value()) {
     return 0;
   }
   return edid->base.horizontal_size_mm();
 }
 
-uint32_t DisplayInfo::GetVerticalSizeMm() const {
+int DisplayInfo::GetVerticalSizeMm() const {
   if (!edid.has_value()) {
     return 0;
   }

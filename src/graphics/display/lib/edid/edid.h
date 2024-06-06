@@ -347,8 +347,12 @@ class Edid {
   const char* manufacturer_name() const { return manufacturer_name_; }
   const char* monitor_name() const { return monitor_name_; }
   const char* monitor_serial() const { return monitor_serial_; }
-  uint32_t horizontal_size_mm() const { return (base_edid().horizontal_size_cm * 10); }
-  uint32_t vertical_size_mm() const { return (base_edid().vertical_size_cm * 10); }
+
+  // Guaranteed to be >= 0 and < 2^16.
+  int horizontal_size_mm() const;
+
+  // Guaranteed to be >= 0 and < 2^16.
+  int vertical_size_mm() const;
   bool is_hdmi() const;
 
   const BaseEdid& base_edid() const { return *reinterpret_cast<const BaseEdid*>(bytes_.data()); }

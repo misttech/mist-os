@@ -1244,8 +1244,16 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
               fidl::StringView::FromExternal(display_info.GetManufacturerName());
           info.monitor_name = fidl::StringView::FromExternal(display_info.GetMonitorName());
           info.monitor_serial = fidl::StringView::FromExternal(display_info.GetMonitorSerial());
-          info.horizontal_size_mm = display_info.GetHorizontalSizeMm();
-          info.vertical_size_mm = display_info.GetVerticalSizeMm();
+
+          // The return value of `GetHorizontalSizeMm()` is guaranteed to be
+          // >= 0 and < 2^16 < std::numeric_limits<uint32_t>::max(). So it can
+          // be safely casted to uint32_t.
+          info.horizontal_size_mm = static_cast<uint32_t>(display_info.GetHorizontalSizeMm());
+
+          // The return value of `GetVerticalSizeMm()` is guaranteed to be
+          // >= 0 and < 2^16 < std::numeric_limits<uint32_t>::max(). So it can
+          // be safely casted to uint32_t.
+          info.vertical_size_mm = static_cast<uint32_t>(display_info.GetVerticalSizeMm());
         });
     if (!found_display_info) {
       zxlogf(ERROR, "Failed to get DisplayInfo for display %" PRIu64, added_display_id.value());

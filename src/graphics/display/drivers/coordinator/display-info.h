@@ -48,11 +48,13 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
   // Should be called after init_done is set to true.
   void InitializeInspect(inspect::Node* parent_node);
 
+  // Guaranteed to be >= 0 and < 2^16.
   // Returns zero if the information is not available.
-  uint32_t GetHorizontalSizeMm() const;
+  int GetHorizontalSizeMm() const;
 
+  // Guaranteed to be >= 0 and < 2^16.
   // Returns zero if the information is not available.
-  uint32_t GetVerticalSizeMm() const;
+  int GetVerticalSizeMm() const;
 
   // Returns an empty view if the information is not available.
   std::string_view GetManufacturerName() const;

@@ -243,6 +243,20 @@ fit::result<const char*> Edid::Initialize() {
   return fit::ok();
 }
 
+int Edid::horizontal_size_mm() const {
+  static constexpr int kMillimetersPerCentimeter = 10;
+  // The multiplication result meets the API contract because
+  // `horizontal_size_cm` is at most 255.
+  return int{base_edid().horizontal_size_cm} * kMillimetersPerCentimeter;
+}
+
+int Edid::vertical_size_mm() const {
+  static constexpr int kMillimetersPerCentimeter = 10;
+  // The multiplication result meets the API contract because
+  // `vertical_size_cm` is at most 255.
+  return int{base_edid().vertical_size_cm} * kMillimetersPerCentimeter;
+}
+
 bool Edid::is_hdmi() const {
   internal::data_block_iterator dbs(this);
   if (!dbs.is_valid() || dbs.cea_revision() < 0x03) {
