@@ -13,6 +13,7 @@
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fpromise/promise.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/time.h>
 #include <zircon/errors.h>
 
 #include <memory>
@@ -23,6 +24,7 @@
 #include <gtest/gtest.h>
 
 #include "src/developer/forensics/exceptions/constants.h"
+#include "src/developer/forensics/testing/gpretty_printers.h"
 #include "src/developer/forensics/testing/stubs/power_broker_lessor.h"
 #include "src/developer/forensics/testing/stubs/power_broker_topology.h"
 #include "src/developer/forensics/testing/stubs/system_activity_governor.h"
@@ -33,6 +35,8 @@ namespace forensics::exceptions::handler {
 namespace {
 
 using ::fidl::testing::TestBase;
+
+constexpr zx::duration kTimeout = zx::sec(5);
 
 namespace fpb = fuchsia_power_broker;
 namespace fps = fuchsia_power_system;
@@ -96,7 +100,7 @@ TEST_F(WakeLeaseTest, AcquiresLeaseSuccessfully) {
 
   std::optional<fidl::Client<fuchsia_power_broker::LeaseControl>> lease;
   GetExecutor().schedule_task(
-      wake_lease.Acquire()
+      wake_lease.Acquire(kTimeout)
           .and_then([&lease](fidl::Client<fuchsia_power_broker::LeaseControl>& acquired_lease) {
             lease = std::move(acquired_lease);
           })
@@ -141,7 +145,7 @@ TEST_F(WakeLeaseTest, AddsElementOnlyOnce) {
   {
     std::optional<fidl::Client<fuchsia_power_broker::LeaseControl>> lease;
     GetExecutor().schedule_task(
-        wake_lease.Acquire()
+        wake_lease.Acquire(kTimeout)
             .and_then([&lease](fidl::Client<fuchsia_power_broker::LeaseControl>& acquired_lease) {
               lease = std::move(acquired_lease);
             })
@@ -166,7 +170,7 @@ TEST_F(WakeLeaseTest, AddsElementOnlyOnce) {
 
   // Acquiring a lease again would check-fail if the element was added to the topology twice.
   GetExecutor().schedule_task(
-      wake_lease.Acquire()
+      wake_lease.Acquire(kTimeout)
           .and_then([&lease](fidl::Client<fuchsia_power_broker::LeaseControl>& acquired_lease) {
             lease = std::move(acquired_lease);
           })
@@ -202,7 +206,7 @@ TEST_F(WakeLeaseTest, WaitsForAddElementToComplete) {
 
   std::optional<fidl::Client<fuchsia_power_broker::LeaseControl>> lease;
   GetExecutor().schedule_task(
-      wake_lease.Acquire()
+      wake_lease.Acquire(kTimeout)
           .and_then([&lease](fidl::Client<fuchsia_power_broker::LeaseControl>& acquired_lease) {
             lease = std::move(acquired_lease);
           })
@@ -219,7 +223,7 @@ TEST_F(WakeLeaseTest, WaitsForAddElementToComplete) {
 
   std::optional<fidl::Client<fuchsia_power_broker::LeaseControl>> lease2;
   GetExecutor().schedule_task(
-      wake_lease.Acquire()
+      wake_lease.Acquire(kTimeout)
           .and_then([&lease2](fidl::Client<fuchsia_power_broker::LeaseControl>& acquired_lease) {
             lease2 = std::move(acquired_lease);
           })
@@ -262,7 +266,7 @@ TEST_F(WakeLeaseTest, WaitsUntilLeaseSatisfied) {
 
   std::optional<fidl::Client<fuchsia_power_broker::LeaseControl>> lease;
   GetExecutor().schedule_task(
-      wake_lease.Acquire()
+      wake_lease.Acquire(kTimeout)
           .and_then([&lease](fidl::Client<fuchsia_power_broker::LeaseControl>& acquired_lease) {
             lease = std::move(acquired_lease);
           })
@@ -311,7 +315,7 @@ TEST_F(WakeLeaseTest, GetPowerElementsFails) {
 
   std::optional<Error> error;
   GetExecutor().schedule_task(
-      wake_lease.Acquire()
+      wake_lease.Acquire(kTimeout)
           .and_then([](const fidl::Client<fuchsia_power_broker::LeaseControl>& acquired_lease) {
             FX_LOGS(FATAL) << "Unexpected success while acquiring lease";
           })
@@ -343,7 +347,7 @@ TEST_F(WakeLeaseTest, GracefulSubsequentFailuresAfterFailureToAddElement) {
 
   std::optional<Error> error;
   GetExecutor().schedule_task(
-      wake_lease.Acquire()
+      wake_lease.Acquire(kTimeout)
           .and_then([](const fidl::Client<fuchsia_power_broker::LeaseControl>& acquired_lease) {
             FX_LOGS(FATAL) << "Unexpected success while acquiring lease";
           })
@@ -357,7 +361,7 @@ TEST_F(WakeLeaseTest, GracefulSubsequentFailuresAfterFailureToAddElement) {
   // Subsequent requests should also fail gracefully.
   error = std::nullopt;
   GetExecutor().schedule_task(
-      wake_lease.Acquire()
+      wake_lease.Acquire(kTimeout)
           .and_then([](const fidl::Client<fuchsia_power_broker::LeaseControl>& acquired_lease) {
             FX_LOGS(FATAL) << "Unexpected success while acquiring lease";
           })
@@ -389,7 +393,7 @@ TEST_F(WakeLeaseTest, GetPowerElementsNoSagPowerElements) {
 
   std::optional<Error> error;
   GetExecutor().schedule_task(
-      wake_lease.Acquire()
+      wake_lease.Acquire(kTimeout)
           .and_then([](const fidl::Client<fuchsia_power_broker::LeaseControl>& acquired_lease) {
             FX_LOGS(FATAL) << "Unexpected success while acquiring lease";
           })
@@ -421,7 +425,7 @@ TEST_F(WakeLeaseTest, GetPowerElementsNoTokens) {
 
   std::optional<Error> error;
   GetExecutor().schedule_task(
-      wake_lease.Acquire()
+      wake_lease.Acquire(kTimeout)
           .and_then([](const fidl::Client<fuchsia_power_broker::LeaseControl>& acquired_lease) {
             FX_LOGS(FATAL) << "Unexpected success while acquiring lease";
           })
@@ -449,7 +453,7 @@ TEST_F(WakeLeaseTest, AddElementFails) {
 
   std::optional<Error> error;
   GetExecutor().schedule_task(
-      wake_lease.Acquire()
+      wake_lease.Acquire(kTimeout)
           .and_then([](const fidl::Client<fuchsia_power_broker::LeaseControl>& acquired_lease) {
             FX_LOGS(FATAL) << "Unexpected success while acquiring lease";
           })
@@ -479,7 +483,7 @@ TEST_F(WakeLeaseTest, LeaseFails) {
 
   std::optional<Error> error;
   GetExecutor().schedule_task(
-      wake_lease.Acquire()
+      wake_lease.Acquire(kTimeout)
           .and_then([](const fidl::Client<fuchsia_power_broker::LeaseControl>& acquired_lease) {
             FX_LOGS(FATAL) << "Unexpected success while acquiring lease";
           })
@@ -490,6 +494,36 @@ TEST_F(WakeLeaseTest, LeaseFails) {
   ASSERT_EQ(error, Error::kBadValue);
   EXPECT_TRUE(topology->ElementInTopology("exceptions-element-001"));
   EXPECT_FALSE(topology->IsLeaseActive("exceptions-element-001"));
+}
+
+TEST_F(WakeLeaseTest, LeaseFailsOnTimeout) {
+  auto sag_client_and_stub = CreateSag<stubs::SystemActivityGovernor>(dispatcher());
+  ASSERT_TRUE(sag_client_and_stub.has_value());
+  auto& [sag_client, sag] = *sag_client_and_stub;
+
+  auto topology_client_and_stub = CreateTopology<stubs::PowerBrokerTopology>(
+      dispatcher(),
+      /*construct_lessor=*/[dispatcher = dispatcher()](
+                               fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) {
+        return std::make_unique<stubs::PowerBrokerLessor>(std::move(server_end), dispatcher,
+                                                          fpb::LeaseStatus::kPending);
+      });
+  ASSERT_TRUE(topology_client_and_stub.has_value());
+  auto& [topology_client, topology] = *topology_client_and_stub;
+
+  WakeLease wake_lease(dispatcher(), "exceptions-element-001", std::move(sag_client),
+                       std::move(topology_client));
+
+  std::optional<Error> error;
+  GetExecutor().schedule_task(
+      wake_lease.Acquire(kTimeout)
+          .and_then([](const fidl::Client<fuchsia_power_broker::LeaseControl>& acquired_lease) {
+            FX_LOGS(FATAL) << "Unexpected success while acquiring lease";
+          })
+          .or_else([&error](const Error& result) { error = result; }));
+
+  RunLoopFor(kTimeout);
+  EXPECT_EQ(error, Error::kTimeout);
 }
 
 }  // namespace

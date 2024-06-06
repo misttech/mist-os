@@ -31,11 +31,13 @@ class WakeLease {
   // Note, the power element is added automatically when Acquire is called for the first time.
   //
   // The promise returned needs scheduled on an executor and will complete ok with the power lease
-  // channel if successful. If there is an error, the promise will return an error indicating why.
+  // channel if successful. If there is an error, the promise will return an error indicating why,
+  // e.g., the timeout has been hit and the lease couldn't be acquired.
   //
   // This function can be called many times. If the lease returned falls out of scope, the lease
   // will be dropped and can be later reacquired.
-  fpromise::promise<fidl::Client<::fuchsia_power_broker::LeaseControl>, Error> Acquire();
+  fpromise::promise<fidl::Client<::fuchsia_power_broker::LeaseControl>, Error> Acquire(
+      zx::duration timeout);
 
  private:
   // "Unsafe" because it does not have scoping to prevent |this| from being accessed in promise

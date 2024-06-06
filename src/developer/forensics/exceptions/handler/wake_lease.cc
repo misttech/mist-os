@@ -16,6 +16,7 @@
 
 #include "src/developer/forensics/exceptions/constants.h"
 #include "src/developer/forensics/utils/errors.h"
+#include "src/developer/forensics/utils/promise_timeout.h"
 #include "src/lib/fidl/cpp/contrib/fpromise/client.h"
 
 namespace forensics::exceptions::handler {
@@ -116,13 +117,13 @@ WakeLease::WakeLease(async_dispatcher_t* dispatcher, const std::string& power_el
       topology_(std::move(topology_client_end), dispatcher_, topology_event_handler_.get()),
       lease_control_event_handler_(std::make_unique<LeaseControlEventHandler>()) {}
 
-fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> WakeLease::Acquire() {
-  return UnsafeAcquire().wrap_with(scope_);
+fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> WakeLease::Acquire(
+    const zx::duration timeout) {
+  return MakePromiseTimeout<fidl::Client<fpb::LeaseControl>>(UnsafeAcquire().wrap_with(scope_),
+                                                             dispatcher_, timeout);
 }
 
 fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> WakeLease::UnsafeAcquire() {
-  // TODO(https://fxbug.dev/341104129): Timeout if lease doesn't become satisfied within a
-  // reasonable amount of time.
   if (add_power_element_called_) {
     return DoAcquireLease();
   }
