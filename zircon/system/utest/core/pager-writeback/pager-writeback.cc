@@ -7751,4 +7751,12 @@ TEST(PagerWriteback, QueryEarlyTermination) {
   EXPECT_EQ(actual, 2);
 }
 
+TEST(PagerWriteback, Unbounded) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  Vmo* vmo;
+  ASSERT_FALSE(pager.CreateVmoWithOptions(1, ZX_VMO_UNBOUNDED, &vmo));
+}
+
 }  // namespace pager_tests

@@ -228,6 +228,12 @@ bool UserPager::CreateVmoWithOptions(uint64_t size, uint32_t options, Vmo** vmo_
     return false;
   }
 
+  // Cannot create unbounded VMO.
+  if (options & ZX_VMO_UNBOUNDED) {
+    fprintf(stderr, "ZX_VMO_UNBOUNDED is not supported in this class.\n");
+    return false;
+  }
+
   zx::vmo vmo;
   size *= zx_system_get_page_size();
   zx_status_t status = pager_.create_vmo(options, port_, next_key_, size, &vmo);
