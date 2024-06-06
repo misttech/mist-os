@@ -18,6 +18,7 @@
 
 #include <re2/re2.h>
 
+#include "src/lib/fxl/log_settings_command_line.h"
 #include "src/lib/fxl/strings/string_number_conversions.h"
 #include "tools/fidlcat/lib/decode_options.h"
 
@@ -278,8 +279,7 @@ const char* const kVersionHelp = R"(  --version
 // passed to --quiet or --verbose), |multiplier| is a value by which a numerical
 // setting will be multiplied (basically, -1 for verbose and 1 for quiet), and
 // |settings| contains the output.
-bool SetLogSettings(const std::string& level, int multiplier,
-                    fuchsia_logging::LogSettings* settings) {
+bool SetLogSettings(const std::string& level, int multiplier, fxl::LogSettings* settings) {
   if (level == "trace") {
     settings->min_log_level = fuchsia_logging::LOG_TRACE;
   } else if (level == "debug") {
@@ -306,7 +306,7 @@ bool SetLogSettings(const std::string& level, int multiplier,
 }
 
 cmdline::Status ProcessLogOptions(const CommandLineOptions* options) {
-  fuchsia_logging::LogSettings settings;
+  fxl::LogSettings settings;
   if (options->verbose) {
     if (!SetLogSettings(*options->verbose, -1, &settings)) {
       return cmdline::Status::Error("Unable to parse verbose setting \"" + *options->verbose +
@@ -321,7 +321,25 @@ cmdline::Status ProcessLogOptions(const CommandLineOptions* options) {
   if (options->log_file) {
     settings.log_file = *options->log_file;
   }
-  fuchsia_logging::SetLogSettings(settings);
+  fuchsia_logging::LogSettingsBuilder builder;
+  if (settings.disable_interest_listener) {
+    builder.DisableInterestListener();
+  }
+  if (!settings.wait_for_initial_interest) {
+    builder.DisableWaitForInitialInterest();
+  }
+  builder.WithMinLogSeverity(settings.min_log_level);
+#ifndef __Fuchsia__
+  builder.WithLogFile(settings.log_file);
+#else
+  if (settings.single_threaded_dispatcher) {
+    builder.WithDispatcher(settings.single_threaded_dispatcher);
+  }
+  if (settings.log_sink) {
+    builder.WithLogSink(settings.log_sink);
+  }
+#endif
+  builder.BuildAndInitialize();
   return cmdline::Status::Ok();
 }
 
