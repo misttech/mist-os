@@ -17,7 +17,6 @@ mod time_source_manager;
 
 use anyhow::{Context as _, Result};
 use fidl::AsHandleRef;
-use fidl_fuchsia_time as fft;
 use futures::{
     channel::mpsc,
     future::{self, OptionFuture},
@@ -326,7 +325,7 @@ async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
 
         if let Err(status) = clock.signal_handle(
             zx::Signals::NONE,
-            zx::Signals::from_bits(fft::SIGNAL_UTC_CLOCK_LOGGING_QUALITY).unwrap(),
+            zx::Signals::from_bits(ftime::SIGNAL_UTC_CLOCK_LOGGING_QUALITY).unwrap(),
         ) {
             // Since userspace depends on this signal, we probably can not recover if
             // we can not signal.
