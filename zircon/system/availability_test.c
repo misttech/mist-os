@@ -9,13 +9,69 @@
 // __Fuchsia_API_level__. To "run the test," compile it at a variety of API
 // levels, including numbered API levels and named API levels such as PLATFORM.
 
+// =============================================================================
+// ZX_*_SINCE() macro tests.
+//
+// The following tests both the macro mechanics, including support for named levels such as `HEAD`,
+// and calling functions annotated with the macros in cases that won't cause errors. They cannot
+// test that deprecation warnings or compile errors are emitted.
+// =============================================================================
+
+void AddedAtLevel15(void) ZX_AVAILABLE_SINCE(15) {}
+void AddedAtHEAD(void) ZX_AVAILABLE_SINCE(HEAD) {}
+
+void DeprecatedAtLevel15(void) ZX_DEPRECATED_SINCE(14, 15, "Use AddedAtLevel15().") {}
+void DeprecatedAtHEAD(void) ZX_DEPRECATED_SINCE(14, HEAD, "Use AddedAtHEAD().") {}
+
+void RemovedAtLevel15(void) ZX_REMOVED_SINCE(12, 14, 15, "Use AddedAtLevel14().") {}
+void RemovedAtHEAD(void) ZX_REMOVED_SINCE(14, 15, HEAD, "Use AddedAtLevel15().") {}
+
+void CallVersionedFunctions(void) {
+#pragma clang diagnostic push
+// Ensure deprecation warnings are treated as errors so they would cause the test to fail.
+// This applies to the entire test unless temporarily overridden.
+#pragma clang diagnostic error "-Wdeprecated-declarations"
+
+  AddedAtLevel15();
+#if !defined(BUILT_AT_NUMBERED_API_LEVEL)
+  AddedAtHEAD();
+#endif
+
+  // Deprecation warnings that would occur must be suppressed to avoid failing the build..
+  // The warnings must always be suppressed for DeprecatedAtLevel15(), but only need to be
+  // suppressed for DeprecatedAtHEAD() at HEAD and higher because no warning should be produced at
+  // lower API levels.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  DeprecatedAtLevel15();
+#pragma clang diagnostic pop
+
+#pragma clang diagnostic push
+#if !defined(BUILT_AT_NUMBERED_API_LEVEL)
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
+  DeprecatedAtHEAD();
+#pragma clang diagnostic pop
+
+  // RemovedAtLevel15() cannot be called at any level at which this test is run.
+  // RemovedAtHEAD() can be called at any level below HEAD.
+#pragma clang diagnostic push
+#if defined(BUILT_AT_NUMBERED_API_LEVEL)
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  RemovedAtHEAD();
+#endif
+#pragma clang diagnostic pop
+
+#pragma clang diagnostic pop
+}
+
+// =============================================================================
+// FUCHSIA_API_LEVEL_*() macro tests.
+// =============================================================================
+
 #if defined(BUILT_AT_NUMBERED_API_LEVEL)
 
 // When targeting a numbered API level, we can test the macros at and around it.
-
-// TODO(ddorwin): Remove this once API level 15, the first level in availability_levels.inc, is
-// sunset and this file is thus not being built at that level.
-#define FUCHSIA_INTERNAL_LEVEL_14_() 14
 
 // Verify the preprocessor values defined by the build file.
 // Since the macros only accept literals, all relative levels must be provided as literals via
@@ -65,10 +121,10 @@
 #define EXPECT_IFF_NUMBERED_API_LEVEL(condition) \
   static_assert(condition, "`" #condition "` should be true for build at numbered API level.");
 #define EXPECT_IFF_PLATFORM_BUILD(condition) \
-  static_assert(!condition, "`" #condition "` should be false for build at numbered API level.");
+  static_assert(!(condition), "`" #condition "` should be false for build at numbered API level.");
 #else
 #define EXPECT_IFF_NUMBERED_API_LEVEL(condition) \
-  static_assert(!condition, "`" #condition "` should be false for PLATFORM build.");
+  static_assert(!(condition), "`" #condition "` should be false for PLATFORM build.");
 #define EXPECT_IFF_PLATFORM_BUILD(condition) \
   static_assert(condition, "`" #condition "` should be true for PLATFORM build.");
 #endif  // defined(BUILT_AT_NUMBERED_API_LEVEL)
@@ -79,7 +135,6 @@
 #define UINT32_MAX_PLUS_ONE() 4294967296
 
 // The tests use levels that are not supported in production. Define the necessary macros.
-#define FUCHSIA_INTERNAL_LEVEL_9_() 9
 #define FUCHSIA_INTERNAL_LEVEL_10000_() 10000
 #define FUCHSIA_INTERNAL_LEVEL_2147483648_() 2147483648
 #define FUCHSIA_INTERNAL_LEVEL_4294967296_() 4294967296

@@ -6,11 +6,12 @@
 // It is a separate file to allow API level support to evolve separately from the
 // API level-independent macros in that file.
 
-// Special named API levels.
+// Special named API levels, which are defined in
+// https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0246_api_levels_are_32_bits.
+// TODO(https://fxbug.dev/326277078): Add support for `NEXT` as a parameter.
+// #define FUCHSIA_INTERNAL_LEVEL_NEXT_() 4291821568
 #define FUCHSIA_INTERNAL_LEVEL_HEAD_() 4292870144
 #define FUCHSIA_INTERNAL_LEVEL_PLATFORM_() 4293918720
-// TODO(https://fxbug.dev/323889271): Add support for `NEXT` as a parameter.
-// #define FUCHSIA_INTERNAL_LEVEL_NEXT_() TBD
 
 // Published stable API levels.
 //
@@ -26,7 +27,7 @@
 // `NEXT` API level.
 //
 // TODO(https://fxbug.dev/42084512): Generate the numbered levels from version_history.json.
-// TODO(https://fxbug.dev/323889271): Remove the in-development API level number
+// TODO(https://fxbug.dev/326277078): Remove the in-development API level number
 // once `NEXT` is supported.
 #define FUCHSIA_INTERNAL_LEVEL_21_() 21
 #define FUCHSIA_INTERNAL_LEVEL_20_() 20
@@ -35,3 +36,13 @@
 #define FUCHSIA_INTERNAL_LEVEL_17_() 17
 #define FUCHSIA_INTERNAL_LEVEL_16_() 16
 #define FUCHSIA_INTERNAL_LEVEL_15_() 15
+
+// The following older levels are needed for in-tree instances of the ZX_*_SINCE() macros.
+#define FUCHSIA_INTERNAL_LEVEL_14_() 14
+#define FUCHSIA_INTERNAL_LEVEL_12_() 12
+#define FUCHSIA_INTERNAL_LEVEL_11_() 11
+#define FUCHSIA_INTERNAL_LEVEL_10_() 10
+#define FUCHSIA_INTERNAL_LEVEL_9_() 9
+#define FUCHSIA_INTERNAL_LEVEL_8_() 8
+#define FUCHSIA_INTERNAL_LEVEL_7_() 7
+#define FUCHSIA_INTERNAL_LEVEL_1_() 1
