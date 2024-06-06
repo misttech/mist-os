@@ -236,7 +236,7 @@
 
 - name: 'Media'
   api_primary: 'dalesat@google.com'
-  api_secondary: ''
+  api_secondary: 'ypomortsev@google.com'
   description: |
     The set of APIs used to capture, process and render audio and video streams.
     The media APIs also encompass adjacent concerns such as volume control and
@@ -333,8 +333,8 @@
     - fidl: 'fuchsia.tee'
 
 - name: 'Sessions'
-  api_primary: 'ypomortsev@google.com'
-  api_secondary: ''
+  api_primary: 'quiche@google.com'
+  api_secondary: 'neelsa@google.com'
   description: |
     <p>
       A set of APIs to coordinate a product's user experience. Specifically the
