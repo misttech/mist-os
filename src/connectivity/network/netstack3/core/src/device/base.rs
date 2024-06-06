@@ -18,48 +18,48 @@ use net_types::{
     },
     map_ip_twice, MulticastAddr, SpecifiedAddr, Witness as _,
 };
+use netstack3_base::{
+    sync::{PrimaryRc, StrongRc, WeakRc},
+    CounterContext, ExistsError, NotFoundError, ReceivableFrameMeta, ReferenceNotifiersExt,
+    RemoveResourceResultWithContext, ResourceCounterContext,
+};
 use netstack3_base::{AnyDevice, DeviceIdContext, RecvIpFrameMeta};
+use netstack3_device::{
+    ethernet::{
+        self, EthernetDeviceCounters, EthernetDeviceId, EthernetIpLinkDeviceDynamicStateContext,
+        EthernetLinkDevice, EthernetPrimaryDeviceId, EthernetWeakDeviceId,
+    },
+    for_any_device_id,
+    loopback::{self, LoopbackDevice, LoopbackDeviceId, LoopbackPrimaryDeviceId},
+    pure_ip::{self, PureIpDeviceCounters, PureIpDeviceId},
+    queue::TransmitQueueHandler,
+    socket, ArpCounters, BaseDeviceId, DeviceCollectionContext, DeviceConfigurationContext,
+    DeviceCounters, DeviceId, DeviceLayerState, DeviceStateSpec, Devices, DevicesIter,
+    IpLinkDeviceState, IpLinkDeviceStateInner, Ipv6DeviceLinkLayerAddr, OriginTracker,
+    OriginTrackerContext, WeakDeviceId,
+};
+use netstack3_filter::{IpPacket, ProofOfEgressCheck};
+use netstack3_ip::{
+    self as ip,
+    device::{
+        AddressIdIter, AssignedAddress as _, DualStackIpDeviceState, IpDeviceAddressContext,
+        IpDeviceAddressIdContext, IpDeviceConfigurationContext, IpDeviceFlags, IpDeviceIpExt,
+        IpDeviceSendContext, IpDeviceStateContext, Ipv4AddressEntry, Ipv4AddressState,
+        Ipv4DeviceConfiguration, Ipv6AddressEntry, Ipv6AddressState, Ipv6DadState, Ipv6DeviceAddr,
+        Ipv6DeviceConfiguration, Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
+        Ipv6NetworkLearnedParameters,
+    },
+    nud::{
+        ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler, NudIpHandler, NudUserConfig,
+    },
+    IpForwardingDeviceContext, IpTypesIpExt, RawMetric,
+};
 use packet::{BufferMut, Serializer};
 use packet_formats::ethernet::EthernetIpExt;
 
 use crate::{
-    context::{
-        prelude::*, CoreCtxAndResource, CounterContext, Locked, ReceivableFrameMeta,
-        ReferenceNotifiersExt as _, ResourceCounterContext, WrapLockLevel,
-    },
-    device::{
-        ethernet::{
-            self, EthernetDeviceCounters, EthernetDeviceId,
-            EthernetIpLinkDeviceDynamicStateContext, EthernetLinkDevice, EthernetPrimaryDeviceId,
-            EthernetWeakDeviceId,
-        },
-        for_any_device_id,
-        loopback::{self, LoopbackDevice, LoopbackDeviceId, LoopbackPrimaryDeviceId},
-        pure_ip::{self, PureIpDeviceCounters, PureIpDeviceId},
-        queue::TransmitQueueHandler,
-        socket, ArpCounters, BaseDeviceId, DeviceCollectionContext, DeviceConfigurationContext,
-        DeviceCounters, DeviceId, DeviceLayerState, DeviceStateSpec, Devices, DevicesIter,
-        IpLinkDeviceState, IpLinkDeviceStateInner, Ipv6DeviceLinkLayerAddr, OriginTracker,
-        OriginTrackerContext, WeakDeviceId,
-    },
-    error::{ExistsError, NotFoundError},
-    filter::{IpPacket, ProofOfEgressCheck},
-    ip::{
-        device::{
-            AddressIdIter, AssignedAddress as _, DualStackIpDeviceState, IpDeviceAddressContext,
-            IpDeviceAddressIdContext, IpDeviceConfigurationContext, IpDeviceFlags, IpDeviceIpExt,
-            IpDeviceSendContext, IpDeviceStateContext, Ipv4AddressEntry, Ipv4AddressState,
-            Ipv4DeviceConfiguration, Ipv6AddressEntry, Ipv6AddressState, Ipv6DadState,
-            Ipv6DeviceAddr, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationContext,
-            Ipv6DeviceContext, Ipv6NetworkLearnedParameters,
-        },
-        integration::CoreCtxWithIpDeviceConfiguration,
-        nud::{
-            ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler, NudIpHandler, NudUserConfig,
-        },
-        IpForwardingDeviceContext, IpTypesIpExt, RawMetric,
-    },
-    sync::{PrimaryRc, RemoveResourceResultWithContext, StrongRc, WeakRc},
+    context::{prelude::*, CoreCtxAndResource, Locked, WrapLockLevel},
+    ip::integration::CoreCtxWithIpDeviceConfiguration,
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 
@@ -175,10 +175,10 @@ where
         let device = device.into();
         match I::VERSION {
             IpVersion::V4 => {
-                crate::ip::receive_ipv4_packet(core_ctx, bindings_ctx, &device, frame_dst, frame)
+                ip::receive_ipv4_packet(core_ctx, bindings_ctx, &device, frame_dst, frame)
             }
             IpVersion::V6 => {
-                crate::ip::receive_ipv6_packet(core_ctx, bindings_ctx, &device, frame_dst, frame)
+                ip::receive_ipv6_packet(core_ctx, bindings_ctx, &device, frame_dst, frame)
             }
         }
     }

@@ -15,7 +15,11 @@ use alloc::vec;
 use assert_matches::assert_matches;
 
 use net_types::{ip::Ipv4, Witness as _};
-use netstack3_base::{bench, testutil::Bencher};
+use netstack3_base::{bench, testutil::Bencher, testutil::TEST_ADDRS_V4};
+use netstack3_device::{
+    ethernet::{EthernetLinkDevice, RecvEthernetFrameMeta},
+    DeviceId,
+};
 use packet::{Buf, InnerPacketBuilder, Serializer};
 use packet_formats::{
     ethernet::{
@@ -33,12 +37,8 @@ use packet_formats::{
 };
 
 use crate::{
-    device::{
-        ethernet::{EthernetLinkDevice, RecvEthernetFrameMeta},
-        DeviceId,
-    },
     state::StackStateBuilder,
-    testutil::{CtxPairExt as _, FakeCtxBuilder, TEST_ADDRS_V4},
+    testutil::{CtxPairExt as _, FakeCtxBuilder},
 };
 
 // NOTE: Extra tests that are too expensive to run during benchmarks can be

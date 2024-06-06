@@ -12,7 +12,10 @@ use net_types::{
     ip::{AddrSubnet, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv6, Ipv6Addr},
     MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
 };
-use netstack3_base::FrameDestination;
+use netstack3_base::{
+    testutil::{new_rng, TestIpExt, TEST_ADDRS_V4},
+    FrameDestination,
+};
 use netstack3_core::{
     device::{DeviceId, EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta},
     error::NotFoundError,
@@ -21,12 +24,12 @@ use netstack3_core::{
         SlaacConfiguration,
     },
     testutil::{
-        new_rng, CtxPairExt as _, FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeCtxBuilder, TestIpExt,
-        DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE, TEST_ADDRS_V4,
+        CtxPairExt as _, FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeCtxBuilder,
+        DEFAULT_INTERFACE_METRIC,
     },
     IpExt,
 };
-use netstack3_device::ethernet;
+use netstack3_device::{ethernet, testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE};
 use netstack3_ip::device::{IpAddressId as _, IpDeviceStateContext};
 use packet::{Buf, Serializer as _};
 use packet_formats::{

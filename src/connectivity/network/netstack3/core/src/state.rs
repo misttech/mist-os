@@ -5,31 +5,33 @@
 //! Structs containing the entire stack state.
 
 use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
+use netstack3_base::{BuildableCoreContext, ContextProvider, CoreTimerContext, CtxPair};
+use netstack3_device::{DeviceId, DeviceLayerState};
+use netstack3_ip::{
+    self as ip, icmp::IcmpState, nud::NudCounters, IpLayerIpExt, IpLayerTimerId, IpStateInner,
+    Ipv4State, Ipv6State,
+};
+use netstack3_tcp::TcpCounters;
+use netstack3_udp::UdpCounters;
 
 use crate::{
     api::CoreApi,
-    context::{BuildableCoreContext, ContextProvider, CoreTimerContext, CtxPair},
-    device::{DeviceId, DeviceLayerState},
-    ip::{
-        self, icmp::IcmpState, nud::NudCounters, IpLayerIpExt, IpLayerTimerId, IpStateInner,
-        Ipv4State, Ipv6State,
-    },
     time::TimerId,
-    transport::{self, tcp::TcpCounters, udp::UdpCounters, TransportLayerState},
+    transport::{TransportLayerState, TransportStateBuilder},
     BindingsContext, BindingsTypes, CoreCtx,
 };
 
 /// A builder for [`StackState`].
 #[derive(Default, Clone)]
 pub struct StackStateBuilder {
-    transport: transport::TransportStateBuilder,
+    transport: TransportStateBuilder,
     ipv4: ip::Ipv4StateBuilder,
     ipv6: ip::Ipv6StateBuilder,
 }
 
 impl StackStateBuilder {
     /// Get the builder for the transport layer state.
-    pub fn transport_builder(&mut self) -> &mut transport::TransportStateBuilder {
+    pub fn transport_builder(&mut self) -> &mut TransportStateBuilder {
         &mut self.transport
     }
 

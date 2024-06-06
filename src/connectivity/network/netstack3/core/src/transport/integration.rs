@@ -8,22 +8,20 @@ use lock_order::{
 };
 use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
 use netstack3_base::{
-    CoreTimerContext, CounterContext, Uninstantiable, UninstantiableWrapper, WeakDeviceIdentifier,
+    socket::MaybeDualStack, CoreTimerContext, CounterContext, Uninstantiable,
+    UninstantiableWrapper, WeakDeviceIdentifier,
 };
 use netstack3_datagram as datagram;
+use netstack3_device::WeakDeviceId;
+use netstack3_tcp::{
+    self as tcp, IsnGenerator, TcpContext, TcpCounters, TcpDemuxContext, TcpDualStackContext,
+    TcpSocketId, TcpSocketSet, TcpSocketState, WeakTcpSocketId,
+};
+use netstack3_udp::{self as udp, UdpCounters, UdpSocketId, UdpSocketSet, UdpSocketState};
 
 use crate::{
     context::{prelude::*, WrapLockLevel},
-    device::WeakDeviceId,
-    socket::MaybeDualStack,
-    transport::{
-        tcp::{
-            self, IsnGenerator, TcpContext, TcpCounters, TcpDemuxContext, TcpDualStackContext,
-            TcpSocketId, TcpSocketSet, TcpSocketState, WeakTcpSocketId,
-        },
-        udp::{self, UdpCounters, UdpSocketId, UdpSocketSet, UdpSocketState},
-        TransportLayerTimerId,
-    },
+    transport::TransportLayerTimerId,
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 

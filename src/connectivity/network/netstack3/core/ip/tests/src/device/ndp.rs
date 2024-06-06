@@ -43,7 +43,10 @@ use tracing::trace;
 use zerocopy::ByteSlice;
 
 use netstack3_base::{
-    testutil::{FakeInstant, FakeNetwork, FakeNetworkLinks, StepResult},
+    testutil::{
+        assert_empty, set_logger_for_test, FakeInstant, FakeNetwork, FakeNetworkLinks, StepResult,
+        TestIpExt, TEST_ADDRS_V6,
+    },
     FrameDestination, InstantContext as _, RngContext as _,
 };
 use netstack3_core::{
@@ -52,12 +55,12 @@ use netstack3_core::{
         MaxEthernetFrameSize,
     },
     testutil::{
-        assert_empty, new_simple_fake_network, set_logger_for_test, Ctx, CtxPairExt as _,
-        DispatchedFrame, FakeBindingsCtx, FakeCtx, FakeCtxBuilder, FakeCtxNetworkSpec, TestIpExt,
-        DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE, TEST_ADDRS_V6,
+        new_simple_fake_network, Ctx, CtxPairExt as _, DispatchedFrame, FakeBindingsCtx, FakeCtx,
+        FakeCtxBuilder, FakeCtxNetworkSpec, DEFAULT_INTERFACE_METRIC,
     },
     BindingsTypes, Instant, TimerId,
 };
+use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::{
     self as ip,
     device::{

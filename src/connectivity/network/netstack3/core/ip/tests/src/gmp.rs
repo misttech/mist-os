@@ -23,14 +23,13 @@ use packet_formats::{
     },
 };
 
+use netstack3_base::testutil::{TestAddrs, TestIpExt as _};
 use netstack3_core::{
     device::{DeviceId, EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
-    testutil::{
-        CtxPairExt as _, FakeBindingsCtx, FakeCtx, TestAddrs, TestIpExt as _,
-        DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-    },
+    testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC},
     InstantContext as _, StackStateBuilder, TimerId,
 };
+use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::{
     device::{
         IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv4DeviceTimerId,

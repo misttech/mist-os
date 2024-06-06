@@ -37,17 +37,14 @@
 
 use lock_order::Unlocked;
 
+use netstack3_base::ContextProvider;
+use netstack3_device as device;
+use netstack3_ip as ip;
+use netstack3_udp as udp;
+
 use crate::{
     marker::{BindingsContext, BindingsTypes},
     state::StackState,
-};
-
-pub use netstack3_base::{
-    BuildableCoreContext, ContextPair, ContextProvider, CoreTimerContext, CounterContext, CtxPair,
-    DeferredResourceRemovalContext, EventContext, HandleableTimer, InstantBindingsTypes,
-    InstantContext, ReceivableFrameMeta, ReferenceNotifiers, ReferenceNotifiersExt,
-    ResourceCounterContext, RngContext, TimerBindingsTypes, TimerContext, TimerHandler,
-    TracingContext,
 };
 
 // Enable all blanket implementations on CoreCtx.
@@ -57,24 +54,12 @@ pub use netstack3_base::{
 // individually so it's easier to split things into separate crates and avoids
 // playing whack-a-mole with single markers that work for some traits/crates but
 // not others.
-impl<BC: BindingsContext, L> crate::ip::marker::UseTransportIpContextBlanket
-    for CoreCtx<'_, BC, L>
-{
-}
-impl<BC: BindingsContext, L> crate::ip::marker::UseIpSocketContextBlanket for CoreCtx<'_, BC, L> {}
-impl<BC: BindingsContext, L> crate::ip::marker::UseIpSocketHandlerBlanket for CoreCtx<'_, BC, L> {}
-impl<BC: BindingsContext, L> crate::ip::marker::UseDeviceIpSocketHandlerBlanket
-    for CoreCtx<'_, BC, L>
-{
-}
-impl<BC: BindingsContext, L> crate::transport::udp::UseUdpIpTransportContextBlanket
-    for CoreCtx<'_, BC, L>
-{
-}
-impl<BC: BindingsContext, L> crate::device::marker::UseArpFrameMetadataBlanket
-    for CoreCtx<'_, BC, L>
-{
-}
+impl<BC: BindingsContext, L> ip::marker::UseTransportIpContextBlanket for CoreCtx<'_, BC, L> {}
+impl<BC: BindingsContext, L> ip::marker::UseIpSocketContextBlanket for CoreCtx<'_, BC, L> {}
+impl<BC: BindingsContext, L> ip::marker::UseIpSocketHandlerBlanket for CoreCtx<'_, BC, L> {}
+impl<BC: BindingsContext, L> ip::marker::UseDeviceIpSocketHandlerBlanket for CoreCtx<'_, BC, L> {}
+impl<BC: BindingsContext, L> udp::UseUdpIpTransportContextBlanket for CoreCtx<'_, BC, L> {}
+impl<BC: BindingsContext, L> device::marker::UseArpFrameMetadataBlanket for CoreCtx<'_, BC, L> {}
 
 /// Provides access to core context implementations.
 ///
@@ -206,16 +191,4 @@ mod locked {
     /// `LockBefore` trait bound) it must be wrapped in `WrapLockLevel` for
     /// compilation with `cfg(no_lock_order)` to succeed.
     pub(crate) type WrapLockLevel<L> = <L as WrappedLockLevel>::LockLevel;
-}
-
-/// Fake implementations of context traits.
-#[cfg(any(test, feature = "testutils"))]
-pub(crate) mod testutil {
-    // TODO(https://fxbug.dev/342685842): Remove this re-export.
-    pub use netstack3_base::testutil::{
-        FakeBindingsCtx, FakeCoreCtx, FakeCryptoRng, FakeEventCtx, FakeFrameCtx, FakeInstant,
-        FakeInstantCtx, FakeNetwork, FakeNetworkLinks, FakeNetworkSpec, FakeTimerCtx,
-        FakeTimerCtxExt, FakeTracingCtx, InstantAndData, PendingFrame, PendingFrameData,
-        StepResult, WithFakeFrameContext, WithFakeTimerContext,
-    };
 }

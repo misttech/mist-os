@@ -18,18 +18,21 @@ use net_types::{
 };
 use test_case::test_case;
 
-use netstack3_base::{testutil::FakeInstant, InstantContext as _};
+use netstack3_base::{
+    testutil::{assert_empty, FakeInstant, TestIpExt as _},
+    InstantContext as _,
+};
 use netstack3_core::{
     device::{
         DeviceId, EthernetCreationProperties, EthernetLinkDevice, LoopbackCreationProperties,
         LoopbackDevice, MaxEthernetFrameSize,
     },
     testutil::{
-        assert_empty, Ctx, CtxPairExt as _, DispatchedEvent, FakeBindingsCtx, FakeCtx,
-        TestIpExt as _, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+        Ctx, CtxPairExt as _, DispatchedEvent, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC,
     },
     IpExt, StackStateBuilder, TimerId,
 };
+use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::{
     device::{
         AddressRemovedReason, DadTimerId, IpAddressId as _, IpAddressState, IpDeviceConfiguration,

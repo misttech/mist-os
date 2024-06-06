@@ -26,13 +26,13 @@ use packet_formats::{
     udp::UdpPacketBuilder,
 };
 
-use netstack3_base::FrameDestination;
+use netstack3_base::{
+    testutil::{set_logger_for_test, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6},
+    FrameDestination,
+};
 use netstack3_core::{
     device::DeviceId,
-    testutil::{
-        set_logger_for_test, Ctx, CtxPairExt as _, FakeBindingsCtx, FakeCtxBuilder, TestIpExt,
-        TEST_ADDRS_V4, TEST_ADDRS_V6,
-    },
+    testutil::{Ctx, CtxPairExt as _, FakeBindingsCtx, FakeCtxBuilder},
     IpExt, StackStateBuilder,
 };
 use netstack3_ip::icmp::Icmpv4StateBuilder;

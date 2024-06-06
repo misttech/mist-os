@@ -59,28 +59,14 @@ mod integration;
 
 use derivative::Derivative;
 use net_types::ip::{Ip, Ipv4, Ipv6};
+use netstack3_base::{HandleableTimer, TimerHandler};
 use netstack3_datagram as datagram;
+use netstack3_device::WeakDeviceId;
 use netstack3_icmp_echo::IcmpSockets;
+use netstack3_tcp::{self as tcp, TcpCounters, TcpState, TcpTimerId};
+use netstack3_udp::{UdpCounters, UdpState, UdpStateBuilder};
 
-use crate::{
-    context::{HandleableTimer, TimerHandler},
-    device::WeakDeviceId,
-    transport::{
-        tcp::{TcpCounters, TcpState, TcpTimerId},
-        udp::{UdpCounters, UdpState, UdpStateBuilder},
-    },
-    BindingsContext, BindingsTypes,
-};
-
-// TODO(https://fxbug.dev/342685842): Remove this re-export.
-pub(crate) mod tcp {
-    pub(crate) use netstack3_tcp::*;
-}
-
-// TODO(https://fxbug.dev/342685842): Remove this re-export.
-pub(crate) mod udp {
-    pub(crate) use netstack3_udp::*;
-}
+use crate::{BindingsContext, BindingsTypes};
 
 /// A builder for transport layer state.
 #[derive(Default, Clone)]

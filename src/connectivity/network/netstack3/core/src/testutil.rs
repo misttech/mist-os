@@ -29,85 +29,59 @@ use net_types::{
     },
     MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
-use netstack3_base::{FrameDestination, LinkDevice, RemoveResourceResult};
-use netstack3_filter::FilterTimerId;
+use netstack3_base::{
+    sync::{DynDebugReferences, Mutex},
+    testutil::{
+        FakeCryptoRng, FakeFrameCtx, FakeInstant, FakeNetwork, FakeNetworkLinks, FakeNetworkSpec,
+        FakeTimerCtx, FakeTimerCtxExt, MonotonicIdentifier, TestAddrs, WithFakeFrameContext,
+        WithFakeTimerContext,
+    },
+    AddressResolutionFailed, CtxPair, DeferredResourceRemovalContext, EventContext,
+    FrameDestination, InstantBindingsTypes, InstantContext, LinkDevice, NotFoundError,
+    ReferenceNotifiers, RemoveResourceResult, RngContext, TimerBindingsTypes, TimerContext,
+    TimerHandler, TracingContext, WorkQueueReport,
+};
+use netstack3_device::{
+    self as device,
+    ethernet::{
+        EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
+        RecvEthernetFrameMeta,
+    },
+    loopback::{LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId},
+    pure_ip::{PureIpDeviceId, PureIpWeakDeviceId},
+    queue::{ReceiveQueueBindingsContext, TransmitQueueBindingsContext},
+    socket::{DeviceSocketBindingsContext, DeviceSocketTypes},
+    testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+    DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceLayerTypes,
+    DeviceSendFrameError, WeakDeviceId,
+};
+use netstack3_filter::{FilterBindingsTypes, FilterTimerId};
 use netstack3_icmp_echo::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId};
+use netstack3_ip::{
+    self as ip,
+    device::{
+        IpDeviceConfiguration, IpDeviceConfigurationUpdate, IpDeviceEvent,
+        Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+    },
+    nud::{self, LinkResolutionContext, LinkResolutionNotifier},
+    raw::{RawIpSocketId, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes},
+    AddRouteError, AddableEntryEither, AddableMetric, IpLayerEvent, IpLayerTimerId, RawMetric,
+};
+use netstack3_tcp::{
+    testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer},
+    BufferSizes, RingBuffer, TcpBindingsTypes,
+};
+use netstack3_udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId};
 use packet::{Buf, BufferMut};
 use zerocopy::ByteSlice;
 
 use crate::{
-    context::{
-        prelude::*,
-        testutil::{
-            FakeFrameCtx, FakeInstant, FakeNetwork, FakeNetworkLinks, FakeNetworkSpec,
-            FakeTimerCtx, FakeTimerCtxExt, WithFakeFrameContext, WithFakeTimerContext,
-        },
-        CtxPair, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes,
-        InstantContext, ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext,
-        TimerHandler, TracingContext, UnlockedCoreCtx,
-    },
-    device::{
-        ethernet::{
-            EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
-        },
-        loopback::{LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId},
-        pure_ip::{PureIpDeviceId, PureIpWeakDeviceId},
-        queue::{ReceiveQueueBindingsContext, TransmitQueueBindingsContext},
-        DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceLayerTypes,
-        DeviceSendFrameError, WeakDeviceId,
-    },
-    filter::FilterBindingsTypes,
-    ip::{
-        self,
-        device::{
-            IpDeviceConfigurationUpdate, IpDeviceEvent, Ipv4DeviceConfigurationUpdate,
-            Ipv6DeviceConfigurationUpdate,
-        },
-        nud::{self, LinkResolutionContext, LinkResolutionNotifier},
-        raw::{RawIpSocketId, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes},
-        AddRouteError, AddableEntryEither, AddableMetric, IpDeviceConfiguration, IpLayerEvent,
-        IpLayerTimerId, RawMetric,
-    },
+    api::CoreApi,
+    context::{prelude::*, UnlockedCoreCtx},
     state::{StackState, StackStateBuilder},
-    sync::{DynDebugReferences, Mutex},
     time::{TimerId, TimerIdInner},
-    transport::{
-        tcp::{
-            testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer},
-            BufferSizes, RingBuffer, TcpBindingsTypes,
-        },
-        udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId},
-    },
-    types::WorkQueueReport,
-    BindingsContext, BindingsTypes,
+    BindingsContext, BindingsTypes, IpExt,
 };
-
-// TODO(https://fxbug.dev/342685842): Remove all re-exports from foreign crates.
-
-pub use netstack3_base::testutil::{
-    assert_empty, new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng,
-    MonotonicIdentifier, TestAddrs, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
-};
-
-pub use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
-
-/// NDP test utilities.
-pub mod ndp {
-    pub use crate::ip::icmp::testutil::{
-        neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet,
-    };
-}
-/// Context test utilities.
-pub mod context {
-    pub use crate::context::testutil::*;
-}
-
-/// TCP test utilities.
-pub mod tcp {
-    pub use crate::transport::tcp::testutil::{
-        ClientBuffers, ProvidedBuffers, WriteBackClientBuffers,
-    };
-}
 
 /// The default interface routing metric for test interfaces.
 pub const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
@@ -123,10 +97,10 @@ pub trait CtxPairExt<BC: BindingsContext> {
     /// a core context.
     fn contexts(&mut self) -> (UnlockedCoreCtx<'_, BC>, &mut BC);
 
-    /// Retrieves a [`crate::api::CoreApi`] from this context pair.
-    fn core_api(&mut self) -> crate::api::CoreApi<'_, &mut BC> {
+    /// Retrieves a [`CoreApi`] from this context pair.
+    fn core_api(&mut self) -> CoreApi<'_, &mut BC> {
         let (core_ctx, bindings_ctx) = self.contexts();
-        crate::api::CoreApi::new(CtxPair { core_ctx, bindings_ctx })
+        CoreApi::new(CtxPair { core_ctx, bindings_ctx })
     }
 
     /// Like [`CtxPairExt::contexts`], but retrieves only the core context.
@@ -203,17 +177,17 @@ pub struct TestApi<'a, BT: BindingsTypes>(UnlockedCoreCtx<'a, BT>, &'a mut BT);
 
 impl<'l, BC> TestApi<'l, BC>
 where
-    BC: crate::BindingsContext,
+    BC: BindingsContext,
 {
     fn contexts(&mut self) -> (&mut UnlockedCoreCtx<'l, BC>, &mut BC) {
         let Self(core_ctx, bindings_ctx) = self;
         (core_ctx, bindings_ctx)
     }
 
-    fn core_api(&mut self) -> crate::api::CoreApi<'_, &mut BC> {
+    fn core_api(&mut self) -> CoreApi<'_, &mut BC> {
         let (core_ctx, bindings_ctx) = self.contexts();
         let core_ctx = core_ctx.as_owned();
-        crate::api::CoreApi::new(crate::context::CtxPair { core_ctx, bindings_ctx })
+        CoreApi::new(CtxPair { core_ctx, bindings_ctx })
     }
 
     /// Joins the multicast group `multicast_addr` for `device`.
@@ -223,7 +197,7 @@ where
         device: &DeviceId<BC>,
         multicast_addr: MulticastAddr<A>,
     ) where
-        A::Version: crate::IpExt,
+        A::Version: IpExt,
     {
         let (core_ctx, bindings_ctx) = self.contexts();
         ip::device::join_ip_multicast::<A::Version, _, _>(
@@ -241,7 +215,7 @@ where
         device: &DeviceId<BC>,
         multicast_addr: MulticastAddr<A>,
     ) where
-        A::Version: crate::IpExt,
+        A::Version: IpExt,
     {
         let (core_ctx, bindings_ctx) = self.contexts();
         ip::device::leave_ip_multicast::<A::Version, _, _>(
@@ -260,7 +234,7 @@ where
         addr: MulticastAddr<A>,
     ) -> bool
     where
-        A::Version: crate::IpExt,
+        A::Version: IpExt,
     {
         use ip::{
             AddressStatus, IpDeviceStateContext, IpLayerIpExt, Ipv4PresentAddressStatus,
@@ -339,7 +313,7 @@ where
     pub fn del_routes_to_subnet(
         &mut self,
         subnet: net_types::ip::SubnetEither,
-    ) -> Result<(), crate::error::NotFoundError> {
+    ) -> Result<(), NotFoundError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         match subnet {
             SubnetEither::V4(subnet) => {
@@ -377,7 +351,7 @@ where
     /// Enables or disables the device for IP version `I` and returns whether it
     /// was enabled before.
     #[netstack3_macros::context_ip_bounds(I, BC, crate)]
-    pub fn set_ip_device_enabled<I: crate::IpExt>(
+    pub fn set_ip_device_enabled<I: IpExt>(
         &mut self,
         device: &DeviceId<BC>,
         enabled: bool,
@@ -397,11 +371,7 @@ where
 
     /// Enables or disables IP packet routing on `device`.
     #[netstack3_macros::context_ip_bounds(I, BC, crate)]
-    pub fn set_forwarding_enabled<I: crate::IpExt>(
-        &mut self,
-        device: &DeviceId<BC>,
-        enabled: bool,
-    ) {
+    pub fn set_forwarding_enabled<I: IpExt>(&mut self, device: &DeviceId<BC>, enabled: bool) {
         let _config = self
             .core_api()
             .device_ip::<I>()
@@ -418,7 +388,7 @@ where
 
     /// Returns whether IP packet routing is enabled on `device`.
     #[netstack3_macros::context_ip_bounds(I, BC, crate)]
-    pub fn is_forwarding_enabled<I: crate::IpExt>(&mut self, device: &DeviceId<BC>) -> bool {
+    pub fn is_forwarding_enabled<I: IpExt>(&mut self, device: &DeviceId<BC>) -> bool {
         let configuration = self.core_api().device_ip::<I>().get_configuration(device);
         let IpDeviceConfiguration { forwarding_enabled, .. } = configuration.as_ref();
         *forwarding_enabled
@@ -500,13 +470,13 @@ pub struct FakeBindingsCtxState {
 }
 
 impl FakeBindingsCtxState {
-    pub(crate) fn udp_state_mut<I: crate::IpExt>(
+    pub(crate) fn udp_state_mut<I: IpExt>(
         &mut self,
     ) -> &mut HashMap<UdpSocketId<I, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>, Vec<Vec<u8>>>
     {
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
-        struct Wrapper<'a, I: crate::IpExt>(
+        struct Wrapper<'a, I: IpExt>(
             &'a mut HashMap<
                 UdpSocketId<I, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>,
                 Vec<Vec<u8>>,
@@ -526,14 +496,14 @@ pub type FakeCtx = Ctx<FakeBindingsCtx>;
 /// Shorthand for [`StackState`] that uses a [`FakeBindingsCtx`].
 pub type FakeCoreCtx = StackState<FakeBindingsCtx>;
 
-type InnerFakeBindingsCtx = crate::context::testutil::FakeBindingsCtx<
+type InnerFakeBindingsCtx = netstack3_base::testutil::FakeBindingsCtx<
     TimerId<FakeBindingsCtx>,
     DispatchedEvent,
     FakeBindingsCtxState,
     DispatchedFrame,
 >;
 
-/// Test-only implementation of [`crate::BindingsContext`].
+/// Test-only implementation of [`BindingsContext`].
 #[derive(Default, Clone)]
 pub struct FakeBindingsCtx(Arc<Mutex<InnerFakeBindingsCtx>>);
 
@@ -678,7 +648,7 @@ impl FakeBindingsCtx {
     }
 
     /// Takes all the received ICMP replies for a given `conn`.
-    pub fn take_icmp_replies<I: crate::IpExt>(
+    pub fn take_icmp_replies<I: IpExt>(
         &mut self,
         conn: &IcmpSocketId<I, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>,
     ) -> Vec<Vec<u8>> {
@@ -692,7 +662,7 @@ impl FakeBindingsCtx {
     }
 
     /// Takes all received UDP frames from the fake bindings context.
-    pub fn take_udp_received<I: crate::IpExt>(
+    pub fn take_udp_received<I: IpExt>(
         &mut self,
         conn: &UdpSocketId<I, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>,
     ) -> Vec<Vec<u8>> {
@@ -740,8 +710,7 @@ impl InstantContext for FakeBindingsCtx {
 }
 
 impl TimerBindingsTypes for FakeBindingsCtx {
-    type Timer =
-        <crate::context::testutil::FakeTimerCtx<TimerId<Self>> as TimerBindingsTypes>::Timer;
+    type Timer = <FakeTimerCtx<TimerId<Self>> as TimerBindingsTypes>::Timer;
     type DispatchId = TimerId<Self>;
 }
 
@@ -864,7 +833,7 @@ impl<D: LinkDevice> LinkResolutionNotifier<D> for NoOpLinkResolutionNotifier {
         (NoOpLinkResolutionNotifier, ())
     }
 
-    fn notify(self, _result: Result<D::Address, crate::error::AddressResolutionFailed>) {}
+    fn notify(self, _result: Result<D::Address, AddressResolutionFailed>) {}
 }
 
 #[derive(Clone)]
@@ -1155,8 +1124,8 @@ impl FakeNetworkSpec for FakeCtxNetworkSpec {
     type RecvMeta = EthernetDeviceId<FakeBindingsCtx>;
     fn handle_frame(ctx: &mut FakeCtx, device_id: Self::RecvMeta, data: Buf<Vec<u8>>) {
         ctx.core_api()
-            .device::<crate::device::ethernet::EthernetLinkDevice>()
-            .receive_frame(crate::device::ethernet::RecvEthernetFrameMeta { device_id }, data)
+            .device::<EthernetLinkDevice>()
+            .receive_frame(RecvEthernetFrameMeta { device_id }, data)
     }
     fn handle_timer(ctx: &mut FakeCtx, timer: Self::TimerId) {
         ctx.core_api().handle_timer(timer)
@@ -1169,7 +1138,7 @@ impl FakeNetworkSpec for FakeCtxNetworkSpec {
     }
 }
 
-impl<I: crate::IpExt> UdpReceiveBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
+impl<I: IpExt> UdpReceiveBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
     fn receive_udp<B: BufferMut>(
         &mut self,
         id: &UdpSocketId<I, WeakDeviceId<Self>, FakeBindingsCtx>,
@@ -1189,7 +1158,7 @@ impl UdpBindingsTypes for FakeBindingsCtx {
     type ExternalData<I: Ip> = ();
 }
 
-impl<I: crate::IpExt> IcmpEchoBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
+impl<I: IpExt> IcmpEchoBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
         conn: &IcmpSocketId<I, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>,
@@ -1217,7 +1186,7 @@ impl IcmpEchoBindingsTypes for FakeBindingsCtx {
     type ExternalData<I: Ip> = ();
 }
 
-impl crate::device::socket::DeviceSocketTypes for FakeBindingsCtx {
+impl DeviceSocketTypes for FakeBindingsCtx {
     type SocketState = Mutex<Vec<(WeakDeviceId<FakeBindingsCtx>, Vec<u8>)>>;
 }
 
@@ -1225,19 +1194,19 @@ impl RawIpSocketsBindingsTypes for FakeBindingsCtx {
     type RawIpSocketState<I: Ip> = ();
 }
 
-impl crate::device::socket::DeviceSocketBindingsContext<DeviceId<Self>> for FakeBindingsCtx {
+impl DeviceSocketBindingsContext<DeviceId<Self>> for FakeBindingsCtx {
     fn receive_frame(
         &self,
         state: &Self::SocketState,
         device: &DeviceId<Self>,
-        _frame: crate::device::socket::Frame<&[u8]>,
+        _frame: device::socket::Frame<&[u8]>,
         raw_frame: &[u8],
     ) {
         state.lock().push((device.downgrade(), raw_frame.into()));
     }
 }
 
-impl<I: crate::IpExt> RawIpSocketsBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
+impl<I: IpExt> RawIpSocketsBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
     fn receive_packet<B: ByteSlice>(
         &self,
         _socket: &RawIpSocketId<I, WeakDeviceId<Self>, Self>,

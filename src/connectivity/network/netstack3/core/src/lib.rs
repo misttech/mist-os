@@ -51,38 +51,37 @@ pub mod device {
         };
     }
 
-    // TODO(https://fxbug.dev/342685842): Remove this re-export.
-    pub(crate) use netstack3_device::*;
-
     // Re-exported types.
-    pub use ethernet::{
+    pub use netstack3_device::ethernet::{
         EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
         MaxEthernetFrameSize, RecvEthernetFrameMeta,
     };
-    pub use loopback::{LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId};
+    pub use netstack3_device::loopback::{
+        LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId,
+    };
+    pub use netstack3_device::pure_ip::{
+        PureIpDevice, PureIpDeviceCreationProperties, PureIpDeviceId,
+        PureIpDeviceReceiveFrameMetadata, PureIpHeaderParams, PureIpWeakDeviceId,
+    };
+    pub use netstack3_device::queue::{
+        ReceiveQueueBindingsContext, TransmitQueueBindingsContext, TransmitQueueConfiguration,
+    };
     pub use netstack3_device::{
         ArpConfiguration, ArpConfigurationUpdate, DeviceClassMatcher, DeviceConfiguration,
         DeviceConfigurationUpdate, DeviceConfigurationUpdateError, DeviceId,
         DeviceIdAndNameMatcher, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceProvider,
         DeviceSendFrameError, NdpConfiguration, NdpConfigurationUpdate, WeakDeviceId,
     };
-    pub use pure_ip::{
-        PureIpDevice, PureIpDeviceCreationProperties, PureIpDeviceId,
-        PureIpDeviceReceiveFrameMetadata, PureIpHeaderParams, PureIpWeakDeviceId,
-    };
-    pub use queue::{
-        ReceiveQueueBindingsContext, TransmitQueueBindingsContext, TransmitQueueConfiguration,
-    };
 }
 
 /// Device socket API.
 pub mod device_socket {
-    pub use crate::device::socket::{
+    pub use netstack3_base::FrameDestination;
+    pub use netstack3_device::socket::{
         DeviceSocketBindingsContext, DeviceSocketMetadata, DeviceSocketTypes, EthernetFrame,
         EthernetHeaderParams, Frame, IpFrame, Protocol, ReceivedFrame, SendFrameError, SentFrame,
         SocketId, SocketInfo, TargetDevice,
     };
-    pub use netstack3_base::FrameDestination;
 }
 
 /// Generic netstack errors.
@@ -95,16 +94,13 @@ pub mod error {
 
 /// Framework for packet filtering.
 pub mod filter {
-    pub(crate) mod integration;
+    mod integration;
 
     pub use netstack3_filter::{
         Action, AddressMatcher, AddressMatcherType, FilterApi, FilterBindingsContext,
         FilterBindingsTypes, Hook, InterfaceMatcher, InterfaceProperties, IpRoutines, NatRoutines,
         PacketMatcher, PortMatcher, ProofOfEgressCheck, Routine, Routines, Rule, TransparentProxy,
         TransportProtocolMatcher, UninstalledRoutine, ValidationError,
-    };
-    pub(crate) use netstack3_filter::{
-        FilterContext, FilterImpl, FilterIpContext, IpPacket, NatContext, State,
     };
 }
 
@@ -129,11 +125,8 @@ pub mod ip {
         pub(crate) use device::{CoreCtxWithIpDeviceConfiguration, IpAddrCtxSpec};
     }
 
-    // TODO(https://fxbug.dev/342685842): Remove this re-export.
-    pub(crate) use netstack3_ip::*;
-
     // Re-exported types.
-    pub use device::{
+    pub use netstack3_ip::device::{
         AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, AddressRemovedReason,
         IpAddressState, IpDeviceConfiguration, IpDeviceConfigurationUpdate, IpDeviceEvent,
         Ipv4AddrConfig, Ipv4DeviceConfigurationAndFlags, Ipv4DeviceConfigurationUpdate,
@@ -141,13 +134,15 @@ pub mod ip {
         Ipv6DeviceConfigurationUpdate, Lifetime, SetIpAddressPropertiesError, SlaacConfiguration,
         StableIidSecret, TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
     };
-    pub use netstack3_ip::{IpLayerEvent, ResolveRouteError};
-    pub use raw::{
+    pub use netstack3_ip::raw::{
         RawIpSocketIcmpFilter, RawIpSocketIcmpFilterError, RawIpSocketId, RawIpSocketProtocol,
         RawIpSocketSendToError, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes,
         WeakRawIpSocketId,
     };
-    pub use socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError};
+    pub use netstack3_ip::socket::{
+        IpSockCreateAndSendError, IpSockCreationError, IpSockSendError,
+    };
+    pub use netstack3_ip::{IpLayerEvent, ResolveRouteError};
 }
 
 /// Types and utilities for dealing with neighbors.
@@ -171,9 +166,6 @@ pub mod routes {
 
 /// Common types for dealing with sockets.
 pub mod socket {
-    // TODO(https://fxbug.dev/342685842): Remove these re-exports.
-    pub(crate) use netstack3_base::socket::{MaybeDualStack, SocketIpAddr};
-
     pub use netstack3_datagram::{
         ConnInfo, ConnectError, ExpectedConnError, ExpectedUnboundError, ListenerInfo,
         MulticastInterfaceSelector, MulticastMembershipInterfaceSelector, SendError, SendToError,
@@ -228,13 +220,13 @@ pub mod udp {
 }
 
 pub use api::CoreApi;
-pub use context::{
-    CoreCtx, CtxPair, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes,
-    InstantContext, ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext,
-    TracingContext, UnlockedCoreCtx,
-};
+pub use context::{CoreCtx, UnlockedCoreCtx};
 pub use inspect::Inspector;
 pub use marker::{BindingsContext, BindingsTypes, CoreContext, IpBindingsContext, IpExt};
+pub use netstack3_base::{
+    CtxPair, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
+    ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TracingContext,
+};
 pub use state::{StackState, StackStateBuilder};
 pub use time::{Instant, TimerId};
 

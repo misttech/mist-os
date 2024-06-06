@@ -11,11 +11,10 @@ use net_types::{
     ip::{AddrSubnet, Ip, Ipv4, Ipv6, Mtu},
     SpecifiedAddr,
 };
+use netstack3_base::testutil::{TestAddrs, TestIpExt};
 use netstack3_core::{
     error::NotFoundError,
-    testutil::{
-        CtxPairExt as _, FakeBindingsCtx, FakeCtx, TestAddrs, TestIpExt, DEFAULT_INTERFACE_METRIC,
-    },
+    testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC},
     IpExt,
 };
 use netstack3_device::{

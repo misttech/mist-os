@@ -14,36 +14,35 @@ use net_types::{
     ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr},
     MulticastAddr, SpecifiedAddr,
 };
-use netstack3_base::{CounterContext, TokenBucket, WeakDeviceIdentifier};
+use netstack3_base::{socket::SocketIpAddr, CounterContext, TokenBucket, WeakDeviceIdentifier};
 use netstack3_datagram as datagram;
+use netstack3_device::{DeviceId, WeakDeviceId};
 use netstack3_icmp_echo::{
     self as icmp_echo, IcmpEchoBoundStateContext, IcmpEchoContextMarker,
     IcmpEchoIpTransportContext, IcmpEchoStateContext, IcmpSocketId, IcmpSocketSet, IcmpSocketState,
     IcmpSockets,
 };
+use netstack3_ip::{
+    self as ip,
+    device::{self, IpDeviceBindingsContext, IpDeviceIpExt},
+    icmp::{
+        self, IcmpIpTransportContext, IcmpRxCounters, IcmpState, IcmpTxCounters, Icmpv4ErrorCode,
+        Icmpv6ErrorCode, InnerIcmpContext, InnerIcmpv4Context, NdpCounters,
+    },
+    raw::RawIpSocketMap,
+    ForwardingTable, FragmentContext, IpCounters, IpLayerBindingsContext, IpLayerContext,
+    IpLayerIpExt, IpPacketFragmentCache, IpStateContext, IpStateInner, IpTransportContext,
+    IpTransportDispatchContext, MulticastMembershipHandler, PmtuCache, PmtuContext,
+    ResolveRouteError, ResolvedRoute, TransparentLocalDelivery, TransportReceiveError,
+};
+use netstack3_tcp::TcpIpTransportContext;
+use netstack3_udp::UdpIpTransportContext;
 use packet::BufferMut;
 use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
 use tracing::trace;
 
 use crate::{
     context::{prelude::*, WrapLockLevel},
-    device::{DeviceId, WeakDeviceId},
-    ip::{
-        self,
-        device::{self, IpDeviceBindingsContext, IpDeviceIpExt},
-        icmp::{
-            self, IcmpIpTransportContext, IcmpRxCounters, IcmpState, IcmpTxCounters,
-            Icmpv4ErrorCode, Icmpv6ErrorCode, InnerIcmpContext, InnerIcmpv4Context, NdpCounters,
-        },
-        raw::RawIpSocketMap,
-        ForwardingTable, FragmentContext, IpCounters, IpLayerBindingsContext, IpLayerContext,
-        IpLayerIpExt, IpPacketFragmentCache, IpStateContext, IpStateInner, IpTransportContext,
-        IpTransportDispatchContext, MulticastMembershipHandler, PmtuCache, PmtuContext,
-        ResolveRouteError, TransparentLocalDelivery, TransportReceiveError,
-    },
-    routes::ResolvedRoute,
-    socket::SocketIpAddr,
-    transport::{tcp::TcpIpTransportContext, udp::UdpIpTransportContext},
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 

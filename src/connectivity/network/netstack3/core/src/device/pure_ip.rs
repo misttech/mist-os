@@ -13,27 +13,24 @@ use lock_order::{
 };
 use net_types::ip::Ip;
 use netstack3_base::DeviceIdContext;
+use netstack3_device::{
+    pure_ip::{
+        DynamicPureIpDeviceState, PureIpDevice, PureIpDeviceCounters, PureIpDeviceId,
+        PureIpDeviceStateContext, PureIpDeviceTxQueueFrameMetadata, PureIpPrimaryDeviceId,
+        PureIpWeakDeviceId,
+    },
+    queue::{
+        BufVecU8Allocator, DequeueState, TransmitDequeueContext, TransmitQueueCommon,
+        TransmitQueueContext, TransmitQueueState,
+    },
+    socket::{IpFrame, ParseSentFrameError, SentFrame},
+    DeviceCollectionContext, DeviceConfigurationContext, DeviceLayerEventDispatcher,
+    DeviceSendFrameError, IpLinkDeviceState,
+};
+use netstack3_ip::nud::NudUserConfig;
 use packet::Buf;
 
-use crate::{
-    device::{
-        self,
-        pure_ip::{
-            DynamicPureIpDeviceState, PureIpDevice, PureIpDeviceCounters, PureIpDeviceId,
-            PureIpDeviceStateContext, PureIpDeviceTxQueueFrameMetadata, PureIpPrimaryDeviceId,
-            PureIpWeakDeviceId,
-        },
-        queue::{
-            BufVecU8Allocator, DequeueState, TransmitDequeueContext, TransmitQueueCommon,
-            TransmitQueueContext, TransmitQueueState,
-        },
-        socket::{IpFrame, ParseSentFrameError, SentFrame},
-        DeviceCollectionContext, DeviceConfigurationContext, DeviceLayerEventDispatcher,
-        DeviceSendFrameError, IpLinkDeviceState,
-    },
-    neighbor::NudUserConfig,
-    BindingsContext, BindingsTypes, CoreCtx,
-};
+use crate::{device::integration, BindingsContext, BindingsTypes, CoreCtx};
 
 impl<BT: BindingsTypes, L> DeviceIdContext<PureIpDevice> for CoreCtx<'_, BT, L> {
     type DeviceId = PureIpDeviceId<BT>;
@@ -110,7 +107,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceTxQueu
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        let mut state = device::integration::device_state(self, device_id);
+        let mut state = integration::device_state(self, device_id);
         let mut x = state.lock::<crate::lock_ordering::PureIpDeviceTxQueue>();
         cb(&mut x)
     }
@@ -143,8 +140,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceTxDequ
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        let mut core_ctx_and_resource =
-            device::integration::device_state_and_core_ctx(self, device_id);
+        let mut core_ctx_and_resource = integration::device_state_and_core_ctx(self, device_id);
         let (mut x, mut locked) = core_ctx_and_resource
             .lock_with_and::<crate::lock_ordering::PureIpDeviceTxDequeue, _>(|c| c.right());
         cb(&mut x, &mut locked.cast_core_ctx())
@@ -187,7 +183,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceDynami
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        let mut state = device::integration::device_state(self, device_id);
+        let mut state = integration::device_state(self, device_id);
         let dynamic_state = state.read_lock::<crate::lock_ordering::PureIpDeviceDynamicState>();
         cb(&dynamic_state)
     }
@@ -197,7 +193,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceDynami
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        let mut state = device::integration::device_state(self, device_id);
+        let mut state = integration::device_state(self, device_id);
         let mut dynamic_state =
             state.write_lock::<crate::lock_ordering::PureIpDeviceDynamicState>();
         cb(&mut dynamic_state)

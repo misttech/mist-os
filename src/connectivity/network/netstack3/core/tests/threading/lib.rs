@@ -23,11 +23,11 @@ use netstack3_core::{
     device_socket::{Protocol, TargetDevice},
     routes::{AddableEntry, AddableMetric, RawMetric},
     sync::Mutex,
-    testutil::{
-        ndp::{neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet},
-        CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder,
-    },
+    testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder},
     CtxPair,
+};
+use netstack3_ip::icmp::testutil::{
+    neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet,
 };
 use packet::{Buf, InnerPacketBuilder as _, ParseBuffer as _, Serializer as _};
 use packet_formats::{

@@ -14,8 +14,9 @@ use net_types::{
 use packet::Buf;
 use test_case::test_case;
 
+use netstack3_base::testutil::{set_logger_for_test, TestIpExt};
 use netstack3_core::{
-    testutil::{set_logger_for_test, CtxPairExt as _, FakeBindingsCtx, FakeCtxBuilder, TestIpExt},
+    testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtxBuilder},
     IpExt,
 };
 

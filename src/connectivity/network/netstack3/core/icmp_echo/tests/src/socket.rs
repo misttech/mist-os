@@ -16,11 +16,9 @@ use packet::Serializer;
 use packet_formats::icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode};
 use test_case::test_case;
 
+use netstack3_base::testutil::{set_logger_for_test, TestIpExt};
 use netstack3_core::{
-    testutil::{
-        new_simple_fake_network, set_logger_for_test, CtxPairExt as _, FakeBindingsCtx,
-        FakeCtxBuilder, TestIpExt,
-    },
+    testutil::{new_simple_fake_network, CtxPairExt as _, FakeBindingsCtx, FakeCtxBuilder},
     IpExt,
 };
 

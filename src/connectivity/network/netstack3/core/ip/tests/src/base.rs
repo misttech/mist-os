@@ -34,16 +34,21 @@ use packet_formats::{
 use rand::Rng;
 use test_case::test_case;
 
-use netstack3_base::{testutil::FakeInstant, FrameDestination, InstantContext as _};
+use netstack3_base::{
+    testutil::{
+        new_rng, set_logger_for_test, FakeInstant, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
+    },
+    FrameDestination, InstantContext as _,
+};
 use netstack3_core::{
     device::{DeviceId, EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta},
     testutil::{
-        new_rng, new_simple_fake_network, set_logger_for_test, Ctx, CtxPairExt as _,
-        FakeBindingsCtx, FakeCtx, FakeCtxBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC,
-        IPV6_MIN_IMPLIED_MAX_FRAME_SIZE, TEST_ADDRS_V4, TEST_ADDRS_V6,
+        new_simple_fake_network, Ctx, CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder,
+        DEFAULT_INTERFACE_METRIC,
     },
     BindingsContext, IpExt, StackState,
 };
+use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::{
     self as ip,
     device::{

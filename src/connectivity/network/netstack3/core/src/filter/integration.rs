@@ -10,12 +10,12 @@ use net_types::{
     ip::{Ip, Ipv4, Ipv6},
     NonMappedAddr, SpecifiedAddr,
 };
+use netstack3_device::DeviceId;
+use netstack3_filter::{FilterContext, FilterImpl, FilterIpContext, NatContext, State};
+use netstack3_ip::{FilterHandlerProvider, IpDeviceStateContext, IpLayerIpExt, IpStateInner};
 
 use crate::{
     context::{prelude::*, WrapLockLevel},
-    device::DeviceId,
-    filter::{FilterContext, FilterImpl, FilterIpContext, NatContext, State},
-    ip::{FilterHandlerProvider, IpDeviceStateContext, IpLayerIpExt, IpStateInner},
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 

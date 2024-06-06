@@ -26,13 +26,14 @@ use packet_formats::{
 };
 use test_case::test_case;
 
-use netstack3_base::{socket::SocketIpAddr, EitherDeviceId};
+use netstack3_base::{
+    socket::SocketIpAddr,
+    testutil::{set_logger_for_test, TestAddrs, TestIpExt},
+    EitherDeviceId,
+};
 use netstack3_core::{
     device::{DeviceId, EthernetLinkDevice},
-    testutil::{
-        set_logger_for_test, CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder, TestAddrs,
-        TestIpExt,
-    },
+    testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder},
     IpExt,
 };
 use netstack3_ip::{

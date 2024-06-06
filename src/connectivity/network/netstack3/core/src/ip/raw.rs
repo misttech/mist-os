@@ -6,17 +6,13 @@
 //! foreign modules.
 
 use lock_order::{lock::LockLevelFor, relation::LockBefore, wrap::LockedWrapperApi};
-
-use crate::{
-    device::WeakDeviceId,
-    ip::raw::{
-        RawIpSocketId, RawIpSocketLockedState, RawIpSocketMap, RawIpSocketMapContext,
-        RawIpSocketState, RawIpSocketStateContext,
-    },
-    lock_ordering,
-    marker::IpExt,
-    BindingsContext, BindingsTypes, CoreCtx,
+use netstack3_device::WeakDeviceId;
+use netstack3_ip::raw::{
+    RawIpSocketId, RawIpSocketLockedState, RawIpSocketMap, RawIpSocketMapContext, RawIpSocketState,
+    RawIpSocketStateContext,
 };
+
+use crate::{lock_ordering, marker::IpExt, BindingsContext, BindingsTypes, CoreCtx};
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<I: IpExt, BC: BindingsContext, L: LockBefore<lock_ordering::RawIpSocketState<I>>>

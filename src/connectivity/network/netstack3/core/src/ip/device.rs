@@ -25,6 +25,35 @@ use netstack3_base::{
     sync::WeakRc, AnyDevice, CoreEventContext, CoreTimerContext, CounterContext, DeviceIdContext,
     ExistsError, NotFoundError, RemoveResourceResultWithContext,
 };
+use netstack3_device::{DeviceId, WeakDeviceId};
+use netstack3_filter::FilterImpl;
+use netstack3_ip::{
+    self as ip,
+    device::{
+        self, add_ip_addr_subnet_with_config, del_ip_addr_inner, get_ipv6_hop_limit,
+        is_ip_device_enabled, is_ip_forwarding_enabled, join_ip_multicast_with_config,
+        leave_ip_multicast_with_config, AddressRemovedReason, DadAddressContext,
+        DadAddressStateRef, DadContext, DadEvent, DadStateRef, DadTimerId, DefaultHopLimit,
+        DelIpAddr, DualStackIpDeviceState, IpAddressId, IpAddressIdSpec, IpAddressIdSpecContext,
+        IpAddressState, IpDeviceAddr, IpDeviceAddresses, IpDeviceConfiguration, IpDeviceEvent,
+        IpDeviceFlags, IpDeviceIpExt, IpDeviceMulticastGroups, IpDeviceStateBindingsTypes,
+        IpDeviceStateContext, IpDeviceStateIpExt, IpDeviceTimerId, Ipv4AddressEntry,
+        Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressEntry,
+        Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState, Ipv6DeviceAddr, Ipv6DeviceConfiguration,
+        Ipv6DeviceTimerId, Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext,
+        Ipv6NetworkLearnedParameters, Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState,
+        RsContext, RsState, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses,
+        SlaacAddrsMutAndConfig, SlaacConfig, SlaacContext, SlaacCounters, SlaacState,
+    },
+    gmp::{
+        GmpQueryHandler, GmpStateRef, IgmpContext, IgmpGroupState, IgmpState, IgmpStateContext,
+        MldContext, MldGroupState, MldStateContext, MulticastGroupSet,
+    },
+    nud::{self, ConfirmationFlags, NudCounters, NudIpHandler},
+    socket::SasCandidate,
+    AddableMetric, AddressStatus, FilterHandlerProvider, IpLayerIpExt, IpStateContext,
+    Ipv4PresentAddressStatus, RawMetric, DEFAULT_TTL,
+};
 use packet::{EmptyBuf, Serializer};
 use packet_formats::icmp::{
     ndp::{NeighborSolicitation, RouterSolicitation},
@@ -33,36 +62,6 @@ use packet_formats::icmp::{
 
 use crate::{
     context::{prelude::*, WrapLockLevel},
-    device::{DeviceId, WeakDeviceId},
-    filter::FilterImpl,
-    ip::{
-        self,
-        device::{
-            self, add_ip_addr_subnet_with_config, del_ip_addr_inner, get_ipv6_hop_limit,
-            is_ip_device_enabled, is_ip_forwarding_enabled, join_ip_multicast_with_config,
-            leave_ip_multicast_with_config, AddressRemovedReason, DadAddressContext,
-            DadAddressStateRef, DadContext, DadEvent, DadStateRef, DadTimerId, DefaultHopLimit,
-            DelIpAddr, DualStackIpDeviceState, IpAddressId, IpAddressIdSpec,
-            IpAddressIdSpecContext, IpAddressState, IpDeviceAddr, IpDeviceAddresses,
-            IpDeviceConfiguration, IpDeviceEvent, IpDeviceFlags, IpDeviceIpExt,
-            IpDeviceMulticastGroups, IpDeviceStateBindingsTypes, IpDeviceStateContext,
-            IpDeviceStateIpExt, IpDeviceTimerId, Ipv4AddressEntry, Ipv4AddressState,
-            Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressEntry, Ipv6AddressFlags,
-            Ipv6AddressState, Ipv6DadState, Ipv6DeviceAddr, Ipv6DeviceConfiguration,
-            Ipv6DeviceTimerId, Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext,
-            Ipv6NetworkLearnedParameters, Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState,
-            RsContext, RsState, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses,
-            SlaacAddrsMutAndConfig, SlaacConfig, SlaacContext, SlaacCounters, SlaacState,
-        },
-        gmp::{
-            GmpQueryHandler, GmpStateRef, IgmpContext, IgmpGroupState, IgmpState, IgmpStateContext,
-            MldContext, MldGroupState, MldStateContext, MulticastGroupSet,
-        },
-        nud::{self, ConfirmationFlags, NudCounters, NudIpHandler},
-        socket::SasCandidate,
-        AddableMetric, AddressStatus, FilterHandlerProvider, IpLayerIpExt, IpStateContext,
-        Ipv4PresentAddressStatus, RawMetric, DEFAULT_TTL,
-    },
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 
@@ -435,7 +434,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
             self,
             device_id,
             |addrs, core_ctx| {
-                IpDeviceAddr::new_from_ipv6_source(crate::ip::socket::select_ipv6_source_address(
+                IpDeviceAddr::new_from_ipv6_source(ip::socket::select_ipv6_source_address(
                     remote,
                     device_id,
                     addrs.map(|addr_id| {
@@ -777,7 +776,7 @@ impl<
         message: NeighborSolicitation,
     ) -> Result<(), ()> {
         let Self { config: _, core_ctx } = self;
-        crate::ip::icmp::send_ndp_packet(
+        ip::icmp::send_ndp_packet(
             core_ctx,
             bindings_ctx,
             device_id,
@@ -840,7 +839,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
             core_ctx,
             device_id,
             |addrs, core_ctx| {
-                crate::ip::socket::select_ipv6_source_address(
+                ip::socket::select_ipv6_source_address(
                     Some(dst_ip),
                     device_id,
                     addrs.map(|addr_id| {
@@ -862,7 +861,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
             Ipv6SourceAddr::Unicast(addr) => Some(*addr),
             Ipv6SourceAddr::Unspecified => None,
         };
-        crate::ip::icmp::send_ndp_packet(
+        ip::icmp::send_ndp_packet(
             core_ctx,
             bindings_ctx,
             device_id,

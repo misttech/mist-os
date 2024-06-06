@@ -13,37 +13,32 @@ use netstack3_base::{
     RngContext, TimerBindingsTypes, TracingContext,
 };
 use netstack3_datagram as datagram;
-use netstack3_icmp_echo::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpEchoStateContext};
-
-use crate::{
-    device::{
-        self,
-        ethernet::{EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId},
-        DeviceId, DeviceLayerTypes, WeakDeviceId,
-    },
-    filter::{FilterBindingsContext, FilterBindingsTypes},
-    ip::{
-        self,
-        device::{
-            IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceConfigurationHandler,
-            IpDeviceIpExt,
-        },
-        icmp::{IcmpBindingsContext, IcmpBindingsTypes},
-        nud::{NudBindingsContext, NudContext},
-        raw::{
-            RawIpSocketMapContext, RawIpSocketStateContext, RawIpSocketsBindingsContext,
-            RawIpSocketsBindingsTypes,
-        },
-        socket::IpSocketContext,
-        IpLayerBindingsContext, IpLayerContext, IpLayerIpExt,
-    },
-    transport::{
-        self,
-        tcp::{TcpBindingsContext, TcpBindingsTypes, TcpContext},
-        udp::{UdpBindingsContext, UdpBindingsTypes, UdpCounters},
-    },
-    TimerId,
+use netstack3_device::{
+    self as device,
+    ethernet::{EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId},
+    DeviceId, DeviceLayerTypes, WeakDeviceId,
 };
+use netstack3_filter::{FilterBindingsContext, FilterBindingsTypes};
+use netstack3_icmp_echo::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpEchoStateContext};
+use netstack3_ip::{
+    self as ip,
+    device::{
+        IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceConfigurationHandler,
+        IpDeviceIpExt,
+    },
+    icmp::{IcmpBindingsContext, IcmpBindingsTypes},
+    nud::{NudBindingsContext, NudContext},
+    raw::{
+        RawIpSocketMapContext, RawIpSocketStateContext, RawIpSocketsBindingsContext,
+        RawIpSocketsBindingsTypes,
+    },
+    socket::IpSocketContext,
+    IpLayerBindingsContext, IpLayerContext, IpLayerIpExt,
+};
+use netstack3_tcp::{self as tcp, TcpBindingsContext, TcpBindingsTypes, TcpContext};
+use netstack3_udp::{self as udp, UdpBindingsContext, UdpBindingsTypes, UdpCounters};
+
+use crate::TimerId;
 
 /// A marker for extensions to IP types.
 pub trait IpExt:
@@ -51,7 +46,7 @@ pub trait IpExt:
     + IpDeviceIpExt
     + ip::icmp::IcmpIpExt
     + ip::device::IpDeviceIpExt
-    + transport::tcp::DualStackIpExt
+    + tcp::DualStackIpExt
     + datagram::DualStackIpExt
 {
 }
@@ -61,7 +56,7 @@ impl<O> IpExt for O where
         + IpDeviceIpExt
         + ip::icmp::IcmpIpExt
         + ip::device::IpDeviceIpExt
-        + transport::tcp::DualStackIpExt
+        + tcp::DualStackIpExt
         + datagram::DualStackIpExt
 {
 }
@@ -73,7 +68,7 @@ impl<O> IpExt for O where
 /// implemented by [`crate::context::UnlockedCoreCtx`] to satisfy all the API
 /// objects vended by [`crate::api::CoreApi`].
 pub trait CoreContext<I, BC>:
-    transport::udp::StateContext<I, BC>
+    udp::StateContext<I, BC>
     + CounterContext<UdpCounters<I>>
     + TcpContext<I, BC>
     + IcmpEchoStateContext<I, BC>
@@ -100,7 +95,7 @@ impl<I, BC, O> CoreContext<I, BC> for O
 where
     I: IpExt,
     BC: IpBindingsContext<I>,
-    O: transport::udp::StateContext<I, BC>
+    O: udp::StateContext<I, BC>
         + CounterContext<UdpCounters<I>>
         + TcpContext<I, BC>
         + IcmpEchoStateContext<I, BC>

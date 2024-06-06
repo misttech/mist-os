@@ -15,7 +15,10 @@ use net_types::{
     ip::{AddrSubnet, Ip, Ipv4, Ipv6, Mtu},
     SpecifiedAddr, UnicastAddr, Witness as _,
 };
-use netstack3_base::{testutil::FakeInstant, WorkQueueReport};
+use netstack3_base::{
+    testutil::{FakeInstant, TestIpExt},
+    WorkQueueReport,
+};
 use netstack3_core::{
     device::{
         DeviceId, DeviceProvider, EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice,
@@ -29,12 +32,10 @@ use netstack3_core::{
         Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfigurationUpdate,
         Lifetime, SlaacConfiguration,
     },
-    testutil::{
-        CtxPairExt as _, FakeBindingsCtx, FakeCtx, TestIpExt, DEFAULT_INTERFACE_METRIC,
-        IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-    },
+    testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC},
     IpExt,
 };
+use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use test_case::test_case;
 
 #[test]

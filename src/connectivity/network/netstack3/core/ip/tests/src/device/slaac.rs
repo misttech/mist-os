@@ -24,14 +24,15 @@ use packet_formats::{
     utils::NonZeroDuration,
 };
 
-use netstack3_base::{FrameDestination, InstantContext as _};
+use netstack3_base::{
+    testutil::{TestAddrs, TestIpExt as _},
+    FrameDestination, InstantContext as _,
+};
 use netstack3_core::{
     device::{EthernetCreationProperties, EthernetLinkDevice},
-    testutil::{
-        CtxPairExt as _, FakeCtx, TestAddrs, TestIpExt as _, DEFAULT_INTERFACE_METRIC,
-        IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-    },
+    testutil::{CtxPairExt as _, FakeCtx, DEFAULT_INTERFACE_METRIC},
 };
+use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::{
     self as ip,
     device::{

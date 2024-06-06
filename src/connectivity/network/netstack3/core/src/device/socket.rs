@@ -9,18 +9,19 @@ use lock_order::{
     lock::{DelegatedOrderedLockAccess, LockLevelFor},
     relation::LockBefore,
 };
+use netstack3_device::{
+    for_any_device_id,
+    socket::{
+        AllSockets, AnyDeviceSockets, DeviceSocketAccessor, DeviceSocketContext,
+        DeviceSocketContextTypes, DeviceSocketId, DeviceSockets, HeldSockets,
+        PrimaryDeviceSocketId, SocketStateAccessor, Target,
+    },
+    DeviceId, WeakDeviceId,
+};
 
 use crate::{
     context::{prelude::*, WrapLockLevel},
-    device::{
-        self, for_any_device_id,
-        socket::{
-            AllSockets, AnyDeviceSockets, DeviceSocketAccessor, DeviceSocketContext,
-            DeviceSocketContextTypes, DeviceSocketId, DeviceSockets, HeldSockets,
-            PrimaryDeviceSocketId, SocketStateAccessor, Target,
-        },
-        DeviceId, WeakDeviceId,
-    },
+    device::integration,
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 
@@ -125,7 +126,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSockets>>
             device,
             device => {
                 let mut core_ctx_and_resource =
-                    device::integration::device_state_and_core_ctx(self, device);
+                    integration::device_state_and_core_ctx(self, device);
                 let (device_sockets, mut locked) = core_ctx_and_resource
                     .read_lock_with_and::<crate::lock_ordering::DeviceSockets, _>(
                     |c| c.right(),
@@ -148,7 +149,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSockets>>
             device,
             device => {
                 let mut core_ctx_and_resource =
-                    device::integration::device_state_and_core_ctx(self, device);
+                    integration::device_state_and_core_ctx(self, device);
                 let (mut device_sockets, mut locked) = core_ctx_and_resource
                     .write_lock_with_and::<crate::lock_ordering::DeviceSockets, _>(
                     |c| c.right(),

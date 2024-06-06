@@ -10,10 +10,11 @@ use net_types::{
     ip::{AddrSubnet, Ip, IpAddress as _, IpVersion, Ipv4, Ipv6, Mtu},
     Witness, ZonedAddr,
 };
+use netstack3_base::testutil::TestIpExt;
 use netstack3_core::{
     sync::RemoveResourceResult,
     testutil::{
-        CtxPairExt as _, FakeBindingsCtx, FakeCtx, PureIpDeviceAndIpVersion, TestIpExt,
+        CtxPairExt as _, FakeBindingsCtx, FakeCtx, PureIpDeviceAndIpVersion,
         DEFAULT_INTERFACE_METRIC,
     },
     types::WorkQueueReport,

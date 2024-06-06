@@ -17,6 +17,7 @@ rustc_test("netstack3_icmp_echo_integration_test") {
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/netstack3/core:netstack3-core-testutils",
+    "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
     "//src/connectivity/network/netstack3/core/macros:netstack3-macros",
     "//src/lib/fakealloc",
     "//src/lib/network/packet",

@@ -10,10 +10,11 @@ use net_types::{
 };
 use test_case::test_case;
 
+use netstack3_base::testutil::TestIpExt;
 use netstack3_core::{
     device::{DeviceId, EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
     error::NotFoundError,
-    testutil::{CtxPairExt as _, FakeCtx, TestIpExt, DEFAULT_INTERFACE_METRIC},
+    testutil::{CtxPairExt as _, FakeCtx, DEFAULT_INTERFACE_METRIC},
     StackStateBuilder,
 };
 use netstack3_ip::{

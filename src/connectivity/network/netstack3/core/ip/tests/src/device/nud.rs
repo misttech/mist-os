@@ -35,19 +35,18 @@ use packet_formats::{
 use test_case::test_case;
 
 use netstack3_base::{
-    testutil::{FakeNetwork, FakeNetworkLinks, WithFakeFrameContext},
+    testutil::{FakeNetwork, FakeNetworkLinks, TestAddrs, TestIpExt, WithFakeFrameContext},
     DeviceIdContext, FrameDestination, InstantContext as _,
 };
 use netstack3_core::{
     device::{EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, WeakDeviceId},
-    tcp::{self, TcpSocketId},
     testutil::{
-        new_simple_fake_network, tcp as tcp_testutil, CtxPairExt, DispatchedFrame, FakeBindingsCtx,
-        FakeCtx, FakeCtxBuilder, FakeCtxNetworkSpec, TestAddrs, TestIpExt,
-        DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+        new_simple_fake_network, CtxPairExt, DispatchedFrame, FakeBindingsCtx, FakeCtx,
+        FakeCtxBuilder, FakeCtxNetworkSpec, DEFAULT_INTERFACE_METRIC,
     },
     IpExt, UnlockedCoreCtx,
 };
+use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::{
     self as ip,
     device::{Ipv6DeviceConfigurationUpdate, SlaacConfiguration},
@@ -58,6 +57,7 @@ use netstack3_ip::{
     },
     AddableEntry, AddableMetric,
 };
+use netstack3_tcp::{self as tcp, TcpSocketId};
 
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 fn assert_neighbors<I: IpExt>(
@@ -473,13 +473,13 @@ fn bind_and_connect_sockets<
     L: FakeNetworkLinks<DispatchedFrame, EthernetDeviceId<FakeBindingsCtx>, &'static str>,
 >(
     net: &mut FakeNudNetwork<L>,
-    local_buffers: tcp_testutil::ProvidedBuffers,
+    local_buffers: tcp::testutil::ProvidedBuffers,
 ) -> TcpSocketId<I, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx> {
     const REMOTE_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(33333));
 
     net.with_context("remote", |ctx| {
         let mut tcp_api = ctx.core_api().tcp::<I>();
-        let socket = tcp_api.create(tcp_testutil::ProvidedBuffers::default());
+        let socket = tcp_api.create(tcp::testutil::ProvidedBuffers::default());
         tcp_api
             .bind(
                 &socket,
@@ -542,7 +542,7 @@ where
     // Initiate a TCP connection and make sure the SYN and resulting SYN/ACK are
     // received by each context.
     let _: TcpSocketId<I, _, _> =
-        bind_and_connect_sockets::<I, _>(&mut net, tcp_testutil::ProvidedBuffers::default());
+        bind_and_connect_sockets::<I, _>(&mut net, tcp::testutil::ProvidedBuffers::default());
     for _ in 0..2 {
         assert_eq!(net.step().frames_sent, 1);
     }
@@ -584,10 +584,10 @@ where
 
     // Initiate a TCP connection, allow the handshake to complete, and wait until
     // the neighbor entry goes STALE due to lack of traffic on the connection.
-    let client_ends = tcp_testutil::WriteBackClientBuffers::default();
+    let client_ends = tcp::testutil::WriteBackClientBuffers::default();
     let local_socket = bind_and_connect_sockets::<I, _>(
         &mut net,
-        tcp_testutil::ProvidedBuffers::Buffers(client_ends.clone()),
+        tcp::testutil::ProvidedBuffers::Buffers(client_ends.clone()),
     );
     net.run_until_idle();
     net.with_context("local", |FakeCtx { core_ctx, bindings_ctx: _ }| {
@@ -600,7 +600,7 @@ where
     });
 
     // Send some data on the local socket and wait for it to be ACKed by the peer.
-    let tcp_testutil::ClientBuffers { send, receive: _ } =
+    let tcp::testutil::ClientBuffers { send, receive: _ } =
         client_ends.0.as_ref().lock().take().unwrap();
     send.lock().extend_from_slice(b"hello");
     net.with_context("local", |ctx| {
@@ -650,7 +650,7 @@ fn icmp_error_on_address_resolution_failure_tcp_local<I: Ip + TestIpExt + IpExt>
     let _loopback_id = ctx.test_api().add_loopback();
 
     let mut tcp_api = ctx.core_api().tcp::<I>();
-    let socket = tcp_api.create(tcp_testutil::ProvidedBuffers::default());
+    let socket = tcp_api.create(tcp::testutil::ProvidedBuffers::default());
     const REMOTE_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(33333));
     tcp_api
         .connect(&socket, Some(net_types::ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), REMOTE_PORT)
@@ -700,7 +700,7 @@ fn icmp_error_on_address_resolution_failure_tcp_forwarding<I: Ip + TestIpExt + I
 
     let socket = net.with_context("local", |ctx| {
         let mut tcp_api = ctx.core_api().tcp::<I>();
-        let socket = tcp_api.create(tcp_testutil::ProvidedBuffers::default());
+        let socket = tcp_api.create(tcp::testutil::ProvidedBuffers::default());
         const REMOTE_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(33333));
         tcp_api
             .connect(
