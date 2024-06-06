@@ -460,20 +460,39 @@ class FfxTests(unittest.TestCase):
 
         mock_ffx_run.assert_called()
 
+    @mock.patch.object(
+        ffx.FFX,
+        "run",
+        return_value=_MOCK_ARGS["ffx_target_list_output"],
+        autospec=True,
+    )
+    def test_get_target_info_from_target_list(
+        self, mock_ffx_run: mock.Mock
+    ) -> None:
+        """Test case for get_target_info_from_target_list()."""
+        mock_ffx_run.return_value = _MOCK_ARGS["ffx_target_list_output"]
+
+        self.assertEqual(
+            self.ffx_obj_with_ip.get_target_info_from_target_list(),
+            _EXPECTED_VALUES["ffx_target_list_json"][0],
+        )
+
+        mock_ffx_run.assert_called()
+
     @parameterized.expand(
         [
             (
                 {
                     "label": "when_no_devices_connected",
-                    "return_value": "[]\n",
-                    "expected_value": [],
+                    "side_effect": "[]\n",
                 },
             ),
             (
                 {
-                    "label": "when_one_device_connected",
-                    "return_value": _MOCK_ARGS["ffx_target_list_output"],
-                    "expected_value": _EXPECTED_VALUES["ffx_target_list_json"],
+                    "label": "when_ffx_run_fails",
+                    "side_effect": errors.FfxCommandError(
+                        "ffx target list failed"
+                    ),
                 },
             ),
         ],
@@ -482,31 +501,15 @@ class FfxTests(unittest.TestCase):
     @mock.patch.object(
         ffx.FFX,
         "run",
-        return_value=_MOCK_ARGS["ffx_target_list_output"],
         autospec=True,
     )
-    def test_get_target_list(
+    def test_get_target_info_from_target_list_exception(
         self, parameterized_dict: dict[str, Any], mock_ffx_run: mock.Mock
     ) -> None:
-        """Test case for get_target_list()."""
-        mock_ffx_run.return_value = parameterized_dict["return_value"]
-        self.assertEqual(
-            self.ffx_obj_with_ip.get_target_list(),
-            parameterized_dict["expected_value"],
-        )
-
-        mock_ffx_run.assert_called()
-
-    @mock.patch.object(
-        ffx.FFX,
-        "run",
-        side_effect=errors.FfxCommandError("ffx target list failed"),
-        autospec=True,
-    )
-    def test_get_target_list_exception(self, mock_ffx_run: mock.Mock) -> None:
-        """Test case for get_target_list() raising exception."""
+        """Test case for get_target_info_from_target_list() raising exception."""
+        mock_ffx_run.side_effect = parameterized_dict["side_effect"]
         with self.assertRaises(errors.FfxCommandError):
-            self.ffx_obj_with_ip.get_target_list()
+            self.ffx_obj_with_ip.get_target_info_from_target_list()
         mock_ffx_run.assert_called()
 
     @mock.patch.object(

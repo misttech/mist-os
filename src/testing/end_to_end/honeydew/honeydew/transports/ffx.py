@@ -379,30 +379,42 @@ class FFX(ffx_interface.FFX):
                 f"Failed to get the target information of {self._target_name}"
             ) from err
 
-    def get_target_list(
+    def get_target_info_from_target_list(
         self, timeout: float = ffx_interface.TIMEOUTS["FFX_CLI"]
-    ) -> list[dict[str, Any]]:
-        """Executed and returns the output of `ffx --machine json target list`.
+    ) -> dict[str, Any]:
+        """Executed and returns the output of
+        `ffx --machine json target list <target>`.
 
         Args:
             timeout: Timeout to wait for the ffx command to return.
 
         Returns:
-            Output of `ffx --machine json target list`.
+            Output of `ffx --machine json target list <target>`.
 
         Raises:
             errors.FfxCommandError: In case of failure.
         """
-        cmd: list[str] = _FFX_CMDS["TARGET_LIST"]
+        cmd: list[str] = _FFX_CMDS["TARGET_LIST"] + [self._target]
         try:
-            output: str = self.run(cmd=cmd, timeout=timeout)
-
-            ffx_target_list_info: list[dict[str, Any]] = json.loads(output)
-            _LOGGER.debug(
-                "`%s` returned: %s", " ".join(cmd), ffx_target_list_info
+            output: str = self.run(
+                cmd=cmd,
+                timeout=timeout,
+                include_target=False,
             )
 
-            return ffx_target_list_info
+            target_info_from_target_list: list[dict[str, Any]] = json.loads(
+                output
+            )
+            _LOGGER.debug(
+                "`%s` returned: %s", " ".join(cmd), target_info_from_target_list
+            )
+
+            if len(target_info_from_target_list) == 1:
+                return target_info_from_target_list[0]
+            else:
+                raise errors.FfxCommandError(
+                    f"'{self._target_name}' is not connected to host"
+                )
         except Exception as err:  # pylint: disable=broad-except
             raise errors.FfxCommandError(f"`{cmd}` command failed") from err
 
@@ -518,8 +530,9 @@ class FFX(ffx_interface.FFX):
         exceptions_to_skip: Iterable[type[Exception]] | None = None,
         capture_output: bool = True,
         log_output: bool = True,
+        include_target: bool = True,
     ) -> str:
-        """Executes and returns the output of `ffx -t {target} {cmd}`.
+        """Runs an FFX command.
 
         Args:
             cmd: FFX command to run.
@@ -532,10 +545,12 @@ class FFX(ffx_interface.FFX):
             log_output: When True, logs the output in DEBUG level. Callers
                 may set this to False when expecting particularly large
                 or spammy output.
+            include_target: If set to True, `ffx -t {target} {cmd}` will be run.
+                Otherwise, `ffx {cmd}` will be run.
 
         Returns:
-            Output of `ffx -t {target} {cmd}` when capture_output is set to True, otherwise an
-            empty string.
+            Output of FFX command when capture_output is set to True, otherwise
+            an empty string.
 
         Raises:
             errors.DeviceNotConnectedError: If FFX fails to reach target.
@@ -544,7 +559,10 @@ class FFX(ffx_interface.FFX):
         """
         exceptions_to_skip = tuple(exceptions_to_skip or [])
 
-        ffx_cmd: list[str] = self._generate_ffx_cmd(cmd=cmd)
+        ffx_cmd: list[str] = self._generate_ffx_cmd(
+            cmd=cmd,
+            include_target=include_target,
+        )
         try:
             _LOGGER.debug("Executing command `%s`", " ".join(ffx_cmd))
             if capture_output:

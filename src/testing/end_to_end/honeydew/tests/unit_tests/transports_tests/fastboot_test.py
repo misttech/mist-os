@@ -342,36 +342,28 @@ class FastbootTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    @mock.patch.object(fastboot.Fastboot, "_get_target_info", autospec=True)
     def test_is_in_fastboot_mode(
         self,
         parameterized_dict: dict[str, Any],
-        mock_get_target_info: mock.Mock,
     ) -> None:
         """Test case for Fastboot.is_in_fastboot_mode()"""
-        mock_get_target_info.side_effect = [
+        self.ffx_obj.get_target_info_from_target_list.return_value = (
             parameterized_dict["ffx_target_info"]
-        ]
+        )
         self.assertEqual(
             self.fastboot_obj.is_in_fastboot_mode(),
             parameterized_dict["expected"],
         )
-        mock_get_target_info.assert_called()
 
-    @mock.patch.object(
-        fastboot.Fastboot,
-        "_get_target_info",
-        side_effect=errors.FfxCommandError("error"),
-        autospec=True,
-    )
-    def test_is_in_fastboot_mode_exception(
-        self, mock_get_target_info: mock.Mock
-    ) -> None:
+    def test_is_in_fastboot_mode_exception(self) -> None:
         """Test case for Fastboot.is_in_fastboot_mode() raising
         FastbootCommandError."""
+        self.ffx_obj.get_target_info_from_target_list.side_effect = (
+            errors.FfxCommandError("error")
+        )
+
         with self.assertRaises(errors.FastbootCommandError):
             self.fastboot_obj.is_in_fastboot_mode()
-        mock_get_target_info.assert_called()
 
     @mock.patch.object(
         fastboot.Fastboot,
@@ -511,22 +503,18 @@ class FastbootTests(unittest.TestCase):
             self.fastboot_obj._fastboot_node_id, _USB_BASED_FASTBOOT_NODE_ID
         )
 
-    @mock.patch.object(
-        fastboot.Fastboot,
-        "_get_target_info",
-        return_value=_USB_BASED_TARGET_WHEN_IN_FUCHSIA_MODE,
-        autospec=True,
-    )
     def test_get_fastboot_node_without_fastboot_node_id_arg_usb_based(
-        self, mock_fastboot_get_target_info: mock.Mock
+        self,
     ) -> None:
         """Test case for Fastboot._get_fastboot_node() when called without
         fastboot_node_id arg for a USB based fastboot device."""
+        self.ffx_obj.get_target_info_from_target_list.return_value = (
+            _USB_BASED_TARGET_WHEN_IN_FUCHSIA_MODE
+        )
         self.fastboot_obj._get_fastboot_node()
         self.assertEqual(
             self.fastboot_obj._fastboot_node_id, _USB_BASED_FASTBOOT_NODE_ID
         )
-        mock_fastboot_get_target_info.assert_called()
 
     @mock.patch.object(fastboot.Fastboot, "boot_to_fuchsia_mode", autospec=True)
     @mock.patch.object(
@@ -535,66 +523,41 @@ class FastbootTests(unittest.TestCase):
     @mock.patch.object(
         fastboot.Fastboot, "boot_to_fastboot_mode", autospec=True
     )
-    @mock.patch.object(
-        fastboot.Fastboot,
-        "_get_target_info",
-        side_effect=[
-            _TCP_BASED_TARGET_WHEN_IN_FUCHSIA_MODE,
-            _TCP_BASED_TARGET_WHEN_IN_FASTBOOT_MODE,
-        ],
-        autospec=True,
-    )
     def test_get_fastboot_node_without_fastboot_node_id_arg_tcp_based(
         self,
-        mock_fastboot_get_target_info: mock.Mock,
         mock_boot_to_fastboot_mode: mock.Mock,
         mock_wait_for_valid_tcp_address: mock.Mock,
         mock_boot_to_fuchsia_mode: mock.Mock,
     ) -> None:
         """Test case for Fastboot._get_fastboot_node() when called without
         fastboot_node_id arg for a TCP based fastboot device."""
+        self.ffx_obj.get_target_info_from_target_list.side_effect = [
+            _TCP_BASED_TARGET_WHEN_IN_FUCHSIA_MODE,
+            _TCP_BASED_TARGET_WHEN_IN_FASTBOOT_MODE,
+        ]
+
         self.fastboot_obj._get_fastboot_node()
         self.assertEqual(
             self.fastboot_obj._fastboot_node_id, _TCP_BASED_FASTBOOT_NODE_ID
         )
 
-        self.assertEqual(mock_fastboot_get_target_info.call_count, 2)
+        self.assertEqual(
+            self.ffx_obj.get_target_info_from_target_list.call_count, 2
+        )
         mock_boot_to_fastboot_mode.assert_called()
         mock_wait_for_valid_tcp_address.assert_called()
         mock_boot_to_fuchsia_mode.assert_called()
 
-    @mock.patch.object(
-        fastboot.Fastboot,
-        "_get_target_info",
-        side_effect=errors.FfxCommandError("error"),
-        autospec=True,
-    )
     def test_get_fastboot_node_without_fastboot_node_id_arg_exception(
-        self, mock_fastboot_get_target_info: mock.Mock
+        self,
     ) -> None:
         """Test case for Fastboot._get_fastboot_node() when called without
         fastboot_node_id arg results in an exception."""
+        self.ffx_obj.get_target_info_from_target_list.side_effect = (
+            errors.FfxCommandError("error")
+        )
         with self.assertRaises(errors.FuchsiaDeviceError):
             self.fastboot_obj._get_fastboot_node()
-        mock_fastboot_get_target_info.assert_called()
-
-    def test_get_target_info_when_connected(self) -> None:
-        """Test case for Fastboot._get_target_info() when device is
-        connected."""
-        self.ffx_obj.get_target_list.return_value = (
-            _FFX_TARGET_LIST_WHEN_IN_FUCHSIA_MODE
-        )
-        self.assertEqual(
-            self.fastboot_obj._get_target_info(),
-            _USB_BASED_TARGET_WHEN_IN_FUCHSIA_MODE,
-        )
-
-    def test_get_target_info_when_not_connected(self) -> None:
-        """Test case for Fastboot._get_target_info() when device is not
-        connected."""
-        self.ffx_obj.get_target_list.return_value = []
-        with self.assertRaises(errors.FfxCommandError):
-            self.fastboot_obj._get_target_info()
 
     @parameterized.expand(
         [
@@ -615,26 +578,18 @@ class FastbootTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    @mock.patch.object(
-        fastboot.Fastboot,
-        "_get_target_info",
-        return_value=_USB_BASED_TARGET_WHEN_IN_FUCHSIA_MODE,
-        autospec=True,
-    )
     def test_is_a_single_ip_address(
         self,
         parameterized_dict: dict[str, Any],
-        mock_fastboot_get_target_info: mock.Mock,
     ) -> None:
         """Test case for Fastboot._is_a_single_ip_address()"""
-        mock_fastboot_get_target_info.return_value = parameterized_dict[
-            "get_target_info"
-        ]
+        self.ffx_obj.get_target_info_from_target_list.return_value = (
+            parameterized_dict["get_target_info"]
+        )
         self.assertEqual(
             self.fastboot_obj._is_a_single_ip_address(),
             parameterized_dict["expected"],
         )
-        mock_fastboot_get_target_info.assert_called()
 
     @mock.patch.object(common, "wait_for_state", autospec=True)
     def test_wait_for_fastboot_mode_success(
