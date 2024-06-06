@@ -230,7 +230,7 @@ int cmd_ub(int argc, const cmd_args* argv, uint32_t flags) {
         ub_cmd.func();
       } else {
         for (const auto& next_ub_cmd : ktl::span(kUbCommands).subspan(1)) {
-          if (gBootOptions->ubsan_action == CheckFail::kOops && next_ub_cmd.cannot_continue) {
+          if (gBootOptions->ubsan_action == CheckFailAction::kOops && next_ub_cmd.cannot_continue) {
             printf("*** Skipping `ub %s`, which cannot avoid panic ***\n", next_ub_cmd.name.data());
           } else {
             printf("*** ub %s\n", next_ub_cmd.name.data());
