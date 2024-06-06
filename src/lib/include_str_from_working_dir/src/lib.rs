@@ -4,7 +4,7 @@
 
 use proc_macro2::{Literal, Span, TokenStream};
 use quote::quote;
-use std::{env, fs};
+use std::{env, fs, path::Path};
 use syn::{Error, LitStr, Result};
 
 /// Imports a file's content as a string like [`include_str!`] does but looks up files relative to
@@ -118,14 +118,16 @@ fn path_from_env_tokens(input: TokenStream) -> Result<String> {
 }
 
 fn read_file_str(path: &str) -> Result<TokenStream> {
-    let contents = fs::read_to_string(path).map_err(|err| {
+    let build_dir = env::var("FUCHSIA_BUILD_DIR").unwrap_or(".".to_string());
+    let contents = fs::read_to_string(Path::new(&build_dir).join(path)).map_err(|err| {
         Error::new(Span::call_site(), format!("Unable to read file {path:?}: {err:?}"))
     })?;
     Ok(quote! { #contents })
 }
 
 fn read_file_bytes(path: &str) -> Result<TokenStream> {
-    let contents = fs::read(path).map_err(|err| {
+    let build_dir = env::var("FUCHSIA_BUILD_DIR").unwrap_or(".".to_string());
+    let contents = std::fs::read(Path::new(&build_dir).join(path)).map_err(|err| {
         Error::new(Span::call_site(), format!("Unable to read file {path:?}: {err:?}"))
     })?;
     let contents = Literal::byte_string(&contents);

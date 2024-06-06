@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use proc_macro2::{Literal, Span, TokenStream, TokenTree};
-use std::env;
+use std::{env, path::Path};
 use syn::{Error, LitStr, Result};
 
 /// Imports a file's content as a reference to a byte array like [`include_bytes!`] does but looks
@@ -76,7 +76,8 @@ fn include_bytes_from_working_dir_env_impl(input: TokenStream) -> Result<TokenSt
 }
 
 fn inner_impl(path: &str) -> Result<TokenStream> {
-    let contents = std::fs::read(path).map_err(|err| {
+    let build_dir = env::var("FUCHSIA_BUILD_DIR").unwrap_or(".".to_string());
+    let contents = std::fs::read(Path::new(&build_dir).join(path)).map_err(|err| {
         Error::new(Span::call_site(), format!("Unable to read file {path:?}: {err:?}"))
     })?;
     let tokens = TokenTree::Literal(Literal::byte_string(&contents)).into();
