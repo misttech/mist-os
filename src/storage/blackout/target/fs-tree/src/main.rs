@@ -134,7 +134,15 @@ impl FsTree {
 
     async fn verify_fxfs(&self, controller: ControllerProxy) -> Result<()> {
         let mut fxfs = Fxfs::new(controller);
-        fxfs.fsck().await?;
+        fxfs.fsck().await.context("overall fsck")?;
+
+        // Also check the volume we created.
+        let mut fs = fxfs.serve_multi_volume().await.context("failed to serve")?;
+        self.setup_crypt_service().await?;
+        let crypt_service = Some(
+            connect_to_protocol::<CryptMarker>()?.into_channel().unwrap().into_zx_channel().into(),
+        );
+        fs.check_volume("default", crypt_service).await.context("default volume check")?;
         Ok(())
     }
 
