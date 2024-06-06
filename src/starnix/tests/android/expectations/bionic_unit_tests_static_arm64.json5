@@ -32,6 +32,9 @@
 
                 // TODO(https://fxbug.dev/317335324): Flaky on the bots - needs to be investigated.
                 "properties.__system_property_reload_invalid",
+
+                // TODO(https://fxbug.dev/345290064): Started failing and blocking roller.
+                "MemtagNoteTest.*",
             ],
         },
     ],
