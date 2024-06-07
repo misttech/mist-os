@@ -13,12 +13,12 @@ use core::ops::Range;
 
 use net_types::ethernet::Mac;
 use net_types::ip::{Ipv4Addr, Ipv6Addr};
-use packet::{ParsablePacket, ParseBuffer};
+use packet::{ParsablePacket, ParseBuffer, SliceBufViewMut};
 use tracing::debug;
 
 use crate::error::{IpParseResult, ParseError, ParseResult};
 use crate::ethernet::{EtherType, EthernetFrame, EthernetFrameLengthCheck};
-use crate::icmp::{IcmpIpExt, IcmpMessage, IcmpPacket, IcmpParseArgs};
+use crate::icmp::{IcmpIpExt, IcmpMessage, IcmpPacket, IcmpParseArgs, Icmpv6PacketRaw};
 use crate::ip::{IpExt, Ipv4Proto};
 use crate::ipv4::{Ipv4FragmentType, Ipv4Header, Ipv4Packet};
 use crate::ipv6::{Ipv6Header, Ipv6Packet};
@@ -282,6 +282,15 @@ where
     }
     let (message, code) = parse_icmp_packet(body, src_ip, dst_ip, f)?;
     Ok((src_mac, dst_mac, src_ip, dst_ip, ttl, message, code))
+}
+
+/// Overwrite the checksum in an ICMPv6 message, returning the original value.
+///
+/// On `Err`, the provided buf is unmodified.
+pub fn overwrite_icmpv6_checksum(buf: &mut [u8], checksum: [u8; 2]) -> ParseResult<[u8; 2]> {
+    let buf = SliceBufViewMut::new(buf);
+    let mut message = Icmpv6PacketRaw::parse_mut(buf, ())?;
+    Ok(message.overwrite_checksum(checksum))
 }
 
 #[cfg(test)]

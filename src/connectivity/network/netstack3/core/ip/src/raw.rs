@@ -12,14 +12,14 @@ use net_types::{
     SpecifiedAddr, ZonedAddr,
 };
 use netstack3_base::{
-    socket::{DualStackIpExt, DualStackRemoteIp, SocketZonedAddrExt as _},
+    socket::{DualStackIpExt, DualStackRemoteIp, SocketIpAddr, SocketZonedAddrExt as _},
     sync::{PrimaryRc, StrongRc, WeakRc},
     AnyDevice, ContextPair, DeviceIdContext, ReferenceNotifiers, ReferenceNotifiersExt as _,
     RemoveResourceResultWithContext, StrongDeviceIdentifier, WeakDeviceIdentifier,
     ZonedAddressError,
 };
 use netstack3_filter::RawIpBody;
-use packet::BufferMut;
+use packet::{BufferMut, SliceBufViewMut};
 use packet_formats::{icmp, ip::IpPacket};
 use tracing::debug;
 use zerocopy::ByteSlice;
@@ -32,12 +32,13 @@ use crate::{
             protocol::RawIpSocketProtocol,
             state::{RawIpSocketLockedState, RawIpSocketState},
         },
-        socket::SocketHopLimits,
+        socket::{SendOneShotIpPacketError, SocketHopLimits},
     },
     socket::{IpSockCreateAndSendError, IpSocketHandler, SendOptions},
     DEFAULT_HOP_LIMITS,
 };
 
+mod checksum;
 pub(crate) mod filter;
 pub(crate) mod protocol;
 pub(crate) mod state;
@@ -101,6 +102,11 @@ where
             PrimaryRawIpSocketId(PrimaryRc::new(RawIpSocketState::new(protocol, external_state)));
         let strong = self.core_ctx().with_socket_map_mut(|socket_map| socket_map.insert(socket));
         debug!("created raw IP socket {strong:?}, on protocol {protocol:?}");
+
+        if protocol.requires_system_checksums() {
+            self.core_ctx().with_locked_state_mut(&strong, |state| state.system_checksums = true)
+        }
+
         strong
     }
 
@@ -140,7 +146,7 @@ where
                 <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
             >,
         >,
-        body: B,
+        mut body: B,
     ) -> Result<(), RawIpSocketSendToError> {
         match id.protocol() {
             RawIpSocketProtocol::Raw => return Err(RawIpSocketSendToError::ProtocolRaw),
@@ -162,23 +168,50 @@ where
 
         let (core_ctx, bindings_ctx) = self.contexts();
         core_ctx.with_locked_state_and_socket_handler(id, |state, core_ctx| {
-            let RawIpSocketLockedState { bound_device, icmp_filter: _, hop_limits } = state;
+            let RawIpSocketLockedState {
+                bound_device,
+                icmp_filter: _,
+                hop_limits,
+                system_checksums,
+            } = state;
             let (remote_ip, device) = remote_ip
                 .resolve_addr_with_device(bound_device.clone())
                 .map_err(RawIpSocketSendToError::Zone)?;
             let send_options = RawIpSocketSendOptions { hop_limits: &hop_limits };
+
+            let build_packet_fn =
+                |src_ip: SocketIpAddr<I::Addr>| -> Result<RawIpBody<_, _>, RawIpSocketSendToError> {
+                    if *system_checksums {
+                        let buf = SliceBufViewMut::new(body.as_mut());
+                        if !checksum::populate_checksum::<I, _>(
+                            src_ip.addr(),
+                            remote_ip.addr(),
+                            protocol,
+                            buf,
+                        ) {
+                            return Err(RawIpSocketSendToError::InvalidBody);
+                        }
+                    }
+                    Ok(RawIpBody::new(protocol, src_ip.addr(), remote_ip.addr(), body))
+                };
+
             core_ctx
-                .send_oneshot_ip_packet(
+                .send_oneshot_ip_packet_with_fallible_serializer(
                     bindings_ctx,
                     device.as_ref().map(|d| d.as_ref()),
                     local_ip,
                     remote_ip,
                     protocol,
                     &send_options,
-                    |src_ip| RawIpBody::new(protocol, src_ip.addr(), remote_ip.addr(), body),
+                    build_packet_fn,
                     None,
                 )
-                .map_err(RawIpSocketSendToError::Ip)
+                .map_err(|e| match e {
+                    SendOneShotIpPacketError::CreateAndSendError { err } => {
+                        RawIpSocketSendToError::Ip(err)
+                    }
+                    SendOneShotIpPacketError::SerializeError(err) => err,
+                })
         })
     }
 
@@ -296,6 +329,10 @@ pub enum RawIpSocketSendToError {
     /// The provided remote_ip was an IPv4-mapped-IPv6 address. Dual stack
     /// operations are not supported on raw IP sockets.
     MappedRemoteIp,
+    /// The provided packet body was invalid, and could not be sent. Typically
+    /// originates when the stack is asked to inspect the packet body, e.g. to
+    /// compute and populate the checksum value.
+    InvalidBody,
     /// There was an error when resolving the remote_ip's zone.
     Zone(ZonedAddressError),
     /// The IP layer failed to send the packet.
@@ -582,9 +619,18 @@ fn should_deliver_to_socket<I: IpExt, D: StrongDeviceIdentifier, B: ByteSlice>(
     device: &D,
     socket: &RawIpSocketLockedState<I, D::Weak>,
 ) -> bool {
-    let RawIpSocketLockedState { bound_device, icmp_filter, hop_limits: _ } = socket;
+    let RawIpSocketLockedState { bound_device, icmp_filter, hop_limits: _, system_checksums } =
+        socket;
     // Verify the received device matches the socket's bound device, if any.
     if bound_device.as_ref().is_some_and(|bound_device| bound_device != device) {
+        return false;
+    }
+
+    // Verify the inner message's checksum, if requested.
+    // NB: The checksum was not previously validated by the IP layer, because
+    // packets are delivered to raw sockets before the IP layer attempts to
+    // parse the inner message.
+    if *system_checksums && !checksum::has_valid_checksum::<I, B>(packet) {
         return false;
     }
 
@@ -646,8 +692,9 @@ mod test {
     };
     use packet::{Buf, InnerPacketBuilder as _, ParseBuffer as _, Serializer as _};
     use packet_formats::{
-        icmp::{IcmpEchoReply, IcmpMessage, IcmpPacketBuilder, IcmpUnusedCode},
-        ip::{IpPacketBuilder, IpProto, IpProtoExt},
+        icmp::{IcmpEchoReply, IcmpMessage, IcmpPacketBuilder, IcmpUnusedCode, Icmpv6MessageType},
+        ip::{IpPacketBuilder, IpProto, IpProtoExt, Ipv6Proto},
+        ipv6::Ipv6Packet,
     };
     use test_case::test_case;
 
@@ -1083,6 +1130,43 @@ mod test {
         }
     }
 
+    // Verify that ICMPv6 messages with an invalid checksum won't be received.
+    // Note that the successful delivery case is tested by
+    // `receive_ip_packet_with_icmp_filter`.
+    #[test]
+    fn do_not_receive_icmpv6_packet_with_bad_checksum() {
+        let mut api = new_raw_ip_socket_api::<Ipv6>();
+        let sock = api.create(RawIpSocketProtocol::new(Ipv6Proto::Icmpv6), Default::default());
+
+        // Use a valid ICMP message, but intentionally corrupt the checksum.
+        // The checksum is present at bytes 2 & 3.
+        let mut icmp_body =
+            new_icmp_message_buf::<Ipv6, _>(IcmpEchoReply::new(0, 0), IcmpUnusedCode)
+                .as_ref()
+                .to_vec();
+        const CORRUPT_CHECKSUM: [u8; 2] = [123, 234];
+        assert_ne!(
+            packet_formats::testutil::overwrite_icmpv6_checksum(
+                icmp_body.as_mut(),
+                CORRUPT_CHECKSUM
+            )
+            .expect("parse should succeed"),
+            CORRUPT_CHECKSUM
+        );
+
+        let buf = new_ip_packet_buf::<Ipv6>(icmp_body.as_ref(), Ipv6Proto::Icmpv6);
+        let mut buf_ref = buf.as_ref();
+        let packet = buf_ref.parse::<Ipv6Packet<_>>().expect("parse should succeed");
+        {
+            let (core_ctx, bindings_ctx) = api.ctx.contexts();
+            core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet, &MultipleDevicesId::A);
+        }
+
+        // Verify the packet wasn't received.
+        let FakeExternalSocketState { received_packets } = api.close(sock).into_removed();
+        assert_matches!(&received_packets.lock()[..], []);
+    }
+
     #[ip_test]
     #[test_case(None, None; "default_send")]
     #[test_case(Some(MultipleDevicesId::A), None; "with_bound_dev")]
@@ -1135,6 +1219,57 @@ mod test {
         assert_matches!(
             api.send_to(&sock, Some(mapped_remote_ip), Buf::new(IP_BODY.to_vec(), ..)),
             Err(RawIpSocketSendToError::MappedRemoteIp)
+        );
+    }
+
+    // Verify that packets sent on ICMPv6 raw IP sockets have their checksum
+    // automatically populated by the netstack.
+    #[test]
+    fn icmpv6_send_to_generates_checksum() {
+        let mut api = new_raw_ip_socket_api::<Ipv6>();
+        let sock = api.create(RawIpSocketProtocol::new(Ipv6Proto::Icmpv6), Default::default());
+
+        // Use a valid ICMP body, but intentionally corrupt the checksum.
+        // The checksum is present at bytes 2 & 3.
+        let icmp_body_with_checksum =
+            new_icmp_message_buf::<Ipv6, _>(IcmpEchoReply::new(0, 0), IcmpUnusedCode)
+                .as_ref()
+                .to_vec();
+        const CORRUPT_CHECKSUM: [u8; 2] = [123, 234];
+        let mut icmp_body_without_checksum = icmp_body_with_checksum.clone();
+        assert_ne!(
+            packet_formats::testutil::overwrite_icmpv6_checksum(
+                icmp_body_without_checksum.as_mut(),
+                CORRUPT_CHECKSUM,
+            )
+            .expect("parse should succeed"),
+            CORRUPT_CHECKSUM
+        );
+
+        // Send the buffer that has the corrupt checksum.
+        let remote_ip = ZonedAddr::Unzoned(Ipv6::TEST_ADDRS.remote_ip);
+        assert_matches!(&api.ctx.core_ctx().take_frames()[..], []);
+        api.send_to(&sock, Some(remote_ip), Buf::new(icmp_body_without_checksum.to_vec(), ..))
+            .expect("send should succeed");
+
+        // Observe that the checksum is populated.
+        let frames = api.core_ctx().take_frames();
+        let (_send_ip_packet_meta, data) = assert_matches!( &frames[..], [packet] => packet);
+        assert_eq!(&data[..], icmp_body_with_checksum);
+    }
+
+    // Verify that invalid ICMPv6 packets cannot be sent on raw IP sockets.
+    #[test_case(Icmpv6MessageType::DestUnreachable.into(), 4; "header-too-short")]
+    #[test_case(0, 8; "message-type-zero-not-supported")]
+    fn icmpv6_send_to_invalid_body(message_type: u8, header_len: usize) {
+        let mut body = vec![0; header_len];
+        body[0] = message_type;
+        let mut api = new_raw_ip_socket_api::<Ipv6>();
+        let sock = api.create(RawIpSocketProtocol::new(Ipv6Proto::Icmpv6), Default::default());
+        let remote_ip = ZonedAddr::Unzoned(Ipv6::TEST_ADDRS.remote_ip);
+        assert_matches!(
+            api.send_to(&sock, Some(remote_ip), Buf::new(body, ..)),
+            Err(RawIpSocketSendToError::InvalidBody)
         );
     }
 }

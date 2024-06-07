@@ -200,6 +200,47 @@ impl<B: ByteSliceMut> Icmpv6PacketRaw<B> {
             }
         }
     }
+
+    /// Overwrites the current checksum with `checksum`, returning the original.
+    pub(crate) fn overwrite_checksum(&mut self, checksum: [u8; 2]) -> [u8; 2] {
+        core::mem::replace(&mut self.header_prefix_mut().checksum, checksum)
+    }
+
+    /// Attempts to calculate and write a Checksum for this [`Icmpv6PacketRaw`].
+    ///
+    /// Returns whether the checksum was successfully calculated & written. In
+    /// the false case, self is left unmodified.
+    pub fn try_write_checksum(&mut self, src_ip: Ipv6Addr, dst_ip: Ipv6Addr) -> bool {
+        use Icmpv6PacketRaw::*;
+        match self {
+            DestUnreachable(p) => p.try_write_checksum(src_ip, dst_ip),
+            PacketTooBig(p) => p.try_write_checksum(src_ip, dst_ip),
+            TimeExceeded(p) => p.try_write_checksum(src_ip, dst_ip),
+            ParameterProblem(p) => p.try_write_checksum(src_ip, dst_ip),
+            EchoRequest(p) => p.try_write_checksum(src_ip, dst_ip),
+            EchoReply(p) => p.try_write_checksum(src_ip, dst_ip),
+            Ndp(p) => {
+                use ndp::NdpPacketRaw::*;
+                match p {
+                    RouterSolicitation(p) => p.try_write_checksum(src_ip, dst_ip),
+                    RouterAdvertisement(p) => p.try_write_checksum(src_ip, dst_ip),
+                    NeighborSolicitation(p) => p.try_write_checksum(src_ip, dst_ip),
+                    NeighborAdvertisement(p) => p.try_write_checksum(src_ip, dst_ip),
+                    Redirect(p) => p.try_write_checksum(src_ip, dst_ip),
+                }
+            }
+            Mld(p) => {
+                use mld::MldPacketRaw::*;
+                match p {
+                    MulticastListenerQuery(p) => p.try_write_checksum(src_ip, dst_ip),
+                    MulticastListenerQueryV2(p) => p.try_write_checksum(src_ip, dst_ip),
+                    MulticastListenerReport(p) => p.try_write_checksum(src_ip, dst_ip),
+                    MulticastListenerDone(p) => p.try_write_checksum(src_ip, dst_ip),
+                    MulticastListenerReportV2(p) => p.try_write_checksum(src_ip, dst_ip),
+                }
+            }
+        }
+    }
 }
 
 impl<B: ByteSlice> ParsablePacket<B, ()> for Icmpv6PacketRaw<B> {

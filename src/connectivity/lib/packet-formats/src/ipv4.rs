@@ -14,7 +14,7 @@ use core::fmt::{self, Debug, Formatter};
 use core::ops::Range;
 
 use internet_checksum::Checksum;
-use net_types::ip::{IpAddress, Ipv4, Ipv4Addr, Ipv6Addr};
+use net_types::ip::{GenericOverIp, IpAddress, Ipv4, Ipv4Addr, Ipv6Addr};
 use packet::records::options::OptionSequenceBuilder;
 use packet::records::options::OptionsRaw;
 use packet::{
@@ -30,7 +30,7 @@ use zerocopy::{
 
 use crate::error::{IpParseError, IpParseResult, ParseError};
 use crate::ip::{
-    IpPacketBuilder, IpProto, Ipv4Proto, Ipv6Proto, Nat64Error, Nat64TranslationResult,
+    IpExt, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6Proto, Nat64Error, Nat64TranslationResult,
 };
 use crate::ipv6::Ipv6PacketBuilder;
 use crate::tcp::{TcpParseArgs, TcpSegment};
@@ -236,6 +236,10 @@ pub struct Ipv4Packet<B> {
     hdr_prefix: Ref<B, HeaderPrefix>,
     options: Options<B>,
     body: B,
+}
+
+impl<B: ByteSlice, I: IpExt> GenericOverIp<I> for Ipv4Packet<B> {
+    type Type = <I as IpExt>::Packet<B>;
 }
 
 impl<B: ByteSlice> Ipv4Header for Ipv4Packet<B> {

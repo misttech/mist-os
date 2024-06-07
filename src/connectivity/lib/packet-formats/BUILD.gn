@@ -71,6 +71,7 @@ rustc_test("packet-formats_test") {
   edition = "2021"
 
   deps = _common_deps + [
+           "//src/connectivity/lib/ip-test-macro",
            "//third_party/rust_crates:assert_matches",
            "//third_party/rust_crates:test-case",
            "//third_party/rust_crates:tracing-subscriber",

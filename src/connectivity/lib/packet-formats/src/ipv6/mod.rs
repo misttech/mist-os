@@ -15,7 +15,7 @@ use core::borrow::Borrow;
 use core::fmt::{self, Debug, Formatter};
 use core::ops::Range;
 
-use net_types::ip::{Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr};
+use net_types::ip::{GenericOverIp, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr};
 use packet::records::{AlignedRecordSequenceBuilder, Records, RecordsRaw};
 use packet::{
     BufferAlloc, BufferProvider, BufferView, BufferViewMut, EmptyBuf, FragmentedBytesMut, FromRaw,
@@ -31,7 +31,7 @@ use zerocopy::{
 use crate::error::{IpParseError, IpParseErrorAction, IpParseResult, ParseError};
 use crate::icmp::Icmpv6ParameterProblemCode;
 use crate::ip::{
-    IpPacketBuilder, IpProto, Ipv4Proto, Ipv6ExtHdrType, Ipv6Proto, Nat64Error,
+    IpExt, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6ExtHdrType, Ipv6Proto, Nat64Error,
     Nat64TranslationResult,
 };
 use crate::ipv4::{Ipv4PacketBuilder, HDR_PREFIX_LEN};
@@ -282,6 +282,10 @@ pub struct Ipv6Packet<B> {
     extension_hdrs: Records<B, Ipv6ExtensionHeaderImpl>,
     body: B,
     proto: Ipv6Proto,
+}
+
+impl<B: ByteSlice, I: IpExt> GenericOverIp<I> for Ipv6Packet<B> {
+    type Type = <I as IpExt>::Packet<B>;
 }
 
 impl<B: ByteSlice> Ipv6Header for Ipv6Packet<B> {

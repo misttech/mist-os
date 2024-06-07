@@ -33,6 +33,7 @@ rustc_library_with_features("netstack3-ip") {
     "src/lib.rs",
     "src/path_mtu.rs",
     "src/raw.rs",
+    "src/raw/checksum.rs",
     "src/raw/filter.rs",
     "src/raw/protocol.rs",
     "src/raw/state.rs",

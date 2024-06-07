@@ -4,7 +4,7 @@
 
 //! Declares types related to the protocols of raw IP sockets.
 
-use net_types::ip::{GenericOverIp, Ip};
+use net_types::ip::{GenericOverIp, Ip, IpVersion};
 use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
 
 use crate::internal::base::IpExt;
@@ -64,6 +64,17 @@ impl<I: IpExt> RawIpSocketProtocol<I> {
             RawIpSocketProtocol::Raw => false,
             RawIpSocketProtocol::Proto(Protocol(p)) => *p == I::ICMP_IP_PROTO,
         }
+    }
+
+    /// True if the protocol requires system checksum support.
+    pub fn requires_system_checksums(&self) -> bool {
+        // Per RFC 2292, Section 3.1:
+        //
+        // The kernel will calculate and insert the ICMPv6 checksum for ICMPv6
+        // raw sockets, since this checksum is mandatory.
+        //
+        // https://www.rfc-editor.org/rfc/rfc2292#section-3.1
+        self.is_icmp() && I::VERSION == IpVersion::V6
     }
 }
 

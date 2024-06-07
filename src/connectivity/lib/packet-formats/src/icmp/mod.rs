@@ -408,6 +408,31 @@ impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I>> IcmpPacketRaw<I, B, M> {
     }
 }
 
+impl<I: IcmpIpExt, B: ByteSliceMut, M: IcmpMessage<I>> IcmpPacketRaw<I, B, M> {
+    /// Attempts to calculate and write a Checksum for this [`IcmpPacketRaw`].
+    ///
+    /// Returns whether the checksum was successfully calculated & written. In
+    /// the false case, self is left unmodified.
+    pub(crate) fn try_write_checksum(&mut self, src_ip: I::Addr, dst_ip: I::Addr) -> bool {
+        // NB: Zero the checksum to avoid interference when computing it.
+        let original_checksum = self.header.prefix.checksum;
+        self.header.prefix.checksum = [0, 0];
+
+        if let Some(checksum) = IcmpPacket::<I, B, M>::compute_checksum(
+            &self.header,
+            &self.message_body,
+            src_ip,
+            dst_ip,
+        ) {
+            self.header.prefix.checksum = checksum;
+            true
+        } else {
+            self.header.prefix.checksum = original_checksum;
+            false
+        }
+    }
+}
+
 impl<I: IcmpIpExt, B: ByteSliceMut> IcmpPacketRaw<I, B, IcmpEchoRequest> {
     /// Set the ID of the ICMP echo message.
     pub fn set_id(&mut self, new: u16) {
@@ -763,7 +788,9 @@ impl IdAndSeq {
 
 #[cfg(test)]
 mod tests {
-    use packet::ParseBuffer;
+    use ip_test_macro::ip_test;
+    use packet::{InnerPacketBuilder, ParseBuffer, Serializer, SliceBufViewMut};
+    use test_case::test_case;
 
     use super::*;
 
@@ -814,5 +841,42 @@ mod tests {
         header.prefix.checksum = [1, 1];
         let mut buf = header.as_bytes();
         assert!(buf.parse::<IcmpPacketRaw<Ipv4, _, IcmpEchoRequest>>().is_ok());
+    }
+
+    #[ip_test]
+    #[test_case([0,0]; "zeroed_checksum")]
+    #[test_case([123, 234]; "garbage_checksum")]
+    fn test_try_write_checksum<I: Ip + IcmpIpExt>(corrupt_checksum: [u8; 2]) {
+        // NB: The process of serializing an `IcmpPacketBuilder` will compute a
+        // valid checksum.
+        let icmp_message_with_checksum = []
+            .into_serializer()
+            .encapsulate(IcmpPacketBuilder::<I, _>::new(
+                *I::LOOPBACK_ADDRESS,
+                *I::LOOPBACK_ADDRESS,
+                IcmpUnusedCode,
+                IcmpEchoRequest::new(1, 1),
+            ))
+            .serialize_vec_outer()
+            .unwrap()
+            .as_ref()
+            .to_vec();
+
+        // Clone the message and corrupt the checksum.
+        let mut icmp_message_without_checksum = icmp_message_with_checksum.clone();
+        {
+            let buf = SliceBufViewMut::new(&mut icmp_message_without_checksum);
+            let mut message = IcmpPacketRaw::<I, _, IcmpEchoRequest>::parse_mut(buf, ())
+                .expect("parse packet raw should succeed");
+            message.header.prefix.checksum = corrupt_checksum;
+        }
+        assert_ne!(&icmp_message_with_checksum[..], &icmp_message_without_checksum[..]);
+
+        // Write the checksum, and verify the message now matches the original.
+        let buf = SliceBufViewMut::new(&mut icmp_message_without_checksum);
+        let mut message = IcmpPacketRaw::<I, _, IcmpEchoRequest>::parse_mut(buf, ())
+            .expect("parse packet raw should succeed");
+        assert!(message.try_write_checksum(*I::LOOPBACK_ADDRESS, *I::LOOPBACK_ADDRESS));
+        assert_eq!(&icmp_message_with_checksum[..], &icmp_message_without_checksum[..]);
     }
 }

@@ -913,6 +913,7 @@ impl IntoErrno for RawIpSocketSendToError {
         match self {
             RawIpSocketSendToError::ProtocolRaw => fposix::Errno::Einval,
             RawIpSocketSendToError::MappedRemoteIp => fposix::Errno::Enetunreach,
+            RawIpSocketSendToError::InvalidBody => fposix::Errno::Einval,
             RawIpSocketSendToError::Ip(inner) => match inner {
                 // MTU errors result in `Emsgsize` for sendto, but `Einval` for
                 // send.
