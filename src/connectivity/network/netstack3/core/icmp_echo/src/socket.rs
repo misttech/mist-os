@@ -35,9 +35,10 @@ use netstack3_base::{
     RngContext, SocketError, StrongDeviceIdentifier, UninstantiableWrapper, WeakDeviceIdentifier,
 };
 use netstack3_datagram::{
-    self as datagram, DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSet, DatagramSocketSpec,
-    DatagramSpecBoundStateContext, DatagramSpecStateContext, DatagramStateContext,
-    ExpectedUnboundError, NonDualStackConverter, NonDualStackDatagramSpecBoundStateContext,
+    self as datagram, DatagramApi, DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSet,
+    DatagramSocketSpec, DatagramSpecBoundStateContext, DatagramSpecStateContext,
+    DatagramStateContext, ExpectedUnboundError, NonDualStackConverter,
+    NonDualStackDatagramSpecBoundStateContext,
 };
 use netstack3_ip::{
     icmp::{EchoTransportContextMarker, IcmpIpExt, IcmpRxCounters},
@@ -756,9 +757,9 @@ where
         pair.core_ctx()
     }
 
-    fn contexts(&mut self) -> (&mut C::CoreContext, &mut C::BindingsContext) {
+    fn datagram(&mut self) -> &mut DatagramApi<I, C, Icmp<C::BindingsContext>> {
         let Self(pair, IpVersionMarker { .. }) = self;
-        pair.contexts()
+        DatagramApi::wrap(pair)
     }
 
     /// Creates a new unbound ICMP socket with default external data.
@@ -774,7 +775,7 @@ where
         &mut self,
         external_data: <C::BindingsContext as IcmpEchoBindingsTypes>::ExternalData<I>,
     ) -> IcmpApiSocketId<I, C> {
-        datagram::create(self.core_ctx(), external_data)
+        self.datagram().create(external_data)
     }
 
     /// Connects an ICMP socket to remote IP.
@@ -791,8 +792,7 @@ where
         >,
         remote_id: u16,
     ) -> Result<(), datagram::ConnectError> {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::connect(core_ctx, bindings_ctx, id, remote_ip, (), remote_id)
+        self.datagram().connect(id, remote_ip, (), remote_id)
     }
 
     /// Binds an ICMP socket to a local IP address and a local ID.
@@ -810,8 +810,7 @@ where
         >,
         icmp_id: Option<NonZeroU16>,
     ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::listen(core_ctx, bindings_ctx, id, local_ip, icmp_id)
+        self.datagram().listen(id, local_ip, icmp_id)
     }
 
     /// Gets the information about an ICMP socket.
@@ -820,8 +819,7 @@ where
         id: &IcmpApiSocketId<I, C>,
     ) -> datagram::SocketInfo<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>
     {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::get_info(core_ctx, bindings_ctx, id)
+        self.datagram().get_info(id)
     }
 
     /// Sets the bound device for a socket.
@@ -834,8 +832,7 @@ where
         id: &IcmpApiSocketId<I, C>,
         device_id: Option<&<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
     ) -> Result<(), SocketError> {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::set_device(core_ctx, bindings_ctx, id, device_id)
+        self.datagram().set_device(id, device_id)
     }
 
     /// Gets the device the specified socket is bound to.
@@ -843,8 +840,7 @@ where
         &mut self,
         id: &IcmpApiSocketId<I, C>,
     ) -> Option<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::get_bound_device(core_ctx, bindings_ctx, id)
+        self.datagram().get_bound_device(id)
     }
 
     /// Disconnects an ICMP socket.
@@ -852,8 +848,7 @@ where
         &mut self,
         id: &IcmpApiSocketId<I, C>,
     ) -> Result<(), datagram::ExpectedConnError> {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::disconnect_connected(core_ctx, bindings_ctx, id)
+        self.datagram().disconnect_connected(id)
     }
 
     /// Shuts down an ICMP socket.
@@ -862,14 +857,12 @@ where
         id: &IcmpApiSocketId<I, C>,
         shutdown_type: ShutdownType,
     ) -> Result<(), datagram::ExpectedConnError> {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::shutdown_connected(core_ctx, bindings_ctx, id, shutdown_type)
+        self.datagram().shutdown_connected(id, shutdown_type)
     }
 
     /// Gets the current shutdown state of an ICMP socket.
     pub fn get_shutdown(&mut self, id: &IcmpApiSocketId<I, C>) -> Option<ShutdownType> {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::get_shutdown_connected(core_ctx, bindings_ctx, id)
+        self.datagram().get_shutdown_connected(id)
     }
 
     /// Closes an ICMP socket.
@@ -880,20 +873,17 @@ where
         <C::BindingsContext as IcmpEchoBindingsTypes>::ExternalData<I>,
         C::BindingsContext,
     > {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::close(core_ctx, bindings_ctx, id)
+        self.datagram().close(id)
     }
 
     /// Gets unicast IP hop limit for ICMP sockets.
     pub fn get_unicast_hop_limit(&mut self, id: &IcmpApiSocketId<I, C>) -> NonZeroU8 {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::get_ip_hop_limits(core_ctx, bindings_ctx, id).unicast
+        self.datagram().get_ip_hop_limits(id).unicast
     }
 
     /// Gets multicast IP hop limit for ICMP sockets.
     pub fn get_multicast_hop_limit(&mut self, id: &IcmpApiSocketId<I, C>) -> NonZeroU8 {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::get_ip_hop_limits(core_ctx, bindings_ctx, id).multicast
+        self.datagram().get_ip_hop_limits(id).multicast
     }
 
     /// Sets unicast IP hop limit for ICMP sockets.
@@ -902,13 +892,7 @@ where
         id: &IcmpApiSocketId<I, C>,
         hop_limit: Option<NonZeroU8>,
     ) {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::update_ip_hop_limit(
-            core_ctx,
-            bindings_ctx,
-            id,
-            SocketHopLimits::set_unicast(hop_limit),
-        )
+        self.datagram().update_ip_hop_limit(id, SocketHopLimits::set_unicast(hop_limit))
     }
 
     /// Sets multicast IP hop limit for ICMP sockets.
@@ -917,13 +901,7 @@ where
         id: &IcmpApiSocketId<I, C>,
         hop_limit: Option<NonZeroU8>,
     ) {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::update_ip_hop_limit(
-            core_ctx,
-            bindings_ctx,
-            id,
-            SocketHopLimits::set_multicast(hop_limit),
-        )
+        self.datagram().update_ip_hop_limit(id, SocketHopLimits::set_multicast(hop_limit))
     }
 
     /// Sends an ICMP packet through a connection.
@@ -934,13 +912,7 @@ where
         id: &IcmpApiSocketId<I, C>,
         body: B,
     ) -> Result<(), datagram::SendError<packet_formats::error::ParseError>> {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::send_conn::<_, _, _, Icmp<C::BindingsContext>, _>(
-            core_ctx,
-            bindings_ctx,
-            id,
-            body,
-        )
+        self.datagram().send_conn(id, body)
     }
 
     /// Sends an ICMP packet with an remote address.
@@ -960,21 +932,13 @@ where
         (),
         either::Either<LocalAddressError, datagram::SendToError<packet_formats::error::ParseError>>,
     > {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::send_to::<_, _, _, Icmp<C::BindingsContext>, _>(
-            core_ctx,
-            bindings_ctx,
-            id,
-            remote_ip,
-            (),
-            body,
-        )
+        self.datagram().send_to(id, remote_ip, (), body)
     }
 
     /// Collects all currently opened sockets, returning a cloned reference for
     /// each one.
     pub fn collect_all_sockets(&mut self) -> Vec<IcmpApiSocketId<I, C>> {
-        datagram::collect_all_sockets(self.core_ctx())
+        self.datagram().collect_all_sockets()
     }
 
     /// Provides inspect data for ICMP echo sockets.

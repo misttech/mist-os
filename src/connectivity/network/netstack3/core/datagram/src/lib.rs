@@ -21,21 +21,14 @@ mod internal {
 }
 
 pub use internal::datagram::{
-    close, collect_all_sockets, connect, create, disconnect_connected, get_bound_device, get_info,
-    get_ip_hop_limits, get_ip_transparent, get_multicast_interface, get_multicast_loop,
-    get_options_device, get_sharing, get_shutdown_connected, listen, send_conn, send_to,
-    set_device, set_ip_transparent, set_multicast_interface, set_multicast_loop,
-    set_multicast_membership, shutdown_connected, update_ip_hop_limit, update_sharing,
-    with_other_stack_ip_options, with_other_stack_ip_options_and_default_hop_limits,
-    with_other_stack_ip_options_mut, with_other_stack_ip_options_mut_if_unbound, BoundSocketState,
-    BoundSocketStateType, BoundSockets, ConnInfo, ConnState, ConnectError,
-    DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec, DatagramSocketOptions,
-    DatagramSocketSet, DatagramSocketSpec, DatagramStateContext, DualStackConnState,
-    DualStackConverter, DualStackDatagramBoundStateContext, DualStackIpExt, EitherIpSocket,
-    ExpectedConnError, ExpectedUnboundError, InUseError, IpExt, IpOptions, ListenerInfo,
-    MulticastInterfaceSelector, MulticastMembershipInterfaceSelector, NonDualStackConverter,
-    NonDualStackDatagramBoundStateContext, ReferenceState, SendError, SendToError,
-    SetMulticastMembershipError, SocketInfo, SocketState, StrongRc, WeakRc,
+    BoundSocketState, BoundSocketStateType, BoundSockets, ConnInfo, ConnState, ConnectError,
+    DatagramApi, DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec,
+    DatagramSocketOptions, DatagramSocketSet, DatagramSocketSpec, DatagramStateContext,
+    DualStackConnState, DualStackConverter, DualStackDatagramBoundStateContext, DualStackIpExt,
+    EitherIpSocket, ExpectedConnError, ExpectedUnboundError, InUseError, IpExt, IpOptions,
+    ListenerInfo, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
+    NonDualStackConverter, NonDualStackDatagramBoundStateContext, ReferenceState, SendError,
+    SendToError, SetMulticastMembershipError, SocketInfo, SocketState, StrongRc, WeakRc,
     WrapOtherStackIpOptions, WrapOtherStackIpOptionsMut,
 };
 pub use internal::spec_context::{

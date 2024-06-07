@@ -40,7 +40,7 @@ use netstack3_base::{
 use netstack3_datagram::{
     self as datagram, BoundSocketState as DatagramBoundSocketState,
     BoundSocketStateType as DatagramBoundSocketStateType, BoundSockets as DatagramBoundSockets,
-    ConnectError, DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec,
+    ConnectError, DatagramApi, DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec,
     DatagramSocketOptions, DatagramSocketSet, DatagramSocketSpec, DatagramSpecBoundStateContext,
     DatagramSpecStateContext, DatagramStateContext, DualStackConnState, DualStackConverter,
     DualStackDatagramBoundStateContext, DualStackDatagramSpecBoundStateContext, DualStackIpExt,
@@ -1476,7 +1476,7 @@ fn try_deliver<
         if should_deliver {
             let dst = match transparent_original_dst {
                 Some(OriginalDestination { addr, port }) => {
-                    let (ip_options, _device) = datagram::get_options_device(core_ctx, state);
+                    let (ip_options, _device) = state.get_options_device(core_ctx);
 
                     // This packet has been transparently proxied, and such packets are only
                     // delivered to transparent sockets.
@@ -1707,9 +1707,15 @@ where
         pair.core_ctx()
     }
 
+    #[cfg(test)]
     fn contexts(&mut self) -> (&mut C::CoreContext, &mut C::BindingsContext) {
         let Self(pair, IpVersionMarker { .. }) = self;
         pair.contexts()
+    }
+
+    fn datagram(&mut self) -> &mut DatagramApi<I, C, Udp<C::BindingsContext>> {
+        let Self(pair, IpVersionMarker { .. }) = self;
+        DatagramApi::wrap(pair)
     }
 
     /// Creates a new unbound UDP socket with default external data.
@@ -1725,7 +1731,7 @@ where
         &mut self,
         external_data: <C::BindingsContext as UdpBindingsTypes>::ExternalData<I>,
     ) -> UdpApiSocketId<I, C> {
-        datagram::create(self.core_ctx(), external_data)
+        self.datagram().create(external_data)
     }
 
     /// Connect a UDP socket
@@ -1757,9 +1763,8 @@ where
         >,
         remote_port: UdpRemotePort,
     ) -> Result<(), ConnectError> {
-        let (core_ctx, bindings_ctx) = self.contexts();
         debug!("connect on {id:?} to {remote_ip:?}:{remote_port:?}");
-        datagram::connect(core_ctx, bindings_ctx, id, remote_ip, remote_port, ())
+        self.datagram().connect(id, remote_ip, remote_port, ())
     }
 
     /// Sets the bound device for a socket.
@@ -1772,9 +1777,8 @@ where
         id: &UdpApiSocketId<I, C>,
         device_id: Option<&<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
     ) -> Result<(), SocketError> {
-        let (core_ctx, bindings_ctx) = self.contexts();
         debug!("set device on {id:?} to {device_id:?}");
-        datagram::set_device(core_ctx, bindings_ctx, id, device_id)
+        self.datagram().set_device(id, device_id)
     }
 
     /// Gets the device the specified socket is bound to.
@@ -1782,8 +1786,7 @@ where
         &mut self,
         id: &UdpApiSocketId<I, C>,
     ) -> Option<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::get_bound_device(core_ctx, bindings_ctx, id)
+        self.datagram().get_bound_device(id)
     }
 
     /// Enable or disable dual stack operations on the given socket.
@@ -1799,12 +1802,8 @@ where
         id: &UdpApiSocketId<I, C>,
         enabled: bool,
     ) -> Result<(), SetDualStackEnabledError> {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::with_other_stack_ip_options_mut_if_unbound(
-            core_ctx,
-            bindings_ctx,
-            id,
-            |other_stack| {
+        self.datagram()
+            .with_other_stack_ip_options_mut_if_unbound(id, |other_stack| {
                 I::map_ip(
                     (enabled, WrapOtherStackIpOptionsMut(other_stack)),
                     |(_enabled, _v4)| Err(SetDualStackEnabledError::NotCapable),
@@ -1814,16 +1813,15 @@ where
                         Ok(())
                     },
                 )
-            },
-        )
-        .map_err(|ExpectedUnboundError| {
-            // NB: Match Linux and prefer to return `NotCapable` errors over
-            // `SocketIsBound` errors, for IPv4 sockets.
-            match I::VERSION {
-                IpVersion::V4 => SetDualStackEnabledError::NotCapable,
-                IpVersion::V6 => SetDualStackEnabledError::SocketIsBound,
-            }
-        })?
+            })
+            .map_err(|ExpectedUnboundError| {
+                // NB: Match Linux and prefer to return `NotCapable` errors over
+                // `SocketIsBound` errors, for IPv4 sockets.
+                match I::VERSION {
+                    IpVersion::V4 => SetDualStackEnabledError::NotCapable,
+                    IpVersion::V6 => SetDualStackEnabledError::SocketIsBound,
+                }
+            })?
     }
 
     /// Get the enabled state of dual stack operations on the given socket.
@@ -1838,8 +1836,7 @@ where
         &mut self,
         id: &UdpApiSocketId<I, C>,
     ) -> Result<bool, NotDualStackCapableError> {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::with_other_stack_ip_options(core_ctx, bindings_ctx, id, |other_stack| {
+        self.datagram().with_other_stack_ip_options(id, |other_stack| {
             I::map_ip(
                 WrapOtherStackIpOptions(other_stack),
                 |_v4| Err(NotDualStackCapableError),
@@ -1861,14 +1858,16 @@ where
         id: &UdpApiSocketId<I, C>,
         reuse_addr: bool,
     ) -> Result<(), ExpectedUnboundError> {
-        let mut sharing = datagram::get_sharing(self.core_ctx(), id);
+        // TODO(https://fxbug.dev/345740748): This is racy, change to do
+        // everything under lock.
+        let mut sharing = self.datagram().get_sharing(id);
         sharing.reuse_addr = reuse_addr;
-        datagram::update_sharing(self.core_ctx(), id, sharing)
+        self.datagram().update_sharing(id, sharing)
     }
 
     /// Gets the POSIX `SO_REUSEADDR` option for the specified socket.
     pub fn get_posix_reuse_addr(&mut self, id: &UdpApiSocketId<I, C>) -> bool {
-        datagram::get_sharing(self.core_ctx(), id).reuse_addr
+        self.datagram().get_sharing(id).reuse_addr
     }
 
     /// Sets the POSIX `SO_REUSEPORT` option for the specified socket.
@@ -1881,14 +1880,16 @@ where
         id: &UdpApiSocketId<I, C>,
         reuse_port: bool,
     ) -> Result<(), ExpectedUnboundError> {
-        let mut sharing = datagram::get_sharing(self.core_ctx(), id);
+        // TODO(https://fxbug.dev/345740748): This is racy, change to do
+        // everything under lock.
+        let mut sharing = self.datagram().get_sharing(id);
         sharing.reuse_port = reuse_port;
-        datagram::update_sharing(self.core_ctx(), id, sharing)
+        self.datagram().update_sharing(id, sharing)
     }
 
     /// Gets the POSIX `SO_REUSEPORT` option for the specified socket.
     pub fn get_posix_reuse_port(&mut self, id: &UdpApiSocketId<I, C>) -> bool {
-        datagram::get_sharing(self.core_ctx(), id).reuse_port
+        self.datagram().get_sharing(id).reuse_port
     }
 
     /// Sets the specified socket's membership status for the given group.
@@ -1908,16 +1909,9 @@ where
         >,
         want_membership: bool,
     ) -> Result<(), SetMulticastMembershipError> {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::set_multicast_membership(
-            core_ctx,
-            bindings_ctx,
-            id,
-            multicast_group,
-            interface,
-            want_membership,
-        )
-        .map_err(Into::into)
+        self.datagram()
+            .set_multicast_membership(id, multicast_group, interface, want_membership)
+            .map_err(Into::into)
     }
 
     /// Sets the hop limit for packets sent by the socket to a unicast
@@ -1934,16 +1928,12 @@ where
         unicast_hop_limit: Option<NonZeroU8>,
         ip_version: IpVersion,
     ) -> Result<(), NotDualStackCapableError> {
-        let (core_ctx, bindings_ctx) = self.contexts();
         if ip_version == I::VERSION {
-            return Ok(datagram::update_ip_hop_limit(
-                core_ctx,
-                bindings_ctx,
-                id,
-                SocketHopLimits::set_unicast(unicast_hop_limit),
-            ));
+            return Ok(self
+                .datagram()
+                .update_ip_hop_limit(id, SocketHopLimits::set_unicast(unicast_hop_limit)));
         }
-        datagram::with_other_stack_ip_options_mut(core_ctx, bindings_ctx, id, |other_stack| {
+        self.datagram().with_other_stack_ip_options_mut(id, |other_stack| {
             I::map_ip(
                 (IpInvariant(unicast_hop_limit), WrapOtherStackIpOptionsMut(other_stack)),
                 |(IpInvariant(_unicast_hop_limit), _v4)| Err(NotDualStackCapableError),
@@ -1977,16 +1967,12 @@ where
         multicast_hop_limit: Option<NonZeroU8>,
         ip_version: IpVersion,
     ) -> Result<(), NotDualStackCapableError> {
-        let (core_ctx, bindings_ctx) = self.contexts();
         if ip_version == I::VERSION {
-            return Ok(datagram::update_ip_hop_limit(
-                core_ctx,
-                bindings_ctx,
-                id,
-                SocketHopLimits::set_multicast(multicast_hop_limit),
-            ));
+            return Ok(self
+                .datagram()
+                .update_ip_hop_limit(id, SocketHopLimits::set_multicast(multicast_hop_limit)));
         }
-        datagram::with_other_stack_ip_options_mut(core_ctx, bindings_ctx, id, |other_stack| {
+        self.datagram().with_other_stack_ip_options_mut(id, |other_stack| {
             I::map_ip(
                 (IpInvariant(multicast_hop_limit), WrapOtherStackIpOptionsMut(other_stack)),
                 |(IpInvariant(_multicast_hop_limit), _v4)| Err(NotDualStackCapableError),
@@ -2019,37 +2005,35 @@ where
         id: &UdpApiSocketId<I, C>,
         ip_version: IpVersion,
     ) -> Result<NonZeroU8, NotDualStackCapableError> {
-        let (core_ctx, bindings_ctx) = self.contexts();
         if ip_version == I::VERSION {
-            return Ok(datagram::get_ip_hop_limits(core_ctx, bindings_ctx, id).unicast);
+            return Ok(self.datagram().get_ip_hop_limits(id).unicast);
         }
-        datagram::with_other_stack_ip_options_and_default_hop_limits(
-            core_ctx,
-            bindings_ctx,
-            id,
-            |other_stack, default_hop_limits| {
-                I::map_ip::<_, Result<IpInvariant<NonZeroU8>, _>>(
-                    (WrapOtherStackIpOptions(other_stack), IpInvariant(default_hop_limits)),
-                    |_v4| Err(NotDualStackCapableError),
-                    |(
-                        WrapOtherStackIpOptions(other_stack),
-                        IpInvariant(HopLimits { unicast: default_unicast, multicast: _ }),
-                    )| {
-                        let DualStackSocketState {
-                            socket_options:
-                                DatagramSocketOptions {
-                                    hop_limits:
-                                        SocketHopLimits { unicast, multicast: _, version: _ },
-                                    ..
-                                },
-                            ..
-                        } = other_stack;
-                        Ok(IpInvariant(unicast.unwrap_or(default_unicast)))
-                    },
-                )
-            },
-        )?
-        .map(|IpInvariant(unicast)| unicast)
+        self.datagram()
+            .with_other_stack_ip_options_and_default_hop_limits(
+                id,
+                |other_stack, default_hop_limits| {
+                    I::map_ip::<_, Result<IpInvariant<NonZeroU8>, _>>(
+                        (WrapOtherStackIpOptions(other_stack), IpInvariant(default_hop_limits)),
+                        |_v4| Err(NotDualStackCapableError),
+                        |(
+                            WrapOtherStackIpOptions(other_stack),
+                            IpInvariant(HopLimits { unicast: default_unicast, multicast: _ }),
+                        )| {
+                            let DualStackSocketState {
+                                socket_options:
+                                    DatagramSocketOptions {
+                                        hop_limits:
+                                            SocketHopLimits { unicast, multicast: _, version: _ },
+                                        ..
+                                    },
+                                ..
+                            } = other_stack;
+                            Ok(IpInvariant(unicast.unwrap_or(default_unicast)))
+                        },
+                    )
+                },
+            )?
+            .map(|IpInvariant(unicast)| unicast)
     }
 
     /// Gets the hop limit for packets sent by the socket to a multicast
@@ -2065,37 +2049,35 @@ where
         id: &UdpApiSocketId<I, C>,
         ip_version: IpVersion,
     ) -> Result<NonZeroU8, NotDualStackCapableError> {
-        let (core_ctx, bindings_ctx) = self.contexts();
         if ip_version == I::VERSION {
-            return Ok(datagram::get_ip_hop_limits(core_ctx, bindings_ctx, id).multicast);
+            return Ok(self.datagram().get_ip_hop_limits(id).multicast);
         }
-        datagram::with_other_stack_ip_options_and_default_hop_limits(
-            core_ctx,
-            bindings_ctx,
-            id,
-            |other_stack, default_hop_limits| {
-                I::map_ip::<_, Result<IpInvariant<NonZeroU8>, _>>(
-                    (WrapOtherStackIpOptions(other_stack), IpInvariant(default_hop_limits)),
-                    |_v4| Err(NotDualStackCapableError),
-                    |(
-                        WrapOtherStackIpOptions(other_stack),
-                        IpInvariant(HopLimits { unicast: _, multicast: default_multicast }),
-                    )| {
-                        let DualStackSocketState {
-                            socket_options:
-                                DatagramSocketOptions {
-                                    hop_limits:
-                                        SocketHopLimits { unicast: _, multicast, version: _ },
-                                    ..
-                                },
-                            ..
-                        } = other_stack;
-                        Ok(IpInvariant(multicast.unwrap_or(default_multicast)))
-                    },
-                )
-            },
-        )?
-        .map(|IpInvariant(multicast)| multicast)
+        self.datagram()
+            .with_other_stack_ip_options_and_default_hop_limits(
+                id,
+                |other_stack, default_hop_limits| {
+                    I::map_ip::<_, Result<IpInvariant<NonZeroU8>, _>>(
+                        (WrapOtherStackIpOptions(other_stack), IpInvariant(default_hop_limits)),
+                        |_v4| Err(NotDualStackCapableError),
+                        |(
+                            WrapOtherStackIpOptions(other_stack),
+                            IpInvariant(HopLimits { unicast: _, multicast: default_multicast }),
+                        )| {
+                            let DualStackSocketState {
+                                socket_options:
+                                    DatagramSocketOptions {
+                                        hop_limits:
+                                            SocketHopLimits { unicast: _, multicast, version: _ },
+                                        ..
+                                    },
+                                ..
+                            } = other_stack;
+                            Ok(IpInvariant(multicast.unwrap_or(default_multicast)))
+                        },
+                    )
+                },
+            )?
+            .map(|IpInvariant(multicast)| multicast)
     }
 
     /// Returns the configured multicast interface for the socket.
@@ -2107,21 +2089,21 @@ where
         Option<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
         NotDualStackCapableError,
     > {
-        let (core_ctx, bindings_ctx) = self.contexts();
         if ip_version == I::VERSION {
-            return Ok(datagram::get_multicast_interface(core_ctx, id));
+            return Ok(self.datagram().get_multicast_interface(id));
         };
 
-        datagram::with_other_stack_ip_options(core_ctx, bindings_ctx, id, |other_stack| {
-            I::map_ip::<_, Result<IpInvariant<Option<_>>, _>>(
-                WrapOtherStackIpOptions(other_stack),
-                |_v4| Err(NotDualStackCapableError),
-                |WrapOtherStackIpOptions(other_stack)| {
-                    Ok(IpInvariant(other_stack.socket_options.multicast_interface.clone()))
-                },
-            )
-        })
-        .map(|IpInvariant(result)| result)
+        self.datagram()
+            .with_other_stack_ip_options(id, |other_stack| {
+                I::map_ip::<_, Result<IpInvariant<Option<_>>, _>>(
+                    WrapOtherStackIpOptions(other_stack),
+                    |_v4| Err(NotDualStackCapableError),
+                    |WrapOtherStackIpOptions(other_stack)| {
+                        Ok(IpInvariant(other_stack.socket_options.multicast_interface.clone()))
+                    },
+                )
+            })
+            .map(|IpInvariant(result)| result)
     }
 
     /// Sets the multicast interface to `interface` for a socket.
@@ -2131,14 +2113,12 @@ where
         interface: Option<&<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
         ip_version: IpVersion,
     ) -> Result<(), NotDualStackCapableError> {
-        let (core_ctx, bindings_ctx) = self.contexts();
-
         if ip_version == I::VERSION {
-            datagram::set_multicast_interface(core_ctx, id, interface);
+            self.datagram().set_multicast_interface(id, interface);
             return Ok(());
         };
 
-        datagram::with_other_stack_ip_options_mut(core_ctx, bindings_ctx, id, |other_stack| {
+        self.datagram().with_other_stack_ip_options_mut(id, |other_stack| {
             I::map_ip(
                 (IpInvariant(interface), WrapOtherStackIpOptionsMut(other_stack)),
                 |(IpInvariant(_interface), _v4)| Err(NotDualStackCapableError),
@@ -2153,12 +2133,12 @@ where
 
     /// Gets the transparent option.
     pub fn get_transparent(&mut self, id: &UdpApiSocketId<I, C>) -> bool {
-        datagram::get_ip_transparent(self.core_ctx(), id)
+        self.datagram().get_ip_transparent(id)
     }
 
     /// Sets the transparent option.
     pub fn set_transparent(&mut self, id: &UdpApiSocketId<I, C>, value: bool) {
-        datagram::set_ip_transparent(self.core_ctx(), id, value)
+        self.datagram().set_ip_transparent(id, value)
     }
 
     /// Gets the loopback multicast option.
@@ -2167,21 +2147,21 @@ where
         id: &UdpApiSocketId<I, C>,
         ip_version: IpVersion,
     ) -> Result<bool, NotDualStackCapableError> {
-        let (core_ctx, bindings_ctx) = self.contexts();
         if ip_version == I::VERSION {
-            return Ok(datagram::get_multicast_loop(core_ctx, id));
+            return Ok(self.datagram().get_multicast_loop(id));
         };
 
-        datagram::with_other_stack_ip_options(core_ctx, bindings_ctx, id, |other_stack| {
-            I::map_ip::<_, Result<IpInvariant<bool>, _>>(
-                WrapOtherStackIpOptions(other_stack),
-                |_v4| Err(NotDualStackCapableError),
-                |WrapOtherStackIpOptions(other_stack)| {
-                    Ok(IpInvariant(other_stack.socket_options.multicast_loop))
-                },
-            )
-        })
-        .map(|IpInvariant(result)| result)
+        self.datagram()
+            .with_other_stack_ip_options(id, |other_stack| {
+                I::map_ip::<_, Result<IpInvariant<bool>, _>>(
+                    WrapOtherStackIpOptions(other_stack),
+                    |_v4| Err(NotDualStackCapableError),
+                    |WrapOtherStackIpOptions(other_stack)| {
+                        Ok(IpInvariant(other_stack.socket_options.multicast_loop))
+                    },
+                )
+            })
+            .map(|IpInvariant(result)| result)
     }
 
     /// Sets the loopback multicast option.
@@ -2191,14 +2171,12 @@ where
         value: bool,
         ip_version: IpVersion,
     ) -> Result<(), NotDualStackCapableError> {
-        let (core_ctx, bindings_ctx) = self.contexts();
-
         if ip_version == I::VERSION {
-            datagram::set_multicast_loop(core_ctx, id, value);
+            self.datagram().set_multicast_loop(id, value);
             return Ok(());
         };
 
-        datagram::with_other_stack_ip_options_mut(core_ctx, bindings_ctx, id, |other_stack| {
+        self.datagram().with_other_stack_ip_options_mut(id, |other_stack| {
             I::map_ip(
                 (IpInvariant(value), WrapOtherStackIpOptionsMut(other_stack)),
                 |(IpInvariant(_interface), _v4)| Err(NotDualStackCapableError),
@@ -2219,9 +2197,8 @@ where
     ///
     /// Returns an error if the socket is not connected.
     pub fn disconnect(&mut self, id: &UdpApiSocketId<I, C>) -> Result<(), ExpectedConnError> {
-        let (core_ctx, bindings_ctx) = self.contexts();
         debug!("disconnect {id:?}");
-        datagram::disconnect_connected(core_ctx, bindings_ctx, id)
+        self.datagram().disconnect_connected(id)
     }
 
     /// Shuts down a socket for reading and/or writing.
@@ -2234,9 +2211,8 @@ where
         id: &UdpApiSocketId<I, C>,
         which: ShutdownType,
     ) -> Result<(), ExpectedConnError> {
-        let (core_ctx, bindings_ctx) = self.contexts();
         debug!("shutdown {id:?} {which:?}");
-        datagram::shutdown_connected(core_ctx, bindings_ctx, id, which)
+        self.datagram().shutdown_connected(id, which)
     }
 
     /// Get the shutdown state for a socket.
@@ -2244,8 +2220,7 @@ where
     /// If the socket is not connected, or if `shutdown` was not called on it,
     /// returns `None`.
     pub fn get_shutdown(&mut self, id: &UdpApiSocketId<I, C>) -> Option<ShutdownType> {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::get_shutdown_connected(core_ctx, bindings_ctx, id)
+        self.datagram().get_shutdown_connected(id)
     }
 
     /// Removes a socket that was previously created.
@@ -2256,9 +2231,8 @@ where
         <C::BindingsContext as UdpBindingsTypes>::ExternalData<I>,
         C::BindingsContext,
     > {
-        let (core_ctx, bindings_ctx) = self.contexts();
         debug!("close {id:?}");
-        datagram::close(core_ctx, bindings_ctx, id)
+        self.datagram().close(id)
     }
 
     /// Gets the [`SocketInfo`] associated with the UDP socket referenced by
@@ -2267,8 +2241,7 @@ where
         &mut self,
         id: &UdpApiSocketId<I, C>,
     ) -> SocketInfo<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::get_info(core_ctx, bindings_ctx, id)
+        self.datagram().get_info(id)
     }
 
     /// Use an existing socket to listen for incoming UDP packets.
@@ -2298,9 +2271,8 @@ where
         >,
         port: Option<NonZeroU16>,
     ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
-        let (core_ctx, bindings_ctx) = self.contexts();
         debug!("listen on {id:?} on {addr:?}:{port:?}");
-        datagram::listen(core_ctx, bindings_ctx, id, addr, port)
+        self.datagram().listen(id, addr, port)
     }
 
     /// Sends a UDP packet on an existing socket.
@@ -2315,10 +2287,9 @@ where
         id: &UdpApiSocketId<I, C>,
         body: B,
     ) -> Result<(), Either<SendError, ExpectedConnError>> {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        core_ctx.increment(|counters| &counters.tx);
-        datagram::send_conn(core_ctx, bindings_ctx, id, body).map_err(|err| {
-            core_ctx.increment(|counters| &counters.tx_error);
+        self.core_ctx().increment(|counters| &counters.tx);
+        self.datagram().send_conn(id, body).map_err(|err| {
+            self.core_ctx().increment(|counters| &counters.tx_error);
             match err {
                 DatagramSendError::NotConnected => Either::Right(ExpectedConnError),
                 DatagramSendError::NotWriteable => Either::Left(SendError::NotWriteable),
@@ -2358,10 +2329,9 @@ where
             UdpRemotePort::Set(_) => {}
         }
 
-        let (core_ctx, bindings_ctx) = self.contexts();
-        core_ctx.increment(|counters| &counters.tx);
-        datagram::send_to(core_ctx, bindings_ctx, id, remote_ip, remote_port, body).map_err(|e| {
-            core_ctx.increment(|counters| &counters.tx_error);
+        self.core_ctx().increment(|counters| &counters.tx);
+        self.datagram().send_to(id, remote_ip, remote_port, body).map_err(|e| {
+            self.core_ctx().increment(|counters| &counters.tx_error);
             match e {
                 Either::Left(e) => Either::Left(e),
                 Either::Right(e) => {
@@ -2391,7 +2361,7 @@ where
     /// Collects all currently opened sockets, returning a cloned reference for
     /// each one.
     pub fn collect_all_sockets(&mut self) -> Vec<UdpApiSocketId<I, C>> {
-        datagram::collect_all_sockets(self.core_ctx())
+        self.datagram().collect_all_sockets()
     }
 
     /// Provides inspect data for UDP sockets.
