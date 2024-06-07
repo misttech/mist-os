@@ -22,7 +22,7 @@ following terminology:
 
 * **Test code**: Code written to test production code.
 
-    * Note: The `bt-host` C++ codebase uses the convention that for production
+  * Note: The `bt-host` C++ codebase uses the convention that for production
             code in `foo.(h|cc)`, associated tests are written in
             `foo_unittest.cc`.
 
@@ -63,14 +63,12 @@ lowest-level way to test `bt-host` functionality. Given the complexity of
 Bluetooth controller software, there are a variety of test utilities available
 for different use cases.
 
-
 #### [ControllerTestDoubleBase](https://fuchsia.googlesource.com/fuchsia/+/f28eb81421883d215a654933acf69868dfc67295/src/connectivity/bluetooth/core/bt-host/testing/controller_test_double_base.h)
 
 `ControllerTestDoubleBase` exists to provide basic functionality (mostly related
 to opening and handing off Bluetooth data channels) needed by any Controller
 test double. This class is not used directly, but subclassed by Controller test
 doubles for shared functionality.
-
 
 #### [FakeController](https://fuchsia.googlesource.com/fuchsia/+/f28eb81421883d215a654933acf69868dfc67295/src/connectivity/bluetooth/core/bt-host/testing/fake_controller.h)
 
@@ -109,7 +107,6 @@ behavior. Clients queue up specific HCI commands and responses, and
 protocol. Use `MockController` to simulate an exact flow of either ACL packets
 or HCI commands, or to inject test-specific HCI behavior into a test.
 
-
 #### [ControllerTest](https://fuchsia.googlesource.com/fuchsia/+/f28eb81421883d215a654933acf69868dfc67295/src/connectivity/bluetooth/core/bt-host/testing/controller_test.h)
 
 `ControllerTest` is not a test double in itself, but a
@@ -120,7 +117,6 @@ they provide. Test suites that depend on test double Controllers tend to
 subclass this class (vs. explicitly creating `ControllerTestDouble` implementors
 themselves), and then access their chosen Controller test double through this
 class’s accessors.
-
 
 ## `bt-host` object test doubles
 
@@ -157,7 +153,6 @@ with the Bluetooth controller using HCI commands, its test double
 hci::FakeConnection allows for writing control plane unit tests without a
 functional HCI backend.
 
-
 #### [FakeLocalAddressDelegate](https://fuchsia.googlesource.com/fuchsia/+/f28eb81421883d215a654933acf69868dfc67295/src/connectivity/bluetooth/core/bt-host/hci/fake_local_address_delegate.h)
 
 The
@@ -172,7 +167,6 @@ don't particularly depend on the rotating or private nature of local addresses,
 so the FakeLocalAddressDelegate is used to have more isolated and repeatable
 tests with simplified address behavior.
 
-
 ### Logical link control and adaption protocol (L2CAP)
 
 L2CAP provides "higher level protocol multiplexing, packet segmentation and
@@ -185,13 +179,12 @@ Core Specification v5.2 Vol. 3 Part A).
 [L2CAP channels](https://fuchsia.googlesource.com/fuchsia/+/f28eb81421883d215a654933acf69868dfc67295/src/connectivity/bluetooth/core/bt-host/l2cap/channel.h).
 L2CAP channels provide a logical connection to a peer service, so dependent
 protocols include higher-level protocols like ATT, GATT, SMP, SDP. Based on our
-[predefined terms](#Definitions), it would probably be more correct to call this
+[predefined terms](#definitions), it would probably be more correct to call this
 utility MockChannel, as most uses of `FakeChannel` are explicitly `Expect`ing
 and `Receiv`ing specific L2CAP packets. `FakeChannelTest` is an example of the
 [test harness pattern](#test-loop-harness), which provides additional
 commonly-used functionality (e.g. `ReceiveAndExpect` to easily verify a specific
 production response to a specific received message).
-
 
 #### [FakeSignalingChannel](https://fuchsia.googlesource.com/fuchsia/+/f28eb81421883d215a654933acf69868dfc67295/src/connectivity/bluetooth/core/bt-host/l2cap/fake_signaling_channel.h)
 
@@ -199,7 +192,6 @@ Used internally in L2CAP tests to mock production signaling channel behavior.
 Like `FakeChannel`, it can more accurately be described as a test mock, as L2CAP
 tests that use `FakeSignalingChannel` are expected to explicitly configure
 packets to be expected and sent back to the production code.
-
 
 ### Generic attribute protocol (GATT)
 
@@ -218,7 +210,6 @@ serves as a test double for this root GATT object, allowing for unit tests of
 the GATT client and server implementations to be run without dependence on
 production ATT code. The GATT library also exposes a `FakeLayerTest` harness
 (per above [note](#test-loop-harness)).
-
 
 #### [FakeClient](https://fuchsia.googlesource.com/fuchsia/+/f28eb81421883d215a654933acf69868dfc67295/src/connectivity/bluetooth/core/bt-host/gatt/fake_client.h)
 
@@ -241,13 +232,12 @@ v5.2 Vol. 3 Part H).
 `FakeListener` is used as a test double for
 [`PairingPhase`](https://fuchsia.googlesource.com/fuchsia/+/f28eb81421883d215a654933acf69868dfc67295/src/connectivity/bluetooth/core/bt-host/sm/pairing_phase.h#25)’s
 `Listener` class, which in production code is their owning class,
-[`PairingState`](https://fuchsia.googlesource.com/fuchsia/+/f28eb81421883d215a654933acf69868dfc67295/src/connectivity/bluetooth/core/bt-host/sm/pairing_state.h).
+[`SecureSimplePairingState`](https://fuchsia.googlesource.com/fuchsia/+/f28eb81421883d215a654933acf69868dfc67295/src/connectivity/bluetooth/core/bt-host/sm/secure_simple_pairing_state.h).
 `PairingPhase`s use a pointer to `Listener` to communicate with their owning
 class. `FakeListener` is another example of using the word `Fake` where `Mock`
 probably makes more sense, as the main test usage is to expect that certain
 calls were made to the `FakeListener` class by production `PairingPhase`
 instances.
-
 
 #### [TestSecurityManager(Factory)](https://fuchsia.googlesource.com/fuchsia/+/f28eb81421883d215a654933acf69868dfc67295/src/connectivity/bluetooth/core/bt-host/sm/test_security_manager.h)
 
@@ -258,7 +248,6 @@ to inject `TestSecurityManager`s into production code while keeping them
 accessible by unit tests. The current implementation is a very minimal test spy.
 It provides basic argument snooping and stub responses for a few methods and
 noop implementations for others.
-
 
 ### Generic access protocol (GAP)
 
@@ -279,7 +268,6 @@ pairing. `FakePairingDelegate` exists in order to enable unit tests of pairing
 flows without real user interaction. Test code configures the test double to
 expect and provide responses to pairing i/o requests from `bt-host` production
 code.
-
 
 #### [FakeL2cap](../core/bt-host/testing/fake_l2cap.h)
 
@@ -314,7 +302,6 @@ signaling channels, which exist on a per-peer-and-transport basis. In the
 FakeController emulation world, FakeSignalingServer provides canned responses
 for these per-logical link signaling channel messages.
 
-
 #### [FakeL2cap](https://fuchsia.googlesource.com/fuchsia/+/f28eb81421883d215a654933acf69868dfc67295/src/connectivity/bluetooth/core/bt-host/testing/fake_l2cap.h) (L2CAP)
 
 FakeL2cap emulates the production L2CAP layer. It provides a simplified
@@ -325,13 +312,11 @@ test code. Instead, FakeL2cap usually serves as an underlying emulation layer
 for other test utilities in the FakeController world. These higher-level
 emulation utilities see usage in test code more than one level above L2CAP.
 
-
 #### [FakeDynamicChannel](https://fuchsia.googlesource.com/fuchsia/+/f28eb81421883d215a654933acf69868dfc67295/src/connectivity/bluetooth/core/bt-host/testing/fake_dynamic_channel.h) (L2CAP)
 
 `FakeDynamicChannel` provides a simplified model of real dynamic channels in the
 emulator. Services which use real dynamic channels in production use
 `FakeDynamicChannel` to transmit and receive data in emulated environments.
-
 
 #### [FakeSdpServer](https://fuchsia.googlesource.com/fuchsia/+/f28eb81421883d215a654933acf69868dfc67295/src/connectivity/bluetooth/core/bt-host/testing/fake_sdp_server.h) (SDP)
 
@@ -340,8 +325,8 @@ of Bluetooth flows requiring specific SDP entries. It largely leverages the
 production SDP server implementation to store services and generate response
 packets as necessary.
 
-
 #### [FakeGattServer](https://fuchsia.googlesource.com/fuchsia/+/f28eb81421883d215a654933acf69868dfc67295/src/connectivity/bluetooth/core/bt-host/testing/fake_gatt_server.h) (GATT)
+
 `FakeGattServer` provides a basic level of GATT server emulation. This sees use
 in integration-style LE tests which use the GATT client role and require peer
 GATT server functionality.

@@ -18,8 +18,6 @@ Before running the test, ensure QEMU is running.
 Run `fx fuzz list` to see the full list of available fuzzing targets. To run a specific fuzz test,
 do `fx fuzz $package/$fuzzer` where `$package` and `$fuzzer` match those reported by `fx fuzz list`.
 
-
-
 See the [fuzzing documentation](https://fuchsia.dev/fuchsia-src/development/testing/fuzzing/overview?hl=en)
 for a more in depth guide.
 
@@ -73,7 +71,7 @@ adapter:
         connections:
             connection_0x0:
                 peer_id
-                pairing_state:
+                secure_simple_pairing_state:
                     encryption_status
                     security_properties:
                         encrypted
