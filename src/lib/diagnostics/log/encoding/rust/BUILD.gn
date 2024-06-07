@@ -27,6 +27,7 @@ rustc_library("rust") {
     "//sdk/fidl/fuchsia.diagnostics.stream:fuchsia.diagnostics.stream_rust",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:bitfield",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:nom",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
