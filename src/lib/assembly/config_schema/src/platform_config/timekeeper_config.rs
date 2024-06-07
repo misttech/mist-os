@@ -20,13 +20,11 @@ pub struct TimekeeperConfig {
     /// If set, the device's real time clock is only ever read from, but
     /// not written to.
     #[serde(default)]
-    pub rtc_is_read_only: bool,
-    /// The endpoint URL for querying time information. The HTTPS time source
-    /// uses the time reported in HTTPS responses to estimate current time.
-    /// None of the other approaches such as NTP are acceptable for Fuchsia
-    /// products in general.
-    #[serde(default)]
     pub time_source_endpoint_url: String,
+    /// If set, Timekeeper will serve test-only protocols from the library
+    /// `fuchsia.time.test`.
+    #[serde(default)]
+    pub serve_test_protocols: bool,
 }
 
 impl Default for TimekeeperConfig {
@@ -35,8 +33,8 @@ impl Default for TimekeeperConfig {
         Self {
             back_off_time_between_pull_samples_sec: 300,
             first_sampling_delay_sec: 0,
-            rtc_is_read_only: false,
             time_source_endpoint_url: "https://clients3.google.com/generate_204".into(),
+            serve_test_protocols: false,
         }
     }
 }

@@ -30,6 +30,10 @@
             protocol: [ "fuchsia.posix.socket.Provider" ],
             from: "#netstack",
         },
+        {
+            storage: "tmp",
+            path: "/tmp",
+        },
     ],
     offer: [
         {

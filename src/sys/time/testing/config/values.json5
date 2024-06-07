@@ -17,5 +17,5 @@
     utc_start_at_startup: true,
     early_exit: false,
     power_topology_integration_enabled: false,
-    rtc_is_read_only: false,
+    serve_test_protocols: true,
 }

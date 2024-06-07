@@ -13,8 +13,9 @@ use {
         },
         estimator::Estimator,
         rtc::Rtc,
+        rtc_testing,
         time_source_manager::{KernelMonotonicProvider, TimeSourceManager},
-        Config,
+        Command, Config,
     },
     chrono::prelude::*,
     fuchsia_async as fasync,
@@ -60,6 +61,9 @@ const ERROR_REFRESH_INTERVAL: zx::Duration = zx::Duration::from_minutes(6);
 
 /// Denotes an unknown clock error bound
 const ZX_CLOCK_UNKNOWN_ERROR_BOUND: u64 = u64::MAX;
+
+/// The path to the internal persistentstate
+const PERSISTENT_STATE_PATH: &'static str = "/data/persistent_state.json";
 
 /// Describes how a correction will be made to a clock.
 enum ClockCorrection {
@@ -309,7 +313,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         diagnostics: Arc<D>,
         track: Track,
         config: Arc<Config>,
-        async_commands: mpsc::Receiver<()>,
+        async_commands: mpsc::Receiver<Command>,
     ) {
         ClockManager::new(clock, time_source_manager, rtc, diagnostics, track, config, None)
             .maintain_clock(async_commands)
@@ -345,7 +349,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
     }
 
     /// Maintain the clock indefinitely. This future will never complete.
-    async fn maintain_clock(mut self, async_commands: mpsc::Receiver<()>) {
+    async fn maintain_clock(mut self, async_commands: mpsc::Receiver<Command>) {
         let pull_delay = self.config.get_back_off_time_between_pull_samples();
         let first_delay = self.config.get_first_sampling_delay();
 
@@ -363,6 +367,14 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
             details.backstop.into_nanos() != details.ticks_to_synthetic.synthetic_offset;
         std::mem::drop(details);
         let mut receiver = async_commands.fuse(); // Required by select! below.
+
+        // Initialize from persistent settings.
+        let serve_test_protocols = self.config.serve_test_protocols();
+        let mut allow_timekeeper_to_update_rtc = !serve_test_protocols
+            || rtc_testing::read_and_update_state(PERSISTENT_STATE_PATH).may_update_rtc();
+        if !allow_timekeeper_to_update_rtc {
+            warn!("RTC updates by Timekeeper are not allowed. This is not a production setting. Take note if you didn't expect this.");
+        }
 
         loop {
             // Acquire a new sample.
@@ -391,8 +403,11 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
             } else {
                 self.apply_clock_correction(&estimate_transform).await;
             }
-            // Update the RTC clock if we have one.
-            self.update_rtc(&estimate_transform).await;
+
+            if allow_timekeeper_to_update_rtc {
+                // Update the RTC clock if we have one.
+                self.update_rtc(&estimate_transform).await;
+            }
 
             // Back off for a bit.
             let delay = if self.time_source_manager.is_suspendable_source() {
@@ -405,17 +420,32 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                 command = receiver.next() => {
                     debug!("received command: {:?}", &command);
 
-                    // If a signal is received, set the error bound to unknown.
-                    if let Some(_) = command {
-                        self.record_correction(
-                            ClockCorrection::MaxErrorBound, &Default::default(), zx::Time::ZERO);
-                    }
+                    match command {
+                        Some(Command::PowerManagement) => {
+                            self.record_correction(
+                                ClockCorrection::MaxErrorBound, &Default::default(), zx::Time::ZERO);
+                        }
+                        Some(Command::Rtc{ persistent_enabled, mut done }) => {
+                            allow_timekeeper_to_update_rtc = persistent_enabled;
+                            rtc_testing::write_state(PERSISTENT_STATE_PATH, &rtc_testing::State::new(allow_timekeeper_to_update_rtc));
 
+
+                            // Acknowledge the change, in a detached task to avoid blocking.
+                            fasync::Task::local(async move {
+                                if let Err(e) = done.send(()).await {
+                                    warn!("could not acknowledge error: {:?}", &e);
+                                }
+                            }).detach();
+                        }
+                        None => {
+                            debug!("unexpected `None`");
+                        }
+                    }
                     // If a test signaler is present, acknowledge command receipt.
                     // The signaller will send a message when the channel is closed too.
                     if let Some(ref mut test_signaler) = self.test_signaler {
                         if let Err(ref e) = test_signaler.send(()).await {
-                            warn!("could not acknowledge error: {:?}, command: {:?}",  &e, &command);
+                            warn!("could not acknowledge error on test_signaler: {:?}",  &e);
                         }
                     }
                 },
@@ -1017,7 +1047,7 @@ mod tests {
 
         // Signal that clock update is needed.
         let _s = fasync::Task::local(async move {
-            s.send(()).await.unwrap();
+            s.send(Command::PowerManagement).await.unwrap();
         });
 
         // Wait until the signal propagates.
@@ -1027,6 +1057,47 @@ mod tests {
         // Verify that clock now has a large error bound.
         let details = clock_clone.get_details().unwrap();
         assert_eq!(ZX_CLOCK_UNKNOWN_ERROR_BOUND, details.error_bounds);
+    }
+
+    #[fuchsia::test]
+    fn verify_asynchronous_test_signal_honored() {
+        let mut executor = fasync::LocalExecutor::new();
+        let (test_sender, mut test_received) = mpsc::channel(1);
+        let (mut s, r) = mpsc::channel(1);
+        let clock = create_clock();
+        clock.update(zx::ClockUpdate::builder().error_bounds(0).build()).unwrap();
+
+        let _clock_manager_task = fasync::Task::local(async move {
+            // Set zero bound.
+            let rtc = FakeRtc::valid(BACKSTOP_TIME);
+            let diagnostics = Arc::new(FakeDiagnostics::new());
+            let config = crate::tests::make_test_config_with_test_protocols();
+
+            let monotonic_ref = zx::Time::get_monotonic();
+            let clock_manager = create_clock_manager(
+                Arc::clone(&clock),
+                vec![Sample::new(monotonic_ref + OFFSET, monotonic_ref, STD_DEV)],
+                None,
+                Some(rtc.clone()),
+                Arc::clone(&diagnostics),
+                config,
+                Some(test_sender),
+            );
+            clock_manager.maintain_clock(r).boxed().await;
+        });
+
+        let (done_send, mut done_recv) = mpsc::channel(1);
+
+        // Signal that clock update is needed.
+        let _signal_rtc_command = fasync::Task::local(async move {
+            s.send(Command::Rtc { persistent_enabled: false, done: done_send }).await.unwrap();
+        });
+
+        // Wait until the signal propagates.
+        let _result = executor
+            .run_singlethreaded(async move { done_recv.next().await.expect("received result") });
+        let ret = executor.run_singlethreaded(async move { test_received.next().await });
+        assert_eq!(Some(()), ret);
     }
 
     #[fuchsia::test]

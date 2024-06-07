@@ -12,11 +12,13 @@ mod enums;
 mod estimator;
 mod power_topology_integration;
 mod rtc;
+mod rtc_testing;
 mod time_source;
 mod time_source_manager;
 
 use anyhow::{Context as _, Result};
 use fidl::AsHandleRef;
+use fidl_fuchsia_time_test as fftt;
 use futures::{
     channel::mpsc,
     future::{self, OptionFuture},
@@ -29,7 +31,7 @@ use {
             CobaltDiagnostics, CompositeDiagnostics, Diagnostics, Event, InspectDiagnostics,
         },
         enums::{InitialClockState, InitializeRtcOutcome, Role, StartClockSource, Track},
-        rtc::{Rtc, RtcCreationError, RtcImpl, RtcReadOnlyImpl},
+        rtc::{Rtc, RtcCreationError, RtcImpl},
         time_source::{TimeSource, TimeSourceLauncher},
         time_source_manager::TimeSourceManager,
     },
@@ -41,6 +43,28 @@ use {
     time_metrics_registry::TimeMetricDimensionExperiment,
     tracing::{debug, error, info, warn},
 };
+
+/// A command sent from various FIDL clients.
+#[derive(Debug)]
+pub enum Command {
+    /// A power management command.
+    PowerManagement,
+    /// A real time clock (RTC) command, only used in tests.
+    Rtc {
+        /// If true, the RTC will be used. If false, the RTC will not be used.
+        /// This setting persists across reboots.
+        persistent_enabled: bool,
+
+        /// The responder used to get a notification of job done.
+        done: mpsc::Sender<()>,
+    },
+}
+
+/// The type union of FIDL messages served by Timekeeper.
+pub enum Rpcs {
+    /// Time test protocol commands.
+    TimeTest(fftt::RtcRequestStream),
+}
 
 /// Timekeeper config, populated from build-time generated structured config.
 #[derive(Debug)]
@@ -109,15 +133,14 @@ impl Config {
         self.source_config.early_exit
     }
 
-    // Returns true if RTC is read only.  Most of the time this will be `false`.
-    fn rtc_read_only(&self) -> bool {
-        self.source_config.rtc_is_read_only
-    }
-
     // TODO: b/295537795 - remove annotation once used.
     #[allow(dead_code)]
     fn power_topology_integration_enabled(&self) -> bool {
         self.source_config.power_topology_integration_enabled
+    }
+
+    fn serve_test_protocols(&self) -> bool {
+        self.source_config.serve_test_protocols
     }
 }
 
@@ -224,29 +247,60 @@ async fn main() -> Result<()> {
         }
     };
 
-    if config.rtc_read_only() {
-        info!("using a read-only RTC implementation");
-        let optional_rtc: Option<RtcReadOnlyImpl> = optional_rtc.map(Into::into);
-        fasync::Task::spawn(async move {
-            maintain_utc(primary_track, monitor_track, optional_rtc, diagnostics, config).await;
-        })
-        .detach();
-    } else {
-        fasync::Task::spawn(async move {
-            maintain_utc(primary_track, monitor_track, optional_rtc, diagnostics, config).await;
-        })
-        .detach();
-    }
+    let (cmd_send, cmd_rcv) = mpsc::channel(1);
+    let serve_test_protocols = config.serve_test_protocols();
+
+    let cmd_send_clone = cmd_send.clone();
+    fasync::Task::spawn(async move {
+        maintain_utc(
+            primary_track,
+            monitor_track,
+            optional_rtc,
+            diagnostics,
+            config,
+            cmd_send_clone,
+            cmd_rcv,
+        )
+        .await;
+    })
+    .detach();
 
     let _inspect_server_task = inspect_runtime::publish(
         &diagnostics::INSPECTOR,
         inspect_runtime::PublishOptions::default(),
     );
 
-    let mut fs = ServiceFs::new();
-    fs.take_and_serve_directory_handle()?;
+    if serve_test_protocols {
+        let mut fs = ServiceFs::new();
+        fs.dir("svc").add_fidl_service(Rpcs::TimeTest);
+        fs.take_and_serve_directory_handle()?;
+        info!("serving test protocols: fuchsia.test.time/RTC");
 
-    Ok(fs.collect().await)
+        // Allows us to move cmd_send into the closure below.
+        let send_fn = || cmd_send.clone();
+
+        // Serves one client at a time.  Multiple clients at a time could produce conflicting
+        // results.
+        return Ok(fs
+            .for_each(|request: Rpcs| async move {
+                match request {
+                    Rpcs::TimeTest(stream) => {
+                        rtc_testing::serve(send_fn(), stream)
+                            .await
+                            .map_err(|e| {
+                                tracing::error!("while serving fuchsia.time.test/RPC: {:?}", e)
+                            })
+                            .unwrap_or(());
+                    }
+                };
+            })
+            .await);
+    } else {
+        // fuchsia::main can only return () or Result<()>.
+        let mut fs = ServiceFs::new();
+        fs.take_and_serve_directory_handle()?;
+        Ok(fs.collect().await)
+    }
 }
 
 /// Creates a new userspace clock for use in the monitor track, set to the same backstop time as
@@ -345,6 +399,8 @@ async fn maintain_utc<R: 'static, D: 'static>(
     optional_rtc: Option<R>,
     diagnostics: Arc<D>,
     config: Arc<Config>,
+    cmd_send: mpsc::Sender<Command>,
+    cmd_recv: mpsc::Receiver<Command>,
 ) where
     R: Rtc,
     D: Diagnostics,
@@ -416,7 +472,6 @@ async fn maintain_utc<R: 'static, D: 'static>(
     });
 
     info!("launching clock managers...");
-    let (s1, r1) = mpsc::channel(1);
     let fut1 = ClockManager::execute(
         primary.clock,
         primary_source_manager,
@@ -424,7 +479,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
         Arc::clone(&diagnostics),
         Track::Primary,
         Arc::clone(&config),
-        r1,
+        cmd_recv,
     );
     let (_, r2) = mpsc::channel(1);
     let fut2_cfg_clone = config.clone();
@@ -446,7 +501,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
     let oneshot = Box::pin(async move {
         info!("power_topology_integration_enabled: {}", pte);
         if pte {
-            power_topology_integration::manage(s1)
+            power_topology_integration::manage(cmd_send)
                 .await
                 .context("(timekeeper will ignore this error and just turn the integration off)")
                 .map_err(|e| error!("power management integration: {:#}", e))
@@ -499,7 +554,7 @@ mod tests {
         (Arc::new(clock), initial_update_ticks)
     }
 
-    pub fn make_test_config_with_delay(delay: i64) -> Arc<Config> {
+    pub fn make_test_config_with_params(delay: i64, serve_test_protocols: bool) -> Arc<Config> {
         Arc::new(Config::from(timekeeper_config::Config {
             disable_delays: true,
             oscillator_error_std_dev_ppm: 15,
@@ -514,12 +569,20 @@ mod tests {
             utc_start_at_startup: false,
             early_exit: false,
             power_topology_integration_enabled: false,
-            rtc_is_read_only: false,
+            serve_test_protocols,
         }))
+    }
+
+    pub fn make_test_config_with_delay(delay: i64) -> Arc<Config> {
+        make_test_config_with_params(delay, /*serve_test_protocols=*/ false)
     }
 
     pub fn make_test_config() -> Arc<Config> {
         make_test_config_with_delay(0)
+    }
+
+    pub fn make_test_config_with_test_protocols() -> Arc<Config> {
+        make_test_config_with_params(/*delay=*/ 0, /*serve_test_protocols=*/ true)
     }
 
     #[fuchsia::test]
@@ -532,6 +595,8 @@ mod tests {
         let config = make_test_config();
 
         let monotonic_ref = zx::Time::get_monotonic();
+
+        let (s, r) = mpsc::channel(1);
 
         // Maintain UTC until no more work remains
         let mut fut = maintain_utc(
@@ -563,6 +628,8 @@ mod tests {
             Some(rtc.clone()),
             Arc::clone(&diagnostics),
             Arc::clone(&config),
+            s,
+            r,
         )
         .boxed();
         let _ = executor.run_until_stalled(&mut fut);
@@ -617,6 +684,7 @@ mod tests {
         let config = make_test_config_with_delay(delay);
 
         let monotonic_ref = zx::Time::get_monotonic();
+        let (s, r) = mpsc::channel(1);
 
         // Maintain UTC until no more work remains
         let mut fut = maintain_utc(
@@ -636,6 +704,8 @@ mod tests {
             Some(rtc.clone()),
             Arc::clone(&diagnostics),
             Arc::clone(&config),
+            s,
+            r,
         )
         .boxed();
 
@@ -690,6 +760,7 @@ mod tests {
         let config = make_test_config_with_delay(1);
 
         let monotonic_ref = zx::Time::get_monotonic();
+        let (s, r) = mpsc::channel(1);
 
         // Maintain UTC until no more work remains
         let mut fut = maintain_utc(
@@ -709,6 +780,8 @@ mod tests {
             Some(rtc),
             Arc::clone(&diagnostics),
             Arc::clone(&config),
+            s,
+            r,
         )
         .boxed();
 
@@ -741,6 +814,7 @@ mod tests {
             status: ftexternal::Status::Network,
         }])
         .into();
+        let (s, r) = mpsc::channel(1);
 
         // Maintain UTC until no more work remains
         let mut fut = maintain_utc(
@@ -749,6 +823,8 @@ mod tests {
             Some(rtc.clone()),
             Arc::clone(&diagnostics),
             Arc::clone(&config),
+            s,
+            r,
         )
         .boxed();
         let _ = executor.run_until_stalled(&mut fut);
@@ -780,6 +856,7 @@ mod tests {
             status: ftexternal::Status::Network,
         }])
         .into();
+        let (s, r) = mpsc::channel(1);
 
         // Maintain UTC until no more work remains
         let mut fut = maintain_utc(
@@ -788,6 +865,8 @@ mod tests {
             Some(rtc.clone()),
             Arc::clone(&diagnostics),
             Arc::clone(&config),
+            s,
+            r,
         )
         .boxed();
         let _ = executor.run_until_stalled(&mut fut);
@@ -831,6 +910,8 @@ mod tests {
         }])
         .into();
 
+        let (s, r) = mpsc::channel(1);
+
         // Maintain UTC until no more work remains
         let mut fut = maintain_utc(
             PrimaryTrack { clock: Arc::clone(&clock), time_source },
@@ -838,6 +919,8 @@ mod tests {
             Some(rtc.clone()),
             Arc::clone(&diagnostics),
             Arc::clone(&config),
+            s,
+            r,
         )
         .boxed();
         let _ = executor.run_until_stalled(&mut fut);
