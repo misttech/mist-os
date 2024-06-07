@@ -44,8 +44,8 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   zx::result<> WithRepresentation(
       fit::callback<zx::result<>(fuchsia_io::wire::Representation)> handler,
       std::optional<fuchsia_io::NodeAttributesQuery> query) const final;
-  zx::result<> WithNodeInfoDeprecated(
-      fit::callback<void(fuchsia_io::wire::NodeInfoDeprecated)> handler) const final;
+  zx_status_t WithNodeInfoDeprecated(
+      fit::callback<zx_status_t(fuchsia_io::wire::NodeInfoDeprecated)> handler) const final;
 
   //
   // |fuchsia.io/Node| operations.

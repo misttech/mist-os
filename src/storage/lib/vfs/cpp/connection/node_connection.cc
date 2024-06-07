@@ -133,11 +133,10 @@ zx::result<> NodeConnection::WithRepresentation(
       fidl::ObjectView<NodeRepresentation>::FromExternal(&representation)));
 }
 
-zx::result<> NodeConnection::WithNodeInfoDeprecated(
-    fit::callback<void(fuchsia_io::wire::NodeInfoDeprecated)> handler) const {
+zx_status_t NodeConnection::WithNodeInfoDeprecated(
+    fit::callback<zx_status_t(fuchsia_io::wire::NodeInfoDeprecated)> handler) const {
   // In io1, node reference connections are mapped to the service variant of NodeInfoDeprecated.
-  handler(fuchsia_io::wire::NodeInfoDeprecated::WithService({}));
-  return zx::ok();
+  return handler(fuchsia_io::wire::NodeInfoDeprecated::WithService({}));
 }
 
 }  // namespace fs::internal

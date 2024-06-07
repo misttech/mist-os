@@ -31,47 +31,6 @@ namespace fs::internal {
 
 namespace {
 
-// Performs a path walk and opens a connection to another node.
-void OpenAt(FuchsiaVfs* vfs, const fbl::RefPtr<Vnode>& parent,
-            fidl::ServerEnd<fio::Node> server_end, std::string_view path,
-            VnodeConnectionOptions options, fio::Rights parent_rights) {
-  vfs->Open(parent, path, options, parent_rights)
-      .visit([vfs, &server_end, options, path](auto&& result) {
-        using ResultT = std::decay_t<decltype(result)>;
-        using OpenResult = fs::Vfs::OpenResult;
-        if constexpr (std::is_same_v<ResultT, OpenResult::Error>) {
-          if (options.flags & fuchsia_io::OpenFlags::kDescribe) {
-            // Ignore errors since there is nothing we can do if this fails.
-            [[maybe_unused]] const fidl::Status unused_result =
-                fidl::WireSendEvent(server_end)->OnOpen(result, fio::wire::NodeInfoDeprecated());
-            server_end.reset();
-          }
-        } else if constexpr (std::is_same_v<ResultT, OpenResult::Remote>) {
-          const fbl::RefPtr<const Vnode> vn = result.vnode;
-          const std::string_view path = result.path;
-          vn->OpenRemote(options.ToIoV1Flags(), {}, fidl::StringView::FromExternal(path),
-                         std::move(server_end));
-        } else if constexpr (std::is_same_v<ResultT, OpenResult::Ok>) {
-          // TODO(https://fxbug.dev/42051879): Remove this when web_engine with SDK 13.20230626.3.1
-          // or later is rolled. The important commit is in the private integration repo, but the
-          // next Fuchsia commit is b615ff398580f3b47c050beb9e8f0fc28907ac67 which can be used with
-          // the sdkrevisions tool.
-          VnodeConnectionOptions options = result.options;
-          if (options.ToIoV1Flags() == fio::OpenFlags::kRightReadable) {
-            bool is_device =
-                path.length() == 8 &&
-                std::all_of(path.begin(), path.end(), [](char c) { return std::isxdigit(c); });
-            if (path == "000" || is_device) {
-              options.rights -= fio::Rights::kReadBytes;
-            }
-          }
-          // |Vfs::Open| already performs option validation for us.
-          [[maybe_unused]] zx_status_t status =
-              vfs->Serve(result.vnode, server_end.TakeChannel(), options);
-        }
-      });
-}
-
 // Get optional rights from |node_options| if present.
 fuchsia_io::Rights* GetOptionalRights(const fio::wire::ConnectionProtocols& protocols) {
   if (!protocols.is_node() || !protocols.node().has_protocols()) {
@@ -236,7 +195,7 @@ void DirectoryConnection::SetFlags(SetFlagsRequestView request,
 
 void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& completer) {
   // TODO(https://fxbug.dev/324080764): This io1 operation should require the TRAVERSE right.
-  zx_status_t status = [&]() {
+  zx_status_t status = [&]() -> zx_status_t {
     std::string_view path(request->path.data(), request->path.size());
     fio::OpenFlags flags = request->flags;
     if (path.empty() || ((path == "." || path == "/") && (flags & fio::OpenFlags::kNotDirectory))) {
@@ -273,15 +232,34 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
         !(rights() & fio::Rights::kModifyDirectory)) {
       return ZX_ERR_ACCESS_DENIED;
     }
-    OpenAt(vfs(), vnode(), std::move(request->object), path, *open_options, rights());
-    return ZX_OK;
+
+    return vfs()
+        ->Open(vnode(), path, *open_options, rights())
+        .visit([&](auto&& result) -> zx_status_t {
+          using ResultT = std::decay_t<decltype(result)>;
+          if constexpr (std::is_same_v<ResultT, Vfs::OpenResult::Error>) {
+            return result;
+          } else if constexpr (std::is_same_v<ResultT, Vfs::OpenResult::Remote>) {
+            result.vnode->OpenRemote(open_options->ToIoV1Flags(), {},
+                                     fidl::StringView::FromExternal(result.path),
+                                     std::move(request->object));
+            return ZX_OK;
+          } else if constexpr (std::is_same_v<ResultT, Vfs::OpenResult::Ok>) {
+            return vfs()->Serve(result.vnode, request->object.TakeChannel(), result.options);
+          }
+        });
   }();
 
+  // On any errors, if the channel wasn't consumed, we send an OnOpen event if required, and try
+  // closing the channel with an epitaph describing the error.
   if (status != ZX_OK) {
-    FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] error: ", status);
-    if (request->flags & fio::wire::OpenFlags::kDescribe) {
-      // Ignore errors since there is nothing we can do if this fails.
-      [[maybe_unused]] auto result = fidl::WireSendEvent(request->object)->OnOpen(status, {});
+    FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] error: ", zx_status_get_string(status));
+    if (request->object.is_valid()) {
+      if (request->flags & fio::wire::OpenFlags::kDescribe) {
+        // Ignore errors since there is nothing we can do if this fails.
+        [[maybe_unused]] auto result = fidl::WireSendEvent(request->object)->OnOpen(status, {});
+      }
+      request->object.Close(status);
     }
   }
 }
@@ -294,7 +272,7 @@ void DirectoryConnection::Open2(fuchsia_io::wire::Directory2Open2Request* reques
   // TODO(https://fxbug.dev/324080764): This operation should require the TRAVERSE right.
 
   // Attempt to open/create the target vnode, and serve a connection to it.
-  zx::result handled = [&]() -> zx::result<> {
+  zx::result result = [&]() -> zx::result<> {
     std::string_view path(request->path.data(), request->path.size());
     // Calculate the set of rights the connection should have.
     zx::result resulting_rights = ValidateRequestRights(request->protocols, this->rights());
@@ -326,17 +304,17 @@ void DirectoryConnection::Open2(fuchsia_io::wire::Directory2Open2Request* reques
       rights |= optional_rights;
     }
     // Serve a new connection to the vnode.
-    return vfs()->Serve2(*std::move(open_result), rights, request->object_request,
+    return vfs()->Serve2(*std::move(open_result), rights, std::move(request->object_request),
                          &request->protocols);
   }();
 
-  // On any errors above, the object request channel should remain usable, so that we can close it
-  // with the corresponding error epitaph.
-  if (handled.is_error()) {
-    FS_PRETTY_TRACE_DEBUG("[DirectoryConnection::Open2] Error: ", handled.status_string());
-    ZX_ASSERT(request->object_request.is_valid());
-    fidl::ServerEnd<fio::Node>{std::move(request->object_request)}.Close(handled.error_value());
-    return;
+  // On any errors, if the channel wasn't consumed, we try closing it with an epitaph.
+  if (result.is_error()) {
+    FS_PRETTY_TRACE_DEBUG("[DirectoryConnection::Open2] Error: ", result.status_string());
+    if (request->object_request.is_valid()) {
+      fidl::ServerEnd<fio::Node> server_end{std::move(request->object_request)};
+      server_end.Close(result.error_value());
+    }
   }
 }
 
@@ -497,10 +475,9 @@ zx::result<> DirectoryConnection::WithRepresentation(
       fidl::ObjectView<DirectoryRepresentation>::FromExternal(&representation)));
 }
 
-zx::result<> DirectoryConnection::WithNodeInfoDeprecated(
-    fit::callback<void(fuchsia_io::wire::NodeInfoDeprecated)> handler) const {
-  handler(fuchsia_io::wire::NodeInfoDeprecated::WithDirectory({}));
-  return zx::ok();
+zx_status_t DirectoryConnection::WithNodeInfoDeprecated(
+    fit::callback<zx_status_t(fuchsia_io::wire::NodeInfoDeprecated)> handler) const {
+  return handler(fuchsia_io::wire::NodeInfoDeprecated::WithDirectory({}));
 }
 
 }  // namespace fs::internal

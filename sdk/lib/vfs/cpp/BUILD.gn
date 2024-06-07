@@ -50,8 +50,8 @@ sdk_source_set("cpp") {
   #
   # See https://fxbug.dev/311176363 for details.
   #
-  # TODO(https://fxbug.dev/336617685): Relax this visibility list once this library is compatible
-  # with the new C++ FIDL bindings, and has support for io2 rights.
+  # TODO(https://fxbug.dev/336617685): Relax this visibility list for public SDK usage once this
+  # library is compatible with the new C++ FIDL bindings, and has support for io2 rights.
   visibility = [
     ":*",
     "//build/sdk:*",
@@ -63,26 +63,7 @@ sdk_source_set("cpp") {
     "//sdk/lib/sys/inspect/cpp:*",
     "//sdk/lib/sys/service/cpp:*",
     "//sdk/lib/vfs/cpp/testing:*",
-    "//src/developer/build_info:*",
-    "//src/developer/forensics/feedback_data:*",
-    "//src/devices/bin/driver_host:*",
-    "//src/devices/bin/driver_manager:*",
-    "//src/devices/sysmem/bin/sysmem_connector:*",
-    "//src/diagnostics/validator/inspect/lib/cpp:*",
-    "//src/lib/metrics_buffer:*",
-    "//src/lib/vulkan/gapii-pkg:*",
-    "//src/lib/vulkan/vulkan-validation-pkg:*",
-    "//src/media/audio/audio_core/testing/integration:*",
-    "//src/media/codec/factory:*",
-    "//src/media/lib/codec_impl:*",
-    "//src/storage/conformance/*",
-    "//src/sys/early_boot_instrumentation:*",
-    "//src/sys/early_boot_instrumentation/test:*",
-    "//src/tests/fidl/compatibility/cpp:*",
-    "//src/tests/fidl/compatibility/llcpp:*",
-    "//src/ui/a11y/bin/a11y_manager/tests/util:*",
-    "//src/ui/a11y/lib/configuration/tests:*",
-    "//src/ui/lib/escher:*",
+    "//src/*",
     "//third_party/tcpdump:*",
     "//vendor/google/*",
   ]

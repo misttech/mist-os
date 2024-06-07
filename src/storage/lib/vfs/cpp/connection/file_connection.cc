@@ -73,24 +73,23 @@ void FileConnection::Query(QueryCompleter::Sync& completer) {
   completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, protocol.size()));
 }
 
-zx::result<> FileConnection::WithNodeInfoDeprecated(
-    fit::callback<void(fuchsia_io::wire::NodeInfoDeprecated)> handler) const {
+zx_status_t FileConnection::WithNodeInfoDeprecated(
+    fit::callback<zx_status_t(fuchsia_io::wire::NodeInfoDeprecated)> handler) const {
   fio::wire::FileObject file_object;
   zx::result<zx::event> observer = vnode()->GetObserver();
   if (observer.is_ok()) {
     file_object.event = std::move(*observer);
   } else if (observer.error_value() != ZX_ERR_NOT_SUPPORTED) {
-    return observer.take_error();
+    return observer.error_value();
   }
   if (stream()) {
     if (zx_status_t status = stream()->duplicate(ZX_RIGHT_SAME_RIGHTS, &file_object.stream);
         status != ZX_OK) {
-      return zx::error(status);
+      return status;
     }
   }
-  handler(fuchsia_io::wire::NodeInfoDeprecated::WithFile(
+  return handler(fuchsia_io::wire::NodeInfoDeprecated::WithFile(
       fidl::ObjectView<fio::wire::FileObject>::FromExternal(&file_object)));
-  return zx::ok();
 }
 
 zx::result<> FileConnection::WithRepresentation(

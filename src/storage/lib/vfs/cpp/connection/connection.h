@@ -80,8 +80,8 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
       std::optional<fuchsia_io::NodeAttributesQuery> query) const = 0;
 
   // Invokes |handler| with the NodeInfoDeprecated event for this connection.
-  virtual zx::result<> WithNodeInfoDeprecated(
-      fit::callback<void(fuchsia_io::wire::NodeInfoDeprecated)> handler) const = 0;
+  virtual zx_status_t WithNodeInfoDeprecated(
+      fit::callback<zx_status_t(fuchsia_io::wire::NodeInfoDeprecated)> handler) const = 0;
 
   const fbl::RefPtr<fs::Vnode>& vnode() const { return vnode_; }
 
