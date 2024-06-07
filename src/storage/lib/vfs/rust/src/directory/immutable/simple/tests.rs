@@ -1609,3 +1609,18 @@ fn watch_remove_all_entries() {
         assert_close!(proxy);
     });
 }
+
+#[test]
+fn open_directory_containing_itself() {
+    let root = pseudo_directory! {};
+    root.add_entry("dir", root.clone()).unwrap();
+
+    run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
+        let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE;
+
+        let sub_dir = open_get_directory_proxy_assert_ok!(&root, flags, "dir/dir/dir/dir");
+
+        assert_close!(sub_dir);
+        assert_close!(root);
+    });
+}

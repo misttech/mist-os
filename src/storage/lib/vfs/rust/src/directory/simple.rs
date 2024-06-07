@@ -7,10 +7,10 @@
 //! to construct actual instances.  See [`Simple`] for details.
 
 use crate::{
-    common::{rights_to_posix_mode_bits, send_on_open_with_error, CreationMode},
+    common::{rights_to_posix_mode_bits, CreationMode},
     directory::{
         dirents_sink,
-        entry::{DirectoryEntry, EntryInfo, OpenRequest},
+        entry::{DirectoryEntry, EntryInfo, FlagsOrProtocols, OpenRequest},
         entry_container::{Directory, DirectoryWatcher},
         helper::{AlreadyExists, DirectlyMutable, NotDirectory},
         immutable::connection::ImmutableConnection,
@@ -72,61 +72,6 @@ impl Simple {
         })
     }
 
-    fn get_or_insert_entry(
-        self: Arc<Self>,
-        flags: fio::OpenFlags,
-        name: &str,
-    ) -> Result<Arc<dyn DirectoryEntry>, Status> {
-        let this = self.inner.lock().unwrap();
-
-        match this.entries.get(name) {
-            Some(entry) => {
-                if flags.intersects(fio::OpenFlags::CREATE_IF_ABSENT) {
-                    return Err(Status::ALREADY_EXISTS);
-                }
-
-                Ok(entry.clone())
-            }
-            None => {
-                if !flags.intersects(fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT) {
-                    return Err(Status::NOT_FOUND);
-                }
-                return Err(Status::NOT_SUPPORTED);
-            }
-        }
-    }
-
-    // Attempts to find or create a directory entry given the specified protocols.
-    fn get_or_insert_entry_from_protocols(
-        self: Arc<Self>,
-        protocols: &fio::ConnectionProtocols,
-        name: &str,
-    ) -> Result<Arc<dyn DirectoryEntry>, Status> {
-        let this = self.inner.lock().unwrap();
-
-        match this.entries.get(name) {
-            Some(entry) => {
-                if protocols.creation_mode() == CreationMode::Always {
-                    return Err(Status::ALREADY_EXISTS);
-                }
-                Ok(entry.clone())
-            }
-            None => {
-                if let fio::ConnectionProtocols::Node(fio::NodeOptions {
-                    protocols: Some(_), ..
-                }) = protocols
-                {
-                    if protocols.creation_mode() == CreationMode::Never {
-                        return Err(Status::NOT_FOUND);
-                    }
-                    return Err(Status::NOT_SUPPORTED);
-                } else {
-                    return Err(Status::INVALID_ARGS);
-                };
-            }
-        }
-    }
-
     /// The provided function will be called whenever this VFS receives an open request for a path
     /// that is not present in the VFS. The function is invoked with the full path of the missing
     /// entry, relative to the root of this VFS. Typically this function is used for logging.
@@ -175,6 +120,59 @@ impl Simple {
                 .map(String::from)
                 .collect::<Vec<String>>();
             inner.watchers.send_event(&mut StaticVecEventProducer::removed(names));
+        }
+    }
+
+    fn open_impl<'a, P: ProtocolsExt + ToFlagsOrProtocols>(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        mut path: Path,
+        protocols: P,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        // See if the path has a next segment, if so we want to traverse down the directory.
+        // Otherwise we've arrived at the right directory.
+        let (name, path_ref) = match path.next_with_ref() {
+            (path_ref, Some(name)) => (name, path_ref),
+            (_, None) => {
+                return object_request.spawn_connection(
+                    scope,
+                    self,
+                    protocols,
+                    ImmutableConnection::create,
+                )
+            }
+        };
+
+        // Don't hold the inner lock while opening the entry in case the directory contains itself.
+        let entry = self.inner.lock().unwrap().entries.get(name).cloned();
+        match (entry, path_ref.is_empty(), protocols.creation_mode()) {
+            (None, false, _) | (None, true, CreationMode::Never) => {
+                // Either:
+                //   - we're at an intermediate directory and the next entry doesn't exist, or
+                //   - we're at the last directory and the next entry doesn't exist and creating the
+                //     entry wasn't requested.
+                if let Some(not_found_handler) = &mut *self.not_found_handler.lock().unwrap() {
+                    not_found_handler(path_ref.as_str());
+                }
+                Err(Status::NOT_FOUND)
+            }
+            (None, true, CreationMode::Always | CreationMode::AllowExisting) => {
+                // We're at the last directory and the entry doesn't exist and creating the entry
+                // was requested which isn't supported.
+                Err(Status::NOT_SUPPORTED)
+            }
+            (Some(_), true, CreationMode::Always) => {
+                // We're at the last directory and the entry exists but creating the entry is
+                // required.
+                Err(Status::ALREADY_EXISTS)
+            }
+            (Some(entry), _, _) => entry.open_entry(OpenRequest::new(
+                scope,
+                protocols.to_flags_or_protocols(),
+                path,
+                object_request,
+            )),
         }
     }
 }
@@ -232,98 +230,22 @@ impl Directory for Simple {
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mut path: Path,
+        path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        // See if the path has a next segment, if so we want to traverse down
-        // the directory. Otherwise we've arrived at the right directory.
-        let (name, path_ref) = match path.next_with_ref() {
-            (path_ref, Some(name)) => (name, path_ref),
-            (_, None) => {
-                flags.to_object_request(server_end).handle(|object_request| {
-                    object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
-                });
-                return;
-            }
-        };
-
-        // Create a copy so if this fails to open we can call the not found handler
-        let ref_copy = self.clone();
-
-        // Do not hold the mutex more than necessary and the Mutex is not re-entrant.  So we need to
-        // make sure to release the lock before we call `open()` is it may turn out to be a
-        // recursive call, in case the directory contains itself directly or through a number of
-        // other directories.  `get_entry` is responsible for locking `self` and it will unlock it
-        // before returning.
-
-        let res = if !path_ref.is_empty() {
-            self.get_entry(name)
-        } else {
-            self.get_or_insert_entry(flags, name)
-        };
-        let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
-        match res {
-            Err(status) => {
-                send_on_open_with_error(describe, server_end, status);
-
-                let mut handler = ref_copy.not_found_handler.lock().unwrap();
-                if let Some(handler) = handler.as_mut() {
-                    handler(path_ref.as_str());
-                }
-            }
-            Ok(entry) => {
-                flags.to_object_request(server_end).handle(|object_request| {
-                    entry.open_entry(OpenRequest::new(scope, flags, path, object_request))
-                });
-            }
-        }
+        flags
+            .to_object_request(server_end)
+            .handle(|object_request| self.open_impl(scope, path, flags, object_request));
     }
 
     fn open2(
         self: Arc<Self>,
         scope: ExecutionScope,
-        mut path: Path,
+        path: Path,
         protocols: fio::ConnectionProtocols,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status> {
-        // See if the path has a next segment, if so we want to traverse down the directory.
-        // Otherwise we've arrived at the right directory.
-        let (name, path_ref) = match path.next_with_ref() {
-            (path_ref, Some(name)) => (name, path_ref),
-            (_, None) => {
-                object_request.take().handle(|object_request| {
-                    object_request.spawn_connection(
-                        scope,
-                        self,
-                        protocols,
-                        ImmutableConnection::create,
-                    )
-                });
-                return Ok(());
-            }
-        };
-
-        // Create a copy so if this fails to open we can call the not found handler
-        let ref_copy = self.clone();
-
-        let entry = if path_ref.is_empty() {
-            self.get_or_insert_entry_from_protocols(&protocols, name)
-        } else {
-            self.get_entry(name)
-        };
-
-        match entry {
-            Ok(entry) => {
-                entry.open_entry(OpenRequest::new(scope, &protocols, path, object_request))
-            }
-            Err(e) => {
-                let mut handler = ref_copy.not_found_handler.lock().unwrap();
-                if let Some(handler) = handler.as_mut() {
-                    handler(path_ref.as_str());
-                }
-                Err(e)
-            }
-        }
+        self.open_impl(scope, path, protocols, object_request)
     }
 
     async fn read_dirents<'a>(
@@ -456,6 +378,22 @@ impl DirectlyMutable for Simple {
                 }
             }
         }
+    }
+}
+
+trait ToFlagsOrProtocols {
+    fn to_flags_or_protocols(&self) -> FlagsOrProtocols<'_>;
+}
+
+impl ToFlagsOrProtocols for fio::OpenFlags {
+    fn to_flags_or_protocols(&self) -> FlagsOrProtocols<'_> {
+        FlagsOrProtocols::Flags(*self)
+    }
+}
+
+impl ToFlagsOrProtocols for fio::ConnectionProtocols {
+    fn to_flags_or_protocols(&self) -> FlagsOrProtocols<'_> {
+        FlagsOrProtocols::Protocols(self)
     }
 }
 
