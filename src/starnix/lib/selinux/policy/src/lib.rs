@@ -170,7 +170,7 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// Returns the [`SecurityContext`] defined by this policy for the specified
     /// well-known (or "initial") Id.
     pub fn initial_context(&self, id: sc::InitialSid) -> security_context::SecurityContext {
-        self.0.initial_context(id).unwrap()
+        self.0.initial_context(id)
     }
 
     /// Returns a [`SecurityContext`] with fields parsed from the supplied Security Context string.

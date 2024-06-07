@@ -16,7 +16,6 @@ use super::{
 
 use selinux_common::{self as sc, ClassPermission as _};
 use std::{collections::HashMap, num::NonZeroU32};
-use zerocopy::little_endian as le;
 
 /// An index for facilitating fast lookup of common abstractions inside parsed binary policy data
 /// structures. Typically, data is indexed by an enum that describes a well-known value and the
@@ -112,9 +111,8 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         let index = Self { classes, permissions, parsed_policy, cached_object_r_role };
 
         // Verify that the initial Security Contexts are all defined, and valid.
-        // TODO(b/335397745): Look up initial Contexts by name, and cache that index here.
         for id in sc::InitialSid::all_variants() {
-            let _ = index.initial_context(id).map_err(anyhow::Error::from)?;
+            let _ = index.resolve_initial_context(id).map_err(anyhow::Error::from)?;
         }
 
         Ok(index)
@@ -267,20 +265,23 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
     }
 
     /// Returns the [`SecurityContext`] defined by this policy for the specified
-    /// well-known (or "initial") Id. Failure indicates that the parsed policy is not
-    /// internally consistent.
-    pub(super) fn initial_context(
+    /// well-known (or "initial") Id.
+    pub(super) fn initial_context(&self, id: sc::InitialSid) -> security_context::SecurityContext {
+        // All [`InitialSid`] have already been verified as resolvable, by `new()`.
+        self.resolve_initial_context(id).unwrap()
+    }
+
+    /// Helper used to construct and validate well-known [`SecurityContext`] values.
+    fn resolve_initial_context(
         &self,
         id: sc::InitialSid,
     ) -> Result<security_context::SecurityContext, security_context::SecurityContextError> {
-        let id = le::U32::from(id as u32);
-
-        // Policy validation is assumed to have ensured that all `InitialSid` values exist
-        // and have valid & consistent content.
-        let context = self.parsed_policy().initial_context(id).unwrap();
+        let context = self.parsed_policy().initial_context(id);
         let low_level = self.security_level(context.low_level());
         let high_level = context.high_level().as_ref().map(|x| self.security_level(x));
 
+        // Creation of the new [`SecurityContext`] will fail if the fields are inconsistent
+        // with the policy-defined constraints (e.g. on user roles, etc).
         security_context::SecurityContext::new(
             &self,
             context.user_id(),

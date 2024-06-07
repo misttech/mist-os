@@ -24,6 +24,7 @@ use super::{
 };
 
 use anyhow::Context as _;
+use selinux_common as sc;
 use std::{collections::HashSet, fmt::Debug, hash::Hash};
 use zerocopy::little_endian as le;
 
@@ -263,9 +264,10 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     }
 
     /// Returns the policy entry for the specified initial Security Context.
-    /// `id` must correspond to one of the `InitialSid` ids.
-    pub(crate) fn initial_context(&self, id: le::U32) -> Option<&Context<PS>> {
-        Some(&self.initial_sids.data.iter().find(|initial| initial.id() == id)?.context())
+    pub(crate) fn initial_context(&self, id: sc::InitialSid) -> &Context<PS> {
+        let id = le::U32::from(id as u32);
+        // [`InitialSids`] validates that all `InitialSid` values are defined by the policy.
+        &self.initial_sids.data.iter().find(|initial| initial.id() == id).unwrap().context()
     }
 
     /// Returns the `User` structure for the requested Id. Valid policies include definitions
