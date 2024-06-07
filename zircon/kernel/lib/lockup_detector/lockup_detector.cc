@@ -58,11 +58,11 @@ LockupDetectorState gLockupDetectorPerCpuState[SMP_MAX_CPUS];
 namespace {
 
 inline zx_duration_t TicksToDuration(zx_ticks_t ticks) {
-  return platform_get_ticks_to_time_ratio().Scale(ticks);
+  return timer_get_ticks_to_time_ratio().Scale(ticks);
 }
 
 inline zx_ticks_t DurationToTicks(zx_duration_t duration) {
-  return platform_get_ticks_to_time_ratio().Inverse().Scale(duration);
+  return timer_get_ticks_to_time_ratio().Inverse().Scale(duration);
 }
 
 class TA_CAP("mutex") FatalConditionReporterRole {
@@ -509,8 +509,8 @@ void lockup_primary_init() {
       if (CriticalSectionLockupChecker::IsEnabled()) {
         dprintf(
             INFO,
-            "lockup_detector: critical section threshold %" PRId64
-            " ms, fatal threshold %" PRId64 " ms\n",
+            "lockup_detector: critical section threshold %" PRId64 " ms, fatal threshold %" PRId64
+            " ms\n",
             TicksToDuration(CriticalSectionLockupChecker::threshold_ticks()) / ZX_MSEC(1),
             TicksToDuration(CriticalSectionLockupChecker::fatal_threshold_ticks()) / ZX_MSEC(1));
       } else {

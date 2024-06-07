@@ -102,7 +102,7 @@ ClockDispatcher::ClockDispatcher(uint64_t options, zx_time_t backstop_time)
   // Compute the initial state
   if (options & ZX_CLOCK_OPT_AUTO_START) {
     ZX_DEBUG_ASSERT(backstop_time <= current_time());  // This should have been checked by Create
-    affine::Ratio ticks_to_mono_ratio = platform_get_ticks_to_time_ratio();
+    affine::Ratio ticks_to_mono_ratio = timer_get_ticks_to_time_ratio();
 
     zx_ticks_t now_ticks = current_ticks();
     local_params.last_value_update_ticks = now_ticks;
@@ -278,7 +278,7 @@ zx_status_t ClockDispatcher::Update(uint64_t options, const UpdateArgsType& _arg
     // Now compute the new transformations
     if (!skip_update) {
       // Figure out the reference times at which this change will take place at.
-      affine::Ratio ticks_to_mono_ratio = platform_get_ticks_to_time_ratio();
+      affine::Ratio ticks_to_mono_ratio = timer_get_ticks_to_time_ratio();
       int64_t now_mono = ticks_to_mono_ratio.Scale(now_ticks);
       int64_t reference_ticks = now_ticks;
       int64_t reference_mono = now_mono;

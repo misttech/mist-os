@@ -86,7 +86,7 @@ uint32_t event_stream_freq;
 
 zx_time_t cntpct_to_zx_time(uint64_t cntpct) {
   DEBUG_ASSERT(cntpct < static_cast<uint64_t>(ktl::numeric_limits<int64_t>::max()));
-  return platform_get_ticks_to_time_ratio().Scale(static_cast<int64_t>(cntpct));
+  return timer_get_ticks_to_time_ratio().Scale(static_cast<int64_t>(cntpct));
 }
 
 static uint32_t read_cntp_ctl() { return __arm_rsr(TIMER_REG_CNTP_CTL); }
@@ -326,7 +326,7 @@ EXPAND_PLATFORM_CURRENT_RAW_TICKS_SYNCHRONIZED(15);
 zx_ticks_t platform_convert_early_ticks(arch::EarlyTicks sample) {
   // Early tick timestamps are always raw ticks.  We need to convert back to
   // ticks by subtracting the raw_ticks to ticks offset.
-  return sample.*reg_procs.early_ticks + platform_get_mono_ticks_offset();
+  return sample.*reg_procs.early_ticks + timer_get_mono_ticks_offset();
 }
 
 zx_status_t platform_set_oneshot_timer(zx_time_t deadline) {
@@ -343,9 +343,9 @@ zx_status_t platform_set_oneshot_timer(zx_time_t deadline) {
   // TODO(https://fxbug.dev/42173294): If/when we start to use the raw ticks -> ticks offset to
   // manage fixing up the timer when coming out of suspend, we need to come back
   // here and reconsider memory order issues.
-  const affine::Ratio time_to_ticks = platform_get_ticks_to_time_ratio().Inverse();
+  const affine::Ratio time_to_ticks = timer_get_ticks_to_time_ratio().Inverse();
   const uint64_t cntpct_deadline =
-      time_to_ticks.Scale(deadline) + 1 - platform_get_mono_ticks_offset();
+      time_to_ticks.Scale(deadline) + 1 - timer_get_mono_ticks_offset();
 
   // Even if the deadline has already passed, the ARMv8-A timer will fire the
   // interrupt.
@@ -452,8 +452,7 @@ static void arm_generic_timer_init(uint32_t freq_override) {
   // No way to reasonably continue. Just hard stop.
   ASSERT(timer_cntfrq != 0);
 
-  platform_set_ticks_to_time_ratio(
-      arm_generic_timer_compute_conversion_factors<true>(timer_cntfrq));
+  timer_set_ticks_to_time_ratio(arm_generic_timer_compute_conversion_factors<true>(timer_cntfrq));
 
   // Set up the hardware timer irq handler for this vector. Use the permanent irq handler
   // registraion scheme since it is enabled on all cpus and does not need any locking
@@ -521,7 +520,7 @@ void ArmGenericTimerInit(const zbi_dcfg_arm_generic_timer_driver_t& config) {
   // We cannot actually reset the value on the ticks timer, so instead we use
   // the time of clock selection (now) to define the zero point on our ticks
   // timeline moving forward.
-  platform_set_mono_ticks_offset(-reg_procs.read_ct());
+  timer_set_mono_ticks_offset(-reg_procs.read_ct());
   arch::ThreadMemoryBarrier();
 
   dprintf(INFO, "arm generic timer using %s timer, irq %d\n", timer_str, timer_irq);
@@ -604,7 +603,7 @@ bool test_time_to_cntpct(uint32_t cntfrq) {
     uint64_t tps = ticks_per_second();
     ASSERT_LE(tps, ktl::numeric_limits<uint32_t>::max());
     cntfrq = static_cast<uint32_t>(tps);
-    time_to_ticks = platform_get_ticks_to_time_ratio().Inverse();
+    time_to_ticks = timer_get_ticks_to_time_ratio().Inverse();
   } else {
     time_to_ticks = arm_generic_timer_compute_conversion_factors(cntfrq).Inverse();
   }
@@ -641,7 +640,7 @@ bool test_cntpct_to_time(uint32_t cntfrq) {
     uint64_t tps = ticks_per_second();
     ASSERT_LE(tps, ktl::numeric_limits<uint32_t>::max());
     cntfrq = static_cast<uint32_t>(tps);
-    ticks_to_time = platform_get_ticks_to_time_ratio();
+    ticks_to_time = timer_get_ticks_to_time_ratio();
   } else {
     ticks_to_time = arm_generic_timer_compute_conversion_factors(cntfrq);
   }

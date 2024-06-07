@@ -268,7 +268,7 @@ void BrwLock<PI>::ContendedReadAcquire() {
   ContentionTimer timer(current_thread, now_ticks);
 
   const zx_duration_t spin_max_duration = Mutex::SPIN_MAX_DURATION;
-  const affine::Ratio time_to_ticks = platform_get_ticks_to_time_ratio().Inverse();
+  const affine::Ratio time_to_ticks = timer_get_ticks_to_time_ratio().Inverse();
   const zx_ticks_t spin_until_ticks =
       affine::utils::ClampAdd(now_ticks, time_to_ticks.Scale(spin_max_duration));
 
@@ -400,7 +400,7 @@ void BrwLock<PI>::ContendedWriteAcquire() {
   ContentionTimer timer(current_thread, now_ticks);
 
   const zx_duration_t spin_max_duration = Mutex::SPIN_MAX_DURATION;
-  const affine::Ratio time_to_ticks = platform_get_ticks_to_time_ratio().Inverse();
+  const affine::Ratio time_to_ticks = timer_get_ticks_to_time_ratio().Inverse();
   const zx_ticks_t spin_until_ticks =
       affine::utils::ClampAdd(now_ticks, time_to_ticks.Scale(spin_max_duration));
 

@@ -262,7 +262,7 @@ zx_time_t convert_raw_tsc_timestamp_to_clock_monotonic(int64_t ts) {
     // As the offset is only updated early during boot when we're running on a
     // single core with interrupts disabled, we don't need to worry about thread
     // synchronization so memory_order_relaxed is sufficient.
-    int64_t abs_ticks = ts + platform_get_mono_ticks_offset();
+    int64_t abs_ticks = ts + timer_get_mono_ticks_offset();
     return rdtsc_ticks_to_clock_monotonic.Scale(abs_ticks);
   } else {
     // If we are using something other than TSC as our monotonic reference, then
@@ -653,11 +653,11 @@ static void pc_init_timer(uint level) {
     // We cannot (or at least, really should not) reset the TSC to zero, so
     // instead we use the time of clock selection ("now" according to the TSC)
     // to define the zero point on our ticks timeline moving forward.
-    platform_set_ticks_to_time_ratio(rdtsc_ticks_to_clock_monotonic);
+    timer_set_ticks_to_time_ratio(rdtsc_ticks_to_clock_monotonic);
     // At this point in boot we are running on a single core without interrupts
     // or exceptions, so memory_order_relaxed is sufficient. This goes for the load of the
     // offset below as well.
-    platform_set_mono_ticks_offset(-current_ticks_rdtsc());
+    timer_set_mono_ticks_offset(-current_ticks_rdtsc());
 
     // A note about this casting operation.  There is a technical risk of UB
     // here, in the case that -mono_ticks_offset is a value too large to
@@ -677,7 +677,7 @@ static void pc_init_timer(uint level) {
     // years of uptime).  So, for now, we perform the cast and take
     // the risk, assuming that nothing bad will happen.
     early_ticks_to_ticks =
-        affine::Transform{static_cast<int64_t>(-platform_get_mono_ticks_offset()), 0, {1, 1}};
+        affine::Transform{static_cast<int64_t>(-timer_get_mono_ticks_offset()), 0, {1, 1}};
     wall_clock = CLOCK_TSC;
   } else {
     if (constant_tsc || invariant_tsc) {
@@ -689,10 +689,10 @@ static void pc_init_timer(uint level) {
     if (has_hpet && (!force_wallclock || gBootOptions->x86_wallclock == WallclockType::kHpet)) {
       // Set up our wall clock to the HPET, and stash the initial
       // transformation from ticks to clock monotonic.
-      platform_set_ticks_to_time_ratio(hpet_ticks_to_clock_monotonic);
+      timer_set_ticks_to_time_ratio(hpet_ticks_to_clock_monotonic);
       // At this point in boot we are running on a single core without
       // interrupts or exceptions, so memory_order_relaxed is sufficient.
-      platform_set_mono_ticks_offset(0);
+      timer_set_mono_ticks_offset(0);
 
       // Explicitly set the value of the HPET to zero, then make sure it is
       // started.  Take a correspondence pair between HPET and TSC by observing
@@ -724,7 +724,7 @@ static void pc_init_timer(uint level) {
 
       // Set up our wall clock to pit, and stash the initial
       // transformation from ticks to clock monotonic.
-      platform_set_ticks_to_time_ratio({1'000'000, 1});
+      timer_set_ticks_to_time_ratio({1'000'000, 1});
 
       set_pit_frequency(1000);  // ~1ms granularity
 
@@ -740,7 +740,7 @@ static void pc_init_timer(uint level) {
       // At this point in boot we are running on a single core without
       // interrupts or exceptions, so memory_order_relaxed is sufficient.
       // This goes for the load below as well.
-      platform_set_mono_ticks_offset(-current_ticks_pit());
+      timer_set_mono_ticks_offset(-current_ticks_pit());
       const zx_ticks_t tsc_reference = current_ticks_rdtsc();
 
       affine::Ratio rdtsc_ticks_to_pit_ticks = affine::Ratio::Product(
@@ -750,7 +750,7 @@ static void pc_init_timer(uint level) {
       // to be reasonably safe to perform the static cast from unsigned to
       // signed here.
       early_ticks_to_ticks =
-          affine::Transform{tsc_reference, static_cast<int64_t>(-platform_get_mono_ticks_offset()),
+          affine::Transform{tsc_reference, static_cast<int64_t>(-timer_get_mono_ticks_offset()),
                             rdtsc_ticks_to_pit_ticks};
 
       // PIT is now our chosen "ticks" reference.
@@ -786,7 +786,7 @@ zx_status_t platform_set_oneshot_timer(zx_time_t deadline) {
     // with interrupts disabled, we don't need to worry about thread synchronization so
     // memory_order_relaxed is sufficient.
     const uint64_t tsc_deadline =
-        u64_mul_u64_fp32_64(deadline, tsc_per_ns) - platform_get_mono_ticks_offset();
+        u64_mul_u64_fp32_64(deadline, tsc_per_ns) - timer_get_mono_ticks_offset();
     LTRACEF("Scheduling oneshot timer: %" PRIu64 " deadline\n", tsc_deadline);
     apic_timer_set_tsc_deadline(tsc_deadline, false /* unmasked */);
     kcounter_add(platform_timer_set_counter, 1);

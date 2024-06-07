@@ -24,7 +24,7 @@ inline zx_ticks_t platform_current_raw_ticks_synchronized() {
 }
 
 zx_ticks_t platform_convert_early_ticks(arch::EarlyTicks sample) {
-  return sample.time + platform_get_mono_ticks_offset();
+  return sample.time + timer_get_mono_ticks_offset();
 }
 
 zx_status_t platform_set_oneshot_timer(zx_time_t deadline) {

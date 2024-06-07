@@ -56,7 +56,7 @@ enum TimerControl : uint32_t {
 // to account for the difference between the physical and virtual views of the
 // system timer.
 zx_ticks_t convert_raw_ticks_to_mono_ticks(zx_ticks_t raw_ticks) {
-  return raw_ticks + platform_get_mono_ticks_offset();
+  return raw_ticks + timer_get_mono_ticks_offset();
 }
 
 void next_pc(GuestState* guest_state) { guest_state->system_state.elr_el2 += 4; }
@@ -88,7 +88,7 @@ zx::result<> handle_wfi_wfe_instruction(uint32_t iss, GuestState* guest_state,
     if (current_ticks() >= guest_ticks_deadline) {
       return zx::ok();
     }
-    deadline = platform_get_ticks_to_time_ratio().Scale(guest_ticks_deadline);
+    deadline = timer_get_ticks_to_time_ratio().Scale(guest_ticks_deadline);
   }
   return gich_state->Wait(deadline);
 }

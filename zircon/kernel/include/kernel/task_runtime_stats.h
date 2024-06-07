@@ -128,7 +128,7 @@ class ThreadRuntimeStats {
     // is not allowed to move past our store of the final updated sequence
     // number.
     const zx_ticks_t now =
-        platform_current_ticks_synchronized<GetTicksSyncFlag::kAfterPreviousStores>();
+        timer_current_mono_ticks_synchronized<GetTicksSyncFlag::kAfterPreviousStores>();
 
     // Now go ahead an update our payload, making sure to use relaxed atomic
     // stores when writing to the contents.
@@ -212,8 +212,8 @@ class ThreadRuntimeStats {
       // Make sure that our sampling of the ticks counter takes place between
       // the two reads of the sequence number, and is not allowed to move
       // outside of the region because of pipelined execution.
-      ret.now = platform_current_ticks_synchronized<GetTicksSyncFlag::kAfterPreviousLoads |
-                                                    GetTicksSyncFlag::kBeforeSubsequentLoads>();
+      ret.now = timer_current_mono_ticks_synchronized<GetTicksSyncFlag::kAfterPreviousLoads |
+                                                      GetTicksSyncFlag::kBeforeSubsequentLoads>();
       published_stats_.Read(ret.stats);
     }
 

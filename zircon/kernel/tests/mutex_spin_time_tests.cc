@@ -57,7 +57,7 @@ bool mutex_spin_time_test(void) {
       zx::usec(0), zx::usec(50), zx::usec(250), zx::usec(750), zx::usec(5000),
   };
 
-  const affine::Ratio ticks_to_time = platform_get_ticks_to_time_ratio();
+  const affine::Ratio ticks_to_time = timer_get_ticks_to_time_ratio();
 
   struct Args {
     DECLARE_MUTEX(Args) the_mutex;

@@ -55,7 +55,7 @@ zx_status_t riscv_sbi_set_oneshot_timer(zx_time_t deadline) {
   riscv64_csr_set(RISCV64_CSR_SIE, RISCV64_CSR_SIE_TIE);
 
   // convert interval to ticks
-  const affine::Ratio time_to_ticks = platform_get_ticks_to_time_ratio().Inverse();
+  const affine::Ratio time_to_ticks = timer_get_ticks_to_time_ratio().Inverse();
   const uint64_t ticks = time_to_ticks.Scale(deadline) + 1;
   sbi_set_timer(ticks);
 
@@ -83,7 +83,7 @@ const pdev_timer_ops riscv_sbi_timer_ops = {
 };
 
 void riscv_generic_timer_init_early(const zbi_dcfg_riscv_generic_timer_driver_t &config) {
-  platform_set_ticks_to_time_ratio(
+  timer_set_ticks_to_time_ratio(
       riscv_generic_timer_compute_conversion_factors<true>(config.freq_hz));
 
   // register with pdev layer

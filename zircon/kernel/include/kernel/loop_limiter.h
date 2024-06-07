@@ -47,7 +47,7 @@ class LoopLimiter {
   //
   // If |duration| is <= 0 |Exceeded| will always return false.
   static LoopLimiter<ItersPerGetTicks> WithDuration(zx_duration_t duration) {
-    const zx_ticks_t relative_ticks = platform_get_ticks_to_time_ratio().Inverse().Scale(duration);
+    const zx_ticks_t relative_ticks = timer_get_ticks_to_time_ratio().Inverse().Scale(duration);
     return LoopLimiter<ItersPerGetTicks>(relative_ticks);
   }
 

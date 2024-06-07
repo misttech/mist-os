@@ -187,7 +187,7 @@ void SetTimeValues(const fbl::RefPtr<VmObject>& vmo) {
 
   // Grab a copy of the ticks to mono ratio; we need this to initialize the
   // constants window.
-  affine::Ratio ticks_to_mono_ratio = platform_get_ticks_to_time_ratio();
+  affine::Ratio ticks_to_mono_ratio = timer_get_ticks_to_time_ratio();
 
   // At this point in time, we absolutely must know the rate that our tick
   // counter is ticking at.  If we don't, then something has gone horribly
@@ -233,7 +233,7 @@ void SetTimeValues(const fbl::RefPtr<VmObject>& vmo) {
   fasttime::internal::TimeValues values = {
       .version = 1,
       .ticks_per_second = per_second,
-      .mono_ticks_offset = platform_get_mono_ticks_offset(),
+      .mono_ticks_offset = timer_get_mono_ticks_offset(),
       .ticks_to_mono_numerator = ticks_to_mono_ratio.numerator(),
       .ticks_to_mono_denominator = ticks_to_mono_ratio.denominator(),
       .usermode_can_access_ticks = usermode_can_access_ticks,

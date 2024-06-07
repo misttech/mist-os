@@ -73,7 +73,7 @@ __NO_INLINE static void bench_cycles_per_second() {
     const zx_ticks_t after_ticks = current_ticks();
     const uint64_t after_cycles = arch::Cycles();
     const zx_duration_t delta_time =
-        platform_get_ticks_to_time_ratio().Scale(after_ticks - before_ticks);
+        timer_get_ticks_to_time_ratio().Scale(after_ticks - before_ticks);
     const uint64_t delta_cycles = after_cycles - before_cycles;
     printf("%" PRIu64 " cycles per second (%" PRIu64 " cycles in %" PRId64 " ns)\n",
            (delta_cycles * ZX_SEC(1) / delta_time), delta_cycles, delta_time);
