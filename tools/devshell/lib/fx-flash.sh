@@ -104,7 +104,7 @@ function fx-flash {
   fi
 
   if [[ ! -z "${flash_manifest}" ]]; then
-    flash_manifest_args=("${flash_manifest}")
+    flash_manifest_args=(--manifest "${flash_manifest}")
   elif [[ ! -z "${product_bundle}" ]]; then
     flash_manifest_args=(--product-bundle "${product_bundle}")
   else
