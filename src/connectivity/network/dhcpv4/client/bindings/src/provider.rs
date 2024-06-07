@@ -161,7 +161,11 @@ pub(crate) async fn serve_client_provider(
                             });
                         }
                         crate::client::Error::Fidl(e) => {
-                            tracing::error!("FIDL error while serving client: {:?}", e);
+                            if e.is_closed() {
+                                tracing::warn!("Channel closed while serving client: {:?}", e);
+                            } else {
+                                tracing::error!("FIDL error while serving client: {:?}", e);
+                            }
                         }
                         crate::client::Error::Core(e) => {
                             tracing::error!("error while serving client: {:?}", e);
