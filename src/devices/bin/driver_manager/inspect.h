@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_INSPECT_H_
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_INSPECT_H_
 
-#include <lib/ddk/binding.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>

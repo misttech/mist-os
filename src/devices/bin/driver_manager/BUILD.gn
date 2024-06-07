@@ -37,7 +37,6 @@ source_set("inspect") {
   public_deps = [
     "//sdk/lib/inspect/component/cpp",
     "//src/lib/ddk",
-    "//src/lib/ddk:ddk-deprecated-binding-headers",
     "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/fbl",
   ]

@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "platform-interrupt.h"
+#include "src/devices/bus/drivers/platform/platform-interrupt.h"
 
 #include <fidl/fuchsia.hardware.interrupt/cpp/markers.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/ddk/binding_priv.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
-#include <lib/ddk/platform-defs.h>
+
+#include <bind/fuchsia/cpp/bind.h>
 
 #include "src/devices/bus/drivers/platform/platform-device.h"
 
@@ -93,28 +94,13 @@ zx_status_t PlatformInterruptFragment::Add(const char* name, PlatformDevice* pde
       }
     }
   } else {
-    props = {
-        zx_device_prop_t{
-            .id = BIND_PLATFORM_DEV_VID,
-            .value = pdev->vid(),
-        },
-        zx_device_prop_t{
-            .id = BIND_PLATFORM_DEV_DID,
-            .value = pdev->did(),
-        },
-        zx_device_prop_t{
-            .id = BIND_PLATFORM_DEV_PID,
-            .value = pdev->pid(),
-        },
-        zx_device_prop_t{
-            .id = BIND_PLATFORM_DEV_INSTANCE_ID,
-            .value = pdev->instance_id(),
-        },
+    str_props = {
+        ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID, pdev->vid()),
+        ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID, pdev->did()),
+        ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_PID, pdev->pid()),
+        ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, pdev->instance_id()),
         // Because "x == 0" is true if "x" is unset, start at 1.
-        zx_device_prop_t{
-            .id = BIND_PLATFORM_DEV_INTERRUPT_ID,
-            .value = index_ + 1,
-        },
+        ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_INTERRUPT_ID, index_ + 1),
     };
   }
 
