@@ -29,7 +29,6 @@ target_cpu = "x64"
 # Drivers and tools to include on bootfs.
 _bootfs_deps = [
   # Tools
-  "//src/devices/pci/bin:bootfs",
   "//src/media/audio/bin/ihda",
 
   # Configs
