@@ -77,7 +77,7 @@ template("rustc_embed_files") {
 
     foreach(file, invoker.files) {
       relative_path = rebase_path(file.source, root_build_dir)
-      contents += [ "pub const ${file.constant_name} : &[u8] = include_str_from_working_dir::include_bytes_from_working_dir_path!(\"${relative_path}\");" ]
+      contents += [ "pub const ${file.constant_name} : &[u8] = include_bytes_from_working_dir::include_bytes_from_working_dir_path!(\"${relative_path}\");" ]
     }
 
     outputs = [ paths.rust_source ]
@@ -97,6 +97,6 @@ template("rustc_embed_files") {
     sources = [ paths.rust_source ]
     inputs = _inputs
     deps = [ ":${labels.rust_source}" ] + _deps +
-           [ "//src/lib/include_str_from_working_dir" ]
+           [ "//src/lib/include_bytes_from_working_dir" ]
   }
 }
