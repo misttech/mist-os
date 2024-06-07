@@ -12,24 +12,12 @@ from typing import Any, Sequence
 import cxx
 
 
-def _strs(items: Sequence[Any]) -> Sequence[str]:
+def _strs(items: Sequence[Any]) -> list[str]:
     return [str(i) for i in items]
 
 
-def _paths(items: Sequence[Any]) -> Sequence[Path]:
-    if isinstance(items, list):
-        return [Path(i) for i in items]
-    elif isinstance(items, set):
-        return {Path(i) for i in items}
-    elif isinstance(items, tuple):
-        return tuple(Path(i) for i in items)
-
-    t = type(items)
-    raise TypeError(f"Unhandled sequence type: {t}")
-
-
 class CxxActionTests(unittest.TestCase):
-    def test_help_unwanted(self):
+    def test_help_unwanted(self) -> None:
         source = Path("hello.cc")
         output = Path("hello.o")
         for opt in (
@@ -45,7 +33,7 @@ class CxxActionTests(unittest.TestCase):
                 preprocess, compile = c.split_preprocessing()
             mock_exit.assert_not_called()
 
-    def test_simple_clang_cxx(self):
+    def test_simple_clang_cxx(self) -> None:
         source = Path("hello.cc")
         ii_file = Path("hello.ii")
         output = Path("hello.o")
@@ -103,12 +91,12 @@ class CxxActionTests(unittest.TestCase):
             _strs(["clang++", "-c", ii_file, "-o", output]),
         )
 
-    def test_all_unknown_flags_ignored(self):
+    def test_all_unknown_flags_ignored(self) -> None:
         command = ["clang", "--yolo", "foobar", "-q", "-k", "-quack"]
         c = cxx.CxxAction(command + ["-o", "required.o"])
         self.assertEqual(c.uninterpreted_args, command)
 
-    def test_output_flag_not_matched(self):
+    def test_output_flag_not_matched(self) -> None:
         command_pieces = (
             ["clang"],
             ["-octopus"],
@@ -122,7 +110,7 @@ class CxxActionTests(unittest.TestCase):
             c.uninterpreted_args, command_pieces[0] + command_pieces[1]
         )
 
-    def test_clang_cxx_save_temps(self):
+    def test_clang_cxx_save_temps(self) -> None:
         source = Path("hello.cc")
         ii_file = Path("obj/path/to/hello.cc.ii")
         output = Path("obj/path/to/hello.cc.o")
@@ -174,7 +162,7 @@ class CxxActionTests(unittest.TestCase):
             _strs(["clang++", "-c", ii_file, "-o", output, "--save-temps"]),
         )
 
-    def test_simple_clang_c(self):
+    def test_simple_clang_c(self) -> None:
         source = Path("hello.c")
         i_file = Path("hello.i")
         output = Path("hello.o")
@@ -211,7 +199,7 @@ class CxxActionTests(unittest.TestCase):
             _strs(["clang", "-c", i_file, "-o", output]),
         )
 
-    def test_clang_c_save_temps(self):
+    def test_clang_c_save_temps(self) -> None:
         source = Path("hello.c")
         i_file = Path("obj/path/to/hello.i")
         output = Path("obj/path/to/hello.o")
@@ -260,7 +248,7 @@ class CxxActionTests(unittest.TestCase):
             _strs(["clang", "-c", i_file, "-o", output, "--save-temps"]),
         )
 
-    def test_simple_clang_asm(self):
+    def test_simple_clang_asm(self) -> None:
         source = Path("hello.s")
         i_file = Path("hello.i")
         output = Path("hello.o")
@@ -280,7 +268,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertFalse(c.dialect_is_c)
         self.assertIsNone(c.crash_diagnostics_dir)
 
-    def test_simple_clang_asm_pp(self):
+    def test_simple_clang_asm_pp(self) -> None:
         source = Path("hello.S")
         i_file = Path("hello.i")
         output = Path("hello.o")
@@ -300,20 +288,20 @@ class CxxActionTests(unittest.TestCase):
         self.assertFalse(c.dialect_is_c)
         self.assertIsNone(c.crash_diagnostics_dir)
 
-    def test_shared(self):
+    def test_shared(self) -> None:
         source = Path("hello.o")
         output = Path("hello.so")
         c = cxx.CxxAction(_strs(["clang++", "-shared", source, "-o", output]))
         self.assertTrue(c.shared)
         self.assertEqual(c.linker_inputs, [source])
 
-    def test_flto_default(self):
+    def test_flto_default(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         c = cxx.CxxAction(_strs(["clang++", "-flto", source, "-o", output]))
         self.assertEqual(c.lto, "full")
 
-    def test_flto_full(self):
+    def test_flto_full(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         c = cxx.CxxAction(
@@ -321,7 +309,7 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertEqual(c.lto, "full")
 
-    def test_flto_thin(self):
+    def test_flto_thin(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         c = cxx.CxxAction(
@@ -329,7 +317,7 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertEqual(c.lto, "thin")
 
-    def test_fuse_ld(self):
+    def test_fuse_ld(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         linker = "lld"
@@ -340,7 +328,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(c.linker_inputs, [source])
         self.assertEqual(c.clang_linker_executable, "ld.lld")
 
-    def test_fuse_ld_windows(self):
+    def test_fuse_ld_windows(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         linker = "lld"
@@ -360,7 +348,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(c.linker_inputs, [source])
         self.assertEqual(c.clang_linker_executable, "lld-link")
 
-    def test_asan(self):
+    def test_asan(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         c = cxx.CxxAction(
@@ -371,7 +359,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertFalse(c.using_ubsan)
         self.assertEqual(c.linker_inputs, [source])
 
-    def test_no_sanitize(self):
+    def test_no_sanitize(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         c = cxx.CxxAction(
@@ -391,7 +379,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertFalse(c.using_ubsan)
         self.assertEqual(c.linker_inputs, [source])
 
-    def test_ubsan(self):
+    def test_ubsan(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         c = cxx.CxxAction(
@@ -402,7 +390,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertTrue(c.using_ubsan)
         self.assertEqual(c.linker_inputs, [source])
 
-    def test_libdirs(self):
+    def test_libdirs(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         c = cxx.CxxAction(
@@ -412,7 +400,7 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertEqual(c.libdirs, [Path("../foo/foo"), Path("bar/bar")])
 
-    def test_unwindlib_equals_arg(self):
+    def test_unwindlib_equals_arg(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         c = cxx.CxxAction(
@@ -420,7 +408,7 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertEqual(c.unwindlib, "libunwind")
 
-    def test_unwindlib_separate_arg(self):
+    def test_unwindlib_separate_arg(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         c = cxx.CxxAction(
@@ -428,7 +416,7 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertEqual(c.unwindlib, "libunwind")
 
-    def test_not_a_prefix_for_unwindlib(self):
+    def test_not_a_prefix_for_unwindlib(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         for unknown_flag in ("-u", "--u", "--un", "-un", "-uu"):
@@ -438,7 +426,7 @@ class CxxActionTests(unittest.TestCase):
             self.assertIsNone(c.unwindlib)
             self.assertIn(unknown_flag, c.uninterpreted_args)
 
-    def test_not_a_prefix_for_rtlib(self):
+    def test_not_a_prefix_for_rtlib(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         for unknown_flag in ("-r", "--r", "--rt", "-rt", "-rx"):
@@ -448,7 +436,7 @@ class CxxActionTests(unittest.TestCase):
             self.assertIsNone(c.rtlib)
             self.assertIn(unknown_flag, c.uninterpreted_args)
 
-    def test_rtlib_equals_arg(self):
+    def test_rtlib_equals_arg(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         c = cxx.CxxAction(
@@ -456,7 +444,7 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertEqual(c.rtlib, "compiler-rt")
 
-    def test_rtlib_separate_arg(self):
+    def test_rtlib_separate_arg(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         c = cxx.CxxAction(
@@ -473,7 +461,7 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertEqual(c.rtlib, "different-compiler-rt")
 
-    def test_static_libstdcxx(self):
+    def test_static_libstdcxx(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         c = cxx.CxxAction(
@@ -481,7 +469,7 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertTrue(c.static_libstdcxx)
 
-    def test_unknown_linker_driver_flag(self):
+    def test_unknown_linker_driver_flag(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         flag = "--unknown-flag=foobar"
@@ -490,7 +478,7 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertEqual(c.linker_driver_flags, [flag])
 
-    def test_linker_mapfile_double_dash(self):
+    def test_linker_mapfile_double_dash(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         mapfile = Path("hello.map")
@@ -500,7 +488,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(c.linker_mapfile, mapfile)
         self.assertEqual(list(c.linker_output_files()), [output, mapfile])
 
-    def test_linker_mapfile_single_dash(self):
+    def test_linker_mapfile_single_dash(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         mapfile = Path("hello.map")
@@ -510,7 +498,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(c.linker_mapfile, mapfile)
         self.assertEqual(list(c.linker_output_files()), [output, mapfile])
 
-    def test_linker_depfile(self):
+    def test_linker_depfile(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         depfile = Path("hello.d")
@@ -528,7 +516,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(c.linker_depfile, depfile)
         self.assertEqual(list(c.linker_output_files()), [output, depfile])
 
-    def test_linker_pdb_output(self):
+    def test_linker_pdb_output(self) -> None:
         source = Path("hello.o")
         output = Path("hello.efi")
         pdb = Path("hello.pdb")
@@ -547,7 +535,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(c.pdb, pdb)
         self.assertEqual(list(c.linker_output_files()), [output, pdb])
 
-    def test_linker_retain_symbols_file(self):
+    def test_linker_retain_symbols_file(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         retain_file = Path("hello.allowlist")
@@ -565,7 +553,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(c.linker_retain_symbols_file, retain_file)
         self.assertEqual(list(c.linker_inputs_from_flags()), [retain_file])
 
-    def test_linker_version_script(self):
+    def test_linker_version_script(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         version_script = Path("hello.ld")
@@ -583,7 +571,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(c.linker_version_script, version_script)
         self.assertEqual(list(c.linker_inputs_from_flags()), [version_script])
 
-    def test_linker_version_script_with_response_file(self):
+    def test_linker_version_script_with_response_file(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         version_script = Path("hello.ld")
@@ -606,7 +594,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(list(c.linker_inputs_from_flags()), [version_script])
         self.assertEqual(c.linker_response_files, [rsp_file])
 
-    def test_linker_just_symbols(self):
+    def test_linker_just_symbols(self) -> None:
         source = Path("hello.o")
         output = Path("hello")
         symbols = Path("hello.elf")
@@ -624,7 +612,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(c.linker_just_symbols, symbols)
         self.assertEqual(list(c.linker_inputs_from_flags()), [symbols])
 
-    def test_simple_gcc_cxx(self):
+    def test_simple_gcc_cxx(self) -> None:
         source = Path("hello.cc")
         output = Path("hello.o")
         ii_file = Path("hello.ii")
@@ -655,7 +643,7 @@ class CxxActionTests(unittest.TestCase):
             _strs(["g++", "-c", ii_file, "-o", output]),
         )
 
-    def test_simple_gcc_c(self):
+    def test_simple_gcc_c(self) -> None:
         source = Path("hello.c")
         i_file = Path("hello.i")
         output = Path("hello.o")
@@ -686,7 +674,7 @@ class CxxActionTests(unittest.TestCase):
             _strs(["gcc", "-c", i_file, "-o", output]),
         )
 
-    def test_clang_target(self):
+    def test_clang_target(self) -> None:
         c = cxx.CxxAction(
             [
                 "clang++",
@@ -699,7 +687,7 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertEqual(c.target, "powerpc-apple-darwin8")
 
-    def test_clang_crash_diagnostics_dir(self):
+    def test_clang_crash_diagnostics_dir(self) -> None:
         crash_dir = Path("/tmp/graveyard")
         c = cxx.CxxAction(
             [
@@ -714,7 +702,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(c.crash_diagnostics_dir, crash_dir)
         self.assertEqual(set(c.output_dirs()), {crash_dir})
 
-    def test_profile_list(self):
+    def test_profile_list(self) -> None:
         source = Path("hello.cc")
         ii_file = Path("hello.ii")
         output = Path("hello.o")
@@ -734,7 +722,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(c.profile_list, profile)
         self.assertEqual(set(c.input_files()), {source, profile})
 
-    def test_profile_generate(self):
+    def test_profile_generate(self) -> None:
         source = Path("hello.cc")
         ii_file = Path("hello.ii")
         output = Path("hello.o")
@@ -752,7 +740,7 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertEqual(c.profile_generate, Path("."))
 
-    def test_profile_generate_with_dir(self):
+    def test_profile_generate_with_dir(self) -> None:
         source = Path("hello.cc")
         ii_file = Path("hello.ii")
         output = Path("hello.o")
@@ -771,7 +759,7 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertEqual(c.profile_generate, pdir)
 
-    def test_profile_instr_generate(self):
+    def test_profile_instr_generate(self) -> None:
         source = Path("hello.cc")
         ii_file = Path("hello.ii")
         output = Path("hello.o")
@@ -789,7 +777,7 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertEqual(c.profile_instr_generate, Path("default.profraw"))
 
-    def test_profile_instr_generate_with_file(self):
+    def test_profile_instr_generate_with_file(self) -> None:
         source = Path("hello.cc")
         ii_file = Path("hello.ii")
         output = Path("hello.o")
@@ -808,7 +796,7 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertEqual(c.profile_instr_generate, pfile)
 
-    def test_uses_macos_sdk(self):
+    def test_uses_macos_sdk(self) -> None:
         sysroot = Path("/Library/Developer/blah")
         c = cxx.CxxAction(
             [
@@ -823,7 +811,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(c.sysroot, sysroot)
         self.assertTrue(c.uses_macos_sdk)
 
-    def test_split_preprocessing(self):
+    def test_split_preprocessing(self) -> None:
         source = Path("hello.cc")
         ii_file = Path("hello.ii")
         output = Path("hello.o")

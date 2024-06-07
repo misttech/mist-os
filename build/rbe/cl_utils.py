@@ -237,7 +237,7 @@ def remove_hash_comments(lines: Iterable[str]) -> Iterable[str]:
 
 def expand_response_files(
     command: Iterable[str], rspfiles: List[Path]
-) -> Iterable[str]:
+) -> Iterator[str]:
     """Expand response files in a command into tokens contained therein.
 
     Args:
