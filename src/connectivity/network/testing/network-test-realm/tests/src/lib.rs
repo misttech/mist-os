@@ -1561,6 +1561,7 @@ fn extract_v6_multicast_event(data: &[u8]) -> Vec<MulticastEvent> {
                 .collect()
         }
         packet_formats::icmp::mld::MldPacket::MulticastListenerQuery(_) => Vec::new(),
+        packet_formats::icmp::mld::MldPacket::MulticastListenerQueryV2(_) => Vec::new(),
         packet_formats::icmp::mld::MldPacket::MulticastListenerReportV2(packet) => packet
             .body()
             .iter_multicast_records()

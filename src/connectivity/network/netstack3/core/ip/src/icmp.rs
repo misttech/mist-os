@@ -1007,7 +1007,9 @@ impl<
                         // compliant and we expect this to be very rare (for
                         // IPv4, the lowest MTU value for a link can be 68
                         // bytes).
-                        let original_packet_buf = dest_unreachable.body().bytes();
+                        let (original_packet_buf, inner_body) = dest_unreachable.body().bytes();
+                        // Note: ICMP Dest Unreachable messages don't have a variable size body.
+                        debug_assert!(inner_body.is_none());
                         if original_packet_buf.len() >= 4 {
                             // We need the first 4 bytes as the total length
                             // field is at bytes 2/3 of the original packet

@@ -364,8 +364,17 @@ mod tests {
         icmp: &IcmpPacket<Ipv4, B, M>,
         builder: Ipv4PacketBuilder,
     ) -> Vec<u8> {
-        icmp.message_body
-            .bytes()
+        // We allocate a Vec<u8> only if the packet has records, otherwise we
+        // simply return a refernence to the header.
+        let (inner_header, inner_body) = icmp.message_body.bytes();
+        let complete_packet = if let Some(body) = inner_body {
+            [inner_header, body].concat()
+        } else {
+            Default::default()
+        };
+        let complete_msg = if inner_body.is_some() { &complete_packet } else { inner_header };
+
+        complete_msg
             .into_serializer()
             .encapsulate(icmp.builder(src_ip, dst_ip))
             .encapsulate(builder)
@@ -399,7 +408,10 @@ mod tests {
     fn test_parse_and_serialize_echo_request() {
         use crate::testdata::icmp_echo::*;
         test_parse_and_serialize::<IcmpEchoRequest, _>(REQUEST_IP_PACKET_BYTES, |icmp| {
-            assert_eq!(icmp.message_body.bytes(), ECHO_DATA);
+            let (inner_header, inner_body) = icmp.message_body.bytes();
+            assert!(inner_body.is_none());
+            let complete_msg = inner_header;
+            assert_eq!(complete_msg, ECHO_DATA);
             assert_eq!(icmp.message().id_seq.id.get(), IDENTIFIER);
             assert_eq!(icmp.message().id_seq.seq.get(), SEQUENCE_NUM);
         });
@@ -409,7 +421,10 @@ mod tests {
     fn test_parse_and_serialize_echo_response() {
         use crate::testdata::icmp_echo::*;
         test_parse_and_serialize::<IcmpEchoReply, _>(RESPONSE_IP_PACKET_BYTES, |icmp| {
-            assert_eq!(icmp.message_body.bytes(), ECHO_DATA);
+            let (header, body) = icmp.message_body.bytes();
+            assert!(body.is_none());
+            let complete_msg = header;
+            assert_eq!(complete_msg, ECHO_DATA);
             assert_eq!(icmp.message().id_seq.id.get(), IDENTIFIER);
             assert_eq!(icmp.message().id_seq.seq.get(), SEQUENCE_NUM);
         });

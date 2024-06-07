@@ -461,7 +461,9 @@ async fn test_forwarding<I: IpExt + IcmpIpExt, N: Netstack>(
                 let echo_request = icmp.message();
                 assert_eq!(echo_request.id(), ECHO_ID);
                 assert_eq!(echo_request.seq(), ECHO_SEQ);
-                assert_eq!(icmp.body().bytes(), icmp_body);
+                let (inner_header, inner_body) = icmp.body().bytes();
+                assert!(inner_body.is_none());
+                assert_eq!(inner_header, icmp_body);
                 assert_eq!(got_ttl, TTL - 1);
 
                 // Our packet was forwarded.

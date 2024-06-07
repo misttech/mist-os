@@ -127,6 +127,10 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> MldPacketHandler<BC, CC::Device
                         )
                     })
             }
+            MldPacket::MulticastListenerQueryV2(_msg) => {
+                debug!("TODO(https://fxbug.dev/42071006): Support MLDv2");
+                return;
+            }
             MldPacket::MulticastListenerReport(msg) => {
                 let addr = msg.body().group_addr();
                 MulticastAddr::new(msg.body().group_addr())

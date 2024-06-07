@@ -250,7 +250,18 @@ pub trait MessageBody: Sized {
     }
 
     /// Return the underlying bytes.
-    fn bytes(&self) -> &[u8];
+    ///
+    /// Not all ICMP messages have a fixed size, some messages like MLDv2 Query or MLDv2 Report
+    /// ([RFC 3810 section 5.1] and [RFC 3810 section 5.2]) contain a fixed amount of information
+    /// followed by a variable amount of records.
+    /// The first value returned contains the fixed size part, while the second value contains the
+    /// records for the messages that support them, more precisely, the second value is [None] if
+    /// the message does not have a variable part, otherwise it will contain the serialized list of
+    /// records.
+    ///
+    /// [RFC 3810 section 5.1]: https://datatracker.ietf.org/doc/html/rfc3810#section-5.1
+    /// [RFC 3810 section 5.2]: https://datatracker.ietf.org/doc/html/rfc3810#section-5.2
+    fn bytes(&self) -> (&[u8], Option<&[u8]>);
 }
 
 impl<B: ByteSlice> MessageBody for EmptyMessage<B> {
@@ -268,8 +279,8 @@ impl<B: ByteSlice> MessageBody for EmptyMessage<B> {
         0
     }
 
-    fn bytes(&self) -> &[u8] {
-        &[]
+    fn bytes(&self) -> (&[u8], Option<&[u8]>) {
+        (&[], None)
     }
 }
 
@@ -299,8 +310,8 @@ impl<B: ByteSlice> MessageBody for OriginalPacket<B> {
         self.0.len()
     }
 
-    fn bytes(&self) -> &[u8] {
-        &self.0
+    fn bytes(&self) -> (&[u8], Option<&[u8]>) {
+        (&self.0, None)
     }
 }
 
@@ -314,8 +325,8 @@ impl<B: ByteSlice, O: for<'a> OptionsImpl<'a>> MessageBody for Options<B, O> {
         self.bytes().len()
     }
 
-    fn bytes(&self) -> &[u8] {
-        self.bytes()
+    fn bytes(&self) -> (&[u8], Option<&[u8]>) {
+        (self.bytes(), None)
     }
 }
 

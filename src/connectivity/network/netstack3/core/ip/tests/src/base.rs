@@ -736,7 +736,9 @@ fn test_ipv6_packet_too_big() {
                 let actual_body: &[u8] = ipv6_packet_buf.as_ref();
                 let actual_body = &actual_body[..expected_len];
                 assert_eq!(packet.body().len(), expected_len);
-                assert_eq!(packet.body().bytes(), actual_body);
+                let (inner_header, inner_body) = packet.body().bytes();
+                assert!(inner_body.is_none());
+                assert_eq!(inner_header, actual_body);
             },
         )
         .unwrap();

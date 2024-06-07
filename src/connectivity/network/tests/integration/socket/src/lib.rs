@@ -2313,7 +2313,10 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
         };
     assert_eq!(icmp_packet.message().id(), ICMP_ID);
     assert_eq!(icmp_packet.message().seq(), SEQ_NUM);
-    assert_eq!(icmp_packet.body().bytes(), &payload[..]);
+
+    let (inner_header, inner_body) = icmp_packet.body().bytes();
+    assert!(inner_body.is_none());
+    assert_eq!(inner_header, &payload[..]);
 
     // Send the same data again, but with an IPv6 frame type, expect that it'll
     // fail parsing and no response will be generated.
@@ -2385,7 +2388,10 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
         };
     assert_eq!(icmp_packet.message().id(), ICMP_ID);
     assert_eq!(icmp_packet.message().seq(), SEQ_NUM);
-    assert_eq!(icmp_packet.body().bytes(), &payload[..]);
+
+    let (inner_header, inner_body) = icmp_packet.body().bytes();
+    assert!(inner_body.is_none());
+    assert_eq!(inner_header, &payload[..]);
 
     // Send the same data again, but with an IPv4 frame type, expect that it'll
     // fail parsing and no response will be generated.

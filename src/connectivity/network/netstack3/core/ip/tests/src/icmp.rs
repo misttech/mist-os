@@ -174,7 +174,11 @@ fn test_receive_echo() {
             I::ICMP_IP_PROTO,
             assert_counters,
             Some((req.reply(), IcmpUnusedCode)),
-            |packet| assert_eq!(packet.original_packet().bytes(), req_body),
+            |packet| {
+                let (inner_header, inner_body) = packet.original_packet().bytes();
+                assert!(inner_body.is_none());
+                assert_eq!(inner_header, req_body)
+            },
         );
     }
 
@@ -239,7 +243,7 @@ fn test_protocol_unreachable() {
                         Icmpv4DestUnreachableCode::DestProtocolUnreachable,
                     )),
                     // Ensure packet is truncated to the right length.
-                    |packet| assert_eq!(packet.original_packet().bytes().len(), 84),
+                    |packet| assert_eq!(packet.original_packet().len(), 84),
                 );
             }
             Ipv4Proto::Icmp
@@ -306,7 +310,7 @@ fn test_port_unreachable() {
             assert_counters,
             Some((IcmpDestUnreachable::default(), code)),
             // Ensure packet is truncated to the right length.
-            |packet| assert_eq!(packet.original_packet().bytes().len(), original_packet_len),
+            |packet| assert_eq!(packet.original_packet().len(), original_packet_len),
         );
         test_receive_ip_packet::<I, C, IcmpDestUnreachable, _, _, _>(
             |_| {},
@@ -340,7 +344,7 @@ fn test_net_unreachable() {
         &["net_unreachable"],
         Some((IcmpDestUnreachable::default(), Icmpv4DestUnreachableCode::DestNetworkUnreachable)),
         // Ensure packet is truncated to the right length.
-        |packet| assert_eq!(packet.original_packet().bytes().len(), 84),
+        |packet| assert_eq!(packet.original_packet().len(), 84),
     );
     test_receive_ip_packet::<Ipv6, _, _, _, _, _>(
         |_| {},
@@ -353,7 +357,7 @@ fn test_net_unreachable() {
         &["net_unreachable"],
         Some((IcmpDestUnreachable::default(), Icmpv6DestUnreachableCode::NoRoute)),
         // Ensure packet is truncated to the right length.
-        |packet| assert_eq!(packet.original_packet().bytes().len(), 168),
+        |packet| assert_eq!(packet.original_packet().len(), 168),
     );
     // Same test for IPv4 but with a non-initial fragment. No ICMP error
     // should be sent.
@@ -384,7 +388,7 @@ fn test_ttl_expired() {
         &["ttl_expired"],
         Some((IcmpTimeExceeded::default(), Icmpv4TimeExceededCode::TtlExpired)),
         // Ensure packet is truncated to the right length.
-        |packet| assert_eq!(packet.original_packet().bytes().len(), 84),
+        |packet| assert_eq!(packet.original_packet().len(), 84),
     );
     test_receive_ip_packet::<Ipv6, _, _, _, _, _>(
         |_| {},
@@ -396,7 +400,7 @@ fn test_ttl_expired() {
         &["ttl_expired"],
         Some((IcmpTimeExceeded::default(), Icmpv6TimeExceededCode::HopLimitExceeded)),
         // Ensure packet is truncated to the right length.
-        |packet| assert_eq!(packet.original_packet().bytes().len(), 168),
+        |packet| assert_eq!(packet.original_packet().len(), 168),
     );
     // Same test for IPv4 but with a non-initial fragment. No ICMP error
     // should be sent.

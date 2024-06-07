@@ -105,7 +105,9 @@ fn reply_if_echo_request(
         IcmpEchoRequest,
         _,
     >(&frame, EthernetFrameLengthCheck::NoCheck, |p| {
-        icmp_body.extend(p.body().bytes());
+        let (inner_header, inner_body) = p.body().bytes();
+        assert!(inner_body.is_none());
+        icmp_body.extend(inner_header);
     });
     match r {
         Ok((src_mac, dst_mac, src_ip, dst_ip, _ttl, message, _code)) => {
@@ -155,7 +157,9 @@ fn reply_if_echo_request(
         IcmpEchoRequest,
         _,
     >(&frame, EthernetFrameLengthCheck::NoCheck, |p| {
-        icmp_body.extend(p.body().bytes());
+        let (inner_header, inner_body) = p.body().bytes();
+        assert!(inner_body.is_none());
+        icmp_body.extend(inner_header);
     });
     match r {
         Ok((src_mac, dst_mac, src_ip, dst_ip, _ttl, message, _code)) => {
