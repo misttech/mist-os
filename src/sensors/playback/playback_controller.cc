@@ -23,6 +23,18 @@ using fuchsia_sensors_types::SensorEvent;
 using fuchsia_sensors_types::SensorId;
 using fuchsia_sensors_types::SensorInfo;
 using fuchsia_sensors_types::SensorRateConfig;
+
+// Pushing events to a channel too quickly can cause crashes due to the channel filling up. Right
+// now the limit seems to be in the neighbourhood of 1 kHz. Most real sensors will not support rates
+// that high, and if they do it will be via a shared memory interface rather than a channel. In
+// Android, the highest rates that most sensors support without using shared memory is ~200 Hz.
+// Eventually we'll add minimum sampling period information to SensorInfo which can be used to do
+// more realistic clamping, but for now we'll clamp to 200 Hz to avoid crashes.
+const int64_t kMinSamplingPeriod = 5e6;
+void TemporarilyClampSensorRateConfig(SensorRateConfig& rate_config) {
+  rate_config.sampling_period_ns(std::max(*rate_config.sampling_period_ns(), kMinSamplingPeriod));
+}
+
 }  // namespace
 
 PlaybackController::PlaybackController(async_dispatcher_t* dispatcher)
@@ -141,6 +153,8 @@ promise<void, ConfigureSensorRateError> PlaybackController::ConfigureSensorRate(
       completer.complete_error(ConfigureSensorRateError::kInvalidSensorId);
       return fpromise::make_ok_promise();
     }
+
+    TemporarilyClampSensorRateConfig(rate_config);
 
     FX_LOGS(INFO) << "ConfigureSensorRate: Setting sampling period to "
                   << *rate_config.sampling_period_ns() << " ns and max reporting lagency to "
@@ -287,7 +301,7 @@ promise<void> PlaybackController::UpdatePlaybackState(SensorId sensor_id, bool e
       FX_LOGS(INFO) << "ActivateSensor: Enabling sensor " << sensor_id;
       enabled_sensor_count_ += 1;
     } else if (already_enabled && !enabled) {
-      FX_LOGS(INFO) << "ActivateSensor: Disabling sensor " << sensor_id;
+      FX_LOGS(INFO) << "DeactivateSensor: Disabling sensor " << sensor_id;
       enabled_sensor_count_ -= 1;
     } else if (!already_enabled && !enabled) {
       FX_LOGS(WARNING) << "DeactivateSensor: Sensor " << sensor_id << " already disabled.";
@@ -318,6 +332,7 @@ promise<void> PlaybackController::UpdatePlaybackState(SensorId sensor_id, bool e
     if (enabled) {
       return ScheduleSensorEvents(sensor_id);
     } else {
+      state.last_scheduled_event_time = std::nullopt;
       return fpromise::make_ok_promise();
     }
   });
@@ -327,7 +342,7 @@ promise<void> PlaybackController::ScheduleSensorEvents(SensorId sensor_id) {
   return fpromise::make_promise([this, sensor_id]() -> promise<void> {
     switch (playback_mode_) {
       case PlaybackMode::kFixedValuesMode:
-        return ScheduleFixedEvent(sensor_id, /*first_event=*/true);
+        return ScheduleFixedEvent(sensor_id);
       case PlaybackMode::kNone:
         ZX_ASSERT_MSG(false, "Events scheduled when no playback mode was set.");
     }
@@ -341,17 +356,15 @@ SensorEvent PlaybackController::GenerateNextFixedEventForSensor(SensorId sensor_
                                                                 zx::time timestamp) {
   SensorPlaybackState& state = sensor_playback_state_[sensor_id];
 
-  SensorEvent first_event = state.fixed_sensor_events[state.next_fixed_event];
+  SensorEvent event = state.fixed_sensor_events[state.next_fixed_event];
   state.next_fixed_event = (state.next_fixed_event + 1) % state.fixed_sensor_events.size();
+  event.timestamp(timestamp.get());
 
-  state.last_scheduled_event_time = timestamp;
-  first_event.timestamp(timestamp.get());
-
-  return first_event;
+  return event;
 }
 
-promise<void> PlaybackController::ScheduleFixedEvent(SensorId sensor_id, bool first_event) {
-  return fpromise::make_promise([this, sensor_id, first_event]() {
+promise<void> PlaybackController::ScheduleFixedEvent(SensorId sensor_id) {
+  return fpromise::make_promise([this, sensor_id]() {
     // If playback shouldn't be running any more, schedule nothing further.
     if (playback_state_ != PlaybackState::kRunning) {
       return;
@@ -369,33 +382,70 @@ promise<void> PlaybackController::ScheduleFixedEvent(SensorId sensor_id, bool fi
     //
     // Wraps the promise chain in a special scope so we can cancel it separately to the rest of the
     // controller actor promises.
-    if (first_event) {
-      zx::time now = zx::time(zx_clock_get_monotonic());
-      SensorEvent first_event = GenerateNextFixedEventForSensor(sensor_id, now);
-      Schedule(SendEvent(first_event)
-                   .and_then(ScheduleFixedEvent(sensor_id, /*first_event=*/false))
-                   .wrap_with(*running_playback_scope_));
+    zx::time timestamp_base;
+    if (!state.last_scheduled_event_time) {
+      timestamp_base = zx::time(zx_clock_get_monotonic());
     } else {
-      zx::time event_timestamp = state.last_scheduled_event_time + state.sampling_period;
-      SensorEvent next_event = GenerateNextFixedEventForSensor(sensor_id, event_timestamp);
-      ScheduleAtTime(event_timestamp,
-                     SendEvent(next_event)
-                         .and_then(ScheduleFixedEvent(sensor_id, /*first_event=*/false))
-                         .wrap_with(*running_playback_scope_));
+      timestamp_base = *state.last_scheduled_event_time;
     }
+    zx::time event_timestamp = timestamp_base + state.sampling_period;
+    state.last_scheduled_event_time = event_timestamp;
+    SensorEvent next_event = GenerateNextFixedEventForSensor(sensor_id, event_timestamp);
+    ScheduleAtTime(event_timestamp, SendOrBufferEvent(next_event)
+                                        .and_then(ScheduleFixedEvent(sensor_id))
+                                        .wrap_with(*running_playback_scope_));
   });
 }
 
-promise<void> PlaybackController::SendEvent(const SensorEvent& event) {
+promise<void> PlaybackController::SendOrBufferEvent(const SensorEvent& event) {
   return fpromise::make_promise([this, event]() {
+    SensorId sensor_id = event.sensor_id();
+    SensorPlaybackState& state = sensor_playback_state_[sensor_id];
+
     // If playback shouldn't be running any more, do nothing.
     if (playback_state_ != PlaybackState::kRunning)
       return;
     // If the sensor has become disabled, do nothing.
-    if (!sensor_playback_state_[event.sensor_id()].enabled)
+    if (!state.enabled)
       return;
 
-    event_callback_(event);
+    // If the maximum reporting latency for the sensor is 0, send the event immediately and do
+    // nothing further.
+    if (state.max_reporting_latency == zx::duration(0) && event_callback_) {
+      event_callback_(event);
+      return;
+    }
+
+    // Add the event to the sensor's output buffer.
+    state.event_buffer.push(event);
+    // If that was the first event in the buffer, schedule the buffer contents to be sent after the
+    // max reporting latency has elapsed.
+    if (state.event_buffer.size() == 1) {
+      zx::time send_buffer_time = zx::time(event.timestamp()) + state.max_reporting_latency;
+      ScheduleAtTime(send_buffer_time,
+                     SendBufferedEvents(sensor_id).wrap_with(*running_playback_scope_));
+    }
+  });
+}
+
+promise<void> PlaybackController::SendBufferedEvents(SensorId sensor_id) {
+  return fpromise::make_promise([this, sensor_id]() {
+    SensorPlaybackState& state = sensor_playback_state_[sensor_id];
+
+    // If playback shouldn't be running any more, do nothing.
+    if (playback_state_ != PlaybackState::kRunning)
+      return;
+    // If the sensor has become disabled, do nothing.
+    if (!state.enabled)
+      return;
+    // Do nothing if the event callback isn't set.
+    if (!event_callback_)
+      return;
+
+    while (!state.event_buffer.empty()) {
+      event_callback_(state.event_buffer.front());
+      state.event_buffer.pop();
+    }
   });
 }
 
