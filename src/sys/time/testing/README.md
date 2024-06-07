@@ -25,6 +25,12 @@ Specifically:
 
   NOTE: if a library you depend on needs a UTC clock, then so does your test.
 
+* If you have a single-process unit test that should run in fake time, you may
+  be better served by [`TestExecutor`][te]. Study the documentation carefully
+  if you decide to use it, since timer wake behavior in fake time is subtle.
+
+[te]: https://fuchsia-docs.firebaseapp.com/rust/fuchsia_async/struct.TestExecutor.html#method.new_with_fake_time
+
 ## Overview
 
 TTRF spins up a hermetic instance of Timekeeper, optionally connected
@@ -63,7 +69,7 @@ let ttr_proxy = client::connect_to_protocol::<fttr::RealmFactoryMarker>()
     .expect("should be able to connect to the realm factory");
 ```
 
-This is the UTC clock object that timekeeper will manage.
+Next, we create UTC clock object that timekeeper will manage.
 
 We give it an arbitrary backstop time. On real systems the backstop
 time is generated based on the timestamp of the last change that
@@ -75,16 +81,22 @@ let utc_clock = zx::Clock::create(zx::ClockOpts::empty(), Some(*BACKSTOP_TIME))
 ```
 
 
-RealmProxy endpoint is useful for connecting to any protocols in the test realm, by name.
+RealmProxy endpoint is useful for connecting to any protocols in the test
+realm, by name.
 
-`_rp_keepalive needs` to be held to ensure that the realm continues to live.
-We can also use this client end to request any protocol that is available in TTRF by its
-name. In this test case, however, we don't do any of that.
-
-We must duplicate the clock object if we want to pass it into the test realm, and
-also keep a reference for this test.
 ```
 let (_rp_keepalive, rp_server_end) = endpoints::create_endpoints::<ftth::RealmProxy_Marker>();
+```
+
+`_rp_keepalive needs` to be held to ensure that the realm continues is kept
+alive during the test runtime. We can also use this client end to request any
+protocol that is available in TTRF by its name. In this test case, however, we
+don't do any of that.
+
+We duplicate the UTC clock object to pass it into the test realm while also
+keeping a reference for this test.
+
+```
 let (push_source_puppet_client_end, _ignore_opts, _ignore_cobalt) = ttr_proxy
     .create_realm(
         fttr::RealmOptions { use_real_monotonic_clock: Some(true), ..Default::default() },
@@ -98,17 +110,23 @@ let (push_source_puppet_client_end, _ignore_opts, _ignore_cobalt) = ttr_proxy
 
 Sampling the monotonic clock directly is OK since we configured the timekeeper
 test realm to use the real monotonic clock. Convert to a proxy so we can send
-RPCs. Let's tell Timekeeper to set a UTC time sample. We do this by
-establishing a correspondence between a reading of the monotonic clock, and the
-reading of the UTC clock, then also providing a standard deviation of the
-estimation error. The "push source puppet" is an endpoint that allows us to
-inject "fake" readings of the time source.  When we inject the time sample as
-shown below, Timekeeper will see that as if the time source provided a time
-sample, and will adjust all clocks accordingly.
+RPCs.
+
+Now we tell Timekeeper to set a UTC time sample. We do this by establishing a
+correspondence between a reading of the monotonic clock, and the reading of the
+UTC clock. We then also provide a standard deviation of the estimation error.
+The "push source puppet" is an endpoint that allows us to inject "fake"
+readings of the time source.
 
 ```
 let sample_monotonic = zx::Time::get_monotonic();
 let push_source_puppet = push_source_puppet_client_end.into_proxy().expect("infallible");
+```
+
+When we inject the time sample as shown below, Timekeeper will see that as if
+the time source provided a time sample, and will adjust all clocks accordingly.
+
+```
 const STD_DEV: zx::Duration = zx::Duration::from_millis(50);
 push_source_puppet
     .set_sample(&TimeSample {
@@ -121,10 +139,12 @@ push_source_puppet
     .expect("FIDL call succeeds");
 ```
 
-Wait until the UTC clock is started. This is the canonical way to do that.
-The signal below is a direct consequence of the `set_sample` call above.
-The above call is synchronized because it goes to a separate process, so
-we only need to write all of this in a sequential manner.
+We can now wait until the UTC clock is started. The snippet below shows the
+canonical way to do that.
+
+The signal below is a direct consequence of the `set_sample` call above. The
+above call is synchronized because it goes to a separate process. We can
+therefore write this test in a sequential manner.
 
 ```
 fasync::OnSignals::new(
