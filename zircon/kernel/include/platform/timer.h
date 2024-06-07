@@ -32,17 +32,6 @@ void timer_tick(zx_time_t now);
 // which allow directly observing the tick counter or not.
 bool platform_usermode_can_access_tick_registers();
 
-// Reads a platform-specific fixed-rate monotonic counter
-// The "raw" form of the counter should give the current counter value (and is
-// almost certainly not what you want).  The normal form will give the counter
-// value, potentially adjusted by a constant used to make the ticks timeline
-// start ticking from 0 when the system boots.
-zx_ticks_t platform_current_raw_ticks();
-zx_ticks_t platform_current_ticks();
-
-// The current monotonic time in ticks.
-inline zx_ticks_t current_ticks() { return platform_current_ticks(); }
-
 // Access the platform specific offset from the raw ticks timeline to the monotonic ticks
 // timeline.  The only current legit uses for this function are when
 // initializing the RO data for the VDSO, and when fixing up timer values during
@@ -65,6 +54,9 @@ class Ratio;  // Fwd decl.
 // source has been selected and characterized.
 void platform_set_ticks_to_time_ratio(const affine::Ratio& ticks_to_time);
 const affine::Ratio& platform_get_ticks_to_time_ratio();
+
+// Sets the initial mono ticks offset.
+void platform_set_mono_ticks_offset(uint64_t offset);
 
 // Convert a sample taken early on to a proper zx_ticks_t, if possible.
 // This returns 0 if early samples are not convertible.
@@ -117,6 +109,36 @@ enum class GetTicksSyncFlag : uint8_t {
 FBL_ENABLE_ENUM_BITS(GetTicksSyncFlag)
 
 template <GetTicksSyncFlag Flags>
-zx_ticks_t platform_current_ticks_synchronized();
+zx_ticks_t platform_current_raw_ticks_synchronized();
+
+template <GetTicksSyncFlag Flags>
+inline zx_ticks_t platform_current_ticks_synchronized() {
+  while (true) {
+    // Since the mono_ticks_offset is only updated early in boot when we're running on a
+    // single core with interrupts disabled, we don't need to worry about thread synchronization so
+    // memory_order_relaxed is sufficient.
+    const zx_ticks_t off1 = platform_get_mono_ticks_offset();
+    const zx_ticks_t raw_ticks = platform_current_raw_ticks_synchronized<Flags>();
+    const zx_ticks_t off2 = platform_get_mono_ticks_offset();
+    if (off1 == off2) {
+      return raw_ticks + off1;
+    }
+  }
+}
+
+// Reads a platform-specific fixed-rate monotonic counter
+// The "raw" form of the counter should give the current counter value (and is
+// almost certainly not what you want).  The non-raw form will give the counter
+// value, potentially adjusted by a constant used to make the ticks timeline
+// start ticking from 0 when the system boots.
+inline zx_ticks_t platform_current_raw_ticks() {
+  return platform_current_raw_ticks_synchronized<GetTicksSyncFlag::kNone>();
+}
+inline zx_ticks_t platform_current_ticks() {
+  return platform_current_ticks_synchronized<GetTicksSyncFlag::kNone>();
+}
+
+// The current monotonic time in ticks.
+inline zx_ticks_t current_ticks() { return platform_current_ticks(); }
 
 #endif  // ZIRCON_KERNEL_INCLUDE_PLATFORM_TIMER_H_

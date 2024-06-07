@@ -82,11 +82,6 @@ timer_irq_assignment timer_assignment;
 uint32_t event_stream_shift;
 uint32_t event_stream_freq;
 
-// TODO(https://fxbug.dev/42173294): Make this ktl::atomic when we start to mutate the offset to
-// deal with suspend.
-// Offset between the raw ticks counter and the monotonic ticks timeline.
-uint64_t mono_ticks_offset{0};
-
 }  // anonymous namespace
 
 zx_time_t cntpct_to_zx_time(uint64_t cntpct) {
@@ -264,10 +259,8 @@ static void platform_tick(void* arg) {
   timer_tick(current_time());
 }
 
-namespace internal {
-
 template <GetTicksSyncFlag Flags>
-inline zx_ticks_t platform_current_raw_ticks() {
+inline zx_ticks_t platform_current_raw_ticks_synchronized() {
   // Refer to Section D12.1.3 "Synchronization requirements for AArch64 System
   // registers" of "ARM Architecture Reference Manual® ARMv8, for ARMv8-A
   // architecture profile" for details about how to synchronize reads of the
@@ -308,63 +301,32 @@ inline zx_ticks_t platform_current_raw_ticks() {
   return ret;
 }
 
-template <GetTicksSyncFlag Flags>
-inline zx_ticks_t platform_current_ticks() {
-  // TODO(https://fxbug.dev/42173294): switch to the ABA method of reading the offset when we start
-  // to allow the offset to be changed as a result of coming out of system
-  // suspend.
-  return platform_current_raw_ticks<Flags>() + mono_ticks_offset;
-}
-
-}  // namespace internal
-
-zx_ticks_t platform_current_ticks() {
-  return internal::platform_current_ticks<GetTicksSyncFlag::kNone>();
-}
-
-zx_ticks_t platform_current_raw_ticks() {
-  return internal::platform_current_raw_ticks<GetTicksSyncFlag::kNone>();
-}
-
-template <GetTicksSyncFlag Flags>
-zx_ticks_t platform_current_ticks_synchronized() {
-  return internal::platform_current_ticks<Flags>();
-}
-
 // Explicit instantiation of all of the forms of synchronized tick access.
-//
-// TODO(johngro): Look into reasonable ways to put architecture specific code in
-// common platform headers, so we can both defer expansion (to only expand what
-// we need and nothing more) as well as inline this code.
-#define EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(flags) \
-  template zx_ticks_t platform_current_ticks_synchronized<static_cast<GetTicksSyncFlag>(flags)>()
-EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(1);
-EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(2);
-EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(3);
-EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(4);
-EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(5);
-EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(6);
-EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(7);
-EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(8);
-EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(9);
-EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(10);
-EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(11);
-EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(12);
-EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(13);
-EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(14);
-EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(15);
-#undef EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED
-
-zx_ticks_t platform_get_mono_ticks_offset() {
-  // TODO(https://fxbug.dev/42173294): consider the memory order semantics of this load when the
-  // time comes.
-  return mono_ticks_offset;
-}
+#define EXPAND_PLATFORM_CURRENT_RAW_TICKS_SYNCHRONIZED(flags) \
+  template zx_ticks_t                                         \
+  platform_current_raw_ticks_synchronized<static_cast<GetTicksSyncFlag>(flags)>()
+EXPAND_PLATFORM_CURRENT_RAW_TICKS_SYNCHRONIZED(0);
+EXPAND_PLATFORM_CURRENT_RAW_TICKS_SYNCHRONIZED(1);
+EXPAND_PLATFORM_CURRENT_RAW_TICKS_SYNCHRONIZED(2);
+EXPAND_PLATFORM_CURRENT_RAW_TICKS_SYNCHRONIZED(3);
+EXPAND_PLATFORM_CURRENT_RAW_TICKS_SYNCHRONIZED(4);
+EXPAND_PLATFORM_CURRENT_RAW_TICKS_SYNCHRONIZED(5);
+EXPAND_PLATFORM_CURRENT_RAW_TICKS_SYNCHRONIZED(6);
+EXPAND_PLATFORM_CURRENT_RAW_TICKS_SYNCHRONIZED(7);
+EXPAND_PLATFORM_CURRENT_RAW_TICKS_SYNCHRONIZED(8);
+EXPAND_PLATFORM_CURRENT_RAW_TICKS_SYNCHRONIZED(9);
+EXPAND_PLATFORM_CURRENT_RAW_TICKS_SYNCHRONIZED(10);
+EXPAND_PLATFORM_CURRENT_RAW_TICKS_SYNCHRONIZED(11);
+EXPAND_PLATFORM_CURRENT_RAW_TICKS_SYNCHRONIZED(12);
+EXPAND_PLATFORM_CURRENT_RAW_TICKS_SYNCHRONIZED(13);
+EXPAND_PLATFORM_CURRENT_RAW_TICKS_SYNCHRONIZED(14);
+EXPAND_PLATFORM_CURRENT_RAW_TICKS_SYNCHRONIZED(15);
+#undef EXPAND_PLATFORM_CURRENT_RAW_TICKS_SYNCHRONIZED
 
 zx_ticks_t platform_convert_early_ticks(arch::EarlyTicks sample) {
   // Early tick timestamps are always raw ticks.  We need to convert back to
   // ticks by subtracting the raw_ticks to ticks offset.
-  return sample.*reg_procs.early_ticks + mono_ticks_offset;
+  return sample.*reg_procs.early_ticks + platform_get_mono_ticks_offset();
 }
 
 zx_status_t platform_set_oneshot_timer(zx_time_t deadline) {
@@ -382,7 +344,8 @@ zx_status_t platform_set_oneshot_timer(zx_time_t deadline) {
   // manage fixing up the timer when coming out of suspend, we need to come back
   // here and reconsider memory order issues.
   const affine::Ratio time_to_ticks = platform_get_ticks_to_time_ratio().Inverse();
-  const uint64_t cntpct_deadline = time_to_ticks.Scale(deadline) + 1 - mono_ticks_offset;
+  const uint64_t cntpct_deadline =
+      time_to_ticks.Scale(deadline) + 1 - platform_get_mono_ticks_offset();
 
   // Even if the deadline has already passed, the ARMv8-A timer will fire the
   // interrupt.
@@ -558,7 +521,7 @@ void ArmGenericTimerInit(const zbi_dcfg_arm_generic_timer_driver_t& config) {
   // We cannot actually reset the value on the ticks timer, so instead we use
   // the time of clock selection (now) to define the zero point on our ticks
   // timeline moving forward.
-  mono_ticks_offset = -reg_procs.read_ct();
+  platform_set_mono_ticks_offset(-reg_procs.read_ct());
   arch::ThreadMemoryBarrier();
 
   dprintf(INFO, "arm generic timer using %s timer, irq %d\n", timer_str, timer_irq);
