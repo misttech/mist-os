@@ -40,11 +40,6 @@ board_bootfs_labels = _bootfs_deps
 board_recovery_bootfs_labels = _bootfs_deps
 board_zedboot_bootfs_labels = _bootfs_deps
 
-board_driver_package_labels = [
-  "//src/devices/acpi:drivers",
-  "//src/graphics/drivers/msd-intel-gen",
-]
-
 board_package_labels = [
   # The following are all config_data entries, only.
   "//src/factory/factory_store_providers/config/qemu",
@@ -54,7 +49,6 @@ board_package_labels = [
 # https://fxbug.dev/42108122
 platform_enable_user_pci = true
 
-# This will enable suspend only if the enable_suspend flag is set to true
 partitions_config_label = "//boards/partitions:x64"
 partitions_config_contents = [ "$root_build_dir/fuchsia.esp.blk" ]
 

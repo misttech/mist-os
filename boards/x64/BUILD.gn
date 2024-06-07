@@ -218,6 +218,21 @@ board_input_bundle("x64_common") {
       package_set = "base"
       driver_components = [ "meta/fake_battery.cm" ]
     },
+    {
+      package_target = "//src/devices/acpi/drivers/acpi-battery:acpi-battery"
+      package_set = "base"
+      driver_components = [ "meta/acpi-battery.cm" ]
+    },
+    {
+      package_target = "//src/devices/acpi/drivers/intel-thermal:intel-thermal"
+      package_set = "base"
+      driver_components = [ "meta/intel-thermal.cm" ]
+    },
+    {
+      package_target = "//src/graphics/drivers/msd-intel-gen:msd-intel-gen"
+      package_set = "base"
+      driver_components = [ "meta/libmsd_intel.cm" ]
+    },
   ]
 
   # Additional drivers to support running as a virtualization guest.
