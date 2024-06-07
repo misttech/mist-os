@@ -185,6 +185,9 @@
                 // TODO(https://fxbug.dev/345290064): Started failing and blocking roller.
                 "elftls.align_test",
                 "elftls.skew_align_test",
+
+                // TODO(https://fxbug.dev/317335324): Flaky on the bots - needs to be investigated.
+                "properties.__system_property_reload_invalid",
             ],
         },
     ],
