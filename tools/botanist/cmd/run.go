@@ -107,6 +107,9 @@ type RunCommand struct {
 
 	// The timeout to wait for an SSH connection after booting the target.
 	bootupTimeout time.Duration
+
+	// Whether the product bundle is expected to support SSH.
+	expectsSSH bool
 }
 
 func (*RunCommand) Name() string {
@@ -146,6 +149,7 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	// Temporary flag to enable a soft transition to uploading test results from botanist rather than from the recipe.
 	f.BoolVar(&r.uploadToResultDB, "upload-to-resultdb", false, "if set, test results will be uploaded to ResultDB from testrunner.")
 	f.DurationVar(&r.bootupTimeout, "bootup-timeout", 0, "duration allowed for the command to finish execution, a value of 0 (zero) will fall back to the default.")
+	f.BoolVar(&r.expectsSSH, "expects-ssh", false, "if set, botanist will try to establish an SSH connection before running tests.")
 
 	// Parsing of testrunner options.
 	f.StringVar(&r.testrunnerOptions.OutDir, "out-dir", "", "Optional path where a directory containing test results should be created.")
@@ -362,7 +366,7 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 		}
 		defer os.Remove(testbedConfig)
 
-		if !r.netboot {
+		if r.expectsSSH {
 			for _, t := range fuchsiaTargets {
 				t := t
 				client, err := t.SSHClient()
@@ -451,6 +455,7 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 	// Parse targets out from the target configuration file.
 	baseTargets, fuchsiaTargets, err := r.deriveTargetsFromFile(ctx, targets.Options{
 		Netboot:       r.netboot,
+		ExpectsSSH:    r.expectsSSH,
 		SSHKey:        sshKey,
 		AuthorizedKey: authorizedKey,
 	})
@@ -600,9 +605,7 @@ func (r *RunCommand) runAgainstTarget(ctx context.Context, t targets.FuchsiaTarg
 		constants.TestbedConfigEnvKey: testbedConfig,
 	}
 
-	// If |netboot| is true, then we assume that fuchsia is not provisioned
-	// with a netstack; in this case, do not try to establish a connection.
-	if !r.netboot {
+	if r.expectsSSH {
 		var addr net.IPAddr
 		ipv6, err := t.IPv6()
 		if err != nil {
@@ -674,6 +677,11 @@ func (r *RunCommand) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 	args := f.Args()
 	if len(args) == 0 {
 		return subcommands.ExitUsageError
+	}
+
+	// TODO(https://fxbug.dev/338300717): Remove once -expects-ssh starts getting set.
+	if !r.netboot {
+		r.expectsSSH = true
 	}
 
 	// If the TestOutDirEnvKey was set, that means botanist is being run in an infra

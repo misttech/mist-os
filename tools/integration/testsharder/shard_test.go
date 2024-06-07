@@ -58,8 +58,9 @@ func makeTest(id int, os string) Test {
 
 func spec(id int, envs ...build.Environment) build.TestSpec {
 	return build.TestSpec{
-		Test: makeTest(id, "fuchsia").Test,
-		Envs: envs,
+		Test:       makeTest(id, "fuchsia").Test,
+		Envs:       envs,
+		ExpectsSSH: true,
 	}
 }
 
@@ -73,9 +74,10 @@ func shard(env build.Environment, os string, ids ...int) *Shard {
 		tests = append(tests, makeTest(id, os))
 	}
 	return &Shard{
-		Name:  environmentName(env),
-		Tests: tests,
-		Env:   env,
+		Name:       environmentName(env),
+		Tests:      tests,
+		Env:        env,
+		ExpectsSSH: true,
 	}
 }
 
@@ -215,6 +217,7 @@ func TestMakeShards(t *testing.T) {
 	t.Run("isolated tests are in separate shards", func(t *testing.T) {
 		isolate := func(test build.TestSpec) build.TestSpec {
 			test.Test.Isolated = true
+			test.ExpectsSSH = false
 			return test
 		}
 
@@ -234,6 +237,7 @@ func TestMakeShards(t *testing.T) {
 			for i := range shard.Tests {
 				shard.Tests[i].Test.Isolated = true
 			}
+			shard.ExpectsSSH = false
 			return shard
 		}
 		expected := []*Shard{
@@ -276,13 +280,15 @@ func TestMakeShards(t *testing.T) {
 		}
 		expected := []*Shard{
 			{
-				Name:  environmentName(env1),
-				Tests: []Test{makeTestWithTagsAndRealm(1, testListEntry.Tags, "/some/realm"), makeTest(2, "fuchsia")},
-				Env:   env1,
+				Name:       environmentName(env1),
+				Tests:      []Test{makeTestWithTagsAndRealm(1, testListEntry.Tags, "/some/realm"), makeTest(2, "fuchsia")},
+				Env:        env1,
+				ExpectsSSH: true,
 			}, {
-				Name:  environmentName(env2),
-				Tests: []Test{makeTestWithTagsAndRealm(1, testListEntry.Tags, "/some/realm"), makeTest(3, "fuchsia")},
-				Env:   env2,
+				Name:       environmentName(env2),
+				Tests:      []Test{makeTestWithTagsAndRealm(1, testListEntry.Tags, "/some/realm"), makeTest(3, "fuchsia")},
+				Env:        env2,
+				ExpectsSSH: true,
 			},
 		}
 		assertEqual(t, expected, actual)
@@ -372,17 +378,19 @@ func TestMakeShards(t *testing.T) {
 		}
 		expected := []*Shard{
 			{
-				Name:    environmentName(env1),
-				Tests:   []Test{makeTestWithPackageManifest(1), makeTest(2, "fuchsia"), makeTest(3, "fuchsia")},
-				Env:     env1,
-				PkgRepo: fmt.Sprintf("repo_%s", environmentName(env1)),
-				Deps:    []string{fmt.Sprintf("repo_%s", environmentName(env1))},
+				Name:       environmentName(env1),
+				Tests:      []Test{makeTestWithPackageManifest(1), makeTest(2, "fuchsia"), makeTest(3, "fuchsia")},
+				Env:        env1,
+				ExpectsSSH: true,
+				PkgRepo:    fmt.Sprintf("repo_%s", environmentName(env1)),
+				Deps:       []string{fmt.Sprintf("repo_%s", environmentName(env1))},
 			}, {
-				Name:    environmentName(env2),
-				Tests:   []Test{makeTestWithPackageManifest(1)},
-				Env:     env2,
-				PkgRepo: fmt.Sprintf("repo_%s", environmentName(env2)),
-				Deps:    []string{fmt.Sprintf("repo_%s", environmentName(env2))},
+				Name:       environmentName(env2),
+				Tests:      []Test{makeTestWithPackageManifest(1)},
+				Env:        env2,
+				ExpectsSSH: true,
+				PkgRepo:    fmt.Sprintf("repo_%s", environmentName(env2)),
+				Deps:       []string{fmt.Sprintf("repo_%s", environmentName(env2))},
 			},
 		}
 		assertEqual(t, expected, actual)

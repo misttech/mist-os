@@ -161,6 +161,11 @@ if (allowed_device_types == []) {
 #     and environment it's run against will take to boot up. This value is only
 #     respected when `isolated` is true.
 #
+#   expects_ssh (optional, default: True)
+#     [bool] Whether the test is expected to run against a product bundle that
+#     supports SSH. This value should be the same for all tests with the same
+#     product_bundle.
+#
 #   environments (optional, default: Emu for fuchsia; else a VM)
 #     [list of scopes] Device environments in which the test should run.
 #
@@ -393,12 +398,24 @@ template("test_spec") {
     }
   }
 
+  if (is_linux || is_mac) {
+    # If the test is a pure host test, expects_ssh should be false
+    # because there is no target to run against.
+    if (!defined(invoker.expects_ssh) && _environments == [ host_env ]) {
+      invoker.expects_ssh = false
+    }
+  }
+
   test_spec = {
     forward_variables_from(invoker,
                            [
                              "product_bundle",
                              "bootup_timeout_secs",
+                             "expects_ssh",
                            ])
+    if (!defined(expects_ssh)) {
+      expects_ssh = true
+    }
     test = {
       forward_variables_from(invoker,
                              [

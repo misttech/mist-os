@@ -591,6 +591,9 @@ type Options struct {
 	// will be paved. Ignored for QEMU.
 	Netboot bool
 
+	// ExpectsSSH specifies whether we expect to be able to SSH to the target.
+	ExpectsSSH bool
+
 	// SSHKey is a private SSH key file, corresponding to an authorized key to be paved or
 	// to one baked into a boot image.
 	SSHKey string

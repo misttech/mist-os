@@ -53,6 +53,7 @@
         "timeout_secs": 614,
         "summary": {
             "tests": null
-        }
+        },
+        "expects_ssh": true
     }
 ]

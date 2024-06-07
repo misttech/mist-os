@@ -30,9 +30,10 @@ func affectedShard(env build.Environment, os string, ids ...int) *Shard {
 		tests = append(tests, test)
 	}
 	return &Shard{
-		Name:  AffectedShardPrefix + environmentName(env),
-		Tests: tests,
-		Env:   env,
+		Name:       AffectedShardPrefix + environmentName(env),
+		Tests:      tests,
+		Env:        env,
+		ExpectsSSH: true,
 	}
 }
 
@@ -77,6 +78,7 @@ func TestSplitOutMultipliers(t *testing.T) {
 			Name:        MultipliedShardPrefix + environmentName(env),
 			Tests:       tests,
 			Env:         env,
+			ExpectsSSH:  true,
 			TimeoutSecs: int(computeShardTimeout(subshard{time.Duration(timeoutSecs) * time.Second, tests}).Seconds()),
 		}
 	}

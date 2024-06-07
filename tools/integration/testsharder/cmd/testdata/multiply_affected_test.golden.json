@@ -34,7 +34,8 @@
         "timeout_secs": 604,
         "summary": {
             "tests": null
-        }
+        },
+        "expects_ssh": true
     },
     {
         "name": "affected:AEMU",
@@ -74,7 +75,8 @@
         "timeout_secs": 842,
         "summary": {
             "tests": null
-        }
+        },
+        "expects_ssh": true
     },
     {
         "name": "multiplied:AEMU",
@@ -113,6 +115,7 @@
         "timeout_secs": 842,
         "summary": {
             "tests": null
-        }
+        },
+        "expects_ssh": true
     }
 ]

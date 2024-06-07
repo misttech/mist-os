@@ -358,6 +358,12 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 			return err
 		} else {
 			for _, s := range shards {
+				if !s.ExpectsSSH {
+					// A package repo is only needed for tests run over SSH and
+					// thus unnecessary for shards running against product bundles
+					// that don't support SSH.
+					continue
+				}
 				if err := s.CreatePackageRepo(flags.buildDir, pkgRepos[0].Path, flags.cacheTestPackages || flags.hermeticDeps); err != nil {
 					return err
 				}
