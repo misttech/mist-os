@@ -8,6 +8,9 @@
 #include <fidl/fuchsia.hardware.suspend/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
+#include <lib/inspect/component/cpp/component.h>
+#include <lib/inspect/contrib/cpp/bounded_list_node.h>
+#include <lib/inspect/cpp/inspect.h>
 
 #include "lib/fdf/cpp/dispatcher.h"
 
@@ -16,9 +19,7 @@ namespace suspend {
 class AmlSuspend : public fdf::DriverBase,
                    public fidl::WireServer<fuchsia_hardware_suspend::Suspender> {
  public:
-  AmlSuspend(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
-      : fdf::DriverBase("aml-suspend", std::move(start_args), std::move(dispatcher)),
-        devfs_connector_(fit::bind_member<&AmlSuspend::Serve>(this)) {}
+  AmlSuspend(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher);
 
   zx::result<> Start() override;
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
@@ -39,6 +40,8 @@ class AmlSuspend : public fdf::DriverBase,
  private:
   void Serve(fidl::ServerEnd<fuchsia_hardware_suspend::Suspender> request);
   zx::result<> CreateDevfsNode();
+
+  inspect::contrib::BoundedListNode inspect_events_;
 
   fidl::ServerBindingGroup<fuchsia_hardware_suspend::Suspender> suspend_bindings_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_;
