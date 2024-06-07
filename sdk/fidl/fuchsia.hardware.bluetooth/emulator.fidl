@@ -14,8 +14,8 @@ using fuchsia.bluetooth.bredr as bredr;
 // TODO(armansito): Add ability to specify Bluetooth HCI version.
 
 /// Defines the list of HCI protocol error codes that a Bluetooth controller can report. These
-/// values are taken from Bluetooth Core Specification v5.1, Vol 2, Part D.
-type HciError = strict enum : uint8 {
+/// values are taken from Bluetooth Core Specification v5.4, Vol 2, Part D, Section 1.3
+type HciError = flexible enum : uint8 {
     SUCCESS = 0x00;
     UNKNOWN_COMMAND = 0x01;
     UNKNOWN_CONNECTION_ID = 0x02;
@@ -87,17 +87,17 @@ type HciError = strict enum : uint8 {
     OPERATION_CANCELLED_BY_HOST = 0x44;
 };
 
-type ConnectionState = strict enum {
+type ConnectionState = flexible enum {
     CONNECTED = 1;
     DISCONNECTED = 2;
 };
 
 /// The maximum size (in bytes) of a local name assigned using the HCI_Write_Local_Name command
-/// (see Core Specification v5.1, Vol 2, Part E, 7.3.11).
+/// (see Core Specification v5.4, Vol 4, Part E, 7.3.11).
 const MAX_LOCAL_NAME_LENGTH uint8 = 248;
 
 /// Advertising data MTUs for legacy (4.x) and extended (5.x) advertising PDU types
-/// (see Core Specification v5.1, Vol 2, Part E, sections 7.3.11 & 7.8.54).
+/// (see Core Specification v5.4, Vol 4, Part E, Sections 7.3.11 & 7.8.54).
 const MAX_LEGACY_ADVERTISING_DATA_LENGTH uint8 = 31;
 
 /// Maximum service records that can be advertised at once.
@@ -163,31 +163,15 @@ type AdvertisingData = table {
 
 /// Parameters used to emulate a peer's behavior over the BR/EDR/Low Energy transport.
 type PeerParameters = resource table {
-    /// The BD_ADDR of the peer. This field is mandatory.
+    /// The public BR/EDR BD_ADDR address of a peer. This field is mandatory.
     1: address bt.Address;
 
     /// When present and true, the peer will send connectable advertisements and accept connection
     /// requests. The peer will ignore connection requests if not connectable.
     2: connectable bool;
 
-    /// The device class reported in the inquiry response for this peer during device discovery. If
-    /// not present, the major device class defaults to uncategorized (device code not specified).
-    3: bredr_device_class bt.DeviceClass;
-
-    // The peer's services that will be discoverable via Service Discovery Protocol. If not
-    /// present, the peer has no services to be discovered (besides the Service Discovery Service).
-    4: bredr_service_definition vector<bredr.ServiceDefinition>:MAX_PEER_SERVICES;
-
-    /// The advertising data contents. If not present, the advertising data sent by this peer will
-    /// be empty.
-    5: le_advertisement AdvertisingData;
-
-    /// The scan response data contents. When present, the fake controller will generate scannable
-    /// advertising packets and scan response events.
-    6: le_scan_response AdvertisingData;
-
     /// Server end of channel bound to Peer protocol.
-    7: channel server_end:Peer;
+    3: channel server_end:Peer;
 };
 
 /// Contains Bluetooth controller & baseband parameters that are writable by the host but don't
@@ -202,8 +186,7 @@ type ControllerParameters = table {
     2: device_class bt.DeviceClass;
 };
 
-/// Represents the LE scan state. The fields are present if scan parameters have been
-/// configured.
+/// Represents the LE scan state. The fields are present if scan parameters have been configured.
 type LeScanState = table {
     /// True if a scan is enabled.
     1: enabled bool;
@@ -224,7 +207,7 @@ type LeScanState = table {
     6: address_type bt.AddressType;
 };
 
-/// LE legacy advertising types from Bluetooth Core Specification 5.1 Vol 2, Part E, Section 7.8.5.
+/// LE legacy advertising types from Bluetooth Core Specification v5.4, Vol 4, Part E, 7.8.5.
 type LegacyAdvertisingType = strict enum : uint8 {
     /// Connectable and scannable.
     ADV_IND = 0;
@@ -266,33 +249,57 @@ type LegacyAdvertisingState = table {
 };
 
 /// Protocol used to drive the state of a fake peer device.
-closed protocol Peer {
+open protocol Peer {
     /// Assign a HCI `status` for the controller to generate in response to connection requests.
     /// Applies to all successive HCI_Create_Connection and HCI_LE_Create_Connection commands. The
     /// procedure is acknowledged with an empty response.
-    strict AssignConnectionStatus(struct {
+    flexible AssignConnectionStatus(struct {
         status HciError;
     }) -> ();
 
     /// Emulates a LE connection event. Does nothing if the peer is already connected. The
     /// `role` parameter determines the link layer connection role.
-    strict EmulateLeConnectionComplete(struct {
+    flexible EmulateLeConnectionComplete(struct {
         role bt.ConnectionRole;
     });
 
     /// Emulate disconnection. Does nothing if the peer is not connected.
-    strict EmulateDisconnectionComplete();
+    flexible EmulateDisconnectionComplete();
 
-    /// Watch connection state changes using the
-    /// [hanging get pattern](https://fuchsia.dev/fuchsia-src/concepts/api/fidl#delay-responses-using-hanging-gets).
-    /// Notifies the most recent controller connection state if there has been a change since the
-    /// last time this method was called.
+    /// Returns a vector of the least to most recent controller connection states.
+    /// This method returns when there has been a state change since the last invocation of this
+    /// method by this client.
     ///
     /// Multiple calls to this method can be outstanding at a given time. All calls will resolve in
-    /// a response as soon as there is a change to the connection state.
-    strict WatchConnectionStates() -> (struct {
+    /// a response as soon as there is a change to the scan state.
+    // TODO(https://fxbug.dev/345262024): Update to single hanging get call
+    flexible WatchConnectionStates() -> (struct {
         states vector<ConnectionState>:MAX;
     });
+
+    /// Sets the device class reported in the inquiry response for this peer during device
+    /// discovery. If the peer is not BR/EDR, the server will close with the `ZX_ERR_NOT_SUPPORTED`
+    /// epitaph.
+    flexible SetDeviceClass(bt.DeviceClass) -> ();
+
+    /// Sets the peer's services that will be discoverable via Service Discovery Protocol. If the
+    /// peer is not BR/EDR, the server will close with the `ZX_ERR_NOT_SUPPORTED` epitaph.
+    flexible SetServiceDefinitions(struct {
+        service_definitions vector<bredr.ServiceDefinition>:MAX_PEER_SERVICES;
+    }) -> ();
+
+    flexible SetLeAdvertisement(table {
+        /// The LE address of the peer.
+        1: le_address bt.Address;
+
+        /// The advertising data contents. If not present, the advertising data sent by this peer
+        /// will be empty.
+        2: advertisement AdvertisingData;
+
+        /// The scan response data contents. When present, the fake controller will generate
+        /// scannable advertising packets and scan response events.
+        3: scan_response AdvertisingData;
+    }) -> () error EmulatorPeerError;
 };
 
 /// Protocol used to emulate a Bluetooth controller that supports the standard Bluetooth HCI.

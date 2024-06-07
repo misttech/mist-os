@@ -94,6 +94,7 @@ class FakePeer {
   // Returns true if this device is scannable. We use this to tell
   // FakeController whether or not it should send scan response PDUs.
   bool scannable() const { return scannable_; }
+  void set_scannable(bool scannable) { scannable_ = scannable; }
 
   bool connectable() const { return connectable_; }
 
@@ -126,6 +127,10 @@ class FakePeer {
   hci_spec::LESupportedFeatures le_features() const { return le_features_; }
   void set_le_features(hci_spec::LESupportedFeatures le_features) {
     le_features_ = le_features;
+  }
+
+  void set_le_advertising_address(DeviceAddress address) {
+    le_advertising_address_ = address;
   }
 
   // The response status that will be returned when this device receives a LE
@@ -254,6 +259,8 @@ class FakePeer {
   bool supports_ll_conn_update_procedure_;
 
   hci_spec::LESupportedFeatures le_features_;
+
+  std::optional<DeviceAddress> le_advertising_address_;
 
   DynamicByteBuffer advertising_data_;
   DynamicByteBuffer scan_response_;

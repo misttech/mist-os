@@ -6,6 +6,7 @@
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_FIDL_HELPERS_H_
 
 #include <fidl/fuchsia.bluetooth.bredr/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <fuchsia/bluetooth/gatt/cpp/fidl.h>
 #include <fuchsia/bluetooth/gatt2/cpp/fidl.h>
 #include <fuchsia/bluetooth/host/cpp/fidl.h>
@@ -266,6 +267,9 @@ bt::StaticPacket<pw::bluetooth::emboss::CodecIdWriter> CodecIdFromFidl(
 
 pw::bluetooth::emboss::LogicalTransportType LogicalTransportTypeFromFidl(
     const fuchsia::bluetooth::LogicalTransportType& fidl_transport_type);
+
+pw::bluetooth::emboss::StatusCode FidlHciErrorToStatusCode(
+    fuchsia_hardware_bluetooth::HciError code);
 
 }  // namespace bthost::fidl_helpers
 

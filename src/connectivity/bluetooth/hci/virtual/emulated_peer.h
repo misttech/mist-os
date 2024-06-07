@@ -58,6 +58,14 @@ class EmulatedPeer : public fidl::Server<fuchsia_hardware_bluetooth::Peer> {
   void EmulateDisconnectionComplete(
       EmulateDisconnectionCompleteCompleter::Sync& completer) override;
   void WatchConnectionStates(WatchConnectionStatesCompleter::Sync& completer) override;
+  void SetDeviceClass(SetDeviceClassRequest& request,
+                      SetDeviceClassCompleter::Sync& completer) override;
+  void SetServiceDefinitions(SetServiceDefinitionsRequest& request,
+                             SetServiceDefinitionsCompleter::Sync& completer) override;
+  void SetLeAdvertisement(SetLeAdvertisementRequest& request,
+                          SetLeAdvertisementCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Peer> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // Updates this peer with the current connection state which is used to notify its FIDL client
   // of state changes that it is observing.

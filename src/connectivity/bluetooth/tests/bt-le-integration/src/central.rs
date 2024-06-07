@@ -8,6 +8,7 @@ use {
         emulator::{add_le_peer, default_le_peer},
         low_energy_central::CentralHarness,
     },
+    fidl_fuchsia_hardware_bluetooth::{AdvertisingData, PeerSetLeAdvertisementRequest},
     fuchsia_async::{DurationExt, TimeoutExt},
     fuchsia_bluetooth::{
         constants::INTEGRATION_TIMEOUT,
@@ -65,8 +66,26 @@ async fn start_scan(central: &CentralHarness) -> Result<(), Error> {
 #[test_harness::run_singlethreaded_test]
 async fn test_enable_scan(central: CentralHarness) {
     let address = Address::Random([1, 0, 0, 0, 0, 0]);
-    let fut = add_le_peer(central.aux().as_ref(), default_le_peer(&address));
-    let _peer = fut.await.unwrap();
+    let fut = add_le_peer(central.aux().as_ref(), default_le_peer(&address), None);
+    let peer = fut.await.unwrap();
+    let request = PeerSetLeAdvertisementRequest {
+        le_address: Some(address.into()),
+        advertisement: Some(AdvertisingData {
+            data: Some(vec![
+                // Flags field set to "general discoverable"
+                0x02, 0x01, 0x02, // Complete local name set to "Fake"
+                0x05, 0x09, 'F' as u8, 'a' as u8, 'k' as u8, 'e' as u8,
+            ]),
+            __source_breaking: fidl::marker::SourceBreaking,
+        }),
+        scan_response: Some(AdvertisingData {
+            data: None,
+            __source_breaking: fidl::marker::SourceBreaking,
+        }),
+        __source_breaking: fidl::marker::SourceBreaking,
+    };
+    let _ = peer.set_le_advertisement(&request).await.unwrap();
+
     start_scan(&central).await.unwrap();
     let _ = central
         .when_satisfied(

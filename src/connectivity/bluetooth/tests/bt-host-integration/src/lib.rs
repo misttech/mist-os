@@ -32,11 +32,18 @@ use {
     std::sync::Arc,
 };
 
+static ADV_DATA: &'static [u8] = &[
+    // Flags field set to "general discoverable"
+    0x02, 0x01, 0x02, // Complete local name set to "Fake"
+    0x05, 0x09, 'F' as u8, 'a' as u8, 'k' as u8, 'e' as u8,
+];
+
 async fn wait_for_test_peer(
     harness: HostHarness,
     address: &Address,
 ) -> Result<(PeerId, PeerProxy), Error> {
-    let fut = add_le_peer(harness.aux().as_ref(), default_le_peer(&address));
+    let fut =
+        add_le_peer(harness.aux().as_ref(), default_le_peer(&address), Some(ADV_DATA.to_vec()));
     let proxy = fut.await.unwrap();
 
     // Start discovery and let bt-host process the fake LE peer.
@@ -187,7 +194,8 @@ async fn test_discovery(harness: HostHarness) {
         .unwrap();
 
     let address = Address::Random([1, 0, 0, 0, 0, 0]);
-    let fut = add_le_peer(harness.aux().as_ref(), default_le_peer(&address));
+    let fut =
+        add_le_peer(harness.aux().as_ref(), default_le_peer(&address), Some(ADV_DATA.to_vec()));
     let _peer = fut.await.unwrap();
 
     // The host should discover a fake peer.
@@ -243,10 +251,16 @@ async fn test_watch_peers(harness: HostHarness) {
     let le_peer_address = Address::Random([1, 0, 0, 0, 0, 0]);
     let bredr_peer_address = Address::Public([2, 0, 0, 0, 0, 0]);
 
-    let fut = add_le_peer(harness.aux().as_ref(), default_le_peer(&le_peer_address));
+    let fut = add_le_peer(
+        harness.aux().as_ref(),
+        default_le_peer(&le_peer_address),
+        Some(ADV_DATA.to_vec()),
+    );
     let _le_peer = fut.await.unwrap();
+
     let fut = add_bredr_peer(harness.aux().as_ref(), default_bredr_peer(&bredr_peer_address));
-    let _bredr_peer = fut.await.unwrap();
+    let bredr_peer = fut.await.unwrap();
+    let _ = bredr_peer.set_device_class(MAJOR_DEVICE_CLASS_TOY).await.unwrap();
 
     // At this stage the fake peers are registered with the emulator but bt-host does not know about
     // them yet. Check that `watch_fut` is still unsatisfied.
@@ -273,9 +287,11 @@ async fn test_watch_peers(harness: HostHarness) {
 async fn test_connect(harness: HostHarness) {
     let address1 = Address::Random([1, 0, 0, 0, 0, 0]);
     let address2 = Address::Random([2, 0, 0, 0, 0, 0]);
-    let fut = add_le_peer(harness.aux().as_ref(), default_le_peer(&address1));
+    let fut =
+        add_le_peer(harness.aux().as_ref(), default_le_peer(&address1), Some(ADV_DATA.to_vec()));
     let _peer1 = fut.await.unwrap();
-    let fut = add_le_peer(harness.aux().as_ref(), default_le_peer(&address2));
+    let fut =
+        add_le_peer(harness.aux().as_ref(), default_le_peer(&address2), Some(ADV_DATA.to_vec()));
     let peer2 = fut.await.unwrap();
 
     // Configure `peer2` to return an error for the connection attempt.

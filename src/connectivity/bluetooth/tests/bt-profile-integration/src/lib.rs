@@ -9,7 +9,7 @@ use {
         profile::ProfileHarness,
     },
     fidl::endpoints::create_request_stream,
-    fidl_fuchsia_bluetooth::{DeviceClass, ErrorCode, MAJOR_DEVICE_CLASS_MISCELLANEOUS},
+    fidl_fuchsia_bluetooth::{ErrorCode, MAJOR_DEVICE_CLASS_MISCELLANEOUS},
     fidl_fuchsia_bluetooth_bredr::{
         ConnectParameters, ConnectionReceiverRequestStream, DataElement, L2capParameters,
         ProfileAdvertiseRequest, ProfileDescriptor, ProfileSearchRequest, ProtocolDescriptor,
@@ -80,8 +80,6 @@ async fn create_bredr_peer(proxy: &EmulatorProxy, address: Address) -> Result<Pe
     let peer_params = PeerParameters {
         address: Some(address.into()),
         connectable: Some(true),
-        bredr_device_class: Some(DeviceClass { value: MAJOR_DEVICE_CLASS_MISCELLANEOUS + 0 }),
-        bredr_service_definition: Some(vec![a2dp_sink_service_definition()]),
         channel: Some(remote),
         ..Default::default()
     };
@@ -179,7 +177,9 @@ async fn test_add_search((access, profile): (AccessHarness, ProfileHarness)) {
     let peer_address = default_address();
     let profile_id = ServiceClassProfileIdentifier::AudioSink;
     let mut search_result = add_search(&profile, profile_id).await.expect("can register search");
-    let _test_peer = create_bredr_peer(&emulator, peer_address).await.unwrap();
+    let test_peer = create_bredr_peer(&emulator, peer_address).await.unwrap();
+    let _ = test_peer.set_device_class(MAJOR_DEVICE_CLASS_MISCELLANEOUS + 0).await.unwrap();
+    let _ = test_peer.set_service_definitions(&vec![a2dp_sink_service_definition()]).await.unwrap();
     let _discovery_result = start_discovery(&access).await.unwrap();
 
     let state = access

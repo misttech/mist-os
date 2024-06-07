@@ -86,8 +86,6 @@ async fn add_fake_peer(proxy: &EmulatorProxy, address: &Address) -> Result<PeerP
     let params = PeerParameters {
         address: Some(address.into()),
         connectable: Some(true),
-        le_advertisement: None,
-        le_scan_response: None,
         channel: Some(remote),
         ..Default::default()
     };

@@ -46,28 +46,13 @@ EmulatedPeer::Result EmulatedPeer::NewLowEnergy(
     return fpromise::error(fuchsia_hardware_bluetooth::EmulatorPeerError::kParametersInvalid);
   }
 
-  bt::BufferView adv, scan_response;
-  if (parameters.le_advertisement().has_value() &&
-      parameters.le_advertisement()->data().has_value()) {
-    adv = bt::BufferView(parameters.le_advertisement()->data().value());
-  }
-  if (parameters.le_scan_response().has_value() &&
-      parameters.le_scan_response()->data().has_value()) {
-    scan_response = bt::BufferView(parameters.le_scan_response()->data().value());
-  }
-
   auto address = LeAddressFromFidl(parameters.address().value());
   bool connectable = parameters.connectable().has_value() && parameters.connectable().value();
-  bool scannable = scan_response.size() != 0u;
 
   // TODO(armansito): We should consider splitting bt::testing::FakePeer into separate types for
   // BR/EDR and LE transport emulation logic.
   auto peer = std::make_unique<bt::testing::FakePeer>(address, fake_controller->pw_dispatcher(),
-                                                      connectable, scannable);
-  peer->set_advertising_data(adv);
-  if (scannable) {
-    peer->set_scan_response(scan_response);
-  }
+                                                      connectable);
 
   if (!fake_controller->AddPeer(std::move(peer))) {
     bt_log(ERROR, "virtual", "A fake LE peer with given address already exists: %s\n",
@@ -99,23 +84,6 @@ EmulatedPeer::Result EmulatedPeer::NewBredr(fuchsia_hardware_bluetooth::PeerPara
   auto peer = std::make_unique<bt::testing::FakePeer>(address, fake_controller->pw_dispatcher(),
                                                       connectable, false);
 
-  peer->set_class_of_device(bt::DeviceClass(bt::DeviceClass::MajorClass::kUnspecified));
-  if (parameters.bredr_device_class().has_value()) {
-    peer->set_class_of_device(bt::DeviceClass(parameters.bredr_device_class()->value()));
-  }
-  if (parameters.bredr_service_definition().has_value()) {
-    std::vector<bt::sdp::ServiceRecord> recs;
-    for (const auto& defn : parameters.bredr_service_definition().value()) {
-      auto rec = bthost::fidl_helpers::ServiceDefinitionToServiceRecord(defn);
-      if (rec.is_ok()) {
-        recs.emplace_back(std::move(rec.value()));
-      }
-    }
-    bt::l2cap::ChannelParameters params;
-    auto NopConnectCallback = [](auto /*channel*/, const bt::sdp::DataElement&) {};
-    peer->sdp_server()->server()->RegisterService(std::move(recs), params, NopConnectCallback);
-  }
-
   if (!fake_controller->AddPeer(std::move(peer))) {
     bt_log(ERROR, "virtual", "A fake BR/EDR peer with given address already exists: %s\n",
            address.ToString().c_str());
@@ -144,7 +112,7 @@ void EmulatedPeer::AssignConnectionStatus(AssignConnectionStatusRequest& request
 
   auto peer = fake_controller_->FindPeer(address_);
   if (peer) {
-    peer->set_connect_response(static_cast<pw::bluetooth::emboss::StatusCode>(request.status()));
+    peer->set_connect_response(bthost::fidl_helpers::FidlHciErrorToStatusCode(request.status()));
   }
 
   completer.Reply();
@@ -171,6 +139,98 @@ void EmulatedPeer::WatchConnectionStates(WatchConnectionStatesCompleter::Sync& c
     connection_states_completers_.emplace(completer.ToAsync());
   }
   MaybeUpdateConnectionStates();
+}
+
+void EmulatedPeer::SetDeviceClass(SetDeviceClassRequest& request,
+                                  SetDeviceClassCompleter::Sync& completer) {
+  auto peer = fake_controller_->FindPeer(address_);
+  if (!peer) {
+    bt_log(WARN, "virtual", "Peer with address %s not found", address_.ToString().c_str());
+    binding_.Close(ZX_ERR_NOT_SUPPORTED);
+    return;
+  }
+  if (!peer->supports_bredr()) {
+    bt_log(WARN, "virtual", "Expected fake BR/EDR peer");
+    binding_.Close(ZX_ERR_NOT_SUPPORTED);
+    return;
+  }
+
+  peer->set_class_of_device(bt::DeviceClass(request.value()));
+
+  completer.Reply();
+}
+
+void EmulatedPeer::SetServiceDefinitions(SetServiceDefinitionsRequest& request,
+                                         SetServiceDefinitionsCompleter::Sync& completer) {
+  auto peer = fake_controller_->FindPeer(address_);
+  if (!peer) {
+    bt_log(WARN, "virtual", "Peer with address %s not found", address_.ToString().c_str());
+    binding_.Close(ZX_ERR_NOT_SUPPORTED);
+    return;
+  }
+  if (!peer->supports_bredr()) {
+    bt_log(WARN, "virtual", "Expected fake BR/EDR peer");
+    binding_.Close(ZX_ERR_NOT_SUPPORTED);
+    return;
+  }
+
+  std::vector<bt::sdp::ServiceRecord> recs;
+  for (const auto& defn : request.service_definitions()) {
+    auto rec = bthost::fidl_helpers::ServiceDefinitionToServiceRecord(defn);
+    if (rec.is_ok()) {
+      recs.emplace_back(std::move(rec.value()));
+    }
+  }
+  bt::l2cap::ChannelParameters params;
+  auto NopConnectCallback = [](auto /*channel*/, const bt::sdp::DataElement&) {};
+  peer->sdp_server()->server()->RegisterService(std::move(recs), params, NopConnectCallback);
+
+  completer.Reply();
+}
+
+void EmulatedPeer::SetLeAdvertisement(SetLeAdvertisementRequest& request,
+                                      SetLeAdvertisementCompleter::Sync& completer) {
+  auto peer = fake_controller_->FindPeer(address_);
+  if (!peer) {
+    bt_log(WARN, "virtual", "Peer with address %s not found", address_.ToString().c_str());
+    completer.Reply(fit::error(fuchsia_hardware_bluetooth::EmulatorPeerError::kParametersInvalid));
+    return;
+  }
+  if (!peer->supports_le()) {
+    bt_log(WARN, "virtual", "Expected fake LE peer");
+    completer.Reply(fit::error(fuchsia_hardware_bluetooth::EmulatorPeerError::kParametersInvalid));
+    return;
+  }
+
+  if (request.le_address().has_value()) {
+    bt::DeviceAddress le_address = LeAddressFromFidl(request.le_address().value());
+    auto le_peer = fake_controller_->FindPeer(le_address);
+    if (le_peer != peer) {
+      bt_log(ERROR, "virtual", "A fake LE peer with given address already exists: %s\n",
+             le_address.ToString().c_str());
+      completer.Reply(fit::error(fuchsia_hardware_bluetooth::EmulatorPeerError::kAddressRepeated));
+      return;
+    }
+    peer->set_le_advertising_address(le_address);
+  }
+
+  if (request.advertisement().has_value() && request.advertisement().value().data().has_value()) {
+    peer->set_advertising_data(bt::BufferView(request.advertisement().value().data().value()));
+  }
+
+  if (request.scan_response().has_value() && request.scan_response().value().data().has_value()) {
+    bt::BufferView scan_rsp = bt::BufferView(request.scan_response().value().data().value());
+    peer->set_scannable(true);
+    peer->set_scan_response(scan_rsp);
+  }
+  completer.Reply(fit::success());
+}
+
+void EmulatedPeer::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Peer> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  bt_log(WARN, "virtual", "Unknown method in Peer request, closing with ZX_ERR_NOT_SUPPORTED");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 void EmulatedPeer::UpdateConnectionState(bool connected) {

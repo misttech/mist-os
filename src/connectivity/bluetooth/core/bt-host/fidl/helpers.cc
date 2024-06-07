@@ -6,6 +6,7 @@
 
 #include <endian.h>
 #include <fidl/fuchsia.bluetooth.bredr/cpp/natural_types.h>
+#include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <fuchsia/bluetooth/sys/cpp/fidl.h>
 #include <fuchsia/media/cpp/fidl.h>
 
@@ -33,6 +34,7 @@ namespace fgatt = fuchsia::bluetooth::gatt;
 namespace fgatt2 = fuchsia::bluetooth::gatt2;
 namespace fsys = fuchsia::bluetooth::sys;
 namespace faudio = fuchsia::hardware::audio;
+namespace fhbt = fuchsia_hardware_bluetooth;
 namespace android_emb = pw::bluetooth::vendor::android_hci;
 
 const uint8_t BIT_SHIFT_8 = 8;
@@ -2033,6 +2035,151 @@ pw::bluetooth::emboss::LogicalTransportType LogicalTransportTypeFromFidl(
   }
   BT_PANIC("Unrecognized value for logical transport type: %u",
            static_cast<unsigned>(fidl_transport_type));
+}
+
+pw::bluetooth::emboss::StatusCode FidlHciErrorToStatusCode(fhbt::HciError code) {
+  switch (code) {
+    case fuchsia_hardware_bluetooth::HciError::kSuccess:
+      return pw::bluetooth::emboss::StatusCode::SUCCESS;
+    case fuchsia_hardware_bluetooth::HciError::kUnknownCommand:
+      return pw::bluetooth::emboss::StatusCode::UNKNOWN_COMMAND;
+    case fuchsia_hardware_bluetooth::HciError::kUnknownConnectionId:
+      return pw::bluetooth::emboss::StatusCode::UNKNOWN_CONNECTION_ID;
+    case fuchsia_hardware_bluetooth::HciError::kHardwareFailure:
+      return pw::bluetooth::emboss::StatusCode::HARDWARE_FAILURE;
+    case fuchsia_hardware_bluetooth::HciError::kPageTimeout:
+      return pw::bluetooth::emboss::StatusCode::PAGE_TIMEOUT;
+    case fuchsia_hardware_bluetooth::HciError::kAuthenticationFailure:
+      return pw::bluetooth::emboss::StatusCode::AUTHENTICATION_FAILURE;
+    case fuchsia_hardware_bluetooth::HciError::kPinOrKeyMissing:
+      return pw::bluetooth::emboss::StatusCode::PIN_OR_KEY_MISSING;
+    case fuchsia_hardware_bluetooth::HciError::kMemoryCapacityExceeded:
+      return pw::bluetooth::emboss::StatusCode::MEMORY_CAPACITY_EXCEEDED;
+    case fuchsia_hardware_bluetooth::HciError::kConnectionTimeout:
+      return pw::bluetooth::emboss::StatusCode::CONNECTION_TIMEOUT;
+    case fuchsia_hardware_bluetooth::HciError::kConnectionLimitExceeded:
+      return pw::bluetooth::emboss::StatusCode::CONNECTION_LIMIT_EXCEEDED;
+    case fuchsia_hardware_bluetooth::HciError::kSynchronousConnectionLimitExceeded:
+      return pw::bluetooth::emboss::StatusCode::SYNCHRONOUS_CONNECTION_LIMIT_EXCEEDED;
+    case fuchsia_hardware_bluetooth::HciError::kConnectionAlreadyExists:
+      return pw::bluetooth::emboss::StatusCode::CONNECTION_ALREADY_EXISTS;
+    case fuchsia_hardware_bluetooth::HciError::kCommandDisallowed:
+      return pw::bluetooth::emboss::StatusCode::COMMAND_DISALLOWED;
+    case fuchsia_hardware_bluetooth::HciError::kConnectionRejectedLimitedResources:
+      return pw::bluetooth::emboss::StatusCode::CONNECTION_REJECTED_LIMITED_RESOURCES;
+    case fuchsia_hardware_bluetooth::HciError::kConnectionRejectedSecurity:
+      return pw::bluetooth::emboss::StatusCode::CONNECTION_REJECTED_SECURITY;
+    case fuchsia_hardware_bluetooth::HciError::kConnectionRejectedBadBdAddr:
+      return pw::bluetooth::emboss::StatusCode::CONNECTION_REJECTED_BAD_BD_ADDR;
+    case fuchsia_hardware_bluetooth::HciError::kConnectionAcceptTimeoutExceeded:
+      return pw::bluetooth::emboss::StatusCode::CONNECTION_ACCEPT_TIMEOUT_EXCEEDED;
+    case fuchsia_hardware_bluetooth::HciError::kUnsupportedFeatureOrParameter:
+      return pw::bluetooth::emboss::StatusCode::UNSUPPORTED_FEATURE_OR_PARAMETER;
+    case fuchsia_hardware_bluetooth::HciError::kInvalidHcicommandParameters:
+      return pw::bluetooth::emboss::StatusCode::INVALID_HCI_COMMAND_PARAMETERS;
+    case fuchsia_hardware_bluetooth::HciError::kRemoteUserTerminatedConnection:
+      return pw::bluetooth::emboss::StatusCode::REMOTE_USER_TERMINATED_CONNECTION;
+    case fuchsia_hardware_bluetooth::HciError::kRemoteDeviceTerminatedConnectionLowResources:
+      return pw::bluetooth::emboss::StatusCode::REMOTE_DEVICE_TERMINATED_CONNECTION_LOW_RESOURCES;
+    case fuchsia_hardware_bluetooth::HciError::kRemoteDeviceTerminatedConnectionPowerOff:
+      return pw::bluetooth::emboss::StatusCode::REMOTE_DEVICE_TERMINATED_CONNECTION_POWER_OFF;
+    case fuchsia_hardware_bluetooth::HciError::kConnectionTerminatedByLocalHost:
+      return pw::bluetooth::emboss::StatusCode::CONNECTION_TERMINATED_BY_LOCAL_HOST;
+    case fuchsia_hardware_bluetooth::HciError::kRepeatedAttempts:
+      return pw::bluetooth::emboss::StatusCode::REPEATED_ATTEMPTS;
+    case fuchsia_hardware_bluetooth::HciError::kPairingNotAllowed:
+      return pw::bluetooth::emboss::StatusCode::PAIRING_NOT_ALLOWED;
+    case fuchsia_hardware_bluetooth::HciError::kUnknownLmpPdu:
+      return pw::bluetooth::emboss::StatusCode::UNKNOWN_LMP_PDU;
+    case fuchsia_hardware_bluetooth::HciError::kUnsupportedRemoteFeature:
+      return pw::bluetooth::emboss::StatusCode::UNSUPPORTED_REMOTE_FEATURE;
+    case fuchsia_hardware_bluetooth::HciError::kScoOffsetRejected:
+      return pw::bluetooth::emboss::StatusCode::SCO_OFFSET_REJECTED;
+    case fuchsia_hardware_bluetooth::HciError::kScoIntervalRejected:
+      return pw::bluetooth::emboss::StatusCode::SCO_INTERVAL_REJECTED;
+    case fuchsia_hardware_bluetooth::HciError::kScoAirModeRejected:
+      return pw::bluetooth::emboss::StatusCode::SCO_AIRMODE_REJECTED;
+    case fuchsia_hardware_bluetooth::HciError::kInvalidLmpOrLlParameters:
+      return pw::bluetooth::emboss::StatusCode::INVALID_LMP_OR_LL_PARAMETERS;
+    case fuchsia_hardware_bluetooth::HciError::kUnspecifiedError:
+      return pw::bluetooth::emboss::StatusCode::UNSPECIFIED_ERROR;
+    case fuchsia_hardware_bluetooth::HciError::kUnsupportedLmpOrLlParameterValue:
+      return pw::bluetooth::emboss::StatusCode::UNSUPPORTED_LMP_OR_LL_PARAMETER_VALUE;
+    case fuchsia_hardware_bluetooth::HciError::kRoleChangeNotAllowed:
+      return pw::bluetooth::emboss::StatusCode::ROLE_CHANGE_NOT_ALLOWED;
+    case fuchsia_hardware_bluetooth::HciError::kLmpOrLlResponseTimeout:
+      return pw::bluetooth::emboss::StatusCode::LMP_OR_LL_RESPONSE_TIMEOUT;
+    case fuchsia_hardware_bluetooth::HciError::kLmpErrorTransactionCollision:
+      return pw::bluetooth::emboss::StatusCode::LMP_ERROR_TRANSACTION_COLLISION;
+    case fuchsia_hardware_bluetooth::HciError::kLmpPduNotAllowed:
+      return pw::bluetooth::emboss::StatusCode::LMP_PDU_NOT_ALLOWED;
+    case fuchsia_hardware_bluetooth::HciError::kEncryptionModeNotAcceptable:
+      return pw::bluetooth::emboss::StatusCode::ENCRYPTION_MODE_NOT_ACCEPTABLE;
+    case fuchsia_hardware_bluetooth::HciError::kLinkKeyCannotBeChanged:
+      return pw::bluetooth::emboss::StatusCode::LINK_KEY_CANNOT_BE_CHANGED;
+    case fuchsia_hardware_bluetooth::HciError::kRequestedQosNotSupported:
+      return pw::bluetooth::emboss::StatusCode::REQUESTED_QOS_NOT_SUPPORTED;
+    case fuchsia_hardware_bluetooth::HciError::kInstantPassed:
+      return pw::bluetooth::emboss::StatusCode::INSTANT_PASSED;
+    case fuchsia_hardware_bluetooth::HciError::kPairingWithUnitKeyNotSupported:
+      return pw::bluetooth::emboss::StatusCode::PAIRING_WITH_UNIT_KEY_NOT_SUPPORTED;
+    case fuchsia_hardware_bluetooth::HciError::kDifferentTransactionCollision:
+      return pw::bluetooth::emboss::StatusCode::DIFFERENT_TRANSACTION_COLLISION;
+    case fuchsia_hardware_bluetooth::HciError::kReserved0:
+      return pw::bluetooth::emboss::StatusCode::RESERVED_0;
+    case fuchsia_hardware_bluetooth::HciError::kQosUnacceptableParameter:
+      return pw::bluetooth::emboss::StatusCode::QOS_UNACCEPTABLE_PARAMETER;
+    case fuchsia_hardware_bluetooth::HciError::kQosRejected:
+      return pw::bluetooth::emboss::StatusCode::QOS_REJECTED;
+    case fuchsia_hardware_bluetooth::HciError::kChannelClassificationNotSupported:
+      return pw::bluetooth::emboss::StatusCode::CHANNEL_CLASSIFICATION_NOT_SUPPORTED;
+    case fuchsia_hardware_bluetooth::HciError::kInsufficientSecurity:
+      return pw::bluetooth::emboss::StatusCode::INSUFFICIENT_SECURITY;
+    case fuchsia_hardware_bluetooth::HciError::kParameterOutOfMandatoryRange:
+      return pw::bluetooth::emboss::StatusCode::PARAMETER_OUT_OF_MANDATORY_RANGE;
+    case fuchsia_hardware_bluetooth::HciError::kReserved1:
+      return pw::bluetooth::emboss::StatusCode::RESERVED_1;
+    case fuchsia_hardware_bluetooth::HciError::kRoleSwitchPending:
+      return pw::bluetooth::emboss::StatusCode::ROLE_SWITCH_PENDING;
+    case fuchsia_hardware_bluetooth::HciError::kReserved2:
+      return pw::bluetooth::emboss::StatusCode::RESERVED_2;
+    case fuchsia_hardware_bluetooth::HciError::kReservedSlotViolation:
+      return pw::bluetooth::emboss::StatusCode::RESERVED_SLOT_VIOLATION;
+    case fuchsia_hardware_bluetooth::HciError::kRoleSwitchFailed:
+      return pw::bluetooth::emboss::StatusCode::ROLE_SWITCH_FAILED;
+    case fuchsia_hardware_bluetooth::HciError::kExtendedInquiryResponseTooLarge:
+      return pw::bluetooth::emboss::StatusCode::EXTENDED_INQUIRY_RESPONSE_TOO_LARGE;
+    case fuchsia_hardware_bluetooth::HciError::kSecureSimplePairingNotSupportedByHost:
+      return pw::bluetooth::emboss::StatusCode::SECURE_SIMPLE_PAIRING_NOT_SUPPORTED_BY_HOST;
+    case fuchsia_hardware_bluetooth::HciError::kHostBusyPairing:
+      return pw::bluetooth::emboss::StatusCode::HOST_BUSY_PAIRING;
+    case fuchsia_hardware_bluetooth::HciError::kConnectionRejectedNoSuitableChannelFound:
+      return pw::bluetooth::emboss::StatusCode::CONNECTION_REJECTED_NO_SUITABLE_CHANNEL_FOUND;
+    case fuchsia_hardware_bluetooth::HciError::kControllerBusy:
+      return pw::bluetooth::emboss::StatusCode::CONTROLLER_BUSY;
+    case fuchsia_hardware_bluetooth::HciError::kUnacceptableConnectionParameters:
+      return pw::bluetooth::emboss::StatusCode::UNACCEPTABLE_CONNECTION_PARAMETERS;
+    case fuchsia_hardware_bluetooth::HciError::kDirectedAdvertisingTimeout:
+      return pw::bluetooth::emboss::StatusCode::DIRECTED_ADVERTISING_TIMEOUT;
+    case fuchsia_hardware_bluetooth::HciError::kConnectionTerminatedMicFailure:
+      return pw::bluetooth::emboss::StatusCode::CONNECTION_TERMINATED_MIC_FAILURE;
+    case fuchsia_hardware_bluetooth::HciError::kConnectionFailedToBeEstablished:
+      return pw::bluetooth::emboss::StatusCode::CONNECTION_FAILED_TO_BE_ESTABLISHED;
+    case fuchsia_hardware_bluetooth::HciError::kMacConnectionFailed:
+      return pw::bluetooth::emboss::StatusCode::MAC_CONNECTION_FAILED;
+    case fuchsia_hardware_bluetooth::HciError::kCoarseClockAdjustmentRejected:
+      return pw::bluetooth::emboss::StatusCode::COARSE_CLOCK_ADJUSTMENT_REJECTED;
+    case fuchsia_hardware_bluetooth::HciError::kType0SubmapNotDefined:
+      return pw::bluetooth::emboss::StatusCode::TYPE_0_SUBMAP_NOT_DEFINED;
+    case fuchsia_hardware_bluetooth::HciError::kUnknownAdvertisingIdentifier:
+      return pw::bluetooth::emboss::StatusCode::UNKNOWN_ADVERTISING_IDENTIFIER;
+    case fuchsia_hardware_bluetooth::HciError::kLimitReached:
+      return pw::bluetooth::emboss::StatusCode::LIMIT_REACHED;
+    case fuchsia_hardware_bluetooth::HciError::kOperationCancelledByHost:
+      return pw::bluetooth::emboss::StatusCode::OPERATION_CANCELLED_BY_HOST;
+    default:
+      return pw::bluetooth::emboss::StatusCode::UNKNOWN_COMMAND;
+  }
 }
 
 }  // namespace bthost::fidl_helpers

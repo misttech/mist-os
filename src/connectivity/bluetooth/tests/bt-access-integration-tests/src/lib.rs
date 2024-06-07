@@ -9,7 +9,8 @@ use {
         host_watcher::{activate_fake_host, HostWatcherHarness},
     },
     fidl_fuchsia_bluetooth_sys::ProcedureTokenProxy,
-    fidl_fuchsia_hardware_bluetooth::{AdvertisingData, PeerParameters, PeerProxy},
+    fidl_fuchsia_hardware_bluetooth::{AdvertisingData, PeerSetLeAdvertisementRequest},
+    fidl_fuchsia_hardware_bluetooth::{PeerParameters, PeerProxy},
     fuchsia_bluetooth::{
         constants::INTEGRATION_TIMEOUT,
         expectation::asynchronous::{ExpectableExt, ExpectableStateExt},
@@ -23,11 +24,6 @@ async fn create_le_peer(hci: &Emulator, address: Address) -> Result<PeerProxy, E
     let peer_params = PeerParameters {
         address: Some(address.into()),
         connectable: Some(true),
-        le_advertisement: Some(AdvertisingData {
-            data: Some(vec![0x02, 0x01, 0x02]), // Flags field set to "general discoverable"
-            __source_breaking: fidl::marker::SourceBreaking,
-        }),
-        le_scan_response: None,
         channel: Some(remote),
         ..Default::default()
     };
@@ -36,6 +32,23 @@ async fn create_le_peer(hci: &Emulator, address: Address) -> Result<PeerProxy, E
         .add_low_energy_peer(peer_params)
         .await?
         .map_err(|e| format_err!("Failed to register fake peer: {:#?}", e))?;
+
+    let request = PeerSetLeAdvertisementRequest {
+        le_address: Some(address.into()),
+        advertisement: Some(AdvertisingData {
+            data: Some(
+                vec![0x02, 0x01, 0x02], // Flags field set to "general discoverable"
+            ),
+            __source_breaking: fidl::marker::SourceBreaking,
+        }),
+        scan_response: Some(AdvertisingData {
+            data: None,
+            __source_breaking: fidl::marker::SourceBreaking,
+        }),
+        __source_breaking: fidl::marker::SourceBreaking,
+    };
+    let _ = peer.set_le_advertisement(&request).await.unwrap();
+
     Ok(peer)
 }
 
@@ -71,7 +84,6 @@ async fn test_watch_peers((access, host_watcher): (AccessHarness, HostWatcherHar
     let first_address = Address::Random([1, 0, 0, 0, 0, 0]);
     let second_address = Address::Public([2, 0, 0, 0, 0, 0]);
     let _first_peer = create_le_peer(&hci, first_address).await.unwrap();
-
     let _discovery_token = start_discovery(&access).await.unwrap();
 
     // We should be notified of the first peer
@@ -99,7 +111,6 @@ async fn test_disconnect((access, host_watcher): (AccessHarness, HostWatcherHarn
 
     let peer_address = Address::Random([6, 5, 0, 0, 0, 0]);
     let _peer = create_le_peer(&hci, peer_address).await.unwrap();
-
     let _discovery = start_discovery(&access).await.unwrap();
 
     let state = access

@@ -80,9 +80,10 @@
 ///     ```
 use {
     anyhow::{format_err, Error},
-    fidl_fuchsia_bluetooth::{DeviceClass, MAJOR_DEVICE_CLASS_TOY},
+    fidl_fuchsia_bluetooth::DeviceClass,
     fidl_fuchsia_hardware_bluetooth::{
         AdvertisingData, ConnectionState, EmulatorProxy, PeerParameters, PeerProxy,
+        PeerSetLeAdvertisementRequest,
     },
     fuchsia_bluetooth::{
         expectation::asynchronous::{ExpectableExt, ExpectableState},
@@ -127,46 +128,45 @@ impl Default for EmulatorState {
 }
 
 pub fn default_le_peer(addr: &Address) -> PeerParameters {
-    PeerParameters {
-        address: Some(addr.into()),
-        connectable: Some(true),
-        le_advertisement: Some(AdvertisingData {
-            data: Some(vec![
-                // Flags field set to "general discoverable"
-                0x02, 0x01, 0x02, // Complete local name set to "Fake"
-                0x05, 0x09, 'F' as u8, 'a' as u8, 'k' as u8, 'e' as u8,
-            ]),
-            __source_breaking: fidl::marker::SourceBreaking,
-        }),
-        le_scan_response: None,
-        ..Default::default()
-    }
+    PeerParameters { address: Some(addr.into()), connectable: Some(true), ..Default::default() }
 }
 
 /// An emulated BR/EDR peer using default parameters commonly used in tests. The peer is set up to
 /// be connectable and has the "toy" device class.
 pub fn default_bredr_peer(addr: &Address) -> PeerParameters {
-    PeerParameters {
-        address: Some(addr.into()),
-        connectable: Some(true),
-        bredr_device_class: Some(DeviceClass { value: MAJOR_DEVICE_CLASS_TOY }),
-        bredr_service_definition: None,
-        ..Default::default()
-    }
+    PeerParameters { address: Some(addr.into()), connectable: Some(true), ..Default::default() }
 }
 
 pub fn add_le_peer(
     proxy: &EmulatorProxy,
     mut parameters: PeerParameters,
+    adv_data: Option<Vec<u8>>,
 ) -> impl Future<Output = Result<PeerProxy, Error>> {
     match fidl::endpoints::create_proxy() {
         Ok((local, remote)) => {
+            let address = parameters.address.clone();
             parameters.channel = Some(remote);
             let fut = proxy.add_low_energy_peer(parameters);
-            Either::Right(async {
+            Either::Right(async move {
                 let _ = fut
                     .await?
                     .map_err(|e| format_err!("Failed to add emulated LE peer: {:?}", e))?;
+
+                if adv_data.is_some() {
+                    let request = PeerSetLeAdvertisementRequest {
+                        le_address: Some(address.unwrap().into()),
+                        advertisement: Some(AdvertisingData {
+                            data: Some(adv_data.unwrap()),
+                            __source_breaking: fidl::marker::SourceBreaking,
+                        }),
+                        scan_response: Some(AdvertisingData {
+                            data: None,
+                            __source_breaking: fidl::marker::SourceBreaking,
+                        }),
+                        __source_breaking: fidl::marker::SourceBreaking,
+                    };
+                    let _ = local.set_le_advertisement(&request).await.unwrap();
+                }
                 Ok(local)
             })
         }
