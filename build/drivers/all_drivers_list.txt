@@ -1,4 +1,3 @@
-//examples/drivers/demo-number:driver
 //examples/drivers/driver_test_realm/sample-driver:driver
 //examples/drivers/metadata:forwarder_driver
 //examples/drivers/metadata:retriever_driver

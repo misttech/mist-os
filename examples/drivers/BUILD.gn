@@ -6,7 +6,6 @@ group("drivers") {
   deps = [
     "bind/bindlib_codegen",
     "bind/fidl_bindlib_codegen",
-    "demo-number:component",
     "driver_test_realm/sample-driver",
     "metadata:drivers",
     "simple/dfv1:pkg",
@@ -20,7 +19,6 @@ group("drivers") {
 group("hermetic_tests") {
   testonly = true
   deps = [
-    "demo-number:hermetic_tests",
     "driver_test_realm:hermetic_tests",
     "simple/dfv2/tests:simple-driver-hermetic-test-pkg",
     "template:template-test",

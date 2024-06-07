@@ -53,7 +53,6 @@ hlcpp_visibility = [
   "//examples/diagnostics/workshop/*",
   "//examples/drivers/driver_test_realm/hermetic/cpp:*",
   "//examples/drivers/transport/tests:*",
-  "//examples/drivers/demo-number:*",
   "//examples/fidl/new/canvas/*",
   "//examples/intl/wisdom/*",
   "//sdk/lib/component/tests:*",
