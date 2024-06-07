@@ -29,7 +29,7 @@
 
 - name: 'Component Framework'
   api_primary: 'geb@google.com'
-  api_secondary: 'ypomortsev@google.com'
+  api_secondary: 'dgilhooley@google.com'
   description: |
     The set of APIs that are used to define components, interact with
     components, and integrate with the Component Framework. These are the low
@@ -251,7 +251,7 @@
     - fidl: 'fuchsia.mediacodec'
 
 - name: 'Metrics'
-  api_primary: ''
+  api_primary: 'frousseau@google.com'
   api_secondary: ''
   description: |
     The set of APIs that allow clients to log events that are associated with
