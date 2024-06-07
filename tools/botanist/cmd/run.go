@@ -679,11 +679,6 @@ func (r *RunCommand) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 		return subcommands.ExitUsageError
 	}
 
-	// TODO(https://fxbug.dev/338300717): Remove once -expects-ssh starts getting set.
-	if !r.netboot {
-		r.expectsSSH = true
-	}
-
 	// If the TestOutDirEnvKey was set, that means botanist is being run in an infra
 	// setting and thus needs an isolated environment.
 	testOutDir, needsIsolatedEnv := os.LookupEnv(testrunnerconstants.TestOutDirEnvKey)
