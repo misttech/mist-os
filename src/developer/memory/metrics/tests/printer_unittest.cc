@@ -11,9 +11,20 @@
 #include "src/developer/memory/metrics/tests/test_utils.h"
 #include "src/lib/fxl/strings/split_string.h"
 #include "third_party/rapidjson/include/rapidjson/document.h"
+#include "third_party/rapidjson/include/rapidjson/ostreamwrapper.h"
+#include "third_party/rapidjson/include/rapidjson/prettywriter.h"
 
-namespace memory {
-namespace test {
+namespace rapidjson {
+
+// Teach the testing framework to print json doc.
+void PrintTo(const rapidjson::Document& value, ::std::ostream* os) {
+  rapidjson::OStreamWrapper osw(*os);
+  rapidjson::PrettyWriter writer(osw);
+  value.Accept(writer);
+}
+}  // namespace rapidjson
+
+namespace memory::test {
 
 using PrinterUnitTest = testing::Test;
 
@@ -25,7 +36,7 @@ void ConfirmLines(std::ostringstream& oss, std::vector<std::string> expected_lin
     SCOPED_TRACE(li);
     std::string expected_line = expected_lines.at(li);
     std::string_view line = lines.at(li);
-    EXPECT_STREQ(expected_line.c_str(), line.data());
+    EXPECT_STREQ(expected_line.c_str(), std::string(line).c_str());
   }
 }
 
@@ -78,12 +89,68 @@ TEST_F(PrinterUnitTest, PrintCapture) {
                                        },
                                });
   std::ostringstream oss;
-  Printer p(oss);
-
-  p.PrintCapture(c);
+  Printer(oss).PrintCapture(c);
 
   rapidjson::Document doc;
   doc.Parse(oss.str().c_str());
+
+  rapidjson::Document expected;
+  expected.Parse(R"json(
+    {
+        "Time": 1234,
+        "Kernel": {
+            "total": 300,
+            "free": 100,
+            "wired": 10,
+            "total_heap": 20,
+            "free_heap": 30,
+            "vmo": 40,
+            "mmu": 50,
+            "ipc": 60,
+            "other": 70,
+            "vmo_pager_total": 15,
+            "vmo_pager_newest": 4,
+            "vmo_pager_oldest": 8,
+            "vmo_discardable_locked": 3,
+            "vmo_discardable_unlocked": 7,
+            "vmo_reclaim_disabled": 0
+        },
+        "Processes": [
+            [
+                "koid",
+                "name",
+                "vmos"
+            ],
+            [
+                100,
+                "p1",
+                [
+                    1
+                ]
+            ]
+        ],
+        "VmoNames": [
+            "v1"
+        ],
+        "Vmos": [
+            [
+                "koid",
+                "name",
+                "parent_koid",
+                "committed_bytes",
+                "allocated_bytes"
+            ],
+            [
+                1,
+                0,
+                100,
+                200,
+                300
+            ]
+        ]
+    }
+  )json");
+  EXPECT_EQ(doc, expected);
 
   ASSERT_TRUE(doc.IsObject());
 
@@ -664,5 +731,4 @@ TEST_F(PrinterUnitTest, FormatSize) {
   }
 }
 
-}  // namespace test
-}  // namespace memory
+}  // namespace memory::test

@@ -355,7 +355,7 @@ inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& buck
   // Expose raw values for downstream computation.
   {
     auto values = root.CreateChild("values");
-    const auto& stats = capture.kmem_extended();
+    const auto& stats = capture.kmem_extended().value();
     values.CreateUint("total_bytes", stats.total_bytes, &inspector);
     values.CreateUint("free_bytes", stats.free_bytes, &inspector);
     values.CreateUint("wired_bytes", stats.wired_bytes, &inspector);

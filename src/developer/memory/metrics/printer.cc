@@ -38,13 +38,15 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
       .AddMember("other", k.other_bytes, a);
 
   // Add additional kernel fields if kmem_extended is populated.
-  const auto& k_ext = capture.kmem_extended();
-  if (k_ext.total_bytes > 0) {
+  // `kmem()` and `kmem_extended()` consistency is guaranteed.
+  if (capture.kmem_extended()) {
+    const auto& k_ext = capture.kmem_extended().value();
     kernel.AddMember("vmo_pager_total", k_ext.vmo_pager_total_bytes, a)
         .AddMember("vmo_pager_newest", k_ext.vmo_pager_newest_bytes, a)
         .AddMember("vmo_pager_oldest", k_ext.vmo_pager_oldest_bytes, a)
         .AddMember("vmo_discardable_locked", k_ext.vmo_discardable_locked_bytes, a)
-        .AddMember("vmo_discardable_unlocked", k_ext.vmo_discardable_unlocked_bytes, a);
+        .AddMember("vmo_discardable_unlocked", k_ext.vmo_discardable_unlocked_bytes, a)
+        .AddMember("vmo_reclaim_disabled", k_ext.vmo_reclaim_disabled_bytes, a);
   }
 
   const auto& k_zram = capture.kmem_compression();

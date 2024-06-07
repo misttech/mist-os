@@ -141,7 +141,9 @@ class Capture {
 
   zx_time_t time() const { return time_; }
   const zx_info_kmem_stats_t& kmem() const { return kmem_; }
-  const zx_info_kmem_stats_extended_t& kmem_extended() const { return kmem_extended_; }
+  const std::optional<zx_info_kmem_stats_extended_t>& kmem_extended() const {
+    return kmem_extended_;
+  }
   const zx_info_kmem_stats_compression_t& kmem_compression() const { return kmem_compression_; }
 
   const std::unordered_map<zx_koid_t, Process>& koid_to_process() const { return koid_to_process_; }
@@ -162,7 +164,7 @@ class Capture {
 
   zx_time_t time_;
   zx_info_kmem_stats_t kmem_ = {};
-  zx_info_kmem_stats_extended_t kmem_extended_ = {};
+  std::optional<zx_info_kmem_stats_extended_t> kmem_extended_;
   zx_info_kmem_stats_compression_t kmem_compression_ = {};
   std::unordered_map<zx_koid_t, Process> koid_to_process_;
   std::unordered_map<zx_koid_t, Vmo> koid_to_vmo_;
