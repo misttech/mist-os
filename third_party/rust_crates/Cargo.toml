@@ -605,9 +605,6 @@ uses_fuchsia_license = true
 [gn.package.lock_api."0.4.11"]
 rustflags = ["--cfg=has_const_fn_trait_bound"]
 
-[gn.package.log."0.4.20"]
-group_visibility = { import = "//src/lib/diagnostics/log/log_visibility.gni", variable = "third_party_rust_crate_log_visibility" }
-
 # Loom has not gone through a thorough safety review yet, and needs to be
 # re-reviewed before it can be used outside of tests.
 [gn.package.loom."0.7.1"]

@@ -457,12 +457,8 @@ group("lock_api") {
   public_deps = [ ":lock_api-v0_4_11" ]
 }
 
-import("//src/lib/diagnostics/log/log_visibility.gni")
-
 group("log") {
   public_deps = [ ":log-v0_4_20" ]
-
-  visibility = third_party_rust_crate_log_visibility
 }
 
 if (!(current_os == "fuchsia")) {
