@@ -406,6 +406,7 @@ impl SecurityServer {
         policy
             .parsed
             .new_file_security_context(source_context, target_context, &file_class)
+            // TODO(http://b/334968228): check that transitions are allowed.
             .map(|sc| state.security_context_to_sid(sc))
             .map_err(anyhow::Error::from)
             .context("computing new file security context from policy")
