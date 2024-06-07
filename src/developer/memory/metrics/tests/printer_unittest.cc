@@ -151,58 +151,6 @@ TEST_F(PrinterUnitTest, PrintCapture) {
     }
   )json");
   EXPECT_EQ(doc, expected);
-
-  ASSERT_TRUE(doc.IsObject());
-
-  EXPECT_EQ(1234, doc["Time"].GetInt64());
-
-  auto kernel = doc["Kernel"].GetObject();
-  EXPECT_EQ(300U, kernel["total"].GetUint64());
-  EXPECT_EQ(100U, kernel["free"].GetUint64());
-  EXPECT_EQ(10U, kernel["wired"].GetUint64());
-  EXPECT_EQ(20U, kernel["total_heap"].GetUint64());
-  EXPECT_EQ(30U, kernel["free_heap"].GetUint64());
-  EXPECT_EQ(40U, kernel["vmo"].GetUint64());
-  EXPECT_EQ(50U, kernel["mmu"].GetUint64());
-  EXPECT_EQ(60U, kernel["ipc"].GetUint64());
-  EXPECT_EQ(70U, kernel["other"].GetUint64());
-  EXPECT_EQ(15U, kernel["vmo_pager_total"].GetUint64());
-  EXPECT_EQ(4U, kernel["vmo_pager_newest"].GetUint64());
-  EXPECT_EQ(8U, kernel["vmo_pager_oldest"].GetUint64());
-  EXPECT_EQ(3U, kernel["vmo_discardable_locked"].GetUint64());
-  EXPECT_EQ(7U, kernel["vmo_discardable_unlocked"].GetUint64());
-
-  auto processes = doc["Processes"].GetArray();
-  ASSERT_EQ(2U, processes.Size());
-  auto process_header = processes[0].GetArray();
-  EXPECT_STREQ("koid", process_header[0].GetString());
-  EXPECT_STREQ("name", process_header[1].GetString());
-  EXPECT_STREQ("vmos", process_header[2].GetString());
-  auto process = processes[1].GetArray();
-  EXPECT_EQ(100U, process[0].GetUint64());
-  EXPECT_STREQ("p1", process[1].GetString());
-  auto process_vmos = process[2].GetArray();
-  ASSERT_EQ(1U, process_vmos.Size());
-  EXPECT_EQ(1, process_vmos[0]);
-
-  auto vmo_names = doc["VmoNames"].GetArray();
-  ASSERT_EQ(1U, vmo_names.Size());
-  EXPECT_STREQ("v1", vmo_names[0].GetString());
-
-  auto vmos = doc["Vmos"].GetArray();
-  ASSERT_EQ(2U, vmos.Size());
-  auto vmo_header = vmos[0].GetArray();
-  EXPECT_STREQ("koid", vmo_header[0].GetString());
-  EXPECT_STREQ("name", vmo_header[1].GetString());
-  EXPECT_STREQ("parent_koid", vmo_header[2].GetString());
-  EXPECT_STREQ("committed_bytes", vmo_header[3].GetString());
-  EXPECT_STREQ("allocated_bytes", vmo_header[4].GetString());
-  auto vmo = vmos[1].GetArray();
-  EXPECT_EQ(1U, vmo[0].GetUint64());
-  EXPECT_EQ(0U, vmo[1].GetUint64());
-  EXPECT_EQ(100U, vmo[2].GetUint64());
-  EXPECT_EQ(200U, vmo[3].GetUint64());
-  EXPECT_EQ(300U, vmo[4].GetUint64());
 }
 
 TEST_F(PrinterUnitTest, PrintCaptureAndBucketConfig) {
