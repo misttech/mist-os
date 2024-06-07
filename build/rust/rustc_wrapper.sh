@@ -44,7 +44,7 @@ for opt do
   esac
   shift
 done
-test -z "$prev_out" || { echo "Option is missing argument to set $prev_opt." ; exit 1;}
+test -z "$prev_opt" || { echo "Option is missing argument to set $prev_opt." ; exit 1;}
 
 ice_err="internal compiler error"
 ice_msg="\n\n\e[1;3;41mIt looks like you've encountered an INTERNAL COMPILER\n"
@@ -54,10 +54,9 @@ ice_msg+="args.gn, try running 'rm out/default/foo' and re-running the build.\n"
 ice_msg+="If after clearing your incremental dir you still get an ICE, file\n"
 ice_msg+="a bug against Language Platforms > Rust.\e[m\n"
 
-if [[ $duration == 0 ]]; then
-  command=("$@")
-else
-  command=(timeout "${duration}s" env "$@")
+command=(env "$@")
+if [[ $duration != 0 ]]; then
+  command=(timeout "${duration}s" "${command[@]}")
 fi
 
 if [[ $check_ice == 1 ]]; then
