@@ -1587,3 +1587,25 @@ fn watch_addition_with_two_scopes() {
         }
     });
 }
+
+#[test]
+fn watch_remove_all_entries() {
+    let root = pseudo_directory! {
+        "file1" => file::read_only(""),
+        "file2" => file::read_only(""),
+    };
+
+    run_server_client(fio::OpenFlags::RIGHT_READABLE, root.clone(), |proxy| async move {
+        let watcher = assert_watch!(proxy, fio::WatchMask::REMOVED);
+        root.remove_all_entries();
+
+        assert_watcher_one_message_watched_events!(
+            watcher,
+            { REMOVED, "file1" },
+            { REMOVED, "file2"}
+        );
+
+        drop(watcher);
+        assert_close!(proxy);
+    });
+}

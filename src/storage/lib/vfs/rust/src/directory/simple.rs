@@ -166,15 +166,16 @@ impl Simple {
         }
     }
 
-    /// Filters and maps all directory entries.  It is similar to std::iter::Iterator::filter_map
-    /// except that it always return a Vec rather than an iterator.
-    pub fn filter_map<B>(&self, f: impl Fn(&str, &Arc<dyn DirectoryEntry>) -> Option<B>) -> Vec<B> {
-        self.inner.lock().unwrap().entries.iter().filter_map(|(k, v)| f(k, v)).collect()
-    }
-
-    /// Returns true if any entry matches the given predicate.
-    pub fn any(&self, f: impl Fn(&str, &Arc<dyn DirectoryEntry>) -> bool) -> bool {
-        self.inner.lock().unwrap().entries.iter().any(|(k, v)| f(k, v))
+    /// Removes all entries from the directory.
+    pub fn remove_all_entries(&self) {
+        let mut inner = self.inner.lock().unwrap();
+        if !inner.entries.is_empty() {
+            let names = std::mem::take(&mut inner.entries)
+                .into_keys()
+                .map(String::from)
+                .collect::<Vec<String>>();
+            inner.watchers.send_event(&mut StaticVecEventProducer::removed(names));
+        }
     }
 }
 
@@ -529,5 +530,19 @@ mod tests {
 
             assert_eq!(expectation, path_mutex.lock().unwrap().take());
         }
+    }
+
+    #[test]
+    fn remove_all_entries() {
+        let dir = Simple::new();
+
+        dir.add_entry("file", file::read_only(""))
+            .expect("add entry with valid filename should succeed");
+
+        dir.remove_all_entries();
+        assert_eq!(
+            dir.get_entry("file").err().expect("file should no longer exist"),
+            Status::NOT_FOUND
+        );
     }
 }

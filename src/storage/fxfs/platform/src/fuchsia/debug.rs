@@ -271,9 +271,7 @@ impl ObjectStoreDirectory {
         } else {
             return Ok(());
         };
-        for layer in layers_dir.filter_map(|name, _| Some(name.to_string())) {
-            layers_dir.remove_entry(layer, false)?;
-        }
+        layers_dir.remove_all_entries();
         let mut idx = 0;
         let layers = store
             .tree()
