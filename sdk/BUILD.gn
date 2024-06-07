@@ -24,8 +24,8 @@ visibility = [ ":*" ]
 
 # Log a message if a non-default set of API levels or CPU architecture will be
 # built as this reduces the compatibility coverage of the build and should not
-# happen in infra. Ensure the messages are only logged once.
-if (!is_host) {
+# happen in infra. Ensure the messages are only logged once per build.
+if (current_toolchain == default_toolchain) {
   if (override_build_time_supported_api_levels != false) {
     print(
         "IDK build supported API levels is overridden: ${platform_version.build_time_supported_api_levels}. Compatibility with other levels cannot be checked.")
