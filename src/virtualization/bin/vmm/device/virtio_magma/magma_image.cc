@@ -463,15 +463,6 @@ zx_status_t VulkanImageCreator::GetImageInfo(uint32_t width, uint32_t height, zx
                                              magma_image_info_t* image_info_out) {
   auto wait_result = collection_.sync()->WaitForAllBuffersAllocated();
 
-  // Process any channel closures to detect any allocation errors
-  async_handler_->loop().RunUntilIdle();
-
-  auto unbind_info = async_handler_->unbind_info();
-  if (unbind_info && unbind_info->status() != ZX_OK) {
-    LOG_VERBOSE("Unbind: %s", unbind_info->FormatDescription().c_str());
-    return unbind_info->status();
-  }
-
   const fidl::Status call_result = collection_->Release();
   if (!call_result.ok()) {
     LOG_VERBOSE("Close: %s", call_result.FormatDescription().c_str());
@@ -825,9 +816,9 @@ magma_status_t CreateDrmImage(uint32_t physical_device_index,
                                       image_info_out);
   if (status != ZX_OK) {
     LOG_VERBOSE("GetImageInfo failed: %d", status);
-    if (status == ZX_ERR_NOT_SUPPORTED)
-      return MAGMA_STATUS_INVALID_ARGS;
-
+    // This error status is intentionally vague due to the number of different potential causes for
+    // a failure allocating buffers, including causes involving other clients causing the
+    // BufferCollection to fail async.
     return MAGMA_STATUS_INTERNAL_ERROR;
   }
 
