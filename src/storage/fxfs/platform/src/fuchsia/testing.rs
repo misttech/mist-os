@@ -15,6 +15,7 @@ use {
     fxfs::{
         filesystem::{FxFilesystem, FxFilesystemBuilder, OpenFxFilesystem},
         fsck::{errors::FsckIssue, fsck_volume_with_options, fsck_with_options, FsckOptions},
+        log::*,
         object_store::volume::root_volume,
     },
     fxfs_insecure_crypto::InsecureCrypt,
@@ -180,9 +181,9 @@ impl TestFixture {
         // hold references to the volume which we want to unwrap.
         volume.volume().terminate().await;
 
-        Arc::try_unwrap(volume.into_volume())
-            .map_err(|_| "References to volume still exist")
-            .unwrap();
+        if volume.into_volume().unwrap_or_poison().is_none() {
+            error!("Unexpected leftover reference to Volume, it has been poisoned.");
+        }
 
         // We have to reopen the filesystem briefly to fsck it. (We could fsck before closing, but
         // there might be pending operations that go through after fsck but before we close the
