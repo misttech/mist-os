@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::{collections::HashMap, pin::pin};
+
 use assert_matches::assert_matches;
 use async_trait::async_trait;
 use fidl_fuchsia_hardware_network as fhardware_network;
@@ -14,7 +16,12 @@ use fuchsia_zircon as zx;
 use futures::{SinkExt as _, StreamExt as _};
 use net_declare::fidl_mac;
 use net_types::{ip::Ip as _, Witness as _};
-use std::{collections::HashMap, pin::pin};
+
+const PERF_TEST_MODE_ITERATIONS: usize = 10;
+const PERF_TEST_MODE_INTERFACES: usize = 10;
+
+const UNIT_TEST_MODE_ITERATIONS: usize = 2;
+const UNIT_TEST_MODE_INTERFACES: usize = 1;
 
 pub struct Interfaces;
 
@@ -22,7 +29,7 @@ pub struct Interfaces;
 impl crate::Workload for Interfaces {
     const NAME: &'static str = "Interfaces";
 
-    async fn run(netstack: &netemul::TestRealm<'_>) {
+    async fn run(netstack: &netemul::TestRealm<'_>, perftest_mode: bool) {
         let interfaces_state = netstack
             .connect_to_protocol::<fnet_interfaces::StateMarker>()
             .expect("connect to protocol");
@@ -42,10 +49,12 @@ impl crate::Workload for Interfaces {
             .await
             .expect("collect existing interfaces");
 
-            const NUM_INTERFACES: usize = 10;
-            let (tx, rx) = futures::channel::mpsc::channel(NUM_INTERFACES);
-            futures::stream::iter(0..NUM_INTERFACES)
-                .for_each_concurrent(None, |_| {
+            let num_interfaces =
+                if perftest_mode { PERF_TEST_MODE_INTERFACES } else { UNIT_TEST_MODE_INTERFACES };
+            let (tx, rx) = futures::channel::mpsc::channel(num_interfaces);
+            futures::stream::repeat(())
+                .take(num_interfaces)
+                .for_each_concurrent(None, |()| {
                     let interfaces_state = &interfaces_state;
                     let mut tx = tx.clone();
                     async move {
@@ -56,7 +65,7 @@ impl crate::Workload for Interfaces {
                 .await;
             drop(tx);
             fnet_interfaces_ext::wait_interface(stream.by_ref(), &mut if_state, |interfaces| {
-                (interfaces.len() == NUM_INTERFACES + 1).then_some(())
+                (interfaces.len() == num_interfaces + 1).then_some(())
             })
             .await
             .expect("observe interface creation");
@@ -64,7 +73,9 @@ impl crate::Workload for Interfaces {
         };
 
         interfaces
-            .for_each_concurrent(None, |interface| stress_interface(interface, &interfaces_state))
+            .for_each_concurrent(None, |interface| {
+                stress_interface(interface, &interfaces_state, perftest_mode)
+            })
             .await;
 
         // Wait for the interfaces we installed to be removed.
@@ -141,7 +152,11 @@ async fn install_interface(
     }
 }
 
-async fn stress_interface(interface: Interface, interfaces_state: &fnet_interfaces::StateProxy) {
+async fn stress_interface(
+    interface: Interface,
+    interfaces_state: &fnet_interfaces::StateProxy,
+    perftest_mode: bool,
+) {
     let Interface { id, addr, control, tun_device, .. } = interface;
     let stream = fnet_interfaces_ext::event_stream_from_state(
         &interfaces_state,
@@ -153,8 +168,9 @@ async fn stress_interface(interface: Interface, interfaces_state: &fnet_interfac
 
     // Repeatedly toggle interface up/down and send traffic through it
     // simulating incoming neighbor solicitations.
-    const ITERATIONS: u8 = 10;
-    for i in 0..ITERATIONS {
+    let iterations =
+        if perftest_mode { PERF_TEST_MODE_ITERATIONS } else { UNIT_TEST_MODE_ITERATIONS };
+    for i in 0..iterations {
         fuchsia_async::Timer::new(zx::Duration::from_millis(50)).await;
 
         assert!(control.disable().await.expect("call disable").expect("disable interface"));
@@ -181,7 +197,7 @@ async fn stress_interface(interface: Interface, interfaces_state: &fnet_interfac
             *last = !*last;
             net_types::ip::Ipv6Addr::from_bytes(bytes)
         };
-        let src_mac = net_types::ethernet::Mac::new([0, 0, 0, 0, 0, i]);
+        let src_mac = net_types::ethernet::Mac::new([0, 0, 0, 0, 0, u8::try_from(i).unwrap()]);
 
         // Simulate an incoming Neighbor Solicitation.
         let frame = serialize_neighbor_solictation(src_ip, src_mac);

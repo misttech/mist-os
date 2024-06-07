@@ -10,8 +10,12 @@ use std::net::SocketAddr;
 
 const UNSPECIFIED: std::net::SocketAddr =
     std::net::SocketAddr::new(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED), 0);
-const NUM_SOCKET_PAIRS: usize = 100;
-const NUM_ITERATIONS: usize = 100;
+
+const PERF_TEST_MODE_SOCKET_PAIRS: usize = 100;
+const PERF_TEST_MODE_ITERATIONS: usize = 100;
+
+const UNIT_TEST_MODE_SOCKET_PAIRS: usize = 2;
+const UNIT_TEST_MODE_ITERATIONS: usize = 1;
 
 pub struct TcpSockets;
 
@@ -19,9 +23,12 @@ pub struct TcpSockets;
 impl crate::Workload for TcpSockets {
     const NAME: &'static str = "Sockets/TCP";
 
-    async fn run(netstack: &netemul::TestRealm<'_>) {
-        futures::stream::iter(0..NUM_SOCKET_PAIRS)
-            .for_each_concurrent(None, |_: usize| async {
+    async fn run(netstack: &netemul::TestRealm<'_>, perftest_mode: bool) {
+        let pairs =
+            if perftest_mode { PERF_TEST_MODE_SOCKET_PAIRS } else { UNIT_TEST_MODE_SOCKET_PAIRS };
+        futures::stream::repeat(())
+            .take(pairs)
+            .for_each_concurrent(None, |()| async {
                 let listener =
                     TcpListener::listen_in_realm(netstack, UNSPECIFIED).await.expect("bind");
                 let mut connected = fuchsia_async::net::TcpStream::connect_in_realm(
@@ -33,7 +40,12 @@ impl crate::Workload for TcpSockets {
                 let (_, mut connection, _): (TcpListener, _, SocketAddr) =
                     listener.accept().await.expect("accept connection");
 
-                for _ in 0..NUM_ITERATIONS {
+                let iterations = if perftest_mode {
+                    PERF_TEST_MODE_ITERATIONS
+                } else {
+                    UNIT_TEST_MODE_ITERATIONS
+                };
+                for _ in 0..iterations {
                     const MSG_SIZE: usize = 100_000;
                     const DATA: [u8; MSG_SIZE] = [0xff; MSG_SIZE];
                     connected.write_all(&DATA).await.expect("write");
@@ -51,14 +63,22 @@ pub struct UdpSockets;
 impl crate::Workload for UdpSockets {
     const NAME: &'static str = "Sockets/UDP";
 
-    async fn run(netstack: &netemul::TestRealm<'_>) {
-        futures::stream::iter(0..NUM_SOCKET_PAIRS)
-            .for_each_concurrent(None, |_: usize| async {
+    async fn run(netstack: &netemul::TestRealm<'_>, perftest_mode: bool) {
+        let pairs =
+            if perftest_mode { PERF_TEST_MODE_SOCKET_PAIRS } else { UNIT_TEST_MODE_SOCKET_PAIRS };
+        futures::stream::repeat(())
+            .take(pairs)
+            .for_each_concurrent(None, |()| async {
                 let client = UdpSocket::bind_in_realm(netstack, UNSPECIFIED).await.expect("bind");
                 let server = UdpSocket::bind_in_realm(netstack, UNSPECIFIED).await.expect("bind");
                 let server_addr = server.local_addr().expect("get local addr");
 
-                for _ in 0..NUM_ITERATIONS {
+                let iterations = if perftest_mode {
+                    PERF_TEST_MODE_ITERATIONS
+                } else {
+                    UNIT_TEST_MODE_ITERATIONS
+                };
+                for _ in 0..iterations {
                     const MSG_SIZE: usize = 60_000;
                     const DATA: [u8; MSG_SIZE] = [0xff; MSG_SIZE];
                     assert_eq!(

@@ -28,43 +28,50 @@ struct Args {
 
     /// whether to run in perftest mode instead of unit test mode
     #[argh(switch, short = 'p')]
-    perftest: bool,
+    perftest_mode: bool,
 
     /// path to which the fuchsiaperf.json results will be written to.
     #[argh(positional, default = "String::from(\"/custom_artifacts/results.fuchsiaperf.json\")")]
     output_path: String,
 }
 
+const UNIT_TEST_MODE_RUNS: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(1));
+const PERF_TEST_MODE_RUNS: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(5));
+
 #[fuchsia::main]
 async fn main() {
-    let Args { netstack3, perftest, output_path } = argh::from_env();
+    let Args { netstack3, perftest_mode, output_path } = argh::from_env();
 
     const BENCHMARK_NAME: &str = "fuchsia.netstack.resource_usage";
-    let num_runs = if perftest {
-        const_unwrap_option(NonZeroUsize::new(5))
-    } else {
-        const_unwrap_option(NonZeroUsize::new(1))
-    };
     let metrics = if netstack3 {
         let benchmark_name = format!("{BENCHMARK_NAME}.netstack3");
         [
-            run_benchmark::<sockets::UdpSockets, ProdNetstack3>(&benchmark_name, num_runs).await,
-            run_benchmark::<sockets::TcpSockets, ProdNetstack3>(&benchmark_name, num_runs).await,
-            run_benchmark::<interfaces::Interfaces, ProdNetstack3>(&benchmark_name, num_runs).await,
+            run_benchmark::<sockets::UdpSockets, ProdNetstack3>(&benchmark_name, perftest_mode)
+                .await,
+            run_benchmark::<sockets::TcpSockets, ProdNetstack3>(&benchmark_name, perftest_mode)
+                .await,
+            run_benchmark::<interfaces::Interfaces, ProdNetstack3>(&benchmark_name, perftest_mode)
+                .await,
         ]
     } else {
         [
-            run_benchmark::<sockets::UdpSockets, ProdNetstack2>(BENCHMARK_NAME, num_runs).await,
-            run_benchmark::<sockets::TcpSockets, ProdNetstack2>(BENCHMARK_NAME, num_runs).await,
-            run_benchmark::<interfaces::Interfaces, ProdNetstack2>(BENCHMARK_NAME, num_runs).await,
+            run_benchmark::<sockets::UdpSockets, ProdNetstack2>(BENCHMARK_NAME, perftest_mode)
+                .await,
+            run_benchmark::<sockets::TcpSockets, ProdNetstack2>(BENCHMARK_NAME, perftest_mode)
+                .await,
+            run_benchmark::<interfaces::Interfaces, ProdNetstack2>(BENCHMARK_NAME, perftest_mode)
+                .await,
         ]
     }
     .into_iter()
     .flatten()
     .collect::<Vec<_>>();
 
-    let metrics_json = serde_json::to_string_pretty(&metrics).expect("serialize metrics as JSON");
-    std::fs::write(output_path, metrics_json).expect("write metrics as custom artifact");
+    if perftest_mode {
+        let metrics_json =
+            serde_json::to_string_pretty(&metrics).expect("serialize metrics as JSON");
+        std::fs::write(output_path, metrics_json).expect("write metrics as custom artifact");
+    }
 }
 
 #[async_trait(?Send)]
@@ -73,12 +80,12 @@ trait Workload {
 
     /// Run a self-contained, repeatable workload against the provided hermetic
     /// netstack.
-    async fn run(netstack: &netemul::TestRealm<'_>);
+    async fn run(netstack: &netemul::TestRealm<'_>, perftest_mode: bool);
 }
 
 async fn run_benchmark<W: Workload, N: Netstack>(
     suite_name: &str,
-    runs: std::num::NonZeroUsize,
+    perftest_mode: bool,
 ) -> Vec<fuchsiaperf::FuchsiaPerfBenchmarkResult> {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let netstack = sandbox
@@ -129,10 +136,11 @@ async fn run_benchmark<W: Workload, N: Netstack>(
     let measure_peak = fuchsia_async::Task::spawn(measure_peak_usage(rx, process_clone));
     let start_time = std::time::Instant::now();
 
-    W::run(&netstack).await;
+    W::run(&netstack, perftest_mode).await;
     let initial_increase = ResourceUsage::record(&process) - &baseline;
-    for _ in 0..runs.get() - 1 {
-        W::run(&netstack).await;
+    let runs = if perftest_mode { PERF_TEST_MODE_RUNS.get() } else { UNIT_TEST_MODE_RUNS.get() };
+    for _ in 0..runs - 1 {
+        W::run(&netstack, perftest_mode).await;
     }
 
     let runtime = start_time.elapsed();
@@ -150,7 +158,7 @@ async fn run_benchmark<W: Workload, N: Netstack>(
     let increase = ResourceUsage::record(&process) - &baseline;
 
     eprintln!("================== workload: {} ==================\n", W::NAME);
-    eprintln!("Running workload {} times took {:?}\n", runs.get(), runtime);
+    eprintln!("Running workload {runs} times took {runtime:?}\n");
     eprintln!("Baseline resource usage:\n{baseline}");
     eprintln!("Peak resource usage:\n{peak}");
     eprintln!("Increase in resource usage from baseline:\n{increase}");
