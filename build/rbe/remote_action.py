@@ -76,6 +76,8 @@ _RETRIABLE_REWRAPPER_STATUSES = {
     _RBE_KILLED_STATUS,
 }
 
+_MAX_CONCURRENT_DOWNLOADS = 4
+
 
 def init_from_main_once() -> int:
     # Support parallel downloads using forkserver method.
@@ -2288,7 +2290,7 @@ def download_input_stub_paths_batch(
 
     if parallel:
         try:
-            with multiprocessing.Pool() as pool:
+            with multiprocessing.Pool(_MAX_CONCURRENT_DOWNLOADS) as pool:
                 statuses = pool.map(_download_input_for_mp, download_args)
         except OSError as e:  # in case /dev/shm is not writeable (required)
             if (e.errno == errno.EPERM and e.filename == "/dev/shm") or (
@@ -2325,7 +2327,7 @@ def download_output_stub_infos_batch(
 
     if parallel:
         try:
-            with multiprocessing.Pool() as pool:
+            with multiprocessing.Pool(_MAX_CONCURRENT_DOWNLOADS) as pool:
                 statuses = pool.map(_download_output_for_mp, download_args)
         except OSError as e:  # in case /dev/shm is not writeable (required)
             if (e.errno == errno.EPERM and e.filename == "/dev/shm") or (
