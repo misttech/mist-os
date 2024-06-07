@@ -18,7 +18,9 @@ class PowerMetricsTest(unittest.TestCase):
     """Power metrics tests."""
 
     def construct_trace_model(
-        self, loadgen_tids: Iterable[int]
+        self,
+        loadgen_tids: Iterable[int],
+        power_events_stop_at: trace_time.TimePoint | None = None,
     ) -> trace_model.Model:
         """Builds a fake trace model.
 
@@ -42,6 +44,45 @@ class PowerMetricsTest(unittest.TestCase):
             "tid": 0x8C01_1EC7_EDDA_7A20,
         }
 
+        power_events: list[trace_model.Event] = list(
+            filter(
+                lambda e: (
+                    power_events_stop_at is None
+                    or e.start < power_events_stop_at
+                ),
+                [
+                    trace_model.CounterEvent.from_dict(
+                        {  # during sync signal
+                            **event_template,
+                            "ts": 500000,  # microseconds
+                            "args": {"Voltage": 12, "Current": 1000},
+                        }
+                    ),
+                    trace_model.CounterEvent.from_dict(
+                        {  # during sync signal
+                            **event_template,
+                            "ts": 750000,  # microseconds
+                            "args": {"Voltage": 12, "Current": 2000},
+                        }
+                    ),
+                    trace_model.CounterEvent.from_dict(
+                        {
+                            **event_template,
+                            "ts": 1000000,  # microseconds
+                            "args": {"Voltage": 12, "Current": 100},
+                        }
+                    ),
+                    trace_model.CounterEvent.from_dict(
+                        {
+                            **event_template,
+                            "ts": 1250000,  # microseconds
+                            "args": {"Voltage": 12, "Current": 600},
+                        }
+                    ),
+                ],
+            )
+        )
+
         fake_power_process = trace_model.Process(
             0x8C01_1EC7_EDDA_7A10,
             "PowerData",
@@ -49,36 +90,7 @@ class PowerMetricsTest(unittest.TestCase):
                 trace_model.Thread(
                     0x8C01_1EC7_EDDA_7A20,
                     "Fake",
-                    [
-                        trace_model.CounterEvent.from_dict(
-                            {  # during sync signal
-                                **event_template,
-                                "ts": 500000,  # microseconds
-                                "args": {"Voltage": 12, "Current": 1000},
-                            }
-                        ),
-                        trace_model.CounterEvent.from_dict(
-                            {  # during sync signal
-                                **event_template,
-                                "ts": 750000,  # microseconds
-                                "args": {"Voltage": 12, "Current": 2000},
-                            }
-                        ),
-                        trace_model.CounterEvent.from_dict(
-                            {
-                                **event_template,
-                                "ts": 1000000,  # microseconds
-                                "args": {"Voltage": 12, "Current": 100},
-                            }
-                        ),
-                        trace_model.CounterEvent.from_dict(
-                            {
-                                **event_template,
-                                "ts": 1250000,  # microseconds
-                                "args": {"Voltage": 12, "Current": 600},
-                            }
-                        ),
-                    ],
+                    power_events,
                 ),
             ],
         )
@@ -322,6 +334,51 @@ class PowerMetricsTest(unittest.TestCase):
             trace_model.ContextSwitch(
                 trace_time.TimePoint(0),
                 40,
+                70,
+                612,
+                612,
+                trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
+                {},
+            ),
+        ]
+        model.scheduling_records = {0: records_0, 1: records_1}
+        self.assertEqual(
+            [], power.PowerMetricsProcessor().process_metrics(model)
+        )
+
+    def test_no_power_data_after_sync_signal(self) -> None:
+        """Handle 'inf' in aggregated power metrics."""
+        end_of_load = trace_time.TimePoint(1000000000)
+        threads = (1, 2)
+        model = self.construct_trace_model(threads, end_of_load)
+
+        records_0: list[trace_model.SchedulingRecord] = [
+            # "thread-1" is active from 0 - 1000, then exits.
+            trace_model.ContextSwitch(
+                trace_time.TimePoint(0),
+                threads[0],
+                100,
+                612,
+                612,
+                trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
+                {},
+            ),
+            trace_model.ContextSwitch(
+                end_of_load,
+                70,
+                threads[0],
+                612,
+                612,
+                trace_model.ThreadState.ZX_THREAD_STATE_DEAD,
+                {},
+            ),
+        ]
+
+        records_1: list[trace_model.SchedulingRecord] = [
+            # small-thread
+            trace_model.ContextSwitch(
+                trace_time.TimePoint(0),
+                100,
                 70,
                 612,
                 612,

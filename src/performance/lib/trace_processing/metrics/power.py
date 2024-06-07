@@ -7,7 +7,7 @@
 import dataclasses
 import itertools
 import logging
-from typing import Iterable, Iterator, Sequence
+from typing import Sequence
 
 from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
 
@@ -55,9 +55,9 @@ class AggregatePowerMetrics:
     """
 
     sample_count: int = 0
-    max_power: float = float("-inf")
+    max_power: float | None = None
     mean_power: float = 0
-    min_power: float = float("inf")
+    min_power: float | None = None
 
     def process_sample(self, sample: PowerMetricSample) -> None:
         """Process a sample of power metrics.
@@ -66,11 +66,24 @@ class AggregatePowerMetrics:
             sample: A sample of power metrics.
         """
         self.sample_count += 1
-        self.max_power = max(self.max_power, sample.power)
+        self.max_power = (
+            max(self.max_power, sample.power)
+            if self.max_power is not None
+            else sample.power
+        )
         self.mean_power = _running_avg(
             self.mean_power, sample.power, self.sample_count
         )
-        self.min_power = min(self.min_power, sample.power)
+        self.min_power = (
+            min(self.min_power, sample.power)
+            if self.min_power is not None
+            else sample.power
+        )
+
+    @property
+    def is_uninitialized(self) -> bool:
+        """Returns true if no samples have been processed yet."""
+        return self.max_power is None or self.min_power is None
 
     def to_fuchsiaperf_results(
         self, tag: str = ""
@@ -80,6 +93,7 @@ class AggregatePowerMetrics:
         Returns:
           List of JSON object.
         """
+        assert self.min_power is not None and self.max_power is not None
         results: list[trace_metrics.TestCaseResult] = [
             trace_metrics.TestCaseResult(
                 label="MinPower" + tag,
@@ -199,5 +213,12 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
                     else None,
                 )
                 power_metrics.process_sample(sample)
+
+        if power_metrics.is_uninitialized:
+            _LOGGER.warning(
+                "No power metric records after load_generator sync signal. "
+                "There may have been an error processing power or trace data."
+            )
+            return []
 
         return power_metrics.to_fuchsiaperf_results(tag="_by_model")
