@@ -17,8 +17,11 @@ toc:
   - title: "Frequently asked questions"
     path: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2/faq.md
     step_group: driver_migration-dfv1-to-dv2
-  - title: "Update driver interfaces to DFv2"
-    path: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2/update-driver-interfaces-to-dfv2.md
+  - title: "Update DDK interfaces to DFv2"
+    path: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2/update-ddk-interfaces-to-dfv2.md
+    step_group: driver_migration-dfv1-to-dv2
+  - title: "Update other services to DFv2"
+    path: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2/update-other-services-to-dfv2.md
     step_group: driver_migration-dfv1-to-dv2
 - title: "2. Migrate from Banjo to FIDL"
   section:
