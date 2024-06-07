@@ -25,7 +25,9 @@ declare_args() {
   verify_depfile = true
 
   # Enables a rustc wrapper that detects timeouts and ICEs
-  ice_detection = rust_incremental != ""
+  # TODO(pineapple): enable by default when using rust_incremental after
+  # b/345596983 is resolved
+  ice_detection = false
 
   # A timeout to catch rustc hangs, expressed in seconds. A value of zero
   # means no timeout
