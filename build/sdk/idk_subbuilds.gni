@@ -1,0 +1,194 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/config/compiler.gni")
+import("//build/config/fuchsia/platform_version.gni")
+import("//build/sdk/config.gni")
+import("//sdk/config.gni")
+
+# Create a GN directory, and build an `sdk_collection` target for a particular
+# target_cpu and api_level by calling `gn gen` and then `ninja` in that
+# directory.
+template("_subbuild") {
+  assert(defined(invoker.sdk_collection))
+  assert(defined(invoker.target_cpu))
+  assert(defined(invoker.api_level))
+  assert(defined(invoker.extra_deps))
+  assert(defined(invoker.build_dir_prefix))
+
+  _build_dir = root_build_dir + "/${invoker.build_dir_prefix}"
+  _build_dir_stamp = _build_dir + ".stamp"
+
+  _sdk_collection_dir = get_label_info(invoker.sdk_collection, "dir")
+  _sdk_collection_name = get_label_info(invoker.sdk_collection, "name")
+  _sdk_collection = "${_sdk_collection_dir}:${_sdk_collection_name}"
+
+  _collection_dir = _build_dir + "/sdk/exported/${_sdk_collection_name}"
+  _collection_dir_manifest = "${_collection_dir}/meta/manifest.json"
+
+  action(target_name) {
+    script = "//build/sdk/subbuild.py"
+    outputs = [
+      _build_dir_stamp,
+      _collection_dir_manifest,
+    ]
+
+    # //sdk:idk_build_tools contains the host tools that must be used in the
+    # subbuilds. Make sure those (and any extra deps) are built first.
+    deps = [ "//sdk:idk_build_tools" ] + invoker.extra_deps
+
+    args = [
+      "--stamp-file",
+      rebase_path(_build_dir_stamp, root_build_dir),
+      "--sdk-id",
+      sdk_id,
+      "--output-build-dir",
+      rebase_path(_build_dir, root_build_dir),
+
+      "--sdk-collection-label",
+      _sdk_collection,
+      "--target-cpu",
+      invoker.target_cpu,
+      "--api-level",
+      invoker.api_level,
+
+      "--fuchsia-dir",
+      rebase_path("//", root_build_dir),
+      "--prebuilt-host-tools-dir",
+      rebase_path("$root_build_dir/sdk/idk_build_tools", _build_dir),
+      "--compress-debuginfo",
+      compress_debuginfo,
+    ]
+
+    if (sdk_sub_build_parallelism != "") {
+      args += [
+        "--parallelism",
+        "${sdk_sub_build_parallelism}",
+      ]
+    }
+    if (sdk_sub_build_max_load_average != "") {
+      args += [
+        "--max-load-average",
+        "${sdk_sub_build_max_load_average}",
+      ]
+    }
+    if (sdk_sub_build_verbose) {
+      args += [ "--verbose" ]
+    }
+
+    if (cxx_rbe_enable) {
+      args += [ "--cxx-rbe-enable" ]
+    }
+    if (rust_rbe_enable) {
+      args += [ "--rust-rbe-enable" ]
+    }
+
+    pool = "//sdk:subbuild_pool"
+
+    # This script cannot be hermetic.
+    hermetic_deps = false
+
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+  }
+}
+
+# Calling this template generates a set of action() targets, each one building
+# the atoms of a given sdk_collection() for a specific CPU architecture and API
+# levels. This is used by the idk() template.
+#
+# The generated actions are named as follows:
+#
+#    ${target_name}-${cpu}
+#        For the default API level, and each supported ${cpu}
+#        Uses ${root_build_dir}/${subbuild_prefix}-${cpu} as its build directory.
+#
+#    ${target_name}-api${api_level}-${cpu}
+#        For individual API levels and cpu values.
+#        Uses ${root_build_dir}/${subbuild_prefix}-api${api_level}-${cpu} as
+#        its build directory.
+#
+# Each action will depend on sdk_collection_label as well as //sdk:idk_build_tools.
+#
+# Note that this does not define a top-level group() target that depends on all of
+# them. Instead, users like the idk() template should pick the sub-build targets
+# they need directly.
+#
+# Args:
+#    sdk_collection_label  (required)
+#      [GN Label] Label of sdk_collection() target to generate sub-builds for.
+#
+#    subbuild_prefix  (optional)
+#      [string] A name prefix for all sub-build directories. Default is
+#          "idk_subbuild.<name>"  where <name> is the name of the sdk_collection_label
+#          target. This is useful to differentiatte idk_subbuilds() instances that
+#          reference collections with the same name, but different directories
+#          (e.g. `//sdk:core` and `//vendor/acme/sdk:core`).
+#
+template("idk_subbuilds") {
+  main_target_name = target_name
+
+  if (defined(invoker.subbuild_prefix)) {
+    subbuild_prefix = invoker.subbuild_prefix
+  } else {
+    subbuild_prefix =
+        "idk_subbuild." + get_label_info(invoker.sdk_collection_label, "name")
+  }
+
+  _api_levels = platform_version.build_time_supported_api_levels
+  _target_cpus = idk_target_cpus_default
+
+  # First, define subbuild targets for the default API level.
+  foreach(target_cpu, _target_cpus) {
+    _subbuild_target = "${main_target_name}-${target_cpu}"
+    _subbuild_dir_prefix = "${subbuild_prefix}-${target_cpu}"
+
+    _subbuild(_subbuild_target) {
+      sdk_collection = invoker.sdk_collection_label
+      target_cpu = target_cpu
+      api_level = "PLATFORM"
+      build_dir_prefix = _subbuild_dir_prefix
+
+      # Each subbuild depends on the `sdk_collection` in the main build, so
+      # that when a change happens that would cause the `sdk_collection` to be
+      # rebuilt, that also triggers the subbuilds to be rerun.
+      extra_deps = [ invoker.sdk_collection_label ]
+
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+    }
+  }
+
+  # Now do them for all individual API levels.
+  foreach(api_level, _api_levels) {
+    foreach(target_cpu, _target_cpus) {
+      _subbuild_target = "${main_target_name}-api${api_level}-${target_cpu}"
+      _subbuild_dir_prefix = "${subbuild_prefix}-api${api_level}-${target_cpu}"
+
+      _subbuild(_subbuild_target) {
+        sdk_collection = invoker.sdk_collection_label
+        target_cpu = target_cpu
+        api_level = "$api_level"
+        build_dir_prefix = _subbuild_dir_prefix
+
+        # Each subbuild depends on the `sdk_collection` in the main build, so
+        # that when a change happens that would cause the `sdk_collection` to be
+        # rebuilt, that also triggers the subbuilds to be rerun.
+        extra_deps = [ invoker.sdk_collection_label ]
+
+        forward_variables_from(invoker,
+                               [
+                                 "testonly",
+                                 "visibility",
+                               ])
+      }
+    }
+  }
+}
