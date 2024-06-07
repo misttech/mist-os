@@ -372,12 +372,17 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         is_ip_device_enabled::<Ipv4, _, _>(self, device_id)
     }
 
-    type DeviceAndAddressStatusIter<'a, 's> =
-        FilterPresentWithDevices<Ipv4, <Self as device::IpDeviceConfigurationContext<Ipv4, BC>>::DevicesIter<'a>, <Self as device::IpDeviceConfigurationContext<Ipv4, BC>>::DeviceAddressAndGroupsAccessor<'a>, BC> where
-                Self: 's;
+    type DeviceAndAddressStatusIter<'a> = FilterPresentWithDevices<
+        Ipv4,
+        <Self as device::IpDeviceConfigurationContext<Ipv4, BC>>::DevicesIter<'a>,
+        <Self as device::IpDeviceConfigurationContext<Ipv4, BC>>::DeviceAddressAndGroupsAccessor<
+            'a,
+        >,
+        BC,
+    >;
 
-    fn with_address_statuses<'a, F: FnOnce(Self::DeviceAndAddressStatusIter<'_, 'a>) -> R, R>(
-        &'a mut self,
+    fn with_address_statuses<F: FnOnce(Self::DeviceAndAddressStatusIter<'_>) -> R, R>(
+        &mut self,
         addr: SpecifiedAddr<Ipv4Addr>,
         cb: F,
     ) -> R {
@@ -474,12 +479,17 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         is_ip_device_enabled::<Ipv6, _, _>(self, device_id)
     }
 
-    type DeviceAndAddressStatusIter<'a, 's> =
-        FilterPresentWithDevices<Ipv6, <Self as device::IpDeviceConfigurationContext<Ipv6, BC>>::DevicesIter<'a>, <Self as device::IpDeviceConfigurationContext<Ipv6, BC>>::DeviceAddressAndGroupsAccessor<'a>, BC> where
-                Self: 's;
+    type DeviceAndAddressStatusIter<'a> = FilterPresentWithDevices<
+        Ipv6,
+        <Self as device::IpDeviceConfigurationContext<Ipv6, BC>>::DevicesIter<'a>,
+        <Self as device::IpDeviceConfigurationContext<Ipv6, BC>>::DeviceAddressAndGroupsAccessor<
+            'a,
+        >,
+        BC,
+    >;
 
-    fn with_address_statuses<'a, F: FnOnce(Self::DeviceAndAddressStatusIter<'_, 'a>) -> R, R>(
-        &'a mut self,
+    fn with_address_statuses<F: FnOnce(Self::DeviceAndAddressStatusIter<'_>) -> R, R>(
+        &mut self,
         addr: SpecifiedAddr<Ipv6Addr>,
         cb: F,
     ) -> R {

@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use alloc::vec::Vec;
 use core::{
     cmp::Ordering,
     fmt::Debug,
     hash::Hash,
+    marker::PhantomData,
     num::{NonZeroU16, NonZeroU32, NonZeroU8},
     sync::atomic::{self, AtomicU16},
 };
@@ -276,21 +276,20 @@ impl<I: IpExt, BC, CC: DeviceIdContext<AnyDevice> + ?Sized> IpTransportContext<I
 /// The base execution context provided by the IP layer to transport layer
 /// protocols.
 pub trait BaseTransportIpContext<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
-    /// The iterator returned by
-    /// [`TransportIpContext::get_devices_with-assigned_addr`].
-    type DevicesWithAddrIter<'s>: Iterator<Item = Self::DeviceId>
-    where
-        Self: 's;
+    /// The iterator given to
+    /// [`BaseTransportIpContext::with_devices_with_assigned_addr`].
+    type DevicesWithAddrIter<'s>: Iterator<Item = Self::DeviceId>;
 
     /// Is this one of our local addresses, and is it in the assigned state?
     ///
-    /// Returns an iterator over all the local interfaces for which `addr` is an
-    /// associated address, and, for IPv6, for which it is in the "assigned"
-    /// state.
-    fn get_devices_with_assigned_addr(
+    /// Calls `cb` with an iterator over all the local interfaces for which
+    /// `addr` is an associated address, and, for IPv6, for which it is in the
+    /// "assigned" state.
+    fn with_devices_with_assigned_addr<O, F: FnOnce(Self::DevicesWithAddrIter<'_>) -> O>(
         &mut self,
         addr: SpecifiedAddr<I::Addr>,
-    ) -> Self::DevicesWithAddrIter<'_>;
+        cb: F,
+    ) -> O;
 
     /// Get default hop limits.
     ///
@@ -377,6 +376,22 @@ pub trait MulticastMembershipHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
 /// of `TransportIpContext` given the other requirements are met.
 pub trait UseTransportIpContextBlanket {}
 
+/// An iterator supporting the blanket implementation of
+/// [`BaseTransportIpContext::with_devices_with_assigned_addr`].
+pub struct AssignedAddressDeviceIterator<Iter, I, D>(Iter, PhantomData<(I, D)>);
+
+impl<Iter, I, D> Iterator for AssignedAddressDeviceIterator<Iter, I, D>
+where
+    Iter: Iterator<Item = (D, I::AddressStatus)>,
+    I: IpLayerIpExt,
+{
+    type Item = D;
+    fn next(&mut self) -> Option<D> {
+        let Self(iter, PhantomData) = self;
+        iter.by_ref().find_map(|(device, state)| is_unicast_assigned::<I>(&state).then_some(device))
+    }
+}
+
 impl<
         I: IpLayerIpExt,
         BC,
@@ -386,17 +401,15 @@ impl<
             + UseTransportIpContextBlanket,
     > BaseTransportIpContext<I, BC> for CC
 {
-    type DevicesWithAddrIter<'s> = <Vec<CC::DeviceId> as IntoIterator>::IntoIter where CC: 's;
+    type DevicesWithAddrIter<'s> =
+        AssignedAddressDeviceIterator<CC::DeviceAndAddressStatusIter<'s>, I, CC::DeviceId>;
 
-    fn get_devices_with_assigned_addr(
+    fn with_devices_with_assigned_addr<O, F: FnOnce(Self::DevicesWithAddrIter<'_>) -> O>(
         &mut self,
         addr: SpecifiedAddr<I::Addr>,
-    ) -> Self::DevicesWithAddrIter<'_> {
-        self.with_address_statuses(addr, |it| {
-            it.filter_map(|(device, state)| is_unicast_assigned::<I>(&state).then_some(device))
-                .collect::<Vec<_>>()
-        })
-        .into_iter()
+        cb: F,
+    ) -> O {
+        self.with_address_statuses(addr, |it| cb(AssignedAddressDeviceIterator(it, PhantomData)))
     }
 
     fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
@@ -678,17 +691,15 @@ pub trait IpDeviceContext<I: IpLayerIpExt, BC>: IpDeviceStateContext<I, BC> {
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
 
     /// The iterator provided to [`IpDeviceContext::with_address_statuses`].
-    type DeviceAndAddressStatusIter<'a, 's>: Iterator<Item = (Self::DeviceId, I::AddressStatus)>
-    where
-        Self: IpDeviceContext<I, BC> + 's;
+    type DeviceAndAddressStatusIter<'a>: Iterator<Item = (Self::DeviceId, I::AddressStatus)>;
 
     /// Provides access to the status of an address.
     ///
     /// Calls the provided callback with an iterator over the devices for which
     /// the address is assigned and the status of the assignment for each
     /// device.
-    fn with_address_statuses<'a, F: FnOnce(Self::DeviceAndAddressStatusIter<'_, 'a>) -> R, R>(
-        &'a mut self,
+    fn with_address_statuses<F: FnOnce(Self::DeviceAndAddressStatusIter<'_>) -> R, R>(
+        &mut self,
         addr: SpecifiedAddr<I::Addr>,
         cb: F,
     ) -> R;

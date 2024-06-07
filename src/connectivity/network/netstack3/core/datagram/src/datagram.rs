@@ -2179,20 +2179,22 @@ fn try_pick_bound_address<I: IpExt, CC: TransportIpContext<I, BC>, BC, LI>(
             // Other addresses can only be bound to if they are assigned
             // to the device.
             if !addr.addr().is_multicast() {
-                let mut assigned_to =
-                    BaseTransportIpContext::<I, _>::get_devices_with_assigned_addr(
-                        core_ctx,
-                        addr.into(),
-                    );
-                if let Some(device) = &device {
-                    if !assigned_to.any(|d| device == &EitherDeviceId::Strong(d)) {
-                        return Err(LocalAddressError::AddressMismatch);
-                    }
-                } else {
-                    if !assigned_to.any(|_: CC::DeviceId| true) {
-                        return Err(LocalAddressError::CannotBindToAddress);
-                    }
-                }
+                BaseTransportIpContext::<I, _>::with_devices_with_assigned_addr(
+                    core_ctx,
+                    addr.into(),
+                    |mut assigned_to| {
+                        if let Some(device) = &device {
+                            if !assigned_to.any(|d| device == &EitherDeviceId::Strong(d)) {
+                                return Err(LocalAddressError::AddressMismatch);
+                            }
+                        } else {
+                            if !assigned_to.any(|_: CC::DeviceId| true) {
+                                return Err(LocalAddressError::CannotBindToAddress);
+                            }
+                        }
+                        Ok(())
+                    },
+                )?;
             }
             (Some(addr), device, identifier)
         }
@@ -3636,17 +3638,18 @@ where
 {
     core_ctx.with_transport_context(|core_ctx| match source_addr {
         Some(source_addr) => {
-            let mut devices =
-                BaseTransportIpContext::<A::Version, _>::get_devices_with_assigned_addr(
-                    core_ctx,
-                    source_addr,
-                );
-            if let Some(d) = devices.next() {
-                if devices.next() == None {
-                    return Ok(d);
-                }
-            }
-            Err(SetMulticastMembershipError::NoDeviceAvailable)
+            BaseTransportIpContext::<A::Version, _>::with_devices_with_assigned_addr(
+                core_ctx,
+                source_addr,
+                |mut devices| {
+                    if let Some(d) = devices.next() {
+                        if devices.next() == None {
+                            return Ok(d);
+                        }
+                    }
+                    Err(SetMulticastMembershipError::NoDeviceAvailable)
+                },
+            )
         }
         None => {
             let device = MulticastMembershipHandler::select_device_for_multicast_group(

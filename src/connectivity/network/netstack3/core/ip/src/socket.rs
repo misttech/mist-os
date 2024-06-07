@@ -1080,13 +1080,14 @@ pub(crate) mod testutil {
 
         type DevicesWithAddrIter<'a> = Box<dyn Iterator<Item = D> + 'a>;
 
-        fn get_devices_with_assigned_addr(
+        fn with_devices_with_assigned_addr<O, F: FnOnce(Self::DevicesWithAddrIter<'_>) -> O>(
             &mut self,
-            addr: SpecifiedAddr<<I>::Addr>,
-        ) -> Self::DevicesWithAddrIter<'_> {
-            Box::new(self.devices.iter().filter_map(move |(device, state)| {
+            addr: SpecifiedAddr<I::Addr>,
+            cb: F,
+        ) -> O {
+            cb(Box::new(self.devices.iter().filter_map(move |(device, state)| {
                 state.addresses.contains(&addr).then(|| device.clone())
-            }))
+            })))
         }
 
         fn confirm_reachable_with_destination(
@@ -1182,16 +1183,17 @@ pub(crate) mod testutil {
         State: InnerFakeIpSocketCtx<I, D>,
         Self: IpSocketHandler<I, BC, DeviceId = D, WeakDeviceId = FakeWeakDeviceId<D>>,
     {
-        type DevicesWithAddrIter<'a> = Box<dyn Iterator<Item = D> + 'a>
-            where Self: 'a;
+        type DevicesWithAddrIter<'a> = Box<dyn Iterator<Item = D> + 'a>;
 
-        fn get_devices_with_assigned_addr(
+        fn with_devices_with_assigned_addr<O, F: FnOnce(Self::DevicesWithAddrIter<'_>) -> O>(
             &mut self,
             addr: SpecifiedAddr<I::Addr>,
-        ) -> Self::DevicesWithAddrIter<'_> {
-            BaseTransportIpContext::<I, BC>::get_devices_with_assigned_addr(
+            cb: F,
+        ) -> O {
+            BaseTransportIpContext::<I, BC>::with_devices_with_assigned_addr(
                 self.state.fake_ip_socket_ctx_mut(),
                 addr,
+                cb,
             )
         }
 

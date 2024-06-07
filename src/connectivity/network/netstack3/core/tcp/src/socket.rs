@@ -1929,14 +1929,17 @@ where
                 .resolve_addr_with_device(bound_device.clone())
                 .map_err(LocalAddressError::Zone)?;
 
-            let mut assigned_to = core_ctx.get_devices_with_assigned_addr(addr.clone().into());
-
-            if !assigned_to.any(|d| {
-                required_device.as_ref().map_or(true, |device| device == &EitherDeviceId::Strong(d))
-            }) {
-                return Err(LocalAddressError::AddressMismatch);
-            }
-
+            core_ctx.with_devices_with_assigned_addr(addr.clone().into(), |mut assigned_to| {
+                if !assigned_to.any(|d| {
+                    required_device
+                        .as_ref()
+                        .map_or(true, |device| device == &EitherDeviceId::Strong(d))
+                }) {
+                    Err(LocalAddressError::AddressMismatch)
+                } else {
+                    Ok(())
+                }
+            })?;
             (Some(addr), required_device)
         }
         None => (None, bound_device.clone().map(EitherDeviceId::Weak)),
@@ -5430,13 +5433,15 @@ mod tests {
         type DevicesWithAddrIter<'a> = <InnerCoreCtx<D> as BaseTransportIpContext<I, BC>>::DevicesWithAddrIter<'a>
             where Self: 'a;
 
-        fn get_devices_with_assigned_addr(
+        fn with_devices_with_assigned_addr<O, F: FnOnce(Self::DevicesWithAddrIter<'_>) -> O>(
             &mut self,
             addr: SpecifiedAddr<I::Addr>,
-        ) -> Self::DevicesWithAddrIter<'_> {
-            BaseTransportIpContext::<I, BC>::get_devices_with_assigned_addr(
+            cb: F,
+        ) -> O {
+            BaseTransportIpContext::<I, BC>::with_devices_with_assigned_addr(
                 &mut self.ip_socket_ctx,
                 addr,
+                cb,
             )
         }
 

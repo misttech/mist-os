@@ -20,13 +20,12 @@ use crate::internal::{
 impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> BaseTransportIpContext<I, C>
     for UninstantiableWrapper<P>
 {
-    type DevicesWithAddrIter<'s> = UninstantiableWrapper<core::iter::Empty<P::DeviceId>>
-    where
-        Self: 's;
-    fn get_devices_with_assigned_addr(
+    type DevicesWithAddrIter<'s> = UninstantiableWrapper<core::iter::Empty<P::DeviceId>>;
+    fn with_devices_with_assigned_addr<O, F: FnOnce(Self::DevicesWithAddrIter<'_>) -> O>(
         &mut self,
         _addr: SpecifiedAddr<I::Addr>,
-    ) -> Self::DevicesWithAddrIter<'_> {
+        _cb: F,
+    ) -> O {
         self.uninstantiable_unreachable()
     }
     fn get_default_hop_limits(&mut self, _device: Option<&Self::DeviceId>) -> HopLimits {
