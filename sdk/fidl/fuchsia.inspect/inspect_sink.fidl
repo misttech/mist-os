@@ -6,12 +6,23 @@ library fuchsia.inspect;
 @available(added=16)
 const MAX_NAME_LENGTH uint64 = 4096;
 
-@available(added=16)
 @discoverable
+@available(added=16, replaced=21)
 closed protocol InspectSink {
     /// Publishes a handle to the `fuchsia.inspect.Tree` protocol that the server can use to read
     /// Inspect data, including lazy nodes.
     strict Publish(resource table {
+        1: tree client_end:Tree;
+        2: name string:MAX_NAME_LENGTH;
+    });
+};
+
+@discoverable
+@available(added=21)
+open protocol InspectSink {
+    /// Publishes a handle to the `fuchsia.inspect.Tree` protocol that the server can use to read
+    /// Inspect data, including lazy nodes.
+    flexible Publish(resource table {
         1: tree client_end:Tree;
         2: name string:MAX_NAME_LENGTH;
     });

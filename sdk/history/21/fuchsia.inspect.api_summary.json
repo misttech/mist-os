@@ -2,7 +2,7 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.inspect/InspectSink.Publish",
-        "strictness": "strict",
+        "strictness": "flexible",
         "ordinal": "1125032506939960139",
         "direction": "one_way",
         "request": "fuchsia.inspect/InspectSinkPublishRequest"
@@ -10,7 +10,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.inspect/InspectSink",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
