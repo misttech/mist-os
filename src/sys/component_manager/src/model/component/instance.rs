@@ -1296,10 +1296,12 @@ impl Routable for CapabilityRequestedHook {
             receiver: receiver.clone(),
         });
         source.hooks.dispatch(&event).await;
-        if receiver.is_taken() {
-            Ok(sender.into())
+        let capability =
+            if receiver.is_taken() { sender.into() } else { self.capability.clone().into() };
+        if !request.debug {
+            Ok(capability)
         } else {
-            Ok(self.capability.clone().into())
+            Ok(Capability::Component(WeakComponentToken::new_component(self.source.clone())))
         }
     }
 }

@@ -18,7 +18,7 @@ use namespace::{Namespace, NamespaceError};
 use routing::policy::ScopedPolicyChecker;
 use runner::component::{ChannelEpitaph, Controllable, Controller};
 use sandbox::{Capability, Dict, Open, RemotableCapability};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use thiserror::Error;
 use tracing::warn;
 use vfs::{directory::entry::OpenRequest, execution_scope::ExecutionScope, service::endpoint};
@@ -26,7 +26,7 @@ use zx::{AsHandleRef, HandleBased, Task};
 
 use crate::{
     builtin::runner::BuiltinRunnerFactory,
-    model::component::WeakComponentInstance,
+    model::component::{WeakComponentInstance, WeakExtendedInstance},
     model::token::{InstanceRegistry, InstanceToken},
     sandbox_util,
     sandbox_util::LaunchTaskOnReceive,
@@ -229,6 +229,7 @@ impl ElfRunnerProgram {
 
         let inner_clone = inner.clone();
         let elf_runner = Arc::new(LaunchTaskOnReceive::new(
+            WeakExtendedInstance::AboveRoot(Weak::new()),
             task_group.as_weak(),
             fcrunner::ComponentRunnerMarker::PROTOCOL_NAME,
             None,
@@ -244,6 +245,7 @@ impl ElfRunnerProgram {
 
         let inner_clone = inner.clone();
         let snapshot_provider = Arc::new(LaunchTaskOnReceive::new(
+            WeakExtendedInstance::AboveRoot(Weak::new()),
             task_group.as_weak(),
             fattribution::ProviderMarker::PROTOCOL_NAME,
             None,

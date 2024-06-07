@@ -33,6 +33,7 @@ use {
 
 pub type RouteRequest = ::routing::RouteRequest;
 pub type RouteSource = ::routing::RouteSource<ComponentInstance>;
+pub use bedrock::RouteRequest as BedrockRouteRequest;
 pub use bedrock::UseRouteRequest as BedrockUseRouteRequest;
 
 #[async_trait]

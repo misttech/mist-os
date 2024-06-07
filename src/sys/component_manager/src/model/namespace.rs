@@ -300,7 +300,7 @@ fn service_or_protocol_use(
         // Bedrock routing.
         UseDecl::Protocol(use_protocol_decl) => {
             let (router, request) = BedrockUseRouteRequest::UseProtocol(use_protocol_decl.clone())
-                .into_router(component.as_weak(), program_input_dict);
+                .into_router(component.as_weak(), program_input_dict, false);
 
             // When there are router errors, they are sent to the error handler, which reports
             // errors.

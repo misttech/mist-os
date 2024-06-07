@@ -52,6 +52,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
                 Request {
                     availability: Availability::Transitional,
                     target: WeakComponentToken::new_component(self.target.clone()),
+                    debug: false,
                 },
             )
             .await?

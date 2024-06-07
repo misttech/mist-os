@@ -91,6 +91,7 @@ impl RouterExt for Router {
                         // Use the weakest availability, so that it gets immediately upgraded to
                         // the availability in `router`.
                         availability: cm_types::Availability::Transitional,
+                        debug: false,
                     };
                     // TODO: Should we convert the Open to a Directory here if the Router wraps a
                     // Dict?

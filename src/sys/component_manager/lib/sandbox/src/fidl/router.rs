@@ -57,7 +57,8 @@ impl Router {
                 Some(_) => return Err(fsandbox::RouterError::InvalidArgs),
                 None => return Err(fsandbox::RouterError::InvalidArgs),
             };
-            let request = Request { availability: to_cm_type(availability), target: component };
+            let request =
+                Request { availability: to_cm_type(availability), target: component, debug: false };
             let cap = router.route(request).await?;
             Ok(cap.into())
         }

@@ -7,7 +7,9 @@ use {
     crate::{
         capability::CapabilitySource,
         model::{
-            component::{ComponentInstance, StartReason, WeakComponentInstance},
+            component::{
+                ComponentInstance, StartReason, WeakComponentInstance, WeakExtendedInstance,
+            },
             routing::{Route, RouteSource},
             start::Start,
             storage::admin_protocol::StorageAdmin,
@@ -404,6 +406,7 @@ pub fn build_storage_admin_dictionary(
             .insert(
                 storage_decl.name.clone(),
                 LaunchTaskOnReceive::new(
+                    WeakExtendedInstance::Component(weak_component.clone()),
                     component.nonblocking_task_group().as_weak(),
                     "storage admin protocol",
                     Some((component.context.policy().clone(), capability_source)),

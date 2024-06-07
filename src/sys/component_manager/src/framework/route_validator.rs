@@ -12,15 +12,18 @@ use {
             component::{ComponentInstance, WeakComponentInstance},
             model::Model,
             routing::{
-                self, service::AnonymizedServiceRoute, Route, RouteRequest as LegacyRouteRequest,
-                RoutingError,
+                self, router_ext::WeakComponentTokenExt, service::AnonymizedServiceRoute,
+                BedrockRouteRequest, Route, RouteRequest as LegacyRouteRequest, RoutingError,
             },
         },
     },
-    ::routing::capability_source::InternalCapability,
+    ::routing::{
+        capability_source::InternalCapability, component_instance::ComponentInstanceInterface,
+    },
     async_trait::async_trait,
     cm_rust::{ExposeDecl, SourceName, UseDecl},
     cm_types::Name,
+    errors::{ActionError, StartActionError},
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
@@ -28,6 +31,8 @@ use {
     lazy_static::lazy_static,
     moniker::{ExtendedMoniker, Moniker},
     router_error::Explain,
+    router_error::RouterError,
+    sandbox::{Request, Router},
     std::{
         cmp::Ordering,
         sync::{Arc, Weak},
@@ -292,6 +297,7 @@ impl RouteValidator {
 
 #[derive(Clone, Debug)]
 enum RouteRequest {
+    Bedrock(BedrockRouteRequest),
     Legacy(LegacyRouteRequest),
 }
 
@@ -307,6 +313,13 @@ impl RouteRequest {
             Self::Legacy(route_request) => {
                 let availability = route_request.availability().map(From::from);
                 let res = Self::route_legacy(route_request, instance)
+                    .await
+                    .map_err(|e| -> Box<dyn Explain> { Box::new(e) });
+                (availability, res)
+            }
+            Self::Bedrock(route_request) => {
+                let availability = Some(route_request.availability().into());
+                let res = Self::route_bedrock(route_request, instance)
                     .await
                     .map_err(|e| -> Box<dyn Explain> { Box::new(e) });
                 (availability, res)
@@ -361,11 +374,39 @@ impl RouteRequest {
         };
         Ok((Some(source_moniker), service_info))
     }
+
+    async fn route_bedrock(
+        route_request: BedrockRouteRequest,
+        instance: &Arc<ComponentInstance>,
+    ) -> Result<(Option<ExtendedMoniker>, Option<Vec<fsys::ServiceInstance>>), RouterError> {
+        let res: Result<(Router, Request), ActionError> = async move {
+            let resolved_state = instance.lock_resolved_state().await.map_err(|err| {
+                ActionError::from(StartActionError::ResolveActionError {
+                    moniker: instance.moniker.clone(),
+                    err: Box::new(err),
+                })
+            })?;
+            Ok(route_request.into_router(instance.as_weak(), &resolved_state.sandbox, true))
+        }
+        .await;
+        let (router, request) = res.map_err(|e| RouterError::NotFound(Arc::new(e)))?;
+        router.route(request).await.map(|capability| {
+            if let sandbox::Capability::Component(source) = capability {
+                (Some(source.moniker()), None)
+            } else {
+                warn!(target=%instance.moniker, "router did not return source info");
+                (None, None)
+            }
+        })
+    }
 }
 
 impl From<UseDecl> for RouteRequest {
     fn from(u: UseDecl) -> Self {
-        Self::Legacy(u.into())
+        match BedrockRouteRequest::try_from(u) {
+            Ok(r) => Self::Bedrock(r),
+            Err(r) => Self::Legacy(r.into()),
+        }
     }
 }
 
@@ -373,7 +414,10 @@ impl TryFrom<Vec<&ExposeDecl>> for RouteRequest {
     type Error = RoutingError;
 
     fn try_from(e: Vec<&ExposeDecl>) -> Result<Self, Self::Error> {
-        Ok(Self::Legacy(e.try_into()?))
+        match BedrockRouteRequest::try_from(&e) {
+            Ok(r) => Ok(Self::Bedrock(r)),
+            Err(()) => Ok(Self::Legacy(e.try_into()?)),
+        }
     }
 }
 

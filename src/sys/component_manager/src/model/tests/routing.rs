@@ -3421,6 +3421,7 @@ async fn source_component_stopping_when_routing() {
             .route(sandbox::Request {
                 availability: Availability::Required,
                 target: WeakComponentToken::new_component(root.as_weak()),
+                debug: false,
             })
             .await
             .unwrap();
@@ -3485,6 +3486,7 @@ async fn source_component_stopped_after_routing_before_open() {
         .route(sandbox::Request {
             availability: Availability::Required,
             target: WeakComponentToken::new_component(root.as_weak()),
+            debug: false,
         })
         .await
         .unwrap();
@@ -3554,6 +3556,7 @@ async fn source_component_shutdown_after_routing_before_open() {
         .route(sandbox::Request {
             availability: Availability::Required,
             target: WeakComponentToken::new_component(root.as_weak()),
+            debug: false,
         })
         .await
         .unwrap();

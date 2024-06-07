@@ -25,6 +25,9 @@ pub struct Request {
 
     /// A reference to the requesting component.
     pub target: WeakComponentToken,
+
+    /// If true, debug information is requested instead of the actual capabilithy.
+    pub debug: bool,
 }
 
 /// A [`Router`] is a capability that lets the holder obtain other capabilities
@@ -150,6 +153,7 @@ mod tests {
             .route(Request {
                 availability: Availability::Required,
                 target: FakeComponentToken::new(),
+                debug: false,
             })
             .await
             .unwrap();

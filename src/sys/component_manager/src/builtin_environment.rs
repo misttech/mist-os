@@ -41,7 +41,7 @@ use {
         model::events::registry::EventSubscription,
         model::{
             component::manager::ComponentManagerInstance,
-            component::WeakComponentInstance,
+            component::{WeakComponentInstance, WeakExtendedInstance},
             environment::Environment,
             event_logger::EventLogger,
             events::{
@@ -413,12 +413,14 @@ impl RootComponentInputBuilder {
             return;
         }
 
+        let top_instance = Arc::downgrade(&self.top_instance);
         let capability_source = CapabilitySource::Builtin {
             capability: InternalCapability::Protocol(name.clone()),
-            top_instance: Arc::downgrade(&self.top_instance),
+            top_instance: top_instance.clone(),
         };
 
         let launch = LaunchTaskOnReceive::new(
+            WeakExtendedInstance::AboveRoot(top_instance),
             self.top_instance.task_group().as_weak(),
             name.clone(),
             Some((self.policy_checker.clone(), capability_source)),
@@ -438,11 +440,13 @@ impl RootComponentInputBuilder {
 
     fn add_namespace_protocol(&mut self, protocol: &cm_rust::ProtocolDecl) {
         let path = protocol.source_path.as_ref().unwrap().to_string();
+        let top_instance = Arc::downgrade(&self.top_instance);
         let capability_source = CapabilitySource::Namespace {
             capability: ComponentCapability::Protocol(protocol.clone()),
-            top_instance: Arc::downgrade(&self.top_instance),
+            top_instance: top_instance.clone(),
         };
         let launch = LaunchTaskOnReceive::new(
+            WeakExtendedInstance::AboveRoot(top_instance),
             self.top_instance.task_group().as_weak(),
             "namespace capability dispatcher",
             Some((self.policy_checker.clone(), capability_source)),
@@ -1450,12 +1454,14 @@ impl BuiltinEnvironment {
     ) where
         P: ProtocolMarker,
     {
+        let top_instance = Arc::downgrade(self.model.top_instance());
         let capability_source = CapabilitySource::Builtin {
             capability: InternalCapability::Protocol(name.clone()),
-            top_instance: Arc::downgrade(self.model.top_instance()),
+            top_instance: top_instance.clone(),
         };
 
         let launch = LaunchTaskOnReceive::new(
+            WeakExtendedInstance::AboveRoot(top_instance),
             self.model.top_instance().task_group().as_weak(),
             name.clone(),
             Some((self.model.root().context.policy().clone(), capability_source)),
