@@ -15,6 +15,12 @@ import("//build/components.gni")
 #     The name of the fuchsia_package to archive.
 #     This is also used as the archive name.
 #     Type: string
+#
+#   test_component_names (optional)
+#     The names of components in the package that represent tests.
+#     If $test_component_name exists in this list, templates should expect to
+#     find a test component called $test_component_name.cm.
+#     Type: list[string]
 template("ctf_fuchsia_package_archive") {
   assert(defined(invoker.package),
          "you must specify a package target to archive")
@@ -22,8 +28,8 @@ template("ctf_fuchsia_package_archive") {
          "you must specify the name of the package to archive")
 
   archive_name = invoker.package_name
-
   archive_target = "${target_name}_archive"
+
   fuchsia_package_archive(archive_target) {
     testonly = true
     package = invoker.package
@@ -52,6 +58,9 @@ template("ctf_fuchsia_package_archive") {
           package_name = invoker.package_name
           archive_gn_label =
               get_label_info(":$copy_target", "label_no_toolchain")
+          if (defined(invoker.test_component_names)) {
+            test_component_names = invoker.test_component_names
+          }
         },
       ]
     }
@@ -62,6 +71,14 @@ template("ctf_fuchsia_package_archive") {
 #
 # An equivalent to fuchsia_package, but ensures dependencies are allowed in CTF.
 # To build a FAR archive of this package, depend on ${target_name}_archive.
+#
+# Additional arguments:
+#
+#   test_component_names (optional)
+#     The names of components in the package that represent tests.
+#     If $test_component_name exists in this list, templates should expect to
+#     find a test component called $test_component_name.cm.
+#     Type: list[string]
 template("ctf_fuchsia_package") {
   assert(defined(invoker.package_name), "package_name must be defined.")
 
@@ -72,12 +89,15 @@ template("ctf_fuchsia_package") {
   }
 
   fuchsia_package(target_name) {
-    forward_variables_from(invoker, "*")
+    forward_variables_from(invoker, "*", [ "test_component_names" ])
   }
 
   # Optional FAR archive that can be released in CTF.
   ctf_fuchsia_package_archive("${target_name}_archive") {
     package = ":$main_target_name"
     package_name = invoker.package_name
+    if (defined(invoker.test_component_names)) {
+      test_component_names = invoker.test_component_names
+    }
   }
 }
