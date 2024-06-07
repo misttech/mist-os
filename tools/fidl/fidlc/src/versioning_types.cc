@@ -367,9 +367,10 @@ std::string Availability::Debug() const {
   return ss.str();
 }
 
-bool VersionSelection::Insert(Platform platform, Version version) {
+bool VersionSelection::Insert(Platform platform, std::set<Version> versions) {
   ZX_ASSERT_MSG(!platform.is_unversioned(), "version selection cannot contain 'unversioned'");
-  auto [_, inserted] = map_.emplace(std::move(platform), version);
+  ZX_ASSERT_MSG(!versions.empty(), "cannot select an empty set of versions");
+  auto [_, inserted] = map_.emplace(std::move(platform), std::move(versions));
   return inserted;
 }
 
@@ -382,6 +383,19 @@ Version VersionSelection::Lookup(const Platform& platform) const {
   if (platform.is_unversioned()) {
     return Version::kHead;
   }
+  const auto iter = map_.find(platform);
+  ZX_ASSERT_MSG(iter != map_.end(), "no version was inserted for platform '%s'",
+                platform.name().c_str());
+  auto& versions = iter->second;
+  // TODO(https://fxbug.dev/42085274): Temporary, for aligning legacy=true with supported levels.
+  return versions.size() == 1 ? *versions.begin() : Version::kLegacy;
+}
+
+const std::set<Version> kOnlyHead{Version::kHead};
+
+const std::set<Version>& VersionSelection::LookupSet(const Platform& platform) const {
+  if (platform.is_unversioned())
+    return kOnlyHead;
   const auto iter = map_.find(platform);
   ZX_ASSERT_MSG(iter != map_.end(), "no version was inserted for platform '%s'",
                 platform.name().c_str());

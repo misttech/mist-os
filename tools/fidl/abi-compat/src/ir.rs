@@ -211,7 +211,7 @@ pub enum Declaration {
 
 #[derive(Deserialize, Debug)]
 pub struct IR {
-    pub available: HashMap<String, String>,
+    pub available: HashMap<String, Vec<String>>,
     bits_declarations: Vec<BitsDeclaration>,
     enum_declarations: Vec<EnumDeclaration>,
     pub protocol_declarations: Vec<ProtocolDeclaration>,
@@ -307,7 +307,7 @@ open protocol Example {
     )
     .expect("loading simple test library");
 
-    assert_eq!(hashmap! {"fuchsia".to_owned() => "1".to_owned()}, ir.available);
+    assert_eq!(hashmap! {"fuchsia".to_owned() => vec!["1".to_owned()]}, ir.available);
 
     assert_eq!(1, ir.table_declarations.len());
 }

@@ -1727,7 +1727,7 @@ type Root struct {
 	Attributes
 	Name            EncodedLibraryIdentifier    `json:"name"`
 	Platform        Platform                    `json:"platform"`
-	Available       map[Platform]Version        `json:"available"`
+	Available       map[Platform][]Version      `json:"available"`
 	Experiments     Experiments                 `json:"experiments,omitempty"`
 	Consts          []Const                     `json:"const_declarations"`
 	Bits            []Bits                      `json:"bits_declarations"`

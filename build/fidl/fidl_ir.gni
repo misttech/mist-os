@@ -22,13 +22,12 @@ import("//build/fidl/fidlc.gni")
 #   json_representation (required)
 #     [path] Where to generate the FIDL IR. Must be relative to gen_dir.
 #
-#   target_api_level (required)
-#     [string] Only compile APIs available at this Fuchsia API level. For more
-#     information, look for --available in `fidlc --help`.
-#
 #   out_json_summary
 #     [path] If set, generates a JSON API summary file at the given path.
 #     Must be relative to gen_dir.
+#
+#   target_api_level
+#     [string] Target Fuchsia API level. Required when out_json_summmary is set.
 #
 # Other parameters (see //build/fidl/fidl.gni for descriptions):
 #

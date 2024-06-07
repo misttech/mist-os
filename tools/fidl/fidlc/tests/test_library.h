@@ -81,7 +81,7 @@ class SharedInterface {
     SelectVersion(std::move(platform), Version::Parse(version).value());
   }
   void SelectVersion(std::string platform, Version version) {
-    version_selection()->Insert(Platform::Parse(std::move(platform)).value(), version);
+    version_selection()->Insert(Platform::Parse(std::move(platform)).value(), {version});
   }
   void EnableFlag(ExperimentalFlag flag) { experimental_flags().Enable(flag); }
 };

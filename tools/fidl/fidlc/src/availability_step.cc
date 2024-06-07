@@ -307,6 +307,33 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
     report(removed_or_replaced, result.removed);
     report_legacy(legacy, result.legacy);
   }
+
+  // TODO(https://fxbug.dev/42085274): For removed elements, this enforces
+  // legacy=true when targeting a set of multiple versions that includes the
+  // element, and enforces legacy=false otherwise. Once we remove 'legacy' from
+  // the language, this logic should be used to determine whether an element is
+  // included in the special combined version, instead of just for validation.
+  if (auto& platform = library()->platform.value();
+      !platform.is_unversioned() && version_selection()->Contains(platform)) {
+    auto& target_set = version_selection()->LookupSet(platform);
+    if (target_set.size() > 1 && element->availability.state() == Availability::State::kInherited &&
+        removed) {
+      bool is_targeted = false;
+      auto set = element->availability.set();
+      for (auto target_version : target_set) {
+        if (set.Contains(target_version)) {
+          is_targeted = true;
+          break;
+        }
+      }
+      bool is_legacy = init_args.legacy == Availability::Legacy::kYes;
+      if (is_targeted && !is_legacy) {
+        reporter()->Fail(ErrLegacyShouldBeTrue, attribute->span, element);
+      } else if (!is_targeted && is_legacy) {
+        reporter()->Fail(ErrLegacyShouldBeFalse, attribute->span, element);
+      }
+    }
+  }
 }
 
 Platform AvailabilityStep::GetDefaultPlatform() {

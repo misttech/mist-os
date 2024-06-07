@@ -360,23 +360,26 @@ class Availability final {
 // A version selection is an assignment of versions to platforms.
 class VersionSelection final {
  public:
-  // Inserts a platform version. Must not be "unversioned". Returns true on
-  // success, and false if a version was already inserted for this platform.
-  bool Insert(Platform platform, Version version);
+  // Inserts versions. The platform must not be "unversioned". The version set
+  // must be nonempty. Returns false if already called for this platform.
+  bool Insert(Platform platform, std::set<Version> versions);
 
-  // Returns true if a version was inserted for the given platform.
+  // Returns true if versions were inserted for the given platform.
   bool Contains(const Platform& platform) const;
 
   // Returns the version for the given platform. Always returns HEAD for the
   // unversioned platform. Otherwise, assumes the platform was inserted.
   Version Lookup(const Platform& platform) const;
 
+  // TODO(https://fxbug.dev/42085274): Remove.
+  const std::set<Version>& LookupSet(const Platform& platform) const;
+
   // Iterator over the (platform, version) pairs.
   auto begin() const { return map_.begin(); }
   auto end() const { return map_.end(); }
 
  private:
-  std::map<Platform, Version, Platform::Compare> map_;
+  std::map<Platform, std::set<Version>, Platform::Compare> map_;
 };
 
 }  // namespace fidlc

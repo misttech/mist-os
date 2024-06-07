@@ -440,6 +440,12 @@ constexpr ErrorDef<217, const Element *, Version, AbiKind, AbiValue, AbiValue, S
         "{0} is marked replaced={1}, but its {2} ({3}) does not match the "
         "replacement's {2} ({4}) at {5}; use removed={1} if you intend to "
         "remove the ABI, otherwise use the same {2}");
+constexpr ErrorDef<218, const Element *> ErrLegacyShouldBeTrue(
+    "{0} is in a supported API level, so it should have the @available argument legacy=true",
+    {.documented = false});
+constexpr ErrorDef<219, const Element *> ErrLegacyShouldBeFalse(
+    "{0} is NOT in a supported API level, so it should NOT have the @available argument legacy=true",
+    {.documented = false});
 
 // To add a new error:
 //
@@ -670,6 +676,8 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0215 */ &ErrInvalidReplacedAndRenamed,
     /* fi-0216 */ &ErrInvalidRemovedAbi,
     /* fi-0217 */ &ErrInvalidReplacedAbi,
+    /* fi-0218 */ &ErrLegacyShouldBeTrue,
+    /* fi-0219 */ &ErrLegacyShouldBeFalse,
 };
 
 // In reporter.h we assert that reported error IDs are <= kNumDiagnosticDefs.

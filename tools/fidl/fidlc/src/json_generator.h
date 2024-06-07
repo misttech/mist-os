@@ -63,6 +63,8 @@ class JSONGenerator : public JsonWriter<JSONGenerator> {
 
   std::ostringstream Produce();
 
+  void Generate(Version version);
+
   void Generate(SourceSpan value);
   void Generate(NameSpan value);
 

@@ -2,8 +2,12 @@
   "name": "test.versions",
   "platform": "test",
   "available": {
-    "fuchsia": "HEAD",
-    "test": "HEAD"
+    "fuchsia": [
+      "HEAD"
+    ],
+    "test": [
+      "HEAD"
+    ]
   },
   "maybe_attributes": [
     {

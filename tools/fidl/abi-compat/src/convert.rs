@@ -506,7 +506,11 @@ pub fn convert_platform(ir: Rc<ir::IR>) -> Result<compare::Platform> {
     let mut platform = compare::Platform::default();
     platform.api_level = match ir.available.get("fuchsia") {
         None => bail!("missing API level for 'fuchsia'"),
-        Some(api_level) => FlyStr::new(api_level),
+        Some(levels) => match &levels[..] {
+            [] => bail!("empty API level list for 'fuchsia'"),
+            [api_level] => FlyStr::new(api_level),
+            _ => FlyStr::new("PLATFORM"),
+        },
     };
 
     let context = Context::new(ir.clone(), platform.api_level.clone());

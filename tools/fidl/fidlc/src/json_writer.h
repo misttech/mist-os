@@ -9,6 +9,7 @@
 #include <zircon/assert.h>
 
 #include <ostream>
+#include <set>
 #include <string_view>
 #include <vector>
 
@@ -80,6 +81,11 @@ class JsonWriter {
 
   template <typename T>
   void Generate(const std::vector<T>& value) {
+    self.GenerateArray(value);
+  }
+
+  template <typename T>
+  void Generate(const std::set<T>& value) {
     self.GenerateArray(value);
   }
 
