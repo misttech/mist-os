@@ -69,6 +69,9 @@ class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framewo
   void WatchLeScanStates(WatchLeScanStatesCompleter::Sync& completer) override;
   void WatchLegacyAdvertisingStates(
       WatchLegacyAdvertisingStatesCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Emulator> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // fuchsia_hardware_bluetooth::Vendor overrides:
   void EncodeCommand(EncodeCommandRequestView request,

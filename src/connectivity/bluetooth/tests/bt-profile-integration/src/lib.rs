@@ -17,7 +17,7 @@ use {
         ServiceClassProfileIdentifier, ServiceDefinition, PSM_AVDTP,
     },
     fidl_fuchsia_bluetooth_sys::ProcedureTokenProxy,
-    fidl_fuchsia_hardware_bluetooth::{BredrPeerParameters, EmulatorProxy, PeerProxy},
+    fidl_fuchsia_hardware_bluetooth::{EmulatorProxy, PeerParameters, PeerProxy},
     fuchsia_async::{DurationExt, TimeoutExt},
     fuchsia_bluetooth::{
         constants::INTEGRATION_TIMEOUT,
@@ -76,17 +76,17 @@ fn add_service(profile: &ProfileHarness) -> Result<ConnectionReceiverRequestStre
 }
 
 async fn create_bredr_peer(proxy: &EmulatorProxy, address: Address) -> Result<PeerProxy, Error> {
-    let peer_params = BredrPeerParameters {
+    let (peer, remote) = fidl::endpoints::create_proxy()?;
+    let peer_params = PeerParameters {
         address: Some(address.into()),
         connectable: Some(true),
-        device_class: Some(DeviceClass { value: MAJOR_DEVICE_CLASS_MISCELLANEOUS + 0 }),
-        service_definition: Some(vec![a2dp_sink_service_definition()]),
+        bredr_device_class: Some(DeviceClass { value: MAJOR_DEVICE_CLASS_MISCELLANEOUS + 0 }),
+        bredr_service_definition: Some(vec![a2dp_sink_service_definition()]),
+        channel: Some(remote),
         ..Default::default()
     };
-
-    let (peer, remote) = fidl::endpoints::create_proxy()?;
     let _ = proxy
-        .add_bredr_peer(&peer_params, remote)
+        .add_bredr_peer(peer_params)
         .await?
         .map_err(|e| format_err!("Failed to register fake peer: {:#?}", e))?;
     Ok(peer)

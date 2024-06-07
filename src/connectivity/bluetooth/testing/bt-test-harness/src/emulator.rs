@@ -82,8 +82,7 @@ use {
     anyhow::{format_err, Error},
     fidl_fuchsia_bluetooth::{DeviceClass, MAJOR_DEVICE_CLASS_TOY},
     fidl_fuchsia_hardware_bluetooth::{
-        AdvertisingData, BredrPeerParameters, ConnectionState, EmulatorProxy,
-        LowEnergyPeerParameters, PeerProxy,
+        AdvertisingData, ConnectionState, EmulatorProxy, PeerParameters, PeerProxy,
     },
     fuchsia_bluetooth::{
         expectation::asynchronous::{ExpectableExt, ExpectableState},
@@ -127,41 +126,43 @@ impl Default for EmulatorState {
     }
 }
 
-pub fn default_le_peer(addr: &Address) -> LowEnergyPeerParameters {
-    LowEnergyPeerParameters {
+pub fn default_le_peer(addr: &Address) -> PeerParameters {
+    PeerParameters {
         address: Some(addr.into()),
         connectable: Some(true),
-        advertisement: Some(AdvertisingData {
-            data: vec![
+        le_advertisement: Some(AdvertisingData {
+            data: Some(vec![
                 // Flags field set to "general discoverable"
                 0x02, 0x01, 0x02, // Complete local name set to "Fake"
                 0x05, 0x09, 'F' as u8, 'a' as u8, 'k' as u8, 'e' as u8,
-            ],
+            ]),
+            __source_breaking: fidl::marker::SourceBreaking,
         }),
-        scan_response: None,
+        le_scan_response: None,
         ..Default::default()
     }
 }
 
 /// An emulated BR/EDR peer using default parameters commonly used in tests. The peer is set up to
 /// be connectable and has the "toy" device class.
-pub fn default_bredr_peer(addr: &Address) -> BredrPeerParameters {
-    BredrPeerParameters {
+pub fn default_bredr_peer(addr: &Address) -> PeerParameters {
+    PeerParameters {
         address: Some(addr.into()),
         connectable: Some(true),
-        device_class: Some(DeviceClass { value: MAJOR_DEVICE_CLASS_TOY }),
-        service_definition: None,
+        bredr_device_class: Some(DeviceClass { value: MAJOR_DEVICE_CLASS_TOY }),
+        bredr_service_definition: None,
         ..Default::default()
     }
 }
 
 pub fn add_le_peer(
     proxy: &EmulatorProxy,
-    parameters: LowEnergyPeerParameters,
+    mut parameters: PeerParameters,
 ) -> impl Future<Output = Result<PeerProxy, Error>> {
     match fidl::endpoints::create_proxy() {
         Ok((local, remote)) => {
-            let fut = proxy.add_low_energy_peer(&parameters, remote);
+            parameters.channel = Some(remote);
+            let fut = proxy.add_low_energy_peer(parameters);
             Either::Right(async {
                 let _ = fut
                     .await?
@@ -175,11 +176,12 @@ pub fn add_le_peer(
 
 pub fn add_bredr_peer(
     proxy: &EmulatorProxy,
-    parameters: BredrPeerParameters,
+    mut parameters: PeerParameters,
 ) -> impl Future<Output = Result<PeerProxy, Error>> {
     match fidl::endpoints::create_proxy() {
         Ok((local, remote)) => {
-            let fut = proxy.add_bredr_peer(&parameters, remote);
+            parameters.channel = Some(remote);
+            let fut = proxy.add_bredr_peer(parameters);
             Either::Right(async {
                 let _ = fut
                     .await?
@@ -325,7 +327,7 @@ pub mod expectation {
         )
     }
 
-    pub fn advertising_data_is<S>(data: Vec<u8>) -> Predicate<S>
+    pub fn advertising_data_is<S>(data: AdvertisingData) -> Predicate<S>
     where
         S: 'static + AsRef<EmulatorState>,
     {
@@ -343,7 +345,7 @@ pub mod expectation {
         )
     }
 
-    pub fn scan_response_is<S>(data: Vec<u8>) -> Predicate<S>
+    pub fn scan_response_is<S>(data: AdvertisingData) -> Predicate<S>
     where
         S: 'static + AsRef<EmulatorState>,
     {

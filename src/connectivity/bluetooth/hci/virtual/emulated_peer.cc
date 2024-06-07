@@ -36,10 +36,9 @@ pw::bluetooth::emboss::ConnectionRole ConnectionRoleFromFidl(fbt::ConnectionRole
 
 // static
 EmulatedPeer::Result EmulatedPeer::NewLowEnergy(
-    fuchsia_hardware_bluetooth::LowEnergyPeerParameters parameters,
-    fidl::ServerEnd<fuchsia_hardware_bluetooth::Peer> request,
+    fuchsia_hardware_bluetooth::PeerParameters parameters,
     bt::testing::FakeController* fake_controller, async_dispatcher_t* dispatcher) {
-  ZX_DEBUG_ASSERT(request);
+  ZX_DEBUG_ASSERT(parameters.channel().has_value());
   ZX_DEBUG_ASSERT(fake_controller);
 
   if (!parameters.address().has_value()) {
@@ -48,11 +47,13 @@ EmulatedPeer::Result EmulatedPeer::NewLowEnergy(
   }
 
   bt::BufferView adv, scan_response;
-  if (parameters.advertisement().has_value()) {
-    adv = bt::BufferView(parameters.advertisement()->data());
+  if (parameters.le_advertisement().has_value() &&
+      parameters.le_advertisement()->data().has_value()) {
+    adv = bt::BufferView(parameters.le_advertisement()->data().value());
   }
-  if (parameters.scan_response().has_value()) {
-    scan_response = bt::BufferView(parameters.scan_response()->data());
+  if (parameters.le_scan_response().has_value() &&
+      parameters.le_scan_response()->data().has_value()) {
+    scan_response = bt::BufferView(parameters.le_scan_response()->data().value());
   }
 
   auto address = LeAddressFromFidl(parameters.address().value());
@@ -74,16 +75,15 @@ EmulatedPeer::Result EmulatedPeer::NewLowEnergy(
     return fpromise::error(fuchsia_hardware_bluetooth::EmulatorPeerError::kAddressRepeated);
   }
 
-  return fpromise::ok(std::unique_ptr<EmulatedPeer>(
-      new EmulatedPeer(address, std::move(request), fake_controller, dispatcher)));
+  return fpromise::ok(std::unique_ptr<EmulatedPeer>(new EmulatedPeer(
+      address, std::move(parameters.channel().value()), fake_controller, dispatcher)));
 }
 
 // static
-EmulatedPeer::Result EmulatedPeer::NewBredr(
-    fuchsia_hardware_bluetooth::BredrPeerParameters parameters,
-    fidl::ServerEnd<fuchsia_hardware_bluetooth::Peer> request,
-    bt::testing::FakeController* fake_controller, async_dispatcher_t* dispatcher) {
-  ZX_DEBUG_ASSERT(request);
+EmulatedPeer::Result EmulatedPeer::NewBredr(fuchsia_hardware_bluetooth::PeerParameters parameters,
+                                            bt::testing::FakeController* fake_controller,
+                                            async_dispatcher_t* dispatcher) {
+  ZX_DEBUG_ASSERT(parameters.channel().has_value());
   ZX_DEBUG_ASSERT(fake_controller);
 
   if (!parameters.address().has_value()) {
@@ -98,12 +98,14 @@ EmulatedPeer::Result EmulatedPeer::NewBredr(
   // BR/EDR and LE transport emulation logic.
   auto peer = std::make_unique<bt::testing::FakePeer>(address, fake_controller->pw_dispatcher(),
                                                       connectable, false);
-  if (parameters.device_class().has_value()) {
-    peer->set_class_of_device(bt::DeviceClass(parameters.device_class()->value()));
+
+  peer->set_class_of_device(bt::DeviceClass(bt::DeviceClass::MajorClass::kUnspecified));
+  if (parameters.bredr_device_class().has_value()) {
+    peer->set_class_of_device(bt::DeviceClass(parameters.bredr_device_class()->value()));
   }
-  if (parameters.service_definition().has_value()) {
+  if (parameters.bredr_service_definition().has_value()) {
     std::vector<bt::sdp::ServiceRecord> recs;
-    for (const auto& defn : parameters.service_definition().value()) {
+    for (const auto& defn : parameters.bredr_service_definition().value()) {
       auto rec = bthost::fidl_helpers::ServiceDefinitionToServiceRecord(defn);
       if (rec.is_ok()) {
         recs.emplace_back(std::move(rec.value()));
@@ -120,8 +122,8 @@ EmulatedPeer::Result EmulatedPeer::NewBredr(
     return fpromise::error(fuchsia_hardware_bluetooth::EmulatorPeerError::kAddressRepeated);
   }
 
-  return fpromise::ok(std::unique_ptr<EmulatedPeer>(
-      new EmulatedPeer(address, std::move(request), fake_controller, dispatcher)));
+  return fpromise::ok(std::unique_ptr<EmulatedPeer>(new EmulatedPeer(
+      address, std::move(parameters.channel().value()), fake_controller, dispatcher)));
 }
 
 EmulatedPeer::EmulatedPeer(bt::DeviceAddress address,

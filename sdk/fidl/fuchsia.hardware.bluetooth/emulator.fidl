@@ -104,7 +104,7 @@ const MAX_LEGACY_ADVERTISING_DATA_LENGTH uint8 = 31;
 const MAX_PEER_SERVICES uint8 = 32;
 
 /// Pre-set HCI configurations.
-type HciConfig = strict enum {
+type HciConfig = flexible enum {
     /// Support both BR/EDR and LE in LMP features.
     DUAL_MODE = 1;
 
@@ -113,12 +113,12 @@ type HciConfig = strict enum {
 };
 
 /// The HCI ACL data flow-control parameters.
-type AclBufferSettings = struct {
+type AclBufferSettings = table {
     /// ACL frame MTU in bytes.
-    data_packet_length uint16;
+    1: data_packet_length uint16;
 
     /// The maximum number of ACL frames that the controller can buffer.
-    total_num_data_packets uint8;
+    2: total_num_data_packets uint8;
 };
 
 /// Controller settings used by the emulator.
@@ -145,54 +145,49 @@ type EmulatorSettings = table {
 };
 
 /// Error codes that can be generated for emulator-wide configurations.
-type EmulatorError = strict enum {
+type EmulatorError = flexible enum {
     FAILED = 1;
     HCI_ALREADY_PUBLISHED = 2;
 };
 
 /// Error codes that are generated for functions that manipulate fake peers.
-type EmulatorPeerError = strict enum {
+type EmulatorPeerError = flexible enum {
     ADDRESS_REPEATED = 1;
     PARAMETERS_INVALID = 2;
     NOT_FOUND = 3;
 };
 
-type AdvertisingData = struct {
-    data vector<uint8>:MAX_LEGACY_ADVERTISING_DATA_LENGTH;
+type AdvertisingData = table {
+    1: data vector<uint8>:MAX_LEGACY_ADVERTISING_DATA_LENGTH;
 };
 
-/// Parameters used to emulate a peer's behavior over the Low Energy transport.
-type LowEnergyPeerParameters = table {
-    /// The LE identity address of the peer. This field is mandatory.
+/// Parameters used to emulate a peer's behavior over the BR/EDR/Low Energy transport.
+type PeerParameters = resource table {
+    /// The BD_ADDR of the peer. This field is mandatory.
     1: address bt.Address;
 
     /// When present and true, the peer will send connectable advertisements and accept connection
     /// requests. The peer will ignore connection requests if not connectable.
     2: connectable bool;
 
+    /// The device class reported in the inquiry response for this peer during device discovery. If
+    /// not present, the major device class defaults to uncategorized (device code not specified).
+    3: bredr_device_class bt.DeviceClass;
+
+    // The peer's services that will be discoverable via Service Discovery Protocol. If not
+    /// present, the peer has no services to be discovered (besides the Service Discovery Service).
+    4: bredr_service_definition vector<bredr.ServiceDefinition>:MAX_PEER_SERVICES;
+
     /// The advertising data contents. If not present, the advertising data sent by this peer will
     /// be empty.
-    3: advertisement AdvertisingData;
+    5: le_advertisement AdvertisingData;
 
     /// The scan response data contents. When present, the fake controller will generate scannable
     /// advertising packets and scan response events.
-    4: scan_response AdvertisingData;
-};
+    6: le_scan_response AdvertisingData;
 
-/// Parameters used to emulate a peer's behavior over the BR/EDR transport.
-type BredrPeerParameters = table {
-    /// The BD_ADDR of the peer. This field is mandatory.
-    1: address bt.Address;
-
-    /// When present and true, the peer will accept connection requests. The peer will ignore
-    /// connection requests if not connectable.
-    2: connectable bool;
-
-    /// The device class reported in the inquiry response for this peer during device discovery.
-    3: device_class bt.DeviceClass;
-
-    // The peer's services that will be discoverable via Service Discovery Protocol.
-    4: service_definition vector<bredr.ServiceDefinition>:MAX_PEER_SERVICES;
+    /// Server end of channel bound to Peer protocol.
+    7: channel server_end:Peer;
 };
 
 /// Contains Bluetooth controller & baseband parameters that are writable by the host but don't
@@ -266,8 +261,8 @@ type LegacyAdvertisingState = table {
     5: interval_max uint16;
 
     /// Any configured advertising and scan response data. Present only if either field is non-zero.
-    6: advertising_data vector<uint8>:MAX_LEGACY_ADVERTISING_DATA_LENGTH;
-    7: scan_response vector<uint8>:MAX_LEGACY_ADVERTISING_DATA_LENGTH;
+    6: advertising_data AdvertisingData;
+    7: scan_response AdvertisingData;
 };
 
 /// Protocol used to drive the state of a fake peer device.
@@ -303,15 +298,12 @@ closed protocol Peer {
 /// Protocol used to emulate a Bluetooth controller that supports the standard Bluetooth HCI.
 /// Represents the bt-emulator device protocol. A bt-emulator device is used for configuring and
 /// publishing fake bt-hci devices.
-// TODO(https://fxbug.dev/330591131): Modernize this API
 @discoverable
-closed protocol Emulator {
+open protocol Emulator {
     /// Publish a bt-hci device using the provided `settings`. Each Emulator instance can only
     /// manage a single bt-hci device. Returns Emulator.`HCI_ALREADY_PUBLISHED` if the device has
     /// already been published.
-    strict Publish(struct {
-        settings EmulatorSettings;
-    }) -> () error EmulatorError;
+    flexible Publish(EmulatorSettings) -> () error EmulatorError;
 
     /// Inserts a new LE peer device to be emulated by this controller. Once registered, the state
     /// of the fake peer can be driven and observed using the `peer` handle.
@@ -325,10 +317,7 @@ closed protocol Emulator {
     /// configuration as long as the `peer` channel is open. The emulator stops emulating this peer
     /// when the channel gets closed, which makes it no longer discoverable and not respond to any
     /// requests.
-    strict AddLowEnergyPeer(resource struct {
-        parameters LowEnergyPeerParameters;
-        peer server_end:Peer;
-    }) -> () error EmulatorPeerError;
+    flexible AddLowEnergyPeer(PeerParameters) -> () error EmulatorPeerError;
 
     /// Inserts a new BR/EDR peer device to be emulated by this controller. Once registered, the state
     /// of the fake peer can be driven and observed using the `peer` handle.
@@ -342,39 +331,31 @@ closed protocol Emulator {
     /// configuration as long as the `peer` channel is open. The emulator stops emulating this peer
     /// when the channel gets closed, which makes it no longer discoverable and not respond to any
     /// requests.
-    strict AddBredrPeer(resource struct {
-        parameters BredrPeerParameters;
-        peer server_end:Peer;
-    }) -> () error EmulatorPeerError;
+    flexible AddBredrPeer(PeerParameters) -> () error EmulatorPeerError;
 
-    /// Returns the current controller parameter state. If the parameters have not changed since the
-    /// last time this message was received, then this method does not return until there is a
-    /// change.
-    /// (see [hanging get pattern](https://fuchsia.dev/fuchsia-src/concepts/api/fidl#delay-responses-using-hanging-gets))
-    strict WatchControllerParameters() -> (struct {
-        parameters ControllerParameters;
-    });
+    /// Hanging get pattern for the controller parameter state will not resolve until the state has
+    /// changed from the last response.
+    flexible WatchControllerParameters() -> (ControllerParameters);
 
-    /// Returns the most recent set of state transitions for the link layer LE scan procedure. This
-    /// method returns when there has been a state change since the last invocation of this method
-    /// by this client.
+    /// Returns a vector of the least to most recent states for the link layer LE scan procedure.
+    /// This method returns when there has been at least one state change since the last invocation
+    /// of this method by this client.
     ///
     /// Multiple calls to this method can be outstanding at a given time. All calls will resolve in
     /// a response as soon as there is a change to the scan state.
-    /// (see [hanging get pattern](https://fuchsia.dev/fuchsia-src/concepts/api/fidl#delay-responses-using-hanging-gets))
-    strict WatchLeScanStates() -> (struct {
+    // TODO(https://fxbug.dev/345262024): Update to single hanging get call
+    flexible WatchLeScanStates() -> (struct {
         states vector<LeScanState>:MAX;
     });
 
-    /// Returns the most recent set of state transitions for the link layer LE legacy advertising
-    /// procedure. This method returns when there has been a state change since the last invocation
-    /// of this method by this client.
+    /// Returns a vector of the least to most recent states for the link layer LE legacy
+    /// advertising procedure. This method returns when there has been at least one state change
+    /// since the last invocation of this method by this client.
     ///
-    /// Only one call to this method can be outstanding at a given time. The
-    /// [`fuchsia.hardware.bluetooth/Emulator`] channel will be closed if a call received when one
-    /// is already pending.
-    /// (see [hanging get pattern](https://fuchsia.dev/fuchsia-src/concepts/api/fidl#delay-responses-using-hanging-gets))
-    strict WatchLegacyAdvertisingStates() -> (struct {
+    /// Multiple calls to this method can be outstanding at a given time. All calls will resolve in
+    /// a response as soon as there is a change to the scan state.
+    // TODO(https://fxbug.dev/345262024): Update to single hanging get call
+    flexible WatchLegacyAdvertisingStates() -> (struct {
         states vector<LegacyAdvertisingState>:MAX;
     });
 };

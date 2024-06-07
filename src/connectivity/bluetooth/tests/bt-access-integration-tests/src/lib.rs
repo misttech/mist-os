@@ -9,7 +9,7 @@ use {
         host_watcher::{activate_fake_host, HostWatcherHarness},
     },
     fidl_fuchsia_bluetooth_sys::ProcedureTokenProxy,
-    fidl_fuchsia_hardware_bluetooth::{AdvertisingData, LowEnergyPeerParameters, PeerProxy},
+    fidl_fuchsia_hardware_bluetooth::{AdvertisingData, PeerParameters, PeerProxy},
     fuchsia_bluetooth::{
         constants::INTEGRATION_TIMEOUT,
         expectation::asynchronous::{ExpectableExt, ExpectableStateExt},
@@ -19,20 +19,21 @@ use {
 };
 
 async fn create_le_peer(hci: &Emulator, address: Address) -> Result<PeerProxy, Error> {
-    let peer_params = LowEnergyPeerParameters {
+    let (peer, remote) = fidl::endpoints::create_proxy()?;
+    let peer_params = PeerParameters {
         address: Some(address.into()),
         connectable: Some(true),
-        advertisement: Some(AdvertisingData {
-            data: vec![0x02, 0x01, 0x02], // Flags field set to "general discoverable"
+        le_advertisement: Some(AdvertisingData {
+            data: Some(vec![0x02, 0x01, 0x02]), // Flags field set to "general discoverable"
+            __source_breaking: fidl::marker::SourceBreaking,
         }),
-        scan_response: None,
+        le_scan_response: None,
+        channel: Some(remote),
         ..Default::default()
     };
-
-    let (peer, remote) = fidl::endpoints::create_proxy()?;
     let _ = hci
         .emulator()
-        .add_low_energy_peer(&peer_params, remote)
+        .add_low_energy_peer(peer_params)
         .await?
         .map_err(|e| format_err!("Failed to register fake peer: {:#?}", e))?;
     Ok(peer)

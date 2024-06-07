@@ -28,15 +28,13 @@ class EmulatedPeer : public fidl::Server<fuchsia_hardware_bluetooth::Peer> {
 
   // Registers a peer with the FakeController using the provided LE parameters. Returns the peer on
   // success or an error reporting the failure.
-  static Result NewLowEnergy(fuchsia_hardware_bluetooth::LowEnergyPeerParameters parameters,
-                             fidl::ServerEnd<fuchsia_hardware_bluetooth::Peer> request,
+  static Result NewLowEnergy(fuchsia_hardware_bluetooth::PeerParameters parameters,
                              bt::testing::FakeController* fake_controller,
                              async_dispatcher_t* dispatcher);
 
   // Registers a peer with the FakeController using the provided BR/EDR parameters. Returns the peer
   // on success or an error reporting the failure.
-  static Result NewBredr(fuchsia_hardware_bluetooth::BredrPeerParameters parameters,
-                         fidl::ServerEnd<fuchsia_hardware_bluetooth::Peer> request,
+  static Result NewBredr(fuchsia_hardware_bluetooth::PeerParameters parameters,
                          bt::testing::FakeController* fake_controller,
                          async_dispatcher_t* dispatcher);
 

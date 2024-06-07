@@ -7,12 +7,13 @@ use {
     fidl::endpoints::{create_endpoints, Proxy, ServerEnd},
     fidl_fuchsia_bluetooth::{ConnectionRole, Uuid},
     fidl_fuchsia_bluetooth_le::{
-        AdvertisingData, AdvertisingHandleMarker, AdvertisingModeHint, AdvertisingParameters,
-        PeripheralError, PeripheralStartAdvertisingResult as AdvertisingResult,
+        AdvertisingData as LEAdvertisingData, AdvertisingHandleMarker, AdvertisingModeHint,
+        AdvertisingParameters, PeripheralError,
+        PeripheralStartAdvertisingResult as AdvertisingResult,
     },
     fidl_fuchsia_hardware_bluetooth::{
-        ConnectionState, EmulatorProxy, LegacyAdvertisingType, LowEnergyPeerParameters, PeerProxy,
-        MAX_LEGACY_ADVERTISING_DATA_LENGTH,
+        AdvertisingData, ConnectionState, EmulatorProxy, LegacyAdvertisingType, PeerParameters,
+        PeerProxy, MAX_LEGACY_ADVERTISING_DATA_LENGTH,
     },
     fuchsia_async::{self as fasync, DurationExt, TimeoutExt},
     fuchsia_bluetooth::{
@@ -38,8 +39,8 @@ mod expectation {
     }
 }
 
-fn empty_advertising_data() -> AdvertisingData {
-    AdvertisingData {
+fn empty_advertising_data() -> LEAdvertisingData {
+    LEAdvertisingData {
         name: None,
         appearance: None,
         tx_power_level: None,
@@ -82,15 +83,16 @@ fn default_address() -> Address {
 
 async fn add_fake_peer(proxy: &EmulatorProxy, address: &Address) -> Result<PeerProxy, Error> {
     let (local, remote) = fidl::endpoints::create_proxy()?;
-    let params = LowEnergyPeerParameters {
+    let params = PeerParameters {
         address: Some(address.into()),
         connectable: Some(true),
-        advertisement: None,
-        scan_response: None,
+        le_advertisement: None,
+        le_scan_response: None,
+        channel: Some(remote),
         ..Default::default()
     };
     let _ = proxy
-        .add_low_energy_peer(&params, remote)
+        .add_low_energy_peer(params)
         .await?
         .map_err(|e| format_err!("Failed to register fake peer: {:?}", e))?;
     Ok(local)
@@ -153,7 +155,7 @@ async fn test_advertising_data_too_long(harness: PeripheralHarness) {
 
     // Assign a very long name.
     let mut params = default_parameters();
-    params.data = Some(AdvertisingData {
+    params.data = Some(LEAdvertisingData {
         name: Some(repeat("x").take(LENGTH).collect::<String>()),
         ..empty_advertising_data()
     });
@@ -168,7 +170,7 @@ async fn test_scan_response_data_too_long(harness: PeripheralHarness) {
 
     // Assign a very long name.
     let mut params = default_parameters();
-    params.scan_response = Some(AdvertisingData {
+    params.scan_response = Some(LEAdvertisingData {
         name: Some(repeat("x").take(LENGTH).collect::<String>()),
         ..empty_advertising_data()
     });
@@ -256,7 +258,7 @@ async fn test_advertising_type_adv_scan_ind(harness: PeripheralHarness) {
     // Scannable
     let params = AdvertisingParameters {
         connectable: Some(false),
-        scan_response: Some(AdvertisingData {
+        scan_response: Some(LEAdvertisingData {
             name: Some("hello".to_string()),
             ..empty_advertising_data()
         }),
@@ -279,7 +281,7 @@ async fn test_advertising_type_adv_ind_connectable_scannable(harness: Peripheral
     // Connectable and scannable
     let params = AdvertisingParameters {
         connectable: Some(true),
-        scan_response: Some(AdvertisingData {
+        scan_response: Some(LEAdvertisingData {
             name: Some("hello".to_string()),
             ..empty_advertising_data()
         }),
@@ -367,27 +369,34 @@ async fn test_advertising_modes(harness: PeripheralHarness) {
 async fn test_advertising_data(harness: PeripheralHarness) {
     // Test that encoding one field works. The serialization of other fields is unit tested elsewhere.
     let params = AdvertisingParameters {
-        data: Some(AdvertisingData { name: Some("hello".to_string()), ..empty_advertising_data() }),
+        data: Some(LEAdvertisingData {
+            name: Some("hello".to_string()),
+            ..empty_advertising_data()
+        }),
         ..default_parameters()
     };
     let (_handle, handle_remote) = create_endpoints::<AdvertisingHandleMarker>();
     let result = start_advertising(&harness, params, handle_remote).await.unwrap();
     result.expect("failed to start advertising");
 
-    let data = vec![
-        // Flags (General discoverable mode)
-        0x02,
-        0x01,
-        0x02,
-        // The local name, as above.
-        0x06,
-        0x09,
-        ('h' as u8),
-        ('e' as u8),
-        ('l' as u8),
-        ('l' as u8),
-        ('o' as u8),
-    ];
+    let data: AdvertisingData = AdvertisingData {
+        data: Some(vec![
+            // Flags (General discoverable mode)
+            0x02,
+            0x01,
+            0x02,
+            // The local name, as above.
+            0x06,
+            0x09,
+            ('h' as u8),
+            ('e' as u8),
+            ('l' as u8),
+            ('l' as u8),
+            ('o' as u8),
+        ]),
+        __source_breaking: fidl::marker::SourceBreaking,
+    };
+
     let _ = harness
         .when_satisfied(
             emulator::expectation::advertising_is_enabled(true)
@@ -402,7 +411,7 @@ async fn test_advertising_data(harness: PeripheralHarness) {
 async fn test_scan_response(harness: PeripheralHarness) {
     // Test that encoding one field works. The serialization of other fields is unit tested elsewhere.
     let params = AdvertisingParameters {
-        data: Some(AdvertisingData {
+        data: Some(LEAdvertisingData {
             service_uuids: Some(vec![Uuid {
                 value: [
                     0xFB, 0x34, 0x9B, 0x5F, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0x0d,
@@ -411,7 +420,7 @@ async fn test_scan_response(harness: PeripheralHarness) {
             }]),
             ..empty_advertising_data()
         }),
-        scan_response: Some(AdvertisingData {
+        scan_response: Some(LEAdvertisingData {
             name: Some("hello".to_string()),
             ..empty_advertising_data()
         }),
@@ -421,20 +430,27 @@ async fn test_scan_response(harness: PeripheralHarness) {
     let result = start_advertising(&harness, params, handle_remote).await.unwrap();
     result.expect("failed to start advertising");
 
-    let data = vec![
-        0x02, 0x01, 0x02, // Flags (General discoverable mode)
-        0x03, 0x02, 0x0d, 0x18, // Incomplete list of service UUIDs
-    ];
-    let scan_rsp = vec![
-        // The local name, as above.
-        0x06,
-        0x09,
-        ('h' as u8),
-        ('e' as u8),
-        ('l' as u8),
-        ('l' as u8),
-        ('o' as u8),
-    ];
+    let data: AdvertisingData = AdvertisingData {
+        data: Some(vec![
+            0x02, 0x01, 0x02, // Flags (General discoverable mode)
+            0x03, 0x02, 0x0d, 0x18, // Incomplete list of service UUIDs
+        ]),
+        __source_breaking: fidl::marker::SourceBreaking,
+    };
+    let scan_rsp: AdvertisingData = AdvertisingData {
+        data: Some(vec![
+            // The local name, as above.
+            0x06,
+            0x09,
+            ('h' as u8),
+            ('e' as u8),
+            ('l' as u8),
+            ('l' as u8),
+            ('o' as u8),
+        ]),
+        __source_breaking: fidl::marker::SourceBreaking,
+    };
+
     let _ = harness
         .when_satisfied(
             emulator::expectation::advertising_is_enabled(true)
