@@ -1,6 +1,3 @@
-<!--
-// LINT.IfChange
--->
 <!-- mdformat off(templates not supported) -->
 {% set rfcid = "RFC-0238" %}
 {% include "docs/contribute/governance/rfcs/_common/_rfc_header.md" %}
@@ -292,9 +289,15 @@ Returns the *stream size* of the VMO.
 If the *size* argument is greater than the size of the VMO, this operation
 returns **ZX_ERR_OUT_OF_RANGE**.
 
-Overwrites the stream size of the VMO to the *size* argument and zeros the
-rest of the VMO. This behavior matches the previous behavior of setting the
-content size.
+Overwrites the stream size of the VMO to the *size* argument and zeroes from the
+smaller of *size* and the previous stream size to the end of the VMO. This
+differs from the previous behavior of setting the content size where zeroing
+would only happen from the new *size* to the end of the VMO. This difference
+means that when the stream size is increased the newly revealed range is zeroed.
+
+This behavior change ensures that newly revealed content is always zero even if
+the VMO beyond the stream size had been modified via other means, such as a
+direct memory mapping.
 
 If this operation shrinks the data stream, any pages that no longer overlap
 with the data stream mapped with the **ZX_VM_FAULT_BEYOND_STREAM_SIZE** option
