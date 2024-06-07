@@ -149,7 +149,7 @@ class BuildBucketTool(object):
 
 def fetch_reproxy_log_from_bbid(
     bbpath: Path, bbid: str, verbose: bool = False
-) -> Optional[Path]:
+) -> Path | None:
     bb = BuildBucketTool(bbpath)
 
     # Get the build that actually used RBE, and has an reproxy log.

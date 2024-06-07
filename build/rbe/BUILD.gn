@@ -83,11 +83,11 @@ if (is_host) {
   }
 
   python_library("build_summary") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _build_summary_sources
   }
   python_host_test("build_summary_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "build_summary_test.py"
     sources = _build_summary_sources
   }

@@ -15,7 +15,7 @@ import tablefmt
 # Rather than depend on the proto (from reclient source),
 import textpb
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional, Sequence, Tuple
+from typing import Any, Iterable, Sequence, Tuple
 
 _SCRIPT = Path(__file__)
 
@@ -40,7 +40,7 @@ def _main_arg_parser() -> argparse.ArgumentParser:
 _MAIN_ARG_PARSER = _main_arg_parser()
 
 
-def labels_to_dict(labels: str) -> Dict[str, str]:
+def labels_to_dict(labels: str) -> dict[str, str]:
     result = {}
     for label in labels.split(","):
         k, _, v = label.partition("=")
@@ -64,7 +64,7 @@ def get_action_category_from_labels(labels: str) -> str:
     return action_toolname or "other"
 
 
-def get_action_category_and_metric(text: str) -> Tuple[Optional[str], str]:
+def get_action_category_and_metric(text: str) -> Tuple[str | None, str]:
     if not text.startswith("["):
         return None, text
     if "]." not in text:
@@ -75,48 +75,50 @@ def get_action_category_and_metric(text: str) -> Tuple[Optional[str], str]:
     return None, metric
 
 
-def _get_stat_name(stat: Dict[str, Any]) -> str:
+def _get_stat_name(stat: dict[str, Any]) -> str:
     # based on textpb structure and stats.Stat_pb2 proto
     return stat["name"][0].text.strip('"')
 
 
-def _get_stat_count(stat: Dict[str, Any]) -> int:
+def _get_stat_count(stat: dict[str, Any]) -> int:
     return int(stat["count"][0].text)
 
 
-def _counts_by_value_to_dict(fields: Iterable[Any]) -> Dict[str, int]:
+def _counts_by_value_to_dict(fields: Iterable[Any]) -> dict[str, int]:
     # based on the structure returned by textpb.parse()
     return {_get_stat_name(entry): _get_stat_count(entry) for entry in fields}
 
 
 def build_metric_table(
     name: str,
-    data_source: Dict[str, Dict[str, int]],  # [action_category][value]: count
+    data_source: dict[str, dict[str, int]],  # [action_category][value]: count
     column_headers: Sequence[str],
     include_header: bool = True,
     with_totals: bool = False,
 ) -> Sequence[Sequence[Any]]:
     """Construct a numeric table of data (2D)."""
-    rows = set()
+    rows: set[str] = set()
     for v in data_source.values():
         rows.update(v.keys())
 
     ordered_rows = sorted(rows)
 
-    totals_row = tablefmt.create_table(1, len(column_headers) + 1)
-    totals_row[0] = "total"
-    totals_row[1:] = [0 for _ in range(len(column_headers))]
+    totals_row = [0 for _ in range(len(column_headers))]
 
-    table = tablefmt.create_table(len(rows), len(column_headers) + 1)
+    table: list[list[int | str]] = tablefmt.create_table(
+        len(rows), len(column_headers)
+    )
     for r, row in enumerate(ordered_rows):
         table[r][0] = "  " + row  # visual hang-indentation
         for c, col in enumerate(column_headers):
             count = data_source[col].get(row, 0)
             table[r][c + 1] = count
-            totals_row[c + 1] += count  # for the "total" row
+            totals_row[c] = (
+                int(totals_row[c + 1]) + count
+            )  # for the "total" row
 
     # Assemble the table with optional header/totals.
-    final_table = []
+    final_table: list[Any] = []
     if include_header:
         final_table.append(tablefmt.make_table_header(column_headers, name))
     else:
@@ -127,14 +129,14 @@ def build_metric_table(
     final_table.extend(table)
 
     if with_totals:
-        final_table.append(totals_row)
+        final_table.append(["totals", *[str(t) for t in totals_row]])
 
     return final_table
 
 
 def build_metric_row(
     name: str,
-    data_source: Dict[str, int],  # [action_category]: number
+    data_source: dict[str, int],  # [action_category]: number
     column_headers: Sequence[str],
     include_header: bool = True,
 ) -> Sequence[Sequence[Any]]:
@@ -167,8 +169,8 @@ def main(argv: Sequence[str]) -> int:
     stats = {_get_stat_name(stat): stat for stat in data["stats"]}
 
     # Construct a table by action type
-    status_metrics = collections.defaultdict(dict)
-    bandwidth_metrics = collections.defaultdict(dict)
+    status_metrics: dict[str, dict[str, Any]] = collections.defaultdict(dict)
+    bandwidth_metrics: dict[str, dict[str, Any]] = collections.defaultdict(dict)
 
     for name, fields in stats.items():
         # Extract labels from name (if applicable)
@@ -202,29 +204,29 @@ def main(argv: Sequence[str]) -> int:
 
     # Align cells across multiple tables by viewing as a single table.
     # All cell values in these tables are numeric, and thus, right-aligned.
-    joint_table = (
-        [shared_header]
-        + build_metric_table(
+    joint_table = [
+        *shared_header,
+        *build_metric_table(
             "CompletionStatus",
             status_metrics["CompletionStatus"],
             ordered_action_categories,
             include_header=False,
             with_totals=True,
-        )
-        + [blank_row]
-        + build_metric_row(
+        ),
+        *blank_row,
+        *build_metric_row(
             "BytesDownloaded",
             bandwidth_metrics["RemoteMetadata.RealBytesDownloaded"],
             ordered_action_categories,
             include_header=False,
-        )
-        + build_metric_row(
+        ),
+        *build_metric_row(
             "BytesUploaded",
             bandwidth_metrics["RemoteMetadata.RealBytesUploaded"],
             ordered_action_categories,
             include_header=False,
-        )
-    )
+        ),
+    ]
 
     # Render multi-table.
     script_rel = os.path.relpath(str(_SCRIPT), start=os.curdir)
@@ -233,6 +235,7 @@ def main(argv: Sequence[str]) -> int:
     )
     for row in tablefmt.format_numeric_table(joint_table):
         print(row)
+    return 0
 
 
 if __name__ == "__main__":

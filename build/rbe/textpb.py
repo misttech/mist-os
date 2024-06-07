@@ -13,7 +13,7 @@ import re
 import sys
 
 from pathlib import Path
-from typing import Any, Dict, Iterable, Sequence
+from typing import Any, Iterable, Iterator, Sequence
 
 
 class TokenType(enum.Enum):
@@ -108,7 +108,7 @@ class ParseError(ValueError):
         super().__init__(msg)
 
 
-def _auto_dict(values: Sequence[Any]):
+def _auto_dict(values: Sequence[Any]) -> Any:
     """Convert sequences of key-value pairs to dictionaries."""
     if len(values) == 0:
         return values
@@ -123,9 +123,7 @@ def _auto_dict(values: Sequence[Any]):
     return values
 
 
-def _parse_block(
-    tokens: Iterable[Token], top: bool
-) -> Dict[str, Sequence[Any]]:
+def _parse_block(tokens: Iterator[Token], top: bool) -> dict[str, Any]:
     """Parse text proto tokens into a structure.
 
     Args:
@@ -167,6 +165,7 @@ def _parse_block(
                 "Unexpected EOF, expecting a value or start-of-block."
             )
 
+        value: dict[str, Any] | Token
         if value_or_block.type == TokenType.START_BLOCK:
             value = _parse_block(tokens, top=False)
         elif value_or_block.type in {
@@ -183,11 +182,11 @@ def _parse_block(
     return {k: _auto_dict(v) for k, v in result.items()}
 
 
-def _parse_tokens(tokens: Iterable[Token]) -> Dict[str, Sequence[Any]]:
+def _parse_tokens(tokens: Iterator[Token]) -> dict[str, Any]:
     return _parse_block(tokens, top=True)
 
 
-def parse(lines: Iterable[str]) -> Dict[str, Sequence[Any]]:
+def parse(lines: Iterable[str]) -> dict[str, Any]:
     """Parse a text protobuf into a recursive dictionary.
 
     Args:

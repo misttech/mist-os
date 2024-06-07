@@ -2583,7 +2583,7 @@ def remote_action_from_args(
     input_list_paths: Sequence[Path] = None,
     output_files: Sequence[Path] = None,
     output_dirs: Sequence[Path] = None,
-    **kwargs,  # other RemoteAction __init__ params
+    **kwargs: Any,  # other RemoteAction __init__ params
 ) -> RemoteAction:
     """Construct a remote action based on argparse parameters."""
     inputs = (inputs or []) + [

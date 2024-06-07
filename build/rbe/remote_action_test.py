@@ -1782,7 +1782,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
             Path(local_trace + ".norm"), Path(remote_trace + ".norm")
         )
 
-    def test_local_check_determinism(self):
+    def test_local_check_determinism(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
         working_dir = exec_root / build_dir

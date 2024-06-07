@@ -5,7 +5,7 @@
 
 import contextlib
 import io
-from typing import Any, Dict
+from typing import Any
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -125,7 +125,7 @@ class BuildBucketToolTests(unittest.TestCase):
     def test_get_rbe_build_info_no_child(self) -> None:
         bb = bbtool.BuildBucketTool()
         bbid = "8888"
-        build_json: Dict[str, Any] = {"output": {"properties": {}}}
+        build_json: dict[str, Any] = {"output": {"properties": {}}}
         with mock.patch.object(
             bbtool.BuildBucketTool, "get_json_fields", return_value=build_json
         ) as mock_get_json:
@@ -179,7 +179,7 @@ class FetchReproxyLogFromBbidTests(unittest.TestCase):
         mock_fetch_log.assert_called_once()
 
     def test_no_rpl_files(self) -> None:
-        bb_json: Dict[str, Any] = {"output": {"properties": {}}}
+        bb_json: dict[str, Any] = {"output": {"properties": {}}}
         with mock.patch.object(
             bbtool.BuildBucketTool,
             "get_rbe_build_info",
