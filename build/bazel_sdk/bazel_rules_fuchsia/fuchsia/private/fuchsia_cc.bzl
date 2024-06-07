@@ -191,6 +191,7 @@ def fuchsia_wrap_cc_binary(
 def fuchsia_cc_binary(
         *,
         name,
+        bin_name = None,
         sdk_root_label = "@fuchsia_sdk",
         clang_root_label = "@fuchsia_clang",
         tags = ["manual"],
@@ -202,6 +203,7 @@ def fuchsia_cc_binary(
 
     Args:
         name: The target name.
+        bin_name: The filename to place under bin/. Defaults to name.
         sdk_root_label: Optionally override the root label of the fuchsia sdk repo.
         clang_root_label: Optionally override the root label of the fuchsia clang repo.
         tags: Tags to set for all generated targets. This type of target is marked "manual" by default.
@@ -224,6 +226,7 @@ def fuchsia_cc_binary(
     )
     fuchsia_wrap_cc_binary(
         name = name,
+        bin_name = bin_name,
         cc_binary = "_%s_native" % name,
         exact_cc_binary_deps = cc_binary_kwargs["deps"] if "deps" in cc_binary_kwargs else [],
         sdk_root_label = sdk_root_label,
