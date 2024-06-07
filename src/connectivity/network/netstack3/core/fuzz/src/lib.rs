@@ -36,6 +36,7 @@ use packet_formats::{
     tcp::TcpSegmentBuilder,
     udp::UdpPacketBuilder,
 };
+use tracing::info;
 
 mod print_on_panic {
     use core::fmt::Display;
@@ -426,9 +427,9 @@ pub(crate) fn single_device_arbitrary_packets(input: FuzzInput) {
 
     let FuzzInput { actions } = input;
 
-    tracing::info!("Processing {} actions", actions.len());
+    info!("Processing {} actions", actions.len());
     for action in actions {
-        tracing::info!("{}", action);
+        info!("{}", action);
         dispatch(&mut ctx, device_id, action);
     }
 

@@ -54,7 +54,7 @@ use fuchsia_zircon as zx;
 use futures::{channel::mpsc, select, FutureExt as _, StreamExt as _};
 use packet::{Buf, BufferMut};
 use rand::{rngs::OsRng, CryptoRng, RngCore};
-use tracing::{error, info};
+use tracing::{debug, error, info, warn};
 use util::{ConversionContext, IntoFidl as _};
 
 use devices::{
@@ -555,7 +555,7 @@ fn send_netdevice_frame(
     if *phy_up && *admin_enabled {
         handler
             .send(frame.as_ref(), frame_type)
-            .unwrap_or_else(|e| tracing::warn!("failed to send frame to {:?}: {:?}", handler, e))
+            .unwrap_or_else(|e| warn!("failed to send frame to {:?}: {:?}", handler, e))
     }
     Ok(())
 }
@@ -732,14 +732,12 @@ impl<T> ReferenceReceiver<T> {
         T: 'a,
     {
         let Self { receiver, debug_references: refs } = self;
-        tracing::debug!("{resource_name} {resource_id:?} removal is pending references: {refs:?}");
+        debug!("{resource_name} {resource_id:?} removal is pending references: {refs:?}");
         // If we get stuck trying to remove the resource, log the remaining refs
         // at a low frequency to aid debugging.
         let interval_logging = fasync::Interval::new(zx::Duration::from_seconds(30))
             .map(move |()| {
-                tracing::warn!(
-                    "{resource_name} {resource_id:?} removal is pending references: {refs:?}"
-                )
+                warn!("{resource_name} {resource_id:?} removal is pending references: {refs:?}")
             })
             .collect::<()>();
 
@@ -1228,7 +1226,7 @@ impl NetstackSeed {
                     Ok(()) => (),
                     Err(e) => {
                         if !e.is_closed() {
-                            tracing::error!("error {e:?} collecting watchers");
+                            error!("error {e:?} collecting watchers");
                         }
                     }
                 })
@@ -1421,7 +1419,7 @@ impl NetstackSeed {
                             )
                             .await
                             .unwrap_or_else(|e| {
-                                tracing::error!(
+                                error!(
                                     "error serving {}: {e:?}",
                                     fnet_routes_admin::RouteTableProviderV4Marker::DEBUG_NAME
                                 );
@@ -1435,7 +1433,7 @@ impl NetstackSeed {
                             )
                             .await
                             .unwrap_or_else(|e| {
-                                tracing::error!(
+                                error!(
                                     "error serving {}: {e:?}",
                                     fnet_routes_admin::RouteTableProviderV6Marker::DEBUG_NAME
                                 );
@@ -1448,7 +1446,7 @@ impl NetstackSeed {
                         )
                         .await
                         .unwrap_or_else(|e| {
-                            tracing::error!(
+                            error!(
                                 "error serving {}: {e:?}",
                                 fidl_fuchsia_net_root::RoutesV4Marker::DEBUG_NAME
                             );
@@ -1460,7 +1458,7 @@ impl NetstackSeed {
                         )
                         .await
                         .unwrap_or_else(|e| {
-                            tracing::error!(
+                            error!(
                                 "error serving {}: {e:?}",
                                 fidl_fuchsia_net_root::RoutesV6Marker::DEBUG_NAME
                             );
@@ -1476,7 +1474,7 @@ impl NetstackSeed {
                                 .await
                         }
                         Service::InterfacesAdmin(installer) => {
-                            tracing::debug!(
+                            debug!(
                                 "serving {}",
                                 fidl_fuchsia_net_interfaces_admin::InstallerMarker::PROTOCOL_NAME
                             );

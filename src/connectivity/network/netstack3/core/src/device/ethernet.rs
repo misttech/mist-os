@@ -50,6 +50,7 @@ use packet_formats::{
     ipv4::Ipv4FragmentType,
     utils::NonZeroDuration,
 };
+use tracing::debug;
 
 use crate::{
     context::{prelude::*, WrapLockLevel},
@@ -210,7 +211,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>
         <Self as CounterContext<NdpCounters>>::increment(self, |counters| {
             &counters.tx.neighbor_solicitation
         });
-        tracing::debug!("sending NDP solicitation for {lookup_addr} to {dst_ip}");
+        debug!("sending NDP solicitation for {lookup_addr} to {dst_ip}");
         // TODO(https://fxbug.dev/42165912): Either panic or guarantee that this error
         // can't happen statically.
         let _: Result<(), _> = icmp::send_ndp_packet(

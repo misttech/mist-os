@@ -28,6 +28,7 @@ use netstack3_core::{
     },
     tcp, udp,
 };
+use tracing::{debug, error};
 
 use crate::bindings::{
     devices::{
@@ -45,7 +46,7 @@ fn log_not_supported(name: &str) {
     let location = Location::caller();
     // TODO(https://fxbug.dev/343992493): don't embed location in the log
     // message when better track_caller support is available.
-    tracing::debug!("{location}: {} not supported", name);
+    debug!("{location}: {} not supported", name);
 }
 
 macro_rules! respond_not_supported {
@@ -88,10 +89,7 @@ pub(crate) async fn serve(
                 Ok(req) => req,
                 Err(e) => {
                     if !e.is_closed() {
-                        tracing::error!(
-                            "{} request error {e:?}",
-                            psocket::ProviderMarker::DEBUG_NAME
-                        );
+                        error!("{} request error {e:?}", psocket::ProviderMarker::DEBUG_NAME);
                     }
                     return;
                 }

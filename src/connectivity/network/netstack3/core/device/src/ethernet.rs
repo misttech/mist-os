@@ -36,7 +36,7 @@ use packet_formats::{
         ETHERNET_HDR_LEN_NO_TAG,
     },
 };
-use tracing::trace;
+use tracing::{error, trace};
 
 use crate::internal::{
     arp::{ArpFrameMetadata, ArpPacketHandler, ArpState, ArpTimerId},
@@ -163,7 +163,7 @@ where
         }
         Err(TransmitQueueFrameError::NoQueue(e)) => {
             core_ctx.increment(device_id, |counters| &counters.send_dropped_no_queue);
-            tracing::error!("device {device_id:?} not ready to send frame: {e:?}");
+            error!("device {device_id:?} not ready to send frame: {e:?}");
             Ok(())
         }
         Err(TransmitQueueFrameError::QueueFull(s)) => {

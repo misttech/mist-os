@@ -13,6 +13,7 @@ use packet::{
     new_buf_vec, Buf, BufferAlloc, ContiguousBuffer, GrowBufferMut, NoReuseBufferProvider,
     ReusableBuffer, Serializer,
 };
+use tracing::trace;
 
 use crate::internal::{
     base::DeviceSendFrameError,
@@ -161,11 +162,7 @@ pub(super) fn deliver_to_device_sockets<
             bytes,
         ),
         Err(ParseSentFrameError) => {
-            tracing::trace!(
-                "failed to parse outgoing frame on {:?} ({} bytes)",
-                device_id,
-                bytes.len()
-            )
+            trace!("failed to parse outgoing frame on {:?} ({} bytes)", device_id, bytes.len())
         }
     }
 }

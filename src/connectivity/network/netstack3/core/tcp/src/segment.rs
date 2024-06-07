@@ -11,6 +11,7 @@ use core::{
 };
 
 use packet_formats::tcp::options::TcpOption;
+use tracing::info;
 
 use crate::internal::{
     base::{Control, Mss},
@@ -62,7 +63,7 @@ impl Options {
                     //   value larger than 14, the TCP SHOULD log the error but
                     //   MUST use 14 instead of the specified value.
                     if ws > WindowScale::MAX.get() {
-                        tracing::info!(
+                        info!(
                             "received an out-of-range window scale: {}, want < {}",
                             ws,
                             WindowScale::MAX.get()

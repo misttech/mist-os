@@ -40,6 +40,7 @@ use packet_formats::{
     ipv6::Ipv6Packet,
     utils::NonZeroDuration,
 };
+use tracing::{debug, error, warn};
 use zerocopy::ByteSlice;
 
 pub(crate) mod api;
@@ -538,7 +539,7 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
             core_ctx
                 .send_ip_packet_to_neighbor_link_addr(bindings_ctx, link_address, body)
                 .unwrap_or_else(|_: Buf<Vec<u8>>| {
-                    tracing::error!("failed to send pending IP packet to neighbor {link_address:?}")
+                    error!("failed to send pending IP packet to neighbor {link_address:?}")
                 })
         }
         for notifier in notifiers.drain(..) {
@@ -2149,9 +2150,7 @@ fn handle_neighbor_timer<I, D, CC, BC>(
                         // TODO(https://fxbug.dev/42082448): consider retaining this neighbor entry in
                         // a sentinel `Failed` state, equivalent to its having been discarded except
                         // for debugging/observability purposes.
-                        tracing::debug!(
-                            "neighbor resolution failed for {lookup_addr}; removing entry"
-                        );
+                        debug!("neighbor resolution failed for {lookup_addr}; removing entry");
                         let Incomplete {
                             transmit_counter: _,
                             ref mut pending_frames,
@@ -2294,10 +2293,7 @@ fn handle_neighbor_timer<I, D, CC, BC>(
                 let Some((packet, original_src_ip, original_dst_ip)) = frame
                     .parse_mut::<I::Packet<_>>()
                     .map_err(|e| {
-                        tracing::warn!(
-                            "not sending ICMP dest unreachable due to parsing error: {:?}",
-                            e
-                        );
+                        warn!("not sending ICMP dest unreachable due to parsing error: {:?}", e);
                     })
                     .ok()
                     .and_then(|packet| {
@@ -2363,7 +2359,7 @@ impl<
         link_address: D::Address,
         source: DynamicNeighborUpdateSource,
     ) {
-        tracing::debug!("received neighbor {:?} from {}", source, neighbor);
+        debug!("received neighbor {:?} from {}", source, neighbor);
         self.with_nud_state_mut_and_sender_ctx(
             device_id,
             |NudState { neighbors, last_gc, timer_heap }, core_ctx| {
@@ -2560,7 +2556,7 @@ pub fn confirm_reachable<I, D, CC, BC>(
         |NudState { neighbors, last_gc: _, timer_heap }, core_ctx| {
             match neighbors.entry(neighbor) {
                 Entry::Vacant(_) => {
-                    tracing::debug!(
+                    debug!(
                         "got an upper-layer confirmation for non-existent neighbor entry {}",
                         neighbor
                     );

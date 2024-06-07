@@ -439,7 +439,7 @@ impl<
                         I::map_ip::<_, ()>(
                             WrapBroadcastMarker(marker),
                             |WrapBroadcastMarker(())| {
-                                tracing::debug!(
+                                debug!(
                                     "can't confirm {dst:?}@{device:?} as reachable: \
                                                  dst is a broadcast address"
                                 );
@@ -452,7 +452,7 @@ impl<
                 self.confirm_reachable(bindings_ctx, &device, neighbor);
             }
             None => {
-                tracing::debug!("can't confirm {dst:?}@{device:?} as reachable: no route");
+                debug!("can't confirm {dst:?}@{device:?} as reachable: no route");
             }
         }
     }

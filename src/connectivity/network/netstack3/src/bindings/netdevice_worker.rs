@@ -33,6 +33,7 @@ use netstack3_core::{
     routes::RawMetric,
     sync::RwLock as CoreRwLock,
 };
+use tracing::{debug, error, info, warn};
 
 use crate::bindings::{
     devices, interfaces_admin, routes, trace_duration, BindingId, BindingsCtx, Ctx, DeviceId,
@@ -141,7 +142,7 @@ impl NetdeviceWorker {
             let id = if let Some(id) = state.lock().await.get(&port) {
                 id.clone()
             } else {
-                tracing::debug!("dropping frame for port {:?}, no device mapping available", port);
+                debug!("dropping frame for port {:?}, no device mapping available", port);
                 continue;
             };
 
@@ -151,7 +152,7 @@ impl NetdeviceWorker {
             // TODO(https://fxbug.dev/42051635): pass strongly owned buffers down
             // to the stack instead of copying it out.
             rx.read_at(0, &mut buff[..frame_length]).map_err(|e| {
-                tracing::error!("failed to read from buffer {:?}", e);
+                error!("failed to read from buffer {:?}", e);
                 Error::Client(e)
             })?;
 
@@ -160,9 +161,7 @@ impl NetdeviceWorker {
                 // be removed under us. Note that when the device removal has
                 // completed, the interface's `PortHandler` will be uninstalled
                 // from the port slab (table of ports for this network device).
-                tracing::debug!(
-                    "received frame for device after it has been removed; device_id={id:?}"
-                );
+                debug!("received frame for device after it has been removed; device_id={id:?}");
                 // We continue because even though we got frames for a removed
                 // device, this network device may have other ports that will
                 // receive and handle frames.
@@ -350,7 +349,7 @@ impl DeviceHandler {
 
         let wire_format = PortWireFormat::new_from_port_info(&base_info).map_err(
             |e: PortWireFormatError<'_>| {
-                tracing::warn!("not installing port with invalid wire format: {:?}", e);
+                warn!("not installing port with invalid wire format: {:?}", e);
                 Error::ConfigurationNotSupported
             },
         )?;
@@ -387,7 +386,7 @@ impl DeviceHandler {
         let mut state = state.lock().await;
         let state_entry = match state.entry(port) {
             netdevice_client::port_slab::Entry::Occupied(occupied) => {
-                tracing::warn!(
+                warn!(
                     "attempted to install port {:?} which is already installed for {:?}",
                     port,
                     occupied.get()
@@ -395,10 +394,9 @@ impl DeviceHandler {
                 return Err(Error::AlreadyInstalled(port));
             }
             netdevice_client::port_slab::Entry::SaltMismatch(stale) => {
-                tracing::warn!(
+                warn!(
                     "attempted to install port {:?} which is already has a stale entry: {:?}",
-                    port,
-                    stale
+                    port, stale
                 );
                 return Err(Error::AlreadyInstalled(port));
             }
@@ -543,7 +541,7 @@ impl DeviceHandler {
             .update_configuration(&core_id, Ipv4DeviceConfigurationUpdate { ip_config })
             .unwrap();
 
-        tracing::info!("created interface {:?}", core_id);
+        info!("created interface {:?}", core_id);
         ctx.bindings_ctx().devices.add_device(binding_id, core_id);
 
         Ok((binding_id, status_stream, task))
@@ -562,12 +560,12 @@ async fn get_mac(
 
     let mac_addr = {
         let fnet::MacAddress { octets } = mac_proxy.get_unicast_address().await.map_err(|e| {
-            tracing::warn!("failed to get unicast address, sending not supported: {:?}", e);
+            warn!("failed to get unicast address, sending not supported: {:?}", e);
             Error::ConfigurationNotSupported
         })?;
         let mac = net_types::ethernet::Mac::new(octets);
         net_types::UnicastAddr::new(mac).ok_or_else(|| {
-            tracing::warn!("{} is not a valid unicast address", mac);
+            warn!("{} is not a valid unicast address", mac);
             Error::MacNotUnicast { mac, port: *port }
         })?
     };
@@ -581,9 +579,7 @@ async fn get_mac(
             .await
             .map_err(Error::CantConnectToPort)?,
     )
-    .unwrap_or_else(|e| {
-        tracing::warn!("failed to set multicast promiscuous for new interface: {:?}", e)
-    });
+    .unwrap_or_else(|e| warn!("failed to set multicast promiscuous for new interface: {:?}", e));
 
     Ok((mac_addr, mac_proxy))
 }

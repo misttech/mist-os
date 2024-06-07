@@ -27,6 +27,7 @@ use netstack3_device::{
     DeviceLayerTypes, DeviceSendFrameError, IpLinkDeviceState,
 };
 use packet::Buf;
+use tracing::error;
 
 use crate::{
     context::{prelude::*, WrapLockLevel},
@@ -137,7 +138,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
             Ok(()) => {}
             Err(ReceiveQueueFullError((LoopbackRxQueueMeta, _frame))) => {
                 // RX queue is full - there is nothing further we can do here.
-                tracing::error!("dropped RX frame on loopback device due to full RX queue")
+                error!("dropped RX frame on loopback device due to full RX queue")
             }
         }
 

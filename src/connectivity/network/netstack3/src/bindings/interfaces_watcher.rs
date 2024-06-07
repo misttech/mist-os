@@ -18,6 +18,7 @@ use futures::{
 };
 use net_types::ip::{AddrSubnetEither, IpAddr, IpVersion};
 use netstack3_core::ip::IpAddressState;
+use tracing::{debug, error, warn};
 
 use crate::bindings::{
     devices::BindingId,
@@ -229,14 +230,14 @@ impl Watcher {
         if let Some(responder) = responder.take() {
             match responder.send(&event) {
                 Ok(()) => (),
-                Err(e) => tracing::error!("error sending event {:?} to watcher: {:?}", event, e),
+                Err(e) => error!("error sending event {:?} to watcher: {:?}", event, e),
             }
             return;
         }
         match events.push(event) {
             Ok(()) => (),
             Err(event) => {
-                tracing::warn!("failed to enqueue event {:?} on watcher, closing channel", event);
+                warn!("failed to enqueue event {:?} on watcher, closing channel", event);
                 stream.control_handle().shutdown();
             }
         }
@@ -461,7 +462,7 @@ impl Worker {
                     Some(Ok(())) => {}
                     Some(Err(e)) => {
                         if !e.is_closed() {
-                            tracing::error!("error operating interface watcher {:?}", e);
+                            error!("error operating interface watcher {:?}", e);
                         }
                     }
                     // This should not be observable since we check if our
@@ -485,13 +486,13 @@ impl Worker {
                             responder: None,
                         }),
                         Err(status) => {
-                            tracing::warn!("failed to construct events for watcher: {}", status);
+                            warn!("failed to construct events for watcher: {}", status);
                             stream.control_handle().shutdown_with_epitaph(status);
                         }
                     }
                 }
                 Action::Sink(Some(SinkAction::Event(e))) => {
-                    tracing::debug!("consuming event {:?}", e);
+                    debug!("consuming event {:?}", e);
 
                     #[cfg(test)]
                     {
@@ -519,7 +520,7 @@ impl Worker {
                     };
 
                     match Self::consume_event(&mut interface_state, e)? {
-                        None => tracing::debug!("not publishing No-Op event."),
+                        None => debug!("not publishing No-Op event."),
                         Some((event, changed_address_properties)) => {
                             let num_published = current_watchers
                                 .iter_mut()
@@ -560,7 +561,7 @@ impl Worker {
                                     should_push.then_some(())
                                 })
                                 .count();
-                            tracing::debug!(
+                            debug!(
                                 "published event to {} of {} watchers",
                                 num_published,
                                 current_watchers.len()

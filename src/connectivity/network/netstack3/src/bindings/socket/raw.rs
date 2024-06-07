@@ -547,10 +547,7 @@ pub(crate) async fn serve(
                 Ok(req) => req,
                 Err(e) => {
                     if !e.is_closed() {
-                        tracing::error!(
-                            "{} request error {e:?}",
-                            fpraw::ProviderMarker::DEBUG_NAME
-                        );
+                        error!("{} request error {e:?}", fpraw::ProviderMarker::DEBUG_NAME);
                     }
                     return;
                 }

@@ -38,6 +38,7 @@ use netstack3_core::{
 };
 use once_cell::sync::Lazy;
 use packet_formats::utils::NonZeroDuration;
+use tracing::debug;
 
 use crate::bindings::{
     socket::{
@@ -1094,7 +1095,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 respond_not_supported!("stream::SetLinger", responder);
             }
             fposix_socket::StreamSocketRequest::GetLinger { responder } => {
-                tracing::debug!("stream::GetLinger is not supported, returning Ok((false, 0))");
+                debug!("stream::GetLinger is not supported, returning Ok((false, 0))");
                 responder.send(Ok((false, 0))).unwrap_or_log("failed to respond")
             }
             fposix_socket::StreamSocketRequest::SetReusePort { value: _, responder } => {
@@ -1140,7 +1141,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 responder.send(self.shutdown(mode)).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetIpTypeOfService { value: _, responder } => {
-                tracing::debug!("stream::SetIpTypeOfService is not supported, returning Ok(())");
+                debug!("stream::SetIpTypeOfService is not supported, returning Ok(())");
                 responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetIpTypeOfService { responder } => {
@@ -1332,7 +1333,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 responder.send(Ok(!nagle_enabled)).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetTcpMaxSegment { value_bytes: _, responder } => {
-                tracing::debug!("stream::SetTcpMaxSegment is not supported, returning Ok(())");
+                debug!("stream::SetTcpMaxSegment is not supported, returning Ok(())");
                 responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetTcpMaxSegment { responder } => {
@@ -1460,7 +1461,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 respond_not_supported!("stream::GetTcpWindowClamp", responder);
             }
             fposix_socket::StreamSocketRequest::GetTcpInfo { responder } => {
-                tracing::debug!(
+                debug!(
                     "stream::GetTcpInfo is not supported, \
                      returning fposix_socket::TcpInfo::default()"
                 );

@@ -223,7 +223,7 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
                     continue;
                 }
                 Some(Err(e)) => {
-                    tracing::error!("got error while polling for requests: {}", e);
+                    error!("got error while polling for requests: {}", e);
                     // Continuing implicitly drops the request stream that
                     // produced the error, which would otherwise be re-enqueued
                     // below.

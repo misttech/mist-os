@@ -23,6 +23,7 @@ use futures::{
 };
 use net_types::ip::{GenericOverIp, Ip, IpVersion, Ipv4, Ipv6};
 use netstack3_core::{device::DeviceId, routes::AddableEntry};
+use tracing::{debug, error, warn};
 
 use crate::bindings::{
     devices::StaticCommonInfo,
@@ -74,13 +75,13 @@ pub(crate) async fn serve_route_set<
                 Ok(Some(request)) => {
                     route_set.borrow_mut().handle_request(request).await.unwrap_or_else(|e| {
                         if !e.is_closed() {
-                            tracing::error!("error handling {debug_name} request: {e:?}");
+                            error!("error handling {debug_name} request: {e:?}");
                         }
                     });
                 },
                 Err(err) => {
                     if !err.is_closed() {
-                        tracing::error!("error handling {debug_name} request: {err:?}");
+                        error!("error handling {debug_name} request: {err:?}");
                     }
                     break;
                 }
@@ -179,7 +180,7 @@ pub(crate) async fn serve_route_table<
 ) {
     serve_route_table_inner(stream, spawner, route_table).await.unwrap_or_else(|err| {
         if !err.is_closed() {
-            tracing::error!("error while serving {}: {err:?}", I::RouteTableMarker::DEBUG_NAME);
+            error!("error while serving {}: {err:?}", I::RouteTableMarker::DEBUG_NAME);
         }
     });
 }
@@ -234,7 +235,7 @@ async fn serve_route_table_inner<
     }
 
     if route_table.borrow().detached() {
-        tracing::debug!(
+        debug!(
             "RouteTable protocol for {:?} is shutting down, but the table is detached",
             route_table.borrow().id()
         );
@@ -470,7 +471,7 @@ impl<I: FidlRouteAdminIpExt> UserRouteSet<I> {
                 },
                 Err(err) => match err {
                     routes::ChangeError::TableRemoved => {
-                        tracing::warn!("the table backing this route set has been removed");
+                        warn!("the table backing this route set has been removed");
                     }
                     routes::ChangeError::DeviceRemoved => {
                         unreachable!("closing a route set should not require upgrading a DeviceId")
@@ -575,7 +576,7 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
     fn route_work_sink(&self) -> &mpsc::UnboundedSender<RouteWorkItem<I::Addr>>;
 
     async fn handle_request(&mut self, request: RouteSetRequest<I>) -> Result<(), fidl::Error> {
-        tracing::debug!("RouteSet::handle_request {request:?}");
+        debug!("RouteSet::handle_request {request:?}");
 
         match request {
             RouteSetRequest::AddRoute { route, responder } => {
@@ -734,7 +735,7 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
 
         let core_id =
             self.ctx().bindings_ctx().devices.get_core_id(bindings_id).ok_or_else(|| {
-                tracing::warn!("authentication interface {bindings_id} does not exist");
+                warn!("authentication interface {bindings_id} does not exist");
                 fnet_routes_admin::AuthenticateForInterfaceError::InvalidAuthentication
             })?;
 
@@ -751,7 +752,7 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
             .token
             .basic_info()
             .map_err(|e| {
-                tracing::error!("failed to get basic info for client-provided token: {}", e);
+                error!("failed to get basic info for client-provided token: {}", e);
                 fnet_routes_admin::AuthenticateForInterfaceError::InvalidAuthentication
             })?
             .koid;

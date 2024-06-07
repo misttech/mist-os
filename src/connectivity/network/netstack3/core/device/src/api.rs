@@ -176,7 +176,7 @@ where
             ip::device::clear_ipv6_device_state(core_ctx, bindings_ctx, &device);
         };
 
-        tracing::debug!("removing {device:?}");
+        debug!("removing {device:?}");
         let primary = core_ctx.remove(&device).expect("tried to remove device not in stack");
         assert_eq!(device, primary);
         core::mem::drop(device);

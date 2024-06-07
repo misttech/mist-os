@@ -63,6 +63,7 @@ use netstack3_core::{
         UpdateIpConfigurationError,
     },
 };
+use tracing::{debug, error, info, warn};
 
 use crate::bindings::{
     devices::{self, EthernetInfo, StaticCommonInfo},
@@ -81,7 +82,7 @@ pub(crate) async fn serve(ns: Netstack, req: fnet_interfaces_admin::InstallerReq
             Ok(req) => req,
             Err(e) => {
                 if !e.is_closed() {
-                    tracing::error!(
+                    error!(
                         "{} request error {e:?}",
                         fnet_interfaces_admin::InstallerMarker::DEBUG_NAME
                     );
@@ -100,9 +101,7 @@ pub(crate) async fn serve(ns: Netstack, req: fnet_interfaces_admin::InstallerReq
                     device,
                     device_control.into_stream().expect("failed to obtain stream"),
                 )
-                .map(|r| {
-                    r.unwrap_or_else(|e| tracing::warn!("device control finished with {:?}", e))
-                }),
+                .map(|r| r.unwrap_or_else(|e| warn!("device control finished with {:?}", e))),
             ))),
         }
     })
@@ -267,7 +266,7 @@ async fn create_interface(
     handler: &netdevice_worker::DeviceHandler,
     device_stopped_fut: async_utils::event::EventWaitResult,
 ) -> Option<[fuchsia_async::Task<()>; 2]> {
-    tracing::debug!("creating interface from {:?} with {:?}", port, options);
+    debug!("creating interface from {:?} with {:?}", port, options);
     let fnet_interfaces_admin::Options { name, metric, .. } = options;
     let (control_sender, mut control_receiver) =
         OwnedControlHandle::new_channel_with_owned_handle(control).await;
@@ -286,7 +285,7 @@ async fn create_interface(
             Some([interface_control_task, tx_task])
         }
         Err(e) => {
-            tracing::warn!("failed to add port {:?} to device: {:?}", port, e);
+            warn!("failed to add port {:?} to device: {:?}", port, e);
             let removed_reason = match e {
                 netdevice_worker::Error::Client(e) => match e {
                     // Assume any fidl errors are port closed
@@ -340,7 +339,7 @@ async fn create_interface(
                         .expect("expected control handle to be ready in the receiver")
                         .expect("expected receiver to not be closed/empty");
                 control_handle.send_on_interface_removed(removed_reason).unwrap_or_else(|e| {
-                    tracing::warn!("failed to send removed reason: {:?}", e);
+                    warn!("failed to send removed reason: {:?}", e);
                 });
             }
             None
@@ -368,18 +367,10 @@ async fn run_netdevice_interface_control<
             Err(e) => {
                 match e {
                     netdevice_client::Error::Fidl(e) if e.is_closed() => {
-                        tracing::warn!(
-                            "error operating port state stream {:?} for interface {}",
-                            e,
-                            id
-                        )
+                        warn!("error operating port state stream {:?} for interface {}", e, id)
                     }
                     e => {
-                        tracing::error!(
-                            "error operating port state stream {:?} for interface {}",
-                            e,
-                            id
-                        )
+                        error!("error operating port state stream {:?} for interface {}", e, id)
                     }
                 }
                 // Terminate the stream in case of any errors.
@@ -468,7 +459,7 @@ pub(crate) async fn run_interface_control<S: futures::Stream<Item = DeviceState>
                     let ReqStreamState { ctx, id, owns_interface, control_handle: _ } = &mut state;
                     match request {
                         Err(e) => {
-                            tracing::error!(
+                            error!(
                                 "error operating {} stream for interface {}: {:?}",
                                 fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
                                 id,
@@ -488,10 +479,9 @@ pub(crate) async fn run_interface_control<S: futures::Stream<Item = DeviceState>
                             .await
                             {
                                 Err(e) => {
-                                    tracing::error!(
+                                    error!(
                                         "failed to handle request for interface {}: {:?}",
-                                        id,
-                                        e
+                                        id, e
                                     );
                                     async_utils::fold::FoldWhile::Continue(state)
                                 }
@@ -619,7 +609,7 @@ pub(crate) async fn run_interface_control<S: futures::Stream<Item = DeviceState>
     // Send the termination reason for all handles we had on removal.
     control_handles.into_iter().for_each(|control_handle| {
         control_handle.send_on_interface_removed(remove_reason).unwrap_or_else(|e| {
-            tracing::error!("failed to send terminal event: {:?} for interface {}", e, id)
+            error!("failed to send terminal event: {:?} for interface {}", e, id)
         });
     });
 }
@@ -638,7 +628,7 @@ async fn dispatch_control_request(
     owns_interface: &mut bool,
     enabled_controller: &enabled::InterfaceEnabledController,
 ) -> Result<ControlRequestResult, fidl::Error> {
-    tracing::debug!("serving {:?}", req);
+    debug!("serving {:?}", req);
 
     match req {
         fnet_interfaces_admin::ControlRequest::AddAddress {
@@ -725,7 +715,7 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
                     .await;
                 // Allow the loopback interface to be removed as part of clean
                 // shutdown, but emit a warning about it.
-                tracing::warn!("loopback interface was removed");
+                warn!("loopback interface was removed");
                 return;
             }
             DeviceId::PureIp(core_id) => {
@@ -746,9 +736,9 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
 
     let id = weak_id.bindings_id();
     handler.uninstall().await.unwrap_or_else(|e| {
-        tracing::warn!("error uninstalling netdevice handler for interface {:?}: {:?}", id, e)
+        warn!("error uninstalling netdevice handler for interface {:?}: {:?}", id, e)
     });
-    tracing::info!("device {id:?} removal complete");
+    info!("device {id:?} removal complete");
 }
 
 /// Removes the given `address` from the interface with the given `id`.
@@ -758,7 +748,7 @@ async fn remove_address(ctx: &mut Ctx, id: BindingId, address: fnet::Subnet) -> 
     let specified_addr = match address.addr.try_into_core() {
         Ok(addr) => addr,
         Err(e) => {
-            tracing::warn!("not removing unspecified address {:?}: {:?}", address.addr, e);
+            warn!("not removing unspecified address {:?}: {:?}", address.addr, e);
             return false;
         }
     };
@@ -842,12 +832,10 @@ fn set_configuration(
             __source_breaking,
         }) => {
             if let Some(_) = igmp {
-                tracing::warn!(
-                    "TODO(https://fxbug.dev/42071402): support IGMP configuration changes"
-                )
+                warn!("TODO(https://fxbug.dev/42071402): support IGMP configuration changes")
             }
             if let Some(_) = multicast_forwarding {
-                tracing::warn!(
+                warn!(
                 "TODO(https://fxbug.dev/323052525): setting multicast_forwarding not yet supported"
             )
             }
@@ -881,12 +869,10 @@ fn set_configuration(
             __source_breaking,
         }) => {
             if let Some(_) = mld {
-                tracing::warn!(
-                    "TODO(https://fxbug.dev/42071402): support MLD configuration changes"
-                )
+                warn!("TODO(https://fxbug.dev/42071402): support MLD configuration changes")
             }
             if let Some(_) = multicast_forwarding {
-                tracing::warn!(
+                warn!(
                     "TODO(https://fxbug.dev/323052525): setting multicast_forwarding not yet supported"
                 )
             }
@@ -1101,7 +1087,7 @@ fn add_address(
     let addr_subnet_either: AddrSubnetEither = match address.try_into_core() {
         Ok(addr) => addr,
         Err(e) => {
-            tracing::warn!("not adding invalid address {:?} to interface {}: {:?}", address, id, e);
+            warn!("not adding invalid address {:?} to interface {}: {:?}", address, id, e);
             send_address_removal_event(
                 address.addr.into_core(),
                 id,
@@ -1130,7 +1116,7 @@ fn add_address(
         }
         fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(preferred_until) => {
             if preferred_until != INFINITE_NANOS {
-                tracing::warn!(
+                warn!(
                     "TODO(https://fxbug.dev/42056881): ignoring preferred_until: {:?}",
                     preferred_until
                 );
@@ -1319,7 +1305,7 @@ async fn run_address_state_provider(
 
                 match add_route_result {
                     Err(e) => {
-                        tracing::warn!("failed to add subnet route {:?}: {:?}", subnet, e);
+                        warn!("failed to add subnet route {:?}: {:?}", subnet, e);
                         route_set_v4.close().await;
                         route_set_v6.close().await;
                         StateInCore { address: true, subnet_route: None }
@@ -1344,11 +1330,9 @@ async fn run_address_state_provider(
             };
 
             control_handle.send_on_address_added().unwrap_or_else(|e| {
-                tracing::error!(
+                error!(
                     "failed to send address added event for addr {:?} on interface {}: {:?}",
-                    address,
-                    id,
-                    e
+                    address, id, e
                 );
             });
 
@@ -1504,23 +1488,19 @@ async fn address_state_provider_main_loop(
                     }
                     Ok(None) => {}
                     Err(err @ AddressStateProviderError::PreviousPendingWatchRequest) => {
-                        tracing::warn!(
+                        warn!(
                             "failed to handle request for address {:?} on interface {}: {}",
-                            address,
-                            id,
-                            err
+                            address, id, err
                         );
                         break None;
                     }
-                    Err(err @ AddressStateProviderError::Fidl(_)) => tracing::error!(
+                    Err(err @ AddressStateProviderError::Fidl(_)) => error!(
                         "failed to handle request for address {:?} on interface {}: {}",
-                        address,
-                        id,
-                        err
+                        address, id, err
                     ),
                 },
                 Err(e) => {
-                    tracing::error!(
+                    error!(
                         "error operating {} stream for address {:?} on interface {}: {:?}",
                         fnet_interfaces_admin::AddressStateProviderMarker::DEBUG_NAME,
                         address,
@@ -1532,7 +1512,7 @@ async fn address_state_provider_main_loop(
             },
             AddressStateProviderEvent::AssignmentStateChange(state) => {
                 watch_state.on_new_assignment_state(state).unwrap_or_else(|e|{
-                        tracing::error!(
+                        error!(
                             "failed to respond to pending watch request for address {:?} on interface {}: {:?}",
                             address,
                             id,
@@ -1600,7 +1580,7 @@ impl AddressAssignmentWatcherState {
         let (new_fsm, result) = match old_fsm {
             UnreportedUpdate(old_state) => {
                 if old_state == new_state {
-                    tracing::warn!("received duplicate AddressAssignmentState event from Core.");
+                    warn!("received duplicate AddressAssignmentState event from Core.");
                 }
                 if self.last_response == Some(new_state) {
                     // Return to `Idle` because we've coalesced
@@ -1659,7 +1639,7 @@ fn dispatch_address_state_provider_request(
     detached: &mut bool,
     watch_state: &mut AddressAssignmentWatcherState,
 ) -> Result<Option<UserRemove>, AddressStateProviderError> {
-    tracing::debug!("serving {:?}", req);
+    debug!("serving {:?}", req);
     match req {
         fnet_interfaces_admin::AddressStateProviderRequest::UpdateAddressProperties {
             address_properties:
@@ -1671,7 +1651,7 @@ fn dispatch_address_state_provider_request(
             responder,
         } => {
             if preferred_lifetime_info.is_some() {
-                tracing::warn!("Updating preferred lifetime info is not yet supported (https://fxbug.dev/42056194)");
+                warn!("Updating preferred lifetime info is not yet supported (https://fxbug.dev/42056194)");
             }
             let device_id =
                 ctx.bindings_ctx().devices.get_core_id(id).expect("interface not found");
@@ -1728,11 +1708,9 @@ fn send_address_removal_event(
     reason: fnet_interfaces_admin::AddressRemovalReason,
 ) {
     control_handle.send_on_address_removed(reason).unwrap_or_else(|e| {
-        tracing::error!(
+        error!(
             "failed to send address removal reason for addr {:?} on interface {}: {:?}",
-            addr,
-            id,
-            e
+            addr, id, e
         );
     })
 }
@@ -1812,7 +1790,7 @@ mod enabled {
                 match r {
                     Ok(()) => (),
                     Err(e) => {
-                        tracing::warn!("failed to set port {:?} to {}: {:?}", handler, enabled, e);
+                        warn!("failed to set port {:?} to {}: {:?}", handler, enabled, e);
                         // NB: There might be other errors here to consider in the
                         // future, we start with a very strict set of known errors to
                         // allow and panic on anything that is unexpected.
@@ -1853,23 +1831,16 @@ mod enabled {
 
             match (original_state, online) {
                 (true, true) | (false, false) => {
-                    tracing::debug!(
+                    debug!(
                         "observed no-op port status update on interface {:?}. online = {}",
-                        core_id,
-                        online
+                        core_id, online
                     );
                 }
                 (true, false) => {
-                    tracing::warn!(
-                        "observed port status change to offline on interface {:?}",
-                        core_id
-                    )
+                    warn!("observed port status change to offline on interface {:?}", core_id)
                 }
                 (false, true) => {
-                    tracing::info!(
-                        "observed port status change to online on interface {:?}",
-                        core_id
-                    )
+                    info!("observed port status change to online on interface {:?}", core_id)
                 }
             }
 
@@ -1941,7 +1912,7 @@ mod enabled {
                 .ip_enabled
                 .expect("ip enabled must be informed");
 
-            tracing::info!(
+            info!(
                 "updated core IPv4 and IPv6 enabled state to {dev_enabled} on {core_id:?}, \
                 prev v4={was_v4_previously_enabled},v6={was_v6_previously_enabled}"
             );

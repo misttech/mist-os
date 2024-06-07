@@ -22,6 +22,7 @@ use netstack3_base::Instant;
 use netstack3_ip::icmp::IcmpErrorCode;
 use packet_formats::utils::NonZeroDuration;
 use replace_with::{replace_with, replace_with_and};
+use tracing::error;
 
 use crate::internal::{
     base::{
@@ -831,7 +832,7 @@ impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
         let BufferLimits { capacity, len } = buffer.limits();
         // `unused_window` is RCV.WND as described above.
         let unused_window = WindowSize::from_u32(u32::try_from(*rcv_wup + *last_wnd - rcv_nxt).unwrap_or_else(|_: TryFromIntError| {
-            tracing::error!(
+            error!(
                 "we received more bytes than we advertised, rcv_nxt: {:?}, rcv_wup: {:?}, last_wnd: {:?}",
                 rcv_nxt, rcv_wup, last_wnd
             );

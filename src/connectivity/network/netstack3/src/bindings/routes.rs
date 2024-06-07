@@ -32,6 +32,7 @@ use net_types::{
     SpecifiedAddr,
 };
 use netstack3_core::routes::AddableMetric;
+use tracing::{debug, error, info, warn};
 
 use crate::bindings::{
     util::{EntryAndTableId, TryIntoFidlWithContext},
@@ -207,7 +208,7 @@ impl<A: IpAddress> Table<A> {
         } else {
             TableModifyResult::NoChange
         };
-        tracing::info!(
+        info!(
             "insert operation of route {route:?} into table with set {set:?} had result {result:?}",
         );
         result
@@ -274,23 +275,23 @@ impl<A: IpAddress> Table<A> {
 
         let result = {
             if !removed_from_table.is_empty() {
-                tracing::info!(
+                info!(
                     "remove operation on routing table resulted in removal of \
                      {} routes from the table:",
                     removed_from_table.len()
                 );
                 for (route, generation) in &removed_from_table {
-                    tracing::info!("  removed route {route:?} (generation {generation:?})");
+                    info!("  removed route {route:?} (generation {generation:?})");
                 }
                 TableModifyResult::TableChanged(removed_from_table)
             } else if removed_any_from_set {
-                tracing::info!(
+                info!(
                     "remove operation on routing table removed routes from set \
                     {set:?}, but not the overall table"
                 );
                 TableModifyResult::SetChanged
             } else {
-                tracing::info!(
+                info!(
                     "remove operation on routing table from set {set:?} \
                      resulted in no change"
                 );
@@ -317,10 +318,10 @@ impl<A: IpAddress> Table<A> {
             }
         });
 
-        tracing::info!("route set removal ({set:?}) removed {} routes:", removed_from_table.len());
+        info!("route set removal ({set:?}) removed {} routes:", removed_from_table.len());
 
         for (route, generation) in &removed_from_table {
-            tracing::info!("  removed route {route:?} (generation {generation:?})");
+            info!("  removed route {route:?} (generation {generation:?})");
         }
 
         removed_from_table
@@ -448,7 +449,7 @@ where
                         }| futures::future::ready(responder))
                         .for_each(|responder| futures::future::ready(
                             responder.send(Err(ChangeError::TableRemoved)).unwrap_or_else(|err| {
-                                tracing::error!("failed to respond to the change request: {err:?}");
+                                error!("failed to respond to the change request: {err:?}");
                             })
                         )).await;
                     } else {
@@ -494,7 +495,7 @@ where
                         // Since the other end dropped the receiver, no one will
                         // observe the result of this route change, so we have to
                         // log any errors ourselves.
-                        tracing::error!("error while handling route change: {:?}", e);
+                        error!("error while handling route change: {:?}", e);
                     }
                 },
             };
@@ -713,7 +714,7 @@ async fn handle_route_change<I>(
 where
     I: IpExt + FidlRouteAdminIpExt,
 {
-    tracing::debug!("routes::handle_change {change:?}");
+    debug!("routes::handle_change {change:?}");
 
     fn one_table<I: Ip>(
         tables: &mut HashMap<TableId<I>, Table<I::Addr>>,
@@ -894,7 +895,7 @@ impl ChangeSink {
         let item = RouteWorkItem { change, responder: None };
         match sender.unbounded_send(item) {
             Ok(()) => (),
-            Err(e) => tracing::warn!(
+            Err(e) => warn!(
                 "failed to send route change {:?} because route change sink is closed",
                 e.into_inner().change
             ),
@@ -928,7 +929,7 @@ impl ChangeSink {
         match sender.unbounded_send(item) {
             Ok(()) => receiver.map(|r| r.expect("responder should not be dropped")).left_future(),
             Err(e) => {
-                tracing::warn!("failed to send an table op to ChangeRunner: {e:?}");
+                warn!("failed to send an table op to ChangeRunner: {e:?}");
                 futures::future::ready(Err(TableError::ShuttingDown)).right_future()
             }
         }

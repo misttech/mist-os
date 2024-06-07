@@ -41,7 +41,7 @@ use netstack3_core::{
     udp, IpExt,
 };
 use packet::{Buf, BufferMut};
-use tracing::{error, trace, warn};
+use tracing::{debug, error, trace, warn};
 
 use crate::bindings::{
     socket::{
@@ -946,7 +946,7 @@ impl<I: IpExt> DatagramSocketExternalData<I> {
         id: u16,
         data: B,
     ) {
-        tracing::debug!("Received ICMP echo reply in binding: {:?}, id: {id}", I::VERSION);
+        debug!("Received ICMP echo reply in binding: {:?}, id: {id}", I::VERSION);
         self.message_queue.lock().receive(AvailableMessage {
             source_addr: src_ip,
             source_port: 0,
@@ -1290,7 +1290,7 @@ where
                 responder.send(Err(fposix::Errno::Enoprotoopt)).unwrap_or_log("failed to respond");
             }
             Request::GetError { responder } => {
-                tracing::debug!("syncudp::GetError is not implemented, returning Ok");
+                debug!("syncudp::GetError is not implemented, returning Ok");
                 // Pretend that we don't have any errors to report.
                 // TODO(https://fxbug.dev/322214321): Actually implement SO_ERROR.
                 responder.send(Ok(())).unwrap_or_log("failed to respond");
@@ -1394,7 +1394,7 @@ where
                 respond_not_supported!("syncudp::SetLinger", responder)
             }
             Request::GetLinger { responder } => {
-                tracing::debug!("syncudp::GetLinger is not supported, returning Ok((false, 0))");
+                debug!("syncudp::GetLinger is not supported, returning Ok((false, 0))");
                 responder.send(Ok((false, 0))).unwrap_or_log("failed to respond")
             }
             Request::SetOutOfBandInline { value: _, responder } => {
@@ -1587,7 +1587,7 @@ where
                 respond_not_supported!("syncudp::GetIpReceiveTtl", responder)
             }
             Request::SetIpPacketInfo { value: _, responder } => {
-                tracing::debug!("syncudp::SetIpPacketInfo is not supported, returning Ok(())");
+                debug!("syncudp::SetIpPacketInfo is not supported, returning Ok(())");
                 responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
             Request::GetIpPacketInfo { responder } => {

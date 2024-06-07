@@ -29,7 +29,7 @@ use netstack3_core::{
 };
 use packet::Buf;
 use packet_formats::ethernet::EtherType;
-use tracing::error;
+use tracing::{error, warn};
 
 use crate::bindings::{
     devices::BindingId,
@@ -91,10 +91,7 @@ pub(crate) async fn serve(
                 Ok(req) => req,
                 Err(e) => {
                     if !e.is_closed() {
-                        tracing::error!(
-                            "{} request error {e:?}",
-                            fppacket::ProviderMarker::DEBUG_NAME
-                        );
+                        error!("{} request error {e:?}", fppacket::ProviderMarker::DEBUG_NAME);
                     }
                     return;
                 }
@@ -575,10 +572,10 @@ impl<'a> RequestHandler<'a> {
                 ]
                 .contains(&control)
                 {
-                    tracing::warn!("unsupported control data: {:?}", control);
+                    warn!("unsupported control data: {:?}", control);
                     Err(fposix::Errno::Eopnotsupp)
                 } else if flags != fpsocket::SendMsgFlags::empty() {
-                    tracing::warn!("unsupported control flags: {:?}", flags);
+                    warn!("unsupported control flags: {:?}", flags);
                     Err(fposix::Errno::Eopnotsupp)
                 } else {
                     self.send_msg(packet_info, data)
