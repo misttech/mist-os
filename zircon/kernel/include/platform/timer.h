@@ -55,11 +55,6 @@ class Ratio;  // Fwd decl.
 void timer_set_ticks_to_time_ratio(const affine::Ratio& ticks_to_time);
 const affine::Ratio& timer_get_ticks_to_time_ratio();
 
-// TODO(rudymathu): Remove this function once all external dependencies are removed.
-inline const affine::Ratio& platform_get_ticks_to_time_ratio() {
-  return timer_get_ticks_to_time_ratio();
-}
-
 // Sets the initial mono ticks offset.
 void timer_set_mono_ticks_offset(uint64_t offset);
 
