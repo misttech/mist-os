@@ -237,7 +237,7 @@ From //build/images/vbmeta.gni:23
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/common/x64-common.gni:65
+From //boards/common/x64-common.gni:58
 
 **Overridden from the default:** `""`
 
@@ -257,7 +257,7 @@ From //build/images/vbmeta.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/common/x64-common.gni:63
+From //boards/common/x64-common.gni:56
 
 **Overridden from the default:** `""`
 
@@ -445,7 +445,7 @@ From //build/images/filesystem_limits.gni:17
 
 **Current value for `target_cpu = "x64"`:** `10485760000`
 
-From //boards/common/x64-common.gni:67
+From //boards/common/x64-common.gni:60
 
 **Overridden from the default:** `false`
 
@@ -843,7 +843,7 @@ From //build/images/args.gni:30
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:71
+From //boards/common/x64-common.gni:64
 
 **Overridden from the default:** `false`
 
@@ -1099,7 +1099,7 @@ from infra builds, and later inspection.
 
 **Current value (from the default):** `"//out/not-default/comparison-reports"`
 
-From //build/toolchain/rbe.gni:211
+From //build/toolchain/rbe.gni:208
 
 ### compress_debuginfo
 
@@ -1264,7 +1264,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:206
+From //build/toolchain/rbe.gni:203
 
 ### cxx_rbe_download_obj_files
 
@@ -1276,7 +1276,7 @@ and not restricted environments that lack direct network access.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:218
+From //build/toolchain/rbe.gni:215
 
 ### cxx_rbe_enable
 
@@ -1287,17 +1287,17 @@ Enabling this takes precedence over `use_goma`.
 
 From //out/not-default/args.gn:7
 
-**Overridden from the default:** `true`
+**Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:159
+From //build/toolchain/rbe.gni:156
 
 **Current value for `target_cpu = "x64"`:** `false`
 
 From //out/not-default/args.gn:7
 
-**Overridden from the default:** `true`
+**Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:159
+From //build/toolchain/rbe.gni:156
 
 ### cxx_rbe_exec_strategy
 
@@ -1320,7 +1320,7 @@ One of:
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:182
+From //build/toolchain/rbe.gni:179
 
 ### cxx_rbe_minimalist_wrapper
 
@@ -1330,7 +1330,7 @@ This flag is only meaningful when `cxx_rbe_enable` is true.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:164
+From //build/toolchain/rbe.gni:161
 
 ### data_filesystem_format
 
@@ -3832,10 +3832,12 @@ From //src/devices/board/lib/acpi/BUILD.gn:12
 ### ice_detection
 
 Enables a rustc wrapper that detects timeouts and ICEs
+TODO(pineapple): enable by default when using rust_incremental after
+b/345596983 is resolved
 
 **Current value (from the default):** `false`
 
-From //build/rust/build.gni:28
+From //build/rust/build.gni:30
 
 ### icons_path
 
@@ -4456,13 +4458,17 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:265
+From //build/toolchain/rbe.gni:262
 
 ### link_rbe_download_unstripped_outputs
 
+Controls whether or not to download (often large) unstripped linker
+outputs.  When downloading is disabled, the build produces stubs
+that be used to retrieve remote artifacts later using build/rbe/dlwrap.py.
+
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:271
+From //build/toolchain/rbe.gni:267
 
 ### link_rbe_enable
 
@@ -4474,17 +4480,17 @@ linkers like `lld`.
 
 From //out/not-default/args.gn:11
 
-**Overridden from the default:** `true`
+**Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:227
+From //build/toolchain/rbe.gni:224
 
 **Current value for `target_cpu = "x64"`:** `false`
 
 From //out/not-default/args.gn:11
 
-**Overridden from the default:** `true`
+**Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:227
+From //build/toolchain/rbe.gni:224
 
 ### link_rbe_exec_strategy
 
@@ -4507,7 +4513,7 @@ One of:
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:245
+From //build/toolchain/rbe.gni:242
 
 ### llvm_prefix
 
@@ -4608,7 +4614,7 @@ From //build/images/filesystem_limits.gni:12
 
 **Current value for `target_cpu = "x64"`:** `5216665600`
 
-From //boards/common/x64-common.gni:69
+From //boards/common/x64-common.gni:62
 
 **Overridden from the default:** `false`
 
@@ -5409,7 +5415,7 @@ From //build/board.gni:75
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/common/x64-common.gni:59
+From //boards/common/x64-common.gni:52
 
 **Overridden from the default:** `[]`
 
@@ -5430,7 +5436,7 @@ From //build/board.gni:74
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/common/x64-common.gni:58
+From //boards/common/x64-common.gni:51
 
 **Overridden from the default:** `false`
 
@@ -7039,35 +7045,7 @@ precedence over those earlier in the list.
 
 **Current value (from the default):** `[]`
 
-From //build/toolchain/rbe.gni:30
-
-### rbe_mode
-
-The overall mode for RBE to be operating in.  The valid values are:
- * 'off' => RBE is fully disabled. This is suitable for offline building
-            using only local resources.
- * 'default' => The standard RBE configuration used if not otherwise
-                specified. This contains a mix of enabled/disabled remote
-                services.
- * 'cloudtop' => An RBE configuration that's optimized for running on a
-                 cloudtop. Suitable for high-bandwidth connections to
-                 remote services.
- * 'infra' => The RBE configuration used by CI/CQ bots. Also high-bandwidth.
- * 'low_bandwidth' => An RBE configuration for developers that have a
-                      powerful workstations, but low bandwidth.
-
-**Current value (from the default):** `"default"`
-
-From //build/toolchain/rbe_modes.gni:32
-
-### rbe_settings_overrides
-
-Overridden settings for the RBE mode.  This is a set of override values for
-variables whose default values are set by the chosen RBE mode (above).
-
-**Current value (from the default):** `{ }`
-
-From //build/toolchain/rbe_modes.gni:36
+From //build/toolchain/rbe.gni:28
 
 ### recovery_label
 
@@ -7207,7 +7185,7 @@ This is required to support skipping downloads of rlibs.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:147
+From //build/toolchain/rbe.gni:144
 
 ### rust_incremental
 
@@ -7274,7 +7252,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:133
+From //build/toolchain/rbe.gni:131
 
 ### rust_rbe_download_rlibs
 
@@ -7283,13 +7261,19 @@ rlibs from remote Rust build actions.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:151
+From //build/toolchain/rbe.gni:148
 
 ### rust_rbe_download_unstripped_binaries
 
+Controls whether or not to download (often large) unstripped Rust
+binaries.  When downloading is disabled, the build produces stubs
+that be used to retrieve remote artifacts later using build/rbe/dlwrap.py.
+TODO(b/284994230): This option is only available to developers,
+and not restricted environments that lack direct network access.
+
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:141
+From //build/toolchain/rbe.gni:138
 
 ### rust_rbe_enable
 
@@ -7301,7 +7285,7 @@ From //out/not-default/args.gn:12
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:89
+From //build/toolchain/rbe.gni:87
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -7309,7 +7293,7 @@ From //out/not-default/args.gn:12
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:89
+From //build/toolchain/rbe.gni:87
 
 ### rust_rbe_exec_strategy
 
@@ -7332,7 +7316,7 @@ One of:
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:107
+From //build/toolchain/rbe.gni:105
 
 ### rust_v0_symbol_mangling
 
@@ -7367,7 +7351,7 @@ means no timeout
 
 **Current value (from the default):** `0`
 
-From //build/rust/build.gni:32
+From //build/rust/build.gni:34
 
 ### rustc_use_response_files
 
@@ -8368,7 +8352,7 @@ From //build/images/args.gni:27
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:72
+From //boards/common/x64-common.gni:65
 
 **Overridden from the default:** `false`
 
@@ -8528,7 +8512,7 @@ From //build/images/vbmeta.gni:15
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:61
+From //boards/common/x64-common.gni:54
 
 **Overridden from the default:** `false`
 
