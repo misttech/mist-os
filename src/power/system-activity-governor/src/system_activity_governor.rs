@@ -6,7 +6,9 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use async_utils::hanging_get::server::{HangingGet, Publisher};
 use fidl::endpoints::{create_endpoints, Proxy};
-use fidl_fuchsia_hardware_suspend as fhsuspend;
+use fidl_fuchsia_hardware_suspend::{
+    self as fhsuspend, SuspenderSuspendResponse as SuspendResponse,
+};
 use fidl_fuchsia_power_broker as fbroker;
 use fidl_fuchsia_power_suspend as fsuspend;
 use fidl_fuchsia_power_system::{
@@ -18,6 +20,7 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{
     ArrayProperty, IntProperty as IInt, Node as INode, Property, UintProperty as IUint,
 };
+use fuchsia_inspect_contrib::nodes::BoundedListNode as IRingBuffer;
 use fuchsia_zircon::{self as zx, HandleBased};
 use futures::{
     channel::mpsc::{self, Receiver, Sender},
@@ -90,6 +93,7 @@ struct ExecutionStateManager {
     inner: Mutex<ExecutionStateManagerInner>,
     /// SuspendResumeListener object to notify of suspend/resume.
     suspend_resume_listener: OnceCell<Rc<dyn SuspendResumeListener>>,
+    _inspect_node: RefCell<IRingBuffer>,
 }
 
 impl ExecutionStateManager {
@@ -97,6 +101,7 @@ impl ExecutionStateManager {
     fn new(
         execution_state: PowerElementContext,
         suspender: Option<fhsuspend::SuspenderProxy>,
+        inspect: INode,
     ) -> Self {
         Self {
             passive_dependency_token: execution_state.passive_dependency_token(),
@@ -107,6 +112,7 @@ impl ExecutionStateManager {
                 suspend_allowed: false,
             }),
             suspend_resume_listener: OnceCell::new(),
+            _inspect_node: RefCell::new(IRingBuffer::new(inspect, 128)),
         }
     }
 
@@ -181,6 +187,9 @@ impl ExecutionStateManager {
                 return;
             }
 
+            self._inspect_node.borrow_mut().add_entry(|node| {
+                node.record_int("suspended", zx::Time::get_monotonic().into_nanos());
+            });
             // LINT.IfChange
             tracing::info!("Suspending");
             // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
@@ -201,6 +210,17 @@ impl ExecutionStateManager {
             };
             tracing::info!(?response, "Resuming");
             // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
+            self._inspect_node.borrow_mut().add_entry(|node| {
+                let time = zx::Time::get_monotonic().into_nanos();
+                if let Some(Ok(Ok(SuspendResponse { suspend_duration: Some(duration), .. }))) =
+                    response
+                {
+                    node.record_int("resumed", time);
+                    node.record_int("duration", duration);
+                } else {
+                    node.record_int("suspend_failed", time);
+                }
+            });
 
             listener.suspend_stats().update(|stats_opt: &mut Option<fsuspend::SuspendStats>| {
                 let stats = stats_opt.as_mut().expect("stats is uninitialized");
@@ -522,6 +542,11 @@ impl SystemActivityGovernor {
         };
 
         let suspend_stats = SuspendStatsManager::new(inspect_root.create_child("suspend_stats"));
+        let execution_state_manager = Rc::new(ExecutionStateManager::new(
+            execution_state,
+            suspender,
+            inspect_root.create_child("suspend_events"),
+        ));
 
         Ok(Rc::new(Self {
             inspect_root,
@@ -531,10 +556,7 @@ impl SystemActivityGovernor {
             resume_latency_ctx,
             suspend_stats,
             listeners: RefCell::new(Vec::new()),
-            execution_state_manager: Rc::new(ExecutionStateManager::new(
-                execution_state,
-                suspender,
-            )),
+            execution_state_manager,
             boot_control,
             element_power_level_names,
         }))
