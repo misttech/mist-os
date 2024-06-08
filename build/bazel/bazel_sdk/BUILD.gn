@@ -23,6 +23,12 @@ if (bazel_fuchsia_sdk_all_cpus) {
 idk("idk") {
   output_name = "bazel_fuchsia_sdk_idk"
   sdk_collection_label = "//sdk:core"
+
+  # Ensure sub-builds are shared with the Core IDK (https://fxbug.dev/342695881)
+  # since they use the same set of atoms, but for different sets of
+  # (target_cpu, api_level) combos.
+  idk_subbuilds_label = "//sdk:core_idk_subbuilds"
+
   target_cpus = _fuchsia_sdk_target_cpus
   api_levels = platform_version.build_time_supported_api_levels
 

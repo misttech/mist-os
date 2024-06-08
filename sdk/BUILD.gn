@@ -12,6 +12,7 @@ import("//build/fidl/toolchain.gni")
 import("//build/sdk/config.gni")
 import("//build/sdk/idk.gni")
 import("//build/sdk/idk_archive.gni")
+import("//build/sdk/idk_subbuilds.gni")
 import("//build/sdk/sdk_collection.gni")
 import("//build/sdk/sdk_documentation.gni")
 import("//build/sdk/sdk_final_manifest_golden.gni")
@@ -133,12 +134,18 @@ group("final_fuchsia_idk") {
   testonly = true
 }
 
+idk_subbuilds("core_idk_subbuilds") {
+  sdk_collection_label = ":core"
+  visibility += [ "//build/bazel/bazel_sdk:idk" ]
+}
+
 # This targets generates a "final" IDK archive, including prebuilt binaries for
 # several target_cpu architectures.
 idk("final_fuchsia_idk.exported") {
   visibility += [ "*" ]
   output_name = "fuchsia_idk"
   sdk_collection_label = ":core"
+  idk_subbuilds_label = ":core_idk_subbuilds"
   target_cpus = idk_target_cpus
   api_levels = platform_version.build_time_supported_api_levels
 
