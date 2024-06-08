@@ -1127,6 +1127,15 @@ impl FilesystemLauncher {
                 ..Default::default()
             },
         );
+        if self.config.check_filesystems {
+            tracing::info!("fsck started for fxblob");
+            if let Err(error) = fs.fsck().await {
+                self.report_corruption(DiskFormat::Fxfs, &error);
+                return Err(error);
+            } else {
+                tracing::info!("fsck completed OK for fxblob");
+            }
+        }
         fs.serve_multi_volume().await
     }
 
