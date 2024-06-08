@@ -33,6 +33,7 @@ use core::{
 use assert_matches::assert_matches;
 use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
+use log::{debug, error, trace};
 use net_types::{
     ip::{
         GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion, IpVersionMarker, Ipv4,
@@ -75,7 +76,6 @@ use netstack3_ip::{
 use packet_formats::ip::IpProto;
 use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
-use tracing::{debug, error, trace};
 
 use crate::internal::{
     base::{

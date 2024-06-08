@@ -13,9 +13,9 @@ use fidl_fuchsia_net_stack::{
     self as fidl_net_stack, ForwardingEntry, StackRequest, StackRequestStream,
 };
 use futures::{TryFutureExt as _, TryStreamExt as _};
+use log::{debug, error};
 use net_types::ip::{Ip, Ipv4, Ipv6};
 use netstack3_core::routes::{AddableEntry, AddableEntryEither};
-use tracing::{debug, error};
 
 pub(crate) struct StackFidlWorker {
     netstack: crate::bindings::Netstack,

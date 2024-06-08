@@ -9,6 +9,7 @@ use alloc::collections::hash_map;
 use core::{fmt::Debug, num::NonZeroU16};
 
 use assert_matches::assert_matches;
+use log::{debug, error, warn};
 use net_types::SpecifiedAddr;
 use netstack3_base::{
     socket::{
@@ -34,7 +35,6 @@ use packet_formats::{
     },
 };
 use thiserror::Error;
-use tracing::{debug, error, warn};
 
 use crate::internal::{
     base::{BufferSizes, ConnectionError, Control, Mss, SocketOptions, TcpCounters},

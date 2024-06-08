@@ -61,10 +61,10 @@ common_deps = [
   "//third_party/rust_crates:either",
   "//third_party/rust_crates:futures",
   "//third_party/rust_crates:itertools",
+  "//third_party/rust_crates:log",
   "//third_party/rust_crates:once_cell",
   "//third_party/rust_crates:rand",
   "//third_party/rust_crates:thiserror",
-  "//third_party/rust_crates:tracing",
   "//third_party/rust_crates:zerocopy",
 
   # TODO(https://fxbug.dev/42175119): re-enable check includes when the inspect/client.shard.cml
@@ -84,9 +84,8 @@ common_test_deps = [
   "//src/lib/testing/fixture",
   "//third_party/rust_crates:futures-lite",
   "//third_party/rust_crates:itertools",
+  "//third_party/rust_crates:log",
   "//third_party/rust_crates:test-case",
-  "//third_party/rust_crates:tracing",
-  "//third_party/rust_crates:tracing-subscriber",
 ]
 
 common_sources = [

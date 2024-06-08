@@ -52,9 +52,9 @@ use fuchsia_async as fasync;
 use fuchsia_inspect::health::Reporter as _;
 use fuchsia_zircon as zx;
 use futures::{channel::mpsc, select, FutureExt as _, StreamExt as _};
+use log::{debug, error, info, warn};
 use packet::{Buf, BufferMut};
 use rand::{rngs::OsRng, CryptoRng, RngCore};
-use tracing::{debug, error, info, warn};
 use util::{ConversionContext, IntoFidl as _};
 
 use devices::{

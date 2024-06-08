@@ -16,9 +16,9 @@ use futures::{
     channel::mpsc, ready, sink::SinkExt as _, task::Poll, Future, FutureExt as _, StreamExt as _,
     TryFutureExt as _, TryStreamExt as _,
 };
+use log::{debug, error, warn};
 use net_types::ip::{AddrSubnetEither, IpAddr, IpVersion};
 use netstack3_core::ip::IpAddressState;
-use tracing::{debug, error, warn};
 
 use crate::bindings::{
     devices::BindingId,

@@ -7,7 +7,7 @@ use std::ops::ControlFlow;
 use async_utils::stream::OneOrMany;
 use fidl::endpoints::{ControlHandle, RequestStream};
 use futures::StreamExt as _;
-use tracing::error;
+use log::error;
 
 use crate::bindings::{socket::SocketWorkerProperties, util::ResultExt as _, Ctx};
 

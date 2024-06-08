@@ -19,12 +19,12 @@ use futures::{
     channel::mpsc, task::Poll, Future, SinkExt as _, StreamExt as _, TryFutureExt as _,
     TryStreamExt as _,
 };
+use log::{error, info, warn};
 use net_types::{
     ethernet::Mac,
     ip::{IpAddr, IpAddress, Ipv4, Ipv6},
     SpecifiedAddr, Witness as _,
 };
-use tracing::{error, info, warn};
 
 use crate::bindings::{
     devices::{BindingId, DeviceIdAndName},
@@ -195,7 +195,7 @@ impl Worker {
                 ))) => {
                     // TODO(https://fxbug.dev/42086008): Add flags to the log indicating if
                     // the neighbor is a default gateway and if it is on-link.
-                    info!(tag = "NUD", "{event}");
+                    info!("{event}");
 
                     let DeviceIdAndName { id: binding_id, name: _ } = *id.bindings_id();
                     let entry = neighbor_state

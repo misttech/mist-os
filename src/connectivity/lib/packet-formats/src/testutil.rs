@@ -11,10 +11,10 @@ use alloc::vec::Vec;
 use core::num::NonZeroU16;
 use core::ops::Range;
 
+use log::debug;
 use net_types::ethernet::Mac;
 use net_types::ip::{Ipv4Addr, Ipv6Addr};
 use packet::{ParsablePacket, ParseBuffer, SliceBufViewMut};
-use tracing::debug;
 
 use crate::error::{IpParseResult, ParseError, ParseResult};
 use crate::ethernet::{EtherType, EthernetFrame, EthernetFrameLengthCheck};
@@ -297,21 +297,35 @@ pub fn overwrite_icmpv6_checksum(buf: &mut [u8], checksum: [u8; 2]) -> ParseResu
 mod crateonly {
     use std::sync::Once;
 
-    static LOGGER_ONCE: Once = Once::new();
-
     /// Install a logger for tests.
     ///
     /// Call this method at the beginning of the test for which logging is desired.
     /// This function sets global program state, so all tests that run after this
     /// function is called will use the logger.
     pub(crate) fn set_logger_for_test() {
-        // `init` will panic if called multiple times; using a Once makes
+        /// log::Log implementation that uses stdout.
+        ///
+        /// Useful when debugging tests.
+        struct Logger;
+
+        impl log::Log for Logger {
+            fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
+                true
+            }
+
+            fn log(&self, record: &log::Record<'_>) {
+                println!("{}", record.args())
+            }
+
+            fn flush(&self) {}
+        }
+        static LOGGER_ONCE: Once = Once::new();
+
+        // log::set_logger will panic if called multiple times; using a Once makes
         // set_logger_for_test idempotent
         LOGGER_ONCE.call_once(|| {
-            tracing_subscriber::fmt()
-                .with_writer(std::io::stdout)
-                .with_max_level(tracing::Level::TRACE)
-                .init();
+            log::set_logger(&Logger).unwrap();
+            log::set_max_level(log::LevelFilter::Trace);
         })
     }
 

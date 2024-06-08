@@ -8,12 +8,12 @@
 use alloc::collections::HashMap;
 use core::time::Duration;
 
+use log::trace;
 use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersionMarker, Mtu};
 use netstack3_base::{
     CoreTimerContext, HandleableTimer, Instant, InstantBindingsTypes, TimerBindingsTypes,
     TimerContext,
 };
-use tracing::trace;
 
 /// Time between PMTU maintenance operations.
 ///

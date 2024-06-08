@@ -20,6 +20,7 @@ use core::{
 
 use assert_matches::assert_matches;
 use derivative::Derivative;
+use log::{debug, error, warn};
 use net_types::{
     ip::{GenericOverIp, Ip, IpMarked, Ipv4, Ipv6},
     SpecifiedAddr,
@@ -40,7 +41,6 @@ use packet_formats::{
     ipv6::Ipv6Packet,
     utils::NonZeroDuration,
 };
-use tracing::{debug, error, warn};
 use zerocopy::ByteSlice;
 
 pub(crate) mod api;

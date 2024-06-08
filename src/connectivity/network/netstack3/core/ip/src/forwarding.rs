@@ -7,13 +7,13 @@
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
+use log::debug;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress as _, Ipv4, Ipv4Addr, Subnet},
     SpecifiedAddr, Witness as _,
 };
 use netstack3_base::{AnyDevice, DeviceIdContext, ExistsError};
 use thiserror::Error;
-use tracing::debug;
 
 use crate::internal::{
     base::{IpLayerBindingsContext, IpLayerEvent, IpLayerIpExt},
@@ -450,11 +450,11 @@ mod tests {
 
     use ip_test_macro::ip_test;
     use itertools::Itertools;
+    use log::trace;
     use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
     use net_types::ip::{Ipv6, Ipv6Addr};
     use netstack3_base::testutil::{MultipleDevicesId, TestAddrs};
     use test_case::test_case;
-    use tracing::trace;
 
     use super::*;
     use crate::internal::{forwarding::testutil::FakeIpForwardingCtx, types::Metric};

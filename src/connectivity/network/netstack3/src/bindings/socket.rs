@@ -14,6 +14,7 @@ use fidl_fuchsia_posix::Errno;
 use fidl_fuchsia_posix_socket as psocket;
 use fuchsia_zircon as zx;
 use futures::StreamExt as _;
+use log::{debug, error};
 use net_types::{
     ip::{Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
     ScopeableAddress, SpecifiedAddr, Witness, ZonedAddr,
@@ -28,7 +29,6 @@ use netstack3_core::{
     },
     tcp, udp,
 };
-use tracing::{debug, error};
 
 use crate::bindings::{
     devices::{

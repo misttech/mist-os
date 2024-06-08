@@ -4,7 +4,7 @@
 
 use std::{fmt::Display, panic::Location};
 
-use tracing::{debug, error, trace, warn};
+use log::{debug, error, trace, warn};
 
 /// An extension for common logging patterns for error types.
 pub trait ErrorLogExt {

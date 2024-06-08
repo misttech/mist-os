@@ -7,8 +7,8 @@
 use std::collections::VecDeque;
 
 use fuchsia_zircon::{self as zx, Peered as _};
+use log::{error, trace};
 use thiserror::Error;
-use tracing::{error, trace};
 
 use crate::bindings::socket::ZXSIO_SIGNAL_INCOMING;
 

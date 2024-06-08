@@ -11,8 +11,8 @@ use fuchsia_zircon as zx;
 use futures::{
     channel::mpsc, future::BoxFuture, stream::SelectAll, Future, FutureExt as _, Stream, StreamExt,
 };
+use log::{debug, error, info, warn};
 use netstack3_core::sync::DynDebugReferences;
-use tracing::{debug, error, info, warn};
 
 /// The interval at which [`ResourceRemovalWorker`] generates reports for each
 /// pending resource.

@@ -14,6 +14,7 @@ use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 
 use futures::{lock::Mutex, FutureExt as _, TryStreamExt as _};
+use log::{debug, error, info, warn};
 use net_types::{
     ethernet::Mac,
     ip::{Ip, IpVersion, Ipv4, Ipv6, Ipv6Addr, Mtu, Subnet},
@@ -33,7 +34,6 @@ use netstack3_core::{
     routes::RawMetric,
     sync::RwLock as CoreRwLock,
 };
-use tracing::{debug, error, info, warn};
 
 use crate::bindings::{
     devices, interfaces_admin, routes, trace_duration, BindingId, BindingsCtx, Ctx, DeviceId,

@@ -15,6 +15,7 @@ use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_raw as fpraw;
 use fuchsia_zircon as zx;
 use futures::StreamExt as _;
+use log::error;
 use net_types::{
     ip::{Ip, IpInvariant, IpVersion, Ipv4, Ipv6},
     SpecifiedAddr,
@@ -31,7 +32,6 @@ use netstack3_core::{
 };
 use packet::Buf;
 use packet_formats::ip::IpPacket as _;
-use tracing::error;
 use zerocopy::ByteSlice;
 use zx::{HandleBased, Peered};
 

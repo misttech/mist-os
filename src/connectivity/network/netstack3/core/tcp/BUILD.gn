@@ -38,11 +38,11 @@ rustc_library_with_features("netstack3-tcp") {
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:either",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:siphasher",
     "//third_party/rust_crates:smallvec",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
 
     # TODO(https://github.com/rust-lang/rust/issues/62502): remove this module.
     "//src/connectivity/network/netstack3/core/fakestd",

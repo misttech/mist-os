@@ -14,6 +14,7 @@ use core::{
 
 use arbitrary::{Arbitrary, Unstructured};
 use fuzz_util::Fuzzed;
+use log::info;
 use net_declare::net_mac;
 use net_types::{
     ip::{IpAddress, Ipv4Addr, Ipv6Addr},
@@ -36,23 +37,14 @@ use packet_formats::{
     tcp::TcpSegmentBuilder,
     udp::UdpPacketBuilder,
 };
-use tracing::info;
 
 mod print_on_panic {
     use core::fmt::Display;
+    use core::sync::atomic::{self, AtomicBool};
     use std::sync::Mutex;
 
     use lazy_static::lazy_static;
-    use tracing::Subscriber;
-
-    use tracing_subscriber::{
-        filter::LevelFilter,
-        fmt::{
-            format::{self, FormatEvent, FormatFields},
-            FmtContext,
-        },
-        registry::LookupSpan,
-    };
+    use log::LevelFilter;
 
     lazy_static! {
         pub static ref PRINT_ON_PANIC: PrintOnPanicLog = PrintOnPanicLog::new();
@@ -61,13 +53,13 @@ mod print_on_panic {
 
     /// LogLevel to output at configured at build time. Defaults to `LevelFilter::OFF`.
     const MAX_LOG_LEVEL: LevelFilter = if cfg!(feature = "log_trace") {
-        LevelFilter::TRACE
+        LevelFilter::Trace
     } else if cfg!(feature = "log_debug") {
-        LevelFilter::DEBUG
+        LevelFilter::Debug
     } else if cfg!(feature = "log_info") {
-        LevelFilter::INFO
+        LevelFilter::Info
     } else {
-        LevelFilter::OFF
+        LevelFilter::Off
     };
 
     /// A simple log whose contents get printed to stdout on panic.
@@ -95,7 +87,7 @@ mod print_on_panic {
         }
 
         /// Adds an entry to the log.
-        fn record<T: Display>(&self, t: &T) {
+        fn record<T: Display>(&self, t: T) {
             let Self(mutex) = self;
             mutex.lock().unwrap().push(t.to_string());
         }
@@ -107,61 +99,42 @@ mod print_on_panic {
         }
     }
 
-    struct PrintOnPanicFormatter;
-    impl<S, N> FormatEvent<S, N> for PrintOnPanicFormatter
-    where
-        S: Subscriber + for<'a> LookupSpan<'a>,
-        N: for<'a> FormatFields<'a> + 'static,
-    {
-        fn format_event(
-            &self,
-            ctx: &FmtContext<'_, S, N>,
-            mut writer: format::Writer<'_>,
-            event: &tracing::Event<'_>,
-        ) -> std::fmt::Result {
-            let level = *event.metadata().level();
-            let path = event.metadata().module_path().unwrap_or("_unknown_");
-            write!(writer, "[{path}][{level}] ")?;
-            ctx.field_format().format_fields(writer.by_ref(), event)
-        }
-    }
-
     struct PrintOnPanicLogger;
-    impl std::io::Write for PrintOnPanicLogger {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            PRINT_ON_PANIC.record(&String::from_utf8_lossy(buf));
-            Ok(buf.len())
+    impl log::Log for PrintOnPanicLogger {
+        fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
+            true
         }
 
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
+        fn log(&self, record: &log::Record<'_>) {
+            PRINT_ON_PANIC.record(format_args!(
+                "[{}] ({}) {}",
+                record.level(),
+                record.target(),
+                record.args()
+            ));
         }
+
+        fn flush(&self) {}
     }
 
     /// Tests if the given `level` is enabled.
-    pub fn log_enabled(level: tracing::Level) -> bool {
+    pub fn log_enabled(level: log::Level) -> bool {
         MAX_LOG_LEVEL >= level
     }
 
     /// Initializes the [`log`] crate so that all logs at or above the given
     /// severity level get written to [`PRINT_ON_PANIC`].
-    ///
-    /// When
     pub fn initialize_logging() {
-        if MAX_LOG_LEVEL != LevelFilter::OFF {
-            static LOGGER_ONCE: core::sync::atomic::AtomicBool =
-                core::sync::atomic::AtomicBool::new(true);
+        if MAX_LOG_LEVEL != LevelFilter::Off {
+            static LOGGER_ONCE: AtomicBool = AtomicBool::new(true);
 
-            // This function gets called on every fuzz iteration, but we only need to set up logging the
-            // first time.
-            if LOGGER_ONCE.swap(false, core::sync::atomic::Ordering::AcqRel) {
-                tracing_subscriber::fmt()
-                    .event_format(PrintOnPanicFormatter)
-                    .with_writer(|| PrintOnPanicLogger)
-                    .with_max_level(MAX_LOG_LEVEL)
-                    .init();
+            // This function gets called on every fuzz iteration, but we only
+            // need to set up logging the first time.
+            if LOGGER_ONCE.swap(false, atomic::Ordering::AcqRel) {
+                log::set_logger(&PrintOnPanicLogger).unwrap();
+                log::set_max_level(MAX_LOG_LEVEL);
                 println!("Saving {:?} logs in case of panic", MAX_LOG_LEVEL);
-            };
+            }
         }
     }
 }
@@ -380,7 +353,7 @@ fn arbitrary_packet<P: FuzzablePacket + std::fmt::Debug>(
     // the value here will never be printed. `String::new()` does not allocate,
     // so use that to save CPU and memory when the value would otherwise be
     // thrown away.
-    let description = if print_on_panic::log_enabled(tracing::Level::INFO) {
+    let description = if print_on_panic::log_enabled(log::Level::Info) {
         format!("{:?} with body length {}", packet, body_len)
     } else {
         String::new()

@@ -14,6 +14,7 @@ use fidl::{
 };
 use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::StreamExt as _;
+use log::{error, warn};
 use net_types::{ethernet::Mac, ip::IpVersion};
 use netstack3_core::{
     device::{
@@ -29,7 +30,6 @@ use netstack3_core::{
 };
 use packet::Buf;
 use packet_formats::ethernet::EtherType;
-use tracing::{error, warn};
 
 use crate::bindings::{
     devices::BindingId,

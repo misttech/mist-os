@@ -46,6 +46,7 @@ use futures::{
     future::FusedFuture as _, stream::FusedStream as _, FutureExt as _, SinkExt as _,
     StreamExt as _, TryFutureExt as _, TryStreamExt as _,
 };
+use log::{debug, error, info, warn};
 use net_types::{
     ip::{AddrSubnetEither, IpAddr, Ipv4, Ipv6},
     SpecifiedAddr, Witness,
@@ -63,7 +64,6 @@ use netstack3_core::{
         UpdateIpConfigurationError,
     },
 };
-use tracing::{debug, error, info, warn};
 
 use crate::bindings::{
     devices::{self, EthernetInfo, StaticCommonInfo},

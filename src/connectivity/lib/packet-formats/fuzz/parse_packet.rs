@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::sync::atomic;
+
 use arbitrary::{Arbitrary, Unstructured};
 use fuzz::fuzz;
 use fuzz_util::Fuzzed;
@@ -23,14 +25,6 @@ use packet_formats::{
     udp::{UdpPacket, UdpParseArgs},
 };
 use packet_formats_dhcp::v6::Message as Dhcpv6Message;
-use tracing::Subscriber;
-use tracing_subscriber::{
-    fmt::{
-        format::{self, FormatEvent, FormatFields},
-        FmtContext,
-    },
-    registry::LookupSpan,
-};
 use zerocopy::ByteSlice;
 
 /// Packet formats whose parsers are provided by the [`packet_formats_dhcp`]
@@ -99,34 +93,20 @@ where
 }
 
 fn init_logging() {
-    static LOGGER_ONCE: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(true);
-    if LOGGER_ONCE.swap(false, core::sync::atomic::Ordering::AcqRel) {
-        struct LogEventFormatter;
-        impl<S, N> FormatEvent<S, N> for LogEventFormatter
-        where
-            S: Subscriber + for<'a> LookupSpan<'a>,
-            N: for<'a> FormatFields<'a> + 'static,
-        {
-            fn format_event(
-                &self,
-                ctx: &FmtContext<'_, S, N>,
-                mut writer: format::Writer<'_>,
-                event: &tracing::Event<'_>,
-            ) -> std::fmt::Result {
-                let level = *event.metadata().level();
-                let path = event.metadata().module_path().unwrap_or("_unknown_");
-                write!(writer, "[{path}][{level}]: ")?;
-                ctx.field_format().format_fields(writer.by_ref(), event)?;
-                writeln!(writer)
+    static LOGGER_ONCE: atomic::AtomicBool = atomic::AtomicBool::new(true);
+    if LOGGER_ONCE.swap(false, atomic::Ordering::AcqRel) {
+        struct StderrLogger;
+        impl log::Log for StderrLogger {
+            fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
+                true
             }
+            fn log(&self, record: &log::Record<'_>) {
+                eprintln!("[{}][{}] {}", record.target(), record.level(), record.args());
+            }
+            fn flush(&self) {}
         }
-
-        let subscriber = tracing_subscriber::fmt()
-            .event_format(LogEventFormatter)
-            .with_writer(std::io::stderr)
-            .with_max_level(tracing::Level::DEBUG)
-            .finish();
-        tracing::subscriber::set_global_default(subscriber).expect("Unable to set global default")
+        log::set_logger(&StderrLogger).expect("logging setup failed");
+        log::set_max_level(log::LevelFilter::Debug);
     }
 }
 

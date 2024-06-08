@@ -19,8 +19,8 @@ use futures::{
     TryStreamExt as _,
 };
 use itertools::Itertools as _;
+use log::{error, warn};
 use thiserror::Error;
-use tracing::{error, warn};
 
 use controller::{CommitResult, Controller};
 

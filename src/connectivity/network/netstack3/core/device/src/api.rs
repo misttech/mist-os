@@ -7,6 +7,7 @@
 use alloc::fmt::Debug;
 use core::marker::PhantomData;
 
+use log::debug;
 use net_types::ip::{Ipv4, Ipv6};
 use netstack3_base::{
     AnyDevice, ContextPair, CoreTimerContext, Device, DeviceIdAnyCompatContext, DeviceIdContext,
@@ -22,7 +23,6 @@ use netstack3_ip::{
     RawMetric,
 };
 use packet::BufferMut;
-use tracing::debug;
 
 use crate::internal::{
     base::{

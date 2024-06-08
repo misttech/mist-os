@@ -8,12 +8,12 @@ use alloc::vec::Vec;
 use core::convert::Infallible as Never;
 
 use derivative::Derivative;
+use log::trace;
 use netstack3_base::{sync::Mutex, Device, DeviceIdContext};
 use packet::{
     new_buf_vec, Buf, BufferAlloc, ContiguousBuffer, GrowBufferMut, NoReuseBufferProvider,
     ReusableBuffer, Serializer,
 };
-use tracing::trace;
 
 use crate::internal::{
     base::DeviceSendFrameError,

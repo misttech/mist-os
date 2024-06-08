@@ -18,6 +18,7 @@ use futures::{
     TryStream, TryStreamExt as _,
 };
 use itertools::Itertools as _;
+use log::{debug, error, info, warn};
 use net_types::{
     ethernet::Mac,
     ip::{GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv6},
@@ -30,7 +31,6 @@ use netstack3_core::{
     routes::{NextHop, ResolvedRoute, WrapBroadcastMarker},
 };
 use thiserror::Error;
-use tracing::{debug, error, info, warn};
 
 use crate::bindings::{
     routes,

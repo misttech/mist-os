@@ -6,6 +6,7 @@
 
 use core::num::NonZeroU16;
 
+use log::debug;
 use net_types::{
     ip::{Ipv4, Ipv6, Ipv6Addr},
     MulticastAddr, UnicastAddr, Witness as _,
@@ -15,7 +16,6 @@ use netstack3_base::{
     StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
 };
 use packet_formats::{icmp::ndp::NeighborSolicitation, utils::NonZeroDuration};
-use tracing::debug;
 
 use crate::internal::device::{
     state::Ipv6DadState, IpAddressId as _, IpAddressState, IpDeviceAddressIdContext, IpDeviceIpExt,

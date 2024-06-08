@@ -9,6 +9,7 @@ use core::{fmt::Debug, num::NonZeroU32};
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 
 use const_unwrap::const_unwrap_option;
+use log::{error, trace};
 use net_types::{
     ethernet::Mac,
     ip::{GenericOverIp, Ip, IpAddress, IpMarked, Ipv4, Ipv6, Mtu},
@@ -36,7 +37,6 @@ use packet_formats::{
         ETHERNET_HDR_LEN_NO_TAG,
     },
 };
-use tracing::{error, trace};
 
 use crate::internal::{
     arp::{ArpFrameMetadata, ArpPacketHandler, ArpState, ArpTimerId},

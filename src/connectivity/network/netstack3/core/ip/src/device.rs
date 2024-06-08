@@ -22,6 +22,7 @@ use core::{
 };
 
 use derivative::Derivative;
+use log::info;
 use net_types::{
     ip::{
         AddrSubnet, GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr,
@@ -41,7 +42,6 @@ use packet_formats::{
     icmp::{mld::MldPacket, ndp::NonZeroNdpLifetime},
     utils::NonZeroDuration,
 };
-use tracing::info;
 use zerocopy::ByteSlice;
 
 use crate::internal::{

@@ -9,6 +9,7 @@
 
 use core::{fmt::Debug, time::Duration};
 
+use log::{debug, error};
 use net_types::{
     ip::{AddrSubnet, Ip as _, Ipv4, Ipv4Addr},
     MulticastAddr, SpecifiedAddr, Witness,
@@ -31,7 +32,6 @@ use packet_formats::{
     utils::NonZeroDuration,
 };
 use thiserror::Error;
-use tracing::{debug, error};
 use zerocopy::ByteSlice;
 
 use crate::internal::{

@@ -23,6 +23,7 @@ use fidl_fuchsia_net_stack as fidl_net_stack;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use futures::{task::AtomicWaker, Future, FutureExt as _, Stream, StreamExt as _};
+use log::debug;
 use net_types::{
     ethernet::Mac,
     ip::{
@@ -46,7 +47,6 @@ use netstack3_core::{
     types::WorkQueueReport,
 };
 use packet_formats::utils::NonZeroDuration;
-use tracing::debug;
 
 use crate::bindings::{
     devices::BindingId,

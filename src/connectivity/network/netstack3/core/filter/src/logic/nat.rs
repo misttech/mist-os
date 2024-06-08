@@ -10,12 +10,12 @@ use core::{
     ops::{ControlFlow, RangeInclusive},
 };
 
+use log::{error, warn};
 use net_types::{SpecifiedAddr, Witness as _};
 use netstack3_base::Inspectable;
 use once_cell::sync::OnceCell;
 use packet_formats::ip::IpExt;
 use rand::Rng as _;
-use tracing::{error, warn};
 
 use crate::{
     conntrack::{Connection, ConnectionDirection, Table, Tuple},

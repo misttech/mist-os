@@ -14,6 +14,7 @@ use derivative::Derivative;
 use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fuchsia_zircon as zx;
+use log::warn;
 use net_types::{
     ethernet::Mac,
     ip::{IpAddr, Mtu},
@@ -27,7 +28,6 @@ use netstack3_core::{
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
     types::WorkQueueReport,
 };
-use tracing::warn;
 
 use crate::bindings::{
     interfaces_admin, neighbor_worker, util::NeedsDataNotifier, BindingsCtx, Ctx,

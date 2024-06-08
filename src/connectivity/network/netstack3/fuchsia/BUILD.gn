@@ -16,7 +16,7 @@ rustc_library_with_features("netstack3-fuchsia") {
   ]
   deps = [
     "//src/lib/diagnostics/inspect/rust",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   feature_sets = [

@@ -7,6 +7,7 @@
 use core::{convert::TryInto as _, fmt::Debug, num::NonZeroU8};
 
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
+use log::{debug, error, trace};
 use net_types::{
     ip::{
         GenericOverIp, Ip, IpAddress, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr,
@@ -42,7 +43,6 @@ use packet_formats::{
     ipv4::{Ipv4FragmentType, Ipv4Header},
     ipv6::{ExtHdrParseError, Ipv6Header},
 };
-use tracing::{debug, error, trace};
 use zerocopy::ByteSlice;
 
 use crate::internal::{

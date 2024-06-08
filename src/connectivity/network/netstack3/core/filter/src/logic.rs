@@ -6,10 +6,10 @@ pub(crate) mod nat;
 
 use core::{num::NonZeroU16, ops::RangeInclusive};
 
+use log::error;
 use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
 use netstack3_base::{AnyDevice, DeviceIdContext, HandleableTimer};
 use packet_formats::ip::IpExt;
-use tracing::error;
 
 use crate::{
     context::{FilterBindingsContext, FilterBindingsTypes, FilterIpContext},

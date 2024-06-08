@@ -17,6 +17,7 @@ use lock_order::lock::{DelegatedOrderedLockAccess, OrderedLockAccess, OrderedLoc
 
 use derivative::Derivative;
 use either::Either;
+use log::{debug, trace};
 use net_types::{
     ip::{GenericOverIp, Ip, IpVersionMarker},
     SpecifiedAddr, ZonedAddr,
@@ -51,7 +52,6 @@ use packet_formats::{
     icmp::{IcmpEchoReply, IcmpEchoRequest, IcmpPacketBuilder, IcmpPacketRaw},
     ip::{IpProtoExt, Ipv4Proto, Ipv6Proto},
 };
-use tracing::{debug, trace};
 
 /// A marker trait for all IP extensions required by ICMP sockets.
 pub trait IpExt: datagram::IpExt + IcmpIpExt {}

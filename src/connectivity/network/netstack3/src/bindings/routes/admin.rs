@@ -21,9 +21,9 @@ use futures::{
     channel::{mpsc, oneshot},
     Future, FutureExt as _, StreamExt as _, TryStream, TryStreamExt as _,
 };
+use log::{debug, error, warn};
 use net_types::ip::{GenericOverIp, Ip, IpVersion, Ipv4, Ipv6};
 use netstack3_core::{device::DeviceId, routes::AddableEntry};
-use tracing::{debug, error, warn};
 
 use crate::bindings::{
     devices::StaticCommonInfo,

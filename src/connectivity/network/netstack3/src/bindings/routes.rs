@@ -24,6 +24,7 @@ use futures::{
     channel::{mpsc, oneshot},
     stream, Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
 };
+use log::{debug, error, info, warn};
 use net_types::{
     ip::{
         GenericOverIp, Ip, IpAddress, IpInvariant, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
@@ -32,7 +33,6 @@ use net_types::{
     SpecifiedAddr,
 };
 use netstack3_core::routes::AddableMetric;
-use tracing::{debug, error, info, warn};
 
 use crate::bindings::{
     util::{EntryAndTableId, TryIntoFidlWithContext},

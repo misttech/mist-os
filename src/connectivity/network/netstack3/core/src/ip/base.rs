@@ -10,6 +10,7 @@ use lock_order::{
     lock::{DelegatedOrderedLockAccess, LockLevelFor, UnlockedAccess},
     relation::LockBefore,
 };
+use log::trace;
 use net_types::{
     ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr},
     MulticastAddr, SpecifiedAddr,
@@ -39,7 +40,6 @@ use netstack3_tcp::TcpIpTransportContext;
 use netstack3_udp::UdpIpTransportContext;
 use packet::BufferMut;
 use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
-use tracing::trace;
 
 use crate::{
     context::{prelude::*, WrapLockLevel},

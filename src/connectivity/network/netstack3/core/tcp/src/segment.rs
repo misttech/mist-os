@@ -10,8 +10,8 @@ use core::{
     ops::Range,
 };
 
+use log::info;
 use packet_formats::tcp::options::TcpOption;
-use tracing::info;
 
 use crate::internal::{
     base::{Control, Mss},

@@ -11,6 +11,7 @@ use lock_order::{
     relation::LockBefore,
 };
 
+use log::debug;
 use net_types::{
     ethernet::Mac,
     ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
@@ -50,7 +51,6 @@ use packet_formats::{
     ipv4::Ipv4FragmentType,
     utils::NonZeroDuration,
 };
-use tracing::debug;
 
 use crate::{
     context::{prelude::*, WrapLockLevel},

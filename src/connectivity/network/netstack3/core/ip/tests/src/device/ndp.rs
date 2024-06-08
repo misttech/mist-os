@@ -16,6 +16,7 @@ use core::{
 
 use assert_matches::assert_matches;
 
+use log::trace;
 use net_declare::net::{mac, subnet_v6};
 use net_types::{
     ethernet::Mac,
@@ -39,7 +40,6 @@ use packet_formats::{
     utils::NonZeroDuration,
 };
 use rand::Rng;
-use tracing::trace;
 use zerocopy::ByteSlice;
 
 use netstack3_base::{

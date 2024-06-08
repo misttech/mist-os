@@ -103,7 +103,7 @@ rustc_library_with_features("netstack3-core") {
     "//src/lib/network/packet",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:derivative",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
 
     # TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11):
     # remove this module.
@@ -291,8 +291,7 @@ rustc_fuzzer("fuzz-single-device") {
     "//src/lib/network/packet",
     "//third_party/rust_crates:arbitrary",
     "//third_party/rust_crates:lazy_static",
-    "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:tracing-subscriber",
+    "//third_party/rust_crates:log",
   ]
 
   features = [

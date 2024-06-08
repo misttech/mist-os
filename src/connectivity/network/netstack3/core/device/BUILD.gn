@@ -36,8 +36,8 @@ rustc_library_with_features("netstack3-device") {
     "//src/lib/fakealloc",
     "//src/lib/network/packet",
     "//third_party/rust_crates:derivative",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:ref-cast",
-    "//third_party/rust_crates:tracing",
   ]
 
   _testutils_deps = [ "//third_party/rust_crates:assert_matches" ]

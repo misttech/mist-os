@@ -18,6 +18,7 @@ use core::{
 use derivative::Derivative;
 use either::Either;
 use lock_order::lock::{DelegatedOrderedLockAccess, OrderedLockAccess, OrderedLockRef};
+use log::{debug, trace};
 use net_types::{
     ip::{GenericOverIp, Ip, IpInvariant, IpMarked, IpVersion, IpVersionMarker, Ipv4, Ipv6},
     MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
@@ -61,7 +62,6 @@ use packet_formats::{
     udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs},
 };
 use thiserror::Error;
-use tracing::{debug, trace};
 
 /// A builder for UDP layer state.
 #[derive(Clone)]

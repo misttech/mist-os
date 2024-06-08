@@ -22,7 +22,7 @@ rustc_library_with_features("netstack3-icmp-echo") {
     "//src/lib/network/packet",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:either",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]

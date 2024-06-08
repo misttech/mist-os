@@ -7,6 +7,7 @@
 use alloc::vec::Vec;
 
 use either::Either;
+use log::trace;
 use net_types::{
     ip::{
         AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant,
@@ -20,7 +21,6 @@ use netstack3_base::{
     RemoveResourceResultWithContext,
 };
 use thiserror::Error;
-use tracing::trace;
 
 use crate::internal::{
     device::{

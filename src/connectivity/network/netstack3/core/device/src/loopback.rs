@@ -8,6 +8,7 @@ use alloc::vec::Vec;
 use core::{convert::Infallible as Never, fmt::Debug};
 
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
+use log::trace;
 use net_types::{
     ethernet::Mac,
     ip::{Ip, IpAddress, Ipv4, Ipv6, Mtu},
@@ -21,7 +22,6 @@ use packet::{Buf, Buffer as _, BufferMut, Serializer};
 use packet_formats::ethernet::{
     EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
 };
-use tracing::trace;
 
 use crate::internal::{
     base::{DeviceCounters, DeviceLayerTypes, DeviceReceiveFrameSpec, EthernetDeviceCounters},

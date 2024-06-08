@@ -7,6 +7,7 @@
 use alloc::fmt::Debug;
 use core::time::Duration;
 
+use log::{debug, trace, warn};
 use net_types::{
     ip::{Ipv4, Ipv4Addr},
     SpecifiedAddr, UnicastAddr, Witness as _,
@@ -27,7 +28,6 @@ use packet_formats::{
     utils::NonZeroDuration,
 };
 use ref_cast::RefCast;
-use tracing::{debug, trace, warn};
 
 /// A link device whose addressing scheme is supported by ARP.
 ///

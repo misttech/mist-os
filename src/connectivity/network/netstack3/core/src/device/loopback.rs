@@ -11,6 +11,7 @@ use lock_order::{
     lock::{LockLevelFor, UnlockedAccessMarkerFor},
     relation::LockBefore,
 };
+use log::error;
 use netstack3_base::DeviceIdContext;
 use netstack3_device::{
     ethernet::EthernetDeviceCounters,
@@ -27,7 +28,6 @@ use netstack3_device::{
     DeviceLayerTypes, DeviceSendFrameError, IpLinkDeviceState,
 };
 use packet::Buf;
-use tracing::error;
 
 use crate::{
     context::{prelude::*, WrapLockLevel},

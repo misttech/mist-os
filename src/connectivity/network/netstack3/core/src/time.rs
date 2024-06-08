@@ -7,6 +7,7 @@
 use core::convert::Infallible as Never;
 
 use derivative::Derivative;
+use log::trace;
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 use netstack3_base::{CoreTimerContext, HandleableTimer, TimerHandler};
 use netstack3_device::{DeviceLayerTimerId, WeakDeviceId};
@@ -14,7 +15,6 @@ use netstack3_ip::{
     device::{IpDeviceIpExt, IpDeviceTimerId},
     IpLayerTimerId,
 };
-use tracing::trace;
 
 use crate::{
     context::CoreCtx, ip::integration::IpAddrCtxSpec, transport::TransportLayerTimerId,

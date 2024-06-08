@@ -16,8 +16,8 @@ use std::{
 use async_utils::futures::YieldToExecutorOnce;
 use fuchsia_async as fasync;
 use futures::{future::FusedFuture, Future, FutureExt, StreamExt as _};
+use log::{trace, warn};
 use netstack3_core::sync::Mutex as CoreMutex;
-use tracing::{trace, warn};
 
 use crate::bindings::util::{NeedsDataNotifier, NeedsDataWatcher};
 

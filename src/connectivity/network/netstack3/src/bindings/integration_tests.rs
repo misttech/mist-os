@@ -30,14 +30,6 @@ use netstack3_core::{
     neighbor::LinkResolutionResult,
     routes::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric},
 };
-use tracing::Subscriber;
-use tracing_subscriber::{
-    fmt::{
-        format::{self, FormatEvent, FormatFields},
-        FmtContext,
-    },
-    registry::LookupSpan,
-};
 
 use crate::bindings::{
     ctx::BindingsCtx,
@@ -47,41 +39,29 @@ use crate::bindings::{
     Ctx, InspectPublisher, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
 };
 
-struct LogFormatter;
-
-impl<S, N> FormatEvent<S, N> for LogFormatter
-where
-    S: Subscriber + for<'a> LookupSpan<'a>,
-    N: for<'a> FormatFields<'a> + 'static,
-{
-    fn format_event(
-        &self,
-        ctx: &FmtContext<'_, S, N>,
-        mut writer: format::Writer<'_>,
-        event: &tracing::Event<'_>,
-    ) -> std::fmt::Result {
-        write!(
-            writer,
-            "[{}] ({}) ",
-            event.metadata().level(),
-            event.metadata().module_path().unwrap_or("")
-        )?;
-        ctx.format_fields(writer.by_ref(), event)?;
-        writeln!(writer)
-    }
-}
-
-static LOGGER_ONCE: Once = Once::new();
-
 /// Install a logger for tests.
 pub(crate) fn set_logger_for_test() {
-    // `init` will panic if called multiple times; using a Once makes
+    struct Logger;
+
+    impl log::Log for Logger {
+        fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
+            true
+        }
+
+        fn log(&self, record: &log::Record<'_>) {
+            println!("[{}] ({}) {}", record.level(), record.target(), record.args())
+        }
+
+        fn flush(&self) {}
+    }
+
+    static LOGGER_ONCE: Once = Once::new();
+
+    // log::set_logger will panic if called multiple times; using a Once makes
     // set_logger_for_test idempotent
     LOGGER_ONCE.call_once(|| {
-        tracing_subscriber::fmt()
-            .event_format(LogFormatter)
-            .with_max_level(tracing::Level::TRACE)
-            .init();
+        log::set_logger(&Logger).unwrap();
+        log::set_max_level(log::LevelFilter::Trace);
     })
 }
 

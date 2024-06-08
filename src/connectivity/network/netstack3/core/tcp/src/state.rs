@@ -18,11 +18,11 @@ use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use explicit::ResultExt as _;
+use log::error;
 use netstack3_base::Instant;
 use netstack3_ip::icmp::IcmpErrorCode;
 use packet_formats::utils::NonZeroDuration;
 use replace_with::{replace_with, replace_with_and};
-use tracing::error;
 
 use crate::internal::{
     base::{

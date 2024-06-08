@@ -24,6 +24,7 @@ use fidl_fuchsia_posix_socket as fposix_socket;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, Peered as _};
 use futures::{future::FusedFuture as _, FutureExt as _, StreamExt as _};
+use log::debug;
 use net_types::ip::{IpAddress, IpVersion, Ipv4, Ipv6};
 use netstack3_core::{
     device::{DeviceId, WeakDeviceId},
@@ -38,7 +39,6 @@ use netstack3_core::{
 };
 use once_cell::sync::Lazy;
 use packet_formats::utils::NonZeroDuration;
-use tracing::debug;
 
 use crate::bindings::{
     socket::{

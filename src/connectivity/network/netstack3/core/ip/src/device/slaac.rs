@@ -13,6 +13,7 @@ use core::{marker::PhantomData, num::NonZeroU16, ops::ControlFlow, time::Duratio
 
 use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
+use log::{debug, error, trace};
 use net_types::{
     ip::{AddrSubnet, IpAddress, Ipv6Addr, Subnet},
     Witness as _,
@@ -24,7 +25,6 @@ use netstack3_base::{
 };
 use packet_formats::{icmp::ndp::NonZeroNdpLifetime, utils::NonZeroDuration};
 use rand::{distributions::Uniform, Rng};
-use tracing::{debug, error, trace};
 
 use crate::internal::device::{
     opaque_iid::{OpaqueIid, OpaqueIidNonce, StableIidSecret},
@@ -921,7 +921,7 @@ impl<BC: SlaacBindingsContext, CC: SlaacContext<BC>> HandleableTimer<CC, BC>
                                 panic!("Failed to remove address {addr} on invalidation");
                                 #[cfg(not(test))]
                                 {
-                                    tracing::warn!(
+                                    log::warn!(
                                         "failed to remove SLAAC address {addr}, assuming raced \
                                         with user removal"
                                     );

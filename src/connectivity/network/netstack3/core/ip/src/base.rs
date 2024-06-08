@@ -15,6 +15,7 @@ use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use explicit::ResultExt as _;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
+use log::{debug, error, trace};
 use net_types::{
     ip::{
         GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu, Subnet,
@@ -42,7 +43,6 @@ use packet_formats::{
     ipv6::Ipv6Packet,
 };
 use thiserror::Error;
-use tracing::{debug, error, trace};
 
 use crate::internal::{
     device::{

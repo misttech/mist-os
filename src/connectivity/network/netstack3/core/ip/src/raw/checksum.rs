@@ -4,6 +4,7 @@
 
 //! Declares types and functionality related to checksums for raw IP sockets.
 
+use log::error;
 use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4Addr, Ipv6Addr};
 use packet::{Buf, BufferViewMut, ParsablePacket as _, ParseBuffer as _};
 use packet_formats::{
@@ -12,7 +13,6 @@ use packet_formats::{
     ipv4::Ipv4Packet,
     ipv6::Ipv6Packet,
 };
-use tracing::error;
 use zerocopy::ByteSlice;
 
 use crate::IpExt;

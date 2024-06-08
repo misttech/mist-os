@@ -8,6 +8,7 @@ use alloc::vec::Vec;
 use core::{convert::Infallible as Never, fmt::Debug};
 
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
+use log::warn;
 use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6, Mtu};
 use netstack3_base::{
     sync::{Mutex, RwLock},
@@ -15,7 +16,6 @@ use netstack3_base::{
     RecvIpFrameMeta, ResourceCounterContext, SendableFrameMeta, TimerContext, WeakDeviceIdentifier,
 };
 use packet::{Buf, BufferMut, Serializer};
-use tracing::warn;
 
 use crate::internal::{
     base::{

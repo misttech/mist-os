@@ -7,6 +7,7 @@
 use alloc::collections::{btree_map::Entry, BTreeMap, HashMap};
 use core::{fmt::Debug, num::NonZeroU8};
 use derivative::Derivative;
+use log::debug;
 use net_types::{
     ip::{GenericOverIp, Ip, IpVersionMarker},
     SpecifiedAddr, ZonedAddr,
@@ -21,7 +22,6 @@ use netstack3_base::{
 use netstack3_filter::RawIpBody;
 use packet::{BufferMut, SliceBufViewMut};
 use packet_formats::{icmp, ip::IpPacket};
-use tracing::debug;
 use zerocopy::ByteSlice;
 
 use crate::{

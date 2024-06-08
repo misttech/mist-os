@@ -22,6 +22,7 @@ use explicit::ResultExt as _;
 use fidl::endpoints::RequestStream as _;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, prelude::HandleBased as _, Peered as _};
+use log::{debug, error, trace, warn};
 use net_types::{
     ip::{GenericOverIp, Ip, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6},
     MulticastAddr, SpecifiedAddr, ZonedAddr,
@@ -41,7 +42,6 @@ use netstack3_core::{
     udp, IpExt,
 };
 use packet::{Buf, BufferMut};
-use tracing::{debug, error, trace, warn};
 
 use crate::bindings::{
     socket::{
