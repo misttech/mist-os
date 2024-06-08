@@ -37,6 +37,7 @@ _INPUT_ARGS: dict[str, Any] = {
         logs_level="debug",
         mdns_enabled=False,
         subtools_search_path=None,
+        proxy_timeout_secs=None,
     ),
     "target_name": _TARGET_NAME,
     "target_ip_port": _REMOTE_TARGET_IP_PORT_OBJ,

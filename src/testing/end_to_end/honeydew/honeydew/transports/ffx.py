@@ -67,10 +67,6 @@ _FFX_CMDS: dict[str, list[str]] = {
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-_FFX_LOGS_LEVEL: str = "debug"
-
-_PROXY_TIMEOUT_SECS: int = 30
-
 _DEVICE_NOT_CONNECTED: str = "Timeout attempting to reach target"
 
 
@@ -88,13 +84,14 @@ class FfxConfig:
         logs_level: str | None,
         enable_mdns: bool,
         subtools_search_path: str | None,
+        proxy_timeout_secs: int | None,
     ) -> None:
         """Sets up configuration need to be used while running FFX command.
 
         Args:
             binary_path: absolute path to the FFX binary.
             isolate_dir: Directory that will be passed to `--isolate-dir`
-                arg of FFX
+                arg of FFX. If set to None, a random directory will be created.
             logs_dir: Directory that will be passed to `--config log.dir`
                 arg of FFX
             logs_level: logs level that will be passed to `--config log.level`
@@ -103,6 +100,7 @@ class FfxConfig:
                 passed to `--config discovery.mdns.enabled` arg of FFX
             subtools_search_path: A path of where ffx should
                 look for plugins.
+            proxy_timeout_secs: Proxy timeout in secs.
 
         Raises:
             errors.FfxConfigError: If setup has already been called once.
@@ -128,26 +126,32 @@ class FfxConfig:
         self._isolate_dir: fuchsia_controller.IsolateDir = (
             fuchsia_controller.IsolateDir(isolate_dir)
         )
-
         self._logs_dir: str = logs_dir
-        self._logs_level: str = logs_level if logs_level else _FFX_LOGS_LEVEL
+        self._logs_level: str | None = logs_level
         self._mdns_enabled: bool = enable_mdns
-        self.subtools_search_path: str | None = subtools_search_path
+        self._subtools_search_path: str | None = subtools_search_path
+        self._proxy_timeout_secs: int | None = proxy_timeout_secs
 
         self._run(_FFX_CONFIG_CMDS["LOG_DIR"] + [self._logs_dir])
-        self._run(_FFX_CONFIG_CMDS["LOG_LEVEL"] + [self._logs_level])
+
+        if self._logs_level:
+            self._run(_FFX_CONFIG_CMDS["LOG_LEVEL"] + [self._logs_level])
+
         self._run(_FFX_CONFIG_CMDS["MDNS"] + [str(self._mdns_enabled).lower()])
 
         # Setting this based on the recommendation from awdavies@ for below
         # FuchsiaController error:
         #   FFX Library Error: Timeout attempting to reach target
-        self._run(
-            _FFX_CONFIG_CMDS["PROXY_TIMEOUT"] + [str(_PROXY_TIMEOUT_SECS)]
-        )
-
-        if self.subtools_search_path:
+        if self._proxy_timeout_secs:
             self._run(
-                _FFX_CONFIG_CMDS["SUB_TOOLS_PATH"] + [self.subtools_search_path]
+                _FFX_CONFIG_CMDS["PROXY_TIMEOUT"]
+                + [str(self._proxy_timeout_secs)]
+            )
+
+        if self._subtools_search_path:
+            self._run(
+                _FFX_CONFIG_CMDS["SUB_TOOLS_PATH"]
+                + [self._subtools_search_path]
             )
 
         self._run(_FFX_CONFIG_CMDS["DAEMON_ECHO"])
@@ -188,7 +192,8 @@ class FfxConfig:
             logs_dir=self._logs_dir,
             logs_level=self._logs_level,
             mdns_enabled=self._mdns_enabled,
-            subtools_search_path=self.subtools_search_path,
+            subtools_search_path=self._subtools_search_path,
+            proxy_timeout_secs=self._proxy_timeout_secs,
         )
 
     def _atexit_callback(self) -> None:

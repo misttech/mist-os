@@ -42,6 +42,7 @@ _INPUT_ARGS: dict[str, Any] = {
         logs_level="debug",
         mdns_enabled=False,
         subtools_search_path=None,
+        proxy_timeout_secs=None,
     ),
 }
 

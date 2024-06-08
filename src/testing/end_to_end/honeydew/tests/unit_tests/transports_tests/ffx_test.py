@@ -38,6 +38,7 @@ _BINARY_PATH: str = "ffx"
 _LOGS_LEVEL: str = "debug"
 _MDNS_ENABLED: bool = False
 _SUBTOOLS_SEARCH_PATH: str = "/subtools"
+_PROXY_TIMEOUT_SECS: int = 30
 
 _FFX_TARGET_SHOW_JSON: dict[str, Any] = {
     "target": {
@@ -126,6 +127,7 @@ _INPUT_ARGS: dict[str, Any] = {
         logs_level=_LOGS_LEVEL,
         mdns_enabled=_MDNS_ENABLED,
         subtools_search_path=_SUBTOOLS_SEARCH_PATH,
+        proxy_timeout_secs=_PROXY_TIMEOUT_SECS,
     ),
     "run_cmd": ffx._FFX_CMDS["TARGET_SHOW"],
 }
@@ -179,6 +181,7 @@ class FfxConfigTests(unittest.TestCase):
             logs_level=_LOGS_LEVEL,
             enable_mdns=_MDNS_ENABLED,
             subtools_search_path=_SUBTOOLS_SEARCH_PATH,
+            proxy_timeout_secs=_PROXY_TIMEOUT_SECS,
         )
 
         ffx_configs_calls = [
@@ -189,6 +192,11 @@ class FfxConfigTests(unittest.TestCase):
             mock.call(
                 _FFX_CONFIG_SET
                 + ["discovery.mdns.enabled", str(_MDNS_ENABLED).lower()],
+                timeout=10,
+            ),
+            mock.call(
+                _FFX_CONFIG_SET
+                + ["proxy.timeout_secs", str(_PROXY_TIMEOUT_SECS)],
                 timeout=10,
             ),
             mock.call(
@@ -210,6 +218,7 @@ class FfxConfigTests(unittest.TestCase):
                 logs_level=_LOGS_LEVEL,
                 enable_mdns=_MDNS_ENABLED,
                 subtools_search_path=_SUBTOOLS_SEARCH_PATH,
+                proxy_timeout_secs=_PROXY_TIMEOUT_SECS,
             )
 
     @mock.patch.object(
@@ -237,6 +246,7 @@ class FfxConfigTests(unittest.TestCase):
                 logs_level=_LOGS_LEVEL,
                 enable_mdns=_MDNS_ENABLED,
                 subtools_search_path=_SUBTOOLS_SEARCH_PATH,
+                proxy_timeout_secs=_PROXY_TIMEOUT_SECS,
             )
 
         mock_subprocess_check_call.assert_called()
@@ -262,6 +272,7 @@ class FfxConfigTests(unittest.TestCase):
                 logs_level=_LOGS_LEVEL,
                 enable_mdns=_MDNS_ENABLED,
                 subtools_search_path=_SUBTOOLS_SEARCH_PATH,
+                proxy_timeout_secs=_PROXY_TIMEOUT_SECS,
             )
 
         mock_subprocess_check_call.assert_called()
@@ -284,6 +295,7 @@ class FfxConfigTests(unittest.TestCase):
             logs_level=_LOGS_LEVEL,
             enable_mdns=_MDNS_ENABLED,
             subtools_search_path=_SUBTOOLS_SEARCH_PATH,
+            proxy_timeout_secs=_PROXY_TIMEOUT_SECS,
         )
         mock_ffx_config_run.assert_called()
 
@@ -317,6 +329,7 @@ class FfxConfigTests(unittest.TestCase):
             logs_level=_LOGS_LEVEL,
             enable_mdns=_MDNS_ENABLED,
             subtools_search_path=_SUBTOOLS_SEARCH_PATH,
+            proxy_timeout_secs=_PROXY_TIMEOUT_SECS,
         )
         mock_ffx_config_run.assert_called()
 
