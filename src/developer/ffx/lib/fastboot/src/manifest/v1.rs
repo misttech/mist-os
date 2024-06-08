@@ -335,9 +335,7 @@ mod test {
         let output = String::from_utf8(writer).expect("utf-8 string");
         for partition in &v.0[1].partitions {
             let name_listing = Regex::new(&partition.name()).expect("test regex");
-            let path_listing = Regex::new(&partition.file()).expect("test regex");
             assert_eq!(name_listing.find_iter(&output).count(), 1);
-            assert_eq!(path_listing.find_iter(&output).count(), 1);
         }
         Ok(())
     }
@@ -446,10 +444,8 @@ mod test {
         let output = String::from_utf8(writer).expect("utf-8 string");
         for (i, partition) in v.0[0].bootloader_partitions.iter().enumerate() {
             let name_listing = Regex::new(&partition.name()).expect("test regex");
-            let path_listing = Regex::new(&partition.file()).expect("test regex");
             let expected = if i == 1 { 1 } else { 0 };
             assert_eq!(name_listing.find_iter(&output).count(), expected);
-            assert_eq!(path_listing.find_iter(&output).count(), expected);
         }
         Ok(())
     }

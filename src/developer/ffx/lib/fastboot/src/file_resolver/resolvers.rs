@@ -123,11 +123,11 @@ impl FileResolver for ZipArchiveResolver {
             }
         }
         let time = Utc::now();
+        tracing::debug!("Extracting to {}", self.temp_dir.path().display());
         write!(
             writer,
-            "Extracting {} to {}... ",
-            file.sanitized_name().file_name().expect("has a file name").to_string_lossy(),
-            self.temp_dir.path().display()
+            "Extracting {}... ",
+            file.sanitized_name().file_name().expect("has a file name").to_string_lossy()
         )?;
         if file.size() > (1 << 24) {
             write!(writer, "large file, please wait... ")?;
@@ -151,7 +151,8 @@ impl TarResolver {
         let file = File::open(path.clone())
             .map_err(|e| ffx_error!("Could not open archive file: {}", e))?;
         let time = Utc::now();
-        write!(writer, "Extracting {} to {}... ", path.display(), temp_dir.path().display())?;
+        tracing::debug!("Extracting to {}", temp_dir.path().display());
+        write!(writer, "Extracting {}... ", path.display())?;
         writer.flush()?;
         // Tarballs can't do per file extraction well like Zip, so just unpack it all.
         match path.extension() {

@@ -212,7 +212,7 @@ pub async fn stage_file<W: Write, F: FileResolver + Sync, T: FastbootInterface>(
     } else {
         file.to_string()
     };
-    writeln!(writer, "Preparing to stage {}", file_to_upload)?;
+    tracing::debug!("Preparing to stage {}", file_to_upload);
     try_join!(
         fastboot_interface.stage(&file_to_upload, prog_client).map_err(|e| anyhow!(e)),
         handle_upload_progress_for_staging(writer, prog_server),
@@ -261,7 +261,7 @@ async fn flash_partition_sparse<W: Write, F: FastbootInterface>(
     fastboot_interface: &mut F,
     max_download_size: u64,
 ) -> Result<()> {
-    writeln!(writer, "Preparing to flash {} in sparse mode", file_to_upload)?;
+    tracing::debug!("Preparing to flash {} in sparse mode", file_to_upload);
 
     let sparse_files = build_sparse_files(
         writer,
@@ -290,7 +290,7 @@ pub async fn flash_partition<W: Write, F: FileResolver + Sync, T: FastbootInterf
 ) -> Result<()> {
     let file_to_upload =
         file_resolver.get_file(writer, file).await.context("reconciling file for upload")?;
-    writeln!(writer, "Preparing to upload {}", file_to_upload)?;
+    tracing::debug!("Preparing to upload {}", file_to_upload);
 
     // If the given file to flash is bigger than what the device can download
     // at once, we need to make a sparse image out of the given file
