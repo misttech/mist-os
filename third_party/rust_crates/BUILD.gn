@@ -2153,18 +2153,19 @@ rust_proc_macro("async-trait-v0_1_71") {
   applicable_licenses = [ ":async-trait-v0_1_71.license" ]
 }
 
-license("atomic-waker-v1_0_0.license") {
+license("atomic-waker-v1_1_2.license") {
   public_package_name = "atomic_waker"
   license_files = [
-    "//third_party/rust_crates/vendor/atomic-waker-1.0.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/atomic-waker-1.0.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/atomic-waker-1.1.2/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/atomic-waker-1.1.2/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/atomic-waker-1.1.2/LICENSE-THIRD-PARTY",
   ]
 }
 
-rust_library("atomic-waker-v1_0_0") {
+rust_library("atomic-waker-v1_1_2") {
   crate_name = "atomic_waker"
-  crate_root = "//third_party/rust_crates/vendor/atomic-waker-1.0.0/src/lib.rs"
-  output_name = "atomic_waker-ac068411b12dd2e8"
+  crate_root = "//third_party/rust_crates/vendor/atomic-waker-1.1.2/src/lib.rs"
+  output_name = "atomic_waker-856f7c0622c0dbc0"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -2174,13 +2175,13 @@ rust_library("atomic-waker-v1_0_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=ac068411b12dd2e8",
-    "-Cextra-filename=-ac068411b12dd2e8",
+    "-Cmetadata=856f7c0622c0dbc0",
+    "-Cextra-filename=-856f7c0622c0dbc0",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":atomic-waker-v1_0_0.license" ]
+  applicable_licenses = [ ":atomic-waker-v1_1_2.license" ]
 }
 
 license("atty-v0_2_11.license") {
@@ -2611,7 +2612,7 @@ rust_library("blocking-v1_3_0") {
   deps += [ ":async-channel-v1_8_0" ]
   deps += [ ":async-lock-v2_6_0" ]
   deps += [ ":async-task-v4_0_3" ]
-  deps += [ ":atomic-waker-v1_0_0" ]
+  deps += [ ":atomic-waker-v1_1_2" ]
   deps += [ ":fastrand-v1_4_0" ]
   deps += [ ":futures-lite-v1_11_3" ]
 

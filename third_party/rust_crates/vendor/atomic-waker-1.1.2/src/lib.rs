@@ -1,10 +1,32 @@
 //! `futures::task::AtomicWaker` extracted into its own crate.
+//!
+//! # Features
+//!
+//! This crate adds a feature, `portable-atomic`, which uses a polyfill
+//! from the [`portable-atomic`] crate in order to provide functionality
+//! to targets without atomics. See the [`README`] for the [`portable-atomic`]
+//! crate for more information on how to use it.
+//!
+//! [`portable-atomic`]: https://crates.io/crates/portable-atomic
+//! [`README`]: https://github.com/taiki-e/portable-atomic/blob/main/README.md#optional-cfg
 
-use std::cell::UnsafeCell;
-use std::fmt;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::{Acquire, Release, AcqRel};
-use std::task::Waker;
+#![no_std]
+#![doc(
+    html_favicon_url = "https://raw.githubusercontent.com/smol-rs/smol/master/assets/images/logo_fullsize_transparent.png"
+)]
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/smol-rs/smol/master/assets/images/logo_fullsize_transparent.png"
+)]
+
+use core::cell::UnsafeCell;
+use core::fmt;
+use core::sync::atomic::Ordering::{AcqRel, Acquire, Release};
+use core::task::Waker;
+
+#[cfg(not(feature = "portable-atomic"))]
+use core::sync::atomic::AtomicUsize;
+#[cfg(feature = "portable-atomic")]
+use portable_atomic::AtomicUsize;
 
 /// A synchronization primitive for task wakeup.
 ///
@@ -261,11 +283,20 @@ impl AtomicWaker {
     /// }
     /// ```
     pub fn register(&self, waker: &Waker) {
-        match self.state.compare_and_swap(WAITING, REGISTERING, Acquire) {
+        match self
+            .state
+            .compare_exchange(WAITING, REGISTERING, Acquire, Acquire)
+            .unwrap_or_else(|x| x)
+        {
             WAITING => {
                 unsafe {
                     // Locked acquired, update the waker cell
-                    *self.waker.get() = Some(waker.clone());
+
+                    // Avoid cloning the waker if the old waker will awaken the same task.
+                    match &*self.waker.get() {
+                        Some(old_waker) if old_waker.will_wake(waker) => (),
+                        _ => *self.waker.get() = Some(waker.clone()),
+                    }
 
                     // Release the lock. If the state transitioned to include
                     // the `WAKING` bit, this means that at least one wake has
@@ -277,8 +308,9 @@ impl AtomicWaker {
                     // nothing to acquire, only release. In case of concurrent
                     // wakers, we need to acquire their releases, so success needs
                     // to do both.
-                    let res = self.state.compare_exchange(
-                        REGISTERING, WAITING, AcqRel, Acquire);
+                    let res = self
+                        .state
+                        .compare_exchange(REGISTERING, WAITING, AcqRel, Acquire);
 
                     match res {
                         Ok(_) => {
@@ -342,9 +374,7 @@ impl AtomicWaker {
                 //
                 // We just want to maintain memory safety. It is ok to drop the
                 // call to `register`.
-                debug_assert!(
-                    state == REGISTERING ||
-                    state == REGISTERING | WAKING);
+                debug_assert!(state == REGISTERING || state == REGISTERING | WAKING);
             }
         }
     }
@@ -389,9 +419,8 @@ impl AtomicWaker {
                 // not.
                 //
                 debug_assert!(
-                    state == REGISTERING ||
-                    state == REGISTERING | WAKING ||
-                    state == WAKING);
+                    state == REGISTERING || state == REGISTERING | WAKING || state == WAKING
+                );
                 None
             }
         }
