@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    fidl::endpoints::{create_endpoints, create_proxy},
+    fidl::{
+        endpoints::{create_endpoints, create_proxy, Proxy},
+        HandleBased,
+    },
     fidl_test_wlan_realm as fidl_realm, fidl_test_wlan_testcontroller as fidl_testcontroller,
     fuchsia_component::client::connect_to_protocol,
     realm_client::{extend_namespace, InstalledNamespace},
@@ -13,7 +16,7 @@ use {
 pub mod sme_helpers;
 
 pub struct DriversOnlyTestRealm {
-    pub testcontroller_proxy: fidl_testcontroller::TestControllerProxy,
+    testcontroller_proxy: Option<fidl_testcontroller::TestControllerProxy>,
     _tracing: Option<Tracing>,
     _test_ns: InstalledNamespace,
 }
@@ -75,6 +78,28 @@ impl DriversOnlyTestRealm {
             .map_err(|e| tracing::warn!("{e:?}"))
             .ok();
 
-        Self { testcontroller_proxy, _tracing: tracing, _test_ns: test_ns }
+        Self {
+            testcontroller_proxy: Some(testcontroller_proxy),
+            _tracing: tracing,
+            _test_ns: test_ns,
+        }
+    }
+
+    pub fn testcontroller_proxy(&self) -> &fidl_testcontroller::TestControllerProxy {
+        self.testcontroller_proxy.as_ref().unwrap()
+    }
+
+    pub fn take_sync_testcontroller_proxy(
+        &mut self,
+    ) -> fidl_testcontroller::TestControllerSynchronousProxy {
+        fidl_testcontroller::TestControllerSynchronousProxy::new(fidl::Channel::from_handle(
+            self.testcontroller_proxy
+                .take()
+                .unwrap()
+                .into_channel()
+                .expect("Failed to get fidl::AsyncChannel from proxy")
+                .into_zx_channel()
+                .into_handle(),
+        ))
     }
 }

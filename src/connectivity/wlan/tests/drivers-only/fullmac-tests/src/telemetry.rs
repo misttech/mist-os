@@ -9,12 +9,9 @@ use {
 
 #[fuchsia::test]
 async fn test_get_iface_counter_stats() {
-    let (mut fullmac_driver, generic_sme_proxy) =
-        FullmacDriverFixture::create_and_get_generic_sme(FullmacDriverConfig {
-            ..Default::default()
-        })
-        .await;
-    let telemetry_proxy = sme_helpers::get_telemetry(&generic_sme_proxy).await;
+    let mut fullmac_driver =
+        FullmacDriverFixture::create(FullmacDriverConfig { ..Default::default() }).await;
+    let telemetry_proxy = sme_helpers::get_telemetry(&fullmac_driver.generic_sme_proxy).await;
     let telemetry_fut = telemetry_proxy.get_counter_stats();
 
     let driver_counter_stats = fidl_fullmac::WlanFullmacIfaceCounterStats {
@@ -51,12 +48,9 @@ async fn test_get_iface_counter_stats() {
 
 #[fuchsia::test]
 async fn test_get_iface_histogram_stats() {
-    let (mut fullmac_driver, generic_sme_proxy) =
-        FullmacDriverFixture::create_and_get_generic_sme(FullmacDriverConfig {
-            ..Default::default()
-        })
-        .await;
-    let telemetry_proxy = sme_helpers::get_telemetry(&generic_sme_proxy).await;
+    let mut fullmac_driver =
+        FullmacDriverFixture::create(FullmacDriverConfig { ..Default::default() }).await;
+    let telemetry_proxy = sme_helpers::get_telemetry(&fullmac_driver.generic_sme_proxy).await;
     let telemetry_fut = telemetry_proxy.get_histogram_stats();
 
     // This contains every combination of hist scope and antenna frequency.

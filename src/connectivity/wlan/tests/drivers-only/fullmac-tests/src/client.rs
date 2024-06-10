@@ -29,18 +29,13 @@ use {
 /// This will use COMPATIBLE_OPEN_BSS as the BssDescription for the connect call.
 async fn setup_connected_to_open_bss(
     config: FullmacDriverConfig,
-) -> (
-    fidl_sme::ClientSmeProxy,
-    fidl_sme::ConnectTransactionEventStream,
-    FullmacDriverFixture,
-    fidl_sme::GenericSmeProxy,
-) {
+) -> (fidl_sme::ClientSmeProxy, fidl_sme::ConnectTransactionEventStream, FullmacDriverFixture) {
     // This is wrapped in a Box::pin because otherwise the compiler complains about the future
     // being too large.
     Box::pin(async {
-        let (mut fullmac_driver, generic_sme_proxy) =
-            FullmacDriverFixture::create_and_get_generic_sme(config).await;
-        let client_sme_proxy = sme_helpers::get_client_sme(&generic_sme_proxy).await;
+        let mut fullmac_driver =
+            FullmacDriverFixture::create(config).await;
+        let client_sme_proxy = sme_helpers::get_client_sme(&fullmac_driver.generic_sme_proxy).await;
 
         let client_fut = async {
             let (connect_txn, connect_txn_server) =
@@ -99,18 +94,15 @@ async fn setup_connected_to_open_bss(
 
         // Don't include setup requests in request stream history().
         fullmac_driver.request_stream.clear_history();
-        (client_sme_proxy, connect_txn_event_stream, fullmac_driver, generic_sme_proxy)
+        (client_sme_proxy, connect_txn_event_stream, fullmac_driver)
     }).await
 }
 
 #[fuchsia::test]
 async fn test_scan_request_success() {
-    let (mut fullmac_driver, generic_sme_proxy) =
-        FullmacDriverFixture::create_and_get_generic_sme(FullmacDriverConfig {
-            ..Default::default()
-        })
-        .await;
-    let client_sme_proxy = sme_helpers::get_client_sme(&generic_sme_proxy).await;
+    let mut fullmac_driver =
+        FullmacDriverFixture::create(FullmacDriverConfig { ..Default::default() }).await;
+    let client_sme_proxy = sme_helpers::get_client_sme(&fullmac_driver.generic_sme_proxy).await;
 
     let client_fut = async {
         client_sme_proxy
@@ -183,12 +175,9 @@ async fn test_scan_request_success() {
 
 #[fuchsia::test]
 async fn test_scan_request_error() {
-    let (mut fullmac_driver, generic_sme_proxy) =
-        FullmacDriverFixture::create_and_get_generic_sme(FullmacDriverConfig {
-            ..Default::default()
-        })
-        .await;
-    let client_sme_proxy = sme_helpers::get_client_sme(&generic_sme_proxy).await;
+    let mut fullmac_driver =
+        FullmacDriverFixture::create(FullmacDriverConfig { ..Default::default() }).await;
+    let client_sme_proxy = sme_helpers::get_client_sme(&fullmac_driver.generic_sme_proxy).await;
 
     let client_fut = async {
         client_sme_proxy
@@ -222,12 +211,9 @@ async fn test_scan_request_error() {
 
 #[fuchsia::test]
 async fn test_open_connect_request_success() {
-    let (mut fullmac_driver, generic_sme_proxy) =
-        FullmacDriverFixture::create_and_get_generic_sme(FullmacDriverConfig {
-            ..Default::default()
-        })
-        .await;
-    let client_sme_proxy = sme_helpers::get_client_sme(&generic_sme_proxy).await;
+    let mut fullmac_driver =
+        FullmacDriverFixture::create(FullmacDriverConfig { ..Default::default() }).await;
+    let client_sme_proxy = sme_helpers::get_client_sme(&fullmac_driver.generic_sme_proxy).await;
 
     let client_fut = async {
         let (connect_txn, connect_txn_server) =
@@ -315,12 +301,9 @@ async fn test_open_connect_request_success() {
 
 #[fuchsia::test]
 async fn test_open_connect_request_error() {
-    let (mut fullmac_driver, generic_sme_proxy) =
-        FullmacDriverFixture::create_and_get_generic_sme(FullmacDriverConfig {
-            ..Default::default()
-        })
-        .await;
-    let client_sme_proxy = sme_helpers::get_client_sme(&generic_sme_proxy).await;
+    let mut fullmac_driver =
+        FullmacDriverFixture::create(FullmacDriverConfig { ..Default::default() }).await;
+    let client_sme_proxy = sme_helpers::get_client_sme(&fullmac_driver.generic_sme_proxy).await;
 
     let client_fut = async {
         let (connect_txn, connect_txn_server) =
@@ -416,12 +399,9 @@ async fn test_open_connect_request_error() {
 
 #[fuchsia::test]
 async fn test_wpa2_connect_request_success() {
-    let (mut fullmac_driver, generic_sme_proxy) =
-        FullmacDriverFixture::create_and_get_generic_sme(FullmacDriverConfig {
-            ..Default::default()
-        })
-        .await;
-    let client_sme_proxy = sme_helpers::get_client_sme(&generic_sme_proxy).await;
+    let mut fullmac_driver =
+        FullmacDriverFixture::create(FullmacDriverConfig { ..Default::default() }).await;
+    let client_sme_proxy = sme_helpers::get_client_sme(&fullmac_driver.generic_sme_proxy).await;
 
     let credentials = fidl_wlan_security::WpaCredentials::Passphrase(vec![8, 7, 6, 5, 4, 3, 2, 1]);
 
@@ -606,12 +586,9 @@ async fn test_wpa2_connect_request_success() {
 
 #[fuchsia::test]
 async fn test_wpa3_connect_success() {
-    let (mut fullmac_driver, generic_sme_proxy) =
-        FullmacDriverFixture::create_and_get_generic_sme(FullmacDriverConfig {
-            ..Default::default()
-        })
-        .await;
-    let client_sme_proxy = sme_helpers::get_client_sme(&generic_sme_proxy).await;
+    let mut fullmac_driver =
+        FullmacDriverFixture::create(FullmacDriverConfig { ..Default::default() }).await;
+    let client_sme_proxy = sme_helpers::get_client_sme(&fullmac_driver.generic_sme_proxy).await;
 
     let credentials = fidl_wlan_security::WpaCredentials::Passphrase(vec![8, 7, 6, 5, 4, 3, 2, 1]);
 
@@ -870,7 +847,7 @@ async fn test_wpa3_connect_success() {
 
 #[fuchsia::test]
 async fn test_sme_disconnect() {
-    let (client_sme_proxy, mut connect_txn_event_stream, mut fullmac_driver, _generic_sme_proxy) =
+    let (client_sme_proxy, mut connect_txn_event_stream, mut fullmac_driver) =
         setup_connected_to_open_bss(FullmacDriverConfig { ..Default::default() }).await;
 
     let client_fut = client_sme_proxy
@@ -926,7 +903,7 @@ async fn test_sme_disconnect() {
 
 #[fuchsia::test]
 async fn test_remote_deauth() {
-    let (_client_sme_proxy, mut connect_txn_event_stream, mut fullmac_driver, _generic_sme_proxy) =
+    let (_client_sme_proxy, mut connect_txn_event_stream, mut fullmac_driver) =
         setup_connected_to_open_bss(FullmacDriverConfig { ..Default::default() }).await;
 
     fullmac_driver
@@ -962,7 +939,7 @@ async fn test_remote_deauth() {
 
 #[fuchsia::test]
 async fn test_remote_disassoc_then_reconnect() {
-    let (_client_sme_proxy, mut connect_txn_event_stream, mut fullmac_driver, _generic_sme_proxy) =
+    let (_client_sme_proxy, mut connect_txn_event_stream, mut fullmac_driver) =
         setup_connected_to_open_bss(FullmacDriverConfig { ..Default::default() }).await;
 
     fullmac_driver
@@ -1038,7 +1015,7 @@ async fn test_remote_disassoc_then_reconnect() {
 
 #[fuchsia::test]
 async fn test_channel_switch() {
-    let (_client_sme_proxy, mut connect_txn_event_stream, fullmac_driver, _generic_sme_proxy) =
+    let (_client_sme_proxy, mut connect_txn_event_stream, fullmac_driver) =
         setup_connected_to_open_bss(FullmacDriverConfig { ..Default::default() }).await;
 
     fullmac_driver
@@ -1057,7 +1034,7 @@ async fn test_channel_switch() {
 
 #[fuchsia::test]
 async fn test_signal_report() {
-    let (_client_sme_proxy, mut connect_txn_event_stream, fullmac_driver, _generic_sme_proxy) =
+    let (_client_sme_proxy, mut connect_txn_event_stream, fullmac_driver) =
         setup_connected_to_open_bss(FullmacDriverConfig { ..Default::default() }).await;
 
     for i in 0..10 {
@@ -1085,7 +1062,7 @@ async fn test_signal_report() {
 }
 #[fuchsia::test]
 async fn test_wmm_status() {
-    let (client_sme_proxy, _connect_txn_event_stream, mut fullmac_driver, _generic_sme_proxy) =
+    let (client_sme_proxy, _connect_txn_event_stream, mut fullmac_driver) =
         setup_connected_to_open_bss(FullmacDriverConfig { ..Default::default() }).await;
 
     let gen_random_wmm_ac_params = || -> fidl_common::WlanWmmAccessCategoryParameters {

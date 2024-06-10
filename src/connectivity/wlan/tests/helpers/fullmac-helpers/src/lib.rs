@@ -53,13 +53,14 @@ pub async fn create_fullmac_driver(
     testcontroller_proxy: &fidl_testcontroller::TestControllerProxy,
     config: &config::FullmacDriverConfig,
 ) -> (
+    fidl_testcontroller::FullmacId,
     fidl_fullmac::WlanFullmacImplBridgeRequestStream,
     fidl_fullmac::WlanFullmacImplIfcBridgeProxy,
     fidl_sme::GenericSmeProxy,
 ) {
     let (fullmac_bridge_client, fullmac_bridge_server) = create_endpoints();
 
-    testcontroller_proxy
+    let fullmac_id = testcontroller_proxy
         .create_fullmac(fullmac_bridge_client)
         .await
         .expect("FIDL error on create_fullmac")
@@ -144,5 +145,5 @@ pub async fn create_fullmac_driver(
         }
     );
 
-    (fullmac_bridge_stream, fullmac_ifc_proxy, generic_sme_proxy)
+    (fullmac_id, fullmac_bridge_stream, fullmac_ifc_proxy, generic_sme_proxy)
 }

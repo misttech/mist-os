@@ -12,7 +12,9 @@
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/stdcompat/source_location.h>
+#include <lib/sync/cpp/completion.h>
 
+#include <map>
 #include <sstream>
 #include <vector>
 
@@ -148,12 +150,32 @@ class WlanFullmacImplToChannelBridge : public fdf::Server<fuchsia_wlan_fullmac::
   explicit WlanFullmacImplToChannelBridge(
       fdf_dispatcher_t* driver_dispatcher,
       fdf::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end,
-      fidl::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImplBridge> bridge_client_end)
-      : binding_(driver_dispatcher, std::move(server_end), this, fidl::kIgnoreBindingClosure),
+      fidl::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImplBridge> bridge_client_end,
+      fidl::ClientEnd<fuchsia_driver_framework::NodeController> controller_client_end)
+      : binding_(driver_dispatcher, std::move(server_end), this,
+                 std::mem_fn(&WlanFullmacImplToChannelBridge::OnUnbind)),
         bridge_client_(std::move(bridge_client_end),
                        fdf_dispatcher_get_async_dispatcher(driver_dispatcher)),
-        driver_dispatcher_(driver_dispatcher) {
+        driver_dispatcher_(driver_dispatcher),
+        controller_(std::move(controller_client_end),
+                    fdf_dispatcher_get_async_dispatcher(driver_dispatcher_)) {
     WLAN_TRACE_DURATION();
+  }
+
+  void OnUnbind(fidl::UnbindInfo info) {
+    WLAN_TRACE_DURATION();
+    if (!info.is_peer_closed()) {
+      FDF_SLOG(WARNING, "WlanFullmacImplToChannelBridge unbinding due to unexpected reason",
+               KV("reason", info.FormatDescription()));
+    }
+    if (!unbind_callback_.has_value()) {
+      FDF_SLOG(
+          ERROR,
+          "Unexpected server unbinding: WlanFullmacImplToChannelBridge does not have an unbind callback",
+          KV("reason", info.FormatDescription()));
+      return;
+    }
+    unbind_callback_.value()();
   }
 
   void Start(StartRequest& request, StartCompleter::Sync& completer) override {
@@ -301,11 +323,32 @@ class WlanFullmacImplToChannelBridge : public fdf::Server<fuchsia_wlan_fullmac::
         ForwardResult<WlanFullmacImplBridge::OnLinkStateChanged>(completer.ToAsync()));
   }
 
+  // Calling |RemoveChild| will cause this server to eventually unbind.
+  // |unbind_callback| will run in |OnUnbind|.
+  zx::result<> RemoveChild(fit::closure unbind_callback) {
+    WLAN_TRACE_DURATION();
+    auto result = controller_->Remove();
+    if (result.is_error()) {
+      FDF_SLOG(ERROR, "Failed to remove child",
+               KV("reason", result.error_value().FormatDescription()));
+      return zx::error(result.error_value().status());
+    }
+
+    ZX_ASSERT(!unbind_callback_.has_value());
+    unbind_callback_.emplace(std::move(unbind_callback));
+    return zx::ok();
+  }
+
  private:
   fdf::ServerBinding<fuchsia_wlan_fullmac::WlanFullmacImpl> binding_;
   fidl::Client<fuchsia_wlan_fullmac::WlanFullmacImplBridge> bridge_client_;
   fdf_dispatcher_t* driver_dispatcher_{};
   std::unique_ptr<WlanFullmacImplIfcToDriverBridge> ifc_bridge_server_;
+
+  fidl::Client<fuchsia_driver_framework::NodeController> controller_;
+
+  // Callback that runs when the bridge server is unbound.
+  std::optional<fit::closure> unbind_callback_;
 };
 
 class TestController : public fdf::DriverBase,
@@ -353,22 +396,29 @@ class TestController : public fdf::DriverBase,
   void CreateFullmac(CreateFullmacRequest& request,
                      CreateFullmacCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
+
+    // Generate a unique child name for the new fullmac child.
+    uint32_t id = next_fullmac_id_++;
+    std::string child_name = FullmacChildName(id);
+
+    zx::result controller_endpoints =
+        fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+    ZX_ASSERT(controller_endpoints.is_ok());
+
     auto protocol_handler =
-        [this, bridge_client = std::move(request.bridge_client())](
+        [this, id, bridge_client = std::move(request.bridge_client()),
+         controller_client = std::move(controller_endpoints->client)](
             fdf::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end) mutable {
           WLAN_LAMBDA_TRACE_DURATION("WlanFullmacImpl::Service protocol handler");
-          auto impl = std::make_unique<WlanFullmacImplToChannelBridge>(
-              driver_dispatcher()->get(), std::move(server_end), std::move(bridge_client));
-          fullmac_bridges_.push_back(std::move(impl));
+
+          // Ensure no duplicate bridges and all ids are unique.
+          ZX_ASSERT(fullmac_bridges_.find(id) == fullmac_bridges_.end());
+          fullmac_bridges_.try_emplace(id, driver_dispatcher()->get(), std::move(server_end),
+                                       std::move(bridge_client), std::move(controller_client));
         };
 
     fuchsia_wlan_fullmac::Service::InstanceHandler handler(
         {.wlan_fullmac_impl = std::move(protocol_handler)});
-
-    // Generate a unique child name for the new fullmac child.
-    std::stringstream ss;
-    ss << "fullmac-child-" << num_fullmac_children_++;
-    std::string child_name = ss.str();
 
     zx::result result =
         outgoing()->AddService<fuchsia_wlan_fullmac::Service>(std::move(handler), child_name);
@@ -385,10 +435,6 @@ class TestController : public fdf::DriverBase,
         .offers2 = std::move(offers),
     });
 
-    zx::result controller_endpoints =
-        fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-    ZX_ASSERT(controller_endpoints.is_ok());
-
     auto add_child_result =
         node_->AddChild({std::move(args), std::move(controller_endpoints->server), {}});
     if (add_child_result.is_error()) {
@@ -400,10 +446,61 @@ class TestController : public fdf::DriverBase,
           (error.is_domain_error() ? ZX_ERR_INTERNAL : error.framework_error().status())));
       return;
     }
-    completer.Reply(zx::ok());
+    completer.Reply(zx::ok(id));
+  }
+
+  // Removes the WlanFullmacImpl service which initiates teardown of wlanif.
+  // This is guaranteed to complete only after wlanif has been fully torn down.
+  // The user can expect that the bridge channels are closed once this call completes.
+  void DeleteFullmac(DeleteFullmacRequest& request,
+                     DeleteFullmacCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    auto bridge_iter = fullmac_bridges_.find(request.id());
+    if (bridge_iter == fullmac_bridges_.end()) {
+      FDF_SLOG(ERROR, "Fullmac driver does not exist", KV("id", request.id()));
+      completer.Reply(zx::error(ZX_ERR_NOT_FOUND));
+      return;
+    }
+
+    WlanFullmacImplToChannelBridge& bridge = bridge_iter->second;
+    auto node_remove_result = bridge.RemoveChild(
+        // After the bridge server unbinds, we know that wlanif is fully torn down.
+        // It is then safe to delete the bridge server and reply to the FIDL call.
+        [this, id = request.id(), completer = completer.ToAsync()]() mutable {
+          // This callback posts a task on |dispatcher()| because the |completer| has to run on this
+          // thread. The bridge server's unbind callback does not run on this thread and will fail
+          // an assert if we reply to the |completer| directly in the unbind callback.
+          async::PostTask(dispatcher(), [this, id, completer = std::move(completer)]() mutable {
+            WLAN_LAMBDA_TRACE_DURATION("WlanFullmacImplToChannelBridge unbind callback");
+            ZX_ASSERT(fullmac_bridges_.find(id) != fullmac_bridges_.end());
+            fullmac_bridges_.erase(id);
+            completer.Reply(zx::ok());
+          });
+        });
+
+    if (node_remove_result.is_error()) {
+      completer.Reply(zx::error(node_remove_result.error_value()));
+      return;
+    }
+
+    std::string child_name = FullmacChildName(request.id());
+    auto service_remove_result =
+        outgoing()->RemoveService<fuchsia_wlan_fullmac::Service>(child_name);
+    if (service_remove_result.is_error()) {
+      FDF_SLOG(ERROR, "Could not remove fullmac service", KV("id", request.id()),
+               KV("status", service_remove_result.status_string()));
+      completer.Reply(zx::error(service_remove_result.error_value()));
+      return;
+    }
   }
 
  private:
+  static std::string FullmacChildName(test_wlan_testcontroller::FullmacId id) {
+    std::stringstream ss;
+    ss << "fullmac-child-" << id;
+    return ss.str();
+  }
+
   fidl::SyncClient<fuchsia_driver_framework::Node> node_;
 
   // Holds bindings to TestController, which all bind to this class
@@ -412,10 +509,12 @@ class TestController : public fdf::DriverBase,
   // devfs_connector_ lets the class serve the TestController protocol over devfs.
   driver_devfs::Connector<test_wlan_testcontroller::TestController> devfs_connector_;
 
-  // Tracks the number of fullmac client and aps created. Used to generate names.
-  int num_fullmac_children_ = 0;
+  // Used to generate a unique ID for each created fullmac driver.
+  test_wlan_testcontroller::FullmacId next_fullmac_id_ = 0;
 
-  std::vector<std::unique_ptr<WlanFullmacImplToChannelBridge>> fullmac_bridges_;
+  // Maps from id -> bridge server.
+  // This should only be accessed from the default dispatcher.
+  std::map<test_wlan_testcontroller::FullmacId, WlanFullmacImplToChannelBridge> fullmac_bridges_;
 };
 
 }  // namespace wlan_testcontroller

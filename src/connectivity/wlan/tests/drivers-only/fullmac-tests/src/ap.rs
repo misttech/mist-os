@@ -29,13 +29,13 @@ fn vec_to_cssid(input: &Vec<u8>) -> fidl_ieee80211::CSsid {
 async fn setup_test_bss_started(
     driver_config: FullmacDriverConfig,
     ap_config: &fidl_sme::ApConfig,
-) -> (fidl_sme::ApSmeProxy, FullmacDriverFixture, fidl_sme::GenericSmeProxy) {
+) -> (fidl_sme::ApSmeProxy, FullmacDriverFixture) {
     // This is wrapped in a Box::pin because otherwise the compiler complains about the future
     // being too large.
     Box::pin(async {
-        let (mut fullmac_driver, generic_sme_proxy) =
-            FullmacDriverFixture::create_and_get_generic_sme(driver_config).await;
-        let ap_sme_proxy = sme_helpers::get_ap_sme(&generic_sme_proxy).await;
+        let mut fullmac_driver =
+            FullmacDriverFixture::create(driver_config).await;
+        let ap_sme_proxy = sme_helpers::get_ap_sme(&fullmac_driver.generic_sme_proxy).await;
 
         let ap_fut = ap_sme_proxy.start(&ap_config);
         let driver_fut = async {
@@ -61,15 +61,14 @@ async fn setup_test_bss_started(
         let (_, _) = futures::join!(ap_fut, driver_fut);
 
         fullmac_driver.request_stream.clear_history();
-        (ap_sme_proxy, fullmac_driver, generic_sme_proxy)
+        (ap_sme_proxy, fullmac_driver)
     }).await
 }
 
 #[fuchsia::test]
 async fn test_start_2ghz_bss_success() {
-    let (mut fullmac_driver, generic_sme_proxy) =
-        FullmacDriverFixture::create_and_get_generic_sme(FullmacDriverConfig::default_ap()).await;
-    let ap_sme_proxy = sme_helpers::get_ap_sme(&generic_sme_proxy).await;
+    let mut fullmac_driver = FullmacDriverFixture::create(FullmacDriverConfig::default_ap()).await;
+    let ap_sme_proxy = sme_helpers::get_ap_sme(&fullmac_driver.generic_sme_proxy).await;
 
     let phy_types = [
         fidl_common::WlanPhyType::Dsss,
@@ -158,9 +157,8 @@ async fn test_start_2ghz_bss_success() {
 
 #[fuchsia::test]
 async fn test_start_bss_fail_non_ascii_password() {
-    let (_fullmac_driver, generic_sme_proxy) =
-        FullmacDriverFixture::create_and_get_generic_sme(FullmacDriverConfig::default_ap()).await;
-    let ap_sme_proxy = sme_helpers::get_ap_sme(&generic_sme_proxy).await;
+    let fullmac_driver = FullmacDriverFixture::create(FullmacDriverConfig::default_ap()).await;
+    let ap_sme_proxy = sme_helpers::get_ap_sme(&fullmac_driver.generic_sme_proxy).await;
 
     let sme_ap_config = fidl_sme::ApConfig {
         ssid: random_ssid(),
@@ -183,9 +181,8 @@ async fn test_start_bss_fail_non_ascii_password() {
 
 #[fuchsia::test]
 async fn test_start_bss_fail_bad_channel() {
-    let (_fullmac_driver, generic_sme_proxy) =
-        FullmacDriverFixture::create_and_get_generic_sme(FullmacDriverConfig::default_ap()).await;
-    let ap_sme_proxy = sme_helpers::get_ap_sme(&generic_sme_proxy).await;
+    let fullmac_driver = FullmacDriverFixture::create(FullmacDriverConfig::default_ap()).await;
+    let ap_sme_proxy = sme_helpers::get_ap_sme(&fullmac_driver.generic_sme_proxy).await;
 
     let sme_ap_config = fidl_sme::ApConfig {
         ssid: random_ssid(),
@@ -208,7 +205,7 @@ async fn test_start_bss_fail_bad_channel() {
 
 #[fuchsia::test]
 async fn test_stop_bss() {
-    let (ap_sme_proxy, mut fullmac_driver, _generic_sme_proxy) =
+    let (ap_sme_proxy, mut fullmac_driver) =
         setup_test_bss_started(FullmacDriverConfig::default_ap(), &DEFAULT_OPEN_AP_CONFIG).await;
 
     let ap_fut = ap_sme_proxy.stop();
@@ -252,7 +249,7 @@ async fn test_stop_bss() {
 
 #[fuchsia::test]
 async fn test_remote_client_connected_open() {
-    let (ap_sme_proxy, mut fullmac_driver, _generic_sme_proxy) =
+    let (ap_sme_proxy, mut fullmac_driver) =
         setup_test_bss_started(FullmacDriverConfig::default_ap(), &DEFAULT_OPEN_AP_CONFIG).await;
 
     let remote_sta_address: [u8; 6] = rand::thread_rng().gen();
