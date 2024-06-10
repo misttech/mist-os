@@ -20,8 +20,8 @@ use syn::{
     punctuated::Punctuated,
     spanned::Spanned,
     visit_mut::{self, VisitMut},
-    Attribute, Error, Expr, ExprPath, FnArg, GenericParam, Ident, ItemFn, Pat, PatType, Path,
-    TypeImplTrait, TypeParamBound, TypePath,
+    Attribute, Error, Expr, ExprPath, FnArg, GenericParam, Ident, Pat, PatType, Path,
+    TypeParamBound, TypePath,
 };
 
 /// Defines tests which call the annotated function with [`net_types::ip::Ipv4`]
@@ -292,46 +292,6 @@ fn make_arg_idents<'a>(
         .collect()
 }
 
-// A VisitMut that renames named types. The match criteria is that the first
-// path element must be equal to our target ident. In other words, given a
-// `from` type name I and Self as `to`, we want to replace I::Addr with
-// Self::Addr, but we don't want to touch J::I, since the I in that context
-// isn't the I we care about.
-//
-// We also use this to descend into the body. This is because the body can also
-// contain references to the type parameters.
-#[allow(dead_code)] // TODO(https://fxbug.dev/330168486)
-struct RenameVisit {
-    from: Ident,
-    to: Ident,
-}
-
-impl VisitMut for RenameVisit {
-    fn visit_path_mut(&mut self, i: &mut Path) {
-        let Self { from, to } = self;
-        if i.is_ident(from) {
-            *i = to.clone().into();
-        }
-
-        // descend into the individual path segments; we need to do this since
-        // path segments can contain arguments (e.g., A::<B>::C), and those
-        // arguments can also contain our target
-        visit_mut::visit_path_mut(self, i);
-    }
-
-    // Don't descend into function or type definitions. It's invalid to use
-    // types from the outer scope inside of a function or type definition, so
-    // the only valid uses of type parameters would be from type parameters
-    // whose names shadow the name of the one we actually care about, in which
-    // case it would be incorrect to replace it with Self. Note that this
-    // doesn't apply to type aliases - `type Foo = Bar<I>` is valid, and we
-    // should replace `I` with `Self` in that case.
-    fn visit_item_fn_mut(&mut self, _i: &mut ItemFn) {}
-    fn visit_item_struct_mut(&mut self, _i: &mut syn::ItemStruct) {}
-    fn visit_item_enum_mut(&mut self, _i: &mut syn::ItemEnum) {}
-    fn visit_item_union_mut(&mut self, _i: &mut syn::ItemUnion) {}
-}
-
 /// A VisitMut that replaces accesses of an associated type or constant with
 /// type a different type qualified with a trait name. Given a `type_ident` of
 /// `I`, `concrete` of `Ipv4` and `trait_path` of `Ip`, `I::Addr` would be
@@ -374,19 +334,6 @@ impl VisitMut for TraitToConcreteVisit {
         self.update_type_path(qself, path);
 
         visit_mut::visit_type_path_mut(self, i)
-    }
-}
-
-// A VisitMut that searches for instances of "impl trait". These are unsupported
-// in function return values because they can't be used inside of traits, and we
-// convert the decorated function to a trait function.
-#[allow(dead_code)] // TODO(https://fxbug.dev/330168486)
-struct ReturnImplTraitVisit<'a>(&'a mut Vec<TokenStream2>);
-
-impl<'a> VisitMut for ReturnImplTraitVisit<'a> {
-    fn visit_type_impl_trait_mut(&mut self, i: &mut TypeImplTrait) {
-        push_error(self.0, &i, "impl trait return values are unsupported");
-        visit_mut::visit_type_impl_trait_mut(self, i);
     }
 }
 
