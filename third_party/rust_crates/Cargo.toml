@@ -190,7 +190,7 @@ rustyline = "2.1.0"
 schemars = { version = "0.8", features = ["chrono", "preserve_order"] }
 scopeguard = "1.1.0"
 scrypt = "0.10.0"
-serde = { version = "1.0.147", features = ["derive"] }
+serde = { version = "1.0.203", features = ["derive"] }
 serde_cbor = "0.11.1"
 serde_derive = "1.0.147"
 serde_json = "1.0.87"
@@ -794,10 +794,10 @@ configs = [ "//build/config:optimize_speed" ]
 [gn.package.semver."1.0.4"]
 rustflags = []
 
-[gn.package.serde."1.0.147"]
+[gn.package.serde."1.0.203"]
 rustflags = []
 
-[gn.package.serde_derive."1.0.147"]
+[gn.package.serde_derive."1.0.203"]
 rustflags = []
 
 [gn.package.serde_json."1.0.87"]
