@@ -167,22 +167,28 @@ mod tests {
     use fho::{Format, TestBuffers};
     use sdk_metadata::ProductBundleV2;
     use std::fs;
+    use std::fs::File;
+    use std::io::Write;
+    use tempfile::tempdir;
 
     #[fuchsia::test]
     async fn test_get_image_path() {
         let env = ffx_config::test_init().await.expect("test env");
+        let tmp = tempdir().unwrap();
+        let tempdir = Utf8Path::from_path(tmp.path()).unwrap().canonicalize_utf8().unwrap();
+
         let json = r#"
             {
                 bootloader_partitions: [
                     {
                         type: "bl2",
                         name: "bl2",
-                        image: "/tmp/product_bundle/bootloader/path",
+                        image: "bootloader_bl2",
                     },
                     {
                         type: "",
                         name: "bootloader",
-                        image: "/tmp/product_bundle/bootloader/empty/path",
+                        image: "bootloader",
                     }
                 ],
                 partitions: [
@@ -207,12 +213,24 @@ mod tests {
                 ],
                 hardware_revision: "hw",
                 unlock_credentials: [
-                    "credential/path",
+                    "credential.zip",
                 ],
             }
         "#;
-        let mut cursor = std::io::Cursor::new(json);
-        let config: PartitionsConfig = PartitionsConfig::from_reader(&mut cursor).unwrap();
+        let partitions_config_path = tempdir.join("partitions_config.json");
+        File::create(partitions_config_path.as_path()).unwrap().write_all(json.as_bytes()).unwrap();
+
+        let create_temp_file = |name: &str| {
+            let path = tempdir.join(name);
+            let mut file = File::create(path).unwrap();
+            write!(file, "{}", name).unwrap();
+        };
+
+        create_temp_file("bootloader_bl2");
+        create_temp_file("bootloader");
+        create_temp_file("credential.zip");
+
+        let config = PartitionsConfig::try_load_from(partitions_config_path).unwrap();
 
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),
@@ -221,7 +239,7 @@ mod tests {
             sdk_version: "".to_string(),
             system_a: Some(vec![
                 Image::ZBI { path: Utf8PathBuf::from("zbi/path"), signed: false },
-                Image::FVM(Utf8PathBuf::from("/tmp/product_bundle/system_a/fvm.blk")),
+                Image::FVM(Utf8PathBuf::from(tempdir.join("system_a/fvm.blk"))),
                 Image::QemuKernel(Utf8PathBuf::from("qemu/path")),
             ]),
             system_b: None,
@@ -265,7 +283,7 @@ mod tests {
         {
             let tool = PbGetImagePathTool {
                 cmd: GetImagePathCommand {
-                    product_bundle: Some(Utf8PathBuf::from("/tmp/product_bundle")),
+                    product_bundle: Some(tempdir.clone()),
                     slot: Some(Slot::A),
                     image_type: Some(ImageType::Fvm),
                     relative_path: true,
@@ -280,7 +298,7 @@ mod tests {
         {
             let tool = PbGetImagePathTool {
                 cmd: GetImagePathCommand {
-                    product_bundle: Some(Utf8PathBuf::from("/tmp/product_bundle")),
+                    product_bundle: Some(tempdir.clone()),
                     slot: None,
                     image_type: None,
                     relative_path: true,
@@ -289,13 +307,13 @@ mod tests {
                 env: env.context.clone(),
             };
             let path = tool.extract_image_path(pb.clone()).unwrap().unwrap();
-            let expected_path = Utf8PathBuf::from("bootloader/path");
+            let expected_path = Utf8PathBuf::from("bootloader_bl2");
             assert_eq!(expected_path, path);
         }
         {
             let tool = PbGetImagePathTool {
                 cmd: GetImagePathCommand {
-                    product_bundle: Some(Utf8PathBuf::from("/tmp/product_bundle")),
+                    product_bundle: Some(tempdir.clone()),
                     slot: None,
                     image_type: None,
                     relative_path: true,
@@ -304,7 +322,7 @@ mod tests {
                 env: env.context.clone(),
             };
             let path = tool.extract_image_path(pb.clone()).unwrap().unwrap();
-            let expected_path = Utf8PathBuf::from("bootloader/empty/path");
+            let expected_path = Utf8PathBuf::from("bootloader");
             assert_eq!(expected_path, path);
         }
     }

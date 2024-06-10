@@ -10,6 +10,7 @@ import os
 
 from assembly import FilePath, PackageManifest
 from depfile import DepFile
+from pathlib import Path
 from serialization import json_load
 from typing import List, Set
 
@@ -76,8 +77,8 @@ def main():
     )
     parser.add_argument(
         "--partitions",
-        type=argparse.FileType("r"),
         required=True,
+        type=argparse.FileType("r"),
         help="The partitions config that follows this schema: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/developer/ffx/plugins/assembly/#partitions-config",
     )
     parser.add_argument(
@@ -109,13 +110,15 @@ def main():
     inputs = []
 
     # Add all the bootloaders as inputs.
+    inputs.append(args.partitions.name)
     partitions = json.load(args.partitions)
+    base_dir = os.path.dirname(args.partitions.name)
     for bootloader in partitions.get("bootloader_partitions", []):
-        inputs.append(bootloader["image"])
+        inputs.append(os.path.join(base_dir, bootloader["image"]))
     for bootstrap in partitions.get("bootstrap_partitions", []):
-        inputs.append(bootstrap["image"])
+        inputs.append(os.path.join(base_dir, bootstrap["image"]))
     for credential in partitions.get("unlock_credentials", []):
-        inputs.append(credential)
+        inputs.append(os.path.join(base_dir, credential))
 
     # Add all the system images as inputs.
     package_manifest_paths: Set[FilePath] = set()

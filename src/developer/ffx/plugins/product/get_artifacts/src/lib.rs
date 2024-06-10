@@ -243,7 +243,7 @@ mod tests {
         fs::{self, File},
         io::Write,
     };
-    use tempfile::TempDir;
+    use tempfile::tempdir;
 
     const VIRTUAL_DEVICE_VALID: &str =
         include_str!("../../../../../../../build/sdk/meta/test_data/single_vd_manifest.json");
@@ -251,13 +251,16 @@ mod tests {
     #[fuchsia::test]
     async fn test_get_flashing_artifacts() {
         let env = ffx_config::test_init().await.expect("test env");
+        let tmp = tempdir().unwrap();
+        let tempdir = Utf8Path::from_path(tmp.path()).unwrap().canonicalize_utf8().unwrap();
+
         let json = r#"
             {
                 bootloader_partitions: [
                     {
                         type: "tpl",
                         name: "firmware_tpl",
-                        image: "bootloader/path",
+                        image: "bootloader_path",
                     }
                 ],
                 partitions: [
@@ -282,12 +285,24 @@ mod tests {
                 ],
                 hardware_revision: "hw",
                 unlock_credentials: [
-                    "credential/path",
+                    "credential.zip",
                 ],
             }
         "#;
-        let mut cursor = std::io::Cursor::new(json);
-        let config: PartitionsConfig = PartitionsConfig::from_reader(&mut cursor).unwrap();
+
+        let partitions_config_path = tempdir.join("partitions_config.json");
+        File::create(partitions_config_path.as_path()).unwrap().write_all(json.as_bytes()).unwrap();
+
+        let create_temp_file = |name: &str| {
+            let path = tempdir.join(name);
+            let mut file = File::create(path).unwrap();
+            write!(file, "{}", name).unwrap();
+        };
+
+        create_temp_file("bootloader_path");
+        create_temp_file("credential.zip");
+
+        let config = PartitionsConfig::try_load_from(partitions_config_path).unwrap();
 
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),
@@ -323,8 +338,8 @@ mod tests {
         let artifacts = tool.extract_flashing_artifacts(pb.clone()).unwrap();
         let expected_artifacts = vec![
             String::from("product_bundle.json"),
-            String::from("bootloader/path"),
-            String::from("credential/path"),
+            tempdir.join("bootloader_path").into_string(),
+            tempdir.join("credential.zip").into_string(),
             String::from("zbi/path"),
             String::from("/tmp/product_bundle/system_a/fvm_fastboot.blk"),
             String::from("/tmp/product_bundle/system_a/fxfs.blk"),
@@ -335,13 +350,16 @@ mod tests {
     #[fuchsia::test]
     async fn test_get_emu_artifacts() {
         let env = ffx_config::test_init().await.expect("test env");
+        let tmp = tempdir().unwrap();
+        let tempdir = Utf8Path::from_path(tmp.path()).unwrap().canonicalize_utf8().unwrap();
+
         let json = r#"
             {
                 bootloader_partitions: [
                     {
                         type: "tpl",
                         name: "firmware_tpl",
-                        image: "bootloader/path",
+                        image: "bootloader_path",
                     }
                 ],
                 partitions: [
@@ -366,15 +384,23 @@ mod tests {
                 ],
                 hardware_revision: "hw",
                 unlock_credentials: [
-                    "credential/path",
+                    "credential.zip",
                 ],
             }
         "#;
-        let mut cursor = std::io::Cursor::new(json);
-        let config: PartitionsConfig = PartitionsConfig::from_reader(&mut cursor).unwrap();
+        let partitions_config_path = tempdir.join("partitions_config.json");
+        File::create(partitions_config_path.as_path()).unwrap().write_all(json.as_bytes()).unwrap();
 
-        let temp = TempDir::new().unwrap();
-        let tempdir = Utf8Path::from_path(temp.path()).unwrap().canonicalize_utf8().unwrap();
+        let create_temp_file = |name: &str| {
+            let path = tempdir.join(name);
+            let mut file = File::create(path).unwrap();
+            write!(file, "{}", name).unwrap();
+        };
+
+        create_temp_file("bootloader_path");
+        create_temp_file("credential.zip");
+
+        let config = PartitionsConfig::try_load_from(partitions_config_path).unwrap();
 
         let virtual_device = tempdir.join("manifest.json");
         let mut vd_file1 = File::create(&virtual_device).unwrap();
@@ -427,29 +453,44 @@ mod tests {
     #[fuchsia::test]
     async fn test_get_bootloaders() {
         let env = ffx_config::test_init().await.expect("test env");
+        let tmp = tempdir().unwrap();
+        let tempdir = Utf8Path::from_path(tmp.path()).unwrap().canonicalize_utf8().unwrap();
+
         let json = r#"
             {
                 bootloader_partitions: [
                     {
                         type: "",
                         name: "firmware_tpl",
-                        image: "bootloader/path",
+                        image: "bootloader_path",
                     },
                     {
                         type: "bl2",
                         name: "firmware_tpl",
-                        image: "bootloader/path2",
+                        image: "bootloader_path2",
                     }
                 ],
                 partitions: [],
                 hardware_revision: "hw",
                 unlock_credentials: [
-                    "credential/path",
+                    "credential.zip",
                 ],
             }
         "#;
-        let mut cursor = std::io::Cursor::new(json);
-        let config: PartitionsConfig = PartitionsConfig::from_reader(&mut cursor).unwrap();
+        let partitions_config_path = tempdir.join("partitions_config.json");
+        File::create(partitions_config_path.as_path()).unwrap().write_all(json.as_bytes()).unwrap();
+
+        let create_temp_file = |name: &str| {
+            let path = tempdir.join(name);
+            let mut file = File::create(path).unwrap();
+            write!(file, "{}", name).unwrap();
+        };
+
+        create_temp_file("bootloader_path");
+        create_temp_file("bootloader_path2");
+        create_temp_file("credential.zip");
+
+        let config = PartitionsConfig::try_load_from(partitions_config_path).unwrap();
 
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),
@@ -473,8 +514,8 @@ mod tests {
         };
         let artifacts = tool.extract_bootloaders(pb.clone()).unwrap();
         let expected_artifacts = vec![
-            String::from("firmware:bootloader/path"),
-            String::from("firmware_bl2:bootloader/path2"),
+            format!("firmware:{}/bootloader_path", tempdir.to_string()),
+            format!("firmware_bl2:{}/bootloader_path2", tempdir.to_string()),
         ];
         assert_eq!(expected_artifacts, artifacts);
     }

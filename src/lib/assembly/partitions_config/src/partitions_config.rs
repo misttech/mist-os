@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use camino::Utf8PathBuf;
+use assembly_util::read_config;
+use camino::{Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
-use std::io::Read;
 
 /// The configuration file specifying where the generated images should be placed when flashing of
 /// OTAing. This file lists the partitions used in three different flashing configurations:
@@ -34,14 +34,48 @@ pub struct PartitionsConfig {
 }
 
 impl PartitionsConfig {
-    /// Parse the config from a reader.
-    pub fn from_reader<R>(reader: &mut R) -> Result<Self>
-    where
-        R: Read,
-    {
-        let mut data = String::default();
-        reader.read_to_string(&mut data).context("Cannot read the config")?;
-        serde_json5::from_str(&data).context("Cannot parse the config")
+    /// Load a PartitionsConfig from a partitions_config.json file on disk,
+    /// rebasing its paths appropriately.
+    pub fn try_load_from(path: impl AsRef<Utf8Path>) -> Result<Self> {
+        // Deserialize JSON into PartitionsConfig.
+        let path = path.as_ref();
+        let mut config: PartitionsConfig = read_config(path)?;
+
+        // Determine relative base_path and rebase.
+        // 1. Try to strip CWD from a `canonical_base_path` (the directory
+        //    containing `partitions_config.json`) to determine a relative
+        //    `base_path`.
+        //    a. This helps prevent us from accidentally leaking/serializing the
+        //       ninja out dir by users of fields.
+        //    b. Fallback to the absolute `canonical_base_path` if it's not
+        //       relative to CWD (i.e. `ffx product` shouldn't fail if it's
+        //       invoked from a different CWD).
+        // 2. Rebase paths to be relative to `base_path`, rather than CWD.
+        //    This ensures that partition configs can be packaged into a
+        //    portable directory.
+        //    a. Since the path of the artifact itself may be a symlink that
+        //       points outside of CWD (eg: to `//prebuilt` instead of
+        //       `$root_build_dir`) don't canonicalize the effective path.
+        let cwd = Utf8Path::new(".").canonicalize_utf8()?;
+        let canonical_base_path = path
+            .parent()
+            .context("Determine base path")?
+            .canonicalize_utf8()
+            .context("Canonicalize base_path")?;
+        let base_path = canonical_base_path
+            .strip_prefix(cwd.as_path())
+            .map(|v| v.to_path_buf())
+            .unwrap_or_else(|_| canonical_base_path);
+        for cred_path in &mut config.unlock_credentials {
+            *cred_path = base_path.join(&cred_path);
+        }
+        for bootstrap in &mut config.bootstrap_partitions {
+            bootstrap.image = base_path.join(&bootstrap.image);
+        }
+        for bootloader in &mut config.bootloader_partitions {
+            bootloader.image = base_path.join(&bootloader.image);
+        }
+        Ok(config)
     }
 }
 
@@ -175,6 +209,24 @@ pub enum Slot {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::File;
+    use std::io::Write;
+    use tempfile::TempDir;
+
+    fn write_partition_config(json: &str, additional_files: &[&str]) -> TempDir {
+        let temp_dir = TempDir::new().unwrap();
+        let base_path = temp_dir.path();
+
+        let mut partitions_config = File::create(base_path.join("partitions_config.json")).unwrap();
+        partitions_config.write_all(json.as_bytes()).unwrap();
+
+        additional_files.iter().for_each(|&file_name| {
+            let mut file = File::create(base_path.join(file_name)).unwrap();
+            file.write_all(file_name.as_bytes()).unwrap();
+        });
+
+        temp_dir
+    }
 
     #[test]
     fn from_json() {
@@ -184,7 +236,7 @@ mod tests {
                     {
                         type: "tpl",
                         name: "firmware_tpl",
-                        image: "path/to/image",
+                        image: "tpl_image",
                     }
                 ],
                 partitions: [
@@ -209,12 +261,18 @@ mod tests {
                 ],
                 hardware_revision: "hw",
                 unlock_credentials: [
-                    "path/to/zip",
+                    "unlock_credentials.zip",
                 ],
             }
         "#;
-        let mut cursor = std::io::Cursor::new(json);
-        let config: PartitionsConfig = PartitionsConfig::from_reader(&mut cursor).unwrap();
+        let temp_dir = write_partition_config(json, &["tpl_image", "unlock_credentials.zip"]);
+        let test_dir = Utf8Path::from_path(temp_dir.path()).unwrap();
+
+        let config =
+            PartitionsConfig::try_load_from(test_dir.join("partitions_config.json")).unwrap();
+
+        assert_eq!(config.bootloader_partitions[0].image, test_dir.join("tpl_image"));
+        assert_eq!(config.unlock_credentials[0], test_dir.join("unlock_credentials.zip"));
         assert_eq!(config.partitions.len(), 4);
         assert_eq!(config.hardware_revision, "hw");
     }
@@ -234,8 +292,11 @@ mod tests {
                 "hardware_revision": "hw",
             }
         "#;
-        let mut cursor = std::io::Cursor::new(json);
-        let config: Result<PartitionsConfig> = PartitionsConfig::from_reader(&mut cursor);
+        let temp_dir = write_partition_config(json, &[]);
+        let test_dir = Utf8Path::from_path(temp_dir.path()).unwrap();
+
+        let config = PartitionsConfig::try_load_from(test_dir.join("partitions_config.json"));
+
         assert!(config.is_err());
     }
 }

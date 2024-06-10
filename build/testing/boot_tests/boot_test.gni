@@ -272,7 +272,6 @@ template("boot_test") {
   # If the boot test specifies an EFI disk image, then this should be regarded
   # as the contents of a bootloader partition. Otherwise, default to the
   # board-specific partition contents.
-  partition_contents = []
   if (defined(invoker.efi_disk)) {
     efi_disk_manifest_target = "_boot_test.${target_name}.efi_disk_manifest"
     efi_disk_manifest = "${target_gen_dir}/${main_target}.efi_disks.json"
@@ -287,15 +286,15 @@ template("boot_test") {
       outputs = [ efi_disk_manifest ]
     }
 
-    partition_config_path =
-        "${target_out_dir}/${main_target}.partition_config.json"
-    partition_config_target =
-        "_boot_test.${target_name}.create_efi_partition_config"
-    action(partition_config_target) {
+    partition_config_intermediate_path =
+        "${target_out_dir}/${main_target}.partition_config_intermediate.json"
+    partition_config_intermediate_target =
+        "_boot_test.${target_name}.create_efi_partition_config_intermediate"
+    action(partition_config_intermediate_target) {
       testonly = true
 
       sources = [ efi_disk_manifest ]
-      outputs = [ partition_config_path ]
+      outputs = [ partition_config_intermediate_path ]
 
       script = "//build/testing/boot_tests/create_efi_partition_config.py"
       args = [
@@ -310,6 +309,37 @@ template("boot_test") {
       deps = [ ":$efi_disk_manifest_target" ]
     }
 
+    partition_config_base_path =
+        "${target_out_dir}/${main_target}.partition_config"
+    partition_config_path = "$partition_config_base_path/partitions_config.json"
+    partition_config_target =
+        "_boot_test.${target_name}.create_efi_partition_config"
+    python_action(partition_config_target) {
+      testonly = true
+
+      binary_label = "//build/assembly/scripts:collect_partitions_config"
+
+      depfile_path = "$target_out_dir/$partition_config_target.depfile"
+      depfile = depfile_path
+
+      outputs = [
+        partition_config_base_path,
+        partition_config_path,
+      ]
+      inputs = [ partition_config_intermediate_path ]
+
+      args = [
+        "--partitions-config",
+        rebase_path(inputs[0], root_build_dir),
+        "--output",
+        rebase_path(outputs[0], root_build_dir),
+        "--depfile",
+        rebase_path(depfile_path, root_build_dir),
+      ]
+
+      deps = [ ":$partition_config_intermediate_target" ]
+    }
+
     _partition_config_label = ":$partition_config_target"
   } else {
     _partition_config_label = "//boards/partitions:default($default_toolchain)"
@@ -320,8 +350,8 @@ template("boot_test") {
     }
     partition_config_path =
         get_label_info(_partition_config_label, "target_out_dir") + "/" +
-        get_label_info(_partition_config_label, "name") + ".json"
-    partition_contents = partitions_config_contents
+        get_label_info(_partition_config_label, "name") +
+        "/partitions_config.json"
   }
 
   product_bundle(product_bundle_target) {
@@ -330,7 +360,6 @@ template("boot_test") {
     name = main_target
     system_a = rebased_image_manifest
     partitions = partition_config_path
-    partitions_contents = partition_contents
 
     deps = [
       ":$rebased_image_manifest_target",

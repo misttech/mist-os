@@ -142,13 +142,13 @@ template("assemble_security_pkg_test_system") {
   }
 
   directories = {
-    assembly_out = get_label_info(":${labels.assembly}", "target_out_dir") +
-                   "/${assembly_name}"
-    update_out = get_label_info(":${labels.assembly}", "target_out_dir") +
-                 "/${labels.update_package}"
+    assembly_target_out =
+        get_label_info(":${labels.assembly}", "target_out_dir")
+    partitions_out = "${assembly_target_out}/${assembly_name}_partitions"
+    assembly_out = "${assembly_target_out}/${assembly_name}"
+    update_out = "${assembly_target_out}/${labels.update_package}"
     all_package_manifests_list_out =
-        get_label_info(":${labels.assembly}", "target_out_dir") +
-        "/${assembly_name}/all_package_manifests_list"
+        "${assembly_out}/all_package_manifests_list"
   }
   if (current_toolchain == target_toolchain) {
     directories.packaged_repository =
@@ -159,7 +159,7 @@ template("assemble_security_pkg_test_system") {
     assembly_out_packages_json = "${directories.assembly_out}/packages.json"
     packages_json =
         "${directories.assembly_out}/security_pkg_test_packages.json"
-    partitions_json = "${directories.assembly_out}_partitions.json"
+    partitions_json = "${directories.partitions_out}/partitions_config.json"
     images_json = "${directories.assembly_out}/images.json"
     board_config = "${directories.assembly_out}/board_config.json"
     base_package_manifests_list =
@@ -321,7 +321,7 @@ template("assemble_security_pkg_test_system") {
   }
 
   generated_partitions_config(labels.assembly_partitions_config) {
-    output_path = files.partitions_json
+    output_path = directories.partitions_out
     hw_revision = board_name
   }
 

@@ -12,7 +12,7 @@ import sys
 from typing import List, Set
 
 from depfile import DepFile
-from assembly import FileEntry, FilePath, ImageAssemblyConfig, PackageManifest
+from assembly import FilePath, ImageAssemblyConfig, PackageManifest
 from serialization import json_load
 
 

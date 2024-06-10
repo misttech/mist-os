@@ -34,10 +34,6 @@ main_product_bundle_name = "${build_info_product}.${build_info_board}"
 #     [path] The path to the images manifest that describes images intended
 #     for slot R.
 #
-#   partitions_contents (optional)
-#     [list] A list of files referenced in the partitions config that will
-#     be copied into the outputs.
-#
 #   system_a_contents (optional)
 #     [list] A list of files referenced in the system_a config that will
 #     be copied into the outputs.
@@ -166,12 +162,6 @@ template("product_bundle") {
     }
 
     outputs = []
-    if (defined(invoker.partitions_contents)) {
-      foreach(file, invoker.partitions_contents) {
-        filename = get_path_info(file, "file")
-        outputs += [ "${files.outdir}/partitions/${filename}" ]
-      }
-    }
     if (defined(invoker.system_a_contents)) {
       foreach(file, invoker.system_a_contents) {
         filename = get_path_info(file, "file")
@@ -195,6 +185,7 @@ template("product_bundle") {
     hermetic_inputs_file = files.hermetic_inputs
     hermetic_action_ignored_prefixes = [
       "${files.outdir}/blobs",
+      "${files.outdir}/partitions",
       "${files.outdir}/repository",
       "${files.outdir}/recovery_repository",
     ]

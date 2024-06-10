@@ -35,6 +35,10 @@ python_binary("check_size_hermetic_inputs") {
   deps = [ "//build/python/modules/assembly" ]
 }
 
+python_binary("collect_partitions_config") {
+  main_source = "collect_partitions_config.py"
+}
+
 python_host_test("compare_json_list_test") {
   main_source = "compare_json_list_test.py"
   sources = [ "compare_json_list.py" ]

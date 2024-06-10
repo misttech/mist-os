@@ -50,17 +50,7 @@ def main():
         "--partitions_config1", type=argparse.FileType("r"), required=True
     )
     parser.add_argument(
-        "--root_dir1",
-        help="Directory where paths in --partitions_config1 are relative to",
-        required=True,
-    )
-    parser.add_argument(
         "--partitions_config2", type=argparse.FileType("r"), required=True
-    )
-    parser.add_argument(
-        "--root_dir2",
-        help="Directory where paths in --partitions_config2 are relative to",
-        required=True,
     )
     parser.add_argument("--depfile", required=True)
     parser.add_argument("--output", required=True)
@@ -70,8 +60,16 @@ def main():
     partitions_config2 = json.load(args.partitions_config2)
 
     extra_files_read = []
-    normalize(partitions_config1, args.root_dir1, extra_files_read)
-    normalize(partitions_config2, args.root_dir2, extra_files_read)
+    normalize(
+        partitions_config1,
+        os.path.dirname(args.partitions_config1.name),
+        extra_files_read,
+    )
+    normalize(
+        partitions_config2,
+        os.path.dirname(args.partitions_config2.name),
+        extra_files_read,
+    )
 
     partitions_config1_str = json.dumps(
         partitions_config1, sort_keys=True, indent=2

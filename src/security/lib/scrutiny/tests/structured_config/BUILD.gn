@@ -65,7 +65,7 @@ if (is_fuchsia) {
 
   files = {
     board_config = "$target_out_dir/fuchsia.board_config.json"
-    partitions_config = "$target_out_dir/partitions_config.json"
+    partitions_config = "$target_out_dir/partitions/partitions_config.json"
 
     outdir = target_out_dir + "/assembly"
     packages_json = "${outdir}/packages.json"
@@ -131,7 +131,7 @@ if (is_fuchsia) {
 
   generated_partitions_config("partitions_config") {
     testonly = true
-    output_path = files.partitions_config
+    output_path = get_path_info(files.partitions_config, "dir")
     hw_revision = board_name
   }
 
