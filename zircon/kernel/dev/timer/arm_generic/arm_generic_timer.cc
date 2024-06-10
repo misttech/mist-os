@@ -520,7 +520,7 @@ void ArmGenericTimerInit(const zbi_dcfg_arm_generic_timer_driver_t& config) {
   // We cannot actually reset the value on the ticks timer, so instead we use
   // the time of clock selection (now) to define the zero point on our ticks
   // timeline moving forward.
-  timer_set_mono_ticks_offset(-reg_procs.read_ct());
+  timer_set_initial_ticks_offset(-reg_procs.read_ct());
   arch::ThreadMemoryBarrier();
 
   dprintf(INFO, "arm generic timer using %s timer, irq %d\n", timer_str, timer_irq);

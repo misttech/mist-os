@@ -95,18 +95,7 @@ DECLARE_SINGLETON_LOCK_WRAPPER(TimerLock, timer_lock);
 affine::Ratio gTicksToTime;
 uint64_t gTicksPerSecond;
 
-// Offset between the raw ticks counter and the monotonic ticks timeline.
-ktl::atomic<uint64_t> mono_ticks_offset{0};
-
 }  // anonymous namespace
-
-void timer_set_mono_ticks_offset(uint64_t offset) {
-  mono_ticks_offset.store(offset, ktl::memory_order_relaxed);
-}
-
-zx_ticks_t timer_get_mono_ticks_offset() {
-  return mono_ticks_offset.load(ktl::memory_order_relaxed);
-}
 
 void timer_set_ticks_to_time_ratio(const affine::Ratio& ticks_to_time) {
   // ASSERT that we are not calling this function twice.  Once set, this ratio
@@ -121,6 +110,8 @@ void timer_set_ticks_to_time_ratio(const affine::Ratio& ticks_to_time) {
 const affine::Ratio& timer_get_ticks_to_time_ratio(void) { return gTicksToTime; }
 
 zx_time_t current_time(void) { return gTicksToTime.Scale(current_ticks()); }
+
+zx_boot_time_t current_boot_time(void) { return gTicksToTime.Scale(current_boot_ticks()); }
 
 zx_ticks_t ticks_per_second(void) { return gTicksPerSecond; }
 

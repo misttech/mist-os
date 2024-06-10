@@ -13,7 +13,47 @@
 #include <zircon/types.h>
 
 #include <fbl/enum_bits.h>
+#include <ktl/atomic.h>
 #include <ktl/type_traits.h>
+
+using zx_boot_time_t = int64_t;
+
+namespace internal {
+
+// Offset between the raw ticks counter and the monotonic ticks timeline.
+inline ktl::atomic<uint64_t> mono_ticks_offset{0};
+
+// Offset between the raw ticks counter and the boot ticks timeline.
+inline ktl::atomic<uint64_t> boot_ticks_offset{0};
+
+}  // namespace internal
+
+// Sets the initial ticks offset. This offset is used to ensure that both the boot and monotonic
+// timelines start at 0.
+//
+// Must be called with interrupts disabled, before secondary CPUs are booted.
+inline void timer_set_initial_ticks_offset(uint64_t offset) {
+  internal::mono_ticks_offset.store(offset, ktl::memory_order_relaxed);
+  internal::boot_ticks_offset.store(offset, ktl::memory_order_relaxed);
+}
+
+// Access the platform specific offset from the raw ticks timeline to the monotonic ticks
+// timeline.  The only current legit uses for this function are when
+// initializing the RO data for the VDSO, and when fixing up timer values during
+// vmexit on ARM (see arch/arm64/hypervisor/vmexit.cc).
+inline zx_ticks_t timer_get_mono_ticks_offset() {
+  return internal::mono_ticks_offset.load(ktl::memory_order_relaxed);
+}
+
+// Adds the given ticks to the existing monotonic ticks offset.
+inline void timer_add_mono_ticks_offset(zx_ticks_t additional) {
+  internal::mono_ticks_offset.fetch_add(additional, ktl::memory_order_relaxed);
+}
+
+// Access the offset from the raw ticks timeline to the boot ticks timeline.
+inline zx_ticks_t timer_get_boot_ticks_offset() {
+  return internal::boot_ticks_offset.load(ktl::memory_order_relaxed);
+}
 
 // API to set/clear a hardware timer that is responsible for calling timer_tick() when it fires
 zx_status_t platform_set_oneshot_timer(zx_time_t deadline);
@@ -32,14 +72,11 @@ void timer_tick(zx_time_t now);
 // which allow directly observing the tick counter or not.
 bool platform_usermode_can_access_tick_registers();
 
-// Access the platform specific offset from the raw ticks timeline to the monotonic ticks
-// timeline.  The only current legit uses for this function are when
-// initializing the RO data for the VDSO, and when fixing up timer values during
-// vmexit on ARM (see arch/arm64/hypervisor/vmexit.cc).
-zx_ticks_t timer_get_mono_ticks_offset();
-
 // Current monotonic time in nanoseconds.
 zx_time_t current_time();
+
+// Current boot time in nanoseconds.
+zx_boot_time_t current_boot_time();
 
 // High-precision timer ticks per second.
 zx_ticks_t ticks_per_second();
@@ -54,9 +91,6 @@ class Ratio;  // Fwd decl.
 // source has been selected and characterized.
 void timer_set_ticks_to_time_ratio(const affine::Ratio& ticks_to_time);
 const affine::Ratio& timer_get_ticks_to_time_ratio();
-
-// Sets the initial mono ticks offset.
-void timer_set_mono_ticks_offset(uint64_t offset);
 
 // Convert a sample taken early on to a proper zx_ticks_t, if possible.
 // This returns 0 if early samples are not convertible.
@@ -122,9 +156,9 @@ inline zx_ticks_t platform_current_raw_ticks() {
 template <GetTicksSyncFlag Flags>
 inline zx_ticks_t timer_current_mono_ticks_synchronized() {
   while (true) {
-    const zx_ticks_t off1 = timer_get_mono_ticks_offset();
+    const zx_ticks_t off1 = internal::mono_ticks_offset.load(ktl::memory_order_relaxed);
     const zx_ticks_t raw_ticks = platform_current_raw_ticks_synchronized<Flags>();
-    const zx_ticks_t off2 = timer_get_mono_ticks_offset();
+    const zx_ticks_t off2 = internal::mono_ticks_offset.load(ktl::memory_order_relaxed);
     if (off1 == off2) {
       return raw_ticks + off1;
     }
@@ -134,7 +168,25 @@ inline zx_ticks_t timer_current_mono_ticks() {
   return timer_current_mono_ticks_synchronized<GetTicksSyncFlag::kNone>();
 }
 
+template <GetTicksSyncFlag Flags>
+inline zx_ticks_t timer_current_boot_ticks_synchronized() {
+  while (true) {
+    const zx_ticks_t off1 = internal::boot_ticks_offset.load(ktl::memory_order_relaxed);
+    const zx_ticks_t raw_ticks = platform_current_raw_ticks_synchronized<Flags>();
+    const zx_ticks_t off2 = internal::boot_ticks_offset.load(ktl::memory_order_relaxed);
+    if (off1 == off2) {
+      return raw_ticks + off1;
+    }
+  }
+}
+inline zx_ticks_t timer_current_boot_ticks() {
+  return timer_current_boot_ticks_synchronized<GetTicksSyncFlag::kNone>();
+}
+
 // The current monotonic time in ticks.
 inline zx_ticks_t current_ticks() { return timer_current_mono_ticks(); }
+
+// The current boot time in ticks.
+inline zx_ticks_t current_boot_ticks() { return timer_current_boot_ticks(); }
 
 #endif  // ZIRCON_KERNEL_INCLUDE_PLATFORM_TIMER_H_
