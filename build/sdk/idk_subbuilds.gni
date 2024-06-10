@@ -80,6 +80,9 @@ template("_subbuild") {
     if (cxx_rbe_enable) {
       args += [ "--cxx-rbe-enable" ]
     }
+    if (link_rbe_enable) {
+      args += [ "--link-rbe-enable" ]
+    }
     if (rust_rbe_enable) {
       args += [ "--rust-rbe-enable" ]
     }

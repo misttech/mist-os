@@ -25,6 +25,7 @@ build_info_product = "bringup"
 is_debug = false
 
 cxx_rbe_enable = {cxx_rbe_enable}
+link_rbe_enable = {link_rbe_enable}
 rust_rbe_enable = {rust_rbe_enable}
 universe_package_labels = [{sdk_labels_list}]
 """
@@ -182,6 +183,11 @@ def main():
         help="Enable remote builds with RBE for C++ targets.",
     )
     parser.add_argument(
+        "--link-rbe-enable",
+        action="store_true",
+        help="Enable remote builds with RBE for linking C++ targets.",
+    )
+    parser.add_argument(
         "--rust-rbe-enable",
         action="store_true",
         help="Enable remote builds with RBE for Rust targets.",
@@ -282,6 +288,7 @@ def main():
     args_gn_content = _ARGS_GN_TEMPLATE.format(
         cpu=target_cpu,
         cxx_rbe_enable="true" if args.cxx_rbe_enable else "false",
+        link_rbe_enable="true" if args.link_rbe_enable else "false",
         rust_rbe_enable="true" if args.rust_rbe_enable else "false",
         sdk_labels_list=f'"{args.sdk_collection_label}"',
     )
