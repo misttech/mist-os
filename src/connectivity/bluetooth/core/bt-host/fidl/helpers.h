@@ -28,6 +28,7 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/types.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/types.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/iso/iso_common.h"
 
 // Helpers for implementing the Bluetooth FIDL interfaces.
 
@@ -270,6 +271,9 @@ pw::bluetooth::emboss::LogicalTransportType LogicalTransportTypeFromFidl(
 
 pw::bluetooth::emboss::StatusCode FidlHciErrorToStatusCode(
     fuchsia_hardware_bluetooth::HciError code);
+
+fuchsia::bluetooth::le::CisEstablishedParameters CisEstablishedParametersToFidl(
+    const bt::iso::CisEstablishedParameters& params_in);
 
 }  // namespace bthost::fidl_helpers
 

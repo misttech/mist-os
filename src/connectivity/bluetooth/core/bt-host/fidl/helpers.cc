@@ -2188,6 +2188,45 @@ pw::bluetooth::emboss::StatusCode FidlHciErrorToStatusCode(fhbt::HciError code) 
   }
 }
 
+fuchsia::bluetooth::le::CisEstablishedParameters CisEstablishedParametersToFidl(
+    const bt::iso::CisEstablishedParameters& params_in) {
+  fuchsia::bluetooth::le::CisEstablishedParameters params_out;
+
+  // General parameters
+  zx::duration cig_sync_delay = zx::usec(params_in.cig_sync_delay);
+  params_out.set_cig_sync_delay(cig_sync_delay.get());
+  zx::duration cis_sync_delay = zx::usec(params_in.cis_sync_delay);
+  params_out.set_cis_sync_delay(cis_sync_delay.get());
+  params_out.set_max_subevents(params_in.max_subevents);
+  zx::duration iso_interval = zx::usec(
+      params_in.iso_interval * bt::iso::CisEstablishedParameters::kIsoIntervalToMicroseconds);
+  params_out.set_iso_interval(iso_interval.get());
+
+  // Central => Peripheral parameters
+  // phy and max_pdu_size are not passed back to FIDL client
+  if (params_in.c_to_p_params.burst_number > 0) {
+    fuchsia::bluetooth::le::CisUnidirectionalParams c_to_p_params;
+    zx::duration transport_latency = zx::usec(params_in.c_to_p_params.transport_latency);
+    c_to_p_params.set_transport_latency(transport_latency.get());
+    c_to_p_params.set_burst_number(params_in.c_to_p_params.burst_number);
+    c_to_p_params.set_flush_timeout(params_in.c_to_p_params.flush_timeout);
+    params_out.set_central_to_peripheral_params(std::move(c_to_p_params));
+  }
+
+  // Peripheral => Central parameters
+  // phy and max_pdu_size are not passed back to FIDL client
+  if (params_in.p_to_c_params.burst_number > 0) {
+    fuchsia::bluetooth::le::CisUnidirectionalParams p_to_c_params;
+    zx::duration transport_latency = zx::usec(params_in.p_to_c_params.transport_latency);
+    p_to_c_params.set_transport_latency(transport_latency.get());
+    p_to_c_params.set_burst_number(params_in.p_to_c_params.burst_number);
+    p_to_c_params.set_flush_timeout(params_in.p_to_c_params.flush_timeout);
+    params_out.set_peripheral_to_central_params(std::move(p_to_c_params));
+  }
+
+  return params_out;
+}
+
 }  // namespace bthost::fidl_helpers
 
 // static

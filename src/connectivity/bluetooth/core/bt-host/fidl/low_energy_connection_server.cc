@@ -49,7 +49,28 @@ void LowEnergyConnectionServer::RequestGattClient(fidl::InterfaceRequest<fbg::Cl
 }
 
 void LowEnergyConnectionServer::AcceptCis(
-    fuchsia::bluetooth::le::ConnectionAcceptCisRequest parameters) {}
+    fuchsia::bluetooth::le::ConnectionAcceptCisRequest parameters) {
+  if (!parameters.has_connection_stream()) {
+    bt_log(WARN, "fidl", "AcceptCis invoked without a connection stream");
+    return;
+  }
+  ::fidl::InterfaceRequest<::fuchsia::bluetooth::le::IsochronousStream>* connection_stream =
+      parameters.mutable_connection_stream();
+  uint8_t cig_id = parameters.cig_id();
+  uint8_t cis_id = parameters.cis_id();
+  bt::iso::CigCisIdentifier id(cig_id, cis_id);
+
+  // Check for existing stream with same CIG/CIS combination
+  if (iso_streams_.count(id) != 0) {
+    bt_log(WARN, "fidl", "AcceptCis invoked with duplicate ID (CIG: %u, CIS: %u)", cig_id, cis_id);
+    connection_stream->Close(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  auto stream_server = std::make_unique<IsoStreamServer>(std::move(*connection_stream),
+                                                         [id, this]() { iso_streams_.erase(id); });
+  iso_streams_[id] = std::move(stream_server);
+  bt_log(INFO, "fidl", "waiting for incoming CIS connection (CIG: %u, CIS: %u)", cig_id, cis_id);
+}
 
 void LowEnergyConnectionServer::GetCodecLocalDelayRange(
     ::fuchsia::bluetooth::le::CodecDelayGetCodecLocalDelayRangeRequest parameters,

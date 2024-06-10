@@ -8,10 +8,12 @@
 #include <fuchsia/bluetooth/le/cpp/fidl.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/fidl/gatt2_client_server.h"
+#include "src/connectivity/bluetooth/core/bt-host/fidl/iso_stream_server.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/server_base.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_connection_handle.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/gatt.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/iso/iso_common.h"
 
 namespace bthost {
 
@@ -45,6 +47,8 @@ class LowEnergyConnectionServer : public ServerBase<fuchsia::bluetooth::le::Conn
   bt::gap::Adapter::WeakPtr adapter_;
   bt::gatt::GATT::WeakPtr gatt_;
   std::optional<Gatt2ClientServer> gatt_client_server_;
+
+  std::unordered_map<bt::iso::CigCisIdentifier, std::unique_ptr<IsoStreamServer>> iso_streams_;
 
   BT_DISALLOW_COPY_ASSIGN_AND_MOVE(LowEnergyConnectionServer);
 };

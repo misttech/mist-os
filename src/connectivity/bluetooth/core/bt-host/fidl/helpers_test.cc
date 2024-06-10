@@ -23,6 +23,7 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/device_address.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/uuid.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/gap.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/iso/iso_common.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sco/sco.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp/sdp.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
@@ -74,6 +75,24 @@ const fsys::PeerKey kTestKeyFidl{
     .data = fsys::Key{.value = kTestKeyValue},
 };
 const fsys::Ltk kTestLtkFidl{.key = kTestKeyFidl, .ediv = 0, .rand = 0};
+
+// Minimum values permitted for the CIS_ESTABLISHED unidirectional parameters
+bt::iso::CisEstablishedParameters::CisUnidirectionalParams kMinUniParams = {
+    .transport_latency = 0x0000ea,
+    .phy = pw::bluetooth::emboss::IsoPhyType::LE_1M,
+    .burst_number = 0x01,
+    .flush_timeout = 0x01,
+    .max_pdu_size = 0x00,
+};
+
+// Maximum values permitted for the CIS_ESTABLISHED unidirectional parameters
+bt::iso::CisEstablishedParameters::CisUnidirectionalParams kMaxUniParams = {
+    .transport_latency = 0x7fffff,
+    .phy = pw::bluetooth::emboss::IsoPhyType::LE_CODED,
+    .burst_number = 0x0f,
+    .flush_timeout = 0xff,
+    .max_pdu_size = 0xfb,
+};
 
 class HelpersTestWithLoop : public bt::testing::TestLoopFixture {
  public:
@@ -2231,6 +2250,118 @@ TEST(HelpersTest, LogicalTransportTypeFromFidl) {
             pw::bluetooth::emboss::LogicalTransportType::LE_CIS);
   EXPECT_EQ(LogicalTransportTypeFromFidl(fuchsia::bluetooth::LogicalTransportType::LE_BIS),
             pw::bluetooth::emboss::LogicalTransportType::LE_BIS);
+}
+
+static void ValidateCisEstablishedUnidirectionalParams(
+    const fuchsia::bluetooth::le::CisUnidirectionalParams& fidl_params,
+    const bt::iso::CisEstablishedParameters::CisUnidirectionalParams& iso_params) {
+  zx::duration transport_latency = zx::usec(iso_params.transport_latency);
+  EXPECT_EQ(fidl_params.transport_latency(), transport_latency.get());
+  // phy is not included in FIDL output
+  EXPECT_EQ(fidl_params.burst_number(), iso_params.burst_number);
+  EXPECT_EQ(fidl_params.flush_timeout(), iso_params.flush_timeout);
+  // max_pdu_size is not included in FIDL output
+}
+
+// Helper function to validate a single set of test values
+static void ValidateCisEstablishedConversion(const bt::iso::CisEstablishedParameters& params_in) {
+  auto params_out = CisEstablishedParametersToFidl(params_in);
+
+  zx::duration cig_sync_delay(params_out.cig_sync_delay());
+  EXPECT_EQ(cig_sync_delay, zx::usec(params_in.cig_sync_delay));
+
+  zx::duration cis_sync_delay(params_out.cis_sync_delay());
+  EXPECT_EQ(cis_sync_delay, zx::usec(params_in.cis_sync_delay));
+
+  EXPECT_EQ(params_out.max_subevents(), params_in.max_subevents);
+
+  zx::duration iso_interval(params_out.iso_interval());
+  EXPECT_EQ(iso_interval, zx::usec(params_in.iso_interval *
+                                   bt::iso::CisEstablishedParameters::kIsoIntervalToMicroseconds));
+
+  if (params_in.c_to_p_params.burst_number > 0) {
+    ValidateCisEstablishedUnidirectionalParams(params_out.central_to_peripheral_params(),
+                                               params_in.c_to_p_params);
+  } else {
+    EXPECT_FALSE(params_out.has_central_to_peripheral_params());
+  }
+
+  if (params_in.p_to_c_params.burst_number > 0) {
+    ValidateCisEstablishedUnidirectionalParams(params_out.peripheral_to_central_params(),
+                                               params_in.p_to_c_params);
+  } else {
+    EXPECT_FALSE(params_out.has_peripheral_to_central_params());
+  }
+}
+
+TEST(HelpersTest, CisEstablishedParametersToFidl) {
+  // Min values for all bidirectional params
+  bt::iso::CisEstablishedParameters params1 = {
+      .cig_sync_delay = 0x0000ea,
+      .cis_sync_delay = 0x0000ea,
+      .max_subevents = 0x01,
+      .iso_interval = 0x0004,
+      .c_to_p_params = kMinUniParams,
+      .p_to_c_params = kMaxUniParams,
+  };
+  ValidateCisEstablishedConversion(params1);
+
+  // Values somewhere between min and max
+  bt::iso::CisEstablishedParameters params2 = {
+      .cig_sync_delay = 0x001234,
+      .cis_sync_delay = 0x005678,
+      .max_subevents = 0x10,
+      .iso_interval = 0x246,
+      .c_to_p_params =
+          {
+              .transport_latency = 0x55aa55,
+              .phy = pw::bluetooth::emboss::IsoPhyType::LE_2M,
+              .burst_number = 0x02,
+              .flush_timeout = 0x42,
+              .max_pdu_size = 0xa3,
+          },
+      .p_to_c_params =
+          {
+              .transport_latency = 0xabc123,
+              .phy = pw::bluetooth::emboss::IsoPhyType::LE_CODED,
+              .burst_number = 0x0F,
+              .flush_timeout = 0x53,
+              .max_pdu_size = 0x37,
+          },
+  };
+  ValidateCisEstablishedConversion(params2);
+
+  // Max values for all bidirectional params
+  bt::iso::CisEstablishedParameters params3 = {
+      .cig_sync_delay = 0x7fffff,
+      .cis_sync_delay = 0x7fffff,
+      .max_subevents = 0x1f,
+      .iso_interval = 0x0c80,
+      .c_to_p_params = kMaxUniParams,
+      .p_to_c_params = kMinUniParams,
+  };
+  ValidateCisEstablishedConversion(params3);
+
+  // Parameters where the burst_number is zero, indicating that this direction is not configured.
+  // All other values should be ignored and the corresponding FIDL unidirectional parameters should
+  // not be instantiated.
+  bt::iso::CisEstablishedParameters::CisUnidirectionalParams unconfigured_params = {
+      .transport_latency = 0,
+      .phy = pw::bluetooth::emboss::IsoPhyType::LE_1M,
+      .burst_number = 0x00,
+      .flush_timeout = 0x00,
+      .max_pdu_size = 0x00,
+  };
+
+  // Unconfigured central => peripheral
+  bt::iso::CisEstablishedParameters params4 = params2;
+  params4.c_to_p_params = unconfigured_params;
+  ValidateCisEstablishedConversion(params4);
+
+  // Unconfigured peripheral => central
+  params4 = params2;
+  params4.p_to_c_params = unconfigured_params;
+  ValidateCisEstablishedConversion(params4);
 }
 
 }  // namespace
