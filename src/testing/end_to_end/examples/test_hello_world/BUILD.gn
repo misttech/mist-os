@@ -14,7 +14,10 @@ python_mobly_test("hello_world_test_fc") {
     "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
   ]
   transport = "fuchsia-controller"
-  environments = [ emu_env ]
+  environments = [
+    # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
+    aemu_env,
+  ]
 }
 
 group("tests") {

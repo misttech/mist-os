@@ -19,7 +19,8 @@ python_mobly_test("run_wo_test_case_revive_fc") {
     test_case_revive = false
   }
   environments = [
-    emu_env,
+    # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
+    aemu_env,
     vim3_env,
     nuc11_env,
   ]
@@ -54,7 +55,8 @@ python_mobly_test("test_case_revive_with_soft_reboot_fc") {
     fuchsia_device_operation = "Soft-Reboot"
   }
   environments = [
-    emu_env,
+    # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
+    aemu_env,
     vim3_env,
     nuc11_env,
   ]

@@ -41,7 +41,10 @@ python_mobly_test("soft_reboot_test_fc_preferred") {
   params_source = "params.yaml"
   transport = "fuchsia-controller-preferred"
 
-  environments = [ emu_env ]
+  environments = [
+    # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
+    aemu_env,
+  ]
 }
 
 group("tests") {
