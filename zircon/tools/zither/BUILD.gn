@@ -652,7 +652,10 @@ zither_golden_test("zx.test") {
   cases = [
     {
       backend = "zircon_ifs"
-      files = [ "zircon.ifs" ]
+      files = [
+        "zircon.ifs",
+        "libzircon.json",
+      ]
     },
     {
       backend = "kernel"

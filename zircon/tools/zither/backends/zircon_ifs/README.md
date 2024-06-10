@@ -2,11 +2,12 @@
 
 The zither zircon.ifs backend is responsible for generating "zircon.ifs", the
 text ABI specification of libzircon.so, derived from the FIDL syscall
-specifications of library `zx`.
+specifications of library `zx`.  It also generates "libzircon.json", which is a
+simple list of system call linkage names in JSON format.
 
 ## Output layout
 
-One "zircon.ifs" is generated.
+One "zircon.ifs" and one "libzircon.json" is generated.
 
 ## GN integration
 
@@ -25,6 +26,5 @@ Each syscall contributes two .ifs entries:
 - { Name: zx_foo_bar, Type: Func, Weak: true }
 ```
 
-
-
-
+The JSON file consists of a single JSON array of strings.  This lists only the
+plain `zx_foo_bar` names, without each `_`-prefixed counterpart.

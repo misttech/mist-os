@@ -575,6 +575,7 @@ template("_zither_zircon_ifs_file") {
 
   forward_variables_from(invoker, [ "output_dir" ])
   ifs_file = "${output_dir}/zircon.ifs"
+  json_file = "${output_dir}/libzircon.json"
 
   _zither(zither_target) {
     forward_variables_from(invoker,
@@ -586,7 +587,10 @@ template("_zither_zircon_ifs_file") {
                              "fidl_ir_target",
                            ])
     backend = "zircon_ifs"
-    generated_files = [ ifs_file ]
+    generated_files = [
+      ifs_file,
+      json_file,
+    ]
   }
 
   group(main_target) {
