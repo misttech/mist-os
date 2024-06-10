@@ -282,12 +282,11 @@ class BazelRepositoryMap(object):
     def __init__(
         self,
         fuchsia_source_dir: Path,
-        fuchsia_sdk_dir: Path,
+        fuchsia_sdk_dir: Optional[Path],
         workspace_dir: Path,
         output_base: Path,
     ):
         self._fuchsia_source_dir = fuchsia_source_dir
-        self._fuchsia_sdk_dir = fuchsia_sdk_dir
         self._workspace_dir = workspace_dir
         self._output_base = output_base
 
@@ -308,6 +307,11 @@ class BazelRepositoryMap(object):
             / "build/bazel/local_repositories/remote_coverage_tools",
         }
 
+        if fuchsia_sdk_dir:
+            _fuchsia_sdk_dir = fuchsia_sdk_dir.resolve()
+            self._overrides["fuchsia_sdk"] = _fuchsia_sdk_dir
+            self._overrides["fuchsia_sdk_common"] = _fuchsia_sdk_dir / "common"
+
         # These repository overrides are used when converting Bazel labels to actual paths.
         # NOTE: Mapping labels to repository inputs is considerably simpler than
         # //build/bazel/scripts/bazel_action.py because there are way less edge
@@ -316,13 +320,20 @@ class BazelRepositoryMap(object):
         # by the GN build_fuchsia_sdk_repository target which is an input
         # dependency for running this script.
         self._internal_overrides = self._overrides | {
-            "fuchsia_sdk_common": fuchsia_sdk_dir / "common",
-            "fuchsia_sdk": fuchsia_sdk_dir,
             "prebuilt_python": self.IGNORED_REPO,
             "fuchsia_clang": self.IGNORED_REPO,
             "bazel_tools": self.IGNORED_REPO,
             "local_config_cc": self.IGNORED_REPO,
         }
+
+        if not fuchsia_sdk_dir:
+            fuchsia_sdk_dir = (
+                self._fuchsia_source_dir / "build/bazel_sdk/bazel_rules_fuchsia"
+            )
+            self._internal_overrides["fuchsia_sdk"] = fuchsia_sdk_dir
+            self._internal_overrides["fuchsia_sdk_common"] = (
+                fuchsia_sdk_dir / "common"
+            )
 
     def get_repository_overrides_flags(self) -> Sequence[str]:
         """Return a sequence command-line flags for overriding Bazel external repositories."""
@@ -733,12 +744,9 @@ def main() -> int:
             )[0]
         )
 
+    fuchsia_sdk_dir: Optional[Path] = None
     if args.fuchsia_sdk_dir:
         fuchsia_sdk_dir = Path(args.fuchsia_sdk_dir)
-    else:
-        fuchsia_sdk_dir = (
-            fuchsia_source_dir / "build/bazel_sdk/bazel_rules_fuchsia"
-        )
 
     bazel_repo_map = BazelRepositoryMap(
         fuchsia_source_dir=fuchsia_source_dir,
