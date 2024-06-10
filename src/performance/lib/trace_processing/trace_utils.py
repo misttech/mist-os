@@ -219,46 +219,62 @@ def get_nearest_following_event(
 
 # This method looks for a possible race between trace collection start in multiple processes.
 #
-# This problem usually occurs between Scenic and Magma processes. The flow connection between
-# these processes happen through koids of objects passed to Vulkan, which may be reused. When
-# there is a gap in process trace collection starts, we may see the initial vsync event(s)
+# This problem usually occurs between Scenic, Magma and Display processes. The flow connection
+# between these processes happens through koids of objects passed to Vulkan, which may be reused.
+# When there is a gap in process trace collection starts, we may see the initial vsync event(s)
 # connecting to multiple flows. We can safely skip these initial events. See
 # https://fxbug.dev/322849857 for more detailed examples with screenshots.
+#
+# This method finds the first event flow the test interested in, finds processes in the flow, and
+# cuts tracing when the latest process tracing started.
+#
+# This method used to check processes with given process and thread name. That did not work because
+# different product may have different process setup, for example Display process with different
+# names.
 def adjust_to_common_process_start(
-    model: trace_model.Model, process_and_thread_names: List[tuple[str, str]]
+    model: trace_model.Model,
+    name: str,
+    category: Optional[str] = None,
+    type: type = object,
 ) -> trace_model.Model:
     """Adjust model to a consistent start time tracking the latest first event recorded from a
-    list of processes. The list of processes are selected through matching process_name exactly
-    and thread_name as substring.
+    list of processes. The list of processes are selected through matching event flow.
 
     Args:
       model: Trace model.
-      process_and_thread_names: Tuples of strings representing (process_name, thread_name).
+      name: name of event, or None to skip this filter.
+      category: Category of event, or None to skip this filter.
+      type: Type of event. By default object to include all events.
 
     Returns:
-      Model adjusted to a start time tracking the latest first event recorded from the given
-      processes. KeyError if no match is found from the process and thread name keys.
+      Model adjusted to a start time tracking the latest first event recorded from processes from
+      the given event flow.
+
+    Raises:
+      KeyError if no matched event is found.
     """
-    processes = []
-    for process_name, thread_name in process_and_thread_names:
-        process_matches = [p for p in model.processes if process_name == p.name]
-        if not process_matches:
-            raise KeyError(
-                f"Error, expected traces with process_name '{process_name}'"
-            )
-        for i, process_match in enumerate(process_matches):
-            thread_match = next(
-                (t for t in process_match.threads if thread_name in t.name),
-                None,
-            )
-            if thread_match:
-                processes.append(process_match)
-                break
-            elif i == len(process_matches) - 1:
-                raise KeyError(
-                    f"Error, expected traces with process_name '{process_name}' "
-                    f"and thread name `{thread_name}`"
-                )
+
+    all_events: Iterator[trace_model.Event] = model.all_events()
+
+    filtered = filter_events(
+        model.all_events(), category=category, name=name, type=type
+    )
+    # Get the first matched event.
+    begin_event = next(filtered, None)
+
+    if begin_event is None:
+        raise KeyError(f"Error, expected event with name '{name}'")
+
+    events_in_flow: Iterable[trace_model.Event] = get_following_events(
+        begin_event
+    )
+
+    process_ids = set()
+    process_ids.add(begin_event.pid)
+    for event in events_in_flow:
+        process_ids.add(event.pid)
+
+    process_matches = [p for p in model.processes if p.pid in process_ids]
     consistent_start_time = max(
         min(
             (
@@ -268,7 +284,7 @@ def adjust_to_common_process_start(
             ),
             default=trace_time.TimePoint(),
         )
-        for process in processes
+        for process in process_matches
     )
     return model.slice(start=consistent_start_time)
 
