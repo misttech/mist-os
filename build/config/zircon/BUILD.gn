@@ -180,18 +180,24 @@ config("compiler") {
 }
 
 config("nolibc") {
-  ldflags = [
-    "-nostartfiles",
-    "-nolibc",
-  ]
+  ldflags = [ "-nostartfiles" ]
 
   # Don't use -nostdlib, because the builtins (or libgcc) are what we want
   # and are otherwise annoying to find and specify.  It's just the -lc that
   # we really want to defeat, and that's handled by giving a -L that will
   # find exactly nothing but a dummy libc.so.  Clang has -nolibc to kill
   # the -lc, but for C++ it still uses -lm under -nolibc.  So this is still
-  # needed to make -lm into a stub.
+  # needed to make -lm into a dummy, though for -lc only GCC needs it.
   lib_dirs = [ "libc-dummy" ]
+
+  if (is_gcc) {
+    # Include this in every link.
+    # Note GN requires "./" so it doesn't think this should mean a -l switch.
+    libs = [ "./dso_handle.ld" ]
+  } else {
+    # TODO(mcgrathr): GCC 9 has -nolibc, so use it when we get that toolchain.
+    ldflags += [ "-nolibc" ]
+  }
 }
 
 config("data_sections") {
@@ -274,23 +280,6 @@ variant("user") {
     # This is the default in Clang for Fuchsia targets.  In shlib toolchains
     # this config will come before the one that overrides it with -fPIC.
     common_flags = [ "-fPIE" ]
-  }
-}
-
-variant("user-link") {
-  if (is_gcc) {
-    # Include this in every final link.  This doesn't just use libs because
-    # that propagates implicitly from every kind of target.  But, it needs to
-    # be possible to remove the user-link config from just the linking target
-    # itself to avoid this going into the link (e.g. for relocatable links).
-    # ldflags doesn't propagate like libs does, so this way it only applies
-    # when this config is on the configs list of the actual linking target.
-    # The compiler driver and linker don't care where the input linker script
-    # appears on the link command line, so that is fine.  However, it requires
-    # also plumbing inputs to make sure GN knows the file is being used and
-    # emits Ninja file deps as it would implicitly for libs.
-    inputs = [ "dso_handle.ld" ]
-    ldflags = rebase_path(inputs, root_build_dir)
   }
 }
 

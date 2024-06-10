@@ -223,7 +223,6 @@ if (current_toolchain == default_toolchain) {
       "//build/config/zircon:user",
       "//build/config:shared_library_config",
       "//build/config:symbol_no_undefined",
-      "//build/config/zircon:static-libc++",
     ]
 
     # TODO(https://fxbug.dev/42055641): Ensure all of libc uses libcalls into the hwasan
