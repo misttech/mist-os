@@ -5,6 +5,7 @@
 #include <lib/magma/platform/platform_port.h>
 #include <lib/magma_service/mock/mock_bus_mapper.h>
 
+#include <cstdint>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -46,6 +47,7 @@ class TestOwner : public JobScheduler::Owner {
       semaphore_hang_message_output_count_++;
     }
   }
+  void PowerOnGpuForRunnableAtoms() override { power_on_gpu_count_++; }
 
   std::vector<MsdArmAtom*>& run_list() { return run_list_; }
   std::vector<ResultPair>& completed_list() { return completed_list_; }
@@ -56,6 +58,7 @@ class TestOwner : public JobScheduler::Owner {
   uint32_t semaphore_hang_message_output_count() const {
     return semaphore_hang_message_output_count_;
   }
+  uint32_t power_on_gpu_count() const { return power_on_gpu_count_; }
 
  private:
   std::vector<MsdArmAtom*> run_list_;
@@ -67,6 +70,7 @@ class TestOwner : public JobScheduler::Owner {
   bool in_protected_mode_ = false;
   uint32_t hang_message_output_count_ = 0;
   uint32_t semaphore_hang_message_output_count_ = 0;
+  uint32_t power_on_gpu_count_ = 0;
 };
 
 class TestAddressSpaceObserver : public AddressSpaceObserver {
@@ -925,6 +929,27 @@ class TestJobScheduler {
     EXPECT_EQ(2u, owner.run_list().size());
     EXPECT_TRUE(owner.gpu_active());
   }
+
+  void TestPowerOnGpuRequest() {
+    TestOwner owner;
+    TestConnectionOwner connection_owner;
+    std::shared_ptr<MsdArmConnection> connection = MsdArmConnection::Create(0, &connection_owner);
+    EXPECT_EQ(0u, owner.run_list().size());
+    JobScheduler scheduler(&owner, 1);
+
+    scheduler.SetSchedulingEnabled(false);
+    EXPECT_EQ(0u, owner.power_on_gpu_count());
+
+    auto atom1 = std::make_shared<MsdArmAtom>(connection, 1u, 0, 0, magma_arm_mali_user_data(), 0);
+    scheduler.EnqueueAtom(atom1);
+    EXPECT_EQ(0u, owner.run_list().size());
+    EXPECT_EQ(0u, owner.power_on_gpu_count());
+    scheduler.TryToSchedule();
+
+    EXPECT_EQ(0u, owner.run_list().size());
+    EXPECT_FALSE(owner.gpu_active());
+    EXPECT_LT(0u, owner.power_on_gpu_count());
+  }
 };
 
 class JobSchedulerTest : public testing::Test {
@@ -987,3 +1012,5 @@ TEST_F(JobSchedulerTest, SchedulingDisable) { TestJobScheduler().TestSchedulingD
 TEST_F(JobSchedulerTest, SchedulingDisableSoftStop) {
   TestJobScheduler().TestSchedulingDisableSoftStop();
 }
+
+TEST_F(JobSchedulerTest, PowerOnGpuRequest) { TestJobScheduler().TestPowerOnGpuRequest(); }

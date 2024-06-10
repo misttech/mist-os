@@ -26,6 +26,7 @@
 #include "src/graphics/drivers/msd-arm-mali/include/magma_vendor_queries.h"
 #include "src/graphics/drivers/msd-arm-mali/src/job_scheduler.h"
 #include "src/graphics/drivers/msd-arm-mali/src/registers.h"
+#include "src/graphics/drivers/msd-arm-mali/src/timeout_source.h"
 #include "src/lib/debug/backtrace-request.h"
 #include "string_printf.h"
 
@@ -281,6 +282,7 @@ bool MsdArmDevice::Init(ParentDevice* platform_device,
   perf_counters_ = std::make_unique<PerformanceCounters>(this);
   perf_counters_->SetGpuFeatures(gpu_features_);
   scheduler_ = std::make_unique<JobScheduler>(this, 3);
+  timeout_sources_.push_back(scheduler_.get());
   address_manager_ = std::make_unique<AddressManager>(this, gpu_features_.address_space_count);
 
   if (!InitializeDevicePropertiesBuffer()) {
@@ -298,6 +300,7 @@ bool MsdArmDevice::Init(ParentDevice* platform_device,
       MAGMA_LOG(ERROR, "Failed to initialize fuchsia power manager");
       return false;
     }
+    timeout_sources_.push_back(fuchsia_power_manager_.get());
   }
 
   return ResetDevice();
@@ -515,6 +518,12 @@ void MsdArmDevice::OutputHangMessage(bool hardware_hang) {
   ProcessDumpStatusToLog();
 }
 
+void MsdArmDevice::PowerOnGpuForRunnableAtoms() {
+  if (fuchsia_power_manager_) {
+    fuchsia_power_manager_->EnablePower();
+  }
+}
+
 int MsdArmDevice::DeviceThreadLoop() {
   magma::PlatformThreadHelper::SetCurrentThreadName("DeviceThread");
 
@@ -534,23 +543,37 @@ int MsdArmDevice::DeviceThreadLoop() {
 
   uint32_t timeout_count = 0;
   while (!device_thread_quit_flag_) {
-    auto timeout_duration = scheduler_->GetCurrentTimeoutDuration();
-    if (timeout_duration <= JobScheduler::Clock::duration::zero()) {
-      // Don't timeout if the device request semaphore is signaled, because that could be a sign
-      // that the current thread just took a really long time to wakeup.
-      constexpr uint32_t kMaxConsecutiveTimeouts = 5;
-      if (!device_request_semaphore_->WaitNoReset(0).ok() ||
-          timeout_count >= kMaxConsecutiveTimeouts) {
-        scheduler_->HandleTimedOutAtoms();
-        timeout_count = 0;
-        continue;
+    auto timeout_duration = TimeoutSource::Clock::duration::max();
+    bool timeout_triggered = false;
+    for (TimeoutSource* source : timeout_sources_) {
+      auto duration = source->GetCurrentTimeoutDuration();
+      if (duration <= TimeoutSource::Clock::duration::zero()) {
+        if (source->CheckForDeviceThreadDelay()) {
+          constexpr uint32_t kMaxConsecutiveTimeouts = 5;
+          if (!device_request_semaphore_->WaitNoReset(0).ok() ||
+              timeout_count >= kMaxConsecutiveTimeouts) {
+            source->TimeoutTriggered();
+            timeout_triggered = true;
+
+            timeout_count = 0;
+          } else {
+            timeout_count++;
+          }
+        } else {
+          source->TimeoutTriggered();
+          timeout_triggered = true;
+        }
+      } else {
+        timeout_duration = std::min(timeout_duration, duration);
       }
-      timeout_count++;
+    }
+    if (timeout_triggered) {
+      continue;
     }
     uint64_t key;
     uint64_t timestamp;
     magma::Status status(MAGMA_STATUS_OK);
-    if (timeout_duration < JobScheduler::Clock::duration::max()) {
+    if (timeout_duration < TimeoutSource::Clock::duration::max()) {
       // Add 1 to avoid rounding time down and spinning with timeouts close to 0.
       int64_t millisecond_timeout =
           std::chrono::duration_cast<std::chrono::milliseconds>(timeout_duration).count() + 1;

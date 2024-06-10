@@ -189,6 +189,14 @@ void PowerManager::UpdateGpuActive(bool active) {
 
 void PowerManager::UpdateGpuActiveLocked(bool active) {
   TRACE_DURATION("magma:power", "PowerManager::UpdateGpuActiveLocked", "active", TA_BOOL(active));
+  if (!active && gpu_active_) {
+    // Chosen to avoid performance regressions on benchmarks. 16ms caused 25th-percentile CPU
+    // regressions.
+    constexpr std::chrono::milliseconds kPowerDownTimeout{30};
+    current_gpu_powerdown_timeout_ = Clock::now() + kPowerDownTimeout;
+  } else if (active) {
+    current_gpu_powerdown_timeout_ = Clock::time_point::max();
+  }
   if (power_down_on_idle_ && !active) {
     PowerDownWhileIdle();
   }

@@ -88,14 +88,6 @@ bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device, inspect::Node&
     MAGMA_LOG(INFO, "No %s element, disabling power framework", kHardwarePowerElementName);
     return false;
   }
-  fidl::ClientEnd<fuchsia_power_broker::LeaseControl> lease_control_client_end;
-  zx_status_t status = AcquireLease(hardware_power_lessor_client_, lease_control_client_end);
-  if (status != ZX_OK) {
-    MAGMA_LOG(ERROR, "Failed to acquire lease on hardware power: %s", zx_status_get_string(status));
-    return false;
-  }
-  hardware_power_lease_control_client_ = fidl::WireClient<fuchsia_power_broker::LeaseControl>(
-      std::move(lease_control_client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
   CheckRequiredLevel();
   MAGMA_LOG(INFO, "Using power framework to manage GPU power");
 
@@ -133,7 +125,6 @@ zx_status_t FuchsiaPowerManager::AcquireLease(
     return ZX_ERR_BAD_STATE;
   }
   lease_control_client_end = std::move(result->value()->lease_control);
-  power_lease_active_.Set(true);
   return ZX_OK;
 }
 
@@ -155,13 +146,11 @@ void FuchsiaPowerManager::CheckRequiredLevel() {
           return;
         }
         uint8_t required_level = result->value()->required_level;
-        MAGMA_LOG(INFO, "Starting transition to power level %d", required_level);
         required_power_level_.Set(required_level);
 
         bool enabled = required_level == kPoweredUpPowerLevel;
         owner_->SetPowerState(enabled, [this](bool powered_on) {
           uint8_t new_level = powered_on ? kPoweredUpPowerLevel : kPoweredDownPowerLevel;
-          MAGMA_LOG(INFO, "Finished transition to power level %d", new_level);
           current_power_level_.Set(new_level);
           auto result = hardware_power_current_level_client_->Update(new_level);
           if (!result.ok()) {
@@ -173,3 +162,35 @@ void FuchsiaPowerManager::CheckRequiredLevel() {
         });
       });
 }
+
+TimeoutSource::Clock::duration FuchsiaPowerManager::GetCurrentTimeoutDuration() {
+  if (!LeaseIsRequested()) {
+    return Clock::duration::max();
+  }
+  return owner_->GetPowerManager()->GetGpuPowerdownTimeout();
+}
+
+bool FuchsiaPowerManager::EnablePower() {
+  if (lease_control_client_end_.is_valid()) {
+    return true;
+  }
+
+  fidl::ClientEnd<fuchsia_power_broker::LeaseControl> lease_control_client_end;
+  zx_status_t status = AcquireLease(hardware_power_lessor_client_, lease_control_client_end);
+  if (status != ZX_OK) {
+    MAGMA_LOG(ERROR, "Failed to acquire lease on hardware power: %s", zx_status_get_string(status));
+    return false;
+  }
+
+  lease_control_client_end_ = std::move(lease_control_client_end);
+  power_lease_active_.Set(true);
+  return true;
+}
+
+bool FuchsiaPowerManager::DisablePower() {
+  lease_control_client_end_.reset();
+  power_lease_active_.Set(false);
+  return true;
+}
+
+bool FuchsiaPowerManager::LeaseIsRequested() { return lease_control_client_end_.is_valid(); }

@@ -277,6 +277,8 @@ class TestNonHardwareMsdArmDevice {
       bool got_timeout_check_ = false;
     };
     device->scheduler_ = std::make_unique<FakeJobScheduler>(device.get());
+    device->timeout_sources_.clear();
+    device->timeout_sources_.push_back(device->scheduler_.get());
 
     class FakeSemaphore : public magma::PlatformSemaphore {
      public:
