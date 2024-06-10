@@ -17,7 +17,6 @@ use starnix_core::{
         framebuffer::{fb_device_init, AspectRatio},
         perfetto_consumer::start_perfetto_consumer_thread,
         remote_block_device::remote_block_device_init,
-        touch_power_policy_device::TouchPowerPolicyDevice,
     },
     task::{CurrentTask, Kernel, KernelFeatures},
     vfs::FsString,
@@ -181,10 +180,6 @@ pub fn run_container_features(
         touch_device.start_touch_relay(&kernel, touch_source_proxy);
         keyboard_device.start_keyboard_relay(&kernel, keyboard, view_ref);
         keyboard_device.start_button_relay(&kernel, registry_proxy);
-
-        let touch_policy_device = TouchPowerPolicyDevice::new();
-        touch_policy_device.clone().register(locked, &kernel.kthreads.system_task());
-        touch_policy_device.start_relay(&kernel);
 
         if features.framebuffer2 {
             kernel
