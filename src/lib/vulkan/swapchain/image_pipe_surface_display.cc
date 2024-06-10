@@ -263,8 +263,8 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
 
   fuchsia::sysmem2::BufferCollectionTokenSyncPtr display_token;
   fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest display_duplicate_request;
-  vulkan_duplicate_request.set_token_request(display_token.NewRequest());
-  vulkan_duplicate_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
+  display_duplicate_request.set_token_request(display_token.NewRequest());
+  display_duplicate_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
   status = local_token->Duplicate(std::move(display_duplicate_request));
   if (status != ZX_OK) {
     fprintf(stderr, "%s: Duplicate failed: %d\n", kTag, status);

@@ -52,7 +52,10 @@ test("test_image_pipe_swapchain") {
 
 test("test_image_pipe_swapchain_hermetic") {
   output_name = "image-pipe-swapchain-hermetic-tests"
-  sources = [ "test_hermetic_surface.cc" ]
+  sources = [
+    "test_hermetic_surface.cc",
+    "test_hermetic_swapchain.cc",
+  ]
   deps = [
     "//sdk/lib/sys/cpp/testing:unit",
     "//src/lib/fsl",
@@ -68,6 +71,7 @@ fuchsia_unittest_package("image-pipe-swapchain-hermetic-tests") {
   deps = [
     ":test_image_pipe_swapchain_hermetic",
     "//src/graphics/display/testing/fake-coordinator-connector:child-component",
+    "//src/lib/vulkan/swapchain:image_pipe_swapchain_copy_layer",
     "//src/lib/vulkan/swapchain:image_pipe_swapchain_fb_layer",
     "//src/lib/vulkan/validation_layers",
   ]
