@@ -334,7 +334,7 @@ int main(int argc, char** argv) {
     zx_ticks_t before = zx::ticks::now().get();
     ssize_t r = sendto(s.get(), packet, sent_packet_size, 0, info->ai_addr, info->ai_addrlen);
     if (r < 0) {
-      fprintf(stderr, "ping: Could not send packet\n");
+      fprintf(stderr, "ping: Could not send packet: %s\n", strerror(errno));
       return -1;
     }
 
