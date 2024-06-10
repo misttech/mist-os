@@ -1146,8 +1146,6 @@ fn do_filter_print_rules<'a, W: std::io::Write>(
     rules: impl Iterator<Item = &'a Rule>,
 ) -> Result<(), Error> {
     for rule in rules {
-        // TODO(https://fxbug.dev/329686745): Improve Matchers and Action
-        // readability.
         writeln!(
             out,
             "{:padding$}{}. {:?} -> {:?}",
@@ -1714,10 +1712,10 @@ mod tests {
     use fidl_fuchsia_hardware_network as fhardware_network;
     use fidl_fuchsia_net_routes as froutes;
     use fidl_fuchsia_net_routes_ext as froutes_ext;
-    use fnet_filter_ext::{InstalledIpRoutine, InstalledNatRoutine};
+    use fnet_filter_ext::{InstalledIpRoutine, InstalledNatRoutine, Matchers};
     use fuchsia_async::{self as fasync, TimeoutExt as _};
     use net_declare::{fidl_ip, fidl_ip_v4, fidl_mac, fidl_subnet};
-    use std::{convert::TryInto as _, fmt::Debug};
+    use std::{convert::TryInto as _, fmt::Debug, num::NonZeroU64};
     use test_case::test_case;
 
     const IF_ADDR_V4: fnet::Subnet = fidl_subnet!("192.168.0.1/32");
@@ -3886,6 +3884,7 @@ mac               -
         const INDEX_FIRST: u32 = 11;
         const INDEX_SECOND: u32 = 12;
         const INDEX_THIRD: u32 = 13;
+        const INDEX_FOURTH: u32 = 14;
 
         let mut output = Vec::new();
         let (filter, mut requests) =
@@ -4072,6 +4071,111 @@ mac               -
                     }),
                 )
                 .into(),
+                // Test Matcher output: InterfaceMatcher
+                fnet_filter_ext::Event::Existing(
+                    fnet_filter_ext::ControllerId(CONTROLLER_A.to_string()),
+                    fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
+                        id: fnet_filter_ext::RuleId {
+                            routine: fnet_filter_ext::RoutineId {
+                                namespace: fnet_filter_ext::NamespaceId(NAMESPACE_B.to_string()),
+                                name: ROUTINE_E.to_string(),
+                            },
+                            index: INDEX_FIRST,
+                        },
+                        matchers: Matchers {
+                            in_interface: Some(fnet_filter_ext::InterfaceMatcher::Id(
+                                NonZeroU64::new(23).expect("Failed to create NonZeroU64"),
+                            )),
+                            out_interface: None,
+                            src_addr: None,
+                            dst_addr: None,
+                            transport_protocol: None,
+                        },
+                        action: fnet_filter_ext::Action::Accept,
+                    }),
+                )
+                .into(),
+                // Test Matcher output: AddressMatcher
+                fnet_filter_ext::Event::Existing(
+                    fnet_filter_ext::ControllerId(CONTROLLER_A.to_string()),
+                    fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
+                        id: fnet_filter_ext::RuleId {
+                            routine: fnet_filter_ext::RoutineId {
+                                namespace: fnet_filter_ext::NamespaceId(NAMESPACE_B.to_string()),
+                                name: ROUTINE_E.to_string(),
+                            },
+                            index: INDEX_SECOND,
+                        },
+                        matchers: Matchers {
+                            in_interface: None,
+                            out_interface: None,
+                            src_addr: Some(fnet_filter_ext::AddressMatcher {
+                                matcher: fnet_filter_ext::AddressMatcherType::Subnet(
+                                    IF_ADDR_V4.try_into().expect("Failed to create Subnet"),
+                                ),
+                                invert: false,
+                            }),
+                            dst_addr: None,
+                            transport_protocol: None,
+                        },
+                        action: fnet_filter_ext::Action::Accept,
+                    }),
+                )
+                .into(),
+                // Test Matcher output: TransportProtocolMatcher simple
+                fnet_filter_ext::Event::Existing(
+                    fnet_filter_ext::ControllerId(CONTROLLER_A.to_string()),
+                    fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
+                        id: fnet_filter_ext::RuleId {
+                            routine: fnet_filter_ext::RoutineId {
+                                namespace: fnet_filter_ext::NamespaceId(NAMESPACE_B.to_string()),
+                                name: ROUTINE_E.to_string(),
+                            },
+                            index: INDEX_THIRD,
+                        },
+                        matchers: Matchers {
+                            in_interface: None,
+                            out_interface: None,
+                            src_addr: None,
+                            dst_addr: None,
+                            transport_protocol: Some(
+                                fnet_filter_ext::TransportProtocolMatcher::Icmpv6,
+                            ),
+                        },
+                        action: fnet_filter_ext::Action::Accept,
+                    }),
+                )
+                .into(),
+                // Test Matcher output: TransportProtocolMatcher with src_port and dst_port
+                fnet_filter_ext::Event::Existing(
+                    fnet_filter_ext::ControllerId(CONTROLLER_A.to_string()),
+                    fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
+                        id: fnet_filter_ext::RuleId {
+                            routine: fnet_filter_ext::RoutineId {
+                                namespace: fnet_filter_ext::NamespaceId(NAMESPACE_B.to_string()),
+                                name: ROUTINE_E.to_string(),
+                            },
+                            index: INDEX_FOURTH,
+                        },
+                        matchers: Matchers {
+                            in_interface: None,
+                            out_interface: None,
+                            src_addr: None,
+                            dst_addr: None,
+                            transport_protocol: Some(
+                                fnet_filter_ext::TransportProtocolMatcher::Tcp {
+                                    src_port: None,
+                                    dst_port: Some(
+                                        fnet_filter_ext::PortMatcher::new(41, 42, true)
+                                            .expect("Failed to create PortMatcher"),
+                                    ),
+                                },
+                            ),
+                        },
+                        action: fnet_filter_ext::Action::Accept,
+                    }),
+                )
+                .into(),
                 fnet_filter_ext::Event::Idle.into(),
             ];
 
@@ -4104,11 +4208,11 @@ mac               -
         installed IP routines {
             EGRESS {
                 1. routine b {
-                    13. Matchers { in_interface: None, out_interface: None, src_addr: None, dst_addr: None, transport_protocol: None } -> Accept
+                    13. Matchers -> Accept
                 }
                 2. routine a {
-                    11. Matchers { in_interface: None, out_interface: None, src_addr: None, dst_addr: None, transport_protocol: None } -> Accept
-                    12. Matchers { in_interface: None, out_interface: None, src_addr: None, dst_addr: None, transport_protocol: None } -> Accept
+                    11. Matchers -> Accept
+                    12. Matchers -> Accept
                 }
             }
         }
@@ -4123,11 +4227,15 @@ mac               -
         domain: Ipv4
         uninstalled IP routines {
             routine c {
-                11. Matchers { in_interface: None, out_interface: None, src_addr: None, dst_addr: None, transport_protocol: None } -> Accept
+                11. Matchers -> Accept
             }
         }
         uninstalled NAT routines {
             routine e {
+                11. Matchers { in_interface: Id(23) } -> Accept
+                12. Matchers { src_addr: AddressMatcher { matcher: 192.168.0.1/32, invert: false } } -> Accept
+                13. Matchers { transport_protocol: Icmpv6 } -> Accept
+                14. Matchers { transport_protocol: Tcp { dst_port: PortMatcher { range: 41..=42, invert: true } } } -> Accept
             }
         }
     }
