@@ -285,7 +285,7 @@ crossterm = "0.19"
 easy-parallel = "3.1"
 fs_extra = "1.2.0"
 fuse3 = { version = "0.6.1", features = ["tokio-runtime", "unprivileged"] }
-home = "0.5.3"
+home = "0.5.9"
 hyper-rustls = { version = "0.22.1", default-features = false, features = ["rustls-native-certs"] }
 indoc = "1.0.3"
 loom = "0.7.1"
@@ -366,6 +366,7 @@ windows-core = { path = "empty/windows-core" }
 windows-sys-0_42_0 = { package = "windows-sys", path = "empty/windows-sys-0.42.0" }
 windows-sys-0_45_0 = { package = "windows-sys", path = "empty/windows-sys-0.45.0" }
 windows-sys-0_48_0 = { package = "windows-sys", path = "empty/windows-sys-0.48.0" }
+windows-sys-0_52_0 = { package = "windows-sys", path = "empty/windows-sys-0.52.0" }
 windows-targets-0_48_5 = { package = "windows-targets", path = "empty/windows-targets-0.48.5" }
 windows-targets-0_52_0 = { package = "windows-targets", path = "empty/windows-targets-0.52.0" }
 
