@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use alloc::string::String;
-use core::{num::NonZeroU64, ops::RangeInclusive};
+use core::{fmt::Debug, num::NonZeroU64, ops::RangeInclusive};
+use netstack3_base::InspectableValue;
 
 use derivative::Derivative;
 use net_types::ip::{IpAddress, Subnet};
@@ -49,6 +50,12 @@ pub enum InterfaceMatcher<DeviceClass> {
     Name(String),
     /// The device class of the interface.
     DeviceClass(DeviceClass),
+}
+
+impl<DeviceClass: Debug> InspectableValue for InterfaceMatcher<DeviceClass> {
+    fn record<I: netstack3_base::Inspector>(&self, name: &str, inspector: &mut I) {
+        inspector.record_debug(name, self);
+    }
 }
 
 /// Allows filtering code to match on properties of an interface (ID, name, and
@@ -108,6 +115,12 @@ pub struct AddressMatcher<A: IpAddress> {
     pub invert: bool,
 }
 
+impl<A: IpAddress> InspectableValue for AddressMatcher<A> {
+    fn record<I: netstack3_base::Inspector>(&self, name: &str, inspector: &mut I) {
+        inspector.record_debug(name, self);
+    }
+}
+
 impl<A: IpAddress> Matcher<A> for AddressMatcher<A> {
     fn matches(&self, addr: &A) -> bool {
         let Self { matcher, invert } = self;
@@ -144,6 +157,12 @@ pub struct TransportProtocolMatcher<P> {
     /// If set, the matcher for the destination port or identifier of the
     /// transport header.
     pub dst_port: Option<PortMatcher>,
+}
+
+impl<P: Debug> InspectableValue for TransportProtocolMatcher<P> {
+    fn record<I: netstack3_base::Inspector>(&self, name: &str, inspector: &mut I) {
+        inspector.record_debug(name, self);
+    }
 }
 
 impl<P: PartialEq, T: MaybeTransportPacket> Matcher<(P, T)> for TransportProtocolMatcher<P> {

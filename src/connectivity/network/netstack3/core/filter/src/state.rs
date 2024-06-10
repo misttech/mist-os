@@ -14,7 +14,7 @@ use core::{
 
 use derivative::Derivative;
 use net_types::ip::{GenericOverIp, Ip};
-use netstack3_base::{CoreTimerContext, Inspectable, Inspector as _};
+use netstack3_base::{CoreTimerContext, Inspectable, InspectableValue, Inspector as _};
 use packet_formats::ip::IpExt;
 
 use crate::{
@@ -215,13 +215,13 @@ impl<I: IpExt, DeviceClass: Debug> Inspectable for Rule<I, DeviceClass, ()> {
                 transport_protocol,
             } = matcher;
 
-            fn record_matcher<Inspector: netstack3_base::Inspector, M: Debug>(
+            fn record_matcher<Inspector: netstack3_base::Inspector, M: InspectableValue>(
                 inspector: &mut Inspector,
                 name: &str,
                 matcher: &Option<M>,
             ) {
                 if let Some(matcher) = matcher {
-                    inspector.record_string(name, format!("{matcher:?}"))
+                    inspector.record_inspectable_value(name, matcher);
                 }
             }
 

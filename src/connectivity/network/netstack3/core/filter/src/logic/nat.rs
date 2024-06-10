@@ -47,7 +47,12 @@ pub(crate) enum NatType {
 
 impl Inspectable for NatConfig {
     fn record<I: netstack3_base::Inspector>(&self, inspector: &mut I) {
-        inspector.record_debug("NAT", self.config.get())
+        let value = match self.config.get() {
+            None => "Unconfigured",
+            Some(None) => "No-op",
+            Some(Some(NatType::Destination)) => "Destination",
+        };
+        inspector.record_str("NAT", value);
     }
 }
 
