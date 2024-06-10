@@ -31,14 +31,29 @@ int main(int argc, const char** argv) {
       .no_buffer_access = false,
   };
 
-  std::shared_ptr<zx_device> mock_root = MockDevice::FakeRootParent();
-  zx::result<> create_and_publish_service_result =
-      display::FakeDisplayCoordinatorConnector::CreateAndPublishService(
-          mock_root, loop.dispatcher(), kFakeDisplayDeviceConfig, outgoing);
-  if (create_and_publish_service_result.is_error()) {
-    FX_LOGS(ERROR) << "Cannot start display Provider server and publish service: "
-                   << create_and_publish_service_result.status_string();
-    return -1;
+  {
+    std::shared_ptr<zx_device> mock_root = MockDevice::FakeRootParent();
+    zx::result<> create_and_publish_service_result =
+        display::FakeDisplayCoordinatorConnector::CreateAndPublishService(
+            mock_root, loop.dispatcher(), kFakeDisplayDeviceConfig, "svc", outgoing);
+    if (create_and_publish_service_result.is_error()) {
+      FX_LOGS(ERROR) << "Cannot start display Provider server and publish service: "
+                     << create_and_publish_service_result.status_string();
+      return -1;
+    }
+  }
+
+  {
+    std::shared_ptr<zx_device> mock_root = MockDevice::FakeRootParent();
+    zx::result<> create_and_publish_service_result =
+        display::FakeDisplayCoordinatorConnector::CreateAndPublishService(
+            mock_root, loop.dispatcher(), kFakeDisplayDeviceConfig, "dev-display-coordinator",
+            outgoing);
+    if (create_and_publish_service_result.is_error()) {
+      FX_LOGS(ERROR) << "Cannot start display Provider server and publish service: "
+                     << create_and_publish_service_result.status_string();
+      return -1;
+    }
   }
 
   loop.Run();

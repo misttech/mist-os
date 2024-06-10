@@ -31,7 +31,7 @@ class FakeDisplayCoordinatorConnector : public fidl::Server<fuchsia_hardware_dis
   static zx::result<> CreateAndPublishService(
       std::shared_ptr<zx_device> mock_root, async_dispatcher_t* dispatcher,
       const fake_display::FakeDisplayDeviceConfig& fake_display_device_config,
-      component::OutgoingDirectory& outgoing);
+      std::string_view parent_directory, component::OutgoingDirectory& outgoing);
 
   // Creates a FakeDisplayCoordinatorConnector where the fake display driver
   // is initialized using `fake_display_device_config`.

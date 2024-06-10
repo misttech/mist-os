@@ -20,8 +20,10 @@
     ],
     use: [
         {
-            protocol: [ "fuchsia.hardware.display.Provider" ],
+            directory: "dev-display-coordinator",
             from: "#display-coordinator-connector",
+            rights: [ "r*" ],
+            path: "/dev/class/display-coordinator",
         },
     ],
 }
