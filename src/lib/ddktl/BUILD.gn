@@ -327,7 +327,6 @@ source_set("ddktl") {
     "//src/ui/input/drivers/usb-hid:*",
     "//src/ui/input/drivers/virtio:*",
     "//src/ui/input/lib/hid:*",
-    "//src/ui/input/testing/mock-hidbus-ifc:*",
     "//src/ui/light/drivers/aml-light:*",
     "//tools/create/goldens/my-driver-cpp:*",
     "//vendor/*",

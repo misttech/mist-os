@@ -43,7 +43,6 @@ if (internal_access) {
 group("common") {
   public_deps = [
     ":gt6853-bind",
-    "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_cpp",

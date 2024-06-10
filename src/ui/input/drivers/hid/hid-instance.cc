@@ -5,7 +5,6 @@
 #include "hid-instance.h"
 
 #include <assert.h>
-#include <fuchsia/hardware/hidbus/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -168,11 +167,11 @@ void HidInstance::GetBootProtocol(GetBootProtocolCompleter::Sync& completer) {
 }
 
 void HidInstance::GetDeviceIds(GetDeviceIdsCompleter::Sync& completer) {
-  hid_info_t info = base_->GetHidInfo();
+  auto info = base_->GetHidInfo();
   fuchsia_hardware_input::wire::DeviceIds ids = {};
-  ids.vendor_id = info.vendor_id;
-  ids.product_id = info.product_id;
-  ids.version = info.version;
+  ids.vendor_id = info.vendor_id().value_or(0);
+  ids.product_id = info.product_id().value_or(0);
+  ids.version = info.version().value_or(0);
 
   completer.Reply(ids);
 }
@@ -194,34 +193,20 @@ void HidInstance::GetReport(GetReportRequestView request, GetReportCompleter::Sy
   }
 
   auto& client = base_->GetHidbusProtocol();
-  if (std::holds_alternative<HidDevice::BanjoHidbusClient>(client)) {
-    uint8_t report[needed];
-    size_t actual = 0;
-    zx_status_t status = std::get<HidDevice::BanjoHidbusClient>(client).GetReport(
-        static_cast<uint8_t>(request->type), request->id, report, needed, &actual);
-
-    auto report_view = fidl::VectorView<uint8_t>::FromExternal(report, actual);
-    completer.Reply(status, report_view);
+  auto result = client.sync()->GetReport(request->type, request->id, needed);
+  if (!result.ok()) {
+    zxlogf(ERROR, "FIDL transport failed on GetReport(): %s",
+           result.error().FormatDescription().c_str());
+    completer.Reply(result.status(), {});
     return;
-  } else if (std::holds_alternative<HidDevice::FidlHidbusClient>(client)) {
-    auto result = std::get<HidDevice::FidlHidbusClient>(client).sync()->GetReport(
-        request->type, request->id, needed);
-    if (!result.ok()) {
-      zxlogf(ERROR, "GetReport failed %s", result.error().FormatDescription().c_str());
-      completer.Reply(result.status(), {});
-      return;
-    }
-    if (result->is_error()) {
-      zxlogf(ERROR, "GetReport failed %d", result->error_value());
-      completer.Reply(result->error_value(), {});
-      return;
-    }
-
-    completer.Reply(ZX_OK, result.value()->data);
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "HID device failed to get report: %d", result->error_value());
+    completer.Reply(result->error_value(), {});
     return;
   }
 
-  completer.Reply(ZX_ERR_INTERNAL, {});
+  completer.Reply(ZX_OK, result.value()->data);
 }
 
 void HidInstance::SetReport(SetReportRequestView request, SetReportCompleter::Sync& completer) {
@@ -234,32 +219,19 @@ void HidInstance::SetReport(SetReportRequestView request, SetReportCompleter::Sy
   }
 
   auto& client = base_->GetHidbusProtocol();
-  if (std::holds_alternative<HidDevice::BanjoHidbusClient>(client)) {
-    auto status = std::get<HidDevice::BanjoHidbusClient>(client).SetReport(
-        static_cast<uint8_t>(request->type), request->id, request->report.data(),
-        request->report.count());
-    completer.Reply(status);
+  auto result = client.sync()->SetReport(request->type, request->id, request->report);
+  if (!result.ok()) {
+    zxlogf(ERROR, "FIDL transport failed on SetReport(): %s",
+           result.error().FormatDescription().c_str());
+    completer.Reply(result.status());
     return;
   }
-
-  if (std::holds_alternative<HidDevice::FidlHidbusClient>(client)) {
-    auto result = std::get<HidDevice::FidlHidbusClient>(client).sync()->SetReport(
-        request->type, request->id, request->report);
-    if (!result.ok()) {
-      zxlogf(ERROR, "SetReport failed %s", result.error().FormatDescription().c_str());
-      completer.Reply(result.status());
-      return;
-    }
-    if (result->is_error()) {
-      zxlogf(ERROR, "SetReport failed %d", result->error_value());
-      completer.Reply(result->error_value());
-      return;
-    }
-    completer.Reply(ZX_OK);
+  if (result->is_error()) {
+    zxlogf(ERROR, "HID device failed to set report: %d", result->error_value());
+    completer.Reply(result->error_value());
     return;
   }
-
-  completer.Reply(ZX_ERR_INTERNAL);
+  completer.Reply(ZX_OK);
 }
 
 void HidInstance::GetDeviceReportsReader(GetDeviceReportsReaderRequestView request,

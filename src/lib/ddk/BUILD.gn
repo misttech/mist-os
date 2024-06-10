@@ -387,7 +387,6 @@ sdk_static_library("ddk") {
     "//src/ui/input/drivers/pc-ps2:*",
     "//src/ui/input/drivers/usb-hid:*",
     "//src/ui/input/lib/hid-input-report:*",
-    "//src/ui/input/testing/mock-hidbus-ifc:*",
     "//src/ui/input/tests/hid:*",
     "//src/ui/light/drivers/aml-light:*",
     "//src/ui/tools/print-input-report:*",
