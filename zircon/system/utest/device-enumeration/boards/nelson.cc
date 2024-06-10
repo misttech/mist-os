@@ -16,9 +16,9 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/nelson-buttons/nelson-buttons/buttons",
       "sys/platform/bt-uart/bluetooth-composite-spec/aml-uart/bt-transport-uart",
       "sys/platform/bt-uart/bluetooth-composite-spec/aml-uart/bt-transport-uart/bt-hci-broadcom",
-      "sys/platform/05:00:2/i2c-0/aml-i2c",
-      "sys/platform/05:00:2:1/i2c-1/aml-i2c",
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c",
+      "sys/platform/i2c-0/i2c-0/aml-i2c",
+      "sys/platform/i2c-1/i2c-1/aml-i2c",
+      "sys/platform/i2c-2/i2c-2/aml-i2c",
       "sys/platform/aml_gpu/aml-gpu-composite/aml-gpu",
       "sys/platform/aml-usb-phy/aml_usb_phy/aml_usb_phy",
       "sys/platform/nelson-audio-i2s-out/aml_tdm/nelson-audio-i2s-out",
@@ -28,7 +28,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       // XHCI driver will not be loaded if we are in USB peripheral mode.
       // "xhci/xhci/usb-bus",
 
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
+      "sys/platform/i2c-2/i2c-2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
       "sys/platform/canvas/aml-canvas",
       "sys/platform/tee/tee/optee",
       "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/boot1/block",
@@ -50,7 +50,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-013/block",
       "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-014/block",
       "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-015/block",
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
+      "sys/platform/i2c-0/i2c-0/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
       "sys/platform/aml-nna/aml_nna",
       "sys/platform/nelson-clk/clocks",
       "sys/platform/nelson-clk/clocks/clock-init",
@@ -74,9 +74,9 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/aml-sdio/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
 
       "sys/platform/display/display/amlogic-display/display-coordinator",
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-73/ti_ina231_mlb/ti-ina231",
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-64/ti_ina231_speakers/ti-ina231",
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-112/shtv3",
+      "sys/platform/i2c-2/i2c-2/aml-i2c/i2c/i2c-2-73/ti_ina231_mlb/ti-ina231",
+      "sys/platform/i2c-2/i2c-2/aml-i2c/i2c/i2c-2-64/ti_ina231_speakers/ti-ina231",
+      "sys/platform/i2c-0/i2c-0/aml-i2c/i2c/i2c-0-112/shtv3",
       "sys/platform/gt6853-touch/gt6853_touch/gt6853",
 
       // Amber LED.
@@ -96,8 +96,8 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "class/temperature/000",
       "class/temperature/001",
 
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-45/tas58xx/TAS5805m",
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-45/tas58xx/TAS5805m/brownout_protection",
+      "sys/platform/i2c-2/i2c-2/aml-i2c/i2c/i2c-2-45/tas58xx/TAS5805m",
+      "sys/platform/i2c-2/i2c-2/aml-i2c/i2c/i2c-2-45/tas58xx/TAS5805m/brownout_protection",
 
       "sys/platform/gpio-c/aml-gpio/gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0",
 

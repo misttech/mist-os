@@ -33,7 +33,7 @@ class Rtc(rtc.Rtc):
     # TODO(b/340607972): To allow for smooth transition from vim3 to vim3-devicetree, both monikers
     # will be tried. Whichever path exists will be used. Once the migration is complete, the old
     # moniker can be discarded.
-    MONIKER_OLD = "/bootstrap/pkg-drivers:dev.sys.platform.05_00_2.i2c-0.aml-i2c.i2c.i2c-0-81"
+    MONIKER_OLD = "/bootstrap/pkg-drivers:dev.sys.platform.i2c-0.i2c-0.aml-i2c.i2c.i2c-0-81"
     MONIKER_NEW = "/bootstrap/pkg-drivers:dev.sys.platform.i2c-5000.i2c-5000_group.aml-i2c.i2c.i2c-0-81"
 
     def __init__(

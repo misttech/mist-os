@@ -45,7 +45,7 @@ note that there are multiple ways to access the same device, you can use the
 
 ```
 lsdev /dev/class/i2c/000
-topological path for /dev/class/i2c/000: /dev/sys/platform/05:00:2/aml-i2c/i2c/i2c-2-44
+topological path for /dev/class/i2c/000: /dev/sys/platform/i2c-0/aml-i2c/i2c/i2c-2-44
 ```
 
 ## Creating new driver utilities

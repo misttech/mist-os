@@ -15,9 +15,9 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:1/aml-gpio/gpio-init",
       "sys/platform/vim3-clk/clocks",
       "sys/platform/vim3-clk/clocks/clock-init",
-      "sys/platform/05:00:2/i2c-0/aml-i2c",
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c",
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-50",
+      "sys/platform/i2c-0/i2c-0/aml-i2c",
+      "sys/platform/i2c-2/i2c-2/aml-i2c",
+      "sys/platform/i2c-2/i2c-2/aml-i2c/i2c/i2c-2-50",
       "sys/platform/audio-composite/audio-composite-composite-spec/aml-g12-audio-composite",
       "sys/platform/ethernet_mac/ethernet_mac/aml-ethernet/dwmac/dwmac/eth_phy/phy_null_device",
       "sys/platform/buttons/function-button/adc-buttons",
@@ -94,18 +94,18 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/ddr-temp-sensor/ddr-temp-sensor/aml-trip-device",  // DDR Temperature Sensor
 
       // GPIO
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio/gpio-7",
+      "sys/platform/i2c-0/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio/gpio-7",
 
       // Touch panel
       //
       // i2c device
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-56",
+      "sys/platform/i2c-2/i2c-2/aml-i2c/i2c/i2c-2-56",
       // interrupt pin
       "sys/platform/05:06:1/aml-gpio/gpio/gpio-21",
       // reset pin
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio/gpio-6",
+      "sys/platform/i2c-0/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio/gpio-6",
 
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-24/mcu-composite/vim3-mcu",
+      "sys/platform/i2c-0/i2c-0/aml-i2c/i2c/i2c-0-24/mcu-composite/vim3-mcu",
 
       // Suspend HAL
       "sys/platform/vim3-suspend/aml-suspend-device",
@@ -119,7 +119,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
 #ifdef include_packaged_drivers
 
       // RTC
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-81/rtc",
+      "sys/platform/i2c-0/i2c-0/aml-i2c/i2c/i2c-0-81/rtc",
 
       // WLAN
       "sys/platform/vim3-sdio/vim3_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl",
