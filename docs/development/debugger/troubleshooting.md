@@ -1,26 +1,8 @@
-# Set up and run zxdb, Fuchsia's debugger for C++ and Rust code
+# Troubleshooting zxdb
 
-Launching zxdb on Fuchsia is as simple as one command:
+This page lists common troubleshooting tips for `zxdb`.
 
-```posix-terminal
-ffx debug connect
-```
-
-When the debugger is launched, it should show
-
-```none
-Connecting (use "disconnect" to cancel)...
-Connected successfully.
-👉 To get started, try "status" or "help".
-[zxdb]
-```
-
-It'll work 95% of the time, regardless of whether you work in-tree or out-of-tree, using an emulator
-or a hardware device. If it doesn't work as expected, please check the troubleshooting below.
-
-## Troubleshooting
-
-### The build type is compatible
+## The build type is compatible
 
 Debuggers on Fuchsia depend on privileged syscalls, most notably
 [`zx_process_write_memory`](/reference/syscalls/process_write_memory.md).
@@ -31,7 +13,7 @@ is set to `true`, which means debuggers are not available for `user` and `userde
 
 If you are building from source, most probably these syscalls are enabled.
 
-### zxdb and debug_agent are built
+## zxdb and debug_agent are built
 
 Zxdb depends on a target-side component called debug\_agent.  If an error message says "The plugin
 service selector 'core/debug\_agent:expose:fuchsia.debugger.DebugAgent' did not match any services
@@ -50,7 +32,7 @@ Or you can edit your GN args directly by editing `<build_dir>/args.gn` and addin
 universe_package_labels += [ "//bundles/tools" ]
 ```
 
-### ffx can talk with the device
+## ffx can talk with the device
 
 Make sure that ffx can discover the device, either a emulator or a hardware device, and
 RCS is started on the device.
@@ -64,7 +46,7 @@ demo-emu   <unknown>    core.x64         Product    [10.0.2.15,                 
                                                     127.0.0.1]
 ```
 
-### Package server is running
+## Package server is running
 
 For most build configurations, the debug agent will be in the "universe" (i.e. "available to use")
 but not in the base build so won't be on the system before boot. You will need to run:
@@ -73,7 +55,7 @@ but not in the base build so won't be on the system before boot. You will need t
 fx serve
 ```
 
-### Debug symbols are registered {#set-symbol-location}
+## Debug symbols are registered {#set-symbol-location}
 
 Zxdb will by default obtain the locations of the debug symbols from the
 [symbol index](/docs/development/sdk/ffx/register-debug-symbols.md).
@@ -97,26 +79,26 @@ Or add it to the `build-id-dirs` list option in the interactive UI:
 For in-tree development, `ffx debug connect` automatically sets up all necessary
 flags.
 
-#### `build-id-dir`
+### `build-id-dir`
 
 Some builds produce a `.build-id` directory. Symbol files in it are already indexed according to
 their build IDs. For example, the Fuchsia build itself makes a `.build-id` directory inside the
 build directory, e.g., `out/x64/.build-id`. They can be added to zxdb by `--build-id-dir`
 command-line flag or `build-id-dirs` setting. This is the best option.
 
-#### `ids-txt`
+### `ids-txt`
 
 Instead of a `.build-id` directory, some builds produce a file called `ids.txt` that lists build IDs
 and local paths to the corresponding binaries. They can be added to zxdb by `--ids-txt` command-line
 flag or `ids-txts` setting. This is the second-best option.
 
-#### `symbol-path`
+### `symbol-path`
 
 In addition, `--symbol-path` flag can be used to add arbitrary files or directories to symbol index.
 If the path is pointing to a file, it will be treated as an ELF file and added to the symbol index.
 If it's a directory, all binaries under the given path are indexed.
 
-### Source code location is correctly set up
+## Source code location is correctly set up
 
 The Fuchsia build generates symbols relative to the build directory so relative paths look like
 `../../src/my_component/file.cc`. The build directory is usually provided by the symbol index,

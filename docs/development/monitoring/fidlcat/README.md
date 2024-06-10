@@ -164,7 +164,7 @@ You have the following output options:
 ## Troubleshooting
 
 If you have problems running `ffx debug fidl`, see the [troubleshooting guide
-for zxdb](/docs/development/debugger/running.md),
+for zxdb](/docs/development/debugger/troubleshooting.md),
 
 The `fidlcat` tool needs two sources of information to work.  If either are
 missing, you will not be able to decode fidl messages:

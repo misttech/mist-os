@@ -2,30 +2,150 @@
 
 Zxdb is a console-mode debugger for native code running on Fuchsia.
 
-It primarily supports C, C++ and Rust code, but any language that compiles natively and exports
-DWARF symbols should work to some extent (such as Go). Interpreted code such as Dart and JavaScript
-are not supported.
+It primarily supports C, C++ and Rust code, but any language that compiles
+natively and exports DWARF symbols should work to some extent.
 
-User guide:
+Interpreted code such as Dart and JavaScript is not supported.
 
-  * [Set up and run the debugger](running.md)
-  * [Commands and interaction model](commands.md)
-  * [Debugging a process, component, or crash dump](attaching.md)
-  * [Controlling thread execution](execution.md) (pausing, stepping, and resuming)
-  * [Using breakpoints](breakpoints.md)
-  * [Evaluating and printing expressions](printing.md)
-  * [Inspecting memory](memory.md)
-  * [Working with assembly language](assembly.md)
-  * [Looking at handles](kernel_objects.md)
+## Run zxdb
+
+There are several ways to attach `zxdb` to a component through
+`ffx component debug`.
+
+Note: If you have any issues with launching `zxdb`, see
+[Troubleshooting][zxdb-troubleshooting].
+
+```posix-terminal
+ffx component debug {{ '<var>' }}component-identifier{{ '</var>' }}
+```
+
+For example, this command attaches to the component called `cobalt.cm`:
+
+```posix-terminal
+ffx component debug cobalt.cm
+```
+
+This shows an output like:
+
+```none {:.devsite-disable-click-to-copy}
+Waiting for process matching "job 20905".
+Type "filter" to see the current filters.
+👉 To get started, try "status" or "help".
+Attached Process 1 state=Running koid=21057 name=cobalt.cm component=cobalt.cm
+Loading 15 modules for cobalt.cm ...Done.
+[zxdb]
+```
+
+Note: For more information about component identifiers, see
+[component identifiers][component-identifiers].
+
+You can also use other types of component identifiers such as a component
+moniker.
+
+For example, this example attaches to the `core/cobalt` component moniker:
+
+Note: For more information about component monikers, see
+[monikers][component-monikers].
+
+```posix-terminal
+ffx component debug core/cobalt
+```
+
+Additionally, you can also use shorter component identifiers, such
+as `cobalt`:
+
+```posix-terminal
+ffx component debug cobalt
+```
+
+However, if `zxdb` can't figure out which component you are referring
+to, you may see an output like:
+
+```none {:.devsite-disable-click-to-copy}
+The query "cobalt" matches more than one component instance:
+core/cobalt
+core/cobalt_system_metrics
+
+To avoid ambiguity, use one of the above monikers instead.
+```
+
+In this case make sure to be specific as to which component you want `zxdb` to
+attach to.
 
 
-Advanced usage:
+### Using a Fuchsia package URL
 
-  * [Diagnosing symbol problems](symbols.md)
-  * [Working with exceptions](exceptions.md)
+You can also use the full Fuchsia package URL:
 
-Other topics:
+Note: For more information about Fuchsia package URLs, see
+[component URLs][component-urls].
 
-  * [Developing and debugging the debugger](developing.md)
+```posix-terminal
+ffx component debug fuchsia-pkg://fuchsia.com/cobalt#meta/cobalt.cm
+```
 
-  * [Report a zxdb bug](https://bugs.fuchsia.dev/p/fuchsia/issues/entry?components=Tools%3Ezxdb)
+This shows an output like:
+
+```none {:.devsite-disable-click-to-copy}
+Waiting for process matching "job 20905".
+Type "filter" to see the current filters.
+👉 To get started, try "status" or "help".
+Attached Process 1 state=Running koid=21057 name=cobalt.cm component=cobalt.cm
+Loading 15 modules for cobalt.cm ...Done.
+[zxdb]
+```
+
+### See available components
+
+You can see a full list of available components:
+
+```posix-terminal
+ffx component list
+```
+
+You should see an output like:
+
+```none {:.devsite-disable-click-to-copy}
+...
+bootstrap
+bootstrap/archivist
+bootstrap/archivist/archivist-pipelines
+...
+core/brightness_manager
+core/build-info
+core/cobalt
+...
+```
+
+## Working with zxdb
+
+Once you have successfully connected to the `zxdb` debugger, you may want to:
+
+* [Review commands and the interaction model][zxdb-commands]
+* [Debug tests using zxdb][zxdb-tests]
+* [Debug a process, component, or crash dump][zxdb-attaching]
+* [Control thread execution][zxdb-execution] (pausing, stepping, and resuming)
+* [Use breakpoints][zxdb-breakpoints]
+* [Evaluate and print expressions][zxdb-printing]
+* [Inspect memory][zxdb-memory]
+* [Work with assembly language][zxdb-assembly]
+* [Look at handles][zxdb-kernel-objects]
+* [Diagnose symbol problems][zxdb-symbols]
+* [Work with exceptions][zxdb-exceptions]
+
+
+[zxdb-troubleshooting]: /docs/development/debugger/troubleshooting.md
+[zxdb-commands]: /docs/development/debugger/commands.md
+[zxdb-attaching]: /docs/development/debugger/attaching.md
+[zxdb-execution]: /docs/development/debugger/execution.md
+[zxdb-breakpoints]: /docs/development/debugger/breakpoints.md
+[zxdb-printing]: /docs/development/debugger/printing.md
+[zxdb-memory]: /docs/development/debugger/memory.md
+[zxdb-assembly]: /docs/development/debugger/assembly.md
+[zxdb-kernel-objects]: /docs/development/debugger/kernel_objects.md
+[zxdb-symbols]: /docs/development/debugger/symbols.md
+[zxdb-exceptions]: /docs/development/debugger/exceptions.md
+[zxdb-tests]: /docs/development/debugger/tests.md
+[component-urls]: /docs/reference/components/url.md
+[component-identifiers]: /docs/concepts/components/v2/identifiers.md
+[component-monikers]: /docs/concepts/components/v2/identifiers.md#monikers
