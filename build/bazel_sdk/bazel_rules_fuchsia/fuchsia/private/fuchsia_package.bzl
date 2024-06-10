@@ -317,7 +317,7 @@ def _build_fuchsia_package_impl(ctx):
             fail("Please use `test_components` for test components.")
 
     # Collect all the resources from the deps
-    for dep in ctx.attr.test_components + ctx.attr.components + ctx.attr.resources + ctx.attr.tools:
+    for dep in ctx.attr.test_components + ctx.attr.components + ctx.attr.resources:
         if FuchsiaComponentInfo in dep:
             component_info = dep[FuchsiaComponentInfo]
             component_manifest = component_info.manifest
