@@ -3231,6 +3231,33 @@ assembly_input_bundle("audio_development_support") {
   ]
 }
 
+assembly_input_bundle("intel_hda") {
+  boot_driver_packages = [
+    {
+      package_target = "//src/media/audio/drivers/intel-hda/codecs/hdmi:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/hdmi-audio-codec.cm" ]
+    },
+    {
+      package_target =
+          "//src/media/audio/drivers/intel-hda/codecs/realtek:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/realtek-audio-codec.cm" ]
+    },
+    {
+      package_target = "//src/media/audio/drivers/intel-hda/controller:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/intel-hda.cm" ]
+    },
+    {
+      package_target = "//src/media/audio/drivers/intel-hda/codecs/qemu:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/qemu-audio-codec.cm" ]
+    },
+  ]
+  bootfs_files_labels = [ "//src/media/audio/bin/ihda:bootfs" ]
+}
+
 assembly_input_bundle("video_development_support") {
   testonly = true
   cache_packages = [ "//src/media/codec/examples:encode-file" ]

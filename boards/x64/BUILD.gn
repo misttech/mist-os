@@ -24,6 +24,7 @@ board_configuration("x64") {
     "fuchsia::wlan_softmac",
     "fuchsia::paravirtualization",
     "fuchsia::paver",
+    "fuchsia::intel_hda",
   ]
 
   input_bundles = [
@@ -183,22 +184,6 @@ board_input_bundle("x64_common") {
       driver_components = [ "meta/max98927.cm" ]
     },
     {
-      package_target = "//src/media/audio/drivers/intel-hda/codecs/hdmi:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/hdmi-audio-codec.cm" ]
-    },
-    {
-      package_target =
-          "//src/media/audio/drivers/intel-hda/codecs/realtek:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/realtek-audio-codec.cm" ]
-    },
-    {
-      package_target = "//src/media/audio/drivers/intel-hda/controller:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/intel-hda.cm" ]
-    },
-    {
       package_target = "//src/ui/input/drivers/ctaphid:package"
       package_set = "bootfs"
       driver_components = [ "meta/ctaphid.cm" ]
@@ -254,11 +239,6 @@ board_input_bundle("x64_common") {
           "//src/graphics/display/drivers/simple:simple-intel-package"
       package_set = "bootfs"
       driver_components = [ "meta/simple.intel.cm" ]
-    },
-    {
-      package_target = "//src/media/audio/drivers/intel-hda/codecs/qemu:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/qemu-audio-codec.cm" ]
     },
     {
       package_target = "//zircon/third_party/dev/ethernet/e1000:package"

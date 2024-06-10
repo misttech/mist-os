@@ -345,6 +345,7 @@ eng_only_platform_aib_names =
 
       # Audio development/debugging
       "audio_development_support",
+      "intel_hda",
       "video_development_support",
 
       # Sensor data playback support.

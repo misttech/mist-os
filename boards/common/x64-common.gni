@@ -28,9 +28,6 @@ target_cpu = "x64"
 
 # Drivers and tools to include on bootfs.
 _bootfs_deps = [
-  # Tools
-  "//src/media/audio/bin/ihda",
-
   # Configs
   "//src/power/power-manager:base_config",
 ]
