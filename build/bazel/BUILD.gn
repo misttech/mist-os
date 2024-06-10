@@ -5,6 +5,7 @@
 import("//build/assembly/sshd_config.gni")
 import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/bazel_workspace.gni")
+import("//build/bazel/generate_prebuilt_dir_content_hash.gni")
 import("//build/bazel/legacy_ninja_build_outputs.gni")
 import("//build/images/vbmeta.gni")
 import("//build/info/info.gni")
@@ -203,6 +204,46 @@ bazel_input_resource("build_args_bazel_inputs") {
   sources = [ _build_args_bzl_output ]
   outputs = [ "build_args.bzl" ]
   deps = [ ":${_build_args_bzl_target}" ]
+}
+
+# Generate content hash files for python and Clang toolchains.
+#
+# These will be used to trigger new runs of the bazel_sdk_test_xxx targets
+# if the content of these directory changes. And the
+# //build/bazel_sdk/tests/script/bazel_test.py script will ensure that their
+# values are passed to the test workspace.
+#
+generate_prebuilt_dir_content_hash(prebuilt_content_hash_targets.python) {
+  source_dir = "//prebuilt/third_party/python3/${host_os}-${host_cpu}"
+  output = prebuilt_content_hash_files.python
+  cipd_name = "cpython3"
+  exclude_suffixes = [ ".pyc" ]
+}
+
+generate_prebuilt_dir_content_hash(prebuilt_content_hash_targets.clang) {
+  source_dir = "//prebuilt/third_party/clang/${host_os}-${host_cpu}"
+  output = prebuilt_content_hash_files.clang
+  cipd_name = "clang"
+}
+
+# Generate remote service configs into a bazelrc.
+action("remote_services_bazelrc") {
+  script = "//build/bazel/scripts/generate_services_bazelrc.py"
+  _output = "$target_out_dir/remote_services.bazelrc"
+  outputs = [ _output ]
+  _template = "//build/bazel/templates/template.remote_services.bazelrc"
+  _configs = [
+    "//build/rbe/fuchsia-reproxy.cfg",
+    "//build/rbe/fuchsia-rewrapper.cfg",
+  ]
+  inputs = [ _template ] + _configs
+  args = [
+           "--template",
+           rebase_path(_template, root_build_dir),
+           "--output",
+           rebase_path(_output, root_build_dir),
+           "--cfgs",
+         ] + rebase_path(_configs, root_build_dir)
 }
 
 group("tests") {

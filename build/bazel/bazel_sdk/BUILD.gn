@@ -40,51 +40,6 @@ idk("idk") {
   }
 }
 
-# Generate content hash files for python and Clang toolchains.
-#
-# These will be used to trigger new runs of the bazel_sdk_test_xxx targets
-# if the content of these directory changes. And the
-# //build/bazel_sdk/tests/script/bazel_test.py script will ensure that their
-# values are passed to the test workspace.
-#
-_prebuilt_python_content_hash = "$target_out_dir/prebuilt_python.content_hash"
-_prebuilt_clang_content_hash = "$target_out_dir/prebuilt_clang.content_hash"
-
-generate_prebuilt_dir_content_hash("prebuilt_python_content_hash") {
-  source_dir = "//prebuilt/third_party/python3/${host_os}-${host_cpu}"
-  output = _prebuilt_python_content_hash
-  cipd_name = "cpython3"
-  exclude_suffixes = [ ".pyc" ]
-}
-
-generate_prebuilt_dir_content_hash("prebuilt_clang_content_hash") {
-  source_dir = "//prebuilt/third_party/clang/${host_os}-${host_cpu}"
-  output = _prebuilt_clang_content_hash
-  cipd_name = "clang"
-}
-
-# Generate remote service configs into a bazelrc.
-_services_bazelrc_path = "$target_out_dir/remote_services.bazelrc"
-
-action("remote_services_bazelrc") {
-  script = "//build/bazel/scripts/generate_services_bazelrc.py"
-  _output = _services_bazelrc_path
-  outputs = [ _output ]
-  _template = "//build/bazel/templates/template.remote_services.bazelrc"
-  _configs = [
-    "//build/rbe/fuchsia-reproxy.cfg",
-    "//build/rbe/fuchsia-rewrapper.cfg",
-  ]
-  inputs = [ _template ] + _configs
-  args = [
-           "--template",
-           rebase_path(_template, root_build_dir),
-           "--output",
-           rebase_path(_output, root_build_dir),
-           "--cfgs",
-         ] + rebase_path(_configs, root_build_dir)
-}
-
 # Run the //build/bazel_sdk/tests/scripts/bazel_test.sh
 # script, which runs the test suite for the Fuchsia Bazel
 # SDK rules, using the IDK built from the platform build
@@ -195,11 +150,16 @@ template("bazel_sdk_tests_for") {
       _remote_build = invoker.remote_build
     }
     if (_remote_build || bazel_upload_build_events != "") {
+      _remote_services_bazelrc_target = "//build/bazel:remote_services_bazelrc"
+      _remote_services_bazelrc_path =
+          get_label_info(_remote_services_bazelrc_target, "target_out_dir") +
+          "/remote_services.bazelrc"
+
       args += [
         "--bazelrc",
-        rebase_path(_services_bazelrc_path, root_build_dir),
+        rebase_path(_remote_services_bazelrc_path, root_build_dir),
       ]
-      deps += [ ":remote_services_bazelrc" ]
+      deps += [ _remote_services_bazelrc_target ]
     }
     if (_remote_build) {
       args += [ "--bazel-config=remote" ]
@@ -223,9 +183,9 @@ template("bazel_sdk_tests_for") {
     }
     args += [
       "--prebuilt-python-version-file",
-      rebase_path(_prebuilt_python_content_hash, root_build_dir),
+      rebase_path(prebuilt_content_hash_files.python, root_build_dir),
       "--prebuilt-clang-version-file",
-      rebase_path(_prebuilt_clang_content_hash, root_build_dir),
+      rebase_path(prebuilt_content_hash_files.clang, root_build_dir),
     ]
 
     if (bazel_execution_logs) {
@@ -251,8 +211,8 @@ template("bazel_sdk_tests_for") {
     }
 
     deps += [
-      ":prebuilt_clang_content_hash",
-      ":prebuilt_python_content_hash",
+      prebuilt_content_hash_labels.clang,
+      prebuilt_content_hash_labels.python,
     ]
     pool = "//:console"
     hermetic_deps = false
