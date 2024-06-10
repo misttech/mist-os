@@ -97,6 +97,11 @@ board_input_bundle("main_bundle") {
 }
 
 board_input_bundle("x64_common") {
+  configuration = {
+    power_manager =
+        "//src/power/power-manager/node_config/base_node_config.json5"
+  }
+
   drivers = [
     {
       package_target = "//src/devices/block/drivers/ahci:package"
