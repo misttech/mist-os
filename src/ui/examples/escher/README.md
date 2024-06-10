@@ -1,7 +1,7 @@
 # escher-examples
 
 These examples show off how to build an application using Escher, the Vulkan rendering engine
-powering Scenic.
+powering Scenic.  These run both on Linux and Fuchsia.
 
 ## How to run the examples
 
