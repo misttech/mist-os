@@ -9,9 +9,6 @@
                 // TODO(https://fxbug.dev/339692009): Support HDRINCL raw sockets.
                 "RawHDRINCL.SendAndReceive",
                 "RawHDRINCL.SendAndReceiveDifferentAddress",
-
-                // TODO(https://fxbug.dev/345817647): Flaky when run in CQ.
-                "RawSocketICMPv6Test.PingSuccessfully",
             ],
         },
         {
