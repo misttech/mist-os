@@ -2,12 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-if (is_debug) {
-  # TODO(https://fxbug.dev/42170458): consider "debug"
-  default_optimize = "none"
-} else {
-  default_optimize = "size_lto"
-}
+import("//build/config/compilation_modes.gni")
 
 # NOTE: Keep in sync with //build/config/zircon/levels.gni
 declare_args() {
@@ -20,12 +15,13 @@ declare_args() {
   # * `sanitizer`: optimized for sanitizers (ASan, etc.)
   # * `profile`: optimized for coverage/profile data collection
   # * `coverage`: optimized for coverage data collection
-  optimize = default_optimize
+  optimize = compilation_settings.optimize
 }
 
 _optimize_valid = [
   "none",
   "debug",
+  "minimal",
   "default",
   "size",
   "size_lto",

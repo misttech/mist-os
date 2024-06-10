@@ -22,7 +22,7 @@ _ARGS_GN_TEMPLATE = r"""# Auto-generated - DO NOT EDIT
 target_cpu = "{cpu}"
 build_info_board = "{cpu}"
 build_info_product = "bringup"
-is_debug = false
+compilation_mode = "opt"
 
 cxx_rbe_enable = {cxx_rbe_enable}
 link_rbe_enable = {link_rbe_enable}

@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/config/compilation_modes.gni")
 import("//build/rust/build.gni")
 import("//build/toolchain/rbe.gni")
 import("//build/toolchain/restat.gni")
@@ -21,9 +22,6 @@ declare_args() {
   # is only needed for cross-referencing builds, so we're keeping the flag
   # and the analysis overhead turned off by default.
   is_analysis = false
-
-  # Debug build.
-  is_debug = true
 
   # Sets if we should output breakpad symbols for Fuchsia binaries.
   output_breakpad_syms = false
