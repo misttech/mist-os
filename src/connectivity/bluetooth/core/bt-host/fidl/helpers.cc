@@ -2177,6 +2177,12 @@ pw::bluetooth::emboss::StatusCode FidlHciErrorToStatusCode(fhbt::HciError code) 
       return pw::bluetooth::emboss::StatusCode::LIMIT_REACHED;
     case fuchsia_hardware_bluetooth::HciError::kOperationCancelledByHost:
       return pw::bluetooth::emboss::StatusCode::OPERATION_CANCELLED_BY_HOST;
+    case fuchsia_hardware_bluetooth::HciError::kPacketTooLong:
+      return pw::bluetooth::emboss::StatusCode::PACKET_TOO_LONG;
+    case fuchsia_hardware_bluetooth::HciError::kTooLate:
+      return pw::bluetooth::emboss::StatusCode::TOO_LATE;
+    case fuchsia_hardware_bluetooth::HciError::kTooEarly:
+      return pw::bluetooth::emboss::StatusCode::TOO_EARLY;
     default:
       return pw::bluetooth::emboss::StatusCode::UNKNOWN_COMMAND;
   }

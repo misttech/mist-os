@@ -85,6 +85,9 @@ type HciError = flexible enum : uint8 {
     UNKNOWN_ADVERTISING_IDENTIFIER = 0x42;
     LIMIT_REACHED = 0x43;
     OPERATION_CANCELLED_BY_HOST = 0x44;
+    PACKET_TOO_LONG = 0x45;
+    TOO_LATE = 0x46;
+    TOO_EARLY = 0x47;
 };
 
 type ConnectionState = flexible enum {
