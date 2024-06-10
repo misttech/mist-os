@@ -54,6 +54,7 @@ extra_bazel_assembly_targets = [
 cipd_assembly_artifact_targets = [
   "//build/images/fuchsia:assembly_inputs",
   "//products/minimal:board_assembly_artifacts",
+  "//products/minimal:devicetree",
 ]
 
 use_bazel_images_only = true
