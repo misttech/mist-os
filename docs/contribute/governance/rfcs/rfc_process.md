@@ -7,6 +7,7 @@ The Fuchsia RFC process has evolved from the following RFCs:
 * [RFC-0067: Additions to Fuchsia RFC process](0067_rfc_process_additions.md)
 * [RFC-0017: The FTP Process is dead, long live the RFC Process!](0017_folding_ftp_into_rfc.md)
 * [RFC-0122: RFC Stakeholders](0122_stakeholders.md)
+* [RFC-0248: RFC Problem Statement](0248_rfc_problem_statement.md)
 
 This page collates the above RFCs and captures the current process.
 
