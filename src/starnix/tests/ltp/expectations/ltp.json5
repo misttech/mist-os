@@ -245,6 +245,7 @@
 
                 // TODO(https://fxbug.dev/329897731) Re-enable once falke is resolved.
                 "sigtimedwait01",
+                "rt_sigqueueinfo01",
 
                 // TODO(https://fxbug.dev/329897718) Re-enable once falke is resolved.
                 "sched_setscheduler04",
