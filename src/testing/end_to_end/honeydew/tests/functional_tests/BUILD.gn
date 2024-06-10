@@ -91,6 +91,7 @@ group_with_no_dir_target_deps("core_vim3_stable_tests") {
     "affordance_tests/test_system_power_state_controller:system_power_state_controller_test_on_non_starnix_fc($host_toolchain)",
     "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:vim3_test_fc($host_toolchain)",
+    "transport_tests/test_ffx:ffx_test_on_vim3_fc($host_toolchain)",
   ]
 }
 
@@ -99,7 +100,6 @@ group_with_no_dir_target_deps("core_vim3_unstable_tests") {
   public_deps = [
     "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
     "transport_tests/test_fastboot:fastboot_test_fc($host_toolchain)",
-    "transport_tests/test_ffx:ffx_test_on_vim3_fc($host_toolchain)",
   ]
 }
 
@@ -109,8 +109,10 @@ group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
   public_deps = [
     "affordance_tests/test_rtc:rtc_test_fc($host_toolchain)",
     "affordance_tests/test_system_power_state_controller:system_power_state_controller_test_on_non_starnix_fc($host_toolchain)",
+    "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
     "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:vim3_test_fc($host_toolchain)",
+    "transport_tests/test_ffx:ffx_test_on_vim3_fc($host_toolchain)",
   ]
 }
 
@@ -118,11 +120,9 @@ group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
   testonly = true
   public_deps = [
     "affordance_tests/test_session:session_test_fc($host_toolchain)",
-    "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
     "affordance_tests/test_ui:screenshot_test_ffx($host_toolchain)",
     "affordance_tests/test_ui:user_input_test_fc($host_toolchain)",
     "transport_tests/test_fastboot:fastboot_test_fc($host_toolchain)",
-    "transport_tests/test_ffx:ffx_test_on_vim3_fc($host_toolchain)",
   ]
 }
 
@@ -130,6 +130,7 @@ group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
 group_with_no_dir_target_deps("core_nuc_stable_tests") {
   testonly = true
   public_deps = [
+    "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_fc($host_toolchain)",
   ]
 }
@@ -138,7 +139,6 @@ group_with_no_dir_target_deps("core_nuc_unstable_tests") {
   testonly = true
   public_deps = [
     "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
-    "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
     "transport_tests/test_ffx:ffx_test_on_x64_fc($host_toolchain)",
   ]
 }
@@ -147,6 +147,7 @@ group_with_no_dir_target_deps("core_nuc_unstable_tests") {
 group_with_no_dir_target_deps("workbench_nuc_stable_tests") {
   testonly = true
   public_deps = [
+    "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_fc($host_toolchain)",
   ]
 }
@@ -158,7 +159,6 @@ group_with_no_dir_target_deps("workbench_nuc_unstable_tests") {
     "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
     "affordance_tests/test_ui:screenshot_test_ffx($host_toolchain)",
     "affordance_tests/test_ui:user_input_test_fc($host_toolchain)",
-    "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
     "transport_tests/test_ffx:ffx_test_on_x64_fc($host_toolchain)",
   ]
 }
@@ -214,66 +214,57 @@ group_with_no_dir_target_deps("workbench_emulator_unstable_packages") {
 # core.vim3
 group_with_no_dir_target_deps("core_vim3_stable_packages") {
   testonly = true
-  public_deps = []
+  public_deps = [ "transport_tests/test_ffx:packages" ]
 }
 
 group_with_no_dir_target_deps("core_vim3_unstable_packages") {
   testonly = true
-  public_deps = [ "transport_tests/test_ffx:packages" ]
+  public_deps = []
 }
 
 # workbench.vim3
 group_with_no_dir_target_deps("workbench_vim3_stable_packages") {
   testonly = true
-  public_deps = []
+  public_deps = [ "transport_tests/test_ffx:packages" ]
 }
 
 group_with_no_dir_target_deps("workbench_vim3_unstable_packages") {
   testonly = true
-  public_deps = [
-    "affordance_tests/test_session:packages",
-    "transport_tests/test_ffx:packages",
-  ]
+  public_deps = [ "affordance_tests/test_session:packages" ]
 }
 
 # core.nuc
 group_with_no_dir_target_deps("core_nuc_stable_packages") {
   testonly = true
-  public_deps = []
+  public_deps = [ "transport_tests/test_ffx:packages" ]
 }
 
 group_with_no_dir_target_deps("core_nuc_unstable_packages") {
   testonly = true
-  public_deps = [ "transport_tests/test_ffx:packages" ]
+  public_deps = []
 }
 
 # workbench.nuc
 group_with_no_dir_target_deps("workbench_nuc_stable_packages") {
   testonly = true
-  public_deps = []
+  public_deps = [ "transport_tests/test_ffx:packages" ]
 }
 
 group_with_no_dir_target_deps("workbench_nuc_unstable_packages") {
   testonly = true
-  public_deps = [
-    "affordance_tests/test_session:packages",
-    "transport_tests/test_ffx:packages",
-  ]
+  public_deps = [ "affordance_tests/test_session:packages" ]
 }
 
 # starnix.vim3
 # Note: This will be run on internal builder, hence using `starnix` here instead of internal `<PRODUCT>` name.
 group_with_no_dir_target_deps("starnix_vim3_stable_packages") {
   testonly = true
-  public_deps = []
+  public_deps = [ "transport_tests/test_ffx:packages" ]
 }
 
 group_with_no_dir_target_deps("starnix_vim3_unstable_packages") {
   testonly = true
-  public_deps = [
-    "affordance_tests/test_session:packages",
-    "transport_tests/test_ffx:packages",
-  ]
+  public_deps = [ "affordance_tests/test_session:packages" ]
 }
 
 ############################ Package groups - End ##############################

@@ -65,6 +65,8 @@ group_with_no_dir_target_deps("core_emulator_stable_sl4f_tests") {
 group_with_no_dir_target_deps("core_emulator_stable_tests") {
   testonly = true
   public_deps = [
+    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
     "honeydew/tests/functional_tests:core_emulator_stable_tests",
   ]
@@ -77,11 +79,8 @@ group_with_no_dir_target_deps("core_emulator_unstable_sl4f_tests") {
 
 group_with_no_dir_target_deps("core_emulator_unstable_tests") {
   testonly = true
-  public_deps = [
-    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
-    "honeydew/tests/functional_tests:core_emulator_unstable_tests",
-  ]
+  public_deps =
+      [ "honeydew/tests/functional_tests:core_emulator_unstable_tests" ]
 }
 
 group("core_emulator_staging_sl4f_tests") {
@@ -104,6 +103,7 @@ group("core_emulator_staging_tests") {
 group_with_no_dir_target_deps("workbench_emulator_stable_tests") {
   testonly = true
   public_deps = [
+    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
     "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
     "honeydew/tests/functional_tests:workbench_emulator_stable_tests",
@@ -112,10 +112,8 @@ group_with_no_dir_target_deps("workbench_emulator_stable_tests") {
 
 group_with_no_dir_target_deps("workbench_emulator_unstable_tests") {
   testonly = true
-  public_deps = [
-    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
-    "honeydew/tests/functional_tests:workbench_emulator_unstable_tests",
-  ]
+  public_deps =
+      [ "honeydew/tests/functional_tests:workbench_emulator_unstable_tests" ]
 }
 
 group("workbench_emulator_staging_tests") {
@@ -130,6 +128,7 @@ group("workbench_emulator_staging_tests") {
 group_with_no_dir_target_deps("core_vim3_stable_tests") {
   testonly = true
   public_deps = [
+    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
     "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
     "honeydew/tests/functional_tests:core_vim3_stable_tests",
@@ -139,7 +138,6 @@ group_with_no_dir_target_deps("core_vim3_stable_tests") {
 group_with_no_dir_target_deps("core_vim3_unstable_tests") {
   testonly = true
   public_deps = [
-    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
     "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
     "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
     "honeydew/tests/functional_tests:core_vim3_unstable_tests",
@@ -158,6 +156,7 @@ group("core_vim3_staging_tests") {
 group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
   testonly = true
   public_deps = [
+    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
     "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
     "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
     "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
@@ -168,10 +167,8 @@ group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
 
 group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
   testonly = true
-  public_deps = [
-    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
-    "honeydew/tests/functional_tests:workbench_vim3_unstable_tests",
-  ]
+  public_deps =
+      [ "honeydew/tests/functional_tests:workbench_vim3_unstable_tests" ]
 }
 
 group("workbench_vim3_staging_tests") {
@@ -186,6 +183,10 @@ group("workbench_vim3_staging_tests") {
 group_with_no_dir_target_deps("core_nuc_stable_tests") {
   testonly = true
   public_deps = [
+    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
+    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
     "honeydew/tests/functional_tests:core_nuc_stable_tests",
   ]
@@ -193,13 +194,7 @@ group_with_no_dir_target_deps("core_nuc_stable_tests") {
 
 group_with_no_dir_target_deps("core_nuc_unstable_tests") {
   testonly = true
-  public_deps = [
-    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
-    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
-    "honeydew/tests/functional_tests:core_nuc_unstable_tests",
-  ]
+  public_deps = [ "honeydew/tests/functional_tests:core_nuc_unstable_tests" ]
 }
 
 group("core_nuc_staging_tests") {
@@ -214,6 +209,9 @@ group("core_nuc_staging_tests") {
 group_with_no_dir_target_deps("workbench_nuc_stable_tests") {
   testonly = true
   public_deps = [
+    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
+    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
     "honeydew/tests/functional_tests:workbench_nuc_stable_tests",
   ]
@@ -222,10 +220,7 @@ group_with_no_dir_target_deps("workbench_nuc_stable_tests") {
 group_with_no_dir_target_deps("workbench_nuc_unstable_tests") {
   testonly = true
   public_deps = [
-    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
     "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
-    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
     "honeydew/tests/functional_tests:workbench_nuc_unstable_tests",
   ]
 }
