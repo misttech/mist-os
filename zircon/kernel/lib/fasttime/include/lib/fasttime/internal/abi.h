@@ -13,9 +13,11 @@
 #include <zircon/time.h>
 #include <zircon/types.h>
 
+#include <atomic>
+
 namespace fasttime::internal {
 
-// The members of this struct are all marked const to force folks who initialize the structure to
+// Many members of this struct are marked const to force folks who initialize the structure to
 // explicitly declare values at the time of instantiation. The primary use case for this is the
 // test code. Note that all accesses of this structure should still be done with a const reference.
 struct TimeValues {
@@ -26,7 +28,7 @@ struct TimeValues {
   const zx_ticks_t ticks_per_second;
 
   // Offset for converting from the raw system timer to monotonic ticks.
-  const zx_ticks_t mono_ticks_offset;
+  std::atomic<zx_ticks_t> mono_ticks_offset{};
 
   // Ratio which relates ticks (zx_ticks_get) to clock monotonic (zx_clock_get_monotonic).
   // Specifically...

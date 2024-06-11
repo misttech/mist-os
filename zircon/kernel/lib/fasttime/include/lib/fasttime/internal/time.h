@@ -66,7 +66,10 @@ inline zx_ticks_t compute_monotonic_ticks(const TimeValues& tvalues) {
       return ZX_TIME_INFINITE_PAST;
     }
   }
-  return internal::get_raw_ticks(tvalues) + tvalues.mono_ticks_offset;
+  // TODO(https://fxbug.dev/341785588): This code should be made resilient to a changing
+  // mono_ticks_offset once we start pausing the clock during system suspension.
+  return internal::get_raw_ticks(tvalues) +
+         tvalues.mono_ticks_offset.load(std::memory_order_relaxed);
 }
 
 template <FasttimeVerificationMode kVerificationMode = FasttimeVerificationMode::kNormal>
