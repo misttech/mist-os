@@ -25,7 +25,7 @@ use fuchsia_zircon as zx;
 use futures::{future::FutureExt as _, StreamExt};
 use itertools::Itertools as _;
 use net_declare::{fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix};
-use net_types::ip::{Ipv4, Ipv6, Subnet};
+use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6, Subnet};
 use netstack_testing_common::{
     realms::{Netstack, Netstack3, TestSandboxExt},
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
@@ -1518,6 +1518,29 @@ async fn add_route_table<I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteI
     assert_ne!(main_table_id, user_table_id);
 }
 
+fn route_set_err_stream<I: FidlRouteAdminIpExt>(
+    route_set: <I::RouteSetMarker as ProtocolMarker>::Proxy,
+) -> futures::stream::BoxStream<'static, fidl::Error> {
+    #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
+    struct In<I: FidlRouteAdminIpExt>(<I::RouteSetMarker as ProtocolMarker>::Proxy);
+
+    let IpInvariant(err_stream) = net_types::map_ip_twice!(I, In(route_set), |In(route_set)| {
+        IpInvariant(
+            route_set
+                .take_event_stream()
+                .filter_map(|result| async {
+                    match result {
+                        Err(err) => Some(err),
+                        Ok(event) => match event {},
+                    }
+                })
+                .boxed(),
+        )
+    });
+    err_stream
+}
+
 #[netstack_test]
 #[test_matrix(
     [true, false],
@@ -1615,19 +1638,15 @@ async fn route_set_closed_when_table_removed<
     } else {
         // If not detached, or the table is explicitly removed, the route set
         // should be closed.
-        let channel = user_route_set
-            .into_channel()
-            .unwrap_or_else(|_err| panic!("failed to turn a proxy into a channel"));
-        let client = fidl::client::Client::new(channel, I::RouteSetMarker::DEBUG_NAME);
-        let mut event_receiver = client.take_event_receiver();
+        let mut err_stream = route_set_err_stream::<I>(user_route_set);
         assert_matches!(
-            event_receiver.next().await,
-            Some(Err(fidl::Error::ClientChannelClosed {
+            err_stream.next().await,
+            Some(fidl::Error::ClientChannelClosed {
                 status: zx::Status::UNAVAILABLE,
                 protocol_name: _,
-            }))
+            })
         );
-        assert_matches!(event_receiver.next().await, None);
+        assert_matches!(err_stream.next().await, None);
 
         // The route should also be removed by now.
         fnet_routes_ext::wait_for_routes(&mut routes_stream, &mut routes, |routes| {
