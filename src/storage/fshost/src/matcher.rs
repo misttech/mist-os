@@ -280,22 +280,6 @@ impl Matcher for FvmMatcher {
                 return false;
             }
         }
-        match device.partition_label().await {
-            Ok(label) => {
-                // There are a few different labels used depending on the device. If we don't see
-                // any of them, this isn't the right partition.
-                if !(label == FVM_PARTITION_LABEL
-                    || label == FUCHSIA_FVM_PARTITION_LABEL
-                    || label == FTL_PARTITION_LABEL)
-                {
-                    return false;
-                }
-            }
-            // If there is an error getting the partition label, it might be because this device
-            // doesn't support labels (like if it's directly on a raw disk in an emulator).
-            // Continue with content sniffing.
-            Err(_) => (),
-        }
         device.content_format().await.ok() == Some(DiskFormat::Fvm)
     }
 
@@ -929,86 +913,6 @@ mod tests {
                     .expect_mount_blobfs_on()
                     .expect_format_data()
                     .expect_bind_data()
-            )
-            .await
-            .expect("match_device failed"));
-    }
-
-    #[fuchsia::test]
-    async fn test_multiple_fvm_partitions_second_fails() {
-        let mut matchers = Matchers::new(&default_config(), None);
-
-        // An fvm device with the wrong label should fail.
-        assert!(!matchers
-            .match_device(
-                &mut MockDevice::new()
-                    .set_content_format(DiskFormat::Fvm)
-                    .set_partition_label("wrong_label"),
-                &mut MockEnv::new()
-            )
-            .await
-            .expect("match_device failed"));
-
-        // An fvm device with the right label should succeed.
-        assert!(matchers
-            .match_device(
-                &mut MockDevice::new()
-                    .set_content_format(DiskFormat::Fvm)
-                    .set_partition_label(FVM_PARTITION_LABEL),
-                &mut MockEnv::new()
-                    .expect_bind_and_enumerate_fvm()
-                    .expect_mount_data_on()
-                    .expect_mount_blobfs_on()
-            )
-            .await
-            .expect("match_device failed"));
-
-        assert!(!matchers
-            .match_device(
-                &mut MockDevice::new()
-                    .set_content_format(DiskFormat::Fvm)
-                    .set_partition_label(FVM_PARTITION_LABEL),
-                &mut MockEnv::new()
-            )
-            .await
-            .expect("match_device failed"));
-    }
-
-    #[fuchsia::test]
-    async fn test_multiple_fvm_partitions_second_fails_alternate_label() {
-        let mut matchers = Matchers::new(&default_config(), None);
-
-        // An fvm device with the wrong label should fail.
-        assert!(!matchers
-            .match_device(
-                &mut MockDevice::new()
-                    .set_content_format(DiskFormat::Fvm)
-                    .set_partition_label("wrong_label"),
-                &mut MockEnv::new()
-            )
-            .await
-            .expect("match_device failed"));
-
-        // An fvm device with the right label should succeed.
-        assert!(matchers
-            .match_device(
-                &mut MockDevice::new()
-                    .set_content_format(DiskFormat::Fvm)
-                    .set_partition_label(FUCHSIA_FVM_PARTITION_LABEL),
-                &mut MockEnv::new()
-                    .expect_bind_and_enumerate_fvm()
-                    .expect_mount_data_on()
-                    .expect_mount_blobfs_on()
-            )
-            .await
-            .expect("match_device failed"));
-
-        assert!(!matchers
-            .match_device(
-                &mut MockDevice::new()
-                    .set_content_format(DiskFormat::Fvm)
-                    .set_partition_label(FUCHSIA_FVM_PARTITION_LABEL),
-                &mut MockEnv::new()
             )
             .await
             .expect("match_device failed"));
