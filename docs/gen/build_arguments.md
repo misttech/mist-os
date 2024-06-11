@@ -88,7 +88,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2117
+From //build/config/BUILDCONFIG.gn:2115
 
 ### allowed_test_device_types
 
@@ -237,7 +237,7 @@ From //build/images/vbmeta.gni:23
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/common/x64-common.gni:58
+From //boards/common/x64-common.gni:45
 
 **Overridden from the default:** `""`
 
@@ -257,7 +257,7 @@ From //build/images/vbmeta.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/common/x64-common.gni:56
+From //boards/common/x64-common.gni:43
 
 **Overridden from the default:** `""`
 
@@ -445,7 +445,7 @@ From //build/images/filesystem_limits.gni:17
 
 **Current value for `target_cpu = "x64"`:** `10485760000`
 
-From //boards/common/x64-common.gni:60
+From //boards/common/x64-common.gni:47
 
 **Overridden from the default:** `false`
 
@@ -843,7 +843,7 @@ From //build/images/args.gni:30
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:64
+From //boards/common/x64-common.gni:51
 
 **Overridden from the default:** `false`
 
@@ -1099,7 +1099,19 @@ from infra builds, and later inspection.
 
 **Current value (from the default):** `"//out/not-default/comparison-reports"`
 
-From //build/toolchain/rbe.gni:208
+From //build/toolchain/rbe.gni:211
+
+### compilation_mode
+
+The overall compilation mode to use.  The valid values are:
+ * `dbg`: for debug-enabled builds.
+ * `fastbuild`: some optimizations, but prioritizing compilation speed over
+                runtime performance.
+ * `opt`: all the optimizations, used for product releases.
+
+**Current value (from the default):** `""`
+
+From //build/config/compilation_modes.gni:18
 
 ### compress_debuginfo
 
@@ -1107,7 +1119,7 @@ Enable compression of debug sections.
 
 **Current value (from the default):** `"zstd"`
 
-From //build/config/compiler.gni:92
+From //build/config/compiler.gni:88
 
 ### config_example_cpp_greeting
 
@@ -1264,7 +1276,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:203
+From //build/toolchain/rbe.gni:206
 
 ### cxx_rbe_download_obj_files
 
@@ -1276,7 +1288,7 @@ and not restricted environments that lack direct network access.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:215
+From //build/toolchain/rbe.gni:218
 
 ### cxx_rbe_enable
 
@@ -1287,17 +1299,17 @@ Enabling this takes precedence over `use_goma`.
 
 From //out/not-default/args.gn:7
 
-**Overridden from the default:** `false`
+**Overridden from the default:** `true`
 
-From //build/toolchain/rbe.gni:156
+From //build/toolchain/rbe.gni:159
 
 **Current value for `target_cpu = "x64"`:** `false`
 
 From //out/not-default/args.gn:7
 
-**Overridden from the default:** `false`
+**Overridden from the default:** `true`
 
-From //build/toolchain/rbe.gni:156
+From //build/toolchain/rbe.gni:159
 
 ### cxx_rbe_exec_strategy
 
@@ -1320,7 +1332,7 @@ One of:
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:179
+From //build/toolchain/rbe.gni:182
 
 ### cxx_rbe_minimalist_wrapper
 
@@ -1330,7 +1342,7 @@ This flag is only meaningful when `cxx_rbe_enable` is true.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:161
+From //build/toolchain/rbe.gni:164
 
 ### data_filesystem_format
 
@@ -1350,7 +1362,7 @@ From //src/storage/fshost/generated_fshost_config.gni:12
 
 **Current value (from the default):** `"debug"`
 
-From //build/config/compiler.gni:54
+From //build/config/compiler.gni:50
 
 ### default_configs
 
@@ -2756,7 +2768,7 @@ Explicitly specify DWARF version used.
 
 **Current value (from the default):** `5`
 
-From //build/config/compiler.gni:68
+From //build/config/compiler.gni:64
 
 ### e2e_test_labels
 
@@ -3278,7 +3290,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1839
+From //build/config/BUILDCONFIG.gn:1837
 
 ### extra_vbmeta_descriptors
 
@@ -4088,7 +4100,7 @@ and the analysis overhead turned off by default.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:23
+From //build/config/BUILDCONFIG.gn:24
 
 ### is_debug
 
@@ -4098,17 +4110,17 @@ Debug build.
 
 From //out/not-default/args.gn:10
 
-**Overridden from the default:** `true`
+**Overridden from the default:** `""`
 
-From //build/config/BUILDCONFIG.gn:26
+From //build/config/compilation_modes.gni:37
 
 **Current value for `target_cpu = "x64"`:** `false`
 
 From //out/not-default/args.gn:10
 
-**Overridden from the default:** `true`
+**Overridden from the default:** `""`
 
-From //build/config/BUILDCONFIG.gn:26
+From //build/config/compilation_modes.gni:37
 
 ### is_perfetto_build_generator
 
@@ -4421,7 +4433,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1651
+From //build/config/BUILDCONFIG.gn:1649
 
 ### legacy_base_package_labels
 
@@ -4458,17 +4470,13 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:262
+From //build/toolchain/rbe.gni:265
 
 ### link_rbe_download_unstripped_outputs
 
-Controls whether or not to download (often large) unstripped linker
-outputs.  When downloading is disabled, the build produces stubs
-that be used to retrieve remote artifacts later using build/rbe/dlwrap.py.
-
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:267
+From //build/toolchain/rbe.gni:271
 
 ### link_rbe_enable
 
@@ -4482,7 +4490,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:224
+From //build/toolchain/rbe.gni:227
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -4490,7 +4498,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:224
+From //build/toolchain/rbe.gni:227
 
 ### link_rbe_exec_strategy
 
@@ -4513,7 +4521,7 @@ One of:
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:242
+From //build/toolchain/rbe.gni:245
 
 ### llvm_prefix
 
@@ -4614,7 +4622,7 @@ From //build/images/filesystem_limits.gni:12
 
 **Current value for `target_cpu = "x64"`:** `5216665600`
 
-From //boards/common/x64-common.gni:62
+From //boards/common/x64-common.gni:49
 
 **Overridden from the default:** `false`
 
@@ -5304,7 +5312,7 @@ From //third_party/openthread/etc/gn/openthread.gni:205
 
 **Current value (from the default):** `"size_lto"`
 
-From //build/config/compiler.gni:23
+From //build/config/compiler.gni:18
 
 ### output_breakpad_syms
 
@@ -5312,7 +5320,7 @@ Sets if we should output breakpad symbols for Fuchsia binaries.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:29
+From //build/config/BUILDCONFIG.gn:27
 
 ### output_gsym
 
@@ -5320,7 +5328,7 @@ Controls whether we should output GSYM files for Fuchsia binaries.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:32
+From //build/config/BUILDCONFIG.gn:30
 
 ### override_build_time_supported_api_levels
 
@@ -5415,7 +5423,7 @@ From //build/board.gni:75
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/common/x64-common.gni:52
+From //boards/common/x64-common.gni:39
 
 **Overridden from the default:** `[]`
 
@@ -5436,7 +5444,7 @@ From //build/board.gni:74
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/common/x64-common.gni:51
+From //boards/common/x64-common.gni:38
 
 **Overridden from the default:** `false`
 
@@ -7045,7 +7053,35 @@ precedence over those earlier in the list.
 
 **Current value (from the default):** `[]`
 
-From //build/toolchain/rbe.gni:28
+From //build/toolchain/rbe.gni:30
+
+### rbe_mode
+
+The overall mode for RBE to be operating in.  The valid values are:
+ * 'off' => RBE is fully disabled. This is suitable for offline building
+            using only local resources.
+ * 'default' => The standard RBE configuration used if not otherwise
+                specified. This contains a mix of enabled/disabled remote
+                services.
+ * 'cloudtop' => An RBE configuration that's optimized for running on a
+                 cloudtop. Suitable for high-bandwidth connections to
+                 remote services.
+ * 'infra' => The RBE configuration used by CI/CQ bots. Also high-bandwidth.
+ * 'low_bandwidth' => An RBE configuration for developers that have a
+                      powerful workstations, but low bandwidth.
+
+**Current value (from the default):** `"default"`
+
+From //build/toolchain/rbe_modes.gni:32
+
+### rbe_settings_overrides
+
+Overridden settings for the RBE mode.  This is a set of override values for
+variables whose default values are set by the chosen RBE mode (above).
+
+**Current value (from the default):** `{ }`
+
+From //build/toolchain/rbe_modes.gni:36
 
 ### recovery_label
 
@@ -7185,7 +7221,7 @@ This is required to support skipping downloads of rlibs.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:144
+From //build/toolchain/rbe.gni:147
 
 ### rust_incremental
 
@@ -7252,7 +7288,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:131
+From //build/toolchain/rbe.gni:133
 
 ### rust_rbe_download_rlibs
 
@@ -7261,19 +7297,13 @@ rlibs from remote Rust build actions.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:148
+From //build/toolchain/rbe.gni:151
 
 ### rust_rbe_download_unstripped_binaries
 
-Controls whether or not to download (often large) unstripped Rust
-binaries.  When downloading is disabled, the build produces stubs
-that be used to retrieve remote artifacts later using build/rbe/dlwrap.py.
-TODO(b/284994230): This option is only available to developers,
-and not restricted environments that lack direct network access.
-
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:138
+From //build/toolchain/rbe.gni:141
 
 ### rust_rbe_enable
 
@@ -7285,7 +7315,7 @@ From //out/not-default/args.gn:12
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:87
+From //build/toolchain/rbe.gni:89
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -7293,7 +7323,7 @@ From //out/not-default/args.gn:12
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:87
+From //build/toolchain/rbe.gni:89
 
 ### rust_rbe_exec_strategy
 
@@ -7316,7 +7346,7 @@ One of:
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:105
+From //build/toolchain/rbe.gni:107
 
 ### rust_v0_symbol_mangling
 
@@ -7641,7 +7671,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2107
+From //build/config/BUILDCONFIG.gn:2105
 
 ### select_variant_canonical
 
@@ -7651,7 +7681,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2112
+From //build/config/BUILDCONFIG.gn:2110
 
 ### select_variant_shortcuts
 
@@ -7710,7 +7740,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1885
+From //build/config/BUILDCONFIG.gn:1883
 
 ### size_checker_input
 
@@ -8133,7 +8163,7 @@ for details and documentation for each field.
 }
 ```
 
-From //build/config/BUILDCONFIG.gn:106
+From //build/config/BUILDCONFIG.gn:104
 
 ### truncate_build_info_commit_date
 
@@ -8196,7 +8226,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1869
+From //build/config/BUILDCONFIG.gn:1867
 
 ### universe_package_labels
 
@@ -8352,7 +8382,7 @@ From //build/images/args.gni:27
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:65
+From //boards/common/x64-common.gni:52
 
 **Overridden from the default:** `false`
 
@@ -8416,7 +8446,7 @@ Controls whether to use -Oz when `optimize` is set to `"size"`.
 
 **Current value (from the default):** `false`
 
-From //build/config/compiler.gni:43
+From //build/config/compiler.gni:39
 
 ### use_prebuilt_buildidtool
 
@@ -8512,7 +8542,7 @@ From //build/images/vbmeta.gni:15
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:54
+From //boards/common/x64-common.gni:41
 
 **Overridden from the default:** `false`
 
@@ -8857,7 +8887,7 @@ This allows testing for a Zircon-specific toolchain with:
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:123
+From //build/config/BUILDCONFIG.gn:121
 
 ### zircon_tracelog
 
