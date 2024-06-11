@@ -27,6 +27,9 @@ struct TimeValues {
   // Conversion factor for zx_ticks_get return values to seconds.
   const zx_ticks_t ticks_per_second;
 
+  // Offset for converting from the raw system timer to boot ticks.
+  const zx_ticks_t boot_ticks_offset;
+
   // Offset for converting from the raw system timer to monotonic ticks.
   std::atomic<zx_ticks_t> mono_ticks_offset{};
 
