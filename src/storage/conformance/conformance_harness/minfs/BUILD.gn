@@ -9,15 +9,13 @@ executable("bin") {
   output_name = "io_conformance_harness_minfs"
   sources = [ "harness.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
-    "//sdk/fidl/fuchsia.io.test:fuchsia.io.test_hlcpp",
-    "//sdk/lib/fdio",
-    "//sdk/lib/sys/cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/fidl/fuchsia.io.test:fuchsia.io.test_cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/storage/lib/block_client/cpp:fake_device",
     "//src/storage/lib/vfs/cpp",
     "//src/storage/minfs",
-    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/bitmap",

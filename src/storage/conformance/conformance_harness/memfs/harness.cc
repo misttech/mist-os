@@ -5,10 +5,12 @@
 #include <fidl/fuchsia.io.test/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/async/dispatcher.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
-#include <sys/stat.h>
+#include <lib/zx/result.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
 
@@ -20,7 +22,6 @@
 
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
-#include "src/storage/lib/vfs/cpp/vnode.h"
 #include "src/storage/memfs/memfs.h"
 #include "src/storage/memfs/vnode_dir.h"
 #include "src/storage/memfs/vnode_file.h"
@@ -119,7 +120,7 @@ class TestHarness : public fidl::Server<fio_test::Io1Harness> {
 int main(int argc, const char** argv) {
   fuchsia_logging::SetTags({"io_conformance_harness_memfs"});
 
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   async_dispatcher_t* dispatcher = loop.dispatcher();
 
   component::OutgoingDirectory outgoing = component::OutgoingDirectory(dispatcher);
@@ -133,6 +134,7 @@ int main(int argc, const char** argv) {
   auto memfs = memfs::Memfs::Create(dispatcher, "memfs");
   if (memfs.is_error()) {
     FX_LOGS(ERROR) << "Failed to create memfs: " << memfs.status_string();
+    return EXIT_FAILURE;
   }
 
   result = outgoing.AddProtocol<fio_test::Io1Harness>(
