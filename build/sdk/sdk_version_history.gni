@@ -2,7 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/info/info.gni")
 import("//build/python/python_action.gni")
+import("//build/sdk/config.gni")
 import("//build/sdk/sdk_atom.gni")
 
 # Defines an atom for version_history.json.
@@ -38,16 +40,27 @@ template("sdk_version_history") {
 
     binary_label = "//build/sdk/generate_version_history"
 
-    inputs = [ invoker.source ]
+    deps = [ "//build/info:build_info_files($default_toolchain)" ]
+
+    inputs = [
+      invoker.source,
+      build_info_files.latest_commit_hash,
+    ]
 
     outputs = [ _files.compiled ]
 
     args = [
       "--input",
       rebase_path(inputs[0], root_build_dir),
+      "--latest-commit-hash-file",
+      rebase_path(inputs[1], root_build_dir),
       "--output",
       rebase_path(outputs[0], root_build_dir),
     ]
+
+    if (sdk_legacy_unstable_abi_revisions) {
+      args += [ "--legacy-unstable-abi-revisions" ]
+    }
   }
 
   # SDK metadata.

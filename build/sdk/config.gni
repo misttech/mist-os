@@ -11,6 +11,14 @@ declare_args() {
   # Can be true for any API level, including the default level.
   sdk_inside_sub_build = false
 
+  # When true, uses the "legacy" way of assigning an ABI revision to unstable
+  # API levels (e.g., `HEAD`, `PLATFORM`). When false, uses the "new way", which
+  # derives an ABI revision from the latest integration.git hash.
+  #
+  # TODO(https://fxbug.dev/324892812): Delete this option after a transition
+  # period.
+  sdk_legacy_unstable_abi_revisions = true
+
   # An upper bound on the maximum number of subbuilds that may be running at the
   # same time. A larger number means these good things:
   # - Better parallelization of the inherently single-threaded parts of GN and
