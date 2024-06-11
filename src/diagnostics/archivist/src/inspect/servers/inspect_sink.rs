@@ -8,11 +8,12 @@ use crate::identity::ComponentIdentity;
 use crate::inspect::container::InspectHandle;
 use crate::inspect::repository::InspectRepository;
 use anyhow::Error;
+use fidl::endpoints::ControlHandle;
 use fuchsia_sync::{Mutex, RwLock};
 use futures::channel::mpsc;
 use futures::StreamExt;
 use std::sync::Arc;
-use tracing::warn;
+use tracing::{debug, warn};
 use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync};
 
 pub struct InspectSinkServer {
@@ -70,7 +71,22 @@ impl InspectSinkServer {
                     Arc::clone(&component),
                     InspectHandle::from_named_tree_proxy(tree.into_proxy()?, name),
                 ),
-                _ => continue,
+                finspect::InspectSinkRequest::Publish {
+                    payload: finspect::InspectSinkPublishRequest { tree: None, name, .. },
+                    ..
+                } => {
+                    debug!(name, %component, "InspectSink/Publish without a tree");
+                }
+                finspect::InspectSinkRequest::_UnknownMethod {
+                    ordinal,
+                    control_handle,
+                    method_type,
+                    ..
+                } => {
+                    warn!(ordinal, ?method_type, "Received unknown request for InspectSink");
+                    // Close the connection if we receive an unknown interaction.
+                    control_handle.shutdown();
+                }
             }
         }
 
