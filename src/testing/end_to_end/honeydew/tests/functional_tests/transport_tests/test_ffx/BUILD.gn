@@ -50,7 +50,8 @@ if (is_host) {
   group("tests") {
     testonly = true
     public_deps = [
-      ":ffx_test_fc($host_toolchain)",
+      ":ffx_test_on_vim3_fc($host_toolchain)",
+      ":ffx_test_on_x64_fc($host_toolchain)",
       ":ffx_wait_for_rcs_disconnection_test_fc($host_toolchain)",
     ]
   }
