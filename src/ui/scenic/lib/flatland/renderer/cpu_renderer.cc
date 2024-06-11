@@ -172,7 +172,8 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
     FX_DCHECK(image_id != allocation::kInvalidId);
 
     const auto& image_map_itr_ = image_map_.find(image_id);
-    FX_DCHECK(image_map_itr_ != image_map_.end());
+    // Dereferencing the end marker later is UB, so better fail right here.
+    FX_CHECK(image_map_itr_ != image_map_.end()) << "not found image_id: " << image_id;
     const auto& image_constraints = image_map_itr_->second.second;
 
     // Make sure the image conforms to the constraints of the collection.
