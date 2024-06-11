@@ -12,7 +12,9 @@ use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::mapper::NoopRouteMapper;
 use ::routing::rights::Rights;
 use ::routing::{route_to_storage_decl, verify_instance_in_component_id_index, RouteRequest};
-use cm_rust::{ComponentDecl, UseDecl, UseEventStreamDecl, UseStorageDecl};
+use cm_rust::{
+    ComponentDecl, UseDecl, UseEventStreamDecl, UseProtocolDecl, UseServiceDecl, UseStorageDecl,
+};
 use errors::CreateNamespaceError;
 use fidl::endpoints::ClientEnd;
 use fidl::prelude::*;
@@ -114,19 +116,10 @@ async fn add_use_decls(
                 storage_use(storage, use_, component).await?.into()
             }
             cm_rust::UseDecl::Protocol(s) => {
-                service_or_protocol_use(UseDecl::Protocol(s.clone()), component, program_input_dict)
-                    .into()
+                protocol_use(s.clone(), component, program_input_dict).into()
             }
-            cm_rust::UseDecl::Service(s) => {
-                service_or_protocol_use(UseDecl::Service(s.clone()), component, program_input_dict)
-                    .into()
-            }
-            cm_rust::UseDecl::EventStream(s) => service_or_protocol_use(
-                UseDecl::EventStream(s.clone()),
-                component,
-                program_input_dict,
-            )
-            .into(),
+            cm_rust::UseDecl::Service(s) => service_use(s.clone(), component).into(),
+            cm_rust::UseDecl::EventStream(s) => event_stream_use(s.clone(), component).into(),
             cm_rust::UseDecl::Runner(_) => {
                 std::process::abort();
             }
@@ -282,158 +275,145 @@ async fn route_directory(
 ///
 /// `component` is a weak pointer, which is important because we don't want the VFS
 /// closure to hold a strong pointer to this component lest it create a reference cycle.
-fn service_or_protocol_use(
-    use_: UseDecl,
+fn protocol_use(
+    decl: UseProtocolDecl,
     component: &Arc<ComponentInstance>,
     program_input_dict: &Dict,
 ) -> Open {
-    match use_ {
-        // Bedrock routing.
-        UseDecl::Protocol(use_protocol_decl) => {
-            let (router, request) = BedrockUseRouteRequest::UseProtocol(use_protocol_decl.clone())
-                .into_router(component.as_weak(), program_input_dict, false);
+    let (router, request) = BedrockUseRouteRequest::UseProtocol(decl.clone()).into_router(
+        component.as_weak(),
+        program_input_dict,
+        false,
+    );
 
-            // When there are router errors, they are sent to the error handler, which reports
-            // errors.
-            let weak_target = component.as_weak();
-            let legacy_request = RouteRequest::UseProtocol(use_protocol_decl);
-            Open::new(router.into_directory_entry(
-                request,
-                fio::DirentType::Service,
-                component.execution_scope.clone(),
-                move |error: &RouterError| {
-                    let Ok(target) = weak_target.upgrade() else {
-                        return None;
-                    };
-                    let legacy_request = legacy_request.clone();
-                    Some(
-                        async move {
-                            report_routing_failure(&legacy_request, &target, error).await
-                        }
-                        .boxed(),
-                    )
-                },
-            ))
-        }
+    // When there are router errors, they are sent to the error handler, which reports
+    // errors.
+    let weak_target = component.as_weak();
+    let legacy_request = RouteRequest::UseProtocol(decl);
+    Open::new(router.into_directory_entry(
+        request,
+        fio::DirentType::Service,
+        component.execution_scope.clone(),
+        move |error: &RouterError| {
+            let Ok(target) = weak_target.upgrade() else {
+                return None;
+            };
+            let legacy_request = legacy_request.clone();
+            Some(
+                async move { report_routing_failure(&legacy_request, &target, error).await }
+                    .boxed(),
+            )
+        },
+    ))
+}
 
-        // Legacy routing.
-        UseDecl::Service(use_service_decl) => {
-            struct Service {
-                component: WeakComponentInstance,
-                scope: ExecutionScope,
-                use_service_decl: cm_rust::UseServiceDecl,
-            }
-            impl DirectoryEntry for Service {
-                fn entry_info(&self) -> EntryInfo {
-                    EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-                }
-
-                fn open_entry(
-                    self: Arc<Self>,
-                    mut request: OpenRequest<'_>,
-                ) -> Result<(), zx::Status> {
-                    // Move this request from the namespace scope to the component's scope so that
-                    // we don't block namespace teardown.
-                    request.set_scope(self.scope.clone());
-                    request.spawn(self);
-                    Ok(())
-                }
-            }
-            impl DirectoryEntryAsync for Service {
-                async fn open_entry_async(
-                    self: Arc<Self>,
-                    request: OpenRequest<'_>,
-                ) -> Result<(), zx::Status> {
-                    if request.path().is_empty() {
-                        if !request.wait_till_ready().await {
-                            return Ok(());
-                        }
-                    }
-
-                    let component = match self.component.upgrade() {
-                        Ok(component) => component,
-                        Err(e) => {
-                            error!(
-                                "failed to upgrade WeakComponentInstance routing use \
-                                 decl `{:?}`: {:?}",
-                                self.use_service_decl, e
-                            );
-                            return Err(e.as_zx_status());
-                        }
-                    };
-
-                    // Hold a guard to prevent this task from being dropped during component
-                    // destruction.
-                    let _guard = request.scope().active_guard();
-
-                    let route_request = RouteRequest::UseService(self.use_service_decl.clone());
-
-                    routing::route_and_open_capability_with_reporting(
-                        &route_request,
-                        &component,
-                        request,
-                    )
-                    .await
-                    .map_err(|e| e.as_zx_status())
-                }
-            }
-            Open::new(Arc::new(Service {
-                component: component.as_weak(),
-                scope: component.execution_scope.clone(),
-                use_service_decl,
-            }))
-        }
-
-        UseDecl::EventStream(stream) => {
-            struct UseEventStream {
-                component: WeakComponentInstance,
-                stream: UseEventStreamDecl,
-            }
-            impl DirectoryEntry for UseEventStream {
-                fn entry_info(&self) -> EntryInfo {
-                    EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Service)
-                }
-                fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
-                    if !request.path().is_empty() {
-                        return Err(zx::Status::NOT_DIR);
-                    }
-                    request.spawn(self);
-                    Ok(())
-                }
-            }
-            impl DirectoryEntryAsync for UseEventStream {
-                async fn open_entry_async(
-                    self: Arc<Self>,
-                    mut request: OpenRequest<'_>,
-                ) -> Result<(), zx::Status> {
-                    let component = match self.component.upgrade() {
-                        Ok(component) => component,
-                        Err(e) => {
-                            error!(
-                                "failed to upgrade WeakComponentInstance routing use \
-                                 decl `{:?}`: {:?}",
-                                self.stream, e
-                            );
-                            return Err(e.as_zx_status());
-                        }
-                    };
-
-                    request.prepend_path(&self.stream.target_path.to_string().try_into()?);
-                    let route_request = RouteRequest::UseEventStream(self.stream.clone());
-                    routing::route_and_open_capability_with_reporting(
-                        &route_request,
-                        &component,
-                        request,
-                    )
-                    .await
-                    .map_err(|e| e.as_zx_status())
-                }
-            }
-            Open::new(Arc::new(UseEventStream { component: component.as_weak(), stream }))
-        }
-
-        _ => panic!("add_service_or_protocol_use called with non-service or protocol capability"),
+/// Makes a capability for the service/protocol described by `use_`. The service will be
+/// proxied to the outgoing directory of the source component.
+///
+/// `component` is a weak pointer, which is important because we don't want the VFS
+/// closure to hold a strong pointer to this component lest it create a reference cycle.
+fn service_use(decl: UseServiceDecl, component: &Arc<ComponentInstance>) -> Open {
+    struct Service {
+        component: WeakComponentInstance,
+        scope: ExecutionScope,
+        decl: cm_rust::UseServiceDecl,
     }
+    impl DirectoryEntry for Service {
+        fn entry_info(&self) -> EntryInfo {
+            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
+        }
+
+        fn open_entry(self: Arc<Self>, mut request: OpenRequest<'_>) -> Result<(), zx::Status> {
+            // Move this request from the namespace scope to the component's scope so that
+            // we don't block namespace teardown.
+            request.set_scope(self.scope.clone());
+            request.spawn(self);
+            Ok(())
+        }
+    }
+    impl DirectoryEntryAsync for Service {
+        async fn open_entry_async(
+            self: Arc<Self>,
+            request: OpenRequest<'_>,
+        ) -> Result<(), zx::Status> {
+            if request.path().is_empty() {
+                if !request.wait_till_ready().await {
+                    return Ok(());
+                }
+            }
+
+            let component = match self.component.upgrade() {
+                Ok(component) => component,
+                Err(e) => {
+                    error!(
+                        "failed to upgrade WeakComponentInstance routing use \
+                                 decl `{:?}`: {:?}",
+                        self.decl, e
+                    );
+                    return Err(e.as_zx_status());
+                }
+            };
+
+            // Hold a guard to prevent this task from being dropped during component
+            // destruction.
+            let _guard = request.scope().active_guard();
+
+            let route_request = RouteRequest::UseService(self.decl.clone());
+
+            routing::route_and_open_capability_with_reporting(&route_request, &component, request)
+                .await
+                .map_err(|e| e.as_zx_status())
+        }
+    }
+    Open::new(Arc::new(Service {
+        component: component.as_weak(),
+        scope: component.execution_scope.clone(),
+        decl,
+    }))
+}
+
+fn event_stream_use(decl: UseEventStreamDecl, component: &Arc<ComponentInstance>) -> Open {
+    struct UseEventStream {
+        component: WeakComponentInstance,
+        decl: UseEventStreamDecl,
+    }
+    impl DirectoryEntry for UseEventStream {
+        fn entry_info(&self) -> EntryInfo {
+            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Service)
+        }
+        fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+            if !request.path().is_empty() {
+                return Err(zx::Status::NOT_DIR);
+            }
+            request.spawn(self);
+            Ok(())
+        }
+    }
+    impl DirectoryEntryAsync for UseEventStream {
+        async fn open_entry_async(
+            self: Arc<Self>,
+            mut request: OpenRequest<'_>,
+        ) -> Result<(), zx::Status> {
+            let component = match self.component.upgrade() {
+                Ok(component) => component,
+                Err(e) => {
+                    error!(
+                        "failed to upgrade WeakComponentInstance routing use \
+                                 decl `{:?}`: {:?}",
+                        self.decl, e
+                    );
+                    return Err(e.as_zx_status());
+                }
+            };
+
+            request.prepend_path(&self.decl.target_path.to_string().try_into()?);
+            let route_request = RouteRequest::UseEventStream(self.decl.clone());
+            routing::route_and_open_capability_with_reporting(&route_request, &component, request)
+                .await
+                .map_err(|e| e.as_zx_status())
+        }
+    }
+    Open::new(Arc::new(UseEventStream { component: component.as_weak(), decl }))
 }
 
 fn not_found_logging(component: &Arc<ComponentInstance>) -> UnboundedSender<String> {
