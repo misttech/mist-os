@@ -134,59 +134,16 @@ To use `rust-analyzer` with VS Code, Fuchsia recommends:
 ##### Configure workflow {#rust-configure-workflow}
 
 Using the [`fuchsia.code-workspace` configuration file][code-workspace]
-will set recommended defaults for using rust-analyzer on Fuchsia. If you
-aren't using the workspace file, here are some settings you may want to add
-to your `settings.json`:
+will set recommended defaults for using rust-analyzer on Fuchsia.
 
-```json
-
-  // disable cargo check on save
-  "rust-analyzer.checkOnSave.enable": false,
-  "rust-analyzer.checkOnSave.allTargets": false,
-
-  // workaround for https://fxbug.dev/42053708
-  // needed if you see errors about extension host crashing
-  "rust-analyzer.files.watcher": "server",
-```
-
-Additionally, you may want to configure smaller tooltips and hide parameter hints to optimize your
-workspace:
+Beyond those defaults, here are some optional settings you may want to add to your `settings.json`:
 
 ```json
 
   // optional: only show summary docs for functions (keeps tooltips small)
-  "rust-analyzer.callInfo.full": false,
+  "rust-analyzer.signatureInfo.detail": "parameters",
   // optional: don't activate parameterHints automatically
   "editor.parameterHints.enabled": false,
-
-```
-
-##### Enable rustfmt
-
-The `rust-analyzer` extension relies on the `rustup` installer to invoke `rustfmt`,
-a tool for formatting Rust code according to style guidelines.
-
-To configure `rustup` with your Fuchsia source code, run:
-
-Note: `HOST_OS` is `linux-x64` on Linux and `mac-x64` on macOS.
-
-```posix-terminal
-rustup toolchain link fuchsia {{ '<var>' }}FUCHSIA_DIR{{ '</var>' }}/prebuilt/third_party/rust/{{ '<var>' }}HOST_OS{{ '</var>' }}
-```
-
-After configuring `rustup`, the `rust-analyzer` extension supports additional configuration
-with Fuchsia's Rust style guide, [`rustfmt.toml`](/rustfmt.toml).
-
-Add the following snippet to your `settings.json` using the same steps
-from [Configuring workflow](#rust-configure-workflow):
-
-```json
-
-    // use fuchsia toolchain and fuchsia's rules for rustfmt:
-    "rust-analyzer.rustfmt.extraArgs": [
-        "+fuchsia",
-        "--config-path={{ '<var>' }}FUCHSIA_DIR{{ '</var>' }}/rustfmt.toml"
-    ],
 
 ```
 
@@ -209,7 +166,6 @@ directly from VS Code.
 [vscode-update]:  https://vscode-docs.readthedocs.io/en/stable/supporting/howtoupdate/
 [vscode-disable-telemetry]: https://code.visualstudio.com/docs/getstarted/telemetry#_disable-telemetry-reporting
 [lsp-definition]: https://microsoft.github.io/language-server-protocol/
-[vscode-remote-workspaces]: /docs/reference/tools/editors/vscode/remote-workspaces.md
 [extension-install]: /docs/reference/tools/editors/vscode/fuchsia-ext-install.md
 [extension-link]: https://marketplace.visualstudio.com/items?itemName=fuchsia-authors.vscode-fuchsia
 [structured-config-json5]: /docs/development/components/configuration/structured_config.md

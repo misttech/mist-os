@@ -132,6 +132,12 @@
     "rust-analyzer.files.watcher": "server",
     "rust-analyzer.server.path": "${workspaceFolder}/prebuilt/third_party/rust-analyzer/rust-analyzer",
 
+    // Use Fuchsia's config and vendored rustfmt.
+    "rust-analyzer.rustfmt.overrideCommand": [
+      "${workspaceFolder}/prebuilt/third_party/rust/linux-x64/bin/rustfmt",
+      "--config-path=${workspaceFolder}/rustfmt.toml"
+    ],
+
     // Use clippy.
     "rust-analyzer.check.overrideCommand": [
       "${workspaceFolder}/scripts/fx",
