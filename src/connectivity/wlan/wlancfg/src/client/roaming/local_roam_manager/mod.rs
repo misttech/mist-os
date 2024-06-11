@@ -13,7 +13,6 @@ use {
         util::pseudo_energy::EwmaSignalData,
     },
     anyhow::{format_err, Error},
-    fuchsia_async as fasync,
     futures::{
         channel::mpsc, future::BoxFuture, select, stream::FuturesUnordered, FutureExt, StreamExt,
     },
@@ -60,10 +59,9 @@ impl LocalRoamManagerApi for LocalRoamManager {
         currently_fulfilled_connection: types::ConnectSelection,
         roam_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
     ) -> Box<dyn roam_monitor::RoamMonitorApi> {
-        let connection_data = ConnectionData::new(
+        let connection_data = RoamingConnectionData::new(
             currently_fulfilled_connection.clone(),
             EwmaSignalData::new(signal.rssi_dbm, signal.snr_db, EWMA_SMOOTHING_FACTOR_FOR_METRICS),
-            fasync::Time::now(),
         );
         Box::new(roam_monitor::RoamMonitor::new(
             self.roam_search_sender.clone(),
@@ -251,10 +249,9 @@ mod tests {
 
         let signal_data = EwmaSignalData::new(-80, 10, EWMA_SMOOTHING_FACTOR_FOR_METRICS);
 
-        let connection_data = ConnectionData::new(
+        let connection_data = RoamingConnectionData::new(
             test_values.currently_fulfilled_connection.clone(),
             signal_data,
-            fuchsia_async::Time::now(),
         );
 
         // Send a request for the LocalRoamManagerService to initiate bss selection.
@@ -307,10 +304,9 @@ mod tests {
         // Initialize current connection data.
         let signal_data =
             EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR_FOR_METRICS);
-        let connection_data = ConnectionData::new(
+        let connection_data = RoamingConnectionData::new(
             test_values.currently_fulfilled_connection.clone(),
             signal_data,
-            fuchsia_async::Time::now(),
         );
 
         // Send a roam search request to local roam manager service
@@ -378,10 +374,9 @@ mod tests {
         // Initialize current connection data.
         let signal_data =
             EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR_FOR_METRICS);
-        let connection_data = ConnectionData::new(
+        let connection_data = RoamingConnectionData::new(
             test_values.currently_fulfilled_connection.clone(),
             signal_data,
-            fuchsia_async::Time::now(),
         );
 
         // Send a roam search request to local roam manager service
@@ -420,10 +415,9 @@ mod tests {
         let _exec = TestExecutor::new();
         let (sender, _) = mpsc::unbounded();
         let roam_search_request = RoamSearchRequest::new(
-            ConnectionData::new(
+            RoamingConnectionData::new(
                 generate_connect_selection(),
                 generate_random_ewma_signal_data(),
-                fasync::Time::now(),
             ),
             sender,
         );

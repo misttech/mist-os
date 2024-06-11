@@ -41,7 +41,7 @@ pub struct RoamMonitor {
     roam_search_sender: mpsc::UnboundedSender<RoamSearchRequest>,
     /// Channel to send roam requests to a state machine.
     roam_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
-    connection_data: ConnectionData,
+    connection_data: RoamingConnectionData,
     telemetry_sender: TelemetrySender,
 }
 
@@ -49,7 +49,7 @@ impl RoamMonitor {
     pub fn new(
         roam_search_sender: mpsc::UnboundedSender<RoamSearchRequest>,
         roam_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
-        connection_data: ConnectionData,
+        connection_data: RoamingConnectionData,
         telemetry_sender: TelemetrySender,
     ) -> Self {
         Self { roam_search_sender, roam_sender, connection_data, telemetry_sender }
@@ -79,7 +79,7 @@ impl RoamMonitorApi for RoamMonitor {
         if !roam_reasons.is_empty() {
             let now = fasync::Time::now();
             if now
-                < self.connection_data.roam_decision_data.time_prev_roam_scan
+                < self.connection_data.previous_roam_scan_data.time_prev_roam_scan
                     + MIN_TIME_BETWEEN_ROAM_SCANS
             {
                 return Ok(bss_score);
@@ -87,14 +87,14 @@ impl RoamMonitorApi for RoamMonitor {
             // If there isn't a new reason to roam and the previous scan
             // happened recently, do not scan again.
             let is_scan_old = now
-                > self.connection_data.roam_decision_data.time_prev_roam_scan
+                > self.connection_data.previous_roam_scan_data.time_prev_roam_scan
                     + TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE;
             let has_new_reason = roam_reasons.iter().any(|r| {
-                !self.connection_data.roam_decision_data.roam_reasons_prev_scan.contains(r)
+                !self.connection_data.previous_roam_scan_data.roam_reasons_prev_scan.contains(r)
             });
             let rssi = self.connection_data.signal_data.ewma_rssi.get();
             let is_rssi_different =
-                (self.connection_data.roam_decision_data.rssi_prev_roam_scan - rssi).abs()
+                (self.connection_data.previous_roam_scan_data.rssi_prev_roam_scan - rssi).abs()
                     > MIN_RSSI_CHANGE_TO_ROAM_SCAN;
             if is_scan_old || has_new_reason || is_rssi_different {
                 // Initiate roam scan.
@@ -103,9 +103,10 @@ impl RoamMonitorApi for RoamMonitor {
                 let _ = self.roam_search_sender.unbounded_send(req);
 
                 // Updated fields for tracking roam scan decisions
-                self.connection_data.roam_decision_data.time_prev_roam_scan = fasync::Time::now();
-                self.connection_data.roam_decision_data.roam_reasons_prev_scan = roam_reasons;
-                self.connection_data.roam_decision_data.rssi_prev_roam_scan = rssi;
+                self.connection_data.previous_roam_scan_data.time_prev_roam_scan =
+                    fasync::Time::now();
+                self.connection_data.previous_roam_scan_data.roam_reasons_prev_scan = roam_reasons;
+                self.connection_data.previous_roam_scan_data.rssi_prev_roam_scan = rssi;
             }
         }
         // return score for metrics purposes
@@ -243,14 +244,15 @@ mod test {
 
         let init_rssi = -75;
         let init_snr = 15;
-        let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
+        let previous_roam_scan_data = PreviousRoamScanData::new(init_rssi);
         let mut signal_data =
             EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR_FOR_METRICS);
-        let connection_data = ConnectionData {
+        let rssi_velocity = RssiVelocity::new(init_rssi);
+        let connection_data = RoamingConnectionData {
             currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
             signal_data,
-            rssi_velocity: RssiVelocity::new(0.0),
-            roam_decision_data: roam_data,
+            rssi_velocity,
+            previous_roam_scan_data,
         };
 
         let mut roam_monitor = RoamMonitor::new(
@@ -293,14 +295,14 @@ mod test {
 
         let init_rssi = -40;
         let init_snr = 50;
-        let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
+        let roam_data = PreviousRoamScanData::new(init_rssi as f64);
         let signal_data = EwmaSignalData::new(init_rssi, init_snr, 1);
 
-        let connection_data = ConnectionData {
+        let connection_data = RoamingConnectionData {
             currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
             signal_data,
             rssi_velocity: RssiVelocity::new(-40),
-            roam_decision_data: roam_data,
+            previous_roam_scan_data: roam_data,
         };
         let mut roam_monitor = RoamMonitor::new(
             test_values.roam_search_sender.clone(),
@@ -350,14 +352,15 @@ mod test {
 
         let init_rssi = -80;
         let init_snr = 10;
-        let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
+        let previous_roam_scan_data = PreviousRoamScanData::new(init_rssi);
         let signal_data =
             EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR_FOR_METRICS);
-        let connection_data = ConnectionData {
+        let rssi_velocity = RssiVelocity::new(init_rssi);
+        let connection_data = RoamingConnectionData {
             currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
             signal_data,
-            rssi_velocity: RssiVelocity::new(0.0),
-            roam_decision_data: roam_data,
+            rssi_velocity,
+            previous_roam_scan_data,
         };
         let mut roam_monitor = RoamMonitor::new(
             test_values.roam_search_sender.clone(),
