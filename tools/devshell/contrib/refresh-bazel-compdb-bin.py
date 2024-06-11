@@ -65,6 +65,15 @@ class CompDBFormatter:
         if file_path == ".":
             return "../../"
 
+        # There are actions which are external that reference cc_libraries which
+        # are defined as part of the main workspace, mostly @internal_sdk targets.
+        # The files they reference are mainly in the //sdk directory so we need
+        # to rewrite the path and treat them as local files.
+        # In the future we will likely need to do this for other cc_library targets
+        # that are outside of the SDK directory and will need to find a better solution.
+        if file_path.startswith("sdk/"):
+            return "../../" + file_path
+
         # bazel-out needs to be checked first because it contains external/ paths
         if "bazel-out/" in file_path:
             return file_path.replace("bazel-out/", self.output_path_rel + "/")
