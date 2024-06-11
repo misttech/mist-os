@@ -247,4 +247,6 @@ type RepositoryError = strict enum : uint32 {
     NO_MATCHING_PACKAGE = 15;
     /// The repository registration has a conflicting alias.
     CONFLICTING_REGISTRATION = 16;
+    /// The repository metadata cannot be found.
+    REPOSITORY_METADATA_NOT_FOUND = 17;
 };

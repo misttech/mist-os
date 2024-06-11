@@ -439,6 +439,9 @@ async fn add_repository(
             repository::Error::Tuf(tuf::Error::ExpiredMetadata { .. }) => {
                 ffx::RepositoryError::ExpiredRepositoryMetadata
             }
+            repository::Error::Tuf(tuf::Error::MetadataNotFound { .. }) => {
+                ffx::RepositoryError::RepositoryMetadataNotFound
+            }
             _ => ffx::RepositoryError::IoError,
         }
     })?;

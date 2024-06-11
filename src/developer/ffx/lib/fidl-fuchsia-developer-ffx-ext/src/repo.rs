@@ -429,6 +429,9 @@ pub enum RepositoryError {
 
     #[error("repository registration conflict")]
     ConflictingRegistration,
+
+    #[error("repository metadata cannot be found")]
+    NoRepositoryMetadata,
 }
 
 impl From<fidl::RepositoryError> for RepositoryError {
@@ -451,6 +454,7 @@ impl From<fidl::RepositoryError> for RepositoryError {
             fErr::ServerAddressAlreadyInUse => Err::ServerAddressAlreadyInUse,
             fErr::NoMatchingPackage => Err::NoMatchingPackage,
             fErr::ConflictingRegistration => Err::ConflictingRegistration,
+            fErr::RepositoryMetadataNotFound => Err::NoRepositoryMetadata,
         }
     }
 }
@@ -475,6 +479,7 @@ impl From<RepositoryError> for fidl::RepositoryError {
             Err::ServerAddressAlreadyInUse => fErr::ServerAddressAlreadyInUse,
             Err::NoMatchingPackage => fErr::NoMatchingPackage,
             Err::ConflictingRegistration => fErr::ConflictingRegistration,
+            Err::NoRepositoryMetadata => fErr::RepositoryMetadataNotFound,
         }
     }
 }
