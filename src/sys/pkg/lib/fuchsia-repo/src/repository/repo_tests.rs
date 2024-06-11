@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    range::Range,
-    repository::{Error, RepoProvider},
-};
+use crate::range::Range;
+use crate::repository::{Error, RepoProvider};
 
 #[async_trait::async_trait]
 pub(crate) trait TestEnv: Sized {
@@ -74,18 +72,12 @@ macro_rules! repo_test_suite {
     ) => {
         #[cfg(test)]
         mod repo_test_suite {
-            use {
-                super::*,
-                assert_matches::assert_matches,
-                futures::{stream, StreamExt},
-                $crate::{
-                    range::Range,
-                    repository::{
-                        repo_tests::{read_blob, read_metadata},
-                        Error,
-                    },
-                },
-            };
+            use super::*;
+            use assert_matches::assert_matches;
+            use futures::{stream, StreamExt};
+            use $crate::range::Range;
+            use $crate::repository::repo_tests::{read_blob, read_metadata};
+            use $crate::repository::Error;
 
             // Test to check that fetching a non-existing file returns a NotFound.
             #[fuchsia::test]

@@ -4,18 +4,14 @@
 
 #![cfg_attr(feature = "benchmarks", feature(test))]
 
-use {
-    core::mem,
-    thiserror::Error,
-    tracing::warn,
-    wlan_bitfield::bitfield,
-    wlan_common::{
-        appendable::{Appendable, BufferTooSmall},
-        big_endian::{BigEndianU16, BigEndianU64},
-        buffer_reader::BufferReader,
-    },
-    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned},
-};
+use core::mem;
+use thiserror::Error;
+use tracing::warn;
+use wlan_bitfield::bitfield;
+use wlan_common::appendable::{Appendable, BufferTooSmall};
+use wlan_common::big_endian::{BigEndianU16, BigEndianU64};
+use wlan_common::buffer_reader::BufferReader;
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -410,7 +406,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wlan_common::{assert_variant, buffer_writer::BufferWriter};
+    use wlan_common::assert_variant;
+    use wlan_common::buffer_writer::BufferWriter;
 
     #[cfg(feature = "benchmarks")]
     mod benches {

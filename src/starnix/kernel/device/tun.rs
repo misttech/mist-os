@@ -4,30 +4,26 @@
 
 //! This file contains code for creating and serving tun/tap devices.
 
-use std::{num::NonZeroU64, sync::Arc};
+use std::num::NonZeroU64;
+use std::sync::Arc;
 
 use fidl::endpoints::Proxy as _;
-use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_tun as fnet_tun;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
 use starnix_logging::{log_info, log_warn};
 use starnix_sync::{Locked, Mutex, Unlocked};
-use starnix_uapi::{
-    errors::Errno,
-    user_address::{UserAddress, UserRef},
-};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::user_address::{UserAddress, UserRef};
 use zerocopy::IntoBytes as _;
-
-use crate::{
-    mm::MemoryAccessorExt,
-    signals::RunState,
-    task::{CurrentTask, WaiterRef},
-    vfs::{default_ioctl, FileObject, FileOps},
+use {
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_tun as fnet_tun,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
+
+use crate::mm::MemoryAccessorExt;
+use crate::signals::RunState;
+use crate::task::{CurrentTask, WaiterRef};
+use crate::vfs::{default_ioctl, FileObject, FileOps};
 
 #[derive(Debug, Clone, Copy)]
 enum DevKind {

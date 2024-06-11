@@ -5,9 +5,6 @@
 #![allow(non_upper_case_globals)]
 
 use crate::vulkan::{BufferCollectionTokens, Loader};
-use fidl_fuchsia_images2 as fimages2;
-use fidl_fuchsia_sysmem2 as fsysmem2;
-use fidl_fuchsia_ui_composition as fuicomp;
 use fsysmem2::{AllocatorAllocateSharedCollectionRequest, BufferCollectionTokenDuplicateRequest};
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_image_format::{
@@ -23,7 +20,6 @@ use fuchsia_vulkan::{
     STRUCTURE_TYPE_IMAGE_FORMAT_CONSTRAINTS_INFO_FUCHSIA,
     STRUCTURE_TYPE_SYSMEM_COLOR_SPACE_FUCHSIA,
 };
-use fuchsia_zircon as zx;
 use magma::{
     magma_handle_t, magma_image_create_info_t, magma_image_info_t, magma_poll_item__bindgen_ty_1,
     magma_poll_item_t, magma_semaphore_t, magma_status_t, virtio_magma_ctrl_hdr_t,
@@ -33,15 +29,17 @@ use magma::{
     MAGMA_MAX_IMAGE_PLANES, MAGMA_POLL_TYPE_SEMAPHORE, MAGMA_STATUS_INTERNAL_ERROR,
     MAGMA_STATUS_INVALID_ARGS,
 };
-use starnix_core::{mm::MemoryAccessorExt, task::CurrentTask};
+use starnix_core::mm::MemoryAccessorExt;
+use starnix_core::task::CurrentTask;
 use starnix_logging::{log_warn, track_stub};
-use starnix_uapi::{
-    errno,
-    errors::Errno,
-    user_address::{UserAddress, UserRef},
-};
-use vk_sys as vk;
+use starnix_uapi::errno;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::user_address::{UserAddress, UserRef};
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use {
+    fidl_fuchsia_images2 as fimages2, fidl_fuchsia_sysmem2 as fsysmem2,
+    fidl_fuchsia_ui_composition as fuicomp, fuchsia_zircon as zx, vk_sys as vk,
+};
 
 /// Reads a magma command and its type from user space.
 ///

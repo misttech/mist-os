@@ -4,10 +4,8 @@
 
 //! Utilities for parsing and serializing IPCP options.
 
-use {
-    crate::records::options::{OptionsImpl, OptionsImplLayout, OptionsSerializerImpl},
-    byteorder::{ByteOrder, NetworkEndian},
-};
+use crate::records::options::{OptionsImpl, OptionsImplLayout, OptionsSerializerImpl};
+use byteorder::{ByteOrder, NetworkEndian};
 
 /// An IPCP control option.
 #[derive(Clone, Eq, Hash, PartialEq, Debug)]

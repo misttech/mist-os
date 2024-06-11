@@ -4,10 +4,10 @@
 
 //! Type-safe bindings for Zircon threads.
 
-use crate::object_get_info;
-use crate::ok;
-use crate::{AsHandleRef, Handle, HandleBased, HandleRef, Profile, Status, Task};
-use crate::{ObjectQuery, Topic};
+use crate::{
+    object_get_info, ok, AsHandleRef, Handle, HandleBased, HandleRef, ObjectQuery, Profile, Status,
+    Task, Topic,
+};
 use bitflags::bitflags;
 use fuchsia_zircon_sys as sys;
 

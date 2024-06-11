@@ -4,16 +4,14 @@
 
 use std::cell::Cell;
 
-use crate::{
-    bones::Weight,
-    container_component::ContainerComponent,
-    core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property},
-    math::{self, Mat},
-    option_cell::OptionCell,
-    shapes::Path,
-    status_code::StatusCode,
-    Component,
-};
+use crate::bones::Weight;
+use crate::container_component::ContainerComponent;
+use crate::core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property};
+use crate::math::{self, Mat};
+use crate::option_cell::OptionCell;
+use crate::shapes::Path;
+use crate::status_code::StatusCode;
+use crate::Component;
 
 use super::CubicVertex;
 

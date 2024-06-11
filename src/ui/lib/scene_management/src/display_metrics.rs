@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_scenic::DisplayRotation;
+use input_pipeline::Size;
 use num_traits::float::FloatConst;
-use {fuchsia_scenic::DisplayRotation, input_pipeline::Size};
 
 /// Predefined viewing distances with values in millimeters.
 #[derive(Copy, Clone, PartialEq, Debug)]

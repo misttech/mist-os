@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::network_config::{Credential, NetworkConfig, NetworkIdentifier, SecurityType},
-    crate::client::types as client_types,
-    wlan_stash::policy as policy_stash,
-};
+use super::network_config::{Credential, NetworkConfig, NetworkIdentifier, SecurityType};
+use crate::client::types as client_types;
+use wlan_stash::policy as policy_stash;
 
 impl From<policy_stash::NetworkIdentifier> for NetworkIdentifier {
     fn from(item: policy_stash::NetworkIdentifier) -> Self {
@@ -81,10 +79,9 @@ pub fn network_config_vec_to_persistent_data(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{super::*, *},
-        wlan_stash::policy as pstash,
-    };
+    use super::super::*;
+    use super::*;
+    use wlan_stash::policy as pstash;
 
     #[fuchsia::test]
     fn network_identifier_to_stash_from_policy() {

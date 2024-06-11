@@ -2,36 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use async_trait::async_trait;
+use ftest::{Invocation, RunListenerProxy};
+use fuchsia_zircon::{self as zx, HandleBased};
+use futures::future::{abortable, join3, AbortHandle, FutureExt as _};
+use futures::lock::Mutex;
+use futures::prelude::*;
+use lazy_static::lazy_static;
+use namespace::NamespaceError;
+use regex::Regex;
+use std::collections::HashSet;
+use std::sync::{Arc, Weak};
+use test_runners_lib::cases::TestCaseInfo;
+use test_runners_lib::elf::{
+    Component, ComponentError, EnumeratedTestCases, FidlError, KernelError,
+    MemoizedFutureContainer, PinnedFuture, SuiteServer,
+};
+use test_runners_lib::errors::*;
+use test_runners_lib::launch;
+use test_runners_lib::logs::{LogStreamReader, LoggerStream, SocketLogWriter};
+use tracing::{debug, error};
+use zx::Task;
 use {
-    async_trait::async_trait,
-    fidl_fuchsia_process as fproc, fidl_fuchsia_test as ftest,
-    ftest::{Invocation, RunListenerProxy},
-    fuchsia_async as fasync, fuchsia_runtime as runtime,
-    fuchsia_zircon::{self as zx, HandleBased},
-    futures::{
-        future::{abortable, join3, AbortHandle, FutureExt as _},
-        lock::Mutex,
-        prelude::*,
-    },
-    lazy_static::lazy_static,
-    namespace::NamespaceError,
-    regex::Regex,
-    std::{
-        collections::HashSet,
-        sync::{Arc, Weak},
-    },
-    test_runners_lib::{
-        cases::TestCaseInfo,
-        elf::{
-            Component, ComponentError, EnumeratedTestCases, FidlError, KernelError,
-            MemoizedFutureContainer, PinnedFuture, SuiteServer,
-        },
-        errors::*,
-        launch,
-        logs::{LogStreamReader, LoggerStream, SocketLogWriter},
-    },
-    tracing::{debug, error},
-    zx::Task,
+    fidl_fuchsia_process as fproc, fidl_fuchsia_test as ftest, fuchsia_async as fasync,
+    fuchsia_runtime as runtime,
 };
 
 lazy_static! {
@@ -543,19 +537,17 @@ where
 // TODO(https://fxbug.dev/42122424): Add integration tests.
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::{Context as _, Error},
-        assert_matches::assert_matches,
-        fidl_fuchsia_test::{
-            Result_ as TestResult, RunListenerMarker, RunOptions, Status, SuiteMarker,
-        },
-        itertools::Itertools,
-        pretty_assertions::assert_eq,
-        test_runners_test_lib::{
-            assert_event_ord, collect_listener_event, names_to_invocation, test_component,
-            ListenerEvent,
-        },
+    use super::*;
+    use anyhow::{Context as _, Error};
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_test::{
+        Result_ as TestResult, RunListenerMarker, RunOptions, Status, SuiteMarker,
+    };
+    use itertools::Itertools;
+    use pretty_assertions::assert_eq;
+    use test_runners_test_lib::{
+        assert_event_ord, collect_listener_event, names_to_invocation, test_component,
+        ListenerEvent,
     };
 
     #[test]

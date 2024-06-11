@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::generic::{CurrentStateCache, Listener, Message},
-    crate::client::types as client_types,
-    fidl_fuchsia_wlan_policy as fidl_policy,
-    futures::{channel::mpsc, future::BoxFuture, prelude::*},
-};
+use super::generic::{CurrentStateCache, Listener, Message};
+use crate::client::types as client_types;
+use fidl_fuchsia_wlan_policy as fidl_policy;
+use futures::channel::mpsc;
+use futures::future::BoxFuture;
+use futures::prelude::*;
 
 #[derive(Clone, PartialEq)]
 #[cfg_attr(test, derive(Debug))]
@@ -102,7 +102,9 @@ pub type ClientListenerMessageSender = mpsc::UnboundedSender<ClientListenerMessa
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::client::types::Ssid, fidl_fuchsia_wlan_policy as fidl_policy};
+    use super::*;
+    use crate::client::types::Ssid;
+    use fidl_fuchsia_wlan_policy as fidl_policy;
 
     #[fuchsia::test]
     fn merge_update_none_to_one_active() {

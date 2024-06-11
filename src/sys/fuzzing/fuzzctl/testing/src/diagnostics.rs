@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity},
-    futures::AsyncWriteExt,
-};
+use anyhow::Result;
+use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity};
+use futures::AsyncWriteExt;
 
 /// Generates a system log entry from the given `msg` and sends it to the given `socket`.
 ///

@@ -2,22 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    assert_matches::assert_matches,
-    fidl::endpoints,
-    fidl_fuchsia_bluetooth_host::HostRequest,
-    fidl_fuchsia_bluetooth_sys::AccessMarker,
-    fuchsia_bluetooth::types::{
-        pairing_options::{BondableMode, PairingOptions, SecurityLevel},
-        HostId, PeerId, Technology,
-    },
-    fuchsia_sync::RwLock,
-    futures::{future, stream::TryStreamExt},
-    std::sync::Arc,
-};
+use anyhow::Error;
+use assert_matches::assert_matches;
+use fidl::endpoints;
+use fidl_fuchsia_bluetooth_host::HostRequest;
+use fidl_fuchsia_bluetooth_sys::AccessMarker;
+use fuchsia_bluetooth::types::pairing_options::{BondableMode, PairingOptions, SecurityLevel};
+use fuchsia_bluetooth::types::{HostId, PeerId, Technology};
+use fuchsia_sync::RwLock;
+use futures::future;
+use futures::stream::TryStreamExt;
+use std::sync::Arc;
 
-use crate::{host_device, host_dispatcher, services::access};
+use crate::services::access;
+use crate::{host_device, host_dispatcher};
 
 #[fuchsia::test]
 async fn test_pair() -> Result<(), Error> {

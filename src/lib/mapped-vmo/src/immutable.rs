@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fuchsia_zircon as zx, std::ptr::NonNull};
+use fuchsia_zircon as zx;
+use std::ptr::NonNull;
 
 /// Provides a safe byte slice view of a VMO through a `Deref<Target=[u8]>` implementation.
 pub struct ImmutableMapping {
@@ -152,7 +153,9 @@ pub enum Error {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, std::io::Write as _, test_case::test_case};
+    use super::*;
+    use std::io::Write as _;
+    use test_case::test_case;
 
     #[test_case(true; "immediately-page")]
     #[test_case(false; "do-not-immediately-page")]

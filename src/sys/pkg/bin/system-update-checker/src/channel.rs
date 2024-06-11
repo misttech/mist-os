@@ -11,9 +11,8 @@ use fuchsia_sync::Mutex;
 use fuchsia_url::AbsolutePackageUrl;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 use thiserror::Error;
 use tracing::{error, warn};
 

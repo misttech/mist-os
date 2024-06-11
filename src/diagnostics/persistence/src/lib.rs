@@ -11,23 +11,23 @@ mod inspect_server;
 mod persist_server;
 mod scheduler;
 
-use {
-    anyhow::{bail, Error},
-    argh::FromArgs,
-    fetcher::Fetcher,
-    fuchsia_async::{self as fasync, TaskGroup},
-    fuchsia_component::server::{ServiceFs, ServiceObj},
-    fuchsia_inspect::{component, health::Reporter},
-    fuchsia_sync::Mutex,
-    fuchsia_zircon::{Duration, Time},
-    futures::{future::join, FutureExt, StreamExt},
-    persist_server::PersistServer,
-    persistence_component_config::Config as ComponentConfig,
-    persistence_config::Config,
-    scheduler::Scheduler,
-    std::sync::Arc,
-    tracing::*,
-};
+use anyhow::{bail, Error};
+use argh::FromArgs;
+use fetcher::Fetcher;
+use fuchsia_async::{self as fasync, TaskGroup};
+use fuchsia_component::server::{ServiceFs, ServiceObj};
+use fuchsia_inspect::component;
+use fuchsia_inspect::health::Reporter;
+use fuchsia_sync::Mutex;
+use fuchsia_zircon::{Duration, Time};
+use futures::future::join;
+use futures::{FutureExt, StreamExt};
+use persist_server::PersistServer;
+use persistence_component_config::Config as ComponentConfig;
+use persistence_config::Config;
+use scheduler::Scheduler;
+use std::sync::Arc;
+use tracing::*;
 
 /// The name of the subcommand and the logs-tag.
 pub const PROGRAM_NAME: &str = "persistence";

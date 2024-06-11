@@ -3,21 +3,18 @@
 // found in the LICENSE file.
 
 #![cfg(test)]
-use {
-    assert_matches::assert_matches,
-    blobfs_ramdisk::Ramdisk,
-    diagnostics_assertions::assert_data_tree,
-    fidl_fuchsia_pkg_rewrite_ext::Rule,
-    fuchsia_hash::Hash,
-    fuchsia_pkg_testing::{
-        serve::responder, Package, PackageBuilder, RepositoryBuilder, SystemImageBuilder,
-    },
-    fuchsia_zircon::Status,
-    lib::{TestEnvBuilder, EMPTY_REPO_PATH},
-    rand::prelude::*,
-    std::io::Read,
-    std::sync::Arc,
-};
+use assert_matches::assert_matches;
+use blobfs_ramdisk::Ramdisk;
+use diagnostics_assertions::assert_data_tree;
+use fidl_fuchsia_pkg_rewrite_ext::Rule;
+use fuchsia_hash::Hash;
+use fuchsia_pkg_testing::serve::responder;
+use fuchsia_pkg_testing::{Package, PackageBuilder, RepositoryBuilder, SystemImageBuilder};
+use fuchsia_zircon::Status;
+use lib::{TestEnvBuilder, EMPTY_REPO_PATH};
+use rand::prelude::*;
+use std::io::Read;
+use std::sync::Arc;
 
 async fn test_package(name: &str, contents: &str) -> Package {
     PackageBuilder::new(name)

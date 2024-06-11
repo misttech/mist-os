@@ -4,25 +4,20 @@
 
 use std::io::{Read as _, Write as _};
 
-use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_ext as fnet_ext;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_stack as fnet_stack;
-use fidl_fuchsia_net_tun as fnet_tun;
-use fidl_fuchsia_posix_socket as fposix_socket;
-use fidl_fuchsia_tracing_controller as ftracing_controller;
-use fuchsia_async as fasync;
 use futures::{AsyncReadExt as _, FutureExt as _};
+use {
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_stack as fnet_stack,
+    fidl_fuchsia_net_tun as fnet_tun, fidl_fuchsia_posix_socket as fposix_socket,
+    fidl_fuchsia_tracing_controller as ftracing_controller, fuchsia_async as fasync,
+};
 
 use libc as _;
 use net_declare::fidl_subnet;
 use netemul::{PacketCapture, TestEndpoint, TestNetwork};
-use netstack_testing_common::{
-    devices, interfaces,
-    realms::{KnownServiceProvider, NetstackVersion},
-};
+use netstack_testing_common::realms::{KnownServiceProvider, NetstackVersion};
+use netstack_testing_common::{devices, interfaces};
 
 trait IpExt {
     const CLIENT_SUBNET: fnet::Subnet;

@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    packet_encoding::decodable_enum,
-    std::ops::Range,
-    std::u16,
-    thiserror::Error,
-};
+use anyhow::{format_err, Error};
+use packet_encoding::decodable_enum;
+use std::ops::Range;
+use std::u16;
+use thiserror::Error;
 
 /// Decoding error type
 #[derive(Error, Debug, PartialEq)]

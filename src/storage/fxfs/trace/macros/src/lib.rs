@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    proc_macro::TokenStream,
-    proc_macro2::TokenStream as TokenStream2,
-    quote::{quote, ToTokens, TokenStreamExt},
-    syn::{
-        parse::{Parse, ParseStream},
-        parse_macro_input, parse_quote,
-        spanned::Spanned,
-        visit_mut::VisitMut,
-        Attribute, Block, Expr, Ident, ImplItem, ItemFn, ItemImpl, LitStr, ReturnType, Token, Type,
-    },
+use proc_macro::TokenStream;
+use proc_macro2::TokenStream as TokenStream2;
+use quote::{quote, ToTokens, TokenStreamExt};
+use syn::parse::{Parse, ParseStream};
+use syn::spanned::Spanned;
+use syn::visit_mut::VisitMut;
+use syn::{
+    parse_macro_input, parse_quote, Attribute, Block, Expr, Ident, ImplItem, ItemFn, ItemImpl,
+    LitStr, ReturnType, Token, Type,
 };
 
 enum TraceItem {

@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    cell::{Cell, RefCell},
-    rc::Rc,
-};
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
 
-use crate::{
-    component::Component,
-    core::{Core, Object, ObjectRef, OnAdded},
-    option_cell::OptionCell,
-    renderer::{Gradient, PaintColor, RenderPaint},
-    shapes::paint::{Fill, LinearGradient, ShapePaint, SolidColor, Stroke},
-};
+use crate::component::Component;
+use crate::core::{Core, Object, ObjectRef, OnAdded};
+use crate::option_cell::OptionCell;
+use crate::renderer::{Gradient, PaintColor, RenderPaint};
+use crate::shapes::paint::{Fill, LinearGradient, ShapePaint, SolidColor, Stroke};
 
 #[derive(Debug)]
 pub struct ShapePaintMutator {

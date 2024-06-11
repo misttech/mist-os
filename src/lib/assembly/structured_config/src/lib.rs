@@ -9,7 +9,8 @@ use camino::Utf8PathBuf;
 use cm_rust::{FidlIntoNative, NativeIntoFidl};
 use fidl::{unpersist, Persistable};
 use fuchsia_pkg::{PackageBuilder, PackageManifest, RelativeTo};
-use std::{collections::BTreeMap, fmt::Debug};
+use std::collections::BTreeMap;
+use std::fmt::Debug;
 
 pub struct Repackager {
     builder: PackageBuilder,

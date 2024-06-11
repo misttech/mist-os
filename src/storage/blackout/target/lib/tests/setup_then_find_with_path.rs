@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    blackout_target::{find_partition, set_up_partition},
-    fuchsia_async as fasync,
-    ramdevice_client::RamdiskClient,
-};
+use blackout_target::{find_partition, set_up_partition};
+use fuchsia_async as fasync;
+use ramdevice_client::RamdiskClient;
 
 #[fasync::run_singlethreaded(test)]
 async fn setup_then_find_with_path() {

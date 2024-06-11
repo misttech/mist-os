@@ -11,7 +11,8 @@ use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorProxy;
 use iquery::commands::{Command, ListAccessorsResult, ListResult, SelectorsResult, ShowResult};
 use serde::Serialize;
-use std::{fmt, io::Write};
+use std::fmt;
+use std::io::Write;
 
 mod accessor_provider;
 mod apply_selectors;

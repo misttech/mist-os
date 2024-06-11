@@ -4,16 +4,14 @@
 
 //! A collection of types that represent the various parts of socket addresses.
 
-use core::{
-    fmt::{self, Debug, Display, Formatter},
-    marker::PhantomData,
-    num::NonZeroU16,
-    ops::Deref,
-};
+use core::fmt::{self, Debug, Display, Formatter};
+use core::marker::PhantomData;
+use core::num::NonZeroU16;
+use core::ops::Deref;
 
 use derivative::Derivative;
+use net_types::ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6Addr, Ipv6SourceAddr};
 use net_types::{
-    ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6Addr, Ipv6SourceAddr},
     MulticastAddr, NonMappedAddr, ScopeableAddress, SpecifiedAddr, UnicastAddr, Witness, ZonedAddr,
 };
 

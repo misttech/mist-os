@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext::IntoExt;
-use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use net_types::ip::{GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv6};
 use std::collections::HashSet;
 use tracing::error;
+use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_routes_ext as fnet_routes_ext};
 
 /// Keeps track of the current routing state, as observed from the Netstack
 /// `fuchsia.net.routes/WatcherV{4,6}` protocols.

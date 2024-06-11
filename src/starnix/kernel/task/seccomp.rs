@@ -2,47 +2,35 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    mm::MemoryAccessorExt,
-    signals::{send_standard_signal, SignalDetail, SignalInfo},
-    task::{
-        CurrentTask, EventHandler, ExitStatus, Kernel, Task, TaskFlags, WaitCanceler, WaitQueue,
-        Waiter,
-    },
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, Anon, FdFlags, FdNumber, FileObject, FileOps,
-    },
+use crate::mm::MemoryAccessorExt;
+use crate::signals::{send_standard_signal, SignalDetail, SignalInfo};
+use crate::task::{
+    CurrentTask, EventHandler, ExitStatus, Kernel, Task, TaskFlags, WaitCanceler, WaitQueue, Waiter,
 };
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::{fileops_impl_nonseekable, Anon, FdFlags, FdNumber, FileObject, FileOps};
 use bstr::ByteSlice;
-use ebpf::{
-    converter::{bpf_addressing_mode, bpf_class},
-    program::EbpfProgram,
-};
+use ebpf::converter::{bpf_addressing_mode, bpf_class};
+use ebpf::program::EbpfProgram;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked, WriteOps};
-use starnix_syscalls::{decls::Syscall, SyscallArg, SyscallResult};
+use starnix_syscalls::decls::Syscall;
+use starnix_syscalls::{SyscallArg, SyscallResult};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::signals::{SIGKILL, SIGSYS};
+use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    __NR_exit, __NR_read, __NR_write, errno, errno_from_code, error,
-    errors::Errno,
-    open_flags::OpenFlags,
-    seccomp_data, seccomp_notif, seccomp_notif_resp,
-    signals::{SIGKILL, SIGSYS},
-    sock_filter,
-    user_address::{UserAddress, UserRef},
-    vfs::FdEvents,
-    BPF_ABS, BPF_LD, BPF_ST, SECCOMP_IOCTL_NOTIF_ADDFD, SECCOMP_IOCTL_NOTIF_ID_VALID,
-    SECCOMP_IOCTL_NOTIF_RECV, SECCOMP_IOCTL_NOTIF_SEND, SECCOMP_RET_ACTION_FULL, SECCOMP_RET_DATA,
-    SECCOMP_USER_NOTIF_FLAG_CONTINUE, SYS_SECCOMP,
+    __NR_exit, __NR_read, __NR_write, errno, errno_from_code, error, seccomp_data, seccomp_notif,
+    seccomp_notif_resp, sock_filter, BPF_ABS, BPF_LD, BPF_ST, SECCOMP_IOCTL_NOTIF_ADDFD,
+    SECCOMP_IOCTL_NOTIF_ID_VALID, SECCOMP_IOCTL_NOTIF_RECV, SECCOMP_IOCTL_NOTIF_SEND,
+    SECCOMP_RET_ACTION_FULL, SECCOMP_RET_DATA, SECCOMP_USER_NOTIF_FLAG_CONTINUE, SYS_SECCOMP,
 };
-use std::{
-    collections::HashMap,
-    sync::{
-        atomic::{AtomicU8, Ordering},
-        Arc,
-    },
-};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::Arc;
 
 #[cfg(target_arch = "aarch64")]
 use starnix_uapi::__NR_clock_getres;
@@ -1022,7 +1010,8 @@ impl FileOps for SeccompNotifierFileObject {
 
 #[cfg(test)]
 mod test {
-    use crate::{task::SeccompAction, testing::create_kernel_and_task};
+    use crate::task::SeccompAction;
+    use crate::testing::create_kernel_and_task;
 
     #[::fuchsia::test]
     async fn test_actions_logged_accepts_legal_string() {

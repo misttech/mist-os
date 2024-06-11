@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::core::DataCollection,
-    cm_types::Url,
-    core::slice::Iter,
-    fuchsia_merkle::Hash,
-    fuchsia_url::{PackageName, PackageVariant},
-    serde::{Deserialize, Serialize},
-    std::{
-        cmp::{Ord, Ordering, PartialOrd},
-        collections::{HashMap, HashSet},
-        path::PathBuf,
-    },
-};
+use crate::core::DataCollection;
+use cm_types::Url;
+use core::slice::Iter;
+use fuchsia_merkle::Hash;
+use fuchsia_url::{PackageName, PackageVariant};
+use serde::{Deserialize, Serialize};
+use std::cmp::{Ord, Ordering, PartialOrd};
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 
 /// Captures metadata about where a component was loaded from.
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
@@ -372,7 +368,8 @@ impl DataCollection for CoreDataDeps {
 
 #[cfg(test)]
 pub mod testing {
-    use {super::ComponentSource, fuchsia_merkle::HASH_SIZE};
+    use super::ComponentSource;
+    use fuchsia_merkle::HASH_SIZE;
 
     const FAKE_PKG_MERKLE: [u8; HASH_SIZE] = [0x42; HASH_SIZE];
 

@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use fuchsia_url::PinnedAbsolutePackageUrl;
-use omaha_client::{cup_ecdsa::RequestMetadata, installer::Plan, protocol::request::InstallSource};
+use omaha_client::cup_ecdsa::RequestMetadata;
+use omaha_client::installer::Plan;
+use omaha_client::protocol::request::InstallSource;
 use std::fmt;
 
 #[derive(Debug, PartialEq, Eq)]

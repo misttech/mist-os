@@ -4,13 +4,12 @@
 
 // Structs used in parsing packages
 
-use {
-    cm_fidl_analyzer::{match_absolute_pkg_urls, PkgUrlMatch},
-    fuchsia_merkle::Hash,
-    fuchsia_url::AbsolutePackageUrl,
-    std::{collections::HashMap, path::PathBuf},
-    tracing::warn,
-};
+use cm_fidl_analyzer::{match_absolute_pkg_urls, PkgUrlMatch};
+use fuchsia_merkle::Hash;
+use fuchsia_url::AbsolutePackageUrl;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use tracing::warn;
 
 pub type Protocol = String;
 

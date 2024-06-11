@@ -7,14 +7,12 @@ mod realm_factory;
 mod realm_options;
 use crate::realm_factory::*;
 
-use {
-    anyhow::{Error, Result},
-    fidl_test_detect_factory::*,
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    futures::{StreamExt, TryStreamExt},
-    tracing::*,
-};
+use anyhow::{Error, Result};
+use fidl_test_detect_factory::*;
+use fuchsia_async as fasync;
+use fuchsia_component::server::ServiceFs;
+use futures::{StreamExt, TryStreamExt};
+use tracing::*;
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

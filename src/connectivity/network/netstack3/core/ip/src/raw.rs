@@ -4,39 +4,36 @@
 
 //! Facilities backing raw IP sockets.
 
-use alloc::collections::{btree_map::Entry, BTreeMap, HashMap};
-use core::{fmt::Debug, num::NonZeroU8};
+use alloc::collections::btree_map::Entry;
+use alloc::collections::{BTreeMap, HashMap};
+use core::fmt::Debug;
+use core::num::NonZeroU8;
 use derivative::Derivative;
 use log::debug;
-use net_types::{
-    ip::{GenericOverIp, Ip, IpVersionMarker},
-    SpecifiedAddr, ZonedAddr,
+use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
+use net_types::{SpecifiedAddr, ZonedAddr};
+use netstack3_base::socket::{
+    DualStackIpExt, DualStackRemoteIp, SocketIpAddr, SocketZonedAddrExt as _,
 };
+use netstack3_base::sync::{PrimaryRc, StrongRc, WeakRc};
 use netstack3_base::{
-    socket::{DualStackIpExt, DualStackRemoteIp, SocketIpAddr, SocketZonedAddrExt as _},
-    sync::{PrimaryRc, StrongRc, WeakRc},
     AnyDevice, ContextPair, DeviceIdContext, ReferenceNotifiers, ReferenceNotifiersExt as _,
     RemoveResourceResultWithContext, StrongDeviceIdentifier, WeakDeviceIdentifier,
     ZonedAddressError,
 };
 use netstack3_filter::RawIpBody;
 use packet::{BufferMut, SliceBufViewMut};
-use packet_formats::{icmp, ip::IpPacket};
+use packet_formats::icmp;
+use packet_formats::ip::IpPacket;
 use zerocopy::ByteSlice;
 
-use crate::{
-    internal::{
-        base::IpExt,
-        raw::{
-            filter::RawIpSocketIcmpFilter,
-            protocol::RawIpSocketProtocol,
-            state::{RawIpSocketLockedState, RawIpSocketState},
-        },
-        socket::{SendOneShotIpPacketError, SocketHopLimits},
-    },
-    socket::{IpSockCreateAndSendError, IpSocketHandler, SendOptions},
-    DEFAULT_HOP_LIMITS,
-};
+use crate::internal::base::IpExt;
+use crate::internal::raw::filter::RawIpSocketIcmpFilter;
+use crate::internal::raw::protocol::RawIpSocketProtocol;
+use crate::internal::raw::state::{RawIpSocketLockedState, RawIpSocketState};
+use crate::internal::socket::{SendOneShotIpPacketError, SocketHopLimits};
+use crate::socket::{IpSockCreateAndSendError, IpSocketHandler, SendOptions};
+use crate::DEFAULT_HOP_LIMITS;
 
 mod checksum;
 pub(crate) mod filter;
@@ -680,29 +677,31 @@ impl<I: IpExt> SendOptions<I> for RawIpSocketSendOptions<'_, I> {
 mod test {
     use super::*;
 
-    use alloc::{rc::Rc, vec, vec::Vec};
+    use alloc::rc::Rc;
+    use alloc::vec;
+    use alloc::vec::Vec;
     use assert_matches::assert_matches;
-    use core::{cell::RefCell, convert::Infallible as Never, marker::PhantomData};
+    use core::cell::RefCell;
+    use core::convert::Infallible as Never;
+    use core::marker::PhantomData;
     use ip_test_macro::ip_test;
     use net_types::ip::{IpVersion, Ipv4, Ipv6};
-    use netstack3_base::{
-        sync::{DynDebugReferences, Mutex},
-        testutil::{FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId, TestIpExt},
-        ContextProvider, CtxPair,
+    use netstack3_base::sync::{DynDebugReferences, Mutex};
+    use netstack3_base::testutil::{
+        FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId, TestIpExt,
     };
+    use netstack3_base::{ContextProvider, CtxPair};
     use packet::{Buf, InnerPacketBuilder as _, ParseBuffer as _, Serializer as _};
-    use packet_formats::{
-        icmp::{IcmpEchoReply, IcmpMessage, IcmpPacketBuilder, IcmpUnusedCode, Icmpv6MessageType},
-        ip::{IpPacketBuilder, IpProto, IpProtoExt, Ipv6Proto},
-        ipv6::Ipv6Packet,
+    use packet_formats::icmp::{
+        IcmpEchoReply, IcmpMessage, IcmpPacketBuilder, IcmpUnusedCode, Icmpv6MessageType,
     };
+    use packet_formats::ip::{IpPacketBuilder, IpProto, IpProtoExt, Ipv6Proto};
+    use packet_formats::ipv6::Ipv6Packet;
     use test_case::test_case;
 
-    use crate::{
-        internal::socket::testutil::{FakeIpSocketCtx, InnerFakeIpSocketCtx},
-        socket::testutil::FakeDeviceConfig,
-        SendIpPacketMeta, DEFAULT_HOP_LIMITS,
-    };
+    use crate::internal::socket::testutil::{FakeIpSocketCtx, InnerFakeIpSocketCtx};
+    use crate::socket::testutil::FakeDeviceConfig;
+    use crate::{SendIpPacketMeta, DEFAULT_HOP_LIMITS};
 
     #[derive(Derivative, Debug)]
     #[derivative(Default(bound = ""))]

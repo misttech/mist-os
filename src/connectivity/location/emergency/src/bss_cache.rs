@@ -2,20 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_trait::async_trait,
-    fidl::Error as FidlError,
-    fidl_fuchsia_wlan_policy::{
-        Bss as WlanPolicyBss, ScanErrorCode, ScanResult, ScanResultIteratorProxyInterface,
-    },
-    futures::{
-        future::BoxFuture,
-        task::{Context, Poll},
-        Future, FutureExt, Stream, StreamExt,
-    },
-    std::{collections::BTreeMap, pin::Pin},
-    thiserror::Error,
+use async_trait::async_trait;
+use fidl::Error as FidlError;
+use fidl_fuchsia_wlan_policy::{
+    Bss as WlanPolicyBss, ScanErrorCode, ScanResult, ScanResultIteratorProxyInterface,
 };
+use futures::future::BoxFuture;
+use futures::task::{Context, Poll};
+use futures::{Future, FutureExt, Stream, StreamExt};
+use std::collections::BTreeMap;
+use std::pin::Pin;
+use thiserror::Error;
 
 #[async_trait(?Send)]
 pub trait BssCache {
@@ -228,15 +225,13 @@ fn flatten_get_next_error(fidl_result: GetNextResponse) -> Result<Vec<ScanResult
 #[cfg(test)]
 mod tests {
     mod single_call_success {
-        use {
-            super::super::*,
-            assert_matches::assert_matches,
-            fidl_fuchsia_wlan_policy::{
-                Compatibility::Supported, NetworkIdentifier, SecurityType::Wpa2,
-            },
-            fuchsia_async as fasync,
-            test_doubles::FakeScanResultIterator,
-        };
+        use super::super::*;
+        use assert_matches::assert_matches;
+        use fidl_fuchsia_wlan_policy::Compatibility::Supported;
+        use fidl_fuchsia_wlan_policy::NetworkIdentifier;
+        use fidl_fuchsia_wlan_policy::SecurityType::Wpa2;
+        use fuchsia_async as fasync;
+        use test_doubles::FakeScanResultIterator;
 
         #[fasync::run_until_stalled(test)]
         async fn caches_single_bss_with_just_bss_data() {
@@ -526,11 +521,9 @@ mod tests {
     }
 
     mod single_call_failure {
-        use {
-            super::super::*,
-            fuchsia_async as fasync,
-            test_doubles::{FakeScanResultIterator, StubScanResultIterator},
-        };
+        use super::super::*;
+        use fuchsia_async as fasync;
+        use test_doubles::{FakeScanResultIterator, StubScanResultIterator};
 
         #[fasync::run_until_stalled(test)]
         async fn returns_ipc_error_on_fidl_error() {
@@ -613,14 +606,12 @@ mod tests {
     }
 
     mod multiple_calls {
-        use {
-            super::super::*,
-            fidl_fuchsia_wlan_policy::{
-                Compatibility::Supported, NetworkIdentifier, SecurityType::Wpa2,
-            },
-            fuchsia_async as fasync,
-            test_doubles::FakeScanResultIterator,
-        };
+        use super::super::*;
+        use fidl_fuchsia_wlan_policy::Compatibility::Supported;
+        use fidl_fuchsia_wlan_policy::NetworkIdentifier;
+        use fidl_fuchsia_wlan_policy::SecurityType::Wpa2;
+        use fuchsia_async as fasync;
+        use test_doubles::FakeScanResultIterator;
 
         #[fasync::run_until_stalled(test)]
         async fn is_non_empty_after_new_non_empty_data() {
@@ -712,7 +703,9 @@ mod tests {
     }
 
     mod multi_step_iteration {
-        use {super::super::*, fuchsia_async as fasync, test_doubles::FakeScanResultIterator};
+        use super::super::*;
+        use fuchsia_async as fasync;
+        use test_doubles::FakeScanResultIterator;
 
         #[fasync::run_until_stalled(test)]
         async fn reads_all_scan_results() {
@@ -816,12 +809,11 @@ mod tests {
     }
 
     mod ipc_interactions {
-        use {
-            super::super::*,
-            fidl_fuchsia_wlan_policy::{NetworkIdentifier, SecurityType::Wpa2},
-            fuchsia_async as fasync,
-            test_doubles::{RawStubScanResultIterator, StubScanResultIterator},
-        };
+        use super::super::*;
+        use fidl_fuchsia_wlan_policy::NetworkIdentifier;
+        use fidl_fuchsia_wlan_policy::SecurityType::Wpa2;
+        use fuchsia_async as fasync;
+        use test_doubles::{RawStubScanResultIterator, StubScanResultIterator};
 
         #[fasync::run_until_stalled(test)]
         async fn stops_sending_ipcs_when_get_next_yields_fidl_error() {
@@ -907,11 +899,9 @@ mod tests {
 
 #[cfg(test)]
 mod test_doubles {
-    use {
-        super::*,
-        futures::future::{ready, Ready},
-        std::sync::RwLock,
-    };
+    use super::*;
+    use futures::future::{ready, Ready};
+    use std::sync::RwLock;
 
     // Test double that returns scan results from initially provided data.
     // After exhausting the initial data, perpetually returns an empty `Vec`.
@@ -1005,7 +995,8 @@ mod test_doubles {
 
     mod tests {
         mod fake_scan_result_iterator {
-            use {super::super::*, fuchsia_async as fasync};
+            use super::super::*;
+            use fuchsia_async as fasync;
 
             #[fasync::run_until_stalled(test)]
             async fn single_step_yields_all_scan_results_at_once() {

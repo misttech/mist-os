@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use drivers_only_common::DriversOnlyTestRealm;
+use fullmac_helpers::config::FullmacDriverConfig;
+use fullmac_helpers::recorded_request_stream::RecordedRequestStream;
 use {
-    drivers_only_common::DriversOnlyTestRealm,
     fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_sme as fidl_sme,
     fidl_test_wlan_testcontroller as fidl_testcontroller, fuchsia_zircon as zx,
-    fullmac_helpers::{
-        config::FullmacDriverConfig, recorded_request_stream::RecordedRequestStream,
-    },
 };
 
 mod ap;

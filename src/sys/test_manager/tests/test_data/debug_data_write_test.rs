@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::AsHandleRef, fidl_fuchsia_debugdata::PublisherMarker,
-    fuchsia_component::client::connect_to_protocol, fuchsia_zircon as zx, std::ffi::CStr,
-};
+use fidl::AsHandleRef;
+use fidl_fuchsia_debugdata::PublisherMarker;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_zircon as zx;
+use std::ffi::CStr;
 
 const VMO_CONTENTS: &[u8] = b"Debug data from test\n";
 const VMO_NAME: &[u8] = b"vmo_name\0";

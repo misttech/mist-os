@@ -6,10 +6,8 @@ use crate::writer::{Error, Node, State};
 use derivative::Derivative;
 use inspect_format::BlockIndex;
 use private::InspectTypeInternal;
-use std::{
-    fmt::Debug,
-    sync::{Arc, Weak},
-};
+use std::fmt::Debug;
+use std::sync::{Arc, Weak};
 
 /// Trait implemented by all inspect types.
 pub trait InspectType: Send + Sync + Debug {}

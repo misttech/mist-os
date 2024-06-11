@@ -4,13 +4,13 @@
 
 #![cfg(test)]
 
+use anyhow::{ensure, format_err, Error};
+use pretty_assertions::assert_eq;
+use std::env;
 use std::fs::File;
-use {
-    anyhow::{ensure, format_err, Error},
-    pretty_assertions::assert_eq,
-    std::{env, path::PathBuf, process::Command},
-    tempfile::NamedTempFile,
-};
+use std::path::PathBuf;
+use std::process::Command;
+use tempfile::NamedTempFile;
 
 fn test_path() -> PathBuf {
     let mut path = env::current_exe().unwrap();

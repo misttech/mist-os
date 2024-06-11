@@ -15,16 +15,14 @@ use mdns::protocol as dns;
 use mdns::protocol::Type;
 use netext::{get_mcast_interfaces, IsLocalAddr};
 use packet::{InnerPacketBuilder, ParseBuffer};
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
+use std::fmt::Write;
+use std::hash::{Hash, Hasher};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::unix::prelude::AsRawFd;
-use std::{
-    cell::RefCell,
-    collections::{HashMap, HashSet},
-    fmt::Write,
-    hash::{Hash, Hasher},
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-    rc::{Rc, Weak},
-    time::Duration,
-};
+use std::rc::{Rc, Weak};
+use std::time::Duration;
 use timeout::timeout;
 use zerocopy::ByteSlice;
 
@@ -966,7 +964,8 @@ mod tests {
     use ::mdns::protocol::{
         Class, DomainBuilder, EmbeddedPacketBuilder, Message, MessageBuilder, RecordBuilder, Type,
     };
-    use fidl_fuchsia_developer_ffx::{TargetAddrInfo::IpPort, TargetIpPort};
+    use fidl_fuchsia_developer_ffx::TargetAddrInfo::IpPort;
+    use fidl_fuchsia_developer_ffx::TargetIpPort;
     use fidl_fuchsia_net::IpAddress::Ipv4;
     use packet::{InnerPacketBuilder, ParseBuffer, Serializer};
     use std::io::Write;

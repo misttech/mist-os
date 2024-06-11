@@ -6,19 +6,15 @@
 
 #![deny(missing_docs)]
 
-use {
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_zircon_status::{self as zx, assoc_values},
-    futures::stream::{FusedStream, Stream},
-    std::{
-        ffi::OsStr,
-        os::unix::ffi::OsStrExt,
-        path::PathBuf,
-        pin::Pin,
-        task::{Context, Poll},
-    },
-    thiserror::Error,
-};
+use fuchsia_zircon_status::{self as zx, assoc_values};
+use futures::stream::{FusedStream, Stream};
+use std::ffi::OsStr;
+use std::os::unix::ffi::OsStrExt;
+use std::path::PathBuf;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use thiserror::Error;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon::MessageBuf;

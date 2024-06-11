@@ -5,7 +5,8 @@
 #[macro_use]
 extern crate lazy_static;
 
-use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::engine::Engine as _;
 use webpki::trust_anchor_util::cert_der_as_trust_anchor;
 
 static CERT_PATH: &'static str = "/config/ssl/cert.pem";

@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::EscrowRequest;
+use fuchsia_sync::Mutex;
+use futures::channel::oneshot;
+use futures::future::{BoxFuture, Shared};
+use futures::{FutureExt, StreamExt};
+use std::ops::Deref;
+use std::sync::Arc;
 use {
-    super::EscrowRequest,
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_diagnostics_types as fdiagnostics,
-    fuchsia_async as fasync,
-    fuchsia_sync::Mutex,
-    fuchsia_zircon as zx,
-    futures::{
-        channel::oneshot,
-        future::{BoxFuture, Shared},
-        FutureExt, StreamExt,
-    },
-    std::{ops::Deref, sync::Arc},
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 /// Wrapper around the `ComponentControllerProxy` with utilities for handling events.
@@ -133,7 +131,9 @@ impl<'a> ComponentController {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, fidl::prelude::*};
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::prelude::*;
 
     #[fuchsia::test]
     async fn handles_diagnostics_event() {

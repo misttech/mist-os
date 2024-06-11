@@ -4,19 +4,14 @@
 
 //! Implementation of [`TokenRegistry`].
 
-use {
-    crate::directory::entry_container::MutableDirectory,
-    fidl::Handle,
-    fidl::{Event, HandleBased, Rights},
-    fuchsia_zircon_status::Status,
-    pin_project::{pin_project, pinned_drop},
-    std::{
-        collections::hash_map::{Entry, HashMap},
-        ops::{Deref, DerefMut},
-        pin::Pin,
-        sync::{Arc, Mutex},
-    },
-};
+use crate::directory::entry_container::MutableDirectory;
+use fidl::{Event, Handle, HandleBased, Rights};
+use fuchsia_zircon_status::Status;
+use pin_project::{pin_project, pinned_drop};
+use std::collections::hash_map::{Entry, HashMap};
+use std::ops::{Deref, DerefMut};
+use std::pin::Pin;
+use std::sync::{Arc, Mutex};
 
 #[cfg(not(target_os = "fuchsia"))]
 use fuchsia_async::emulated_handle::{AsHandleRef, Koid};
@@ -154,13 +149,11 @@ impl<T: TokenInterface> PinnedDrop for Tokenizable<T> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        self::mocks::{MockChannel, MockDirectory},
-        super::{TokenRegistry, Tokenizable, DEFAULT_TOKEN_RIGHTS},
-        fidl::{AsHandleRef, HandleBased, Rights},
-        futures::pin_mut,
-        std::sync::Arc,
-    };
+    use self::mocks::{MockChannel, MockDirectory};
+    use super::{TokenRegistry, Tokenizable, DEFAULT_TOKEN_RIGHTS};
+    use fidl::{AsHandleRef, HandleBased, Rights};
+    use futures::pin_mut;
+    use std::sync::Arc;
 
     #[test]
     fn client_register_same_token() {
@@ -251,23 +244,20 @@ mod tests {
     }
 
     mod mocks {
-        use crate::{
-            directory::{
-                dirents_sink,
-                entry_container::{Directory, DirectoryWatcher, MutableDirectory},
-                traversal_position::TraversalPosition,
-            },
-            execution_scope::ExecutionScope,
-            node::{IsDirectory, Node},
-            path::Path,
-            token_registry::{TokenInterface, TokenRegistry},
-            ObjectRequestRef,
-        };
+        use crate::directory::dirents_sink;
+        use crate::directory::entry_container::{Directory, DirectoryWatcher, MutableDirectory};
+        use crate::directory::traversal_position::TraversalPosition;
+        use crate::execution_scope::ExecutionScope;
+        use crate::node::{IsDirectory, Node};
+        use crate::path::Path;
+        use crate::token_registry::{TokenInterface, TokenRegistry};
+        use crate::ObjectRequestRef;
 
-        use {
-            async_trait::async_trait, fidl::endpoints::ServerEnd, fidl_fuchsia_io as fio,
-            fuchsia_zircon_status::Status, std::sync::Arc,
-        };
+        use async_trait::async_trait;
+        use fidl::endpoints::ServerEnd;
+        use fidl_fuchsia_io as fio;
+        use fuchsia_zircon_status::Status;
+        use std::sync::Arc;
 
         pub(super) struct MockChannel(pub Arc<TokenRegistry>, pub Arc<MockDirectory>);
 

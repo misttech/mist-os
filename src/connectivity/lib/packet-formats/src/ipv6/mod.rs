@@ -23,10 +23,8 @@ use packet::{
     GrowBufferMut, InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints,
     ParsablePacket, ParseMetadata, ReusableBuffer, SerializeError, SerializeTarget, Serializer,
 };
-use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell,
-    Ref, Unaligned,
-};
+use zerocopy::byteorder::network_endian::U16;
+use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 use crate::error::{IpParseError, IpParseErrorAction, IpParseResult, ParseError};
 use crate::icmp::Icmpv6ParameterProblemCode;
@@ -1320,8 +1318,7 @@ pub(crate) fn reassemble_fragmented_packet<
 #[cfg(test)]
 mod tests {
     use assert_matches::assert_matches;
-    use packet::FragmentedBuffer;
-    use packet::{Buf, ParseBuffer};
+    use packet::{Buf, FragmentedBuffer, ParseBuffer};
 
     use crate::ethernet::{EthernetFrame, EthernetFrameLengthCheck};
     use crate::testutil::*;

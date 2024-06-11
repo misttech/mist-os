@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::filesystems::{BlobFilesystem, DeliveryBlob, FsManagementFilesystemInstance},
-    async_trait::async_trait,
-    delivery_blob::delivery_blob_path,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    std::path::Path,
-    storage_benchmarks::{
-        BlockDeviceConfig, BlockDeviceFactory, CacheClearableFilesystem, Filesystem,
-        FilesystemConfig,
-    },
+use crate::filesystems::{BlobFilesystem, DeliveryBlob, FsManagementFilesystemInstance};
+use async_trait::async_trait;
+use delivery_blob::delivery_blob_path;
+use std::path::Path;
+use storage_benchmarks::{
+    BlockDeviceConfig, BlockDeviceFactory, CacheClearableFilesystem, Filesystem, FilesystemConfig,
 };
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// Config object for starting Blobfs instances.
 #[derive(Clone)]
@@ -121,7 +118,8 @@ impl BlobFilesystem for BlobfsInstance {
 
 #[cfg(test)]
 mod tests {
-    use {super::Blobfs, crate::filesystems::testing::check_blob_filesystem};
+    use super::Blobfs;
+    use crate::filesystems::testing::check_blob_filesystem;
 
     #[fuchsia::test]
     async fn start_blobfs() {

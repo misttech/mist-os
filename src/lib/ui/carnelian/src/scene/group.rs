@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    scene::{facets::FacetId, layout::ArrangerPtr, scene::Scene},
-    IdFromRaw, IdGenerator2, Size,
-};
-use std::{any::Any, collections::HashMap};
+use crate::scene::facets::FacetId;
+use crate::scene::layout::ArrangerPtr;
+use crate::scene::scene::Scene;
+use crate::{IdFromRaw, IdGenerator2, Size};
+use std::any::Any;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// Identifier for a group.

@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Result;
+use async_trait::async_trait;
+use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
 use {
-    anyhow::Result,
-    async_trait::async_trait,
     ffx_power_system_activity_application_activity_args as args_mod,
-    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_power_topology_test as fpt,
 };
 

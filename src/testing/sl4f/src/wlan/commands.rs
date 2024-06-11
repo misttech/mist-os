@@ -11,7 +11,8 @@ use serde_json::{from_value, to_value, Value};
 use tracing::*;
 
 // Testing helper methods
-use crate::wlan::{facade::WlanFacade, types};
+use crate::wlan::facade::WlanFacade;
+use crate::wlan::types;
 
 use crate::common_utils::common::parse_u64_identifier;
 

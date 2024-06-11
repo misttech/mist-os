@@ -4,16 +4,12 @@
 
 // The constant and type definitions in this file must all match
 // //zircon/system/public/zircon/processargs.h
-use {
-    fuchsia_runtime::HandleInfo,
-    fuchsia_zircon as zx,
-    std::ffi::CString,
-    std::fmt,
-    std::mem,
-    std::num,
-    thiserror::Error,
-    zerocopy::{AsBytes, FromBytes, FromZeros, NoCell},
-};
+use fuchsia_runtime::HandleInfo;
+use fuchsia_zircon as zx;
+use std::ffi::CString;
+use std::{fmt, mem, num};
+use thiserror::Error;
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 /// Possible errors that can occur during processargs startup message construction
 #[derive(Error, Debug)]
@@ -243,13 +239,11 @@ impl Message {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::Error,
-        fuchsia_runtime::HandleType,
-        fuchsia_zircon::{AsHandleRef, HandleBased},
-        std::iter,
-    };
+    use super::*;
+    use anyhow::Error;
+    use fuchsia_runtime::HandleType;
+    use fuchsia_zircon::{AsHandleRef, HandleBased};
+    use std::iter;
 
     #[test]
     fn build_and_write_message() -> Result<(), Error> {

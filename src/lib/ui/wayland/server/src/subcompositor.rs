@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::client::Client,
-    crate::compositor::{
-        PlaceSubsurfaceParams, Surface, SurfaceCommand, SurfaceRelation, SurfaceRole,
-    },
-    crate::display::Callback,
-    crate::object::{NewObjectExt, ObjectRef, RequestReceiver},
-    anyhow::{format_err, Error},
-    fuchsia_wayland_core as wl,
-    std::mem,
-    wayland_server_protocol::{
-        WlSubcompositor, WlSubcompositorRequest, WlSubsurface, WlSubsurfaceRequest,
-    },
+use crate::client::Client;
+use crate::compositor::{
+    PlaceSubsurfaceParams, Surface, SurfaceCommand, SurfaceRelation, SurfaceRole,
+};
+use crate::display::Callback;
+use crate::object::{NewObjectExt, ObjectRef, RequestReceiver};
+use anyhow::{format_err, Error};
+use fuchsia_wayland_core as wl;
+use std::mem;
+use wayland_server_protocol::{
+    WlSubcompositor, WlSubcompositorRequest, WlSubsurface, WlSubsurfaceRequest,
 };
 
 /// An implementation of the wl_subcompositor global.

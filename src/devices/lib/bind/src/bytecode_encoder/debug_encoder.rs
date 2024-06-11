@@ -123,13 +123,12 @@ mod test {
     use super::*;
     use crate::bytecode_constants::*;
     use crate::bytecode_encoder::bytecode_checker::*;
-    use crate::bytecode_encoder::encode_v2::encode_composite_to_bytecode;
-    use crate::bytecode_encoder::encode_v2::encode_to_bytecode_v2;
+    use crate::bytecode_encoder::encode_v2::{encode_composite_to_bytecode, encode_to_bytecode_v2};
     use crate::compiler::compiler::compile;
-    use crate::compiler::CompositeBindRules;
-    use crate::compiler::CompositeNode;
-    use crate::compiler::{BindRules, CompiledBindRules};
-    use crate::compiler::{SymbolicInstruction, SymbolicInstructionInfo};
+    use crate::compiler::{
+        BindRules, CompiledBindRules, CompositeBindRules, CompositeNode, SymbolicInstruction,
+        SymbolicInstructionInfo,
+    };
     use crate::make_identifier;
     use crate::parser::bind_library::ValueType;
     use crate::parser::bind_rules::ConditionOp;

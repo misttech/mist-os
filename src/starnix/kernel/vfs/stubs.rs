@@ -8,7 +8,9 @@ use crate::vfs::{
 };
 use starnix_logging::BugRef;
 use starnix_sync::{DeviceOpen, Locked};
-use starnix_uapi::{device_type::DeviceType, errors::Errno, open_flags::OpenFlags};
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
 use std::panic::Location;
 
 #[derive(Clone, Debug)]

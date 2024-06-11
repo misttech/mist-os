@@ -4,9 +4,6 @@
 
 #![cfg(test)]
 
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_netemul_network as fnetemul_network;
-use fuchsia_async as fasync;
 use futures_util::{AsyncReadExt as _, AsyncWriteExt as _, FutureExt as _};
 use net_declare::{fidl_subnet, std_ip};
 use netemul::{RealmTcpListener as _, RealmTcpStream as _};
@@ -14,6 +11,10 @@ use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 use std::pin::pin;
 use tcp_stream_ext::TcpStreamExt as _;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_netemul_network as fnetemul_network,
+    fuchsia_async as fasync,
+};
 
 async fn measure(fut: impl std::future::Future<Output = ()>) -> std::time::Duration {
     let start = std::time::Instant::now();

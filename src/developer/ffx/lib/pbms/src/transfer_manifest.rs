@@ -6,23 +6,15 @@
 //!
 //! This builds upon the lower level /src/lib/transfer_manifest lib.
 
-use {
-    crate::{
-        pbms::{fetch_from_url, GS_SCHEME},
-        string_from_url, AuthFlowChoice,
-    },
-    ::gcs::{
-        client::{Client, ProgressResult, ProgressState},
-        gs_url::split_gs_url,
-    },
-    anyhow::{bail, Context, Result},
-    futures::{StreamExt as _, TryStreamExt as _},
-    std::{
-        format,
-        path::{Component, Path, PathBuf},
-    },
-    transfer_manifest::{TransferManifest, TransferManifestV1},
-};
+use crate::pbms::{fetch_from_url, GS_SCHEME};
+use crate::{string_from_url, AuthFlowChoice};
+use ::gcs::client::{Client, ProgressResult, ProgressState};
+use ::gcs::gs_url::split_gs_url;
+use anyhow::{bail, Context, Result};
+use futures::{StreamExt as _, TryStreamExt as _};
+use std::format;
+use std::path::{Component, Path, PathBuf};
+use transfer_manifest::{TransferManifest, TransferManifestV1};
 
 /// Download a set of files referenced in the `transfer_manifest_url`.
 ///

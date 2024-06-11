@@ -13,9 +13,8 @@ use packet::{
     PacketConstraints, ParsablePacket, ParseMetadata, SerializeTarget,
 };
 use std::num::NonZeroU16;
-use zerocopy::{
-    byteorder::little_endian::U32, AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned,
-};
+use zerocopy::byteorder::little_endian::U32;
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 pub const MULTICAST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33337));
 pub const ACK_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33338));

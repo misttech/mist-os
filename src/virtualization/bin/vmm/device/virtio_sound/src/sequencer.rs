@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {std::cell::RefCell, std::rc::Rc};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 // A doubly-linked list of Notify objects. Each node represents a slot in the
 // sequence. A task acquires its spot in the sequence by waiting on `ready`,
@@ -143,7 +144,9 @@ impl Drop for Lock {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fuchsia_async as fasync, pretty_assertions::assert_eq};
+    use super::*;
+    use fuchsia_async as fasync;
+    use pretty_assertions::assert_eq;
 
     fn new_result_vec() -> Rc<RefCell<Vec<u32>>> {
         Rc::new(RefCell::new(Vec::new()))

@@ -2,16 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    appendable::BufferTooSmall,
-    ie::{
-        rsn::{akm, cipher, rsne::Rsne},
-        wpa::WpaIe,
-        wsc::{ProbeRespWsc, WpsState},
-        *,
-    },
-    organization::Oui,
-};
+use crate::appendable::BufferTooSmall;
+use crate::ie::rsn::rsne::Rsne;
+use crate::ie::rsn::{akm, cipher};
+use crate::ie::wpa::WpaIe;
+use crate::ie::wsc::{ProbeRespWsc, WpsState};
+use crate::ie::*;
+use crate::organization::Oui;
 
 pub fn fake_ht_cap_chanwidth(chanwidth: ChanWidthSet) -> HtCapabilities {
     let mut ht_cap = fake_ht_capabilities();

@@ -11,26 +11,21 @@ use fidl_fuchsia_bluetooth_snoop::{
     CaptureError, DevicePackets, SnoopPacket as FidlSnoopPacket, SnoopRequest, SnoopRequestStream,
     SnoopStartRequest, UnrecognizedDeviceName,
 };
-use fidl_fuchsia_io as fio;
 use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_fs::directory::{WatchEvent, WatchMessage, Watcher};
-use fuchsia_inspect as inspect;
-use fuchsia_trace as trace;
-use futures::{
-    future::{join, ready, Join, Ready},
-    select,
-    stream::{FusedStream, FuturesUnordered, Stream, StreamExt, StreamFuture},
-};
+use futures::future::{join, ready, Join, Ready};
+use futures::select;
+use futures::stream::{FusedStream, FuturesUnordered, Stream, StreamExt, StreamFuture};
 use std::collections::HashMap;
-use std::{fmt, time::Duration};
+use std::fmt;
+use std::time::Duration;
 use tracing::{debug, error, info, trace, warn};
+use {fidl_fuchsia_io as fio, fuchsia_inspect as inspect, fuchsia_trace as trace};
 
-use crate::{
-    packet_logs::PacketLogs,
-    snooper::{SnoopPacket, Snooper},
-    subscription_manager::SubscriptionManager,
-};
+use crate::packet_logs::PacketLogs;
+use crate::snooper::{SnoopPacket, Snooper};
+use crate::subscription_manager::SubscriptionManager;
 
 mod bounded_queue;
 mod packet_logs;

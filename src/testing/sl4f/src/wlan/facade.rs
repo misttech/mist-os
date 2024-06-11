@@ -4,15 +4,16 @@
 
 use crate::wlan::types;
 use anyhow::{Context as _, Error};
-use fidl_fuchsia_wlan_common as fidl_common;
 use fidl_fuchsia_wlan_device_service::{DeviceMonitorMarker, DeviceMonitorProxy};
-use fidl_fuchsia_wlan_internal as fidl_internal;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::RwLock;
-use fuchsia_zircon as zx;
 use ieee80211::{MacAddr, Ssid};
 use std::collections::HashMap;
 use wlan_common::scan::ScanResult;
+use {
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
+    fuchsia_zircon as zx,
+};
 
 // WlanFacade: proxies commands from sl4f test to proper fidl APIs
 //

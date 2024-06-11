@@ -2,20 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        checksum::{fletcher64, Checksum},
-        log::*,
-        metrics,
-        object_store::journal::JournalCheckpoint,
-        serialized_types::{Versioned, LATEST_VERSION},
-    },
-    anyhow::{anyhow, Error},
-    byteorder::{LittleEndian, WriteBytesExt},
-    fuchsia_inspect::{Property as _, UintProperty},
-    std::{cmp::min, io::Write},
-    storage_device::buffer::MutableBufferRef,
-};
+use crate::checksum::{fletcher64, Checksum};
+use crate::log::*;
+use crate::metrics;
+use crate::object_store::journal::JournalCheckpoint;
+use crate::serialized_types::{Versioned, LATEST_VERSION};
+use anyhow::{anyhow, Error};
+use byteorder::{LittleEndian, WriteBytesExt};
+use fuchsia_inspect::{Property as _, UintProperty};
+use std::cmp::min;
+use std::io::Write;
+use storage_device::buffer::MutableBufferRef;
 
 /// JournalWriter is responsible for writing log records to a journal file.  Each block contains a
 /// fletcher64 checksum at the end of the block.  This is used by both the main journal file and the
@@ -174,18 +171,14 @@ impl Drop for JournalWriter {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::JournalWriter,
-        crate::{
-            checksum::{fletcher64, Checksum},
-            object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle},
-            object_store::journal::JournalCheckpoint,
-            serialized_types::*,
-            testing::fake_object::{FakeObject, FakeObjectHandle},
-        },
-        byteorder::{ByteOrder, LittleEndian},
-        std::sync::Arc,
-    };
+    use super::JournalWriter;
+    use crate::checksum::{fletcher64, Checksum};
+    use crate::object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle};
+    use crate::object_store::journal::JournalCheckpoint;
+    use crate::serialized_types::*;
+    use crate::testing::fake_object::{FakeObject, FakeObjectHandle};
+    use byteorder::{ByteOrder, LittleEndian};
+    use std::sync::Arc;
 
     const TEST_BLOCK_SIZE: usize = 512;
 

@@ -6,7 +6,8 @@ use fidl::endpoints::RequestStream;
 use fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream};
 use fuchsia_async as fasync;
 use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
-use futures::{channel::oneshot, StreamExt};
+use futures::channel::oneshot;
+use futures::StreamExt;
 use tracing::{debug, error};
 
 /// Takes the startup handle for LIFECYCLE and returns a stream listening for Lifecycle FIDL

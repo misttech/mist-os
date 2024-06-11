@@ -2,35 +2,33 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    assert_matches::assert_matches,
-    async_trait::async_trait,
-    blobfs_ramdisk::BlobfsRamdisk,
-    fidl::endpoints::{ClientEnd, Proxy, RequestStream, ServerEnd},
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_paver::{Asset, Configuration},
-    fidl_fuchsia_pkg_ext::{MirrorConfigBuilder, RepositoryConfigBuilder, RepositoryConfigs},
-    fuchsia_async as fasync,
-    fuchsia_component_test::LocalComponentHandles,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
-    fuchsia_pkg_testing::{Package, PackageBuilder},
-    fuchsia_sync::Mutex,
-    fuchsia_zircon as zx,
-    futures::{future::FutureExt, prelude::*},
-    http::uri::Uri,
-    isolated_ota::{download_and_apply_update_with_updater, OmahaConfig, UpdateError},
-    isolated_ota_env::{
-        expose_mock_paver, OmahaState, TestEnvBuilder, TestExecutor, TestParams,
-        GLOBAL_SSL_CERTS_PATH,
-    },
-    isolated_swd::updater::Updater,
-    mock_omaha_server::OmahaResponse,
-    mock_paver::{hooks as mphooks, PaverEvent},
-    pretty_assertions::assert_eq,
-    std::collections::BTreeSet,
-    vfs::{directory::entry_container::Directory, file::vmo::read_only},
+use anyhow::{Context, Error};
+use assert_matches::assert_matches;
+use async_trait::async_trait;
+use blobfs_ramdisk::BlobfsRamdisk;
+use fidl::endpoints::{ClientEnd, Proxy, RequestStream, ServerEnd};
+use fidl_fuchsia_paver::{Asset, Configuration};
+use fidl_fuchsia_pkg_ext::{MirrorConfigBuilder, RepositoryConfigBuilder, RepositoryConfigs};
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
 };
+use fuchsia_pkg_testing::{Package, PackageBuilder};
+use fuchsia_sync::Mutex;
+use futures::future::FutureExt;
+use futures::prelude::*;
+use http::uri::Uri;
+use isolated_ota::{download_and_apply_update_with_updater, OmahaConfig, UpdateError};
+use isolated_ota_env::{
+    expose_mock_paver, OmahaState, TestEnvBuilder, TestExecutor, TestParams, GLOBAL_SSL_CERTS_PATH,
+};
+use isolated_swd::updater::Updater;
+use mock_omaha_server::OmahaResponse;
+use mock_paver::{hooks as mphooks, PaverEvent};
+use pretty_assertions::assert_eq;
+use std::collections::BTreeSet;
+use vfs::directory::entry_container::Directory;
+use vfs::file::vmo::read_only;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 struct TestResult {
     blobfs: Option<BlobfsRamdisk>,

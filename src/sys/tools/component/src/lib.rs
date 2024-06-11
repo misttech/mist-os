@@ -9,10 +9,9 @@ use anyhow::Result;
 use component_debug::cli::*;
 use component_debug::config::resolve_raw_config_overrides;
 use component_debug::copy::copy_cmd;
-use fidl_fuchsia_dash as fdash;
-use fidl_fuchsia_sys2 as fsys;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
 use socket_to_stdio::Stdout;
+use {fidl_fuchsia_dash as fdash, fidl_fuchsia_sys2 as fsys};
 
 pub async fn exec() -> Result<()> {
     let args: ComponentArgs = argh::from_env();

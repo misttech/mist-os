@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::collection::AssetCollectionError;
+use anyhow::Error;
+use async_trait::async_trait;
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_pkg::FontResolverMarker;
+use fuchsia_component::client::connect_to_protocol;
+use manifest::v2;
+use std::fs::File;
+use std::path::Path;
 use {
-    super::collection::AssetCollectionError,
-    anyhow::Error,
-    async_trait::async_trait,
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_io as io, fidl_fuchsia_mem as mem,
-    fidl_fuchsia_pkg::FontResolverMarker,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_trace as trace, fuchsia_zircon as zx,
-    manifest::v2,
-    std::{fs::File, path::Path},
+    fidl_fuchsia_io as io, fidl_fuchsia_mem as mem, fuchsia_trace as trace, fuchsia_zircon as zx,
 };
 
 /// A trait that covers the interactions of the font service with `fuchsia.pkg.FontResolver` and

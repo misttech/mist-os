@@ -11,7 +11,8 @@
 //!   names.
 //! * The boilerplate around the mirror traits is mostly out of the way.
 
-use netstack3_base::{socket::MaybeDualStack, AnyDevice, DeviceIdContext};
+use netstack3_base::socket::MaybeDualStack;
+use netstack3_base::{AnyDevice, DeviceIdContext};
 use netstack3_ip::{MulticastMembershipHandler, TransportIpContext};
 
 use crate::internal::datagram::{

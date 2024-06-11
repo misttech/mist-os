@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    error::{StringPatternError, ValidationError},
-    types::{
-        self, ComparisonOperator, FilterExpression, Identifier, InclusionOperator, OneOrMany,
-        Operator, Value,
-    },
+use crate::error::{StringPatternError, ValidationError};
+use crate::types::{
+    self, ComparisonOperator, FilterExpression, Identifier, InclusionOperator, OneOrMany, Operator,
+    Value,
 };
 use fidl_fuchsia_diagnostics as fdiagnostics;
 

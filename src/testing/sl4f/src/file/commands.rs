@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::file::{facade::FileFacade, types::FileMethod};
+use crate::file::facade::FileFacade;
+use crate::file::types::FileMethod;
 use crate::server::Facade;
 use anyhow::Error;
 use async_trait::async_trait;

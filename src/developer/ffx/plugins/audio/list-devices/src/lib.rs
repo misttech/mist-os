@@ -4,15 +4,12 @@
 
 use async_trait::async_trait;
 use ffx_audio_common::ffxtool::{exposed_dir, optional_moniker};
-use ffx_audio_device::{
-    device_list_untagged,
-    list::{get_devices, ListResult},
-};
+use ffx_audio_device::device_list_untagged;
+use ffx_audio_device::list::{get_devices, ListResult};
 use ffx_audio_listdevices_args::ListDevicesCommand;
 use fho::{FfxMain, FfxTool, MachineWriter};
-use fidl_fuchsia_audio_device as fadevice;
-use fidl_fuchsia_io as fio;
 use fuchsia_audio::Registry;
+use {fidl_fuchsia_audio_device as fadevice, fidl_fuchsia_io as fio};
 
 #[derive(FfxTool)]
 pub struct ListDevicesTool {

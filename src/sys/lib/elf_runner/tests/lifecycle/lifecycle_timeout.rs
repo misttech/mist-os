@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    component_events::{
-        events::{Destroyed, Event, EventStream, Started},
-        matcher::{EventMatcher, ExitStatusMatcher},
-        sequence::{EventSequence, Ordering},
-    },
-    fuchsia_component_test::ScopedInstance,
-    tracing::info,
-};
+use component_events::events::{Destroyed, Event, EventStream, Started};
+use component_events::matcher::{EventMatcher, ExitStatusMatcher};
+use component_events::sequence::{EventSequence, Ordering};
+use fuchsia_component_test::ScopedInstance;
+use tracing::info;
 
 /// Test that a component tree which contains a root component with no program
 /// and two children is stopped properly. One of the children inherits whatever

@@ -9,28 +9,25 @@ use fidl::endpoints::{create_endpoints, Proxy};
 use fidl_fuchsia_hardware_suspend::{
     self as fhsuspend, SuspenderSuspendResponse as SuspendResponse,
 };
-use fidl_fuchsia_power_broker as fbroker;
-use fidl_fuchsia_power_suspend as fsuspend;
 use fidl_fuchsia_power_system::{
     self as fsystem, ApplicationActivityLevel, ExecutionStateLevel, FullWakeHandlingLevel,
     WakeHandlingLevel,
 };
-use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{
     ArrayProperty, IntProperty as IInt, Node as INode, Property, UintProperty as IUint,
 };
 use fuchsia_inspect_contrib::nodes::BoundedListNode as IRingBuffer;
 use fuchsia_zircon::{self as zx, HandleBased};
-use futures::{
-    channel::mpsc::{self, Receiver, Sender},
-    lock::Mutex,
-    prelude::*,
-};
+use futures::channel::mpsc::{self, Receiver, Sender};
+use futures::lock::Mutex;
+use futures::prelude::*;
 use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
-use std::{
-    cell::{OnceCell, RefCell},
-    rc::Rc,
+use std::cell::{OnceCell, RefCell};
+use std::rc::Rc;
+use {
+    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_suspend as fsuspend,
+    fuchsia_async as fasync,
 };
 
 type NotifyFn = Box<dyn Fn(&fsuspend::SuspendStats, fsuspend::StatsWatchResponder) -> bool>;

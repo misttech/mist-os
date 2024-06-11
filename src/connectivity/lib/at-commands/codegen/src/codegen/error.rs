@@ -4,7 +4,8 @@
 
 //! Code common to all code generation modules.
 
-use {super::super::definition::Arguments, std::io};
+use super::super::definition::Arguments;
+use std::io;
 
 /// Errors that occur during code generation, mainly from ill-formed definitions.
 #[derive(Debug, thiserror::Error)]

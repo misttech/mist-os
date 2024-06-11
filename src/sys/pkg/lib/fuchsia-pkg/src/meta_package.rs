@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{errors::MetaPackageError, path::PackagePath},
-    fuchsia_url::{PackageName, PackageVariant},
-    serde::{Deserialize, Serialize},
-    std::{convert::TryInto as _, io},
-};
+use crate::errors::MetaPackageError;
+use crate::path::PackagePath;
+use fuchsia_url::{PackageName, PackageVariant};
+use serde::{Deserialize, Serialize};
+use std::convert::TryInto as _;
+use std::io;
 
 /// A `MetaPackage` represents the "meta/package" file of a meta.far (which is
 /// a Fuchsia archive file of a Fuchsia package).

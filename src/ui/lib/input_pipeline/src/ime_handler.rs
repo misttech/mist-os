@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::input_handler::{InputHandlerStatus, UnhandledInputHandler},
-    crate::{input_device, keyboard_binding, metrics},
-    anyhow::Error,
-    async_trait::async_trait,
-    fidl_fuchsia_ui_input3::{self as fidl_ui_input3, LockState, Modifiers},
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_inspect::health::Reporter,
-    fuchsia_zircon as zx,
-    keymaps::{LockStateChecker, ModifierChecker},
-    metrics_registry::*,
-    std::rc::Rc,
-};
+use crate::input_handler::{InputHandlerStatus, UnhandledInputHandler};
+use crate::{input_device, keyboard_binding, metrics};
+use anyhow::Error;
+use async_trait::async_trait;
+use fidl_fuchsia_ui_input3::{self as fidl_ui_input3, LockState, Modifiers};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_inspect::health::Reporter;
+use fuchsia_zircon as zx;
+use keymaps::{LockStateChecker, ModifierChecker};
+use metrics_registry::*;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct FrozenLockState {
@@ -200,17 +198,17 @@ fn create_key_event(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::input_handler::InputHandler;
+    use crate::keyboard_binding::{self, KeyboardEvent};
+    use crate::testing_utilities;
+    use assert_matches::assert_matches;
+    use futures::StreamExt;
+    use std::convert::TryFrom as _;
+    use test_case::test_case;
     use {
-        super::*,
-        crate::input_handler::InputHandler,
-        crate::keyboard_binding::{self, KeyboardEvent},
-        crate::testing_utilities,
-        assert_matches::assert_matches,
         fidl_fuchsia_input as fidl_input, fidl_fuchsia_ui_input3 as fidl_ui_input3,
         fuchsia_async as fasync, fuchsia_zircon as zx,
-        futures::StreamExt,
-        std::convert::TryFrom as _,
-        test_case::test_case,
     };
 
     fn handle_events(

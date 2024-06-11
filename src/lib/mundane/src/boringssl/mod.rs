@@ -107,9 +107,8 @@ use boringssl::raw::{
     ED25519_verify, ERR_print_errors_cb, EVP_PBE_scrypt, EVP_PKEY_assign_EC_KEY,
     EVP_PKEY_assign_RSA, EVP_PKEY_get1_EC_KEY, EVP_PKEY_get1_RSA, EVP_marshal_public_key,
     EVP_parse_public_key, HMAC_CTX_copy, HMAC_CTX_init, HMAC_Final, HMAC_Init_ex, HMAC_Update,
-    HMAC_size, RAND_bytes, RC4_set_key, RSA_bits, RSA_generate_key_ex,
-    RSA_marshal_private_key, RSA_parse_private_key, RSA_sign_pss_mgf1, RSA_size,
-    RSA_verify_pss_mgf1, SHA384_Init, RC4,
+    HMAC_size, RAND_bytes, RC4_set_key, RSA_bits, RSA_generate_key_ex, RSA_marshal_private_key,
+    RSA_parse_private_key, RSA_sign_pss_mgf1, RSA_size, RSA_verify_pss_mgf1, SHA384_Init, RC4,
 };
 #[cfg(feature = "rsa-pkcs1v15")]
 use boringssl::raw::{RSA_sign, RSA_verify};
@@ -303,14 +302,7 @@ pub fn ecdsa_sign(
 #[must_use]
 pub fn ecdsa_verify(digest: &[u8], sig: &[u8], key: &CHeapWrapper<EC_KEY>) -> bool {
     unsafe {
-        ECDSA_verify(
-            0,
-            digest.as_ptr(),
-            digest.len(),
-            sig.as_ptr(),
-            sig.len(),
-            key.as_const(),
-        )
+        ECDSA_verify(0, digest.as_ptr(), digest.len(), sig.as_ptr(), sig.len(), key.as_const())
     }
 }
 
@@ -924,13 +916,7 @@ pub fn crypto_memcmp(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;
     }
-    unsafe {
-        CRYPTO_memcmp(
-            a.as_ptr() as *const c_void,
-            b.as_ptr() as *const c_void,
-            a.len(),
-        ) == 0
-    }
+    unsafe { CRYPTO_memcmp(a.as_ptr() as *const c_void, b.as_ptr() as *const c_void, a.len()) == 0 }
 }
 
 /// The `RAND_bytes` function.
@@ -990,11 +976,7 @@ impl BoringError {
 fn get_error_stack_trace() -> Vec<String> {
     // Credit to agl@google.com for this implementation.
 
-    unsafe extern "C" fn error_callback(
-        s: *const c_char,
-        s_len: usize,
-        ctx: *mut c_void,
-    ) -> c_int {
+    unsafe extern "C" fn error_callback(s: *const c_char, s_len: usize, ctx: *mut c_void) -> c_int {
         let stack_trace = ctx as *mut Vec<String>;
         let s = ::std::slice::from_raw_parts(s as *const u8, s_len - 1);
         (*stack_trace).push(String::from_utf8_lossy(s).to_string());

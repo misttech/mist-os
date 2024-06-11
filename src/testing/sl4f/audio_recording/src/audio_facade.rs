@@ -6,14 +6,13 @@ use anyhow::{anyhow, format_err, Context, Error};
 use async_lock::RwLock;
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_media::*;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::{select, StreamExt, TryFutureExt, TryStreamExt};
 use std::io::Write;
 use std::sync::Arc;
 use tracing::trace;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 // Fixed configuration for our virtual output device.
 const OUTPUT_SAMPLE_FORMAT: AudioSampleFormat = AudioSampleFormat::Signed16;

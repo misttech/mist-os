@@ -326,7 +326,8 @@ fn split_once(s: &[u8], needle: u8) -> Option<(&[u8], &[u8])> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn test_range_parses_correctly() {

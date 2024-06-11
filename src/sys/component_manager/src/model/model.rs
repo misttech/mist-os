@@ -2,22 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::{
-        actions::{ActionKey, ActionsManager, DiscoverAction},
-        component::{manager::ComponentManagerInstance, ComponentInstance, StartReason},
-        context::ModelContext,
-        environment::Environment,
-        start::Start,
-        token::InstanceRegistry,
-    },
-    cm_config::RuntimeConfig,
-    cm_types::Url,
-    errors::ModelError,
-    routing::bedrock::structured_dict::ComponentInput,
-    std::sync::Arc,
-    tracing::warn,
-};
+use crate::model::actions::{ActionKey, ActionsManager, DiscoverAction};
+use crate::model::component::manager::ComponentManagerInstance;
+use crate::model::component::{ComponentInstance, StartReason};
+use crate::model::context::ModelContext;
+use crate::model::environment::Environment;
+use crate::model::start::Start;
+use crate::model::token::InstanceRegistry;
+use cm_config::RuntimeConfig;
+use cm_types::Url;
+use errors::ModelError;
+use routing::bedrock::structured_dict::ComponentInput;
+use std::sync::Arc;
+use tracing::warn;
 
 /// Parameters for initializing a component model, particularly the root of the component
 /// instance tree.
@@ -133,20 +130,16 @@ impl Model {
 
 #[cfg(test)]
 pub mod tests {
-    use {
-        crate::model::{
-            actions::{ShutdownAction, ShutdownType},
-            model::{ActionsManager, Model},
-            testing::test_helpers::{TestEnvironmentBuilder, TestModelResult},
-        },
-        async_trait::async_trait,
-        cm_rust_testing::*,
-        errors::ModelError,
-        hooks::{Event, EventType, Hook, HooksRegistration},
-        moniker::Moniker,
-        routing::bedrock::structured_dict::ComponentInput,
-        std::sync::{Arc, Weak},
-    };
+    use crate::model::actions::{ShutdownAction, ShutdownType};
+    use crate::model::model::{ActionsManager, Model};
+    use crate::model::testing::test_helpers::{TestEnvironmentBuilder, TestModelResult};
+    use async_trait::async_trait;
+    use cm_rust_testing::*;
+    use errors::ModelError;
+    use hooks::{Event, EventType, Hook, HooksRegistration};
+    use moniker::Moniker;
+    use routing::bedrock::structured_dict::ComponentInput;
+    use std::sync::{Arc, Weak};
 
     #[fuchsia::test]
     async fn already_shut_down_when_start_fails() {

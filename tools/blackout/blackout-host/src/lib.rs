@@ -6,20 +6,14 @@
 
 #![deny(missing_docs)]
 
-use {
-    rand::random,
-    std::{
-        fmt,
-        path::PathBuf,
-        process::{ExitStatus, Output},
-        sync::{
-            atomic::{AtomicU64, Ordering},
-            Arc,
-        },
-        time::Duration,
-    },
-    thiserror::Error,
-};
+use rand::random;
+use std::fmt;
+use std::path::PathBuf;
+use std::process::{ExitStatus, Output};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
+use thiserror::Error;
 
 pub mod steps;
 use ffx_config::global_env_context;
@@ -466,20 +460,15 @@ impl TestEnv {
 
 #[cfg(test)]
 mod tests {
-    use super::BlackoutError as Error;
-    use super::{BlackoutError, CommandError, CommonOpts, RebootType, Test, TestStep};
-    use {
-        async_trait::async_trait,
-        fuchsia_async as fasync,
-        std::{
-            os::unix::process::ExitStatusExt,
-            process::ExitStatus,
-            sync::{
-                atomic::{AtomicBool, AtomicU64, Ordering},
-                Arc,
-            },
-        },
+    use super::{
+        BlackoutError as Error, BlackoutError, CommandError, CommonOpts, RebootType, Test, TestStep,
     };
+    use async_trait::async_trait;
+    use fuchsia_async as fasync;
+    use std::os::unix::process::ExitStatusExt;
+    use std::process::ExitStatus;
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+    use std::sync::Arc;
 
     struct FakeStep<F>
     where

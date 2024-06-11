@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::common::{extract_expected, gen_visit_str, ident_from_path},
-    maplit::hashset,
-    proc_macro2::{Ident, TokenStream as TokenStream2},
-    quote::{quote, ToTokens, TokenStreamExt},
-    std::collections::HashSet,
-    syn::{punctuated::Punctuated, Meta, Token},
-};
+use crate::common::{extract_expected, gen_visit_str, ident_from_path};
+use maplit::hashset;
+use proc_macro2::{Ident, TokenStream as TokenStream2};
+use quote::{quote, ToTokens, TokenStreamExt};
+use std::collections::HashSet;
+use syn::punctuated::Punctuated;
+use syn::{Meta, Token};
 
 pub fn impl_derive_ref(ast: syn::DeriveInput) -> Result<TokenStream2, syn::Error> {
     let attrs = parse_reference_attributes(&ast)?;

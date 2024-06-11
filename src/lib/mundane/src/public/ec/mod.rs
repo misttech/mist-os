@@ -24,7 +24,8 @@ use std::fmt::{self, Debug, Formatter};
 use boringssl::{CHeapWrapper, CStackWrapper};
 use public::ec::curve::CurveKind;
 use public::ec::inner::EcKey;
-use public::{inner::DerKey, DerPrivateKey, DerPublicKey, PrivateKey, PublicKey};
+use public::inner::DerKey;
+use public::{DerPrivateKey, DerPublicKey, PrivateKey, PublicKey};
 use util::Sealed;
 use Error;
 
@@ -334,16 +335,14 @@ pub mod ecdsa {
     use std::fmt::{self, Debug, Formatter};
     use std::marker::PhantomData;
 
-    use boringssl;
+    use hash::inner::Digest;
     #[cfg(feature = "experimental-sha512-ec")]
     use hash::Sha512;
-    use hash::{inner::Digest, Hasher, Sha256, Sha384};
-    use public::{
-        ec::{EcPrivKey, EcPubKey, PCurve, P256, P384, P521},
-        Signature,
-    };
+    use hash::{Hasher, Sha256, Sha384};
+    use public::ec::{EcPrivKey, EcPubKey, PCurve, P256, P384, P521};
+    use public::Signature;
     use util::Sealed;
-    use Error;
+    use {boringssl, Error};
 
     /// A hash function which is compatible with ECDSA signatures over the curve
     /// `C`.
@@ -476,7 +475,8 @@ pub mod ecdsa {
 
     #[cfg(test)]
     mod tests {
-        use super::{super::*, *};
+        use super::super::*;
+        use super::*;
         use public::testutil::test_signature_smoke;
 
         #[test]

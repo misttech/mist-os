@@ -1,15 +1,15 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use crate::modular::types::{
+    BasemgrResult, KillSessionResult, RestartSessionResult, StartBasemgrRequest,
+};
+use anyhow::{format_err, Error};
+use fuchsia_component::client::connect_to_protocol;
+use serde_json::{from_value, Value};
 use {
-    crate::modular::types::{
-        BasemgrResult, KillSessionResult, RestartSessionResult, StartBasemgrRequest,
-    },
-    anyhow::{format_err, Error},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_session as fsession,
     fidl_fuchsia_sys2 as fsys,
-    fuchsia_component::client::connect_to_protocol,
-    serde_json::{from_value, Value},
 };
 
 // The session runs as `./core/session-manager/session:session`. The parts are:
@@ -131,23 +131,19 @@ impl ModularFacade {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::modular::{
-            facade::{
-                ModularFacade, SESSION_CHILD_NAME, SESSION_COLLECTION_NAME, SESSION_MONIKER,
-                SESSION_PARENT_MONIKER,
-            },
-            types::{BasemgrResult, KillSessionResult, RestartSessionResult},
-        },
-        anyhow::Error,
-        assert_matches::assert_matches,
-        fidl::endpoints::spawn_stream_handler,
-        fidl_fuchsia_session as fsession, fidl_fuchsia_sys2 as fsys,
-        futures::Future,
-        lazy_static::lazy_static,
-        serde_json::json,
-        test_util::Counter,
+    use crate::modular::facade::{
+        ModularFacade, SESSION_CHILD_NAME, SESSION_COLLECTION_NAME, SESSION_MONIKER,
+        SESSION_PARENT_MONIKER,
     };
+    use crate::modular::types::{BasemgrResult, KillSessionResult, RestartSessionResult};
+    use anyhow::Error;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::spawn_stream_handler;
+    use futures::Future;
+    use lazy_static::lazy_static;
+    use serde_json::json;
+    use test_util::Counter;
+    use {fidl_fuchsia_session as fsession, fidl_fuchsia_sys2 as fsys};
 
     const TEST_SESSION_URL: &str = "fuchsia-pkg://fuchsia.com/test_session#meta/test_session.cm";
 

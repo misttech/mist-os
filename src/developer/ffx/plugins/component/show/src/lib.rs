@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use component_debug::cli::{show::ShowCmdInstance, show_cmd_print, show_cmd_serialized};
+use component_debug::cli::show::ShowCmdInstance;
+use component_debug::cli::{show_cmd_print, show_cmd_serialized};
 use errors::FfxError;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_show_args::ComponentShowCommand;

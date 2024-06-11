@@ -2,15 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property},
-    base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _},
-    serde::{
-        de::{self, MapAccess, SeqAccess, Visitor},
-        Deserialize, Deserializer,
-    },
-    std::{collections::HashMap, fmt, hash::Hash, marker::PhantomData, str::FromStr},
-};
+use crate::{ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property};
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::engine::Engine as _;
+use serde::de::{self, MapAccess, SeqAccess, Visitor};
+use serde::{Deserialize, Deserializer};
+use std::collections::HashMap;
+use std::fmt;
+use std::hash::Hash;
+use std::marker::PhantomData;
+use std::str::FromStr;
 
 struct RootVisitor<Key> {
     // Key is unused.
@@ -648,7 +649,8 @@ impl<'de> Visitor<'de> for NumericValueVisitor {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::ArrayFormat};
+    use super::*;
+    use crate::ArrayFormat;
 
     #[fuchsia::test]
     fn deserialize_json() {

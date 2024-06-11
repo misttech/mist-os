@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    fmt::{self, Display, Formatter},
-    slice, vec,
-};
+use std::fmt::{self, Display, Formatter};
+use std::{slice, vec};
 
 /// Represents either a single value, or multiple values of T.
 /// Useful for differentiating between an array of length 1 and a single value.
@@ -240,7 +238,8 @@ impl<T> ExactSizeIterator for IntoIter<T> {}
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn test_iter_one() {

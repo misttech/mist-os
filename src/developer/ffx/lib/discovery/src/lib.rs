@@ -318,11 +318,13 @@ pub mod test {
     use addr::TargetAddr;
     use futures::StreamExt;
     use pretty_assertions::assert_eq;
+    use std::cell::RefCell;
+    use std::collections::VecDeque;
     use std::fs::File;
     use std::io::Write;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use std::rc::Rc;
     use std::str::FromStr;
-    use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
     /// Used for testing functions that take a TargetDiscovery<TargetFilter>
     ///

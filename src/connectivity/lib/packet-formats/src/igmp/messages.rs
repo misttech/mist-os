@@ -9,10 +9,8 @@ use core::ops::Deref;
 use net_types::ip::Ipv4Addr;
 use packet::records::{ParsedRecord, RecordParseResult, Records, RecordsImpl, RecordsImplLayout};
 use packet::{BufferView, ParsablePacket, ParseMetadata};
-use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref,
-    Unaligned,
-};
+use zerocopy::byteorder::network_endian::U16;
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 use super::{
     parse_v3_possible_floating_point, peek_message_type, IgmpMessage, IgmpNonEmptyBody,

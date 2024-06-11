@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    bones::Bone,
-    core::{Core, CoreContext, ObjectRef, OnAdded, Property},
-    status_code::StatusCode,
-    transform_component::TransformComponent,
-};
+use crate::bones::Bone;
+use crate::core::{Core, CoreContext, ObjectRef, OnAdded, Property};
+use crate::status_code::StatusCode;
+use crate::transform_component::TransformComponent;
 
 #[derive(Debug, Default)]
 pub struct RootBone {

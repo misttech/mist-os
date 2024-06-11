@@ -2,13 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    event_listener::Event,
-    std::sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, RwLock,
-    },
-};
+use event_listener::Event;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, RwLock};
 
 // usize::MAX % EPOCHS_SIZE should be EPOCHS_SIZE - 1.
 const EPOCHS_SIZE: usize = 16;
@@ -132,11 +128,9 @@ impl Drop for RefGuard {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{Epochs, EPOCHS_SIZE},
-        futures::stream::{FuturesUnordered, StreamExt},
-        std::pin::pin,
-    };
+    use super::{Epochs, EPOCHS_SIZE};
+    use futures::stream::{FuturesUnordered, StreamExt};
+    use std::pin::pin;
 
     #[fuchsia::test]
     async fn test_epochs() {

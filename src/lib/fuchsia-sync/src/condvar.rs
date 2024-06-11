@@ -4,7 +4,8 @@
 
 use crate::MutexGuard;
 use fuchsia_zircon as zx;
-use std::{sync::atomic::Ordering, time::Duration};
+use std::sync::atomic::Ordering;
+use std::time::Duration;
 
 /// A [condition variable][wikipedia] that integrates with [`fuchsia_sync::Mutex`].
 ///

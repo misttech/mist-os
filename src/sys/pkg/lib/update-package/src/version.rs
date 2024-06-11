@@ -4,16 +4,14 @@
 
 //! Typesafe wrappers around reading the version file.
 
-use {
-    fidl_fuchsia_io as fio,
-    omaha_client::version::Version as SemanticVersion,
-    serde::{
-        de::{self, Visitor},
-        Deserialize, Deserializer, Serialize, Serializer,
-    },
-    std::{convert::Infallible, fmt, str::FromStr},
-    thiserror::Error,
-};
+use fidl_fuchsia_io as fio;
+use omaha_client::version::Version as SemanticVersion;
+use serde::de::{self, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::convert::Infallible;
+use std::fmt;
+use std::str::FromStr;
+use thiserror::Error;
 
 /// An error encountered while reading the version.
 #[derive(Debug, Error)]
@@ -138,9 +136,10 @@ pub(crate) async fn read_version(
 #[cfg(test)]
 #[allow(clippy::bool_assert_comparison)]
 mod tests {
-    use {
-        super::*, crate::TestUpdatePackage, assert_matches::assert_matches, fuchsia_async as fasync,
-    };
+    use super::*;
+    use crate::TestUpdatePackage;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
 
     #[fasync::run_singlethreaded(test)]
     async fn read_version_success_file_exists() {

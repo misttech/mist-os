@@ -6,7 +6,8 @@ use crate::output::{
     ArtifactType, DirectoryArtifactType, DirectoryWrite, DynArtifact, DynDirectoryArtifact,
     EntityId, EntityInfo, ReportedOutcome, Reporter, Timestamp,
 };
-use std::{io::Error, path::Path};
+use std::io::Error;
+use std::path::Path;
 
 /// A reporter that acts as a data sink and does not save results or artifacts.
 pub struct NoopReporter;

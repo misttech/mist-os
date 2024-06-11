@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::options::AsyncOptions,
-    anyhow::{bail, Context as _, Result},
-    fidl_fuchsia_fuzzer as fuzz,
-    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
-    futures::channel::{mpsc, oneshot},
-    futures::lock::Mutex,
-    futures::{pin_mut, select, FutureExt, SinkExt, StreamExt, TryStreamExt},
-    std::cell::RefCell,
-    std::collections::HashMap,
-};
+use crate::options::AsyncOptions;
+use anyhow::{bail, Context as _, Result};
+use fidl_fuchsia_fuzzer as fuzz;
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
+use futures::channel::{mpsc, oneshot};
+use futures::lock::Mutex;
+use futures::{pin_mut, select, FutureExt, SinkExt, StreamExt, TryStreamExt};
+use std::cell::RefCell;
+use std::collections::HashMap;
 
 /// Provides coverage data from multiple instrumented processes to the fuzzing engine.
 ///
@@ -301,15 +299,13 @@ pub async fn provide_data(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{collect_data, provide_data, Aggregator},
-        anyhow::{bail, Context as _, Result},
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync,
-        fuchsia_runtime::process_self,
-        fuchsia_zircon::{self as zx, AsHandleRef, Peered},
-        futures::{pin_mut, select, try_join, FutureExt},
-    };
+    use super::{collect_data, provide_data, Aggregator};
+    use anyhow::{bail, Context as _, Result};
+    use fidl::endpoints::create_proxy_and_stream;
+    use fuchsia_runtime::process_self;
+    use fuchsia_zircon::{self as zx, AsHandleRef, Peered};
+    use futures::{pin_mut, select, try_join, FutureExt};
+    use {fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync};
 
     // Test fixtures.
 

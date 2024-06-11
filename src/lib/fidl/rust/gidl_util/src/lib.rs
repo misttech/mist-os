@@ -4,14 +4,10 @@
 
 //! This crate contains utility functions used in GIDL tests and benchmarks.
 
-use {
-    fidl::{
-        encoding::{Context, Decode, Decoder, TypeMarker},
-        AsHandleRef, Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, Rights,
-    },
-    fuchsia_zircon_status::Status,
-    fuchsia_zircon_types as zx_types,
-};
+use fidl::encoding::{Context, Decode, Decoder, TypeMarker};
+use fidl::{AsHandleRef, Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, Rights};
+use fuchsia_zircon_status::Status;
+use fuchsia_zircon_types as zx_types;
 
 /// Handle subtypes that can be created via `create_handles`. Each subtype `X`
 /// corresponds to a `fidl::X` type that implements `HandleBased`.

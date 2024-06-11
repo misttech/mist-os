@@ -2,21 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::model::component::{ComponentInstance, WeakComponentInstance};
+use crate::model::routing::{open_capability, RouteRequest};
+use ::routing::component_instance::ComponentInstanceInterface;
+use ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError};
+use async_trait::async_trait;
+use cm_rust::{ConfigValueSource, FidlIntoNative, ResolverRegistration};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tracing::error;
 use {
-    crate::model::{
-        component::{ComponentInstance, WeakComponentInstance},
-        routing::{open_capability, RouteRequest},
-    },
-    ::routing::{
-        component_instance::ComponentInstanceInterface,
-        resolving::{ComponentAddress, ResolvedComponent, ResolverError},
-    },
-    async_trait::async_trait,
-    cm_rust::{ConfigValueSource, FidlIntoNative, ResolverRegistration},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_mem as fmem,
-    std::{collections::HashMap, sync::Arc},
-    tracing::error,
 };
 
 /// Resolves a component URL to its content.
@@ -196,31 +193,26 @@ pub fn read_and_validate_config_values(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::model::{
-            actions::DiscoverAction,
-            component::{manager::ComponentManagerInstance, WeakExtendedInstance},
-            context::ModelContext,
-            environment::Environment,
-        },
-        anyhow::{format_err, Error},
-        assert_matches::assert_matches,
-        async_trait::async_trait,
-        cm_rust::NativeIntoFidl,
-        cm_rust_testing::new_decl_from_json,
-        fidl_fuchsia_component_decl as fdecl,
-        hooks::Hooks,
-        lazy_static::lazy_static,
-        moniker::Moniker,
-        routing::{
-            bedrock::structured_dict::ComponentInput,
-            environment::{DebugRegistry, RunnerRegistry},
-            resolving::ComponentResolutionContext,
-        },
-        serde_json::json,
-        std::sync::{Mutex, Weak},
-    };
+    use super::*;
+    use crate::model::actions::DiscoverAction;
+    use crate::model::component::manager::ComponentManagerInstance;
+    use crate::model::component::WeakExtendedInstance;
+    use crate::model::context::ModelContext;
+    use crate::model::environment::Environment;
+    use anyhow::{format_err, Error};
+    use assert_matches::assert_matches;
+    use async_trait::async_trait;
+    use cm_rust::NativeIntoFidl;
+    use cm_rust_testing::new_decl_from_json;
+    use fidl_fuchsia_component_decl as fdecl;
+    use hooks::Hooks;
+    use lazy_static::lazy_static;
+    use moniker::Moniker;
+    use routing::bedrock::structured_dict::ComponentInput;
+    use routing::environment::{DebugRegistry, RunnerRegistry};
+    use routing::resolving::ComponentResolutionContext;
+    use serde_json::json;
+    use std::sync::{Mutex, Weak};
 
     #[derive(Debug)]
     struct MockOkResolver {

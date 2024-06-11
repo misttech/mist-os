@@ -4,38 +4,36 @@
 
 #![allow(clippy::let_unit_value)]
 #![cfg(test)]
+use anyhow::anyhow;
+use assert_matches::assert_matches;
+use fidl_fuchsia_update::{
+    AttemptsMonitorMarker, AttemptsMonitorRequest, AttemptsMonitorRequestStream, CheckOptions,
+    CheckingForUpdatesData, CommitStatusProviderMarker, CommitStatusProviderProxy, Initiator,
+    InstallationDeferralReason, InstallationDeferredData, InstallationErrorData,
+    InstallationProgress, InstallingData, ManagerMarker, ManagerProxy, MonitorMarker,
+    MonitorRequest, MonitorRequestStream, State, UpdateInfo,
+};
+use fidl_fuchsia_update_channel::{ProviderMarker, ProviderProxy};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use fuchsia_pkg_testing::make_packages_json;
+use fuchsia_sync::Mutex;
+use futures::channel::mpsc;
+use futures::prelude::*;
+use mock_installer::MockUpdateInstallerService;
+use mock_paver::{hooks as mphooks, MockPaverService, MockPaverServiceBuilder, PaverEvent};
+use mock_resolver::MockResolverService;
+use mock_space::MockSpaceService;
+use mock_verifier::MockVerifierService;
+use pretty_assertions::assert_eq;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
+use tempfile::TempDir;
 use {
-    anyhow::anyhow,
-    assert_matches::assert_matches,
     fidl_fuchsia_io as fio, fidl_fuchsia_paver as fpaver, fidl_fuchsia_pkg as fpkg,
-    fidl_fuchsia_space as fspace,
-    fidl_fuchsia_update::{
-        AttemptsMonitorMarker, AttemptsMonitorRequest, AttemptsMonitorRequestStream, CheckOptions,
-        CheckingForUpdatesData, CommitStatusProviderMarker, CommitStatusProviderProxy, Initiator,
-        InstallationDeferralReason, InstallationDeferredData, InstallationErrorData,
-        InstallationProgress, InstallingData, ManagerMarker, ManagerProxy, MonitorMarker,
-        MonitorRequest, MonitorRequestStream, State, UpdateInfo,
-    },
-    fidl_fuchsia_update_channel::{ProviderMarker, ProviderProxy},
-    fidl_fuchsia_update_installer as finstaller, fidl_fuchsia_update_installer_ext as installer,
-    fidl_fuchsia_update_verify as fupdate_verify, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    fuchsia_pkg_testing::make_packages_json,
-    fuchsia_sync::Mutex,
-    fuchsia_zircon as zx,
-    futures::{channel::mpsc, prelude::*},
-    mock_installer::MockUpdateInstallerService,
-    mock_paver::{hooks as mphooks, MockPaverService, MockPaverServiceBuilder, PaverEvent},
-    mock_resolver::MockResolverService,
-    mock_space::MockSpaceService,
-    mock_verifier::MockVerifierService,
-    pretty_assertions::assert_eq,
-    std::sync::{
-        atomic::{AtomicU32, Ordering},
-        Arc,
-    },
-    tempfile::TempDir,
+    fidl_fuchsia_space as fspace, fidl_fuchsia_update_installer as finstaller,
+    fidl_fuchsia_update_installer_ext as installer, fidl_fuchsia_update_verify as fupdate_verify,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 struct Mounts {

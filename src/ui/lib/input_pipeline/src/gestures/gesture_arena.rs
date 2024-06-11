@@ -2,26 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{
-        args, motion, one_finger_button, primary_tap, scroll, secondary_button, secondary_tap,
-    },
-    crate::{
-        input_device,
-        input_handler::{InputHandler, InputHandlerStatus},
-        mouse_binding, touch_binding,
-        utils::Size,
-    },
-    anyhow::{format_err, Context, Error},
-    async_trait::async_trait,
-    core::cell::RefCell,
-    fidl_fuchsia_input_report as fidl_input_report,
-    fuchsia_inspect::{health::Reporter, ArrayProperty, Node as InspectNode},
-    fuchsia_inspect_contrib::nodes::BoundedListNode,
-    fuchsia_zircon as zx,
-    std::any::Any,
-    std::fmt::Debug,
+use super::{
+    args, motion, one_finger_button, primary_tap, scroll, secondary_button, secondary_tap,
 };
+use crate::input_handler::{InputHandler, InputHandlerStatus};
+use crate::utils::Size;
+use crate::{input_device, mouse_binding, touch_binding};
+use anyhow::{format_err, Context, Error};
+use async_trait::async_trait;
+use core::cell::RefCell;
+use fuchsia_inspect::health::Reporter;
+use fuchsia_inspect::{ArrayProperty, Node as InspectNode};
+use fuchsia_inspect_contrib::nodes::BoundedListNode;
+use std::any::Any;
+use std::fmt::Debug;
+use {fidl_fuchsia_input_report as fidl_input_report, fuchsia_zircon as zx};
 
 struct GestureArenaInitialContenders {}
 
@@ -1278,23 +1273,18 @@ fn log_gesture_end(
 #[cfg(test)]
 mod tests {
     mod utils {
-        use {
-            super::super::{
-                args, Contender, ContenderFactory, ExamineEventResult, MatchedContender,
-                ProcessBufferedEventsResult, ProcessNewEventResult, TouchpadEvent,
-                VerifyEventResult, Winner, COUNTS_PER_MM, PRIMARY_BUTTON,
-            },
-            crate::{
-                input_device, keyboard_binding, mouse_binding, touch_binding, utils::Size, Position,
-            },
-            assert_matches::assert_matches,
-            fidl_fuchsia_input_report as fidl_input_report, fuchsia_zircon as zx,
-            maplit::hashset,
-            std::{
-                cell::{Cell, RefCell},
-                rc::Rc,
-            },
+        use super::super::{
+            args, Contender, ContenderFactory, ExamineEventResult, MatchedContender,
+            ProcessBufferedEventsResult, ProcessNewEventResult, TouchpadEvent, VerifyEventResult,
+            Winner, COUNTS_PER_MM, PRIMARY_BUTTON,
         };
+        use crate::utils::Size;
+        use crate::{input_device, keyboard_binding, mouse_binding, touch_binding, Position};
+        use assert_matches::assert_matches;
+        use maplit::hashset;
+        use std::cell::{Cell, RefCell};
+        use std::rc::Rc;
+        use {fidl_fuchsia_input_report as fidl_input_report, fuchsia_zircon as zx};
 
         /// The gesture arena is mostly agnostic to the event details. Consequently, most
         /// tests can use the same lightly populated touchpad event.
@@ -1732,29 +1722,24 @@ mod tests {
     }
 
     mod idle_chain_states {
-        use {
-            super::{
-                super::{
-                    args, ExamineEventResult, GestureArena, InputHandler, MutableState,
-                    ProcessBufferedEventsResult, Reason, RecognizedGesture, TouchpadEvent,
-                },
-                utils::{
-                    make_touchpad_descriptor, make_unhandled_keyboard_event,
-                    make_unhandled_mouse_event, make_unhandled_touchpad_event,
-                    ContenderFactoryCalled, ContenderFactoryOnceOrPanic, StubContender,
-                    StubMatchedContender, StubWinner, TOUCH_CONTACT_INDEX_FINGER,
-                },
-            },
-            crate::{
-                input_device, input_handler::InputHandlerStatus, touch_binding, utils::Size,
-                Position,
-            },
-            assert_matches::assert_matches,
-            fuchsia_zircon as zx,
-            maplit::hashset,
-            std::{cell::RefCell, rc::Rc},
-            test_case::test_case,
+        use super::super::{
+            args, ExamineEventResult, GestureArena, InputHandler, MutableState,
+            ProcessBufferedEventsResult, Reason, RecognizedGesture, TouchpadEvent,
         };
+        use super::utils::{
+            make_touchpad_descriptor, make_unhandled_keyboard_event, make_unhandled_mouse_event,
+            make_unhandled_touchpad_event, ContenderFactoryCalled, ContenderFactoryOnceOrPanic,
+            StubContender, StubMatchedContender, StubWinner, TOUCH_CONTACT_INDEX_FINGER,
+        };
+        use crate::input_handler::InputHandlerStatus;
+        use crate::utils::Size;
+        use crate::{input_device, touch_binding, Position};
+        use assert_matches::assert_matches;
+        use fuchsia_zircon as zx;
+        use maplit::hashset;
+        use std::cell::RefCell;
+        use std::rc::Rc;
+        use test_case::test_case;
 
         fn make_gesture_arena_with_state(
             contender_factory: ContenderFactoryOnceOrPanic,
@@ -2154,30 +2139,25 @@ mod tests {
     }
 
     mod matching_state {
-        use {
-            super::{
-                super::{
-                    Contender, ContenderFactory, ExamineEventResult, GestureArena, InputHandler,
-                    MouseEvent, MutableState, ProcessBufferedEventsResult, Reason,
-                    RecognizedGesture, TouchpadEvent, VerifyEventResult, PRIMARY_BUTTON,
-                },
-                utils::{
-                    make_touchpad_descriptor, make_unhandled_keyboard_event,
-                    make_unhandled_mouse_event, make_unhandled_touchpad_event, ContenderForever,
-                    StubContender, StubMatchedContender, StubWinner, TOUCH_CONTACT_INDEX_FINGER,
-                },
-            },
-            crate::{
-                input_device, input_handler::InputHandlerStatus, mouse_binding, touch_binding,
-                Position,
-            },
-            assert_matches::assert_matches,
-            fuchsia_zircon as zx,
-            maplit::hashset,
-            pretty_assertions::assert_eq,
-            std::{cell::RefCell, rc::Rc},
-            test_case::test_case,
+        use super::super::{
+            Contender, ContenderFactory, ExamineEventResult, GestureArena, InputHandler,
+            MouseEvent, MutableState, ProcessBufferedEventsResult, Reason, RecognizedGesture,
+            TouchpadEvent, VerifyEventResult, PRIMARY_BUTTON,
         };
+        use super::utils::{
+            make_touchpad_descriptor, make_unhandled_keyboard_event, make_unhandled_mouse_event,
+            make_unhandled_touchpad_event, ContenderForever, StubContender, StubMatchedContender,
+            StubWinner, TOUCH_CONTACT_INDEX_FINGER,
+        };
+        use crate::input_handler::InputHandlerStatus;
+        use crate::{input_device, mouse_binding, touch_binding, Position};
+        use assert_matches::assert_matches;
+        use fuchsia_zircon as zx;
+        use maplit::hashset;
+        use pretty_assertions::assert_eq;
+        use std::cell::RefCell;
+        use std::rc::Rc;
+        use test_case::test_case;
 
         struct ContenderFactoryWarn {}
 
@@ -2730,31 +2710,24 @@ mod tests {
     }
 
     mod forwarding_state {
-        use {
-            super::{
-                super::{
-                    Contender, EndGestureEvent, ExamineEventResult, GestureArena, InputHandler,
-                    MouseEvent, MutableState, ProcessNewEventResult, Reason, RecognizedGesture,
-                    TouchpadEvent,
-                },
-                utils::{
-                    make_touchpad_descriptor, make_unhandled_keyboard_event,
-                    make_unhandled_mouse_event, make_unhandled_touchpad_event,
-                    ContenderFactoryOnceOrPanic, ContenderForever, StubContender, StubWinner,
-                    TOUCH_CONTACT_INDEX_FINGER,
-                },
-            },
-            crate::{
-                input_device, input_handler::InputHandlerStatus, mouse_binding, touch_binding,
-                Position,
-            },
-            assert_matches::assert_matches,
-            fuchsia_zircon as zx,
-            maplit::hashset,
-            pretty_assertions::assert_eq,
-            std::{cell::RefCell, rc::Rc},
-            test_case::test_case,
+        use super::super::{
+            Contender, EndGestureEvent, ExamineEventResult, GestureArena, InputHandler, MouseEvent,
+            MutableState, ProcessNewEventResult, Reason, RecognizedGesture, TouchpadEvent,
         };
+        use super::utils::{
+            make_touchpad_descriptor, make_unhandled_keyboard_event, make_unhandled_mouse_event,
+            make_unhandled_touchpad_event, ContenderFactoryOnceOrPanic, ContenderForever,
+            StubContender, StubWinner, TOUCH_CONTACT_INDEX_FINGER,
+        };
+        use crate::input_handler::InputHandlerStatus;
+        use crate::{input_device, mouse_binding, touch_binding, Position};
+        use assert_matches::assert_matches;
+        use fuchsia_zircon as zx;
+        use maplit::hashset;
+        use pretty_assertions::assert_eq;
+        use std::cell::RefCell;
+        use std::rc::Rc;
+        use test_case::test_case;
 
         /// Creates an arena in the forwarding state, with
         /// a) the given `winner`, and
@@ -3183,20 +3156,19 @@ mod tests {
     }
 
     mod touchpad_event_payload {
-        use {
-            super::{
-                super::{args, ExamineEventResult, GestureArena, InputHandler, Reason},
-                utils::{ContenderFactoryOnceOrPanic, StubContender, TOUCH_CONTACT_INDEX_FINGER},
-            },
-            crate::{input_device, touch_binding, utils::Size, Position},
-            assert_matches::assert_matches,
-            fidl_fuchsia_input_report::{self as fidl_input_report, UnitType},
-            fuchsia_zircon as zx,
-            maplit::hashset,
-            std::rc::Rc,
-            test_case::test_case,
-            test_util::assert_near,
+        use super::super::{args, ExamineEventResult, GestureArena, InputHandler, Reason};
+        use super::utils::{
+            ContenderFactoryOnceOrPanic, StubContender, TOUCH_CONTACT_INDEX_FINGER,
         };
+        use crate::utils::Size;
+        use crate::{input_device, touch_binding, Position};
+        use assert_matches::assert_matches;
+        use fidl_fuchsia_input_report::{self as fidl_input_report, UnitType};
+        use fuchsia_zircon as zx;
+        use maplit::hashset;
+        use std::rc::Rc;
+        use test_case::test_case;
+        use test_util::assert_near;
 
         fn make_touchpad_descriptor(
             units: Vec<(fidl_input_report::Unit, fidl_input_report::Unit)>,
@@ -3542,27 +3514,25 @@ mod tests {
     }
 
     mod inspect {
+        use super::super::{
+            args, Contender, ContenderFactory, DetailedReasonFloat, DetailedReasonInt,
+            DetailedReasonUint, EndGestureEvent, ExamineEventResult, GestureArena, InputHandler,
+            MouseEvent, ProcessBufferedEventsResult, ProcessNewEventResult, Reason,
+            RecognizedGesture, TouchpadEvent,
+        };
+        use super::utils::{
+            make_touchpad_descriptor, make_unhandled_keyboard_event, make_unhandled_mouse_event,
+            make_unhandled_touchpad_event, ContenderFactoryOnceOrPanic, StubContender,
+            StubMatchedContender, StubWinner,
+        };
+        use crate::{input_device, keyboard_binding, mouse_binding, touch_binding, Position, Size};
+        use assert_matches::assert_matches;
+        use maplit::hashset;
+        use std::rc::Rc;
+        use test_case::test_case;
         use {
-            super::{
-                super::{
-                    args, Contender, ContenderFactory, DetailedReasonFloat, DetailedReasonInt,
-                    DetailedReasonUint, EndGestureEvent, ExamineEventResult, GestureArena,
-                    InputHandler, MouseEvent, ProcessBufferedEventsResult, ProcessNewEventResult,
-                    Reason, RecognizedGesture, TouchpadEvent,
-                },
-                utils::{
-                    make_touchpad_descriptor, make_unhandled_keyboard_event,
-                    make_unhandled_mouse_event, make_unhandled_touchpad_event,
-                    ContenderFactoryOnceOrPanic, StubContender, StubMatchedContender, StubWinner,
-                },
-            },
-            crate::{input_device, keyboard_binding, mouse_binding, touch_binding, Position, Size},
-            assert_matches::assert_matches,
             fidl_fuchsia_input_report as fidl_input_report, fuchsia_async as fasync,
             fuchsia_zircon as zx,
-            maplit::hashset,
-            std::rc::Rc,
-            test_case::test_case,
         };
 
         struct EmptyContenderFactory {}

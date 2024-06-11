@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::config::ValidatorFileArgsMap,
-    crate::validators::{Validator, ValidatorError},
-    anyhow::{format_err, Error},
-    serde_json::{map::Map, value::Value},
-    std::collections::HashMap,
-};
+use crate::config::ValidatorFileArgsMap;
+use crate::validators::{Validator, ValidatorError};
+use anyhow::{format_err, Error};
+use serde_json::map::Map;
+use serde_json::value::Value;
+use std::collections::HashMap;
 
 /// A constraint for the size of the contents of a file.
 ///
@@ -150,7 +149,8 @@ impl Validator for SizeValidator {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, serde_json::json};
+    use super::*;
+    use serde_json::json;
 
     const TO_VALIDATE1: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
     const TO_VALIDATE2: &str = "Здравствуйте";

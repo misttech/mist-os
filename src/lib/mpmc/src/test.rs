@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use fuchsia_async as fasync;
-use futures::{future::join, task::noop_waker, Future, FutureExt, StreamExt};
+use futures::future::join;
+use futures::task::noop_waker;
+use futures::{Future, FutureExt, StreamExt};
 use mpmc::*;
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 #[fasync::run_singlethreaded]
 #[test]

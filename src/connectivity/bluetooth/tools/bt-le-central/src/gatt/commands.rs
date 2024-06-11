@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    rustyline::{
-        completion::Completer, error::ReadlineError, highlight::Highlighter, hint::Hinter, Helper,
-    },
-    std::{
-        borrow::Cow::{self, Borrowed, Owned},
-        fmt,
-        str::FromStr,
-    },
-};
+use rustyline::completion::Completer;
+use rustyline::error::ReadlineError;
+use rustyline::highlight::Highlighter;
+use rustyline::hint::Hinter;
+use rustyline::Helper;
+use std::borrow::Cow::{self, Borrowed, Owned};
+use std::fmt;
+use std::str::FromStr;
 
 /// Macro to generate a command enum and its impl.
 /// A command consists of the command name, optional flags, arguments, and a help description.

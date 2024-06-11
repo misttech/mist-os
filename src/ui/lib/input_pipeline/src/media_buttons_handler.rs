@@ -2,23 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::input_handler::{InputHandlerStatus, UnhandledInputHandler};
+use crate::{consumer_controls_binding, input_device, metrics};
+use anyhow::{Context, Error};
+use async_trait::async_trait;
+use fidl::endpoints::Proxy;
+use fuchsia_inspect::health::Reporter;
+use fuchsia_zircon::AsHandleRef;
+use futures::channel::mpsc;
+use futures::{StreamExt, TryStreamExt};
+use metrics_registry::*;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
 use {
-    crate::input_handler::{InputHandlerStatus, UnhandledInputHandler},
-    crate::{consumer_controls_binding, input_device, metrics},
-    anyhow::{Context, Error},
-    async_trait::async_trait,
-    fidl::endpoints::Proxy,
     fidl_fuchsia_input_interaction_observation as interaction_observation,
     fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_ui_input as fidl_ui_input,
-    fidl_fuchsia_ui_policy as fidl_ui_policy, fuchsia_async as fasync,
-    fuchsia_inspect::health::Reporter,
-    fuchsia_zircon as zx,
-    fuchsia_zircon::AsHandleRef,
-    futures::{channel::mpsc, StreamExt, TryStreamExt},
-    metrics_registry::*,
-    std::cell::RefCell,
-    std::collections::HashMap,
-    std::rc::Rc,
+    fidl_fuchsia_ui_policy as fidl_ui_policy, fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 /// A [`MediaButtonsHandler`] tracks MediaButtonListeners and sends media button events to them.
@@ -322,11 +322,16 @@ impl LocalTaskTracker {
 mod tests {
     use crate::input_handler::InputHandler;
 
+    use super::*;
+    use crate::testing_utilities;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::create_proxy_and_stream;
+    use futures::channel::oneshot;
+    use pretty_assertions::assert_eq;
+    use std::task::Poll;
     use {
-        super::*, crate::testing_utilities, assert_matches::assert_matches,
-        fidl::endpoints::create_proxy_and_stream, fidl_fuchsia_input_report as fidl_input_report,
-        fuchsia_async as fasync, fuchsia_zircon as zx, futures::channel::oneshot,
-        pretty_assertions::assert_eq, std::task::Poll,
+        fidl_fuchsia_input_report as fidl_input_report, fuchsia_async as fasync,
+        fuchsia_zircon as zx,
     };
 
     fn spawn_device_listener_registry_server(

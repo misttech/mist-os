@@ -127,13 +127,10 @@ macro_rules! codable_as_bitmask {
 #[no_implicit_prelude]
 mod test {
     use ::assert_matches::assert_matches;
+    use ::core::convert::{From, TryFrom};
+    use ::core::option::Option::Some;
     use ::core::result::Result;
-    use ::core::{
-        assert, assert_eq,
-        convert::{From, TryFrom},
-        option::Option::Some,
-        panic,
-    };
+    use ::core::{assert, assert_eq, panic};
     use ::std::collections::HashSet;
     use ::std::iter::{IntoIterator, Iterator};
     use ::std::vec;

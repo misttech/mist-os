@@ -4,18 +4,16 @@
 
 use fuchsia_zircon as zx;
 
-use crate::{
-    arch::registers::RegisterState,
-    signals::{SignalInfo, SignalState},
-    task::{CurrentTask, Task},
-};
+use crate::arch::registers::RegisterState;
+use crate::signals::{SignalInfo, SignalState};
+use crate::task::{CurrentTask, Task};
 use extended_pstate::ExtendedPstateState;
 use starnix_logging::log_debug;
+use starnix_uapi::errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK};
+use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
-    self as uapi, __NR_restart_syscall, error,
-    errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK},
-    sigaction, sigaltstack, sigcontext, siginfo_t, ucontext,
-    user_address::UserAddress,
+    self as uapi, __NR_restart_syscall, error, sigaction, sigaltstack, sigcontext, siginfo_t,
+    ucontext,
 };
 use static_assertions::const_assert_eq;
 
@@ -248,19 +246,15 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use crate::{
-        mm::{DesiredAddress, MappingName, MappingOptions, ProtectionFlags},
-        signals::{restore_from_signal_handler, testing::dequeue_signal_for_test, SignalDetail},
-        task::Kernel,
-        testing::*,
-        vfs::FileWriteGuardRef,
-    };
-    use starnix_uapi::{
-        __NR_rt_sigreturn,
-        errors::{EINTR, ERESTARTSYS},
-        signals::{SIGUSR1, SIGUSR2},
-        SA_RESTART, SA_RESTORER, SA_SIGINFO, SI_USER,
-    };
+    use crate::mm::{DesiredAddress, MappingName, MappingOptions, ProtectionFlags};
+    use crate::signals::testing::dequeue_signal_for_test;
+    use crate::signals::{restore_from_signal_handler, SignalDetail};
+    use crate::task::Kernel;
+    use crate::testing::*;
+    use crate::vfs::FileWriteGuardRef;
+    use starnix_uapi::errors::{EINTR, ERESTARTSYS};
+    use starnix_uapi::signals::{SIGUSR1, SIGUSR2};
+    use starnix_uapi::{__NR_rt_sigreturn, SA_RESTART, SA_RESTORER, SA_SIGINFO, SI_USER};
 
     const SYSCALL_INSTRUCTION_ADDRESS: UserAddress = UserAddress::const_from(100);
     const SYSCALL_NUMBER: u64 = 42;

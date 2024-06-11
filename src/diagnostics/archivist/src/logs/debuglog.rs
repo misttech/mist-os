@@ -4,20 +4,20 @@
 
 // Read debug logs, convert them to LogMessages and serve them.
 
-use crate::{
-    identity::ComponentIdentity,
-    logs::{error::LogsError, stats::LogStreamStats, stored_message::DebugLogStoredMessage},
-};
+use crate::identity::ComponentIdentity;
+use crate::logs::error::LogsError;
+use crate::logs::stats::LogStreamStats;
+use crate::logs::stored_message::DebugLogStoredMessage;
 use diagnostics_data::{BuilderArgs, LogsData, LogsDataBuilder, Severity};
 use fidl::prelude::*;
 use fidl_fuchsia_boot::ReadOnlyLogMarker;
-use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon as zx;
 use futures::stream::{unfold, Stream};
 use lazy_static::lazy_static;
 use moniker::ExtendedMoniker;
-use std::{future::Future, sync::Arc};
+use std::future::Future;
+use std::sync::Arc;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub const KERNEL_URL: &str = "fuchsia-boot://kernel";
 lazy_static! {
@@ -173,7 +173,8 @@ pub fn convert_debuglog_to_log_message(record: &zx::sys::zx_log_record_t) -> Opt
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::logs::{stored_message::StoredMessage, testing::*};
+    use crate::logs::stored_message::StoredMessage;
+    use crate::logs::testing::*;
 
     use fidl_fuchsia_diagnostics as fdiagnostics;
     use fidl_fuchsia_logger::LogMessage;

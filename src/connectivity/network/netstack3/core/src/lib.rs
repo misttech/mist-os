@@ -179,13 +179,11 @@ pub mod sync {
     // rustc's unused dependency check.
     use netstack3_sync as _;
 
-    pub use netstack3_base::{
-        sync::{
-            DebugReferences, DynDebugReferences, LockGuard, MapRcNotifier, Mutex, PrimaryRc,
-            RcNotifier, RwLock, RwLockReadGuard, RwLockWriteGuard, StrongRc, WeakRc,
-        },
-        RemoveResourceResult, RemoveResourceResultWithContext,
+    pub use netstack3_base::sync::{
+        DebugReferences, DynDebugReferences, LockGuard, MapRcNotifier, Mutex, PrimaryRc,
+        RcNotifier, RwLock, RwLockReadGuard, RwLockWriteGuard, StrongRc, WeakRc,
     };
+    pub use netstack3_base::{RemoveResourceResult, RemoveResourceResultWithContext};
 }
 
 /// Methods for dealing with TCP sockets.

@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_component::client::connect_to_protocol;
+use futures::{FutureExt, StreamExt};
 use {
     fidl_fuchsia_component as fcomp, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_sys2 as fsys,
-    fuchsia_component::client::connect_to_protocol,
-    futures::{FutureExt, StreamExt},
 };
 
 #[fuchsia::test]

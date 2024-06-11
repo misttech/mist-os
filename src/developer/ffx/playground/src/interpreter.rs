@@ -14,8 +14,7 @@ use futures::{Future, FutureExt, Stream, StreamExt};
 use std::collections::HashMap;
 use std::fmt::Write;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::OnceLock;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::compiler::Visitor;
 use crate::error::{Error, Result};

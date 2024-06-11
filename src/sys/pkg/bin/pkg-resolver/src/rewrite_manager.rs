@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context as _},
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_pkg_rewrite_ext::{Rule, RuleConfig},
-    fuchsia_inspect::{self as inspect, Property},
-    fuchsia_url::AbsolutePackageUrl,
-    std::collections::VecDeque,
-    thiserror::Error,
-    tracing::error,
-};
+use anyhow::{anyhow, Context as _};
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_pkg_rewrite_ext::{Rule, RuleConfig};
+use fuchsia_inspect::{self as inspect, Property};
+use fuchsia_url::AbsolutePackageUrl;
+use std::collections::VecDeque;
+use thiserror::Error;
+use tracing::error;
 
 /// [RewriteManager] controls access to all static and dynamic rewrite rules used by the package
 /// resolver.
@@ -406,15 +404,14 @@ impl RewriteManagerBuilder<inspect::Node> {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use {
-        super::*,
-        anyhow::Error,
-        assert_matches::assert_matches,
-        diagnostics_assertions::assert_data_tree,
-        fuchsia_async as fasync,
-        serde_json::json,
-        std::{io, path::Path},
-    };
+    use super::*;
+    use anyhow::Error;
+    use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_async as fasync;
+    use serde_json::json;
+    use std::io;
+    use std::path::Path;
 
     macro_rules! rule {
         ($host_match:expr => $host_replacement:expr,

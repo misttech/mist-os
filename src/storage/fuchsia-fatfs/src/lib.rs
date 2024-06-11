@@ -1,19 +1,17 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::{filesystem::FatFilesystem, node::Node},
-    anyhow::Error,
-    fatfs::FsOptions,
-    fidl_fuchsia_fs::{AdminRequest, AdminShutdownResponder},
-    fuchsia_zircon::Status,
-    std::pin::Pin,
-    std::sync::Arc,
-    vfs::{
-        directory::{entry::DirectoryEntry, entry_container::Directory},
-        execution_scope::ExecutionScope,
-    },
-};
+use crate::filesystem::FatFilesystem;
+use crate::node::Node;
+use anyhow::Error;
+use fatfs::FsOptions;
+use fidl_fuchsia_fs::{AdminRequest, AdminShutdownResponder};
+use fuchsia_zircon::Status;
+use std::pin::Pin;
+use std::sync::Arc;
+use vfs::directory::entry::DirectoryEntry;
+use vfs::directory::entry_container::Directory;
+use vfs::execution_scope::ExecutionScope;
 
 mod directory;
 mod file;
@@ -23,7 +21,8 @@ mod refs;
 mod types;
 mod util;
 
-pub use {directory::FatDirectory, util::fatfs_error_to_status};
+pub use directory::FatDirectory;
+pub use util::fatfs_error_to_status;
 
 #[cfg(fuzz)]
 mod fuzzer;
@@ -115,17 +114,19 @@ impl FatFs {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::types::{Dir, FileSystem},
-        anyhow::{anyhow, Context},
-        fatfs::{format_volume, FormatVolumeOptions},
-        fidl::endpoints::Proxy,
-        fidl_fuchsia_io as fio,
-        futures::{future::BoxFuture, prelude::*},
-        std::{collections::HashMap, io::Write, ops::Deref},
-        vfs::{node::Node, path::Path},
-    };
+    use super::*;
+    use crate::types::{Dir, FileSystem};
+    use anyhow::{anyhow, Context};
+    use fatfs::{format_volume, FormatVolumeOptions};
+    use fidl::endpoints::Proxy;
+    use fidl_fuchsia_io as fio;
+    use futures::future::BoxFuture;
+    use futures::prelude::*;
+    use std::collections::HashMap;
+    use std::io::Write;
+    use std::ops::Deref;
+    use vfs::node::Node;
+    use vfs::path::Path;
 
     #[derive(Debug, PartialEq)]
     /// Helper class for creating a filesystem layout on a FAT disk programatically.

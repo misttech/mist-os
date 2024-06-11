@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_bluetooth_avrcp::AvcPanelCommand,
-    rustyline::{
-        completion::Completer, error::ReadlineError, highlight::Highlighter, hint::Hinter, Helper,
-    },
-    std::{
-        borrow::Cow::{self, Borrowed, Owned},
-        fmt,
-        str::FromStr,
-    },
-};
+use fidl_fuchsia_bluetooth_avrcp::AvcPanelCommand;
+use rustyline::completion::Completer;
+use rustyline::error::ReadlineError;
+use rustyline::highlight::Highlighter;
+use rustyline::hint::Hinter;
+use rustyline::Helper;
+use std::borrow::Cow::{self, Borrowed, Owned};
+use std::fmt;
+use std::str::FromStr;
 
 macro_rules! gen_avc_commands {
 ($name:ident {

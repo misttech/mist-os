@@ -2,46 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        debug_assert_not_too_long,
-        errors::FxfsError,
-        fsck::{fsck_volume_with_options, fsck_with_options, FsckOptions},
-        log::*,
-        metrics,
-        object_store::{
-            allocator::{Allocator, Hold, Reservation},
-            directory::Directory,
-            graveyard::Graveyard,
-            journal::{
-                self, super_block::SuperBlockHeader, Journal, JournalCheckpoint, JournalOptions,
-            },
-            object_manager::ObjectManager,
-            transaction::{
-                self, lock_keys, AssocObj, LockKey, LockKeys, LockManager, MetadataReservation,
-                Mutation, ReadGuard, Transaction, TRANSACTION_METADATA_MAX_AMOUNT,
-            },
-            volume::{root_volume, VOLUMES_DIRECTORY},
-            ObjectStore,
-        },
-        range::RangeExt,
-        serialized_types::Version,
-    },
-    anyhow::{bail, Context, Error},
-    async_trait::async_trait,
-    event_listener::Event,
-    fuchsia_async as fasync,
-    fuchsia_inspect::{NumericProperty as _, UintProperty},
-    futures::FutureExt,
-    fxfs_crypto::Crypt,
-    once_cell::sync::OnceCell,
-    static_assertions::const_assert,
-    std::sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
-        Arc, Mutex, Weak,
-    },
-    storage_device::{Device, DeviceHolder},
+use crate::errors::FxfsError;
+use crate::fsck::{fsck_volume_with_options, fsck_with_options, FsckOptions};
+use crate::log::*;
+use crate::object_store::allocator::{Allocator, Hold, Reservation};
+use crate::object_store::directory::Directory;
+use crate::object_store::graveyard::Graveyard;
+use crate::object_store::journal::super_block::SuperBlockHeader;
+use crate::object_store::journal::{self, Journal, JournalCheckpoint, JournalOptions};
+use crate::object_store::object_manager::ObjectManager;
+use crate::object_store::transaction::{
+    self, lock_keys, AssocObj, LockKey, LockKeys, LockManager, MetadataReservation, Mutation,
+    ReadGuard, Transaction, TRANSACTION_METADATA_MAX_AMOUNT,
 };
+use crate::object_store::volume::{root_volume, VOLUMES_DIRECTORY};
+use crate::object_store::ObjectStore;
+use crate::range::RangeExt;
+use crate::serialized_types::Version;
+use crate::{debug_assert_not_too_long, metrics};
+use anyhow::{bail, Context, Error};
+use async_trait::async_trait;
+use event_listener::Event;
+use fuchsia_async as fasync;
+use fuchsia_inspect::{NumericProperty as _, UintProperty};
+use futures::FutureExt;
+use fxfs_crypto::Crypt;
+use once_cell::sync::OnceCell;
+use static_assertions::const_assert;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, Weak};
+use storage_device::{Device, DeviceHolder};
 
 pub const MIN_BLOCK_SIZE: u64 = 4096;
 pub const MAX_BLOCK_SIZE: u64 = u16::MAX as u64 + 1;
@@ -885,35 +875,28 @@ impl FsckAfterEveryTransaction {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{FxFilesystem, FxFilesystemBuilder, SyncOptions},
-        crate::{
-            fsck::{fsck, fsck_volume},
-            log::*,
-            lsm_tree::{types::Item, Operation},
-            object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID},
-            object_store::{
-                directory::replace_child,
-                directory::Directory,
-                journal::JournalOptions,
-                transaction::{lock_keys, LockKey, Options},
-                volume::root_volume,
-                HandleOptions, ObjectStore,
-            },
-        },
-        fuchsia_async as fasync,
-        futures::{
-            future::join_all,
-            stream::{FuturesUnordered, TryStreamExt},
-        },
-        fxfs_insecure_crypto::InsecureCrypt,
-        rustc_hash::FxHashMap as HashMap,
-        std::{
-            sync::{Arc, Mutex},
-            time::Duration,
-        },
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
+    use super::{FxFilesystem, FxFilesystemBuilder, SyncOptions};
+    use crate::fsck::{fsck, fsck_volume};
+    use crate::log::*;
+    use crate::lsm_tree::types::Item;
+    use crate::lsm_tree::Operation;
+    use crate::object_handle::{
+        ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID,
     };
+    use crate::object_store::directory::{replace_child, Directory};
+    use crate::object_store::journal::JournalOptions;
+    use crate::object_store::transaction::{lock_keys, LockKey, Options};
+    use crate::object_store::volume::root_volume;
+    use crate::object_store::{HandleOptions, ObjectStore};
+    use fuchsia_async as fasync;
+    use futures::future::join_all;
+    use futures::stream::{FuturesUnordered, TryStreamExt};
+    use fxfs_insecure_crypto::InsecureCrypt;
+    use rustc_hash::FxHashMap as HashMap;
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::DeviceHolder;
 
     const TEST_DEVICE_BLOCK_SIZE: u32 = 512;
 

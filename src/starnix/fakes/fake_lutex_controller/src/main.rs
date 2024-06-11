@@ -3,17 +3,18 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Error};
-use fidl_fuchsia_posix as fposix;
-use fidl_fuchsia_starnix_binder as fbinder;
-use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
-use futures::{
-    channel::oneshot, pin_mut, select, FutureExt, StreamExt, TryFutureExt, TryStreamExt,
-};
-use std::{collections::BTreeMap, future::Future, sync::Arc};
+use futures::channel::oneshot;
+use futures::{pin_mut, select, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
+use std::collections::BTreeMap;
+use std::future::Future;
+use std::sync::Arc;
 use tracing::{error, warn};
+use {
+    fidl_fuchsia_posix as fposix, fidl_fuchsia_starnix_binder as fbinder, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
+};
 
 enum Services {
     LutexController(fbinder::LutexControllerRequestStream),

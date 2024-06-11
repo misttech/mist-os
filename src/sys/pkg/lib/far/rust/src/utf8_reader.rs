@@ -55,7 +55,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, fuchsia_async as fasync, std::io::Cursor};
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use std::io::Cursor;
 
     #[fasync::run_singlethreaded(test)]
     async fn new_rejects_non_utf8_path() {

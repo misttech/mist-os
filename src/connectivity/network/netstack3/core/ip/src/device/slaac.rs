@@ -9,28 +9,29 @@
 //! [RFC 8981]: https://datatracker.ietf.org/doc/html/rfc8981
 
 use alloc::vec::Vec;
-use core::{marker::PhantomData, num::NonZeroU16, ops::ControlFlow, time::Duration};
+use core::marker::PhantomData;
+use core::num::NonZeroU16;
+use core::ops::ControlFlow;
+use core::time::Duration;
 
 use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
 use log::{debug, error, trace};
-use net_types::{
-    ip::{AddrSubnet, IpAddress, Ipv6Addr, Subnet},
-    Witness as _,
-};
+use net_types::ip::{AddrSubnet, IpAddress, Ipv6Addr, Subnet};
+use net_types::Witness as _;
 use netstack3_base::{
     AnyDevice, CoreTimerContext, Counter, CounterContext, DeviceIdContext, DeviceIdentifier,
     ExistsError, HandleableTimer, Instant, InstantBindingsTypes, InstantContext, LocalTimerHeap,
     NotFoundError, RngContext, TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
 };
-use packet_formats::{icmp::ndp::NonZeroNdpLifetime, utils::NonZeroDuration};
-use rand::{distributions::Uniform, Rng};
+use packet_formats::icmp::ndp::NonZeroNdpLifetime;
+use packet_formats::utils::NonZeroDuration;
+use rand::distributions::Uniform;
+use rand::Rng;
 
-use crate::internal::device::{
-    opaque_iid::{OpaqueIid, OpaqueIidNonce, StableIidSecret},
-    state::{Lifetime, SlaacConfig, TemporarySlaacConfig},
-    AddressRemovedReason, Ipv6DeviceAddr,
-};
+use crate::internal::device::opaque_iid::{OpaqueIid, OpaqueIidNonce, StableIidSecret};
+use crate::internal::device::state::{Lifetime, SlaacConfig, TemporarySlaacConfig};
+use crate::internal::device::{AddressRemovedReason, Ipv6DeviceAddr};
 
 /// Minimum Valid Lifetime value to actually update an address's valid lifetime.
 ///
@@ -1725,13 +1726,11 @@ mod tests {
     use core::convert::TryFrom as _;
 
     use net_declare::net::ip_v6;
-    use netstack3_base::{
-        testutil::{
-            assert_empty, FakeBindingsCtx, FakeCoreCtx, FakeCryptoRng, FakeDeviceId, FakeInstant,
-            FakeTimerCtxExt as _, FakeWeakDeviceId,
-        },
-        CtxPair, IntoCoreTimerCtx,
+    use netstack3_base::testutil::{
+        assert_empty, FakeBindingsCtx, FakeCoreCtx, FakeCryptoRng, FakeDeviceId, FakeInstant,
+        FakeTimerCtxExt as _, FakeWeakDeviceId,
     };
+    use netstack3_base::{CtxPair, IntoCoreTimerCtx};
     use test_case::test_case;
 
     use super::*;

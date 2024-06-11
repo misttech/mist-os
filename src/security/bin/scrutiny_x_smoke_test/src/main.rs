@@ -2,21 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::anyhow;
-use anyhow::bail;
-use anyhow::Context as _;
-use anyhow::Result;
+use anyhow::{anyhow, bail, Context as _, Result};
 use argh::FromArgs;
 use scrutiny_x as scrutiny;
 use std::collections::HashSet;
-use std::fs::read_dir;
-use std::fs::write;
-use std::fs::File;
+use std::fs::{read_dir, write, File};
 use std::io::Write;
-use std::path::Path;
-use std::path::PathBuf;
-use tracing::debug;
-use tracing::Level;
+use std::path::{Path, PathBuf};
+use tracing::{debug, Level};
 use tracing_subscriber::fmt::format::FmtSpan;
 
 /// Arguments passed to the Scrutiny X smoke test intended to exercise Scrutiny X features against

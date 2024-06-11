@@ -2,21 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    events::{
-        router::EventConsumer,
-        types::{Event, EventPayload, InspectSinkRequestedPayload},
-    },
-    identity::ComponentIdentity,
-    inspect::{container::InspectHandle, repository::InspectRepository},
-};
+use crate::events::router::EventConsumer;
+use crate::events::types::{Event, EventPayload, InspectSinkRequestedPayload};
+use crate::identity::ComponentIdentity;
+use crate::inspect::container::InspectHandle;
+use crate::inspect::repository::InspectRepository;
 use anyhow::Error;
-use fidl_fuchsia_inspect as finspect;
-use fuchsia_async as fasync;
 use fuchsia_sync::{Mutex, RwLock};
-use futures::{channel::mpsc, StreamExt};
+use futures::channel::mpsc;
+use futures::StreamExt;
 use std::sync::Arc;
 use tracing::warn;
+use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync};
 
 pub struct InspectSinkServer {
     /// Shared repository holding the Inspect handles.
@@ -112,26 +109,25 @@ impl EventConsumer for InspectSinkServer {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        events::{
-            router::EventConsumer,
-            types::{Event, EventPayload, InspectSinkRequestedPayload},
-        },
-        identity::ComponentIdentity,
-        inspect::{
-            container::InspectHandle, repository::InspectRepository, servers::InspectSinkServer,
-        },
-    };
+    use crate::events::router::EventConsumer;
+    use crate::events::types::{Event, EventPayload, InspectSinkRequestedPayload};
+    use crate::identity::ComponentIdentity;
+    use crate::inspect::container::InspectHandle;
+    use crate::inspect::repository::InspectRepository;
+    use crate::inspect::servers::InspectSinkServer;
     use assert_matches::assert_matches;
     use diagnostics_assertions::assert_json_diff;
     use fidl::endpoints::{create_proxy_and_stream, create_request_stream, ClientEnd};
-    use fidl_fuchsia_inspect::TreeMarker;
-    use fidl_fuchsia_inspect::{InspectSinkMarker, InspectSinkProxy, InspectSinkPublishRequest};
+    use fidl_fuchsia_inspect::{
+        InspectSinkMarker, InspectSinkProxy, InspectSinkPublishRequest, TreeMarker,
+    };
     use fuchsia_async::Task;
-    use fuchsia_inspect::{reader::read, Inspector};
+    use fuchsia_inspect::reader::read;
+    use fuchsia_inspect::Inspector;
     use fuchsia_zircon::{self as zx, AsHandleRef};
     use futures::Future;
-    use inspect_runtime::{service::spawn_tree_server_with_stream, TreeServerSendPreference};
+    use inspect_runtime::service::spawn_tree_server_with_stream;
+    use inspect_runtime::TreeServerSendPreference;
     use selectors::VerboseError;
     use std::sync::Arc;
 

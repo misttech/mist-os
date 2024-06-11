@@ -4,14 +4,13 @@
 
 // This actor has one action that sends an Echo to the subject.
 
-use {
-    anyhow::{anyhow, bail, Result},
-    fidl_fidl_examples_routing_echo::{EchoMarker, EchoProxy},
-    fuchsia_component::client::connect_to_protocol,
-    futures::{future::BoxFuture, FutureExt},
-    rand::rngs::SmallRng,
-    stress_test_actor::{actor_loop, Action},
-};
+use anyhow::{anyhow, bail, Result};
+use fidl_fidl_examples_routing_echo::{EchoMarker, EchoProxy};
+use fuchsia_component::client::connect_to_protocol;
+use futures::future::BoxFuture;
+use futures::FutureExt;
+use rand::rngs::SmallRng;
+use stress_test_actor::{actor_loop, Action};
 
 const ECHO_TEXT: &'static str = "This is a test";
 

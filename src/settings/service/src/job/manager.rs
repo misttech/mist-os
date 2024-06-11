@@ -13,18 +13,17 @@
 //! will process each received source for new [Jobs](Job) and provide the necessary backing, such as
 //! caches, to support executing the [Job].
 
-use crate::event::{self, source::Event as SourceEvent, Event};
+use crate::event::source::Event as SourceEvent;
+use crate::event::{self, Event};
 use crate::job::source::{self, Error};
-use crate::job::PinStream;
-use crate::job::{self, Job, Payload};
+use crate::job::{self, Job, Payload, PinStream};
 use crate::message::base::MessengerType;
 use crate::service::{self, message};
 use crate::trace;
-use fuchsia_async as fasync;
-use fuchsia_trace as ftrace;
 use futures::stream::{FuturesUnordered, StreamFuture};
 use futures::{FutureExt, StreamExt};
 use std::collections::HashMap;
+use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
 type JobStreamItem = (source::Id, Option<Result<Job, Error>>);
 

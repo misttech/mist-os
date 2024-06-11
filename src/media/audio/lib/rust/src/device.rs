@@ -2,17 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{dai::DaiFormatSet, format_set::PcmFormatSet};
+use crate::dai::DaiFormatSet;
+use crate::format_set::PcmFormatSet;
 use camino::Utf8PathBuf;
-use fidl_fuchsia_audio_controller as fac;
-use fidl_fuchsia_audio_device as fadevice;
-use fidl_fuchsia_hardware_audio as fhaudio;
-use fidl_fuchsia_io as fio;
-use fuchsia_zircon_types as zx_types;
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::str::FromStr;
 use thiserror::Error;
+use {
+    fidl_fuchsia_audio_controller as fac, fidl_fuchsia_audio_device as fadevice,
+    fidl_fuchsia_hardware_audio as fhaudio, fidl_fuchsia_io as fio,
+    fuchsia_zircon_types as zx_types,
+};
 
 /// The type of an audio device.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

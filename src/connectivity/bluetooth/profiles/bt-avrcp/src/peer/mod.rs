@@ -4,22 +4,21 @@
 
 use bt_avctp::{AvcCommandResponse, AvcCommandType, AvcPeer, AvcResponseType, AvctpPeer};
 use derivative::Derivative;
-use fidl_fuchsia_bluetooth_bredr as bredr;
-use fuchsia_async as fasync;
-use fuchsia_bluetooth::{profile::Psm, types::Channel, types::PeerId};
+use fuchsia_bluetooth::profile::Psm;
+use fuchsia_bluetooth::types::{Channel, PeerId};
 use fuchsia_inspect::Property;
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use fuchsia_sync::RwLock;
-use fuchsia_zircon as zx;
-use futures::{channel::mpsc, stream::StreamExt, Future};
+use futures::channel::mpsc;
+use futures::stream::StreamExt;
+use futures::Future;
 use packet_encoding::{Decodable, Encodable};
-use std::{
-    collections::{HashMap, HashSet},
-    mem::{discriminant, Discriminant},
-    num::NonZeroU16,
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
+use std::mem::{discriminant, Discriminant};
+use std::num::NonZeroU16;
+use std::sync::Arc;
 use tracing::{info, trace, warn};
+use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 mod controller;
 mod handlers;
@@ -30,11 +29,11 @@ use crate::metrics::MetricsNode;
 use crate::packets::*;
 use crate::peer_manager::TargetDelegate;
 use crate::profile::AvrcpService;
-use crate::types::PeerError as Error;
-use crate::types::StateChangeListener;
+use crate::types::{PeerError as Error, StateChangeListener};
 
 pub use controller::{Controller, ControllerEvent};
-pub use handlers::{browse_channel::BrowseChannelHandler, ControlChannelHandler};
+pub use handlers::browse_channel::BrowseChannelHandler;
+pub use handlers::ControlChannelHandler;
 use inspect::RemotePeerInspect;
 
 /// The minimum amount of time to wait before establishing an AVCTP connection.
@@ -923,20 +922,19 @@ pub(crate) mod tests {
     use assert_matches::assert_matches;
     use async_utils::PollExt;
     use bt_avctp::{AvcCommand, AvcCommandStream, AvctpCommand, AvctpCommandStream};
-    use futures::{task::Poll, TryStreamExt};
+    use futures::task::Poll;
+    use futures::TryStreamExt;
     use std::pin::pin;
 
-    use {
-        diagnostics_assertions::assert_data_tree,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_bluetooth::ErrorCode,
-        fidl_fuchsia_bluetooth_bredr::{
-            ConnectParameters, L2capParameters, ProfileMarker, ProfileRequest, ProfileRequestStream,
-        },
-        fuchsia_async::{self as fasync, DurationExt},
-        fuchsia_inspect_derive::WithInspect,
-        fuchsia_zircon::DurationNum,
+    use diagnostics_assertions::assert_data_tree;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_bluetooth::ErrorCode;
+    use fidl_fuchsia_bluetooth_bredr::{
+        ConnectParameters, L2capParameters, ProfileMarker, ProfileRequest, ProfileRequestStream,
     };
+    use fuchsia_async::{self as fasync, DurationExt};
+    use fuchsia_inspect_derive::WithInspect;
+    use fuchsia_zircon::DurationNum;
 
     fn setup_remote_peer(
         id: PeerId,

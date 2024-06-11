@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{error::TpmError, ffi_return_if_error};
+use crate::error::TpmError;
+use crate::ffi_return_if_error;
 use std::ptr::null_mut;
 use tpm2_tss_sys as tss_sys;
 

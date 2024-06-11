@@ -1,11 +1,9 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    proc_macro2::TokenStream,
-    quote::quote,
-    syn::{parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Fields, Generics, Ident},
-};
+use proc_macro2::TokenStream;
+use quote::quote;
+use syn::{parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Fields, Generics, Ident};
 
 #[proc_macro_derive(TypeFingerprint)]
 pub fn derive_type_fingerprint(input: proc_macro::TokenStream) -> proc_macro::TokenStream {

@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{Directory, RemotableCapability},
-    fidl::endpoints::ClientEnd,
-    fidl_fuchsia_io as fio,
-    std::sync::Arc,
-    vfs::{directory::entry::DirectoryEntry, remote::RemoteLike},
-};
+use crate::{Directory, RemotableCapability};
+use fidl::endpoints::ClientEnd;
+use fidl_fuchsia_io as fio;
+use std::sync::Arc;
+use vfs::directory::entry::DirectoryEntry;
+use vfs::remote::RemoteLike;
 
 impl Directory {
     /// Turn the [Directory] into a remote VFS node.
@@ -30,15 +29,11 @@ mod tests {
     use fidl_fuchsia_io as fio;
     use futures::channel::mpsc;
     use futures::StreamExt;
-    use vfs::{
-        directory::{
-            entry::{EntryInfo, OpenRequest},
-            entry_container::Directory as VfsDirectory,
-        },
-        execution_scope::ExecutionScope,
-        path::Path,
-        pseudo_directory,
-    };
+    use vfs::directory::entry::{EntryInfo, OpenRequest};
+    use vfs::directory::entry_container::Directory as VfsDirectory;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::path::Path;
+    use vfs::pseudo_directory;
 
     fn serve_vfs_dir(root: Arc<impl VfsDirectory>) -> ClientEnd<fio::DirectoryMarker> {
         let scope = ExecutionScope::new();

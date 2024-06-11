@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::realm::{get_all_instances, Instance},
-    ansi_term::Colour,
-    anyhow::Result,
-    fidl_fuchsia_sys2 as fsys,
-    prettytable::{cell, format::consts::FORMAT_CLEAN, row, Table},
-    std::collections::HashSet,
-    std::str::FromStr,
-};
+use crate::realm::{get_all_instances, Instance};
+use ansi_term::Colour;
+use anyhow::Result;
+use fidl_fuchsia_sys2 as fsys;
+use prettytable::format::consts::FORMAT_CLEAN;
+use prettytable::{cell, row, Table};
+use std::collections::HashSet;
+use std::str::FromStr;
 
 /// Filters that can be applied when listing components
 #[derive(Debug, PartialEq)]

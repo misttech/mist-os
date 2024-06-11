@@ -34,16 +34,12 @@ if let Some(payload) = audio_mux_element.get_payload(0) {
 */
 
 use anyhow::format_err;
-use nom::{
-    bits::{
-        bits,
-        complete::{tag, take},
-    },
-    combinator::cond,
-    error::{make_error, ErrorKind},
-    multi::count,
-    IResult, Offset,
-};
+use nom::bits::bits;
+use nom::bits::complete::{tag, take};
+use nom::combinator::cond;
+use nom::error::{make_error, ErrorKind};
+use nom::multi::count;
+use nom::{IResult, Offset};
 
 // Common type used by all bit parsing functions. First entry is slice pointed at current byte.
 // Second entry is current offset into that byte.

@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {super::*, fidl_fuchsia_pkg::ResolveError, pretty_assertions::assert_eq};
+use super::*;
+use fidl_fuchsia_pkg::ResolveError;
+use pretty_assertions::assert_eq;
 
 #[fasync::run_singlethreaded(test)]
 async fn succeeds_even_if_retained_packages_fails() {

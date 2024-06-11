@@ -4,12 +4,13 @@
 
 use assert_matches::assert_matches;
 use diagnostics_reader::{ArchiveReader, Logs};
-use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_component_decl as fdecl;
-use fidl_fuchsia_memory_attribution as fattribution;
 use fuchsia_component_test::{RealmBuilder, RealmBuilderParams, ScopedInstanceFactory};
 use futures::StreamExt;
 use moniker::Moniker;
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_memory_attribution as fattribution,
+};
 
 const PROGRAM_COLLECTION: &str = "debian_programs";
 

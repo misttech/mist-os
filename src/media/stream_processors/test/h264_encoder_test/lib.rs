@@ -5,13 +5,12 @@
 mod test_suite;
 
 use crate::test_suite::*;
-use fidl_fuchsia_images2 as images2;
 use fidl_fuchsia_math::{RectU, SizeU};
 use fidl_fuchsia_media::*;
-use fuchsia_async as fasync;
 use h264_stream::*;
 use std::rc::Rc;
 use stream_processor_test::*;
+use {fidl_fuchsia_images2 as images2, fuchsia_async as fasync};
 
 // Instructions for capturing output of encoder:
 // 1. Set the `output_file` field to write the encoded output into "/tmp/".

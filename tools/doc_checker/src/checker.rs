@@ -10,10 +10,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
-use std::{
-    fmt::{self, Debug, Display},
-    path::{Path, PathBuf},
-};
+use std::fmt::{self, Debug, Display};
+use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Ord, PartialOrd, Serialize)]
 pub enum ErrorLevel {

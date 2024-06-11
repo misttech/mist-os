@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use std::{ffi::OsStr, fs::read_dir, path::PathBuf};
+use std::ffi::OsStr;
+use std::fs::read_dir;
+use std::path::PathBuf;
 
 /// The default configs paths used if 0 paths are given.
 /// These will be prefixed by ${FUCHSIA_DIR} to get the full config file path.
@@ -86,7 +88,8 @@ pub async fn get_or_default_config_files(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{fs, path::Path};
+    use std::fs;
+    use std::path::Path;
     use tempfile::{tempdir, NamedTempFile};
 
     fn create_empty_file(root: &Path, filename: &'static str) -> PathBuf {

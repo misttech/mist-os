@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 //
+use lazy_static::lazy_static;
+use rand::distributions::Alphanumeric;
+use rand::Rng;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_sme as fidl_sme,
-    lazy_static::lazy_static,
-    rand::{distributions::Alphanumeric, Rng},
 };
 
 lazy_static! {

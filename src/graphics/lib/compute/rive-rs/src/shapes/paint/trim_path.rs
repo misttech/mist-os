@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{mem, rc::Rc};
+use std::mem;
+use std::rc::Rc;
 
-use crate::{
-    component::Component,
-    component_dirt::ComponentDirt,
-    core::{Core, CoreContext, ObjectRef, OnAdded, Property},
-    option_cell::OptionCell,
-    shapes::{
-        paint::{stroke_effect::StrokeEffect, Stroke},
-        CommandPath, CommandPathBuilder, MetricsPath,
-    },
-    status_code::StatusCode,
-};
+use crate::component::Component;
+use crate::component_dirt::ComponentDirt;
+use crate::core::{Core, CoreContext, ObjectRef, OnAdded, Property};
+use crate::option_cell::OptionCell;
+use crate::shapes::paint::stroke_effect::StrokeEffect;
+use crate::shapes::paint::Stroke;
+use crate::shapes::{CommandPath, CommandPathBuilder, MetricsPath};
+use crate::status_code::StatusCode;
 
 #[derive(Debug, Default)]
 pub struct TrimPath {

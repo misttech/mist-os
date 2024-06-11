@@ -2,38 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        capability::CapabilitySource,
-        model::{
-            component::instance::ResolvedInstanceState,
-            component::{ComponentInstance, WeakComponentInstance},
-            routing::router_ext::{RouterExt, WeakComponentTokenExt},
-        },
-    },
-    ::routing::{
-        bedrock::structured_dict::ComponentInput,
-        capability_source::ComponentCapability,
-        component_instance::ComponentInstanceInterface,
-        error::{ComponentInstanceError, RoutingError},
-        DictExt, LazyGet,
-    },
-    async_trait::async_trait,
-    cm_rust::CapabilityDecl,
-    cm_types::{IterablePath, RelativePath},
-    errors::{CapabilityProviderError, ComponentProviderError, OpenError, OpenOutgoingDirError},
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
-    futures::FutureExt,
-    itertools::Itertools,
-    moniker::ChildName,
-    router_error::RouterError,
-    sandbox::Routable,
-    sandbox::{Capability, Dict, Request, Router, WeakComponentToken},
-    std::{collections::HashMap, sync::Arc},
-    tracing::warn,
-    vfs::execution_scope::ExecutionScope,
-};
+use crate::capability::CapabilitySource;
+use crate::model::component::instance::ResolvedInstanceState;
+use crate::model::component::{ComponentInstance, WeakComponentInstance};
+use crate::model::routing::router_ext::{RouterExt, WeakComponentTokenExt};
+use ::routing::bedrock::structured_dict::ComponentInput;
+use ::routing::capability_source::ComponentCapability;
+use ::routing::component_instance::ComponentInstanceInterface;
+use ::routing::error::{ComponentInstanceError, RoutingError};
+use ::routing::{DictExt, LazyGet};
+use async_trait::async_trait;
+use cm_rust::CapabilityDecl;
+use cm_types::{IterablePath, RelativePath};
+use errors::{CapabilityProviderError, ComponentProviderError, OpenError, OpenOutgoingDirError};
+use fidl::endpoints::create_proxy;
+use futures::FutureExt;
+use itertools::Itertools;
+use moniker::ChildName;
+use router_error::RouterError;
+use sandbox::{Capability, Dict, Request, Routable, Router, WeakComponentToken};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tracing::warn;
+use vfs::execution_scope::ExecutionScope;
+use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio};
 
 pub fn build_program_output_dictionary(
     component: &Arc<ComponentInstance>,

@@ -2,16 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl::endpoints::{ProtocolMarker, ServerEnd},
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
-    fuchsia_component::client::connect_to_protocol_at_path,
-    fuchsia_zircon as zx,
-    lazy_static::lazy_static,
-    std::collections::VecDeque,
-    thiserror::Error,
-};
+use anyhow::{format_err, Error};
+use fidl::endpoints::{ProtocolMarker, ServerEnd};
+use fuchsia_component::client::connect_to_protocol_at_path;
+use lazy_static::lazy_static;
+use std::collections::VecDeque;
+use thiserror::Error;
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 lazy_static! {
     /// The path of the static event stream that, by convention, synchronously listens for

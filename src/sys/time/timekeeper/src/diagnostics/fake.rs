@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::diagnostics::{Diagnostics, Event, ANY_DURATION, ANY_TIME},
-    fuchsia_sync::Mutex,
-    fuchsia_zircon as zx,
-};
+use crate::diagnostics::{Diagnostics, Event, ANY_DURATION, ANY_TIME};
+use fuchsia_sync::Mutex;
+use fuchsia_zircon as zx;
 
 /// A fake `Diagnostics` implementation useful for verifying unittest.
 pub struct FakeDiagnostics {
@@ -146,10 +144,8 @@ impl EqWithAny for Event {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::enums::{InitialClockState, StartClockSource, Track},
-    };
+    use super::*;
+    use crate::enums::{InitialClockState, StartClockSource, Track};
 
     const INITIALIZATION_EVENT: Event =
         Event::Initialized { clock_state: InitialClockState::NotSet };

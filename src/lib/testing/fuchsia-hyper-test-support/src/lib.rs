@@ -15,23 +15,19 @@
 // This is gratuitously borrowed from src/sys/pkg/lib/fuchsia-pkg-testing/src/serve.rs, and then
 // made generic across all requests by removing the repo-serving aspects of it.
 
-use {
-    anyhow::Error,
-    chrono::Utc,
-    fuchsia_async::{self as fasync, Task},
-    futures::{future::BoxFuture, prelude::*},
-    hyper::{
-        server::{accept::from_stream, Server},
-        service::{make_service_fn, service_fn},
-        Body, Request, Response, StatusCode,
-    },
-    std::{
-        convert::Infallible,
-        net::{Ipv6Addr, SocketAddr},
-        pin::Pin,
-        sync::Arc,
-    },
-};
+use anyhow::Error;
+use chrono::Utc;
+use fuchsia_async::{self as fasync, Task};
+use futures::future::BoxFuture;
+use futures::prelude::*;
+use hyper::server::accept::from_stream;
+use hyper::server::Server;
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Request, Response, StatusCode};
+use std::convert::Infallible;
+use std::net::{Ipv6Addr, SocketAddr};
+use std::pin::Pin;
+use std::sync::Arc;
 
 // Some provided Handler implementations.
 pub mod handler;
@@ -329,7 +325,8 @@ pub async fn get_body_as_string(url: impl AsRef<str>) -> Result<String, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{fault_injection::*, handler::*};
+    use crate::fault_injection::*;
+    use crate::handler::*;
     use anyhow::anyhow;
     use fasync::TimeoutExt;
 

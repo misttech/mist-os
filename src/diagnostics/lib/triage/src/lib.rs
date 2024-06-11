@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::act::ActionContext,
-    crate::act_structured::StructuredActionContext,
-    crate::metrics::{metric_value::MetricValue, MetricState},
-    anyhow::{bail, Error},
-    injectable_time::{MonotonicTime, TimeSource},
-    regex::Regex,
-};
+use crate::act::ActionContext;
+use crate::act_structured::StructuredActionContext;
+use crate::metrics::metric_value::MetricValue;
+use crate::metrics::MetricState;
+use anyhow::{bail, Error};
+use injectable_time::{MonotonicTime, TimeSource};
+use regex::Regex;
 
 pub(crate) mod act; // Perform appropriate actions and collect results as strings.
 pub(crate) mod act_structured; // Perform appropriate actions and collect serializable actions.

@@ -2,23 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{format_err, Context, Error};
+use component_events::events::{Destroyed, Discovered, Event, EventStream, Started};
+use component_events::matcher::EventMatcher;
+use component_events::sequence::*;
+use fidl::endpoints::ServiceMarker;
+use fuchsia_component::client;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route, ScopedInstance};
+use futures::channel::mpsc;
+use futures::{FutureExt, SinkExt, StreamExt};
+use moniker::ChildName;
+use test_case::test_case;
+use tracing::*;
 use {
-    anyhow::{format_err, Context, Error},
-    component_events::{
-        events::{Destroyed, Discovered, Event, EventStream, Started},
-        matcher::EventMatcher,
-        sequence::*,
-    },
-    fidl::endpoints::ServiceMarker,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_examples as fecho,
     fidl_fuchsia_examples_services as fexamples, fidl_fuchsia_io as fio,
     fidl_fuchsia_sys2 as fsys2,
-    fuchsia_component::client,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route, ScopedInstance},
-    futures::{channel::mpsc, FutureExt, SinkExt, StreamExt},
-    moniker::ChildName,
-    test_case::test_case,
-    tracing::*,
 };
 
 const BRANCHES_COLLECTION: &str = "branches";

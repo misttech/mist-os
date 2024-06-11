@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{big_endian::BigEndianU16, mac::MacAddr},
-    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned},
-};
+use crate::big_endian::BigEndianU16;
+use crate::mac::MacAddr;
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 // RFC 704, Appendix B.2
 // https://www.iana.org/assignments/ieee-802-numbers/ieee-802-numbers.xhtml

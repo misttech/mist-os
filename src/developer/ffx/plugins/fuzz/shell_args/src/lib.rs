@@ -6,14 +6,12 @@
 // they are closely tailored to the type definitions for the ffx plugin and are not meant for
 // general purpose usage.
 
-use {
-    proc_macro::TokenStream,
-    proc_macro2::{Ident, Span},
-    quote::{quote, quote_spanned},
-    syn::parse::Parser,
-    syn::punctuated::Punctuated,
-    syn::{parse_macro_input, Fields, ItemStruct, Token, TypePath},
-};
+use proc_macro::TokenStream;
+use proc_macro2::{Ident, Span};
+use quote::{quote, quote_spanned};
+use syn::parse::Parser;
+use syn::punctuated::Punctuated;
+use syn::{parse_macro_input, Fields, ItemStruct, Token, TypePath};
 
 /// Generates a standalone subcommand from a shell subcommand., e.g. `FooSubcommand` from
 /// `FooShellSubcommand`.

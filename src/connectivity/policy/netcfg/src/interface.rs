@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    either::Either,
-    serde::{Deserialize, Deserializer},
-    std::collections::{HashMap, HashSet},
-    std::sync::atomic::{AtomicU32, Ordering},
-};
+use either::Either;
+use serde::{Deserialize, Deserializer};
+use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use crate::DeviceClass;
 

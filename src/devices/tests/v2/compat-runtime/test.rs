@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Result;
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fuchsia_component_test::{RealmBuilder, Ref};
+use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
 use {
-    anyhow::Result,
-    fidl::endpoints::DiscoverableProtocolMarker,
     fidl_fuchsia_compat_runtime_test as ft, fidl_fuchsia_driver_test as fdt,
     fuchsia_async as fasync,
-    fuchsia_component_test::{RealmBuilder, Ref},
-    fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
 };
 
 #[fasync::run_singlethreaded(test)]

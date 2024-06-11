@@ -4,34 +4,34 @@
 
 #![cfg(test)]
 
-use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext::{IntoExt as _, NetTypesIpAddressExt};
-use fidl_fuchsia_net_interfaces_admin as finterfaces_admin;
-use fidl_fuchsia_net_stack as fnet_stack;
-use fidl_fuchsia_netemul as fnetemul;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as finterfaces_admin,
+    fidl_fuchsia_net_stack as fnet_stack, fidl_fuchsia_netemul as fnetemul,
+};
 
 use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
 use net_declare::{fidl_mac, fidl_subnet, net_mac, std_ip_v4, std_ip_v6, std_socket_addr};
 use netemul::RealmUdpSocket as _;
+use netstack_testing_common::realms::{
+    constants, KnownServiceProvider, Netstack, TestSandboxExt as _,
+};
 use netstack_testing_common::{
-    get_component_moniker,
-    realms::{constants, KnownServiceProvider, Netstack, TestSandboxExt as _},
-    ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+    get_component_moniker, ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
-use packet::{serialize::Serializer as _, ParsablePacket as _};
-use packet_formats::{
-    error::ParseError,
-    ethernet::{
-        EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
-    },
-    icmp::{
-        IcmpEchoRequest, IcmpIpExt, IcmpPacket, IcmpPacketBuilder, IcmpParseArgs, IcmpUnusedCode,
-        MessageBody as _,
-    },
-    ip::{IpExt, IpPacketBuilder as _},
+use packet::serialize::Serializer as _;
+use packet::ParsablePacket as _;
+use packet_formats::error::ParseError;
+use packet_formats::ethernet::{
+    EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
+use packet_formats::icmp::{
+    IcmpEchoRequest, IcmpIpExt, IcmpPacket, IcmpPacketBuilder, IcmpParseArgs, IcmpUnusedCode,
+    MessageBody as _,
+};
+use packet_formats::ip::{IpExt, IpPacketBuilder as _};
 use std::pin::pin;
 use test_case::test_case;
 

@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    fs::fuchsia::RemoteFileObject,
-    mm::{MemoryAccessorExt, ProtectionFlags},
-    task::{
-        CurrentTask, EventHandler, ManyZxHandleSignalHandler, SignalHandler, SignalHandlerInner,
-        WaitCanceler, Waiter,
-    },
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, Anon, FdFlags, FdNumber, FileObject, FileOps,
-    },
+use crate::fs::fuchsia::RemoteFileObject;
+use crate::mm::{MemoryAccessorExt, ProtectionFlags};
+use crate::task::{
+    CurrentTask, EventHandler, ManyZxHandleSignalHandler, SignalHandler, SignalHandlerInner,
+    WaitCanceler, Waiter,
 };
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::{fileops_impl_nonseekable, Anon, FdFlags, FdNumber, FileObject, FileOps};
 use fidl::HandleBased;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::AsHandleRef;
@@ -21,16 +17,15 @@ use starnix_lifecycle::AtomicUsizeCounter;
 use starnix_logging::{impossible_error, log_warn};
 use starnix_sync::{FileOpsCore, FileOpsToHandle, Locked, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    c_char, error,
-    errors::Errno,
-    open_flags::OpenFlags,
-    sync_fence_info, sync_file_info, sync_merge_data,
-    user_address::{UserAddress, UserRef},
-    vfs::FdEvents,
-    SYNC_IOC_MAGIC,
+    c_char, error, sync_fence_info, sync_file_info, sync_merge_data, SYNC_IOC_MAGIC,
 };
-use std::{collections::HashSet, sync::Arc};
+use std::collections::HashSet;
+use std::sync::Arc;
 
 // Implementation of the sync framework described at:
 // https://source.android.com/docs/core/graphics/sync

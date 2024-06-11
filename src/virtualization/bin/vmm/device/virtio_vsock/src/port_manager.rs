@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::connection::VsockConnectionKey,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    std::collections::{hash_map::Entry, HashMap, HashSet, VecDeque},
-};
+use crate::connection::VsockConnectionKey;
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet, VecDeque};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 type HostPort = u32;
 type GuestPort = u32;
@@ -219,11 +218,9 @@ impl PortManager {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_fuchsia_virtualization::{DEFAULT_GUEST_CID, HOST_CID},
-        fuchsia_async::TestExecutor,
-    };
+    use super::*;
+    use fidl_fuchsia_virtualization::{DEFAULT_GUEST_CID, HOST_CID};
+    use fuchsia_async::TestExecutor;
 
     #[fuchsia::test]
     async fn listen_on_ports() {

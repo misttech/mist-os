@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::metrics,
-    anyhow::{Context, Error},
-    fidl_fuchsia_ui_focus as focus, fidl_fuchsia_ui_keyboard_focus as kbd_focus,
-    focus_chain_provider::FocusChainProviderPublisher,
-    fuchsia_component::client::connect_to_protocol,
-    futures::StreamExt,
-    metrics_registry::*,
-};
+use crate::metrics;
+use anyhow::{Context, Error};
+use focus_chain_provider::FocusChainProviderPublisher;
+use fuchsia_component::client::connect_to_protocol;
+use futures::StreamExt;
+use metrics_registry::*;
+use {fidl_fuchsia_ui_focus as focus, fidl_fuchsia_ui_keyboard_focus as kbd_focus};
 
 /// FocusListener listens to focus change and notify to related input modules.
 pub struct FocusListener {
@@ -136,11 +134,12 @@ impl FocusListener {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, fidl_fuchsia_ui_focus_ext::FocusChainExt, fidl_fuchsia_ui_views as fidl_ui_views,
-        fidl_fuchsia_ui_views_ext::ViewRefExt, fuchsia_scenic as scenic, futures::join,
-        pretty_assertions::assert_eq,
-    };
+    use super::*;
+    use fidl_fuchsia_ui_focus_ext::FocusChainExt;
+    use fidl_fuchsia_ui_views_ext::ViewRefExt;
+    use futures::join;
+    use pretty_assertions::assert_eq;
+    use {fidl_fuchsia_ui_views as fidl_ui_views, fuchsia_scenic as scenic};
 
     /// Listens for a ViewRef from a view focus change request on `request_stream`.
     ///

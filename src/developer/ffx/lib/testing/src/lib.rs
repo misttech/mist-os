@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use fidl_fuchsia_developer_remotecontrol as fremotecontrol;
-use fidl_fuchsia_test_manager as ftest_manager;
+use {
+    fidl_fuchsia_developer_remotecontrol as fremotecontrol,
+    fidl_fuchsia_test_manager as ftest_manager,
+};
 
 const RUN_BUILDER_MONIKER: &str = "/core/test_manager";
 const QUERY_MONIKER: &str = "/core/test_manager";

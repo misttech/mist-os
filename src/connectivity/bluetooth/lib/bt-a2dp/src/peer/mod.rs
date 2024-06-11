@@ -12,14 +12,10 @@ use fidl_fuchsia_bluetooth_bredr::{
     PSM_AVDTP,
 };
 use fuchsia_async::{self as fasync, DurationExt};
-use fuchsia_bluetooth::{
-    inspect::DebugExt,
-    types::{Channel, PeerId},
-};
-use fuchsia_inspect as inspect;
+use fuchsia_bluetooth::inspect::DebugExt;
+use fuchsia_bluetooth::types::{Channel, PeerId};
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
 use futures::channel::mpsc;
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
@@ -29,6 +25,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::pin::Pin;
 use std::sync::{Arc, Weak};
 use tracing::{debug, info, trace, warn};
+use {fuchsia_inspect as inspect, fuchsia_zircon as zx};
 
 /// For sending out-of-band commands over the A2DP peer.
 mod controller;

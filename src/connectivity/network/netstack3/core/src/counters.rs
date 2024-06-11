@@ -6,15 +6,14 @@
 
 use net_types::ip::{Ip, Ipv4, Ipv6};
 use netstack3_base::{ContextPair, CounterContext, Inspector};
-use netstack3_device::{ethernet::EthernetDeviceCounters, ArpCounters, DeviceCounters};
-use netstack3_ip::{
-    icmp::{
-        IcmpRxCounters, IcmpRxCountersInner, IcmpTxCounters, IcmpTxCountersInner, NdpCounters,
-        NdpRxCounters, NdpTxCounters,
-    },
-    nud::{NudCounters, NudCountersInner},
-    IpCounters, IpLayerIpExt,
+use netstack3_device::ethernet::EthernetDeviceCounters;
+use netstack3_device::{ArpCounters, DeviceCounters};
+use netstack3_ip::icmp::{
+    IcmpRxCounters, IcmpRxCountersInner, IcmpTxCounters, IcmpTxCountersInner, NdpCounters,
+    NdpRxCounters, NdpTxCounters,
 };
+use netstack3_ip::nud::{NudCounters, NudCountersInner};
+use netstack3_ip::{IpCounters, IpLayerIpExt};
 use netstack3_tcp::{TcpCounters, TcpCountersInner};
 use netstack3_udp::{UdpCounters, UdpCountersInner};
 

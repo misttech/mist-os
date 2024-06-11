@@ -485,7 +485,8 @@ pub mod tests {
     use fuchsia_bluetooth::profile::Psm;
     use fuchsia_bluetooth::types::{Channel, PeerId};
     use futures::TryStreamExt;
-    use std::{pin::pin, sync::Arc};
+    use std::pin::pin;
+    use std::sync::Arc;
 
     const PLAYER_ID: u16 = 1004;
     const UID_COUNTER: u16 = 1;

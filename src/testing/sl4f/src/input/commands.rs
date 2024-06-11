@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::input::{facade::InputFacade, types::InputMethod};
+use crate::input::facade::InputFacade;
+use crate::input::types::InputMethod;
 use crate::server::Facade;
 use anyhow::Error;
 use async_trait::async_trait;

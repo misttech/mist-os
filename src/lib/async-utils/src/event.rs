@@ -4,17 +4,13 @@
 
 //! An event that can be signaled and waited on by multiple consumers.
 
-use {
-    fuchsia_sync::Mutex,
-    futures::future::{FusedFuture, Future},
-    slab::Slab,
-    std::{
-        fmt,
-        pin::Pin,
-        sync::Arc,
-        task::{Context, Poll, Waker},
-    },
-};
+use fuchsia_sync::Mutex;
+use futures::future::{FusedFuture, Future};
+use slab::Slab;
+use std::fmt;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll, Waker};
 
 const NULL_WAKER_KEY: usize = usize::max_value();
 
@@ -244,7 +240,8 @@ impl std::error::Error for Dropped {}
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fuchsia_async as fasync};
+    use super::*;
+    use fuchsia_async as fasync;
 
     // TODO: Add tests to check waker count in EventWait and EventWaitResult.
 

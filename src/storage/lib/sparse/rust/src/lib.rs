@@ -9,18 +9,14 @@ pub mod builder;
 mod format;
 pub mod reader;
 
-use {
-    crate::format::{ChunkHeader, SparseHeader},
-    anyhow::{bail, ensure, Context, Result},
-    core::fmt,
-    serde::de::DeserializeOwned,
-    std::{
-        fs::File,
-        io::{Cursor, Read, Seek, SeekFrom, Write},
-        path::Path,
-    },
-    tempfile::{NamedTempFile, TempPath},
-};
+use crate::format::{ChunkHeader, SparseHeader};
+use anyhow::{bail, ensure, Context, Result};
+use core::fmt;
+use serde::de::DeserializeOwned;
+use std::fs::File;
+use std::io::{Cursor, Read, Seek, SeekFrom, Write};
+use std::path::Path;
+use tempfile::{NamedTempFile, TempPath};
 
 // Size of blocks to write.  Note that the format supports varied block sizes; this is the preferred
 // size by this library.
@@ -576,16 +572,12 @@ pub fn build_sparse_files<W: Write>(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::{
-            add_sparse_chunk,
-            builder::{DataSource, SparseImageBuilder},
-            resparse, unsparse, Chunk, SparseFileWriter, BLK_SIZE,
-        },
-        rand::{rngs::SmallRng, RngCore, SeedableRng},
-        std::io::{Cursor, Read as _, Seek as _, SeekFrom, Write as _},
-        tempfile::{NamedTempFile, TempDir},
-    };
+    use super::builder::{DataSource, SparseImageBuilder};
+    use super::{add_sparse_chunk, resparse, unsparse, Chunk, SparseFileWriter, BLK_SIZE};
+    use rand::rngs::SmallRng;
+    use rand::{RngCore, SeedableRng};
+    use std::io::{Cursor, Read as _, Seek as _, SeekFrom, Write as _};
+    use tempfile::{NamedTempFile, TempDir};
 
     #[test]
     fn test_fill_into_bytes() {

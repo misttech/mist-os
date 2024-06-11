@@ -9,7 +9,8 @@
 
 use core::fmt::Debug;
 
-use net_types::{ethernet::Mac, UnicastAddress};
+use net_types::ethernet::Mac;
+use net_types::UnicastAddress;
 use zerocopy::{AsBytes, FromBytes, NoCell, Unaligned};
 
 use crate::Device;
@@ -69,10 +70,8 @@ pub(crate) mod testutil {
     use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
 
     use super::*;
-    use crate::{
-        testutil::{FakeCoreCtx, FakeStrongDeviceId, FakeWeakDeviceId},
-        DeviceIdContext, DeviceIdentifier, StrongDeviceIdentifier,
-    };
+    use crate::testutil::{FakeCoreCtx, FakeStrongDeviceId, FakeWeakDeviceId};
+    use crate::{DeviceIdContext, DeviceIdentifier, StrongDeviceIdentifier};
 
     /// A fake [`LinkDevice`].
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]

@@ -2,20 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::filesystems::FsManagementFilesystemInstance,
-    async_trait::async_trait,
-    fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose},
-    fuchsia_component::client::{connect_channel_to_protocol, connect_to_protocol_at_dir_root},
-    fuchsia_zircon as zx,
-    std::{
-        path::Path,
-        sync::{Arc, Once},
-    },
-    storage_benchmarks::{
-        BlockDeviceConfig, BlockDeviceFactory, CacheClearableFilesystem, Filesystem,
-        FilesystemConfig,
-    },
+use crate::filesystems::FsManagementFilesystemInstance;
+use async_trait::async_trait;
+use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose};
+use fuchsia_component::client::{connect_channel_to_protocol, connect_to_protocol_at_dir_root};
+use fuchsia_zircon as zx;
+use std::path::Path;
+use std::sync::{Arc, Once};
+use storage_benchmarks::{
+    BlockDeviceConfig, BlockDeviceFactory, CacheClearableFilesystem, Filesystem, FilesystemConfig,
 };
 
 /// Config object for starting Fxfs instances.
@@ -148,7 +143,8 @@ impl CacheClearableFilesystem for FxfsInstance {
 
 #[cfg(test)]
 mod tests {
-    use {super::Fxfs, crate::filesystems::testing::check_filesystem};
+    use super::Fxfs;
+    use crate::filesystems::testing::check_filesystem;
 
     #[fuchsia::test]
     async fn start_fxfs() {

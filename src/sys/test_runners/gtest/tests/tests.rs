@@ -4,14 +4,12 @@
 
 mod helpers;
 
-use {
-    crate::helpers::{assert_events_eq, run_test},
-    fidl_fuchsia_test_manager as ftest_manager,
-    ftest_manager::{CaseStatus, SuiteStatus},
-    maplit::hashset,
-    pretty_assertions::assert_eq,
-    test_manager_test_lib::{GroupRunEventByTestCase, RunEvent},
-};
+use crate::helpers::{assert_events_eq, run_test};
+use fidl_fuchsia_test_manager as ftest_manager;
+use ftest_manager::{CaseStatus, SuiteStatus};
+use maplit::hashset;
+use pretty_assertions::assert_eq;
+use test_manager_test_lib::{GroupRunEventByTestCase, RunEvent};
 
 fn default_options() -> ftest_manager::RunOptions {
     ftest_manager::RunOptions {

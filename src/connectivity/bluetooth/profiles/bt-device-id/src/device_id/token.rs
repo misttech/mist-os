@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::{
-    pin::Pin,
-    task::{Context, Poll},
-};
+use core::pin::Pin;
+use core::task::{Context, Poll};
 use fidl_fuchsia_bluetooth_deviceid as di;
-use futures::{future::FusedFuture, stream::StreamFuture, Future, FutureExt, StreamExt};
+use futures::future::FusedFuture;
+use futures::stream::StreamFuture;
+use futures::{Future, FutureExt, StreamExt};
 use tracing::{debug, info, warn};
 
 use crate::device_id::server::BrEdrProfileAdvertisement;

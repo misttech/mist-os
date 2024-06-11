@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::input_device, crate::input_handler, async_trait::async_trait,
-    futures::channel::mpsc::Sender, std::cell::RefCell, std::rc::Rc,
-};
+use crate::{input_device, input_handler};
+use async_trait::async_trait;
+use futures::channel::mpsc::Sender;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 /// A fake [`InputHandler`] used for testing.
 /// A [`ObserveFakeEventsInputHandler`] does not consume InputEvents.

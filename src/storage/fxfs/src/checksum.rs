@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::errors::FxfsError,
-    anyhow::Error,
-    byteorder::{ByteOrder, LittleEndian},
-    fprint::TypeFingerprint,
-    serde::{Deserialize, Serialize},
-    static_assertions::assert_cfg,
-    zerocopy::{AsBytes as _, FromBytes as _},
-};
+use crate::errors::FxfsError;
+use anyhow::Error;
+use byteorder::{ByteOrder, LittleEndian};
+use fprint::TypeFingerprint;
+use serde::{Deserialize, Serialize};
+use static_assertions::assert_cfg;
+use zerocopy::{AsBytes as _, FromBytes as _};
 
 /// For the foreseeable future, Fxfs will use 64-bit checksums.
 pub type Checksum = u64;
@@ -105,7 +103,8 @@ impl From<ChecksumsV32> for ChecksumsV37 {
 
 #[cfg(test)]
 mod tests {
-    use crate::{checksum::Checksums, errors::FxfsError};
+    use crate::checksum::Checksums;
+    use crate::errors::FxfsError;
 
     #[test]
     fn checksum_encoding_idempotent() {

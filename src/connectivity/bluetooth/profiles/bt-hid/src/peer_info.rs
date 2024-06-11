@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_bluetooth_bredr as bredr,
-    fuchsia_bluetooth::profile::{Attribute, DataElementConversionError},
-    fuchsia_bluetooth::types::PeerId,
-    num_derive::FromPrimitive,
-    num_traits::FromPrimitive,
-    tracing::{debug, info, warn},
-};
+use fidl_fuchsia_bluetooth_bredr as bredr;
+use fuchsia_bluetooth::profile::{Attribute, DataElementConversionError};
+use fuchsia_bluetooth::types::PeerId;
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
+use tracing::{debug, info, warn};
 
-use crate::{
-    descriptor::{DescriptorList, DescriptorReadError},
-    sdp_data,
-};
+use crate::descriptor::{DescriptorList, DescriptorReadError};
+use crate::sdp_data;
 
 #[derive(Debug)]
 enum HidDataElementError {

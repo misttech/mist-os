@@ -2,21 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::ctap_device::CtapDevice,
-    crate::ctap_hid::CtapHidDevice,
-    anyhow::{format_err, Error},
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_io::DirectoryProxy,
-    fuchsia_async as fasync,
-    fuchsia_fs::directory::{WatchEvent, Watcher},
-    fuchsia_inspect::{self as inspect, NumericProperty, Property},
-    futures::lock::Mutex,
-    futures::TryStreamExt,
-    std::path::PathBuf,
-    std::sync::Arc,
-    tracing::{error, info, warn},
-};
+use crate::ctap_device::CtapDevice;
+use crate::ctap_hid::CtapHidDevice;
+use anyhow::{format_err, Error};
+use fidl_fuchsia_io::DirectoryProxy;
+use fuchsia_fs::directory::{WatchEvent, Watcher};
+use fuchsia_inspect::{self as inspect, NumericProperty, Property};
+use futures::lock::Mutex;
+use futures::TryStreamExt;
+use std::path::PathBuf;
+use std::sync::Arc;
+use tracing::{error, info, warn};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// Contains a reference to the currently connected key.
 // TODO(https://fxbug.dev/42060802): Handle multiple security keys connected at once instead of ignoring new
@@ -205,22 +202,20 @@ impl CtapAgent {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        bytes::{BufMut, BytesMut},
-        diagnostics_assertions::assert_data_tree,
-        fidl::endpoints::create_proxy,
-        fidl_fuchsia_fido_report::SecurityKeyDeviceRequest,
-        fuchsia_inspect::{self as inspect},
-        futures::FutureExt,
-        std::collections::VecDeque,
-        vfs::{
-            directory::entry::DirectoryEntry,
-            directory::immutable::connection::ImmutableConnection, directory::simple::Simple,
-            execution_scope::ExecutionScope, path::Path, pseudo_directory,
-            service as pseudo_fs_service,
-        },
-    };
+    use super::*;
+    use bytes::{BufMut, BytesMut};
+    use diagnostics_assertions::assert_data_tree;
+    use fidl::endpoints::create_proxy;
+    use fidl_fuchsia_fido_report::SecurityKeyDeviceRequest;
+    use fuchsia_inspect::{self as inspect};
+    use futures::FutureExt;
+    use std::collections::VecDeque;
+    use vfs::directory::entry::DirectoryEntry;
+    use vfs::directory::immutable::connection::ImmutableConnection;
+    use vfs::directory::simple::Simple;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::path::Path;
+    use vfs::{pseudo_directory, service as pseudo_fs_service};
 
     const INIT_CHANNEL: u32 = 0xFFFFFFFF;
     const TEST_CHANNEL_1: u32 = 0xDEADBEEF;

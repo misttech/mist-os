@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::CurrentTask,
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer, VecOutputBuffer},
-        default_seek, fileops_impl_delegate_read_and_seek, FileObject, FileOps, FsNodeOps,
-        SeekTarget, SimpleFileNode,
-    },
+use crate::task::CurrentTask;
+use crate::vfs::buffers::{InputBuffer, OutputBuffer, VecOutputBuffer};
+use crate::vfs::{
+    default_seek, fileops_impl_delegate_read_and_seek, FileObject, FileOps, FsNodeOps, SeekTarget,
+    SimpleFileNode,
 };
 use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
-use starnix_uapi::{errno, error, errors::Errno, off_t};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::{errno, error, off_t};
 use std::collections::VecDeque;
 
 pub trait SequenceFileSource: Send + Sync + 'static {
@@ -331,15 +330,14 @@ impl FileOps for ConstFile {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        testing::{create_kernel_task_and_unlocked, AutoReleasableTask},
-        vfs::{
-            Anon, DynamicFile, DynamicFileBuf, DynamicFileSource, FileHandle, SeekTarget,
-            SequenceFileSource, VecOutputBuffer,
-        },
+    use crate::testing::{create_kernel_task_and_unlocked, AutoReleasableTask};
+    use crate::vfs::{
+        Anon, DynamicFile, DynamicFileBuf, DynamicFileSource, FileHandle, SeekTarget,
+        SequenceFileSource, VecOutputBuffer,
     };
     use starnix_sync::{Locked, Mutex, Unlocked};
-    use starnix_uapi::{errors::Errno, open_flags::OpenFlags};
+    use starnix_uapi::errors::Errno;
+    use starnix_uapi::open_flags::OpenFlags;
     use std::sync::Arc;
 
     struct Counter {

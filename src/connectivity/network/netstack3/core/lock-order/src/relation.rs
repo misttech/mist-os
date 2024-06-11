@@ -126,7 +126,9 @@ macro_rules! impl_lock_after {
 
 #[cfg(test)]
 mod test {
-    use crate::{lock::LockFor, relation::LockAfter, Locked, Unlocked};
+    use crate::lock::LockFor;
+    use crate::relation::LockAfter;
+    use crate::{Locked, Unlocked};
     use std::sync::{Mutex, MutexGuard};
 
     extern crate self as lock_order;

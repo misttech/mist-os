@@ -2,26 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        fs::TemporaryDirectory,
-        io::{ReadSeek, TryClone, WrappedReaderSeeker},
-        zstd,
-    },
-    anyhow::{anyhow, Context, Error, Result},
-    byteorder::{LittleEndian, ReadBytesExt},
-    serde::Serialize,
-    std::cmp,
-    std::{
-        collections::HashMap,
-        fs::File,
-        io::{BufReader, Read, Seek, SeekFrom},
-        path::{Path, PathBuf},
-        sync::Arc,
-    },
-    thiserror::Error,
-    tracing::warn,
-};
+use crate::fs::TemporaryDirectory;
+use crate::io::{ReadSeek, TryClone, WrappedReaderSeeker};
+use crate::zstd;
+use anyhow::{anyhow, Context, Error, Result};
+use byteorder::{LittleEndian, ReadBytesExt};
+use serde::Serialize;
+use std::cmp;
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufReader, Read, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use thiserror::Error;
+use tracing::warn;
 
 /// Taken from //src/storage/blobfs/include/blobfs/format.h
 const BLOBFS_MAGIC_0: u64 = 0xac2153479e694d21;
@@ -606,23 +600,17 @@ impl<TCRS: 'static + TryClone + Read + Seek> BlobFsReader<TCRS> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{
-            calculate_hash_list_size, merkle_tree_block_count, round_up, BlobFsError, BlobFsHeader,
-            BlobFsReaderBuilder, Extent, Inode, NodePrelude, BLOBFS_FLAG_ALLOCATED, BLOBFS_MAGIC_0,
-            BLOBFS_MAGIC_1, BLOBFS_VERSION_8, BLOBFS_VERSION_9,
-        },
-        crate::{
-            fs::TemporaryDirectory,
-            io::{TryClonableBufReaderFile, TryClone},
-        },
-        std::{
-            fs::{write, File},
-            io::{BufReader, Cursor, Read, Seek},
-            sync::Arc,
-        },
-        tempfile::tempdir,
+    use super::{
+        calculate_hash_list_size, merkle_tree_block_count, round_up, BlobFsError, BlobFsHeader,
+        BlobFsReaderBuilder, Extent, Inode, NodePrelude, BLOBFS_FLAG_ALLOCATED, BLOBFS_MAGIC_0,
+        BLOBFS_MAGIC_1, BLOBFS_VERSION_8, BLOBFS_VERSION_9,
     };
+    use crate::fs::TemporaryDirectory;
+    use crate::io::{TryClonableBufReaderFile, TryClone};
+    use std::fs::{write, File};
+    use std::io::{BufReader, Cursor, Read, Seek};
+    use std::sync::Arc;
+    use tempfile::tempdir;
 
     fn fake_blobfs_header() -> BlobFsHeader {
         BlobFsHeader {

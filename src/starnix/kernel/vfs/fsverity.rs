@@ -2,15 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{mm::MemoryAccessorExt, task::CurrentTask};
+use crate::mm::MemoryAccessorExt;
+use crate::task::CurrentTask;
 use mundane::hash::{Digest, Hasher, Sha256, Sha512};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use starnix_logging::track_stub;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
-    errno, error, errors::Errno, fsverity_descriptor, fsverity_enable_arg,
-    fsverity_read_metadata_arg, user_address::UserAddress, FS_VERITY_HASH_ALG_SHA256,
-    FS_VERITY_HASH_ALG_SHA512,
+    errno, error, fsverity_descriptor, fsverity_enable_arg, fsverity_read_metadata_arg,
+    FS_VERITY_HASH_ALG_SHA256, FS_VERITY_HASH_ALG_SHA512,
 };
 use zerocopy::AsBytes;
 
@@ -129,25 +131,18 @@ impl FsVerityState {
 
 pub mod ioctl {
 
-    use crate::{
-        mm::{MemoryAccessor, MemoryAccessorExt},
-        task::CurrentTask,
-        vfs::{
-            fsverity::{
-                fsverity_descriptor_from_enable_arg, fsverity_enable_arg, fsverity_measurement,
-                fsverity_read_metadata_arg, FsVerityState, HashAlgorithm, MetadataType,
-            },
-            FileObject, FileWriteGuardMode,
-        },
+    use crate::mm::{MemoryAccessor, MemoryAccessorExt};
+    use crate::task::CurrentTask;
+    use crate::vfs::fsverity::{
+        fsverity_descriptor_from_enable_arg, fsverity_enable_arg, fsverity_measurement,
+        fsverity_read_metadata_arg, FsVerityState, HashAlgorithm, MetadataType,
     };
+    use crate::vfs::{FileObject, FileWriteGuardMode};
     use num_traits::FromPrimitive;
     use starnix_syscalls::{SyscallResult, SUCCESS};
-    use starnix_uapi::{
-        errno, error,
-        errors::Errno,
-        uapi,
-        user_address::{UserAddress, UserRef},
-    };
+    use starnix_uapi::errors::Errno;
+    use starnix_uapi::user_address::{UserAddress, UserRef};
+    use starnix_uapi::{errno, error, uapi};
     use zerocopy::AsBytes;
 
     /// ioctl handler for FS_IOC_ENABLE_VERITY.

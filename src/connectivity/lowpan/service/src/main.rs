@@ -8,9 +8,7 @@ mod inspect;
 mod service;
 
 use anyhow::{format_err, Context as _, Error};
-use fidl_fuchsia_factory_lowpan;
 use fidl_fuchsia_lowpan_driver::RegisterRequestStream;
-use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::Inspector;
 use futures::prelude::*;
@@ -20,6 +18,7 @@ use lowpan_driver_common::ServeTo;
 use service::*;
 use std::default::Default;
 use std::sync::Arc;
+use {fidl_fuchsia_factory_lowpan, fuchsia_async as fasync};
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};

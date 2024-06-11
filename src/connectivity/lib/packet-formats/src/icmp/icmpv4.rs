@@ -8,9 +8,8 @@ use core::fmt;
 
 use net_types::ip::{GenericOverIp, Ipv4, Ipv4Addr};
 use packet::{BufferView, ParsablePacket, ParseMetadata};
-use zerocopy::{
-    byteorder::network_endian::U32, AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Unaligned,
-};
+use zerocopy::byteorder::network_endian::U32;
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Unaligned};
 
 use crate::error::{ParseError, ParseResult};
 

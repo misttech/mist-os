@@ -4,25 +4,21 @@
 
 //! Parsing and serialization for DHCPv6 messages.
 
-use {
-    mdns::protocol::{Domain, ParseError as MdnsParseError},
-    net_types::ip::{IpAddress as _, Ipv6Addr, PrefixTooLongError, Subnet},
-    num_derive::FromPrimitive,
-    packet::{
-        records::{
-            ParsedRecord, RecordBuilder, RecordParseResult, RecordSequenceBuilder, Records,
-            RecordsImpl, RecordsImplLayout,
-        },
-        BufferView, BufferViewMut, InnerPacketBuilder, ParsablePacket, ParseMetadata,
-    },
-    std::{convert::Infallible as Never, mem, slice::Iter, str},
-    thiserror::Error,
-    uuid::Uuid,
-    zerocopy::{
-        byteorder::network_endian::{U16, U32},
-        AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned,
-    },
+use mdns::protocol::{Domain, ParseError as MdnsParseError};
+use net_types::ip::{IpAddress as _, Ipv6Addr, PrefixTooLongError, Subnet};
+use num_derive::FromPrimitive;
+use packet::records::{
+    ParsedRecord, RecordBuilder, RecordParseResult, RecordSequenceBuilder, Records, RecordsImpl,
+    RecordsImplLayout,
 };
+use packet::{BufferView, BufferViewMut, InnerPacketBuilder, ParsablePacket, ParseMetadata};
+use std::convert::Infallible as Never;
+use std::slice::Iter;
+use std::{mem, str};
+use thiserror::Error;
+use uuid::Uuid;
+use zerocopy::byteorder::network_endian::{U16, U32};
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 /// A DHCPv6 packet parsing error.
 #[allow(missing_docs)]
@@ -1314,13 +1310,11 @@ impl InnerPacketBuilder for MessageBuilder<'_> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        net_declare::{net_ip_v6, net_subnet_v6},
-        std::str::FromStr,
-        test_case::test_case,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use net_declare::{net_ip_v6, net_subnet_v6};
+    use std::str::FromStr;
+    use test_case::test_case;
 
     fn test_buf_with_no_options() -> Vec<u8> {
         let builder = MessageBuilder::new(MessageType::Solicit, [1, 2, 3], &[]);

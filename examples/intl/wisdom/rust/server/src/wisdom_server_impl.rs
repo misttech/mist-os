@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use thiserror::Error;
 use {
     fidl_fuchsia_intl as fintl, rust_icu_common as ucommon, rust_icu_sys as usys,
     rust_icu_ucal as ucal, rust_icu_udat as udat, rust_icu_uloc as uloc,
-    rust_icu_ustring as ustring, thiserror::Error,
+    rust_icu_ustring as ustring,
 };
 
 /// All error classes produced in this module.

@@ -37,10 +37,8 @@ crate::impl_inspect_type_internal!(StringProperty);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::writer::{
-        testing_utils::{get_state, GetBlockExt},
-        Node,
-    };
+    use crate::writer::testing_utils::{get_state, GetBlockExt};
+    use crate::writer::Node;
     use inspect_format::{BlockType, PropertyFormat};
 
     #[fuchsia::test]

@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use crate::vfs::FsNodeHandle;
-use starnix_uapi::{errno, error, errors::Errno, seal_flags::SealFlags};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::seal_flags::SealFlags;
+use starnix_uapi::{errno, error};
 use std::sync::Arc;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -173,7 +175,8 @@ impl Eq for FileWriteGuardRef {}
 mod tests {
     use super::*;
     use crate::testing::*;
-    use starnix_uapi::{device_type::DeviceType, file_mode::FileMode};
+    use starnix_uapi::device_type::DeviceType;
+    use starnix_uapi::file_mode::FileMode;
 
     fn create_fs_node() -> FsNodeHandle {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();

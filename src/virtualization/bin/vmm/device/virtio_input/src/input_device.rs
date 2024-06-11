@@ -2,23 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::wire,
-    anyhow::{anyhow, Error},
-    async_trait::async_trait,
-    futures::{
-        future::{FusedFuture, OptionFuture},
-        stream::{Fuse, Stream},
-        FutureExt, StreamExt,
-    },
-    std::{collections::VecDeque, io::Write},
-    virtio_device::{
-        chain::WritableChain,
-        mem::DriverMem,
-        queue::{DescChain, DriverNotify},
-    },
-    zerocopy::AsBytes,
-};
+use crate::wire;
+use anyhow::{anyhow, Error};
+use async_trait::async_trait;
+use futures::future::{FusedFuture, OptionFuture};
+use futures::stream::{Fuse, Stream};
+use futures::{FutureExt, StreamExt};
+use std::collections::VecDeque;
+use std::io::Write;
+use virtio_device::chain::WritableChain;
+use virtio_device::mem::DriverMem;
+use virtio_device::queue::{DescChain, DriverNotify};
+use zerocopy::AsBytes;
 
 #[async_trait(?Send)]
 pub trait InputHandler {

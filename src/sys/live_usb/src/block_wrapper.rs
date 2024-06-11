@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    fmt::Debug,
-    io::{Read, Result, Seek, SeekFrom, Write},
-};
+use std::fmt::Debug;
+use std::io::{Read, Result, Seek, SeekFrom, Write};
 
 pub trait FileLike: Read + Write + Seek + Sized {}
 

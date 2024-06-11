@@ -2,35 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::consumer_controls_binding::ConsumerControlsEvent;
+use crate::input_handler::{InputHandlerStatus, UnhandledInputHandler};
+use crate::{input_device, metrics};
+use anyhow::{anyhow, Context as _, Error};
+use async_trait::async_trait;
+use async_utils::hanging_get::server::HangingGet;
+use fidl::endpoints::DiscoverableProtocolMarker as _;
+use fidl_fuchsia_media::AudioRenderUsage;
+use fidl_fuchsia_media_sounds::{PlaySoundError, PlayerMarker};
+use fidl_fuchsia_recovery::FactoryResetMarker;
+use fidl_fuchsia_recovery_policy::{DeviceRequest, DeviceRequestStream};
+use fidl_fuchsia_recovery_ui::{
+    FactoryResetCountdownRequestStream, FactoryResetCountdownState,
+    FactoryResetCountdownWatchResponder,
+};
+use fuchsia_async::{Duration, Task, Time, TimeoutExt, Timer};
+use fuchsia_inspect::health::Reporter;
+use futures::StreamExt;
+use metrics_registry::*;
+use std::cell::RefCell;
+use std::fs::{self, File};
+use std::path::Path;
+use std::rc::Rc;
 use {
-    crate::consumer_controls_binding::ConsumerControlsEvent,
-    crate::input_device,
-    crate::input_handler::{InputHandlerStatus, UnhandledInputHandler},
-    crate::metrics,
-    anyhow::{anyhow, Context as _, Error},
-    async_trait::async_trait,
-    async_utils::hanging_get::server::HangingGet,
-    fidl::endpoints::DiscoverableProtocolMarker as _,
-    fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_io as fio,
-    fidl_fuchsia_media::AudioRenderUsage,
-    fidl_fuchsia_media_sounds::{PlaySoundError, PlayerMarker},
-    fidl_fuchsia_recovery::FactoryResetMarker,
-    fidl_fuchsia_recovery_policy::{DeviceRequest, DeviceRequestStream},
-    fidl_fuchsia_recovery_ui::{
-        FactoryResetCountdownRequestStream, FactoryResetCountdownState,
-        FactoryResetCountdownWatchResponder,
-    },
-    fuchsia_async::{Duration, Task, Time, TimeoutExt, Timer},
-    fuchsia_inspect::health::Reporter,
-    fuchsia_zircon as zx,
-    futures::StreamExt,
-    metrics_registry::*,
-    std::{
-        cell::RefCell,
-        fs::{self, File},
-        path::Path,
-        rc::Rc,
-    },
+    fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
 };
 
 /// FactoryResetState tracks the state of the device through the factory reset
@@ -461,18 +457,17 @@ impl UnhandledInputHandler for FactoryResetHandler {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::consumer_controls_binding::ConsumerControlsDeviceDescriptor,
-        crate::input_handler::InputHandler,
-        assert_matches::assert_matches,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_recovery_policy::{DeviceMarker, DeviceProxy},
-        fidl_fuchsia_recovery_ui::{FactoryResetCountdownMarker, FactoryResetCountdownProxy},
-        fuchsia_async::TestExecutor,
-        pretty_assertions::assert_eq,
-        std::{pin::pin, task::Poll},
-    };
+    use super::*;
+    use crate::consumer_controls_binding::ConsumerControlsDeviceDescriptor;
+    use crate::input_handler::InputHandler;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_recovery_policy::{DeviceMarker, DeviceProxy};
+    use fidl_fuchsia_recovery_ui::{FactoryResetCountdownMarker, FactoryResetCountdownProxy};
+    use fuchsia_async::TestExecutor;
+    use pretty_assertions::assert_eq;
+    use std::pin::pin;
+    use std::task::Poll;
 
     fn create_factory_reset_countdown_proxy(
         reset_handler: Rc<FactoryResetHandler>,

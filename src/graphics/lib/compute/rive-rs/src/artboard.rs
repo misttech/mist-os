@@ -2,28 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    cell::{Cell, Ref, RefCell},
-    collections::{HashMap, VecDeque},
-    iter,
-    rc::Rc,
-};
+use std::cell::{Cell, Ref, RefCell};
+use std::collections::{HashMap, VecDeque};
+use std::iter;
+use std::rc::Rc;
 
-use crate::{
-    animation::{LinearAnimation, StateMachine},
-    component::Component,
-    component_dirt::ComponentDirt,
-    container_component::ContainerComponent,
-    core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property},
-    dependency_sorter::DependencySorter,
-    draw_target::{DrawTarget, DrawTargetPlacement},
-    drawable::Drawable,
-    math::{self, Aabb, Mat},
-    option_cell::OptionCell,
-    renderer::Renderer,
-    shapes::{CommandPath, CommandPathBuilder, ShapePaintContainer},
-    status_code::StatusCode,
-};
+use crate::animation::{LinearAnimation, StateMachine};
+use crate::component::Component;
+use crate::component_dirt::ComponentDirt;
+use crate::container_component::ContainerComponent;
+use crate::core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property};
+use crate::dependency_sorter::DependencySorter;
+use crate::draw_target::{DrawTarget, DrawTargetPlacement};
+use crate::drawable::Drawable;
+use crate::math::{self, Aabb, Mat};
+use crate::option_cell::OptionCell;
+use crate::renderer::Renderer;
+use crate::shapes::{CommandPath, CommandPathBuilder, ShapePaintContainer};
+use crate::status_code::StatusCode;
 
 #[derive(Clone, Debug)]
 pub struct ObjectsIter<T: Core> {

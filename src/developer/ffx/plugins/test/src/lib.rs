@@ -5,7 +5,8 @@
 mod connector;
 mod suite_definition;
 
-use crate::{connector::RunConnector, suite_definition::TestParamsOptions};
+use crate::connector::RunConnector;
+use crate::suite_definition::TestParamsOptions;
 use anyhow::{anyhow, format_err, Context, Result};
 use async_trait::async_trait;
 use either::Either;
@@ -15,18 +16,16 @@ use ffx_test_args::{
 };
 use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl::endpoints::create_proxy;
-use fidl_fuchsia_developer_remotecontrol as fremotecontrol;
-use fidl_fuchsia_test_manager as ftest_manager;
 use futures::FutureExt;
 use lazy_static::lazy_static;
 use run_test_suite_lib::output::Reporter;
-use signal_hook::{
-    consts::signal::{SIGINT, SIGTERM},
-    iterator::Signals,
-};
-use std::{
-    fmt::Debug,
-    io::{stdout, Write},
+use signal_hook::consts::signal::{SIGINT, SIGTERM};
+use signal_hook::iterator::Signals;
+use std::fmt::Debug;
+use std::io::{stdout, Write};
+use {
+    fidl_fuchsia_developer_remotecontrol as fremotecontrol,
+    fidl_fuchsia_test_manager as ftest_manager,
 };
 
 lazy_static! {

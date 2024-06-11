@@ -8,13 +8,10 @@
 //! messages.  This piece of code logically belongs to `intl_model`, but needed
 //! to be factored out here, as it should only be compiled for the host toolchain.
 
-use {
-    crate::message_ids,
-    crate::parser,
-    anyhow::Result,
-    intl_model::{Messages, Model},
-    std::collections::BTreeMap,
-};
+use crate::{message_ids, parser};
+use anyhow::Result;
+use intl_model::{Messages, Model};
+use std::collections::BTreeMap;
 
 #[cfg(test)]
 pub fn as_messages(pairs: &Vec<(u64, String)>) -> Messages {

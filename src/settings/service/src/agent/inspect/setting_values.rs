@@ -13,13 +13,12 @@ use settings_inspect_utils::managed_inspect_map::ManagedInspectMap;
 
 use crate::agent::{Context, Lifespan, Payload};
 use crate::base::{SettingInfo, SettingType};
-use crate::clock;
 use crate::handler::base::{Payload as SettingPayload, Request};
 use crate::handler::setting_handler::{Event, Payload as HandlerPayload};
 use crate::message::base::{Audience, MessageEvent, MessengerType};
-use crate::service;
 use crate::service::message::Messenger;
 use crate::service::TryFromWithClient;
+use crate::{clock, service};
 
 const INSPECT_NODE_NAME: &str = "setting_values";
 const SETTING_TYPE_INSPECT_NODE_NAME: &str = "setting_types";

@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus, InputEvent},
-    crate::metrics,
-    anyhow::{format_err, Error},
-    async_trait::async_trait,
-    fidl_fuchsia_input_report::{self as fidl_input_report, ConsumerControlButton},
-    fidl_fuchsia_input_report::{InputDeviceProxy, InputReport},
-    fuchsia_inspect::{health::Reporter, ArrayProperty},
-    fuchsia_zircon as zx,
-    futures::channel::mpsc::{UnboundedReceiver, UnboundedSender},
-    metrics_registry::*,
+use crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus, InputEvent};
+use crate::metrics;
+use anyhow::{format_err, Error};
+use async_trait::async_trait;
+use fidl_fuchsia_input_report::{
+    self as fidl_input_report, ConsumerControlButton, InputDeviceProxy, InputReport,
 };
+use fuchsia_inspect::health::Reporter;
+use fuchsia_inspect::ArrayProperty;
+use fuchsia_zircon as zx;
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use metrics_registry::*;
 
 /// A [`ConsumerControlsEvent`] represents an event where one or more consumer control buttons
 /// were pressed.
@@ -276,7 +276,10 @@ fn send_consumer_controls_event(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::testing_utilities, fuchsia_async as fasync, futures::StreamExt};
+    use super::*;
+    use crate::testing_utilities;
+    use fuchsia_async as fasync;
+    use futures::StreamExt;
 
     // Tests that an InputReport containing one consumer control button generates an InputEvent
     // containing the same consumer control button.

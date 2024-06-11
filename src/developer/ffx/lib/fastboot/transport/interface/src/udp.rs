@@ -6,16 +6,18 @@ use anyhow::{anyhow, bail, Context as _, Result};
 use async_io::Async;
 use async_net::UdpSocket;
 use byteorder::{BigEndian, ByteOrder};
-use futures::{
-    io::{AsyncRead, AsyncWrite},
-    task::{Context, Poll},
-    Future,
-};
-use std::{fmt, io::ErrorKind, net::SocketAddr, num::Wrapping, pin::Pin, time::Duration};
+use futures::io::{AsyncRead, AsyncWrite};
+use futures::task::{Context, Poll};
+use futures::Future;
+use std::fmt;
+use std::io::ErrorKind;
+use std::net::SocketAddr;
+use std::num::Wrapping;
+use std::pin::Pin;
+use std::time::Duration;
 use timeout::timeout;
-use zerocopy::{
-    byteorder::big_endian::U16, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned,
-};
+use zerocopy::byteorder::big_endian::U16;
+use zerocopy::{ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 const HOST_PORT: u16 = 5554;
 const REPLY_TIMEOUT: Duration = Duration::from_millis(500);

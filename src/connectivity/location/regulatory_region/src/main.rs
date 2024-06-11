@@ -2,20 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_location_namedplace::{
-        RegulatoryRegionConfiguratorRequest as ConfigRequest,
-        RegulatoryRegionConfiguratorRequestStream as ConfigRequestStream,
-        RegulatoryRegionWatcherGetUpdateResponder as WatchUpdateResponder,
-        RegulatoryRegionWatcherRequest as WatchRequest,
-        RegulatoryRegionWatcherRequestStream as WatchRequestStream,
-    },
-    fuchsia_component::server::ServiceFs,
-    futures::{StreamExt, TryFutureExt, TryStreamExt},
-    regulatory_region_lib::pub_sub_hub::PubSubHub,
-    std::path::Path,
+use anyhow::{Context as _, Error};
+use fidl_fuchsia_location_namedplace::{
+    RegulatoryRegionConfiguratorRequest as ConfigRequest,
+    RegulatoryRegionConfiguratorRequestStream as ConfigRequestStream,
+    RegulatoryRegionWatcherGetUpdateResponder as WatchUpdateResponder,
+    RegulatoryRegionWatcherRequest as WatchRequest,
+    RegulatoryRegionWatcherRequestStream as WatchRequestStream,
 };
+use fuchsia_component::server::ServiceFs;
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use regulatory_region_lib::pub_sub_hub::PubSubHub;
+use std::path::Path;
 
 const CONCURRENCY_LIMIT: Option<usize> = None;
 const REGION_CODE_PATH: &str = "/cache/regulatory_region.json";
@@ -128,11 +126,13 @@ async fn respond_to_get_update(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, assert_matches::assert_matches,
-        fidl_fuchsia_location_namedplace::RegulatoryRegionWatcherMarker, fuchsia_async as fasync,
-        std::pin::pin, std::task::Poll, tempfile::TempDir,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_location_namedplace::RegulatoryRegionWatcherMarker;
+    use fuchsia_async as fasync;
+    use std::pin::pin;
+    use std::task::Poll;
+    use tempfile::TempDir;
 
     #[test]
     fn process_watch_requests_sends_first_none() {

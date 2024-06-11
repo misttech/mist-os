@@ -2,10 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    event_queue::Event, fidl_fuchsia_update as fidl, proptest::prelude::*,
-    proptest_derive::Arbitrary, std::fmt, thiserror::Error, typed_builder::TypedBuilder,
-};
+use event_queue::Event;
+use fidl_fuchsia_update as fidl;
+use proptest::prelude::*;
+use proptest_derive::Arbitrary;
+use std::fmt;
+use thiserror::Error;
+use typed_builder::TypedBuilder;
 
 /// Wrapper type for [`fidl_fuchsia_update::State`] which works with
 /// [`event_queue`] and [`proptest`].

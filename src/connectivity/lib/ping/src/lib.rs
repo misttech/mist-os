@@ -25,13 +25,12 @@ pub use fuchsia::{new_icmp_socket, IpExt as FuchsiaIpExt};
 
 use futures::{ready, Sink, SinkExt as _, Stream, TryStreamExt as _};
 use net_types::ip::{Ip, Ipv4, Ipv6};
-use std::{
-    marker::PhantomData,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::marker::PhantomData;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use thiserror::Error;
-use zerocopy::{byteorder::network_endian::U16, AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::byteorder::network_endian::U16;
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
 
 /// The number of bytes of an ICMP (v4 or v6) header.
 pub const ICMP_HEADER_LEN: usize = std::mem::size_of::<IcmpHeader>();
@@ -415,11 +414,9 @@ mod test {
 
     use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryStreamExt as _};
     use net_declare::{std_socket_addr_v4, std_socket_addr_v6};
-    use std::{
-        cell::RefCell,
-        collections::VecDeque,
-        task::{Context, Poll},
-    };
+    use std::cell::RefCell;
+    use std::collections::VecDeque;
+    use std::task::{Context, Poll};
     use zerocopy::AsBytes as _;
 
     // A fake impl of a IcmpSocket which computes and buffers a reply when `send_to` is called,

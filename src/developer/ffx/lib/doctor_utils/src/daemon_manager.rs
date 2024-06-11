@@ -8,12 +8,10 @@ use ffx_daemon::{
 };
 use fidl_fuchsia_developer_ffx::DaemonProxy;
 use fuchsia_async::Timer;
-use std::{
-    path::{Path, PathBuf},
-    process::Command,
-    sync::Arc,
-    time::Duration,
-};
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::sync::Arc;
+use std::time::Duration;
 
 const KILL_RETRY_COUNT: usize = 5;
 const KILL_RETRY_DELAY: Duration = Duration::from_millis(150);

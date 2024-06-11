@@ -4,20 +4,16 @@
 
 use std::time::{Duration, SystemTime};
 
-use {
-    anyhow::Result,
-    fuchsia_hyper::{new_https_client, HttpsClient},
-    hyper::body::HttpBody,
-    hyper::{Body, Method, Request},
-    std::collections::{BTreeMap, HashMap},
-};
+use anyhow::Result;
+use fuchsia_hyper::{new_https_client, HttpsClient};
+use hyper::body::HttpBody;
+use hyper::{Body, Method, Request};
+use std::collections::{BTreeMap, HashMap};
 
-use crate::{
-    env_info::{get_arch, get_os},
-    ga4_event::*,
-    metrics_state::*,
-    notice::{BRIEF_NOTICE, FULL_NOTICE},
-};
+use crate::env_info::{get_arch, get_os};
+use crate::ga4_event::*;
+use crate::metrics_state::*;
+use crate::notice::{BRIEF_NOTICE, FULL_NOTICE};
 
 const DOMAIN: &str = "www.google-analytics.com";
 const ENDPOINT: &str = "/mp/collect";

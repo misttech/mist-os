@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_fuchsia_io as fio,
-    fuchsia_component_test::new::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
-    },
-    futures::{channel::mpsc, FutureExt, SinkExt, StreamExt},
+use anyhow::Error;
+use fidl_fuchsia_io as fio;
+use fuchsia_component_test::new::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
 };
+use futures::channel::mpsc;
+use futures::{FutureExt, SinkExt, StreamExt};
 
 fn get_expected_config_contents() -> String {
     std::fs::read_to_string("/pkg/data/example_config")

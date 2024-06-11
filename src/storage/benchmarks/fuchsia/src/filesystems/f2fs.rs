@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::filesystems::FsManagementFilesystemInstance,
-    async_trait::async_trait,
-    storage_benchmarks::{BlockDeviceConfig, BlockDeviceFactory, FilesystemConfig},
-};
+use crate::filesystems::FsManagementFilesystemInstance;
+use async_trait::async_trait;
+use storage_benchmarks::{BlockDeviceConfig, BlockDeviceFactory, FilesystemConfig};
 
 /// Config object for starting F2fs instances.
 #[derive(Clone)]
@@ -42,7 +40,8 @@ impl FilesystemConfig for F2fs {
 
 #[cfg(test)]
 mod tests {
-    use {super::F2fs, crate::filesystems::testing::check_filesystem};
+    use super::F2fs;
+    use crate::filesystems::testing::check_filesystem;
 
     #[fuchsia::test]
     async fn start_f2fs() {

@@ -6,24 +6,23 @@ use std::collections::HashSet;
 use std::pin::{pin, Pin};
 
 use fidl::endpoints::Proxy as _;
-use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_stack as fnet_stack;
-use fidl_fuchsia_net_virtualization as fnet_virtualization;
-use fuchsia_zircon as zx;
+use {
+    fidl_fuchsia_hardware_network as fhardware_network,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_stack as fnet_stack,
+    fidl_fuchsia_net_virtualization as fnet_virtualization, fuchsia_zircon as zx,
+};
 
 use anyhow::{anyhow, Context as _};
 use async_trait::async_trait;
 use derivative::Derivative;
-use futures::{channel::oneshot, future, FutureExt as _, StreamExt as _, TryStreamExt as _};
+use futures::channel::oneshot;
+use futures::{future, FutureExt as _, StreamExt as _, TryStreamExt as _};
 use tracing::{debug, error, info, warn};
 
-use crate::{
-    errors::{self, ContextExt as _},
-    exit_with_fidl_error, DeviceClass,
-};
+use crate::errors::{self, ContextExt as _};
+use crate::{exit_with_fidl_error, DeviceClass};
 
 /// Network identifier.
 #[derive(Debug, Clone)]
@@ -863,7 +862,8 @@ impl BridgeHandler for BridgeHandlerImpl {
 
 #[cfg(test)]
 mod tests {
-    use futures::{channel::mpsc, SinkExt as _};
+    use futures::channel::mpsc;
+    use futures::SinkExt as _;
     use test_case::test_case;
 
     use super::*;

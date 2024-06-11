@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use fuchsia_component::server as fserver;
+use fuchsia_component_test::new::{ChildOptions, LocalComponentHandles, RealmBuilder};
+use futures::channel::mpsc;
+use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
 use {
-    anyhow::Error,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
-    fuchsia_component::server as fserver,
-    fuchsia_component_test::new::{ChildOptions, LocalComponentHandles, RealmBuilder},
-    futures::{channel::mpsc, FutureExt, SinkExt, StreamExt, TryStreamExt},
 };
 
 const CAST_URL: &'static str = "cast:00000000";

@@ -3,15 +3,10 @@
 // found in the LICENSE file.
 
 use crate::capability::CapabilitySource;
-use crate::model::component::ExtendedInstance;
-use crate::model::component::{WeakComponentInstance, WeakExtendedInstance};
-use ::routing::{
-    error::{ComponentInstanceError, RoutingError},
-    policy::GlobalPolicyChecker,
-};
+use crate::model::component::{ExtendedInstance, WeakComponentInstance, WeakExtendedInstance};
+use ::routing::error::{ComponentInstanceError, RoutingError};
+use ::routing::policy::GlobalPolicyChecker;
 use async_trait::async_trait;
-use fidl_fuchsia_io as fio;
-use fuchsia_zircon as zx;
 use futures::future::BoxFuture;
 use moniker::ExtendedMoniker;
 use router_error::{Explain, RouterError};
@@ -21,6 +16,7 @@ use sandbox::{
 use std::sync::Arc;
 use vfs::directory::entry::{self, DirectoryEntry, DirectoryEntryAsync, EntryInfo};
 use vfs::execution_scope::ExecutionScope;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// A trait to add functions to Router that know about the component manager
 /// types.

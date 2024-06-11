@@ -11,29 +11,26 @@ use std::collections::HashSet;
 
 use assert_matches::assert_matches;
 use fidl::endpoints::{ProtocolMarker, Proxy as _};
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_routes as fnet_routes;
-use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
-use fidl_fuchsia_net_routes_ext::{
-    self as fnet_routes_ext, admin::FidlRouteAdminIpExt, FidlRouteIpExt, RouteAction,
-};
-use fidl_fuchsia_net_stack as fnet_stack;
+use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
+use fidl_fuchsia_net_routes_ext::{self as fnet_routes_ext, FidlRouteIpExt, RouteAction};
 use fuchsia_async::TimeoutExt as _;
-use fuchsia_zircon as zx;
-use futures::{future::FutureExt as _, StreamExt};
+use futures::future::FutureExt as _;
+use futures::StreamExt;
 use itertools::Itertools as _;
 use net_declare::{fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix};
 use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6, Subnet};
-use netstack_testing_common::{
-    realms::{Netstack, Netstack3, TestSandboxExt},
-    ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
-};
+use netstack_testing_common::realms::{Netstack, Netstack3, TestSandboxExt};
+use netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT;
 use netstack_testing_macros::netstack_test;
 use routes_common::{test_route, TestSetup};
 use std::pin::pin;
 use test_case::{test_case, test_matrix};
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin, fidl_fuchsia_net_stack as fnet_stack,
+    fuchsia_zircon as zx,
+};
 
 const METRIC_TRACKS_INTERFACE: fnet_routes::SpecifiedMetric =
     fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty);

@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{child_name::ChildName, error::MonikerError},
-    core::cmp::{self, Ordering, PartialEq},
-    std::{fmt, hash::Hash},
-};
+use crate::child_name::ChildName;
+use crate::error::MonikerError;
+use core::cmp::{self, Ordering, PartialEq};
+use std::fmt;
+use std::hash::Hash;
 
 /// [Moniker] describes the identity of a component instance in terms of its path relative to the
 /// root of the component instance tree.

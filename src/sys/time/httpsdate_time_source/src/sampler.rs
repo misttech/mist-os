@@ -9,7 +9,9 @@ use anyhow::format_err;
 use async_trait::async_trait;
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_zircon as zx;
-use futures::{future::BoxFuture, lock::Mutex, FutureExt};
+use futures::future::BoxFuture;
+use futures::lock::Mutex;
+use futures::FutureExt;
 use httpdate_hyper::{HttpsDateError, HttpsDateErrorType, NetworkTimeClient};
 use hyper::Uri;
 use tracing::warn;
@@ -229,7 +231,9 @@ pub use fake::FakeSampler;
 #[cfg(test)]
 mod fake {
     use super::*;
-    use futures::{channel::oneshot, future::pending, Future};
+    use futures::channel::oneshot;
+    use futures::future::pending;
+    use futures::Future;
     use std::collections::VecDeque;
 
     /// An |HttpsSampler| which responds with premade responses and signals when the responses

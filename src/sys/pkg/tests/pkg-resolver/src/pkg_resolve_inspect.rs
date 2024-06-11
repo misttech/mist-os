@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::format_err,
-    assert_matches::assert_matches,
-    diagnostics_assertions::{assert_data_tree, tree_assertion, AnyProperty, PropertyAssertion},
-    fidl_fuchsia_pkg_ext::RepositoryConfigBuilder,
-    fidl_fuchsia_pkg_rewrite_ext::{Rule, RuleConfig},
-    fuchsia_inspect::reader::Property,
-    fuchsia_pkg_testing::{serve::responder, PackageBuilder, RepositoryBuilder},
-    futures::FutureExt as _,
-    lib::MountsBuilder,
-    lib::{TestEnvBuilder, EMPTY_REPO_PATH},
-    std::sync::Arc,
-};
+use anyhow::format_err;
+use assert_matches::assert_matches;
+use diagnostics_assertions::{assert_data_tree, tree_assertion, AnyProperty, PropertyAssertion};
+use fidl_fuchsia_pkg_ext::RepositoryConfigBuilder;
+use fidl_fuchsia_pkg_rewrite_ext::{Rule, RuleConfig};
+use fuchsia_inspect::reader::Property;
+use fuchsia_pkg_testing::serve::responder;
+use fuchsia_pkg_testing::{PackageBuilder, RepositoryBuilder};
+use futures::FutureExt as _;
+use lib::{MountsBuilder, TestEnvBuilder, EMPTY_REPO_PATH};
+use std::sync::Arc;
 
 #[fuchsia::test]
 async fn initial_inspect_state() {

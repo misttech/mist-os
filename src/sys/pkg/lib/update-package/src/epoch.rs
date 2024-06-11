@@ -4,7 +4,10 @@
 
 //! Typesafe wrappers around parsing the epoch.json file.
 
-use {epoch::EpochFile, fidl_fuchsia_io as fio, fuchsia_zircon_status::Status, thiserror::Error};
+use epoch::EpochFile;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use thiserror::Error;
 
 /// An error encountered while parsing the epoch.json file.
 #[derive(Debug, Error)]
@@ -38,9 +41,10 @@ pub(crate) async fn epoch(proxy: &fio::DirectoryProxy) -> Result<Option<u64>, Pa
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::TestUpdatePackage, assert_matches::assert_matches, fuchsia_async as fasync,
-    };
+    use super::*;
+    use crate::TestUpdatePackage;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
 
     #[fasync::run_singlethreaded(test)]
     async fn parse_epoch_success() {

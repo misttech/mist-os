@@ -6,17 +6,13 @@ pub mod feature;
 pub mod get;
 pub mod read;
 
-use {
-    anyhow::{Context, Result},
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_input_report as fir, fidl_fuchsia_io as fio,
-    futures::stream::{Stream, TryStreamExt},
-    std::{
-        fmt::{Debug, Display},
-        io::Write,
-        path::{Path, PathBuf},
-    },
-};
+use anyhow::{Context, Result};
+use fidl::endpoints::Proxy;
+use futures::stream::{Stream, TryStreamExt};
+use std::fmt::{Debug, Display};
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use {fidl_fuchsia_input_report as fir, fidl_fuchsia_io as fio};
 
 fn connect_to_input_device(
     dev: &fio::DirectoryProxy,

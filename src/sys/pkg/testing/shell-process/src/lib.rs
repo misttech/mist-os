@@ -23,15 +23,13 @@
 //! assert!(output.is_ok());
 //! ```
 
-use {
-    fdio::{SpawnAction, SpawnOptions},
-    fuchsia_async::{self as fasync},
-    fuchsia_runtime::{job_default, HandleInfo, HandleType},
-    fuchsia_zircon::{self as zx, HandleBased, ProcessInfo},
-    futures::prelude::*,
-    libc::{STDERR_FILENO, STDOUT_FILENO},
-    std::ffi::{CStr, CString},
-};
+use fdio::{SpawnAction, SpawnOptions};
+use fuchsia_async::{self as fasync};
+use fuchsia_runtime::{job_default, HandleInfo, HandleType};
+use fuchsia_zircon::{self as zx, HandleBased, ProcessInfo};
+use futures::prelude::*;
+use libc::{STDERR_FILENO, STDOUT_FILENO};
+use std::ffi::{CStr, CString};
 
 /// A struct to contain the results of a shell process.
 pub struct ProcessOutput {

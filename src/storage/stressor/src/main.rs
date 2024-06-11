@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    serde::{Deserialize, Serialize},
-    std::io::BufReader,
-    stressor_lib::{aggressive::Stressor as Aggressive, gentle::Stressor as Gentle},
-};
+use serde::{Deserialize, Serialize};
+use std::io::BufReader;
+use stressor_lib::aggressive::Stressor as Aggressive;
+use stressor_lib::gentle::Stressor as Gentle;
 
 #[derive(Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
 struct AggressiveOptions {

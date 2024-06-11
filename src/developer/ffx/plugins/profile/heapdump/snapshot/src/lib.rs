@@ -2,20 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    async_trait::async_trait,
-    errors::{ffx_bail, ffx_error},
-    ffx_profile_heapdump_common::{
-        build_process_selector, check_snapshot_error, connect_to_collector, export_to_pprof,
-    },
-    ffx_profile_heapdump_snapshot_args::SnapshotCommand,
-    fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter},
-    fidl::endpoints::create_request_stream,
-    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
-    fidl_fuchsia_memory_heapdump_client as fheapdump_client,
-    std::io::Write,
+use anyhow::Result;
+use async_trait::async_trait;
+use errors::{ffx_bail, ffx_error};
+use ffx_profile_heapdump_common::{
+    build_process_selector, check_snapshot_error, connect_to_collector, export_to_pprof,
 };
+use ffx_profile_heapdump_snapshot_args::SnapshotCommand;
+use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
+use fidl::endpoints::create_request_stream;
+use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
+use std::io::Write;
 
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("ffx_profile_heapdump"))]

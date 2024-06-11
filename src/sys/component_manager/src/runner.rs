@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fidl::endpoints::ServerEnd, fidl_fuchsia_component_runner as fcrunner, tracing::warn};
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_component_runner as fcrunner;
+use tracing::warn;
 
 /// A runner provided by a FIDL protocol.
 pub struct RemoteRunner {

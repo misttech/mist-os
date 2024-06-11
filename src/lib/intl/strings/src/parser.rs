@@ -4,15 +4,13 @@
 
 //! The XML parser that turns `strings.xml` into a [Dictionary].
 
-use {
-    anyhow::{anyhow, Context, Error, Result},
-    lazy_static::lazy_static,
-    regex::Regex,
-    std::collections::BTreeMap,
-    std::io,
-    xml::attribute,
-    xml::reader::{EventReader, ParserConfig, XmlEvent},
-};
+use anyhow::{anyhow, Context, Error, Result};
+use lazy_static::lazy_static;
+use regex::Regex;
+use std::collections::BTreeMap;
+use std::io;
+use xml::attribute;
+use xml::reader::{EventReader, ParserConfig, XmlEvent};
 
 /// A dictionary obtained from calling [Instance::parse].
 #[derive(Eq, PartialEq, Debug, Clone)]
@@ -358,10 +356,8 @@ impl Instance {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{Dictionary, Instance},
-        anyhow::{anyhow, Context, Error, Result},
-    };
+    use super::{Dictionary, Instance};
+    use anyhow::{anyhow, Context, Error, Result};
 
     #[test]
     fn dictionary_api() -> Result<(), Error> {

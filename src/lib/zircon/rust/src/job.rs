@@ -4,12 +4,10 @@
 
 //! Type-safe bindings for Zircon jobs.
 
-use crate::ok;
 use crate::sys::{zx_handle_t, zx_rights_t};
-use crate::{object_get_info, object_get_info_vec, Koid, ObjectQuery, Topic};
 use crate::{
-    AsHandleRef, Duration, Handle, HandleBased, HandleRef, Process, ProcessOptions, Status, Task,
-    Vmar,
+    object_get_info, object_get_info_vec, ok, AsHandleRef, Duration, Handle, HandleBased,
+    HandleRef, Koid, ObjectQuery, Process, ProcessOptions, Status, Task, Topic, Vmar,
 };
 use bitflags::bitflags;
 
@@ -332,12 +330,14 @@ bitflags! {
 mod tests {
     // The unit tests are built with a different crate name, but fuchsia_runtime returns a "real"
     // fuchsia_zircon::Job that we need to use.
-    use crate::{sys::ZX_RIGHT_SAME_RIGHTS, INFO_VEC_SIZE_INITIAL};
+    use crate::sys::ZX_RIGHT_SAME_RIGHTS;
+    use crate::INFO_VEC_SIZE_INITIAL;
     use fuchsia_zircon::{
         sys, AsHandleRef, Duration, Job, JobAction, JobCondition, JobCriticalOptions,
         JobDefaultTimerMode, JobInfo, JobPolicy, JobPolicyOption, Koid, Signals, Task, Time,
     };
-    use std::{collections::HashSet, ffi::CString};
+    use std::collections::HashSet;
+    use std::ffi::CString;
 
     #[test]
     fn info_default() {

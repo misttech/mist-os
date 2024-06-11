@@ -8,19 +8,15 @@ use alloc::vec::Vec;
 use core::fmt::Debug;
 
 use log::debug;
-use net_types::{
-    ip::{GenericOverIp, Ip, IpAddress as _, Ipv4, Ipv4Addr, Subnet},
-    SpecifiedAddr, Witness as _,
-};
+use net_types::ip::{GenericOverIp, Ip, IpAddress as _, Ipv4, Ipv4Addr, Subnet};
+use net_types::{SpecifiedAddr, Witness as _};
 use netstack3_base::{AnyDevice, DeviceIdContext, ExistsError};
 use thiserror::Error;
 
-use crate::internal::{
-    base::{IpLayerBindingsContext, IpLayerEvent, IpLayerIpExt},
-    types::{
-        AddableEntry, Destination, Entry, EntryAndGeneration, IpTypesIpExt, NextHop, OrderedEntry,
-        RawMetric,
-    },
+use crate::internal::base::{IpLayerBindingsContext, IpLayerEvent, IpLayerIpExt};
+use crate::internal::types::{
+    AddableEntry, Destination, Entry, EntryAndGeneration, IpTypesIpExt, NextHop, OrderedEntry,
+    RawMetric,
 };
 
 /// Provides access to a device for the purposes of IP forwarding.
@@ -293,12 +289,11 @@ pub(crate) mod testutil {
 
     use derivative::Derivative;
     use net_types::ip::IpAddress;
-    use netstack3_base::{testutil::FakeCoreCtx, NotFoundError, StrongDeviceIdentifier};
+    use netstack3_base::testutil::FakeCoreCtx;
+    use netstack3_base::{NotFoundError, StrongDeviceIdentifier};
 
-    use crate::internal::{
-        base::IpStateContext,
-        types::{AddableMetric, Generation, Metric},
-    };
+    use crate::internal::base::IpStateContext;
+    use crate::internal::types::{AddableMetric, Generation, Metric};
 
     use super::*;
 
@@ -457,7 +452,8 @@ mod tests {
     use test_case::test_case;
 
     use super::*;
-    use crate::internal::{forwarding::testutil::FakeIpForwardingCtx, types::Metric};
+    use crate::internal::forwarding::testutil::FakeIpForwardingCtx;
+    use crate::internal::types::Metric;
 
     type FakeCtx = FakeIpForwardingCtx<MultipleDevicesId>;
 

@@ -8,11 +8,9 @@
 //! currently the only attribute available, further attributes could be defined for other execution
 //! environments.
 
-use {
-    proc_macro::TokenStream,
-    quote::quote_spanned,
-    syn::{parse_macro_input, Error, Visibility},
-};
+use proc_macro::TokenStream;
+use quote::quote_spanned;
+use syn::{parse_macro_input, Error, Visibility};
 
 fn validate_item_fn(sig: &syn::Signature, vis: &syn::Visibility) -> Result<(), syn::Error> {
     // Disallow const, unsafe or abi linkage, generics etc

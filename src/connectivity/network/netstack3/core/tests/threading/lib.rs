@@ -13,32 +13,26 @@ use const_unwrap::const_unwrap_option;
 use ip_test_macro::ip_test;
 use loom::sync::Arc;
 use net_declare::{net_ip_v4, net_ip_v6, net_mac, net_subnet_v4, net_subnet_v6};
-use net_types::{
-    ethernet::Mac,
-    ip::{Ip, Ipv4, Ipv6, Subnet},
-    SpecifiedAddr, UnicastAddr, Witness as _, ZonedAddr,
-};
-use netstack3_core::{
-    device::{EthernetLinkDevice, RecvEthernetFrameMeta},
-    device_socket::{Protocol, TargetDevice},
-    routes::{AddableEntry, AddableMetric, RawMetric},
-    sync::Mutex,
-    testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder},
-    CtxPair,
-};
+use net_types::ethernet::Mac;
+use net_types::ip::{Ip, Ipv4, Ipv6, Subnet};
+use net_types::{SpecifiedAddr, UnicastAddr, Witness as _, ZonedAddr};
+use netstack3_core::device::{EthernetLinkDevice, RecvEthernetFrameMeta};
+use netstack3_core::device_socket::{Protocol, TargetDevice};
+use netstack3_core::routes::{AddableEntry, AddableMetric, RawMetric};
+use netstack3_core::sync::Mutex;
+use netstack3_core::testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder};
+use netstack3_core::CtxPair;
 use netstack3_ip::icmp::testutil::{
     neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet,
 };
 use packet::{Buf, InnerPacketBuilder as _, ParseBuffer as _, Serializer as _};
-use packet_formats::{
-    arp::{ArpOp, ArpPacketBuilder},
-    ethernet::{
-        EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
-    },
-    ip::IpProto,
-    testutil::parse_ip_packet_in_ethernet_frame,
-    udp::{UdpPacket, UdpParseArgs},
+use packet_formats::arp::{ArpOp, ArpPacketBuilder};
+use packet_formats::ethernet::{
+    EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
+use packet_formats::ip::IpProto;
+use packet_formats::testutil::parse_ip_packet_in_ethernet_frame;
+use packet_formats::udp::{UdpPacket, UdpParseArgs};
 
 /// Spawns a loom thread with a safe stack size.
 #[track_caller]

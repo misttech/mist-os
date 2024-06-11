@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{proxies::player::PlayerProxyEvent, Result, SessionId, CHANNEL_BUFFER_SIZE};
+use crate::proxies::player::PlayerProxyEvent;
+use crate::{Result, SessionId, CHANNEL_BUFFER_SIZE};
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_media_sessions2::*;
-use futures::{
-    channel::mpsc,
-    future,
-    stream::{BoxStream, SelectAll, Stream, StreamExt},
-};
-use std::{
-    collections::{BTreeMap, HashMap},
-    ops::RangeFrom,
-};
+use futures::channel::mpsc;
+use futures::future;
+use futures::stream::{BoxStream, SelectAll, Stream, StreamExt};
+use std::collections::{BTreeMap, HashMap};
+use std::ops::RangeFrom;
 use tracing::warn;
 
 const LOG_TAG: &str = "active_session";

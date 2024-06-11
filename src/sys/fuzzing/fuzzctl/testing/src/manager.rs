@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::controller::serve_controller,
-    crate::test::Test,
-    crate::util::create_task,
-    anyhow::{Context as _, Result},
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_fuzzer as fuzz, fuchsia_zircon_status as zx,
-    futures::StreamExt,
-};
+use crate::controller::serve_controller;
+use crate::test::Test;
+use crate::util::create_task;
+use anyhow::{Context as _, Result};
+use fidl::endpoints::ServerEnd;
+use futures::StreamExt;
+use {fidl_fuchsia_fuzzer as fuzz, fuchsia_zircon_status as zx};
 
 /// Serves `fuchsia.fuzzer.Manager` on the given `server_end` of a FIDL channel.
 pub async fn serve_manager(

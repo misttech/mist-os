@@ -5,32 +5,33 @@
 #![recursion_limit = "512"]
 
 use anyhow::{format_err, Context as _, Error};
-use bt_a2dp::{
-    codec::MediaCodecConfig, connected_peers::ConnectedPeers, peer::ControllerPool,
-    permits::Permits, stream,
-};
-use bt_avdtp as avdtp;
+use bt_a2dp::codec::MediaCodecConfig;
+use bt_a2dp::connected_peers::ConnectedPeers;
+use bt_a2dp::peer::ControllerPool;
+use bt_a2dp::permits::Permits;
+use bt_a2dp::stream;
 use fidl_fuchsia_bluetooth_a2dp::{AudioModeRequest, AudioModeRequestStream, Role};
-use fidl_fuchsia_bluetooth_bredr as bredr;
 use fidl_fuchsia_component::BinderMarker;
 use fidl_fuchsia_media::{
     AudioChannelId, AudioPcmMode, PcmFormat, SessionAudioConsumerFactoryMarker,
 };
-use fidl_fuchsia_media_sessions2 as sessions2;
 use fuchsia_async::{self as fasync, DurationExt};
-use fuchsia_bluetooth::{
-    assigned_numbers::AssignedNumber,
-    profile::{find_profile_descriptors, find_service_classes, profile_descriptor_to_assigned},
-    types::{PeerId, Uuid},
+use fuchsia_bluetooth::assigned_numbers::AssignedNumber;
+use fuchsia_bluetooth::profile::{
+    find_profile_descriptors, find_service_classes, profile_descriptor_to_assigned,
 };
+use fuchsia_bluetooth::types::{PeerId, Uuid};
 use fuchsia_component::server::ServiceFs;
-use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::Inspect;
-use fuchsia_zircon as zx;
 use futures::{Stream, StreamExt};
 use profile_client::{ProfileClient, ProfileEvent};
-use std::{collections::HashSet, sync::Arc};
+use std::collections::HashSet;
+use std::sync::Arc;
 use tracing::{debug, error, info, trace, warn};
+use {
+    bt_avdtp as avdtp, fidl_fuchsia_bluetooth_bredr as bredr,
+    fidl_fuchsia_media_sessions2 as sessions2, fuchsia_inspect as inspect, fuchsia_zircon as zx,
+};
 
 mod avrcp_relay;
 mod config;

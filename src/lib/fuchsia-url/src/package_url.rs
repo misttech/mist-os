@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{errors::ParseError, AbsolutePackageUrl, RelativePackageUrl, UrlParts};
+use crate::errors::ParseError;
+use crate::{AbsolutePackageUrl, RelativePackageUrl, UrlParts};
 
 /// A URL locating a Fuchsia package. Can be either absolute or relative.
 /// See `AbsolutePackageUrl` and `RelativePackageUrl` for more details.
@@ -80,7 +81,9 @@ impl<'de> serde::Deserialize<'de> for PackageUrl {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, std::convert::TryFrom as _};
+    use super::*;
+    use assert_matches::assert_matches;
+    use std::convert::TryFrom as _;
 
     #[test]
     fn parse_err() {

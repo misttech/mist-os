@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::endpoints::{create_proxy, ProtocolMarker};
+use fuchsia_component_test::*;
 use {
-    fidl::endpoints::{create_proxy, ProtocolMarker},
     fidl_fidl_test_components as ftest, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     fuchsia_async as fasync,
-    fuchsia_component_test::*,
 };
 
 const COMPONENT_MANAGER_URL: &str = "#meta/component_manager_for_rights_test.cm";

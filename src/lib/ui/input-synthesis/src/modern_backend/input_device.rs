@@ -4,27 +4,24 @@
 
 #![warn(missing_docs)]
 
-use {
-    crate::{
-        modern_backend::input_reports_reader::InputReportsReader, synthesizer,
-        usages::hid_usage_to_input3_key,
-    },
-    anyhow::{format_err, Context as _, Error},
-    async_trait::async_trait,
-    fidl::endpoints::ServerEnd,
-    fidl::Error as FidlError,
-    fidl_fuchsia_input::Key,
-    fidl_fuchsia_input_report::{
-        ConsumerControlButton, ConsumerControlInputReport, ContactInputReport, DeviceDescriptor,
-        FeatureReport, InputDeviceRequest, InputDeviceRequestStream, InputReport,
-        InputReportsReaderMarker, KeyboardInputReport, MouseInputReport, TouchInputReport,
-        TOUCH_MAX_CONTACTS,
-    },
-    fidl_fuchsia_ui_input::{KeyboardReport, Touch},
-    fuchsia_async as fasync,
-    futures::{future, pin_mut, StreamExt, TryFutureExt},
-    std::convert::TryFrom as _,
+use crate::modern_backend::input_reports_reader::InputReportsReader;
+use crate::synthesizer;
+use crate::usages::hid_usage_to_input3_key;
+use anyhow::{format_err, Context as _, Error};
+use async_trait::async_trait;
+use fidl::endpoints::ServerEnd;
+use fidl::Error as FidlError;
+use fidl_fuchsia_input::Key;
+use fidl_fuchsia_input_report::{
+    ConsumerControlButton, ConsumerControlInputReport, ContactInputReport, DeviceDescriptor,
+    FeatureReport, InputDeviceRequest, InputDeviceRequestStream, InputReport,
+    InputReportsReaderMarker, KeyboardInputReport, MouseInputReport, TouchInputReport,
+    TOUCH_MAX_CONTACTS,
 };
+use fidl_fuchsia_ui_input::{KeyboardReport, Touch};
+use fuchsia_async as fasync;
+use futures::{future, pin_mut, StreamExt, TryFutureExt};
+use std::convert::TryFrom as _;
 
 /// Implements the `synthesizer::InputDevice` trait, and the server side of the
 /// `fuchsia.input.report.InputDevice` FIDL protocol. Used by
@@ -368,14 +365,13 @@ impl InputDevice {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{synthesizer::InputDevice as _, *},
-        fidl::endpoints,
-        fidl_fuchsia_input_report::{
-            DeviceDescriptor, InputDeviceMarker, KeyboardDescriptor, KeyboardInputDescriptor,
-        },
-        fuchsia_async as fasync,
+    use super::synthesizer::InputDevice as _;
+    use super::*;
+    use fidl::endpoints;
+    use fidl_fuchsia_input_report::{
+        DeviceDescriptor, InputDeviceMarker, KeyboardDescriptor, KeyboardInputDescriptor,
     };
+    use fuchsia_async as fasync;
 
     const DEFAULT_REPORT_TIMESTAMP: u64 = 0;
 
@@ -402,14 +398,10 @@ mod tests {
     }
 
     mod responds_to_get_descriptor_request {
-        use {
-            super::{
-                utils::{make_input_device_proxy_and_struct, make_keyboard_descriptor},
-                *,
-            },
-            assert_matches::assert_matches,
-            futures::task::Poll,
-        };
+        use super::utils::{make_input_device_proxy_and_struct, make_keyboard_descriptor};
+        use super::*;
+        use assert_matches::assert_matches;
+        use futures::task::Poll;
 
         #[fasync::run_until_stalled(test)]
         async fn single_request_before_call_to_get_input_reports_reader() -> Result<(), Error> {
@@ -489,15 +481,11 @@ mod tests {
     }
 
     mod report_contents {
-        use {
-            super::{
-                utils::{get_input_reports, make_input_device_proxy_and_struct},
-                *,
-            },
-            crate::usages::Usages,
-            assert_matches::assert_matches,
-            std::convert::TryInto as _,
-        };
+        use super::utils::{get_input_reports, make_input_device_proxy_and_struct};
+        use super::*;
+        use crate::usages::Usages;
+        use assert_matches::assert_matches;
+        use std::convert::TryInto as _;
 
         #[fasync::run_until_stalled(test)]
         async fn media_buttons_generates_empty_consumer_controls_input_report() -> Result<(), Error>
@@ -1012,16 +1000,13 @@ mod tests {
     }
 
     mod future_resolution {
-        use {
-            super::{
-                utils::{make_input_device_proxy_and_struct, make_input_reports_reader_proxy},
-                *,
-            },
-            futures::task::Poll,
-        };
+        use super::utils::{make_input_device_proxy_and_struct, make_input_reports_reader_proxy};
+        use super::*;
+        use futures::task::Poll;
 
         mod yields_ok_after_all_reports_are_sent_to_input_reports_reader {
-            use {super::*, assert_matches::assert_matches};
+            use super::*;
+            use assert_matches::assert_matches;
 
             #[test]
             fn if_device_request_channel_was_closed() {
@@ -1177,10 +1162,9 @@ mod tests {
         }
 
         mod is_pending_if_peer_did_not_read_all_reports {
-            use {
-                super::*, assert_matches::assert_matches,
-                fidl_fuchsia_input_report::MAX_DEVICE_REPORT_COUNT,
-            };
+            use super::*;
+            use assert_matches::assert_matches;
+            use fidl_fuchsia_input_report::MAX_DEVICE_REPORT_COUNT;
 
             #[test]
             fn if_device_request_channel_is_open() {
@@ -1230,10 +1214,9 @@ mod tests {
     // Because `input_synthesis` is a library, unsupported use cases should yield `Error`s,
     // rather than panic!()-ing.
     mod unsupported_use_cases {
-        use {
-            super::{utils::make_input_device_proxy_and_struct, *},
-            assert_matches::assert_matches,
-        };
+        use super::utils::make_input_device_proxy_and_struct;
+        use super::*;
+        use assert_matches::assert_matches;
 
         #[fasync::run_until_stalled(test)]
         async fn multiple_get_input_reports_reader_requests_yield_error() -> Result<(), Error> {
@@ -1260,11 +1243,9 @@ mod tests {
     }
 
     mod utils {
-        use {
-            super::*,
-            fidl_fuchsia_input_report::{InputDeviceProxy, InputReportsReaderProxy},
-            fuchsia_zircon as zx,
-        };
+        use super::*;
+        use fidl_fuchsia_input_report::{InputDeviceProxy, InputReportsReaderProxy};
+        use fuchsia_zircon as zx;
 
         /// Creates a `DeviceDescriptor` for a keyboard which has the keys enumerated
         /// in `keys`.

@@ -2,49 +2,37 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        bedrock::program::Program, builtin::runner::BuiltinRunnerFactory, model::resolver::Resolver,
-    },
-    ::namespace::Namespace,
-    ::routing::{
-        policy::ScopedPolicyChecker,
-        resolving::{ComponentAddress, ResolvedComponent, ResolvedPackage, ResolverError},
-    },
-    anyhow::format_err,
-    async_trait::async_trait,
-    cm_rust::{ComponentDecl, ConfigValuesData},
-    fidl::{
-        endpoints::{create_endpoints, ClientEnd, RequestStream, ServerEnd},
-        epitaph::ChannelEpitaphExt,
-        prelude::*,
-    },
-    fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_diagnostics_types::{
-        ComponentDiagnostics, ComponentTasks, Task as DiagnosticsTask,
-    },
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Koid},
-    futures::{
-        channel::oneshot,
-        future::{AbortHandle, Abortable},
-        lock::Mutex,
-        prelude::*,
-    },
-    std::{
-        collections::{HashMap, HashSet},
-        mem,
-        sync::{Arc, Mutex as SyncMutex},
-    },
-    tracing::warn,
-    vfs::{
-        directory::{entry::OpenRequest, entry_container::Directory},
-        execution_scope::ExecutionScope,
-        file::vmo::read_only,
-        pseudo_directory,
-        service::endpoint,
-    },
+use crate::bedrock::program::Program;
+use crate::builtin::runner::BuiltinRunnerFactory;
+use crate::model::resolver::Resolver;
+use ::namespace::Namespace;
+use ::routing::policy::ScopedPolicyChecker;
+use ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolvedPackage, ResolverError};
+use anyhow::format_err;
+use async_trait::async_trait;
+use cm_rust::{ComponentDecl, ConfigValuesData};
+use fidl::endpoints::{create_endpoints, ClientEnd, RequestStream, ServerEnd};
+use fidl::epitaph::ChannelEpitaphExt;
+use fidl::prelude::*;
+use fidl_fuchsia_diagnostics_types::{
+    ComponentDiagnostics, ComponentTasks, Task as DiagnosticsTask,
 };
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Koid};
+use futures::channel::oneshot;
+use futures::future::{AbortHandle, Abortable};
+use futures::lock::Mutex;
+use futures::prelude::*;
+use std::collections::{HashMap, HashSet};
+use std::mem;
+use std::sync::{Arc, Mutex as SyncMutex};
+use tracing::warn;
+use vfs::directory::entry::OpenRequest;
+use vfs::directory::entry_container::Directory;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::vmo::read_only;
+use vfs::pseudo_directory;
+use vfs::service::endpoint;
+use {fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[derive(Debug, Clone)]
 pub struct MockResolver {

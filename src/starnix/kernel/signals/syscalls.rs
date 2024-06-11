@@ -4,36 +4,32 @@
 
 pub use super::signal_handling::sys_restart_syscall;
 use super::signalfd::SignalFd;
-use crate::{
-    mm::{MemoryAccessor, MemoryAccessorExt},
-    security,
-    signals::{
-        restore_from_signal_handler, send_signal, SignalDetail, SignalInfo, SignalInfoHeader,
-        SI_HEADER_SIZE,
-    },
-    task::{
-        CurrentTask, ProcessEntryRef, ProcessSelector, Task, TaskMutableState, ThreadGroup,
-        WaitResult, Waiter,
-    },
-    vfs::{FdFlags, FdNumber},
+use crate::mm::{MemoryAccessor, MemoryAccessorExt};
+use crate::security;
+use crate::signals::{
+    restore_from_signal_handler, send_signal, SignalDetail, SignalInfo, SignalInfoHeader,
+    SI_HEADER_SIZE,
 };
+use crate::task::{
+    CurrentTask, ProcessEntryRef, ProcessSelector, Task, TaskMutableState, ThreadGroup, WaitResult,
+    Waiter,
+};
+use crate::vfs::{FdFlags, FdNumber};
 use fuchsia_zircon as zx;
 use starnix_logging::track_stub;
 use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::SyscallResult;
+use starnix_uapi::errors::{Errno, ErrnoResultExt, EINTR, ETIMEDOUT};
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::ownership::WeakRef;
+use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS};
+use starnix_uapi::time::{duration_from_timespec, timeval_from_duration};
+use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::{
-    errno, error,
-    errors::{Errno, ErrnoResultExt, EINTR, ETIMEDOUT},
-    open_flags::OpenFlags,
-    ownership::WeakRef,
-    pid_t, rusage, sigaction, sigaltstack,
-    signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS},
-    time::{duration_from_timespec, timeval_from_duration},
-    timespec,
-    user_address::{UserAddress, UserRef},
-    MINSIGSTKSZ, P_ALL, P_PGID, P_PID, P_PIDFD, SFD_CLOEXEC, SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK,
-    SIG_UNBLOCK, SI_MAX_SIZE, SI_TKILL, SI_USER, SS_AUTODISARM, SS_DISABLE, SS_ONSTACK, WCONTINUED,
-    WEXITED, WNOHANG, WNOWAIT, WSTOPPED, WUNTRACED, __WALL, __WCLONE,
+    errno, error, pid_t, rusage, sigaction, sigaltstack, timespec, MINSIGSTKSZ, P_ALL, P_PGID,
+    P_PID, P_PIDFD, SFD_CLOEXEC, SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SI_MAX_SIZE,
+    SI_TKILL, SI_USER, SS_AUTODISARM, SS_DISABLE, SS_ONSTACK, WCONTINUED, WEXITED, WNOHANG,
+    WNOWAIT, WSTOPPED, WUNTRACED, __WALL, __WCLONE,
 };
 use static_assertions::const_assert_eq;
 use std::sync::Arc;
@@ -866,21 +862,19 @@ fn negate_pid(pid: pid_t) -> Result<pid_t, Errno> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        mm::{vmo::round_up_to_system_page_size, PAGE_SIZE},
-        signals::{send_standard_signal, testing::dequeue_signal_for_test},
-        task::{ExitStatus, ProcessExitInfo},
-        testing::*,
+    use crate::mm::vmo::round_up_to_system_page_size;
+    use crate::mm::PAGE_SIZE;
+    use crate::signals::send_standard_signal;
+    use crate::signals::testing::dequeue_signal_for_test;
+    use crate::task::{ExitStatus, ProcessExitInfo};
+    use crate::testing::*;
+    use starnix_uapi::auth::Credentials;
+    use starnix_uapi::errors::ERESTARTSYS;
+    use starnix_uapi::signals::{
+        SIGCHLD, SIGHUP, SIGINT, SIGIO, SIGKILL, SIGRTMIN, SIGSEGV, SIGSTOP, SIGTERM, SIGTRAP,
+        SIGUSR1,
     };
-    use starnix_uapi::{
-        auth::Credentials,
-        errors::ERESTARTSYS,
-        signals::{
-            SIGCHLD, SIGHUP, SIGINT, SIGIO, SIGKILL, SIGRTMIN, SIGSEGV, SIGSTOP, SIGTERM, SIGTRAP,
-            SIGUSR1,
-        },
-        uaddr, uid_t, SI_QUEUE,
-    };
+    use starnix_uapi::{uaddr, uid_t, SI_QUEUE};
     use zerocopy::AsBytes;
 
     #[cfg(target_arch = "x86_64")]

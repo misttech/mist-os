@@ -6,11 +6,9 @@ use anyhow::{anyhow, bail, Context as _, Result};
 use argh::FromArgs;
 use camino::{Utf8Path, Utf8PathBuf};
 use gnaw_lib::CrateOutputMetadata;
-use std::{
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    fs::File,
-    io::{BufRead, BufReader, Write},
-};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::fs::File;
+use std::io::{BufRead, BufReader, Write};
 use walkdir::WalkDir;
 use xml::reader::{EventReader, XmlEvent};
 

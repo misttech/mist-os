@@ -255,10 +255,9 @@ where
 
 /// Utilities used for setting up expectation predicates on the HCI emulator state transitions.
 pub mod expectation {
-    use {
-        super::*, fidl_fuchsia_hardware_bluetooth::LegacyAdvertisingType,
-        fuchsia_bluetooth::expectation::Predicate,
-    };
+    use super::*;
+    use fidl_fuchsia_hardware_bluetooth::LegacyAdvertisingType;
+    use fuchsia_bluetooth::expectation::Predicate;
 
     pub fn local_name_is<S>(name: &'static str) -> Predicate<S>
     where

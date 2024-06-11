@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{
-    events::GraphObjectEventTracker,
-    types::{EdgeMarker, VertexId},
-    EdgeGraphMetadata, Metadata, Vertex,
-};
+use super::events::GraphObjectEventTracker;
+use super::types::{EdgeMarker, VertexId};
+use super::{EdgeGraphMetadata, Metadata, Vertex};
 use fuchsia_inspect as inspect;
 use std::sync::atomic::{AtomicU64, Ordering};
 

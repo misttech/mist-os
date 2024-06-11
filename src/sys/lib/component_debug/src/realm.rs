@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::io::{Directory, RemoteDirectory},
-    anyhow::Context,
-    cm_rust::{ComponentDecl, FidlIntoNative},
-    fidl::endpoints::{create_proxy, ServerEnd},
-    fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    fuchsia_async::TimeoutExt,
-    futures::TryFutureExt,
-    moniker::{Moniker, MonikerError},
-    thiserror::Error,
-};
+use crate::io::{Directory, RemoteDirectory};
+use anyhow::Context;
+use cm_rust::{ComponentDecl, FidlIntoNative};
+use fidl::endpoints::{create_proxy, ServerEnd};
+use fuchsia_async::TimeoutExt;
+use futures::TryFutureExt;
+use moniker::{Moniker, MonikerError};
+use thiserror::Error;
+use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
 
 /// This value is somewhat arbitrarily chosen based on how long we expect a component to take to
 /// respond to a directory request. There is no clear answer for how long it should take a

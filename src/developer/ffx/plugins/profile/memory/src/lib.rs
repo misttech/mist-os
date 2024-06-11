@@ -10,22 +10,20 @@ mod plugin_output;
 mod write_csv_output;
 mod write_human_readable_output;
 
-use {
-    crate::plugin_output::filter_digest_by_process,
-    crate::write_csv_output::write_csv_output,
-    crate::write_human_readable_output::write_human_readable_output,
-    anyhow::Result,
-    async_trait::async_trait,
-    digest::{processed, raw},
-    ffx_profile_memory_args::MemoryCommand,
-    ffx_writer::ToolIO,
-    fho::{moniker, FfxMain, FfxTool, MachineWriter},
-    fidl_fuchsia_memory_inspection::CollectorProxy,
-    futures::AsyncReadExt,
-    plugin_output::ProfileMemoryOutput,
-    std::io::Write,
-    std::time::Duration,
-};
+use crate::plugin_output::filter_digest_by_process;
+use crate::write_csv_output::write_csv_output;
+use crate::write_human_readable_output::write_human_readable_output;
+use anyhow::Result;
+use async_trait::async_trait;
+use digest::{processed, raw};
+use ffx_profile_memory_args::MemoryCommand;
+use ffx_writer::ToolIO;
+use fho::{moniker, FfxMain, FfxTool, MachineWriter};
+use fidl_fuchsia_memory_inspection::CollectorProxy;
+use futures::AsyncReadExt;
+use plugin_output::ProfileMemoryOutput;
+use std::io::Write;
+use std::time::Duration;
 
 #[derive(FfxTool)]
 pub struct MemoryTool {

@@ -6,14 +6,13 @@
 // `fx testgen`. Please run that command to make sure the output looks correct before
 // submitting changes.
 
-use crate::{common::*, flags};
+use crate::common::*;
+use crate::flags;
 
-use {
-    anyhow::{bail, Error},
-    argh::FromArgs,
-    std::path::PathBuf,
-    tracing::info,
-};
+use anyhow::{bail, Error};
+use argh::FromArgs;
+use std::path::PathBuf;
+use tracing::info;
 
 /// Generates an integration test for a Fuchsia component.
 #[derive(FromArgs, PartialEq, Debug)]

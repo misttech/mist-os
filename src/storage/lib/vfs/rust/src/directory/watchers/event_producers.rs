@@ -7,7 +7,8 @@
 //! in order to avoid copying the data around, this namespace provides a more specialized version
 //! of this abstraction.
 
-use {fidl_fuchsia_io as fio, static_assertions::assert_eq_size};
+use fidl_fuchsia_io as fio;
+use static_assertions::assert_eq_size;
 
 /// Watcher event producer, that generates buffers filled with watcher events.  Watchers use this
 /// API to obtain buffers that are then sent to the actual watchers.  Every producer may generate

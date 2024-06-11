@@ -2,37 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::bedrock::program::{Program, StartInfo};
+use crate::framework::controller;
+use crate::model::actions::{Action, ActionKey};
+use crate::model::component::instance::{InstanceState, StartedInstanceState};
+use crate::model::component::{ComponentInstance, IncomingCapabilities, StartReason};
+use crate::model::namespace::create_namespace;
+use crate::model::routing::{open_capability, RouteRequest};
+use crate::runner::RemoteRunner;
+use ::namespace::Entry as NamespaceEntry;
+use ::routing::component_instance::ComponentInstanceInterface;
+use async_trait::async_trait;
+use cm_logger::scoped::ScopedLogger;
+use cm_rust::ComponentDecl;
+use cm_util::{AbortError, AbortFutureExt, AbortHandle, AbortableScope};
+use config_encoder::ConfigFields;
+use errors::{ActionError, CreateNamespaceError, StartActionError, StructuredConfigError};
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl::Vmo;
+use futures::channel::oneshot;
+use hooks::{EventPayload, RuntimeInfo};
+use moniker::Moniker;
+use sandbox::{Capability, Dict};
+use serve_processargs::NamespaceBuilder;
+use std::sync::Arc;
+use tracing::warn;
+use vfs::execution_scope::ExecutionScope;
 use {
-    crate::bedrock::program::{Program, StartInfo},
-    crate::framework::controller,
-    crate::model::{
-        actions::{Action, ActionKey},
-        component::instance::{InstanceState, StartedInstanceState},
-        component::{ComponentInstance, IncomingCapabilities, StartReason},
-        namespace::create_namespace,
-        routing::{open_capability, RouteRequest},
-    },
-    crate::runner::RemoteRunner,
-    ::namespace::Entry as NamespaceEntry,
-    ::routing::component_instance::ComponentInstanceInterface,
-    async_trait::async_trait,
-    cm_logger::scoped::ScopedLogger,
-    cm_rust::ComponentDecl,
-    cm_util::{AbortError, AbortFutureExt, AbortHandle, AbortableScope},
-    config_encoder::ConfigFields,
-    errors::{ActionError, CreateNamespaceError, StartActionError, StructuredConfigError},
-    fidl::{endpoints::DiscoverableProtocolMarker, Vmo},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata,
     fidl_fuchsia_logger as flogger, fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess,
     fuchsia_zircon as zx,
-    futures::channel::oneshot,
-    hooks::{EventPayload, RuntimeInfo},
-    moniker::Moniker,
-    sandbox::{Capability, Dict},
-    serve_processargs::NamespaceBuilder,
-    std::sync::Arc,
-    tracing::warn,
-    vfs::execution_scope::ExecutionScope,
 };
 
 /// Starts a component instance.
@@ -573,29 +572,25 @@ async fn create_scoped_logger(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {
-        crate::model::{
-            actions::{ActionsManager, ShutdownAction, ShutdownType, StopAction},
-            component::instance::{ResolvedInstanceState, UnresolvedInstanceState},
-            component::{Component, WeakComponentInstance},
-            testing::{
-                routing_test_helpers::RoutingTestBuilder,
-                test_helpers::{self, ActionsTest},
-                test_hook::Lifecycle,
-            },
-        },
-        assert_matches::assert_matches,
-        async_trait::async_trait,
-        cm_rust_testing::{ChildBuilder, ComponentDeclBuilder},
-        errors::ModelError,
-        fuchsia_async as fasync, fuchsia_zircon as zx,
-        futures::{channel::mpsc, stream::FuturesUnordered, FutureExt, StreamExt},
-        hooks::Event,
-        hooks::{EventType, Hook, HooksRegistration},
-        rand::seq::SliceRandom,
-        routing::{bedrock::structured_dict::ComponentInput, resolving::ComponentAddress},
-        std::sync::{Mutex, Weak},
-    };
+    use crate::model::actions::{ActionsManager, ShutdownAction, ShutdownType, StopAction};
+    use crate::model::component::instance::{ResolvedInstanceState, UnresolvedInstanceState};
+    use crate::model::component::{Component, WeakComponentInstance};
+    use crate::model::testing::routing_test_helpers::RoutingTestBuilder;
+    use crate::model::testing::test_helpers::{self, ActionsTest};
+    use crate::model::testing::test_hook::Lifecycle;
+    use assert_matches::assert_matches;
+    use async_trait::async_trait;
+    use cm_rust_testing::{ChildBuilder, ComponentDeclBuilder};
+    use errors::ModelError;
+    use futures::channel::mpsc;
+    use futures::stream::FuturesUnordered;
+    use futures::{FutureExt, StreamExt};
+    use hooks::{Event, EventType, Hook, HooksRegistration};
+    use rand::seq::SliceRandom;
+    use routing::bedrock::structured_dict::ComponentInput;
+    use routing::resolving::ComponentAddress;
+    use std::sync::{Mutex, Weak};
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     // Child name for test child components instantiated during tests.
     const TEST_CHILD_NAME: &str = "child";

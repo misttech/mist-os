@@ -2,17 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{cell::RefCell, rc::Rc};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use anyhow::{Context, Result};
 use async_utils::hanging_get::server::HangingGet;
-use fidl_fuchsia_power_suspend as fsuspend;
-use fidl_fuchsia_power_system as fsystem;
-use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_zircon::Event;
 use futures::{StreamExt, TryStreamExt};
 use tracing::info;
+use {
+    fidl_fuchsia_power_suspend as fsuspend, fidl_fuchsia_power_system as fsystem,
+    fuchsia_async as fasync,
+};
 
 type NotifyFn = Box<dyn Fn(&fsuspend::SuspendStats, fsuspend::StatsWatchResponder) -> bool>;
 type StatsHangingGet = HangingGet<fsuspend::SuspendStats, fsuspend::StatsWatchResponder, NotifyFn>;

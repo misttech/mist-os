@@ -5,7 +5,8 @@
 use anyhow::ensure;
 use byteorder::{BigEndian, WriteBytesExt};
 use fidl_fuchsia_media::FormatDetails;
-use std::{fs, mem, path::Path};
+use std::path::Path;
+use std::{fs, mem};
 use stream_processor_test::*;
 
 const SEPARATE_SPS_PPS: bool = true;

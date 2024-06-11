@@ -2,32 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{convert::Infallible as Never, pin::pin};
+use std::convert::Infallible as Never;
+use std::pin::pin;
 
 use anyhow::{Context as _, Error};
 use assert_matches::assert_matches;
 use derivative::Derivative;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_root as fnet_root;
-use fidl_fuchsia_net_routes as fnet_routes;
-use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
-use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
-use futures::{
-    channel::{mpsc, oneshot},
-    FutureExt as _, StreamExt as _,
-};
+use futures::channel::{mpsc, oneshot};
+use futures::{FutureExt as _, StreamExt as _};
 use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
-
-use crate::{
-    client::ClientTable,
-    interfaces,
-    logging::{log_debug, log_info},
-    messaging::Sender,
-    netlink_packet::errno::Errno,
-    protocol_family::{route::NetlinkRoute, ProtocolFamily},
-    routes,
-    rules::{self, RuleRequestHandler as _},
+use {
+    fidl_fuchsia_net_interfaces as fnet_interfaces, fidl_fuchsia_net_root as fnet_root,
+    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
 };
+
+use crate::client::ClientTable;
+use crate::logging::{log_debug, log_info};
+use crate::messaging::Sender;
+use crate::netlink_packet::errno::Errno;
+use crate::protocol_family::route::NetlinkRoute;
+use crate::protocol_family::ProtocolFamily;
+use crate::rules::{self, RuleRequestHandler as _};
+use crate::{interfaces, routes};
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""))]

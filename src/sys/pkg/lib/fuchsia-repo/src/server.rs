@@ -2,36 +2,35 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        manager::RepositoryManager,
-        range::Range,
-        repo_client::RepoClient,
-        repository::{Error as RepoError, RepoProvider},
-    },
-    anyhow::Result,
-    async_lock::RwLock as AsyncRwLock,
-    async_net::{TcpListener, TcpStream},
-    chrono::Utc,
-    fuchsia_async as fasync,
-    fuchsia_url::RepositoryUrl,
-    futures::{future::Shared, prelude::*, TryStreamExt},
-    http::Uri,
-    http_sse::{Event, EventSender, SseResponseCreator},
-    hyper::{body::Body, header::RANGE, service::service_fn, Request, Response, StatusCode},
-    serde::{Deserialize, Serialize},
-    std::{
-        collections::HashMap,
-        convert::Infallible,
-        io,
-        net::SocketAddr,
-        pin::Pin,
-        sync::{Arc, Mutex, RwLock as SyncRwLock, Weak},
-        task::{Context, Poll},
-        time::Duration,
-    },
-    tracing::{error, info, warn},
-};
+use crate::manager::RepositoryManager;
+use crate::range::Range;
+use crate::repo_client::RepoClient;
+use crate::repository::{Error as RepoError, RepoProvider};
+use anyhow::Result;
+use async_lock::RwLock as AsyncRwLock;
+use async_net::{TcpListener, TcpStream};
+use chrono::Utc;
+use fuchsia_async as fasync;
+use fuchsia_url::RepositoryUrl;
+use futures::future::Shared;
+use futures::prelude::*;
+use futures::TryStreamExt;
+use http::Uri;
+use http_sse::{Event, EventSender, SseResponseCreator};
+use hyper::body::Body;
+use hyper::header::RANGE;
+use hyper::service::service_fn;
+use hyper::{Request, Response, StatusCode};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::convert::Infallible;
+use std::io;
+use std::net::SocketAddr;
+use std::pin::Pin;
+use std::sync::{Arc, Mutex, RwLock as SyncRwLock, Weak};
+use std::task::{Context, Poll};
+use std::time::Duration;
+use tracing::{error, info, warn};
 
 // FIXME: This value was chosen basically at random.
 const AUTO_BUFFER_SIZE: usize = 10;
@@ -815,20 +814,20 @@ impl tokio::io::AsyncWrite for ConnectionStream {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::test_utils::{
-            make_file_system_repository, make_writable_empty_repository, repo_key,
-        },
-        assert_matches::assert_matches,
-        bytes::Bytes,
-        camino::Utf8Path,
-        fidl_fuchsia_pkg_ext::{MirrorConfigBuilder, RepositoryConfig, RepositoryConfigBuilder},
-        fuchsia_async as fasync,
-        fuchsia_hyper::HttpClient,
-        http_sse::Client as SseClient,
-        std::{fs::remove_file, io::Write as _, net::Ipv4Addr},
+    use super::*;
+    use crate::test_utils::{
+        make_file_system_repository, make_writable_empty_repository, repo_key,
     };
+    use assert_matches::assert_matches;
+    use bytes::Bytes;
+    use camino::Utf8Path;
+    use fidl_fuchsia_pkg_ext::{MirrorConfigBuilder, RepositoryConfig, RepositoryConfigBuilder};
+    use fuchsia_async as fasync;
+    use fuchsia_hyper::HttpClient;
+    use http_sse::Client as SseClient;
+    use std::fs::remove_file;
+    use std::io::Write as _;
+    use std::net::Ipv4Addr;
 
     /// Make a GET request to some `url`.
     ///

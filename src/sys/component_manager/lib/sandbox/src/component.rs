@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_component_sandbox as fsandbox;
+use std::any::Any;
 use std::fmt::Debug;
-use std::{any::Any, sync::Arc};
+use std::sync::Arc;
 
 /// The trait that `WeakComponentToken` holds.
 pub trait WeakComponentTokenAny: Debug + Send + Sync {

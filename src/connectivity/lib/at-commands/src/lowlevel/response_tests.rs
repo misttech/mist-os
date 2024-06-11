@@ -5,11 +5,9 @@
 //! Tests for AT command responses.
 #![cfg(test)]
 
-use crate::lowlevel::{
-    arguments::{Argument, Arguments, DelimitedArguments},
-    response::{HardcodedError, Response},
-    write_to::WriteTo,
-};
+use crate::lowlevel::arguments::{Argument, Arguments, DelimitedArguments};
+use crate::lowlevel::response::{HardcodedError, Response};
+use crate::lowlevel::write_to::WriteTo;
 
 fn cr_lf_delimit(str: &str) -> String {
     format!("\r\n{}\r\n", str)

@@ -2,36 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.cti
 
+use crate::capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider};
+use crate::framework;
+use crate::model::component::{ComponentInstance, WeakComponentInstance};
+use crate::model::model::Model;
+use ::routing::capability_source::InternalCapability;
+use ::routing::component_instance::ComponentInstanceInterface;
+use anyhow::Error;
+use async_trait::async_trait;
+use cm_config::RuntimeConfig;
+use cm_rust::FidlIntoNative;
+use cm_types::{Name, OPEN_FLAGS_MAX_POSSIBLE_RIGHTS};
+use errors::OpenExposedDirError;
+use fidl::endpoints::ServerEnd;
+use futures::prelude::*;
+use lazy_static::lazy_static;
+use moniker::{ChildName, Moniker};
+use std::cmp;
+use std::sync::{Arc, Weak};
+use tracing::{debug, error, warn};
+use vfs::directory::entry::OpenRequest;
+use vfs::path::Path;
+use vfs::ToObjectRequest;
 use {
-    crate::{
-        capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
-        framework,
-        model::{
-            component::{ComponentInstance, WeakComponentInstance},
-            model::Model,
-        },
-    },
-    ::routing::{
-        capability_source::InternalCapability, component_instance::ComponentInstanceInterface,
-    },
-    anyhow::Error,
-    async_trait::async_trait,
-    cm_config::RuntimeConfig,
-    cm_rust::FidlIntoNative,
-    cm_types::{Name, OPEN_FLAGS_MAX_POSSIBLE_RIGHTS},
-    errors::OpenExposedDirError,
-    fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::prelude::*,
-    lazy_static::lazy_static,
-    moniker::{ChildName, Moniker},
-    std::{
-        cmp,
-        sync::{Arc, Weak},
-    },
-    tracing::{debug, error, warn},
-    vfs::{directory::entry::OpenRequest, path::Path, ToObjectRequest},
 };
 
 lazy_static! {
@@ -355,27 +350,27 @@ impl RealmCapabilityHost {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::builtin_environment::BuiltinEnvironment;
+    use crate::model::component::StartReason;
+    use crate::model::events::source::EventSource;
+    use crate::model::events::stream::EventStream;
+    use crate::model::testing::mocks::*;
+    use crate::model::testing::out_dir::OutDir;
+    use crate::model::testing::test_helpers::*;
+    use crate::model::testing::test_hook::*;
+    use assert_matches::assert_matches;
+    use cm_rust::{ComponentDecl, ExposeSource};
+    use cm_rust_testing::*;
+    use fidl::endpoints;
+    use fuchsia_component::client;
+    use futures::lock::Mutex;
+    use hooks::EventType;
+    use routing_test_helpers::component_decl_with_exposed_binder;
+    use std::collections::HashSet;
     use {
-        super::*,
-        crate::{
-            builtin_environment::BuiltinEnvironment,
-            model::{
-                component::StartReason,
-                events::{source::EventSource, stream::EventStream},
-                testing::{mocks::*, out_dir::OutDir, test_helpers::*, test_hook::*},
-            },
-        },
-        assert_matches::assert_matches,
-        cm_rust::{ComponentDecl, ExposeSource},
-        cm_rust_testing::*,
-        fidl::endpoints,
         fidl_fidl_examples_routing_echo as echo, fidl_fuchsia_component as fcomponent,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_component::client,
-        futures::lock::Mutex,
-        hooks::EventType,
-        routing_test_helpers::component_decl_with_exposed_binder,
-        std::collections::HashSet,
     };
 
     struct RealmCapabilityTest {

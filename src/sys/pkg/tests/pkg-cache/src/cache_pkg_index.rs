@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::TestEnv,
-    fidl_fuchsia_pkg::PackageIndexIteratorMarker,
-    fidl_fuchsia_pkg_ext::BlobId,
-    fuchsia_hash::Hash,
-    fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder},
-};
+use crate::TestEnv;
+use fidl_fuchsia_pkg::PackageIndexIteratorMarker;
+use fidl_fuchsia_pkg_ext::BlobId;
+use fuchsia_hash::Hash;
+use fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder};
 
 async fn verify_cache_packages(
     env: &TestEnv,

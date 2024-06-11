@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    animation::TransitionCondition,
-    core::{Core, ObjectRef, OnAdded},
-};
+use crate::animation::TransitionCondition;
+use crate::core::{Core, ObjectRef, OnAdded};
 
 #[derive(Debug, Default)]
 pub struct TransitionTriggerCondition {

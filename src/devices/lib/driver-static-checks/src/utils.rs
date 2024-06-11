@@ -5,10 +5,9 @@
 use anyhow::{Context, Result};
 use cm_rust::{ComponentDecl, FidlIntoNative, ProgramDecl};
 use fidl::unpersist;
-use fidl_fuchsia_component_decl as fdecl;
-use fidl_fuchsia_data as fdata;
 use fuchsia_archive::Utf8Reader;
 use std::io::Cursor;
+use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata};
 
 pub type FarReader = Utf8Reader<Cursor<Vec<u8>>>;
 

@@ -14,8 +14,7 @@ use futures::{TryFutureExt, TryStreamExt};
 use std::sync::Arc;
 use tracing::warn;
 
-use crate::accessor;
-use crate::store;
+use crate::{accessor, store};
 
 /// Instance represents a single instance of the stash service, handling requests from a single
 /// client.

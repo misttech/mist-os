@@ -2,17 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {at_commands as at, std::iter::once};
+use at_commands as at;
+use std::iter::once;
 
-use super::{
-    calls::Call,
-    gain_control::Gain,
-    indicators::{AgIndicator, AgIndicators, HfIndicators},
-    procedure::{
-        hold::CallHoldAction, query_current_calls::build_clcc_response,
-        subscriber_number_information::build_cnum_response, ProcedureRequest,
-    },
-};
+use super::calls::Call;
+use super::gain_control::Gain;
+use super::indicators::{AgIndicator, AgIndicators, HfIndicators};
+use super::procedure::hold::CallHoldAction;
+use super::procedure::query_current_calls::build_clcc_response;
+use super::procedure::subscriber_number_information::build_cnum_response;
+use super::procedure::ProcedureRequest;
 
 use crate::features::{AgFeatures, CodecId};
 

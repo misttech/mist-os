@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{Context, Result};
+use fidl::endpoints::Proxy as _;
+use fuchsia_component_test::{RealmBuilder, RealmInstance};
+use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
 use {
-    anyhow::{Context, Result},
-    fidl::endpoints::Proxy as _,
     fidl_fuchsia_driver_test as fdt, fidl_fuchsia_rebind_test as frt, fuchsia_async as fasync,
-    fuchsia_component_test::{RealmBuilder, RealmInstance},
-    fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
     fuchsia_zircon as zx,
 };
 

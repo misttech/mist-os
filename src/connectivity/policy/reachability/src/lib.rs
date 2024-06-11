@@ -4,12 +4,12 @@
 
 use async_utils::hanging_get::server as hanging_get;
 use fidl::endpoints::ControlHandle;
-use fidl_fuchsia_net_reachability as freachability;
-use fuchsia_async as fasync;
 use fuchsia_component::server::{ServiceFsDir, ServiceObjLocal};
-use futures::{lock::Mutex, TryFutureExt as _, TryStreamExt as _};
+use futures::lock::Mutex;
+use futures::{TryFutureExt as _, TryStreamExt as _};
 use std::sync::Arc;
 use tracing::error;
+use {fidl_fuchsia_net_reachability as freachability, fuchsia_async as fasync};
 
 type WatchResponder = freachability::MonitorWatchResponder;
 type NotifyFn = Box<dyn Fn(&freachability::Snapshot, WatchResponder) -> bool>;

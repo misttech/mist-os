@@ -2,17 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::subcommands::{
-        debug_bind::args::DebugBindCommand, device::args::DeviceCommand,
-        disable::args::DisableCommand, dump::args::DumpCommand, list::args::ListCommand,
-        list_composite_node_specs::args::ListCompositeNodeSpecsCommand,
-        list_composites::args::ListCompositesCommand, list_devices::args::ListDevicesCommand,
-        list_hosts::args::ListHostsCommand, register::args::RegisterCommand,
-        restart::args::RestartCommand, test_node::args::TestNodeCommand,
-    },
-    argh::{ArgsInfo, FromArgs},
-};
+use super::subcommands::debug_bind::args::DebugBindCommand;
+use super::subcommands::device::args::DeviceCommand;
+use super::subcommands::disable::args::DisableCommand;
+use super::subcommands::dump::args::DumpCommand;
+use super::subcommands::list::args::ListCommand;
+use super::subcommands::list_composite_node_specs::args::ListCompositeNodeSpecsCommand;
+use super::subcommands::list_composites::args::ListCompositesCommand;
+use super::subcommands::list_devices::args::ListDevicesCommand;
+use super::subcommands::list_hosts::args::ListHostsCommand;
+use super::subcommands::register::args::RegisterCommand;
+use super::subcommands::restart::args::RestartCommand;
+use super::subcommands::test_node::args::TestNodeCommand;
+use argh::{ArgsInfo, FromArgs};
 
 #[cfg(not(target_os = "fuchsia"))]
 use {

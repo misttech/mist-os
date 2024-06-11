@@ -14,29 +14,20 @@ extern crate self as wlan_frame_writer;
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-        ieee80211::MacAddr,
-        std::fmt,
-        thiserror::Error,
-        wlan_common::{
-            self as common,
-            appendable::BufferTooSmall,
-            ie::{
-                self,
-                rsn::{
-                    akm::{Akm, PSK},
-                    cipher::{Cipher, CCMP_128, TKIP},
-                    rsne,
-                },
-                wpa,
-            },
-            mac::*,
-            organization::Oui,
-        },
-        wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider},
-    };
+    use super::*;
+    use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
+    use ieee80211::MacAddr;
+    use std::fmt;
+    use thiserror::Error;
+    use wlan_common::appendable::BufferTooSmall;
+    use wlan_common::ie::rsn::akm::{Akm, PSK};
+    use wlan_common::ie::rsn::cipher::{Cipher, CCMP_128, TKIP};
+    use wlan_common::ie::rsn::rsne;
+    use wlan_common::ie::{self, wpa};
+    use wlan_common::mac::*;
+    use wlan_common::organization::Oui;
+    use wlan_common::{self as common};
+    use wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider};
 
     #[derive(Debug, Error, PartialEq, Eq, Ord, PartialOrd, Hash)]
     pub enum Error {

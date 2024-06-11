@@ -2,27 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::client::Client,
-    crate::object::{NewObjectExt, ObjectRef, RequestReceiver},
-    crate::registry::Registry,
-    anyhow::{format_err, Error},
-    fidl::endpoints::ClientEnd,
-    fidl_fuchsia_element::{GraphicalPresenterMarker, GraphicalPresenterProxy},
-    fidl_fuchsia_ui_app::ViewProviderMarker,
-    fidl_fuchsia_ui_gfx::DisplayInfo,
-    fidl_fuchsia_ui_scenic::{ScenicMarker, ScenicProxy},
-    fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_sync::Mutex,
-    fuchsia_zircon as zx,
-    futures::channel::mpsc,
-    std::sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-    wayland_server_protocol::*,
-};
+use crate::client::Client;
+use crate::object::{NewObjectExt, ObjectRef, RequestReceiver};
+use crate::registry::Registry;
+use anyhow::{format_err, Error};
+use fidl::endpoints::ClientEnd;
+use fidl_fuchsia_element::{GraphicalPresenterMarker, GraphicalPresenterProxy};
+use fidl_fuchsia_ui_app::ViewProviderMarker;
+use fidl_fuchsia_ui_gfx::DisplayInfo;
+use fidl_fuchsia_ui_scenic::{ScenicMarker, ScenicProxy};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_sync::Mutex;
+use futures::channel::mpsc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use wayland_server_protocol::*;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// When the connection is created it is initialized with a 'wl_display' object
 /// that the client can immediately interact with.

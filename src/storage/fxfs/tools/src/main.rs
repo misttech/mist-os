@@ -2,19 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    argh::FromArgs,
-    fxfs::{
-        filesystem::{mkfs_with_volume, FxFilesystem, FxFilesystemBuilder},
-        fsck,
-    },
-    fxfs_crypto::Crypt,
-    fxfs_insecure_crypto::InsecureCrypt,
-    std::{io::Read, ops::Deref, path::Path, sync::Arc},
-    storage_device::{file_backed_device::FileBackedDevice, DeviceHolder},
-    tools::ops,
-};
+use anyhow::Error;
+use argh::FromArgs;
+use fxfs::filesystem::{mkfs_with_volume, FxFilesystem, FxFilesystemBuilder};
+use fxfs::fsck;
+use fxfs_crypto::Crypt;
+use fxfs_insecure_crypto::InsecureCrypt;
+use std::io::Read;
+use std::ops::Deref;
+use std::path::Path;
+use std::sync::Arc;
+use storage_device::file_backed_device::FileBackedDevice;
+use storage_device::DeviceHolder;
+use tools::ops;
 
 const DEFAULT_VOLUME: &str = "default";
 

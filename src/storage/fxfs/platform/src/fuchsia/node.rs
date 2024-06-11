@@ -2,20 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::fuchsia::{directory::FxDirectory, file::FxFile},
-    futures::future::poll_fn,
-    fxfs::object_store::ObjectDescriptor,
-    fxfs_macros::ToWeakNode,
-    std::{
-        any::TypeId,
-        collections::{btree_map::Entry, BTreeMap},
-        mem::ManuallyDrop,
-        sync::{Arc, Mutex, Weak},
-        task::{Poll, Waker},
-    },
-    vfs::common::IntoAny,
-};
+use crate::fuchsia::directory::FxDirectory;
+use crate::fuchsia::file::FxFile;
+use futures::future::poll_fn;
+use fxfs::object_store::ObjectDescriptor;
+use fxfs_macros::ToWeakNode;
+use std::any::TypeId;
+use std::collections::btree_map::Entry;
+use std::collections::BTreeMap;
+use std::mem::ManuallyDrop;
+use std::sync::{Arc, Mutex, Weak};
+use std::task::{Poll, Waker};
+use vfs::common::IntoAny;
 
 /// FxNode is a node in the filesystem hierarchy (either a file or directory).
 pub trait FxNode: IntoAny + ToWeakNode + Send + Sync + 'static {
@@ -355,23 +353,15 @@ impl<N: FxNode + ?Sized> std::ops::Deref for OpenedNode<N> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::fuchsia::{
-            directory::FxDirectory,
-            node::{FxNode, GetResult, NodeCache},
-        },
-        fuchsia_async as fasync,
-        futures::future::join_all,
-        fxfs::object_store::ObjectDescriptor,
-        fxfs_macros::ToWeakNode,
-        std::{
-            sync::{
-                atomic::{AtomicU64, Ordering},
-                Arc, Mutex,
-            },
-            time::Duration,
-        },
-    };
+    use crate::fuchsia::directory::FxDirectory;
+    use crate::fuchsia::node::{FxNode, GetResult, NodeCache};
+    use fuchsia_async as fasync;
+    use futures::future::join_all;
+    use fxfs::object_store::ObjectDescriptor;
+    use fxfs_macros::ToWeakNode;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
 
     #[derive(ToWeakNode)]
     struct FakeNode(u64, Arc<NodeCache>);

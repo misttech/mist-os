@@ -4,15 +4,11 @@
 
 use component_events::matcher::ExitStatusMatcher;
 
-use {
-    component_events::{
-        events::{self as events, Event, EventStream},
-        matcher::EventMatcher,
-        sequence::EventSequence,
-    },
-    fidl_fidl_test_components as test_protocol,
-    fuchsia_component_test::ScopedInstance,
-};
+use component_events::events::{self as events, Event, EventStream};
+use component_events::matcher::EventMatcher;
+use component_events::sequence::EventSequence;
+use fidl_fidl_test_components as test_protocol;
+use fuchsia_component_test::ScopedInstance;
 
 #[fuchsia::test]
 async fn test_exit_detection() {

@@ -4,10 +4,8 @@
 
 //! Helper builder for constructing a `MetricEvent`.
 
-use {
-    cobalt_client::traits::AsEventCodes,
-    fidl_fuchsia_metrics::{HistogramBucket, MetricEvent, MetricEventPayload},
-};
+use cobalt_client::traits::AsEventCodes;
+use fidl_fuchsia_metrics::{HistogramBucket, MetricEvent, MetricEventPayload};
 
 ///  Adds the `builder()` method to `MetricEvent`.
 pub trait MetricEventExt {

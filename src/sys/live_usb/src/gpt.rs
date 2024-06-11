@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::block_wrapper::{FileLike, WrappedBlockDevice},
-    anyhow::{Context, Error},
-    gpt::{
-        disk::LogicalBlockSize,
-        partition_types::{OperatingSystem, Type as PartitionType},
-        GptConfig,
-    },
-    std::collections::BTreeMap,
-    tracing::info,
-};
+use crate::block_wrapper::{FileLike, WrappedBlockDevice};
+use anyhow::{Context, Error};
+use gpt::disk::LogicalBlockSize;
+use gpt::partition_types::{OperatingSystem, Type as PartitionType};
+use gpt::GptConfig;
+use std::collections::BTreeMap;
+use tracing::info;
 
 /// Size of the misc partition on the ramdisk, in bytes.
 pub const MISC_SIZE: u64 = 64 * 1024;
@@ -56,7 +52,8 @@ pub fn write_ramdisk<'a, T: FileLike + 'a>(ramdisk: T) -> Result<gpt::DiskDevice
 
 #[cfg(test)]
 mod tests {
-    use {super::*, std::io::Cursor};
+    use super::*;
+    use std::io::Cursor;
 
     #[ignore]
     // TODO(simonshields): enable this once https://github.com/Quyzi/gpt/pull/67 is in the Fuchsia tree.

@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{CheckUse, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder},
-    cm_rust::*,
-    cm_rust_testing::*,
-    fidl_fuchsia_io as fio,
-    moniker::Moniker,
-    std::marker::PhantomData,
-};
+use crate::{CheckUse, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder};
+use cm_rust::*;
+use cm_rust_testing::*;
+use fidl_fuchsia_io as fio;
+use moniker::Moniker;
+use std::marker::PhantomData;
 
 pub struct CommonStorageAdminTest<T: RoutingTestModelBuilder> {
     builder: PhantomData<T>,

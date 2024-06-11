@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::zbi::Zbi,
-    anyhow::Result,
-    scrutiny::{model::controller::DataController, model::model::*},
-    serde::{Deserialize, Serialize},
-    serde_json::{json, value::Value},
-    std::sync::Arc,
-};
+use crate::zbi::Zbi;
+use anyhow::Result;
+use scrutiny::model::controller::DataController;
+use scrutiny::model::model::*;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use serde_json::value::Value;
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct VerifyBuildController {}
@@ -49,14 +49,12 @@ impl DataController for VerifyBuildController {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        scrutiny_testing::fake::*,
-        scrutiny_utils::bootfs::{BootfsFileIndex, BootfsPackageIndex},
-        scrutiny_utils::zbi::ZbiSection,
-        serde_json::json,
-        std::collections::HashSet,
-    };
+    use super::*;
+    use scrutiny_testing::fake::*;
+    use scrutiny_utils::bootfs::{BootfsFileIndex, BootfsPackageIndex};
+    use scrutiny_utils::zbi::ZbiSection;
+    use serde_json::json;
+    use std::collections::HashSet;
 
     fn data_model() -> Arc<DataModel> {
         fake_data_model()

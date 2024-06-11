@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::ui::TerminalMessages,
-    carnelian::{make_message, AppSender, Coord, MessageTarget, Point, Rect, Size, ViewKey},
-};
+use crate::ui::TerminalMessages;
+use carnelian::{make_message, AppSender, Coord, MessageTarget, Point, Rect, Size, ViewKey};
 
 const MAXIMUM_THUMB_RATIO: f32 = 0.8;
 const MINIMUM_THUMB_RATIO: f32 = 0.05;

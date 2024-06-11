@@ -4,12 +4,10 @@
 
 use nix::unistd::{self, Pid};
 use serde::{Deserialize, Serialize};
-use std::{
-    fs::{remove_file, File, Metadata, OpenOptions},
-    io::{ErrorKind, Write},
-    path::{Path, PathBuf},
-    time::{Duration, Instant, SystemTime},
-};
+use std::fs::{remove_file, File, Metadata, OpenOptions};
+use std::io::{ErrorKind, Write};
+use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant, SystemTime};
 use tracing::{error, info, warn};
 
 /// Opens and controls a lockfile against a specific filename using create-only

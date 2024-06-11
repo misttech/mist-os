@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_test as ftest, fuchsia_component::client as fclient, fuchsia_runtime as fruntime,
-    fuchsia_zircon::AsHandleRef, tracing::*,
-};
+use fuchsia_component::client as fclient;
+use fuchsia_zircon::AsHandleRef;
+use tracing::*;
+use {fidl_fuchsia_test as ftest, fuchsia_runtime as fruntime};
 
 #[fuchsia::main]
 async fn main() {

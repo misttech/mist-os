@@ -2,19 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Result},
-    fidl::endpoints::create_request_stream,
-    fidl_fuchsia_stresstest::{
-        Action as FidlAction, ActionIteratorMarker, ActionIteratorRequest, ActorRequest,
-        ActorRequestStream, Error,
-    },
-    fuchsia_component::server::ServiceFs,
-    fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES,
-    futures::{future::BoxFuture, StreamExt, TryStreamExt},
-    rand::{rngs::SmallRng, SeedableRng},
-    rust_measure_tape_for_action::Measurable,
+use anyhow::{format_err, Result};
+use fidl::endpoints::create_request_stream;
+use fidl_fuchsia_stresstest::{
+    Action as FidlAction, ActionIteratorMarker, ActionIteratorRequest, ActorRequest,
+    ActorRequestStream, Error,
 };
+use fuchsia_component::server::ServiceFs;
+use fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES;
+use futures::future::BoxFuture;
+use futures::{StreamExt, TryStreamExt};
+use rand::rngs::SmallRng;
+use rand::SeedableRng;
+use rust_measure_tape_for_action::Measurable;
 
 enum OutgoingProtocols {
     Actor(ActorRequestStream),

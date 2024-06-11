@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::options,
-    anyhow::{Context as _, Result},
-    fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult},
-    fuchsia_fuzzctl::{
-        create_artifact_dir, create_corpus_dir, create_dir_at, get_corpus_name, save_artifact,
-        Controller, InputPair, OutputSink, Writer,
-    },
-    std::path::{Path, PathBuf},
-    url::Url,
-    walkdir::WalkDir,
+use crate::options;
+use anyhow::{Context as _, Result};
+use fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult};
+use fuchsia_fuzzctl::{
+    create_artifact_dir, create_corpus_dir, create_dir_at, get_corpus_name, save_artifact,
+    Controller, InputPair, OutputSink, Writer,
 };
+use std::path::{Path, PathBuf};
+use url::Url;
+use walkdir::WalkDir;
 
 /// Represents a `fuchsia.fuzzer.Controller` connection to a fuzzer.
 #[derive(Debug)]
@@ -389,21 +387,18 @@ fn get_result(result: &FuzzResult) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{get_result, Fuzzer},
-        crate::options,
-        anyhow::{Context as _, Result},
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult},
-        fuchsia_async as fasync,
-        fuchsia_fuzzctl::digest_path,
-        fuchsia_fuzzctl_test::{
-            add_defaults, create_task, serve_controller, verify_saved, BufferSink, FakeController,
-            Test, TEST_URL,
-        },
-        fuchsia_zircon_status as zx,
-        url::Url,
+    use super::{get_result, Fuzzer};
+    use crate::options;
+    use anyhow::{Context as _, Result};
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult};
+    use fuchsia_fuzzctl::digest_path;
+    use fuchsia_fuzzctl_test::{
+        add_defaults, create_task, serve_controller, verify_saved, BufferSink, FakeController,
+        Test, TEST_URL,
     };
+    use url::Url;
+    use {fuchsia_async as fasync, fuchsia_zircon_status as zx};
 
     // Creates a test setup suitable for unit testing `Fuzzer`.
     fn perform_test_setup(

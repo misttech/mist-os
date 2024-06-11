@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::Proxy;
-use fidl_fuchsia_bluetooth as fidl_bt;
-use fidl_fuchsia_bluetooth_bredr as bredr;
-use fuchsia_bluetooth::{profile::ValidScoConnectionParameters, types::PeerId};
+use fuchsia_bluetooth::profile::ValidScoConnectionParameters;
+use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect_derive::Unit;
 use futures::{Future, FutureExt, StreamExt};
 use std::collections::HashSet;
 use tracing::{debug, info, warn};
+use {fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr};
 
 use crate::error::ScoConnectError;
 use crate::features::CodecId;

@@ -5,17 +5,14 @@
 //! A snapshot represents all the loaded blocks of the VMO in a way that we can reconstruct the
 //! implicit tree.
 
-use {
-    crate::{
-        reader::{error::ReaderError, readable_tree::SnapshotSource},
-        Inspector,
-    },
-    inspect_format::{
-        constants, utils, Block, BlockAccessorExt, BlockContainer, BlockIndex, BlockType,
-        Container, CopyBytes, ReadBytes,
-    },
-    std::cmp,
+use crate::reader::error::ReaderError;
+use crate::reader::readable_tree::SnapshotSource;
+use crate::Inspector;
+use inspect_format::{
+    constants, utils, Block, BlockAccessorExt, BlockContainer, BlockIndex, BlockType, Container,
+    CopyBytes, ReadBytes,
 };
+use std::cmp;
 
 pub use crate::reader::tree_reader::SnapshotTree;
 

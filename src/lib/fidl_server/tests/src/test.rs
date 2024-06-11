@@ -2,17 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Error, Result},
-    async_trait::async_trait,
-    fidl::endpoints::{create_endpoints, create_proxy_and_stream},
-    fidl_fuchsia_examples::{EchoMarker, EchoRequest},
-    fidl_server::*,
-    fuchsia_async as fasync,
-    futures::{future::FutureExt, pin_mut, select},
-    std::sync::{mpsc, Arc, Mutex},
-    tracing::info,
-};
+use anyhow::{anyhow, Error, Result};
+use async_trait::async_trait;
+use fidl::endpoints::{create_endpoints, create_proxy_and_stream};
+use fidl_fuchsia_examples::{EchoMarker, EchoRequest};
+use fidl_server::*;
+use fuchsia_async as fasync;
+use futures::future::FutureExt;
+use futures::{pin_mut, select};
+use std::sync::{mpsc, Arc, Mutex};
+use tracing::info;
 
 #[derive(Clone)]
 struct EchoHandler;
@@ -32,7 +31,9 @@ impl AsyncRequestHandler<EchoMarker> for EchoHandler {
 
 fn handle_echo_request(request: EchoRequest) -> Result<(), Error> {
     info!("{:?}", request);
-    let EchoRequest::EchoString { value, responder } = request else { panic!(); };
+    let EchoRequest::EchoString { value, responder } = request else {
+        panic!();
+    };
     responder.send(&value)?;
     Ok(())
 }
@@ -60,7 +61,9 @@ impl RendezvousEchoHandler {
 #[async_trait]
 impl AsyncRequestHandler<EchoMarker> for RendezvousEchoHandler {
     async fn handle_request(&self, request: EchoRequest) -> Result<(), Error> {
-        let EchoRequest::EchoString { value, responder } = request else { panic!(); };
+        let EchoRequest::EchoString { value, responder } = request else {
+            panic!();
+        };
         if value == "" {
             let receiver = self.receiver.clone();
             let value = fasync::unblock(move || {
@@ -190,7 +193,9 @@ async fn should_stop_after_fidl_error() -> Result<(), Error> {
 async fn should_stop_after_handler_returns_error() -> Result<(), Error> {
     let (client, stream) = create_proxy_and_stream::<EchoMarker>()?;
     let handler = |request| {
-        let EchoRequest::EchoString { value, responder } = request else { panic!(); };
+        let EchoRequest::EchoString { value, responder } = request else {
+            panic!();
+        };
         if value == "message 2" {
             Err(anyhow!("failing on message 2"))
         } else {

@@ -7,8 +7,7 @@ use fidl_fuchsia_settings::{
     LightGroup as LightGroupFidl, LightMarker, LightProxy, LightRequestStream,
 };
 use fidl_fuchsia_ui_brightness::{ControlMarker, ControlProxy, ControlRequestStream};
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// Returns whether two floats are close enough to be considered equal.
 pub(crate) fn close_enough(left: f32, right: f32) -> bool {

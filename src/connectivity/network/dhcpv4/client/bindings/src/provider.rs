@@ -1,7 +1,9 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use std::{cell::RefCell, collections::HashSet, num::NonZeroU64};
+use std::cell::RefCell;
+use std::collections::HashSet;
+use std::num::NonZeroU64;
 
 use fidl_fuchsia_net_dhcp::{ClientExitReason, ClientProviderRequest, ClientProviderRequestStream};
 use fidl_fuchsia_posix_socket_packet as fpacket;

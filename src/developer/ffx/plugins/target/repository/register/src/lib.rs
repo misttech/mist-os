@@ -138,7 +138,8 @@ async fn register(
 #[cfg(test)]
 mod test {
     use super::*;
-    use ffx_config::{keys::TARGET_DEFAULT_KEY, ConfigLevel};
+    use ffx_config::keys::TARGET_DEFAULT_KEY;
+    use ffx_config::ConfigLevel;
     use fho::{Format, TestBuffers};
     use fidl_fuchsia_developer_ffx::{
         RepositoryError, RepositoryRegistryRequest, RepositoryStorageType,

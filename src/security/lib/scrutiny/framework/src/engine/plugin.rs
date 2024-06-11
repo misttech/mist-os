@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::hook::PluginHooks,
-    serde::{Deserialize, Serialize},
-    std::fmt,
-};
+use super::hook::PluginHooks;
+use serde::{Deserialize, Serialize};
+use std::fmt;
 
 /// Core identifying information about the plugin.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
@@ -78,16 +76,15 @@ macro_rules! plugin {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::model::collector::DataCollector,
-        crate::model::controller::DataController,
-        crate::model::model::DataModel,
-        anyhow::Result,
-        scrutiny_testing::fake::fake_model_config,
-        serde_json::{json, value::Value},
-        std::sync::Arc,
-    };
+    use super::*;
+    use crate::model::collector::DataCollector;
+    use crate::model::controller::DataController;
+    use crate::model::model::DataModel;
+    use anyhow::Result;
+    use scrutiny_testing::fake::fake_model_config;
+    use serde_json::json;
+    use serde_json::value::Value;
+    use std::sync::Arc;
 
     #[derive(Default)]
     pub struct TestCollector;

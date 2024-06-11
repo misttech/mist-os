@@ -2,23 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::BootloaderType,
-    anyhow::{Context as _, Error},
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_fshost::{BlockWatcherMarker, BlockWatcherProxy},
-    fidl_fuchsia_hardware_block::BlockMarker,
-    fidl_fuchsia_hardware_block_partition::PartitionProxy,
-    fidl_fuchsia_mem::Buffer,
-    fidl_fuchsia_paver::{Asset, Configuration, DynamicDataSinkProxy},
-    fuchsia_zircon as zx,
-    futures::future::try_join,
-    futures::TryFutureExt,
-    payload_streamer::{BlockDevicePayloadStreamer, PayloadStreamer},
-    recovery_util_block::BlockDevice,
-    remote_block_device::{BlockClient, MutableBufferSlice, RemoteBlockClient},
-    std::{cmp::min, fmt, sync::Mutex},
-};
+use crate::BootloaderType;
+use anyhow::{Context as _, Error};
+use fidl::endpoints::Proxy;
+use fidl_fuchsia_fshost::{BlockWatcherMarker, BlockWatcherProxy};
+use fidl_fuchsia_hardware_block::BlockMarker;
+use fidl_fuchsia_hardware_block_partition::PartitionProxy;
+use fidl_fuchsia_mem::Buffer;
+use fidl_fuchsia_paver::{Asset, Configuration, DynamicDataSinkProxy};
+use fuchsia_zircon as zx;
+use futures::future::try_join;
+use futures::TryFutureExt;
+use payload_streamer::{BlockDevicePayloadStreamer, PayloadStreamer};
+use recovery_util_block::BlockDevice;
+use remote_block_device::{BlockClient, MutableBufferSlice, RemoteBlockClient};
+use std::cmp::min;
+use std::fmt;
+use std::sync::Mutex;
 
 /// Number of nanoseconds in a second.
 const NS_PER_S: i64 = 1_000_000_000;
@@ -396,15 +396,13 @@ impl fmt::Debug for Partition {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_fuchsia_hardware_block::{BlockInfo, Flag},
-        fidl_fuchsia_hardware_block_partition::{
-            Guid, PartitionMarker, PartitionRequest, PartitionRequestStream,
-        },
-        fuchsia_async as fasync,
-        futures::TryStreamExt,
+    use super::*;
+    use fidl_fuchsia_hardware_block::{BlockInfo, Flag};
+    use fidl_fuchsia_hardware_block_partition::{
+        Guid, PartitionMarker, PartitionRequest, PartitionRequestStream,
     };
+    use fuchsia_async as fasync;
+    use futures::TryStreamExt;
 
     async fn serve_partition(
         label: &str,

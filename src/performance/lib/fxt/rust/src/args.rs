@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    error::ParseWarning,
-    fxt_builder::FxtBuilder,
-    session::ResolveCtx,
-    string::{StringRef, STRING_REF_INLINE_BIT},
-    trace_header, ParseError, ParseResult,
-};
+use crate::error::ParseWarning;
+use crate::fxt_builder::FxtBuilder;
+use crate::session::ResolveCtx;
+use crate::string::{StringRef, STRING_REF_INLINE_BIT};
+use crate::{trace_header, ParseError, ParseResult};
 use flyweights::FlyStr;
 use nom::number::complete::{le_f64, le_i64, le_u64};
 

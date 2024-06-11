@@ -7,36 +7,26 @@
 // ordering no longer causes overflows.
 #![recursion_limit = "256"]
 
-use core::{
-    convert::{Infallible as Never, TryInto as _},
-    time::Duration,
-};
+use core::convert::{Infallible as Never, TryInto as _};
+use core::time::Duration;
 
 use arbitrary::{Arbitrary, Unstructured};
 use fuzz_util::Fuzzed;
 use log::info;
 use net_declare::net_mac;
-use net_types::{
-    ip::{IpAddress, Ipv4Addr, Ipv6Addr},
-    UnicastAddr,
-};
-use netstack3_core::{
-    device::{EthernetDeviceId, EthernetLinkDevice, RecvEthernetFrameMeta},
-    testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx},
-    TimerId,
-};
-use packet::{
-    serialize::{Buf, Either, PacketBuilder, PacketConstraints, SerializeError},
-    FragmentedBuffer, Serializer,
-};
-use packet_formats::{
-    ethernet::EthernetFrameBuilder,
-    ip::{IpExt, IpPacketBuilder},
-    ipv4::Ipv4PacketBuilder,
-    ipv6::Ipv6PacketBuilder,
-    tcp::TcpSegmentBuilder,
-    udp::UdpPacketBuilder,
-};
+use net_types::ip::{IpAddress, Ipv4Addr, Ipv6Addr};
+use net_types::UnicastAddr;
+use netstack3_core::device::{EthernetDeviceId, EthernetLinkDevice, RecvEthernetFrameMeta};
+use netstack3_core::testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx};
+use netstack3_core::TimerId;
+use packet::serialize::{Buf, Either, PacketBuilder, PacketConstraints, SerializeError};
+use packet::{FragmentedBuffer, Serializer};
+use packet_formats::ethernet::EthernetFrameBuilder;
+use packet_formats::ip::{IpExt, IpPacketBuilder};
+use packet_formats::ipv4::Ipv4PacketBuilder;
+use packet_formats::ipv6::Ipv6PacketBuilder;
+use packet_formats::tcp::TcpSegmentBuilder;
+use packet_formats::udp::UdpPacketBuilder;
 
 mod print_on_panic {
     use core::fmt::Display;

@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use diagnostics_data::Logs;
+use diagnostics_reader::ArchiveReader;
+use futures::stream::StreamExt;
+use std::collections::HashMap;
 use tracing::info;
-use {
-    diagnostics_data::Logs, diagnostics_reader::ArchiveReader, futures::stream::StreamExt,
-    std::collections::HashMap,
-};
 
 #[fuchsia::main(logging_tags = ["archive-reader"])]
 async fn main() {

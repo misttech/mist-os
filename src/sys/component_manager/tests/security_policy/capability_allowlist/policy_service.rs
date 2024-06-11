@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_test_policy::{
-        RestrictedRequest, RestrictedRequestStream, UnrestrictedRequest, UnrestrictedRequestStream,
-    },
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    futures::prelude::*,
+use anyhow::Error;
+use fidl_test_policy::{
+    RestrictedRequest, RestrictedRequestStream, UnrestrictedRequest, UnrestrictedRequestStream,
 };
+use fuchsia_async as fasync;
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
 
 /// Trivial service host that just launches a restricted and unrestricted
 /// protocol that both return a trivial string.

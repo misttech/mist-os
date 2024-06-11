@@ -5,18 +5,16 @@
 //! Triggers a forced fdr by comparing the configured
 //! index against the stored index
 
-use {
-    anyhow::{format_err, Context as _, Error},
-    fidl_fuchsia_recovery::{FactoryResetMarker, FactoryResetProxy},
-    fidl_fuchsia_update_channel::{ProviderMarker, ProviderProxy},
-    fuchsia_component::client::connect_to_protocol,
-    serde::{Deserialize, Serialize},
-    std::collections::HashMap,
-    std::fs,
-    std::fs::File,
-    std::path::PathBuf,
-    tracing::{info, warn},
-};
+use anyhow::{format_err, Context as _, Error};
+use fidl_fuchsia_recovery::{FactoryResetMarker, FactoryResetProxy};
+use fidl_fuchsia_update_channel::{ProviderMarker, ProviderProxy};
+use fuchsia_component::client::connect_to_protocol;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs;
+use std::fs::File;
+use std::path::PathBuf;
+use tracing::{info, warn};
 
 const DEVICE_INDEX_FILE: &str = "stored-index.json";
 const CONFIGURED_INDEX_FILE: &str = "forced-fdr-channel-indices.config";

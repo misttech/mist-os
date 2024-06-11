@@ -5,26 +5,25 @@
 #![cfg(test)]
 
 use anyhow::Context as _;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fuchsia_async::{self as fasync, TimeoutExt as _};
-use fuchsia_zircon as zx;
 use futures::{FutureExt as _, Stream, StreamExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
 use net_declare::{fidl_ip, fidl_subnet, std_ip};
 use net_types::ip::IpVersion;
 use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _};
-use netstack_testing_common::{
-    interfaces,
-    realms::{Netstack, NetstackVersion, TestSandboxExt as _},
-    Result,
-};
+use netstack_testing_common::realms::{Netstack, NetstackVersion, TestSandboxExt as _};
+use netstack_testing_common::{interfaces, Result};
 use netstack_testing_macros::netstack_test;
 use std::collections::{HashMap, HashSet};
-use std::{convert::TryInto as _, pin::pin};
+use std::convert::TryInto as _;
+use std::pin::pin;
 use test_case::test_case;
+use {
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_stack as fnet_stack,
+    fuchsia_zircon as zx,
+};
 
 #[netstack_test]
 async fn watcher_existing<N: Netstack>(name: &str) {

@@ -2,18 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    arbitrary::Arbitrary,
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    std::{
-        borrow::Cow,
-        fmt,
-        ops::{Deref, Index},
-        slice::SliceIndex,
-        str,
-    },
-    thiserror::Error,
-};
+use arbitrary::Arbitrary;
+use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
+use std::borrow::Cow;
+use std::ops::{Deref, Index};
+use std::slice::SliceIndex;
+use std::{fmt, str};
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 #[cfg_attr(test, derive(PartialEq, Eq))]

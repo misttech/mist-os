@@ -2,15 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        diagnostics::{facade::DiagnosticsFacade, types::*},
-        server::Facade,
-    },
-    anyhow::Error,
-    async_trait::async_trait,
-    serde_json::Value,
-};
+use crate::diagnostics::facade::DiagnosticsFacade;
+use crate::diagnostics::types::*;
+use crate::server::Facade;
+use anyhow::Error;
+use async_trait::async_trait;
+use serde_json::Value;
 
 #[async_trait(?Send)]
 impl Facade for DiagnosticsFacade {

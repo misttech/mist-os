@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    futures::{
-        channel::mpsc,
-        never::Never,
-        task::{Context, Poll},
-        Future, Stream,
-    },
-    std::pin::Pin,
-};
+use futures::channel::mpsc;
+use futures::never::Never;
+use futures::task::{Context, Poll};
+use futures::{Future, Stream};
+use std::pin::Pin;
 
 /// A barrier allows an async task to wait for all blocks to be dropped.
 #[derive(Debug)]
@@ -42,7 +38,8 @@ impl Future for Barrier {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, futures::prelude::*};
+    use super::*;
+    use futures::prelude::*;
 
     #[test]
     fn drop_single_block_unblocks_barrier() {

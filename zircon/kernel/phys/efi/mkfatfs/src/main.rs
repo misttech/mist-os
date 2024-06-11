@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    argh::FromArgs,
-    fatfs as _,
-    serde::Deserialize,
-    std::collections::{HashMap, HashSet},
-    std::fs::{File, OpenOptions},
-    std::io::{copy, BufReader, Write},
-    std::path::Path,
-};
+use anyhow::Error;
+use argh::FromArgs;
+use fatfs as _;
+use serde::Deserialize;
+use std::collections::{HashMap, HashSet};
+use std::fs::{File, OpenOptions};
+use std::io::{copy, BufReader, Write};
+use std::path::Path;
 
 // Reasonable defaults for sector and cluster sizes. Sector is the 'block' unit
 // of the entire image, and we pick the minimal size so as to waste less space;

@@ -2,33 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        additional_boot_args::{AdditionalBootConfigCollection, AdditionalBootConfigContents},
-        static_pkgs::collection::{StaticPkgsCollection, StaticPkgsError},
-    },
-    anyhow::{Context, Result},
-    fuchsia_archive::Utf8Reader as FarReader,
-    fuchsia_hash::Hash,
-    fuchsia_url::{PackageName, PackageVariant},
-    maplit::hashset,
-    scrutiny::model::{collector::DataCollector, model::DataModel},
-    scrutiny_utils::{
-        artifact::{ArtifactReader, FileArtifactReader},
-        key_value::parse_key_value,
-        package::{
-            extract_system_image_hash_string, verify_package_merkle, PackageError,
-            PackageIndexContents,
-        },
-        url::from_package_name_variant_path,
-    },
-    std::{
-        collections::{HashMap, HashSet},
-        path::{Path, PathBuf},
-        str::{from_utf8, FromStr},
-        sync::Arc,
-    },
+use crate::additional_boot_args::{AdditionalBootConfigCollection, AdditionalBootConfigContents};
+use crate::static_pkgs::collection::{StaticPkgsCollection, StaticPkgsError};
+use anyhow::{Context, Result};
+use fuchsia_archive::Utf8Reader as FarReader;
+use fuchsia_hash::Hash;
+use fuchsia_url::{PackageName, PackageVariant};
+use maplit::hashset;
+use scrutiny::model::collector::DataCollector;
+use scrutiny::model::model::DataModel;
+use scrutiny_utils::artifact::{ArtifactReader, FileArtifactReader};
+use scrutiny_utils::key_value::parse_key_value;
+use scrutiny_utils::package::{
+    extract_system_image_hash_string, verify_package_merkle, PackageError, PackageIndexContents,
 };
+use scrutiny_utils::url::from_package_name_variant_path;
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
+use std::str::{from_utf8, FromStr};
+use std::sync::Arc;
 
 static META_FAR_CONTENTS_LISTING_PATH: &str = "meta/contents";
 static STATIC_PKGS_LISTING_PATH: &str = "data/static_packages";
@@ -277,31 +269,26 @@ impl DataCollector for StaticPkgsCollector {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{
-            collect_static_pkgs, ErrorWithDeps, StaticPkgsCollector,
-            META_FAR_CONTENTS_LISTING_PATH, STATIC_PKGS_LISTING_PATH,
-        },
-        crate::{
-            additional_boot_args::{AdditionalBootConfigCollection, AdditionalBootConfigError},
-            static_pkgs::collection::{StaticPkgsCollection, StaticPkgsError},
-        },
-        anyhow::{anyhow, Context, Result},
-        fuchsia_archive::write as far_write,
-        fuchsia_merkle::{Hash, HASH_SIZE},
-        fuchsia_url::{PackageName, PackageVariant},
-        maplit::{btreemap, hashmap, hashset},
-        scrutiny::model::collector::DataCollector,
-        scrutiny_testing::{artifact::MockArtifactReader, fake::fake_data_model},
-        scrutiny_utils::package::{PKGFS_BINARY_PATH, PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY},
-        std::{
-            collections::{BTreeMap, HashMap},
-            io::{BufWriter, Read, Write},
-            path::PathBuf,
-            str::FromStr,
-            sync::Arc,
-        },
+    use super::{
+        collect_static_pkgs, ErrorWithDeps, StaticPkgsCollector, META_FAR_CONTENTS_LISTING_PATH,
+        STATIC_PKGS_LISTING_PATH,
     };
+    use crate::additional_boot_args::{AdditionalBootConfigCollection, AdditionalBootConfigError};
+    use crate::static_pkgs::collection::{StaticPkgsCollection, StaticPkgsError};
+    use anyhow::{anyhow, Context, Result};
+    use fuchsia_archive::write as far_write;
+    use fuchsia_merkle::{Hash, HASH_SIZE};
+    use fuchsia_url::{PackageName, PackageVariant};
+    use maplit::{btreemap, hashmap, hashset};
+    use scrutiny::model::collector::DataCollector;
+    use scrutiny_testing::artifact::MockArtifactReader;
+    use scrutiny_testing::fake::fake_data_model;
+    use scrutiny_utils::package::{PKGFS_BINARY_PATH, PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY};
+    use std::collections::{BTreeMap, HashMap};
+    use std::io::{BufWriter, Read, Write};
+    use std::path::PathBuf;
+    use std::str::FromStr;
+    use std::sync::Arc;
 
     fn create_system_image_far(static_pkgs_merkle: Option<Hash>) -> Vec<u8> {
         let mut system_image_far = BufWriter::new(Vec::new());

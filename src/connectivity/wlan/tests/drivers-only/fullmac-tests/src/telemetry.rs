@@ -1,11 +1,12 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::FullmacDriverFixture, drivers_only_common::sme_helpers,
-    fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_stats as fidl_stats,
-    fullmac_helpers::config::FullmacDriverConfig, rand::Rng, wlan_common::assert_variant,
-};
+use crate::FullmacDriverFixture;
+use drivers_only_common::sme_helpers;
+use fullmac_helpers::config::FullmacDriverConfig;
+use rand::Rng;
+use wlan_common::assert_variant;
+use {fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_stats as fidl_stats};
 
 #[fuchsia::test]
 async fn test_get_iface_counter_stats() {

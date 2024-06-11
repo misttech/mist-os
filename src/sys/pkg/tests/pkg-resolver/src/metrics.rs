@@ -396,10 +396,10 @@ async fn update_tuf_client_error() {
 // TODO(b/308214783): Re-enable on risc-v when flakes fixed.
 #[cfg(not(target_arch = "riscv64"))]
 mod pkg_resolver_blob_fetch {
-    use {
-        super::*, metrics::FetchBlobMigratedMetricDimensionResult::*, std::net::Ipv4Addr,
-        test_case::test_case,
-    };
+    use super::*;
+    use metrics::FetchBlobMigratedMetricDimensionResult::*;
+    use std::net::Ipv4Addr;
+    use test_case::test_case;
 
     struct StatusTest {
         min_code: u16,
@@ -513,10 +513,10 @@ mod pkg_resolver_blob_fetch {
 // TODO(b/308214783): Re-enable on risc-v when flakes fixed.
 #[cfg(not(target_arch = "riscv64"))]
 mod pkg_resolver_create_tuf_client {
-    use {
-        super::*, metrics::CreateTufClientMigratedMetricDimensionResult::*, std::net::Ipv4Addr,
-        test_case::test_case,
-    };
+    use super::*;
+    use metrics::CreateTufClientMigratedMetricDimensionResult::*;
+    use std::net::Ipv4Addr;
+    use test_case::test_case;
 
     struct StatusTest {
         min_code: u16,
@@ -615,10 +615,10 @@ mod pkg_resolver_create_tuf_client {
 // TODO(b/308214783): Re-enable on risc-v when flakes fixed.
 #[cfg(not(target_arch = "riscv64"))]
 mod pkg_resolver_update_tuf_client {
-    use {
-        super::*, metrics::UpdateTufClientMigratedMetricDimensionResult::*, std::net::Ipv4Addr,
-        test_case::test_case,
-    };
+    use super::*;
+    use metrics::UpdateTufClientMigratedMetricDimensionResult::*;
+    use std::net::Ipv4Addr;
+    use test_case::test_case;
 
     struct StatusTest {
         min_code: u16,

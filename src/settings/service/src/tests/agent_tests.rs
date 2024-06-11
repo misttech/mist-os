@@ -7,10 +7,9 @@ use crate::agent::{
     AgentCreator, AgentError, Context, CreationFunc, Invocation, InvocationResult, Lifespan,
     Payload,
 };
-use crate::service;
 use crate::service_context::ServiceContext;
 use crate::storage::testing::InMemoryStorageFactory;
-use crate::EnvironmentBuilder;
+use crate::{service, EnvironmentBuilder};
 use core::fmt::{Debug, Formatter};
 use fuchsia_async as fasync;
 use futures::channel::mpsc::UnboundedSender;

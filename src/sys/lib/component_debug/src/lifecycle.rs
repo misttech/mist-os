@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use cm_types::{LongName, Name};
+use fuchsia_url::AbsoluteComponentUrl;
+use futures::future::BoxFuture;
+use futures::{FutureExt, StreamExt};
+use moniker::Moniker;
+use thiserror::Error;
 use {
-    cm_types::{LongName, Name},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_sys2 as fsys,
-    fuchsia_url::AbsoluteComponentUrl,
-    futures::{future::BoxFuture, FutureExt, StreamExt},
-    moniker::Moniker,
-    thiserror::Error,
 };
 
 /// Errors that apply to all lifecycle actions.
@@ -236,10 +237,12 @@ pub async fn unresolve_instance(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*, assert_matches::assert_matches, fidl::endpoints::create_proxy_and_stream,
-        fidl::HandleBased, fidl_fuchsia_process as fprocess, futures::TryStreamExt,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl::HandleBased;
+    use fidl_fuchsia_process as fprocess;
+    use futures::TryStreamExt;
 
     fn lifecycle_create_instance(
         expected_moniker: &'static str,

@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::TestEnv, fidl_fuchsia_io as fio, fuchsia_zircon::Status, futures::TryFutureExt};
+use crate::TestEnv;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon::Status;
+use futures::TryFutureExt;
 
 struct BrokenBlobfs;
 

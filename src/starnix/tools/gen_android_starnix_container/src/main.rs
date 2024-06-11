@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{collections::HashMap, fs::File, io::Cursor};
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::Cursor;
 
 use anyhow::{bail, Context, Result};
 use argh::FromArgs;
@@ -15,7 +17,8 @@ mod depfile;
 mod hal_manifest;
 mod remote_bundle;
 
-use crate::{depfile::Depfile, remote_bundle::Writer};
+use crate::depfile::Depfile;
+use crate::remote_bundle::Writer;
 
 /// Construct a starnix container that can include an Android system and HALs.
 #[derive(FromArgs)]

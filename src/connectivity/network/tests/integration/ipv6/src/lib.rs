@@ -4,55 +4,55 @@
 
 #![cfg(test)]
 
-use std::{collections::HashSet, mem::size_of, pin::pin};
+use std::collections::HashSet;
+use std::mem::size_of;
+use std::pin::pin;
 
 use assert_matches::assert_matches;
-use fidl_fuchsia_net as net;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_routes as fnet_routes;
-use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
-use fuchsia_zircon as zx;
+use {
+    fidl_fuchsia_net as net, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_zircon as zx,
+};
 
 use anyhow::Context as _;
 use futures::{
     future, Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
 };
 use net_declare::net_ip_v6;
+use net_types::ethernet::Mac;
+use net_types::ip::{self as net_types_ip, Ip, Ipv6};
 use net_types::{
-    ethernet::Mac,
-    ip::{self as net_types_ip, Ip, Ipv6},
     LinkLocalAddress as _, MulticastAddr, MulticastAddress as _, SpecifiedAddress as _,
     Witness as _,
 };
 use netemul::InterfaceConfig;
+use netstack_testing_common::constants::{eth as eth_consts, ipv6 as ipv6_consts};
+use netstack_testing_common::ndp::{
+    self, assert_dad_failed, assert_dad_success, expect_dad_neighbor_solicitation,
+    fail_dad_with_na, fail_dad_with_ns, send_ra, send_ra_with_router_lifetime, DadState,
+};
+use netstack_testing_common::realms::{
+    constants, KnownServiceProvider, Netstack, NetstackVersion, TestSandboxExt as _,
+};
 use netstack_testing_common::{
-    constants::{eth as eth_consts, ipv6 as ipv6_consts},
-    interfaces,
-    ndp::{
-        self, assert_dad_failed, assert_dad_success, expect_dad_neighbor_solicitation,
-        fail_dad_with_na, fail_dad_with_ns, send_ra, send_ra_with_router_lifetime, DadState,
-    },
-    realms::{constants, KnownServiceProvider, Netstack, NetstackVersion, TestSandboxExt as _},
-    setup_network, setup_network_with, ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
+    interfaces, setup_network, setup_network_with, ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
     ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
 use packet::ParsablePacket as _;
-use packet_formats::{
-    ethernet::{EtherType, EthernetFrame, EthernetFrameLengthCheck},
-    icmp::{
-        mld::{MldPacket, Mldv2MulticastRecordType},
-        ndp::{
-            options::{NdpOption, NdpOptionBuilder, PrefixInformation, RouteInformation},
-            NeighborSolicitation, RoutePreference, RouterAdvertisement, RouterSolicitation,
-        },
-        IcmpParseArgs, Icmpv6Packet,
-    },
-    ip::Ipv6Proto,
-    testutil::{parse_icmp_packet_in_ip_packet_in_ethernet_frame, parse_ip_packet},
+use packet_formats::ethernet::{EtherType, EthernetFrame, EthernetFrameLengthCheck};
+use packet_formats::icmp::mld::{MldPacket, Mldv2MulticastRecordType};
+use packet_formats::icmp::ndp::options::{
+    NdpOption, NdpOptionBuilder, PrefixInformation, RouteInformation,
 };
+use packet_formats::icmp::ndp::{
+    NeighborSolicitation, RoutePreference, RouterAdvertisement, RouterSolicitation,
+};
+use packet_formats::icmp::{IcmpParseArgs, Icmpv6Packet};
+use packet_formats::ip::Ipv6Proto;
+use packet_formats::testutil::{parse_icmp_packet_in_ip_packet_in_ethernet_frame, parse_ip_packet};
 use test_case::test_case;
 
 /// The expected number of Router Solicitations sent by the netstack when an

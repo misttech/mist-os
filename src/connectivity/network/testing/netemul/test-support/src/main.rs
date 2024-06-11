@@ -2,18 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_netemul_test::{CounterRequest, CounterRequestStream},
-    fuchsia_component::{
-        client,
-        server::{ServiceFs, ServiceFsDir},
-    },
-    futures::prelude::*,
-    std::sync::Arc,
-    std::sync::Mutex,
-    tracing::{error, info},
-};
+use anyhow::{Context as _, Error};
+use fidl_fuchsia_netemul_test::{CounterRequest, CounterRequestStream};
+use fuchsia_component::client;
+use fuchsia_component::server::{ServiceFs, ServiceFsDir};
+use futures::prelude::*;
+use std::sync::{Arc, Mutex};
+use tracing::{error, info};
 
 struct CounterData {
     value: u32,

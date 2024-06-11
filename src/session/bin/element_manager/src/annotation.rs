@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_utils::hanging_get::{error::HangingGetServerError, server as hanging_get},
-    derivative::Derivative,
-    fidl::endpoints::{ControlHandle, RequestStream},
-    fidl_fuchsia_element as felement, fidl_fuchsia_mem as fmem, fuchsia_zircon as zx,
-    futures::{lock::Mutex, TryStreamExt},
-    std::{
-        collections::{HashMap, HashSet},
-        sync::Arc,
-    },
-    tracing::error,
-};
+use async_utils::hanging_get::error::HangingGetServerError;
+use async_utils::hanging_get::server as hanging_get;
+use derivative::Derivative;
+use fidl::endpoints::{ControlHandle, RequestStream};
+use futures::lock::Mutex;
+use futures::TryStreamExt;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+use tracing::error;
+use {fidl_fuchsia_element as felement, fidl_fuchsia_mem as fmem, fuchsia_zircon as zx};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct Key {
@@ -361,20 +359,20 @@ fn handle_annotation_controller_request(
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::annotation::{
-            handle_annotation_controller_request, AnnotationError, AnnotationHolder,
-            WatchSubscriber, MAX_ANNOTATIONS,
-        },
-        assert_matches::assert_matches,
-        async_utils::hanging_get::error::HangingGetServerError,
-        fidl::endpoints::{
-            create_proxy_and_stream, spawn_stream_handler, ControlHandle, RequestStream,
-        },
-        fidl_fuchsia_element as felement, fuchsia_async as fasync, fuchsia_zircon as zx,
-        futures::{stream::FusedStream, StreamExt, TryStreamExt},
-        std::{cmp::Ordering, sync::Arc, sync::Mutex},
+    use crate::annotation::{
+        handle_annotation_controller_request, AnnotationError, AnnotationHolder, WatchSubscriber,
+        MAX_ANNOTATIONS,
     };
+    use assert_matches::assert_matches;
+    use async_utils::hanging_get::error::HangingGetServerError;
+    use fidl::endpoints::{
+        create_proxy_and_stream, spawn_stream_handler, ControlHandle, RequestStream,
+    };
+    use futures::stream::FusedStream;
+    use futures::{StreamExt, TryStreamExt};
+    use std::cmp::Ordering;
+    use std::sync::{Arc, Mutex};
+    use {fidl_fuchsia_element as felement, fuchsia_async as fasync, fuchsia_zircon as zx};
 
     fn make_annotation_key(namespace: &str, value: &str) -> felement::AnnotationKey {
         felement::AnnotationKey { namespace: namespace.to_string(), value: value.to_string() }

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    debug_data_processor::DebugDataSender,
-    self_diagnostics::DiagnosticNode,
-    test_suite::{self, Suite},
-};
+use crate::debug_data_processor::DebugDataSender;
+use crate::self_diagnostics::DiagnosticNode;
+use crate::test_suite::{self, Suite};
 use async_trait::async_trait;
 use futures::channel::oneshot;
 use futures::stream::{self, StreamExt};
@@ -132,15 +130,12 @@ impl<T: RunSuiteFn + std::marker::Sync + std::marker::Send> Scheduler for Parall
 mod tests {
     use super::*;
     use crate::debug_data_processor::{DebugDataDirectory, DebugDataProcessor};
-    use crate::facet;
-    use crate::AboveRootCapabilitiesForTest;
+    use crate::{facet, AboveRootCapabilitiesForTest};
     use async_trait::async_trait;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_component_resolution as fresolution;
-    use fidl_fuchsia_test_manager::RunOptions;
-    use fidl_fuchsia_test_manager::SuiteControllerMarker;
-    use std::sync::Arc;
-    use std::sync::Mutex;
+    use fidl_fuchsia_test_manager::{RunOptions, SuiteControllerMarker};
+    use std::sync::{Arc, Mutex};
 
     async fn create_fake_suite(test_url: String) -> Suite {
         let (_controller_proxy, controller_stream) =

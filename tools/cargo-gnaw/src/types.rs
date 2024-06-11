@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::gn::add_version_suffix,
-    anyhow::{anyhow, Error},
-    cargo_metadata::Package,
-};
+use crate::gn::add_version_suffix;
+use anyhow::{anyhow, Error};
+use cargo_metadata::Package;
 
 pub type Feature = String;
 pub type Platform = String;

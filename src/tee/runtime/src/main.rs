@@ -6,7 +6,9 @@ mod params;
 mod ta_loader;
 mod trusted_app;
 
-use std::{ffi::CString, fs::File, io::Read};
+use std::ffi::CString;
+use std::fs::File;
+use std::io::Read;
 
 use anyhow::Error;
 use fidl_fuchsia_tee::{ApplicationRequest, ApplicationRequestStream};

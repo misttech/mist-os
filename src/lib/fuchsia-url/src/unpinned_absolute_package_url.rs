@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    errors::ParseError,
-    parse::{PackageName, PackageVariant},
-    AbsolutePackageUrl, RepositoryUrl,
-};
+use crate::errors::ParseError;
+use crate::parse::{PackageName, PackageVariant};
+use crate::{AbsolutePackageUrl, RepositoryUrl};
 
 /// A URL locating a Fuchsia package. Cannot have a hash.
 /// Has the form "fuchsia-pkg://<repository>/<name>[/variant]" where:
@@ -133,10 +131,10 @@ impl<'de> serde::Deserialize<'de> for UnpinnedAbsolutePackageUrl {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::errors::PackagePathSegmentError, assert_matches::assert_matches,
-        std::convert::TryFrom as _,
-    };
+    use super::*;
+    use crate::errors::PackagePathSegmentError;
+    use assert_matches::assert_matches;
+    use std::convert::TryFrom as _;
 
     #[test]
     fn new_with_path_err() {

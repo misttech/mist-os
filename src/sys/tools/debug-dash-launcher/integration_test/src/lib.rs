@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_dash as fdash;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon as zx;
+use {fidl_fuchsia_dash as fdash, fuchsia_zircon as zx};
 
 #[fuchsia::test]
 pub async fn unknown_tools_package() {

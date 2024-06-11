@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Error},
-    fidl_fuchsia_update_installer::{InstallerMarker, InstallerProxy, RebootControllerMarker},
-    fidl_fuchsia_update_installer_ext::{self as installer, start_update, Options, StateId},
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_url::AbsolutePackageUrl,
-    futures::prelude::*,
-};
+use anyhow::{anyhow, Context, Error};
+use fidl_fuchsia_update_installer::{InstallerMarker, InstallerProxy, RebootControllerMarker};
+use fidl_fuchsia_update_installer_ext::{self as installer, start_update, Options, StateId};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_url::AbsolutePackageUrl;
+use futures::prelude::*;
 
 pub async fn handle_force_install(
     update_pkg_url: String,

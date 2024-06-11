@@ -2,17 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    collections::{HashMap, HashSet},
-    rc::Rc,
-};
+use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
 use anyhow::Error;
 use fidl_fuchsia_memory_sampler::ModuleMap;
 use fuchsia_zircon::Vmo;
 use prost::Message;
 
-use crate::{crash_reporter::ProfileReport, pprof};
+use crate::crash_reporter::ProfileReport;
+use crate::pprof;
 
 pub type StackTrace = Vec<u64>;
 

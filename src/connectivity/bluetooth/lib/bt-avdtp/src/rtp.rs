@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {bitfield::bitfield, thiserror::Error};
+use bitfield::bitfield;
+use thiserror::Error;
 
 /// The error types for rtp header parsing.
 #[derive(Error, Debug, PartialEq)]

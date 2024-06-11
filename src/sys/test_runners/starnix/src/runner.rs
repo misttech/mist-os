@@ -2,12 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::helpers::clone_start_info;
+use crate::test_suite::handle_suite_requests;
+use anyhow::{anyhow, Error};
+use fidl::endpoints::ServerEnd;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_sync::Mutex;
+use futures::{StreamExt, TryStreamExt};
+use std::sync::Arc;
 use {
-    crate::helpers::clone_start_info, crate::test_suite::handle_suite_requests, anyhow::anyhow,
-    anyhow::Error, fidl::endpoints::ServerEnd, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_test as ftest, fuchsia_async as fasync, fuchsia_component::server::ServiceFs,
-    fuchsia_sync::Mutex, fuchsia_zircon as zx, futures::StreamExt, futures::TryStreamExt,
-    std::sync::Arc,
+    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_test as ftest, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
 };
 
 /// Handles a `fcrunner::ComponentRunnerRequestStream`.

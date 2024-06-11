@@ -2,25 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Error},
-    fidl::endpoints::{Proxy, ServerEnd},
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_pkg::{
-        self as fpkg, PackageResolverMarker, PackageResolverProxy, PackageResolverRequestStream,
-        PackageResolverResolveResponder,
-    },
-    fuchsia_async as fasync,
-    fuchsia_sync::Mutex,
-    futures::{channel::oneshot, prelude::*},
-    std::{
-        collections::HashMap,
-        fs::{self, create_dir},
-        path::{Path, PathBuf},
-        sync::Arc,
-    },
-    tempfile::TempDir,
+use anyhow::{anyhow, Error};
+use fidl::endpoints::{Proxy, ServerEnd};
+use fidl_fuchsia_pkg::{
+    self as fpkg, PackageResolverMarker, PackageResolverProxy, PackageResolverRequestStream,
+    PackageResolverResolveResponder,
 };
+use fuchsia_sync::Mutex;
+use futures::channel::oneshot;
+use futures::prelude::*;
+use std::collections::HashMap;
+use std::fs::{self, create_dir};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use tempfile::TempDir;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 const PACKAGE_CONTENTS_PATH: &str = "package_contents";
 const META_FAR_MERKLE_ROOT_PATH: &str = "meta";
@@ -409,7 +405,9 @@ impl ResolveHandler {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, fidl_fuchsia_pkg::ResolveError};
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_pkg::ResolveError;
 
     async fn read_file(dir_proxy: &fio::DirectoryProxy, path: &str) -> String {
         let file_proxy =

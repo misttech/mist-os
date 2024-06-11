@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl::prelude::*,
-    fidl_fuchsia_fs::AdminRequestStream,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_zircon::Status,
-    futures::{lock::Mutex, prelude::*},
-    std::sync::Arc,
-    tracing::{error, info, warn},
-};
+use anyhow::Error;
+use fidl::prelude::*;
+use fidl_fuchsia_fs::AdminRequestStream;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_zircon::Status;
+use futures::lock::Mutex;
+use futures::prelude::*;
+use std::sync::Arc;
+use tracing::{error, info, warn};
 
 mod device;
 use crate::device::FatDevice;

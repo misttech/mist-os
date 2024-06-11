@@ -7,22 +7,18 @@
 //! Pretty much the useful [`assert_data_tree`][assert_data_tree] macro
 //! plus some utilities for it.
 
-use {
-    anyhow::{bail, format_err, Error},
-    diagnostics_hierarchy::{
-        ArrayContent, ArrayFormat, ExponentialHistogram, ExponentialHistogramParams,
-        LinearHistogram, LinearHistogramParams, Property, EXPONENTIAL_HISTOGRAM_EXTRA_SLOTS,
-        LINEAR_HISTOGRAM_EXTRA_SLOTS,
-    },
-    difference::{Changeset, Difference},
-    num_traits::One,
-    regex::Regex,
-    std::{
-        collections::BTreeSet,
-        fmt::{Debug, Display, Formatter, Result as FmtResult},
-        ops::{Add, AddAssign, MulAssign},
-    },
+use anyhow::{bail, format_err, Error};
+use diagnostics_hierarchy::{
+    ArrayContent, ArrayFormat, ExponentialHistogram, ExponentialHistogramParams, LinearHistogram,
+    LinearHistogramParams, Property, EXPONENTIAL_HISTOGRAM_EXTRA_SLOTS,
+    LINEAR_HISTOGRAM_EXTRA_SLOTS,
 };
+use difference::{Changeset, Difference};
+use num_traits::One;
+use regex::Regex;
+use std::collections::BTreeSet;
+use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+use std::ops::{Add, AddAssign, MulAssign};
 
 pub use diagnostics_hierarchy::{hierarchy, DiagnosticsHierarchy, DiagnosticsHierarchyGetter};
 

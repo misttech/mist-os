@@ -2,15 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{errors::IntoExitCode, target::TargetMode, TargetInfo};
+use crate::errors::IntoExitCode;
+use crate::target::TargetMode;
+use crate::TargetInfo;
 use addr::TargetAddr;
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use home::home_dir;
 use std::io::Write;
-use std::process::Command;
-use std::process::Stdio;
-use std::{os::unix::process::CommandExt, path::PathBuf};
+use std::os::unix::process::CommandExt;
+use std::path::PathBuf;
+use std::process::{Command, Stdio};
 use thiserror::Error;
 
 const CONTROL_MASTER_PATH: &str = ".ssh/control/funnel_control_master";

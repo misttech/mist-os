@@ -4,9 +4,10 @@
 
 use anyhow::{anyhow, Context, Result};
 use errors::{ffx_bail, ffx_bail_with_code};
+use ffx_config::api::ConfigError;
 use ffx_config::{
-    api::ConfigError, print_config, set_metrics_status, show_metrics_status, BuildOverride,
-    ConfigLevel, EnvironmentContext,
+    print_config, set_metrics_status, show_metrics_status, BuildOverride, ConfigLevel,
+    EnvironmentContext,
 };
 use ffx_config_plugin_args::{
     AddCommand, AnalyticsCommand, AnalyticsControlCommand, ConfigCommand, EnvAccessCommand,
@@ -16,10 +17,8 @@ use ffx_config_plugin_args::{
 use ffx_ssh::{SshKeyErrorKind, SshKeyFiles};
 use fho::{FfxMain, FfxTool};
 use serde_json::Value;
-use std::{
-    fs::{File, OpenOptions},
-    io::Write,
-};
+use std::fs::{File, OpenOptions};
+use std::io::Write;
 
 #[derive(FfxTool)]
 pub struct ConfigTool {

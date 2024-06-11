@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    diagnostics_assertions::{assert_data_tree, AnyProperty},
-    diagnostics_reader::{ArchiveReader, DiagnosticsHierarchy, Inspect},
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-};
+use diagnostics_assertions::{assert_data_tree, AnyProperty};
+use diagnostics_reader::{ArchiveReader, DiagnosticsHierarchy, Inspect};
+use fidl::endpoints::create_proxy;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
 
 async fn get_job_koid(moniker: &str, realm_query: &fsys::RealmQueryProxy) -> u64 {
     let (file_proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();

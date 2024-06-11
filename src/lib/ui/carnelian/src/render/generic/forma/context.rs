@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{cell::RefCell, collections::HashMap, io::Read, mem, ptr, u32};
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::io::Read;
+use std::{mem, ptr, u32};
 
 use anyhow::Error;
 use display_utils::PixelFormat;
@@ -21,17 +24,13 @@ use fuchsia_framebuffer::sysmem::set_allocator_name;
 use fuchsia_trace::{duration_begin, duration_end};
 use fuchsia_zircon::sys;
 
-use crate::{
-    drawing::DisplayRotation,
-    render::generic::{
-        forma::{
-            image::VmoImage, Forma, FormaComposition, FormaImage, FormaPathBuilder,
-            FormaRasterBuilder,
-        },
-        Context, CopyRegion, PostCopy, PreClear, PreCopy, RenderExt,
-    },
-    ViewAssistantContext,
+use crate::drawing::DisplayRotation;
+use crate::render::generic::forma::image::VmoImage;
+use crate::render::generic::forma::{
+    Forma, FormaComposition, FormaImage, FormaPathBuilder, FormaRasterBuilder,
 };
+use crate::render::generic::{Context, CopyRegion, PostCopy, PreClear, PreCopy, RenderExt};
+use crate::ViewAssistantContext;
 
 fn buffer_collection_constraints(width: u32, height: u32) -> BufferCollectionConstraints {
     let image_format_constraints = ImageFormatConstraints {

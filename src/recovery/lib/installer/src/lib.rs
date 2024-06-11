@@ -10,20 +10,18 @@
 
 pub mod partition;
 
-use {
-    anyhow::{anyhow, Context, Error},
-    fidl::endpoints::{ClientEnd, Proxy, ServerEnd},
-    fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootReason},
-    fidl_fuchsia_paver::{
-        BootManagerMarker, Configuration, DynamicDataSinkProxy, PaverMarker, PaverProxy,
-    },
-    fidl_fuchsia_sysinfo::SysInfoMarker,
-    fuchsia_component::client,
-    fuchsia_zircon as zx,
-    partition::Partition,
-    recovery_util_block::BlockDevice,
-    std::sync::Mutex,
+use anyhow::{anyhow, Context, Error};
+use fidl::endpoints::{ClientEnd, Proxy, ServerEnd};
+use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootReason};
+use fidl_fuchsia_paver::{
+    BootManagerMarker, Configuration, DynamicDataSinkProxy, PaverMarker, PaverProxy,
 };
+use fidl_fuchsia_sysinfo::SysInfoMarker;
+use fuchsia_component::client;
+use fuchsia_zircon as zx;
+use partition::Partition;
+use recovery_util_block::BlockDevice;
+use std::sync::Mutex;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum BootloaderType {

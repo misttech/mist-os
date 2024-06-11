@@ -11,7 +11,9 @@ use anyhow::{anyhow, bail, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_repo::repository::FileSystemRepository;
 use serde::{Deserialize, Serialize};
-use std::{fs::File, io::Read, ops::Deref};
+use std::fs::File;
+use std::io::Read;
+use std::ops::Deref;
 use v2::Canonicalizer;
 use zip::read::ZipArchive;
 
@@ -276,7 +278,8 @@ mod tests {
     use serde_json::json;
     use std::io::Write;
     use tempfile::TempDir;
-    use zip::{write::FileOptions, CompressionMethod, ZipWriter};
+    use zip::write::FileOptions;
+    use zip::{CompressionMethod, ZipWriter};
 
     fn make_sample_pbv1(name: &str) -> serde_json::Value {
         json!({

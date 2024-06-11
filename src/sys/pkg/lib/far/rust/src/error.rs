@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{ChunkType, DIRECTORY_ENTRY_LEN, INDEX_ENTRY_LEN},
-    std::io,
-};
+use crate::{ChunkType, DIRECTORY_ENTRY_LEN, INDEX_ENTRY_LEN};
+use std::io;
 
 #[non_exhaustive]
 #[derive(thiserror::Error, Debug)]

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    std::marker::PhantomData,
-    wlan_bitfield::bitfield,
-    zerocopy::{AsBytes, FromBytes, FromZeros, NoCell},
-};
+use std::marker::PhantomData;
+use wlan_bitfield::bitfield;
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 // IEEE Std 802.11-2016, 9.2.4.1.3
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]

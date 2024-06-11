@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::framebuffer::{DetectResult, DisplayInfo, Framebuffer},
-    anyhow::Error,
-    serde::Serialize,
-    serde_json::json,
-    std::fs::File,
-    std::os::unix::io::AsRawFd,
-};
+use crate::framebuffer::{DetectResult, DisplayInfo, Framebuffer};
+use anyhow::Error;
+use serde::Serialize;
+use serde_json::json;
+use std::fs::File;
+use std::os::unix::io::AsRawFd;
 
 // Linux framebuffer IOCTLs taken from linux/fb.h
 const FBIOGET_VSCREENINFO: libc::c_ulong = 0x4600;

@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    std::path::PathBuf,
-};
+use anyhow::{Context, Result};
+use std::path::PathBuf;
 
 /// Command-line arguments for the vbmeta tool.
 #[derive(argh::FromArgs)]

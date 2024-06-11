@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Error},
-    num_derive::FromPrimitive,
-    zerocopy::{AsBytes, FromBytes, FromZeros, NoCell},
-};
+use anyhow::{anyhow, Error};
+use num_derive::FromPrimitive;
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 pub use zerocopy::byteorder::little_endian::U16 as LE16;
 

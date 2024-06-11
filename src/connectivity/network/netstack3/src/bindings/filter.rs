@@ -5,22 +5,24 @@
 mod controller;
 mod conversion;
 
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use std::num::NonZeroUsize;
 use std::pin::pin;
 use std::sync::Arc;
 
 use fidl::endpoints::{ControlHandle as _, ProtocolMarker as _};
-use fidl_fuchsia_net_filter as fnet_filter;
-use fidl_fuchsia_net_filter_ext as fnet_filter_ext;
-use fuchsia_zircon as zx;
-use futures::{
-    channel::mpsc, future::FusedFuture as _, lock::Mutex, FutureExt as _, StreamExt as _,
-    TryStreamExt as _,
-};
+use futures::channel::mpsc;
+use futures::future::FusedFuture as _;
+use futures::lock::Mutex;
+use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
 use log::{error, warn};
 use thiserror::Error;
+use {
+    fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
+    fuchsia_zircon as zx,
+};
 
 use controller::{CommitResult, Controller};
 

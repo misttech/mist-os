@@ -373,10 +373,8 @@ mod tests {
     use super::*;
     use crate::igmp::messages::*;
     use crate::ip::Ipv4Proto;
-    use crate::ipv4::{
-        options::{Ipv4Option, Ipv4OptionData},
-        Ipv4Header, Ipv4Packet, Ipv4PacketBuilder, Ipv4PacketBuilderWithOptions,
-    };
+    use crate::ipv4::options::{Ipv4Option, Ipv4OptionData};
+    use crate::ipv4::{Ipv4Header, Ipv4Packet, Ipv4PacketBuilder, Ipv4PacketBuilderWithOptions};
 
     fn serialize_to_bytes<B: ByteSlice + Debug, M: MessageType<B, VariableBody = ()> + Debug>(
         igmp: &IgmpMessage<B, M>,

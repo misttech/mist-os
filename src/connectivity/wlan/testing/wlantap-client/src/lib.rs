@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error, fidl_fuchsia_io as fio, fidl_fuchsia_wlan_tap as wlantap, fuchsia_zircon as zx,
-};
+use anyhow::Error;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_wlan_tap as wlantap, fuchsia_zircon as zx};
 
 pub struct Wlantap {
     proxy: wlantap::WlantapCtlProxy,

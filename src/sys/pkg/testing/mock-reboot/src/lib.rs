@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_fuchsia_hardware_power_statecontrol::{
-        AdminProxy, AdminRebootResult, AdminRequest, AdminRequestStream,
-    },
-    fuchsia_async as fasync,
-    futures::{TryFutureExt, TryStreamExt},
-    std::sync::Arc,
+use anyhow::Error;
+use fidl_fuchsia_hardware_power_statecontrol::{
+    AdminProxy, AdminRebootResult, AdminRequest, AdminRequestStream,
 };
+use fuchsia_async as fasync;
+use futures::{TryFutureExt, TryStreamExt};
+use std::sync::Arc;
 
 pub use fidl_fuchsia_hardware_power_statecontrol::RebootReason;
 
@@ -67,9 +65,8 @@ impl MockRebootService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_async as fasync;
-    use fuchsia_zircon as zx;
     use std::sync::atomic::{AtomicU32, Ordering};
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     #[fasync::run_singlethreaded(test)]
     async fn test_mock_reboot() {

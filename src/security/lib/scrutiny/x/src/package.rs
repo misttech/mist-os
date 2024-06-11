@@ -6,21 +6,16 @@
 // warnings.
 #![allow(dead_code)]
 
-use super::api;
-use super::blob::BlobOpenError;
-use super::blob::BlobSet;
-use super::data_source as ds;
+use super::blob::{BlobOpenError, BlobSet};
 use super::hash::Hash;
-use super::DataSource;
-use cm_rust::ComponentDecl;
-use cm_rust::FidlIntoNative as _;
+use super::{api, data_source as ds, DataSource};
+use cm_rust::{ComponentDecl, FidlIntoNative as _};
 use fidl_fuchsia_component_decl as fdecl;
-use fuchsia_archive::Error as FarError;
-use fuchsia_archive::Utf8Reader as FarReader;
-use fuchsia_pkg::MetaContents as FuchsiaMetaContents;
-use fuchsia_pkg::MetaContentsError as FuchsiaMetaContentsError;
-use fuchsia_pkg::MetaPackage as FuchsiaMetaPackage;
-use fuchsia_pkg::MetaPackageError as FuchsiaMetaPackageError;
+use fuchsia_archive::{Error as FarError, Utf8Reader as FarReader};
+use fuchsia_pkg::{
+    MetaContents as FuchsiaMetaContents, MetaContentsError as FuchsiaMetaContentsError,
+    MetaPackage as FuchsiaMetaPackage, MetaPackageError as FuchsiaMetaPackageError,
+};
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::io;
@@ -382,24 +377,21 @@ impl api::Blob for ContentBlob {
 
 #[cfg(test)]
 pub(crate) mod test {
-    use super::super::api;
     use super::super::blob::test::VerifiedMemoryBlobSet;
     use super::super::blob::BlobSet as _;
-    use super::super::data_source as ds;
     use super::super::hash::Hash;
+    use super::super::{api, data_source as ds};
     use super::Package;
-    use cm_rust as cm;
     use cm_rust::NativeIntoFidl as _;
-    use cm_rust_testing as cmt;
-    use fuchsia_pkg::MetaContents as FuchsiaMetaContents;
-    use fuchsia_pkg::MetaPackage as FuchsiaMetaPackage;
-    use fuchsia_pkg::PackageName;
+    use fuchsia_pkg::{
+        MetaContents as FuchsiaMetaContents, MetaPackage as FuchsiaMetaPackage, PackageName,
+    };
     use fuchsia_url::boot_url::BootUrl;
     use fuchsia_url::PackageUrl;
-    use maplit::btreemap;
-    use maplit::hashmap;
+    use maplit::{btreemap, hashmap};
     use std::io;
     use std::str::FromStr as _;
+    use {cm_rust as cm, cm_rust_testing as cmt};
 
     const PLACEHOLDER_COMPONENT_PATH: &str = "meta/placeholder.cm";
     const PLACEHOLDER_CHILD_URL: &str = "#meta/test_child.cm";
@@ -545,28 +537,20 @@ pub(crate) mod test {
 
 #[cfg(test)]
 mod tests {
-    use super::super::api;
     use super::super::api::Package as _;
     use super::super::blob::test::VerifiedMemoryBlobSet;
-    use super::super::blob::BlobOpenError;
-    use super::super::blob::BlobSet as _;
-    use super::super::blob::VerifiedMemoryBlob;
-    use super::super::data_source as ds;
+    use super::super::blob::{BlobOpenError, BlobSet as _, VerifiedMemoryBlob};
     use super::super::hash::Hash;
+    use super::super::{api, data_source as ds};
     use super::test::placeholder_package_url;
-    use super::Error;
-    use super::MetaContents;
-    use super::MetaPackage;
-    use super::Package;
-    use fuchsia_pkg::MetaContents as FuchsiaMetaContents;
-    use fuchsia_pkg::MetaPackage as FuchsiaMetaPackage;
-    use fuchsia_pkg::PackageName;
-    use maplit::btreemap;
-    use maplit::hashmap;
+    use super::{Error, MetaContents, MetaPackage, Package};
+    use fuchsia_pkg::{
+        MetaContents as FuchsiaMetaContents, MetaPackage as FuchsiaMetaPackage, PackageName,
+    };
+    use maplit::{btreemap, hashmap};
     use std::collections::HashMap;
-    use std::io;
-    use std::iter;
     use std::str::FromStr as _;
+    use std::{io, iter};
 
     #[fuchsia::test]
     fn simple_package() {

@@ -2,30 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    assert_matches::assert_matches,
-    delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob},
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_fshost as fshost,
-    fidl_fuchsia_fshost::AdminMarker,
-    fidl_fuchsia_fxfs::VolumeMarker as FxfsVolumeMarker,
-    fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker},
-    fidl_fuchsia_io as fio,
-    fs_management::{
-        format::constants::DATA_PARTITION_LABEL,
-        partition::{find_partition_in, PartitionMatcher},
-        DATA_TYPE_GUID,
-    },
-    fshost_test_fixture::disk_builder::DEFAULT_DATA_VOLUME_SIZE,
-    fshost_test_fixture::{
-        disk_builder::{DataSpec, VolumesSpec, FVM_SLICE_SIZE},
-        BLOBFS_MAX_BYTES, DATA_MAX_BYTES, VFS_TYPE_FXFS, VFS_TYPE_MEMFS, VFS_TYPE_MINFS,
-    },
-    fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
-    fuchsia_zircon::{self as zx, HandleBased},
-    futures::FutureExt,
+use assert_matches::assert_matches;
+use delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob};
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_fshost::AdminMarker;
+use fidl_fuchsia_fxfs::VolumeMarker as FxfsVolumeMarker;
+use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker};
+use fs_management::format::constants::DATA_PARTITION_LABEL;
+use fs_management::partition::{find_partition_in, PartitionMatcher};
+use fs_management::DATA_TYPE_GUID;
+use fshost_test_fixture::disk_builder::{
+    DataSpec, VolumesSpec, DEFAULT_DATA_VOLUME_SIZE, FVM_SLICE_SIZE,
 };
+use fshost_test_fixture::{
+    BLOBFS_MAX_BYTES, DATA_MAX_BYTES, VFS_TYPE_FXFS, VFS_TYPE_MEMFS, VFS_TYPE_MINFS,
+};
+use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
+use fuchsia_zircon::{self as zx, HandleBased};
+use futures::FutureExt;
+use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[cfg(feature = "fxblob")]
 use {

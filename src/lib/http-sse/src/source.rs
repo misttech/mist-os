@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{borrow::Cow, mem::replace};
+use std::borrow::Cow;
+use std::mem::replace;
 
-use crate::{linealyzer::Linealyzer, Event};
+use crate::linealyzer::Linealyzer;
+use crate::Event;
 
 /// `EventSource` `parse`s byte slices from an http sse connection into sse `Events`.
 /// It maintains state across `parse` calls, so that an `Event` whose bytes

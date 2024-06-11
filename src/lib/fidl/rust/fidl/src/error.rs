@@ -4,10 +4,8 @@
 
 //! Error (common to all fidl operations)
 
-use {
-    crate::handle::{ObjectType, Rights},
-    fuchsia_zircon_status::Status,
-};
+use crate::handle::{ObjectType, Rights};
+use fuchsia_zircon_status::Status;
 
 /// A specialized `Result` type for FIDL operations.
 pub type Result<T> = std::result::Result<T, Error>;

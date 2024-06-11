@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::controller::{DataController, HintDataType},
-    crate::model::model::DataModel,
-    anyhow::{Error, Result},
-    serde_json::value::Value,
-    std::collections::HashMap,
-    std::sync::{Arc, RwLock},
-    thiserror::Error,
-    uuid::Uuid,
-};
+use crate::model::controller::{DataController, HintDataType};
+use crate::model::model::DataModel;
+use anyhow::{Error, Result};
+use serde_json::value::Value;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+use thiserror::Error;
+use uuid::Uuid;
 
 #[derive(Error, Debug)]
 pub enum DispatcherError {
@@ -129,7 +127,9 @@ impl ControllerDispatcher {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, scrutiny_testing::fake::fake_model_config, serde_json::json};
+    use super::*;
+    use scrutiny_testing::fake::fake_model_config;
+    use serde_json::json;
 
     struct FakeController {
         pub result: String,

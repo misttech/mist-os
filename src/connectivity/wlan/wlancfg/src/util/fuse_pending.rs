@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use futures::{
-    stream::{FusedStream, Stream, StreamExt},
-    task::Poll,
-};
+use futures::stream::{FusedStream, Stream, StreamExt};
+use futures::task::Poll;
 
 /// `Stream`s should indicate their termination by returning an item of `Poll::Ready(None)`.
 /// Once a Stream terminated it is generally not safe to poll the Stream any longer.
@@ -57,12 +55,12 @@ impl<F: Stream + Unpin> FusedStream for FusePending<F> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fuchsia_async as fasync,
-        futures::{channel::mpsc, future, select, stream::FuturesOrdered},
-        std::pin::pin,
-    };
+    use super::*;
+    use fuchsia_async as fasync;
+    use futures::channel::mpsc;
+    use futures::stream::FuturesOrdered;
+    use futures::{future, select};
+    use std::pin::pin;
 
     #[fuchsia::test]
     fn infinite_stream() {

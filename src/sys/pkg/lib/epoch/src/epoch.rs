@@ -16,7 +16,9 @@ pub enum EpochFile {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, proptest::prelude::*, serde_json::json};
+    use super::*;
+    use proptest::prelude::*;
+    use serde_json::json;
 
     proptest! {
         #[test]

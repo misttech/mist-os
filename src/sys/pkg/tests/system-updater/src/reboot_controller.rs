@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {super::*, fidl_fuchsia_update_installer_ext::StateId, pretty_assertions::assert_eq};
+use super::*;
+use fidl_fuchsia_update_installer_ext::StateId;
+use pretty_assertions::assert_eq;
 
 #[fasync::run_singlethreaded(test)]
 async fn reboot_controller_detach_causes_deferred_reboot() {

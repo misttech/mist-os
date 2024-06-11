@@ -2,20 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::rwhandle::{RWHandle, ReadableHandle as _, WritableHandle as _},
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::ready,
-    std::{
-        fmt,
-        future::Future,
-        marker::PhantomData,
-        mem::MaybeUninit,
-        pin::Pin,
-        task::{Context, Poll},
-    },
-    zerocopy::{AsBytes, FromBytes, NoCell},
-};
+use super::rwhandle::{RWHandle, ReadableHandle as _, WritableHandle as _};
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use futures::ready;
+use std::fmt;
+use std::future::Future;
+use std::marker::PhantomData;
+use std::mem::MaybeUninit;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use zerocopy::{AsBytes, FromBytes, NoCell};
 
 /// Marker trait for types that can be read/written with a `Fifo`. Unsafe
 /// because not all types may be represented by arbitrary bit patterns.

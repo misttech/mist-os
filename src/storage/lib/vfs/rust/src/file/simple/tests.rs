@@ -12,9 +12,13 @@ use crate::{
     assert_write_fidl_err_closed, clone_as_file_assert_err, clone_get_proxy_assert,
 };
 
-use crate::{execution_scope::ExecutionScope, file::test_utils::*, ToObjectRequest};
+use crate::execution_scope::ExecutionScope;
+use crate::file::test_utils::*;
+use crate::ToObjectRequest;
 
-use {fidl::endpoints::create_proxy, fidl_fuchsia_io as fio, fuchsia_async::TestExecutor};
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_io as fio;
+use fuchsia_async::TestExecutor;
 
 const S_IRUSR: u32 = libc::S_IRUSR as u32;
 const S_IWUSR: u32 = libc::S_IWUSR as u32;

@@ -5,13 +5,9 @@
 // TODO: Exercise all crate-local code in tests and/or other modules.
 #![allow(dead_code)]
 
-use super::api;
-use super::blob::BlobDirectory;
-use super::blob::BlobDirectoryError;
-use super::blob::BlobSet;
-use super::blob::CompositeBlobSet;
-use super::data_source as ds;
+use super::blob::{BlobDirectory, BlobDirectoryError, BlobSet, CompositeBlobSet};
 use super::hash::Hash;
+use super::{api, data_source as ds};
 use camino::Utf8PathBuf;
 use derivative::Derivative;
 use once_cell::sync::OnceCell;
@@ -198,11 +194,8 @@ struct RepositoryData {
 #[cfg(test)]
 pub mod test {
     use assembly_partitions_config::PartitionsConfig;
-    use camino::Utf8Path;
-    use camino::Utf8PathBuf;
-    use sdk_metadata::ProductBundle;
-    use sdk_metadata::ProductBundleV2;
-    use sdk_metadata::Repository;
+    use camino::{Utf8Path, Utf8PathBuf};
+    use sdk_metadata::{ProductBundle, ProductBundleV2, Repository};
     use std::path::Path;
 
     pub(crate) fn utf8_path_buf<P: AsRef<Path>>(path: P) -> Utf8PathBuf {
@@ -328,10 +321,7 @@ pub mod test {
 #[cfg(test)]
 mod tests {
     use super::super::api;
-    use super::test;
-    use super::Error;
-    use super::ProductBundle;
-    use super::Repository;
+    use super::{test, Error, ProductBundle, Repository};
     // use camino::Utf8PathBuf;
     use super::super::hash::Hash;
     use dyn_clone::DynClone;

@@ -6,8 +6,7 @@
 
 /// Useful constants for tests.
 pub(crate) mod constants {
-    use fidl_fuchsia_net as fnet;
-    use fidl_fuchsia_net_name as fname;
+    use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_name as fname};
 
     use net_declare::fidl_socket_addr;
 

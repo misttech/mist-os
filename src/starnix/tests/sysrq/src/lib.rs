@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use assert_matches::assert_matches;
-use component_events::{
-    events::{Event, EventStream, ExitStatus, Stopped},
-    matcher::EventMatcher,
-};
+use component_events::events::{Event, EventStream, ExitStatus, Stopped};
+use component_events::matcher::EventMatcher;
 use diagnostics_reader::{ArchiveReader, Logs, Severity};
 use fidl_fuchsia_hardware_power_statecontrol::{
     AdminMarker, AdminRequest, AdminRequestStream, RebootReason,

@@ -5,21 +5,19 @@
 //! `EntryContainer` is a trait implemented by directories that allow manipulation of their
 //! content.
 
-use crate::{
-    directory::{dirents_sink, traversal_position::TraversalPosition},
-    execution_scope::ExecutionScope,
-    node::Node,
-    object_request::ObjectRequestRef,
-    path::Path,
-};
+use crate::directory::dirents_sink;
+use crate::directory::traversal_position::TraversalPosition;
+use crate::execution_scope::ExecutionScope;
+use crate::node::Node;
+use crate::object_request::ObjectRequestRef;
+use crate::path::Path;
 
-use {
-    async_trait::async_trait,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status,
-    std::{any::Any, sync::Arc},
-};
+use async_trait::async_trait;
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use std::any::Any;
+use std::sync::Arc;
 
 mod private {
     use fidl_fuchsia_io as fio;

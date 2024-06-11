@@ -6,18 +6,16 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use diagnostics_data::Data;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use fidl_fuchsia_diagnostics::ClientSelectorConfiguration::{SelectAll, Selectors};
 use fidl_fuchsia_diagnostics::{
-    ClientSelectorConfiguration::{SelectAll, Selectors},
     Format, Selector, SelectorArgument, StreamParameters, StringSelector, TreeSelector,
 };
 use fidl_fuchsia_diagnostics_host::{ArchiveAccessorMarker, ArchiveAccessorProxy};
 use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_sys2 as fsys2;
 use futures::AsyncReadExt;
-use iquery::{
-    commands::{get_accessor_selectors, DiagnosticsProvider},
-    types::Error,
-};
+use iquery::commands::{get_accessor_selectors, DiagnosticsProvider};
+use iquery::types::Error;
 use serde::Deserialize;
 use std::borrow::Cow;
 

@@ -22,9 +22,8 @@ mod monotonic {
 
 mod utc {
     // [START utc]
-    use fuchsia_async as fasync;
     use fuchsia_runtime::duplicate_utc_clock_handle;
-    use fuchsia_zircon as zx;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     pub async fn utc_examples() {
         // Obtain a UTC handle.

@@ -2,19 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        block_devices::RamdiskFactory,
-        filesystems::{BlobFilesystem, DeliveryBlob},
-    },
-    delivery_blob::CompressionMode,
-    std::{
-        fs::OpenOptions,
-        io::{Read, Write},
-        vec::Vec,
-    },
-    storage_benchmarks::{CacheClearableFilesystem, FilesystemConfig},
-};
+use crate::block_devices::RamdiskFactory;
+use crate::filesystems::{BlobFilesystem, DeliveryBlob};
+use delivery_blob::CompressionMode;
+use std::fs::OpenOptions;
+use std::io::{Read, Write};
+use std::vec::Vec;
+use storage_benchmarks::{CacheClearableFilesystem, FilesystemConfig};
 
 const DEVICE_SIZE: u64 = 128 * 1024 * 1024;
 const BLOCK_SIZE: u64 = 4 * 1024;

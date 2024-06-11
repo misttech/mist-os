@@ -7,17 +7,13 @@
 
 //! Wrapper types for [`fidl_fuchsia_pkg::PackageCacheProxy`] and its related protocols.
 
-use {
-    crate::types::{BlobId, BlobInfo},
-    fidl_fuchsia_pkg as fpkg,
-    fuchsia_pkg::PackageDirectory,
-    fuchsia_zircon_status::Status,
-    futures::prelude::*,
-    std::sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-};
+use crate::types::{BlobId, BlobInfo};
+use fidl_fuchsia_pkg as fpkg;
+use fuchsia_pkg::PackageDirectory;
+use fuchsia_zircon_status::Status;
+use futures::prelude::*;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 mod storage;
 
@@ -176,7 +172,8 @@ pub enum GetSubpackageError {
 
 impl From<fpkg::GetSubpackageError> for GetSubpackageError {
     fn from(fidl: fpkg::GetSubpackageError) -> Self {
-        use {fpkg::GetSubpackageError as fErr, GetSubpackageError::*};
+        use fpkg::GetSubpackageError as fErr;
+        use GetSubpackageError::*;
         match fidl {
             fErr::SuperpackageClosed => SuperpackageClosed,
             fErr::DoesNotExist => DoesNotExist,
@@ -261,7 +258,8 @@ impl DeferredOpenBlob {
     }
 
     fn proxy_cmp_key(&self) -> u32 {
-        use fidl::{endpoints::Proxy, AsHandleRef};
+        use fidl::endpoints::Proxy;
+        use fidl::AsHandleRef;
         self.needed_blobs.as_channel().raw_handle()
     }
 }
@@ -1125,7 +1123,8 @@ mod tests {
     #[cfg(target_os = "fuchsia")]
     #[test]
     fn needed_blobs_abort() {
-        use futures::{future::Either, pin_mut};
+        use futures::future::Either;
+        use futures::pin_mut;
         use std::task::Poll;
 
         let mut executor = fuchsia_async::TestExecutor::new_with_fake_time();

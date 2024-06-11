@@ -36,11 +36,9 @@
 mod zbi_format;
 
 use bitflags::bitflags;
-use core::{
-    fmt::{Debug, Display, Formatter},
-    mem::{size_of, take},
-    ops::DerefMut,
-};
+use core::fmt::{Debug, Display, Formatter};
+use core::mem::{size_of, take};
+use core::ops::DerefMut;
 use zbi_format::*;
 use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, NoCell, Ref};
 

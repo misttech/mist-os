@@ -4,15 +4,13 @@
 
 // Based on https://fuchsia.googlesource.com/fuchsia/+/HEAD/tools/fidl/fidlc/schema.json
 
-use {
-    anyhow::{anyhow, Error},
-    heck::SnakeCase,
-    lazy_static::lazy_static,
-    regex::Regex,
-    serde::{Deserialize, Deserializer, Serialize},
-    std::collections::{BTreeMap, HashSet},
-    std::ops::Add,
-};
+use anyhow::{anyhow, Error};
+use heck::SnakeCase;
+use lazy_static::lazy_static;
+use regex::Regex;
+use serde::{Deserialize, Deserializer, Serialize};
+use std::collections::{BTreeMap, HashSet};
+use std::ops::Add;
 
 lazy_static! {
     pub static ref IDENTIFIER_RE: Regex =

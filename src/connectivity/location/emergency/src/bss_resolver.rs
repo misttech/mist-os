@@ -2,23 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::bss_cache::{Bss, BssId},
-    async_trait::async_trait,
-    fidl::{Error as FidlError, Socket as FidlSocket},
-    fidl_fuchsia_location_position::{Position, PositionExtras},
-    fidl_fuchsia_mem::Buffer as MemBuffer,
-    fidl_fuchsia_net_http::{
-        Body as HttpBody, LoaderProxyInterface, Request as HttpRequest, Response as HttpResponse,
-    },
-    fuchsia_zircon as zx,
-    futures::io::AsyncReadExt,
-    futures::Future,
-    itertools::Itertools,
-    serde_json::{json, map::Map as JsonMap, value::Value as JsonValue},
-    static_assertions::assert_eq_size_val,
-    std::borrow::Borrow,
+use crate::bss_cache::{Bss, BssId};
+use async_trait::async_trait;
+use fidl::{Error as FidlError, Socket as FidlSocket};
+use fidl_fuchsia_location_position::{Position, PositionExtras};
+use fidl_fuchsia_mem::Buffer as MemBuffer;
+use fidl_fuchsia_net_http::{
+    Body as HttpBody, LoaderProxyInterface, Request as HttpRequest, Response as HttpResponse,
 };
+use fuchsia_zircon as zx;
+use futures::io::AsyncReadExt;
+use futures::Future;
+use itertools::Itertools;
+use serde_json::json;
+use serde_json::map::Map as JsonMap;
+use serde_json::value::Value as JsonValue;
+use static_assertions::assert_eq_size_val;
+use std::borrow::Borrow;
 
 // Geographic constants.
 const LATITUDE_RANGE: std::ops::RangeInclusive<f64> = -90.0..=90.0;
@@ -185,10 +185,9 @@ fn json_to_position(response: JsonValue) -> Result<Position, ResolverError> {
 #[cfg(test)]
 mod tests {
     mod request_generation {
-        use {
-            super::super::{test_doubles::HttpRequestValidator, *},
-            fuchsia_async as fasync,
-        };
+        use super::super::test_doubles::HttpRequestValidator;
+        use super::super::*;
+        use fuchsia_async as fasync;
 
         #[fasync::run_until_stalled(test)]
         async fn request_uses_post_method() {
@@ -310,13 +309,9 @@ mod tests {
     }
 
     mod response_error_handling {
-        use {
-            super::super::{
-                test_doubles::{HttpByteResponder, HttpFidlResponder},
-                *,
-            },
-            fuchsia_async as fasync,
-        };
+        use super::super::test_doubles::{HttpByteResponder, HttpFidlResponder};
+        use super::super::*;
+        use fuchsia_async as fasync;
 
         #[fasync::run_until_stalled(test)]
         async fn returns_internal_error_on_fidl_error() {
@@ -510,11 +505,10 @@ mod tests {
     }
 
     mod response_success_reporting {
-        use {
-            super::super::{test_doubles::HttpByteResponder, *},
-            assert_matches::assert_matches,
-            fuchsia_async as fasync,
-        };
+        use super::super::test_doubles::HttpByteResponder;
+        use super::super::*;
+        use assert_matches::assert_matches;
+        use fuchsia_async as fasync;
 
         #[fasync::run_until_stalled(test)]
         async fn returns_success_when_all_fields_are_present() {
@@ -555,11 +549,10 @@ mod tests {
     }
 
     mod response_success_contents {
-        use {
-            super::super::{test_doubles::HttpByteResponder, *},
-            assert_matches::assert_matches,
-            fuchsia_async as fasync,
-        };
+        use super::super::test_doubles::HttpByteResponder;
+        use super::super::*;
+        use assert_matches::assert_matches;
+        use fuchsia_async as fasync;
 
         #[fasync::run_until_stalled(test)]
         async fn provides_precise_latitude() {
@@ -655,13 +648,11 @@ mod tests {
 
 #[cfg(test)]
 mod test_doubles {
-    use {
-        super::*,
-        fidl::endpoints::ClientEnd,
-        fidl_fuchsia_net_http::LoaderClientMarker,
-        futures::future::{ready, Ready},
-        std::sync::RwLock,
-    };
+    use super::*;
+    use fidl::endpoints::ClientEnd;
+    use fidl_fuchsia_net_http::LoaderClientMarker;
+    use futures::future::{ready, Ready};
+    use std::sync::RwLock;
 
     const HTTP_OK: u32 = 200;
 

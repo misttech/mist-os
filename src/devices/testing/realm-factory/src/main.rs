@@ -2,23 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error, Result},
-    fidl::endpoints::{ClientEnd, ControlHandle, ServerEnd},
-    fidl_fuchsia_driver_test as fdt,
-    fidl_fuchsia_driver_testing::*,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_testing_harness::OperationError,
-    fuchsia_async as fasync,
-    fuchsia_component::directory::AsRefDirectory,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
-    },
-    futures::{FutureExt, StreamExt, TryStreamExt},
-    std::sync::Arc,
-    tracing::*,
+use anyhow::{Context, Error, Result};
+use fidl::endpoints::{ClientEnd, ControlHandle, ServerEnd};
+use fidl_fuchsia_driver_testing::*;
+use fidl_fuchsia_testing_harness::OperationError;
+use fuchsia_component::directory::AsRefDirectory;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
 };
+use futures::{FutureExt, StreamExt, TryStreamExt};
+use std::sync::Arc;
+use tracing::*;
+use {fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

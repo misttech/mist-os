@@ -2,21 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{Data, LazyNode, Metrics, Node, Payload, Property, ROOT_NAME},
-    crate::metrics::{BlockMetrics, BlockStatus},
-    anyhow::{bail, format_err, Error},
-    fuchsia_inspect::{reader as ireader, reader::snapshot::ScannedBlock},
-    fuchsia_zircon::Vmo,
-    inspect_format::{
-        constants::MIN_ORDER_SIZE, ArrayFormat, BlockIndex, BlockType, LinkNodeDisposition,
-        PropertyFormat,
-    },
-    std::{
-        cmp::min,
-        collections::{HashMap, HashSet},
-    },
-};
+use super::{Data, LazyNode, Metrics, Node, Payload, Property, ROOT_NAME};
+use crate::metrics::{BlockMetrics, BlockStatus};
+use anyhow::{bail, format_err, Error};
+use fuchsia_inspect::reader as ireader;
+use fuchsia_inspect::reader::snapshot::ScannedBlock;
+use fuchsia_zircon::Vmo;
+use inspect_format::constants::MIN_ORDER_SIZE;
+use inspect_format::{ArrayFormat, BlockIndex, BlockType, LinkNodeDisposition, PropertyFormat};
+use std::cmp::min;
+use std::collections::{HashMap, HashSet};
 
 // When reading from a VMO, the keys of the HashMaps are the indexes of the relevant
 // blocks. Thus, they will never collide.
@@ -731,14 +726,12 @@ enum ScannedPayload {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::*;
+    use fidl_diagnostics_validate::*;
+    use fuchsia_inspect::reader::snapshot::BackingBuffer;
+    use inspect_format::{constants, Block, HeaderFields, PayloadFields, ReadBytes};
     use num_traits::ToPrimitive;
-    use {
-        super::*,
-        crate::*,
-        fidl_diagnostics_validate::*,
-        fuchsia_inspect::reader::snapshot::BackingBuffer,
-        inspect_format::{constants, Block, HeaderFields, PayloadFields, ReadBytes},
-    };
 
     // TODO(https://fxbug.dev/42115894): Depending on the resolution of https://fxbug.dev/42115938, move this const out of mod test.
     const MAX_BLOCK_BITS: usize = constants::MAX_ORDER_SIZE * BITS_PER_BYTE;

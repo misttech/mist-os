@@ -5,11 +5,11 @@
 use std::num::NonZeroU64;
 
 use dhcp_client_core::deps::PacketSocketProvider;
-use fidl_fuchsia_posix as fposix;
-use fidl_fuchsia_posix_socket_ext as fposix_socket_ext;
-use fidl_fuchsia_posix_socket_packet as fpacket;
-use fuchsia_async as fasync;
 use sockaddr::{EthernetSockaddr, IntoSockAddr as _, TryToSockaddrLl as _};
+use {
+    fidl_fuchsia_posix as fposix, fidl_fuchsia_posix_socket_ext as fposix_socket_ext,
+    fidl_fuchsia_posix_socket_packet as fpacket, fuchsia_async as fasync,
+};
 
 pub(crate) struct PacketSocket {
     interface_id: NonZeroU64,
@@ -310,13 +310,13 @@ impl PacketSocketProvider for PacketSocketProviderImpl {
 mod test {
     use super::*;
     use dhcp_client_core::deps::{DatagramInfo, Socket as _};
-    use fidl_fuchsia_net_ext as fnet_ext;
-    use fidl_fuchsia_netemul_network as fnetemul_network;
-    use fidl_fuchsia_posix_socket_packet as fpacket;
-    use fuchsia_async as fasync;
     use futures::{join, FutureExt as _};
     use netstack_testing_common::realms::TestSandboxExt as _;
     use packet::{InnerPacketBuilder as _, Serializer as _};
+    use {
+        fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_netemul_network as fnetemul_network,
+        fidl_fuchsia_posix_socket_packet as fpacket, fuchsia_async as fasync,
+    };
 
     #[fasync::run_singlethreaded(test)]
     async fn packet_socket_provider_impl_send_receive() {

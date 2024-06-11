@@ -19,44 +19,40 @@ pub mod resolving;
 pub mod rights;
 pub mod walk_state;
 
-use fuchsia_zircon_status as zx;
-use {
-    crate::{
-        capability_source::{CapabilitySource, ComponentCapability, InternalCapability},
-        component_instance::{
-            ComponentInstanceInterface, ExtendedInstanceInterface, TopInstanceInterface,
-        },
-        environment::DebugRegistration,
-        error::RoutingError,
-        legacy_router::{
-            AllowedSourcesBuilder, CapabilityVisitor, ErrorNotFoundFromParent,
-            ErrorNotFoundInChild, ExposeVisitor, NoopVisitor, OfferVisitor, RouteBundle,
-        },
-        mapper::DebugRouteMapper,
-        rights::Rights,
-        walk_state::WalkState,
-    },
-    cm_rust::{
-        Availability, CapabilityTypeName, ExposeConfigurationDecl, ExposeDecl, ExposeDeclCommon,
-        ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
-        ExposeServiceDecl, ExposeSource, OfferConfigurationDecl, OfferDeclCommon,
-        OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl,
-        OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl, RegistrationDeclCommon,
-        RegistrationSource, ResolverRegistration, RunnerRegistration, SourceName, StorageDecl,
-        StorageDirectorySource, UseConfigurationDecl, UseDecl, UseDeclCommon, UseDirectoryDecl,
-        UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource,
-        UseStorageDecl,
-    },
-    cm_types::{Name, RelativePath},
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
-    from_enum::FromEnum,
-    moniker::{ChildName, Moniker},
-    router_error::Explain,
-    std::sync::Arc,
-    tracing::warn,
+use crate::capability_source::{CapabilitySource, ComponentCapability, InternalCapability};
+use crate::component_instance::{
+    ComponentInstanceInterface, ExtendedInstanceInterface, TopInstanceInterface,
 };
+use crate::environment::DebugRegistration;
+use crate::error::RoutingError;
+use crate::legacy_router::{
+    AllowedSourcesBuilder, CapabilityVisitor, ErrorNotFoundFromParent, ErrorNotFoundInChild,
+    ExposeVisitor, NoopVisitor, OfferVisitor, RouteBundle,
+};
+use crate::mapper::DebugRouteMapper;
+use crate::rights::Rights;
+use crate::walk_state::WalkState;
+use cm_rust::{
+    Availability, CapabilityTypeName, ExposeConfigurationDecl, ExposeDecl, ExposeDeclCommon,
+    ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
+    ExposeServiceDecl, ExposeSource, OfferConfigurationDecl, OfferDeclCommon, OfferDirectoryDecl,
+    OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl,
+    OfferSource, OfferStorageDecl, RegistrationDeclCommon, RegistrationSource,
+    ResolverRegistration, RunnerRegistration, SourceName, StorageDecl, StorageDirectorySource,
+    UseConfigurationDecl, UseDecl, UseDeclCommon, UseDirectoryDecl, UseEventStreamDecl,
+    UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource, UseStorageDecl,
+};
+use cm_types::{Name, RelativePath};
+use from_enum::FromEnum;
+use moniker::{ChildName, Moniker};
+use router_error::Explain;
+use std::sync::Arc;
+use tracing::warn;
+use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx};
 
-pub use bedrock::{dict_ext::DictExt, lazy_get::LazyGet, with_availability::WithAvailability};
+pub use bedrock::dict_ext::DictExt;
+pub use bedrock::lazy_get::LazyGet;
+pub use bedrock::with_availability::WithAvailability;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

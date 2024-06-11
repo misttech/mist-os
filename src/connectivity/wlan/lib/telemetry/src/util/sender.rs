@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_sync::Mutex,
-    futures::channel::mpsc,
-    std::sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    tracing::{info, warn},
-};
+use fuchsia_sync::Mutex;
+use futures::channel::mpsc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use tracing::{info, warn};
 
 /// Capacity of "first come, first serve" slots available to clients of
 /// the mpsc::Sender<TelemetryEvent>.

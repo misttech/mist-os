@@ -2,20 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Error},
-    async_trait::async_trait,
-    fidl::AsHandleRef,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    std::sync::{Arc, OnceLock},
-    tracing::error,
-    vfs::{
-        common::rights_to_posix_mode_bits,
-        file::{File, FileOptions, GetVmo, SyncMode},
-        immutable_attributes,
-        node::IsDirectory,
-    },
-};
+use anyhow::{anyhow, Error};
+use async_trait::async_trait;
+use fidl::AsHandleRef;
+use std::sync::{Arc, OnceLock};
+use tracing::error;
+use vfs::common::rights_to_posix_mode_bits;
+use vfs::file::{File, FileOptions, GetVmo, SyncMode};
+use vfs::immutable_attributes;
+use vfs::node::IsDirectory;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// Mimics the c++ blobfs block size.
 const BLOCK_SIZE: u64 = 8192;

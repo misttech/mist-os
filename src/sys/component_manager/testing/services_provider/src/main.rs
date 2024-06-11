@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    fidl_fuchsia_examples_services as fexamples,
-    fuchsia_component::server::ServiceFs,
-    futures::lock::Mutex,
-    futures::prelude::*,
-    std::{env, sync::Arc},
-    tracing::*,
-};
+use anyhow::{Context, Result};
+use fidl_fuchsia_examples_services as fexamples;
+use fuchsia_component::server::ServiceFs;
+use futures::lock::Mutex;
+use futures::prelude::*;
+use std::env;
+use std::sync::Arc;
+use tracing::*;
 
 struct Account {
     /// Account owner's name.

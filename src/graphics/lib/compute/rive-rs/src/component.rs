@@ -2,29 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    any::TypeId,
-    cell::Cell,
-    hash::{Hash, Hasher},
-    iter,
-};
+use std::any::TypeId;
+use std::cell::Cell;
+use std::hash::{Hash, Hasher};
+use std::iter;
 
-use crate::{
-    artboard::Artboard,
-    bones::Skin,
-    component_dirt::ComponentDirt,
-    container_component::ContainerComponent,
-    core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property},
-    dyn_vec::DynVec,
-    importers::{ArtboardImporter, ImportStack},
-    option_cell::OptionCell,
-    shapes::{
-        paint::LinearGradient, ClippingShape, Ellipse, Path, PathComposer, PointsPath, Polygon,
-        Rectangle, Shape, Triangle,
-    },
-    status_code::StatusCode,
-    TransformComponent,
+use crate::artboard::Artboard;
+use crate::bones::Skin;
+use crate::component_dirt::ComponentDirt;
+use crate::container_component::ContainerComponent;
+use crate::core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property};
+use crate::dyn_vec::DynVec;
+use crate::importers::{ArtboardImporter, ImportStack};
+use crate::option_cell::OptionCell;
+use crate::shapes::paint::LinearGradient;
+use crate::shapes::{
+    ClippingShape, Ellipse, Path, PathComposer, PointsPath, Polygon, Rectangle, Shape, Triangle,
 };
+use crate::status_code::StatusCode;
+use crate::TransformComponent;
 
 #[derive(Debug)]
 pub struct Component {

@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 //! Tools to convert preflight results to JSON output.
-use {
-    crate::check::{summarize_results, PreflightCheckResult},
-    serde::Serialize,
-};
+use crate::check::{summarize_results, PreflightCheckResult};
+use serde::Serialize;
 
 #[derive(Serialize, Debug, PartialEq)]
 pub struct JsonResult {

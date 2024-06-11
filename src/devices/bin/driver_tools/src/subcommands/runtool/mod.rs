@@ -4,16 +4,14 @@
 
 pub mod args;
 
-use {
-    anyhow::{anyhow, Context, Result},
-    args::RunToolCommand,
-    blocking::Unblock,
-    errors::ffx_error,
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_driver_playground as fdp,
-    futures::{FutureExt, StreamExt},
-    std::io::Write,
-};
+use anyhow::{anyhow, Context, Result};
+use args::RunToolCommand;
+use blocking::Unblock;
+use errors::ffx_error;
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_driver_playground as fdp;
+use futures::{FutureExt, StreamExt};
+use std::io::Write;
 
 pub async fn run_tool(
     cmd: RunToolCommand,

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use netlink_packet_utils::{
-    byteorder::{ByteOrder, NativeEndian},
-    nla::Nla,
-    Emitable,
-};
+use netlink_packet_utils::byteorder::{ByteOrder, NativeEndian};
+use netlink_packet_utils::nla::Nla;
+use netlink_packet_utils::Emitable;
 use std::mem::{size_of, size_of_val};
 
 use crate::nl80211::constants::*;

@@ -2,19 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Context as _,
-    serde::{Deserialize, Serialize},
-    std::{
-        fs::File,
-        io::{copy, BufReader, BufWriter, Write as _},
-    },
-    zip::{
-        read::ZipArchive,
-        write::{FileOptions, ZipWriter},
-        CompressionMethod,
-    },
-};
+use anyhow::Context as _;
+use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::io::{copy, BufReader, BufWriter, Write as _};
+use zip::read::ZipArchive;
+use zip::write::{FileOptions, ZipWriter};
+use zip::CompressionMethod;
 
 /// Flags for poison_tuf_signature.
 #[derive(argh::FromArgs)]

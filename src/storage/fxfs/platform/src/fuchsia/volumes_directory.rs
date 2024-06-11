@@ -2,55 +2,40 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::fuchsia::{
-        component::map_to_raw_status,
-        directory::FxDirectory,
-        errors::map_to_status,
-        fxblob::BlobDirectory,
-        memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
-        profile::new_profile_state,
-        volume::{FxVolume, FxVolumeAndRoot, MemoryPressureConfig, RootDir},
-        RemoteCrypt,
-    },
-    anyhow::{anyhow, bail, ensure, Context, Error},
-    fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
-    fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream},
-    fidl_fuchsia_fxfs::{
-        BlobCreatorMarker, BlobReaderMarker, CheckOptions, MountOptions, ProjectIdMarker,
-        VolumeRequest, VolumeRequestStream,
-    },
-    fidl_fuchsia_io as fio,
-    fs_inspect::{FsInspectTree, FsInspectVolume},
-    fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::{stream::FuturesUnordered, StreamExt, TryStreamExt},
-    fxfs::{
-        errors::FxfsError,
-        fsck,
-        log::*,
-        metrics,
-        object_store::{
-            transaction::{lock_keys, LockKey, Options},
-            volume::RootVolume,
-            Directory, ObjectDescriptor, ObjectStore,
-        },
-    },
-    fxfs_crypto::Crypt,
-    fxfs_trace::{trace_future_args, TraceFutureExt},
-    rustc_hash::FxHashMap as HashMap,
-    std::sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, OnceLock, Weak,
-    },
-    vfs::{
-        directory::{
-            entry_container::{self, MutableDirectory},
-            helper::DirectlyMutable,
-        },
-        path::Path,
-    },
+use crate::fuchsia::component::map_to_raw_status;
+use crate::fuchsia::directory::FxDirectory;
+use crate::fuchsia::errors::map_to_status;
+use crate::fuchsia::fxblob::BlobDirectory;
+use crate::fuchsia::memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor};
+use crate::fuchsia::profile::new_profile_state;
+use crate::fuchsia::volume::{FxVolume, FxVolumeAndRoot, MemoryPressureConfig, RootDir};
+use crate::fuchsia::RemoteCrypt;
+use anyhow::{anyhow, bail, ensure, Context, Error};
+use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
+use fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream};
+use fidl_fuchsia_fxfs::{
+    BlobCreatorMarker, BlobReaderMarker, CheckOptions, MountOptions, ProjectIdMarker,
+    VolumeRequest, VolumeRequestStream,
 };
+use fs_inspect::{FsInspectTree, FsInspectVolume};
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use futures::stream::FuturesUnordered;
+use futures::{StreamExt, TryStreamExt};
+use fxfs::errors::FxfsError;
+use fxfs::log::*;
+use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
+use fxfs::object_store::volume::RootVolume;
+use fxfs::object_store::{Directory, ObjectDescriptor, ObjectStore};
+use fxfs::{fsck, metrics};
+use fxfs_crypto::Crypt;
+use fxfs_trace::{trace_future_args, TraceFutureExt};
+use rustc_hash::FxHashMap as HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, OnceLock, Weak};
+use vfs::directory::entry_container::{self, MutableDirectory};
+use vfs::directory::helper::DirectlyMutable;
+use vfs::path::Path;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 const MEBIBYTE: u64 = 1024 * 1024;
 
@@ -731,30 +716,32 @@ impl VolumesDirectory {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::fuchsia::{testing::open_file_checked, volumes_directory::VolumesDirectory},
-        fidl::endpoints::{create_proxy, create_request_stream, ServerEnd},
-        fidl_fuchsia_fs::AdminMarker,
-        fidl_fuchsia_fxfs::{KeyPurpose, MountOptions, VolumeMarker, VolumeProxy},
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_component::client::connect_to_protocol_at_dir_svc,
-        fuchsia_fs::file,
-        fuchsia_zircon::Status,
-        futures::join,
-        fxfs::{
-            errors::FxfsError, filesystem::FxFilesystem, fsck::fsck,
-            object_store::allocator::Allocator, object_store::volume::root_volume,
-        },
-        fxfs_crypto::Crypt,
-        fxfs_insecure_crypto::InsecureCrypt,
-        rand::Rng as _,
-        std::{
-            sync::{atomic::Ordering, Arc, Weak},
-            time::Duration,
-        },
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
-        vfs::{directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path},
-    };
+    use crate::fuchsia::testing::open_file_checked;
+    use crate::fuchsia::volumes_directory::VolumesDirectory;
+    use fidl::endpoints::{create_proxy, create_request_stream, ServerEnd};
+    use fidl_fuchsia_fs::AdminMarker;
+    use fidl_fuchsia_fxfs::{KeyPurpose, MountOptions, VolumeMarker, VolumeProxy};
+    use fuchsia_component::client::connect_to_protocol_at_dir_svc;
+    use fuchsia_fs::file;
+    use fuchsia_zircon::Status;
+    use futures::join;
+    use fxfs::errors::FxfsError;
+    use fxfs::filesystem::FxFilesystem;
+    use fxfs::fsck::fsck;
+    use fxfs::object_store::allocator::Allocator;
+    use fxfs::object_store::volume::root_volume;
+    use fxfs_crypto::Crypt;
+    use fxfs_insecure_crypto::InsecureCrypt;
+    use rand::Rng as _;
+    use std::sync::atomic::Ordering;
+    use std::sync::{Arc, Weak};
+    use std::time::Duration;
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::DeviceHolder;
+    use vfs::directory::entry_container::Directory;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::path::Path;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     #[fuchsia::test]
     async fn test_volume_creation() {

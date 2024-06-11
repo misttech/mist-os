@@ -2,23 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fuchsia_component::server::ServiceFs,
-    futures::prelude::*,
-    lazy_static::lazy_static,
-    regex::Regex,
-    std::cell::RefCell,
-    std::collections::hash_map::Entry,
-    std::collections::HashMap,
-};
+use anyhow::{Context as _, Error};
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
+use lazy_static::lazy_static;
+use regex::Regex;
+use std::cell::RefCell;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 
 // [START diff_1]
-use {
-    fidl::{persist, Vmo},
-    fidl_examples_keyvaluestore_supportexports::{
-        ExportError, Exportable, Item, StoreRequest, StoreRequestStream, WriteError,
-    },
+use fidl::{persist, Vmo};
+use fidl_examples_keyvaluestore_supportexports::{
+    ExportError, Exportable, Item, StoreRequest, StoreRequestStream, WriteError,
 };
 // [END diff_1]
 

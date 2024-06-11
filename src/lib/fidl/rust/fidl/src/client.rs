@@ -4,33 +4,25 @@
 
 //! An implementation of a client for a fidl interface.
 
-use {
-    crate::{
-        encoding::{
-            decode_transaction_header, Decode, Decoder, DynamicFlags, Encode, Encoder, EpitaphBody,
-            TransactionHeader, TransactionMessage, TransactionMessageType, TypeMarker,
-        },
-        handle::{AsyncChannel, HandleDisposition, MessageBufEtc},
-        Error,
-    },
-    fuchsia_sync::Mutex,
-    fuchsia_zircon_status as zx_status,
-    futures::{
-        future::{self, FusedFuture, Future, FutureExt, Map, MaybeDone},
-        ready,
-        stream::{FusedStream, Stream},
-        task::{Context, Poll, Waker},
-    },
-    slab::Slab,
-    std::{
-        collections::VecDeque,
-        mem,
-        ops::ControlFlow,
-        pin::Pin,
-        sync::{Arc, Weak},
-        task::{RawWaker, RawWakerVTable},
-    },
+use crate::encoding::{
+    decode_transaction_header, Decode, Decoder, DynamicFlags, Encode, Encoder, EpitaphBody,
+    TransactionHeader, TransactionMessage, TransactionMessageType, TypeMarker,
 };
+use crate::handle::{AsyncChannel, HandleDisposition, MessageBufEtc};
+use crate::Error;
+use fuchsia_sync::Mutex;
+use fuchsia_zircon_status as zx_status;
+use futures::future::{self, FusedFuture, Future, FutureExt, Map, MaybeDone};
+use futures::ready;
+use futures::stream::{FusedStream, Stream};
+use futures::task::{Context, Poll, Waker};
+use slab::Slab;
+use std::collections::VecDeque;
+use std::mem;
+use std::ops::ControlFlow;
+use std::pin::Pin;
+use std::sync::{Arc, Weak};
+use std::task::{RawWaker, RawWakerVTable};
 
 /// Decodes the body of `buf` as the FIDL type `T`.
 #[doc(hidden)] // only exported for use in macros or generated code
@@ -964,25 +956,20 @@ pub mod sync {
 #[cfg(all(test, target_os = "fuchsia"))]
 mod tests {
     use super::*;
-    use {
-        crate::encoding::MAGIC_NUMBER_INITIAL,
-        crate::epitaph::{self, ChannelEpitaphExt},
-        anyhow::{Context as _, Error},
-        assert_matches::assert_matches,
-        fuchsia_async as fasync,
-        fuchsia_async::{DurationExt, TimeoutExt},
-        fuchsia_zircon as zx,
-        fuchsia_zircon::{AsHandleRef, DurationNum},
-        futures::{
-            channel::oneshot,
-            join,
-            stream::FuturesUnordered,
-            task::{noop_waker, waker, ArcWake},
-            StreamExt, TryFutureExt,
-        },
-        futures_test::task::new_count_waker,
-        std::{future::pending, thread},
-    };
+    use crate::encoding::MAGIC_NUMBER_INITIAL;
+    use crate::epitaph::{self, ChannelEpitaphExt};
+    use anyhow::{Context as _, Error};
+    use assert_matches::assert_matches;
+    use fuchsia_async::{DurationExt, TimeoutExt};
+    use fuchsia_zircon::{AsHandleRef, DurationNum};
+    use futures::channel::oneshot;
+    use futures::stream::FuturesUnordered;
+    use futures::task::{noop_waker, waker, ArcWake};
+    use futures::{join, StreamExt, TryFutureExt};
+    use futures_test::task::new_count_waker;
+    use std::future::pending;
+    use std::thread;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     const SEND_ORDINAL_HIGH_BYTE: u8 = 42;
     const SEND_ORDINAL: u64 = 42 << 32;

@@ -2,17 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::Plugin,
-    crate::{
-        act::Action,
-        metrics::{
-            fetch::{FileDataFetcher, SelectorString},
-            metric_value::MetricValue,
-        },
-    },
-    itertools::Itertools,
-};
+use super::Plugin;
+use crate::act::Action;
+use crate::metrics::fetch::{FileDataFetcher, SelectorString};
+use crate::metrics::metric_value::MetricValue;
+use itertools::Itertools;
 
 pub struct MemoryPlugin();
 

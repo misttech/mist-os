@@ -2,36 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::cache::MerkleForError;
+use crate::metrics_util::tuf_error_as_create_tuf_client_event_code;
+use crate::{clock, error, inspect_util, TCP_KEEPALIVE_TIMEOUT};
+use anyhow::{anyhow, format_err, Context as _};
+use fidl_contrib::protocol_connector::ProtocolSender;
+use fidl_fuchsia_metrics::MetricEvent;
+use fuchsia_async::TimeoutExt as _;
+use fuchsia_cobalt_builders::MetricEventExt as _;
+use fuchsia_inspect::{self as inspect, Property};
+use futures::future::TryFutureExt as _;
+use futures::lock::Mutex as AsyncMutex;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use std::time::Duration;
+use tracing::info;
+use tuf::client::Config;
+use tuf::crypto::PublicKey;
+use tuf::error::Error as TufError;
+use tuf::metadata::{MetadataVersion, TargetPath};
+use tuf::pouf::Pouf1;
+use tuf::repository::{
+    EphemeralRepository, HttpRepositoryBuilder, RepositoryProvider, RepositoryStorageProvider,
+};
 use {
-    crate::{
-        cache::MerkleForError, clock, error, inspect_util,
-        metrics_util::tuf_error_as_create_tuf_client_event_code, TCP_KEEPALIVE_TIMEOUT,
-    },
-    anyhow::{anyhow, format_err, Context as _},
-    cobalt_sw_delivery_registry as metrics,
-    fidl_contrib::protocol_connector::ProtocolSender,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_metrics::MetricEvent,
-    fidl_fuchsia_pkg_ext as pkg,
-    fuchsia_async::TimeoutExt as _,
-    fuchsia_cobalt_builders::MetricEventExt as _,
-    fuchsia_inspect::{self as inspect, Property},
+    cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fidl_fuchsia_pkg_ext as pkg,
     fuchsia_zircon as zx,
-    futures::{future::TryFutureExt as _, lock::Mutex as AsyncMutex},
-    serde::{Deserialize, Serialize},
-    std::{sync::Arc, time::Duration},
-    tracing::info,
-    tuf::{
-        client::Config,
-        crypto::PublicKey,
-        error::Error as TufError,
-        metadata::{MetadataVersion, TargetPath},
-        pouf::Pouf1,
-        repository::{
-            EphemeralRepository, HttpRepositoryBuilder, RepositoryProvider,
-            RepositoryStorageProvider,
-        },
-    },
 };
 
 mod updating_tuf_client;
@@ -296,21 +292,22 @@ fn get_root_keys(config: &pkg::RepositoryConfig) -> Result<Vec<PublicKey>, anyho
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fuchsia_async as fasync,
-        fuchsia_pkg_testing::{
-            serve::{responder, HttpResponder, ServedRepository, ServedRepositoryBuilder},
-            Package, PackageBuilder, Repository as TestRepository, RepositoryBuilder,
-        },
-        fuchsia_url::RepositoryUrl,
-        futures::{channel::mpsc, stream::StreamExt},
-        http_sse::Event,
-        std::path::{Path, PathBuf},
-        tuf::metadata::MetadataPath,
-        updating_tuf_client::METADATA_CACHE_STALE_TIMEOUT,
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use fuchsia_pkg_testing::serve::{
+        responder, HttpResponder, ServedRepository, ServedRepositoryBuilder,
     };
+    use fuchsia_pkg_testing::{
+        Package, PackageBuilder, Repository as TestRepository, RepositoryBuilder,
+    };
+    use fuchsia_url::RepositoryUrl;
+    use futures::channel::mpsc;
+    use futures::stream::StreamExt;
+    use http_sse::Event;
+    use std::path::{Path, PathBuf};
+    use tuf::metadata::MetadataPath;
+    use updating_tuf_client::METADATA_CACHE_STALE_TIMEOUT;
 
     const TEST_REPO_URL: &str = "fuchsia-pkg://test";
     const EMPTY_REPO_PATH: &str = "/pkg/empty-repo";
@@ -698,15 +695,14 @@ mod tests {
 
 #[cfg(test)]
 mod inspect_tests {
-    use {
-        super::*,
-        diagnostics_assertions::assert_data_tree,
-        fuchsia_async as fasync,
-        fuchsia_pkg_testing::{serve::responder, PackageBuilder, RepositoryBuilder},
-        fuchsia_url::RepositoryUrl,
-        futures::stream::StreamExt,
-        http_sse::Event,
-    };
+    use super::*;
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_async as fasync;
+    use fuchsia_pkg_testing::serve::responder;
+    use fuchsia_pkg_testing::{PackageBuilder, RepositoryBuilder};
+    use fuchsia_url::RepositoryUrl;
+    use futures::stream::StreamExt;
+    use http_sse::Event;
 
     const TEST_REPO_URL: &str = "fuchsia-pkg://test";
     const EMPTY_REPO_PATH: &str = "/pkg/empty-repo";

@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{anyhow, Context, Error};
+use bind::interpreter::decode_bind_rules::DecodedRules;
+use bind::interpreter::match_bind::{match_bind, DeviceProperties, MatchBindData};
+use cm_rust::FidlIntoNative;
+use fidl_fuchsia_pkg_ext::BlobId;
+use fuchsia_pkg::{OpenRights, PackageDirectory};
+use futures::TryFutureExt;
 use {
-    anyhow::{anyhow, Context, Error},
-    bind::interpreter::{
-        decode_bind_rules::DecodedRules,
-        match_bind::{match_bind, DeviceProperties, MatchBindData},
-    },
-    cm_rust::FidlIntoNative,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_index as fdi,
-    fidl_fuchsia_pkg_ext::BlobId,
-    fuchsia_pkg::{OpenRights, PackageDirectory},
-    futures::TryFutureExt,
 };
 
 pub const DEFAULT_DEVICE_CATEGORY: &str = "misc";

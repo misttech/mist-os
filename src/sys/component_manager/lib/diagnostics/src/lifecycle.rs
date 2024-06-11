@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use async_trait::async_trait;
+use errors::ModelError;
+use fuchsia_sync::Mutex;
+use hooks::{Event, EventPayload, EventType, HasEventType, Hook, HooksRegistration};
+use moniker::Moniker;
+use std::sync::{Arc, Weak};
 use {
-    async_trait::async_trait,
-    errors::ModelError,
-    fuchsia_inspect as inspect, fuchsia_inspect_contrib as inspect_contrib,
-    fuchsia_sync::Mutex,
-    fuchsia_zircon as zx,
-    hooks::{Event, EventPayload, EventType, HasEventType, Hook, HooksRegistration},
-    moniker::Moniker,
-    std::sync::{Arc, Weak},
+    fuchsia_inspect as inspect, fuchsia_inspect_contrib as inspect_contrib, fuchsia_zircon as zx,
 };
 
 const MAX_NUMBER_OF_LIFECYCLE_EVENTS: usize = 150;

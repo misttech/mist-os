@@ -8,10 +8,11 @@ use std::collections::HashSet;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
+use xml::attribute::OwnedAttribute;
 use xml::name::OwnedName;
 use xml::reader::{ParserConfig, XmlEvent};
 use xml::writer::{EmitterConfig, XmlEvent as XmlWriteEvent};
-use xml::{attribute::OwnedAttribute, EventWriter};
+use xml::EventWriter;
 
 use crate::error::Error;
 use crate::{Builder, Parser};

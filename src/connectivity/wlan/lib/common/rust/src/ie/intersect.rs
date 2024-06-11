@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::ie::*,
-    std::{
-        cmp::{max, min},
-        collections::HashSet,
-        ops::BitAnd,
-    },
-    zerocopy::Ref,
-};
+use crate::ie::*;
+use std::cmp::{max, min};
+use std::collections::HashSet;
+use std::ops::BitAnd;
+use zerocopy::Ref;
 
 // TODO(https://fxbug.dev/42118992): HT and VHT intersections defined here are best effort only.
 

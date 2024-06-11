@@ -6,51 +6,51 @@
 //! state machine.
 
 use alloc::collections::hash_map;
-use core::{fmt::Debug, num::NonZeroU16};
+use core::fmt::Debug;
+use core::num::NonZeroU16;
 
 use assert_matches::assert_matches;
 use log::{debug, error, warn};
 use net_types::SpecifiedAddr;
+use netstack3_base::socket::{
+    AddrIsMappedError, AddrVec, AddrVecIter, ConnAddr, ConnIpAddr, InsertError, ListenerAddr,
+    ListenerIpAddr, SocketIpAddr, SocketIpAddrExt as _,
+};
 use netstack3_base::{
-    socket::{
-        AddrIsMappedError, AddrVec, AddrVecIter, ConnAddr, ConnIpAddr, InsertError, ListenerAddr,
-        ListenerIpAddr, SocketIpAddr, SocketIpAddrExt as _,
-    },
     trace_duration, BidirectionalConverter as _, CounterContext, CtxPair, EitherDeviceId,
     NotFoundError, StrongDeviceIdentifier as _, WeakDeviceIdentifier,
 };
 use netstack3_filter::TransportPacketSerializer;
+use netstack3_ip::socket::{IpSockCreationError, MmsError};
 use netstack3_ip::{
-    socket::{IpSockCreationError, MmsError},
     BaseTransportIpContext, IpTransportContext, TransparentLocalDelivery, TransportIpContext,
     TransportReceiveError,
 };
 use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder as _, Serializer};
-use packet_formats::{
-    error::ParseError,
-    ip::{IpExt, IpProto},
-    tcp::{
-        TcpFlowAndSeqNum, TcpOptionsTooLongError, TcpParseArgs, TcpSegment, TcpSegmentBuilder,
-        TcpSegmentBuilderWithOptions,
-    },
+use packet_formats::error::ParseError;
+use packet_formats::ip::{IpExt, IpProto};
+use packet_formats::tcp::{
+    TcpFlowAndSeqNum, TcpOptionsTooLongError, TcpParseArgs, TcpSegment, TcpSegmentBuilder,
+    TcpSegmentBuilderWithOptions,
 };
 use thiserror::Error;
 
-use crate::internal::{
-    base::{BufferSizes, ConnectionError, Control, Mss, SocketOptions, TcpCounters},
-    buffer::SendPayload,
-    segment::{Options, Segment},
-    seqnum::{SeqNum, UnscaledWindowSize},
-    socket::{
-        self, isn::IsnGenerator, AsThisStack as _, BoundSocketState, Connection, DemuxState,
-        DeviceIpSocketHandler, DualStackDemuxIdConverter as _, DualStackIpExt, EitherStack,
-        HandshakeStatus, Listener, ListenerAddrState, ListenerSharingState, MaybeDualStack,
-        MaybeListener, PrimaryRc, TcpApi, TcpBindingsContext, TcpBindingsTypes, TcpContext,
-        TcpDemuxContext, TcpDualStackContext, TcpIpTransportContext, TcpPortSpec, TcpSocketId,
-        TcpSocketSetEntry, TcpSocketState, TcpSocketStateInner,
-    },
-    state::{BufferProvider, Closed, DataAcked, Initial, State, TimeWait},
+use crate::internal::base::{
+    BufferSizes, ConnectionError, Control, Mss, SocketOptions, TcpCounters,
 };
+use crate::internal::buffer::SendPayload;
+use crate::internal::segment::{Options, Segment};
+use crate::internal::seqnum::{SeqNum, UnscaledWindowSize};
+use crate::internal::socket::isn::IsnGenerator;
+use crate::internal::socket::{
+    self, AsThisStack as _, BoundSocketState, Connection, DemuxState, DeviceIpSocketHandler,
+    DualStackDemuxIdConverter as _, DualStackIpExt, EitherStack, HandshakeStatus, Listener,
+    ListenerAddrState, ListenerSharingState, MaybeDualStack, MaybeListener, PrimaryRc, TcpApi,
+    TcpBindingsContext, TcpBindingsTypes, TcpContext, TcpDemuxContext, TcpDualStackContext,
+    TcpIpTransportContext, TcpPortSpec, TcpSocketId, TcpSocketSetEntry, TcpSocketState,
+    TcpSocketStateInner,
+};
+use crate::internal::state::{BufferProvider, Closed, DataAcked, Initial, State, TimeWait};
 
 impl<BT: TcpBindingsTypes> BufferProvider<BT::ReceiveBuffer, BT::SendBuffer> for BT {
     type ActiveOpen = BT::ListenerNotifierOrProvidedBuffers;

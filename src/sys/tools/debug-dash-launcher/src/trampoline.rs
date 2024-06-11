@@ -4,11 +4,8 @@
 
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_dash::LauncherError;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_kernel as fkernel;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_url::{AbsoluteComponentUrl, AbsolutePackageUrl};
-use fuchsia_zircon as zx;
 use indexmap::IndexMap;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
@@ -18,6 +15,7 @@ use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::immutable::simple::Simple as PseudoDirectory;
 use vfs::file::vmo;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fuchsia_zircon as zx};
 
 // The location of the added trampolines. The path will be of the form:
 // `/.dash/tools/<package-name>/<trampoline-name>`.
@@ -302,15 +300,14 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
-    use fidl_fuchsia_pkg as fpkg;
     use fio::OpenFlags;
-    use fuchsia_async as fasync;
     use fuchsia_fs::directory::open_file;
     use fuchsia_fs::file::read_to_string;
     use futures::StreamExt;
     use std::fmt;
     use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
+    use {fidl_fuchsia_pkg as fpkg, fuchsia_async as fasync};
 
     #[fuchsia::test]
     async fn parse_url_test() {

@@ -20,24 +20,20 @@ use std::collections::{HashMap, HashSet};
 
 use assert_matches::assert_matches;
 use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
+use futures::channel::{mpsc, oneshot};
 use futures::{
-    channel::{mpsc, oneshot},
     stream, Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
 };
 use log::{debug, error, info, warn};
-use net_types::{
-    ip::{
-        GenericOverIp, Ip, IpAddress, IpInvariant, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
-        Subnet,
-    },
-    SpecifiedAddr,
+use net_types::ip::{
+    GenericOverIp, Ip, IpAddress, IpInvariant, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
+    Subnet,
 };
+use net_types::SpecifiedAddr;
 use netstack3_core::routes::AddableMetric;
 
-use crate::bindings::{
-    util::{EntryAndTableId, TryIntoFidlWithContext},
-    BindingsCtx, Ctx, IpExt,
-};
+use crate::bindings::util::{EntryAndTableId, TryIntoFidlWithContext};
+use crate::bindings::{BindingsCtx, Ctx, IpExt};
 
 pub(crate) mod admin;
 use admin::{StrongUserRouteSet, WeakUserRouteSet};

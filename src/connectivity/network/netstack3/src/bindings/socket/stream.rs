@@ -4,55 +4,47 @@
 
 //! Stream sockets, primarily TCP sockets.
 
-use std::{
-    num::{NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize, TryFromIntError},
-    ops::ControlFlow,
-    pin::pin,
-    sync::Arc,
-    time::Duration,
-};
+use std::num::{NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize, TryFromIntError};
+use std::ops::ControlFlow;
+use std::pin::pin;
+use std::sync::Arc;
+use std::time::Duration;
 
 use const_unwrap::const_unwrap_option;
 use explicit::ResultExt as _;
-use fidl::{
-    endpoints::{ClientEnd, RequestStream as _},
-    AsHandleRef as _, HandleBased as _,
-};
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_posix as fposix;
-use fidl_fuchsia_posix_socket as fposix_socket;
-use fuchsia_async as fasync;
+use fidl::endpoints::{ClientEnd, RequestStream as _};
+use fidl::{AsHandleRef as _, HandleBased as _};
 use fuchsia_zircon::{self as zx, Peered as _};
-use futures::{future::FusedFuture as _, FutureExt as _, StreamExt as _};
+use futures::future::FusedFuture as _;
+use futures::{FutureExt as _, StreamExt as _};
 use log::debug;
 use net_types::ip::{IpAddress, IpVersion, Ipv4, Ipv6};
-use netstack3_core::{
-    device::{DeviceId, WeakDeviceId},
-    socket::ShutdownType,
-    tcp::{
-        self, AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
-        ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
-        Payload, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload, SetReuseAddrError, SocketAddr,
-        SocketInfo, SocketOptions, Takeable, TcpBindingsTypes, UnboundInfo,
-    },
-    IpExt,
+use netstack3_core::device::{DeviceId, WeakDeviceId};
+use netstack3_core::socket::ShutdownType;
+use netstack3_core::tcp::{
+    self, AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
+    ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
+    Payload, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload, SetReuseAddrError, SocketAddr,
+    SocketInfo, SocketOptions, Takeable, TcpBindingsTypes, UnboundInfo,
 };
+use netstack3_core::IpExt;
 use once_cell::sync::Lazy;
 use packet_formats::utils::NonZeroDuration;
-
-use crate::bindings::{
-    socket::{
-        worker::{self, CloseResponder, SocketWorker},
-        IntoErrno, IpSockAddrExt, SockAddr, SocketWorkerProperties, ZXSIO_SIGNAL_CONNECTED,
-        ZXSIO_SIGNAL_INCOMING,
-    },
-    trace_duration,
-    util::{
-        AllowBindingIdFromWeak, ConversionContext, IntoCore, IntoFidl, NeedsDataNotifier,
-        NeedsDataWatcher, ResultExt as _, TryIntoCoreWithContext, TryIntoFidlWithContext,
-    },
-    BindingsCtx, Ctx,
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_posix as fposix,
+    fidl_fuchsia_posix_socket as fposix_socket, fuchsia_async as fasync,
 };
+
+use crate::bindings::socket::worker::{self, CloseResponder, SocketWorker};
+use crate::bindings::socket::{
+    IntoErrno, IpSockAddrExt, SockAddr, SocketWorkerProperties, ZXSIO_SIGNAL_CONNECTED,
+    ZXSIO_SIGNAL_INCOMING,
+};
+use crate::bindings::util::{
+    AllowBindingIdFromWeak, ConversionContext, IntoCore, IntoFidl, NeedsDataNotifier,
+    NeedsDataWatcher, ResultExt as _, TryIntoCoreWithContext, TryIntoFidlWithContext,
+};
+use crate::bindings::{trace_duration, BindingsCtx, Ctx};
 
 /// Maximum values allowed on linux: https://github.com/torvalds/linux/blob/0326074ff4652329f2a1a9c8685104576bd8d131/include/net/tcp.h#L159-L161
 const MAX_TCP_KEEPIDLE_SECS: u64 = 32767;

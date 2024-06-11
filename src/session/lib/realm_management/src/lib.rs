@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::endpoints::ServerEnd;
 use {
-    fidl::endpoints::ServerEnd, fidl_fuchsia_component as fcomponent,
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_io as fio,
 };
 
 /// Creates a (lazy) child in the specified `Realm`.
@@ -95,16 +96,14 @@ pub async fn destroy_child_component(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{
-            create_child_component, destroy_child_component, open_child_component_exposed_dir,
-        },
-        fidl::endpoints::{create_endpoints, create_proxy, spawn_stream_handler},
-        fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
-        lazy_static::lazy_static,
-        session_testing::spawn_directory_server,
-        test_util::Counter,
+    use super::{
+        create_child_component, destroy_child_component, open_child_component_exposed_dir,
     };
+    use fidl::endpoints::{create_endpoints, create_proxy, spawn_stream_handler};
+    use lazy_static::lazy_static;
+    use session_testing::spawn_directory_server;
+    use test_util::Counter;
+    use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio};
 
     /// Tests that creating a child results in the appropriate call to the `RealmProxy`.
     #[fuchsia::test]

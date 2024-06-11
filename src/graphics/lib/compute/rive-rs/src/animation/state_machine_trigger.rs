@@ -4,10 +4,8 @@
 
 use std::cell::Cell;
 
-use crate::{
-    animation::StateMachineInput,
-    core::{Core, ObjectRef, OnAdded},
-};
+use crate::animation::StateMachineInput;
+use crate::core::{Core, ObjectRef, OnAdded};
 
 #[derive(Debug, Default)]
 pub struct StateMachineTrigger {

@@ -2,17 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::additional_boot_args::AdditionalBootConfigError,
-    fuchsia_merkle::Hash,
-    scrutiny::prelude::DataCollection,
-    scrutiny_utils::package::{
-        deserialize_pkg_index, serialize_pkg_index, PackageIndexContents, SystemImageError,
-    },
-    serde::{Deserialize, Serialize},
-    std::{collections::HashSet, path::PathBuf},
-    thiserror::Error,
+use crate::additional_boot_args::AdditionalBootConfigError;
+use fuchsia_merkle::Hash;
+use scrutiny::prelude::DataCollection;
+use scrutiny_utils::package::{
+    deserialize_pkg_index, serialize_pkg_index, PackageIndexContents, SystemImageError,
 };
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+use std::path::PathBuf;
+use thiserror::Error;
 
 #[derive(Debug, Deserialize, Serialize, Error)]
 #[serde(rename_all = "snake_case")]

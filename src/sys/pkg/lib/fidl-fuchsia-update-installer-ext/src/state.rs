@@ -4,15 +4,13 @@
 
 //! Wrapper types for the State union.
 
-use {
-    event_queue::Event,
-    fidl_fuchsia_update_installer as fidl, fuchsia_inspect as inspect,
-    proptest::prelude::*,
-    proptest_derive::Arbitrary,
-    serde::{Deserialize, Serialize},
-    thiserror::Error,
-    typed_builder::TypedBuilder,
-};
+use event_queue::Event;
+use proptest::prelude::*;
+use proptest_derive::Arbitrary;
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+use typed_builder::TypedBuilder;
+use {fidl_fuchsia_update_installer as fidl, fuchsia_inspect as inspect};
 
 /// The state of an update installation attempt.
 #[derive(Arbitrary, Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -935,10 +933,11 @@ fn arb_info_and_progress() -> impl Strategy<Value = (UpdateInfo, Progress)> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, assert_matches::assert_matches, diagnostics_assertions::assert_data_tree,
-        fuchsia_inspect::Inspector, serde_json::json,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_inspect::Inspector;
+    use serde_json::json;
 
     prop_compose! {
         fn arb_progress()(fraction_completed: f32, bytes_downloaded: u64) -> Progress {

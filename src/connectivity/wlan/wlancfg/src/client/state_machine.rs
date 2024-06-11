@@ -2,40 +2,35 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::client::roaming::local_roam_manager::LocalRoamManagerApi;
+use crate::client::types;
+use crate::config_management::{PastConnectionData, SavedNetworksManagerApi};
+use crate::mode_management::{Defect, IfaceFailure};
+use crate::telemetry::{
+    DisconnectInfo, TelemetryEvent, TelemetrySender, AVERAGE_SCORE_DELTA_MINIMUM_DURATION,
+    METRICS_SHORT_CONNECT_DURATION,
+};
+use crate::util::historical_list::HistoricalList;
+use crate::util::listener::Message::NotifyListeners;
+use crate::util::listener::{ClientListenerMessageSender, ClientNetworkState, ClientStateUpdate};
+use crate::util::state_machine::{self, ExitReason, IntoStateExt};
+use anyhow::format_err;
+use fidl::endpoints::create_proxy;
+use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
+use futures::channel::{mpsc, oneshot};
+use futures::future::FutureExt;
+use futures::lock::Mutex;
+use futures::select;
+use futures::stream::{self, StreamExt, TryStreamExt};
+use std::convert::Infallible;
+use std::sync::Arc;
+use tracing::{debug, error, info, warn};
+use wlan_common::bss::BssDescription;
+use wlan_common::sequestered::Sequestered;
 use {
-    crate::{
-        client::{roaming::local_roam_manager::LocalRoamManagerApi, types},
-        config_management::{PastConnectionData, SavedNetworksManagerApi},
-        mode_management::{Defect, IfaceFailure},
-        telemetry::{
-            DisconnectInfo, TelemetryEvent, TelemetrySender, AVERAGE_SCORE_DELTA_MINIMUM_DURATION,
-            METRICS_SHORT_CONNECT_DURATION,
-        },
-        util::{
-            historical_list::HistoricalList,
-            listener::{
-                ClientListenerMessageSender, ClientNetworkState, ClientStateUpdate,
-                Message::NotifyListeners,
-            },
-            state_machine::{self, ExitReason, IntoStateExt},
-        },
-    },
-    anyhow::format_err,
-    fidl::endpoints::create_proxy,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_async::{self as fasync, DurationExt, TimeoutExt},
     fuchsia_zircon as zx,
-    futures::{
-        channel::{mpsc, oneshot},
-        future::FutureExt,
-        lock::Mutex,
-        select,
-        stream::{self, StreamExt, TryStreamExt},
-    },
-    std::{convert::Infallible, sync::Arc},
-    tracing::{debug, error, info, warn},
-    wlan_common::{bss::BssDescription, sequestered::Sequestered},
 };
 
 const MAX_CONNECTION_ATTEMPTS: u8 = 4; // arbitrarily chosen until we have some data
@@ -807,31 +802,24 @@ pub fn convert_manual_connect_to_disconnect_reason(
 #[cfg(test)]
 mod tests {
 
-    use {
-        super::*,
-        crate::{
-            config_management::{
-                network_config::{self, Credential, FailureReason},
-                PastConnectionList, SavedNetworksManager,
-            },
-            util::{
-                listener,
-                testing::{
-                    generate_connect_selection, generate_disconnect_info, poll_sme_req,
-                    random_connection_data, ConnectResultRecord, ConnectionRecord,
-                    FakeLocalRoamManager, FakeSavedNetworksManager,
-                },
-            },
-        },
-        fidl::{endpoints::create_proxy_and_stream, prelude::*},
-        fidl_fuchsia_stash as fidl_stash, fidl_fuchsia_wlan_policy as fidl_policy,
-        fuchsia_zircon::prelude::*,
-        futures::{task::Poll, Future},
-        lazy_static::lazy_static,
-        std::pin::pin,
-        wlan_common::assert_variant,
-        wlan_metrics_registry::PolicyDisconnectionMigratedMetricDimensionReason,
+    use super::*;
+    use crate::config_management::network_config::{self, Credential, FailureReason};
+    use crate::config_management::{PastConnectionList, SavedNetworksManager};
+    use crate::util::listener;
+    use crate::util::testing::{
+        generate_connect_selection, generate_disconnect_info, poll_sme_req, random_connection_data,
+        ConnectResultRecord, ConnectionRecord, FakeLocalRoamManager, FakeSavedNetworksManager,
     };
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl::prelude::*;
+    use fuchsia_zircon::prelude::*;
+    use futures::task::Poll;
+    use futures::Future;
+    use lazy_static::lazy_static;
+    use std::pin::pin;
+    use wlan_common::assert_variant;
+    use wlan_metrics_registry::PolicyDisconnectionMigratedMetricDimensionReason;
+    use {fidl_fuchsia_stash as fidl_stash, fidl_fuchsia_wlan_policy as fidl_policy};
 
     lazy_static! {
         pub static ref TEST_PASSWORD: Credential = Credential::Password(b"password".to_vec());

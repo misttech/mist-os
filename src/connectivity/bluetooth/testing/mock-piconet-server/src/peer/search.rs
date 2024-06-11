@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_fuchsia_bluetooth_bredr::{SearchResultsProxy, ServiceClassProfileIdentifier},
-    slab::Slab,
-    std::collections::{HashMap, HashSet},
-    tracing::info,
-};
+use anyhow::Error;
+use fidl_fuchsia_bluetooth_bredr::{SearchResultsProxy, ServiceClassProfileIdentifier};
+use slab::Slab;
+use std::collections::{HashMap, HashSet};
+use tracing::info;
 
 use crate::types::{RegisteredServiceId, ServiceRecord};
 
@@ -166,14 +164,14 @@ impl SearchSet {
 mod tests {
     use super::*;
 
-    use {
-        fidl::endpoints::{create_proxy, create_proxy_and_stream},
-        fidl_fuchsia_bluetooth_bredr::{SearchResultsMarker, SearchResultsRequest},
-        fuchsia_async as fasync,
-        fuchsia_bluetooth::{profile::Psm, types::PeerId},
-        futures::{stream::StreamExt, task::Poll},
-        std::pin::pin,
-    };
+    use fidl::endpoints::{create_proxy, create_proxy_and_stream};
+    use fidl_fuchsia_bluetooth_bredr::{SearchResultsMarker, SearchResultsRequest};
+    use fuchsia_async as fasync;
+    use fuchsia_bluetooth::profile::Psm;
+    use fuchsia_bluetooth::types::PeerId;
+    use futures::stream::StreamExt;
+    use futures::task::Poll;
+    use std::pin::pin;
 
     use crate::profile::tests::a2dp_service_definition;
 

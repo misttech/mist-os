@@ -4,29 +4,29 @@
 
 #![allow(clippy::let_unit_value)]
 
-use {
-    anyhow::anyhow,
-    assert_matches::assert_matches,
-    diagnostics_assertions::{assert_data_tree, AnyProperty},
-    diagnostics_hierarchy::DiagnosticsHierarchy,
-    diagnostics_reader::{ArchiveReader, Inspect},
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_paver::{self as fpaver, Configuration, ConfigurationStatus},
-    fidl_fuchsia_update::{CommitStatusProviderMarker, CommitStatusProviderProxy},
-    fidl_fuchsia_update_verify as fupdate_verify,
-    fuchsia_async::{self as fasync, OnSignals, TimeoutExt},
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    fuchsia_sync::Mutex,
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::{channel::oneshot, prelude::*},
-    mock_paver::{hooks as mphooks, MockPaverService, MockPaverServiceBuilder, PaverEvent},
-    mock_reboot::{MockRebootService, RebootReason},
-    mock_verifier::MockVerifierService,
-    serde_json::json,
-    std::{path::PathBuf, sync::Arc, time::Duration},
-    tempfile::TempDir,
-};
+use anyhow::anyhow;
+use assert_matches::assert_matches;
+use diagnostics_assertions::{assert_data_tree, AnyProperty};
+use diagnostics_hierarchy::DiagnosticsHierarchy;
+use diagnostics_reader::{ArchiveReader, Inspect};
+use fidl_fuchsia_paver::{self as fpaver, Configuration, ConfigurationStatus};
+use fidl_fuchsia_update::{CommitStatusProviderMarker, CommitStatusProviderProxy};
+use fuchsia_async::{self as fasync, OnSignals, TimeoutExt};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use fuchsia_sync::Mutex;
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use futures::channel::oneshot;
+use futures::prelude::*;
+use mock_paver::{hooks as mphooks, MockPaverService, MockPaverServiceBuilder, PaverEvent};
+use mock_reboot::{MockRebootService, RebootReason};
+use mock_verifier::MockVerifierService;
+use serde_json::json;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
+use tempfile::TempDir;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_update_verify as fupdate_verify};
 
 const SYSTEM_UPDATE_COMMITTER_CM: &str = "#meta/system-update-committer.cm";
 const HANG_DURATION: Duration = Duration::from_millis(500);

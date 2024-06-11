@@ -5,20 +5,20 @@
 #![cfg(test)]
 
 use assert_matches::assert_matches;
-use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_debug as fnet_debug;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_root as fnet_root;
 use fuchsia_zircon::{self as zx, AsHandleRef as _};
 use futures::TryStreamExt as _;
 use net_declare::fidl_mac;
-use netstack_testing_common::{
-    devices::{add_pure_ip_interface, create_ip_tun_port, create_tun_device, install_device},
-    realms::{Netstack, TestRealmExt as _, TestSandboxExt as _},
+use netstack_testing_common::devices::{
+    add_pure_ip_interface, create_ip_tun_port, create_tun_device, install_device,
 };
+use netstack_testing_common::realms::{Netstack, TestRealmExt as _, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
+use {
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_debug as fnet_debug,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_root as fnet_root,
+};
 
 async fn get_loopback_id(realm: &netemul::TestRealm<'_>) -> u64 {
     let fnet_interfaces_ext::Properties {

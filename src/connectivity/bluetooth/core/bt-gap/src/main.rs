@@ -15,19 +15,19 @@ use fidl_fuchsia_bluetooth_host::{ReceiverRequest, ReceiverRequestStream};
 use fidl_fuchsia_bluetooth_le::{CentralMarker, PeripheralMarker};
 use fidl_fuchsia_device::NameProviderMarker;
 use fuchsia_async as fasync;
-use fuchsia_component::{client::connect_to_protocol, server::ServiceFs};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
 use futures::channel::mpsc;
 use futures::future::BoxFuture;
 use futures::{try_join, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use std::collections::HashMap;
 use tracing::{error, info, warn};
 
-use crate::{
-    generic_access_service::GenericAccessService,
-    host_dispatcher::{HostDispatcher, HostService, HostService::*},
-    services::host_watcher,
-    watch_peers::PeerWatcher,
-};
+use crate::generic_access_service::GenericAccessService;
+use crate::host_dispatcher::HostService::*;
+use crate::host_dispatcher::{HostDispatcher, HostService};
+use crate::services::host_watcher;
+use crate::watch_peers::PeerWatcher;
 
 mod build_config;
 mod generic_access_service;

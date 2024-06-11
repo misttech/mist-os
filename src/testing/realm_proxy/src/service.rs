@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error, Result},
-    fidl::endpoints,
-    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
-    fidl_fuchsia_testing_harness::{OperationError, RealmProxy_Request, RealmProxy_RequestStream},
-    fuchsia_async as fasync,
-    fuchsia_component_test::RealmInstance,
-    fuchsia_zircon::{self as zx},
-    futures::{Future, StreamExt, TryStreamExt},
-    tracing::{debug, error, warn},
-};
+use anyhow::{Context, Error, Result};
+use fidl::endpoints;
+use fidl_fuchsia_testing_harness::{OperationError, RealmProxy_Request, RealmProxy_RequestStream};
+use fuchsia_component_test::RealmInstance;
+use fuchsia_zircon::{self as zx};
+use futures::{Future, StreamExt, TryStreamExt};
+use tracing::{debug, error, warn};
+use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 // RealmProxy mediates a test suite's access to the services in a test realm.
 pub trait RealmProxy {

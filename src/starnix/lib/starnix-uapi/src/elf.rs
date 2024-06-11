@@ -6,7 +6,8 @@
 #![allow(non_camel_case_types)]
 #![allow(non_upper_case_globals)]
 
-use crate::{error, errors::Errno};
+use crate::error;
+use crate::errors::Errno;
 
 #[derive(Clone, Copy, PartialEq)]
 #[repr(usize)]

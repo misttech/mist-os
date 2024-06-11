@@ -4,10 +4,8 @@
 
 //! This is the Fuchsia Installer implementation that talks to fuchsia.update.installer FIDL API.
 
-use crate::{
-    app_set::FuchsiaAppSet,
-    install_plan::{FuchsiaInstallPlan, UpdatePackageUrl},
-};
+use crate::app_set::FuchsiaAppSet;
+use crate::install_plan::{FuchsiaInstallPlan, UpdatePackageUrl};
 use anyhow::{anyhow, Context as _};
 use fidl_connector::{Connect, ServiceReconnector};
 use fidl_fuchsia_pkg::{self as fpkg, CupData, CupMarker, CupProxy, WriteError};
@@ -20,18 +18,17 @@ use fidl_fuchsia_update_installer_ext::{
 };
 use fuchsia_async as fasync;
 use fuchsia_url::PinnedAbsolutePackageUrl;
-use futures::{future::LocalBoxFuture, lock::Mutex as AsyncMutex, prelude::*};
-use omaha_client::{
-    app_set::AppSet as _,
-    cup_ecdsa::RequestMetadata,
-    installer::{AppInstallResult, Installer, ProgressObserver},
-    protocol::{
-        request::InstallSource,
-        response::{OmahaStatus, Response, UpdateCheck},
-    },
-    request_builder::RequestParams,
-};
-use std::{rc::Rc, time::Duration};
+use futures::future::LocalBoxFuture;
+use futures::lock::Mutex as AsyncMutex;
+use futures::prelude::*;
+use omaha_client::app_set::AppSet as _;
+use omaha_client::cup_ecdsa::RequestMetadata;
+use omaha_client::installer::{AppInstallResult, Installer, ProgressObserver};
+use omaha_client::protocol::request::InstallSource;
+use omaha_client::protocol::response::{OmahaStatus, Response, UpdateCheck};
+use omaha_client::request_builder::RequestParams;
+use std::rc::Rc;
+use std::time::Duration;
 use thiserror::Error;
 use tracing::{info, warn};
 
@@ -456,22 +453,21 @@ pub fn is_update_urgent(update_check: &UpdateCheck) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::app_set::{AppIdSource, AppMetadata},
-        assert_matches::assert_matches,
-        fidl_fuchsia_pkg::{CupRequest, CupRequestStream},
-        fidl_fuchsia_update_installer::{
-            FailPrepareData, InstallationProgress, InstallerRequest, InstallerRequestStream,
-            RebootControllerRequest, State, UpdateInfo,
-        },
-        fuchsia_async as fasync,
-        fuchsia_sync::Mutex,
-        futures::future::BoxFuture,
-        omaha_client::protocol::response::{App, Manifest, Package, Packages},
-        serde_json::Map,
-        std::{sync::Arc, task::Poll},
+    use super::*;
+    use crate::app_set::{AppIdSource, AppMetadata};
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_pkg::{CupRequest, CupRequestStream};
+    use fidl_fuchsia_update_installer::{
+        FailPrepareData, InstallationProgress, InstallerRequest, InstallerRequestStream,
+        RebootControllerRequest, State, UpdateInfo,
     };
+    use fuchsia_async as fasync;
+    use fuchsia_sync::Mutex;
+    use futures::future::BoxFuture;
+    use omaha_client::protocol::response::{App, Manifest, Package, Packages};
+    use serde_json::Map;
+    use std::sync::Arc;
+    use std::task::Poll;
 
     const TEST_URL: &str = "fuchsia-pkg://fuchsia.test/update/0?hash=0000000000000000000000000000000000000000000000000000000000000000";
     const TEST_URL_BASE: &str = "fuchsia-pkg://fuchsia.test/";

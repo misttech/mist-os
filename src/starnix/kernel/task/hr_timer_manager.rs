@@ -5,14 +5,14 @@
 use fidl_fuchsia_hardware_hrtimer as fhrtimer;
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, HandleRef};
 use starnix_sync::{Mutex, MutexGuard};
-use starnix_uapi::{errno, errors::Errno, from_status_like_fdio};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::{errno, from_status_like_fdio};
 
-use std::{collections::BinaryHeap, sync::Arc};
+use std::collections::BinaryHeap;
+use std::sync::Arc;
 
-use crate::{
-    fs::fuchsia::TimerOps,
-    task::{CurrentTask, HandleWaitCanceler, WaitCanceler},
-};
+use crate::fs::fuchsia::TimerOps;
+use crate::task::{CurrentTask, HandleWaitCanceler, WaitCanceler};
 
 const HRTIMER_DIRECTORY: &str = "/dev/class/hrtimer";
 const HRTIMER_DEFAULT_ID: u64 = 6;
@@ -296,9 +296,8 @@ impl PartialOrd for HrTimerNode {
 
 #[cfg(test)]
 mod tests {
-    use fidl_fuchsia_hardware_hrtimer as fhrtimer;
-    use fuchsia_async as fasync;
     use futures::StreamExt;
+    use {fidl_fuchsia_hardware_hrtimer as fhrtimer, fuchsia_async as fasync};
 
     use super::*;
 

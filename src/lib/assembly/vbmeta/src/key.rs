@@ -7,7 +7,8 @@ use num::bigint::BigUint;
 use num::traits::Pow;
 use ring::signature::KeyPair;
 use thiserror::Error;
-use zerocopy::{byteorder::big_endian::U32, AsBytes};
+use zerocopy::byteorder::big_endian::U32;
+use zerocopy::AsBytes;
 
 /// Number of bytes of a Signature.
 pub const SIGNATURE_SIZE: u64 = 0x200;

@@ -2,36 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::model::actions::{ActionsManager, DestroyAction, ShutdownType};
+use crate::model::component::StartReason;
+use crate::model::routing::route_and_open_capability;
+use crate::model::start::Start;
+use crate::model::testing::routing_test_helpers::*;
+use ::routing_test_helpers::component_id_index::make_index_file;
+use ::routing_test_helpers::storage::CommonStorageTest;
+use ::routing_test_helpers::RoutingTestModel;
+use assert_matches::assert_matches;
+use async_utils::PollExt;
+use cm_rust::*;
+use cm_rust_testing::*;
+use component_id_index::InstanceId;
+use errors::{ActionError, CreateNamespaceError, ModelError, StartActionError};
+use fidl::endpoints::ServerEnd;
+use fuchsia_async::TestExecutor;
+use futures::channel::mpsc;
+use futures::{pin_mut, StreamExt};
+use moniker::Moniker;
+use router_error::{DowncastErrorForTest, RouterError};
+use routing::error::RoutingError;
+use routing::RouteRequest;
+use std::path::Path;
+use vfs::directory::entry::OpenRequest;
+use vfs::execution_scope::ExecutionScope;
+use vfs::path::Path as VfsPath;
+use vfs::ToObjectRequest;
 use {
-    crate::model::{
-        actions::{ActionsManager, DestroyAction, ShutdownType},
-        component::StartReason,
-        routing::route_and_open_capability,
-        start::Start,
-        testing::routing_test_helpers::*,
-    },
-    ::routing_test_helpers::{
-        component_id_index::make_index_file, storage::CommonStorageTest, RoutingTestModel,
-    },
-    assert_matches::assert_matches,
-    async_utils::PollExt,
-    cm_rust::*,
-    cm_rust_testing::*,
-    component_id_index::InstanceId,
-    errors::{ActionError, CreateNamespaceError, ModelError, StartActionError},
-    fidl::endpoints::ServerEnd,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    fuchsia_async::TestExecutor,
     fuchsia_sync as fsync, fuchsia_zircon as zx,
-    futures::{channel::mpsc, pin_mut, StreamExt},
-    moniker::Moniker,
-    router_error::{DowncastErrorForTest, RouterError},
-    routing::{error::RoutingError, RouteRequest},
-    std::path::Path,
-    vfs::{
-        directory::entry::OpenRequest, execution_scope::ExecutionScope, path::Path as VfsPath,
-        ToObjectRequest,
-    },
 };
 
 #[fuchsia::test]

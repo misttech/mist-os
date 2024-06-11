@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Context,
-    fidl::endpoints::{ControlHandle, Responder},
-    fidl_fuchsia_dash as fdash, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_inspect::{component, health::Reporter},
-    fuchsia_zircon as zx,
-    futures::prelude::*,
-    tracing::*,
-};
+use anyhow::Context;
+use fidl::endpoints::{ControlHandle, Responder};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_inspect::component;
+use fuchsia_inspect::health::Reporter;
+use futures::prelude::*;
+use tracing::*;
+use {fidl_fuchsia_dash as fdash, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 mod launch;
 mod layout;

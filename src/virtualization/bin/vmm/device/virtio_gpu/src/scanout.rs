@@ -2,32 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::gpu_command::{GpuCommandSender, ScanoutController},
-    crate::resource::Resource2D,
-    crate::wire,
-    anyhow::{anyhow, Context, Error},
-    async_utils::hanging_get::client::HangingGetStream,
-    fidl::endpoints::{create_proxy, ClientEnd, ServerEnd},
-    fidl_fuchsia_element::{GraphicalPresenterMarker, ViewSpec},
-    fidl_fuchsia_math as fmath,
-    fidl_fuchsia_ui_composition::{
-        BlendMode, ColorRgba, ContentId, FlatlandEvent, FlatlandMarker, FlatlandProxy,
-        ImageProperties, LayoutInfo, ParentViewportWatcherMarker, PresentArgs, TransformId,
-        ViewBoundProtocols,
-    },
-    fidl_fuchsia_ui_input3::KeyboardListenerMarker,
-    fidl_fuchsia_ui_pointer::MouseSourceMarker,
-    fidl_fuchsia_ui_views::{ViewCreationToken, ViewIdentityOnCreation, ViewportCreationToken},
-    fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_scenic::ViewRefPair,
-    fuchsia_zircon as zx,
-    futures::{channel::oneshot, select, StreamExt},
-    std::cell::Cell,
-    std::collections::HashMap,
-    std::rc::Rc,
+use crate::gpu_command::{GpuCommandSender, ScanoutController};
+use crate::resource::Resource2D;
+use crate::wire;
+use anyhow::{anyhow, Context, Error};
+use async_utils::hanging_get::client::HangingGetStream;
+use fidl::endpoints::{create_proxy, ClientEnd, ServerEnd};
+use fidl_fuchsia_element::{GraphicalPresenterMarker, ViewSpec};
+use fidl_fuchsia_ui_composition::{
+    BlendMode, ColorRgba, ContentId, FlatlandEvent, FlatlandMarker, FlatlandProxy, ImageProperties,
+    LayoutInfo, ParentViewportWatcherMarker, PresentArgs, TransformId, ViewBoundProtocols,
 };
+use fidl_fuchsia_ui_input3::KeyboardListenerMarker;
+use fidl_fuchsia_ui_pointer::MouseSourceMarker;
+use fidl_fuchsia_ui_views::{ViewCreationToken, ViewIdentityOnCreation, ViewportCreationToken};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_scenic::ViewRefPair;
+use futures::channel::oneshot;
+use futures::{select, StreamExt};
+use std::cell::Cell;
+use std::collections::HashMap;
+use std::rc::Rc;
+use {fidl_fuchsia_math as fmath, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 const BACKGROUND_COLOR: ColorRgba = ColorRgba { red: 0.5, green: 0.5, blue: 0.5, alpha: 1.0 };
 

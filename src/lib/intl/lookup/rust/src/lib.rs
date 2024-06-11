@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{Context, Result};
+use std::collections::BTreeMap;
+use std::{ffi, fs, io, mem, str};
+use tracing::error;
 use {
-    anyhow::{Context, Result},
     intl_model as model, rust_icu_common as ucommon, rust_icu_sys as usys, rust_icu_uloc as uloc,
-    std::collections::BTreeMap,
-    std::ffi,
-    std::fs,
-    std::io,
-    std::mem,
-    std::str,
-    tracing::error,
 };
 
 /// The directory where localized resources are kept.

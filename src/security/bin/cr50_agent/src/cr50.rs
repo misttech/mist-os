@@ -5,25 +5,18 @@
 mod command;
 mod status;
 
-use crate::{
-    cr50::{
-        command::{
-            ccd::{
-                CcdCommand, CcdGetInfoResponse, CcdOpenResponse, CcdPhysicalPresenceResponse,
-                CcdRequest,
-            },
-            pinweaver::{
-                GetLogEntryData, PinweaverGetLog, PinweaverInsertLeaf, PinweaverLogReplay,
-                PinweaverRemoveLeaf, PinweaverResetTree, PinweaverTryAuth, PROTOCOL_VERSION,
-            },
-            wp::WpInfoRequest,
-            Serializable, TpmCommand,
-        },
-        status::{ExecuteError, TpmStatus},
-    },
-    power_button::PowerButton,
-    util::Serializer,
+use crate::cr50::command::ccd::{
+    CcdCommand, CcdGetInfoResponse, CcdOpenResponse, CcdPhysicalPresenceResponse, CcdRequest,
 };
+use crate::cr50::command::pinweaver::{
+    GetLogEntryData, PinweaverGetLog, PinweaverInsertLeaf, PinweaverLogReplay, PinweaverRemoveLeaf,
+    PinweaverResetTree, PinweaverTryAuth, PROTOCOL_VERSION,
+};
+use crate::cr50::command::wp::WpInfoRequest;
+use crate::cr50::command::{Serializable, TpmCommand};
+use crate::cr50::status::{ExecuteError, TpmStatus};
+use crate::power_button::PowerButton;
+use crate::util::Serializer;
 use anyhow::{anyhow, Context, Error};
 use fidl::endpoints::RequestStream;
 use fidl_fuchsia_tpm::TpmDeviceProxy;
@@ -34,11 +27,10 @@ use fidl_fuchsia_tpm_cr50::{
     PinWeaverError, PinWeaverRequest, PinWeaverRequestStream, TryAuthFailed, TryAuthRateLimited,
     TryAuthResponse, TryAuthSuccess, WpState,
 };
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
 use futures::TryStreamExt;
 use std::sync::Arc;
 use tracing::warn;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub struct Cr50 {
     proxy: TpmDeviceProxy,

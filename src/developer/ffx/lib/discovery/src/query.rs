@@ -1,7 +1,8 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{desc::Description, DiscoverySources};
+use crate::desc::Description;
+use crate::DiscoverySources;
 use addr::TargetAddr;
 use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetInfo, TargetIp, TargetIpPort};
 use fidl_fuchsia_net as net;

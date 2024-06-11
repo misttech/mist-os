@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{Benchmark, CacheClearableFilesystem, Filesystem, OperationDuration, OperationTimer},
-    async_trait::async_trait,
-    rand::{seq::SliceRandom, Rng, SeedableRng},
-    rand_xorshift::XorShiftRng,
-    std::{
-        fs::OpenOptions,
-        io::{Seek, SeekFrom, Write},
-        os::unix::{fs::FileExt, io::AsRawFd},
-    },
-};
+use crate::{Benchmark, CacheClearableFilesystem, Filesystem, OperationDuration, OperationTimer};
+use async_trait::async_trait;
+use rand::seq::SliceRandom;
+use rand::{Rng, SeedableRng};
+use rand_xorshift::XorShiftRng;
+use std::fs::OpenOptions;
+use std::io::{Seek, SeekFrom, Write};
+use std::os::unix::fs::FileExt;
+use std::os::unix::io::AsRawFd;
 
 const RNG_SEED: u64 = 0xda782a0c3ce1819a;
 /// How many blocks to skip after each used block in sparse read benchmarks. This is set to thwart
@@ -602,7 +600,8 @@ fn write_random<F: AsRawFd, R: Rng>(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::testing::TestFilesystem};
+    use super::*;
+    use crate::testing::TestFilesystem;
 
     const OP_SIZE: usize = 8;
     const OP_COUNT: usize = 2;

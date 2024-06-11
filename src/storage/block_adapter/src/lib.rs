@@ -8,27 +8,22 @@
 // of writing, this is used to run the fsck-msdosfs and mkfs-msdosfs tools which use POSIX I/O to
 // interact with block devices.
 
+use anyhow::Error;
+use async_trait::async_trait;
+use fidl::endpoints::{create_endpoints, ServerEnd};
+use remote_block_device::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient};
+use std::sync::Arc;
+use vfs::common::rights_to_posix_mode_bits;
+use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use vfs::directory::entry_container::Directory;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode};
+use vfs::node::Node;
+use vfs::path::Path;
+use vfs::{attributes, pseudo_directory, ObjectRequestRef};
 use {
-    anyhow::Error,
-    async_trait::async_trait,
-    fidl::endpoints::{create_endpoints, ServerEnd},
     fidl_fuchsia_hardware_block as fhardware_block, fidl_fuchsia_io as fio,
     fuchsia_async as fasync, fuchsia_zircon as zx,
-    remote_block_device::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient},
-    std::sync::Arc,
-    vfs::{
-        attributes,
-        common::rights_to_posix_mode_bits,
-        directory::{
-            entry::{DirectoryEntry, EntryInfo, OpenRequest},
-            entry_container::Directory,
-        },
-        execution_scope::ExecutionScope,
-        file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode},
-        node::Node,
-        path::Path,
-        pseudo_directory, ObjectRequestRef,
-    },
 };
 
 fn map_to_status(err: Error) -> zx::Status {

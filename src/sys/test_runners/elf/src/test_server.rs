@@ -2,27 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::launcher::ComponentLauncher,
-    async_trait::async_trait,
-    fidl_fuchsia_test::{
-        self as ftest, Invocation, Result_ as TestResult, RunListenerProxy, Status,
-    },
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{
-        future::{abortable, AbortHandle},
-        prelude::*,
-        TryStreamExt,
-    },
-    std::sync::{Arc, Weak},
-    test_runners_lib::{
-        cases::TestCaseInfo,
-        elf::{Component, EnumeratedTestCases, FidlError, KernelError, SuiteServer},
-        errors::*,
-        logs::SocketLogWriter,
-    },
-    tracing::{debug, error},
+use crate::launcher::ComponentLauncher;
+use async_trait::async_trait;
+use fidl_fuchsia_test::{
+    self as ftest, Invocation, Result_ as TestResult, RunListenerProxy, Status,
 };
+use futures::future::{abortable, AbortHandle};
+use futures::prelude::*;
+use futures::TryStreamExt;
+use std::sync::{Arc, Weak};
+use test_runners_lib::cases::TestCaseInfo;
+use test_runners_lib::elf::{Component, EnumeratedTestCases, FidlError, KernelError, SuiteServer};
+use test_runners_lib::errors::*;
+use test_runners_lib::logs::SocketLogWriter;
+use tracing::{debug, error};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// Implements `fuchsia.test.Suite` and runs provided test.
 #[derive(Default)]

@@ -4,16 +4,15 @@
 
 mod test;
 
+use anyhow::*;
+use fidl::endpoints::{create_proxy, ServerEnd};
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
+use test::StressTest;
+use tracing::{error, info};
 use {
-    anyhow::*,
-    fidl::endpoints::{create_proxy, ServerEnd},
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fidl_fuchsia_test as ftest,
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_zircon as zx,
-    futures::prelude::*,
-    test::StressTest,
-    tracing::{error, info},
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 #[fuchsia::main]

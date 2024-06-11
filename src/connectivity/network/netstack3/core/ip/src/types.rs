@@ -4,16 +4,14 @@
 
 //! Common types for dealing with ip table entries.
 
-use core::{
-    convert::Infallible as Never,
-    fmt::{Debug, Display, Formatter},
-    hash::Hash,
-};
+use core::convert::Infallible as Never;
+use core::fmt::{Debug, Display, Formatter};
+use core::hash::Hash;
 
-use net_types::{
-    ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet, SubnetEither},
-    SpecifiedAddr,
+use net_types::ip::{
+    GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet, SubnetEither,
 };
+use net_types::SpecifiedAddr;
 use netstack3_base::socket::SocketIpAddr;
 
 /// The priority of a forwarding entry. Lower metrics are preferred.

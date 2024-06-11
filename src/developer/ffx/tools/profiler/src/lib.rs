@@ -4,16 +4,16 @@
 mod args;
 
 use ::std::path::PathBuf;
-use anyhow::Context;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use args::{ProfilerCommand, ProfilerSubCommand};
 use async_fs::File;
 use errors::{ffx_bail, ffx_error};
 use fho::{deferred, moniker, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_cpu_profiler as profiler;
 use fuchsia_async::unblock;
+use std::io::{stdin, BufRead};
 use std::process::Command;
-use std::{io::stdin, io::BufRead, time::Duration};
+use std::time::Duration;
 use tempfile::Builder;
 
 type Writer = MachineWriter<()>;

@@ -2,18 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{cache::Cache, Asset, AssetId, AssetLoader},
-    anyhow::Error,
-    fidl_fuchsia_fonts::CacheMissPolicy,
-    fidl_fuchsia_io as io, fidl_fuchsia_mem as mem,
-    fuchsia_inspect::{self as finspect, Property},
-    fuchsia_url::AbsoluteComponentUrl,
-    futures::{join, lock::Mutex},
-    manifest::v2,
-    std::{collections::BTreeMap, hash::Hash, path::PathBuf},
-    thiserror::Error,
-};
+use super::cache::Cache;
+use super::{Asset, AssetId, AssetLoader};
+use anyhow::Error;
+use fidl_fuchsia_fonts::CacheMissPolicy;
+use fuchsia_inspect::{self as finspect, Property};
+use fuchsia_url::AbsoluteComponentUrl;
+use futures::join;
+use futures::lock::Mutex;
+use manifest::v2;
+use std::collections::BTreeMap;
+use std::hash::Hash;
+use std::path::PathBuf;
+use thiserror::Error;
+use {fidl_fuchsia_io as io, fidl_fuchsia_mem as mem};
 
 /// A complete asset location, including the file name. (`AssetLocation` only includes the
 /// directory or package.)
@@ -423,10 +425,11 @@ impl AssetCollectionInspectData {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, async_trait::async_trait, diagnostics_assertions::assert_data_tree,
-        fuchsia_async as fasync, fuchsia_zircon as zx, std::path::Path,
-    };
+    use super::*;
+    use async_trait::async_trait;
+    use diagnostics_assertions::assert_data_tree;
+    use std::path::Path;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     fn mock_vmo(vmo_size: u64, buffer_size: u64) -> mem::Buffer {
         mem::Buffer { vmo: zx::Vmo::create(vmo_size).unwrap(), size: buffer_size }

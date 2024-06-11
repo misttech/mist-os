@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 use bitfield::bitfield;
-use fidl_fuchsia_bluetooth_bredr as bredr;
-use fidl_fuchsia_bluetooth_deviceid as di;
 use fuchsia_bluetooth::types::Uuid;
+use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_deviceid as di};
 
 use crate::error::Error;
 

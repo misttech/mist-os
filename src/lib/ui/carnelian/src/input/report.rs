@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    app::{
-        strategies::framebuffer::{AutoRepeatContext, AutoRepeatTimer},
-        Config,
-    },
-    drawing::DisplayRotation,
-    geometry::{IntVector, LimitToBounds},
-    input::{
-        consumer_control, input3_key_to_hid_usage, keyboard, mouse, touch, Button, ButtonSet,
-        DeviceId, Event, EventType, Modifiers,
-    },
-    IntPoint, IntRect, IntSize,
+use crate::app::strategies::framebuffer::{AutoRepeatContext, AutoRepeatTimer};
+use crate::app::Config;
+use crate::drawing::DisplayRotation;
+use crate::geometry::{IntVector, LimitToBounds};
+use crate::input::{
+    consumer_control, input3_key_to_hid_usage, keyboard, mouse, touch, Button, ButtonSet, DeviceId,
+    Event, EventType, Modifiers,
 };
+use crate::{IntPoint, IntRect, IntSize};
 use euclid::{point2, size2, vec2};
 use fidl_fuchsia_input_report as hid_input_report;
 use keymaps::Keymap;

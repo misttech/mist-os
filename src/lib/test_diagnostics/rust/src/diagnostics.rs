@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    diagnostics_data::LogsData,
-    fidl_fuchsia_test_manager as ftest_manager,
-    futures::Stream,
-    futures::{stream::BoxStream, StreamExt},
-    log_command::log_socket_stream::LogsDataStream,
-    pin_project::pin_project,
-    std::{
-        pin::Pin,
-        task::{Context, Poll},
-    },
-};
+use anyhow::Error;
+use diagnostics_data::LogsData;
+use fidl_fuchsia_test_manager as ftest_manager;
+use futures::stream::BoxStream;
+use futures::{Stream, StreamExt};
+use log_command::log_socket_stream::LogsDataStream;
+use pin_project::pin_project;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 #[cfg(target_os = "fuchsia")]
 use crate::diagnostics::fuchsia::BatchLogStream;
@@ -78,10 +74,10 @@ fn get_log_stream(syslog: ftest_manager::Syslog) -> Result<LogStream, fidl::Erro
 
 #[cfg(target_os = "fuchsia")]
 mod fuchsia {
-    use {
-        super::*, diagnostics_reader::Subscription, fidl::endpoints::ClientEnd,
-        fidl_fuchsia_diagnostics::BatchIteratorMarker,
-    };
+    use super::*;
+    use diagnostics_reader::Subscription;
+    use fidl::endpoints::ClientEnd;
+    use fidl_fuchsia_diagnostics::BatchIteratorMarker;
 
     #[pin_project]
     pub struct BatchLogStream {
@@ -121,24 +117,20 @@ mod fuchsia {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        diagnostics_data::{Severity, Timestamp},
-        fuchsia_async as fasync,
-    };
+    use super::*;
+    use diagnostics_data::{Severity, Timestamp};
+    use fuchsia_async as fasync;
 
     #[cfg(target_os = "fuchsia")]
     mod fuchsia {
-        use {
-            super::*,
-            assert_matches::assert_matches,
-            fidl::endpoints::ServerEnd,
-            fidl_fuchsia_diagnostics::{
-                BatchIteratorMarker, BatchIteratorRequest, FormattedContent, ReaderError,
-            },
-            fidl_fuchsia_mem as fmem, fuchsia_zircon as zx,
-            futures::TryStreamExt,
+        use super::*;
+        use assert_matches::assert_matches;
+        use fidl::endpoints::ServerEnd;
+        use fidl_fuchsia_diagnostics::{
+            BatchIteratorMarker, BatchIteratorRequest, FormattedContent, ReaderError,
         };
+        use futures::TryStreamExt;
+        use {fidl_fuchsia_mem as fmem, fuchsia_zircon as zx};
 
         fn create_log_stream() -> Result<(LogStream, ftest_manager::LogsIterator), fidl::Error> {
             let (stream, iterator) = BatchLogStream::new()?;
@@ -222,7 +214,9 @@ mod tests {
 
     #[cfg(not(target_os = "fuchsia"))]
     mod host {
-        use {super::*, assert_matches::assert_matches, futures::AsyncWriteExt};
+        use super::*;
+        use assert_matches::assert_matches;
+        use futures::AsyncWriteExt;
 
         fn create_log_stream() -> Result<(LogStream, ftest_manager::LogsIterator), fidl::Error> {
             let (client_end, server_end) = fidl::Socket::create_stream();

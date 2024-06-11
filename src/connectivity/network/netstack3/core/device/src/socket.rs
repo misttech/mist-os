@@ -5,23 +5,25 @@
 //! Link-layer sockets (analogous to Linux's AF_PACKET sockets).
 
 use alloc::collections::{HashMap, HashSet};
-use core::{fmt::Debug, hash::Hash, num::NonZeroU16};
+use core::fmt::Debug;
+use core::hash::Hash;
+use core::num::NonZeroU16;
 
 use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
-use net_types::{ethernet::Mac, ip::IpVersion};
+use net_types::ethernet::Mac;
+use net_types::ip::IpVersion;
+use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc};
 use netstack3_base::{
-    sync::{Mutex, PrimaryRc, RwLock, StrongRc},
     AnyDevice, ContextPair, Device, DeviceIdContext, FrameDestination, SendFrameContext,
     StrongDeviceIdentifier as _, WeakDeviceIdentifier as _,
 };
 use packet::{BufferMut, ParsablePacket as _, Serializer};
-use packet_formats::{
-    error::ParseError,
-    ethernet::{EtherType, EthernetFrameLengthCheck},
-};
+use packet_formats::error::ParseError;
+use packet_formats::ethernet::{EtherType, EthernetFrameLengthCheck};
 
-use crate::internal::{base::DeviceLayerTypes, id::WeakDeviceId};
+use crate::internal::base::DeviceLayerTypes;
+use crate::internal::id::WeakDeviceId;
 
 /// A selector for frames based on link-layer protocol number.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
@@ -871,17 +873,20 @@ mod testutil {
 
 #[cfg(test)]
 mod tests {
-    use alloc::{collections::HashMap, rc::Rc, vec, vec::Vec};
-    use core::{cell::RefCell, cmp::PartialEq, marker::PhantomData};
+    use alloc::collections::HashMap;
+    use alloc::rc::Rc;
+    use alloc::vec;
+    use alloc::vec::Vec;
+    use core::cell::RefCell;
+    use core::cmp::PartialEq;
+    use core::marker::PhantomData;
 
     use const_unwrap::const_unwrap_option;
     use derivative::Derivative;
-    use netstack3_base::{
-        testutil::{
-            FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId,
-        },
-        ContextProvider, CtxPair, DeviceIdentifier,
+    use netstack3_base::testutil::{
+        FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId,
     };
+    use netstack3_base::{ContextProvider, CtxPair, DeviceIdentifier};
     use packet::ParsablePacket;
     use test_case::test_case;
 

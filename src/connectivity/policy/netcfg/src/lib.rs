@@ -15,45 +15,41 @@ mod masquerade;
 mod virtualization;
 
 use ::dhcpv4::protocol::FromFidlExt as _;
-use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
-    fs, io,
-    num::NonZeroU64,
-    path,
-    pin::{pin, Pin},
-    str::FromStr,
-};
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
+use std::num::NonZeroU64;
+use std::pin::{pin, Pin};
+use std::str::FromStr;
+use std::{fs, io, path};
 
 use fidl::endpoints::{RequestStream as _, Responder as _};
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_dhcp as fnet_dhcp;
-use fidl_fuchsia_net_dhcp_ext as fnet_dhcp_ext;
-use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
 use fidl_fuchsia_net_ext::{self as fnet_ext, DisplayExt as _, IpExt as _};
-use fidl_fuchsia_net_filter as fnet_filter;
-use fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext, Update as _};
-use fidl_fuchsia_net_masquerade as fnet_masquerade;
-use fidl_fuchsia_net_name as fnet_name;
-use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
-use fidl_fuchsia_net_stack as fnet_stack;
-use fidl_fuchsia_net_virtualization as fnet_virtualization;
-use fuchsia_async as fasync;
 use fuchsia_component::client::{clone_namespace_svc, new_protocol_connector_in_dir};
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_fs::directory as fvfs_watcher;
-use fuchsia_zircon as zx;
+use {
+    fidl_fuchsia_io as fio, fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcp as fnet_dhcp,
+    fidl_fuchsia_net_dhcp_ext as fnet_dhcp_ext, fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6,
+    fidl_fuchsia_net_filter as fnet_filter,
+    fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_masquerade as fnet_masquerade, fidl_fuchsia_net_name as fnet_name,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin, fidl_fuchsia_net_stack as fnet_stack,
+    fidl_fuchsia_net_virtualization as fnet_virtualization, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
+};
 
 use anyhow::{anyhow, Context as _};
 use async_trait::async_trait;
 use async_utils::stream::{TryFlattenUnorderedExt as _, WithTag as _};
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource, DEFAULT_DNS_PORT};
 use fuchsia_fs::OpenFlags;
-use futures::{stream::BoxStream, FutureExt, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
-use net_declare::{fidl_ip_v4, net::prefix_length_v4};
+use futures::stream::BoxStream;
+use futures::{FutureExt, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
+use net_declare::fidl_ip_v4;
+use net_declare::net::prefix_length_v4;
 use net_types::ip::{IpAddress as _, Ipv4, PrefixLength};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, trace, warn};
@@ -3226,11 +3222,12 @@ pub(crate) fn exit_with_fidl_error(cause: fidl::Error) -> ! {
 
 #[cfg(test)]
 mod tests {
-    use fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext;
     use fidl_fuchsia_net_ext::FromExt as _;
-    use fidl_fuchsia_net_routes as fnet_routes;
-    use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
-    use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
+    use {
+        fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext, fidl_fuchsia_net_routes as fnet_routes,
+        fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+        fidl_fuchsia_net_routes_ext as fnet_routes_ext,
+    };
 
     use assert_matches::assert_matches;
     use const_unwrap::const_unwrap_option;

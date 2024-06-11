@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_diagnostics::StringSelector,
-    selectors::FastError,
-    serde::{de::Unexpected, Deserialize, Deserializer},
-    std::sync::atomic::{AtomicU64, Ordering},
-    std::sync::Arc,
-};
+use fidl_fuchsia_diagnostics::StringSelector;
+use selectors::FastError;
+use serde::de::Unexpected;
+use serde::{Deserialize, Deserializer};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 // SelectorList and StringList are adapted from SelectorEntry in
 // src/diagnostics/lib/triage/src/config.rs

@@ -4,13 +4,13 @@
 
 pub mod component;
 
+use fidl::endpoints::{ClientEnd, ServerEnd};
+use std::path::Path;
+use thiserror::Error;
 use {
-    fidl::endpoints::{ClientEnd, ServerEnd},
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
     fidl_fuchsia_process as fprocess, fuchsia_zircon as zx,
-    std::path::Path,
-    thiserror::Error,
 };
 
 const ARGS_KEY: &str = "args";
@@ -395,7 +395,8 @@ impl From<StartInfo> for fcrunner::ComponentStartInfo {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, test_case::test_case};
+    use super::*;
+    use test_case::test_case;
 
     #[test_case(Some("some_url"), Some("some_url".to_owned()) ; "when url is valid")]
     #[test_case(None, None ; "when url is missing")]

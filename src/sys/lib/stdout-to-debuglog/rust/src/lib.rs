@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_fuchsia_boot as fboot,
-    fuchsia_zircon::{self as zx, HandleBased},
-};
+use anyhow::Error;
+use fidl_fuchsia_boot as fboot;
+use fuchsia_zircon::{self as zx, HandleBased};
 
 pub async fn init() -> Result<(), Error> {
     let write_only_log_proxy =

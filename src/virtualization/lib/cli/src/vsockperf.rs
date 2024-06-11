@@ -2,24 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::platform::PlatformServices,
-    anyhow::{anyhow, Error},
-    fidl::endpoints::{create_proxy, create_request_stream},
-    fidl_fuchsia_virtualization::{
-        GuestManagerProxy, GuestMarker, GuestStatus, HostVsockAcceptorMarker,
-        HostVsockEndpointMarker,
-    },
-    fuchsia_async as fasync, fuchsia_zircon_status as zx_status,
-    futures::{select, try_join, AsyncReadExt, AsyncWriteExt, FutureExt, TryStreamExt},
-    guest_cli_args as arguments,
-    prettytable::{cell, format::consts::FORMAT_CLEAN, row, Table},
-    std::{
-        collections::{HashMap, HashSet},
-        fmt,
-        io::Write,
-    },
+use crate::platform::PlatformServices;
+use anyhow::{anyhow, Error};
+use fidl::endpoints::{create_proxy, create_request_stream};
+use fidl_fuchsia_virtualization::{
+    GuestManagerProxy, GuestMarker, GuestStatus, HostVsockAcceptorMarker, HostVsockEndpointMarker,
 };
+use futures::{select, try_join, AsyncReadExt, AsyncWriteExt, FutureExt, TryStreamExt};
+use prettytable::format::consts::FORMAT_CLEAN;
+use prettytable::{cell, row, Table};
+use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::io::Write;
+use {fuchsia_async as fasync, fuchsia_zircon_status as zx_status, guest_cli_args as arguments};
 
 const LATENCY_CHECK_SIZE_BYTES: usize = 4096;
 const THROUGHPUT_SIZE_MEBIBYTES: usize = 128;

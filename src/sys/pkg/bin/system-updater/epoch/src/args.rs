@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {argh::FromArgs, std::path::Path};
+use argh::FromArgs;
+use std::path::Path;
 
 #[derive(FromArgs)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -29,7 +30,8 @@ impl Args {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn fail_unknown_option() {

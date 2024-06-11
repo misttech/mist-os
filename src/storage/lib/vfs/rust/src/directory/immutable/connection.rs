@@ -5,23 +5,18 @@
 //! Connection to a directory that can not be modified by the client, no matter what permissions
 //! the client has on the FIDL connection.
 
-use crate::{
-    directory::{
-        connection::{BaseConnection, ConnectionState},
-        entry_container::Directory,
-    },
-    execution_scope::ExecutionScope,
-    node::OpenNode,
-    ObjectRequestRef, ProtocolsExt,
-};
+use crate::directory::connection::{BaseConnection, ConnectionState};
+use crate::directory::entry_container::Directory;
+use crate::execution_scope::ExecutionScope;
+use crate::node::OpenNode;
+use crate::{ObjectRequestRef, ProtocolsExt};
 
-use {
-    fidl_fuchsia_io as fio,
-    fio::DirectoryRequest,
-    fuchsia_zircon_status::Status,
-    futures::TryStreamExt as _,
-    std::{future::Future, sync::Arc},
-};
+use fidl_fuchsia_io as fio;
+use fio::DirectoryRequest;
+use fuchsia_zircon_status::Status;
+use futures::TryStreamExt as _;
+use std::future::Future;
+use std::sync::Arc;
 
 pub struct ImmutableConnection<DirectoryType: Directory> {
     base: BaseConnection<DirectoryType>,

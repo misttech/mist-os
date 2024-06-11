@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        client::{connection_selection::scoring_functions, types},
-        telemetry::{TelemetryEvent, TelemetrySender},
-    },
-    fuchsia_inspect_contrib::{
-        auto_persist::AutoPersist, inspect_insert, inspect_log, log::InspectList,
-        nodes::BoundedListNode as InspectBoundedListNode,
-    },
-    futures::lock::Mutex,
-    std::{cmp::Reverse, sync::Arc},
-    tracing::{error, info},
-};
+use crate::client::connection_selection::scoring_functions;
+use crate::client::types;
+use crate::telemetry::{TelemetryEvent, TelemetrySender};
+use fuchsia_inspect_contrib::auto_persist::AutoPersist;
+use fuchsia_inspect_contrib::log::InspectList;
+use fuchsia_inspect_contrib::nodes::BoundedListNode as InspectBoundedListNode;
+use fuchsia_inspect_contrib::{inspect_insert, inspect_log};
+use futures::lock::Mutex;
+use std::cmp::Reverse;
+use std::sync::Arc;
+use tracing::{error, info};
 
 /// BSS selection. Selects the best from a list of candidates that are available for
 /// connection.
@@ -80,25 +78,23 @@ pub async fn select_bss(
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    use crate::config_management::{ConnectFailure, FailureReason};
+    use crate::util::testing::{
+        create_inspect_persistence_channel, generate_channel,
+        generate_random_bss_with_compatibility, generate_random_connect_reason,
+        generate_random_scanned_candidate,
+    };
+    use diagnostics_assertions::{
+        assert_data_tree, AnyBoolProperty, AnyNumericProperty, AnyProperty, AnyStringProperty,
+    };
+    use futures::channel::mpsc;
+    use ieee80211_testutils::{BSSID_REGEX, SSID_REGEX};
+    use rand::Rng;
+    use wlan_common::{assert_variant, random_fidl_bss_description};
     use {
-        super::*,
-        crate::{
-            config_management::{ConnectFailure, FailureReason},
-            util::testing::{
-                create_inspect_persistence_channel, generate_channel,
-                generate_random_bss_with_compatibility, generate_random_connect_reason,
-                generate_random_scanned_candidate,
-            },
-        },
-        diagnostics_assertions::{
-            assert_data_tree, AnyBoolProperty, AnyNumericProperty, AnyProperty, AnyStringProperty,
-        },
         fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync,
         fuchsia_inspect as inspect,
-        futures::channel::mpsc,
-        ieee80211_testutils::{BSSID_REGEX, SSID_REGEX},
-        rand::Rng,
-        wlan_common::{assert_variant, random_fidl_bss_description},
     };
 
     struct TestValues {

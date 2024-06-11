@@ -11,21 +11,17 @@
 // should be used.
 #![cfg_attr(not(test), deny(clippy::print_stdout, clippy::print_stderr,))]
 
-use {
-    crate::{
-        bootfs::BootfsSvc,
-        builtin_environment::{BuiltinEnvironment, BuiltinEnvironmentBuilder},
-    },
-    ::cm_logger::klog,
-    anyhow::Error,
-    cm_config::RuntimeConfig,
-    fidl_fuchsia_component_internal as finternal, fuchsia_async as fasync,
-    fuchsia_runtime::{job_default, process_self},
-    fuchsia_zircon::JobCriticalOptions,
-    std::path::PathBuf,
-    std::{panic, process},
-    tracing::{error, info},
-};
+use crate::bootfs::BootfsSvc;
+use crate::builtin_environment::{BuiltinEnvironment, BuiltinEnvironmentBuilder};
+use ::cm_logger::klog;
+use anyhow::Error;
+use cm_config::RuntimeConfig;
+use fuchsia_runtime::{job_default, process_self};
+use fuchsia_zircon::JobCriticalOptions;
+use std::path::PathBuf;
+use std::{panic, process};
+use tracing::{error, info};
+use {fidl_fuchsia_component_internal as finternal, fuchsia_async as fasync};
 
 mod bedrock;
 mod bootfs;

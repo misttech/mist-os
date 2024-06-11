@@ -6,9 +6,8 @@ use std::collections::{HashMap, HashSet};
 
 use crate::trace;
 use anyhow::Error;
-use fuchsia_async as fasync;
-use fuchsia_trace as ftrace;
 use futures::StreamExt;
+use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
 use crate::agent::earcons::agent::CommonEarconsParams;
 use crate::agent::earcons::sound_ids::{VOLUME_CHANGED_SOUND_ID, VOLUME_MAX_SOUND_ID};
@@ -18,11 +17,10 @@ use crate::audio::types::{
 };
 use crate::audio::{create_default_modified_counters, ModifiedCounters};
 use crate::base::{SettingInfo, SettingType};
-use crate::event;
 use crate::handler::base::{Payload, Request};
 use crate::message::base::Audience;
 use crate::message::receptor::extract_payload;
-use crate::service;
+use crate::{event, service};
 
 /// The `VolumeChangeHandler` takes care of the earcons functionality on volume change.
 pub(super) struct VolumeChangeHandler {

@@ -421,7 +421,10 @@ pub async fn check_registration_alias_conflict(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, maplit::btreemap, pretty_assertions::assert_eq, serde_json::json};
+    use super::*;
+    use maplit::btreemap;
+    use pretty_assertions::assert_eq;
+    use serde_json::json;
 
     const CONFIG_KEY_ROOT: &str = "repository";
 

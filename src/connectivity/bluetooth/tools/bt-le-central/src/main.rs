@@ -6,10 +6,8 @@ use anyhow::{format_err, Context as _, Error};
 use fidl::endpoints;
 use fidl_fuchsia_bluetooth_le::{CentralMarker, Filter, ScanOptions, ScanResultWatcherMarker};
 use fuchsia_async as fasync;
-use fuchsia_bluetooth::{
-    assigned_numbers,
-    types::{PeerId, Uuid},
-};
+use fuchsia_bluetooth::assigned_numbers;
+use fuchsia_bluetooth::types::{PeerId, Uuid};
 use futures::{try_join, TryFutureExt};
 use getopts::Options;
 use std::str::FromStr;

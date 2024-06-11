@@ -2,14 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::frame_writer::BufferWrite,
-    quote::quote,
-    syn::{
-        parse::{Parse, ParseStream},
-        Error, Expr, Ident, Result, Token,
-    },
-};
+use crate::frame_writer::BufferWrite;
+use quote::quote;
+use syn::parse::{Parse, ParseStream};
+use syn::{Error, Expr, Ident, Result, Token};
 
 const IE_SSID: &str = "ssid";
 const IE_HT_CAPABILITIES: &str = "ht_cap";

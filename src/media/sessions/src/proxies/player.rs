@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{id::Id, services::discovery::filter::*, Result, SessionId};
+use crate::id::Id;
+use crate::services::discovery::filter::*;
+use crate::{Result, SessionId};
 use anyhow::format_err;
 use fidl::client::QueryResponseFut;
 use fidl::endpoints::{ClientEnd, ServerEnd};
@@ -11,18 +13,14 @@ use fidl_fuchsia_media_audio::*;
 use fidl_fuchsia_media_sessions2::*;
 use fidl_table_validation::*;
 use fuchsia_inspect as inspect;
-use futures::{
-    channel::oneshot,
-    future::BoxFuture,
-    stream::{FusedStream, FuturesUnordered},
-    Future, FutureExt, Stream, StreamExt,
-};
-use std::{
-    convert::*,
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll, Waker},
-};
+use futures::channel::oneshot;
+use futures::future::BoxFuture;
+use futures::stream::{FusedStream, FuturesUnordered};
+use futures::{Future, FutureExt, Stream, StreamExt};
+use std::convert::*;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll, Waker};
 use tracing::info;
 
 const DEFAULT_PLAYER_USAGE: AudioRenderUsage = AudioRenderUsage::Media;
@@ -477,11 +475,10 @@ mod test {
     use super::*;
     use assert_matches::assert_matches;
     use diagnostics_assertions::assert_data_tree;
-    use fidl::{
-        endpoints::{create_endpoints, create_proxy_and_stream},
-        prelude::*,
-    };
-    use futures::{future, stream::TryStreamExt};
+    use fidl::endpoints::{create_endpoints, create_proxy_and_stream};
+    use fidl::prelude::*;
+    use futures::future;
+    use futures::stream::TryStreamExt;
     use futures_test::task::noop_waker;
     use inspect::Inspector;
 

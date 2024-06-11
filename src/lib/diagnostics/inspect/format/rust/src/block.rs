@@ -4,23 +4,18 @@
 
 //! Utilities for writing VMO blocks in a type-safe way.
 
-use crate::{
-    bitfields::{HeaderFields, PayloadFields},
-    block_index::BlockIndex,
-    block_type::BlockType,
-    constants,
-    container::{ReadBytes, WriteBytes},
-    error::Error,
-    utils,
-};
+use crate::bitfields::{HeaderFields, PayloadFields};
+use crate::block_index::BlockIndex;
+use crate::block_type::BlockType;
+use crate::container::{ReadBytes, WriteBytes};
+use crate::error::Error;
+use crate::{constants, utils};
 use byteorder::{ByteOrder, LittleEndian};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
-use std::{
-    cmp::min,
-    ops::{Deref, DerefMut},
-    sync::atomic::{fence, Ordering},
-};
+use std::cmp::min;
+use std::ops::{Deref, DerefMut};
+use std::sync::atomic::{fence, Ordering};
 
 pub use diagnostics_hierarchy::ArrayFormat;
 

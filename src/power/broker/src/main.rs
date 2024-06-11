@@ -15,7 +15,8 @@ use fidl_fuchsia_power_broker::{
 use fpb::ElementSchema;
 use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_inspect::{component, health::Reporter};
+use fuchsia_inspect::component;
+use fuchsia_inspect::health::Reporter;
 use futures::channel::mpsc::UnboundedReceiver;
 use futures::prelude::*;
 use futures::select;

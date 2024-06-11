@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    cm_fidl_validator::error::ErrorList,
-    cm_types::ParseError,
-    fidl_fuchsia_component_decl as fdecl,
-    std::path::Path,
-    std::str::Utf8Error,
-    std::{error, fmt, io},
-};
+use cm_fidl_validator::error::ErrorList;
+use cm_types::ParseError;
+use fidl_fuchsia_component_decl as fdecl;
+use std::path::Path;
+use std::str::Utf8Error;
+use std::{error, fmt, io};
 
 /// The location in the file where an error was detected.
 #[derive(PartialEq, Clone, Debug)]
@@ -333,8 +331,7 @@ mod tests {
 
     #[test]
     fn test_format_multiple_fidl_validator_errors() {
-        use cm_fidl_validator::error::AvailabilityList;
-        use cm_fidl_validator::error::Error as CmFidlError;
+        use cm_fidl_validator::error::{AvailabilityList, Error as CmFidlError};
 
         let error = Error::FidlValidator {
             errs: ErrorList {

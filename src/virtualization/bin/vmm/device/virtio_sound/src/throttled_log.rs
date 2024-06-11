@@ -5,10 +5,12 @@
 // Don't complain if one of info/warn/err/debug are unused.
 #![allow(unused)]
 
-use {
-    fuchsia_zircon as zx, once_cell::sync::Lazy, std::cell::RefCell, std::rc::Rc,
-    std::sync::atomic::AtomicBool, std::sync::Mutex,
-};
+use fuchsia_zircon as zx;
+use once_cell::sync::Lazy;
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::sync::atomic::AtomicBool;
+use std::sync::Mutex;
 
 /// A simple rate limiter
 struct RateLimiter<C: Clock> {
@@ -125,10 +127,7 @@ macro_rules! error {
     };
 }
 
-pub(crate) use debug;
-pub(crate) use error;
-pub(crate) use info;
-pub(crate) use warning;
+pub(crate) use {debug, error, info, warning};
 
 #[cfg(test)]
 mod tests {

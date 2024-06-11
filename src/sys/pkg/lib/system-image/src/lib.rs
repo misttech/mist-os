@@ -9,14 +9,12 @@ mod errors;
 mod path_hash_mapping;
 mod system_image;
 
-pub use crate::{
-    cache_packages::CachePackages,
-    errors::{
-        AllowListError, CachePackagesInitError, PathHashMappingError, StaticPackagesInitError,
-    },
-    path_hash_mapping::{Bootfs, PathHashMapping, StaticPackages},
-    system_image::{ExecutabilityRestrictions, SystemImage},
+pub use crate::cache_packages::CachePackages;
+pub use crate::errors::{
+    AllowListError, CachePackagesInitError, PathHashMappingError, StaticPackagesInitError,
 };
+pub use crate::path_hash_mapping::{Bootfs, PathHashMapping, StaticPackages};
+pub use crate::system_image::{ExecutabilityRestrictions, SystemImage};
 
 static PKGFS_BOOT_ARG_KEY: &str = "zircon.system.pkgfs.cmd";
 static PKGFS_BOOT_ARG_VALUE_PREFIX: &str = "bin/pkgsvr+";
@@ -56,10 +54,12 @@ pub enum SystemImageHashError {
 
 #[cfg(test)]
 mod test_get_system_image_hash {
-    use {
-        super::*, assert_matches::assert_matches, fuchsia_async as fasync,
-        mock_boot_arguments::MockBootArgumentsService, std::collections::HashMap, std::sync::Arc,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use mock_boot_arguments::MockBootArgumentsService;
+    use std::collections::HashMap;
+    use std::sync::Arc;
 
     #[fasync::run_singlethreaded(test)]
     async fn missing_value() {

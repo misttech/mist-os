@@ -4,20 +4,18 @@
 
 #![allow(unused_variables)]
 
+use crate::visitor::{BpfVisitor, DataWidth, ProgramCounter, Register, Source};
 use crate::{
-    visitor::{BpfVisitor, DataWidth, ProgramCounter, Register, Source},
     EbpfError, MapSchema, BPF_MAX_INSTS, BPF_SIZE_MASK, BPF_STACK_SIZE, GENERAL_REGISTER_COUNT,
     REGISTER_COUNT,
 };
 use byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian};
 use fuchsia_sync::Mutex;
 use linux_uapi::bpf_insn;
-use std::{
-    cmp::Ordering,
-    collections::{BTreeMap, HashMap, HashSet},
-    ops::Deref,
-    sync::Arc,
-};
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::ops::Deref;
+use std::sync::Arc;
 use zerocopy::AsBytes;
 
 /// A trait to receive the log from the verifier.

@@ -5,18 +5,16 @@
 mod balloon_device;
 mod wire;
 
-use {
-    crate::balloon_device::{BalloonDevice, VmoMemoryBackend},
-    anyhow::{anyhow, Context},
-    fidl::endpoints::RequestStream,
-    fidl_fuchsia_virtualization_hardware::VirtioBalloonRequestStream,
-    fuchsia_component::server,
-    fuchsia_inspect as inspect,
-    futures::channel::mpsc,
-    futures::{future, StreamExt, TryFutureExt, TryStreamExt},
-    machina_virtio_device::GuestBellTrap,
-    virtio_device::chain::{ReadableChain, WritableChain},
-};
+use crate::balloon_device::{BalloonDevice, VmoMemoryBackend};
+use anyhow::{anyhow, Context};
+use fidl::endpoints::RequestStream;
+use fidl_fuchsia_virtualization_hardware::VirtioBalloonRequestStream;
+use fuchsia_component::server;
+use fuchsia_inspect as inspect;
+use futures::channel::mpsc;
+use futures::{future, StreamExt, TryFutureExt, TryStreamExt};
+use machina_virtio_device::GuestBellTrap;
+use virtio_device::chain::{ReadableChain, WritableChain};
 
 async fn run_virtio_balloon(
     mut virtio_balloon_fidl: VirtioBalloonRequestStream,

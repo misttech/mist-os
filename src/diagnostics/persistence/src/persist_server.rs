@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{constants, Scheduler},
-    fidl_fuchsia_diagnostics_persist::{
-        DataPersistenceRequest, DataPersistenceRequestStream, PersistResult,
-    },
-    fuchsia_async::TaskGroup,
-    fuchsia_component::server::{ServiceFs, ServiceObj},
-    fuchsia_sync::Mutex,
-    futures::StreamExt,
-    persistence_config::{ServiceName, Tag},
-    std::{collections::HashSet, sync::Arc},
-    tracing::*,
+use crate::{constants, Scheduler};
+use fidl_fuchsia_diagnostics_persist::{
+    DataPersistenceRequest, DataPersistenceRequestStream, PersistResult,
 };
+use fuchsia_async::TaskGroup;
+use fuchsia_component::server::{ServiceFs, ServiceObj};
+use fuchsia_sync::Mutex;
+use futures::StreamExt;
+use persistence_config::{ServiceName, Tag};
+use std::collections::HashSet;
+use std::sync::Arc;
+use tracing::*;
 
 pub struct PersistServerData {
     // Service name that this persist server is hosting.

@@ -2,22 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::api;
-use super::data_source as ds;
 use super::hash::Hash;
+use super::{api, data_source as ds};
 use delivery_blob::DeliveryBlobType;
-use dyn_clone::clone_trait_object;
-use dyn_clone::DynClone;
+use dyn_clone::{clone_trait_object, DynClone};
 use fuchsia_hash::ParseHashError as FuchsiaParseHashError;
 use fuchsia_merkle::Hash as FuchsiaMerkleHash;
 use rayon::prelude::*;
 use std::collections::HashSet;
-use std::fs;
-use std::io;
-use std::iter;
-use std::path;
 use std::rc::Rc;
 use std::str::FromStr as _;
+use std::{fs, io, iter, path};
 use thiserror::Error;
 
 /// Detailed error for `BlobSet::blob()` failure.
@@ -501,9 +496,7 @@ struct BlobDirectoryData {
 pub(crate) mod test {
     use super::super::api;
     use super::super::api::Blob as _;
-    use super::BlobOpenError;
-    use super::BlobSet;
-    use super::VerifiedMemoryBlob;
+    use super::{BlobOpenError, BlobSet, VerifiedMemoryBlob};
     use std::collections::HashMap;
     use std::io;
     use std::rc::Rc;
@@ -568,8 +561,7 @@ pub(crate) mod test {
 mod tests {
     use super::super::api;
     use super::super::hash::Hash;
-    use super::BlobDirectory;
-    use super::BlobOpenError;
+    use super::{BlobDirectory, BlobOpenError};
     use delivery_blob::DeliveryBlobType;
     use fuchsia_hash::HASH_SIZE as FUCHSIA_HASH_SIZE;
     use fuchsia_merkle::Hash as FuchsiaMerkleHash;

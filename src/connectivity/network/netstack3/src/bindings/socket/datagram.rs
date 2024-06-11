@@ -4,58 +4,48 @@
 
 //! Datagram socket bindings.
 
-use std::{
-    convert::{Infallible as Never, TryInto as _},
-    fmt::Debug,
-    hash::Hash,
-    num::{NonZeroU16, NonZeroU64, NonZeroU8, TryFromIntError},
-    ops::ControlFlow,
-};
+use std::convert::{Infallible as Never, TryInto as _};
+use std::fmt::Debug;
+use std::hash::Hash;
+use std::num::{NonZeroU16, NonZeroU64, NonZeroU8, TryFromIntError};
+use std::ops::ControlFlow;
 
 use either::Either;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_posix as fposix;
-use fidl_fuchsia_posix_socket as fposix_socket;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_posix as fposix,
+    fidl_fuchsia_posix_socket as fposix_socket,
+};
 
 use derivative::Derivative;
 use explicit::ResultExt as _;
 use fidl::endpoints::RequestStream as _;
 use fuchsia_async as fasync;
-use fuchsia_zircon::{self as zx, prelude::HandleBased as _, Peered as _};
+use fuchsia_zircon::prelude::HandleBased as _;
+use fuchsia_zircon::{self as zx, Peered as _};
 use log::{debug, error, trace, warn};
-use net_types::{
-    ip::{GenericOverIp, Ip, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6},
-    MulticastAddr, SpecifiedAddr, ZonedAddr,
+use net_types::ip::{GenericOverIp, Ip, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6};
+use net_types::{MulticastAddr, SpecifiedAddr, ZonedAddr};
+use netstack3_core::device::{DeviceId, WeakDeviceId};
+use netstack3_core::error::{LocalAddressError, NotSupportedError, SocketError};
+use netstack3_core::ip::{IpSockCreateAndSendError, IpSockSendError};
+use netstack3_core::socket::{
+    self as core_socket, ConnInfo, ConnectError, ExpectedConnError, ExpectedUnboundError,
+    ListenerInfo, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
+    NotDualStackCapableError, SetDualStackEnabledError, SetMulticastMembershipError, ShutdownType,
+    SocketInfo,
 };
-use netstack3_core::{
-    device::{DeviceId, WeakDeviceId},
-    error::{LocalAddressError, NotSupportedError, SocketError},
-    icmp,
-    ip::{IpSockCreateAndSendError, IpSockSendError},
-    socket::{
-        self as core_socket, ConnInfo, ConnectError, ExpectedConnError, ExpectedUnboundError,
-        ListenerInfo, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
-        NotDualStackCapableError, SetDualStackEnabledError, SetMulticastMembershipError,
-        ShutdownType, SocketInfo,
-    },
-    sync::Mutex as CoreMutex,
-    udp, IpExt,
-};
+use netstack3_core::sync::Mutex as CoreMutex;
+use netstack3_core::{icmp, udp, IpExt};
 use packet::{Buf, BufferMut};
 
-use crate::bindings::{
-    socket::{
-        queue::{BodyLen, MessageQueue},
-        worker::{self, SocketWorker},
-    },
-    trace_duration,
-    util::{
-        DeviceNotFoundError, IntoCore as _, IntoFidl, RemoveResourceResultExt as _, ResultExt as _,
-        TryFromFidlWithContext, TryIntoCore, TryIntoCoreWithContext, TryIntoFidl,
-        TryIntoFidlWithContext,
-    },
-    BindingId, BindingsCtx, Ctx,
+use crate::bindings::socket::queue::{BodyLen, MessageQueue};
+use crate::bindings::socket::worker::{self, SocketWorker};
+use crate::bindings::util::{
+    DeviceNotFoundError, IntoCore as _, IntoFidl, RemoveResourceResultExt as _, ResultExt as _,
+    TryFromFidlWithContext, TryIntoCore, TryIntoCoreWithContext, TryIntoFidl,
+    TryIntoFidlWithContext,
 };
+use crate::bindings::{trace_duration, BindingId, BindingsCtx, Ctx};
 
 use super::{
     IntoErrno, IpSockAddrExt, SockAddr, SocketWorkerProperties, ZXSIO_SIGNAL_INCOMING,
@@ -2322,16 +2312,13 @@ mod tests {
     use packet::Serializer as _;
     use packet_formats::icmp::IcmpIpExt;
 
-    use crate::bindings::{
-        integration_tests::{
-            test_ep_name, StackSetupBuilder, TestSetup, TestSetupBuilder, TestStack,
-        },
-        socket::{queue::MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE, testutil::TestSockAddr},
+    use crate::bindings::integration_tests::{
+        test_ep_name, StackSetupBuilder, TestSetup, TestSetupBuilder, TestStack,
     };
-    use net_types::{
-        ip::{IpAddr, IpAddress},
-        Witness as _,
-    };
+    use crate::bindings::socket::queue::MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE;
+    use crate::bindings::socket::testutil::TestSockAddr;
+    use net_types::ip::{IpAddr, IpAddress};
+    use net_types::Witness as _;
 
     async fn prepare_test<A: TestSockAddr>(
         proto: fposix_socket::DatagramSocketProtocol,

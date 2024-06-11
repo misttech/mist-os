@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{errors::Error, update_manager::TargetChannelUpdater, DEFAULT_UPDATE_PACKAGE_URL};
+use crate::errors::Error;
+use crate::update_manager::TargetChannelUpdater;
+use crate::DEFAULT_UPDATE_PACKAGE_URL;
 use anyhow::{anyhow, Context as _};
 use fidl::endpoints::{Proxy, ServerEnd};
 use fidl_fuchsia_update_ext::Initiator;
@@ -15,7 +17,9 @@ use fidl_fuchsia_update_installer_ext::{
 };
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_url::AbsolutePackageUrl;
-use futures::{future::BoxFuture, prelude::*, stream::BoxStream};
+use futures::future::BoxFuture;
+use futures::prelude::*;
+use futures::stream::BoxStream;
 use tracing::info;
 
 // On success, system will reboot before this function returns

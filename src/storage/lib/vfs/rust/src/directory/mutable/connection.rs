@@ -4,33 +4,29 @@
 
 //! Connection to a directory that can be modified by the client though a FIDL connection.
 
-use crate::{
-    common::{
-        decode_extended_attribute_value, encode_extended_attribute_value,
-        extended_attributes_sender,
-    },
-    directory::{
-        connection::{BaseConnection, ConnectionState},
-        entry_container::MutableDirectory,
-    },
-    execution_scope::ExecutionScope,
-    name::validate_name,
-    node::OpenNode,
-    path::Path,
-    token_registry::{TokenInterface, TokenRegistry, Tokenizable},
-    ObjectRequestRef, ProtocolsExt,
+use crate::common::{
+    decode_extended_attribute_value, encode_extended_attribute_value, extended_attributes_sender,
 };
+use crate::directory::connection::{BaseConnection, ConnectionState};
+use crate::directory::entry_container::MutableDirectory;
+use crate::execution_scope::ExecutionScope;
+use crate::name::validate_name;
+use crate::node::OpenNode;
+use crate::path::Path;
+use crate::token_registry::{TokenInterface, TokenRegistry, Tokenizable};
+use crate::{ObjectRequestRef, ProtocolsExt};
 
-use {
-    anyhow::Error,
-    fidl::{endpoints::ServerEnd, Handle},
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status,
-    futures::{pin_mut, TryStreamExt as _},
-    pin_project::pin_project,
-    std::{future::Future, pin::Pin, sync::Arc},
-    storage_trace::{self as trace, TraceFutureExt},
-};
+use anyhow::Error;
+use fidl::endpoints::ServerEnd;
+use fidl::Handle;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use futures::{pin_mut, TryStreamExt as _};
+use pin_project::pin_project;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+use storage_trace::{self as trace, TraceFutureExt};
 
 #[pin_project]
 pub struct MutableConnection<DirectoryType: MutableDirectory> {
@@ -331,23 +327,15 @@ impl<DirectoryType: MutableDirectory> TokenInterface for MutableConnection<Direc
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            directory::{
-                dirents_sink,
-                entry_container::{Directory, DirectoryWatcher},
-                traversal_position::TraversalPosition,
-            },
-            node::{IsDirectory, Node},
-            ToObjectRequest,
-        },
-        async_trait::async_trait,
-        std::{
-            any::Any,
-            sync::{Mutex, Weak},
-        },
-    };
+    use super::*;
+    use crate::directory::dirents_sink;
+    use crate::directory::entry_container::{Directory, DirectoryWatcher};
+    use crate::directory::traversal_position::TraversalPosition;
+    use crate::node::{IsDirectory, Node};
+    use crate::ToObjectRequest;
+    use async_trait::async_trait;
+    use std::any::Any;
+    use std::sync::{Mutex, Weak};
 
     #[derive(Debug, PartialEq)]
     enum MutableDirectoryAction {

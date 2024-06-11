@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{unhandled_type, Lambda},
-    diagnostics_hierarchy::{ArrayContent, Property as DiagnosticProperty},
-    serde::{Deserialize, Serialize},
-    serde_json::Value as JsonValue,
-};
+use super::{unhandled_type, Lambda};
+use diagnostics_hierarchy::{ArrayContent, Property as DiagnosticProperty};
+use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
 
 /// The calculated or selected value of a Metric.
 ///
@@ -204,12 +202,10 @@ impl std::fmt::Debug for Problem {
 
 #[cfg(test)]
 pub(crate) mod test {
-    use {
-        super::*,
-        crate::assert_problem,
-        diagnostics_hierarchy::ArrayFormat,
-        serde_json::{json, Number as JsonNumber},
-    };
+    use super::*;
+    use crate::assert_problem;
+    use diagnostics_hierarchy::ArrayFormat;
+    use serde_json::{json, Number as JsonNumber};
 
     #[fuchsia::test]
     fn test_equality() {

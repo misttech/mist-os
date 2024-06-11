@@ -6,26 +6,24 @@
 
 #[cfg(test)]
 mod test {
-    use {
-        anyhow::Error,
-        fidl_fuchsia_wayland::Server_Marker,
-        fuchsia_async::{self as fasync},
-        fuchsia_component::client::connect_to_protocol,
-        fuchsia_wayland_core::{self as wl, Interface, IntoMessage},
-        fuchsia_zircon as zx,
-        wayland_client_protocol::{
-            WlCompositor, WlDataDeviceManager, WlDisplayRequest, WlOutput, WlSeat, WlShm,
-            WlSubcompositor,
-        },
-        wp_viewporter_client_protocol::WpViewporter,
-        xdg_shell_client_protocol::XdgWmBase,
-        zaura_shell_client_protocol::ZauraShell,
-        zcr_alpha_compositing_v1_client_protocol::ZcrAlphaCompositingV1,
-        zcr_secure_output_v1_client_protocol::ZcrSecureOutputV1,
-        zwp_linux_dmabuf_v1_client_protocol::ZwpLinuxDmabufV1,
-        zwp_pointer_constraints_v1_client_protocol::ZwpPointerConstraintsV1,
-        zwp_relative_pointer_v1_client_protocol::ZwpRelativePointerManagerV1,
+    use anyhow::Error;
+    use fidl_fuchsia_wayland::Server_Marker;
+    use fuchsia_async::{self as fasync};
+    use fuchsia_component::client::connect_to_protocol;
+    use fuchsia_wayland_core::{self as wl, Interface, IntoMessage};
+    use fuchsia_zircon as zx;
+    use wayland_client_protocol::{
+        WlCompositor, WlDataDeviceManager, WlDisplayRequest, WlOutput, WlSeat, WlShm,
+        WlSubcompositor,
     };
+    use wp_viewporter_client_protocol::WpViewporter;
+    use xdg_shell_client_protocol::XdgWmBase;
+    use zaura_shell_client_protocol::ZauraShell;
+    use zcr_alpha_compositing_v1_client_protocol::ZcrAlphaCompositingV1;
+    use zcr_secure_output_v1_client_protocol::ZcrSecureOutputV1;
+    use zwp_linux_dmabuf_v1_client_protocol::ZwpLinuxDmabufV1;
+    use zwp_pointer_constraints_v1_client_protocol::ZwpPointerConstraintsV1;
+    use zwp_relative_pointer_v1_client_protocol::ZwpRelativePointerManagerV1;
 
     async fn expect_global_with_name<I: Interface>(
         expect_name: u32,

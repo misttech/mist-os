@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        errors::FxfsError,
-        lsm_tree::types::{ItemRef, LayerIterator},
-        object_store::{
-            transaction::{lock_keys, LockKey, Mutation, Options},
-            ObjectKey, ObjectKeyData, ObjectKind, ObjectStore, ObjectValue, ProjectProperty,
-        },
-    },
-    anyhow::{ensure, Error},
-    std::ops::Bound,
+use crate::errors::FxfsError;
+use crate::lsm_tree::types::{ItemRef, LayerIterator};
+use crate::object_store::transaction::{lock_keys, LockKey, Mutation, Options};
+use crate::object_store::{
+    ObjectKey, ObjectKeyData, ObjectKind, ObjectStore, ObjectValue, ProjectProperty,
 };
+use anyhow::{ensure, Error};
+use std::ops::Bound;
 
 impl ObjectStore {
     /// Adds a mutation to set the project limit as an attribute with `bytes` and `nodes` to root

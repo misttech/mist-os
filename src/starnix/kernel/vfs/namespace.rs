@@ -2,56 +2,54 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    bpf::fs::BpfFs,
-    device::BinderFs,
-    fs::{
-        devpts::dev_pts_fs, devtmpfs::dev_tmp_fs, ext4::ExtFilesystem, functionfs::FunctionFs,
-        overlayfs::OverlayFs, proc::proc_fs, sysfs::sys_fs, tmpfs::TmpFs, tracefs::trace_fs,
-    },
-    mutable_state::{state_accessor, state_implementation},
-    security::selinux_fs,
-    task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter},
-    time::utc,
-    vfs::{
-        buffers::InputBuffer,
-        file_system::SeLinuxContexts,
-        fileops_impl_dataless, fileops_impl_delegate_read_and_seek, fileops_impl_nonseekable,
-        fs_node_impl_not_dir,
-        fuse::{new_fuse_fs, new_fusectl_fs},
-        socket::{SocketAddress, SocketHandle, UnixSocket},
-        CheckAccessReason, DirEntry, DirEntryHandle, DynamicFile, DynamicFileBuf,
-        DynamicFileSource, FileHandle, FileObject, FileOps, FileSystemHandle, FileSystemOptions,
-        FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString, PathBuilder, RenameFlags, SimpleFileNode,
-        SymlinkTarget, UnlinkKind,
-    },
+use crate::bpf::fs::BpfFs;
+use crate::device::BinderFs;
+use crate::fs::devpts::dev_pts_fs;
+use crate::fs::devtmpfs::dev_tmp_fs;
+use crate::fs::ext4::ExtFilesystem;
+use crate::fs::functionfs::FunctionFs;
+use crate::fs::overlayfs::OverlayFs;
+use crate::fs::proc::proc_fs;
+use crate::fs::sysfs::sys_fs;
+use crate::fs::tmpfs::TmpFs;
+use crate::fs::tracefs::trace_fs;
+use crate::mutable_state::{state_accessor, state_implementation};
+use crate::security::selinux_fs;
+use crate::task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter};
+use crate::time::utc;
+use crate::vfs::buffers::InputBuffer;
+use crate::vfs::file_system::SeLinuxContexts;
+use crate::vfs::fuse::{new_fuse_fs, new_fusectl_fs};
+use crate::vfs::socket::{SocketAddress, SocketHandle, UnixSocket};
+use crate::vfs::{
+    fileops_impl_dataless, fileops_impl_delegate_read_and_seek, fileops_impl_nonseekable,
+    fs_node_impl_not_dir, CheckAccessReason, DirEntry, DirEntryHandle, DynamicFile, DynamicFileBuf,
+    DynamicFileSource, FileHandle, FileObject, FileOps, FileSystemHandle, FileSystemOptions,
+    FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString, PathBuilder, RenameFlags, SimpleFileNode,
+    SymlinkTarget, UnlinkKind,
 };
 use fidl_fuchsia_io as fio;
 use macro_rules_attribute::apply;
 use ref_cast::RefCast;
 use starnix_logging::log_warn;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, RwLock, WriteOps};
-use starnix_uapi::{
-    arc_key::{ArcKey, PtrKey, WeakKey},
-    device_type::DeviceType,
-    errno, error,
-    errors::Errno,
-    file_mode::{Access, FileMode},
-    inotify_mask::InotifyMask,
-    mount_flags::MountFlags,
-    open_flags::OpenFlags,
-    ownership::WeakRef,
-    vfs::{FdEvents, ResolveFlags},
-    NAME_MAX,
-};
-use std::{
-    borrow::Borrow,
-    collections::{hash_map::Entry, HashMap, HashSet},
-    fmt,
-    hash::{Hash, Hasher},
-    ops::{Deref, DerefMut},
-    sync::{Arc, Weak},
-};
+use starnix_uapi::arc_key::{ArcKey, PtrKey, WeakKey};
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::{Access, FileMode};
+use starnix_uapi::inotify_mask::InotifyMask;
+use starnix_uapi::mount_flags::MountFlags;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::ownership::WeakRef;
+use starnix_uapi::vfs::{FdEvents, ResolveFlags};
+use starnix_uapi::{errno, error, NAME_MAX};
+use std::borrow::Borrow;
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::hash::{Hash, Hasher};
+use std::ops::{Deref, DerefMut};
+use std::sync::{Arc, Weak};
 
 /// A mount namespace.
 ///
@@ -1697,12 +1695,13 @@ impl Borrow<ArcKey<DirEntry>> for Submount {
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        fs::tmpfs::TmpFs,
-        testing::create_kernel_task_and_unlocked,
-        vfs::{LookupContext, Namespace, NamespaceNode, RenameFlags, UnlinkKind, WhatToMount},
+    use crate::fs::tmpfs::TmpFs;
+    use crate::testing::create_kernel_task_and_unlocked;
+    use crate::vfs::{
+        LookupContext, Namespace, NamespaceNode, RenameFlags, UnlinkKind, WhatToMount,
     };
-    use starnix_uapi::{errno, mount_flags::MountFlags};
+    use starnix_uapi::errno;
+    use starnix_uapi::mount_flags::MountFlags;
     use std::sync::Arc;
 
     #[::fuchsia::test]

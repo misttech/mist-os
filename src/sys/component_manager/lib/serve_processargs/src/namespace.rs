@@ -8,7 +8,8 @@ use futures::channel::mpsc::{unbounded, UnboundedSender};
 use namespace::{Entry as NamespaceEntry, EntryError, Namespace, NamespaceError, Tree};
 use sandbox::{Capability, Dict, RemotableCapability};
 use thiserror::Error;
-use vfs::{directory::entry::serve_directory, execution_scope::ExecutionScope};
+use vfs::directory::entry::serve_directory;
+use vfs::execution_scope::ExecutionScope;
 
 /// A builder object for assembling a program's incoming namespace.
 pub struct NamespaceBuilder {
@@ -170,32 +171,24 @@ pub fn ignore_not_found() -> UnboundedSender<String> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::test_util::multishot,
-        anyhow::Result,
-        assert_matches::assert_matches,
-        fidl::{
-            endpoints::{self, Proxy, ServerEnd},
-            Peered,
-        },
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_fs::directory::DirEntry,
-        fuchsia_zircon as zx,
-        fuchsia_zircon::AsHandleRef,
-        futures::{channel::mpsc, StreamExt, TryStreamExt},
-        sandbox::Directory,
-        std::sync::Arc,
-        test_case::test_case,
-        vfs::{
-            directory::{
-                entry::{DirectoryEntry, EntryInfo, OpenRequest},
-                entry_container::Directory as VfsDirectory,
-            },
-            path, pseudo_directory,
-            remote::RemoteLike,
-        },
-    };
+    use super::*;
+    use crate::test_util::multishot;
+    use anyhow::Result;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::{self, Proxy, ServerEnd};
+    use fidl::Peered;
+    use fuchsia_fs::directory::DirEntry;
+    use fuchsia_zircon::AsHandleRef;
+    use futures::channel::mpsc;
+    use futures::{StreamExt, TryStreamExt};
+    use sandbox::Directory;
+    use std::sync::Arc;
+    use test_case::test_case;
+    use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+    use vfs::directory::entry_container::Directory as VfsDirectory;
+    use vfs::remote::RemoteLike;
+    use vfs::{path, pseudo_directory};
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
 
     fn connector_cap() -> Capability {
         let (sender, _receiver) = multishot();

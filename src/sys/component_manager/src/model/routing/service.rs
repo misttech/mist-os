@@ -2,53 +2,40 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        capability::CapabilityProvider,
-        model::{
-            component::{ComponentInstance, WeakComponentInstance, WeakExtendedInstance},
-            mutable_directory::MutableDirectory,
-            routing::{CapabilityOpenRequest, CapabilitySource, RouteSource},
-        },
-    },
-    async_trait::async_trait,
-    cm_rust::{CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon},
-    cm_types::{IterablePath, Name, RelativePath},
-    cm_util::TaskGroup,
-    errors::{CapabilityProviderError, ModelError, OpenError},
-    fidl_fuchsia_io as fio,
-    flyweights::FlyStr,
-    fuchsia_async::{DurationExt, TimeoutExt},
-    fuchsia_zircon as zx,
-    futures::{
-        channel::oneshot,
-        future::{join_all, BoxFuture},
-        lock::Mutex,
-        stream::TryStreamExt,
-    },
-    hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
-    moniker::{ExtendedMoniker, Moniker},
-    router_error::Explain,
-    routing::capability_source::{
-        AggregateInstance, AggregateMember, AnonymizedAggregateCapabilityProvider,
-        FilteredAggregateCapabilityProvider,
-    },
-    std::{
-        collections::HashMap,
-        fmt,
-        sync::{Arc, Weak},
-    },
-    tracing::{error, warn},
-    vfs::{
-        directory::{
-            entry::{DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest},
-            immutable::simple::{simple as simple_immutable_dir, Simple as SimpleImmutableDir},
-        },
-        execution_scope::ExecutionScope,
-        path::Path,
-        ToObjectRequest,
-    },
+use crate::capability::CapabilityProvider;
+use crate::model::component::{ComponentInstance, WeakComponentInstance, WeakExtendedInstance};
+use crate::model::mutable_directory::MutableDirectory;
+use crate::model::routing::{CapabilityOpenRequest, CapabilitySource, RouteSource};
+use async_trait::async_trait;
+use cm_rust::{CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon};
+use cm_types::{IterablePath, Name, RelativePath};
+use cm_util::TaskGroup;
+use errors::{CapabilityProviderError, ModelError, OpenError};
+use flyweights::FlyStr;
+use fuchsia_async::{DurationExt, TimeoutExt};
+use futures::channel::oneshot;
+use futures::future::{join_all, BoxFuture};
+use futures::lock::Mutex;
+use futures::stream::TryStreamExt;
+use hooks::{Event, EventPayload, EventType, Hook, HooksRegistration};
+use moniker::{ExtendedMoniker, Moniker};
+use router_error::Explain;
+use routing::capability_source::{
+    AggregateInstance, AggregateMember, AnonymizedAggregateCapabilityProvider,
+    FilteredAggregateCapabilityProvider,
 };
+use std::collections::HashMap;
+use std::fmt;
+use std::sync::{Arc, Weak};
+use tracing::{error, warn};
+use vfs::directory::entry::{DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest};
+use vfs::directory::immutable::simple::{
+    simple as simple_immutable_dir, Simple as SimpleImmutableDir,
+};
+use vfs::execution_scope::ExecutionScope;
+use vfs::path::Path;
+use vfs::ToObjectRequest;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// Timeout for opening a service capability when aggregating.
 const OPEN_SERVICE_TIMEOUT: zx::Duration = zx::Duration::from_seconds(5);
@@ -937,29 +924,24 @@ impl<T: Send + Sync + 'static> DirectoryEntryAsync for ServiceInstanceDirectoryE
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::model::{
-            component::StartReason,
-            routing::RoutingError,
-            start::Start,
-            testing::out_dir::OutDir,
-            testing::routing_test_helpers::{RoutingTest, RoutingTestBuilder},
-        },
-        ::routing::{
-            capability_source::{ComponentCapability, FilteredAggregateCapabilityRouteData},
-            component_instance::ComponentInstanceInterface,
-        },
-        cm_rust::*,
-        cm_rust_testing::*,
-        fidl::endpoints::ServerEnd,
-        fuchsia_async as fasync,
-        maplit::hashmap,
-        proptest::prelude::*,
-        rand::SeedableRng,
-        std::collections::HashSet,
-        vfs::{directory::entry_container::Directory, pseudo_directory},
-    };
+    use super::*;
+    use crate::model::component::StartReason;
+    use crate::model::routing::RoutingError;
+    use crate::model::start::Start;
+    use crate::model::testing::out_dir::OutDir;
+    use crate::model::testing::routing_test_helpers::{RoutingTest, RoutingTestBuilder};
+    use ::routing::capability_source::{ComponentCapability, FilteredAggregateCapabilityRouteData};
+    use ::routing::component_instance::ComponentInstanceInterface;
+    use cm_rust::*;
+    use cm_rust_testing::*;
+    use fidl::endpoints::ServerEnd;
+    use fuchsia_async as fasync;
+    use maplit::hashmap;
+    use proptest::prelude::*;
+    use rand::SeedableRng;
+    use std::collections::HashSet;
+    use vfs::directory::entry_container::Directory;
+    use vfs::pseudo_directory;
 
     #[derive(Clone)]
     struct MockAnonymizedCapabilityProvider {

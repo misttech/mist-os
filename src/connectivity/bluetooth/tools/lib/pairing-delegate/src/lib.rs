@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl_fuchsia_bluetooth_sys::{
-        PairingDelegateRequest, PairingDelegateRequestStream, PairingMethod,
-    },
-    fuchsia_bluetooth::types::{Address, PeerId},
-    futures::{channel::mpsc::Sender, StreamExt},
-    std::io::{self, Read, Write},
+use anyhow::{format_err, Error};
+use fidl_fuchsia_bluetooth_sys::{
+    PairingDelegateRequest, PairingDelegateRequestStream, PairingMethod,
 };
+use fuchsia_bluetooth::types::{Address, PeerId};
+use futures::channel::mpsc::Sender;
+use futures::StreamExt;
+use std::io::{self, Read, Write};
 
 fn print_and_flush(msg: &str) {
     print!("{}", msg);
@@ -184,10 +183,10 @@ pub async fn handle_requests(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, fidl_fuchsia_bluetooth_sys::PairingDelegateMarker, fuchsia_async as fasync,
-        futures::channel::mpsc::channel,
-    };
+    use super::*;
+    use fidl_fuchsia_bluetooth_sys::PairingDelegateMarker;
+    use fuchsia_async as fasync;
+    use futures::channel::mpsc::channel;
 
     #[fuchsia::test]
     async fn test_pairing_delegate() {

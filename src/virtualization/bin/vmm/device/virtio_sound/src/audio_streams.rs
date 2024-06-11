@@ -2,26 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::notification::Notification,
-    crate::reply::*,
-    crate::sequencer,
-    crate::sequencer::Sequencer,
-    crate::throttled_log,
-    crate::wire,
-    crate::wire_convert,
-    anyhow::{anyhow, Context, Error},
-    async_trait::async_trait,
-    fuchsia_async::{DurationExt, TimeoutExt},
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::FutureExt,
-    futures::TryStreamExt,
-    mapped_vmo::Mapping,
-    std::cell::RefCell,
-    std::collections::{HashMap, VecDeque},
-    std::ffi::CString,
-    std::ops::Range,
-};
+use crate::notification::Notification;
+use crate::reply::*;
+use crate::sequencer::Sequencer;
+use crate::{sequencer, throttled_log, wire, wire_convert};
+use anyhow::{anyhow, Context, Error};
+use async_trait::async_trait;
+use fuchsia_async::{DurationExt, TimeoutExt};
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use futures::{FutureExt, TryStreamExt};
+use mapped_vmo::Mapping;
+use std::cell::RefCell;
+use std::collections::{HashMap, VecDeque};
+use std::ffi::CString;
+use std::ops::Range;
 
 /// Parameters needed to construct an AudioStream.
 #[derive(Debug, Copy, Clone)]

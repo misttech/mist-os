@@ -2,16 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_zircon as zx,
-    packet_encoding::{decodable_enum, Decodable, Encodable},
-    std::{
-        fmt,
-        io::{Cursor, Write},
-        result,
-    },
-    thiserror::Error,
-};
+use fuchsia_zircon as zx;
+use packet_encoding::{decodable_enum, Decodable, Encodable};
+use std::io::{Cursor, Write};
+use std::{fmt, result};
+use thiserror::Error;
 
 /// Result type for AVDTP, using avdtp::Error
 pub type Result<T> = result::Result<T, Error>;

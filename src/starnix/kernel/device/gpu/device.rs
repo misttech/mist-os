@@ -2,15 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_core::{
-    device::{kobject::DeviceMetadata, DeviceMode},
-    fs::sysfs::DeviceDirectory,
-    task::CurrentTask,
-    vfs::{FileOps, FsNode},
-};
+use starnix_core::device::kobject::DeviceMetadata;
+use starnix_core::device::DeviceMode;
+use starnix_core::fs::sysfs::DeviceDirectory;
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::{FileOps, FsNode};
 use starnix_logging::log_error;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
-use starnix_uapi::{device_type::DeviceType, error, errors::Errno, open_flags::OpenFlags};
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::error;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
 
 fn create_gpu_device(
     _locked: &mut Locked<'_, DeviceOpen>,

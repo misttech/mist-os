@@ -4,17 +4,14 @@
 
 use super::{Procedure, ProcedureError as Error, ProcedureMarker, ProcedureRequest};
 
-use crate::{
-    features::{AgFeatures, HfFeatures},
-    peer::{
-        indicators::{AgIndicators, AgIndicatorsReporting},
-        service_level_connection::SlcState,
-        slc_request::SlcRequest,
-        update::AgUpdate,
-    },
-};
+use crate::features::{AgFeatures, HfFeatures};
+use crate::peer::indicators::{AgIndicators, AgIndicatorsReporting};
+use crate::peer::service_level_connection::SlcState;
+use crate::peer::slc_request::SlcRequest;
+use crate::peer::update::AgUpdate;
 
-use {at_commands as at, num_traits::FromPrimitive};
+use at_commands as at;
+use num_traits::FromPrimitive;
 
 /// A singular state within the SLC Initialization Procedure.
 pub trait SlcProcedureState: core::fmt::Debug {

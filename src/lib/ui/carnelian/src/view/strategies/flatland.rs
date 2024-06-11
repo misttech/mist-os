@@ -1,25 +1,16 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{
-    app::{Config, MessageInternal},
-    drawing::DisplayRotation,
-    geometry::UintSize,
-    input::{
-        flatland::{FlatlandMouseInputHandler, FlatlandTouchInputHandler},
-        key3::KeyboardInputHandler,
-    },
-    render::{
-        self,
-        generic::{self, Backend},
-        ContextInner,
-    },
-    view::{
-        strategies::base::{FlatlandParams, ViewStrategy, ViewStrategyPtr},
-        UserInputMessage, ViewAssistantContext, ViewAssistantPtr, ViewDetails, ViewKey,
-    },
-    Size,
-};
+use crate::app::{Config, MessageInternal};
+use crate::drawing::DisplayRotation;
+use crate::geometry::UintSize;
+use crate::input::flatland::{FlatlandMouseInputHandler, FlatlandTouchInputHandler};
+use crate::input::key3::KeyboardInputHandler;
+use crate::render::generic::{self, Backend};
+use crate::render::{self, ContextInner};
+use crate::view::strategies::base::{FlatlandParams, ViewStrategy, ViewStrategyPtr};
+use crate::view::{UserInputMessage, ViewAssistantContext, ViewAssistantPtr, ViewDetails, ViewKey};
+use crate::Size;
 use anyhow::{ensure, Context, Error, Result};
 use async_trait::async_trait;
 use async_utils::hanging_get::client::HangingGetStream;
@@ -31,11 +22,14 @@ use fidl_fuchsia_ui_composition as flatland;
 use fidl_fuchsia_ui_views::ViewRef;
 use fuchsia_async::{self as fasync, OnSignals};
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameSet, FrameUsage, ImageId};
+use fuchsia_framebuffer::sysmem::BufferCollectionAllocator;
+use fuchsia_framebuffer::{FrameSet, FrameUsage, ImageId};
 use fuchsia_scenic::BufferCollectionTokenPair;
 use fuchsia_trace::{duration, instant};
 use fuchsia_zircon::{self as zx, Event, HandleBased, Signals, Time};
-use futures::{channel::mpsc::UnboundedSender, prelude::*, StreamExt, TryStreamExt};
+use futures::channel::mpsc::UnboundedSender;
+use futures::prelude::*;
+use futures::{StreamExt, TryStreamExt};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 fn setup_handle_flatland_events(

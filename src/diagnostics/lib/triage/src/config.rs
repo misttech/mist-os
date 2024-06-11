@@ -2,21 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        act::{validate_action, Actions, ActionsSchema, Severity},
-        metrics::{
-            fetch::{InspectFetcher, KeyValueFetcher, SelectorString, TextFetcher},
-            Metric, Metrics, ValueSource,
-        },
-        validate::{validate, Trials, TrialsSchema},
-        Action,
-    },
-    anyhow::{bail, format_err, Context, Error},
-    num_derive::FromPrimitive,
-    serde::{Deserialize, Deserializer},
-    std::collections::HashMap,
-};
+use crate::act::{validate_action, Actions, ActionsSchema, Severity};
+use crate::metrics::fetch::{InspectFetcher, KeyValueFetcher, SelectorString, TextFetcher};
+use crate::metrics::{Metric, Metrics, ValueSource};
+use crate::validate::{validate, Trials, TrialsSchema};
+use crate::Action;
+use anyhow::{bail, format_err, Context, Error};
+use num_derive::FromPrimitive;
+use serde::{Deserialize, Deserializer};
+use std::collections::HashMap;
 
 // These numbers are used in the wasm-bindgen bridge so they are explicit and
 // permanent. They don't need to be sequential. This enum must be consistent
@@ -357,10 +351,10 @@ pub(crate) fn filter_actions(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*, crate::act::Alert, fidl_fuchsia_feedback::MAX_CRASH_SIGNATURE_LENGTH,
-        maplit::hashmap,
-    };
+    use super::*;
+    use crate::act::Alert;
+    use fidl_fuchsia_feedback::MAX_CRASH_SIGNATURE_LENGTH;
+    use maplit::hashmap;
 
     // initialize() will be tested in the integration test: "fx test triage_lib_test"
     // TODO(cphoenix) - set up dirs under test/ and test initialize() here.

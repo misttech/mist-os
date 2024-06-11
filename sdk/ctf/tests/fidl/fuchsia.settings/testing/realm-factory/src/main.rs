@@ -2,24 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Error, Result},
-    fidl::endpoints::{create_endpoints, ServerEnd},
-    fidl_fuchsia_inspect::InspectSinkMarker,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_settings::PrivacyMarker,
-    fidl_fuchsia_settings_test::*,
-    fidl_fuchsia_stash::StoreMarker,
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
-    },
-    futures::{StreamExt, TryStreamExt},
-    std::sync::Arc,
-    tracing::*,
-    vfs::{directory::entry_container::Directory, file::vmo::read_only, pseudo_directory},
+use anyhow::{Error, Result};
+use fidl::endpoints::{create_endpoints, ServerEnd};
+use fidl_fuchsia_inspect::InspectSinkMarker;
+use fidl_fuchsia_settings::PrivacyMarker;
+use fidl_fuchsia_settings_test::*;
+use fidl_fuchsia_stash::StoreMarker;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
 };
+use futures::{StreamExt, TryStreamExt};
+use std::sync::Arc;
+use tracing::*;
+use vfs::directory::entry_container::Directory;
+use vfs::file::vmo::read_only;
+use vfs::pseudo_directory;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

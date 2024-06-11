@@ -4,10 +4,10 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use assembly_components::ComponentBuilder;
-use assembly_config_schema::{
-    assembly_config::{CompiledComponentDefinition, CompiledPackageDefinition},
-    PackageSet,
+use assembly_config_schema::assembly_config::{
+    CompiledComponentDefinition, CompiledPackageDefinition,
 };
+use assembly_config_schema::PackageSet;
 use assembly_tool::Tool;
 use assembly_util::{DuplicateKeyError, FileEntry, InsertUniqueExt, MapEntry};
 use camino::{Utf8Path, Utf8PathBuf};
@@ -205,7 +205,8 @@ mod tests {
     use super::*;
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::ToolProvider;
-    use assembly_util::{CompiledPackageDestination, TestCompiledPackageDestination::ForTest};
+    use assembly_util::CompiledPackageDestination;
+    use assembly_util::TestCompiledPackageDestination::ForTest;
     use fuchsia_archive::Utf8Reader;
     use fuchsia_pkg::PackageManifest;
     use std::fs::File;

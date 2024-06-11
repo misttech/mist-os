@@ -7,18 +7,14 @@ use core::num::NonZeroU16;
 use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
 use ip_test_macro::ip_test;
-use net_types::{
-    ip::{Ip, Ipv4, Ipv6},
-    ZonedAddr,
-};
+use net_types::ip::{Ip, Ipv4, Ipv6};
+use net_types::ZonedAddr;
 use packet::Buf;
 use test_case::test_case;
 
 use netstack3_base::testutil::{set_logger_for_test, TestIpExt};
-use netstack3_core::{
-    testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtxBuilder},
-    IpExt,
-};
+use netstack3_core::testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtxBuilder};
+use netstack3_core::IpExt;
 
 const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(100));
 

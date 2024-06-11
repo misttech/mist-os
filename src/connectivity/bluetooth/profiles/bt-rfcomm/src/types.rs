@@ -200,7 +200,8 @@ pub(crate) mod tests {
     use fuchsia_async as fasync;
     use fuchsia_bluetooth::profile::{Attribute, DataElement, ProtocolDescriptor};
     use fuchsia_bluetooth::types::{PeerId, Uuid};
-    use futures::{stream::StreamExt, task::Poll};
+    use futures::stream::StreamExt;
+    use futures::task::Poll;
 
     /// Defines a Protocol requesting RFCOMM with the provided server `channel`.
     pub fn rfcomm_protocol_descriptor_list(

@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::check::{PreflightCheck, PreflightCheckResult, PreflightCheckResult::*},
-    crate::command_runner::CommandRunner,
-    crate::config::*,
-    anyhow::Result,
-    async_trait::async_trait,
-    lazy_static::lazy_static,
-    regex::Regex,
-};
+use crate::check::PreflightCheckResult::*;
+use crate::check::{PreflightCheck, PreflightCheckResult};
+use crate::command_runner::CommandRunner;
+use crate::config::*;
+use anyhow::Result;
+use async_trait::async_trait;
+use lazy_static::lazy_static;
+use regex::Regex;
 
 static NO_TUNTAP_MESSAGE: &str =
     "Did not find a tuntap device named 'qemu' for the current user. This will prevent you from \
@@ -73,7 +72,8 @@ impl PreflightCheck for EmuNetworking<'_> {
 
 #[cfg(test)]
 mod test {
-    use {super::*, crate::command_runner::ExitStatus};
+    use super::*;
+    use crate::command_runner::ExitStatus;
 
     static IP_TUNTAP_OUTPUT_FOUND: &str = "qemu: tap one_queue vnet_hdr persist user 12345\n";
     static IP_TUNTAP_OUTPUT_NOT_FOUND: &str = "\n";

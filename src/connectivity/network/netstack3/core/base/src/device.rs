@@ -16,7 +16,9 @@
 //! * Modularity.
 
 use alloc::borrow::Cow;
-use core::{borrow::Borrow, fmt::Debug, hash::Hash};
+use core::borrow::Borrow;
+use core::fmt::Debug;
+use core::hash::Hash;
 
 pub(crate) mod link;
 

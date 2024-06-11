@@ -2,20 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use proc_macro::TokenStream;
+use proc_macro2::TokenStream as TokenStream2;
+use quote::{format_ident, quote, ToTokens};
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Error, Formatter};
-use {
-    proc_macro::TokenStream,
-    proc_macro2::TokenStream as TokenStream2,
-    quote::{format_ident, quote, ToTokens},
-    std::cmp::Ordering,
-    std::collections::{BTreeMap, BTreeSet},
-    syn::{
-        bracketed, parenthesized,
-        parse::{Parse, ParseBuffer},
-        parse_macro_input::parse,
-        punctuated::Punctuated,
-        token, AngleBracketedGenericArguments, Attribute, GenericArgument, Generics, Ident, Token,
-    },
+use syn::parse::{Parse, ParseBuffer};
+use syn::parse_macro_input::parse;
+use syn::punctuated::Punctuated;
+use syn::{
+    bracketed, parenthesized, token, AngleBracketedGenericArguments, Attribute, GenericArgument,
+    Generics, Ident, Token,
 };
 
 /// Represents a state identifier that optionally provides generic arguments, e.g. 'A' or 'A<T>'

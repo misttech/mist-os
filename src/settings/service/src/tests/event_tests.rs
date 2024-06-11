@@ -3,11 +3,9 @@
 // found in the LICENSE file.
 
 use crate::agent::{AgentCreator, AgentError, Context, CreationFunc, Payload};
-use crate::event;
-use crate::service;
 use crate::storage::testing::InMemoryStorageFactory;
 use crate::tests::scaffold;
-use crate::EnvironmentBuilder;
+use crate::{event, service, EnvironmentBuilder};
 use assert_matches::assert_matches;
 use fuchsia_async as fasync;
 use futures::future::BoxFuture;

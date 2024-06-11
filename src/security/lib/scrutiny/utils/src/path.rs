@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    pathdiff::diff_paths,
-    std::path::{Path, PathBuf},
-    tracing::warn,
-};
+use pathdiff::diff_paths;
+use std::path::{Path, PathBuf};
+use tracing::warn;
 
 /// Attempt to build a canonical path of the form `base`/`path`. If `path` is absolute,
 /// then `base` is ignored. If paths do not actually exist on the filesystem, the resulting path
@@ -61,14 +59,10 @@ fn canonicalize<P: AsRef<Path>>(path: P, path_name: &str) -> PathBuf {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::{join_and_canonicalize, relativize_path},
-        std::{
-            fs::{create_dir_all, File},
-            path::PathBuf,
-        },
-        tempfile::tempdir,
-    };
+    use super::{join_and_canonicalize, relativize_path};
+    use std::fs::{create_dir_all, File};
+    use std::path::PathBuf;
+    use tempfile::tempdir;
 
     fn path_buf(path_str: &str) -> PathBuf {
         PathBuf::from(String::from(path_str))

@@ -2,16 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl::prelude::*,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_ldsvc::{LoaderRequest, LoaderRequestStream},
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{TryFutureExt, TryStreamExt},
-    std::sync::Arc,
-    tracing::*,
-};
+use anyhow::{format_err, Error};
+use fidl::prelude::*;
+use fidl_fuchsia_ldsvc::{LoaderRequest, LoaderRequestStream};
+use futures::{TryFutureExt, TryStreamExt};
+use std::sync::Arc;
+use tracing::*;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// Helper function to load `object_name` from `search_dirs`.
 /// This function looks in the given directories, and returns the
@@ -153,7 +150,8 @@ pub fn parse_config_string(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fidl_fuchsia_ldsvc::LoaderMarker};
+    use super::*;
+    use fidl_fuchsia_ldsvc::LoaderMarker;
 
     async fn list_directory<'a>(root_proxy: &'a fio::DirectoryProxy) -> Vec<String> {
         let entries = fuchsia_fs::directory::readdir(root_proxy).await.expect("readdir failed");

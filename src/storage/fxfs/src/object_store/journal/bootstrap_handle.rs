@@ -2,28 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        log::*,
-        object_handle::{ObjectHandle, ReadObjectHandle},
-        object_store::journal::JournalHandle,
-        range::RangeExt,
-    },
-    anyhow::Error,
-    async_trait::async_trait,
-    std::{
-        cmp::min,
-        ops::Range,
-        sync::{
-            atomic::{AtomicBool, Ordering},
-            Arc,
-        },
-    },
-    storage_device::{
-        buffer::{BufferFuture, MutableBufferRef},
-        Device,
-    },
-};
+use crate::log::*;
+use crate::object_handle::{ObjectHandle, ReadObjectHandle};
+use crate::object_store::journal::JournalHandle;
+use crate::range::RangeExt;
+use anyhow::Error;
+use async_trait::async_trait;
+use std::cmp::min;
+use std::ops::Range;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use storage_device::buffer::{BufferFuture, MutableBufferRef};
+use storage_device::Device;
 
 /// To read the super-block and journal, we use this handle since we cannot use DataObjectHandle
 /// until we've replayed the whole journal.  Clients must supply the extents to be used.

@@ -2,16 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::FullmacDriverFixture;
+use drivers_only_common::sme_helpers::{
+    self, random_password, random_ssid, DEFAULT_OPEN_AP_CONFIG,
+};
+use fullmac_helpers::config::FullmacDriverConfig;
+use fullmac_helpers::recorded_request_stream::FullmacRequest;
+use rand::seq::SliceRandom;
+use rand::Rng;
+use wlan_common::assert_variant;
+use wlan_common::ie::rsn::rsne;
 use {
-    crate::FullmacDriverFixture,
-    drivers_only_common::sme_helpers::{
-        self, random_password, random_ssid, DEFAULT_OPEN_AP_CONFIG,
-    },
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
-    fullmac_helpers::{config::FullmacDriverConfig, recorded_request_stream::FullmacRequest},
-    rand::{seq::SliceRandom, Rng},
-    wlan_common::{assert_variant, ie::rsn::rsne},
 };
 
 fn vec_to_cssid(input: &Vec<u8>) -> fidl_ieee80211::CSsid {

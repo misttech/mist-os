@@ -7,14 +7,11 @@
 //! A pair of these files is generated per target product using the `generated_file` GN rule (see
 //! "//src/fonts/build/fonts.gni").
 
-use {
-    crate::serde_ext::{self, LoadError},
-    serde::Deserialize,
-    std::{
-        collections::{btree_map::Iter as BTreeMapIter, BTreeMap, BTreeSet},
-        path::Path,
-    },
-};
+use crate::serde_ext::{self, LoadError};
+use serde::Deserialize;
+use std::collections::btree_map::Iter as BTreeMapIter;
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
 
 /// Describes which set a font belongs to, local or downloadable.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash)]
@@ -79,10 +76,12 @@ impl<'a> IntoIterator for &'a FontSets {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, anyhow::Error, pretty_assertions::assert_eq, serde_json::json, std::io::Write,
-        tempfile::NamedTempFile,
-    };
+    use super::*;
+    use anyhow::Error;
+    use pretty_assertions::assert_eq;
+    use serde_json::json;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn test_load_from_all_and_local_paths() -> Result<(), Error> {

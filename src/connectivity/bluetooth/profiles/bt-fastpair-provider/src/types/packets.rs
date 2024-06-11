@@ -5,8 +5,7 @@
 use bitfield::bitfield;
 use fuchsia_bluetooth::types::Address;
 use hmac::{Hmac, Mac};
-use packet_encoding::decodable_enum;
-use packet_encoding::Encodable as PacketEncodable;
+use packet_encoding::{decodable_enum, Encodable as PacketEncodable};
 use rand::Rng;
 use sha2::Sha256;
 use tracing::debug;

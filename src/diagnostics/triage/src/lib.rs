@@ -9,7 +9,8 @@ pub mod file_io;
 #[cfg(test)]
 mod test;
 
-use {crate::config::OutputFormat, structopt::StructOpt};
+use crate::config::OutputFormat;
+use structopt::StructOpt;
 
 #[derive(StructOpt, Debug, Clone)]
 pub struct Options {

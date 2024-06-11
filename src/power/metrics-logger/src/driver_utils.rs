@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Result},
-    fidl_fuchsia_device as fdevice, fuchsia_zircon as zx,
-    serde_derive::Deserialize,
-    std::collections::HashMap,
-    tracing::{error, info},
-};
+use anyhow::{format_err, Result};
+use serde_derive::Deserialize;
+use std::collections::HashMap;
+use tracing::{error, info};
+use {fidl_fuchsia_device as fdevice, fuchsia_zircon as zx};
 
 #[derive(Deserialize)]
 pub struct DriverAlias {

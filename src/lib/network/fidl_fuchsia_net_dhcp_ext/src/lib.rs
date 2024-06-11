@@ -5,24 +5,23 @@
 //! Extensions for types in the `fidl_fuchsia_net_dhcp` crate.
 #![deny(missing_docs)]
 
-use std::{collections::HashSet, num::NonZeroU64};
+use std::collections::HashSet;
+use std::num::NonZeroU64;
 
 use anyhow::anyhow;
 use async_trait::async_trait;
 use fidl::endpoints::ServerEnd;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_dhcp as fnet_dhcp;
 use fidl_fuchsia_net_ext::IntoExt as _;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_routes as fnet_routes;
-use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
-use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use futures::{pin_mut, Future, FutureExt, Stream, StreamExt as _, TryStreamExt as _};
 use net_declare::fidl_ip_v4_with_prefix;
-use net_types::{
-    ip::{Ipv4, Ipv4Addr},
-    SpecifiedAddr,
+use net_types::ip::{Ipv4, Ipv4Addr};
+use net_types::SpecifiedAddr;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcp as fnet_dhcp,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
 };
 
 /// The default `fnet_dhcp::NewClientParams`.
@@ -433,9 +432,8 @@ pub fn merged_configuration_stream(
 /// Contains types used when testing the DHCP client.
 pub mod testutil {
     use super::*;
-    use fuchsia_async as fasync;
-    use fuchsia_zircon as zx;
     use futures::future::ready;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     /// Task for polling the DHCP client.
     pub struct DhcpClientTask {
@@ -551,24 +549,24 @@ pub mod testutil {
 mod test {
     use crate::{ClientExt as _, Error, DEFAULT_ADDR_PREFIX};
 
-    use std::{collections::HashSet, num::NonZeroU64};
+    use std::collections::HashSet;
+    use std::num::NonZeroU64;
 
     use assert_matches::assert_matches;
     use fidl::endpoints::RequestStream;
-    use fidl_fuchsia_net as fnet;
-    use fidl_fuchsia_net_dhcp as fnet_dhcp;
     use fidl_fuchsia_net_ext::IntoExt as _;
-    use fidl_fuchsia_net_routes as fnet_routes;
-    use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
-    use fuchsia_async as fasync;
-    use futures::{channel::oneshot, join, pin_mut, FutureExt as _, StreamExt as _};
+    use futures::channel::oneshot;
+    use futures::{join, pin_mut, FutureExt as _, StreamExt as _};
     use net_declare::net_ip_v4;
-    use net_types::{
-        ip::{Ip, Ipv4, Ipv4Addr},
-        SpecifiedAddr, SpecifiedAddress as _, Witness as _,
-    };
+    use net_types::ip::{Ip, Ipv4, Ipv4Addr};
+    use net_types::{SpecifiedAddr, SpecifiedAddress as _, Witness as _};
     use proptest::prelude::*;
     use test_case::test_case;
+    use {
+        fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcp as fnet_dhcp,
+        fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+        fuchsia_async as fasync,
+    };
 
     #[derive(proptest_derive::Arbitrary, Clone, Debug)]
     struct Address {

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    core::{Core, ObjectRef, OnAdded, Property},
-    math,
-    shapes::{CubicVertex, PathVertex},
-};
+use crate::core::{Core, ObjectRef, OnAdded, Property};
+use crate::math;
+use crate::shapes::{CubicVertex, PathVertex};
 
 #[derive(Debug, Default)]
 pub struct CubicDetachedVertex {

@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fidl_fuchsia_pkg as fpkg, hmac::Mac as _, rand::Rng as _};
+use fidl_fuchsia_pkg as fpkg;
+use hmac::Mac as _;
+use rand::Rng as _;
 
 /// Creates and authenticates `fidl_fuchsia_pkg::ResolutionContext`s using an HMAC.
 /// The contexts contain the hash of the superpackage.
@@ -70,7 +72,8 @@ pub(crate) enum ContextAuthenticatorError {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     fn hash() -> fuchsia_hash::Hash {
         [0; 32].into()

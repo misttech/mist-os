@@ -2,27 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        boot_args::BootArgs,
-        config::apply_boot_args_to_config,
-        environment::{Environment, FshostEnvironment},
-        inspect::register_stats,
-    },
-    anyhow::{format_err, Error},
-    fidl::prelude::*,
-    fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio,
-    fuchsia_runtime::{take_startup_handle, HandleType},
-    fuchsia_zircon::sys::zx_debug_write,
-    futures::{channel::mpsc, lock::Mutex, StreamExt},
-    std::{collections::HashSet, sync::Arc},
-    vfs::{
-        directory::{entry_container::Directory, helper::DirectlyMutable},
-        execution_scope::ExecutionScope,
-        path::Path,
-        remote::remote_dir,
-    },
-};
+use crate::boot_args::BootArgs;
+use crate::config::apply_boot_args_to_config;
+use crate::environment::{Environment, FshostEnvironment};
+use crate::inspect::register_stats;
+use anyhow::{format_err, Error};
+use fidl::prelude::*;
+use fuchsia_runtime::{take_startup_handle, HandleType};
+use fuchsia_zircon::sys::zx_debug_write;
+use futures::channel::mpsc;
+use futures::lock::Mutex;
+use futures::StreamExt;
+use std::collections::HashSet;
+use std::sync::Arc;
+use vfs::directory::entry_container::Directory;
+use vfs::directory::helper::DirectlyMutable;
+use vfs::execution_scope::ExecutionScope;
+use vfs::path::Path;
+use vfs::remote::remote_dir;
+use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio};
 
 mod boot_args;
 mod config;

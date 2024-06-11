@@ -2,21 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::base_packages::{BasePackages, CachePackages},
-    crate::index::PackageIndex,
-    anyhow::anyhow,
-    anyhow::Context as _,
-    fidl_fuchsia_space::{
-        ErrorCode as SpaceErrorCode, ManagerRequest as SpaceManagerRequest,
-        ManagerRequestStream as SpaceManagerRequestStream,
-    },
-    fidl_fuchsia_update::CommitStatusProviderProxy,
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::prelude::*,
-    std::{collections::HashSet, sync::Arc},
-    tracing::{error, info},
+use crate::base_packages::{BasePackages, CachePackages};
+use crate::index::PackageIndex;
+use anyhow::{anyhow, Context as _};
+use fidl_fuchsia_space::{
+    ErrorCode as SpaceErrorCode, ManagerRequest as SpaceManagerRequest,
+    ManagerRequestStream as SpaceManagerRequestStream,
 };
+use fidl_fuchsia_update::CommitStatusProviderProxy;
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use futures::prelude::*;
+use std::collections::HashSet;
+use std::sync::Arc;
+use tracing::{error, info};
 
 pub async fn serve(
     blobfs: blobfs::Client,

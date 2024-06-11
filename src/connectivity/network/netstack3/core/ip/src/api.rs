@@ -5,25 +5,22 @@
 //! Defines the public API exposed to bindings by the IP module.
 
 use alloc::vec::Vec;
-use net_types::{
-    ip::{Ip, IpAddr, IpVersionMarker, Ipv4, Ipv6},
-    SpecifiedAddr, Witness as _,
-};
+use net_types::ip::{Ip, IpAddr, IpVersionMarker, Ipv4, Ipv6};
+use net_types::{SpecifiedAddr, Witness as _};
 
 use netstack3_base::{
     AnyDevice, ContextPair, DeviceIdContext, Inspector, InspectorDeviceExt, StrongDeviceIdentifier,
 };
 
-use crate::internal::{
-    base::{
-        self, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt, IpStateContext,
-        ResolveRouteError,
-    },
-    device::{IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt},
-    types::{
-        Destination, Entry, EntryAndGeneration, EntryEither, Metric, NextHop, OrderedEntry,
-        ResolvedRoute, RoutableIpAddr, WrapBroadcastMarker,
-    },
+use crate::internal::base::{
+    self, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt, IpStateContext, ResolveRouteError,
+};
+use crate::internal::device::{
+    IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
+};
+use crate::internal::types::{
+    Destination, Entry, EntryAndGeneration, EntryEither, Metric, NextHop, OrderedEntry,
+    ResolvedRoute, RoutableIpAddr, WrapBroadcastMarker,
 };
 
 /// The routes API for a specific IP version `I`.

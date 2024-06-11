@@ -413,12 +413,10 @@ mod tests {
     use ip_test_macro::ip_test;
     use net_types::ip::{Ipv4, Ipv6};
     use net_types::{SpecifiedAddr, Witness};
-    use netstack3_base::{
-        testutil::{
-            assert_empty, FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeTimerCtxExt, TestIpExt,
-        },
-        CtxPair, InstantContext, IntoCoreTimerCtx,
+    use netstack3_base::testutil::{
+        assert_empty, FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeTimerCtxExt, TestIpExt,
     };
+    use netstack3_base::{CtxPair, InstantContext, IntoCoreTimerCtx};
     use test_case::test_case;
 
     struct FakePmtuContext<I: Ip> {

@@ -8,22 +8,22 @@
 
 mod common;
 
-use std::{collections::HashMap, convert::TryFrom as _, num::NonZeroU64, time::Duration};
+use std::collections::HashMap;
+use std::convert::TryFrom as _;
+use std::num::NonZeroU64;
+use std::time::Duration;
 
 use assert_matches::assert_matches;
-use fidl_fuchsia_net_filter as fnet_filter;
-use fidl_fuchsia_net_filter_ext as fnet_filter_ext;
-use fidl_fuchsia_posix_socket as fposix_socket;
+use {
+    fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
+    fidl_fuchsia_posix_socket as fposix_socket,
+};
 
 use net_declare::{fidl_mac, fidl_subnet, std_ip_v4, std_ip_v6};
-use net_types::{
-    ip::{IpAddress, IpInvariant, IpVersion, Ipv4, Ipv6},
-    AddrAndPortFormatter, Witness as _,
-};
-use netstack_testing_common::{
-    constants, get_inspect_data,
-    realms::{Netstack3, TestSandboxExt as _},
-};
+use net_types::ip::{IpAddress, IpInvariant, IpVersion, Ipv4, Ipv6};
+use net_types::{AddrAndPortFormatter, Witness as _};
+use netstack_testing_common::realms::{Netstack3, TestSandboxExt as _};
+use netstack_testing_common::{constants, get_inspect_data};
 use netstack_testing_macros::netstack_test;
 use packet_formats::ethernet::testutil::ETHERNET_HDR_LEN_NO_TAG;
 use test_case::test_case;

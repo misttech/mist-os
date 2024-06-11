@@ -4,16 +4,14 @@
 
 //! Provides a generic implementation of a PPP control protocol.
 
-use {
-    futures::future::BoxFuture,
-    packet::{Buf, BufferMut, Serializer},
-    ppp_packet::{
-        CodeRejectPacketBuilder, ConfigurationPacketBuilder, ControlProtocolPacketBuilder,
-        PppPacketBuilder, TerminationPacketBuilder,
-    },
-    std::fmt::Debug,
-    thiserror::Error,
+use futures::future::BoxFuture;
+use packet::{Buf, BufferMut, Serializer};
+use ppp_packet::{
+    CodeRejectPacketBuilder, ConfigurationPacketBuilder, ControlProtocolPacketBuilder,
+    PppPacketBuilder, TerminationPacketBuilder,
 };
+use std::fmt::Debug;
+use thiserror::Error;
 
 /// The protocol byte pattern used in IPCP packets.
 pub const PROTOCOL_IPV4_CONTROL: u16 = 0x8021;

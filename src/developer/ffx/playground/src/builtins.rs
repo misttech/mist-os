@@ -599,10 +599,9 @@ impl ReplayableIteratorCursor for FileCursor {
 mod test {
     use super::*;
     use crate::test::*;
-    use fidl_fuchsia_io as fio;
-    use fidl_test_fidlcodec_examples as fctest;
     use futures::StreamExt;
     use std::collections::HashMap;
+    use {fidl_fuchsia_io as fio, fidl_test_fidlcodec_examples as fctest};
 
     #[fuchsia::test]
     async fn open() {

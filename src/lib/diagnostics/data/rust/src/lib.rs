@@ -15,19 +15,15 @@ use flyweights::FlyStr;
 use itertools::Itertools;
 use moniker::{ExtendedMoniker, MonikerError};
 use selectors::SelectorExt;
-use serde::{
-    de::{DeserializeOwned, Deserializer},
-    Deserialize, Serialize, Serializer,
-};
-use std::{
-    borrow::Borrow,
-    cmp::Ordering,
-    fmt,
-    hash::Hash,
-    ops::{Deref, DerefMut},
-    str::FromStr,
-    time::Duration,
-};
+use serde::de::{DeserializeOwned, Deserializer};
+use serde::{Deserialize, Serialize, Serializer};
+use std::borrow::Borrow;
+use std::cmp::Ordering;
+use std::fmt;
+use std::hash::Hash;
+use std::ops::{Deref, DerefMut};
+use std::str::FromStr;
+use std::time::Duration;
 use termion::{color, style};
 use thiserror::Error;
 

@@ -7,11 +7,8 @@
 use fidl::endpoints::ProtocolMarker as _;
 use fidl_fuchsia_netemul as fnetemul;
 use futures::{FutureExt as _, StreamExt as _};
-use netstack_testing_common::{
-    get_component_moniker,
-    realms::{constants, Netstack, TestSandboxExt as _},
-    wait_for_component_stopped,
-};
+use netstack_testing_common::realms::{constants, Netstack, TestSandboxExt as _};
+use netstack_testing_common::{get_component_moniker, wait_for_component_stopped};
 use netstack_testing_macros::netstack_test;
 use std::pin::pin;
 use test_case::test_case;

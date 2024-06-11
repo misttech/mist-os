@@ -7,11 +7,10 @@ use crate::prelude::*;
 use fidl_fuchsia_factory_lowpan::*;
 use fidl_fuchsia_lowpan::*;
 use fidl_fuchsia_lowpan_device::*;
-use fidl_fuchsia_lowpan_experimental::DeviceConnectorMarker as ExperimentalDeviceConnectorMarker;
-use fidl_fuchsia_lowpan_experimental::DeviceExtraConnectorMarker as ExperimentalDeviceExtraConnectorMarker;
-use fidl_fuchsia_lowpan_experimental::DeviceExtraMarker as ExperimentalDeviceExtraMarker;
-use fidl_fuchsia_lowpan_experimental::DeviceMarker as ExperimentalDeviceMarker;
 use fidl_fuchsia_lowpan_experimental::{
+    DeviceConnectorMarker as ExperimentalDeviceConnectorMarker,
+    DeviceExtraConnectorMarker as ExperimentalDeviceExtraConnectorMarker,
+    DeviceExtraMarker as ExperimentalDeviceExtraMarker, DeviceMarker as ExperimentalDeviceMarker,
     DeviceRouteConnectorMarker, DeviceRouteExtraConnectorMarker, DeviceRouteExtraMarker,
     DeviceRouteMarker, LegacyJoiningConnectorMarker, LegacyJoiningMarker,
 };

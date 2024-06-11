@@ -2,28 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::core::collection::{Package, Packages},
-    anyhow::{anyhow, Context, Result},
-    fuchsia_archive::Utf8Reader as FarReader,
-    fuchsia_url::AbsolutePackageUrl,
-    scrutiny::{
-        model::controller::{DataController, HintDataType},
-        model::model::DataModel,
-    },
-    scrutiny_utils::{
-        artifact::{ArtifactReader, FileArtifactReader},
-        usage::UsageBuilder,
-    },
-    serde::{Deserialize, Serialize},
-    serde_json::{json, value::Value},
-    std::{
-        fs::{self, File},
-        io::Write,
-        path::{Path, PathBuf},
-        sync::Arc,
-    },
-};
+use crate::core::collection::{Package, Packages};
+use anyhow::{anyhow, Context, Result};
+use fuchsia_archive::Utf8Reader as FarReader;
+use fuchsia_url::AbsolutePackageUrl;
+use scrutiny::model::controller::{DataController, HintDataType};
+use scrutiny::model::model::DataModel;
+use scrutiny_utils::artifact::{ArtifactReader, FileArtifactReader};
+use scrutiny_utils::usage::UsageBuilder;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use serde_json::value::Value;
+use std::fs::{self, File};
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 #[derive(Deserialize, Serialize)]
 pub struct PackageExtractRequest {

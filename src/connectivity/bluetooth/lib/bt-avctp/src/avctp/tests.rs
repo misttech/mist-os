@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx, Status},
-    futures::{executor::block_on, StreamExt},
-    std::result,
-};
+use fuchsia_async as fasync;
+use fuchsia_zircon::{self as zx, Status};
+use futures::executor::block_on;
+use futures::StreamExt;
+use std::result;
 
 use super::*;
 

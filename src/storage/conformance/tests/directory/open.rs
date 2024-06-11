@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    assert_matches::assert_matches,
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    io_conformance_util::{test_harness::TestHarness, *},
-};
+use assert_matches::assert_matches;
+use fidl::endpoints::create_proxy;
+use io_conformance_util::test_harness::TestHarness;
+use io_conformance_util::*;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 #[fuchsia::test]
 async fn open_dir_without_describe_flag() {

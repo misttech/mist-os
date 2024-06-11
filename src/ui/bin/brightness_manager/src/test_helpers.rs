@@ -2,11 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::format_err,
-    futures::{channel::oneshot, future::Shared, lock::Mutex, pin_mut, FutureExt},
-    std::{future::Future, pin::Pin, sync::Arc, task::Poll},
-};
+use anyhow::format_err;
+use futures::channel::oneshot;
+use futures::future::Shared;
+use futures::lock::Mutex;
+use futures::{pin_mut, FutureExt};
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::Poll;
 
 /// A `Future` whose output value can be cleared and replaced. The future is in a `Poll::Pending`
 /// state if and only if it has no value.
@@ -97,11 +101,9 @@ where
 #[cfg(test)]
 mod tests {
 
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        futures::{join, poll},
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use futures::{join, poll};
 
     #[fuchsia::test]
     async fn basic_get_set_and_clear() {

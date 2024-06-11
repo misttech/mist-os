@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use test_runners_elf_lib::{
-    launcher::ElfComponentLauncher, runner::add_runner_service, test_server::TestServer,
-};
+use test_runners_elf_lib::launcher::ElfComponentLauncher;
+use test_runners_elf_lib::runner::add_runner_service;
+use test_runners_elf_lib::test_server::TestServer;
 
 type ElfTestServer = TestServer<ElfComponentLauncher>;
 

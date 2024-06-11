@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    packet_encoding::{Decodable, Encodable},
-    std::num::NonZeroU64,
-};
+use packet_encoding::{Decodable, Encodable};
+use std::num::NonZeroU64;
 
 use crate::packets::{Direction, Error, PacketResult, StatusCode};
 
@@ -171,7 +169,8 @@ impl Encodable for ChangePathResponse {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     #[fuchsia::test]
     /// Encoding a GetFolderItemsCommand successfully produces a byte buffer.

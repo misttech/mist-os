@@ -4,12 +4,11 @@
 
 use anyhow::{Context, Result};
 
-use std::{path::PathBuf, process::Command};
+use std::path::PathBuf;
+use std::process::Command;
 
-use crate::{
-    api::{Api, Component, ComponentId, CreateIssue, IssueId, UpdateIssue},
-    command_ext::CommandExt as _,
-};
+use crate::api::{Api, Component, ComponentId, CreateIssue, IssueId, UpdateIssue};
+use crate::command_ext::CommandExt as _;
 
 pub struct Bugspec {
     path: PathBuf,

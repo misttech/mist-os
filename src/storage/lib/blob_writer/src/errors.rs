@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fuchsia_zircon::Status, thiserror::Error};
+use fuchsia_zircon::Status;
+use thiserror::Error;
 
 /// The error type used by the `BlobWriter` for the create() command.
 #[derive(Clone, Debug, Error)]

@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{object_get_info, ok};
-use crate::{AsHandleRef, Channel, Handle, ObjectQuery, Status, Topic};
+use crate::{object_get_info, ok, AsHandleRef, Channel, Handle, ObjectQuery, Status, Topic};
 use bitflags::bitflags;
 use fuchsia_zircon_sys::{self as sys, zx_duration_t};
 

@@ -16,13 +16,14 @@ use chrono::Local;
 use discovery::{
     wait_for_devices, DiscoverySources, FastbootConnectionState, TargetEvent, TargetState,
 };
-use futures::Stream;
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use signal_hook::consts::signal::*;
 use signal_hook::iterator::Signals;
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::{collections::HashMap, io, io::Write, time::Duration};
+use std::collections::HashMap;
+use std::io;
+use std::io::Write;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use target::{TargetInfo, TargetMode};
 use timeout::timeout;
 use tracing_subscriber::filter::LevelFilter;

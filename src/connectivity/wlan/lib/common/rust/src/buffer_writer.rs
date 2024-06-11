@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::appendable::{Appendable, BufferTooSmall},
-    zerocopy::ByteSliceMut,
-};
+use crate::appendable::{Appendable, BufferTooSmall};
+use zerocopy::ByteSliceMut;
 
 pub struct BufferWriter<B> {
     buffer: B,

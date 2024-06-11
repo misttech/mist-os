@@ -2,49 +2,42 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{Context as _, Error};
+use async_trait::async_trait;
+use dns::async_resolver::{Resolver, Spawner};
+use dns::config::{ServerList, UpdateServersResult};
+use fidl_fuchsia_net_name::{
+    self as fname, LookupAdminRequest, LookupAdminRequestStream, LookupRequest, LookupRequestStream,
+};
+use fuchsia_component::server::{ServiceFs, ServiceFsDir};
+use fuchsia_sync::RwLock;
+use futures::channel::mpsc;
+use futures::lock::Mutex;
+use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryStreamExt as _};
+use net_declare::fidl_ip_v6;
+use net_types::ip::IpAddress;
+use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::convert::TryFrom as _;
+use std::hash::{Hash, Hasher};
+use std::net::IpAddr;
+use std::num::NonZeroUsize;
+use std::rc::Rc;
+use std::str::FromStr as _;
+use std::sync::Arc;
+use tracing::{debug, error, info, warn};
+use trust_dns_proto::op::ResponseCode;
+use trust_dns_proto::rr::domain::IntoName;
+use trust_dns_proto::rr::{RData, RecordType};
+use trust_dns_resolver::config::{
+    LookupIpStrategy, NameServerConfig, NameServerConfigGroup, Protocol, ResolverConfig,
+    ResolverOpts, ServerOrderingStrategy,
+};
+use trust_dns_resolver::error::{ResolveError, ResolveErrorKind};
+use trust_dns_resolver::lookup;
+use unicode_xid::UnicodeXID as _;
 use {
-    anyhow::{Context as _, Error},
-    async_trait::async_trait,
-    dns::{
-        async_resolver::{Resolver, Spawner},
-        config::{ServerList, UpdateServersResult},
-    },
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as net_ext,
-    fidl_fuchsia_net_name::{
-        self as fname, LookupAdminRequest, LookupAdminRequestStream, LookupRequest,
-        LookupRequestStream,
-    },
-    fidl_fuchsia_net_routes as fnet_routes, fuchsia_async as fasync,
-    fuchsia_component::server::{ServiceFs, ServiceFsDir},
-    fuchsia_sync::RwLock,
-    fuchsia_zircon as zx,
-    futures::{
-        channel::mpsc, lock::Mutex, FutureExt as _, SinkExt as _, StreamExt as _, TryStreamExt as _,
-    },
-    net_declare::fidl_ip_v6,
-    net_types::ip::IpAddress,
-    std::collections::{BTreeMap, HashMap, VecDeque},
-    std::convert::TryFrom as _,
-    std::hash::{Hash, Hasher},
-    std::net::IpAddr,
-    std::num::NonZeroUsize,
-    std::rc::Rc,
-    std::str::FromStr as _,
-    std::sync::Arc,
-    tracing::{debug, error, info, warn},
-    trust_dns_proto::{
-        op::ResponseCode,
-        rr::{domain::IntoName, RData, RecordType},
-    },
-    trust_dns_resolver::{
-        config::{
-            LookupIpStrategy, NameServerConfig, NameServerConfigGroup, Protocol, ResolverConfig,
-            ResolverOpts, ServerOrderingStrategy,
-        },
-        error::{ResolveError, ResolveErrorKind},
-        lookup,
-    },
-    unicode_xid::UnicodeXID as _,
+    fidl_fuchsia_net_routes as fnet_routes, fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 struct SharedResolver<T>(RwLock<Rc<T>>);
@@ -1185,11 +1178,9 @@ pub async fn main() -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        net::{Ipv4Addr, Ipv6Addr, SocketAddr},
-        pin::pin,
-        str::FromStr,
-    };
+    use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
+    use std::pin::pin;
+    use std::str::FromStr;
 
     use assert_matches::assert_matches;
     use diagnostics_assertions::{assert_data_tree, tree_assertion, NonZeroUintProperty};
@@ -1200,11 +1191,9 @@ mod tests {
     use net_declare::{fidl_ip, std_ip, std_ip_v4, std_ip_v6};
     use net_types::ip::Ip as _;
     use test_case::test_case;
-    use trust_dns_proto::{
-        op::Query,
-        rr::{Name, Record},
-    };
-    use trust_dns_resolver::{lookup::Lookup, lookup::ReverseLookup};
+    use trust_dns_proto::op::Query;
+    use trust_dns_proto::rr::{Name, Record};
+    use trust_dns_resolver::lookup::{Lookup, ReverseLookup};
 
     use super::*;
 
@@ -2469,7 +2458,8 @@ mod tests {
     #[test]
     fn test_failure_stats() {
         use anyhow::anyhow;
-        use trust_dns_proto::{error::ProtoError, op::Query};
+        use trust_dns_proto::error::ProtoError;
+        use trust_dns_proto::op::Query;
 
         let mut stats = FailureStats::default();
         for (error_kind, expected) in &[

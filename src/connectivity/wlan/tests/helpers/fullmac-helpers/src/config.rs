@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use test_realm_helpers::constants::DEFAULT_CLIENT_STA_ADDR;
+use wlan_common::ie::fake_ht_capabilities;
+use zerocopy::AsBytes;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
-    test_realm_helpers::constants::DEFAULT_CLIENT_STA_ADDR, wlan_common::ie::fake_ht_capabilities,
-    zerocopy::AsBytes,
 };
 
 /// Contains all the configuration required for the fullmac driver.

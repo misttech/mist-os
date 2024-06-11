@@ -8,19 +8,18 @@ use crate::constants::constants::{
     TITLE_FONT_SIZE,
 };
 use crate::generic_view::ButtonInfo;
-use crate::text_field::{SceneBuilderTextFieldExt, TextVisibility};
-use crate::text_field::{TextField, TextFieldOptions};
+use crate::text_field::{SceneBuilderTextFieldExt, TextField, TextFieldOptions, TextVisibility};
 use anyhow::Error;
+use carnelian::drawing::load_font;
+use carnelian::render::Context as RenderContext;
+use carnelian::scene::facets::{TextFacetOptions, TextHorizontalAlignment, TextVerticalAlignment};
+use carnelian::scene::layout::{
+    CrossAxisAlignment, Flex, FlexOptions, MainAxisAlignment, MainAxisSize,
+};
+use carnelian::scene::scene::{Scene, SceneBuilder};
 use carnelian::{
-    drawing::load_font,
-    input, make_message,
-    render::Context as RenderContext,
-    scene::{
-        facets::{TextFacetOptions, TextHorizontalAlignment, TextVerticalAlignment},
-        layout::{CrossAxisAlignment, Flex, FlexOptions, MainAxisAlignment, MainAxisSize},
-        scene::{Scene, SceneBuilder},
-    },
-    AppSender, Message, MessageTarget, Point, Size, ViewAssistant, ViewAssistantContext, ViewKey,
+    input, make_message, AppSender, Message, MessageTarget, Point, Size, ViewAssistant,
+    ViewAssistantContext, ViewKey,
 };
 use euclid::size2;
 use std::path::PathBuf;

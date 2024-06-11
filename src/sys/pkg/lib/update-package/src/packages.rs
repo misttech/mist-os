@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_io as fio,
-    fuchsia_url::PinnedAbsolutePackageUrl,
-    serde::{Deserialize, Serialize},
-};
+use fidl_fuchsia_io as fio;
+use fuchsia_url::PinnedAbsolutePackageUrl;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "version", content = "content", deny_unknown_fields)]
@@ -73,7 +71,10 @@ pub(crate) async fn packages(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::TestUpdatePackage, assert_matches::assert_matches, serde_json::json};
+    use super::*;
+    use crate::TestUpdatePackage;
+    use assert_matches::assert_matches;
+    use serde_json::json;
 
     fn pkg_urls<'a>(v: impl IntoIterator<Item = &'a str>) -> Vec<PinnedAbsolutePackageUrl> {
         v.into_iter().map(|s| s.parse().unwrap()).collect()

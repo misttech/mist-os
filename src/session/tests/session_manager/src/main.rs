@@ -2,25 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use diagnostics_hierarchy::DiagnosticsHierarchy;
+use diagnostics_reader::{ArchiveReader, Inspect};
+use fidl::endpoints::{create_endpoints, create_proxy, ServerEnd};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{
+    Capability, ChildOptions, ChildRef, DirectoryContents, RealmBuilder, RealmInstance, Ref, Route,
+};
+use futures::{select, FutureExt, StreamExt};
+use realm_proxy_client::RealmProxyClient;
+use std::sync::{Arc, Mutex};
+use tsc::DeviceProxy;
 use {
-    diagnostics_hierarchy::DiagnosticsHierarchy,
-    diagnostics_reader::{ArchiveReader, Inspect},
-    fidl::endpoints::{create_endpoints, create_proxy, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_hardware_suspend as fhsuspend,
     fidl_fuchsia_io as fio, fidl_fuchsia_power_broker as fbroker,
     fidl_fuchsia_power_suspend as fsuspend, fidl_fuchsia_power_system as fsystem,
     fidl_fuchsia_session as fsession, fidl_fuchsia_session_power as fpower,
     fidl_fuchsia_sys2 as fsys2, fidl_test_suspendcontrol as tsc,
     fidl_test_systemactivitygovernor as ftest, fuchsia_async as fasync,
-    fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
-    fuchsia_component_test::{
-        Capability, ChildOptions, ChildRef, DirectoryContents, RealmBuilder, RealmInstance, Ref,
-        Route,
-    },
-    futures::{select, FutureExt, StreamExt},
-    realm_proxy_client::RealmProxyClient,
-    std::sync::{Arc, Mutex},
-    tsc::DeviceProxy,
 };
 
 const SESSION_URL: &'static str = "hello-world-session#meta/hello-world-session.cm";

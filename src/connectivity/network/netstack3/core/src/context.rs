@@ -38,14 +38,10 @@
 use lock_order::Unlocked;
 
 use netstack3_base::ContextProvider;
-use netstack3_device as device;
-use netstack3_ip as ip;
-use netstack3_udp as udp;
+use {netstack3_device as device, netstack3_ip as ip, netstack3_udp as udp};
 
-use crate::{
-    marker::{BindingsContext, BindingsTypes},
-    state::StackState,
-};
+use crate::marker::{BindingsContext, BindingsTypes};
+use crate::state::StackState;
 
 // Enable all blanket implementations on CoreCtx.
 //
@@ -102,7 +98,8 @@ mod locked {
     use super::{BindingsTypes, CoreCtx, StackState};
 
     use core::ops::Deref;
-    use lock_order::{wrap::LockedWrapper, Locked as ExternalLocked, TupleWrapper, Unlocked};
+    use lock_order::wrap::LockedWrapper;
+    use lock_order::{Locked as ExternalLocked, TupleWrapper, Unlocked};
 
     /// A crate-local wrapper on [`lock_order::Locked`].
     pub struct Locked<T, L>(ExternalLocked<T, L>);

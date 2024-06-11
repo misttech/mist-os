@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::args,
-    anyhow::{Context, Error},
-    fidl_fuchsia_update_channelcontrol::{ChannelControlMarker, ChannelControlProxy},
-    fuchsia_component::client::connect_to_protocol,
-};
+use crate::args;
+use anyhow::{Context, Error};
+use fidl_fuchsia_update_channelcontrol::{ChannelControlMarker, ChannelControlProxy};
+use fuchsia_component::client::connect_to_protocol;
 
 pub async fn handle_channel_control_cmd(cmd: args::channel::Command) -> Result<(), Error> {
     let channel_control = connect_to_protocol::<ChannelControlMarker>()
@@ -48,11 +46,12 @@ async fn handle_channel_control_cmd_impl(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, assert_matches::assert_matches, fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_update_channelcontrol::ChannelControlRequest, fuchsia_async as fasync,
-        futures::prelude::*,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_update_channelcontrol::ChannelControlRequest;
+    use fuchsia_async as fasync;
+    use futures::prelude::*;
 
     async fn perform_channel_control_test<V>(argument: args::channel::Command, verifier: V)
     where

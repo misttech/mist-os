@@ -9,8 +9,9 @@ use fidl_fuchsia_media::{AudioCoreMarker, AudioRenderUsage};
 use fidl_fuchsia_settings::{
     AudioMarker, AudioProxy, AudioStreamSettingSource, AudioStreamSettings, Volume,
 };
-use fuchsia_component_test::{Capability, LocalComponentHandles, Ref, Route};
-use fuchsia_component_test::{ChildOptions, RealmBuilder, RealmInstance};
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
+};
 use fuchsia_sync::RwLock;
 use futures::channel::mpsc::{Receiver, Sender};
 use futures::StreamExt;

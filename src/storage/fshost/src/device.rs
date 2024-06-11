@@ -4,19 +4,17 @@
 
 pub mod constants;
 
-use {
-    anyhow::{anyhow, Context, Error},
-    async_trait::async_trait,
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
-    fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy},
-    fidl_fuchsia_hardware_block_partition::{PartitionMarker, PartitionProxy},
-    fidl_fuchsia_hardware_block_volume::{VolumeMarker, VolumeProxy},
-    fidl_fuchsia_io::OpenFlags,
-    fs_management::format::{detect_disk_format, DiskFormat},
-    fuchsia_component::client::connect_to_protocol_at_path,
-    fuchsia_zircon as zx,
-};
+use anyhow::{anyhow, Context, Error};
+use async_trait::async_trait;
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
+use fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy};
+use fidl_fuchsia_hardware_block_partition::{PartitionMarker, PartitionProxy};
+use fidl_fuchsia_hardware_block_volume::{VolumeMarker, VolumeProxy};
+use fidl_fuchsia_io::OpenFlags;
+use fs_management::format::{detect_disk_format, DiskFormat};
+use fuchsia_component::client::connect_to_protocol_at_path;
+use fuchsia_zircon as zx;
 
 #[async_trait]
 pub trait Device: Send + Sync {

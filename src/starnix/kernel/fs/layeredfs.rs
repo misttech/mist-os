@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::{CurrentTask, Kernel},
-    vfs::{
-        fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek, CacheMode,
-        DirectoryEntryType, DirentSink, FileHandle, FileObject, FileOps, FileSystem,
-        FileSystemHandle, FileSystemOps, FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString,
-        MountInfo, SeekTarget,
-    },
+use crate::task::{CurrentTask, Kernel};
+use crate::vfs::{
+    fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek, CacheMode,
+    DirectoryEntryType, DirentSink, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle,
+    FileSystemOps, FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString, MountInfo, SeekTarget,
 };
 use starnix_sync::{FileOpsCore, Locked};
-use starnix_uapi::{errno, errors::Errno, ino_t, off_t, open_flags::OpenFlags, statfs};
-use std::{collections::BTreeMap, sync::Arc};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::{errno, ino_t, off_t, statfs};
+use std::collections::BTreeMap;
+use std::sync::Arc;
 
 /// A filesystem that will delegate most operation to a base one, but have a number of top level
 /// directory that points to other filesystems.
@@ -164,7 +164,8 @@ impl FileOps for LayeredFsRootNodeOps {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{fs::tmpfs::TmpFs, testing::*};
+    use crate::fs::tmpfs::TmpFs;
+    use crate::testing::*;
     use starnix_sync::Unlocked;
 
     fn get_root_entry_names(

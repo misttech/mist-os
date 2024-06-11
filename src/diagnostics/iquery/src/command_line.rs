@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{commands::*, types::*},
-    argh::FromArgs,
-    async_trait::async_trait,
-};
+use crate::commands::*;
+use crate::types::*;
+use argh::FromArgs;
+use async_trait::async_trait;
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]

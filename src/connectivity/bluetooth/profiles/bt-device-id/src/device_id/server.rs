@@ -3,17 +3,16 @@
 // found in the LICENSE file.
 
 use async_utils::stream::{FlattenUnordered, FlattenUnorderedExt};
-use core::{
-    pin::Pin,
-    task::{Context, Poll},
-};
-use fidl_fuchsia_bluetooth_bredr as bredr;
-use fidl_fuchsia_bluetooth_deviceid as di;
-use fuchsia_zircon as zx;
+use core::pin::Pin;
+use core::task::{Context, Poll};
 use futures::channel::mpsc;
 use futures::stream::FuturesUnordered;
 use futures::{ready, select, Future, StreamExt};
 use tracing::{info, warn};
+use {
+    fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_deviceid as di,
+    fuchsia_zircon as zx,
+};
 
 use crate::device_id::service_record::DeviceIdentificationService;
 use crate::device_id::token::DeviceIdRequestToken;

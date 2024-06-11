@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{
-    events::{GraphObjectEventTracker, MetaEventNode},
-    types::{EdgeMarker, GraphObject, VertexMarker},
-    VertexId,
-};
+use super::events::{GraphObjectEventTracker, MetaEventNode};
+use super::types::{EdgeMarker, GraphObject, VertexMarker};
+use super::VertexId;
 use fuchsia_inspect::{self as inspect, ArrayProperty, Property};
-use std::{borrow::Cow, collections::BTreeMap, ops::Deref};
+use std::borrow::Cow;
+use std::collections::BTreeMap;
+use std::ops::Deref;
 
 /// An enum encoding all the possible metadata value types and contents.
 pub enum MetadataValue<'a> {

@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{cell::RefCell, fmt::Debug, rc::Rc};
+use std::cell::RefCell;
+use std::fmt::Debug;
+use std::rc::Rc;
 
 /// An observer that can be used to observe values from a `HangingGet` or
 /// `Window` instance. The observer must not be observed multiple

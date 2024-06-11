@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{constants::*, fields::*, id::Id, rsn::rsne, wpa, wsc},
-    crate::{
-        appendable::{Appendable, BufferTooSmall},
-        error::FrameWriteError,
-        organization::Oui,
-    },
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    zerocopy::AsBytes,
-};
+use super::constants::*;
+use super::fields::*;
+use super::id::Id;
+use super::rsn::rsne;
+use super::{wpa, wsc};
+use crate::appendable::{Appendable, BufferTooSmall};
+use crate::error::FrameWriteError;
+use crate::organization::Oui;
+use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
+use zerocopy::AsBytes;
 
 macro_rules! validate {
     ( $condition:expr, $fmt:expr $(, $args:expr)* $(,)? ) => {
@@ -192,11 +192,9 @@ pub fn write_wmm_param<B: Appendable>(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::buffer_writer::BufferWriter,
-        crate::ie::rsn::{akm, cipher},
-    };
+    use super::*;
+    use crate::buffer_writer::BufferWriter;
+    use crate::ie::rsn::{akm, cipher};
 
     #[test]
     fn write_ie_body_too_long() {

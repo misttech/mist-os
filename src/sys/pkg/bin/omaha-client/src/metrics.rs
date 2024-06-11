@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Context, Error};
-use fidl_contrib::protocol_connector::ConnectedProtocol;
-use fidl_contrib::{protocol_connector::ProtocolSender, ProtocolConnector};
+use fidl_contrib::protocol_connector::{ConnectedProtocol, ProtocolSender};
+use fidl_contrib::ProtocolConnector;
 use fidl_fuchsia_metrics::{
     MetricEvent, MetricEventLoggerFactoryMarker, MetricEventLoggerProxy, ProjectSpec,
 };
@@ -12,10 +12,8 @@ use fuchsia_cobalt_builders::MetricEventExt;
 use fuchsia_component::client::connect_to_protocol;
 use futures::prelude::*;
 use mos_metrics_registry as mos_registry;
-use omaha_client::{
-    metrics::{ClockType, Metrics, MetricsReporter},
-    protocol::request::{EventResult, EventType, InstallSource},
-};
+use omaha_client::metrics::{ClockType, Metrics, MetricsReporter};
+use omaha_client::protocol::request::{EventResult, EventType, InstallSource};
 use std::time::Duration;
 use tracing::{info, warn};
 
@@ -364,7 +362,8 @@ mod tests {
     use fidl_fuchsia_metrics::MetricEventPayload;
     use fuchsia_async as fasync;
     use futures::stream::StreamExt;
-    use omaha_client::{metrics::UpdateCheckFailureReason, protocol::request::Event};
+    use omaha_client::metrics::UpdateCheckFailureReason;
+    use omaha_client::protocol::request::Event;
 
     async fn assert_metrics(metrics: Metrics, expected_events: &[MetricEvent]) {
         let receiver = {

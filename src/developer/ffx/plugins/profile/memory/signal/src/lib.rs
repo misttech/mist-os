@@ -4,14 +4,12 @@
 
 //! Implementation of the `signal` subcommand.
 
-use {
-    anyhow::Result,
-    async_trait::async_trait,
-    errors::ffx_error,
-    ffx_profile_memory_signal_args::SignalCommand,
-    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
-    fidl_fuchsia_memory_debug::MemoryPressureProxy,
-};
+use anyhow::Result;
+use async_trait::async_trait;
+use errors::ffx_error;
+use ffx_profile_memory_signal_args::SignalCommand;
+use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fidl_fuchsia_memory_debug::MemoryPressureProxy;
 
 #[derive(FfxTool)]
 pub struct MemorySignalTool {

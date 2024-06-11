@@ -4,18 +4,16 @@
 
 //! fuchsia io conformance testing harness for Fxfs
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_io_test::{
-        self as io_test, Io1Config, Io1HarnessRequest, Io1HarnessRequestStream,
-    },
-    fuchsia_component::server::ServiceFs,
-    futures::prelude::*,
-    fxfs_testing::{open_dir, open_file, TestFixture},
-    std::sync::atomic::{AtomicU64, Ordering},
-    tracing::error,
+use anyhow::{Context as _, Error};
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_io_test::{
+    self as io_test, Io1Config, Io1HarnessRequest, Io1HarnessRequestStream,
 };
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
+use fxfs_testing::{open_dir, open_file, TestFixture};
+use std::sync::atomic::{AtomicU64, Ordering};
+use tracing::error;
 
 struct Harness(Io1HarnessRequestStream);
 

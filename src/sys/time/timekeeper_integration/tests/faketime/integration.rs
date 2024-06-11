@@ -4,28 +4,25 @@
 
 use anyhow::{Context, Result};
 use fidl::{endpoints, AsHandleRef, HandleBased};
-use fidl_fuchsia_testing as ffte;
-use fidl_fuchsia_testing_harness as ffth;
-use fidl_fuchsia_time as fft;
-use fidl_test_time_realm as fttr;
+use fidl_fuchsia_metrics_test::{LogMethod, MetricEventLoggerQuerierProxy};
+use fidl_fuchsia_testing::Increment;
+use fidl_fuchsia_time_external::{Status, TimeSample};
 use fuchsia_component::client;
+use fuchsia_zircon::{self as zx};
+use futures::{Future, StreamExt};
+use std::sync::Arc;
+use test_util::assert_geq;
+use time_metrics_registry::{
+    TimekeeperTimeSourceEventsMigratedMetricDimensionEventType as TimeSourceEvent,
+    TIMEKEEPER_TIME_SOURCE_EVENTS_MIGRATED_METRIC_ID,
+};
+use timekeeper_integration_lib::{
+    create_cobalt_event_stream, new_nonshareable_clock, poll_until_async, poll_until_async_2,
+    FakeClockController, RemotePushSourcePuppet, STD_DEV, VALID_TIME,
+};
 use {
-    fidl_fuchsia_metrics_test::{LogMethod, MetricEventLoggerQuerierProxy},
-    fidl_fuchsia_testing::Increment,
-    fidl_fuchsia_time_external::{Status, TimeSample},
-    fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx},
-    futures::{Future, StreamExt},
-    std::sync::Arc,
-    test_util::assert_geq,
-    time_metrics_registry::{
-        TimekeeperTimeSourceEventsMigratedMetricDimensionEventType as TimeSourceEvent,
-        TIMEKEEPER_TIME_SOURCE_EVENTS_MIGRATED_METRIC_ID,
-    },
-    timekeeper_integration_lib::{
-        create_cobalt_event_stream, new_nonshareable_clock, poll_until_async, poll_until_async_2,
-        FakeClockController, RemotePushSourcePuppet, STD_DEV, VALID_TIME,
-    },
+    fidl_fuchsia_testing as ffte, fidl_fuchsia_testing_harness as ffth, fidl_fuchsia_time as fft,
+    fidl_test_time_realm as fttr, fuchsia_async as fasync,
 };
 
 use fidl_fuchsia_testing as _; // TODO: fmil - Figure out why this is needed.

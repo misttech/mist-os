@@ -2,32 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    mm::PAGE_SIZE,
-    task::{CurrentTask, Kernel},
-    vfs::{
-        directory_file::MemoryDirectoryFile, fs_args, fs_node_impl_not_dir,
-        fs_node_impl_xattr_delegate, CacheMode, FileOps, FileSystem, FileSystemHandle,
-        FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-        MemoryXattrStorage, SymlinkNode, VmoFileNode,
-    },
+use crate::mm::PAGE_SIZE;
+use crate::task::{CurrentTask, Kernel};
+use crate::vfs::directory_file::MemoryDirectoryFile;
+use crate::vfs::{
+    fs_args, fs_node_impl_not_dir, fs_node_impl_xattr_delegate, CacheMode, FileOps, FileSystem,
+    FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
+    FsNodeOps, FsStr, MemoryXattrStorage, SymlinkNode, VmoFileNode,
 };
 use bstr::B;
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, MutexGuard};
-use starnix_uapi::{
-    auth::FsCred,
-    device_type::DeviceType,
-    error,
-    errors::Errno,
-    file_mode::{mode, FileMode},
-    gid_t,
-    open_flags::OpenFlags,
-    seal_flags::SealFlags,
-    statfs, uid_t,
-    vfs::default_statfs,
-    TMPFS_MAGIC,
-};
+use starnix_uapi::auth::FsCred;
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::{mode, FileMode};
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::seal_flags::SealFlags;
+use starnix_uapi::vfs::default_statfs;
+use starnix_uapi::{error, gid_t, statfs, uid_t, TMPFS_MAGIC};
 use std::sync::Arc;
 
 pub struct TmpFs(());
@@ -355,14 +348,12 @@ impl FsNodeOps for TmpfsSpecialNode {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        testing::*,
-        vfs::{
-            buffers::{VecInputBuffer, VecOutputBuffer},
-            FdNumber, UnlinkKind,
-        },
-    };
-    use starnix_uapi::{errno, mount_flags::MountFlags, vfs::ResolveFlags};
+    use crate::testing::*;
+    use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
+    use crate::vfs::{FdNumber, UnlinkKind};
+    use starnix_uapi::errno;
+    use starnix_uapi::mount_flags::MountFlags;
+    use starnix_uapi::vfs::ResolveFlags;
     use zerocopy::AsBytes;
 
     #[::fuchsia::test]

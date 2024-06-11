@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_test_manager::LaunchError,
-    fuchsia_component_test::error::Error as RealmBuilderError, thiserror::Error, tracing::warn,
-};
+use fidl_fuchsia_component as fcomponent;
+use fidl_fuchsia_test_manager::LaunchError;
+use fuchsia_component_test::error::Error as RealmBuilderError;
+use thiserror::Error;
+use tracing::warn;
 
 /// Error encountered running test manager
 #[derive(Debug, Error)]

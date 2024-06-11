@@ -6,9 +6,11 @@ use errors::IntoExitCode;
 pub use ffx_command_error::*;
 use ffx_config::environment::ExecutableKind;
 use fuchsia_async::TimeoutExt;
-use std::{
-    fs::File, io::Write, os::unix::process::ExitStatusExt, process::ExitStatus, time::Duration,
-};
+use std::fs::File;
+use std::io::Write;
+use std::os::unix::process::ExitStatusExt;
+use std::process::ExitStatus;
+use std::time::Duration;
 
 mod args_info;
 mod describe;

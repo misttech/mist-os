@@ -6,31 +6,30 @@
 //! in the pure_ip module.
 
 use alloc::vec::Vec;
-use lock_order::{
-    lock::{LockLevelFor, UnlockedAccessMarkerFor},
-    relation::LockBefore,
-    wrap::LockedWrapperApi,
-};
+use lock_order::lock::{LockLevelFor, UnlockedAccessMarkerFor};
+use lock_order::relation::LockBefore;
+use lock_order::wrap::LockedWrapperApi;
 use net_types::ip::Ip;
 use netstack3_base::DeviceIdContext;
+use netstack3_device::pure_ip::{
+    DynamicPureIpDeviceState, PureIpDevice, PureIpDeviceCounters, PureIpDeviceId,
+    PureIpDeviceStateContext, PureIpDeviceTxQueueFrameMetadata, PureIpPrimaryDeviceId,
+    PureIpWeakDeviceId,
+};
+use netstack3_device::queue::{
+    BufVecU8Allocator, DequeueState, TransmitDequeueContext, TransmitQueueCommon,
+    TransmitQueueContext, TransmitQueueState,
+};
+use netstack3_device::socket::{IpFrame, ParseSentFrameError, SentFrame};
 use netstack3_device::{
-    pure_ip::{
-        DynamicPureIpDeviceState, PureIpDevice, PureIpDeviceCounters, PureIpDeviceId,
-        PureIpDeviceStateContext, PureIpDeviceTxQueueFrameMetadata, PureIpPrimaryDeviceId,
-        PureIpWeakDeviceId,
-    },
-    queue::{
-        BufVecU8Allocator, DequeueState, TransmitDequeueContext, TransmitQueueCommon,
-        TransmitQueueContext, TransmitQueueState,
-    },
-    socket::{IpFrame, ParseSentFrameError, SentFrame},
     DeviceCollectionContext, DeviceConfigurationContext, DeviceLayerEventDispatcher,
     DeviceSendFrameError, IpLinkDeviceState,
 };
 use netstack3_ip::nud::NudUserConfig;
 use packet::Buf;
 
-use crate::{device::integration, BindingsContext, BindingsTypes, CoreCtx};
+use crate::device::integration;
+use crate::{BindingsContext, BindingsTypes, CoreCtx};
 
 impl<BT: BindingsTypes, L> DeviceIdContext<PureIpDevice> for CoreCtx<'_, BT, L> {
     type DeviceId = PureIpDeviceId<BT>;

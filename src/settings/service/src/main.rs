@@ -19,11 +19,10 @@ use settings::handler::setting_proxy_inspect_info::SettingProxyInspectInfo;
 use settings::input::build_input_default_settings;
 use settings::inspect::listener_logger::ListenerInspectLogger;
 use settings::light::build_light_default_settings;
-use settings::AgentConfiguration;
-use settings::EnabledInterfacesConfiguration;
-use settings::EnvironmentBuilder;
-use settings::ServiceConfiguration;
-use settings::ServiceFlags;
+use settings::{
+    AgentConfiguration, EnabledInterfacesConfiguration, EnvironmentBuilder, ServiceConfiguration,
+    ServiceFlags,
+};
 use settings_storage::stash_logger::StashInspectLogger;
 use settings_storage::storage_factory::StashDeviceStorageFactory;
 use std::path::Path;

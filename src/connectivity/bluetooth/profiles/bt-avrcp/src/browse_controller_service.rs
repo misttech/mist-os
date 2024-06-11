@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_fuchsia_bluetooth_avrcp::*,
-    fidl_fuchsia_bluetooth_avrcp_test::*,
-    fuchsia_async as fasync,
-    futures::{
-        future::{FutureExt, TryFutureExt},
-        stream::TryStreamExt,
-    },
-    tracing::warn,
-};
+use anyhow::Error;
+use fidl_fuchsia_bluetooth_avrcp::*;
+use fidl_fuchsia_bluetooth_avrcp_test::*;
+use fuchsia_async as fasync;
+use futures::future::{FutureExt, TryFutureExt};
+use futures::stream::TryStreamExt;
+use tracing::warn;
 
 use crate::packets::Scope;
 use crate::peer::Controller;

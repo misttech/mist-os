@@ -2,14 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    device::{kobject::DeviceMetadata, DeviceMode},
-    fs::tmpfs::TmpFs,
-    task::CurrentTask,
-    vfs::{path, DirEntryHandle, FileSystemHandle, FsStr, LookupContext, MountInfo, NamespaceNode},
+use crate::device::kobject::DeviceMetadata;
+use crate::device::DeviceMode;
+use crate::fs::tmpfs::TmpFs;
+use crate::task::CurrentTask;
+use crate::vfs::{
+    path, DirEntryHandle, FileSystemHandle, FsStr, LookupContext, MountInfo, NamespaceNode,
 };
 use starnix_sync::{FileOpsCore, LockBefore, Locked};
-use starnix_uapi::{auth::FsCred, device_type::DeviceType, errors::Errno, file_mode::mode};
+use starnix_uapi::auth::FsCred;
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::mode;
 
 pub fn dev_tmp_fs<'l, L>(
     locked: &mut Locked<'_, L>,

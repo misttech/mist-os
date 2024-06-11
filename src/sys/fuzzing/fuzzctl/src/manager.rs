@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, Context as _, Result},
-    fidl::endpoints::{create_proxy, ProtocolMarker},
-    fidl_fuchsia_fuzzer as fuzz, fuchsia_zircon_status as zx,
-    url::Url,
-};
+use anyhow::{bail, Context as _, Result};
+use fidl::endpoints::{create_proxy, ProtocolMarker};
+use url::Url;
+use {fidl_fuchsia_fuzzer as fuzz, fuchsia_zircon_status as zx};
 
 /// Represents the FIDL connection from the `ffx fuzz` plugin to the `fuzz-manager` component on a
 /// target device.
@@ -82,14 +80,12 @@ fn fidl_name(method: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::Manager,
-        anyhow::Result,
-        fidl::endpoints::create_proxy,
-        fidl_fuchsia_fuzzer as fuzz,
-        fuchsia_fuzzctl_test::{create_task, serve_manager, Test, TEST_URL},
-        url::Url,
-    };
+    use super::Manager;
+    use anyhow::Result;
+    use fidl::endpoints::create_proxy;
+    use fidl_fuchsia_fuzzer as fuzz;
+    use fuchsia_fuzzctl_test::{create_task, serve_manager, Test, TEST_URL};
+    use url::Url;
 
     #[fuchsia::test]
     async fn test_connect() -> Result<()> {

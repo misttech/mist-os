@@ -1,13 +1,12 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio,
-    fuchsia_fs::{file::ReadError, node::OpenError},
-    fuchsia_zircon_status::Status,
-    thiserror::Error,
-    version_history::AbiRevision,
-};
+use fuchsia_fs::file::ReadError;
+use fuchsia_fs::node::OpenError;
+use fuchsia_zircon_status::Status;
+use thiserror::Error;
+use version_history::AbiRevision;
+use {fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio};
 
 #[derive(Error, Debug)]
 pub enum AbiRevisionFileError {
@@ -58,15 +57,12 @@ async fn read_abi_revision(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fuchsia_fs::directory::open_in_namespace,
-        std::sync::Arc,
-        vfs::{
-            directory::entry_container::Directory, execution_scope, file::vmo::read_only,
-            pseudo_directory,
-        },
-    };
+    use super::*;
+    use fuchsia_fs::directory::open_in_namespace;
+    use std::sync::Arc;
+    use vfs::directory::entry_container::Directory;
+    use vfs::file::vmo::read_only;
+    use vfs::{execution_scope, pseudo_directory};
 
     fn serve_dir(root: Arc<impl Directory>) -> fio::DirectoryProxy {
         let (dir_proxy, dir_server) =

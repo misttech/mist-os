@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    buffer_set::*, elementary_stream::*, input_packet_stream::*, output_validator::*, stream::*,
-    Result,
-};
+use crate::buffer_set::*;
+use crate::elementary_stream::*;
+use crate::input_packet_stream::*;
+use crate::output_validator::*;
+use crate::stream::*;
+use crate::Result;
 use fidl_fuchsia_media::*;
 use futures::TryStreamExt;
 use std::rc::Rc;

@@ -20,10 +20,12 @@
 
 use fidl_fuchsia_bluetooth::Appearance;
 use fidl_fuchsia_bluetooth_le as fidl;
-use std::{fmt, str::FromStr};
+use std::fmt;
+use std::str::FromStr;
 
 use crate::error::Error;
-use crate::types::{id::PeerId, uuid::Uuid};
+use crate::types::id::PeerId;
+use crate::types::uuid::Uuid;
 
 #[derive(Clone, Debug)]
 pub struct RemoteDevice {
@@ -229,8 +231,7 @@ impl fmt::Display for Peer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl_fuchsia_bluetooth as fbt;
-    use fidl_fuchsia_bluetooth_le as fble;
+    use {fidl_fuchsia_bluetooth as fbt, fidl_fuchsia_bluetooth_le as fble};
 
     #[test]
     fn advertising_data_from_fidl_empty() {

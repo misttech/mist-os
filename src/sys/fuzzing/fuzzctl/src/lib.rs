@@ -14,16 +14,14 @@ mod manager;
 mod util;
 mod writer;
 
-pub use {
-    self::artifact::{save_artifact, Artifact},
-    self::controller::Controller,
-    self::corpus::{get_name as get_corpus_name, get_type as get_corpus_type},
-    self::diagnostics::{Forwarder, SocketForwarder},
-    self::duration::{deadline_after, Duration},
-    self::input::{save_input, Input, InputPair},
-    self::manager::Manager,
-    self::util::{
-        create_artifact_dir, create_corpus_dir, create_dir_at, digest_path, get_fuzzer_urls,
-    },
-    self::writer::{OutputSink, StdioSink, Writer},
+pub use self::artifact::{save_artifact, Artifact};
+pub use self::controller::Controller;
+pub use self::corpus::{get_name as get_corpus_name, get_type as get_corpus_type};
+pub use self::diagnostics::{Forwarder, SocketForwarder};
+pub use self::duration::{deadline_after, Duration};
+pub use self::input::{save_input, Input, InputPair};
+pub use self::manager::Manager;
+pub use self::util::{
+    create_artifact_dir, create_corpus_dir, create_dir_at, digest_path, get_fuzzer_urls,
 };
+pub use self::writer::{OutputSink, StdioSink, Writer};

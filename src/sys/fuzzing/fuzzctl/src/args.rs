@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {argh::FromArgs, fidl_fuchsia_fuzzer as fuzz, fuchsia_fuzzctl::constants::*, url::Url};
+use argh::FromArgs;
+use fidl_fuchsia_fuzzer as fuzz;
+use fuchsia_fuzzctl::constants::*;
+use url::Url;
 
 /// Interacts with the fuzz-manager.
 #[derive(Clone, Debug, FromArgs, PartialEq)]

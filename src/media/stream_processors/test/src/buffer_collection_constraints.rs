@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_images2 as fimages2;
-use fidl_fuchsia_sysmem2 as fsysmem2;
+use {fidl_fuchsia_images2 as fimages2, fidl_fuchsia_sysmem2 as fsysmem2};
 
 pub fn image_format_constraints_default() -> fsysmem2::ImageFormatConstraints {
     fsysmem2::ImageFormatConstraints {

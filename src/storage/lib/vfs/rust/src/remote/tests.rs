@@ -8,25 +8,19 @@ use super::{remote_dir, RemoteLike};
 
 use crate::{assert_close, assert_read, assert_read_dirents, pseudo_directory};
 
-use crate::{
-    directory::{
-        entry::{DirectoryEntry, EntryInfo, OpenRequest},
-        entry_container::Directory,
-        test_utils::{run_client, DirentsSameInodeBuilder},
-    },
-    execution_scope::ExecutionScope,
-    file,
-    object_request::ToObjectRequest as _,
-    path::Path,
-};
+use crate::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use crate::directory::entry_container::Directory;
+use crate::directory::test_utils::{run_client, DirentsSameInodeBuilder};
+use crate::execution_scope::ExecutionScope;
+use crate::file;
+use crate::object_request::ToObjectRequest as _;
+use crate::path::Path;
 
-use {
-    fidl::endpoints::{create_proxy, ServerEnd},
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_zircon_status::Status,
-    futures::channel::oneshot,
-    std::sync::{Arc, Mutex},
-};
+use fidl::endpoints::{create_proxy, ServerEnd};
+use fuchsia_zircon_status::Status;
+use futures::channel::oneshot;
+use std::sync::{Arc, Mutex};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 fn set_up_remote(scope: ExecutionScope) -> fio::DirectoryProxy {
     let r = pseudo_directory! {

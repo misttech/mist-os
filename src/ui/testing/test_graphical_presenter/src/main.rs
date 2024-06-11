@@ -2,33 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Error},
-    async_utils::hanging_get::client::HangingGetStream,
-    fidl::endpoints::{RequestStream, ServerEnd},
-    fidl_fuchsia_element::{
-        GraphicalPresenterRequest, GraphicalPresenterRequestStream, PresentViewError,
-        ViewControllerRequestStream,
-    },
-    fidl_fuchsia_ui_app::{ViewProviderRequest, ViewProviderRequestStream},
-    fidl_fuchsia_ui_composition::{
-        ChildViewWatcherMarker, ChildViewWatcherProxy, ColorRgba, ContentId, FlatlandEvent,
-        FlatlandEventStream, FlatlandMarker, FlatlandProxy, LayoutInfo,
-        ParentViewportWatcherMarker, ParentViewportWatcherProxy, PresentArgs, TransformId,
-        ViewBoundProtocols, ViewportProperties,
-    },
-    fidl_fuchsia_ui_views::{
-        FocusState, FocuserMarker, FocuserProxy, ViewRefFocusedMarker, ViewportCreationToken,
-    },
-    fuchsia_async as fasync,
-    fuchsia_component::{client, server},
-    futures::{
-        stream::{FusedStream, SelectAll},
-        {select, FutureExt, StreamExt},
-    },
-    std::pin::Pin,
-    std::rc::Rc,
+use anyhow::{anyhow, Context, Error};
+use async_utils::hanging_get::client::HangingGetStream;
+use fidl::endpoints::{RequestStream, ServerEnd};
+use fidl_fuchsia_element::{
+    GraphicalPresenterRequest, GraphicalPresenterRequestStream, PresentViewError,
+    ViewControllerRequestStream,
 };
+use fidl_fuchsia_ui_app::{ViewProviderRequest, ViewProviderRequestStream};
+use fidl_fuchsia_ui_composition::{
+    ChildViewWatcherMarker, ChildViewWatcherProxy, ColorRgba, ContentId, FlatlandEvent,
+    FlatlandEventStream, FlatlandMarker, FlatlandProxy, LayoutInfo, ParentViewportWatcherMarker,
+    ParentViewportWatcherProxy, PresentArgs, TransformId, ViewBoundProtocols, ViewportProperties,
+};
+use fidl_fuchsia_ui_views::{
+    FocusState, FocuserMarker, FocuserProxy, ViewRefFocusedMarker, ViewportCreationToken,
+};
+use fuchsia_async as fasync;
+use fuchsia_component::{client, server};
+use futures::stream::{FusedStream, SelectAll};
+use futures::{select, FutureExt, StreamExt};
+use std::pin::Pin;
+use std::rc::Rc;
 
 // The root transform will contain a static/solid background color content node. It will have a
 // single child for the attached viewport.

@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::scanout::Scanout,
-    anyhow::Error,
-    fidl_fuchsia_ui_composition::LayoutInfo,
-    futures::{
-        channel::{mpsc, oneshot},
-        SinkExt,
-    },
-};
+use crate::scanout::Scanout;
+use anyhow::Error;
+use fidl_fuchsia_ui_composition::LayoutInfo;
+use futures::channel::{mpsc, oneshot};
+use futures::SinkExt;
 
 #[derive(Clone)]
 pub struct ScanoutId {

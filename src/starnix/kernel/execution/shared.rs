@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_process as fprocess;
 #[cfg(feature = "syscall_stats")]
 use fuchsia_inspect::NumericProperty;
 use fuchsia_inspect_contrib::profile_duration;
@@ -12,28 +10,29 @@ use fuchsia_runtime::{HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx};
 use starnix_sync::{Locked, Unlocked};
 use std::sync::Arc;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess};
 
-use crate::{
-    arch::execution::{new_syscall, restore_cfi_directives},
-    execution::get_core_dump_info,
-    fs::fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile},
-    generate_cfi_directives,
-    mm::MemoryManager,
-    signals::{dequeue_signal, prepare_to_restart_syscall},
-    syscalls::table::dispatch_syscall,
-    task::{
-        ptrace_syscall_enter, ptrace_syscall_exit, CurrentTask, ExitStatus, Kernel,
-        SeccompStateValue, TaskFlags, ThreadGroup,
-    },
-    vfs::{FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions, FsStr},
+use crate::arch::execution::{new_syscall, restore_cfi_directives};
+use crate::execution::get_core_dump_info;
+use crate::fs::fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile};
+use crate::generate_cfi_directives;
+use crate::mm::MemoryManager;
+use crate::signals::{dequeue_signal, prepare_to_restart_syscall};
+use crate::syscalls::table::dispatch_syscall;
+use crate::task::{
+    ptrace_syscall_enter, ptrace_syscall_exit, CurrentTask, ExitStatus, Kernel, SeccompStateValue,
+    TaskFlags, ThreadGroup,
+};
+use crate::vfs::{
+    FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions, FsStr,
 };
 use starnix_logging::{log_trace, trace_instant, TraceScope, CATEGORY_STARNIX};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore};
-use starnix_syscalls::{
-    decls::{Syscall, SyscallDecl},
-    SyscallResult,
-};
-use starnix_uapi::{errno, errors::Errno, mount_flags::MountFlags};
+use starnix_syscalls::decls::{Syscall, SyscallDecl};
+use starnix_syscalls::SyscallResult;
+use starnix_uapi::errno;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::mount_flags::MountFlags;
 
 /// Contains context to track the most recently failing system call.
 ///
@@ -340,7 +339,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{signals::SignalInfo, task::StopState, testing::*};
+    use crate::signals::SignalInfo;
+    use crate::task::StopState;
+    use crate::testing::*;
     use starnix_uapi::signals::{SIGCONT, SIGSTOP};
 
     #[::fuchsia::test]

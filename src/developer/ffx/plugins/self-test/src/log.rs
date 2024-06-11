@@ -4,12 +4,10 @@
 
 use crate::test::*;
 use anyhow::{ensure, Context, Result};
-use std::{
-    fs::{create_dir_all, File},
-    io::Write,
-    path::Path,
-    process::Stdio,
-};
+use std::fs::{create_dir_all, File};
+use std::io::Write;
+use std::path::Path;
+use std::process::Stdio;
 
 pub mod include_log {
     use std::io::{BufRead, BufReader};

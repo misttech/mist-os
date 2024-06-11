@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    packet_encoding::{Decodable, Encodable},
-    std::u32,
-};
+use packet_encoding::{Decodable, Encodable};
+use std::u32;
 
 use crate::packets::{
     AvcCommandType, Error, PacketResult, PduId, PlaybackStatus, VendorCommand, VendorDependentPdu,

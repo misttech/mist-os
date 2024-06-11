@@ -249,22 +249,17 @@ impl NetworkTimeClient {
 mod test {
     use super::*;
     use anyhow::Error;
-    use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+    use base64::engine::Engine as _;
     use fuchsia_async as fasync;
-    use futures::{
-        future::{ready, TryFutureExt},
-        stream::{StreamExt, TryStreamExt},
-    };
-    use hyper::{
-        server::accept::from_stream,
-        service::{make_service_fn, service_fn},
-        Body, Response, Server, StatusCode,
-    };
+    use futures::future::{ready, TryFutureExt};
+    use futures::stream::{StreamExt, TryStreamExt};
+    use hyper::server::accept::from_stream;
+    use hyper::service::{make_service_fn, service_fn};
+    use hyper::{Body, Response, Server, StatusCode};
     use lazy_static::lazy_static;
-    use std::{
-        convert::Infallible,
-        net::{Ipv6Addr, SocketAddr},
-    };
+    use std::convert::Infallible;
+    use std::net::{Ipv6Addr, SocketAddr};
     use tracing::warn;
 
     lazy_static! {

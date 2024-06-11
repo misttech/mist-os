@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{Context, Error};
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
+use tracing::*;
 use {
-    anyhow::{Context, Error},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
-    fuchsia_component::server::ServiceFs,
-    futures::prelude::*,
-    tracing::*,
 };
 
 /// Wraps all hosted protocols into a single type that can be matched against

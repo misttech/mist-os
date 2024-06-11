@@ -3,28 +3,23 @@
 // found in the LICENSE file.
 
 //! Serves Client policy services.
+use crate::client::types as client_types;
+use crate::config_management::{
+    self, Credential, NetworkConfigError, NetworkIdentifier, SaveError, SavedNetworksManagerApi,
+};
+use crate::mode_management::iface_manager_api::{ConnectAttemptRequest, IfaceManagerApi};
+use crate::telemetry::{TelemetryEvent, TelemetrySender};
+use crate::util::listener;
+use fidl::epitaph::ChannelEpitaphExt;
+use futures::lock::{Mutex, MutexGuard};
+use futures::prelude::*;
+use futures::select;
+use futures::stream::FuturesUnordered;
+use std::sync::Arc;
+use tracing::{error, info, warn};
 use {
-    crate::{
-        client::types as client_types,
-        config_management::{
-            self, Credential, NetworkConfigError, NetworkIdentifier, SaveError,
-            SavedNetworksManagerApi,
-        },
-        mode_management::iface_manager_api::{ConnectAttemptRequest, IfaceManagerApi},
-        telemetry::{TelemetryEvent, TelemetrySender},
-        util::listener,
-    },
-    fidl::epitaph::ChannelEpitaphExt,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy,
     fuchsia_zircon as zx,
-    futures::{
-        lock::{Mutex, MutexGuard},
-        prelude::*,
-        select,
-        stream::FuturesUnordered,
-    },
-    std::sync::Arc,
-    tracing::{error, info, warn},
 };
 
 pub mod connection_selection;
@@ -504,29 +499,23 @@ async fn handle_client_request_stop_client_connections(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            access_point::state_machine as ap_fsm,
-            config_management::{NetworkConfig, SecurityType, WPA_PSK_BYTE_LEN},
-            mode_management::iface_manager_api::SmeForScan,
-            util::testing::{
-                fakes::{FakeSavedNetworksManager, FakeScanRequester},
-                generate_random_fidl_network_config, generate_random_fidl_network_config_with_ssid,
-            },
-        },
-        anyhow::{format_err, Error},
-        async_trait::async_trait,
-        fidl::endpoints::{create_proxy, create_request_stream, Proxy},
-        fuchsia_async as fasync,
-        futures::{
-            channel::{mpsc, oneshot},
-            task::Poll,
-        },
-        std::pin::pin,
-        test_case::test_case,
-        wlan_common::assert_variant,
+    use super::*;
+    use crate::access_point::state_machine as ap_fsm;
+    use crate::config_management::{NetworkConfig, SecurityType, WPA_PSK_BYTE_LEN};
+    use crate::mode_management::iface_manager_api::SmeForScan;
+    use crate::util::testing::fakes::{FakeSavedNetworksManager, FakeScanRequester};
+    use crate::util::testing::{
+        generate_random_fidl_network_config, generate_random_fidl_network_config_with_ssid,
     };
+    use anyhow::{format_err, Error};
+    use async_trait::async_trait;
+    use fidl::endpoints::{create_proxy, create_request_stream, Proxy};
+    use fuchsia_async as fasync;
+    use futures::channel::{mpsc, oneshot};
+    use futures::task::Poll;
+    use std::pin::pin;
+    use test_case::test_case;
+    use wlan_common::assert_variant;
 
     /// Only used to tell us what disconnect request was given to the IfaceManager so that we
     /// don't need to worry about the implementation logic in the FakeIfaceManager.

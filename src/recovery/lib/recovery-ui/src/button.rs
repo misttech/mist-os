@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{constants::constants::*, font};
-use carnelian::{
-    color::Color,
-    drawing::measure_text_width,
-    input::{self},
-    make_message,
-    scene::{
-        facets::{Facet, FacetId, RiveFacet, SetColorMessage, TextFacetOptions},
-        facets::{TextHorizontalAlignment, TextVerticalAlignment},
-        layout::{Alignment, CrossAxisAlignment, Flex, FlexOptions},
-        layout::{MainAxisAlignment, MainAxisSize, Stack, StackOptions},
-        scene::{Scene, SceneBuilder},
-    },
-    Coord, Point, Size, ViewAssistantContext,
+use crate::constants::constants::*;
+use crate::font;
+use carnelian::color::Color;
+use carnelian::drawing::measure_text_width;
+use carnelian::input::{self};
+use carnelian::scene::facets::{
+    Facet, FacetId, RiveFacet, SetColorMessage, TextFacetOptions, TextHorizontalAlignment,
+    TextVerticalAlignment,
 };
+use carnelian::scene::layout::{
+    Alignment, CrossAxisAlignment, Flex, FlexOptions, MainAxisAlignment, MainAxisSize, Stack,
+    StackOptions,
+};
+use carnelian::scene::scene::{Scene, SceneBuilder};
+use carnelian::{make_message, Coord, Point, Size, ViewAssistantContext};
 use derivative::Derivative;
 use euclid::{size2, Size2D, UnknownUnit};
 use fuchsia_zircon::Time;

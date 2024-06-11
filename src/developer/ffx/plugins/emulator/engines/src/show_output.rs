@@ -6,11 +6,10 @@
 
 use emulator_instance::{EmulatorConfiguration, NetworkingMode};
 use ffx_emulator_config::ShowDetail;
-use sdk_metadata::{
-    virtual_device::{Cpu, Hardware},
-    ElementType, InputDevice, VirtualDeviceV1,
-};
-use std::{collections::HashMap, process::Command};
+use sdk_metadata::virtual_device::{Cpu, Hardware};
+use sdk_metadata::{ElementType, InputDevice, VirtualDeviceV1};
+use std::collections::HashMap;
+use std::process::Command;
 
 pub(crate) fn command(cmd: &Command) -> ShowDetail {
     let mut env: HashMap<String, String> = HashMap::new();

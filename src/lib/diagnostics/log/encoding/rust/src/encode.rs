@@ -6,20 +6,19 @@
 
 use crate::{ArgType, Header, Metatag, SeverityExt, StringRef};
 use fidl_fuchsia_diagnostics::Severity;
-use fidl_fuchsia_diagnostics_stream as fstream;
-use fuchsia_zircon as zx;
-use std::{array::TryFromSliceError, borrow::Borrow, fmt::Debug, io::Cursor, ops::Deref};
+use std::array::TryFromSliceError;
+use std::borrow::Borrow;
+use std::fmt::Debug;
+use std::io::Cursor;
+use std::ops::Deref;
 use thiserror::Error;
 use tracing::{Event, Metadata, Subscriber};
-use tracing_core::{
-    field::{Field, Visit},
-    span,
-};
+use tracing_core::field::{Field, Visit};
+use tracing_core::span;
 use tracing_log::NormalizeEvent;
-use tracing_subscriber::{
-    layer::Context,
-    registry::{LookupSpan, Scope},
-};
+use tracing_subscriber::layer::Context;
+use tracing_subscriber::registry::{LookupSpan, Scope};
+use {fidl_fuchsia_diagnostics_stream as fstream, fuchsia_zircon as zx};
 
 /// An `Encoder` wraps any value implementing `MutableBuffer` and writes diagnostic stream records
 /// into it.
@@ -938,10 +937,8 @@ mod tests {
     use once_cell::sync::Lazy;
     use std::sync::Mutex;
     use tracing::info_span;
-    use tracing_subscriber::{
-        layer::{Layer, SubscriberExt},
-        Registry,
-    };
+    use tracing_subscriber::layer::{Layer, SubscriberExt};
+    use tracing_subscriber::Registry;
 
     #[fuchsia::test]
     fn build_basic_record() {

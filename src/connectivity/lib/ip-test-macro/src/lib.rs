@@ -15,11 +15,11 @@ use core::fmt::Display;
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::ToTokens;
+use syn::parse::{ParseStream, Parser};
+use syn::punctuated::Punctuated;
+use syn::spanned::Spanned;
+use syn::visit_mut::{self, VisitMut};
 use syn::{
-    parse::{ParseStream, Parser},
-    punctuated::Punctuated,
-    spanned::Spanned,
-    visit_mut::{self, VisitMut},
     Attribute, Error, Expr, ExprPath, FnArg, GenericParam, Ident, Pat, PatType, Path,
     TypeParamBound, TypePath,
 };

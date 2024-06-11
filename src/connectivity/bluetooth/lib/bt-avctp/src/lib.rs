@@ -4,7 +4,9 @@
 
 #![recursion_limit = "128"]
 
-use {fuchsia_zircon as zx, std::result, thiserror::Error};
+use fuchsia_zircon as zx;
+use std::result;
+use thiserror::Error;
 
 mod avc;
 mod avctp;

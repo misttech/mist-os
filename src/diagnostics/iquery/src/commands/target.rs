@@ -2,22 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::commands::{types::DiagnosticsProvider, utils::*},
-    crate::types::Error,
-    anyhow::anyhow,
-    async_trait::async_trait,
-    component_debug::dirs::*,
-    diagnostics_data::{Data, DiagnosticsData},
-    diagnostics_reader::{ArchiveReader, RetryConfig},
-    fidl_fuchsia_diagnostics::{
-        ArchiveAccessorMarker, ArchiveAccessorProxy, Selector, StringSelector, TreeSelector,
-    },
-    fidl_fuchsia_io::DirectoryProxy,
-    fidl_fuchsia_sys2 as fsys2,
-    fuchsia_component::client,
-    lazy_static::lazy_static,
+use crate::commands::types::DiagnosticsProvider;
+use crate::commands::utils::*;
+use crate::types::Error;
+use anyhow::anyhow;
+use async_trait::async_trait;
+use component_debug::dirs::*;
+use diagnostics_data::{Data, DiagnosticsData};
+use diagnostics_reader::{ArchiveReader, RetryConfig};
+use fidl_fuchsia_diagnostics::{
+    ArchiveAccessorMarker, ArchiveAccessorProxy, Selector, StringSelector, TreeSelector,
 };
+use fidl_fuchsia_io::DirectoryProxy;
+use fidl_fuchsia_sys2 as fsys2;
+use fuchsia_component::client;
+use lazy_static::lazy_static;
 
 const ROOT_REALM_QUERY: &'static str = "/svc/fuchsia.sys2.RealmQuery.root";
 const ROOT_ARCHIVIST_ACCESSOR: &'static str =
@@ -203,13 +202,11 @@ pub async fn connect_to_archivist(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl_fuchsia_diagnostics::{ComponentSelector, PropertySelector},
-        iquery_test_support::MockRealmQuery,
-        std::sync::Arc,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_diagnostics::{ComponentSelector, PropertySelector};
+    use iquery_test_support::MockRealmQuery;
+    use std::sync::Arc;
 
     #[fuchsia::test]
     async fn test_get_dir_proxy_selector_empty() {

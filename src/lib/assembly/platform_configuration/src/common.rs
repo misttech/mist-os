@@ -7,8 +7,8 @@ use assembly_config_capabilities::CapabilityNamedMap;
 use assembly_config_schema::assembly_config::CompiledPackageDefinition;
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::Serialize;
-use std::collections::BTreeMap;
-use std::collections::{btree_map::Entry, BTreeSet};
+use std::collections::btree_map::Entry;
+use std::collections::{BTreeMap, BTreeSet};
 use tempfile::TempDir;
 
 use assembly_config_schema::platform_config::icu_config::{ICUMap, Revision, ICU_CONFIG_INFO};

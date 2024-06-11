@@ -2,33 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    dhcpv4::{
-        configuration,
-        protocol::{Message, CLIENT_PORT, SERVER_PORT},
-        server::{
-            DataStore, ResponseTarget, Server, ServerAction, ServerDispatcher, ServerError,
-            DEFAULT_STASH_ID,
-        },
-        stash::Stash,
-    },
-    fuchsia_async::{self as fasync, net::UdpSocket},
-    fuchsia_component::server::{ServiceFs, ServiceFsDir},
-    futures::{Future, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _},
-    net_declare::net::prefix_length_v4,
-    net_types::ethernet::Mac,
-    packet::{serialize::InnerPacketBuilder, Serializer},
-    packet_formats::{ipv4::Ipv4PacketBuilder, udp::UdpPacketBuilder},
-    sockaddr::IntoSockAddr as _,
-    std::{
-        cell::RefCell,
-        collections::HashMap,
-        convert::{Infallible, TryInto as _},
-        net::{IpAddr, Ipv4Addr, SocketAddr},
-    },
-    tracing::{debug, error, info, warn},
+use anyhow::{Context as _, Error};
+use dhcpv4::configuration;
+use dhcpv4::protocol::{Message, CLIENT_PORT, SERVER_PORT};
+use dhcpv4::server::{
+    DataStore, ResponseTarget, Server, ServerAction, ServerDispatcher, ServerError,
+    DEFAULT_STASH_ID,
 };
+use dhcpv4::stash::Stash;
+use fuchsia_async::net::UdpSocket;
+use fuchsia_async::{self as fasync};
+use fuchsia_component::server::{ServiceFs, ServiceFsDir};
+use futures::{Future, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
+use net_declare::net::prefix_length_v4;
+use net_types::ethernet::Mac;
+use packet::serialize::InnerPacketBuilder;
+use packet::Serializer;
+use packet_formats::ipv4::Ipv4PacketBuilder;
+use packet_formats::udp::UdpPacketBuilder;
+use sockaddr::IntoSockAddr as _;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::convert::{Infallible, TryInto as _};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use tracing::{debug, error, info, warn};
 
 /// A buffer size in excess of the maximum allowable DHCP message size.
 const BUF_SZ: usize = 1024;
@@ -660,7 +657,8 @@ mod tests {
     use super::*;
     use dhcpv4::configuration::ServerParameters;
     use fuchsia_async as fasync;
-    use futures::{sink::drain, FutureExt};
+    use futures::sink::drain;
+    use futures::FutureExt;
     use net_declare::{fidl_ip_v4, std_ip_v4};
 
     #[derive(Debug, Eq, PartialEq)]

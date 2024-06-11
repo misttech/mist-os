@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::verify::collection::V2ComponentModel,
-    anyhow::{anyhow, Context, Result},
-    cm_fidl_analyzer::{
-        component_instance::ComponentInstanceForAnalyzer,
-        component_model::ComponentModelForAnalyzer, BreadthFirstModelWalker,
-        ComponentInstanceVisitor, ComponentModelWalker,
-    },
-    cm_rust::UseDecl,
-    routing::component_instance::{ComponentInstanceInterface, ExtendedInstanceInterface},
-    scrutiny::{model::controller::DataController, model::model::*},
-    serde::{Deserialize, Serialize},
-    serde_json::{json, value::Value},
-    std::{collections::HashSet, path::PathBuf, sync::Arc},
-};
+use crate::verify::collection::V2ComponentModel;
+use anyhow::{anyhow, Context, Result};
+use cm_fidl_analyzer::component_instance::ComponentInstanceForAnalyzer;
+use cm_fidl_analyzer::component_model::ComponentModelForAnalyzer;
+use cm_fidl_analyzer::{BreadthFirstModelWalker, ComponentInstanceVisitor, ComponentModelWalker};
+use cm_rust::UseDecl;
+use routing::component_instance::{ComponentInstanceInterface, ExtendedInstanceInterface};
+use scrutiny::model::controller::DataController;
+use scrutiny::model::model::*;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use serde_json::value::Value;
+use std::collections::HashSet;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 /// ComponentResolversController
 ///

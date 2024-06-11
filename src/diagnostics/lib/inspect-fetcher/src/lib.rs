@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, Error},
-    diagnostics_reader::{ArchiveReader, Inspect, RetryConfig},
-    tracing::*,
-};
+use anyhow::{bail, Error};
+use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
+use tracing::*;
 
 // Selectors for Inspect data must start with this exact string.
 const INSPECT_PREFIX: &str = "INSPECT:";

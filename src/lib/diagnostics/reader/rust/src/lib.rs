@@ -14,15 +14,16 @@ use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_component::client;
 use fuchsia_sync::Mutex;
 use fuchsia_zircon::{self as zx, Duration, DurationNum};
-use futures::{channel::mpsc, prelude::*, sink::SinkExt, stream::FusedStream};
+use futures::channel::mpsc;
+use futures::prelude::*;
+use futures::sink::SinkExt;
+use futures::stream::FusedStream;
 use pin_project::pin_project;
 use serde::Deserialize;
-use std::{
-    future::ready,
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll},
-};
+use std::future::ready;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
 use thiserror::Error;
 
 pub use diagnostics_data::{Data, Inspect, Logs, Severity};
@@ -635,14 +636,15 @@ mod tests {
     use super::*;
     use diagnostics_assertions::assert_data_tree;
     use diagnostics_log::{Publisher, PublisherOptions};
-    use fidl_fuchsia_diagnostics as fdiagnostics;
-    use fidl_fuchsia_logger as flogger;
     use fuchsia_component_test::{
         Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route,
     };
-    use fuchsia_zircon as zx;
     use futures::TryStreamExt;
     use tracing::{error, info};
+    use {
+        fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_logger as flogger,
+        fuchsia_zircon as zx,
+    };
 
     const TEST_COMPONENT_URL: &str =
         "fuchsia-pkg://fuchsia.com/diagnostics-reader-tests#meta/inspect_test_component.cm";

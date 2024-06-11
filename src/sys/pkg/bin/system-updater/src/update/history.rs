@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::update::{BuildInfo, SystemInfo, SOURCE_EPOCH_RAW},
-    anyhow::{anyhow, Error},
-    bounded_node::BoundedNode,
-    fidl_fuchsia_paver::{BootManagerProxy, DataSinkProxy},
-    fidl_fuchsia_update_installer_ext::{Options, State},
-    fuchsia_inspect as inspect,
-    fuchsia_url::AbsolutePackageUrl,
-    futures::prelude::*,
-    serde::{Deserialize, Serialize},
-    std::{collections::VecDeque, time::SystemTime},
-    tracing::warn,
-};
+use crate::update::{BuildInfo, SystemInfo, SOURCE_EPOCH_RAW};
+use anyhow::{anyhow, Error};
+use bounded_node::BoundedNode;
+use fidl_fuchsia_paver::{BootManagerProxy, DataSinkProxy};
+use fidl_fuchsia_update_installer_ext::{Options, State};
+use fuchsia_inspect as inspect;
+use fuchsia_url::AbsolutePackageUrl;
+use futures::prelude::*;
+use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
+use std::time::SystemTime;
+use tracing::warn;
 
 mod version;
 pub use self::version::Version;
@@ -313,11 +312,9 @@ impl UpdateHistory {
 }
 
 mod serde_system_time {
-    use {
-        anyhow::{anyhow, Error},
-        serde::Deserialize,
-        std::time::{Duration, SystemTime},
-    };
+    use anyhow::{anyhow, Error};
+    use serde::Deserialize;
+    use std::time::{Duration, SystemTime};
 
     fn system_time_to_nanos(time: SystemTime) -> Result<u64, Error> {
         let nanos = time.duration_since(SystemTime::UNIX_EPOCH)?.as_nanos().try_into()?;
@@ -353,7 +350,8 @@ mod serde_system_time {
 
     #[cfg(test)]
     mod tests {
-        use {super::*, proptest::prelude::*};
+        use super::*;
+        use proptest::prelude::*;
 
         proptest! {
             #[test]
@@ -374,21 +372,20 @@ mod serde_system_time {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::update::environment::{FakeSystemInfo, NamespaceBuildInfo},
-        anyhow::anyhow,
-        diagnostics_assertions::assert_data_tree,
-        fidl_fuchsia_update_installer_ext::{
-            Initiator, PrepareFailureReason, UpdateInfo, UpdateInfoAndProgress,
-        },
-        fuchsia_inspect::Inspector,
-        fuchsia_pkg_testing::SOURCE_EPOCH,
-        mock_paver::MockPaverServiceBuilder,
-        pretty_assertions::assert_eq,
-        serde_json::json,
-        std::{sync::Arc, time::Duration},
+    use super::*;
+    use crate::update::environment::{FakeSystemInfo, NamespaceBuildInfo};
+    use anyhow::anyhow;
+    use diagnostics_assertions::assert_data_tree;
+    use fidl_fuchsia_update_installer_ext::{
+        Initiator, PrepareFailureReason, UpdateInfo, UpdateInfoAndProgress,
     };
+    use fuchsia_inspect::Inspector;
+    use fuchsia_pkg_testing::SOURCE_EPOCH;
+    use mock_paver::MockPaverServiceBuilder;
+    use pretty_assertions::assert_eq;
+    use serde_json::json;
+    use std::sync::Arc;
+    use std::time::Duration;
 
     fn default_inspectable_update_attempts() -> BoundedNode<inspect::Node> {
         BoundedNode::from_node_and_capacity(inspect::Node::default(), MAX_UPDATE_ATTEMPTS)

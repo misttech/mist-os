@@ -2,22 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{anyhow, Error, Result};
+use async_trait::async_trait;
+use chrono::prelude::*;
 use chrono::LocalResult;
+use fdio::service_connect;
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_hardware_rtc as frtc;
+use fuchsia_async::{self as fasync, TimeoutExt};
+use fuchsia_zircon::{self as zx, DurationNum};
 use futures::TryFutureExt;
-use {
-    anyhow::{anyhow, Error, Result},
-    async_trait::async_trait,
-    chrono::prelude::*,
-    fdio::service_connect,
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_hardware_rtc as frtc,
-    fuchsia_async::{self as fasync, TimeoutExt},
-    fuchsia_zircon::{self as zx, DurationNum},
-    lazy_static::lazy_static,
-    std::{fs, path::PathBuf},
-    thiserror::Error,
-    tracing::error,
-};
+use lazy_static::lazy_static;
+use std::fs;
+use std::path::PathBuf;
+use thiserror::Error;
+use tracing::error;
 #[cfg(test)]
 use {fuchsia_sync::Mutex, std::sync::Arc};
 
@@ -204,13 +203,11 @@ impl Rtc for FakeRtc {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        fidl::endpoints::create_proxy_and_stream,
-        fuchsia_async as fasync,
-        futures::StreamExt,
-        test_util::{assert_gt, assert_lt},
-    };
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fuchsia_async as fasync;
+    use futures::StreamExt;
+    use test_util::{assert_gt, assert_lt};
 
     const TEST_FIDL_TIME: frtc::Time =
         frtc::Time { year: 2020, month: 8, day: 14, hours: 0, minutes: 0, seconds: 0 };

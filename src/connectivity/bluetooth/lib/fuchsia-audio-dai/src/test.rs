@@ -9,7 +9,8 @@ use fuchsia_async as fasync;
 use futures::{Future, StreamExt};
 use std::sync::{Arc, Mutex};
 use tracing::warn;
-use vfs::{directory::entry_container::Directory, pseudo_directory, service};
+use vfs::directory::entry_container::Directory;
+use vfs::{pseudo_directory, service};
 
 use crate::driver::{ensure_dai_format_is_supported, ensure_pcm_format_is_supported};
 use crate::DigitalAudioInterface;

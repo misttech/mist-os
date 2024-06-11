@@ -4,9 +4,8 @@
 
 use fidl::endpoints::ServerEnd;
 use fidl_fidl_examples_routing_echo::EchoMarker;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_sys2 as fsys;
 use fuchsia_component::client::*;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
 
 #[fuchsia::test]
 pub async fn connect_to_incoming_capabilities_for_component_without_program() {

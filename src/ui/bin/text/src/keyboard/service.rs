@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_ui_input as ui_input,
-    fidl_fuchsia_ui_input3::{self as ui_input3, KeyMeaning, NonPrintableKey},
-    fuchsia_zircon as zx,
-    futures::{TryFutureExt, TryStreamExt},
-};
+use anyhow::{Context as _, Error};
+use fidl_fuchsia_ui_input3::{self as ui_input3, KeyMeaning, NonPrintableKey};
+use futures::{TryFutureExt, TryStreamExt};
+use {fidl_fuchsia_ui_input as ui_input, fuchsia_zircon as zx};
 
 use fidl_fuchsia_ui_keyboard_focus as fidl_focus;
 
-use crate::keyboard::{events::KeyEvent, keyboard3};
+use crate::keyboard::events::KeyEvent;
+use crate::keyboard::keyboard3;
 use crate::text_manager::TextManager;
 
 /// Keyboard service router.

@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::auth,
-    anyhow::{bail, Error},
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    tracing::error,
-    wlan_common::mac,
-    zerocopy::ByteSlice,
-};
+use crate::auth;
+use anyhow::{bail, Error};
+use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
+use tracing::error;
+use wlan_common::mac;
+use zerocopy::ByteSlice;
 
 /// AkmState indicates the current status of authentication after each event is handled by an
 /// AkmAlgorithm.
@@ -163,11 +161,10 @@ impl AkmAlgorithm {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_fuchsia_wlan_mlme as fidl_mlme,
-        wlan_common::{assert_variant, mac::AsBytesExt},
-    };
+    use super::*;
+    use fidl_fuchsia_wlan_mlme as fidl_mlme;
+    use wlan_common::assert_variant;
+    use wlan_common::mac::AsBytesExt;
 
     struct MockAkmAction {
         sent_frames: Vec<(mac::AuthAlgorithmNumber, u16, mac::StatusCode, Vec<u8>)>,

@@ -1334,7 +1334,8 @@ pub mod options {
     use core::num::{NonZeroUsize, TryFromIntError};
 
     use const_unwrap::const_unwrap_option;
-    use zerocopy::{byteorder::ByteOrder, AsBytes, FromBytes, NoCell, Unaligned};
+    use zerocopy::byteorder::ByteOrder;
+    use zerocopy::{AsBytes, FromBytes, NoCell, Unaligned};
 
     use super::*;
 

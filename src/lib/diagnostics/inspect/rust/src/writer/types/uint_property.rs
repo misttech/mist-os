@@ -73,7 +73,8 @@ impl NumericProperty<'_> for UintProperty {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::writer::{testing_utils::get_state, testing_utils::GetBlockExt, Node};
+    use crate::writer::testing_utils::{get_state, GetBlockExt};
+    use crate::writer::Node;
     use inspect_format::BlockType;
 
     #[fuchsia::test]

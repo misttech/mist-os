@@ -1,11 +1,9 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    argh::{ArgsInfo, FromArgs},
-    fho::{Error, Result, SimpleWriter},
-    fidl_fuchsia_fxfs::DebugProxy,
-};
+use argh::{ArgsInfo, FromArgs};
+use fho::{Error, Result, SimpleWriter};
+use fidl_fuchsia_fxfs::DebugProxy;
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    std::fs,
-    std::io::{Read, Write},
-};
+use anyhow::Error;
+use std::fs;
+use std::io::{Read, Write};
 
 const TEMP_FILE_NAME: &'static str = "/tmp/example_file";
 const TEMP_FILE_CONTENTS: &'static str = "Hello, world!";

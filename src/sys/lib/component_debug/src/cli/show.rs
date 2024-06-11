@@ -2,22 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        query::get_single_instance_from_query,
-        realm::{
-            get_config_fields, get_merkle_root, get_outgoing_capabilities,
-            get_resolved_declaration, get_runtime, ConfigField, ExecutionInfo, ResolvedInfo,
-            Runtime,
-        },
-    },
-    ansi_term::Colour,
-    anyhow::Result,
-    cm_rust::ExposeDeclCommon,
-    fidl_fuchsia_sys2 as fsys,
-    moniker::Moniker,
-    prettytable::{cell, format::FormatBuilder, row, Table},
+use crate::query::get_single_instance_from_query;
+use crate::realm::{
+    get_config_fields, get_merkle_root, get_outgoing_capabilities, get_resolved_declaration,
+    get_runtime, ConfigField, ExecutionInfo, ResolvedInfo, Runtime,
 };
+use ansi_term::Colour;
+use anyhow::Result;
+use cm_rust::ExposeDeclCommon;
+use fidl_fuchsia_sys2 as fsys;
+use moniker::Moniker;
+use prettytable::format::FormatBuilder;
+use prettytable::{cell, row, Table};
 
 #[cfg(feature = "serde")]
 use {schemars::JsonSchema, serde::Serialize};

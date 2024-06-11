@@ -14,13 +14,12 @@ use crate::env_context::{EnvContext, FfxConfigEntry};
 use crate::ext_buffer::ExtBuffer;
 use crate::lib_context::LibContext;
 use fidl::HandleBased;
-use fuchsia_zircon_status as zx_status;
-use fuchsia_zircon_types as zx_types;
 use netext::parse_address_parts;
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
 use std::path::PathBuf;
 use std::sync::{mpsc, Arc};
+use {fuchsia_zircon_status as zx_status, fuchsia_zircon_types as zx_types};
 
 mod commands;
 mod env_context;

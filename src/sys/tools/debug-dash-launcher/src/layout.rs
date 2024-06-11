@@ -2,22 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::endpoints::DiscoverableProtocolMarker;
-use fidl::endpoints::Proxy;
-use fidl_fuchsia_component_runner as fcrunner;
+use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fidl_fuchsia_dash::LauncherError;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_process as fproc;
-use fuchsia_async as fasync;
 use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
 use tracing::warn;
-use vfs::{
-    directory::{entry_container::Directory, helper::DirectlyMutable},
-    execution_scope::ExecutionScope,
-    path::Path,
-    service::endpoint,
+use vfs::directory::entry_container::Directory;
+use vfs::directory::helper::DirectlyMutable;
+use vfs::execution_scope::ExecutionScope;
+use vfs::path::Path;
+use vfs::service::endpoint;
+use {
+    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio,
+    fidl_fuchsia_process as fproc, fuchsia_async as fasync,
 };
 
 pub fn package_layout(

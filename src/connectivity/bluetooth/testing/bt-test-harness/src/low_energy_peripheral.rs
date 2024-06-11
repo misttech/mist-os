@@ -2,30 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_bluetooth_le::{
-        ConnectionProxy, PeripheralEvent, PeripheralMarker, PeripheralProxy,
-    },
-    fidl_fuchsia_hardware_bluetooth::EmulatorProxy,
-    fuchsia_bluetooth::{
-        expectation::asynchronous::{expectable, Expectable, ExpectableExt, ExpectableState},
-        types::le::Peer,
-    },
-    futures::future::{self, BoxFuture},
-    futures::{FutureExt, TryFutureExt, TryStreamExt},
-    std::{
-        ops::{Deref, DerefMut},
-        sync::Arc,
-    },
-    test_harness::{SharedState, TestHarness},
+use anyhow::{Context as _, Error};
+use fidl_fuchsia_bluetooth_le::{
+    ConnectionProxy, PeripheralEvent, PeripheralMarker, PeripheralProxy,
 };
+use fidl_fuchsia_hardware_bluetooth::EmulatorProxy;
+use fuchsia_bluetooth::expectation::asynchronous::{
+    expectable, Expectable, ExpectableExt, ExpectableState,
+};
+use fuchsia_bluetooth::types::le::Peer;
+use futures::future::{self, BoxFuture};
+use futures::{FutureExt, TryFutureExt, TryStreamExt};
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
+use test_harness::{SharedState, TestHarness};
 
-use crate::{
-    core_realm::{CoreRealm, SHARED_STATE_INDEX},
-    emulator::{watch_advertising_states, EmulatorState},
-    host_watcher::ActivatedFakeHost,
-};
+use crate::core_realm::{CoreRealm, SHARED_STATE_INDEX};
+use crate::emulator::{watch_advertising_states, EmulatorState};
+use crate::host_watcher::ActivatedFakeHost;
 
 /// A snapshot of the current LE peripheral procedure states of the controller.
 #[derive(Clone, Debug, Default)]

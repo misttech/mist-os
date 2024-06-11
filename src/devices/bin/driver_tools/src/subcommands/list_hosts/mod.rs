@@ -4,12 +4,10 @@
 
 pub mod args;
 
-use {
-    anyhow::Result,
-    args::ListHostsCommand,
-    fidl_fuchsia_driver_development as fdd,
-    std::collections::{BTreeMap, BTreeSet},
-};
+use anyhow::Result;
+use args::ListHostsCommand;
+use fidl_fuchsia_driver_development as fdd;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub async fn list_hosts(
     _cmd: ListHostsCommand,

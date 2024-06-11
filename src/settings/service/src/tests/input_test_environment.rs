@@ -20,8 +20,7 @@ use crate::tests::fakes::camera3_service::Camera3Service;
 use crate::tests::fakes::input_device_registry_service::InputDeviceRegistryService;
 use crate::tests::fakes::service_registry::ServiceRegistry;
 
-use crate::Environment;
-use crate::EnvironmentBuilder;
+use crate::{Environment, EnvironmentBuilder};
 
 use fidl_fuchsia_settings::{InputMarker, InputProxy};
 use futures::lock::Mutex;

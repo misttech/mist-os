@@ -288,9 +288,7 @@ impl<'a, B, S, G: DerefMut<Target = S>> DerefMut for Guard<'a, B, G> {
 }
 
 // Public re-export of macros allows them to be used like regular rust items.
-pub(crate) use ordered_state_accessor;
-pub(crate) use state_accessor;
-pub(crate) use state_implementation;
+pub(crate) use {ordered_state_accessor, state_accessor, state_implementation};
 
 #[cfg(test)]
 mod test {

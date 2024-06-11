@@ -2,23 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus, InputEvent};
+use crate::utils::{Position, Size};
+use crate::{metrics, mouse_binding};
+use anyhow::{format_err, Context, Error};
+use async_trait::async_trait;
+use fidl_fuchsia_input_report::{InputDeviceProxy, InputReport};
+use fuchsia_inspect::health::Reporter;
+use fuchsia_inspect::ArrayProperty;
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use maplit::hashmap;
+use metrics_registry::*;
+use std::collections::{HashMap, HashSet};
 use {
-    crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus, InputEvent},
-    crate::metrics,
-    crate::mouse_binding,
-    crate::utils::{Position, Size},
-    anyhow::{format_err, Context, Error},
-    async_trait::async_trait,
-    fidl_fuchsia_input_report as fidl_input_report,
-    fidl_fuchsia_input_report::{InputDeviceProxy, InputReport},
-    fidl_fuchsia_ui_input as fidl_ui_input, fidl_fuchsia_ui_pointerinjector as pointerinjector,
-    fuchsia_inspect::{health::Reporter, ArrayProperty},
-    fuchsia_zircon as zx,
-    futures::channel::mpsc::{UnboundedReceiver, UnboundedSender},
-    maplit::hashmap,
-    metrics_registry::*,
-    std::collections::HashMap,
-    std::collections::HashSet,
+    fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_ui_input as fidl_ui_input,
+    fidl_fuchsia_ui_pointerinjector as pointerinjector, fuchsia_zircon as zx,
 };
 
 /// A [`TouchScreenEvent`] represents a set of contacts and the phase those contacts are in.
@@ -770,21 +768,19 @@ async fn get_device_type(input_device: &fidl_input_report::InputDeviceProxy) -> 
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::testing_utilities::{
-            self, create_touch_contact, create_touch_input_report, create_touch_screen_event,
-            create_touchpad_event,
-        },
-        crate::utils::Position,
-        assert_matches::assert_matches,
-        diagnostics_assertions::AnyProperty,
-        fidl::endpoints::spawn_stream_handler,
-        fuchsia_async as fasync,
-        futures::StreamExt,
-        pretty_assertions::assert_eq,
-        test_case::test_case,
+    use super::*;
+    use crate::testing_utilities::{
+        self, create_touch_contact, create_touch_input_report, create_touch_screen_event,
+        create_touchpad_event,
     };
+    use crate::utils::Position;
+    use assert_matches::assert_matches;
+    use diagnostics_assertions::AnyProperty;
+    use fidl::endpoints::spawn_stream_handler;
+    use fuchsia_async as fasync;
+    use futures::StreamExt;
+    use pretty_assertions::assert_eq;
+    use test_case::test_case;
 
     #[fasync::run_singlethreaded(test)]
     async fn process_empty_reports() {

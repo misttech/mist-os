@@ -2,19 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::composite_node_spec_manager::CompositeNodeSpecManager;
+use crate::driver_loading_fuzzer::Session;
+use crate::match_common::{node_to_device_property, node_to_device_property_no_autobind};
+use crate::resolved_driver::{DriverPackageType, ResolvedDriver};
+use bind::interpreter::decode_bind_rules::DecodedRules;
+use fidl_fuchsia_pkg_ext::BlobId;
+use fuchsia_zircon::Status;
+use futures::StreamExt;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
+use std::rc::Rc;
+use std::str::FromStr;
 use {
-    crate::composite_node_spec_manager::CompositeNodeSpecManager,
-    crate::driver_loading_fuzzer::Session,
-    crate::match_common::{node_to_device_property, node_to_device_property_no_autobind},
-    crate::resolved_driver::{DriverPackageType, ResolvedDriver},
-    bind::interpreter::decode_bind_rules::DecodedRules,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_driver_framework as fdf,
-    fidl_fuchsia_driver_index as fdi,
-    fidl_fuchsia_pkg_ext::BlobId,
-    fuchsia_async as fasync,
-    fuchsia_zircon::Status,
-    futures::StreamExt,
-    std::{cell::RefCell, collections::HashMap, ops::Deref, ops::DerefMut, rc::Rc, str::FromStr},
+    fidl_fuchsia_driver_index as fdi, fuchsia_async as fasync,
 };
 
 fn ignore_peer_closed(err: fidl::Error) -> Result<(), fidl::Error> {

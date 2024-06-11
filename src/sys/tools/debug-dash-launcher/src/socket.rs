@@ -5,14 +5,14 @@
 use anyhow::{format_err, Error};
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_dash::LauncherError;
-use fidl_fuchsia_hardware_pty as pty;
-use fidl_fuchsia_io as fio;
-use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon as zx;
 use futures::future::{AbortHandle, Abortable};
 use futures::io::{ReadHalf, WriteHalf};
 use futures::prelude::*;
+use {
+    fidl_fuchsia_hardware_pty as pty, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
+};
 
 async fn dash_to_client_loop(
     server: pty::DeviceProxy,

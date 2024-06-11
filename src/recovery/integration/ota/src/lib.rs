@@ -6,26 +6,27 @@ use anyhow::Error;
 use async_trait::async_trait;
 use blobfs_ramdisk::BlobfsRamdisk;
 use fidl::endpoints::{ClientEnd, Proxy};
-use fidl_fuchsia_buildinfo as fbi;
-use fidl_fuchsia_fshost as ffsh;
-use fidl_fuchsia_io as fio;
 use fidl_fuchsia_paver::{Asset, Configuration};
-use fidl_fuchsia_recovery_ui as frui;
-use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
     Capability, ChildOptions, ChildRef, LocalComponentHandles, RealmBuilder, Ref, Route,
 };
 use fuchsia_pkg_testing::PackageBuilder;
-use futures::{channel::mpsc, FutureExt, StreamExt, TryStreamExt};
+use futures::channel::mpsc;
+use futures::{FutureExt, StreamExt, TryStreamExt};
 use isolated_ota::{OmahaConfig, UpdateUrlSource};
-use isolated_ota_env::expose_mock_paver;
-use isolated_ota_env::{OmahaState, TestEnvBuilder, TestExecutor, TestParams};
+use isolated_ota_env::{expose_mock_paver, OmahaState, TestEnvBuilder, TestExecutor, TestParams};
 use mock_omaha_server::OmahaResponse;
 use mock_paver::{MockPaverService, PaverEvent};
 use ota_lib::config::{JsonUpdateConfig, JsonUpdateType};
-use std::{collections::BTreeSet, sync::Arc};
-use vfs::{directory::entry_container::Directory, file::vmo::read_only};
+use std::collections::BTreeSet;
+use std::sync::Arc;
+use vfs::directory::entry_container::Directory;
+use vfs::file::vmo::read_only;
+use {
+    fidl_fuchsia_buildinfo as fbi, fidl_fuchsia_fshost as ffsh, fidl_fuchsia_io as fio,
+    fidl_fuchsia_recovery_ui as frui, fuchsia_async as fasync,
+};
 
 type ProgressRendererSender = mpsc::Sender<frui::ProgressRendererRender2Request>;
 

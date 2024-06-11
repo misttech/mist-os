@@ -13,14 +13,13 @@ use fidl_fuchsia_component::{CreateChildArgs, RealmMarker, RealmProxy};
 use fidl_fuchsia_component_decl::{
     Child, CollectionRef, ConfigOverride, ConfigSingleValue, ConfigValue, StartupMode,
 };
-use fidl_fuchsia_io as fio;
-use fuchsia_async as fasync;
 use fuchsia_bluetooth::constants::{
     BT_HOST, BT_HOST_COLLECTION, BT_HOST_URL, DEV_DIR, HCI_DEVICE_DIR,
 };
 use fuchsia_component::{client, server};
 use futures::{future, StreamExt, TryStreamExt};
 use tracing::{error, info, warn};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 const BT_GAP_CHILD_NAME: &str = "bt-gap";
 const BT_RFCOMM_CHILD_NAME: &str = "bt-rfcomm";
@@ -246,10 +245,10 @@ fn main() -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {
-        anyhow::format_err, fuchsia_async::Channel as AsyncChannel, fuchsia_zircon as zx,
-        std::collections::HashSet,
-    };
+    use anyhow::format_err;
+    use fuchsia_async::Channel as AsyncChannel;
+    use fuchsia_zircon as zx;
+    use std::collections::HashSet;
     struct MockComponentClient {
         pub children_to_fail_for: HashSet<String>,
         pub bt_gap_channel: Option<zx::Channel>,

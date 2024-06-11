@@ -7,18 +7,17 @@ use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use chrono::Duration;
 use errors::ffx_bail;
-use ffx_fastboot::common::{
-    cmd::OemFile,
-    fastboot::{tcp_proxy, udp_proxy, usb_proxy, FastbootNetworkConnectionConfig},
-    from_manifest,
+use ffx_fastboot::common::cmd::OemFile;
+use ffx_fastboot::common::fastboot::{
+    tcp_proxy, udp_proxy, usb_proxy, FastbootNetworkConnectionConfig,
 };
+use ffx_fastboot::common::from_manifest;
 use ffx_flash_args::FlashCommand;
 use ffx_ssh::SshKeyFiles;
-use fho::FfxContext;
-use fho::{FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_developer_ffx::TargetState;
+use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{
     FastbootInterface as FidlFastbootInterface, TargetInfo, TargetProxy, TargetRebootState,
+    TargetState,
 };
 use fuchsia_async::{Time, Timer};
 use std::io::Write;

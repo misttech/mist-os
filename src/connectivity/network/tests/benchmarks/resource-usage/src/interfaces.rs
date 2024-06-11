@@ -2,20 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{collections::HashMap, pin::pin};
+use std::collections::HashMap;
+use std::pin::pin;
 
 use assert_matches::assert_matches;
 use async_trait::async_trait;
-use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_tun as fnet_tun;
-use fuchsia_zircon as zx;
 use futures::{SinkExt as _, StreamExt as _};
 use net_declare::fidl_mac;
-use net_types::{ip::Ip as _, Witness as _};
+use net_types::ip::Ip as _;
+use net_types::Witness as _;
+use {
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_tun as fnet_tun,
+    fuchsia_zircon as zx,
+};
 
 const PERF_TEST_MODE_ITERATIONS: usize = 10;
 const PERF_TEST_MODE_INTERFACES: usize = 10;
@@ -234,12 +236,11 @@ fn serialize_neighbor_solictation(
     src_mac: net_types::ethernet::Mac,
 ) -> Vec<u8> {
     use packet::serialize::{InnerPacketBuilder as _, Serializer as _};
-    use packet_formats::{
-        ethernet::{EtherType, EthernetFrameBuilder, ETHERNET_MIN_BODY_LEN_NO_TAG},
-        icmp::{ndp::NeighborSolicitation, IcmpPacketBuilder, IcmpUnusedCode},
-        ip::Ipv6Proto,
-        ipv6::Ipv6PacketBuilder,
-    };
+    use packet_formats::ethernet::{EtherType, EthernetFrameBuilder, ETHERNET_MIN_BODY_LEN_NO_TAG};
+    use packet_formats::icmp::ndp::NeighborSolicitation;
+    use packet_formats::icmp::{IcmpPacketBuilder, IcmpUnusedCode};
+    use packet_formats::ip::Ipv6Proto;
+    use packet_formats::ipv6::Ipv6PacketBuilder;
 
     let snmc = src_ip.to_solicited_node_address();
     [].into_serializer()

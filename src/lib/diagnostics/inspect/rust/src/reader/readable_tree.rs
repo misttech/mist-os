@@ -5,7 +5,8 @@
 //! Provides implementations for common structs that can be read in its entirety. These are structs
 //! that can be interpreted using the `fuchsia.inspect.Tree` protocol.
 
-use crate::{reader::ReaderError, Inspector};
+use crate::reader::ReaderError;
+use crate::Inspector;
 use async_trait::async_trait;
 
 #[cfg(target_os = "fuchsia")]

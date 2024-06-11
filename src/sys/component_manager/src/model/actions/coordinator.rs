@@ -2,21 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::actions::set::ActionSet,
-    crate::model::actions::{Action, ActionKey, ActionNotifier},
-    crate::model::component::{ComponentInstance, WeakComponentInstance},
-    async_trait::async_trait,
-    cm_util::AbortHandle,
-    errors::ActionError,
-    fuchsia_async as fasync,
-    futures::{
-        channel::{mpsc, oneshot},
-        future::BoxFuture,
-        FutureExt, StreamExt,
-    },
-    std::sync::{Arc, Mutex},
-};
+use crate::model::actions::set::ActionSet;
+use crate::model::actions::{Action, ActionKey, ActionNotifier};
+use crate::model::component::{ComponentInstance, WeakComponentInstance};
+use async_trait::async_trait;
+use cm_util::AbortHandle;
+use errors::ActionError;
+use fuchsia_async as fasync;
+use futures::channel::{mpsc, oneshot};
+use futures::future::BoxFuture;
+use futures::{FutureExt, StreamExt};
+use std::sync::{Arc, Mutex};
 
 /// A command, sent to the action coordinator to request it performs some kind of work.
 pub(super) enum Command {

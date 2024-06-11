@@ -3,26 +3,25 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
+use carnelian::color::Color;
+use carnelian::drawing::{load_font, path_for_rectangle, FontFace};
+use carnelian::input::{self};
+use carnelian::render::{
+    BlendMode, Context as RenderContext, Fill, FillRule, Layer, Raster, Style,
+};
+use carnelian::scene::facets::{
+    Facet, FacetId, TextFacetOptions, TextHorizontalAlignment, TextVerticalAlignment,
+};
+use carnelian::scene::group::GroupMemberData;
+use carnelian::scene::layout::{
+    Alignment, CrossAxisAlignment, FlexMemberData, MainAxisAlignment, MainAxisSize,
+    StackMemberDataBuilder,
+};
+use carnelian::scene::scene::{Scene, SceneBuilder, SceneOrder};
+use carnelian::scene::LayerGroup;
 use carnelian::{
-    color::Color,
-    drawing::{load_font, path_for_rectangle, FontFace},
-    input::{self},
-    make_app_assistant,
-    render::{BlendMode, Context as RenderContext, Fill, FillRule, Layer, Raster, Style},
-    scene::{
-        facets::{
-            Facet, FacetId, TextFacetOptions, TextHorizontalAlignment, TextVerticalAlignment,
-        },
-        group::GroupMemberData,
-        layout::{
-            Alignment, CrossAxisAlignment, FlexMemberData, MainAxisAlignment, MainAxisSize,
-            StackMemberDataBuilder,
-        },
-        scene::{Scene, SceneBuilder, SceneOrder},
-        LayerGroup,
-    },
-    App, AppAssistant, Coord, Point, Rect, Size, ViewAssistant, ViewAssistantContext,
-    ViewAssistantPtr, ViewKey,
+    make_app_assistant, App, AppAssistant, Coord, Point, Rect, Size, ViewAssistant,
+    ViewAssistantContext, ViewAssistantPtr, ViewKey,
 };
 use euclid::size2;
 use rand::{thread_rng, Rng};

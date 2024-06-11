@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuse3::{Errno, Result},
-    fxfs::{errors::FxfsError, log::info},
-};
+use fuse3::{Errno, Result};
+use fxfs::errors::FxfsError;
+use fxfs::log::info;
 
 /// Pre-defined Fxfs Result with FxfsError.
 pub type FxfsResult<T> = std::result::Result<T, anyhow::Error>;

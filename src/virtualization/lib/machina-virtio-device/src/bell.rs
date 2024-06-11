@@ -2,16 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_async::{self as fasync, PacketReceiver, ReceiverRegistration},
-    fuchsia_zircon::{self as zx},
-    futures::{channel::mpsc, Stream, StreamExt, TryStreamExt},
-    std::{
-        pin::Pin,
-        task::{Context, Poll},
-    },
-    thiserror::Error,
-};
+use fuchsia_async::{self as fasync, PacketReceiver, ReceiverRegistration};
+use fuchsia_zircon::{self as zx};
+use futures::channel::mpsc;
+use futures::{Stream, StreamExt, TryStreamExt};
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use thiserror::Error;
 
 // Virtio 1.0 Section 4.1.4.4: notify_off_multiplier is combined with the
 // queue_notify_off to derive the Queue Notify address within a BAR for a

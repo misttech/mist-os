@@ -4,17 +4,14 @@
 
 use crate::node::Node;
 use anyhow::{format_err, Context, Error};
-use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
-use futures::{
-    future::{join_all, LocalBoxFuture},
-    stream::{FuturesUnordered, StreamExt},
-};
-use serde_json as json;
+use futures::future::{join_all, LocalBoxFuture};
+use futures::stream::{FuturesUnordered, StreamExt};
 use std::collections::HashMap;
 use std::rc::Rc;
 use tracing::*;
+use {fuchsia_async as fasync, serde_json as json};
 
 // nodes
 use crate::{

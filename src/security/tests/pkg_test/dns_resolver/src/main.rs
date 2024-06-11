@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    argh::{from_env, FromArgs},
-    fidl_fuchsia_net::{IpAddress, Ipv4Address},
-    fidl_fuchsia_net_name::{LookupRequest, LookupRequestStream, LookupResult},
-    fuchsia_async::Task,
-    fuchsia_component::server::ServiceFs,
-    futures::{StreamExt, TryStreamExt},
-    security_pkg_test_util::config::load_config,
-    std::net::Ipv4Addr,
-    tracing::info,
-};
+use argh::{from_env, FromArgs};
+use fidl_fuchsia_net::{IpAddress, Ipv4Address};
+use fidl_fuchsia_net_name::{LookupRequest, LookupRequestStream, LookupResult};
+use fuchsia_async::Task;
+use fuchsia_component::server::ServiceFs;
+use futures::{StreamExt, TryStreamExt};
+use security_pkg_test_util::config::load_config;
+use std::net::Ipv4Addr;
+use tracing::info;
 
 /// Flags for dns_resolver.
 #[derive(FromArgs, Debug, PartialEq)]

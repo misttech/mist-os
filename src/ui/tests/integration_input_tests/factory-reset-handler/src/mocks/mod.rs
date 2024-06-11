@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fuchsia_component::server as fserver,
-    fuchsia_component_test::LocalComponentHandles,
-    futures::{Future, StreamExt},
-};
+use anyhow::Error;
+use fuchsia_component::server as fserver;
+use fuchsia_component_test::LocalComponentHandles;
+use futures::{Future, StreamExt};
 
 /// Serves multiple FIDL clients, one at a time.
 ///

@@ -4,18 +4,18 @@
 
 use fuchsia_async as fasync;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
+use fuchsia_inspect::reader::ReadableTree;
 use fuchsia_inspect::{
-    reader::ReadableTree, ArithmeticArrayProperty, ArrayProperty, ExponentialHistogramParams, Heap,
-    HistogramProperty, Inspector, LinearHistogramParams, NumericProperty, Property,
+    ArithmeticArrayProperty, ArrayProperty, ExponentialHistogramParams, Heap, HistogramProperty,
+    Inspector, LinearHistogramParams, NumericProperty, Property,
 };
 use inspect_format::Container;
-use num::{pow, traits::FromPrimitive, One};
+use num::traits::FromPrimitive;
+use num::{pow, One};
 use once_cell::sync::OnceCell;
 use rand::Rng;
-use std::{
-    ops::{Add, Mul},
-    time::Duration,
-};
+use std::ops::{Add, Mul};
+use std::time::Duration;
 
 const NAME: &str = "name";
 

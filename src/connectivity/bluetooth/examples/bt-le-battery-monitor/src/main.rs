@@ -4,18 +4,17 @@
 
 use anyhow::{format_err, Error};
 use async_utils::hanging_get::client::HangingGetStream;
-use fidl_fuchsia_bluetooth_gatt2 as gatt;
 use fidl_fuchsia_bluetooth_le::{
     CentralMarker, CentralProxy, ConnectionMarker, ConnectionOptions, ConnectionProxy, Filter,
     Peer, ScanOptions, ScanResultWatcherMarker, ScanResultWatcherProxy,
 };
-use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::le::Peer as btPeer;
 use fuchsia_bluetooth::types::{PeerId, Uuid};
 use fuchsia_component::client::connect_to_protocol;
 use futures::stream::{StreamExt, TryStreamExt};
 use std::collections::HashMap;
 use tracing::{info, warn};
+use {fidl_fuchsia_bluetooth_gatt2 as gatt, fuchsia_async as fasync};
 
 /// The UUID of with the GATT battery service.
 const BATTERY_SERVICE_UUID: Uuid = Uuid::new16(0x180f);

@@ -2,13 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{device::Device, environment::Environment, matcher, service},
-    anyhow::{format_err, Error},
-    fs_management::format::DiskFormat,
-    futures::{channel::mpsc, lock::Mutex, StreamExt},
-    std::{collections::HashSet, sync::Arc},
-};
+use crate::device::Device;
+use crate::environment::Environment;
+use crate::{matcher, service};
+use anyhow::{format_err, Error};
+use fs_management::format::DiskFormat;
+use futures::channel::mpsc;
+use futures::lock::Mutex;
+use futures::StreamExt;
+use std::collections::HashSet;
+use std::sync::Arc;
 
 pub struct Manager {
     matcher: matcher::Matchers,

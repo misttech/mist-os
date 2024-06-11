@@ -2,18 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    device::kobject::{KObject, KObjectHandle},
-    fs::{sysfs::SysfsOps, tmpfs::TmpfsDirectory},
-    task::CurrentTask,
-    vfs::{
-        fs_node_impl_dir_readonly, BytesFile, DirectoryEntryType, FileOps, FsNode, FsNodeHandle,
-        FsNodeInfo, FsNodeOps, FsStr, FsString, VecDirectory, VecDirectoryEntry,
-    },
+use crate::device::kobject::{KObject, KObjectHandle};
+use crate::fs::sysfs::SysfsOps;
+use crate::fs::tmpfs::TmpfsDirectory;
+use crate::task::CurrentTask;
+use crate::vfs::{
+    fs_node_impl_dir_readonly, BytesFile, DirectoryEntryType, FileOps, FsNode, FsNodeHandle,
+    FsNodeInfo, FsNodeOps, FsStr, FsString, VecDirectory, VecDirectoryEntry,
 };
 use fuchsia_zircon as zx;
 use starnix_sync::{FileOpsCore, Locked};
-use starnix_uapi::{auth::FsCred, error, errors::Errno, file_mode::mode, open_flags::OpenFlags};
+use starnix_uapi::auth::FsCred;
+use starnix_uapi::error;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::mode;
+use starnix_uapi::open_flags::OpenFlags;
 use std::sync::Weak;
 
 pub struct CpuClassDirectory {

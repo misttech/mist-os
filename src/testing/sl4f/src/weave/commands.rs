@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::server::Facade;
-use crate::weave::{facade::WeaveFacade, types::WeaveMethod};
+use crate::weave::facade::WeaveFacade;
+use crate::weave::types::WeaveMethod;
 use anyhow::Error;
 use async_trait::async_trait;
 use serde_json::{to_value, Value};

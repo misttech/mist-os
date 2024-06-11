@@ -2,29 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    common::{
-        cmd::{ManifestParams, OemFile},
-        vars::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR},
-    },
-    file_resolver::FileResolver,
-    manifest::{from_in_tree, from_local_product_bundle, from_path, from_sdk},
-};
+use crate::common::cmd::{ManifestParams, OemFile};
+use crate::common::vars::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR};
+use crate::file_resolver::FileResolver;
+use crate::manifest::{from_in_tree, from_local_product_bundle, from_path, from_sdk};
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use errors::ffx_bail;
 use ffx_fastboot_interface::fastboot_interface::{FastbootInterface, RebootEvent, UploadProgress};
-use futures::{prelude::*, try_join};
+use futures::prelude::*;
+use futures::try_join;
 use pbms::is_local_product_bundle;
 use sdk::SdkVersion;
 use sparse::build_sparse_files;
-use std::{io::Write, path::PathBuf};
+use std::io::Write;
+use std::path::PathBuf;
 use termion::{color, style};
-use tokio::sync::{
-    mpsc,
-    mpsc::{Receiver, Sender},
-};
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::{Receiver, Sender};
 
 pub const MISSING_CREDENTIALS: &str =
     "The flash manifest is missing the credential files to unlock this device.\n\

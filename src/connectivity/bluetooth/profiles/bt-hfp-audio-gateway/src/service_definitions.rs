@@ -4,7 +4,9 @@
 //! Service Discovery Protocol (SDP) record definitions for the Hands-Free
 //! and Audio Gateway roles.
 
-use {bitflags::bitflags, fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_bluetooth::types::Uuid};
+use bitflags::bitflags;
+use fidl_fuchsia_bluetooth_bredr as bredr;
+use fuchsia_bluetooth::types::Uuid;
 
 use crate::config::AudioGatewayFeatureSupport;
 

@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::format_err;
-use fidl_fuchsia_bluetooth_gatt2 as gatt;
-use fidl_fuchsia_bluetooth_le as le;
 use profile_client::Error as ProfileClientError;
 use thiserror::Error;
+use {fidl_fuchsia_bluetooth_gatt2 as gatt, fidl_fuchsia_bluetooth_le as le};
 
 /// Errors that occur during the operation of the Fast Pair Provider component.
 #[derive(Error, Debug)]

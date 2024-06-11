@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_trait::async_trait,
-    errors::ModelError,
-    hooks::{Event, EventType, Hook, HooksRegistration},
-    std::sync::{Arc, Weak},
-    tracing::info,
-};
+use async_trait::async_trait;
+use errors::ModelError;
+use hooks::{Event, EventType, Hook, HooksRegistration};
+use std::sync::{Arc, Weak};
+use tracing::info;
 
 pub struct EventLogger;
 

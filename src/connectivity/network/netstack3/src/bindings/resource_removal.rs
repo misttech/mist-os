@@ -6,13 +6,13 @@
 
 use std::time::Duration;
 
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
-use futures::{
-    channel::mpsc, future::BoxFuture, stream::SelectAll, Future, FutureExt as _, Stream, StreamExt,
-};
+use futures::channel::mpsc;
+use futures::future::BoxFuture;
+use futures::stream::SelectAll;
+use futures::{Future, FutureExt as _, Stream, StreamExt};
 use log::{debug, error, info, warn};
 use netstack3_core::sync::DynDebugReferences;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// The interval at which [`ResourceRemovalWorker`] generates reports for each
 /// pending resource.
@@ -249,7 +249,10 @@ impl ActionHandler for LoggingHandler {
 mod tests {
     use super::*;
 
-    use std::{cell::RefCell, pin::pin, rc::Rc, task::Poll};
+    use std::cell::RefCell;
+    use std::pin::pin;
+    use std::rc::Rc;
+    use std::task::Poll;
 
     use assert_matches::assert_matches;
     use futures::channel::oneshot;

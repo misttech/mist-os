@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    cobalt_client::traits::AsEventCodes,
-    fidl_contrib::protocol_connector::ProtocolSender,
-    fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload},
-    futures::channel::mpsc,
-};
+use cobalt_client::traits::AsEventCodes;
+use fidl_contrib::protocol_connector::ProtocolSender;
+use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
+use futures::channel::mpsc;
 
 pub(crate) fn get_mock_cobalt_sender() -> (ProtocolSender<MetricEvent>, mpsc::Receiver<MetricEvent>)
 {

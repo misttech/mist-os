@@ -2,37 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    fidl_fuchsia_wlan_common::{WlanTxResult, WlanTxResultCode, WlanTxResultEntry},
-    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_tap as fidl_tap,
-    fidl_test_wlan_realm::WlanConfig,
-    fuchsia_async::Interval,
-    fuchsia_zircon::DurationNum,
-    futures::{channel::mpsc, StreamExt},
-    ieee80211::{Bssid, MacAddrBytes},
-    lazy_static::lazy_static,
-    std::collections::{hash_map::Entry, HashMap},
-    std::pin::pin,
-    tracing::info,
-    wlan_common::{
-        appendable::Appendable,
-        big_endian::BigEndianU16,
-        bss::Protection,
-        channel::{Cbw, Channel},
-        mac,
-    },
-    wlan_hw_sim::{
-        connect_or_timeout, default_wlantap_config_client,
-        event::{
-            self,
-            buffered::{Buffered, DataFrame},
-            Handler,
-        },
-        loop_until_iface_is_found, netdevice_helper, test_utils, ApAdvertisement, Beacon, AP_SSID,
-        CLIENT_MAC_ADDR, ETH_DST_MAC,
-    },
+use anyhow::{Context, Error};
+use fidl_fuchsia_wlan_common::{WlanTxResult, WlanTxResultCode, WlanTxResultEntry};
+use fidl_test_wlan_realm::WlanConfig;
+use fuchsia_async::Interval;
+use fuchsia_zircon::DurationNum;
+use futures::channel::mpsc;
+use futures::StreamExt;
+use ieee80211::{Bssid, MacAddrBytes};
+use lazy_static::lazy_static;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+use std::pin::pin;
+use tracing::info;
+use wlan_common::appendable::Appendable;
+use wlan_common::big_endian::BigEndianU16;
+use wlan_common::bss::Protection;
+use wlan_common::channel::{Cbw, Channel};
+use wlan_common::mac;
+use wlan_hw_sim::event::buffered::{Buffered, DataFrame};
+use wlan_hw_sim::event::{self, Handler};
+use wlan_hw_sim::{
+    connect_or_timeout, default_wlantap_config_client, loop_until_iface_is_found, netdevice_helper,
+    test_utils, ApAdvertisement, Beacon, AP_SSID, CLIENT_MAC_ADDR, ETH_DST_MAC,
 };
+use {fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_tap as fidl_tap};
 // Remedy for https://fxbug.dev/42162128 (https://fxbug.dev/42108316)
 // Refer to |KMinstrelUpdateIntervalForHwSim| in //src/connectivity/wlan/drivers/wlan/device.cpp
 const DATA_FRAME_INTERVAL_NANOS: i64 = 4_000_000;

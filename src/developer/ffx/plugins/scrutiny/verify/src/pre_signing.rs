@@ -5,9 +5,11 @@
 use anyhow::{anyhow, Context as _, Result};
 use ffx_scrutiny_verify_args::pre_signing::Command;
 use scrutiny_config::{ConfigBuilder, ModelConfig};
-use scrutiny_frontend::{command_builder::CommandBuilder, launcher};
+use scrutiny_frontend::command_builder::CommandBuilder;
+use scrutiny_frontend::launcher;
 use scrutiny_plugins::verify::PreSigningResponse;
-use std::{collections::HashSet, path::PathBuf};
+use std::collections::HashSet;
+use std::path::PathBuf;
 
 pub async fn verify(cmd: &Command, recovery: bool) -> Result<HashSet<PathBuf>> {
     let mut deps = HashSet::new();

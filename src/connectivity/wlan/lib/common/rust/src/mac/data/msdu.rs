@@ -2,14 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        big_endian::BigEndianU16,
-        buffer_reader::BufferReader,
-        mac::{data::*, DataFrame, MacAddr},
-    },
-    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned},
-};
+use crate::big_endian::BigEndianU16;
+use crate::buffer_reader::BufferReader;
+use crate::mac::data::*;
+use crate::mac::{DataFrame, MacAddr};
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 // RFC 1042
 pub const LLC_SNAP_EXTENSION: u8 = 0xAA;
@@ -141,14 +138,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            assert_variant,
-            mac::{self, data},
-            test_utils::fake_frames::*,
-        },
-    };
+    use super::*;
+    use crate::assert_variant;
+    use crate::mac::{self, data};
+    use crate::test_utils::fake_frames::*;
 
     #[test]
     fn msdu_iter_non_aggregated() {

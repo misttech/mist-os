@@ -4,19 +4,18 @@
 
 //! Download blob data from Google Cloud Storage (GCS).
 
-use {
-    crate::{exponential_backoff::default_backoff_strategy, token_store::TokenStore},
-    anyhow::{bail, Context, Result},
-    fuchsia_backoff::retry_or_last_error,
-    fuchsia_hyper::{new_https_client, HttpsClient},
-    hyper::{body::HttpBody as _, header::CONTENT_LENGTH, Body, Response, StatusCode},
-    std::{
-        fs::{create_dir_all, File},
-        io::Write,
-        path::Path,
-        sync::Arc,
-    },
-};
+use crate::exponential_backoff::default_backoff_strategy;
+use crate::token_store::TokenStore;
+use anyhow::{bail, Context, Result};
+use fuchsia_backoff::retry_or_last_error;
+use fuchsia_hyper::{new_https_client, HttpsClient};
+use hyper::body::HttpBody as _;
+use hyper::header::CONTENT_LENGTH;
+use hyper::{Body, Response, StatusCode};
+use std::fs::{create_dir_all, File};
+use std::io::Write;
+use std::path::Path;
+use std::sync::Arc;
 
 /// A snapshot of the progress.
 #[derive(Clone, Debug, PartialEq)]
@@ -324,7 +323,8 @@ impl Client {
 
 #[cfg(test)]
 mod test {
-    use {super::*, std::fs::read_to_string};
+    use super::*;
+    use std::fs::read_to_string;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_client_factory_no_auth() {

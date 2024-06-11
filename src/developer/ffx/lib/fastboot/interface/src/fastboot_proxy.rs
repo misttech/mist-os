@@ -2,24 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fastboot_interface::Fastboot;
-use crate::fastboot_interface::FastbootError;
-use crate::fastboot_interface::FastbootInterface;
-use crate::fastboot_interface::FlashError;
-use crate::fastboot_interface::RebootEvent;
-use crate::fastboot_interface::StageError;
-use crate::fastboot_interface::UploadProgress;
-use crate::fastboot_interface::Variable;
+use crate::fastboot_interface::{
+    Fastboot, FastbootError, FastbootInterface, FlashError, RebootEvent, StageError,
+    UploadProgress, Variable,
+};
 use crate::interface_factory::InterfaceFactory;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use chrono::Duration;
+use fastboot::command::{ClientVariable, Command};
+use fastboot::reply::Reply;
 use fastboot::{
-    command::{ClientVariable, Command},
-    download,
-    reply::Reply,
-    send, send_with_listener, send_with_timeout, upload, upload_with_read_timeout, SendError,
-    UploadError,
+    download, send, send_with_listener, send_with_timeout, upload, upload_with_read_timeout,
+    SendError, UploadError,
 };
 use ffx_config::get;
 use futures::io::{AsyncRead, AsyncWrite};
@@ -517,11 +512,9 @@ mod test {
     use crate::interface_factory::{InterfaceFactoryBase, InterfaceFactoryError};
     use fastboot::test_transport::TestTransport;
     use pretty_assertions::assert_eq;
-    use rand::{rngs::SmallRng, RngCore, SeedableRng};
-    use std::io::Read;
-    use std::io::Seek;
-    use std::io::SeekFrom;
-    use std::io::Write;
+    use rand::rngs::SmallRng;
+    use rand::{RngCore, SeedableRng};
+    use std::io::{Read, Seek, SeekFrom, Write};
     use tempfile::{NamedTempFile, TempDir};
     use tokio::sync::mpsc;
     use tokio::sync::mpsc::Receiver;

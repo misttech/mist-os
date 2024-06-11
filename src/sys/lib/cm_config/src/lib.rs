@@ -2,26 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context, Error},
-    camino::Utf8PathBuf,
-    cm_rust::{CapabilityTypeName, FidlIntoNative},
-    cm_types::{symmetrical_enums, Name, ParseError, Url},
-    fidl::unpersist,
-    fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_component_internal::{
-        self as component_internal, BuiltinBootResolver, CapabilityPolicyAllowlists,
-        DebugRegistrationPolicyAllowlists, LogDestination, RealmBuilderResolverAndRunner,
-    },
-    moniker::{ChildName, ExtendedMoniker, Moniker, MonikerError},
-    std::{
-        collections::{HashMap, HashSet},
-        sync::Arc,
-    },
-    thiserror::Error,
-    tracing::warn,
-    version_history::{AbiRevision, AbiRevisionError, VersionHistory},
+use anyhow::{format_err, Context, Error};
+use camino::Utf8PathBuf;
+use cm_rust::{CapabilityTypeName, FidlIntoNative};
+use cm_types::{symmetrical_enums, Name, ParseError, Url};
+use fidl::unpersist;
+use fidl_fuchsia_component_decl as fdecl;
+use fidl_fuchsia_component_internal::{
+    self as component_internal, BuiltinBootResolver, CapabilityPolicyAllowlists,
+    DebugRegistrationPolicyAllowlists, LogDestination, RealmBuilderResolverAndRunner,
 };
+use moniker::{ChildName, ExtendedMoniker, Moniker, MonikerError};
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+use thiserror::Error;
+use tracing::warn;
+use version_history::{AbiRevision, AbiRevisionError, VersionHistory};
 
 /// Runtime configuration options.
 /// This configuration intended to be "global", in that the same configuration
@@ -818,12 +814,10 @@ impl TryFrom<component_internal::SecurityPolicy> for SecurityPolicy {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl_fuchsia_io as fio,
-        version_history::{ApiLevel, Version},
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_io as fio;
+    use version_history::{ApiLevel, Version};
 
     const FOO_PKG_URL: &str = "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm";
 

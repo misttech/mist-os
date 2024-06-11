@@ -2,28 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    argh::FromArgs,
-    carnelian::{
-        app::{Config, ViewCreationParameters},
-        color::Color,
-        drawing::DisplayRotation,
-        input::{self},
-        make_app_assistant,
-        render::{rive::load_rive, Context as RenderContext},
-        scene::{
-            facets::{FacetId, RiveFacet, SetSizeMessage},
-            scene::{Scene, SceneBuilder},
-        },
-        App, AppAssistant, AppSender, Size, ViewAssistant, ViewAssistantContext, ViewAssistantPtr,
-        ViewKey,
-    },
-    fuchsia_trace::{duration, duration_begin, duration_end},
-    fuchsia_zircon::{Event, Time},
-    rive_rs::{self as rive},
-    std::path::Path,
+use anyhow::Error;
+use argh::FromArgs;
+use carnelian::app::{Config, ViewCreationParameters};
+use carnelian::color::Color;
+use carnelian::drawing::DisplayRotation;
+use carnelian::input::{self};
+use carnelian::render::rive::load_rive;
+use carnelian::render::Context as RenderContext;
+use carnelian::scene::facets::{FacetId, RiveFacet, SetSizeMessage};
+use carnelian::scene::scene::{Scene, SceneBuilder};
+use carnelian::{
+    make_app_assistant, App, AppAssistant, AppSender, Size, ViewAssistant, ViewAssistantContext,
+    ViewAssistantPtr, ViewKey,
 };
+use fuchsia_trace::{duration, duration_begin, duration_end};
+use fuchsia_zircon::{Event, Time};
+use rive_rs::{self as rive};
+use std::path::Path;
 
 /// Rive.
 #[derive(Debug, FromArgs)]

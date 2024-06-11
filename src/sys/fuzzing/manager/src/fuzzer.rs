@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::diagnostics::{ArtifactBridge, ArtifactHandler};
+use crate::events::{handle_run_events, handle_suite_events};
+use anyhow::{Context as _, Result};
+use futures::channel::{mpsc, oneshot};
+use futures::{pin_mut, select, FutureExt, SinkExt};
+use std::cell::RefCell;
+use std::rc::Rc;
+use test_manager::{Artifact, LaunchError, RunControllerProxy, SuiteControllerProxy};
+use tracing::warn;
 use {
-    crate::diagnostics::{ArtifactBridge, ArtifactHandler},
-    crate::events::{handle_run_events, handle_suite_events},
-    anyhow::{Context as _, Result},
     fidl_fuchsia_fuzzer as fuzz, fidl_fuchsia_test_manager as test_manager,
     fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::channel::{mpsc, oneshot},
-    futures::{pin_mut, select, FutureExt, SinkExt},
-    std::cell::RefCell,
-    std::rc::Rc,
-    test_manager::{Artifact, LaunchError, RunControllerProxy, SuiteControllerProxy},
-    tracing::warn,
 };
 
 /// Represents the what stage of its lifecycle a fuzzer is currently in.

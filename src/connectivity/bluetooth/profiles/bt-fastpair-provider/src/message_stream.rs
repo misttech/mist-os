@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use async_helpers::maybe_stream::MaybeStream;
-use core::{
-    pin::Pin,
-    task::{Context, Poll},
-};
+use core::pin::Pin;
+use core::task::{Context, Poll};
 use fidl_fuchsia_bluetooth_bredr::{
     ChannelParameters, ProfileProxy, ProtocolDescriptor, ProtocolIdentifier, ServiceDefinition,
 };

@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use component_debug::{
-    cli::{doctor_cmd_print, doctor_cmd_serialized},
-    doctor::RouteReport,
-};
+use component_debug::cli::{doctor_cmd_print, doctor_cmd_serialized};
+use component_debug::doctor::RouteReport;
 use errors::FfxError;
 use ffx_component::rcs::{connect_to_realm_query, connect_to_route_validator};
 use ffx_component_doctor_args::DoctorCommand;

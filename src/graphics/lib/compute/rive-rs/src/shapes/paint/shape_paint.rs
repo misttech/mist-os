@@ -2,20 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{cell::RefCell, rc::Rc};
+use std::cell::RefCell;
+use std::rc::Rc;
 
-use crate::{
-    container_component::ContainerComponent,
-    core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property},
-    math::Mat,
-    option_cell::OptionCell,
-    shapes::{
-        paint::{shape_paint_mutator::ShapePaintMutator, BlendMode, Fill, Stroke},
-        CommandPath, PathSpace, ShapePaintContainer,
-    },
-    status_code::StatusCode,
-    Component, RenderPaint, Renderer,
-};
+use crate::container_component::ContainerComponent;
+use crate::core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property};
+use crate::math::Mat;
+use crate::option_cell::OptionCell;
+use crate::shapes::paint::shape_paint_mutator::ShapePaintMutator;
+use crate::shapes::paint::{BlendMode, Fill, Stroke};
+use crate::shapes::{CommandPath, PathSpace, ShapePaintContainer};
+use crate::status_code::StatusCode;
+use crate::{Component, RenderPaint, Renderer};
 
 #[derive(Debug)]
 pub struct ShapePaint {

@@ -89,59 +89,45 @@
 pub mod merge;
 pub mod strategy;
 
-use {
-    crate::{
-        drop_event::DropEvent,
-        errors::FxfsError,
-        filesystem::{ApplyContext, ApplyMode, FxFilesystem, JournalingObject, SyncOptions},
-        log::*,
-        lsm_tree::{
-            cache::NullCache,
-            layers_from_handles,
-            skip_list_layer::SkipListLayer,
-            types::{
-                Item, ItemRef, Layer, LayerIterator, LayerKey, MergeType, OrdLowerBound,
-                OrdUpperBound, RangeKey, SortByU64,
-            },
-            LSMTree,
-        },
-        object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID},
-        object_store::{
-            object_manager::ReservationUpdate,
-            transaction::{
-                lock_keys, AllocatorMutation, AssocObj, LockKey, Mutation, Options, Transaction,
-                WriteGuard,
-            },
-            tree, DataObjectHandle, DirectWriter, HandleOptions, ObjectStore,
-        },
-        range::RangeExt,
-        round::{round_div, round_down},
-        serialized_types::{
-            Version, Versioned, VersionedLatest, DEFAULT_MAX_SERIALIZED_RECORD_SIZE,
-        },
-    },
-    anyhow::{anyhow, bail, ensure, Context, Error},
-    async_trait::async_trait,
-    either::Either::{Left, Right},
-    event_listener::EventListener,
-    fprint::TypeFingerprint,
-    fuchsia_inspect::ArrayProperty,
-    futures::FutureExt,
-    merge::{filter_marked_for_deletion, filter_tombstones, merge},
-    serde::{Deserialize, Serialize},
-    std::{
-        borrow::Borrow,
-        collections::{BTreeMap, HashSet, VecDeque},
-        hash::Hash,
-        marker::PhantomData,
-        num::Saturating,
-        ops::{Bound, Range},
-        sync::{
-            atomic::{AtomicU64, Ordering},
-            Arc, Mutex, Weak,
-        },
-    },
+use crate::drop_event::DropEvent;
+use crate::errors::FxfsError;
+use crate::filesystem::{ApplyContext, ApplyMode, FxFilesystem, JournalingObject, SyncOptions};
+use crate::log::*;
+use crate::lsm_tree::cache::NullCache;
+use crate::lsm_tree::skip_list_layer::SkipListLayer;
+use crate::lsm_tree::types::{
+    Item, ItemRef, Layer, LayerIterator, LayerKey, MergeType, OrdLowerBound, OrdUpperBound,
+    RangeKey, SortByU64,
 };
+use crate::lsm_tree::{layers_from_handles, LSMTree};
+use crate::object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID};
+use crate::object_store::object_manager::ReservationUpdate;
+use crate::object_store::transaction::{
+    lock_keys, AllocatorMutation, AssocObj, LockKey, Mutation, Options, Transaction, WriteGuard,
+};
+use crate::object_store::{tree, DataObjectHandle, DirectWriter, HandleOptions, ObjectStore};
+use crate::range::RangeExt;
+use crate::round::{round_div, round_down};
+use crate::serialized_types::{
+    Version, Versioned, VersionedLatest, DEFAULT_MAX_SERIALIZED_RECORD_SIZE,
+};
+use anyhow::{anyhow, bail, ensure, Context, Error};
+use async_trait::async_trait;
+use either::Either::{Left, Right};
+use event_listener::EventListener;
+use fprint::TypeFingerprint;
+use fuchsia_inspect::ArrayProperty;
+use futures::FutureExt;
+use merge::{filter_marked_for_deletion, filter_tombstones, merge};
+use serde::{Deserialize, Serialize};
+use std::borrow::Borrow;
+use std::collections::{BTreeMap, HashSet, VecDeque};
+use std::hash::Hash;
+use std::marker::PhantomData;
+use std::num::Saturating;
+use std::ops::{Bound, Range};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, Weak};
 
 /// This trait is implemented by things that own reservations.
 pub trait ReservationOwner: Send + Sync {
@@ -2099,35 +2085,29 @@ impl<'a> Flusher<'a> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::{
-            filesystem::{FxFilesystem, FxFilesystemBuilder, JournalingObject, OpenFxFilesystem},
-            fsck::fsck,
-            lsm_tree::{
-                cache::NullCache,
-                skip_list_layer::SkipListLayer,
-                types::{Item, ItemRef, Layer, LayerIterator},
-                LSMTree,
-            },
-            object_handle::ObjectHandle,
-            object_store::{
-                allocator::{
-                    merge::merge, Allocator, AllocatorKey, AllocatorValue, CoalescingIterator,
-                },
-                transaction::{lock_keys, Options},
-                volume::root_volume,
-                Directory, LockKey, ObjectStore,
-            },
-            range::RangeExt,
-        },
-        fuchsia_async as fasync,
-        std::{
-            cmp::{max, min},
-            ops::{Bound, Range},
-            sync::{Arc, Mutex},
-        },
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
+    use crate::filesystem::{
+        FxFilesystem, FxFilesystemBuilder, JournalingObject, OpenFxFilesystem,
     };
+    use crate::fsck::fsck;
+    use crate::lsm_tree::cache::NullCache;
+    use crate::lsm_tree::skip_list_layer::SkipListLayer;
+    use crate::lsm_tree::types::{Item, ItemRef, Layer, LayerIterator};
+    use crate::lsm_tree::LSMTree;
+    use crate::object_handle::ObjectHandle;
+    use crate::object_store::allocator::merge::merge;
+    use crate::object_store::allocator::{
+        Allocator, AllocatorKey, AllocatorValue, CoalescingIterator,
+    };
+    use crate::object_store::transaction::{lock_keys, Options};
+    use crate::object_store::volume::root_volume;
+    use crate::object_store::{Directory, LockKey, ObjectStore};
+    use crate::range::RangeExt;
+    use fuchsia_async as fasync;
+    use std::cmp::{max, min};
+    use std::ops::{Bound, Range};
+    use std::sync::{Arc, Mutex};
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::DeviceHolder;
 
     #[fuchsia::test]
     async fn test_coalescing_iterator() {

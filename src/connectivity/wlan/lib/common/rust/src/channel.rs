@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 #![allow(dead_code)]
-use {
-    crate::ie, anyhow::format_err, banjo_fuchsia_wlan_common as banjo_common,
-    fidl_fuchsia_wlan_common as fidl_common, std::fmt,
-};
+use crate::ie;
+use anyhow::format_err;
+use std::fmt;
+use {banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common};
 
 // IEEE Std 802.11-2016, Annex E
 // Note the distinction of index for primary20 and index for center frequency.

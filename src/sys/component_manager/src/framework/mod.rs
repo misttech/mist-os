@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::model::component::ComponentInstance;
+use crate::sandbox_util::LaunchTaskOnReceive;
+use fidl::endpoints::DiscoverableProtocolMarker;
+use routing::capability_source::{CapabilitySource, InternalCapability};
+use sandbox::Dict;
+use std::sync::Arc;
 use {
-    crate::{model::component::ComponentInstance, sandbox_util::LaunchTaskOnReceive},
-    fidl::endpoints::DiscoverableProtocolMarker,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_sys2 as fsys,
-    routing::capability_source::{CapabilitySource, InternalCapability},
-    sandbox::Dict,
-    std::sync::Arc,
 };
 
 pub mod binder;

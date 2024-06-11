@@ -2,31 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::ap::{frame_writer, BufferedFrame, Context, TimedEvent};
+use crate::device::DeviceOps;
+use crate::disconnect::LocallyInitiated;
+use crate::error::Error;
+use ieee80211::{MacAddr, MacAddrBytes, Ssid};
+use std::collections::VecDeque;
+use tracing::warn;
+use wlan_common::appendable::Appendable;
+use wlan_common::buffer_writer::BufferWriter;
+use wlan_common::mac::{self, Aid, AuthAlgorithmNumber, FrameClass, ReasonCode};
+use wlan_common::timer::EventId;
+use wlan_common::{ie, TimeUnit};
+use wlan_ffi_transport::Buffer;
+use wlan_statemachine::StateMachine;
+use zerocopy::ByteSlice;
 use {
-    crate::{
-        ap::{frame_writer, BufferedFrame, Context, TimedEvent},
-        device::DeviceOps,
-        disconnect::LocallyInitiated,
-        error::Error,
-    },
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
-    fuchsia_trace as trace, fuchsia_zircon as zx,
-    ieee80211::{MacAddr, MacAddrBytes, Ssid},
-    std::collections::VecDeque,
-    tracing::warn,
-    wlan_common::{
-        appendable::Appendable,
-        buffer_writer::BufferWriter,
-        ie,
-        mac::{self, Aid, AuthAlgorithmNumber, FrameClass, ReasonCode},
-        timer::EventId,
-        TimeUnit,
-    },
-    wlan_ffi_transport::Buffer,
-    wlan_statemachine::StateMachine,
-    wlan_trace as wtrace,
-    zerocopy::ByteSlice,
+    fuchsia_trace as trace, fuchsia_zircon as zx, wlan_trace as wtrace,
 };
 
 /// dot11BssMaxIdlePeriod (IEEE Std 802.11-2016, 11.24.13 and Annex C.3): This attribute indicates
@@ -1134,21 +1128,17 @@ impl RemoteClient {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::device::FakeDevice,
-        ieee80211::Bssid,
-        lazy_static::lazy_static,
-        test_case::test_case,
-        wlan_common::{
-            assert_variant,
-            mac::{AsBytesExt as _, CapabilityInfo},
-            test_utils::fake_frames::*,
-            timer::{self, create_timer},
-        },
-        wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider},
-        zerocopy::Unalign,
-    };
+    use super::*;
+    use crate::device::FakeDevice;
+    use ieee80211::Bssid;
+    use lazy_static::lazy_static;
+    use test_case::test_case;
+    use wlan_common::assert_variant;
+    use wlan_common::mac::{AsBytesExt as _, CapabilityInfo};
+    use wlan_common::test_utils::fake_frames::*;
+    use wlan_common::timer::{self, create_timer};
+    use wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider};
+    use zerocopy::Unalign;
 
     lazy_static! {
         static ref CLIENT_ADDR: MacAddr = [1; 6].into();

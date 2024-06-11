@@ -5,41 +5,39 @@
 #![cfg(test)]
 #![deny(clippy::await_holding_refcell_ref)]
 
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_neighbor as fnet_neighbor;
-use fidl_fuchsia_net_reachability as fnet_reachability;
-use fidl_fuchsia_net_stack as fnet_stack;
-use fidl_fuchsia_testing as ftesting;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_neighbor as fnet_neighbor, fidl_fuchsia_net_reachability as fnet_reachability,
+    fidl_fuchsia_net_stack as fnet_stack, fidl_fuchsia_testing as ftesting,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
+};
 
 use assert_matches::assert_matches;
 use fidl::endpoints::Proxy;
-use futures::{
-    channel::mpsc, future::FusedFuture, FutureExt as _, StreamExt as _, TryFutureExt as _,
-};
+use futures::channel::mpsc;
+use futures::future::FusedFuture;
+use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _};
 use net_declare::{fidl_subnet, net_ip_v4, net_ip_v6, net_mac};
-use netstack_testing_common::{
-    constants::{ipv4 as ipv4_consts, ipv6 as ipv6_consts},
-    get_inspect_data, interfaces,
-    realms::{constants, KnownServiceProvider, Netstack, TestSandboxExt as _},
-    wait_for_component_stopped,
+use netstack_testing_common::constants::{ipv4 as ipv4_consts, ipv6 as ipv6_consts};
+use netstack_testing_common::realms::{
+    constants, KnownServiceProvider, Netstack, TestSandboxExt as _,
 };
+use netstack_testing_common::{get_inspect_data, interfaces, wait_for_component_stopped};
 use netstack_testing_macros::netstack_test;
 use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
-use packet_formats::{
-    ethernet::{
-        EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
-    },
-    icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode, MessageBody as _},
-    ip::{Ipv4Proto, Ipv6Proto},
-    ipv4::Ipv4PacketBuilder,
-    ipv6::Ipv6PacketBuilder,
-    testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame,
+use packet_formats::ethernet::{
+    EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
+use packet_formats::icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode, MessageBody as _};
+use packet_formats::ip::{Ipv4Proto, Ipv6Proto};
+use packet_formats::ipv4::Ipv4PacketBuilder;
+use packet_formats::ipv6::Ipv6PacketBuilder;
+use packet_formats::testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame;
 use reachability_core::{LinkState, State, FIDL_TIMEOUT_ID};
-use std::{cell::RefCell, collections::HashMap, pin::pin, rc::Rc};
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::pin::pin;
+use std::rc::Rc;
 use test_case::test_case;
 use tracing::info;
 

@@ -6,25 +6,23 @@
 
 #![warn(missing_docs)]
 
-use crate::{
-    common::IntoAny,
-    directory::entry_container::Directory,
-    execution_scope::ExecutionScope,
-    file::{self, FileLike},
-    node::IsDirectory,
-    object_request::ObjectRequestSend,
-    path::Path,
-    service::{self, ServiceLike},
-    symlink::{self, Symlink},
-    ObjectRequestRef, ToObjectRequest,
-};
+use crate::common::IntoAny;
+use crate::directory::entry_container::Directory;
+use crate::execution_scope::ExecutionScope;
+use crate::file::{self, FileLike};
+use crate::node::IsDirectory;
+use crate::object_request::ObjectRequestSend;
+use crate::path::Path;
+use crate::service::{self, ServiceLike};
+use crate::symlink::{self, Symlink};
+use crate::{ObjectRequestRef, ToObjectRequest};
 
-use {
-    fidl::endpoints::{create_endpoints, ClientEnd},
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status,
-    std::{fmt, future::Future, sync::Arc},
-};
+use fidl::endpoints::{create_endpoints, ClientEnd};
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use std::fmt;
+use std::future::Future;
+use std::sync::Arc;
 
 /// Information about a directory entry, used to populate ReadDirents() output.
 /// The first element is the inode number, or INO_UNKNOWN (from fuchsia.io) if not set, and the second
@@ -422,21 +420,20 @@ pub fn serve_directory(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{
-            DirectoryEntry, DirectoryEntryAsync, EntryInfo, FlagsOrProtocols, OpenRequest, SubNode,
-        },
-        crate::{
-            assert_read, directory::entry_container::Directory, execution_scope::ExecutionScope,
-            file::read_only, path::Path, pseudo_directory, ToObjectRequest,
-        },
-        assert_matches::assert_matches,
-        fidl::endpoints::{create_endpoints, create_proxy, ClientEnd},
-        fidl_fuchsia_io as fio,
-        fuchsia_zircon_status::Status,
-        futures::StreamExt,
-        std::sync::Arc,
+    use super::{
+        DirectoryEntry, DirectoryEntryAsync, EntryInfo, FlagsOrProtocols, OpenRequest, SubNode,
     };
+    use crate::directory::entry_container::Directory;
+    use crate::execution_scope::ExecutionScope;
+    use crate::file::read_only;
+    use crate::path::Path;
+    use crate::{assert_read, pseudo_directory, ToObjectRequest};
+    use assert_matches::assert_matches;
+    use fidl::endpoints::{create_endpoints, create_proxy, ClientEnd};
+    use fidl_fuchsia_io as fio;
+    use fuchsia_zircon_status::Status;
+    use futures::StreamExt;
+    use std::sync::Arc;
 
     #[fuchsia::test]
     async fn sub_node() {

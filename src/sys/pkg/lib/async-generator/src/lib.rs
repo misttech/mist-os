@@ -7,17 +7,13 @@
 
 //! Asynchronous generator-like functionality in stable Rust.
 
-use {
-    futures::{
-        channel::mpsc,
-        future::FusedFuture,
-        prelude::*,
-        stream::FusedStream,
-        task::{Context, Poll},
-    },
-    pin_project::pin_project,
-    std::pin::Pin,
-};
+use futures::channel::mpsc;
+use futures::future::FusedFuture;
+use futures::prelude::*;
+use futures::stream::FusedStream;
+use futures::task::{Context, Poll};
+use pin_project::pin_project;
+use std::pin::Pin;
 
 /// Produces an asynchronous `Stream` of [`GeneratorState<I, R>`] by invoking the given closure
 /// with a handle that can be used to yield items.

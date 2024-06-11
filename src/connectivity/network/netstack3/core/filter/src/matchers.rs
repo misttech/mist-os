@@ -3,17 +3,17 @@
 // found in the LICENSE file.
 
 use alloc::string::String;
-use core::{fmt::Debug, num::NonZeroU64, ops::RangeInclusive};
+use core::fmt::Debug;
+use core::num::NonZeroU64;
+use core::ops::RangeInclusive;
 use netstack3_base::InspectableValue;
 
 use derivative::Derivative;
 use net_types::ip::{IpAddress, Subnet};
 use packet_formats::ip::IpExt;
 
-use crate::{
-    logic::Interfaces,
-    packets::{IpPacket, MaybeTransportPacket, TransportPacket},
-};
+use crate::logic::Interfaces;
+use crate::packets::{IpPacket, MaybeTransportPacket, TransportPacket};
 
 /// Matches on metadata of packets that come through the filtering framework.
 trait Matcher<T> {
@@ -222,10 +222,8 @@ impl<I: IpExt, DeviceClass> PacketMatcher<I, DeviceClass> {
 #[cfg(test)]
 pub(crate) mod testutil {
     use const_unwrap::const_unwrap_option;
-    use netstack3_base::{
-        testutil::{FakeStrongDeviceId, FakeWeakDeviceId},
-        DeviceIdentifier, StrongDeviceIdentifier,
-    };
+    use netstack3_base::testutil::{FakeStrongDeviceId, FakeWeakDeviceId};
+    use netstack3_base::{DeviceIdentifier, StrongDeviceIdentifier};
 
     use super::*;
     use crate::context::testutil::FakeDeviceClass;
@@ -343,13 +341,12 @@ mod tests {
     use packet_formats::ip::{IpProto, Ipv4Proto};
     use test_case::test_case;
 
-    use super::{testutil::*, *};
-    use crate::{
-        context::testutil::FakeDeviceClass,
-        packets::testutil::internal::{
-            ArbitraryValue, FakeIcmpEchoRequest, FakeIpPacket, FakeTcpSegment, FakeUdpPacket,
-            TestIpExt, TransportPacketExt,
-        },
+    use super::testutil::*;
+    use super::*;
+    use crate::context::testutil::FakeDeviceClass;
+    use crate::packets::testutil::internal::{
+        ArbitraryValue, FakeIcmpEchoRequest, FakeIpPacket, FakeTcpSegment, FakeUdpPacket,
+        TestIpExt, TransportPacketExt,
     };
 
     #[test_case(InterfaceMatcher::Id(wlan_interface().id))]

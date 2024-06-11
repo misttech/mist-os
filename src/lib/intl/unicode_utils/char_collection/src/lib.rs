@@ -8,5 +8,4 @@ mod char_collection;
 mod conversions;
 mod operators;
 
-pub use char_collection::CharCollection;
-pub use char_collection::MultiCharRange;
+pub use char_collection::{CharCollection, MultiCharRange};

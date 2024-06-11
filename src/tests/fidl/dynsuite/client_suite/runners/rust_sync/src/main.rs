@@ -2,23 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fidl_clientsuite::{
-        AjarTargetEvent, AjarTargetEventReport, AjarTargetEventReporterSynchronousProxy,
-        AjarTargetSynchronousProxy, BindingsProperties, ClosedTargetEvent, ClosedTargetEventReport,
-        ClosedTargetEventReporterSynchronousProxy, ClosedTargetSynchronousProxy, Empty,
-        EmptyResultClassification, EmptyResultWithErrorClassification, IoStyle, NonEmptyPayload,
-        NonEmptyResultClassification, NonEmptyResultWithErrorClassification, OpenTargetEvent,
-        OpenTargetEventReport, OpenTargetEventReporterSynchronousProxy, OpenTargetSynchronousProxy,
-        RunnerRequest, RunnerRequestStream, TableResultClassification, Test,
-        UnionResultClassification, UnknownEvent, CLIENT_SUITE_VERSION,
-    },
-    fuchsia_component::server::ServiceFs,
-    fuchsia_zircon as zx,
-    fuchsia_zircon::AsHandleRef,
-    futures::prelude::*,
-    rust_util::{classify_error, method_name},
+use fidl_fidl_clientsuite::{
+    AjarTargetEvent, AjarTargetEventReport, AjarTargetEventReporterSynchronousProxy,
+    AjarTargetSynchronousProxy, BindingsProperties, ClosedTargetEvent, ClosedTargetEventReport,
+    ClosedTargetEventReporterSynchronousProxy, ClosedTargetSynchronousProxy, Empty,
+    EmptyResultClassification, EmptyResultWithErrorClassification, IoStyle, NonEmptyPayload,
+    NonEmptyResultClassification, NonEmptyResultWithErrorClassification, OpenTargetEvent,
+    OpenTargetEventReport, OpenTargetEventReporterSynchronousProxy, OpenTargetSynchronousProxy,
+    RunnerRequest, RunnerRequestStream, TableResultClassification, Test, UnionResultClassification,
+    UnknownEvent, CLIENT_SUITE_VERSION,
 };
+use fuchsia_component::server::ServiceFs;
+use fuchsia_zircon as zx;
+use fuchsia_zircon::AsHandleRef;
+use futures::prelude::*;
+use rust_util::{classify_error, method_name};
 
 const DISABLED_TESTS: &[Test] = &[
     // No disabled tests!

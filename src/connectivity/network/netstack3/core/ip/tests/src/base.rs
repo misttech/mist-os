@@ -5,60 +5,57 @@
 use alloc::vec;
 use alloc::vec::Vec;
 use assert_matches::assert_matches;
-use core::{num::NonZeroU16, time::Duration};
+use core::num::NonZeroU16;
+use core::time::Duration;
 
 use ip_test_macro::ip_test;
 use net_declare::net_ip_v4;
-use net_types::{
-    ethernet::Mac,
-    ip::{
-        AddrSubnet, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu, Subnet,
-    },
-    MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
+use net_types::ethernet::Mac;
+use net_types::ip::{
+    AddrSubnet, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu, Subnet,
 };
+use net_types::{MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _};
 use packet::{Buf, ParseBuffer, ParseMetadata, Serializer as _};
-use packet_formats::{
-    ethernet::{
-        EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
-    },
-    icmp::{
-        IcmpDestUnreachable, IcmpEchoRequest, IcmpPacketBuilder, IcmpParseArgs, IcmpUnusedCode,
-        Icmpv4DestUnreachableCode, Icmpv6Packet, Icmpv6PacketTooBig, Icmpv6ParameterProblemCode,
-        MessageBody,
-    },
-    ip::{IpPacket as _, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6ExtHdrType, Ipv6Proto},
-    ipv4::Ipv4PacketBuilder,
-    ipv6::{ext_hdrs::ExtensionHeaderOptionAction, Ipv6PacketBuilder},
-    testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame,
+use packet_formats::ethernet::{
+    EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
+use packet_formats::icmp::{
+    IcmpDestUnreachable, IcmpEchoRequest, IcmpPacketBuilder, IcmpParseArgs, IcmpUnusedCode,
+    Icmpv4DestUnreachableCode, Icmpv6Packet, Icmpv6PacketTooBig, Icmpv6ParameterProblemCode,
+    MessageBody,
+};
+use packet_formats::ip::{
+    IpPacket as _, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6ExtHdrType, Ipv6Proto,
+};
+use packet_formats::ipv4::Ipv4PacketBuilder;
+use packet_formats::ipv6::ext_hdrs::ExtensionHeaderOptionAction;
+use packet_formats::ipv6::Ipv6PacketBuilder;
+use packet_formats::testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame;
 use rand::Rng;
 use test_case::test_case;
 
-use netstack3_base::{
-    testutil::{
-        new_rng, set_logger_for_test, FakeInstant, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
-    },
-    FrameDestination, InstantContext as _,
+use netstack3_base::testutil::{
+    new_rng, set_logger_for_test, FakeInstant, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
 };
-use netstack3_core::{
-    device::{DeviceId, EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta},
-    testutil::{
-        new_simple_fake_network, Ctx, CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder,
-        DEFAULT_INTERFACE_METRIC,
-    },
-    BindingsContext, IpExt, StackState,
+use netstack3_base::{FrameDestination, InstantContext as _};
+use netstack3_core::device::{
+    DeviceId, EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta,
 };
+use netstack3_core::testutil::{
+    new_simple_fake_network, Ctx, CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder,
+    DEFAULT_INTERFACE_METRIC,
+};
+use netstack3_core::{BindingsContext, IpExt, StackState};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
+use netstack3_ip::device::{
+    IpDeviceAddr, IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
+    Ipv6DeviceConfigurationUpdate, SlaacConfiguration,
+};
+use netstack3_ip::socket::IpSocketContext;
 use netstack3_ip::{
-    self as ip,
-    device::{
-        IpDeviceAddr, IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
-        Ipv6DeviceConfigurationUpdate, SlaacConfiguration,
-    },
-    socket::IpSocketContext,
-    AddableEntryEither, AddableMetric, AddressStatus, Destination, DropReason, FragmentTimerId,
-    IpDeviceStateContext, IpLayerTimerId, Ipv4PresentAddressStatus, NextHop, RawMetric,
-    ReceivePacketAction, ResolveRouteError, ResolvedRoute, RoutableIpAddr,
+    self as ip, AddableEntryEither, AddableMetric, AddressStatus, Destination, DropReason,
+    FragmentTimerId, IpDeviceStateContext, IpLayerTimerId, Ipv4PresentAddressStatus, NextHop,
+    RawMetric, ReceivePacketAction, ResolveRouteError, ResolvedRoute, RoutableIpAddr,
 };
 
 // Some helper functions

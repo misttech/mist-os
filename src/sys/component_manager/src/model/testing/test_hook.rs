@@ -2,21 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_trait::async_trait,
-    errors::ModelError,
-    futures::{executor::block_on, lock::Mutex, prelude::*},
-    hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
-    moniker::Moniker,
-    std::{
-        cmp::Eq,
-        collections::HashMap,
-        fmt,
-        ops::Deref,
-        pin::Pin,
-        sync::{Arc, Weak},
-    },
-};
+use async_trait::async_trait;
+use errors::ModelError;
+use futures::executor::block_on;
+use futures::lock::Mutex;
+use futures::prelude::*;
+use hooks::{Event, EventPayload, EventType, Hook, HooksRegistration};
+use moniker::Moniker;
+use std::cmp::Eq;
+use std::collections::HashMap;
+use std::fmt;
+use std::ops::Deref;
+use std::pin::Pin;
+use std::sync::{Arc, Weak};
 
 struct ComponentInstance {
     pub moniker: Moniker,

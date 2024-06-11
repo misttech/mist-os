@@ -5,52 +5,42 @@
 use core::num::NonZeroU8;
 use std::ops::ControlFlow;
 
-use fidl::{
-    encoding::Decode as _,
-    endpoints::{ProtocolMarker, RequestStream},
-};
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_posix as fposix;
-use fidl_fuchsia_posix_socket as fposix_socket;
-use fidl_fuchsia_posix_socket_raw as fpraw;
-use fuchsia_zircon as zx;
+use fidl::encoding::Decode as _;
+use fidl::endpoints::{ProtocolMarker, RequestStream};
 use futures::StreamExt as _;
 use log::error;
-use net_types::{
-    ip::{Ip, IpInvariant, IpVersion, Ipv4, Ipv6},
-    SpecifiedAddr,
+use net_types::ip::{Ip, IpInvariant, IpVersion, Ipv4, Ipv6};
+use net_types::SpecifiedAddr;
+use netstack3_core::ip::{
+    IpSockCreateAndSendError, IpSockSendError, RawIpSocketIcmpFilter, RawIpSocketIcmpFilterError,
+    RawIpSocketProtocol, RawIpSocketSendToError, RawIpSocketsBindingsContext,
+    RawIpSocketsBindingsTypes,
 };
-use netstack3_core::{
-    ip::{
-        IpSockCreateAndSendError, IpSockSendError, RawIpSocketIcmpFilter,
-        RawIpSocketIcmpFilterError, RawIpSocketProtocol, RawIpSocketSendToError,
-        RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes,
-    },
-    socket::StrictlyZonedAddr,
-    sync::Mutex,
-    IpExt,
-};
+use netstack3_core::socket::StrictlyZonedAddr;
+use netstack3_core::sync::Mutex;
+use netstack3_core::IpExt;
 use packet::Buf;
 use packet_formats::ip::IpPacket as _;
 use zerocopy::ByteSlice;
 use zx::{HandleBased, Peered};
-
-use crate::bindings::{
-    socket::{
-        queue::{BodyLen, MessageQueue},
-        IntoErrno, IpSockAddrExt, SockAddr,
-    },
-    util::{
-        AllowBindingIdFromWeak, IntoCore, IntoFidl, RemoveResourceResultExt, ResultExt as _,
-        TryFromFidl, TryFromFidlWithContext, TryIntoFidlWithContext,
-    },
-    BindingsCtx, Ctx,
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_posix as fposix,
+    fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_raw as fpraw,
+    fuchsia_zircon as zx,
 };
 
-use super::{
-    worker::{self, CloseResponder, SocketWorker, SocketWorkerHandler, TaskSpawnerCollection},
-    SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING,
+use crate::bindings::socket::queue::{BodyLen, MessageQueue};
+use crate::bindings::socket::{IntoErrno, IpSockAddrExt, SockAddr};
+use crate::bindings::util::{
+    AllowBindingIdFromWeak, IntoCore, IntoFidl, RemoveResourceResultExt, ResultExt as _,
+    TryFromFidl, TryFromFidlWithContext, TryIntoFidlWithContext,
 };
+use crate::bindings::{BindingsCtx, Ctx};
+
+use super::worker::{
+    self, CloseResponder, SocketWorker, SocketWorkerHandler, TaskSpawnerCollection,
+};
+use super::{SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING};
 
 type DeviceId = netstack3_core::device::DeviceId<BindingsCtx>;
 type WeakDeviceId = netstack3_core::device::WeakDeviceId<BindingsCtx>;

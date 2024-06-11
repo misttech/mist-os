@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    assert_matches::assert_matches,
-    cm_rust::{CapabilityTypeName, ComponentDecl, FidlIntoNative},
-    cm_types::{LongName, Name, Path, RelativePath, Url},
-    derivative::Derivative,
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
-    std::collections::BTreeMap,
-};
+use anyhow::{Context, Error};
+use assert_matches::assert_matches;
+use cm_rust::{CapabilityTypeName, ComponentDecl, FidlIntoNative};
+use cm_types::{LongName, Name, Path, RelativePath, Url};
+use derivative::Derivative;
+use std::collections::BTreeMap;
+use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio};
 
 /// Name of the test runner.
 ///

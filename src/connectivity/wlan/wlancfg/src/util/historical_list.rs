@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fuchsia_async as fasync, std::collections::VecDeque, tracing::warn};
+use fuchsia_async as fasync;
+use std::collections::VecDeque;
+use tracing::warn;
 
 /// Trait for time function, for use in HistoricalList functions
 pub trait Timestamped {
@@ -71,7 +73,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fuchsia_zircon::Duration};
+    use super::*;
+    use fuchsia_zircon::Duration;
 
     impl Timestamped for fasync::Time {
         fn time(&self) -> fasync::Time {

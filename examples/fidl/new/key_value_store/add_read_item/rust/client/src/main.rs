@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    config::Config,
-    fidl_examples_keyvaluestore_addreaditem::{Item, StoreMarker},
-    fuchsia_component::client::connect_to_protocol,
-    std::{str, thread, time},
-};
+use anyhow::{Context as _, Error};
+use config::Config;
+use fidl_examples_keyvaluestore_addreaditem::{Item, StoreMarker};
+use fuchsia_component::client::connect_to_protocol;
+use std::{str, thread, time};
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

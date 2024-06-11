@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use ::{
-    async_trait::async_trait,
-    ffx_bluetooth_pandora_args::{PandoraCommand, PandoraSubCommand},
-    fho::{toolbox, AvailabilityFlag, FfxMain, FfxTool, Result, SimpleWriter, ToolIO},
-    fidl_fuchsia_bluetooth_pandora::{
-        GrpcServerControllerProxy, GrpcServerControllerStartRequest,
-        RootcanalClientControllerProxy, RootcanalClientControllerStartRequest, ServiceError,
-    },
+use ::async_trait::async_trait;
+use ::ffx_bluetooth_pandora_args::{PandoraCommand, PandoraSubCommand};
+use ::fho::{toolbox, AvailabilityFlag, FfxMain, FfxTool, Result, SimpleWriter, ToolIO};
+use ::fidl_fuchsia_bluetooth_pandora::{
+    GrpcServerControllerProxy, GrpcServerControllerStartRequest, RootcanalClientControllerProxy,
+    RootcanalClientControllerStartRequest, ServiceError,
 };
 
 #[derive(FfxTool)]

@@ -2,22 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        client::{
-            connection_selection::ConnectionSelectionRequester,
-            roaming::{lib::*, roam_monitor},
-            types,
-        },
-        telemetry::{TelemetryEvent, TelemetrySender, EWMA_SMOOTHING_FACTOR_FOR_METRICS},
-        util::pseudo_energy::EwmaSignalData,
-    },
-    anyhow::{format_err, Error},
-    futures::{
-        channel::mpsc, future::BoxFuture, select, stream::FuturesUnordered, FutureExt, StreamExt,
-    },
-    tracing::{info, warn},
-};
+use crate::client::connection_selection::ConnectionSelectionRequester;
+use crate::client::roaming::lib::*;
+use crate::client::roaming::roam_monitor;
+use crate::client::types;
+use crate::telemetry::{TelemetryEvent, TelemetrySender, EWMA_SMOOTHING_FACTOR_FOR_METRICS};
+use crate::util::pseudo_energy::EwmaSignalData;
+use anyhow::{format_err, Error};
+use futures::channel::mpsc;
+use futures::future::BoxFuture;
+use futures::stream::FuturesUnordered;
+use futures::{select, FutureExt, StreamExt};
+use tracing::{info, warn};
 
 const MIN_RSSI_IMPROVEMENT_TO_ROAM: f64 = 3.0;
 const MIN_SNR_IMPROVEMENT_TO_ROAM: f64 = 3.0;
@@ -183,20 +179,16 @@ fn is_roam_worthwhile(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            client::connection_selection::ConnectionSelectionRequest,
-            util::testing::{
-                generate_connect_selection, generate_random_bss, generate_random_ewma_signal_data,
-                generate_random_scanned_candidate,
-            },
-        },
-        fuchsia_async::TestExecutor,
-        futures::task::Poll,
-        std::pin::pin,
-        wlan_common::assert_variant,
+    use super::*;
+    use crate::client::connection_selection::ConnectionSelectionRequest;
+    use crate::util::testing::{
+        generate_connect_selection, generate_random_bss, generate_random_ewma_signal_data,
+        generate_random_scanned_candidate,
     };
+    use fuchsia_async::TestExecutor;
+    use futures::task::Poll;
+    use std::pin::pin;
+    use wlan_common::assert_variant;
 
     struct RoamManagerServiceTestValues {
         roam_search_sender: mpsc::UnboundedSender<RoamSearchRequest>,

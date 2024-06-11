@@ -5,11 +5,9 @@
 use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 use fidl_fuchsia_audio_device as fadevice;
-use fuchsia_audio::{
-    dai::DaiFormat,
-    device::{Direction, HardwareType},
-    Format,
-};
+use fuchsia_audio::dai::DaiFormat;
+use fuchsia_audio::device::{Direction, HardwareType};
+use fuchsia_audio::Format;
 
 #[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]

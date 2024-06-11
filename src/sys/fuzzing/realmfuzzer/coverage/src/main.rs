@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::aggregator::{collect_data, provide_data, Aggregator},
-    anyhow::Result,
-    fidl_fuchsia_fuzzer as fuzz,
-    fuchsia_component::server::ServiceFs,
-    futures::StreamExt,
-    tracing::warn,
-};
+use crate::aggregator::{collect_data, provide_data, Aggregator};
+use anyhow::Result;
+use fidl_fuchsia_fuzzer as fuzz;
+use fuchsia_component::server::ServiceFs;
+use futures::StreamExt;
+use tracing::warn;
 
 mod aggregator;
 mod options;

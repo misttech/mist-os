@@ -4,19 +4,16 @@
 
 //! TODO(https://fxbug.dev/42084621): Types and functions in this file are taken from wlancfg. Dedupe later.
 
-use {
-    ieee80211::Bssid,
-    std::{cmp::Reverse, collections::HashSet, convert::TryFrom},
-    tracing::{error, warn},
-    wlan_common::{
-        scan::Compatibility,
-        security::{
-            wep::WepKey,
-            wpa::{credential::Passphrase, WpaDescriptor},
-            SecurityAuthenticator, SecurityDescriptor,
-        },
-    },
-};
+use ieee80211::Bssid;
+use std::cmp::Reverse;
+use std::collections::HashSet;
+use std::convert::TryFrom;
+use tracing::{error, warn};
+use wlan_common::scan::Compatibility;
+use wlan_common::security::wep::WepKey;
+use wlan_common::security::wpa::credential::Passphrase;
+use wlan_common::security::wpa::WpaDescriptor;
+use wlan_common::security::{SecurityAuthenticator, SecurityDescriptor};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Credential {

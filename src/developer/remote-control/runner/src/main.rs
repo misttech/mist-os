@@ -226,18 +226,16 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod test {
 
-    use {
-        super::*,
-        anyhow::Error,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_developer_remotecontrol::{
-            IdentifyHostResponse, RemoteControlMarker, RemoteControlProxy, RemoteControlRequest,
-        },
-        fidl_fuchsia_developer_remotecontrol_connector::{ConnectorProxy, ConnectorRequest},
-        fuchsia_async as fasync,
-        std::cell::RefCell,
-        std::rc::Rc,
+    use super::*;
+    use anyhow::Error;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_developer_remotecontrol::{
+        IdentifyHostResponse, RemoteControlMarker, RemoteControlProxy, RemoteControlRequest,
     };
+    use fidl_fuchsia_developer_remotecontrol_connector::{ConnectorProxy, ConnectorRequest};
+    use fuchsia_async as fasync;
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     async fn send_request(proxy: &RemoteControlProxy) -> Result<()> {
         // We just need to make a request to the RCS - it doesn't really matter

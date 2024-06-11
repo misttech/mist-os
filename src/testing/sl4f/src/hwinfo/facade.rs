@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    common_utils::common::macros::{fx_err_and_bail, with_line},
-    hwinfo::types::{SerializableBoardInfo, SerializableDeviceInfo, SerializableProductInfo},
+use crate::common_utils::common::macros::{fx_err_and_bail, with_line};
+use crate::hwinfo::types::{
+    SerializableBoardInfo, SerializableDeviceInfo, SerializableProductInfo,
 };
 use anyhow::Error;
 use fidl_fuchsia_hwinfo::{BoardMarker, DeviceMarker, ProductMarker};

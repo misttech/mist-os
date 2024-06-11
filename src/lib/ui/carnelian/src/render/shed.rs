@@ -2,16 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{fs::File, io::prelude::*, path};
+use std::fs::File;
+use std::io::prelude::*;
+use std::path;
 
 use anyhow::{bail, ensure};
-use euclid::{default::Transform2D, point2, size2};
+use euclid::default::Transform2D;
+use euclid::{point2, size2};
 
-use crate::{
-    color::Color,
-    geometry::{Point, Size},
-    render::{BlendMode, Context, Fill, FillRule, Layer, Path, PathBuilder, Raster, Style},
-};
+use crate::color::Color;
+use crate::geometry::{Point, Size};
+use crate::render::{BlendMode, Context, Fill, FillRule, Layer, Path, PathBuilder, Raster, Style};
 
 #[derive(Clone, Debug, PartialEq)]
 enum PathCommand {

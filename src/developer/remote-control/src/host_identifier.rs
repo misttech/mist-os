@@ -1,15 +1,15 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use anyhow::{Context as _, Result};
+use std::collections::HashMap;
+use tracing::*;
 use {
-    anyhow::{Context as _, Result},
     fidl_fuchsia_buildinfo as buildinfo, fidl_fuchsia_developer_remotecontrol as rcs,
     fidl_fuchsia_device as fdevice, fidl_fuchsia_hwinfo as hwinfo,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_sysinfo as sysinfo,
     fuchsia_zircon as zx,
-    std::collections::HashMap,
-    tracing::*,
 };
 
 pub struct HostIdentifier {

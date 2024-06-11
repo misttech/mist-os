@@ -7,22 +7,19 @@ use tracing::{error, warn};
 
 use crate::config::ActionConfig;
 
-use {
-    super::{
-        config::DiagnosticData,
-        metrics::{
-            fetch::{Fetcher, FileDataFetcher},
-            metric_value::{MetricValue, Problem},
-            ExpressionContext, ExpressionTree, Function, Metric, MetricState, Metrics, ValueSource,
-        },
-        plugins::{register_plugins, Plugin},
-    },
-    crate::metric_value_to_int,
-    anyhow::{bail, Error},
-    fidl_fuchsia_feedback::MAX_CRASH_SIGNATURE_LENGTH,
-    serde::{Deserialize, Serialize},
-    std::{cell::RefCell, collections::HashMap},
+use super::config::DiagnosticData;
+use super::metrics::fetch::{Fetcher, FileDataFetcher};
+use super::metrics::metric_value::{MetricValue, Problem};
+use super::metrics::{
+    ExpressionContext, ExpressionTree, Function, Metric, MetricState, Metrics, ValueSource,
 };
+use super::plugins::{register_plugins, Plugin};
+use crate::metric_value_to_int;
+use anyhow::{bail, Error};
+use fidl_fuchsia_feedback::MAX_CRASH_SIGNATURE_LENGTH;
+use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
+use std::collections::HashMap;
 
 /// Provides the [metric_state] context to evaluate [Action]s and results of the [actions].
 pub struct ActionContext<'a> {
@@ -505,10 +502,9 @@ impl ActionContext<'_> {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::{config::Source, make_metrics},
-    };
+    use super::*;
+    use crate::config::Source;
+    use crate::make_metrics;
 
     /// Tells whether any of the stored values include a substring.
     fn includes(values: &Vec<String>, substring: &str) -> bool {

@@ -15,8 +15,7 @@ use lowpan_driver_common::Driver as _;
 use openthread::ot::Trel;
 use openthread_fuchsia::Platform;
 use std::str::FromStr;
-use std::sync::Arc;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 lazy_static::lazy_static! {
     static ref TEST_HARNESS_SINGLETON_LOCK: Mutex<()> = Mutex::new(());
@@ -174,8 +173,7 @@ async fn test_network_scan() {
 #[fuchsia::test(threads = 10)]
 #[ignore] // TODO: Re-enable once joiner support is added to test RCP
 async fn test_joiner() {
-    use lowpan_driver_common::lowpan_fidl::JoinParams;
-    use lowpan_driver_common::lowpan_fidl::JoinerCommissioningParams;
+    use lowpan_driver_common::lowpan_fidl::{JoinParams, JoinerCommissioningParams};
 
     test_harness(|driver| async move {
         let join_stream =

@@ -4,18 +4,17 @@
 
 use ffx_audio_device_args::DeviceCommand;
 use ffx_command::FfxContext;
-use fidl_fuchsia_audio_device as fadevice;
-use fidl_fuchsia_hardware_audio as fhaudio;
-use fidl_fuchsia_io as fio;
-use fuchsia_audio::{
-    device::{
-        DevfsSelector, HardwareType as HardwareDeviceType, Info as DeviceInfo, Selector,
-        Type as DeviceType,
-    },
-    Registry,
+use fuchsia_audio::device::{
+    DevfsSelector, HardwareType as HardwareDeviceType, Info as DeviceInfo, Selector,
+    Type as DeviceType,
 };
+use fuchsia_audio::Registry;
 use serde::{Serialize, Serializer};
 use std::fmt::Display;
+use {
+    fidl_fuchsia_audio_device as fadevice, fidl_fuchsia_hardware_audio as fhaudio,
+    fidl_fuchsia_io as fio,
+};
 
 /// List of audio devices on the target.
 ///
@@ -227,9 +226,8 @@ pub async fn get_devices(
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl_fuchsia_audio_controller as fac;
-    use fidl_fuchsia_audio_device as fadevice;
     use test_case::test_case;
+    use {fidl_fuchsia_audio_controller as fac, fidl_fuchsia_audio_device as fadevice};
 
     #[test_case(
         DeviceQuery {

@@ -8,102 +8,104 @@ use builtins::smc_resource::SmcResource;
 #[cfg(target_arch = "x86_64")]
 use builtins::ioport_resource::IoportResource;
 
+use crate::bootfs::BootfsSvc;
+use crate::builtin::builtin_resolver::{BuiltinResolver, SCHEME as BUILTIN_SCHEME};
+use crate::builtin::crash_introspect::CrashIntrospectSvc;
+use crate::builtin::fuchsia_boot_resolver::{
+    FuchsiaBootResolverBuiltinCapability, SCHEME as BOOT_SCHEME,
+};
+use crate::builtin::log::{ReadOnlyLog, WriteOnlyLog};
+use crate::builtin::realm_builder::{
+    RealmBuilderResolver, RealmBuilderRunnerFactory, RUNNER_NAME as REALM_BUILDER_RUNNER_NAME,
+    SCHEME as REALM_BUILDER_SCHEME,
+};
+use crate::builtin::runner::{BuiltinRunner, BuiltinRunnerFactory};
+use crate::builtin::svc_stash_provider::SvcStashCapability;
+use crate::builtin::system_controller::SystemController;
+use crate::builtin::time::{create_utc_clock, UtcTimeMaintainer};
+use crate::capability::{BuiltinCapability, CapabilitySource, FrameworkCapability};
+use crate::framework::binder::BinderFrameworkCapability;
+use crate::framework::factory::{FactoryCapabilityHost, FactoryFrameworkCapability};
+use crate::framework::introspector::IntrospectorFrameworkCapability;
+use crate::framework::lifecycle_controller::{
+    LifecycleController, LifecycleControllerFrameworkCapability,
+};
+use crate::framework::namespace::NamespaceFrameworkCapability;
+use crate::framework::pkg_dir::PkgDirectoryFrameworkCapability;
+use crate::framework::realm::RealmFrameworkCapability;
+use crate::framework::realm_query::{RealmQuery, RealmQueryFrameworkCapability};
+use crate::framework::route_validator::RouteValidatorFrameworkCapability;
+use crate::inspect_sink_provider::InspectSinkProvider;
+use crate::model::component::manager::ComponentManagerInstance;
+use crate::model::component::{WeakComponentInstance, WeakExtendedInstance};
+use crate::model::environment::Environment;
+use crate::model::event_logger::EventLogger;
+use crate::model::events::registry::{EventRegistry, EventSubscription};
+use crate::model::events::serve::serve_event_stream;
+use crate::model::events::source_factory::{EventSourceFactory, EventSourceFactoryCapability};
+use crate::model::events::stream_provider::EventStreamProvider;
+use crate::model::model::{Model, ModelParams};
+use crate::model::resolver::{box_arc_resolver, ResolverRegistry};
+use crate::model::token::InstanceRegistry;
+use crate::root_stop_notifier::RootStopNotifier;
+use crate::sandbox_util::LaunchTaskOnReceive;
+use ::diagnostics::lifecycle::ComponentLifecycleTimeStats;
+use ::diagnostics::task_metrics::ComponentTreeStats;
+use ::routing::bedrock::structured_dict::ComponentInput;
+use ::routing::capability_source::{ComponentCapability, InternalCapability};
+use ::routing::component_instance::TopInstanceInterface;
+use ::routing::environment::{DebugRegistry, RunnerRegistry};
+use ::routing::policy::GlobalPolicyChecker;
+use anyhow::{format_err, Context as _, Error};
+use builtins::arguments::Arguments as BootArguments;
+use builtins::cpu_resource::CpuResource;
+use builtins::debug_resource::DebugResource;
+use builtins::debuglog_resource::DebuglogResource;
+use builtins::energy_info_resource::EnergyInfoResource;
+use builtins::factory_items::FactoryItems;
+use builtins::framebuffer_resource::FramebufferResource;
+use builtins::hypervisor_resource::HypervisorResource;
+use builtins::info_resource::InfoResource;
+use builtins::iommu_resource::IommuResource;
+use builtins::irq_resource::IrqResource;
+use builtins::items::Items;
+use builtins::kernel_stats::KernelStats;
+use builtins::mexec_resource::MexecResource;
+use builtins::mmio_resource::MmioResource;
+use builtins::msi_resource::MsiResource;
+use builtins::power_resource::PowerResource;
+use builtins::profile_resource::ProfileResource;
+use builtins::root_job::RootJob;
+use builtins::vmex_resource::VmexResource;
+use cm_config::{RuntimeConfig, VmexSource};
+use cm_rust::{Availability, RunnerRegistration, UseEventStreamDecl, UseSource};
+use cm_types::Name;
+use elf_runner::crash_info::CrashRecords;
+use elf_runner::process_launcher::ProcessLauncher;
+use elf_runner::vdso_vmo::{get_next_vdso_vmo, get_stable_vdso_vmo, get_vdso_vmo};
+use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, RequestStream, ServerEnd};
+use fidl_fuchsia_component_internal::BuiltinBootResolver;
+use fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask;
+use fuchsia_component::server::*;
+use fuchsia_inspect::health::Reporter;
+use fuchsia_inspect::stats::InspectorExt;
+use fuchsia_inspect::{component, Inspector};
+use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
+use fuchsia_zbi::{ZbiParser, ZbiType};
+use fuchsia_zircon::{self as zx, Clock, Resource};
+use futures::future::BoxFuture;
+use futures::{FutureExt, StreamExt};
+use hooks::EventType;
+use moniker::Moniker;
+use std::sync::Arc;
+use tracing::{info, warn};
+use vfs::directory::entry::OpenRequest;
+use vfs::path::Path;
+use vfs::ToObjectRequest;
 use {
-    crate::{
-        bootfs::BootfsSvc,
-        builtin::{
-            builtin_resolver::{BuiltinResolver, SCHEME as BUILTIN_SCHEME},
-            crash_introspect::CrashIntrospectSvc,
-            fuchsia_boot_resolver::{FuchsiaBootResolverBuiltinCapability, SCHEME as BOOT_SCHEME},
-            log::{ReadOnlyLog, WriteOnlyLog},
-            realm_builder::{
-                RealmBuilderResolver, RealmBuilderRunnerFactory,
-                RUNNER_NAME as REALM_BUILDER_RUNNER_NAME, SCHEME as REALM_BUILDER_SCHEME,
-            },
-            runner::{BuiltinRunner, BuiltinRunnerFactory},
-            svc_stash_provider::SvcStashCapability,
-            system_controller::SystemController,
-            time::{create_utc_clock, UtcTimeMaintainer},
-        },
-        capability::{BuiltinCapability, CapabilitySource, FrameworkCapability},
-        framework::{
-            binder::BinderFrameworkCapability,
-            factory::{FactoryCapabilityHost, FactoryFrameworkCapability},
-            introspector::IntrospectorFrameworkCapability,
-            lifecycle_controller::{LifecycleController, LifecycleControllerFrameworkCapability},
-            namespace::NamespaceFrameworkCapability,
-            pkg_dir::PkgDirectoryFrameworkCapability,
-            realm::RealmFrameworkCapability,
-            realm_query::{RealmQuery, RealmQueryFrameworkCapability},
-            route_validator::RouteValidatorFrameworkCapability,
-        },
-        inspect_sink_provider::InspectSinkProvider,
-        model::events::registry::EventSubscription,
-        model::{
-            component::manager::ComponentManagerInstance,
-            component::{WeakComponentInstance, WeakExtendedInstance},
-            environment::Environment,
-            event_logger::EventLogger,
-            events::{
-                registry::EventRegistry,
-                serve::serve_event_stream,
-                source_factory::{EventSourceFactory, EventSourceFactoryCapability},
-                stream_provider::EventStreamProvider,
-            },
-            model::{Model, ModelParams},
-            resolver::{box_arc_resolver, ResolverRegistry},
-            token::InstanceRegistry,
-        },
-        root_stop_notifier::RootStopNotifier,
-        sandbox_util::LaunchTaskOnReceive,
-    },
-    ::diagnostics::lifecycle::ComponentLifecycleTimeStats,
-    ::diagnostics::task_metrics::ComponentTreeStats,
-    ::routing::{
-        bedrock::structured_dict::ComponentInput,
-        capability_source::{ComponentCapability, InternalCapability},
-        component_instance::TopInstanceInterface,
-        environment::{DebugRegistry, RunnerRegistry},
-        policy::GlobalPolicyChecker,
-    },
-    anyhow::{format_err, Context as _, Error},
-    builtins::{arguments::Arguments as BootArguments, root_job::RootJob},
-    builtins::{
-        cpu_resource::CpuResource, debug_resource::DebugResource,
-        debuglog_resource::DebuglogResource, energy_info_resource::EnergyInfoResource,
-        factory_items::FactoryItems, framebuffer_resource::FramebufferResource,
-        hypervisor_resource::HypervisorResource, info_resource::InfoResource,
-        iommu_resource::IommuResource, irq_resource::IrqResource, items::Items,
-        kernel_stats::KernelStats, mexec_resource::MexecResource, mmio_resource::MmioResource,
-        msi_resource::MsiResource, power_resource::PowerResource,
-        profile_resource::ProfileResource, vmex_resource::VmexResource,
-    },
-    cm_config::{RuntimeConfig, VmexSource},
-    cm_rust::{Availability, RunnerRegistration, UseEventStreamDecl, UseSource},
-    cm_types::Name,
-    elf_runner::{
-        crash_info::CrashRecords,
-        process_launcher::ProcessLauncher,
-        vdso_vmo::{get_next_vdso_vmo, get_stable_vdso_vmo, get_vdso_vmo},
-    },
-    fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, RequestStream, ServerEnd},
-    fidl_fuchsia_boot as fboot,
-    fidl_fuchsia_component_internal::BuiltinBootResolver,
-    fidl_fuchsia_component_resolution as fresolution,
-    fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask,
+    fidl_fuchsia_boot as fboot, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fidl_fuchsia_process as fprocess,
     fidl_fuchsia_sys2 as fsys, fidl_fuchsia_time as ftime, fuchsia_async as fasync,
-    fuchsia_component::server::*,
-    fuchsia_inspect::{component, health::Reporter, stats::InspectorExt, Inspector},
-    fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
-    fuchsia_zbi::{ZbiParser, ZbiType},
-    fuchsia_zircon::{self as zx, Clock, Resource},
-    futures::{future::BoxFuture, FutureExt, StreamExt},
-    hooks::EventType,
-    moniker::Moniker,
-    std::sync::Arc,
-    tracing::{info, warn},
-    vfs::{directory::entry::OpenRequest, path::Path, ToObjectRequest},
 };
 
 #[cfg(test)]
@@ -193,8 +195,7 @@ impl BuiltinEnvironmentBuilder {
     }
 
     pub fn add_builtin_runner(self) -> Result<Self, Error> {
-        use crate::builtin::builtin_runner::BuiltinRunner;
-        use crate::builtin::builtin_runner::ElfRunnerResources;
+        use crate::builtin::builtin_runner::{BuiltinRunner, ElfRunnerResources};
 
         let runtime_config = self
             .runtime_config

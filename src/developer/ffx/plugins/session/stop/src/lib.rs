@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Result},
-    async_trait::async_trait,
-    ffx_session_stop_args::SessionStopCommand,
-    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
-    fidl_fuchsia_session::LifecycleProxy,
-};
+use anyhow::{format_err, Result};
+use async_trait::async_trait;
+use ffx_session_stop_args::SessionStopCommand;
+use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fidl_fuchsia_session::LifecycleProxy;
 
 const STOPPING_SESSION: &str = "Stopping the session\n";
 
@@ -42,7 +40,8 @@ pub async fn stop_impl<W: std::io::Write>(
 
 #[cfg(test)]
 mod test {
-    use {super::*, fidl_fuchsia_session::LifecycleRequest};
+    use super::*;
+    use fidl_fuchsia_session::LifecycleRequest;
 
     #[fuchsia::test]
     async fn test_stop_session() -> Result<()> {

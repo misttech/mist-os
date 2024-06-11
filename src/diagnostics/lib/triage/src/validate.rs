@@ -2,21 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{
-        act::{Action, Actions},
-        config::ParseResult,
-        metrics::{
-            fetch::{Fetcher, KeyValueFetcher, TextFetcher, TrialDataFetcher},
-            metric_value::MetricValue,
-            MetricState,
-        },
-    },
-    anyhow::{bail, format_err, Error},
-    serde::Deserialize,
-    serde_json as json,
-    std::collections::HashMap,
-};
+use super::act::{Action, Actions};
+use super::config::ParseResult;
+use super::metrics::fetch::{Fetcher, KeyValueFetcher, TextFetcher, TrialDataFetcher};
+use super::metrics::metric_value::MetricValue;
+use super::metrics::MetricState;
+use anyhow::{bail, format_err, Error};
+use serde::Deserialize;
+use serde_json as json;
+use std::collections::HashMap;
 
 #[derive(Clone, Deserialize, Debug)]
 pub struct Trial {
@@ -166,14 +160,10 @@ fn check_failure(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::{
-            act::{Alert, Severity},
-            make_metrics,
-            metrics::ValueSource,
-        },
-    };
+    use super::*;
+    use crate::act::{Alert, Severity};
+    use crate::make_metrics;
+    use crate::metrics::ValueSource;
 
     // Correct operation of the klog, syslog, and bootlog fields of TrialDataFetcher are tested
     // in the integration test via log_tests.triage.

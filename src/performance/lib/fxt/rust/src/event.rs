@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    args::{Arg, RawArg, RawArgValue},
-    fxt_builder::FxtBuilder,
-    init::Ticks,
-    session::ResolveCtx,
-    string::{StringRef, STRING_REF_INLINE_BIT},
-    thread::{ProcessKoid, ProcessRef, ThreadKoid, ThreadRef},
-    trace_header, ParseResult, Provider, EVENT_RECORD_TYPE,
-};
+use crate::args::{Arg, RawArg, RawArgValue};
+use crate::fxt_builder::FxtBuilder;
+use crate::init::Ticks;
+use crate::session::ResolveCtx;
+use crate::string::{StringRef, STRING_REF_INLINE_BIT};
+use crate::thread::{ProcessKoid, ProcessRef, ThreadKoid, ThreadRef};
+use crate::{trace_header, ParseResult, Provider, EVENT_RECORD_TYPE};
 use flyweights::FlyStr;
 use nom::number::complete::le_u64;
 

@@ -2,23 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    device::DeviceMode,
-    fs::sysfs::SysfsDirectory,
-    task::CurrentTask,
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_seekable, fs_node_impl_not_dir, FileObject, FileOps, FsNode, FsNodeOps, FsStr,
-        FsString, PathBuilder,
-    },
+use crate::device::DeviceMode;
+use crate::fs::sysfs::SysfsDirectory;
+use crate::task::CurrentTask;
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::{
+    fileops_impl_seekable, fs_node_impl_not_dir, FileObject, FileOps, FsNode, FsNodeOps, FsStr,
+    FsString, PathBuilder,
 };
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
-use starnix_uapi::{device_type::DeviceType, error, errors::Errno, open_flags::OpenFlags};
-use std::{
-    collections::BTreeMap,
-    sync::{Arc, Weak},
-};
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::error;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use std::collections::BTreeMap;
+use std::sync::{Arc, Weak};
 
 /// A kobject is the fundamental unit of the sysfs /devices subsystem. Each kobject represents a
 /// sysfs object.

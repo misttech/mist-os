@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::TestEnv, fidl_fuchsia_power_clientlevel as fpowerclient,
-    fidl_fuchsia_power_systemmode as fpowermode,
-};
+use crate::TestEnv;
+use {fidl_fuchsia_power_clientlevel as fpowerclient, fidl_fuchsia_power_systemmode as fpowermode};
 
 /// Convenience type for interacting with the Power Manager's client power level service.
 pub struct PowerLevelClient {

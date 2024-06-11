@@ -1,30 +1,25 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::{
-        directory::FatDirectory,
-        node::{Closer, FatNode, Node},
-        types::Disk,
-        FatFs,
-    },
-    anyhow::Error,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon::Status,
-    futures::{future::BoxFuture, prelude::*},
-    scopeguard::defer,
-    std::{any::Any, io::Cursor, sync::Arc},
-    vfs::{
-        directory::{
-            dirents_sink::{AppendResult, Sealed, Sink},
-            entry::EntryInfo,
-            entry_container::Directory,
-            traversal_position::TraversalPosition,
-        },
-        file::{File, FileIo},
-        node::Node as _,
-    },
-};
+use crate::directory::FatDirectory;
+use crate::node::{Closer, FatNode, Node};
+use crate::types::Disk;
+use crate::FatFs;
+use anyhow::Error;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon::Status;
+use futures::future::BoxFuture;
+use futures::prelude::*;
+use scopeguard::defer;
+use std::any::Any;
+use std::io::Cursor;
+use std::sync::Arc;
+use vfs::directory::dirents_sink::{AppendResult, Sealed, Sink};
+use vfs::directory::entry::EntryInfo;
+use vfs::directory::entry_container::Directory;
+use vfs::directory::traversal_position::TraversalPosition;
+use vfs::file::{File, FileIo};
+use vfs::node::Node as _;
 
 impl Disk for std::io::Cursor<Box<[u8]>> {
     fn is_present(&self) -> bool {

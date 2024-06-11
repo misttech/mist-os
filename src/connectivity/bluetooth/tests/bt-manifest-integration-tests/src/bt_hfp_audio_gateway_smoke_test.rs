@@ -2,24 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileRequest},
-    fidl_fuchsia_bluetooth_hfp::{HfpMarker, HfpProxy},
-    fidl_fuchsia_bluetooth_hfp_test::{HfpTestMarker, HfpTestProxy},
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_media::{AudioDeviceEnumeratorMarker, AudioDeviceEnumeratorRequestStream},
-    fidl_fuchsia_power_battery::{BatteryManagerMarker, BatteryManagerRequestStream},
-    fuchsia_audio_dai::test::mock_dai_dev_with_io_devices,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
-    },
-    futures::{channel::mpsc, SinkExt, StreamExt},
-    realmbuilder_mock_helpers::{add_fidl_service_handler, mock_component, mock_dev},
-    std::collections::HashSet,
-    tracing::info,
+use anyhow::Error;
+use fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileRequest};
+use fidl_fuchsia_bluetooth_hfp::{HfpMarker, HfpProxy};
+use fidl_fuchsia_bluetooth_hfp_test::{HfpTestMarker, HfpTestProxy};
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_media::{AudioDeviceEnumeratorMarker, AudioDeviceEnumeratorRequestStream};
+use fidl_fuchsia_power_battery::{BatteryManagerMarker, BatteryManagerRequestStream};
+use fuchsia_audio_dai::test::mock_dai_dev_with_io_devices;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
 };
+use futures::channel::mpsc;
+use futures::{SinkExt, StreamExt};
+use realmbuilder_mock_helpers::{add_fidl_service_handler, mock_component, mock_dev};
+use std::collections::HashSet;
+use tracing::info;
 
 /// HFP Audio Gateway component URL.
 const HFP_AG_URL: &str =

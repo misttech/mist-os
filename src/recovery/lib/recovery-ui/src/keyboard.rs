@@ -12,25 +12,22 @@ use crate::keys::{get_accent, Accent, Key, SpecialKey, KEYBOARD};
 use crate::proxy_view_assistant::ProxyMessages;
 use crate::text_field::{SceneBuilderTextFieldExt, TextField, TextFieldOptions, TextVisibility};
 use anyhow::Error;
+use carnelian::color::Color;
+use carnelian::drawing::{measure_text_width, FontFace};
+use carnelian::input::{self};
+use carnelian::render::Context as RenderContext;
+use carnelian::scene::facets::{
+    FacetId, SetColorMessage, SetTextMessage, TextFacetOptions, TextHorizontalAlignment,
+    TextVerticalAlignment,
+};
+use carnelian::scene::layout::{
+    Alignment, CrossAxisAlignment, Flex, FlexOptions, MainAxisAlignment, MainAxisSize, Stack,
+    StackOptions,
+};
+use carnelian::scene::scene::{Scene, SceneBuilder};
 use carnelian::{
-    color::Color,
-    drawing::{measure_text_width, FontFace},
-    input::{self},
-    make_message,
-    render::Context as RenderContext,
-    scene::{
-        facets::{
-            FacetId, SetColorMessage, SetTextMessage, TextFacetOptions, TextHorizontalAlignment,
-            TextVerticalAlignment,
-        },
-        layout::{
-            Alignment, CrossAxisAlignment, Flex, FlexOptions, MainAxisAlignment, MainAxisSize,
-            Stack, StackOptions,
-        },
-        scene::{Scene, SceneBuilder},
-    },
-    AppSender, Coord, Message, MessageTarget, Point, Size, ViewAssistant, ViewAssistantContext,
-    ViewKey,
+    make_message, AppSender, Coord, Message, MessageTarget, Point, Size, ViewAssistant,
+    ViewAssistantContext, ViewKey,
 };
 use euclid::{size2, Size2D};
 use fuchsia_zircon::{Duration, Event, Time};

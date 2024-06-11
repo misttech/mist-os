@@ -6,12 +6,10 @@
 //! Allows to insert structured, hierarchical data into a Stash backed
 //! store.
 
-use {
-    anyhow::Error,
-    async_trait::async_trait,
-    std::collections::HashMap,
-    wlan_stash_constants::{NetworkIdentifier, PersistentData},
-};
+use anyhow::Error;
+use async_trait::async_trait;
+use std::collections::HashMap;
+use wlan_stash_constants::{NetworkIdentifier, PersistentData};
 
 pub mod policy;
 mod stash_store;
@@ -40,15 +38,11 @@ trait Store: Send + Sync {
 
 #[cfg(test)]
 mod tests {
-    use {
-        fuchsia_zircon::AsHandleRef,
-        rand::{
-            distributions::{Alphanumeric, DistString as _},
-            thread_rng,
-        },
-        std::sync::atomic::{AtomicU64, Ordering},
-        wlan_stash_constants::{NetworkIdentifier, SecurityType, StashedSsid},
-    };
+    use fuchsia_zircon::AsHandleRef;
+    use rand::distributions::{Alphanumeric, DistString as _};
+    use rand::thread_rng;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use wlan_stash_constants::{NetworkIdentifier, SecurityType, StashedSsid};
 
     pub fn rand_string() -> String {
         Alphanumeric.sample_string(&mut thread_rng(), 20)

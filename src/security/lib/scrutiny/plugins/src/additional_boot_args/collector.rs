@@ -2,22 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::additional_boot_args::collection::{
-        AdditionalBootConfigCollection, AdditionalBootConfigContents, AdditionalBootConfigError,
-        AdditionalBootConfigParseError,
-    },
-    crate::zbi::Zbi,
-    anyhow::{Context, Result},
-    scrutiny::model::{collector::DataCollector, model::DataModel},
-    scrutiny_utils::{bootfs::BootfsReader, zbi::ZbiType},
-    std::{
-        collections::{HashMap, HashSet},
-        path::Path,
-        str::from_utf8,
-        sync::Arc,
-    },
+use crate::additional_boot_args::collection::{
+    AdditionalBootConfigCollection, AdditionalBootConfigContents, AdditionalBootConfigError,
+    AdditionalBootConfigParseError,
 };
+use crate::zbi::Zbi;
+use anyhow::{Context, Result};
+use scrutiny::model::collector::DataCollector;
+use scrutiny::model::model::DataModel;
+use scrutiny_utils::bootfs::BootfsReader;
+use scrutiny_utils::zbi::ZbiType;
+use std::collections::{HashMap, HashSet};
+use std::path::Path;
+use std::str::from_utf8;
+use std::sync::Arc;
 
 // Load the additional boot configuration file by following update package -> zbi -> bootfs -> additional boot config
 // file. The zbi is assumed to be stored at the file path "zbi.signed" or "zbi" in the update
@@ -150,7 +148,8 @@ impl DataCollector for AdditionalBootConfigCollector {
 
 #[cfg(test)]
 mod tests {
-    use {super::parse_additional_boot_args_contents, maplit::hashmap};
+    use super::parse_additional_boot_args_contents;
+    use maplit::hashmap;
 
     #[test]
     fn test_empty() {

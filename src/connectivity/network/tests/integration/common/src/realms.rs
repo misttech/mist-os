@@ -4,35 +4,29 @@
 
 //! Provides utilities for test realms.
 
-use std::{borrow::Cow, collections::HashMap};
+use std::borrow::Cow;
+use std::collections::HashMap;
 
 use fidl::endpoints::DiscoverableProtocolMarker as _;
-use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_net_debug as fnet_debug;
-use fidl_fuchsia_net_dhcp as fnet_dhcp;
-use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
-use fidl_fuchsia_net_filter as fnet_filter;
-use fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_masquerade as fnet_masquerade;
-use fidl_fuchsia_net_multicast_admin as fnet_multicast_admin;
-use fidl_fuchsia_net_name as fnet_name;
-use fidl_fuchsia_net_neighbor as fnet_neighbor;
-use fidl_fuchsia_net_reachability as fnet_reachability;
-use fidl_fuchsia_net_root as fnet_root;
-use fidl_fuchsia_net_routes as fnet_routes;
-use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
-use fidl_fuchsia_net_stack as fnet_stack;
-use fidl_fuchsia_net_test_realm as fntr;
-use fidl_fuchsia_net_virtualization as fnet_virtualization;
-use fidl_fuchsia_netemul as fnetemul;
-use fidl_fuchsia_posix_socket as fposix_socket;
-use fidl_fuchsia_posix_socket_packet as fposix_socket_packet;
-use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
-use fidl_fuchsia_stash as fstash;
-use fidl_fuchsia_update_verify as fupdate_verify;
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_net_debug as fnet_debug,
+    fidl_fuchsia_net_dhcp as fnet_dhcp, fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6,
+    fidl_fuchsia_net_filter as fnet_filter,
+    fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
+    fidl_fuchsia_net_masquerade as fnet_masquerade,
+    fidl_fuchsia_net_multicast_admin as fnet_multicast_admin, fidl_fuchsia_net_name as fnet_name,
+    fidl_fuchsia_net_neighbor as fnet_neighbor, fidl_fuchsia_net_reachability as fnet_reachability,
+    fidl_fuchsia_net_root as fnet_root, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin, fidl_fuchsia_net_stack as fnet_stack,
+    fidl_fuchsia_net_test_realm as fntr, fidl_fuchsia_net_virtualization as fnet_virtualization,
+    fidl_fuchsia_netemul as fnetemul, fidl_fuchsia_posix_socket as fposix_socket,
+    fidl_fuchsia_posix_socket_packet as fposix_socket_packet,
+    fidl_fuchsia_posix_socket_raw as fposix_socket_raw, fidl_fuchsia_stash as fstash,
+    fidl_fuchsia_update_verify as fupdate_verify,
+};
 
 use anyhow::Context as _;
 use async_trait::async_trait;

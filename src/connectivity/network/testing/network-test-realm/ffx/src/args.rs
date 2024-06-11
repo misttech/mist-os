@@ -5,8 +5,7 @@
 // TODO(https://fxbug.dev/42156465): Replace with GN config once available in an ffx_plugin.
 #![deny(unused_results)]
 
-use fidl_fuchsia_net_ext as fnet_ext;
-use fidl_fuchsia_net_test_realm as fntr;
+use {fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_test_realm as fntr};
 
 #[ffx_core::ffx_command]
 #[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]

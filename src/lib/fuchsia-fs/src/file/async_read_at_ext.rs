@@ -2,16 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::file::AsyncReadAt,
-    futures::{future::Future, ready},
-    std::{
-        convert::{TryFrom as _, TryInto as _},
-        io,
-        pin::Pin,
-        task::{Context, Poll},
-    },
-};
+use crate::file::AsyncReadAt;
+use futures::future::Future;
+use futures::ready;
+use std::convert::{TryFrom as _, TryInto as _};
+use std::io;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// An extension trait which adds utility methods to AsyncReadAt.
 pub trait AsyncReadAtExt: AsyncReadAt {
@@ -153,17 +150,13 @@ impl Drop for Guard<'_> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::file::{self, AsyncFile},
-        fidl::endpoints,
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        futures::{
-            future::{self},
-            StreamExt as _,
-        },
-        tempfile::TempDir,
-    };
+    use super::*;
+    use crate::file::{self, AsyncFile};
+    use fidl::endpoints;
+    use futures::future::{self};
+    use futures::StreamExt as _;
+    use tempfile::TempDir;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     async fn read_to_end_file_with_expected_contents(expected_contents: &[u8]) {
         let dir = TempDir::new().unwrap();

@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_zircon::{self as zx, prelude::DurationNum},
-    ieee80211::MacAddr,
-    wlan_common::timer::TimeoutDuration,
-};
+use fuchsia_zircon::prelude::DurationNum;
+use fuchsia_zircon::{self as zx};
+use ieee80211::MacAddr;
+use wlan_common::timer::TimeoutDuration;
 
 // https://fxbug.dev/42131271 exposed the issue that longer timeout is needed for starting AP while the
 // client iface is scanning, this is not a magic number, but a number we chose after

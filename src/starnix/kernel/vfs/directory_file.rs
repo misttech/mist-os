@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::CurrentTask,
-    vfs::{
-        default_seek, fileops_impl_directory, DirectoryEntryType, DirentSink, FileObject, FileOps,
-        FsString, SeekTarget,
-    },
+use crate::task::CurrentTask;
+use crate::vfs::{
+    default_seek, fileops_impl_directory, DirectoryEntryType, DirentSink, FileObject, FileOps,
+    FsString, SeekTarget,
 };
 use starnix_sync::{FileOpsCore, Locked, Mutex};
-use starnix_uapi::{error, errors::Errno, off_t};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::{error, off_t};
 use std::ops::Bound;
 
 pub struct MemoryDirectoryFile {

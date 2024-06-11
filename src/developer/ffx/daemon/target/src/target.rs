@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    overnet::host_pipe::{spawn, LogBuffer},
-    FASTBOOT_MAX_AGE, MDNS_MAX_AGE, ZEDBOOT_MAX_AGE,
-};
+use crate::overnet::host_pipe::{spawn, LogBuffer};
+use crate::{FASTBOOT_MAX_AGE, MDNS_MAX_AGE, ZEDBOOT_MAX_AGE};
 use addr::TargetAddr;
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
@@ -27,28 +25,24 @@ use fuchsia_async::Task;
 use netext::IsLocalAddr;
 use rand::random;
 use rcs::{knock_rcs, RcsConnection};
-use std::{
-    cell::{Cell, RefCell},
-    cmp::Ordering,
-    collections::{BTreeSet, HashSet},
-    default::Default,
-    fmt,
-    fmt::Debug,
-    hash::{Hash, Hasher},
-    net::{IpAddr, SocketAddr},
-    rc::{Rc, Weak},
-    sync::Arc,
-    time::{Duration, Instant, SystemTime},
-};
+use std::cell::{Cell, RefCell};
+use std::cmp::Ordering;
+use std::collections::{BTreeSet, HashSet};
+use std::default::Default;
+use std::fmt;
+use std::fmt::Debug;
+use std::hash::{Hash, Hasher};
+use std::net::{IpAddr, SocketAddr};
+use std::rc::{Rc, Weak};
+use std::sync::Arc;
+use std::time::{Duration, Instant, SystemTime};
 use usb_bulk::AsyncInterface as Interface;
 use usb_fastboot_discovery::open_interface_with_serial;
 
 mod identity;
 mod update;
-pub use self::{
-    identity::{Identity, IdentityCmp},
-    update::{TargetUpdate, TargetUpdateBuilder},
-};
+pub use self::identity::{Identity, IdentityCmp};
+pub use self::update::{TargetUpdate, TargetUpdateBuilder};
 
 const DEFAULT_SSH_PORT: u16 = 22;
 const CONFIG_HOST_PIPE_SSH_TIMEOUT: &str = "daemon.host_pipe_ssh_timeout";
@@ -1569,11 +1563,10 @@ mod test {
     use fidl_fuchsia_net::Subnet;
     use fidl_fuchsia_overnet_protocol::NodeId;
     use fuchsia_async::Timer;
-    use futures::{channel, prelude::*};
-    use std::{
-        borrow::Borrow,
-        net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
-    };
+    use futures::channel;
+    use futures::prelude::*;
+    use std::borrow::Borrow;
+    use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
     const DEFAULT_PRODUCT_CONFIG: &str = "core";
     const DEFAULT_BOARD_CONFIG: &str = "x64";

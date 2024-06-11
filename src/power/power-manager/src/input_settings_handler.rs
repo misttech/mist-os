@@ -2,24 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::log_if_err,
-    crate::message::Message,
-    crate::node::Node,
-    anyhow::{format_err, Context, Result},
-    async_trait::async_trait,
-    async_utils::hanging_get::client::HangingGetStream,
-    fidl_fuchsia_settings as fsettings,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_inspect::{self as inspect, Property},
-    futures::future::{FutureExt as _, LocalBoxFuture},
-    futures::stream::FuturesUnordered,
-    futures::StreamExt as _,
-    serde_derive::Deserialize,
-    serde_json as json,
-    std::collections::HashMap,
-    std::rc::Rc,
-};
+use crate::log_if_err;
+use crate::message::Message;
+use crate::node::Node;
+use anyhow::{format_err, Context, Result};
+use async_trait::async_trait;
+use async_utils::hanging_get::client::HangingGetStream;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_inspect::{self as inspect, Property};
+use futures::future::{FutureExt as _, LocalBoxFuture};
+use futures::stream::FuturesUnordered;
+use futures::StreamExt as _;
+use serde_derive::Deserialize;
+use std::collections::HashMap;
+use std::rc::Rc;
+use {fidl_fuchsia_settings as fsettings, serde_json as json};
 
 /// Node: InputSettingsHandler
 ///
@@ -231,13 +228,11 @@ impl InspectData {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::test::mock_node::{create_dummy_node, MessageMatcher, MockNodeMaker},
-        crate::{msg_eq, msg_ok_return},
-        diagnostics_assertions::assert_data_tree,
-        fuchsia_async as fasync,
-    };
+    use super::*;
+    use crate::test::mock_node::{create_dummy_node, MessageMatcher, MockNodeMaker};
+    use crate::{msg_eq, msg_ok_return};
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_async as fasync;
 
     // A fake Settings service implementation for testing
     struct FakeSettingsSvc {

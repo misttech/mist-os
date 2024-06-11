@@ -2,24 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::shell::Shell,
-    anyhow::Result,
-    scrutiny::{
-        engine::{
-            dispatcher::ControllerDispatcher, manager::PluginManager, plugin::Plugin,
-            scheduler::CollectorScheduler,
-        },
-        model::model::DataModel,
-    },
-    scrutiny_config::{Config, LoggingVerbosity},
-    simplelog::{Config as SimpleLogConfig, LevelFilter, WriteLogger},
-    std::{
-        fs::File,
-        io::{BufRead, BufReader},
-        sync::{Arc, Mutex, RwLock},
-    },
-};
+use crate::shell::Shell;
+use anyhow::Result;
+use scrutiny::engine::dispatcher::ControllerDispatcher;
+use scrutiny::engine::manager::PluginManager;
+use scrutiny::engine::plugin::Plugin;
+use scrutiny::engine::scheduler::CollectorScheduler;
+use scrutiny::model::model::DataModel;
+use scrutiny_config::{Config, LoggingVerbosity};
+use simplelog::{Config as SimpleLogConfig, LevelFilter, WriteLogger};
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::sync::{Arc, Mutex, RwLock};
 
 /// Holds a reference to core objects required by the application to run.
 pub struct Scrutiny {

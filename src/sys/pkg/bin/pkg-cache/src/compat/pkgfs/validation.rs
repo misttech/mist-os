@@ -2,24 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_trait::async_trait,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    std::{collections::HashSet, sync::Arc},
-    tracing::{error, info},
-    vfs::{
-        directory::{
-            entry::{EntryInfo, OpenRequest},
-            immutable::connection::ImmutableConnection,
-            traversal_position::TraversalPosition,
-        },
-        execution_scope::ExecutionScope,
-        immutable_attributes,
-        path::Path as VfsPath,
-        ObjectRequestRef, ToObjectRequest,
-    },
-};
+use async_trait::async_trait;
+use fidl::endpoints::ServerEnd;
+use std::collections::HashSet;
+use std::sync::Arc;
+use tracing::{error, info};
+use vfs::directory::entry::{EntryInfo, OpenRequest};
+use vfs::directory::immutable::connection::ImmutableConnection;
+use vfs::directory::traversal_position::TraversalPosition;
+use vfs::execution_scope::ExecutionScope;
+use vfs::path::Path as VfsPath;
+use vfs::{immutable_attributes, ObjectRequestRef, ToObjectRequest};
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 #[cfg(feature = "supports_open2")]
 use vfs::ProtocolsExt as _;
@@ -248,17 +242,14 @@ impl vfs::directory::entry_container::Directory for Validation {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        blobfs_ramdisk::BlobfsRamdisk,
-        futures::prelude::*,
-        std::convert::TryInto as _,
-        vfs::{
-            directory::{entry::DirectoryEntry, entry_container::Directory},
-            node::Node,
-        },
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use blobfs_ramdisk::BlobfsRamdisk;
+    use futures::prelude::*;
+    use std::convert::TryInto as _;
+    use vfs::directory::entry::DirectoryEntry;
+    use vfs::directory::entry_container::Directory;
+    use vfs::node::Node;
 
     struct TestEnv {
         _blobfs: BlobfsRamdisk,

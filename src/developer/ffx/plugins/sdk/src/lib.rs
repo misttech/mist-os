@@ -11,7 +11,8 @@ use fho::{
     VerifiedMachineWriter,
 };
 use schemars::JsonSchema;
-use sdk::{in_tree_sdk_version, metadata::ElementType, Sdk, SdkRoot, SdkVersion};
+use sdk::metadata::ElementType;
+use sdk::{in_tree_sdk_version, Sdk, SdkRoot, SdkVersion};
 use serde::Serialize;
 use std::io::{ErrorKind, Write};
 

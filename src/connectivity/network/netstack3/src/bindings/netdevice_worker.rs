@@ -2,38 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    collections::HashMap,
-    convert::{TryFrom as _, TryInto as _},
-    sync::Arc,
-};
+use std::collections::HashMap;
+use std::convert::{TryFrom as _, TryInto as _};
+use std::sync::Arc;
 
 use assert_matches::assert_matches;
 use fidl_fuchsia_hardware_network::{self as fhardware_network, FrameType};
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
+use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces as fnet_interfaces};
 
-use futures::{lock::Mutex, FutureExt as _, TryStreamExt as _};
+use futures::lock::Mutex;
+use futures::{FutureExt as _, TryStreamExt as _};
 use log::{debug, error, info, warn};
-use net_types::{
-    ethernet::Mac,
-    ip::{Ip, IpVersion, Ipv4, Ipv6, Ipv6Addr, Mtu, Subnet},
-    UnicastAddr,
+use net_types::ethernet::Mac;
+use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6, Ipv6Addr, Mtu, Subnet};
+use net_types::UnicastAddr;
+use netstack3_core::device::{
+    DeviceProvider, EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice,
+    EthernetWeakDeviceId, MaxEthernetFrameSize, PureIpDevice, PureIpDeviceCreationProperties,
+    PureIpDeviceId, PureIpDeviceReceiveFrameMetadata, PureIpWeakDeviceId, RecvEthernetFrameMeta,
 };
-use netstack3_core::{
-    device::{
-        DeviceProvider, EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice,
-        EthernetWeakDeviceId, MaxEthernetFrameSize, PureIpDevice, PureIpDeviceCreationProperties,
-        PureIpDeviceId, PureIpDeviceReceiveFrameMetadata, PureIpWeakDeviceId,
-        RecvEthernetFrameMeta,
-    },
-    ip::{
-        IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
-        SlaacConfiguration, StableIidSecret, TemporarySlaacAddressConfiguration,
-    },
-    routes::RawMetric,
-    sync::RwLock as CoreRwLock,
+use netstack3_core::ip::{
+    IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+    SlaacConfiguration, StableIidSecret, TemporarySlaacAddressConfiguration,
 };
+use netstack3_core::routes::RawMetric;
+use netstack3_core::sync::RwLock as CoreRwLock;
 
 use crate::bindings::{
     devices, interfaces_admin, routes, trace_duration, BindingId, BindingsCtx, Ctx, DeviceId,

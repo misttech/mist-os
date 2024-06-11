@@ -28,10 +28,9 @@ pub use self::common::*;
 pub use self::icmpv4::*;
 pub use self::icmpv6::*;
 
-use core::cmp;
 use core::fmt::Debug;
 use core::marker::PhantomData;
-use core::mem;
+use core::{cmp, mem};
 
 use byteorder::{ByteOrder, NetworkEndian};
 use derivative::Derivative;

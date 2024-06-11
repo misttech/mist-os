@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        boringssl::{self, Bignum, BignumCtx, EcGroup, EcGroupId, EcGroupParams, EcPoint},
-        internal::FiniteCyclicGroup,
-        internal::SaeParameters,
-        PweMethod,
-    },
-    anyhow::{bail, Error},
-    ieee80211::MacAddr,
-    num::{integer::Integer, ToPrimitive},
-    tracing::warn,
-};
+use crate::boringssl::{self, Bignum, BignumCtx, EcGroup, EcGroupId, EcGroupParams, EcPoint};
+use crate::internal::{FiniteCyclicGroup, SaeParameters};
+use crate::PweMethod;
+use anyhow::{bail, Error};
+use ieee80211::MacAddr;
+use num::integer::Integer;
+use num::ToPrimitive;
+use tracing::warn;
 
 /// An elliptic curve group to be used as the finite cyclic group for SAE.
 pub struct Group {
@@ -389,14 +385,12 @@ impl FiniteCyclicGroup for Group {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::hmac_utils::HmacUtilsImpl,
-        ieee80211::{MacAddr, Ssid},
-        lazy_static::lazy_static,
-        mundane::hash::Sha256,
-        std::convert::TryFrom,
-    };
+    use super::*;
+    use crate::hmac_utils::HmacUtilsImpl;
+    use ieee80211::{MacAddr, Ssid};
+    use lazy_static::lazy_static;
+    use mundane::hash::Sha256;
+    use std::convert::TryFrom;
 
     #[derive(Debug)]
     struct SswuTestVector {

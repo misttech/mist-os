@@ -10,17 +10,14 @@ pub mod event_producers;
 mod watcher;
 pub use watcher::Controller;
 
-use crate::{
-    directory::{
-        entry_container::{Directory, DirectoryWatcher},
-        watchers::event_producers::EventProducer,
-    },
-    execution_scope::ExecutionScope,
-};
+use crate::directory::entry_container::{Directory, DirectoryWatcher};
+use crate::directory::watchers::event_producers::EventProducer;
+use crate::execution_scope::ExecutionScope;
 
 use fidl_fuchsia_io as fio;
 
-use {slab::Slab, std::sync::Arc};
+use slab::Slab;
+use std::sync::Arc;
 
 /// Wraps all watcher connections observing one directory.  The directory is responsible for
 /// calling [`Self::add()`] and [`Self::send_event()`] method when appropriate to make sure

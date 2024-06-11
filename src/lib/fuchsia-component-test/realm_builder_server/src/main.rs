@@ -2,36 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Context;
+use cm_rust::{FidlIntoNative, NativeIntoFidl, OfferDeclCommon};
+use cm_types::{LongName, RelativePath};
+use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy, ServerEnd};
+use fidl_fuchsia_inspect::InspectSinkMarker;
+use fidl_fuchsia_logger::LogSinkMarker;
+use flyweights::FlyStr;
+use fuchsia_component::server as fserver;
+use futures::future::BoxFuture;
+use futures::lock::Mutex;
+use futures::{join, FutureExt, StreamExt, TryStreamExt};
+use lazy_static::lazy_static;
+use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
+use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use thiserror::Error;
+use tracing::*;
+use url::Url;
+use vfs::execution_scope::ExecutionScope;
 use {
-    anyhow::Context,
-    cm_rust::{FidlIntoNative, NativeIntoFidl, OfferDeclCommon},
-    cm_types::{LongName, RelativePath},
-    fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fcdecl,
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_test as ftest,
-    fidl_fuchsia_data as fdata,
-    fidl_fuchsia_inspect::InspectSinkMarker,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_logger::LogSinkMarker,
-    flyweights::FlyStr,
-    fuchsia_async as fasync,
-    fuchsia_component::server as fserver,
+    fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon_status as zx_status,
-    futures::{future::BoxFuture, join, lock::Mutex, FutureExt, StreamExt, TryStreamExt},
-    lazy_static::lazy_static,
-    std::{
-        collections::HashMap,
-        ops::{Deref, DerefMut},
-        str::FromStr,
-        sync::{
-            atomic::{AtomicBool, Ordering},
-            Arc,
-        },
-    },
-    thiserror::Error,
-    tracing::*,
-    url::Url,
-    vfs::execution_scope::ExecutionScope,
 };
 
 mod builtin;
@@ -2172,19 +2168,18 @@ fn to_tabulated_string(errors: cm_fidl_validator::error::ErrorList) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use assert_matches::assert_matches;
+    use cm_rust_testing::*;
+    use difference::Changeset;
+    use fidl::endpoints::{
+        create_endpoints, create_proxy, create_proxy_and_stream, create_request_stream, ClientEnd,
+    };
+    use std::time::Duration;
+    use test_case::test_case;
     use {
-        super::*,
-        assert_matches::assert_matches,
-        cm_rust_testing::*,
-        difference::Changeset,
-        fidl::endpoints::{
-            create_endpoints, create_proxy, create_proxy_and_stream, create_request_stream,
-            ClientEnd,
-        },
         fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
         fuchsia_zircon as zx,
-        std::time::Duration,
-        test_case::test_case,
     };
 
     /// Assert that two ComponentTrees are equivalent.

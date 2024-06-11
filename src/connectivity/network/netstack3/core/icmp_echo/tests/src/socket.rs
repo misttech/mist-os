@@ -7,20 +7,17 @@ use core::num::NonZeroU16;
 
 use assert_matches::assert_matches;
 use ip_test_macro::ip_test;
-use net_types::{
-    ip::{Ip, Ipv4, Ipv6},
-    ZonedAddr,
-};
-use packet::Buf;
-use packet::Serializer;
+use net_types::ip::{Ip, Ipv4, Ipv6};
+use net_types::ZonedAddr;
+use packet::{Buf, Serializer};
 use packet_formats::icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode};
 use test_case::test_case;
 
 use netstack3_base::testutil::{set_logger_for_test, TestIpExt};
-use netstack3_core::{
-    testutil::{new_simple_fake_network, CtxPairExt as _, FakeBindingsCtx, FakeCtxBuilder},
-    IpExt,
+use netstack3_core::testutil::{
+    new_simple_fake_network, CtxPairExt as _, FakeBindingsCtx, FakeCtxBuilder,
 };
+use netstack3_core::IpExt;
 
 const REMOTE_ID: u16 = 1;
 

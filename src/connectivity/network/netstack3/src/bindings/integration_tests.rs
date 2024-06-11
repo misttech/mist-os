@@ -2,42 +2,34 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    collections::HashMap,
-    pin::pin,
-    sync::{Arc, Once},
-};
+use std::collections::HashMap;
+use std::pin::pin;
+use std::sync::{Arc, Once};
 
 use assert_matches::assert_matches;
-use fidl_fuchsia_net as fidl_net;
 use fidl_fuchsia_net_ext::IntoExt as _;
-use fidl_fuchsia_net_neighbor as fnet_neighbor;
-use fidl_fuchsia_net_stack as fidl_net_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
-use fidl_fuchsia_netemul_network as net;
-use fuchsia_async as fasync;
-use futures::{channel::mpsc, StreamExt as _, TryFutureExt as _};
+use futures::channel::mpsc;
+use futures::{StreamExt as _, TryFutureExt as _};
 use net_declare::{net_ip_v4, net_ip_v6, net_mac, net_subnet_v4, net_subnet_v6};
-use net_types::{
-    ethernet::Mac,
-    ip::{AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv6},
-    SpecifiedAddr, Witness as _,
-};
-use netstack3_core::{
-    device::{DeviceId, EthernetLinkDevice},
-    error::AddressResolutionFailed,
-    ip::{Ipv6DeviceConfigurationUpdate, StableIidSecret},
-    neighbor::LinkResolutionResult,
-    routes::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric},
+use net_types::ethernet::Mac;
+use net_types::ip::{AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv6};
+use net_types::{SpecifiedAddr, Witness as _};
+use netstack3_core::device::{DeviceId, EthernetLinkDevice};
+use netstack3_core::error::AddressResolutionFailed;
+use netstack3_core::ip::{Ipv6DeviceConfigurationUpdate, StableIidSecret};
+use netstack3_core::neighbor::LinkResolutionResult;
+use netstack3_core::routes::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric};
+use {
+    fidl_fuchsia_net as fidl_net, fidl_fuchsia_net_neighbor as fnet_neighbor,
+    fidl_fuchsia_net_stack as fidl_net_stack, fidl_fuchsia_netemul_network as net,
+    fuchsia_async as fasync,
 };
 
-use crate::bindings::{
-    ctx::BindingsCtx,
-    devices::{BindingId, Devices},
-    routes,
-    util::{ConversionContext as _, IntoFidl as _, TryIntoFidlWithContext as _},
-    Ctx, InspectPublisher, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
-};
+use crate::bindings::ctx::BindingsCtx;
+use crate::bindings::devices::{BindingId, Devices};
+use crate::bindings::util::{ConversionContext as _, IntoFidl as _, TryIntoFidlWithContext as _};
+use crate::bindings::{routes, Ctx, InspectPublisher, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME};
 
 /// Install a logger for tests.
 pub(crate) fn set_logger_for_test() {

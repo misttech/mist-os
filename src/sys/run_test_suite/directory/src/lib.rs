@@ -6,18 +6,14 @@ mod macros;
 pub mod testing;
 mod v1;
 
-use {
-    serde::{Deserialize, Serialize},
-    std::collections::hash_map::Iter,
-    std::{
-        borrow::Cow,
-        collections::HashMap,
-        fs::{DirBuilder, File},
-        io::Error,
-        path::{Path, PathBuf},
-    },
-    test_list::TestTag,
-};
+use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
+use std::collections::hash_map::Iter;
+use std::collections::HashMap;
+use std::fs::{DirBuilder, File};
+use std::io::Error;
+use std::path::{Path, PathBuf};
+use test_list::TestTag;
 
 /// Filename of the top level summary json.
 pub const RUN_SUMMARY_NAME: &str = "run_summary.json";

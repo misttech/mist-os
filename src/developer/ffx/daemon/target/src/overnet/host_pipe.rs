@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{target::Target, RETRY_DELAY};
+use crate::target::Target;
+use crate::RETRY_DELAY;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use compat_info::CompatibilityInfo;
@@ -13,28 +14,21 @@ use ffx_ssh::parse::{
 };
 use ffx_ssh::ssh::{build_ssh_command_with_ssh_path, SshError};
 use fuchsia_async::{unblock, Task, TimeoutExt, Timer};
-use nix::{
-    errno::Errno,
-    sys::{
-        signal::{kill, Signal::SIGKILL},
-        wait::waitpid,
-    },
-    unistd::Pid,
-};
-use std::{
-    cell::RefCell,
-    collections::VecDeque,
-    io,
-    net::SocketAddr,
-    process::Stdio,
-    rc::{Rc, Weak},
-    sync::Arc,
-    time::Duration,
-};
-use tokio::{
-    io::{copy_buf, BufReader},
-    process::Child,
-};
+use nix::errno::Errno;
+use nix::sys::signal::kill;
+use nix::sys::signal::Signal::SIGKILL;
+use nix::sys::wait::waitpid;
+use nix::unistd::Pid;
+use std::cell::RefCell;
+use std::collections::VecDeque;
+use std::io;
+use std::net::SocketAddr;
+use std::process::Stdio;
+use std::rc::{Rc, Weak};
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::io::{copy_buf, BufReader};
+use tokio::process::Child;
 
 const BUFFER_SIZE: usize = 65536;
 
@@ -634,8 +628,9 @@ mod test {
     use ffx_config::ConfigLevel;
     use serde_json::json;
     use std::fs;
+    use std::net::Ipv4Addr;
     use std::os::unix::prelude::PermissionsExt;
-    use std::{net::Ipv4Addr, str::FromStr};
+    use std::str::FromStr;
     use tokio::process::Command;
 
     const ERR_CTX: &'static str = "running fake host-pipe command for test";

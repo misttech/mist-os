@@ -5,17 +5,15 @@
 //! The `pull_source` library defines an implementation of the `PullSource` API and traits to hook
 //! in an algorithm that produces time updates.
 
-use {
-    anyhow::Error,
-    async_trait::async_trait,
-    fidl_fuchsia_time_external::{
-        self as ftexternal, Properties, PullSourceRequest, PullSourceRequestStream, TimeSample,
-        Urgency,
-    },
-    fuchsia_zircon as zx,
-    futures::{lock::Mutex, TryStreamExt},
-    tracing::warn,
+use anyhow::Error;
+use async_trait::async_trait;
+use fidl_fuchsia_time_external::{
+    self as ftexternal, Properties, PullSourceRequest, PullSourceRequestStream, TimeSample, Urgency,
 };
+use fuchsia_zircon as zx;
+use futures::lock::Mutex;
+use futures::TryStreamExt;
+use tracing::warn;
 
 /// An |UpdateAlgorithm| trait produces time samples on demand.
 #[async_trait]
@@ -162,13 +160,11 @@ impl UpdateAlgorithm for TestUpdateAlgorithm {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_time_external::{PullSourceMarker, PullSourceProxy},
-        fuchsia_async as fasync,
-        std::sync::Arc,
-    };
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_time_external::{PullSourceMarker, PullSourceProxy};
+    use fuchsia_async as fasync;
+    use std::sync::Arc;
 
     struct TestHarness {
         /// The `PullSource` under test.

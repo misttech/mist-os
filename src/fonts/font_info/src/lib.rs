@@ -5,22 +5,21 @@
 mod sources;
 mod vmo_stream;
 
-use {
-    anyhow::{format_err, Error},
-    byteorder::{BigEndian, ReadBytesExt},
-    char_set::CharSet,
-    freetype_ffi::{
-        FT_Add_Default_Modules, FT_Done_Face, FT_Done_Library, FT_Err_Ok, FT_Face,
-        FT_Get_First_Char, FT_Get_Next_Char, FT_Get_Postscript_Name, FT_Get_Sfnt_Name,
-        FT_Get_Sfnt_Name_Count, FT_Library, FT_New_Library, FT_Open_Face, FT_SfntName, FT_MEMORY,
-        TT_MS_ID_SYMBOL_CS, TT_MS_ID_UNICODE_CS, TT_MS_LANGID_ENGLISH_UNITED_STATES,
-        TT_NAME_ID_FULL_NAME, TT_PLATFORM_MICROSOFT,
-    },
-    std::{ffi::CStr, io::Cursor, ops::Range, ptr},
+use anyhow::{format_err, Error};
+use byteorder::{BigEndian, ReadBytesExt};
+use char_set::CharSet;
+use freetype_ffi::{
+    FT_Add_Default_Modules, FT_Done_Face, FT_Done_Library, FT_Err_Ok, FT_Face, FT_Get_First_Char,
+    FT_Get_Next_Char, FT_Get_Postscript_Name, FT_Get_Sfnt_Name, FT_Get_Sfnt_Name_Count, FT_Library,
+    FT_New_Library, FT_Open_Face, FT_SfntName, FT_MEMORY, TT_MS_ID_SYMBOL_CS, TT_MS_ID_UNICODE_CS,
+    TT_MS_LANGID_ENGLISH_UNITED_STATES, TT_NAME_ID_FULL_NAME, TT_PLATFORM_MICROSOFT,
 };
+use std::ffi::CStr;
+use std::io::Cursor;
+use std::ops::Range;
+use std::ptr;
 
-pub use crate::sources::FTOpenArgs;
-pub use crate::sources::FontAssetSource;
+pub use crate::sources::{FTOpenArgs, FontAssetSource};
 
 /// Contains information parsed from a font file.
 #[derive(Default, Clone, Debug, Eq, PartialEq)]

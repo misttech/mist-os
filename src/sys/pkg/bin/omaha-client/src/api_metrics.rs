@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use cobalt_sw_delivery_registry as registry;
-use fidl_contrib::{protocol_connector::ProtocolSender, ProtocolConnector};
+use fidl_contrib::protocol_connector::ProtocolSender;
+use fidl_contrib::ProtocolConnector;
 use fidl_fuchsia_metrics::MetricEvent;
 use fidl_fuchsia_update::CheckNotStartedReason;
 use fuchsia_cobalt_builders::MetricEventExt as _;

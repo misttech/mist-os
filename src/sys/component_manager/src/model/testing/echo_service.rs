@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    cm_types::Name,
-    fidl_fidl_examples_routing_echo::{EchoRequest, EchoRequestStream},
-    futures::TryStreamExt,
-    lazy_static::lazy_static,
-};
+use cm_types::Name;
+use fidl_fidl_examples_routing_echo::{EchoRequest, EchoRequestStream};
+use futures::TryStreamExt;
+use lazy_static::lazy_static;
 
 lazy_static! {
     pub static ref ECHO_CAPABILITY: Name = "builtin.Echo".parse().unwrap();

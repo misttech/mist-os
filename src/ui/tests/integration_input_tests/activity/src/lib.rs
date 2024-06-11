@@ -2,28 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_utils::hanging_get::client::HangingGetStream,
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_input_interaction::{NotifierMarker, NotifierProxy, State},
-    fidl_fuchsia_input_report::{ConsumerControlButton, KeyboardInputReport},
-    fidl_fuchsia_logger::LogSinkMarker,
-    fidl_fuchsia_math::Vec_,
-    fidl_fuchsia_scheduler::RoleManagerMarker,
-    fidl_fuchsia_tracing_provider::RegistryMarker,
-    fidl_fuchsia_ui_test_input::{
-        KeyboardMarker, KeyboardSimulateKeyEventRequest, MediaButtonsDeviceMarker,
-        MediaButtonsDeviceSimulateButtonPressRequest, MouseMarker, MouseSimulateMouseEventRequest,
-        RegistryMarker as InputRegistryMarker, RegistryRegisterKeyboardRequest,
-        RegistryRegisterMediaButtonsDeviceRequest, RegistryRegisterMouseRequest,
-        RegistryRegisterTouchScreenRequest, TouchScreenMarker, TouchScreenSimulateTapRequest,
-    },
-    fidl_fuchsia_vulkan_loader::LoaderMarker,
-    fuchsia_async::{Time, Timer},
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    fuchsia_zircon::Duration,
-    futures::{future, StreamExt},
+use async_utils::hanging_get::client::HangingGetStream;
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_input_interaction::{NotifierMarker, NotifierProxy, State};
+use fidl_fuchsia_input_report::{ConsumerControlButton, KeyboardInputReport};
+use fidl_fuchsia_logger::LogSinkMarker;
+use fidl_fuchsia_math::Vec_;
+use fidl_fuchsia_scheduler::RoleManagerMarker;
+use fidl_fuchsia_tracing_provider::RegistryMarker;
+use fidl_fuchsia_ui_test_input::{
+    KeyboardMarker, KeyboardSimulateKeyEventRequest, MediaButtonsDeviceMarker,
+    MediaButtonsDeviceSimulateButtonPressRequest, MouseMarker, MouseSimulateMouseEventRequest,
+    RegistryMarker as InputRegistryMarker, RegistryRegisterKeyboardRequest,
+    RegistryRegisterMediaButtonsDeviceRequest, RegistryRegisterMouseRequest,
+    RegistryRegisterTouchScreenRequest, TouchScreenMarker, TouchScreenSimulateTapRequest,
 };
+use fidl_fuchsia_vulkan_loader::LoaderMarker;
+use fuchsia_async::{Time, Timer};
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use fuchsia_zircon::Duration;
+use futures::{future, StreamExt};
 
 const TEST_UI_STACK: &str = "ui";
 const TEST_UI_STACK_URL: &str = "flatland-scene-manager-test-ui-stack#meta/test-ui-stack.cm";

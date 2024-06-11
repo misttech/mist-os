@@ -2,20 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::{power, startup};
+use anyhow::{anyhow, Context as _, Error};
+use fidl::endpoints::{create_proxy, ClientEnd, ServerEnd};
+use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
+use fuchsia_inspect_contrib::nodes::BoundedListNode;
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use std::sync::{Arc, Mutex};
+use tracing::{error, warn};
+use zx::HandleBased;
 use {
-    crate::{power, startup},
-    anyhow::{anyhow, Context as _, Error},
-    fidl::endpoints::{create_proxy, ClientEnd, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_session as fsession,
-    fidl_fuchsia_session_power as fpower,
-    fuchsia_component::server::{ServiceFs, ServiceObjLocal},
-    fuchsia_inspect_contrib::nodes::BoundedListNode,
-    fuchsia_zircon as zx,
-    futures::{StreamExt, TryFutureExt, TryStreamExt},
-    std::sync::{Arc, Mutex},
-    tracing::{error, warn},
-    zx::HandleBased,
+    fidl_fuchsia_session_power as fpower, fuchsia_zircon as zx,
 };
 
 /// Maximum number of concurrent connections to the protocols served by SessionManager.
@@ -533,19 +532,18 @@ impl SessionManager {
 
 #[cfg(test)]
 mod tests {
+    use super::SessionManager;
+    use anyhow::{anyhow, Error};
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
+    use fidl::endpoints::{create_proxy_and_stream, spawn_stream_handler, ServerEnd};
+    use futures::channel::mpsc;
+    use futures::prelude::*;
+    use lazy_static::lazy_static;
+    use session_testing::{spawn_directory_server, spawn_noop_directory_server, spawn_server};
+    use test_util::Counter;
     use {
-        super::SessionManager,
-        anyhow::{anyhow, Error},
-        diagnostics_assertions::assert_data_tree,
-        diagnostics_assertions::AnyProperty,
-        fidl::endpoints::{create_proxy_and_stream, spawn_stream_handler, ServerEnd},
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
         fidl_fuchsia_session as fsession,
-        futures::channel::mpsc,
-        futures::prelude::*,
-        lazy_static::lazy_static,
-        session_testing::{spawn_directory_server, spawn_noop_directory_server, spawn_server},
-        test_util::Counter,
     };
 
     fn serve_launcher(session_manager: SessionManager) -> fsession::LauncherProxy {

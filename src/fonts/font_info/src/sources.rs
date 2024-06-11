@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    freetype_ffi::{FT_Open_Args, FT_Stream, FT_OPEN_PATHNAME, FT_OPEN_STREAM},
-    std::{ffi::CString, fmt, ptr},
-};
+use anyhow::Error;
+use freetype_ffi::{FT_Open_Args, FT_Stream, FT_OPEN_PATHNAME, FT_OPEN_STREAM};
+use std::ffi::CString;
+use std::{fmt, ptr};
 
 /// Describes the source of a font asset to be parsed.
 pub enum FontAssetSource {

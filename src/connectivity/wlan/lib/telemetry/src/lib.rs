@@ -5,15 +5,14 @@
 // TODO(339221340): remove these allows once the skeleton has a few uses
 #![allow(unused)]
 
-use {
-    fidl_fuchsia_metrics, fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_inspect::Node as InspectNode,
-    fuchsia_inspect_contrib::auto_persist,
-    futures::{channel::mpsc, Future, StreamExt},
-    std::boxed::Box,
-    tracing::error,
-    wlan_common::bss::BssDescription,
-};
+use fuchsia_inspect::Node as InspectNode;
+use fuchsia_inspect_contrib::auto_persist;
+use futures::channel::mpsc;
+use futures::{Future, StreamExt};
+use std::boxed::Box;
+use tracing::error;
+use wlan_common::bss::BssDescription;
+use {fidl_fuchsia_metrics, fidl_fuchsia_wlan_sme as fidl_sme};
 
 mod processors;
 pub(crate) mod util;

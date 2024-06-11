@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::indexes::{
-        StreamConfigIndex, STREAM_CONFIG_INDEX_HEADSET_IN, STREAM_CONFIG_INDEX_HEADSET_OUT,
-        STREAM_CONFIG_INDEX_MICS, STREAM_CONFIG_INDEX_SPEAKERS,
-    },
-    anyhow::Error,
-    std::collections::HashMap,
+use crate::indexes::{
+    StreamConfigIndex, STREAM_CONFIG_INDEX_HEADSET_IN, STREAM_CONFIG_INDEX_HEADSET_OUT,
+    STREAM_CONFIG_INDEX_MICS, STREAM_CONFIG_INDEX_SPEAKERS,
 };
+use anyhow::Error;
+use std::collections::HashMap;
 
 #[derive(Eq, Hash, PartialEq, Debug)]
 pub struct Device {

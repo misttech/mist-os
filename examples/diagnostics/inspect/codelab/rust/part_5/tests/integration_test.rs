@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    inspect_rust_codelab_testing::{IntegrationTest, TestOptions},
-};
+use anyhow::Error;
+use inspect_rust_codelab_testing::{IntegrationTest, TestOptions};
 
 // [START include_test_stuff]
-use {
-    anyhow::format_err,
-    diagnostics_assertions::{assert_data_tree, AnyProperty},
-    diagnostics_reader::{ArchiveReader, DiagnosticsHierarchy, Inspect},
-};
+use anyhow::format_err;
+use diagnostics_assertions::{assert_data_tree, AnyProperty};
+use diagnostics_reader::{ArchiveReader, DiagnosticsHierarchy, Inspect};
 // [END include_test_stuff]
 
 // [START get_inspect]

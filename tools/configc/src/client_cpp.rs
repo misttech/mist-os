@@ -6,12 +6,10 @@ use crate::common::load_manifest;
 use anyhow::{format_err, Context as _, Error};
 use argh::FromArgs;
 use config_client::cpp::{create_cpp_wrapper, CppSource};
-use std::{
-    fs,
-    io::Write,
-    path::PathBuf,
-    process::{Command as Process, Stdio},
-};
+use std::fs;
+use std::io::Write;
+use std::path::PathBuf;
+use std::process::{Command as Process, Stdio};
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Generates a C++ client library from a given manifest.

@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::router_ext::WeakComponentTokenExt,
-    crate::model::component::WeakComponentInstance,
-    ::routing::{bedrock::sandbox_construction::ComponentSandbox, DictExt},
-    cm_rust::{ExposeDecl, ExposeProtocolDecl, UseDecl, UseProtocolDecl},
-    sandbox::{Capability, Dict, Request, Router, WeakComponentToken},
-};
+use super::router_ext::WeakComponentTokenExt;
+use crate::model::component::WeakComponentInstance;
+use ::routing::bedrock::sandbox_construction::ComponentSandbox;
+use ::routing::DictExt;
+use cm_rust::{ExposeDecl, ExposeProtocolDecl, UseDecl, UseProtocolDecl};
+use sandbox::{Capability, Dict, Request, Router, WeakComponentToken};
 
 /// A request to route a capability through the bedrock layer from use.
 #[derive(Clone, Debug)]

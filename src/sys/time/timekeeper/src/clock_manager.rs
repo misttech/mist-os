@@ -2,31 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_time as fft;
-use fuchsia_zircon::{self as zx, AsHandleRef};
-use futures::{channel::mpsc, select, FutureExt, SinkExt, StreamExt};
-use {
-    crate::{
-        diagnostics::{Diagnostics, Event},
-        enums::{
-            ClockCorrectionStrategy, ClockUpdateReason, StartClockSource, Track, WriteRtcOutcome,
-        },
-        estimator::Estimator,
-        rtc::Rtc,
-        rtc_testing,
-        time_source_manager::{KernelMonotonicProvider, TimeSourceManager},
-        Command, Config,
-    },
-    chrono::prelude::*,
-    fuchsia_async as fasync,
-    std::{
-        cmp,
-        fmt::{self, Debug},
-        sync::Arc,
-    },
-    time_util::Transform,
-    tracing::{debug, error, info, warn},
+use crate::diagnostics::{Diagnostics, Event};
+use crate::enums::{
+    ClockCorrectionStrategy, ClockUpdateReason, StartClockSource, Track, WriteRtcOutcome,
 };
+use crate::estimator::Estimator;
+use crate::rtc::Rtc;
+use crate::time_source_manager::{KernelMonotonicProvider, TimeSourceManager};
+use crate::{rtc_testing, Command, Config};
+use chrono::prelude::*;
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use futures::channel::mpsc;
+use futures::{select, FutureExt, SinkExt, StreamExt};
+use std::cmp;
+use std::fmt::{self, Debug};
+use std::sync::Arc;
+use time_util::Transform;
+use tracing::{debug, error, info, warn};
+use {fidl_fuchsia_time as fft, fuchsia_async as fasync};
 
 /// One million for PPM calculations
 const MILLION: i64 = 1_000_000;
@@ -639,21 +632,17 @@ fn update_clock(clock: &Arc<zx::Clock>, track: &Track, update: impl Into<zx::Clo
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            diagnostics::{FakeDiagnostics, ANY_DURATION},
-            enums::{FrequencyDiscardReason, Role},
-            make_test_config, make_test_config_with_delay,
-            rtc::FakeRtc,
-            time_source::{Event as TimeSourceEvent, FakePushTimeSource, Sample},
-        },
-        fidl_fuchsia_time_external::{self as ftexternal, Status},
-        fuchsia_async as fasync, fuchsia_zircon as zx,
-        lazy_static::lazy_static,
-        test_util::{assert_geq, assert_gt, assert_leq, assert_lt, assert_near},
-        zx::DurationNum,
-    };
+    use super::*;
+    use crate::diagnostics::{FakeDiagnostics, ANY_DURATION};
+    use crate::enums::{FrequencyDiscardReason, Role};
+    use crate::rtc::FakeRtc;
+    use crate::time_source::{Event as TimeSourceEvent, FakePushTimeSource, Sample};
+    use crate::{make_test_config, make_test_config_with_delay};
+    use fidl_fuchsia_time_external::{self as ftexternal, Status};
+    use lazy_static::lazy_static;
+    use test_util::{assert_geq, assert_gt, assert_leq, assert_lt, assert_near};
+    use zx::DurationNum;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     const NANOS_PER_SECOND: i64 = 1_000_000_000;
     const TEST_ROLE: Role = Role::Primary;

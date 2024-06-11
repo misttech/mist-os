@@ -3,11 +3,13 @@
 // found in the LICENSE file.
 
 use super::proc_directory::ProcDirectory;
-use crate::{
-    task::CurrentTask,
-    vfs::{CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr},
+use crate::task::CurrentTask;
+use crate::vfs::{
+    CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr,
 };
-use starnix_uapi::{errors::Errno, statfs, vfs::default_statfs, PROC_SUPER_MAGIC};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::vfs::default_statfs;
+use starnix_uapi::{statfs, PROC_SUPER_MAGIC};
 
 use std::sync::Arc;
 

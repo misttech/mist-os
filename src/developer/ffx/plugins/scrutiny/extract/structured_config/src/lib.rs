@@ -6,7 +6,8 @@ use anyhow::{Context, Error};
 use ffx_core::ffx_plugin;
 use ffx_scrutiny_structured_config_args::ScrutinyStructuredConfigCommand;
 use scrutiny_config::{ConfigBuilder, ModelConfig};
-use scrutiny_frontend::{command_builder::CommandBuilder, launcher};
+use scrutiny_frontend::command_builder::CommandBuilder;
+use scrutiny_frontend::launcher;
 use scrutiny_plugins::verify::ExtractStructuredConfigResponse;
 use scrutiny_utils::path::relativize_path;
 

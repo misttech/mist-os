@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Error},
-    carnelian::{App, AppAssistantPtr},
-    fidl_fuchsia_boot::{ArgumentsMarker, ReadOnlyLogMarker},
-    fuchsia_async::LocalExecutor,
-    fuchsia_component::client::connect_to_protocol,
-    virtual_console_lib::{VirtualConsoleAppAssistant, VirtualConsoleArgs},
-};
+use anyhow::{anyhow, Error};
+use carnelian::{App, AppAssistantPtr};
+use fidl_fuchsia_boot::{ArgumentsMarker, ReadOnlyLogMarker};
+use fuchsia_async::LocalExecutor;
+use fuchsia_component::client::connect_to_protocol;
+use virtual_console_lib::{VirtualConsoleAppAssistant, VirtualConsoleArgs};
 
 fn main() -> Result<(), Error> {
     fuchsia_trace_provider::trace_provider_create_with_fdio();

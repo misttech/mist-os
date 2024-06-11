@@ -2,29 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    event_listener::{Event, EventListener},
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_memorypressure::{
-        ProviderMarker, WatcherMarker, WatcherOnLevelChangedResponder, WatcherRequest,
-        WatcherRequestStream,
-    },
-    fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    futures::{
-        stream::{FusedStream, Stream},
-        task::{self, Poll},
-        FutureExt, StreamExt,
-    },
-    fxfs::log::*,
-    std::{
-        pin::Pin,
-        sync::{
-            atomic::{AtomicU32, Ordering},
-            Arc,
-        },
-    },
+use event_listener::{Event, EventListener};
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_memorypressure::{
+    ProviderMarker, WatcherMarker, WatcherOnLevelChangedResponder, WatcherRequest,
+    WatcherRequestStream,
 };
+use fuchsia_async as fasync;
+use fuchsia_component::client::connect_to_protocol;
+use futures::stream::{FusedStream, Stream};
+use futures::task::{self, Poll};
+use futures::{FutureExt, StreamExt};
+use fxfs::log::*;
+use std::pin::Pin;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 
 pub use fidl_fuchsia_memorypressure::Level as MemoryPressureLevel;
 

@@ -2,36 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::task_metrics::{
-        component_stats::ComponentStats,
-        constants::*,
-        measurement::{Measurement, MeasurementsQueue},
-        runtime_stats_source::{ComponentStartedInfo, RuntimeStatsContainer, RuntimeStatsSource},
-        task_info::{create_cpu_histogram, TaskInfo},
-    },
-    async_trait::async_trait,
-    errors::ModelError,
-    fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask,
-    fuchsia_async as fasync,
-    fuchsia_inspect::{self as inspect, ArrayProperty, HistogramProperty},
-    fuchsia_zircon::{self as zx, sys as zx_sys, HandleBased},
-    futures::{
-        channel::{mpsc, oneshot},
-        lock::Mutex,
-        FutureExt, StreamExt,
-    },
-    hooks::{Event, EventPayload, EventType, HasEventType, Hook, HooksRegistration},
-    injectable_time::{MonotonicTime, TimeSource},
-    lazy_static::lazy_static,
-    moniker::{ExtendedMoniker, Moniker},
-    std::{
-        collections::{BTreeMap, VecDeque},
-        fmt::Debug,
-        sync::{Arc, Weak},
-    },
-    tracing::warn,
+use crate::task_metrics::component_stats::ComponentStats;
+use crate::task_metrics::constants::*;
+use crate::task_metrics::measurement::{Measurement, MeasurementsQueue};
+use crate::task_metrics::runtime_stats_source::{
+    ComponentStartedInfo, RuntimeStatsContainer, RuntimeStatsSource,
 };
+use crate::task_metrics::task_info::{create_cpu_histogram, TaskInfo};
+use async_trait::async_trait;
+use errors::ModelError;
+use fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask;
+use fuchsia_async as fasync;
+use fuchsia_inspect::{self as inspect, ArrayProperty, HistogramProperty};
+use fuchsia_zircon::{self as zx, sys as zx_sys, HandleBased};
+use futures::channel::{mpsc, oneshot};
+use futures::lock::Mutex;
+use futures::{FutureExt, StreamExt};
+use hooks::{Event, EventPayload, EventType, HasEventType, Hook, HooksRegistration};
+use injectable_time::{MonotonicTime, TimeSource};
+use lazy_static::lazy_static;
+use moniker::{ExtendedMoniker, Moniker};
+use std::collections::{BTreeMap, VecDeque};
+use std::fmt::Debug;
+use std::sync::{Arc, Weak};
+use tracing::warn;
 
 macro_rules! maybe_return {
     ($e:expr) => {
@@ -543,15 +537,13 @@ impl AggregatedStats {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::task_metrics::testing::{FakeDiagnosticsContainer, FakeRuntime, FakeTask},
-        diagnostics_assertions::{assert_data_tree, AnyProperty},
-        diagnostics_hierarchy::DiagnosticsHierarchy,
-        fuchsia_inspect::DiagnosticsHierarchyGetter,
-        fuchsia_zircon::DurationNum,
-        injectable_time::{FakeTime, IncrementingFakeTime},
-    };
+    use super::*;
+    use crate::task_metrics::testing::{FakeDiagnosticsContainer, FakeRuntime, FakeTask};
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
+    use diagnostics_hierarchy::DiagnosticsHierarchy;
+    use fuchsia_inspect::DiagnosticsHierarchyGetter;
+    use fuchsia_zircon::DurationNum;
+    use injectable_time::{FakeTime, IncrementingFakeTime};
 
     #[fuchsia::test]
     async fn total_tracks_cpu_after_termination() {

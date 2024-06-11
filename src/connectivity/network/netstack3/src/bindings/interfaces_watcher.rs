@@ -5,25 +5,26 @@
 use std::collections::{HashMap, VecDeque};
 
 use fidl::prelude::*;
-use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces::{
     self as finterfaces, StateRequest, StateRequestStream, WatcherRequest, WatcherRequestStream,
     WatcherWatchResponder,
 };
-use fidl_fuchsia_net_interfaces_ext as finterfaces_ext;
-use fuchsia_zircon as zx;
+use futures::channel::mpsc;
+use futures::sink::SinkExt as _;
+use futures::task::Poll;
 use futures::{
-    channel::mpsc, ready, sink::SinkExt as _, task::Poll, Future, FutureExt as _, StreamExt as _,
-    TryFutureExt as _, TryStreamExt as _,
+    ready, Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
 };
 use log::{debug, error, warn};
 use net_types::ip::{AddrSubnetEither, IpAddr, IpVersion};
 use netstack3_core::ip::IpAddressState;
-
-use crate::bindings::{
-    devices::BindingId,
-    util::{IntoFidl, ResultExt as _},
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_ext as finterfaces_ext,
+    fuchsia_zircon as zx,
 };
+
+use crate::bindings::devices::BindingId;
+use crate::bindings::util::{IntoFidl, ResultExt as _};
 
 /// Possible errors when serving `fuchsia.net.interfaces/State`.
 #[derive(thiserror::Error, Debug)]
@@ -912,15 +913,11 @@ mod tests {
     use fixture::fixture;
     use futures::Stream;
     use itertools::Itertools as _;
-    use net_types::{
-        ip::{AddrSubnet, IpAddress as _, Ipv6, Ipv6Addr},
-        Witness as _,
-    };
-    use std::{
-        convert::{TryFrom as _, TryInto as _},
-        num::NonZeroU64,
-        pin::pin,
-    };
+    use net_types::ip::{AddrSubnet, IpAddress as _, Ipv6, Ipv6Addr};
+    use net_types::Witness as _;
+    use std::convert::{TryFrom as _, TryInto as _};
+    use std::num::NonZeroU64;
+    use std::pin::pin;
     use test_case::test_case;
 
     impl WorkerWatcherSink {

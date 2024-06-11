@@ -2,23 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::options,
-    anyhow::Result,
-    ffx_fuzz_args::*,
-    fuchsia_fuzzctl::get_fuzzer_urls,
-    rustyline::completion::{Completer, FilenameCompleter, Pair},
-    rustyline::error::ReadlineError,
-    rustyline::highlight::Highlighter,
-    rustyline::hint::Hinter,
-    rustyline::Helper,
-    std::borrow::Cow::{self, Borrowed},
-    std::cell::RefCell,
-    std::collections::BTreeMap,
-    std::collections::{HashMap, VecDeque},
-    std::sync::{Arc, Mutex},
-    std::vec::IntoIter,
-};
+use crate::options;
+use anyhow::Result;
+use ffx_fuzz_args::*;
+use fuchsia_fuzzctl::get_fuzzer_urls;
+use rustyline::completion::{Completer, FilenameCompleter, Pair};
+use rustyline::error::ReadlineError;
+use rustyline::highlight::Highlighter;
+use rustyline::hint::Hinter;
+use rustyline::Helper;
+use std::borrow::Cow::{self, Borrowed};
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::sync::{Arc, Mutex};
+use std::vec::IntoIter;
 
 /// Performs `rustyline`-style autocompletion for the `ffx fuzz` plugin.
 pub struct FuzzHelper {
@@ -258,14 +255,12 @@ fn get_parameter_types(
 
 #[cfg(test)]
 mod test_fixtures {
-    use {
-        super::FuzzHelper,
-        anyhow::{Context as _, Result},
-        ffx_fuzz_args::FuzzerState,
-        fuchsia_fuzzctl_test::Test,
-        rustyline::completion::{Completer, Pair},
-        std::sync::{Arc, Mutex},
-    };
+    use super::FuzzHelper;
+    use anyhow::{Context as _, Result};
+    use ffx_fuzz_args::FuzzerState;
+    use fuchsia_fuzzctl_test::Test;
+    use rustyline::completion::{Completer, Pair};
+    use std::sync::{Arc, Mutex};
 
     /// Represents replacement strings when auto-completing. Typically, the replacement is just
     /// an auto-completion candidate with the prefix that the user has already entered removed, but
@@ -337,15 +332,13 @@ mod test_fixtures {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::test_fixtures::{set_state, verify_files, verify_pairs, Replacements},
-        super::FuzzHelper,
-        anyhow::Result,
-        ffx_fuzz_args::FuzzerState,
-        fuchsia_fuzzctl_test::Test,
-        rustyline::completion::Completer,
-        std::sync::{Arc, Mutex},
-    };
+    use super::test_fixtures::{set_state, verify_files, verify_pairs, Replacements};
+    use super::FuzzHelper;
+    use anyhow::Result;
+    use ffx_fuzz_args::FuzzerState;
+    use fuchsia_fuzzctl_test::Test;
+    use rustyline::completion::Completer;
+    use std::sync::{Arc, Mutex};
 
     #[fuchsia::test]
     async fn test_empty() -> Result<()> {

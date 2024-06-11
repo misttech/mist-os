@@ -1,13 +1,11 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::config::ConfigMapValue,
-    fidl_fuchsia_boot::{FactoryItemsRequest, FactoryItemsRequestStream},
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::prelude::*,
-    std::sync::{Arc, RwLock},
-};
+use crate::config::ConfigMapValue;
+use fidl_fuchsia_boot::{FactoryItemsRequest, FactoryItemsRequestStream};
+use futures::prelude::*;
+use std::sync::{Arc, RwLock};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 type ConfigMap = Arc<RwLock<ConfigMapValue>>;
 

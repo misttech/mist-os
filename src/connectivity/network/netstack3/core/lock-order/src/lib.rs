@@ -174,12 +174,11 @@ pub mod lock;
 pub mod relation;
 pub mod wrap;
 
-use core::{marker::PhantomData, ops::Deref};
+use core::marker::PhantomData;
+use core::ops::Deref;
 
-use crate::{
-    lock::{LockFor, RwLockFor, UnlockedAccess},
-    relation::LockBefore,
-};
+use crate::lock::{LockFor, RwLockFor, UnlockedAccess};
+use crate::relation::LockBefore;
 
 /// Enforcement mechanism for lock ordering.
 ///
@@ -659,10 +658,8 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::{
-        ops::Deref,
-        sync::{Mutex, MutexGuard},
-    };
+    use std::ops::Deref;
+    use std::sync::{Mutex, MutexGuard};
 
     mod lock_levels {
         //! Lock ordering tree:
@@ -670,7 +667,8 @@ mod test {
 
         extern crate self as lock_order;
 
-        use crate::{impl_lock_after, relation::LockAfter, Unlocked};
+        use crate::relation::LockAfter;
+        use crate::{impl_lock_after, Unlocked};
 
         pub enum A {}
         pub enum B {}
@@ -685,10 +683,8 @@ mod test {
         impl_lock_after!(D => E);
     }
 
-    use crate::{
-        lock::{LockFor, UnlockedAccess},
-        Locked,
-    };
+    use crate::lock::{LockFor, UnlockedAccess};
+    use crate::Locked;
     use lock_levels::{A, B, C, D, E};
 
     /// Data type with multiple locked fields.

@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleOnEscrowRequest},
-    fuchsia_async as fasync,
-    fuchsia_runtime::{self as fruntime, HandleInfo, HandleType},
-    fuchsia_zircon::{self as zx},
-    std::process,
-    tracing::{error, info},
-};
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleOnEscrowRequest};
+use fuchsia_async as fasync;
+use fuchsia_runtime::{self as fruntime, HandleInfo, HandleType};
+use fuchsia_zircon::{self as zx};
+use std::process;
+use tracing::{error, info};
 
 /// This component immediately escrows its outgoing directory and then exits.
 #[fuchsia::main]

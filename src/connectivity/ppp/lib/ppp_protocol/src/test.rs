@@ -4,25 +4,19 @@
 
 #![cfg(test)]
 
-use {
-    crate::{
-        ipv4, ipv6, link,
-        ppp::{
-            FrameError, FrameReceiver, FrameTransmitter, ProtocolError, ProtocolState,
-            PROTOCOL_IPV4_CONTROL, PROTOCOL_IPV6_CONTROL, PROTOCOL_LINK_CONTROL,
-        },
-    },
-    futures::future::BoxFuture,
-    packet::{Buf, ParseBuffer},
-    ppp_packet::{
-        ipv4::ControlOption as Ipv4ControlOption, ipv6::ControlOption as Ipv6ControlOption,
-        link::ControlOption as LinkControlOption, PppPacket,
-    },
-    std::{
-        sync::{Arc, Mutex},
-        time::{Duration, Instant},
-    },
+use crate::ppp::{
+    FrameError, FrameReceiver, FrameTransmitter, ProtocolError, ProtocolState,
+    PROTOCOL_IPV4_CONTROL, PROTOCOL_IPV6_CONTROL, PROTOCOL_LINK_CONTROL,
 };
+use crate::{ipv4, ipv6, link};
+use futures::future::BoxFuture;
+use packet::{Buf, ParseBuffer};
+use ppp_packet::ipv4::ControlOption as Ipv4ControlOption;
+use ppp_packet::ipv6::ControlOption as Ipv6ControlOption;
+use ppp_packet::link::ControlOption as LinkControlOption;
+use ppp_packet::PppPacket;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 macro_rules! assert_closed {
     ($x:expr) => {

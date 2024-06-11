@@ -11,13 +11,11 @@
 //!       is to move this code when it's further along. Potentially using it for
 //!       all ffx UI.
 
-use {
-    anyhow::Result,
-    cfg_if::cfg_if,
-    serde::{Deserialize, Serialize},
-    std::io::{BufRead, BufReader, Read, Write},
-    unicode_segmentation::UnicodeSegmentation,
-};
+use anyhow::Result;
+use cfg_if::cfg_if;
+use serde::{Deserialize, Serialize};
+use std::io::{BufRead, BufReader, Read, Write};
+use unicode_segmentation::UnicodeSegmentation;
 
 // Magic terminal escape codes.
 const CLEAR_TO_EOL: &'static str = "\x1b[J";

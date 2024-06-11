@@ -14,7 +14,9 @@ use anyhow::{bail, format_err, Error};
 use fidl::Signals;
 use fidl_fuchsia_overnet_protocol::SignalUpdate;
 use fuchsia_zircon_status as zx_status;
-use futures::{future::poll_fn, prelude::*, task::noop_waker_ref};
+use futures::future::poll_fn;
+use futures::prelude::*;
+use futures::task::noop_waker_ref;
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll};
 

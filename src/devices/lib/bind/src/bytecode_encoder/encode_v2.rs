@@ -198,8 +198,7 @@ pub fn encode_composite_to_bytecode(
 mod test {
     use super::*;
     use crate::bytecode_encoder::bytecode_checker::*;
-    use crate::compiler::Symbol;
-    use crate::compiler::{SymbolicInstruction, SymbolicInstructionInfo};
+    use crate::compiler::{Symbol, SymbolicInstruction, SymbolicInstructionInfo};
     use crate::parser::bind_library::ValueType;
     use std::collections::HashMap;
 

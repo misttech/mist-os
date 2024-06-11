@@ -10,7 +10,8 @@ use log_symbolizer::{is_symbolizer_context_marker, Symbolizer};
 use std::fmt::Debug;
 use thiserror::Error;
 
-use crate::{error::LogError, mutex::LocalOrderedMutex};
+use crate::error::LogError;
+use crate::mutex::LocalOrderedMutex;
 
 /// Connection to a symbolizer.
 #[derive(Derivative)]
@@ -113,7 +114,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::{cell::RefCell, rc::Rc};
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     use assert_matches::assert_matches;
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};

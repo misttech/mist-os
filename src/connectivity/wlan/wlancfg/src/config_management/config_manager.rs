@@ -2,27 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::network_config::{
+    ConnectFailure, Credential, FailureReason, HiddenProbEvent, NetworkConfig, NetworkConfigError,
+    NetworkIdentifier, PastConnectionData, PastConnectionList, SecurityType,
+    HIDDEN_PROBABILITY_HIGH,
+};
+use super::stash_conversion::*;
+use crate::client::types::{self, ScanObservation};
+use crate::telemetry::{TelemetryEvent, TelemetrySender};
+use async_trait::async_trait;
+use futures::lock::Mutex;
+use rand::Rng;
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
+use tracing::{error, info};
+use wlan_stash::policy::{PolicyStorage as Stash, POLICY_STORAGE_ID};
 use {
-    super::{
-        network_config::{
-            ConnectFailure, Credential, FailureReason, HiddenProbEvent, NetworkConfig,
-            NetworkConfigError, NetworkIdentifier, PastConnectionData, PastConnectionList,
-            SecurityType, HIDDEN_PROBABILITY_HIGH,
-        },
-        stash_conversion::*,
-    },
-    crate::{
-        client::types::{self, ScanObservation},
-        telemetry::{TelemetryEvent, TelemetrySender},
-    },
-    async_trait::async_trait,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
     fuchsia_async as fasync,
-    futures::lock::Mutex,
-    rand::Rng,
-    std::collections::{hash_map::Entry, HashMap, HashSet},
-    tracing::{error, info},
-    wlan_stash::policy::{PolicyStorage as Stash, POLICY_STORAGE_ID},
 };
 
 const MAX_CONFIGS_PER_SSID: usize = 1;
@@ -190,13 +187,9 @@ impl SavedNetworksManager {
     /// test
     #[cfg(test)]
     pub async fn new_for_test() -> Self {
-        use {
-            futures::channel::mpsc,
-            rand::{
-                distributions::{Alphanumeric, DistString as _},
-                thread_rng,
-            },
-        };
+        use futures::channel::mpsc;
+        use rand::distributions::{Alphanumeric, DistString as _};
+        use rand::thread_rng;
 
         let stash_id = Alphanumeric.sample_string(&mut thread_rng(), 20);
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
@@ -210,13 +203,9 @@ impl SavedNetworksManager {
     /// executor to step through futures.
     #[cfg(test)]
     pub async fn new_and_stash_server() -> (Self, fidl_fuchsia_stash::StoreAccessorRequestStream) {
-        use {
-            futures::channel::mpsc,
-            rand::{
-                distributions::{Alphanumeric, DistString as _},
-                thread_rng,
-            },
-        };
+        use futures::channel::mpsc;
+        use rand::distributions::{Alphanumeric, DistString as _};
+        use rand::thread_rng;
 
         let id = Alphanumeric.sample_string(&mut thread_rng(), 20);
         use fidl::endpoints::create_proxy;
@@ -685,25 +674,21 @@ fn evict_if_needed(configs: &mut Vec<NetworkConfig>) -> Option<NetworkConfig> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            config_management::{
-                HistoricalListsByBssid, PROB_HIDDEN_DEFAULT, PROB_HIDDEN_IF_CONNECT_ACTIVE,
-                PROB_HIDDEN_IF_CONNECT_PASSIVE, PROB_HIDDEN_IF_SEEN_PASSIVE,
-            },
-            util::testing::{generate_random_bss, random_connection_data},
-        },
-        fidl_fuchsia_stash as fidl_stash,
-        futures::{channel::mpsc, task::Poll, TryStreamExt},
-        rand::{
-            distributions::{Alphanumeric, DistString as _},
-            thread_rng,
-        },
-        std::pin::pin,
-        test_case::test_case,
-        wlan_common::assert_variant,
+    use super::*;
+    use crate::config_management::{
+        HistoricalListsByBssid, PROB_HIDDEN_DEFAULT, PROB_HIDDEN_IF_CONNECT_ACTIVE,
+        PROB_HIDDEN_IF_CONNECT_PASSIVE, PROB_HIDDEN_IF_SEEN_PASSIVE,
     };
+    use crate::util::testing::{generate_random_bss, random_connection_data};
+    use fidl_fuchsia_stash as fidl_stash;
+    use futures::channel::mpsc;
+    use futures::task::Poll;
+    use futures::TryStreamExt;
+    use rand::distributions::{Alphanumeric, DistString as _};
+    use rand::thread_rng;
+    use std::pin::pin;
+    use test_case::test_case;
+    use wlan_common::assert_variant;
 
     #[fuchsia::test]
     async fn store_and_lookup() {

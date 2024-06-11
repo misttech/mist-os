@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_test_proxy_stress as fstress,
-    fuchsia_component::server::ServiceFs,
-    futures::{
-        future::TryFutureExt,
-        stream::{StreamExt, TryStreamExt},
-    },
-    tracing::{info, warn},
-};
+use anyhow::Error;
+use fidl_test_proxy_stress as fstress;
+use fuchsia_component::server::ServiceFs;
+use futures::future::TryFutureExt;
+use futures::stream::{StreamExt, TryStreamExt};
+use tracing::{info, warn};
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

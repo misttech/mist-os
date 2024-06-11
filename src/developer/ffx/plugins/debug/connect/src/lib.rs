@@ -6,19 +6,15 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use errors::{ffx_bail, ffx_error};
 use ffx_debug_connect_args::ConnectCommand;
-use ffx_zxdb::{
-    forward_to_agent,
-    util::{self, Agent},
-    Debugger,
-};
+use ffx_zxdb::util::{self, Agent};
+use ffx_zxdb::{forward_to_agent, Debugger};
 use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_debugger as fdebugger;
 use signal_hook::consts::signal::SIGINT;
-use std::{
-    io::{BufRead, Write},
-    process::Command,
-    sync::{atomic::AtomicBool, Arc},
-};
+use std::io::{BufRead, Write};
+use std::process::Command;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 pub use ffx_zxdb::debug_agent::{DebugAgentSocket, DebuggerProxy};
 

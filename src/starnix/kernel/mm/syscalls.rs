@@ -5,35 +5,27 @@
 use fuchsia_zircon as zx;
 use starnix_sync::{Locked, Unlocked};
 
-use crate::{
-    execution::notify_debugger_of_module_list,
-    mm::{
-        DesiredAddress, FutexKey, MappingName, MappingOptions, MemoryAccessorExt, MremapFlags,
-        PrivateFutexKey, ProtectionFlags, SharedFutexKey, PAGE_SIZE,
-    },
-    task::{CurrentTask, Task},
-    vfs::{
-        buffers::{OutputBuffer, UserBuffersInputBuffer, UserBuffersOutputBuffer},
-        FdNumber,
-    },
+use crate::execution::notify_debugger_of_module_list;
+use crate::mm::{
+    DesiredAddress, FutexKey, MappingName, MappingOptions, MemoryAccessorExt, MremapFlags,
+    PrivateFutexKey, ProtectionFlags, SharedFutexKey, PAGE_SIZE,
 };
+use crate::task::{CurrentTask, Task};
+use crate::vfs::buffers::{OutputBuffer, UserBuffersInputBuffer, UserBuffersOutputBuffer};
+use crate::vfs::FdNumber;
 use fuchsia_inspect_contrib::profile_duration;
 use starnix_logging::{log_trace, trace_duration, track_stub, CATEGORY_STARNIX_MM};
 use starnix_syscalls::SyscallArg;
+use starnix_uapi::auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS};
+use starnix_uapi::errors::{Errno, EINTR};
+use starnix_uapi::time::{duration_from_timespec, time_from_timespec};
+use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::{
-    auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
-    errno, error,
-    errors::Errno,
-    errors::EINTR,
-    pid_t, robust_list_head,
-    time::{duration_from_timespec, time_from_timespec},
-    timespec, uapi,
-    user_address::{UserAddress, UserRef},
-    FUTEX_BITSET_MATCH_ANY, FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_CMP_REQUEUE, FUTEX_LOCK_PI,
-    FUTEX_PRIVATE_FLAG, FUTEX_REQUEUE, FUTEX_UNLOCK_PI, FUTEX_WAIT, FUTEX_WAIT_BITSET, FUTEX_WAKE,
-    FUTEX_WAKE_BITSET, MAP_ANONYMOUS, MAP_DENYWRITE, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_GROWSDOWN,
-    MAP_NORESERVE, MAP_POPULATE, MAP_PRIVATE, MAP_SHARED, MAP_SHARED_VALIDATE, MAP_STACK,
-    PROT_EXEC,
+    errno, error, pid_t, robust_list_head, timespec, uapi, FUTEX_BITSET_MATCH_ANY,
+    FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_CMP_REQUEUE, FUTEX_LOCK_PI, FUTEX_PRIVATE_FLAG,
+    FUTEX_REQUEUE, FUTEX_UNLOCK_PI, FUTEX_WAIT, FUTEX_WAIT_BITSET, FUTEX_WAKE, FUTEX_WAKE_BITSET,
+    MAP_ANONYMOUS, MAP_DENYWRITE, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_GROWSDOWN, MAP_NORESERVE,
+    MAP_POPULATE, MAP_PRIVATE, MAP_SHARED, MAP_SHARED_VALIDATE, MAP_STACK, PROT_EXEC,
 };
 use std::ops::Deref as _;
 
@@ -568,7 +560,8 @@ mod tests {
 
     use super::*;
     use crate::testing::*;
-    use starnix_uapi::{errors::EEXIST, MREMAP_FIXED, MREMAP_MAYMOVE, PROT_READ};
+    use starnix_uapi::errors::EEXIST;
+    use starnix_uapi::{MREMAP_FIXED, MREMAP_MAYMOVE, PROT_READ};
 
     #[::fuchsia::test]
     async fn test_mmap_with_colliding_hint() {

@@ -7,8 +7,7 @@ use crate::bytecode_encoder::debug_encoder::add_astlocation_enum_debug_symbols;
 use crate::bytecode_encoder::error::BindRulesEncodeError;
 use crate::bytecode_encoder::symbol_table_encoder::SymbolTableEncoder;
 use crate::compiler::instruction::{Condition, Instruction};
-use crate::compiler::Symbol;
-use crate::compiler::SymbolicInstructionInfo;
+use crate::compiler::{Symbol, SymbolicInstructionInfo};
 use crate::parser::bind_library::ValueType;
 use std::collections::HashMap;
 

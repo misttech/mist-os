@@ -2,35 +2,33 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    events::types::{Event, EventPayload, LogSinkRequestedPayload},
-    identity::ComponentIdentity,
-    logs::{repository::LogsRepository, servers::LogServer},
-};
-use diagnostics_log_encoding::{encode::Encoder, Record};
+use crate::events::types::{Event, EventPayload, LogSinkRequestedPayload};
+use crate::identity::ComponentIdentity;
+use crate::logs::repository::LogsRepository;
+use crate::logs::servers::LogServer;
+use diagnostics_log_encoding::encode::Encoder;
+use diagnostics_log_encoding::Record;
 use diagnostics_message::{fx_log_packet_t, MAX_DATAGRAM_LEN};
 use fidl::prelude::*;
-use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_io as fio;
 use fidl_fuchsia_logger::{
     LogFilterOptions, LogLevelFilter, LogMarker, LogMessage, LogProxy, LogSinkMarker, LogSinkProxy,
 };
-use fuchsia_async as fasync;
 use fuchsia_async::Task;
 use fuchsia_component::client::connect_to_protocol_at_dir_svc;
 use fuchsia_inspect::Inspector;
 use fuchsia_sync::Mutex;
 use fuchsia_syslog_listener::{run_log_listener_with_proxy, LogProcessor};
-use fuchsia_zircon as zx;
 use futures::channel::mpsc;
 use futures::prelude::*;
-use std::{
-    collections::VecDeque,
-    io::Cursor,
-    marker::PhantomData,
-    sync::{Arc, Weak},
-};
+use std::collections::VecDeque;
+use std::io::Cursor;
+use std::marker::PhantomData;
+use std::sync::{Arc, Weak};
 use validating_log_listener::{validate_log_dump, validate_log_stream};
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
+};
 
 pub struct TestHarness {
     inspector: Inspector,

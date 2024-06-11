@@ -8,10 +8,12 @@ use fidl_fuchsia_bluetooth_sys::{
     InputCapability, OutputCapability, PairingDelegateMarker, PairingMarker,
 };
 use fuchsia_bluetooth::types::HostId;
-use futures::{select, stream::StreamExt, FutureExt};
+use futures::stream::StreamExt;
+use futures::{select, FutureExt};
 use std::pin::pin;
 
-use crate::{host_dispatcher, services::pairing};
+use crate::host_dispatcher;
+use crate::services::pairing;
 
 // Test that a client can request to set the pairing delegate.
 #[fuchsia::test]

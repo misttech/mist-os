@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    fs::fuchsia::update_info_from_attrs,
-    mm::{ProtectionFlags, VMEX_RESOURCE},
-    task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
-    vfs::{
-        default_seek, emit_dotdot, fileops_impl_directory, fileops_impl_seekable,
-        fs_node_impl_dir_readonly, fs_node_impl_not_dir, fs_node_impl_symlink, CacheConfig,
-        CacheMode, DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem,
-        FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
-        FsNodeOps, FsStr, FsString, InputBuffer, OutputBuffer, SeekTarget, SymlinkTarget,
-        ValueOrSize, DEFAULT_BYTES_PER_BLOCK,
-    },
+use crate::fs::fuchsia::update_info_from_attrs;
+use crate::mm::{ProtectionFlags, VMEX_RESOURCE};
+use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter};
+use crate::vfs::{
+    default_seek, emit_dotdot, fileops_impl_directory, fileops_impl_seekable,
+    fs_node_impl_dir_readonly, fs_node_impl_not_dir, fs_node_impl_symlink, CacheConfig, CacheMode,
+    DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle,
+    FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    InputBuffer, OutputBuffer, SeekTarget, SymlinkTarget, ValueOrSize, DEFAULT_BYTES_PER_BLOCK,
 };
 use anyhow::{anyhow, ensure, Error};
 use ext4_metadata::{Metadata, Node, NodeInfo};
@@ -23,23 +20,15 @@ use fuchsia_zircon::{
 };
 use starnix_logging::{impossible_error, log_warn};
 use starnix_sync::{FileOpsCore, Locked, RwLock, RwLockReadGuard, RwLockWriteGuard, WriteOps};
-use starnix_uapi::{
-    auth::FsCred,
-    errno, error,
-    errors::{Errno, SourceContext},
-    file_mode::FileMode,
-    from_status_like_fdio, ino_t,
-    mount_flags::MountFlags,
-    off_t,
-    open_flags::OpenFlags,
-    statfs,
-    vfs::default_statfs,
-    vfs::FdEvents,
-};
-use std::{
-    io::Read,
-    sync::{Arc, Mutex},
-};
+use starnix_uapi::auth::FsCred;
+use starnix_uapi::errors::{Errno, SourceContext};
+use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::mount_flags::MountFlags;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::vfs::{default_statfs, FdEvents};
+use starnix_uapi::{errno, error, from_status_like_fdio, ino_t, off_t, statfs};
+use std::io::Read;
+use std::sync::{Arc, Mutex};
 use syncio::{zxio_node_attr_has_t, zxio_node_attributes_t};
 
 const REMOTE_BUNDLE_NODE_LRU_CAPACITY: usize = 1024;
@@ -512,18 +501,18 @@ fn to_fs_node_info(inode_num: ino_t, metadata_node: &ext4_metadata::Node) -> FsN
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        fs::fuchsia::RemoteBundle,
-        testing::create_kernel_task_and_unlocked,
-        vfs::{
-            buffers::VecOutputBuffer, DirectoryEntryType, DirentSink, FsStr, LookupContext,
-            Namespace, SymlinkMode, SymlinkTarget,
-        },
+    use crate::fs::fuchsia::RemoteBundle;
+    use crate::testing::create_kernel_task_and_unlocked;
+    use crate::vfs::buffers::VecOutputBuffer;
+    use crate::vfs::{
+        DirectoryEntryType, DirentSink, FsStr, LookupContext, Namespace, SymlinkMode, SymlinkTarget,
     };
-    use fidl_fuchsia_io as fio;
-    use fuchsia_zircon as zx;
-    use starnix_uapi::{errors::Errno, file_mode::FileMode, ino_t, off_t, open_flags::OpenFlags};
+    use starnix_uapi::errors::Errno;
+    use starnix_uapi::file_mode::FileMode;
+    use starnix_uapi::open_flags::OpenFlags;
+    use starnix_uapi::{ino_t, off_t};
     use std::collections::{HashMap, HashSet};
+    use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
     #[::fuchsia::test]
     async fn test_read_image() {

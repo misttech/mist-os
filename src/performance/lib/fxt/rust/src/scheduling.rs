@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    args::{Arg, RawArg},
-    error::ParseWarning,
-    init::Ticks,
-    session::ResolveCtx,
-    thread::{ProcessKoid, ProcessRef, ThreadKoid, ThreadRef},
-    trace_header, ParseError, ParseResult, Provider, SCHEDULING_RECORD_TYPE,
-};
-use nom::{combinator::all_consuming, number::complete::le_u64};
+use crate::args::{Arg, RawArg};
+use crate::error::ParseWarning;
+use crate::init::Ticks;
+use crate::session::ResolveCtx;
+use crate::thread::{ProcessKoid, ProcessRef, ThreadKoid, ThreadRef};
+use crate::{trace_header, ParseError, ParseResult, Provider, SCHEDULING_RECORD_TYPE};
+use nom::combinator::all_consuming;
+use nom::number::complete::le_u64;
 
 const LEGACY_CONTEXT_SWITCH_SCHEDULING_TYPE: u8 = 0;
 const CONTEXT_SWITCH_SCHEDULING_TYPE: u8 = 1;
@@ -358,12 +357,10 @@ impl ThreadState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        args::{I32Header, RawArgValue},
-        fxt_builder::FxtBuilder,
-        string::{StringRef, STRING_REF_INLINE_BIT},
-        RawTraceRecord,
-    };
+    use crate::args::{I32Header, RawArgValue};
+    use crate::fxt_builder::FxtBuilder;
+    use crate::string::{StringRef, STRING_REF_INLINE_BIT};
+    use crate::RawTraceRecord;
 
     #[test]
     fn context_switch_event() {

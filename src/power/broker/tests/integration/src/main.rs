@@ -32,10 +32,8 @@ async fn build_power_broker_realm() -> Result<RealmInstance, Error> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fpb::{CurrentLevelMarker, RequiredLevelMarker},
-    };
+    use super::*;
+    use fpb::{CurrentLevelMarker, RequiredLevelMarker};
 
     #[test]
     fn test_direct() -> Result<()> {

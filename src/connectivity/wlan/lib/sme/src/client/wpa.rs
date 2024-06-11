@@ -2,13 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use wlan_common::{
-    ie::{
-        rsn::{akm, cipher},
-        wpa::WpaIe,
-    },
-    organization::Oui,
-};
+use wlan_common::ie::rsn::{akm, cipher};
+use wlan_common::ie::wpa::WpaIe;
+use wlan_common::organization::Oui;
 
 /// According to the WiFi Alliance WPA standard (2004), only TKIP support is required. We allow
 /// CCMP if the AP requests it.

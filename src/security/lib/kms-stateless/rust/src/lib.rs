@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_async::TimeoutExt as _,
-    futures::{TryFutureExt as _, TryStreamExt as _},
-    std::ffi::{CStr, CString},
-};
+use fuchsia_async::TimeoutExt as _;
+use futures::{TryFutureExt as _, TryStreamExt as _};
+use std::ffi::{CStr, CString};
 
 /// Hardware derived key is expected to be a 128-bit AES key.
 const DERIVED_KEY_SIZE: usize = 16;

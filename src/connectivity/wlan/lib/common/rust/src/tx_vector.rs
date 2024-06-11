@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::ie::SupportedRate,
-    crate::mac::WlanGi,
-    anyhow::{bail, Error},
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_softmac as fidl_softmac,
-};
+use crate::ie::SupportedRate;
+use crate::mac::WlanGi;
+use anyhow::{bail, Error};
+use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_softmac as fidl_softmac};
 
 pub const HT_NUM_MCS: u8 = 32; // Only support MCS 0-31
 pub const HT_NUM_UNIQUE_MCS: u8 = 8;

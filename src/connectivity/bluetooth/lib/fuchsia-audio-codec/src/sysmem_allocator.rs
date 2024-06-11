@@ -2,30 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context as _, Error},
-    fidl::{
-        client::QueryResponseFut,
-        endpoints::{ClientEnd, Proxy},
-    },
-    fidl_fuchsia_sysmem2::{
-        AllocatorAllocateSharedCollectionRequest, AllocatorBindSharedCollectionRequest,
-        AllocatorProxy, AllocatorSetDebugClientInfoRequest, BufferCollectionConstraints,
-        BufferCollectionMarker, BufferCollectionProxy, BufferCollectionSetConstraintsRequest,
-        BufferCollectionTokenDuplicateRequest, BufferCollectionTokenMarker,
-        BufferCollectionWaitForAllBuffersAllocatedResponse,
-        BufferCollectionWaitForAllBuffersAllocatedResult, BufferMemorySettings, NodeSetNameRequest,
-    },
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::{
-        future::{FusedFuture, Future},
-        ready,
-        task::{Context, Poll},
-        FutureExt,
-    },
-    std::pin::Pin,
-    tracing::error,
+use anyhow::{format_err, Context as _, Error};
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::{ClientEnd, Proxy};
+use fidl_fuchsia_sysmem2::{
+    AllocatorAllocateSharedCollectionRequest, AllocatorBindSharedCollectionRequest, AllocatorProxy,
+    AllocatorSetDebugClientInfoRequest, BufferCollectionConstraints, BufferCollectionMarker,
+    BufferCollectionProxy, BufferCollectionSetConstraintsRequest,
+    BufferCollectionTokenDuplicateRequest, BufferCollectionTokenMarker,
+    BufferCollectionWaitForAllBuffersAllocatedResponse,
+    BufferCollectionWaitForAllBuffersAllocatedResult, BufferMemorySettings, NodeSetNameRequest,
 };
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use futures::future::{FusedFuture, Future};
+use futures::task::{Context, Poll};
+use futures::{ready, FutureExt};
+use std::pin::Pin;
+use tracing::error;
 
 /// A set of buffers that have been allocated with the SysmemAllocator.
 #[derive(Debug)]

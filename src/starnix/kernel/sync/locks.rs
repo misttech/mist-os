@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 // Use these crates so that we don't need to make the dependencies conditional.
-use fuchsia_sync as _;
-use lock_api as _;
-use tracing_mutex as _;
+use {fuchsia_sync as _, lock_api as _, tracing_mutex as _};
 
 use crate::{LockBefore, LockFor, Locked, RwLockFor};
 use core::marker::PhantomData;

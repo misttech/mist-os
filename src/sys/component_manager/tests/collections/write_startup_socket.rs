@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
-    fuchsia_zircon::Socket,
-};
+use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
+use fuchsia_zircon::Socket;
 
 // This program take a startup handle as a socket and write to it.
 fn main() {

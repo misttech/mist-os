@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_fuchsia_component_resolution as fresolution, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_component::server::ServiceFs,
-    futures::StreamExt,
-    std::sync::Arc,
-    test_manager_lib::{constants, AboveRootCapabilitiesForTest, RootDiagnosticNode},
-    tracing::{info, warn},
-};
+use anyhow::Error;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use futures::StreamExt;
+use std::sync::Arc;
+use test_manager_lib::{constants, AboveRootCapabilitiesForTest, RootDiagnosticNode};
+use tracing::{info, warn};
+use {fidl_fuchsia_component_resolution as fresolution, fuchsia_async as fasync};
 
 const DEFAULT_MANIFEST_NAME: &str = "test_manager.cm";
 

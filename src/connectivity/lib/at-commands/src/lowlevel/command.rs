@@ -7,10 +7,9 @@
 //! The format of of these is not specifed in any one place in the spec, but they are
 //! described thoughout HFP 1.8.
 
-use {
-    crate::lowlevel::{arguments, write_to::WriteTo},
-    std::io,
-};
+use crate::lowlevel::arguments;
+use crate::lowlevel::write_to::WriteTo;
+use std::io;
 
 /// A single AT command.
 #[derive(Debug, Clone, PartialEq)]

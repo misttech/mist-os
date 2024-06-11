@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    component_events::{
-        events::*,
-        matcher::EventMatcher,
-        sequence::{EventSequence, Ordering},
-    },
-    fidl_fuchsia_component as fcomponent, fuchsia_async as fasync,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
-};
+use component_events::events::*;
+use component_events::matcher::EventMatcher;
+use component_events::sequence::{EventSequence, Ordering};
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
+use {fidl_fuchsia_component as fcomponent, fuchsia_async as fasync};
 
 #[fasync::run_singlethreaded(test)]
 async fn destroy() {

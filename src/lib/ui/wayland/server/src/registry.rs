@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::client::Client, crate::object::MessageReceiver, anyhow::Error,
-    fuchsia_wayland_core as wl, std::mem,
-};
+use crate::client::Client;
+use crate::object::MessageReceiver;
+use anyhow::Error;
+use fuchsia_wayland_core as wl;
+use std::mem;
 
 /// Helper for constructing a |Registry|.
 ///
@@ -113,10 +114,9 @@ mod tests {
 
     use std::sync::Arc;
 
-    use fuchsia_async as fasync;
     use fuchsia_sync::Mutex;
     use fuchsia_wayland_core::{Interface, IntoMessage};
-    use fuchsia_zircon as zx;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     use crate::display::Display;
     use crate::object::RequestDispatcher;

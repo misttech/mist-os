@@ -2,19 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    app::strategies::{
-        base::{create_app_strategy, AppStrategyPtr},
-        framebuffer::DisplayId,
-    },
-    drawing::DisplayRotation,
-    geometry::Size,
-    input::{DeviceId, UserInputMessage},
-    message::Message,
-    scene::facets::FacetId,
-    view::{strategies::base::ViewStrategyParams, ViewAssistantPtr, ViewController, ViewKey},
-    IdGenerator2,
-};
+use crate::app::strategies::base::{create_app_strategy, AppStrategyPtr};
+use crate::app::strategies::framebuffer::DisplayId;
+use crate::drawing::DisplayRotation;
+use crate::geometry::Size;
+use crate::input::{DeviceId, UserInputMessage};
+use crate::message::Message;
+use crate::scene::facets::FacetId;
+use crate::view::strategies::base::ViewStrategyParams;
+use crate::view::{ViewAssistantPtr, ViewController, ViewKey};
+use crate::IdGenerator2;
 use anyhow::{bail, format_err, Context as _, Error};
 use fidl_fuchsia_hardware_display::{CoordinatorEvent, VirtconMode};
 use fidl_fuchsia_input_report as hid_input_report;
@@ -22,14 +19,17 @@ use fuchsia_async::{self as fasync, DurationExt, Timer};
 use fuchsia_component::{self as component};
 use fuchsia_trace::duration;
 use fuchsia_zircon::{self as zx, DurationNum};
-use futures::{
-    channel::mpsc::{unbounded, UnboundedSender},
-    future::{Either, Future},
-    StreamExt,
-};
+use futures::channel::mpsc::{unbounded, UnboundedSender};
+use futures::future::{Either, Future};
+use futures::StreamExt;
 use once_cell::sync::OnceCell;
 use serde::Deserialize;
-use std::{any::Any, collections::BTreeMap, fmt::Debug, fs, path::PathBuf, pin::Pin};
+use std::any::Any;
+use std::collections::BTreeMap;
+use std::fmt::Debug;
+use std::fs;
+use std::path::PathBuf;
+use std::pin::Pin;
 
 pub(crate) mod strategies;
 

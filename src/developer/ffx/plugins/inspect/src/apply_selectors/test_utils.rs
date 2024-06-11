@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::apply_selectors::{screen::Line, terminal::Terminal};
-use std::{
-    cmp::min,
-    io::Write,
-    sync::{Arc, Mutex},
-};
+use crate::apply_selectors::screen::Line;
+use crate::apply_selectors::terminal::Terminal;
+use std::cmp::min;
+use std::io::Write;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]
 pub struct FakeTerminal {

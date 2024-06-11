@@ -30,32 +30,33 @@ mod timers;
 mod util;
 mod verifier_worker;
 
-use std::{
-    collections::HashMap,
-    convert::{Infallible as Never, TryFrom as _},
-    ffi::CStr,
-    fmt::Debug,
-    future::Future,
-    num::NonZeroU16,
-    ops::Deref,
-    pin::pin,
-    sync::Arc,
-    time::Duration,
-};
+use std::collections::HashMap;
+use std::convert::{Infallible as Never, TryFrom as _};
+use std::ffi::CStr;
+use std::fmt::Debug;
+use std::future::Future;
+use std::num::NonZeroU16;
+use std::ops::Deref;
+use std::pin::pin;
+use std::sync::Arc;
+use std::time::Duration;
 
 use assert_matches::assert_matches;
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker as _, RequestStream};
-use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
-use fuchsia_async as fasync;
 use fuchsia_inspect::health::Reporter as _;
-use fuchsia_zircon as zx;
-use futures::{channel::mpsc, select, FutureExt as _, StreamExt as _};
+use futures::channel::mpsc;
+use futures::{select, FutureExt as _, StreamExt as _};
 use log::{debug, error, info, warn};
 use packet::{Buf, BufferMut};
-use rand::{rngs::OsRng, CryptoRng, RngCore};
+use rand::rngs::OsRng;
+use rand::{CryptoRng, RngCore};
 use util::{ConversionContext, IntoFidl as _};
+use {
+    fidl_fuchsia_hardware_network as fhardware_network,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
+};
 
 use devices::{
     BindingId, DeviceIdAndName, DeviceSpecificInfo, Devices, DynamicCommonInfo,
@@ -65,33 +66,33 @@ use devices::{
 use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceUpdate};
 use resource_removal::{ResourceRemovalSink, ResourceRemovalWorker};
 
-use crate::bindings::{interfaces_watcher::AddressPropertiesUpdate, util::TaskWaitGroup};
-use net_types::{
-    ethernet::Mac,
-    ip::{AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv6, Mtu},
-    SpecifiedAddr,
+use crate::bindings::interfaces_watcher::AddressPropertiesUpdate;
+use crate::bindings::util::TaskWaitGroup;
+use net_types::ethernet::Mac;
+use net_types::ip::{
+    AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv6, Mtu,
 };
+use net_types::SpecifiedAddr;
+use netstack3_core::device::{
+    DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError,
+    EthernetDeviceId, LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId, PureIpDeviceId,
+    ReceiveQueueBindingsContext, TransmitQueueBindingsContext, WeakDeviceId,
+};
+use netstack3_core::error::ExistsError;
+use netstack3_core::filter::FilterBindingsTypes;
+use netstack3_core::icmp::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId};
+use netstack3_core::inspect::{InspectableValue, Inspector};
+use netstack3_core::ip::{
+    AddIpAddrSubnetError, AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
+    Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationUpdate,
+    Lifetime, SlaacConfiguration,
+};
+use netstack3_core::routes::RawMetric;
+use netstack3_core::sync::{DynDebugReferences, RwLock as CoreRwLock};
+use netstack3_core::udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId};
 use netstack3_core::{
-    device::{
-        DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError,
-        EthernetDeviceId, LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId,
-        PureIpDeviceId, ReceiveQueueBindingsContext, TransmitQueueBindingsContext, WeakDeviceId,
-    },
-    error::ExistsError,
-    filter::FilterBindingsTypes,
-    icmp::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId},
-    inspect::{InspectableValue, Inspector},
-    ip::{
-        AddIpAddrSubnetError, AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
-        Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationUpdate,
-        Lifetime, SlaacConfiguration,
-    },
-    neighbor,
-    routes::RawMetric,
-    sync::{DynDebugReferences, RwLock as CoreRwLock},
-    udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId},
-    DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext, IpExt,
-    ReferenceNotifiers, RngContext, StackState, TimerBindingsTypes, TimerContext, TimerId,
+    neighbor, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
+    IpExt, ReferenceNotifiers, RngContext, StackState, TimerBindingsTypes, TimerContext, TimerId,
     TracingContext,
 };
 

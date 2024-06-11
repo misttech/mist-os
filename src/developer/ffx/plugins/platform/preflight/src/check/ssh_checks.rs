@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::check::{PreflightCheck, PreflightCheckResult, PreflightCheckResult::*},
-    crate::command_runner::CommandRunner,
-    crate::config::*,
-    anyhow::Result,
-    async_trait::async_trait,
-    std::env,
-};
+use crate::check::PreflightCheckResult::*;
+use crate::check::{PreflightCheck, PreflightCheckResult};
+use crate::command_runner::CommandRunner;
+use crate::config::*;
+use anyhow::Result;
+use async_trait::async_trait;
+use std::env;
 
 const SSH_NOT_FOUND_ERROR: &str = "Did not find an ssh binary on the path for the current user.";
 const SSH_NOT_FOUND_RESOLUTION_MESSAGE: &str = "To resolve, run: sudo apt install ssh";
@@ -56,7 +55,8 @@ impl PreflightCheck for SshChecks<'_> {
 
 #[cfg(test)]
 mod test {
-    use {super::*, crate::command_runner::ExitStatus};
+    use super::*;
+    use crate::command_runner::ExitStatus;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_linux_success() -> Result<()> {

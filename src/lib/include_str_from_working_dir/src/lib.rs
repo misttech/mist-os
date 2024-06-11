@@ -4,7 +4,8 @@
 
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use std::{env, fs, path::Path};
+use std::path::Path;
+use std::{env, fs};
 use syn::{Error, LitStr, Result};
 
 /// Imports a file's content as a string like [`include_str!`] does but looks up files relative to

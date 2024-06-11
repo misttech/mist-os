@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_criterion::{
-    criterion::{self, Criterion},
-    FuchsiaCriterion,
-};
+use fuchsia_criterion::criterion::{self, Criterion};
+use fuchsia_criterion::FuchsiaCriterion;
 
 use archivist_lib::logs::buffer::{ArcList, LazyItem};
 use fidl_fuchsia_diagnostics::StreamMode;

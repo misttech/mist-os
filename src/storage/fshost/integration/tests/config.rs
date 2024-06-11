@@ -6,8 +6,8 @@
 //! runs. It must live in the binary directly, instead of in the fixture crate, which is why it
 //! lives here and is recompiled into each separate test.
 
+use fshost_test_fixture::disk_builder::{DataSpec, VolumesSpec};
 use fshost_test_fixture::{
-    disk_builder::{DataSpec, VolumesSpec},
     TestFixtureBuilder, VFS_TYPE_BLOBFS, VFS_TYPE_F2FS, VFS_TYPE_FXFS, VFS_TYPE_MINFS,
 };
 

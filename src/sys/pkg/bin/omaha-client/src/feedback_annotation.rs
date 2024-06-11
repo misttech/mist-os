@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::app_set::FuchsiaAppSet,
-    fidl_fuchsia_feedback::{
-        Annotation, ComponentData, ComponentDataRegisterMarker, ComponentDataRegisterProxy,
-    },
-    futures::lock::Mutex,
-    omaha_client::app_set::AppSet as _,
-    std::rc::Rc,
-    tracing::error,
+use crate::app_set::FuchsiaAppSet;
+use fidl_fuchsia_feedback::{
+    Annotation, ComponentData, ComponentDataRegisterMarker, ComponentDataRegisterProxy,
 };
+use futures::lock::Mutex;
+use omaha_client::app_set::AppSet as _;
+use std::rc::Rc;
+use tracing::error;
 
 pub async fn publish_ids_to_feedback(app_set: Rc<Mutex<FuchsiaAppSet>>) {
     let proxy =

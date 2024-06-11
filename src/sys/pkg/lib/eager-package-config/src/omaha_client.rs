@@ -76,13 +76,11 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use channel_config::ChannelConfig;
-    use omaha_client::cup_ecdsa::{
-        test_support::{
-            make_default_json_public_keys_for_test, make_default_public_key_for_test,
-            make_default_public_key_id_for_test,
-        },
-        PublicKeyAndId,
+    use omaha_client::cup_ecdsa::test_support::{
+        make_default_json_public_keys_for_test, make_default_public_key_for_test,
+        make_default_public_key_id_for_test,
     };
+    use omaha_client::cup_ecdsa::PublicKeyAndId;
     use pretty_assertions::assert_eq;
 
     #[test]

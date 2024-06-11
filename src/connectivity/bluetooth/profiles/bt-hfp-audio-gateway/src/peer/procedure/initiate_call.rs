@@ -4,10 +4,10 @@
 
 use super::{Procedure, ProcedureError, ProcedureMarker, ProcedureRequest};
 
-use crate::peer::{
-    calls::CallAction, service_level_connection::SlcState, slc_request::SlcRequest,
-    update::AgUpdate,
-};
+use crate::peer::calls::CallAction;
+use crate::peer::service_level_connection::SlcState;
+use crate::peer::slc_request::SlcRequest;
+use crate::peer::update::AgUpdate;
 
 use at_commands as at;
 

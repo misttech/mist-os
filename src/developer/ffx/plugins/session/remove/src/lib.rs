@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Result},
-    async_trait::async_trait,
-    ffx_session_remove_args::SessionRemoveCommand,
-    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
-    fidl_fuchsia_element::ManagerProxy,
-};
+use anyhow::{format_err, Result};
+use async_trait::async_trait;
+use ffx_session_remove_args::SessionRemoveCommand;
+use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fidl_fuchsia_element::ManagerProxy;
 
 #[derive(FfxTool)]
 pub struct RemoveTool {
@@ -43,7 +41,8 @@ pub async fn remove_impl<W: std::io::Write>(
 
 #[cfg(test)]
 mod test {
-    use {super::*, fidl_fuchsia_element::ManagerRequest};
+    use super::*;
+    use fidl_fuchsia_element::ManagerRequest;
 
     #[fuchsia::test]
     async fn test_remove_element() {

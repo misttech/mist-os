@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    fidl_fuchsia_update::{CommitStatusProviderMarker, CommitStatusProviderProxy},
-    fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon as zx,
-    futures::{future::FusedFuture, prelude::*},
-    std::time::Duration,
-};
+use anyhow::{Context, Error};
+use fidl_fuchsia_update::{CommitStatusProviderMarker, CommitStatusProviderProxy};
+use fuchsia_component::client::connect_to_protocol;
+use futures::future::FusedFuture;
+use futures::prelude::*;
+use std::time::Duration;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 const WARNING_DURATION: Duration = Duration::from_secs(30);
 
@@ -91,13 +89,12 @@ async fn handle_wait_for_commit_impl(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_fuchsia_update::CommitStatusProviderRequest,
-        fuchsia_sync::Mutex,
-        fuchsia_zircon::{DurationNum, EventPair, HandleBased, Peered},
-        futures::{pin_mut, task::Poll},
-    };
+    use super::*;
+    use fidl_fuchsia_update::CommitStatusProviderRequest;
+    use fuchsia_sync::Mutex;
+    use fuchsia_zircon::{DurationNum, EventPair, HandleBased, Peered};
+    use futures::pin_mut;
+    use futures::task::Poll;
 
     struct TestObserver {
         events: Mutex<Vec<CommitEvent>>,

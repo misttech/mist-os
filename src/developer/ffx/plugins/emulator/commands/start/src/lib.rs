@@ -18,7 +18,8 @@ use fho::{
 use pbms::LoadedProductBundle;
 use schemars::JsonSchema;
 use serde::Serialize;
-use std::{path::PathBuf, str::FromStr};
+use std::path::PathBuf;
+use std::str::FromStr;
 
 mod editor;
 mod pbm;
@@ -517,7 +518,9 @@ mod tests {
     use ffx_config::ConfigLevel;
     use pbms::ProductBundle;
     use sdk_metadata::ProductBundleV2;
-    use std::{fs, path::Path, process::Command};
+    use std::fs;
+    use std::path::Path;
+    use std::process::Command;
 
     const VIRTUAL_DEVICE_VALID: &str = include_str!("../test_data/virtual_device.json");
     const VIRTUAL_DEVICE_TEMPLATE_VALID: &str = include_str!("../test_data/device_1.json.template");

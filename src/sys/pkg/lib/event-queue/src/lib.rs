@@ -48,17 +48,14 @@
 //! }
 //! ```
 
-use {
-    fuchsia_async::TimeoutExt,
-    futures::{
-        channel::{mpsc, oneshot},
-        future::select_all,
-        prelude::*,
-        select,
-    },
-    std::{collections::VecDeque, time::Duration},
-    thiserror::Error,
-};
+use fuchsia_async::TimeoutExt;
+use futures::channel::{mpsc, oneshot};
+use futures::future::select_all;
+use futures::prelude::*;
+use futures::select;
+use std::collections::VecDeque;
+use std::time::Duration;
+use thiserror::Error;
 
 mod barrier;
 use barrier::{Barrier, BarrierBlock};
@@ -451,17 +448,17 @@ impl<E> ClientCommand<E> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_test_pkg_eventqueue::{
-            ExampleEventMonitorMarker, ExampleEventMonitorProxy, ExampleEventMonitorProxyInterface,
-            ExampleEventMonitorRequest, ExampleEventMonitorRequestStream,
-        },
-        fuchsia_async as fasync,
-        futures::{future::BoxFuture, pin_mut, task::Poll},
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_test_pkg_eventqueue::{
+        ExampleEventMonitorMarker, ExampleEventMonitorProxy, ExampleEventMonitorProxyInterface,
+        ExampleEventMonitorRequest, ExampleEventMonitorRequestStream,
     };
+    use fuchsia_async as fasync;
+    use futures::future::BoxFuture;
+    use futures::pin_mut;
+    use futures::task::Poll;
 
     struct FidlNotifier {
         proxy: ExampleEventMonitorProxy,

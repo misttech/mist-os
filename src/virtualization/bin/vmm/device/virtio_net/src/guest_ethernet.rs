@@ -6,13 +6,12 @@
 //! including appropriate memory management. See the comments in interface.rs for what each
 //! FFI function does. Do not use the interface directly.
 
-use {
-    crate::interface,
-    fidl_fuchsia_net::MacAddress,
-    fuchsia_zircon as zx,
-    futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
-    std::{marker::PhantomPinned, pin::Pin},
-};
+use crate::interface;
+use fidl_fuchsia_net::MacAddress;
+use fuchsia_zircon as zx;
+use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use std::marker::PhantomPinned;
+use std::pin::Pin;
 
 pub struct RxPacket {
     pub data: *const u8,

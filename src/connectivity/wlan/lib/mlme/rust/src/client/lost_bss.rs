@@ -57,7 +57,8 @@ impl LostBssCounter {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, wlan_common::time::TimeUnit};
+    use super::*;
+    use wlan_common::time::TimeUnit;
 
     const TEST_BEACON_PERIOD: zx::Duration = zx::Duration::from_micros(TimeUnit(42).into_micros());
     const TEST_TIMEOUT_BCN_COUNT: u32 = 1000;

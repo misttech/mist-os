@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::server::Facade;
-use crate::tracing::{facade::TracingFacade, types::TracingMethod};
+use crate::tracing::facade::TracingFacade;
+use crate::tracing::types::TracingMethod;
 use anyhow::Error;
 use async_trait::async_trait;
 use serde_json::Value;

@@ -4,11 +4,9 @@
 
 use anyhow::Context;
 use netlink_packet_generic::{GenlFamily, GenlHeader};
-use netlink_packet_utils::{
-    nla::NlasIterator,
-    traits::{Emitable, ParseableParametrized},
-    DecodeError, Parseable,
-};
+use netlink_packet_utils::nla::NlasIterator;
+use netlink_packet_utils::traits::{Emitable, ParseableParametrized};
+use netlink_packet_utils::{DecodeError, Parseable};
 use std::convert::TryInto;
 
 mod attr;

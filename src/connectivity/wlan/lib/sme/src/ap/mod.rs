@@ -12,29 +12,23 @@ pub mod test_utils;
 use event::*;
 use remote_client::*;
 
+use crate::responder::Responder;
+use crate::{mlme_event_name, MlmeRequest, MlmeSink};
+use fidl_fuchsia_wlan_mlme::{self as fidl_mlme, DeviceInfo, MlmeEvent};
+use futures::channel::{mpsc, oneshot};
+use ieee80211::{MacAddr, MacAddrBytes, Ssid};
+use std::collections::HashMap;
+use tracing::{debug, error, info, warn};
+use wlan_common::capabilities::get_device_band_cap;
+use wlan_common::channel::{Cbw, Channel};
+use wlan_common::ie::rsn::rsne::{RsnCapabilities, Rsne};
+use wlan_common::ie::{parse_ht_capabilities, ChanWidthSet, SupportedRate};
+use wlan_common::timer::{self, EventId, Timer};
+use wlan_common::{mac, RadioConfig};
+use wlan_rsn::psk;
 use {
-    crate::{mlme_event_name, responder::Responder, MlmeRequest, MlmeSink},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_mlme::{self as fidl_mlme, DeviceInfo, MlmeEvent},
-    fidl_fuchsia_wlan_sme as fidl_sme,
-    futures::channel::{mpsc, oneshot},
-    ieee80211::{MacAddr, MacAddrBytes, Ssid},
-    std::collections::HashMap,
-    tracing::{debug, error, info, warn},
-    wlan_common::{
-        capabilities::get_device_band_cap,
-        channel::{Cbw, Channel},
-        ie::{
-            parse_ht_capabilities,
-            rsn::rsne::{RsnCapabilities, Rsne},
-            ChanWidthSet, SupportedRate,
-        },
-        mac,
-        timer::{self, EventId, Timer},
-        RadioConfig,
-    },
-    wlan_rsn::psk,
+    fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
 };
 
 const DEFAULT_BEACON_PERIOD: u16 = 100;
@@ -876,25 +870,19 @@ fn create_start_request(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{test_utils::*, MlmeStream, Station},
-        fidl_fuchsia_wlan_mlme as fidl_mlme,
-        lazy_static::lazy_static,
-        test_case::test_case,
-        wlan_common::{
-            assert_variant,
-            channel::Cbw,
-            mac::Aid,
-            test_utils::{
-                fake_capabilities::{
-                    fake_2ghz_band_capability_vht, fake_5ghz_band_capability,
-                    fake_5ghz_band_capability_ht_cbw,
-                },
-                fake_features::fake_mac_sublayer_support,
-            },
-        },
+    use super::*;
+    use crate::test_utils::*;
+    use crate::{MlmeStream, Station};
+    use fidl_fuchsia_wlan_mlme as fidl_mlme;
+    use lazy_static::lazy_static;
+    use test_case::test_case;
+    use wlan_common::assert_variant;
+    use wlan_common::channel::Cbw;
+    use wlan_common::mac::Aid;
+    use wlan_common::test_utils::fake_capabilities::{
+        fake_2ghz_band_capability_vht, fake_5ghz_band_capability, fake_5ghz_band_capability_ht_cbw,
     };
+    use wlan_common::test_utils::fake_features::fake_mac_sublayer_support;
 
     lazy_static! {
         static ref AP_ADDR: MacAddr = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66].into();

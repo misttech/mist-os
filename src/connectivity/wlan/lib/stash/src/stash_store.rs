@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::Store,
-    anyhow::{bail, format_err, Context, Error},
-    async_trait::async_trait,
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_stash as fidl_stash,
-    std::collections::HashMap,
-    wlan_stash_constants::{
-        NetworkIdentifier, PersistentData, NODE_SEPARATOR, POLICY_DATA_KEY, POLICY_STASH_PREFIX,
-    },
+use super::Store;
+use anyhow::{bail, format_err, Context, Error};
+use async_trait::async_trait;
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_stash as fidl_stash;
+use std::collections::HashMap;
+use wlan_stash_constants::{
+    NetworkIdentifier, PersistentData, NODE_SEPARATOR, POLICY_DATA_KEY, POLICY_STASH_PREFIX,
 };
 
 struct StashNode {
@@ -252,12 +250,10 @@ impl Store for StashStore {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::tests::{network_id, new_stash_id},
-        fuchsia_component::client::connect_to_protocol,
-        wlan_stash_constants::{Credential, SecurityType},
-    };
+    use super::*;
+    use crate::tests::{network_id, new_stash_id};
+    use fuchsia_component::client::connect_to_protocol;
+    use wlan_stash_constants::{Credential, SecurityType};
 
     fn new_stash_store(id: &str) -> fidl_stash::StoreAccessorProxy {
         let store_client = connect_to_protocol::<fidl_stash::StoreMarker>()

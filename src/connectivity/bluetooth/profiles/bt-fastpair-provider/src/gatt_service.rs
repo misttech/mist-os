@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::Context as _;
-use core::{
-    pin::Pin,
-    task::{Context, Poll},
-};
+use core::pin::Pin;
+use core::task::{Context, Poll};
 use fidl::endpoints::{create_request_stream, ControlHandle, RequestStream, Responder};
 use fidl_fuchsia_bluetooth_gatt2::{
     self as gatt, AttributePermissions, Characteristic, CharacteristicPropertyBits, Handle,

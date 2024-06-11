@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{bss::BssDescription, security::SecurityDescriptor},
-    anyhow::format_err,
-    fidl_fuchsia_wlan_sme as fidl_sme,
-    std::collections::HashSet,
-};
+use crate::bss::BssDescription;
+use crate::security::SecurityDescriptor;
+use anyhow::format_err;
+use fidl_fuchsia_wlan_sme as fidl_sme;
+use std::collections::HashSet;
 
 #[cfg(target_os = "fuchsia")]
 use {anyhow::Context as _, fuchsia_zircon as zx};

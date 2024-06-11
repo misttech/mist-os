@@ -8,10 +8,9 @@
 use std::borrow::Borrow;
 use std::sync::Arc;
 
-use fuchsia_async as fasync;
-use fuchsia_trace as ftrace;
 use futures::stream::{FuturesUnordered, StreamFuture};
 use futures::StreamExt;
+use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
 use crate::accessibility::types::AccessibilityInfo;
 use crate::agent::{self, AgentCreator, Context, CreationFunc, Lifespan};
@@ -29,12 +28,11 @@ use crate::light::types::LightInfo;
 use crate::message::base::{MessageEvent, MessengerType};
 use crate::message::receptor::Receptor;
 use crate::night_mode::types::NightModeInfo;
-use crate::payload_convert;
 use crate::privacy::types::PrivacyInfo;
 use crate::service::{self, Address};
 use crate::setup::types::SetupInfo;
 use crate::storage::{Error, Payload, StorageInfo, StorageRequest, StorageResponse, StorageType};
-use crate::{trace, trace_guard};
+use crate::{payload_convert, trace, trace_guard};
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageConvertible};
 use settings_storage::fidl_storage::{FidlStorage, FidlStorageConvertible};
 use settings_storage::storage_factory::StorageFactory;

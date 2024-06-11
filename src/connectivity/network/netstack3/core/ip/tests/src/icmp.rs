@@ -4,37 +4,29 @@
 
 use alloc::vec;
 use alloc::vec::Vec;
-use core::{fmt::Debug, num::NonZeroU16};
+use core::fmt::Debug;
+use core::num::NonZeroU16;
 
 use assert_matches::assert_matches;
-use net_types::{
-    ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
-    SpecifiedAddr, Witness,
+use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use net_types::{SpecifiedAddr, Witness};
+use packet::{Buf, Serializer};
+use packet_formats::ethernet::EthernetFrameLengthCheck;
+use packet_formats::icmp::{
+    IcmpDestUnreachable, IcmpEchoRequest, IcmpMessage, IcmpPacket, IcmpPacketBuilder,
+    IcmpTimeExceeded, IcmpUnusedCode, Icmpv4DestUnreachableCode, Icmpv4TimeExceededCode,
+    Icmpv4TimestampRequest, Icmpv6DestUnreachableCode, Icmpv6TimeExceededCode, MessageBody,
+    OriginalPacket,
 };
-use packet::Buf;
-use packet::Serializer;
-use packet_formats::{
-    ethernet::EthernetFrameLengthCheck,
-    icmp::{
-        IcmpDestUnreachable, IcmpEchoRequest, IcmpMessage, IcmpPacket, IcmpPacketBuilder,
-        IcmpTimeExceeded, IcmpUnusedCode, Icmpv4DestUnreachableCode, Icmpv4TimeExceededCode,
-        Icmpv4TimestampRequest, Icmpv6DestUnreachableCode, Icmpv6TimeExceededCode, MessageBody,
-        OriginalPacket,
-    },
-    ip::{IpPacketBuilder as _, IpProto, Ipv4Proto, Ipv6Proto},
-    testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame,
-    udp::UdpPacketBuilder,
-};
+use packet_formats::ip::{IpPacketBuilder as _, IpProto, Ipv4Proto, Ipv6Proto};
+use packet_formats::testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame;
+use packet_formats::udp::UdpPacketBuilder;
 
-use netstack3_base::{
-    testutil::{set_logger_for_test, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6},
-    FrameDestination,
-};
-use netstack3_core::{
-    device::DeviceId,
-    testutil::{Ctx, CtxPairExt as _, FakeBindingsCtx, FakeCtxBuilder},
-    IpExt, StackStateBuilder,
-};
+use netstack3_base::testutil::{set_logger_for_test, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6};
+use netstack3_base::FrameDestination;
+use netstack3_core::device::DeviceId;
+use netstack3_core::testutil::{Ctx, CtxPairExt as _, FakeBindingsCtx, FakeCtxBuilder};
+use netstack3_core::{IpExt, StackStateBuilder};
 use netstack3_ip::icmp::Icmpv4StateBuilder;
 
 /// Test that receiving a particular IP packet results in a particular ICMP

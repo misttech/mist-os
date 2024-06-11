@@ -6,11 +6,9 @@ use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::{
-    hash::Hash,
-    marker::PhantomData,
-    path::{Path, PathBuf},
-};
+use std::hash::Hash;
+use std::marker::PhantomData;
+use std::path::{Path, PathBuf};
 
 /// A base trait for TypePath's marker traits.
 pub trait PathTypeMarker {

@@ -12,7 +12,9 @@ use fidl_fuchsia_bluetooth_snoop::{
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use futures::TryStreamExt;
-use std::{fmt, fs::File, io, path::Path};
+use std::fs::File;
+use std::path::Path;
+use std::{fmt, io};
 use tracing::{error, info, warn};
 
 const PCAP_CMD: u8 = 0x01;

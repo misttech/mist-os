@@ -2,20 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_bluetooth::types::Channel,
-    fuchsia_sync::Mutex,
-    fuchsia_zircon as zx,
-    futures::{
-        ready,
-        stream::{FusedStream, Stream},
-        task::{Context, Poll, Waker},
-    },
-    packet_encoding::{Decodable, Encodable},
-    slab::Slab,
-    std::{collections::VecDeque, mem, pin::Pin, sync::Arc},
-    tracing::{info, trace, warn},
-};
+use fuchsia_bluetooth::types::Channel;
+use fuchsia_sync::Mutex;
+use fuchsia_zircon as zx;
+use futures::ready;
+use futures::stream::{FusedStream, Stream};
+use futures::task::{Context, Poll, Waker};
+use packet_encoding::{Decodable, Encodable};
+use slab::Slab;
+use std::collections::VecDeque;
+use std::mem;
+use std::pin::Pin;
+use std::sync::Arc;
+use tracing::{info, trace, warn};
 
 #[cfg(test)]
 mod tests;

@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::{convert::Infallible as Never, num::NonZeroU16};
+use core::convert::Infallible as Never;
+use core::num::NonZeroU16;
 
 use net_types::ip::{GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use packet::{
@@ -10,28 +11,23 @@ use packet::{
     GrowBufferMut, InnerSerializer, Nested, PacketConstraints, ParsablePacket, ParseBuffer,
     ParseMetadata, ReusableBuffer, SerializeError, Serializer, SliceBufViewMut,
 };
-use packet_formats::{
-    icmp::{
-        self,
-        mld::{MulticastListenerDone, MulticastListenerReport},
-        ndp::{
-            options::NdpOptionBuilder, NeighborAdvertisement, NeighborSolicitation,
-            RouterSolicitation,
-        },
-        IcmpDestUnreachable, IcmpEchoReply, IcmpEchoRequest, IcmpPacketBuilder, IcmpPacketRaw,
-        IcmpPacketTypeRaw as _, IcmpTimeExceeded, Icmpv4MessageType, Icmpv4PacketRaw,
-        Icmpv4ParameterProblem, Icmpv4TimestampReply, Icmpv6MessageType, Icmpv6PacketRaw,
-        Icmpv6PacketTooBig, Icmpv6ParameterProblem,
-    },
-    igmp::{self, IgmpPacketBuilder},
-    ip::{IpExt, IpPacket as _, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6Proto},
-    ipv4::{Ipv4Packet, Ipv4PacketRaw},
-    ipv6::{Ipv6Packet, Ipv6PacketRaw},
-    tcp::{
-        TcpParseArgs, TcpSegment, TcpSegmentBuilder, TcpSegmentBuilderWithOptions, TcpSegmentRaw,
-    },
-    udp::{UdpPacket, UdpPacketBuilder, UdpPacketRaw, UdpParseArgs},
+use packet_formats::icmp::mld::{MulticastListenerDone, MulticastListenerReport};
+use packet_formats::icmp::ndp::options::NdpOptionBuilder;
+use packet_formats::icmp::ndp::{NeighborAdvertisement, NeighborSolicitation, RouterSolicitation};
+use packet_formats::icmp::{
+    self, IcmpDestUnreachable, IcmpEchoReply, IcmpEchoRequest, IcmpPacketBuilder, IcmpPacketRaw,
+    IcmpPacketTypeRaw as _, IcmpTimeExceeded, Icmpv4MessageType, Icmpv4PacketRaw,
+    Icmpv4ParameterProblem, Icmpv4TimestampReply, Icmpv6MessageType, Icmpv6PacketRaw,
+    Icmpv6PacketTooBig, Icmpv6ParameterProblem,
 };
+use packet_formats::igmp::{self, IgmpPacketBuilder};
+use packet_formats::ip::{IpExt, IpPacket as _, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6Proto};
+use packet_formats::ipv4::{Ipv4Packet, Ipv4PacketRaw};
+use packet_formats::ipv6::{Ipv6Packet, Ipv6PacketRaw};
+use packet_formats::tcp::{
+    TcpParseArgs, TcpSegment, TcpSegmentBuilder, TcpSegmentBuilderWithOptions, TcpSegmentRaw,
+};
+use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpPacketRaw, UdpParseArgs};
 use zerocopy::ByteSliceMut;
 
 /// An IP packet that provides header inspection.
@@ -1866,7 +1862,8 @@ mod tests {
     use packet_formats::icmp::IcmpUnusedCode;
     use test_case::test_case;
 
-    use super::{testutil::internal::TestIpExt, *};
+    use super::testutil::internal::TestIpExt;
+    use super::*;
 
     const SRC_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(11111));
     const DST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(22222));

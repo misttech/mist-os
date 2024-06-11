@@ -6,7 +6,8 @@ use anyhow::{Context, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_hardware_light::{Info, LightError, LightMarker, LightProxy};
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
-use fuchsia_fs::{directory::open_in_namespace, OpenFlags};
+use fuchsia_fs::directory::open_in_namespace;
+use fuchsia_fs::OpenFlags;
 use futures::TryStreamExt;
 
 async fn open_light() -> Result<LightProxy, Error> {

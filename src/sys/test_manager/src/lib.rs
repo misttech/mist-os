@@ -19,12 +19,10 @@ mod test_manager_server;
 mod test_suite;
 mod utilities;
 
-pub use {
-    above_root_capabilities::AboveRootCapabilitiesForTest,
-    self_diagnostics::RootDiagnosticNode,
-    test_manager_server::{
-        run_test_manager_query_server, run_test_manager_run_builder_server,
-        run_test_manager_suite_runner_server, run_test_manager_test_case_enumerator_server,
-        serve_early_boot_profiles,
-    },
+pub use above_root_capabilities::AboveRootCapabilitiesForTest;
+pub use self_diagnostics::RootDiagnosticNode;
+pub use test_manager_server::{
+    run_test_manager_query_server, run_test_manager_run_builder_server,
+    run_test_manager_suite_runner_server, run_test_manager_test_case_enumerator_server,
+    serve_early_boot_profiles,
 };

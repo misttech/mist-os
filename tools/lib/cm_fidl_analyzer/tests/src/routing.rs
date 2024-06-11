@@ -2,42 +2,41 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::anyhow;
+use assert_matches::assert_matches;
+use async_trait::async_trait;
+use camino::Utf8PathBuf;
+use cm_config::{
+    AllowlistEntry, CapabilityAllowlistKey, DebugCapabilityAllowlistEntry, DebugCapabilityKey,
+    RuntimeConfig, SecurityPolicy,
+};
+use cm_fidl_analyzer::component_instance::ComponentInstanceForAnalyzer;
+use cm_fidl_analyzer::component_model::{
+    AnalyzerModelError, ComponentModelForAnalyzer, ModelBuilderForAnalyzer,
+};
+use cm_fidl_analyzer::environment::{BOOT_RESOLVER_NAME, BOOT_SCHEME};
+use cm_fidl_analyzer::route::VerifyRouteResult;
+use cm_rust::*;
+use cm_rust_testing::*;
+use cm_types::Url;
+use fidl::prelude::*;
+use moniker::Moniker;
+use routing::component_instance::ComponentInstanceInterface;
+use routing::environment::RunnerRegistry;
+use routing::error::RoutingError;
+use routing::mapper::RouteSegment;
+use routing::RegistrationDecl;
+use routing_test_helpers::{
+    CheckUse, ComponentEventRoute, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,
+    ServiceInstance,
+};
+use std::collections::{HashMap, HashSet};
+use std::path::Path;
+use std::sync::Arc;
+use thiserror::Error;
 use {
-    anyhow::anyhow,
-    assert_matches::assert_matches,
-    async_trait::async_trait,
-    camino::Utf8PathBuf,
-    cm_config::{
-        AllowlistEntry, CapabilityAllowlistKey, DebugCapabilityAllowlistEntry, DebugCapabilityKey,
-        RuntimeConfig, SecurityPolicy,
-    },
-    cm_fidl_analyzer::{
-        component_instance::ComponentInstanceForAnalyzer,
-        component_model::{AnalyzerModelError, ComponentModelForAnalyzer, ModelBuilderForAnalyzer},
-        environment::{BOOT_RESOLVER_NAME, BOOT_SCHEME},
-        route::VerifyRouteResult,
-    },
-    cm_rust::*,
-    cm_rust_testing::*,
-    cm_types::Url,
-    fidl::prelude::*,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_zircon_status as zx_status,
-    moniker::Moniker,
-    routing::{
-        component_instance::ComponentInstanceInterface, environment::RunnerRegistry,
-        error::RoutingError, mapper::RouteSegment, RegistrationDecl,
-    },
-    routing_test_helpers::{
-        CheckUse, ComponentEventRoute, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,
-        ServiceInstance,
-    },
-    std::{
-        collections::{HashMap, HashSet},
-        path::Path,
-        sync::Arc,
-    },
-    thiserror::Error,
 };
 
 const TEST_URL_PREFIX: &str = "test:///";
@@ -522,7 +521,8 @@ impl RoutingTestModel for RoutingTestForAnalyzer {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, routing_test_helpers::instantiate_common_routing_tests};
+    use super::*;
+    use routing_test_helpers::instantiate_common_routing_tests;
 
     instantiate_common_routing_tests! { RoutingTestBuilderForAnalyzer }
 

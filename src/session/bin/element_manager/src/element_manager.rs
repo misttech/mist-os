@@ -8,32 +8,34 @@
 //! Elements are instantiated as dynamic component instances in a component collection of the
 //! calling component.
 
+use crate::annotation::{
+    handle_annotation_controller_stream, AnnotationError, AnnotationHolder, WatchResponder,
+};
+use crate::element::Element;
+use anyhow::{anyhow, bail, format_err, Context, Error};
+use fidl::endpoints::{
+    create_proxy, create_request_stream, ClientEnd, ControlHandle, Proxy, RequestStream, ServerEnd,
+};
+use fidl_connector::Connect;
+use fuchsia_async::{self as fasync, DurationExt};
+use fuchsia_fs::directory as ffs_dir;
+use futures::channel::oneshot;
+use futures::future::Fuse;
+use futures::lock::Mutex;
+use futures::{select, FutureExt, StreamExt, TryStreamExt};
+use rand::distributions::{Alphanumeric, DistString};
+use rand::thread_rng;
+use std::collections::HashMap;
+use std::io::Write;
+use std::os::fd::AsRawFd;
+use std::pin::pin;
+use std::sync::Arc;
+use tracing::{error, info, warn};
 use {
-    crate::annotation::{
-        handle_annotation_controller_stream, AnnotationError, AnnotationHolder, WatchResponder,
-    },
-    crate::element::Element,
-    anyhow::{anyhow, bail, format_err, Context, Error},
-    fidl::endpoints::{
-        create_proxy, create_request_stream, ClientEnd, ControlHandle, Proxy, RequestStream,
-        ServerEnd,
-    },
-    fidl_connector::Connect,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_element as felement, fidl_fuchsia_element_manager_persistence as persistence,
-    fidl_fuchsia_io as fio, fidl_fuchsia_ui_app as fuiapp,
-    fuchsia_async::{self as fasync, DurationExt},
-    fuchsia_fs::directory as ffs_dir,
-    fuchsia_scenic as scenic, fuchsia_zircon as zx,
-    futures::{
-        channel::oneshot, future::Fuse, lock::Mutex, select, FutureExt, StreamExt, TryStreamExt,
-    },
-    rand::{
-        distributions::{Alphanumeric, DistString},
-        thread_rng,
-    },
-    std::{collections::HashMap, io::Write, os::fd::AsRawFd, pin::pin, sync::Arc},
-    tracing::{error, info, warn},
+    fidl_fuchsia_io as fio, fidl_fuchsia_ui_app as fuiapp, fuchsia_scenic as scenic,
+    fuchsia_zircon as zx,
 };
 
 const DEFAULT_PERSISTENT_ELEMENTS_PATH: &str = "/data/persistent_elements";
@@ -830,18 +832,16 @@ fn name_key() -> felement::AnnotationKey {
 
 #[cfg(test)]
 mod tests {
+    use super::{CollectionConfig, ElementManager, ElementManagerError};
+    use assert_matches::assert_matches;
+    use fidl::endpoints::{create_proxy_and_stream, spawn_stream_handler};
+    use fidl::prelude::*;
+    use futures::FutureExt;
+    use maplit::hashmap;
+    use session_testing::spawn_directory_server;
     use {
-        super::{CollectionConfig, ElementManager, ElementManagerError},
-        assert_matches::assert_matches,
-        fidl::{
-            endpoints::{create_proxy_and_stream, spawn_stream_handler},
-            prelude::*,
-        },
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
         fidl_fuchsia_element as felement, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-        futures::FutureExt,
-        maplit::hashmap,
-        session_testing::spawn_directory_server,
     };
 
     fn example_collection_config() -> CollectionConfig {

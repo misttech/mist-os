@@ -4,16 +4,16 @@
 
 use anyhow::format_err;
 use async_helpers::maybe_stream::MaybeStream;
-use fidl::{endpoints::ClientEnd, prelude::*};
+use fidl::endpoints::ClientEnd;
+use fidl::prelude::*;
 use fidl_fuchsia_hardware_audio::*;
-use fuchsia_async as fasync;
-use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::{IValue, Inspect};
 use fuchsia_sync::Mutex;
 use fuchsia_zircon::{self as zx, DurationNum};
 use futures::{select, StreamExt};
 use std::sync::Arc;
 use tracing::{info, warn};
+use {fuchsia_async as fasync, fuchsia_inspect as inspect};
 
 use crate::audio_frame_sink::AudioFrameSink;
 use crate::audio_frame_stream::AudioFrameStream;
@@ -500,7 +500,8 @@ pub(crate) mod tests {
 
     use async_utils::PollExt;
     use fixture::fixture;
-    use futures::{future, task::Poll};
+    use futures::future;
+    use futures::task::Poll;
 
     const TEST_UNIQUE_ID: &[u8; 16] = &[5; 16];
     const TEST_CLOCK_DOMAIN: u32 = 0x00010203;

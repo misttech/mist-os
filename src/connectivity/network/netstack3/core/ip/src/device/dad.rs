@@ -7,19 +7,18 @@
 use core::num::NonZeroU16;
 
 use log::debug;
-use net_types::{
-    ip::{Ipv4, Ipv6, Ipv6Addr},
-    MulticastAddr, UnicastAddr, Witness as _,
-};
+use net_types::ip::{Ipv4, Ipv6, Ipv6Addr};
+use net_types::{MulticastAddr, UnicastAddr, Witness as _};
 use netstack3_base::{
     AnyDevice, CoreEventContext, CoreTimerContext, DeviceIdContext, EventContext, HandleableTimer,
     StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
 };
-use packet_formats::{icmp::ndp::NeighborSolicitation, utils::NonZeroDuration};
+use packet_formats::icmp::ndp::NeighborSolicitation;
+use packet_formats::utils::NonZeroDuration;
 
+use crate::internal::device::state::Ipv6DadState;
 use crate::internal::device::{
-    state::Ipv6DadState, IpAddressId as _, IpAddressState, IpDeviceAddressIdContext, IpDeviceIpExt,
-    WeakIpAddressId,
+    IpAddressId as _, IpAddressState, IpDeviceAddressIdContext, IpDeviceIpExt, WeakIpAddressId,
 };
 
 /// A timer ID for duplicate address detection.
@@ -419,21 +418,18 @@ mod tests {
     use core::time::Duration;
 
     use assert_matches::assert_matches;
-    use net_types::{
-        ip::{AddrSubnet, IpAddress as _},
-        Witness as _,
+    use net_types::ip::{AddrSubnet, IpAddress as _};
+    use net_types::Witness as _;
+    use netstack3_base::testutil::{
+        FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeTimerCtxExt as _, FakeWeakDeviceId,
     };
-    use netstack3_base::{
-        testutil::{
-            FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeTimerCtxExt as _, FakeWeakDeviceId,
-        },
-        CtxPair, InstantContext as _, SendFrameContext as _, TimerHandler,
-    };
+    use netstack3_base::{CtxPair, InstantContext as _, SendFrameContext as _, TimerHandler};
     use packet::EmptyBuf;
     use packet_formats::icmp::ndp::Options;
 
     use super::*;
-    use crate::internal::device::{testutil::FakeWeakAddressId, Ipv6DeviceAddr};
+    use crate::internal::device::testutil::FakeWeakAddressId;
+    use crate::internal::device::Ipv6DeviceAddr;
 
     struct FakeDadAddressContext {
         addr: UnicastAddr<Ipv6Addr>,

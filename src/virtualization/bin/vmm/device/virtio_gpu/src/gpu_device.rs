@@ -2,23 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::gpu_command::{AttachScanoutResponder, GpuCommand, GpuCommandSender, ScanoutId},
-    crate::resource::Resource2D,
-    crate::scanout::Scanout,
-    crate::wire,
-    anyhow::{anyhow, Context, Error},
-    fidl_fuchsia_ui_composition::LayoutInfo,
-    fidl_fuchsia_virtualization_hardware::VirtioGpuControlHandle,
-    futures::{channel::mpsc, select, StreamExt},
-    machina_virtio_device::WrappedDescChainStream,
-    std::collections::{hash_map::Entry, HashMap},
-    std::io::{Read, Write},
-    virtio_device::chain::{ReadableChain, Remaining, WritableChain},
-    virtio_device::mem::{DriverMem, DriverRange},
-    virtio_device::queue::DriverNotify,
-    zerocopy::{AsBytes, FromBytes, NoCell},
-};
+use crate::gpu_command::{AttachScanoutResponder, GpuCommand, GpuCommandSender, ScanoutId};
+use crate::resource::Resource2D;
+use crate::scanout::Scanout;
+use crate::wire;
+use anyhow::{anyhow, Context, Error};
+use fidl_fuchsia_ui_composition::LayoutInfo;
+use fidl_fuchsia_virtualization_hardware::VirtioGpuControlHandle;
+use futures::channel::mpsc;
+use futures::{select, StreamExt};
+use machina_virtio_device::WrappedDescChainStream;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+use std::io::{Read, Write};
+use virtio_device::chain::{ReadableChain, Remaining, WritableChain};
+use virtio_device::mem::{DriverMem, DriverRange};
+use virtio_device::queue::DriverNotify;
+use zerocopy::{AsBytes, FromBytes, NoCell};
 
 /// This is a (somewhat arbitrary) upper bound to the number of entries in a
 /// VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING command.
@@ -708,20 +708,16 @@ impl<'a, M: DriverMem> GpuDevice<'a, M> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::gpu_command::ScanoutController,
-        crate::resource::bytes_per_pixel,
-        crate::scanout::FakeScanout,
-        fidl::endpoints::{create_proxy_and_stream, RequestStream},
-        fidl_fuchsia_math as fmath,
-        fidl_fuchsia_virtualization_hardware::{VirtioGpuMarker, VirtioGpuProxy},
-        futures::FutureExt,
-        virtio_device::{
-            fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue},
-            mem::DeviceRange,
-        },
-    };
+    use super::*;
+    use crate::gpu_command::ScanoutController;
+    use crate::resource::bytes_per_pixel;
+    use crate::scanout::FakeScanout;
+    use fidl::endpoints::{create_proxy_and_stream, RequestStream};
+    use fidl_fuchsia_math as fmath;
+    use fidl_fuchsia_virtualization_hardware::{VirtioGpuMarker, VirtioGpuProxy};
+    use futures::FutureExt;
+    use virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue};
+    use virtio_device::mem::DeviceRange;
 
     const VIRTIO_GPU_STARTUP_HEIGHT: u32 = 720;
     const VIRTIO_GPU_STARTUP_WIDTH: u32 = 1280;

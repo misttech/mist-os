@@ -37,14 +37,10 @@ mod driver;
 mod prelude {
     #![allow(unused_imports)]
 
-    pub use crate::convert_ext::FromExt as _;
-    pub use crate::convert_ext::IntoExt as _;
+    pub use crate::convert_ext::{FromExt as _, IntoExt as _};
     pub use crate::Result;
     pub use anyhow::{bail, format_err, Context as _};
     pub use fasync::TimeoutExt as _;
-    pub use fidl_fuchsia_net_ext as fnet_ext;
-    pub use fuchsia_async as fasync;
-    pub use fuchsia_zircon as fz;
     pub use fuchsia_zircon_status::Status as ZxStatus;
     pub use futures::future::BoxFuture;
     pub use futures::stream::BoxStream;
@@ -54,6 +50,7 @@ mod prelude {
     pub use std::convert::TryInto;
     pub use std::fmt::Debug;
     pub use tracing::{debug, error, info, trace, warn};
+    pub use {fidl_fuchsia_net_ext as fnet_ext, fuchsia_async as fasync, fuchsia_zircon as fz};
 
     pub use futures::prelude::*;
     pub use openthread::prelude::*;

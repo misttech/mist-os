@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::error::RoutingError, std::fmt::Debug};
+use crate::error::RoutingError;
+use std::fmt::Debug;
 
 /// The payload of a walk state.
 pub trait WalkStateUnit<Rhs = Self> {

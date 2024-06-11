@@ -2,28 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider};
+use crate::model::actions::{ActionsManager, StopAction};
+use crate::model::component::{IncomingCapabilities, StartReason, WeakComponentInstance};
+use crate::model::model::Model;
+use ::routing::capability_source::InternalCapability;
+use async_trait::async_trait;
+use cm_rust::FidlIntoNative;
+use cm_types::Name;
+use errors::ModelError;
+use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
+use futures::prelude::*;
+use lazy_static::lazy_static;
+use moniker::{ChildName, Moniker, MonikerError};
+use std::sync::{Arc, Weak};
+use tracing::warn;
 use {
-    crate::{
-        capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
-        model::{
-            actions::{ActionsManager, StopAction},
-            component::{IncomingCapabilities, StartReason, WeakComponentInstance},
-            model::Model,
-        },
-    },
-    ::routing::capability_source::InternalCapability,
-    async_trait::async_trait,
-    cm_rust::FidlIntoNative,
-    cm_types::Name,
-    errors::ModelError,
-    fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
-    futures::prelude::*,
-    lazy_static::lazy_static,
-    moniker::{ChildName, Moniker, MonikerError},
-    std::sync::{Arc, Weak},
-    tracing::warn,
 };
 
 lazy_static! {
@@ -292,16 +288,14 @@ fn join_monikers(scope_moniker: &Moniker, moniker_str: &str) -> Result<Moniker, 
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::model::actions::test_utils::{is_discovered, is_resolved, is_shutdown};
+    use crate::model::testing::test_helpers::TestEnvironmentBuilder;
+    use cm_rust_testing::ComponentDeclBuilder;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_component_decl::{ChildRef, CollectionRef};
     use {
-        super::*,
-        crate::model::{
-            actions::test_utils::{is_discovered, is_resolved, is_shutdown},
-            testing::test_helpers::TestEnvironmentBuilder,
-        },
-        cm_rust_testing::ComponentDeclBuilder,
-        fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-        fidl_fuchsia_component_decl::{ChildRef, CollectionRef},
         fuchsia_async as fasync,
     };
 

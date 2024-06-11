@@ -2,20 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_utils::stream::{StreamMap, Tagged, WithTag},
-    fuchsia_bluetooth::types::{HostId, PeerId},
-    futures::{
-        future::BoxFuture,
-        stream::{FusedStream, FuturesUnordered, Stream},
-        StreamExt,
-    },
-    std::{
-        collections::HashMap,
-        pin::Pin,
-        task::{Context, Poll},
-    },
-};
+use async_utils::stream::{StreamMap, Tagged, WithTag};
+use fuchsia_bluetooth::types::{HostId, PeerId};
+use futures::future::BoxFuture;
+use futures::stream::{FusedStream, FuturesUnordered, Stream};
+use futures::StreamExt;
+use std::collections::HashMap;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// A Stream of outstanding Pairing Requests, indexed by Host. When polled, the Stream impl will
 /// yield the next available completed request, when ready. `T` is the response type returned on

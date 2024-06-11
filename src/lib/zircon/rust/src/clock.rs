@@ -4,12 +4,12 @@
 
 //! Type-safe bindings for Zircon clock objects.
 
-use crate::ok;
-use crate::{AsHandleRef, ClockUpdate, Handle, HandleBased, HandleRef, Time};
+use crate::{ok, AsHandleRef, ClockUpdate, Handle, HandleBased, HandleRef, Time};
 use bitflags::bitflags;
 use fuchsia_zircon_status::Status;
 use fuchsia_zircon_sys as sys;
-use std::{mem::MaybeUninit, ptr};
+use std::mem::MaybeUninit;
+use std::ptr;
 
 /// An object representing a kernel [clock], used to track the progress of time. A clock is a
 /// one-dimensional affine transformation of the [clock monotonic] reference timeline which may be

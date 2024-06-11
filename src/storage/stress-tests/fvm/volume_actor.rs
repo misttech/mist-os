@@ -2,16 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::volume::VolumeConnection,
-    crate::vslice::{VSliceRange, VSliceRanges},
-    async_trait::async_trait,
-    fuchsia_zircon::Status,
-    rand::{prelude::IteratorRandom, rngs::SmallRng, seq::SliceRandom, Rng, SeedableRng},
-    std::collections::HashMap,
-    stress_test::actor::{Actor, ActorError},
-    tracing::{debug, info},
-};
+use crate::volume::VolumeConnection;
+use crate::vslice::{VSliceRange, VSliceRanges};
+use async_trait::async_trait;
+use fuchsia_zircon::Status;
+use rand::prelude::IteratorRandom;
+use rand::rngs::SmallRng;
+use rand::seq::SliceRandom;
+use rand::{Rng, SeedableRng};
+use std::collections::HashMap;
+use stress_test::actor::{Actor, ActorError};
+use tracing::{debug, info};
 
 #[derive(Clone, Debug)]
 enum VolumeOperation {

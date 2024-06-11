@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    fidl_fuchsia_pkg_rewrite::{
-        EditTransactionMarker, EngineMarker, EngineProxy, LiteralRule, Rule,
-    },
-    fuchsia_zircon as zx,
+use anyhow::{Context, Error};
+use fidl_fuchsia_pkg_rewrite::{
+    EditTransactionMarker, EngineMarker, EngineProxy, LiteralRule, Rule,
 };
+use fuchsia_zircon as zx;
 
 pub async fn disable_updates() -> Result<(), Error> {
     let engine = fuchsia_component::client::connect_to_protocol::<EngineMarker>()
@@ -47,17 +45,14 @@ async fn disable_updates_at(engine: EngineProxy) -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_fuchsia_pkg_rewrite::{
-            EditTransactionRequest, EditTransactionRequestStream, EngineRequest,
-            EngineRequestStream,
-        },
-        fidl_fuchsia_pkg_rewrite_ext::Rule,
-        fuchsia_async as fasync,
-        fuchsia_url::AbsolutePackageUrl,
-        futures::prelude::*,
+    use super::*;
+    use fidl_fuchsia_pkg_rewrite::{
+        EditTransactionRequest, EditTransactionRequestStream, EngineRequest, EngineRequestStream,
     };
+    use fidl_fuchsia_pkg_rewrite_ext::Rule;
+    use fuchsia_async as fasync;
+    use fuchsia_url::AbsolutePackageUrl;
+    use futures::prelude::*;
 
     /// A mock implementation of fuchsia.pkg.rewrite.Engine.
     struct MockRewriteEngine {

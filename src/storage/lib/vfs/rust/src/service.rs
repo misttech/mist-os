@@ -7,18 +7,19 @@
 #[cfg(test)]
 mod tests;
 
-use crate::{
-    directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
-    execution_scope::ExecutionScope,
-    node::Node,
-    object_request::{ObjectRequestRef, ObjectRequestSend},
-    ProtocolsExt,
-};
+use crate::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use crate::execution_scope::ExecutionScope;
+use crate::node::Node;
+use crate::object_request::{ObjectRequestRef, ObjectRequestSend};
+use crate::ProtocolsExt;
 
-use {
-    async_trait::async_trait, fidl::endpoints::RequestStream, fidl_fuchsia_io as fio,
-    fuchsia_async::Channel, fuchsia_zircon_status::Status, futures::future::Future, std::sync::Arc,
-};
+use async_trait::async_trait;
+use fidl::endpoints::RequestStream;
+use fidl_fuchsia_io as fio;
+use fuchsia_async::Channel;
+use fuchsia_zircon_status::Status;
+use futures::future::Future;
+use std::sync::Arc;
 
 // Redefine these constants as a u32 as in macos they are u16
 const S_IRUSR: u32 = libc::S_IRUSR as u32;

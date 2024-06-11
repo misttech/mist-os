@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::input_device,
-    async_trait::async_trait,
-    fuchsia_inspect::{health::Reporter, NumericProperty, Property},
-    std::any::Any,
-    std::cell::RefCell,
-    std::fmt::{Debug, Formatter},
-    std::rc::Rc,
-};
+use crate::input_device;
+use async_trait::async_trait;
+use fuchsia_inspect::health::Reporter;
+use fuchsia_inspect::{NumericProperty, Property};
+use std::any::Any;
+use std::cell::RefCell;
+use std::fmt::{Debug, Formatter};
+use std::rc::Rc;
 
 pub trait AsRcAny {
     fn as_rc_any(self: Rc<Self>) -> Rc<dyn Any>;
@@ -198,19 +197,16 @@ impl InputHandlerStatus {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{async_trait, InputHandler, UnhandledInputHandler},
-        crate::{
-            input_device::{
-                Handled, InputDeviceDescriptor, InputDeviceEvent, InputEvent, UnhandledInputEvent,
-            },
-            input_handler::InputHandlerStatus,
-        },
-        fuchsia_zircon as zx,
-        futures::{channel::mpsc, StreamExt as _},
-        pretty_assertions::assert_eq,
-        test_case::test_case,
+    use super::{async_trait, InputHandler, UnhandledInputHandler};
+    use crate::input_device::{
+        Handled, InputDeviceDescriptor, InputDeviceEvent, InputEvent, UnhandledInputEvent,
     };
+    use crate::input_handler::InputHandlerStatus;
+    use fuchsia_zircon as zx;
+    use futures::channel::mpsc;
+    use futures::StreamExt as _;
+    use pretty_assertions::assert_eq;
+    use test_case::test_case;
 
     struct FakeUnhandledInputHandler {
         event_sender: mpsc::UnboundedSender<UnhandledInputEvent>,

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl_fuchsia_wlan_sme as fidl_sme,
-    std::sync::{Arc, Mutex},
-};
+use anyhow::{format_err, Error};
+use fidl_fuchsia_wlan_sme as fidl_sme;
+use std::sync::{Arc, Mutex};
 
 pub mod deprecated_client;
 pub mod deprecated_configuration;

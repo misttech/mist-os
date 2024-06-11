@@ -9,7 +9,8 @@
 //! of their local traits on these types, so they can be used in uninstantiable
 //! contexts.
 
-use core::{convert::Infallible as Never, marker::PhantomData};
+use core::convert::Infallible as Never;
+use core::marker::PhantomData;
 
 use explicit::UnreachableExt as _;
 

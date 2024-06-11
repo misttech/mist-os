@@ -7,13 +7,11 @@ use ffx_config::{global_env_context, EnvironmentContext, SdkRoot};
 use sdk::FfxSdkConfig;
 use serde::Serialize;
 use serde_json::Value;
-use std::{
-    borrow::Cow,
-    collections::HashMap,
-    path::{Path, PathBuf},
-    process::{Child, ExitStatus},
-    time::SystemTime,
-};
+use std::borrow::Cow;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::process::{Child, ExitStatus};
+use std::time::SystemTime;
 use tempfile::TempDir;
 
 pub mod test;

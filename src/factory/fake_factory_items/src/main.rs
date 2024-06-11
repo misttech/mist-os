@@ -5,15 +5,13 @@
 mod config;
 mod fake_factory_items_server;
 
-use {
-    anyhow::Error,
-    config::Config,
-    fake_factory_items_server::{spawn_fake_factory_items_server, FakeFactoryItemsServer},
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    futures::prelude::*,
-    std::sync::{Arc, RwLock},
-};
+use anyhow::Error;
+use config::Config;
+use fake_factory_items_server::{spawn_fake_factory_items_server, FakeFactoryItemsServer};
+use fuchsia_async as fasync;
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
+use std::sync::{Arc, RwLock};
 
 #[fasync::run_singlethreaded]
 async fn main() -> Result<(), Error> {

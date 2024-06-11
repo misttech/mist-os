@@ -8,18 +8,20 @@
 
 mod common;
 
-use std::{collections::HashMap, convert::TryFrom as _, num::NonZeroU16};
+use std::collections::HashMap;
+use std::convert::TryFrom as _;
+use std::num::NonZeroU16;
 
 use diagnostics_assertions::{
     assert_data_tree, tree_assertion, AnyProperty, NonZeroIntProperty, PropertyAssertion,
     TreeAssertion,
 };
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_posix_socket as fposix_socket;
-use fidl_fuchsia_posix_socket_packet as fposix_socket_packet;
-use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
+use {
+    fidl_fuchsia_io as fio, fidl_fuchsia_posix_socket as fposix_socket,
+    fidl_fuchsia_posix_socket_packet as fposix_socket_packet,
+    fidl_fuchsia_posix_socket_raw as fposix_socket_raw, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
+};
 
 use const_unwrap::const_unwrap_option;
 use diagnostics_hierarchy::{DiagnosticsHierarchy, Property};
@@ -27,21 +29,14 @@ use itertools::Itertools as _;
 use net_declare::{fidl_ip, fidl_mac, fidl_subnet};
 use net_types::ip::Ip as _;
 use netemul::InStack;
-use netstack_testing_common::{
-    constants,
-    realms::{KnownServiceProvider, Netstack, TestSandboxExt as _},
-    Result,
-};
+use netstack_testing_common::realms::{KnownServiceProvider, Netstack, TestSandboxExt as _};
+use netstack_testing_common::{constants, Result};
 use netstack_testing_macros::netstack_test;
 use packet::{ParsablePacket as _, Serializer as _};
-use packet_formats::{
-    ethernet::{
-        testutil::ETHERNET_HDR_LEN_NO_TAG, EtherType, EthernetFrameBuilder,
-        ETHERNET_MIN_BODY_LEN_NO_TAG,
-    },
-    ipv4::{Ipv4Header as _, Ipv4PacketBuilder},
-    udp::{UdpPacketBuilder, UdpParseArgs},
-};
+use packet_formats::ethernet::testutil::ETHERNET_HDR_LEN_NO_TAG;
+use packet_formats::ethernet::{EtherType, EthernetFrameBuilder, ETHERNET_MIN_BODY_LEN_NO_TAG};
+use packet_formats::ipv4::{Ipv4Header as _, Ipv4PacketBuilder};
+use packet_formats::udp::{UdpPacketBuilder, UdpParseArgs};
 use test_case::test_case;
 
 /// A helper type to provide address verification in inspect NIC data.

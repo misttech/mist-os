@@ -2,21 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{format_err, Context as _, Error};
+use async_utils::hanging_get::client::HangingGetStream;
+use fidl::endpoints;
+use fuchsia_async::{self as fasync, DurationExt, Timer};
+use futures::channel::oneshot::Sender;
+use futures::future::{Fuse, FusedFuture};
+use futures::{select, Future, FutureExt, StreamExt};
+use std::fmt::Debug;
+use std::pin::pin;
+use tracing::{info, trace, warn};
 use {
-    anyhow::{format_err, Context as _, Error},
-    async_utils::hanging_get::client::HangingGetStream,
-    fidl::endpoints,
     fidl_fuchsia_bluetooth_avrcp as avrcp, fidl_fuchsia_media as media,
-    fidl_fuchsia_settings as settings,
-    fuchsia_async::{self as fasync, DurationExt, Timer},
-    fuchsia_zircon as zx,
-    futures::{
-        channel::oneshot::Sender,
-        future::{Fuse, FusedFuture},
-        select, Future, FutureExt, StreamExt,
-    },
-    std::{fmt::Debug, pin::pin},
-    tracing::{info, trace, warn},
+    fidl_fuchsia_settings as settings, fuchsia_zircon as zx,
 };
 
 /// Represents set volume request.

@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    fidl_fidl_test_components::{TriggerRequest, TriggerRequestStream},
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    futures::{StreamExt, TryStreamExt},
-    tracing::*,
-};
+use anyhow::{Context, Error};
+use fidl_fidl_test_components::{TriggerRequest, TriggerRequestStream};
+use fuchsia_async as fasync;
+use fuchsia_component::server::ServiceFs;
+use futures::{StreamExt, TryStreamExt};
+use tracing::*;
 
 /// Wraps all hosted protocols into a single type that can be matched against
 /// and dispatched.

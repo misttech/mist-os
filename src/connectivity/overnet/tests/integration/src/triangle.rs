@@ -6,19 +6,15 @@
 
 #![cfg(test)]
 
-use {
-    super::Overnet,
-    anyhow::{Context as _, Error},
-    fidl::{
-        endpoints::{ClientEnd, ServerEnd},
-        prelude::*,
-    },
-    fidl_test_echo as echo, fidl_test_triangle as triangle,
-    fuchsia_async::Task,
-    futures::prelude::*,
-    overnet_core::{ListablePeer, NodeId, NodeIdGenerator},
-    std::sync::Arc,
-};
+use super::Overnet;
+use anyhow::{Context as _, Error};
+use fidl::endpoints::{ClientEnd, ServerEnd};
+use fidl::prelude::*;
+use fuchsia_async::Task;
+use futures::prelude::*;
+use overnet_core::{ListablePeer, NodeId, NodeIdGenerator};
+use std::sync::Arc;
+use {fidl_test_echo as echo, fidl_test_triangle as triangle};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Test scenarios

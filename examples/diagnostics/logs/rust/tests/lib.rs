@@ -9,7 +9,8 @@ use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMarker, LogMessag
 use fuchsia_async::Task;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_syslog_listener::run_log_listener_with_proxy;
-use futures::{channel::mpsc, prelude::*};
+use futures::channel::mpsc;
+use futures::prelude::*;
 use std::pin::pin;
 
 #[fuchsia::test]

@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::FuchsiaTime,
-    async_trait::async_trait,
-    fuchsia_async::net::TcpStream,
-    futures::io::{AsyncRead, AsyncWrite},
-    futures::task::{Context, Poll},
-    std::net::SocketAddr,
-    std::{io, pin::Pin},
-    trust_dns_proto::tcp::Connect,
-};
+use crate::FuchsiaTime;
+use async_trait::async_trait;
+use fuchsia_async::net::TcpStream;
+use futures::io::{AsyncRead, AsyncWrite};
+use futures::task::{Context, Poll};
+use std::io;
+use std::net::SocketAddr;
+use std::pin::Pin;
+use trust_dns_proto::tcp::Connect;
 
 /// A Fuchsia-compatible implementation of trust-dns's `Connect` trait which allows
 /// creating a `TcpStream` to a particular destination.

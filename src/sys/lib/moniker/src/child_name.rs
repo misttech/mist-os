@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::error::MonikerError,
-    cm_types::{LongName, Name},
-    core::cmp::Ordering,
-    std::fmt,
-};
+use crate::error::MonikerError;
+use cm_types::{LongName, Name};
+use core::cmp::Ordering;
+use std::fmt;
 
 /// A [ChildName] locally identifies a child component instance using the name assigned by
 /// its parent and its collection (if present). It is the building block of [Moniker].
@@ -106,10 +104,8 @@ impl fmt::Debug for ChildName {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        cm_types::{MAX_LONG_NAME_LENGTH, MAX_NAME_LENGTH},
-    };
+    use super::*;
+    use cm_types::{MAX_LONG_NAME_LENGTH, MAX_NAME_LENGTH};
 
     #[test]
     fn child_monikers() {

@@ -5,8 +5,7 @@
 use anyhow::Context;
 use argh::{ArgsInfo, FromArgs};
 use fho::{Error, SimpleWriter};
-use fidl_fuchsia_developer_remotecontrol as rc;
-use fidl_fuchsia_starnix_runner as fstarrunner;
+use {fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_starnix_runner as fstarrunner};
 
 use std::io::Write;
 

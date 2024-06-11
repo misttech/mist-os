@@ -2,18 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        font_catalog::TypefaceInAssetIndex, font_db::FontDb, FontCatalog, FontPackageListing,
-        FontSets, ProductConfig,
-    },
-    anyhow::Error,
-    font_info::FontInfoLoader,
-    itertools::Itertools,
-    manifest::{v2, FontManifestWrapper},
-    std::{collections::BTreeMap, fmt, path::Path},
-    thiserror::Error,
-};
+use crate::font_catalog::TypefaceInAssetIndex;
+use crate::font_db::FontDb;
+use crate::{FontCatalog, FontPackageListing, FontSets, ProductConfig};
+use anyhow::Error;
+use font_info::FontInfoLoader;
+use itertools::Itertools;
+use manifest::{v2, FontManifestWrapper};
+use std::collections::BTreeMap;
+use std::fmt;
+use std::path::Path;
+use thiserror::Error;
 
 /// Builds a `FontDb` and then generates a manifest from all of the font metadata that has been
 /// loaded.
@@ -206,23 +205,19 @@ impl fmt::Display for GeneratorErrorVec {
 mod tests {
     #![allow(deprecated)]
 
-    use {
-        super::*,
-        crate::{
-            constants,
-            font_catalog::{Asset, Family, Typeface},
-            font_pkgs::FontPackageEntry,
-            font_sets::FontSet,
-            product_config::{FallbackChainEntry, Settings},
-        },
-        anyhow::format_err,
-        assert_matches::assert_matches,
-        char_set::CharSet,
-        fidl_fuchsia_fonts::{GenericFontFamily, Slant, Width},
-        font_info::{FontAssetSource, FontInfo},
-        manifest::v2::Style,
-        maplit::btreemap,
-    };
+    use super::*;
+    use crate::constants;
+    use crate::font_catalog::{Asset, Family, Typeface};
+    use crate::font_pkgs::FontPackageEntry;
+    use crate::font_sets::FontSet;
+    use crate::product_config::{FallbackChainEntry, Settings};
+    use anyhow::format_err;
+    use assert_matches::assert_matches;
+    use char_set::CharSet;
+    use fidl_fuchsia_fonts::{GenericFontFamily, Slant, Width};
+    use font_info::{FontAssetSource, FontInfo};
+    use manifest::v2::Style;
+    use maplit::btreemap;
 
     /// Implementation of `FontInfoLoader` whose outputs for each file name and index are explicitly
     /// specified in a user-provided map.

@@ -2,30 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context as _, Error},
-    base64::engine::{
-        general_purpose::{GeneralPurpose, GeneralPurposeConfig},
-        DecodePaddingMode, Engine as _,
-    },
-    fidl::client::QueryResponseFut,
-    fidl::endpoints::create_request_stream,
-    fidl_fuchsia_bluetooth::Appearance,
-    fidl_fuchsia_bluetooth_le::{
-        AdvertisedPeripheralMarker, AdvertisedPeripheralRequest, AdvertisedPeripheralRequestStream,
-        AdvertisingData, AdvertisingModeHint, AdvertisingParameters, ConnectionOptions,
-        ConnectionProxy, ManufacturerData, PeripheralError, PeripheralMarker, PeripheralProxy,
-        ServiceData,
-    },
-    fuchsia_async::{self as fasync},
-    fuchsia_bluetooth::{
-        assigned_numbers::find_service_uuid,
-        types::{le::Peer, Uuid},
-    },
-    fuchsia_component::client::connect_to_protocol,
-    futures::{select, StreamExt},
-    structopt::StructOpt,
+use anyhow::{format_err, Context as _, Error};
+use base64::engine::general_purpose::{GeneralPurpose, GeneralPurposeConfig};
+use base64::engine::{DecodePaddingMode, Engine as _};
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::create_request_stream;
+use fidl_fuchsia_bluetooth::Appearance;
+use fidl_fuchsia_bluetooth_le::{
+    AdvertisedPeripheralMarker, AdvertisedPeripheralRequest, AdvertisedPeripheralRequestStream,
+    AdvertisingData, AdvertisingModeHint, AdvertisingParameters, ConnectionOptions,
+    ConnectionProxy, ManufacturerData, PeripheralError, PeripheralMarker, PeripheralProxy,
+    ServiceData,
 };
+use fuchsia_async::{self as fasync};
+use fuchsia_bluetooth::assigned_numbers::find_service_uuid;
+use fuchsia_bluetooth::types::le::Peer;
+use fuchsia_bluetooth::types::Uuid;
+use fuchsia_component::client::connect_to_protocol;
+use futures::{select, StreamExt};
+use structopt::StructOpt;
 
 // TODO(armansito): Add ability to construct a valid fuchsia.bluetooth.Appearance from a string.
 // Defines all the command line arguments accepted by the tool.
@@ -299,15 +294,13 @@ async fn main() -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {
-        fidl::endpoints::{create_endpoints, create_proxy, create_proxy_and_stream, ServerEnd},
-        fidl_fuchsia_bluetooth_le::{
-            AdvertisedPeripheralProxy, ConnectionMarker, Peer, PeripheralRequest,
-            PeripheralRequestStream,
-        },
-        fuchsia_bluetooth::types::le::{ManufacturerData, ServiceData},
-        futures::{join, TryStreamExt},
+    use fidl::endpoints::{create_endpoints, create_proxy, create_proxy_and_stream, ServerEnd};
+    use fidl_fuchsia_bluetooth_le::{
+        AdvertisedPeripheralProxy, ConnectionMarker, Peer, PeripheralRequest,
+        PeripheralRequestStream,
     };
+    use fuchsia_bluetooth::types::le::{ManufacturerData, ServiceData};
+    use futures::{join, TryStreamExt};
 
     #[test]
     fn test_parse_service_uuid() {

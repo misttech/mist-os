@@ -4,16 +4,14 @@
 
 //! The images and firmware that should be downloaded and written during the update.
 
-use {
-    crate::update_mode::UpdateMode,
-    camino::Utf8Path,
-    fidl_fuchsia_io as fio,
-    fuchsia_url::{AbsoluteComponentUrl, ParseError, PinnedAbsolutePackageUrl},
-    fuchsia_zircon_status::Status,
-    serde::{Deserialize, Serialize},
-    std::collections::{BTreeMap, HashSet},
-    thiserror::Error,
-};
+use crate::update_mode::UpdateMode;
+use camino::Utf8Path;
+use fidl_fuchsia_io as fio;
+use fuchsia_url::{AbsoluteComponentUrl, ParseError, PinnedAbsolutePackageUrl};
+use fuchsia_zircon_status::Status;
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashSet};
+use thiserror::Error;
 
 /// An error encountered while resolving images.
 #[derive(Debug, Error)]
@@ -513,13 +511,13 @@ async fn image_packages(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        serde_json::json,
-        std::{fs::File, io::Write},
-        vfs::{file::vmo::read_only, pseudo_directory},
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use serde_json::json;
+    use std::fs::File;
+    use std::io::Write;
+    use vfs::file::vmo::read_only;
+    use vfs::pseudo_directory;
 
     fn sha256(n: u8) -> fuchsia_hash::Sha256 {
         [n; 32].into()

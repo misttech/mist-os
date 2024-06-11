@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error, fidl_fuchsia_boot as fuchsia_boot, fuchsia_sync::Mutex, fuchsia_zircon::Channel,
-    futures::prelude::*, std::sync::Arc,
-};
+use anyhow::Error;
+use fidl_fuchsia_boot as fuchsia_boot;
+use fuchsia_sync::Mutex;
+use fuchsia_zircon::Channel;
+use futures::prelude::*;
+use std::sync::Arc;
 
 pub struct SvcStashCapability {
     channel: Mutex<Option<fidl::endpoints::ServerEnd<fuchsia_boot::SvcStashMarker>>>,
@@ -36,12 +38,10 @@ impl SvcStashCapability {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl::endpoints::create_proxy_and_stream,
-        fuchsia_async as fasync,
-        fuchsia_zircon::{sys, AsHandleRef},
-    };
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fuchsia_async as fasync;
+    use fuchsia_zircon::{sys, AsHandleRef};
 
     // Just need a channel to stash.
     async fn get_svc_stash_handle() -> Result<Channel, Error> {

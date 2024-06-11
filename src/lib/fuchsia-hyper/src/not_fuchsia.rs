@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{parse_ip_addr, HyperConnectorFuture, SocketOptions, TcpOptions, TcpStream},
-    async_net as net,
-    futures::io,
-    http::uri::{Scheme, Uri},
-    hyper::service::Service,
-    rustls::ClientConfig,
-    std::net::ToSocketAddrs,
-    std::task::{Context, Poll},
-    tracing::warn,
-};
+use crate::{parse_ip_addr, HyperConnectorFuture, SocketOptions, TcpOptions, TcpStream};
+use async_net as net;
+use futures::io;
+use http::uri::{Scheme, Uri};
+use hyper::service::Service;
+use rustls::ClientConfig;
+use std::net::ToSocketAddrs;
+use std::task::{Context, Poll};
+use tracing::warn;
 
 pub(crate) fn configure_cert_store(tls: &mut ClientConfig) {
     tls.root_store = rustls_native_certs::load_native_certs().unwrap_or_else(|(certs, err)| {
@@ -130,21 +128,19 @@ async fn resolve_host_port(host: &str, port: u16) -> Result<net::TcpStream, io::
 
 #[cfg(test)]
 mod test {
-    use {
-        crate::*,
-        anyhow::{Error, Result},
-        async_net::TcpListener,
-        futures::{
-            future::BoxFuture, stream::FuturesUnordered, StreamExt, TryFutureExt, TryStreamExt,
-        },
-        hyper::{
-            body::HttpBody,
-            server::{accept::from_stream, Server},
-            service::{make_service_fn, service_fn},
-            Response, StatusCode,
-        },
-        std::{convert::Infallible, io::Write},
-    };
+    use crate::*;
+    use anyhow::{Error, Result};
+    use async_net::TcpListener;
+    use futures::future::BoxFuture;
+    use futures::stream::FuturesUnordered;
+    use futures::{StreamExt, TryFutureExt, TryStreamExt};
+    use hyper::body::HttpBody;
+    use hyper::server::accept::from_stream;
+    use hyper::server::Server;
+    use hyper::service::{make_service_fn, service_fn};
+    use hyper::{Response, StatusCode};
+    use std::convert::Infallible;
+    use std::io::Write;
 
     trait AsyncReadWrite: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send {}
     impl<T> AsyncReadWrite for T where T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send {}

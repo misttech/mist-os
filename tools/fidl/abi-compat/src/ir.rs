@@ -7,7 +7,12 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use serde::Deserialize;
-use std::{collections::HashMap, fmt::Display, fs, io::BufReader, path::Path, rc::Rc};
+use std::collections::HashMap;
+use std::fmt::Display;
+use std::fs;
+use std::io::BufReader;
+use std::path::Path;
+use std::rc::Rc;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct AttributeArgument {
@@ -315,7 +320,10 @@ open protocol Example {
 #[cfg(test)]
 mod testing {
     use super::{Result, IR};
-    use std::{ffi::OsString, path::Path, process::Command, rc::Rc};
+    use std::ffi::OsString;
+    use std::path::Path;
+    use std::process::Command;
+    use std::rc::Rc;
 
     // A minimal zx library for tests.
     const ZX_SOURCE: &'static str = "

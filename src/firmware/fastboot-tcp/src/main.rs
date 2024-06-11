@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::Context;
-use std::{
-    io::{Read, Write},
-    net::{Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener},
-};
+use std::io::{Read, Write};
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener};
 use tracing::info;
 
 pub mod fastboot;

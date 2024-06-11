@@ -6,14 +6,12 @@ use derivative::Derivative;
 use fidl_fuchsia_diagnostics::StreamMode;
 use fuchsia_sync::Mutex;
 use futures::prelude::*;
-use std::{
-    collections::VecDeque,
-    default::Default,
-    fmt::Debug,
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll, Waker},
-};
+use std::collections::VecDeque;
+use std::default::Default;
+use std::fmt::Debug;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll, Waker};
 use tracing::{trace, warn};
 
 /// A list that can be iterated despite concurrent insertions and deletions.

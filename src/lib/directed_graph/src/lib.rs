@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    cmp::min,
-    collections::{HashMap, HashSet, VecDeque},
-    fmt::{Debug, Display},
-    hash::Hash,
-};
+use std::cmp::min;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt::{Debug, Display};
+use std::hash::Hash;
 
 /// A directed graph, whose nodes contain an identifier of type `T`.
 pub struct DirectedGraph<T: PartialEq + Hash + Copy + Ord + Debug + Display>(

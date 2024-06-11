@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::crypto_provider::mundane_provider::MundaneSoftwareProvider;
 use crate::crypto_provider::{
-    mundane_provider::MundaneSoftwareProvider, AsymmetricProviderKey, CryptoProvider,
-    CryptoProviderError, ProviderKey, SealingProviderKey,
+    AsymmetricProviderKey, CryptoProvider, CryptoProviderError, ProviderKey, SealingProviderKey,
 };
-use aes_gcm::{aead::AeadInPlace, Aes256Gcm, Key, KeyInit, Nonce, Tag};
+use aes_gcm::aead::AeadInPlace;
+use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, Tag};
 use fidl_fuchsia_kms::{AsymmetricKeyAlgorithm, KeyProvider};
 use serde::{Deserialize, Serialize};
 

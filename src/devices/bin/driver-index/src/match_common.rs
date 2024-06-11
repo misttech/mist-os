@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::resolved_driver::ResolvedDriver,
-    bind::compiler::Symbol,
-    bind::ddk_bind_constants::{BIND_AUTOBIND, BIND_PROTOCOL},
-    bind::interpreter::decode_bind_rules::DecodedCompositeBindRules,
-    bind::interpreter::match_bind::{DeviceProperties, PropertyKey},
-    fidl_fuchsia_driver_framework as fdf,
-    fuchsia_zircon::{zx_status_t, Status},
-};
+use crate::resolved_driver::ResolvedDriver;
+use bind::compiler::Symbol;
+use bind::ddk_bind_constants::{BIND_AUTOBIND, BIND_PROTOCOL};
+use bind::interpreter::decode_bind_rules::DecodedCompositeBindRules;
+use bind::interpreter::match_bind::{DeviceProperties, PropertyKey};
+use fidl_fuchsia_driver_framework as fdf;
+use fuchsia_zircon::{zx_status_t, Status};
 
 const BIND_PROTOCOL_KEY: PropertyKey = PropertyKey::NumberKey(BIND_PROTOCOL as u64);
 const BIND_AUTOBIND_KEY: PropertyKey = PropertyKey::NumberKey(BIND_AUTOBIND as u64);

@@ -7,19 +7,19 @@
 //! to put pixels on screen. The items in this module are higher-
 //! level drawing primitives.
 
-use crate::{
-    color::Color,
-    geometry::{Coord, Corners, Point, Rect, Size},
-    render::{Context as RenderContext, Path, PathBuilder, Raster, RasterBuilder},
-};
+use crate::color::Color;
+use crate::geometry::{Coord, Corners, Point, Rect, Size};
+use crate::render::{Context as RenderContext, Path, PathBuilder, Raster, RasterBuilder};
 use anyhow::{anyhow, Context, Error};
-use euclid::{
-    default::{Box2D, Size2D, Transform2D, Vector2D},
-    point2, size2, vec2, Angle,
-};
+use euclid::default::{Box2D, Size2D, Transform2D, Vector2D};
+use euclid::{point2, size2, vec2, Angle};
 use fuchsia_zircon::{self as zx};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fs::File, path::PathBuf, slice, str::FromStr};
+use std::collections::BTreeMap;
+use std::fs::File;
+use std::path::PathBuf;
+use std::slice;
+use std::str::FromStr;
 use ttf_parser::Face;
 
 /// Some Fuchsia device displays are mounted rotated. This value represents
@@ -718,16 +718,14 @@ impl TextGrid {
 #[cfg(test)]
 mod tests {
     use super::{GlyphMap, Size, Text, TextGrid};
-    use crate::{
-        drawing::{measure_text_size, DisplayRotation, FontFace},
-        render::{
-            generic::{self, Backend},
-            Context as RenderContext, ContextInner,
-        },
-    };
-    use euclid::{approxeq::ApproxEq, size2, vec2};
+    use crate::drawing::{measure_text_size, DisplayRotation, FontFace};
+    use crate::render::generic::{self, Backend};
+    use crate::render::{Context as RenderContext, ContextInner};
+    use euclid::approxeq::ApproxEq;
+    use euclid::{size2, vec2};
     use fuchsia_async::{self as fasync, Time, TimeoutExt};
-    use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameUsage};
+    use fuchsia_framebuffer::sysmem::BufferCollectionAllocator;
+    use fuchsia_framebuffer::FrameUsage;
     use once_cell::sync::Lazy;
 
     const DEFAULT_TIMEOUT: fuchsia_zircon::Duration = fuchsia_zircon::Duration::from_seconds(5);

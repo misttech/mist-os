@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property},
-    base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _},
-    serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer},
-};
+use crate::{ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property};
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::engine::Engine as _;
+use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 
 impl<Key> Serialize for DiagnosticsHierarchy<Key>
 where
@@ -169,10 +168,8 @@ impl_serialize_for_array_value![i64, u64, f64,];
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{hierarchy, ArrayFormat},
-    };
+    use super::*;
+    use crate::{hierarchy, ArrayFormat};
 
     #[fuchsia::test]
     fn serialize_json() {

@@ -2,29 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::core::package::reader::{PackageReader, PackagesFromUpdateReader},
-    crate::core::util::types::PartialPackageDefinition,
-    crate::zbi::collection::Zbi,
-    anyhow::{anyhow, bail, format_err, Context, Result},
-    fuchsia_hash::Hash,
-    fuchsia_url::{AbsolutePackageUrl, PackageName, PackageVariant},
-    scrutiny::prelude::{DataCollector, DataModel},
-    scrutiny_utils::{
-        artifact::{ArtifactReader, FileArtifactReader},
-        bootfs::{BootfsFileIndex, BootfsPackageIndex, BootfsReader},
-        key_value::parse_key_value,
-        package::PackageIndexContents,
-        url::from_package_name_variant_path,
-        zbi::{ZbiReader, ZbiType},
-    },
-    std::collections::HashMap,
-    std::path::{Path, PathBuf},
-    std::str::FromStr,
-    std::sync::Arc,
-    tracing::{info, warn},
-    update_package::parse_image_packages_json,
-};
+use crate::core::package::reader::{PackageReader, PackagesFromUpdateReader};
+use crate::core::util::types::PartialPackageDefinition;
+use crate::zbi::collection::Zbi;
+use anyhow::{anyhow, bail, format_err, Context, Result};
+use fuchsia_hash::Hash;
+use fuchsia_url::{AbsolutePackageUrl, PackageName, PackageVariant};
+use scrutiny::prelude::{DataCollector, DataModel};
+use scrutiny_utils::artifact::{ArtifactReader, FileArtifactReader};
+use scrutiny_utils::bootfs::{BootfsFileIndex, BootfsPackageIndex, BootfsReader};
+use scrutiny_utils::key_value::parse_key_value;
+use scrutiny_utils::package::PackageIndexContents;
+use scrutiny_utils::url::from_package_name_variant_path;
+use scrutiny_utils::zbi::{ZbiReader, ZbiType};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
+use std::sync::Arc;
+use tracing::{info, warn};
+use update_package::parse_image_packages_json;
 
 /// The path of the file in bootfs that lists all the bootfs packages.
 const BOOT_PACKAGE_INDEX: &str = "data/bootfs_packages";

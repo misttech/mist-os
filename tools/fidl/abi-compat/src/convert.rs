@@ -5,17 +5,14 @@
 //! This module implements the conversion between the IR representation and the
 //! comparison representation.
 
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    rc::Rc,
-};
+use std::collections::{BTreeMap, BTreeSet};
+use std::rc::Rc;
 
 use anyhow::{anyhow, bail, Context as _, Result};
 use flyweights::FlyStr;
 use itertools::Itertools;
 
-use crate::compare;
-use crate::ir;
+use crate::{compare, ir};
 
 #[derive(Clone)]
 pub struct Context {

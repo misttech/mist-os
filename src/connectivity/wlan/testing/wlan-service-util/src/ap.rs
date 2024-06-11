@@ -4,11 +4,10 @@
 
 use anyhow::{format_err, Context as _, Error};
 use fidl::endpoints;
-use fidl_fuchsia_wlan_common as fidl_common;
 use fidl_fuchsia_wlan_common::WlanMacRole;
 use fidl_fuchsia_wlan_device_service::DeviceMonitorProxy;
-use fidl_fuchsia_wlan_sme as fidl_sme;
 use ieee80211::Ssid;
+use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_sme as fidl_sme};
 
 type WlanService = DeviceMonitorProxy;
 
@@ -80,15 +79,12 @@ mod tests {
     use fidl_fuchsia_wlan_device_service::{
         DeviceMonitorMarker, DeviceMonitorRequest, DeviceMonitorRequestStream,
     };
-    use fidl_fuchsia_wlan_sme::ApSmeMarker;
-    use fidl_fuchsia_wlan_sme::StartApResultCode;
-    use fidl_fuchsia_wlan_sme::{ApSmeRequest, ApSmeRequestStream};
-    use fuchsia_async as fasync;
-    use fuchsia_zircon as zx;
+    use fidl_fuchsia_wlan_sme::{ApSmeMarker, ApSmeRequest, ApSmeRequestStream, StartApResultCode};
     use futures::stream::{StreamExt, StreamFuture};
     use futures::task::Poll;
     use ieee80211::Ssid;
     use std::pin::pin;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     use wlan_common::assert_variant;
 

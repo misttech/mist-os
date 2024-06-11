@@ -7,54 +7,41 @@ pub mod experiment;
 mod inspect_time_series;
 mod windowed_stats;
 
+use crate::client;
+use crate::telemetry::inspect_time_series::TimeSeriesStats;
+use crate::telemetry::windowed_stats::WindowedStats;
+use crate::util::historical_list::{HistoricalList, Timestamped};
+use crate::util::pseudo_energy::{EwmaSignalData, RssiVelocity};
+use anyhow::{format_err, Context, Error};
+use cobalt_client::traits::AsEventCode;
+use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
+use fuchsia_async::{self as fasync, TimeoutExt};
+use fuchsia_inspect::{
+    ArrayProperty, InspectType, Inspector, LazyNode, Node as InspectNode, NumericProperty,
+    UintProperty,
+};
+use fuchsia_inspect_contrib::auto_persist::{self, AutoPersist};
+use fuchsia_inspect_contrib::inspectable::{InspectableBool, InspectableU64};
+use fuchsia_inspect_contrib::log::{InspectBytes, InspectList};
+use fuchsia_inspect_contrib::nodes::BoundedListNode;
+use fuchsia_inspect_contrib::{inspect_insert, inspect_log, make_inspect_loggable};
+use fuchsia_sync::Mutex;
+use fuchsia_zircon::{self as zx, DurationNum};
+use futures::channel::{mpsc, oneshot};
+use futures::future::BoxFuture;
+use futures::{select, Future, FutureExt, StreamExt};
+use ieee80211::OuiFmt;
+use num_traits::SaturatingAdd;
+use static_assertions::const_assert_eq;
+use std::cmp::{max, min, Reverse};
+use std::collections::{HashMap, HashSet};
+use std::ops::Add;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use tracing::{error, info, warn};
 use {
-    crate::{
-        client,
-        telemetry::{inspect_time_series::TimeSeriesStats, windowed_stats::WindowedStats},
-        util::{
-            historical_list::{HistoricalList, Timestamped},
-            pseudo_energy::{EwmaSignalData, RssiVelocity},
-        },
-    },
-    anyhow::{format_err, Context, Error},
-    cobalt_client::traits::AsEventCode,
-    fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload},
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_async::{self as fasync, TimeoutExt},
-    fuchsia_inspect::{
-        ArrayProperty, InspectType, Inspector, LazyNode, Node as InspectNode, NumericProperty,
-        UintProperty,
-    },
-    fuchsia_inspect_contrib::{
-        auto_persist::{self, AutoPersist},
-        inspect_insert, inspect_log,
-        inspectable::{InspectableBool, InspectableU64},
-        log::{InspectBytes, InspectList},
-        make_inspect_loggable,
-        nodes::BoundedListNode,
-    },
-    fuchsia_sync::Mutex,
-    fuchsia_zircon::{self as zx, DurationNum},
-    futures::{
-        channel::{mpsc, oneshot},
-        future::BoxFuture,
-        select, Future, FutureExt, StreamExt,
-    },
-    ieee80211::OuiFmt,
-    num_traits::SaturatingAdd,
-    static_assertions::const_assert_eq,
-    std::{
-        cmp::{max, min, Reverse},
-        collections::{HashMap, HashSet},
-        ops::Add,
-        sync::{
-            atomic::{AtomicBool, Ordering},
-            Arc,
-        },
-    },
-    tracing::{error, info, warn},
-    wlan_metrics_registry as metrics,
+    fidl_fuchsia_wlan_sme as fidl_sme, wlan_metrics_registry as metrics,
 };
 
 // Include a timeout on stats calls so that if the driver deadlocks, telemtry doesn't get stuck.
@@ -4198,37 +4185,32 @@ impl ConnectAttemptsCounter {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::util::testing::{
-            create_inspect_persistence_channel, generate_random_bss, generate_random_channel,
-            generate_random_scanned_candidate,
-        },
-        diagnostics_assertions::{
-            AnyBoolProperty, AnyNumericProperty, AnyStringProperty, NonZeroUintProperty,
-        },
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_metrics::{MetricEvent, MetricEventLoggerRequest, MetricEventPayload},
-        fidl_fuchsia_wlan_common as fidl_common,
-        futures::{stream::FusedStream, task::Poll, TryStreamExt},
-        ieee80211_testutils::{BSSID_REGEX, SSID_REGEX},
-        rand::Rng,
-        regex::Regex,
-        std::{
-            collections::VecDeque,
-            pin::{pin, Pin},
-        },
-        test_case::test_case,
-        test_util::assert_gt,
-        wlan_common::{
-            assert_variant,
-            bss::BssDescription,
-            channel::{Cbw, Channel},
-            ie::IeType,
-            random_bss_description,
-            test_utils::fake_stas::IesOverrides,
-        },
+    use super::*;
+    use crate::util::testing::{
+        create_inspect_persistence_channel, generate_random_bss, generate_random_channel,
+        generate_random_scanned_candidate,
     };
+    use diagnostics_assertions::{
+        AnyBoolProperty, AnyNumericProperty, AnyStringProperty, NonZeroUintProperty,
+    };
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_metrics::{MetricEvent, MetricEventLoggerRequest, MetricEventPayload};
+    use fidl_fuchsia_wlan_common as fidl_common;
+    use futures::stream::FusedStream;
+    use futures::task::Poll;
+    use futures::TryStreamExt;
+    use ieee80211_testutils::{BSSID_REGEX, SSID_REGEX};
+    use rand::Rng;
+    use regex::Regex;
+    use std::collections::VecDeque;
+    use std::pin::{pin, Pin};
+    use test_case::test_case;
+    use test_util::assert_gt;
+    use wlan_common::bss::BssDescription;
+    use wlan_common::channel::{Cbw, Channel};
+    use wlan_common::ie::IeType;
+    use wlan_common::test_utils::fake_stas::IesOverrides;
+    use wlan_common::{assert_variant, random_bss_description};
 
     const STEP_INCREMENT: zx::Duration = zx::Duration::from_seconds(1);
     const IFACE_ID: u16 = 1;

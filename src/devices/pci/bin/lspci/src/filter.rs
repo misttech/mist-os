@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 use crate::device;
 use anyhow::anyhow;
-use std::fmt;
-use std::str;
+use std::{fmt, str};
 
 /// Provides a way to filter Devices to those specified by the user's preference.
 #[derive(Copy, Clone, Debug, Default, PartialEq)]

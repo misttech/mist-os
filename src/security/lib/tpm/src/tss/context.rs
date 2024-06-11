@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    capability::{capability_property, Tpm2Capability},
-    error::TpmError,
-    ffi_return_if_error,
-    hierarchy::{Tpm2Hierarchy, ENDORSEMENT_KEY_ECC_P256_TEMPLATE, TPM2_HIERARCHY_AUTH_SIZE},
-    tpm::AUTH_SIZE,
-    tss::{heap::EsysHeapObj, tcti::TctiContext},
+use crate::capability::{capability_property, Tpm2Capability};
+use crate::error::TpmError;
+use crate::ffi_return_if_error;
+use crate::hierarchy::{
+    Tpm2Hierarchy, ENDORSEMENT_KEY_ECC_P256_TEMPLATE, TPM2_HIERARCHY_AUTH_SIZE,
 };
+use crate::tpm::AUTH_SIZE;
+use crate::tss::heap::EsysHeapObj;
+use crate::tss::tcti::TctiContext;
 use std::ptr::null_mut;
 use tpm2_tss_sys as tss_sys;
 

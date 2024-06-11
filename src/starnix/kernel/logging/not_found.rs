@@ -8,7 +8,8 @@ use futures::future::BoxFuture;
 use once_cell::sync::Lazy;
 use regex::bytes::Regex;
 use starnix_sync::Mutex;
-use std::collections::{hash_map::Entry, BTreeMap, HashMap};
+use std::collections::hash_map::Entry;
+use std::collections::{BTreeMap, HashMap};
 
 /// Path prefixes for which Starnix is responsible.
 const DESIRED_PATH_PREFIXES: &[&str] = &["/dev/", "/proc/", "/sys/"];

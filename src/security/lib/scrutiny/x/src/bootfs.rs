@@ -2,24 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::api;
 use super::api::Blob as _;
-use super::blob::BlobOpenError;
-use super::blob::BlobSet;
-use super::blob::VerifiedMemoryBlob;
-use super::data_source as ds;
-use super::package::Error as PackageError;
-use super::package::Package;
+use super::blob::{BlobOpenError, BlobSet, VerifiedMemoryBlob};
+use super::package::{Error as PackageError, Package};
+use super::{api, data_source as ds};
 use cm_config::RuntimeConfig;
-use fidl::unpersist;
-use fidl::Error as FidlError;
+use fidl::{unpersist, Error as FidlError};
 use fidl_fuchsia_component_internal as component_internal;
 use fuchsia_url::boot_url::BootUrl;
 use scrutiny_utils::key_value::parse_key_value;
 use std::collections::HashMap;
 use std::io::Error as IoError;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::str::Utf8Error;
 use thiserror::Error;
@@ -294,19 +288,15 @@ impl api::ComponentManagerConfiguration for ComponentManagerConfiguration {
 
 #[cfg(test)]
 mod tests {
-    use super::super::api;
     use super::super::api::Bootfs as _;
-    use super::super::blob::BlobSet as _;
-    use super::super::blob::VerifiedMemoryBlob;
-    use super::super::data_source as ds;
+    use super::super::blob::{BlobSet as _, VerifiedMemoryBlob};
     use super::super::package::test::placeholder_package_far;
-    use super::AdditionalBootConfigurationError;
-    use super::Bootfs;
-    use super::BootfsPackageIndexError;
-    use super::ComponentManagerConfigurationError;
-    use super::ADDITIONAL_BOOT_ARGS_PATH;
-    use super::BOOTFS_PACKAGE_INDEX_PATH;
-    use super::COMPONENT_MANAGER_CONFIG_PATH;
+    use super::super::{api, data_source as ds};
+    use super::{
+        AdditionalBootConfigurationError, Bootfs, BootfsPackageIndexError,
+        ComponentManagerConfigurationError, ADDITIONAL_BOOT_ARGS_PATH, BOOTFS_PACKAGE_INDEX_PATH,
+        COMPONENT_MANAGER_CONFIG_PATH,
+    };
     use fidl::persist;
     use fidl_fuchsia_component_internal as component_internal;
     use std::collections::HashMap;

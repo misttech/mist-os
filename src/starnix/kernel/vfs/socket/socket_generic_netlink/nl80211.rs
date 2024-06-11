@@ -8,11 +8,13 @@ use starnix_logging::{log_debug, log_error, log_warn};
 use anyhow::{bail, format_err, Context as _, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_wlan_wlanix as fidl_wlanix;
-use futures::{channel::mpsc, StreamExt};
-use netlink::{messaging::Sender, NETLINK_LOG_TAG};
+use futures::channel::mpsc;
+use futures::StreamExt;
+use netlink::messaging::Sender;
+use netlink::NETLINK_LOG_TAG;
+use netlink_packet_core::buffer::NETLINK_HEADER_LEN;
 use netlink_packet_core::{
-    buffer::NETLINK_HEADER_LEN, DoneMessage, ErrorMessage, NetlinkHeader, NetlinkMessage,
-    NetlinkPayload,
+    DoneMessage, ErrorMessage, NetlinkHeader, NetlinkMessage, NetlinkPayload,
 };
 use netlink_packet_utils::Emitable;
 

@@ -2,14 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    component_events::{
-        events::{EventStream, Started},
-        matcher::{EventMatcher, ExitStatusMatcher},
-        sequence::EventSequence,
-    },
-    fuchsia_component_test::ScopedInstance,
-};
+use component_events::events::{EventStream, Started};
+use component_events::matcher::{EventMatcher, ExitStatusMatcher};
+use component_events::sequence::EventSequence;
+use fuchsia_component_test::ScopedInstance;
 
 #[fuchsia::test]
 async fn test_normal_behavior() {

@@ -2,23 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_async::{DurationExt, OnTimeout, TimeoutExt},
-    fuchsia_bluetooth::types::Channel,
-    fuchsia_sync::Mutex,
-    fuchsia_zircon::{self as zx, Duration},
-    futures::{
-        future::{FusedFuture, MaybeDone},
-        ready,
-        stream::Stream,
-        task::{Context, Poll, Waker},
-        Future, FutureExt, TryFutureExt,
-    },
-    packet_encoding::{Decodable, Encodable},
-    slab::Slab,
-    std::{collections::VecDeque, marker::PhantomData, mem, pin::Pin, sync::Arc},
-    tracing::{info, trace, warn},
-};
+use fuchsia_async::{DurationExt, OnTimeout, TimeoutExt};
+use fuchsia_bluetooth::types::Channel;
+use fuchsia_sync::Mutex;
+use fuchsia_zircon::{self as zx, Duration};
+use futures::future::{FusedFuture, MaybeDone};
+use futures::stream::Stream;
+use futures::task::{Context, Poll, Waker};
+use futures::{ready, Future, FutureExt, TryFutureExt};
+use packet_encoding::{Decodable, Encodable};
+use slab::Slab;
+use std::collections::VecDeque;
+use std::marker::PhantomData;
+use std::mem;
+use std::pin::Pin;
+use std::sync::Arc;
+use tracing::{info, trace, warn};
 
 #[cfg(test)]
 mod tests;
@@ -29,14 +28,13 @@ mod types;
 
 use crate::types::{SignalIdentifier, SignalingHeader, SignalingMessageType, TxLabel};
 
-pub use crate::{
-    rtp::{RtpError, RtpHeader},
-    stream_endpoint::{MediaStream, StreamEndpoint, StreamEndpointUpdateCallback, StreamState},
-    types::{
-        ContentProtectionType, EndpointType, Error, ErrorCode, MediaCodecType, MediaType,
-        RemoteReject, Result, ServiceCapability, ServiceCategory, StreamEndpointId,
-        StreamInformation,
-    },
+pub use crate::rtp::{RtpError, RtpHeader};
+pub use crate::stream_endpoint::{
+    MediaStream, StreamEndpoint, StreamEndpointUpdateCallback, StreamState,
+};
+pub use crate::types::{
+    ContentProtectionType, EndpointType, Error, ErrorCode, MediaCodecType, MediaType, RemoteReject,
+    Result, ServiceCapability, ServiceCategory, StreamEndpointId, StreamInformation,
 };
 
 /// An AVDTP signaling peer can send commands to another peer, receive requests and send responses.

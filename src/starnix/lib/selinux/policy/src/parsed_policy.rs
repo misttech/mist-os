@@ -4,28 +4,28 @@
 
 use crate::arrays::{RoleAllow, RoleTransition};
 
-use super::{
-    arrays::{
-        AccessVectors, ConditionalNodes, Context, DeprecatedFilenameTransitions,
-        FilenameTransitionList, FilenameTransitions, FsUses, GenericFsContexts, IPv6Nodes,
-        InfinitiBandEndPorts, InfinitiBandPartitionKeys, InitialSids, NamedContextPairs, Nodes,
-        Ports, RangeTransitions, RoleAllows, RoleTransitions, SimpleArray,
-        MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY,
-    },
-    error::{ParseError, QueryError, ValidateError},
-    extensible_bitmap::ExtensibleBitmap,
-    metadata::{Config, Counts, HandleUnknown, Magic, PolicyVersion, Signature},
-    parser::ParseStrategy,
-    symbols::{
-        find_class_by_name, find_class_permission_by_name, Category, Class, Classes, CommonSymbol,
-        CommonSymbols, ConditionalBoolean, Permission, Role, Sensitivity, SymbolList, Type, User,
-    },
-    AccessVector, CategoryId, Parse, RoleId, SensitivityId, TypeId, UserId, Validate,
+use super::arrays::{
+    AccessVectors, ConditionalNodes, Context, DeprecatedFilenameTransitions,
+    FilenameTransitionList, FilenameTransitions, FsUses, GenericFsContexts, IPv6Nodes,
+    InfinitiBandEndPorts, InfinitiBandPartitionKeys, InitialSids, NamedContextPairs, Nodes, Ports,
+    RangeTransitions, RoleAllows, RoleTransitions, SimpleArray,
+    MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY,
 };
+use super::error::{ParseError, QueryError, ValidateError};
+use super::extensible_bitmap::ExtensibleBitmap;
+use super::metadata::{Config, Counts, HandleUnknown, Magic, PolicyVersion, Signature};
+use super::parser::ParseStrategy;
+use super::symbols::{
+    find_class_by_name, find_class_permission_by_name, Category, Class, Classes, CommonSymbol,
+    CommonSymbols, ConditionalBoolean, Permission, Role, Sensitivity, SymbolList, Type, User,
+};
+use super::{AccessVector, CategoryId, Parse, RoleId, SensitivityId, TypeId, UserId, Validate};
 
 use anyhow::Context as _;
 use selinux_common as sc;
-use std::{collections::HashSet, fmt::Debug, hash::Hash};
+use std::collections::HashSet;
+use std::fmt::Debug;
+use std::hash::Hash;
 use zerocopy::little_endian as le;
 
 /// A parsed binary policy.

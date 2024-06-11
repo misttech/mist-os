@@ -4,13 +4,15 @@
 
 use anyhow::{Context, Result};
 use errors::ffx_bail;
-use ffx_config::{
-    global_env_context,
-    logging::{change_log_file, reset_log_file},
-};
+use ffx_config::global_env_context;
+use ffx_config::logging::{change_log_file, reset_log_file};
 use fuchsia_async::TimeoutExt;
 use serde_json::Value;
-use std::{future::Future, io::Write, path::PathBuf, pin::Pin, time::Duration};
+use std::future::Future;
+use std::io::Write;
+use std::path::PathBuf;
+use std::pin::Pin;
+use std::time::Duration;
 use termion::is_tty;
 
 pub mod asserts;

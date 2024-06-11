@@ -6,20 +6,18 @@
 
 use async_utils::channel::TrySend as _;
 use fidl::endpoints::{ControlHandle as _, ProtocolMarker as _, ServerEnd};
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_root as fnet_root;
-use fuchsia_zircon as zx;
 use futures::TryStreamExt as _;
 use log::debug;
 use net_types::ip::{Ipv4, Ipv6};
-
-use crate::bindings::{
-    devices::{BindingId, DeviceSpecificInfo, LOOPBACK_MAC},
-    interfaces_admin,
-    routes::admin::{serve_route_set, GlobalRouteSet},
-    util::{IntoFidl as _, ResultExt as _, TaskWaitGroupSpawner},
-    DeviceIdExt as _, Netstack,
+use {
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin, fidl_fuchsia_net_root as fnet_root,
+    fuchsia_zircon as zx,
 };
+
+use crate::bindings::devices::{BindingId, DeviceSpecificInfo, LOOPBACK_MAC};
+use crate::bindings::routes::admin::{serve_route_set, GlobalRouteSet};
+use crate::bindings::util::{IntoFidl as _, ResultExt as _, TaskWaitGroupSpawner};
+use crate::bindings::{interfaces_admin, DeviceIdExt as _, Netstack};
 
 // Serve a stream of fuchsia.net.root.Interfaces API requests for a single
 // channel (e.g. a single client connection).

@@ -3,38 +3,35 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_debug as fdebug;
-use fidl_fuchsia_net_dhcp as fdhcp;
-use fidl_fuchsia_net_ext as fnet_ext;
-use fidl_fuchsia_net_filter as fnet_filter;
-use fidl_fuchsia_net_filter_deprecated as ffilter_deprecated;
-use fidl_fuchsia_net_filter_ext as fnet_filter_ext;
-use fidl_fuchsia_net_interfaces as finterfaces;
-use fidl_fuchsia_net_interfaces_admin as finterfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as finterfaces_ext;
-use fidl_fuchsia_net_name as fname;
-use fidl_fuchsia_net_neighbor as fneighbor;
-use fidl_fuchsia_net_neighbor_ext as fneighbor_ext;
-use fidl_fuchsia_net_root as froot;
-use fidl_fuchsia_net_routes as froutes;
-use fidl_fuchsia_net_routes_ext as froutes_ext;
-use fidl_fuchsia_net_stack as fstack;
 use fidl_fuchsia_net_stack_ext::{self as fstack_ext, FidlReturn as _};
-use fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration;
 use filter::{IpRoutines, NatRoutines};
 use fnet_filter_ext::{ControllerId, Rule};
-use fuchsia_zircon_status as zx;
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_types::ip::{Ipv4, Ipv6};
 use netfilter::FidlReturn as _;
 use prettytable::{cell, format, row, Row, Table};
 use ser::AddressAssignmentState;
-use serde_json::{json, value::Value};
+use serde_json::json;
+use serde_json::value::Value;
 use std::collections::hash_map::HashMap;
 use std::collections::BTreeMap;
-use std::{convert::TryFrom as _, iter::FromIterator as _, pin::pin, str::FromStr as _};
+use std::convert::TryFrom as _;
+use std::iter::FromIterator as _;
+use std::pin::pin;
+use std::str::FromStr as _;
 use tracing::{info, warn};
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_debug as fdebug, fidl_fuchsia_net_dhcp as fdhcp,
+    fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_filter as fnet_filter,
+    fidl_fuchsia_net_filter_deprecated as ffilter_deprecated,
+    fidl_fuchsia_net_filter_ext as fnet_filter_ext, fidl_fuchsia_net_interfaces as finterfaces,
+    fidl_fuchsia_net_interfaces_admin as finterfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as finterfaces_ext, fidl_fuchsia_net_name as fname,
+    fidl_fuchsia_net_neighbor as fneighbor, fidl_fuchsia_net_neighbor_ext as fneighbor_ext,
+    fidl_fuchsia_net_root as froot, fidl_fuchsia_net_routes as froutes,
+    fidl_fuchsia_net_routes_ext as froutes_ext, fidl_fuchsia_net_stack as fstack,
+    fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration, fuchsia_zircon_status as zx,
+};
 
 mod opts;
 pub use opts::{
@@ -1709,14 +1706,17 @@ mod tests {
 
     use assert_matches::assert_matches;
     use fidl::endpoints::ProtocolMarker;
-    use fidl_fuchsia_hardware_network as fhardware_network;
-    use fidl_fuchsia_net_routes as froutes;
-    use fidl_fuchsia_net_routes_ext as froutes_ext;
     use fnet_filter_ext::{InstalledIpRoutine, InstalledNatRoutine, Matchers};
     use fuchsia_async::{self as fasync, TimeoutExt as _};
     use net_declare::{fidl_ip, fidl_ip_v4, fidl_mac, fidl_subnet};
-    use std::{convert::TryInto as _, fmt::Debug, num::NonZeroU64};
+    use std::convert::TryInto as _;
+    use std::fmt::Debug;
+    use std::num::NonZeroU64;
     use test_case::test_case;
+    use {
+        fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net_routes as froutes,
+        fidl_fuchsia_net_routes_ext as froutes_ext,
+    };
 
     const IF_ADDR_V4: fnet::Subnet = fidl_subnet!("192.168.0.1/32");
     const IF_ADDR_V6: fnet::Subnet = fidl_subnet!("fd00::1/64");

@@ -4,22 +4,22 @@
 
 //! See https://www.kernel.org/doc/html/latest/admin-guide/sysrq.html.
 
-use crate::{
-    task::{CurrentTask, Kernel},
-    vfs::{
-        FileObject, FileOps, FsNode, FsNodeHandle, FsNodeOps, FsStr, InputBuffer, OutputBuffer,
-        SeekTarget,
-    },
+use crate::task::{CurrentTask, Kernel};
+use crate::vfs::{
+    FileObject, FileOps, FsNode, FsNodeHandle, FsNodeOps, FsStr, InputBuffer, OutputBuffer,
+    SeekTarget,
 };
 use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootReason};
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_zircon as zx;
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, WriteOps};
-use starnix_uapi::{
-    auth::FsCred, device_type::DeviceType, error, errors::Errno, file_mode::FileMode, off_t,
-    open_flags::OpenFlags,
-};
+use starnix_uapi::auth::FsCred;
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::{error, off_t};
 
 pub struct SysRqNode {}
 

@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use component_events::{events::*, matcher::*, sequence::*};
+use component_events::events::*;
+use component_events::matcher::*;
+use component_events::sequence::*;
 use fidl_fuchsia_component as fcomponent;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
 

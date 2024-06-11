@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::fuchsia::node::FxNode,
-    fxfs::object_handle::INVALID_OBJECT_ID,
-    linked_hash_map::LinkedHashMap,
-    rustc_hash::FxHasher,
-    std::{
-        borrow::Borrow,
-        hash::{BuildHasherDefault, Hash, Hasher},
-        sync::{Arc, Mutex},
-    },
-};
+use crate::fuchsia::node::FxNode;
+use fxfs::object_handle::INVALID_OBJECT_ID;
+use linked_hash_map::LinkedHashMap;
+use rustc_hash::FxHasher;
+use std::borrow::Borrow;
+use std::hash::{BuildHasherDefault, Hash, Hasher};
+use std::sync::{Arc, Mutex};
 
 enum CacheHolder {
     Node(Arc<dyn FxNode>),
@@ -218,12 +214,12 @@ impl DirentCacheKeyRef for (u64, &str) {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::fuchsia::{directory::FxDirectory, dirent_cache::DirentCache, node::FxNode},
-        fxfs::object_store::ObjectDescriptor,
-        fxfs_macros::ToWeakNode,
-        std::sync::Arc,
-    };
+    use crate::fuchsia::directory::FxDirectory;
+    use crate::fuchsia::dirent_cache::DirentCache;
+    use crate::fuchsia::node::FxNode;
+    use fxfs::object_store::ObjectDescriptor;
+    use fxfs_macros::ToWeakNode;
+    use std::sync::Arc;
 
     #[derive(ToWeakNode)]
     struct FakeNode(u64);

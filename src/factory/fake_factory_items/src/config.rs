@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fuchsia_zircon as zx,
-    serde::{Deserialize, Serialize},
-    std::collections::HashMap,
-};
+use anyhow::Error;
+use fuchsia_zircon as zx;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 const CONFIG_JSON: &str = "/pkg/data/fake_factory_items.json";
 

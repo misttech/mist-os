@@ -2,21 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::super::{
-    handle::{Message, ProxyableHandle, ProxyableRW, ReadValue},
-    stream::{Frame, StreamReader, StreamWriter, StreamWriterBinder},
-    Proxy, ProxyTransferInitiationReceiver, StreamRefSender,
-};
+use super::super::handle::{Message, ProxyableHandle, ProxyableRW, ReadValue};
+use super::super::stream::{Frame, StreamReader, StreamWriter, StreamWriterBinder};
+use super::super::{Proxy, ProxyTransferInitiationReceiver, StreamRefSender};
 use crate::labels::{generate_transfer_key, Endpoint, NodeId, TransferKey};
 use crate::peer::{FramedStreamReader, FramedStreamWriter};
 use crate::router::OpenedTransfer;
 use anyhow::{bail, format_err, Error};
 use fuchsia_zircon_status as zx_status;
-use futures::{
-    future::Either,
-    prelude::*,
-    task::{noop_waker_ref, Context, Poll},
-};
+use futures::future::Either;
+use futures::prelude::*;
+use futures::task::{noop_waker_ref, Context, Poll};
 use std::sync::{Arc, Weak};
 
 // Follow a transfer that was initated elsewhere to the destination.

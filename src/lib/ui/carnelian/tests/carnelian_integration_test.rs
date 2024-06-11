@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
+use carnelian::color::Color;
+use carnelian::render::{Composition, Context as RenderContext, PreClear, RenderExt};
 use carnelian::{
-    color::Color,
-    make_app_assistant,
-    render::{Composition, Context as RenderContext, PreClear, RenderExt},
-    App, AppAssistant, ViewAssistant, ViewAssistantContext, ViewAssistantPtr, ViewKey,
+    make_app_assistant, App, AppAssistant, ViewAssistant, ViewAssistantContext, ViewAssistantPtr,
+    ViewKey,
 };
 use fuchsia_zircon::{AsHandleRef, Event, Signals};
 

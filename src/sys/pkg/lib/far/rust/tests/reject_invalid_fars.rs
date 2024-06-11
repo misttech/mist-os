@@ -4,12 +4,11 @@
 
 #![cfg(test)]
 
-use {
-    assert_matches::assert_matches,
-    fidl_fuchsia_io as fio,
-    fuchsia_archive::{ChunkType, Error, Reader, DIR_CHUNK_TYPE, DIR_NAMES_CHUNK_TYPE},
-    std::{fs::File, path::Path},
-};
+use assert_matches::assert_matches;
+use fidl_fuchsia_io as fio;
+use fuchsia_archive::{ChunkType, Error, Reader, DIR_CHUNK_TYPE, DIR_NAMES_CHUNK_TYPE};
+use std::fs::File;
+use std::path::Path;
 
 const ALL_ZEROES_CHUNK_TYPE: ChunkType = [0u8; 8];
 

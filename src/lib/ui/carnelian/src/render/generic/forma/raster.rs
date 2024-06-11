@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{cell::RefCell, ops::Add, rc::Rc};
+use std::cell::RefCell;
+use std::ops::Add;
+use std::rc::Rc;
 
 use euclid::default::{Transform2D, Vector2D};
 use smallvec::{smallvec, SmallVec};
 
-use crate::render::generic::{
-    forma::{Forma, FormaPath},
-    Raster, RasterBuilder,
-};
+use crate::render::generic::forma::{Forma, FormaPath};
+use crate::render::generic::{Raster, RasterBuilder};
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Print {

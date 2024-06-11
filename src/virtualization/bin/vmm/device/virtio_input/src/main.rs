@@ -7,16 +7,14 @@ mod keyboard;
 mod mouse;
 mod wire;
 
-use {
-    crate::input_device::{InputDevice, InputHandler},
-    crate::keyboard::KeyboardDevice,
-    crate::mouse::MouseDevice,
-    anyhow::{anyhow, Context},
-    fidl::endpoints::RequestStream,
-    fidl_fuchsia_virtualization_hardware::{InputType, VirtioInputRequestStream},
-    fuchsia_component::server,
-    futures::{StreamExt, TryFutureExt, TryStreamExt},
-};
+use crate::input_device::{InputDevice, InputHandler};
+use crate::keyboard::KeyboardDevice;
+use crate::mouse::MouseDevice;
+use anyhow::{anyhow, Context};
+use fidl::endpoints::RequestStream;
+use fidl_fuchsia_virtualization_hardware::{InputType, VirtioInputRequestStream};
+use fuchsia_component::server;
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
 
 async fn run_virtio_input(
     mut virtio_input_fidl: VirtioInputRequestStream,

@@ -2,20 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    diagnostics_log::PublishOptions,
-    fidl::prelude::*,
-    fidl_fuchsia_developer_remotecontrol as rcs, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    futures::channel::mpsc::unbounded,
-    futures::join,
-    futures::prelude::*,
-    remote_control::RemoteControlService,
-    std::rc::Rc,
-    std::sync::Arc,
-    tracing::{debug, error, info},
-};
+use anyhow::Error;
+use diagnostics_log::PublishOptions;
+use fidl::prelude::*;
+use fuchsia_component::server::ServiceFs;
+use futures::channel::mpsc::unbounded;
+use futures::join;
+use futures::prelude::*;
+use remote_control::RemoteControlService;
+use std::rc::Rc;
+use std::sync::Arc;
+use tracing::{debug, error, info};
+use {fidl_fuchsia_developer_remotecontrol as rcs, fuchsia_async as fasync};
 
 mod args;
 mod usb;

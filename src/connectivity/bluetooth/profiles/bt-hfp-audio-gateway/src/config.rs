@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_inspect as inspect,
-    fuchsia_inspect_derive::{AttachError, Inspect},
-};
+use fuchsia_inspect as inspect;
+use fuchsia_inspect_derive::{AttachError, Inspect};
 
 /// Configuration of optional feature support.
 /// This list of features is derived from the optional features in HFP v1.8, Table 3.1.

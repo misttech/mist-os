@@ -3,19 +3,15 @@
 // found in the LICENSE file.
 
 use starnix_sync::Mutex;
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    sync::{Arc, Weak},
-};
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+use std::sync::{Arc, Weak};
 
-use crate::{
-    task::CurrentTask,
-    vfs::{
-        socket::{Socket, SocketAddress, SocketHandle},
-        FsString,
-    },
-};
-use starnix_uapi::{errno, error, errors::Errno};
+use crate::task::CurrentTask;
+use crate::vfs::socket::{Socket, SocketAddress, SocketHandle};
+use crate::vfs::FsString;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::{errno, error};
 
 /// A registry of abstract sockets.
 ///

@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::command_runner::SYSTEM_COMMAND_RUNNER, analytics::add_custom_event, anyhow::Result,
-    std::collections::BTreeMap,
-};
+use super::command_runner::SYSTEM_COMMAND_RUNNER;
+use analytics::add_custom_event;
+use anyhow::Result;
+use std::collections::BTreeMap;
 
 #[allow(unused_imports)]
 use super::check::femu_graphics::{linux_find_graphics_cards, macos_find_graphics_cards};

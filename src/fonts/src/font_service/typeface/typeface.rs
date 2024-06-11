@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::font_service::{inspect::zero_pad, AssetId},
-    char_set::CharSet,
-    fidl_fuchsia_fonts::{FamilyName, GenericFontFamily, Slant, Style2, TypefaceRequest, Width},
-    fidl_fuchsia_fonts_experimental::TypefaceInfo,
-    fidl_fuchsia_intl::LocaleId,
-    fuchsia_inspect as finspect,
-    heck::KebabCase,
-    itertools::Itertools,
-    manifest::v2,
-    std::collections::BTreeSet,
-    thiserror::Error,
-};
+use crate::font_service::inspect::zero_pad;
+use crate::font_service::AssetId;
+use char_set::CharSet;
+use fidl_fuchsia_fonts::{FamilyName, GenericFontFamily, Slant, Style2, TypefaceRequest, Width};
+use fidl_fuchsia_fonts_experimental::TypefaceInfo;
+use fidl_fuchsia_intl::LocaleId;
+use fuchsia_inspect as finspect;
+use heck::KebabCase;
+use itertools::Itertools;
+use manifest::v2;
+use std::collections::BTreeSet;
+use thiserror::Error;
 
 /// Asset ID and font index.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -284,10 +283,11 @@ impl TypefaceInspectData {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, char_collection::char_collect, diagnostics_assertions::assert_data_tree,
-        fidl_fuchsia_fonts::WEIGHT_NORMAL, maplit::btreeset,
-    };
+    use super::*;
+    use char_collection::char_collect;
+    use diagnostics_assertions::assert_data_tree;
+    use fidl_fuchsia_fonts::WEIGHT_NORMAL;
+    use maplit::btreeset;
 
     #[fuchsia::test]
     fn test_typeface_new_empty_char_set_is_error() {

@@ -2,21 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_test_wlan_realm::WlanConfig;
+use fuchsia_zircon::DurationNum;
+use futures::channel::oneshot;
+use futures::{future, join, FutureExt, StreamExt, TryFutureExt};
+use ieee80211::MacAddr;
+use lazy_static::lazy_static;
+use std::fmt::Display;
+use std::panic;
+use std::pin::pin;
+use std::sync::Arc;
+use wlan_common::bss::Protection::Open;
+use wlan_hw_sim::event::{action, branch, Handler};
+use wlan_hw_sim::*;
 use {
     fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_tap as fidl_tap,
-    fidl_test_wlan_realm::WlanConfig,
     fuchsia_async as fasync,
-    fuchsia_zircon::DurationNum,
-    futures::{channel::oneshot, future, join, FutureExt, StreamExt, TryFutureExt},
-    ieee80211::MacAddr,
-    lazy_static::lazy_static,
-    std::pin::pin,
-    std::{fmt::Display, panic, sync::Arc},
-    wlan_common::bss::Protection::Open,
-    wlan_hw_sim::{
-        event::{action, branch, Handler},
-        *,
-    },
 };
 
 lazy_static! {

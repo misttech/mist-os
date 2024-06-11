@@ -11,19 +11,20 @@ mod services;
 #[cfg(test)]
 mod test;
 
-use self::services::{
-    active_session::ActiveSession,
-    discovery::{filter::Filter, Discovery},
-    publisher::Publisher,
-};
+use self::services::active_session::ActiveSession;
+use self::services::discovery::filter::Filter;
+use self::services::discovery::Discovery;
+use self::services::publisher::Publisher;
 use anyhow::{Context, Error};
 use fidl::endpoints::{create_endpoints, create_request_stream};
 use fidl_fuchsia_media::UsageReporterMarker;
 use fidl_fuchsia_media_sessions2::*;
 use fuchsia_async as fasync;
-use fuchsia_component::{client, server::ServiceFs};
+use fuchsia_component::client;
+use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
-use futures::{channel::mpsc, prelude::*};
+use futures::channel::mpsc;
+use futures::prelude::*;
 use std::sync::Arc;
 use tracing::warn;
 

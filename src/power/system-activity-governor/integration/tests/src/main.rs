@@ -6,19 +6,20 @@ use anyhow::Result;
 use diagnostics_assertions::{tree_assertion, AnyProperty};
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl::endpoints::create_endpoints;
-use fidl_fuchsia_hardware_suspend as fhsuspend;
 use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
-use fidl_fuchsia_power_suspend as fsuspend;
-use fidl_fuchsia_power_system as fsystem;
-use fidl_test_suspendcontrol as tsc;
-use fidl_test_systemactivitygovernor as ftest;
-use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon::{self as zx, HandleBased};
-use futures::{channel::mpsc, StreamExt};
+use futures::channel::mpsc;
+use futures::StreamExt;
 use power_broker_client::PowerElementContext;
 use realm_proxy_client::RealmProxyClient;
-use std::{collections::HashMap, time::Instant};
+use std::collections::HashMap;
+use std::time::Instant;
+use {
+    fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_suspend as fsuspend,
+    fidl_fuchsia_power_system as fsystem, fidl_test_suspendcontrol as tsc,
+    fidl_test_systemactivitygovernor as ftest, fuchsia_async as fasync,
+};
 
 const REALM_FACTORY_CHILD_NAME: &str = "test_realm_factory";
 

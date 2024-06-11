@@ -4,7 +4,7 @@
 
 use ext4_metadata::{S_IFDIR, S_IFLNK, S_IFREG};
 use fuchsia_pkg::PathToStringExt;
-use std::{collections::HashMap, collections::HashSet};
+use std::collections::{HashMap, HashSet};
 
 use crate::layered_image;
 use crate::layered_image::DirectoryVisitor;

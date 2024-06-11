@@ -2,21 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    mutable_state::{ordered_state_accessor, state_implementation},
-    signals::SignalInfo,
-    task::{Session, ThreadGroup},
-};
+use crate::mutable_state::{ordered_state_accessor, state_implementation};
+use crate::signals::SignalInfo;
+use crate::task::{Session, ThreadGroup};
 use macro_rules_attribute::apply;
 use starnix_sync::{LockBefore, Locked, OrderedRwLock, ProcessGroupState};
-use starnix_uapi::{
-    pid_t,
-    signals::{Signal, SIGCONT, SIGHUP},
-};
-use std::{
-    collections::BTreeMap,
-    sync::{Arc, Weak},
-};
+use starnix_uapi::pid_t;
+use starnix_uapi::signals::{Signal, SIGCONT, SIGHUP};
+use std::collections::BTreeMap;
+use std::sync::{Arc, Weak};
 
 #[derive(Debug)]
 pub struct ProcessGroupMutableState {

@@ -6,13 +6,11 @@ use component_debug::capability;
 use ffx_driver_args::DriverCommand;
 use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
-use fidl_fuchsia_developer_remotecontrol as rc;
-use fidl_fuchsia_driver_development as fdd;
-use fidl_fuchsia_driver_playground as fdp;
-use fidl_fuchsia_driver_registrar as fdr;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_sys2 as fsys;
-use fidl_fuchsia_test_manager as ftm;
+use {
+    fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_driver_development as fdd,
+    fidl_fuchsia_driver_playground as fdp, fidl_fuchsia_driver_registrar as fdr,
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fidl_fuchsia_test_manager as ftm,
+};
 
 struct DriverConnector {
     remote_control: Option<rc::RemoteControlProxy>,

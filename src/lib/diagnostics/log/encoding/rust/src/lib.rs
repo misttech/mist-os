@@ -215,15 +215,12 @@ impl FromSeverity for log::LevelFilter {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            encode::{Encoder, EncodingError, MutableBuffer},
-            parse::{parse_argument, try_parse_record, ParseResult},
-        },
-        fuchsia_zircon as zx,
-        std::{fmt::Debug, io::Cursor},
-    };
+    use super::*;
+    use crate::encode::{Encoder, EncodingError, MutableBuffer};
+    use crate::parse::{parse_argument, try_parse_record, ParseResult};
+    use fuchsia_zircon as zx;
+    use std::fmt::Debug;
+    use std::io::Cursor;
 
     const BUF_LEN: usize = 1024;
 

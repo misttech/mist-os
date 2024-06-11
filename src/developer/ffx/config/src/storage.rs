@@ -2,24 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    api::{query::SelectMode, value::merge_map},
-    environment::Environment,
-    nested::{nested_get, nested_remove, nested_set},
-    ConfigLevel,
-};
+use crate::api::query::SelectMode;
+use crate::api::value::merge_map;
+use crate::environment::Environment;
+use crate::nested::{nested_get, nested_remove, nested_set};
+use crate::ConfigLevel;
 use anyhow::{bail, Context, Result};
 use config_macros::include_default;
 use fuchsia_lockfile::Lockfile;
-use futures::{stream::FuturesUnordered, StreamExt};
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
-use std::{
-    fmt,
-    fs::OpenOptions,
-    io::{BufReader, BufWriter, ErrorKind, Read, Write},
-    path::{Path, PathBuf},
-};
+use std::fmt;
+use std::fs::OpenOptions;
+use std::io::{BufReader, BufWriter, ErrorKind, Read, Write};
+use std::path::{Path, PathBuf};
 use tracing::error;
 
 /// The type of a configuration level's mapping.

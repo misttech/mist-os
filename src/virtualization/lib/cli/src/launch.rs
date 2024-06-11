@@ -1,13 +1,11 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::attach::attach,
-    crate::platform::PlatformServices,
-    fidl_fuchsia_virtualization::{GuestConfig, GuestManagerError, GuestMarker, GuestProxy},
-    guest_cli_args as arguments,
-    std::fmt,
-};
+use crate::attach::attach;
+use crate::platform::PlatformServices;
+use fidl_fuchsia_virtualization::{GuestConfig, GuestManagerError, GuestMarker, GuestProxy};
+use guest_cli_args as arguments;
+use std::fmt;
 
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum LaunchResult {

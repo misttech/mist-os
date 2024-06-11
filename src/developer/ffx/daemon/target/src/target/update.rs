@@ -12,10 +12,8 @@ use super::{
     BuildConfig, Identity, SharedIdentity, TargetAddrEntry, TargetAddrStatus, TargetProtocol,
     TargetTransport,
 };
-use std::{
-    net::{IpAddr, SocketAddr},
-    time::{Instant, SystemTime},
-};
+use std::net::{IpAddr, SocketAddr};
+use std::time::{Instant, SystemTime};
 
 #[derive(Clone, Debug)]
 enum ConnectionKind {
@@ -385,7 +383,8 @@ impl super::Target {
 
 #[cfg(test)]
 mod tests {
-    use super::{super::*, *};
+    use super::super::*;
+    use super::*;
 
     use assert_matches::assert_matches;
     use fidl_fuchsia_overnet_protocol::NodeId;

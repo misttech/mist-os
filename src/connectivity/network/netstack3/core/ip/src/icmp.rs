@@ -4,20 +4,22 @@
 
 //! The Internet Control Message Protocol (ICMP).
 
-use core::{convert::TryInto as _, fmt::Debug, num::NonZeroU8};
+use core::convert::TryInto as _;
+use core::fmt::Debug;
+use core::num::NonZeroU8;
 
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use log::{debug, error, trace};
+use net_types::ip::{
+    GenericOverIp, Ip, IpAddress, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu,
+    SubnetError,
+};
 use net_types::{
-    ip::{
-        GenericOverIp, Ip, IpAddress, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr,
-        Mtu, SubnetError,
-    },
     LinkLocalAddress, LinkLocalUnicastAddr, MulticastAddress, SpecifiedAddr, UnicastAddr, Witness,
 };
+use netstack3_base::socket::{AddrIsMappedError, SocketIpAddr};
+use netstack3_base::sync::Mutex;
 use netstack3_base::{
-    socket::{AddrIsMappedError, SocketIpAddr},
-    sync::Mutex,
     AnyDevice, Counter, CounterContext, DeviceIdContext, EitherDeviceId, FrameDestination,
     InstantBindingsTypes, InstantContext, RngContext, TokenBucket,
 };
@@ -26,39 +28,33 @@ use packet::{
     BufferMut, InnerPacketBuilder as _, ParsablePacket as _, ParseBuffer, Serializer,
     TruncateDirection, TruncatingSerializer,
 };
-use packet_formats::{
-    icmp::{
-        ndp::{
-            options::{NdpOption, NdpOptionBuilder},
-            NdpPacket, NeighborAdvertisement, NonZeroNdpLifetime, OptionSequenceBuilder,
-        },
-        peek_message_type, IcmpDestUnreachable, IcmpEchoRequest, IcmpMessage, IcmpMessageType,
-        IcmpPacket, IcmpPacketBuilder, IcmpPacketRaw, IcmpParseArgs, IcmpTimeExceeded,
-        IcmpUnusedCode, Icmpv4DestUnreachableCode, Icmpv4Packet, Icmpv4ParameterProblem,
-        Icmpv4ParameterProblemCode, Icmpv4RedirectCode, Icmpv4TimeExceededCode,
-        Icmpv6DestUnreachableCode, Icmpv6Packet, Icmpv6PacketTooBig, Icmpv6ParameterProblem,
-        Icmpv6ParameterProblemCode, Icmpv6TimeExceededCode, MessageBody, OriginalPacket,
-    },
-    ip::{Ipv4Proto, Ipv6Proto},
-    ipv4::{Ipv4FragmentType, Ipv4Header},
-    ipv6::{ExtHdrParseError, Ipv6Header},
+use packet_formats::icmp::ndp::options::{NdpOption, NdpOptionBuilder};
+use packet_formats::icmp::ndp::{
+    NdpPacket, NeighborAdvertisement, NonZeroNdpLifetime, OptionSequenceBuilder,
 };
+use packet_formats::icmp::{
+    peek_message_type, IcmpDestUnreachable, IcmpEchoRequest, IcmpMessage, IcmpMessageType,
+    IcmpPacket, IcmpPacketBuilder, IcmpPacketRaw, IcmpParseArgs, IcmpTimeExceeded, IcmpUnusedCode,
+    Icmpv4DestUnreachableCode, Icmpv4Packet, Icmpv4ParameterProblem, Icmpv4ParameterProblemCode,
+    Icmpv4RedirectCode, Icmpv4TimeExceededCode, Icmpv6DestUnreachableCode, Icmpv6Packet,
+    Icmpv6PacketTooBig, Icmpv6ParameterProblem, Icmpv6ParameterProblemCode, Icmpv6TimeExceededCode,
+    MessageBody, OriginalPacket,
+};
+use packet_formats::ip::{Ipv4Proto, Ipv6Proto};
+use packet_formats::ipv4::{Ipv4FragmentType, Ipv4Header};
+use packet_formats::ipv6::{ExtHdrParseError, Ipv6Header};
 use zerocopy::ByteSlice;
 
-use crate::internal::{
-    base::{
-        self, AddressStatus, IpDeviceStateContext, IpExt, IpLayerHandler, IpPacketDestination,
-        IpTransportContext, Ipv6PresentAddressStatus, SendIpPacketMeta, TransparentLocalDelivery,
-        TransportReceiveError, IPV6_DEFAULT_SUBNET,
-    },
-    device::{
-        nud::{ConfirmationFlags, NudIpHandler},
-        route_discovery::Ipv6DiscoveredRoute,
-        IpAddressState, IpDeviceHandler, Ipv6DeviceHandler,
-    },
-    path_mtu::PmtuHandler,
-    socket::{DefaultSendOptions, IpSocketHandler},
+use crate::internal::base::{
+    self, AddressStatus, IpDeviceStateContext, IpExt, IpLayerHandler, IpPacketDestination,
+    IpTransportContext, Ipv6PresentAddressStatus, SendIpPacketMeta, TransparentLocalDelivery,
+    TransportReceiveError, IPV6_DEFAULT_SUBNET,
 };
+use crate::internal::device::nud::{ConfirmationFlags, NudIpHandler};
+use crate::internal::device::route_discovery::Ipv6DiscoveredRoute;
+use crate::internal::device::{IpAddressState, IpDeviceHandler, Ipv6DeviceHandler};
+use crate::internal::path_mtu::PmtuHandler;
+use crate::internal::socket::{DefaultSendOptions, IpSocketHandler};
 
 /// The IP packet hop limit for all NDP packets.
 ///
@@ -2808,22 +2804,16 @@ fn is_icmp_error_message<I: IcmpIpExt>(proto: I::Proto, buf: &[u8]) -> bool {
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
     use alloc::vec::Vec;
-    use net_types::{
-        ethernet::Mac,
-        ip::{Ipv6, Ipv6Addr},
-    };
+    use net_types::ethernet::Mac;
+    use net_types::ip::{Ipv6, Ipv6Addr};
     use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
-    use packet_formats::{
-        icmp::{
-            ndp::{
-                options::NdpOptionBuilder, NeighborAdvertisement, NeighborSolicitation,
-                OptionSequenceBuilder,
-            },
-            IcmpPacketBuilder, IcmpUnusedCode,
-        },
-        ip::Ipv6Proto,
-        ipv6::Ipv6PacketBuilder,
+    use packet_formats::icmp::ndp::options::NdpOptionBuilder;
+    use packet_formats::icmp::ndp::{
+        NeighborAdvertisement, NeighborSolicitation, OptionSequenceBuilder,
     };
+    use packet_formats::icmp::{IcmpPacketBuilder, IcmpUnusedCode};
+    use packet_formats::ip::Ipv6Proto;
+    use packet_formats::ipv6::Ipv6PacketBuilder;
 
     use super::REQUIRED_NDP_IP_PACKET_HOP_LIMIT;
 
@@ -2886,24 +2876,25 @@ pub(crate) mod testutil {
 
 #[cfg(test)]
 mod tests {
-    use alloc::{vec, vec::Vec};
+    use alloc::vec;
+    use alloc::vec::Vec;
 
     use core::time::Duration;
 
     use net_types::ip::Subnet;
-    use netstack3_base::{
-        testutil::{
-            set_logger_for_test, FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeInstant,
-            FakeWeakDeviceId, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
-        },
-        CtxPair,
+    use netstack3_base::testutil::{
+        set_logger_for_test, FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeInstant,
+        FakeWeakDeviceId, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
     };
+    use netstack3_base::CtxPair;
     use packet::Buf;
-    use packet_formats::{icmp::mld::MldPacket, ip::IpProto, utils::NonZeroDuration};
+    use packet_formats::icmp::mld::MldPacket;
+    use packet_formats::ip::IpProto;
+    use packet_formats::utils::NonZeroDuration;
 
     use super::*;
+    use crate::internal::socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx};
     use crate::internal::socket::{
-        testutil::{FakeDeviceConfig, FakeIpSocketCtx},
         IpSock, IpSockCreationError, IpSockSendError, IpSocketHandler, SendOptions,
     };
 

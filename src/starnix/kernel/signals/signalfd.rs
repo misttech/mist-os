@@ -2,19 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    signals::SignalDetail,
-    task::{CurrentTask, EventHandler, WaitCanceler, Waiter},
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps,
-    },
-};
+use crate::signals::SignalDetail;
+use crate::task::{CurrentTask, EventHandler, WaitCanceler, Waiter};
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::{fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps};
 use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
-use starnix_uapi::{
-    errno, error, errors::Errno, open_flags::OpenFlags, signalfd_siginfo, signals::SigSet,
-    vfs::FdEvents, SFD_NONBLOCK,
-};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::signals::SigSet;
+use starnix_uapi::vfs::FdEvents;
+use starnix_uapi::{errno, error, signalfd_siginfo, SFD_NONBLOCK};
 use zerocopy::AsBytes;
 
 pub struct SignalFd {

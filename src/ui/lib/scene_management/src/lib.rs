@@ -7,11 +7,9 @@ mod graphics_utils;
 mod pointerinjector_config;
 mod scene_manager;
 
-pub use display_metrics::DisplayMetrics;
-pub use display_metrics::ViewingDistance;
-pub use graphics_utils::ScreenCoordinates;
-pub use graphics_utils::ScreenSize;
+pub use display_metrics::{DisplayMetrics, ViewingDistance};
+pub use graphics_utils::{ScreenCoordinates, ScreenSize};
 pub use pointerinjector_config::InjectorViewportSubscriber;
-pub use scene_manager::handle_pointer_injector_configuration_setup_request_stream;
-pub use scene_manager::SceneManager;
-pub use scene_manager::SceneManagerTrait;
+pub use scene_manager::{
+    handle_pointer_injector_configuration_setup_request_stream, SceneManager, SceneManagerTrait,
+};

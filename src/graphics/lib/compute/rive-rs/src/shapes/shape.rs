@@ -2,20 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{cell::Cell, rc::Rc};
+use std::cell::Cell;
+use std::rc::Rc;
 
-use crate::{
-    component::Component,
-    component_dirt::ComponentDirt,
-    core::{Core, CoreContext, Object, ObjectRef, OnAdded},
-    drawable::Drawable,
-    dyn_vec::DynVec,
-    math::Mat,
-    shapes::{Path, PathComposer, PathSpace, ShapePaintContainer},
-    status_code::StatusCode,
-    transform_component::TransformComponent,
-    Renderer,
-};
+use crate::component::Component;
+use crate::component_dirt::ComponentDirt;
+use crate::core::{Core, CoreContext, Object, ObjectRef, OnAdded};
+use crate::drawable::Drawable;
+use crate::dyn_vec::DynVec;
+use crate::math::Mat;
+use crate::shapes::{Path, PathComposer, PathSpace, ShapePaintContainer};
+use crate::status_code::StatusCode;
+use crate::transform_component::TransformComponent;
+use crate::Renderer;
 
 #[derive(Debug, Default)]
 pub struct Shape {

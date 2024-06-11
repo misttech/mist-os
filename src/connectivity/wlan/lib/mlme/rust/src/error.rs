@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::client::ScanError,
-    fuchsia_zircon as zx,
-    thiserror::Error,
-    wlan_common::{
-        appendable::BufferTooSmall,
-        error::{FrameParseError, FrameWriteError},
-    },
-};
+use crate::client::ScanError;
+use fuchsia_zircon as zx;
+use thiserror::Error;
+use wlan_common::appendable::BufferTooSmall;
+use wlan_common::error::{FrameParseError, FrameWriteError};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -118,7 +114,8 @@ impl From<wlan_ffi_transport::Error> for Error {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, anyhow::format_err};
+    use super::*;
+    use anyhow::format_err;
 
     #[test]
     fn test_error_into_status() {

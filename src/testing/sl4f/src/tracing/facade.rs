@@ -6,7 +6,8 @@ use crate::tracing::types::{
     InitializeRequest, ResultsDestination, TerminateRequest, TerminateResponse,
 };
 use anyhow::Error;
-use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::engine::Engine as _;
 use fidl_fuchsia_tracing_controller::{
     ControllerMarker, ControllerProxy, StartErrorCode, StartOptions, StopOptions, TerminateOptions,
     TraceConfig,
@@ -14,7 +15,8 @@ use fidl_fuchsia_tracing_controller::{
 use fuchsia_component::{self as app};
 use fuchsia_sync::RwLock;
 use fuchsia_zircon as zx;
-use futures::{future, io::AsyncReadExt, TryFutureExt};
+use futures::io::AsyncReadExt;
+use futures::{future, TryFutureExt};
 use serde_json::{from_value, to_value, Value};
 
 // This list should be kept in sync with defaultCategories in //src/performance/traceutil/actions.go

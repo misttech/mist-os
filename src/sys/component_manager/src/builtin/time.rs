@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::bootfs::BootfsSvc,
-    anyhow::{anyhow, Context, Error},
-    fidl_fuchsia_time as ftime,
-    fuchsia_fs::{file, OpenFlags},
-    fuchsia_zircon::{Clock, ClockOpts, HandleBased, Rights, Time},
-    futures::prelude::*,
-    std::sync::Arc,
-};
+use crate::bootfs::BootfsSvc;
+use anyhow::{anyhow, Context, Error};
+use fidl_fuchsia_time as ftime;
+use fuchsia_fs::{file, OpenFlags};
+use fuchsia_zircon::{Clock, ClockOpts, HandleBased, Rights, Time};
+use futures::prelude::*;
+use std::sync::Arc;
 
 /// An implementation of the `fuchsia.time.Maintenance` protocol, which
 /// maintains a UTC clock, vending out handles with write access.

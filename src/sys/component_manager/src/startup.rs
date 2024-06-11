@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    cm_types::Url,
-};
+use anyhow::{format_err, Error};
+use cm_types::Url;
 
 // Used when component manager is started with the "--boot" flag by userboot.
 const BOOT_CONFIG: &str = "/boot/config/component_manager";
@@ -110,7 +108,8 @@ impl Arguments {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, lazy_static::lazy_static};
+    use super::*;
+    use lazy_static::lazy_static;
 
     lazy_static! {
         static ref CONFIG_FILENAME: fn() -> String = || String::from("foo");

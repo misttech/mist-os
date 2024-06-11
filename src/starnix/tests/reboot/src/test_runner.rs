@@ -2,20 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::anyhow,
-    fidl_fuchsia_hardware_power_statecontrol::{self as fpower, RebootReason},
-    fidl_fuchsia_sys2 as fsys2, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{
-        Capability, ChildOptions, ChildRef, RealmBuilder, RealmBuilderParams, RealmInstance, Ref,
-        Route,
-    },
-    fuchsia_sync::Mutex,
-    futures::{channel::oneshot, prelude::*},
-    mock_reboot::MockRebootService,
-    std::sync::Arc,
+use anyhow::anyhow;
+use fidl_fuchsia_hardware_power_statecontrol::{self as fpower, RebootReason};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{
+    Capability, ChildOptions, ChildRef, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
 };
+use fuchsia_sync::Mutex;
+use futures::channel::oneshot;
+use futures::prelude::*;
+use mock_reboot::MockRebootService;
+use std::sync::Arc;
+use {fidl_fuchsia_sys2 as fsys2, fuchsia_async as fasync};
 
 async fn build_realm() -> (RealmInstance, oneshot::Receiver<RebootReason>) {
     let builder =

@@ -2,24 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::colors::ColorScheme,
-    crate::terminal::TerminalConfig,
-    carnelian::{
-        color::Color,
-        render::Context as RenderContext,
-        scene::{facets::Facet, LayerGroup},
-        Size, ViewAssistantContext,
-    },
-    fuchsia_trace::duration,
-    std::{any::Any, cell::RefCell, rc::Rc},
-    term_model::{
-        ansi::{CursorStyle, TermInfo},
-        term::{cell::Flags, color::Rgb},
-        Term,
-    },
-    terminal::{renderable_layers, FontSet, LayerContent, Offset, RenderableLayer, Renderer},
-};
+use crate::colors::ColorScheme;
+use crate::terminal::TerminalConfig;
+use carnelian::color::Color;
+use carnelian::render::Context as RenderContext;
+use carnelian::scene::facets::Facet;
+use carnelian::scene::LayerGroup;
+use carnelian::{Size, ViewAssistantContext};
+use fuchsia_trace::duration;
+use std::any::Any;
+use std::cell::RefCell;
+use std::rc::Rc;
+use term_model::ansi::{CursorStyle, TermInfo};
+use term_model::term::cell::Flags;
+use term_model::term::color::Rgb;
+use term_model::Term;
+use terminal::{renderable_layers, FontSet, LayerContent, Offset, RenderableLayer, Renderer};
 
 fn make_rgb(color: &Color) -> Rgb {
     Rgb { r: color.r, g: color.g, b: color.b }
@@ -144,13 +142,11 @@ impl<T: 'static> Facet for TextGridFacet<T> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::Error,
-        carnelian::drawing::load_font,
-        std::path::PathBuf,
-        term_model::event::{Event, EventListener},
-    };
+    use super::*;
+    use anyhow::Error;
+    use carnelian::drawing::load_font;
+    use std::path::PathBuf;
+    use term_model::event::{Event, EventListener};
 
     #[derive(Default)]
     struct TestListener;

@@ -4,18 +4,13 @@
 
 use crate::uinput;
 use fidl_fuchsia_input::Key;
-use fidl_fuchsia_input_report as fir;
-use fidl_fuchsia_ui_input3 as fuiinput;
-use fuchsia_zircon as zx;
 use once_cell::sync::Lazy;
 use starnix_logging::log_warn;
-use starnix_uapi::{
-    error,
-    errors::Errno,
-    time::{time_from_timeval, timeval_from_time},
-    uapi,
-};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::time::{time_from_timeval, timeval_from_time};
+use starnix_uapi::{error, uapi};
 use std::collections::{HashMap, HashSet};
+use {fidl_fuchsia_input_report as fir, fidl_fuchsia_ui_input3 as fuiinput, fuchsia_zircon as zx};
 
 type SlotId = i32;
 type TrackingId = u32;

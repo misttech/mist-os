@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::gesture_arena::{
-        self, DetailedReasonFloat, DetailedReasonUint, EndGestureEvent, ExamineEventResult,
-        ProcessBufferedEventsResult, ProcessNewEventResult, Reason, RecognizedGesture,
-        TouchpadEvent, VerifyEventResult,
-    },
-    super::utils::{movement_from_events, MovementDetail},
-    crate::mouse_binding::{MouseButton, MouseEvent, MouseLocation, MousePhase, RelativeLocation},
-    crate::utils::{euclidean_distance, Position},
-    fuchsia_zircon as zx,
-    maplit::hashset,
-    std::collections::HashSet,
+use super::gesture_arena::{
+    self, DetailedReasonFloat, DetailedReasonUint, EndGestureEvent, ExamineEventResult,
+    ProcessBufferedEventsResult, ProcessNewEventResult, Reason, RecognizedGesture, TouchpadEvent,
+    VerifyEventResult,
 };
+use super::utils::{movement_from_events, MovementDetail};
+use crate::mouse_binding::{MouseButton, MouseEvent, MouseLocation, MousePhase, RelativeLocation};
+use crate::utils::{euclidean_distance, Position};
+use fuchsia_zircon as zx;
+use maplit::hashset;
+use std::collections::HashSet;
 
 /// The initial state of this recognizer, before a secondary tap has been
 /// detected.
@@ -618,7 +616,10 @@ fn make_mouse_event(
 
 #[cfg(test)]
 mod test {
-    use {super::*, crate::touch_binding, assert_matches::assert_matches, test_case::test_case};
+    use super::*;
+    use crate::touch_binding;
+    use assert_matches::assert_matches;
+    use test_case::test_case;
 
     fn make_touch_contact(id: u32, position: Position) -> touch_binding::TouchContact {
         touch_binding::TouchContact { id, position, pressure: None, contact_size: None }

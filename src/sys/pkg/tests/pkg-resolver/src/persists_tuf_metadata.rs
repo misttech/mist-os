@@ -3,13 +3,11 @@
 // found in the LICENSE file.
 
 #![cfg(test)]
-use {
-    fuchsia_pkg_testing::{Package, PackageBuilder, RepositoryBuilder, SystemImageBuilder},
-    lib::{
-        EnableDynamicConfig, MountsBuilder, PersistedReposConfig, TestEnvBuilder, EMPTY_REPO_PATH,
-    },
-    std::sync::Arc,
+use fuchsia_pkg_testing::{Package, PackageBuilder, RepositoryBuilder, SystemImageBuilder};
+use lib::{
+    EnableDynamicConfig, MountsBuilder, PersistedReposConfig, TestEnvBuilder, EMPTY_REPO_PATH,
 };
+use std::sync::Arc;
 
 async fn test_package(name: &str, contents: &str) -> Package {
     PackageBuilder::new(name)

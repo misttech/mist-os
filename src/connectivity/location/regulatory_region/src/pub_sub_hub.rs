@@ -4,19 +4,15 @@
 
 //! A simple publish-and-subscribe facility.
 
-use {
-    serde::{Deserialize, Serialize},
-    std::{
-        cell::RefCell,
-        collections::BTreeMap,
-        fs::{self, File},
-        future::Future,
-        io,
-        path::{Path, PathBuf},
-        pin::Pin,
-        task::{Context, Poll, Waker},
-    },
-};
+use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
+use std::collections::BTreeMap;
+use std::fs::{self, File};
+use std::future::Future;
+use std::io;
+use std::path::{Path, PathBuf};
+use std::pin::Pin;
+use std::task::{Context, Poll, Waker};
 
 /// A rendezvous point for publishers and subscribers.
 pub struct PubSubHub {
@@ -180,10 +176,12 @@ impl PubSubHubInner {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, assert_matches::assert_matches, fuchsia_async as fasync,
-        futures_test::task::new_count_waker, std::io::Write, tempfile::TempDir,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use futures_test::task::new_count_waker;
+    use std::io::Write;
+    use tempfile::TempDir;
 
     #[fasync::run_until_stalled(test)]
     async fn watch_for_change_future_is_pending_when_both_values_are_none() {

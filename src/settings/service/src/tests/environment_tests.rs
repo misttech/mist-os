@@ -8,8 +8,7 @@ use crate::agent::{
 };
 use crate::base::{Dependency, Entity, SettingType};
 use crate::event::{Event, Payload as EventPayload};
-use crate::ingress::fidl;
-use crate::ingress::registration;
+use crate::ingress::{fidl, registration};
 use crate::job::source::Error;
 use crate::job::{self, Job};
 use crate::light::build_light_default_settings;
@@ -28,8 +27,7 @@ use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_stash::StoreMarker;
 use fuchsia_async as fasync;
 use futures::future::BoxFuture;
-use futures::FutureExt;
-use futures::StreamExt;
+use futures::{FutureExt, StreamExt};
 use std::sync::Arc;
 
 const ENV_NAME: &str = "settings_service_environment_test";

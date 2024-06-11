@@ -2,21 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    carnelian::{
-        color::Color,
-        drawing::path_for_rounded_rectangle,
-        render::{BlendMode, Context as RenderContext, Fill, FillRule, Layer, Raster, Style},
-        scene::{facets::Facet, LayerGroup, SceneOrder},
-        AppSender, Coord, Rect, Size, ViewAssistantContext, ViewKey,
-    },
-    fuchsia_trace as ftrace,
-    std::time::{Duration, Instant},
-    std::{any::Any, cell::RefCell, rc::Rc},
-    term_model::{ansi::TermInfo, config::Config, Term},
-    terminal::{renderable_layers, FontSet, Offset, Renderer},
+use anyhow::Error;
+use carnelian::color::Color;
+use carnelian::drawing::path_for_rounded_rectangle;
+use carnelian::render::{
+    BlendMode, Context as RenderContext, Fill, FillRule, Layer, Raster, Style,
 };
+use carnelian::scene::facets::Facet;
+use carnelian::scene::{LayerGroup, SceneOrder};
+use carnelian::{AppSender, Coord, Rect, Size, ViewAssistantContext, ViewKey};
+use fuchsia_trace as ftrace;
+use std::any::Any;
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::time::{Duration, Instant};
+use term_model::ansi::TermInfo;
+use term_model::config::Config;
+use term_model::Term;
+use terminal::{renderable_layers, FontSet, Offset, Renderer};
 
 /// Empty type for term model config
 pub struct UIConfig;

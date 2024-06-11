@@ -2,21 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus, InputEvent},
-    crate::metrics,
-    crate::mouse_model_database,
-    crate::utils::Position,
-    anyhow::{format_err, Error},
-    async_trait::async_trait,
-    fidl_fuchsia_input_report as fidl_input_report,
-    fidl_fuchsia_input_report::{InputDeviceProxy, InputReport},
-    fuchsia_inspect::{health::Reporter, ArrayProperty},
-    fuchsia_zircon as zx,
-    futures::channel::mpsc::{UnboundedReceiver, UnboundedSender},
-    metrics_registry::*,
-    std::collections::HashSet,
-};
+use crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus, InputEvent};
+use crate::utils::Position;
+use crate::{metrics, mouse_model_database};
+use anyhow::{format_err, Error};
+use async_trait::async_trait;
+use fidl_fuchsia_input_report::{InputDeviceProxy, InputReport};
+use fuchsia_inspect::health::Reporter;
+use fuchsia_inspect::ArrayProperty;
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use metrics_registry::*;
+use std::collections::HashSet;
+use {fidl_fuchsia_input_report as fidl_input_report, fuchsia_zircon as zx};
 
 pub type MouseButton = u8;
 
@@ -643,10 +640,11 @@ fn buttons_from_optional_report(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::testing_utilities, fuchsia_async as fasync, futures::StreamExt,
-        pretty_assertions::assert_eq,
-    };
+    use super::*;
+    use crate::testing_utilities;
+    use fuchsia_async as fasync;
+    use futures::StreamExt;
+    use pretty_assertions::assert_eq;
 
     const DEVICE_ID: u32 = 1;
     const COUNTS_PER_MM: u32 = 12;

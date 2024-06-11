@@ -2,27 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Error},
-    fidl_fuchsia_bluetooth_pandora::{
-        RootcanalClientControllerRequest, RootcanalClientControllerRequestStream, ServiceError,
-    },
-    fidl_fuchsia_hardware_bluetooth::VirtualControllerMarker,
-    fuchsia_async::{self as fasync, net::TcpStream},
-    fuchsia_bluetooth::constants::DEV_DIR,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_fs::OpenFlags,
-    fuchsia_sync::Mutex,
-    fuchsia_zircon::{self as zx},
-    futures::{
-        future::Either, io::ReadHalf, io::WriteHalf, AsyncRead, AsyncReadExt, AsyncWrite,
-        AsyncWriteExt, StreamExt, TryFutureExt,
-    },
-    std::net::{IpAddr, SocketAddr},
-    std::pin::pin,
-    std::str::FromStr,
-    std::sync::Arc,
+use anyhow::{anyhow, Context, Error};
+use fidl_fuchsia_bluetooth_pandora::{
+    RootcanalClientControllerRequest, RootcanalClientControllerRequestStream, ServiceError,
 };
+use fidl_fuchsia_hardware_bluetooth::VirtualControllerMarker;
+use fuchsia_async::net::TcpStream;
+use fuchsia_async::{self as fasync};
+use fuchsia_bluetooth::constants::DEV_DIR;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_fs::OpenFlags;
+use fuchsia_sync::Mutex;
+use fuchsia_zircon::{self as zx};
+use futures::future::Either;
+use futures::io::{ReadHalf, WriteHalf};
+use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, StreamExt, TryFutureExt};
+use std::net::{IpAddr, SocketAddr};
+use std::pin::pin;
+use std::str::FromStr;
+use std::sync::Arc;
 
 // Across all three link types, ACL has the largest frame at 1028. Add a byte of UART header.
 const UART_MAX_FRAME_BUFFER_SIZE: usize = 1029;

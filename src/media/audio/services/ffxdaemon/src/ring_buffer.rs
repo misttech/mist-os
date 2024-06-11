@@ -4,13 +4,14 @@
 
 use anyhow::{anyhow, bail, Context};
 use async_trait::async_trait;
-use fidl_fuchsia_audio as faudio;
-use fidl_fuchsia_audio_device as fadevice;
-use fidl_fuchsia_hardware_audio as fhaudio;
 use fuchsia_audio::Format;
 use fuchsia_runtime::vmar_root_self;
 use fuchsia_zircon::{self as zx};
 use thiserror::Error;
+use {
+    fidl_fuchsia_audio as faudio, fidl_fuchsia_audio_device as fadevice,
+    fidl_fuchsia_hardware_audio as fhaudio,
+};
 
 // TODO(b/317991807) Remove #[async_trait] when supported by compiler.
 #[async_trait]

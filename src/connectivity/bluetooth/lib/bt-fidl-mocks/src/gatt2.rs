@@ -127,7 +127,8 @@ impl ClientMock {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {crate::timeout_duration, futures::join};
+    use crate::timeout_duration;
+    use futures::join;
 
     #[fuchsia_async::run_until_stalled(test)]
     async fn test_expect_read_by_type() {

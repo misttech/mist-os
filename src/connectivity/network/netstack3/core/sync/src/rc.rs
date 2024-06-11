@@ -13,12 +13,10 @@
 //!   * Allow waiting for all strongly-held references to be dropped after
 //!     marking the data.
 
-use core::{
-    hash::{Hash, Hasher},
-    ops::Deref,
-    panic::Location,
-    sync::atomic::{AtomicBool, Ordering},
-};
+use core::hash::{Hash, Hasher};
+use core::ops::Deref;
+use core::panic::Location;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use derivative::Derivative;
 

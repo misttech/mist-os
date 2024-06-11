@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_hardware_block_volume::VolumeManagerProxy,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon::{AsHandleRef, Rights, Status, Vmo},
-    ramdevice_client::{RamdiskClient, RamdiskClientBuilder},
-    std::path::PathBuf,
-    storage_isolated_driver_manager::{
-        create_random_guid, fvm, wait_for_block_device, BlockDeviceMatcher,
-    },
+use fidl_fuchsia_hardware_block_volume::VolumeManagerProxy;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon::{AsHandleRef, Rights, Status, Vmo};
+use ramdevice_client::{RamdiskClient, RamdiskClientBuilder};
+use std::path::PathBuf;
+use storage_isolated_driver_manager::{
+    create_random_guid, fvm, wait_for_block_device, BlockDeviceMatcher,
 };
 
 pub use storage_isolated_driver_manager::Guid;

@@ -14,22 +14,20 @@
 #[cfg(target_os = "fuchsia")]
 pub mod sync;
 
-use std::{
-    collections::HashMap,
-    fmt::Debug,
-    num::{NonZeroU16, NonZeroU64},
-    ops::RangeInclusive,
-};
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::num::{NonZeroU16, NonZeroU64};
+use std::ops::RangeInclusive;
 
 use async_utils::fold::FoldWhile;
 use fidl::marker::SourceBreaking;
-use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext::IntoExt;
-use fidl_fuchsia_net_filter as fnet_filter;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use futures::{Stream, StreamExt as _, TryStreamExt as _};
 use thiserror::Error;
+use {
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_interfaces as fnet_interfaces,
+};
 
 /// Conversion errors from `fnet_filter` FIDL types to the
 /// equivalents defined in this module.
@@ -1747,7 +1745,9 @@ mod tests {
 
     use assert_matches::assert_matches;
     use const_unwrap::const_unwrap_option;
-    use futures::{channel::mpsc, task::Poll, FutureExt as _, SinkExt as _};
+    use futures::channel::mpsc;
+    use futures::task::Poll;
+    use futures::{FutureExt as _, SinkExt as _};
     use net_declare::{fidl_ip, fidl_subnet};
     use test_case::test_case;
 

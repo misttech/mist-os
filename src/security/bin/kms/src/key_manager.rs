@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 use crate::common::{DataRequest, KeyAttributes, KeyRequestType, KeyType, KmsKey};
-use crate::crypto_provider::{
-    optee_provider::OpteeProvider, software_provider::SoftwareProvider, CryptoProvider,
-};
+use crate::crypto_provider::optee_provider::OpteeProvider;
+use crate::crypto_provider::software_provider::SoftwareProvider;
+use crate::crypto_provider::CryptoProvider;
 use crate::kms_asymmetric_key::KmsAsymmetricKey;
 use crate::kms_sealing_key::{KmsSealingKey, SEALING_KEY_NAME};
 use anyhow::format_err;
-use base64::engine::{general_purpose::URL_SAFE as BASE64_URL_SAFE, Engine as _};
+use base64::engine::general_purpose::URL_SAFE as BASE64_URL_SAFE;
+use base64::engine::Engine as _;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_kms::{
     AsymmetricKeyAlgorithm, AsymmetricPrivateKeyMarker, Error, KeyManagerRequest, KeyOrigin,
@@ -20,11 +21,10 @@ use fuchsia_async as fasync;
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
 use std::io::{Error as IOError, ErrorKind};
 use std::path::{Path, PathBuf};
-use std::str;
 use std::sync::{Arc, Mutex, RwLock};
+use std::{fs, str};
 use tracing::{error, warn};
 
 const DEFAULT_PROVIDER: KeyProvider = KeyProvider::SoftwareProvider;
@@ -715,7 +715,8 @@ impl KeyManager {
 mod tests {
     use super::*;
     use crate::common::{self as common, ASYMMETRIC_KEY_ALGORITHMS};
-    use crate::crypto_provider::{mock_provider::MockProvider, CryptoProviderError};
+    use crate::crypto_provider::mock_provider::MockProvider;
+    use crate::crypto_provider::CryptoProviderError;
     use tempfile::tempdir;
     static TEST_KEY_NAME: &str = "TestKey";
 

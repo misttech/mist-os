@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType},
-    assembly_config_schema::DriverDetails,
-    camino::Utf8Path,
-    fuchsia_pkg::PackageManifest,
-};
+use anyhow::{Context, Result};
+use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
+use assembly_config_schema::DriverDetails;
+use camino::Utf8Path;
+use fuchsia_pkg::PackageManifest;
 
 /// Possible driver package.
 pub enum DriverPackageType {

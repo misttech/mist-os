@@ -8,9 +8,10 @@ use fidl_fuchsia_scheduler::{
 };
 use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, log_debug, log_warn, track_stub};
+use starnix_uapi::errors::Errno;
 use starnix_uapi::{
-    errno, error, errors::Errno, sched_param, SCHED_BATCH, SCHED_DEADLINE, SCHED_FIFO, SCHED_IDLE,
-    SCHED_NORMAL, SCHED_RESET_ON_FORK, SCHED_RR,
+    errno, error, sched_param, SCHED_BATCH, SCHED_DEADLINE, SCHED_FIFO, SCHED_IDLE, SCHED_NORMAL,
+    SCHED_RESET_ON_FORK, SCHED_RR,
 };
 use std::cmp::Ordering;
 

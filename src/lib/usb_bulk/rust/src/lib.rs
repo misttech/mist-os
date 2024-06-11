@@ -13,10 +13,8 @@
 //! See tests for examples using the Zedmon power monitor.
 
 use fuchsia_async::unblock;
-use futures::{
-    io::{AsyncRead, AsyncWrite},
-    task::{Context, Poll},
-};
+use futures::io::{AsyncRead, AsyncWrite};
+use futures::task::{Context, Poll};
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter, Result as FmtResult};

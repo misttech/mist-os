@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{types::*, MetadataValue};
-use crate::{
-    inspect_log,
-    nodes::{BoundedListNode, NodeExt},
-};
+use super::types::*;
+use super::MetadataValue;
+use crate::inspect_log;
+use crate::nodes::{BoundedListNode, NodeExt};
 use fuchsia_inspect::{self as inspect, InspectTypeReparentable};
-use std::{
-    marker::PhantomData,
-    ops::Deref,
-    sync::{Arc, Mutex},
-};
+use std::marker::PhantomData;
+use std::ops::Deref;
+use std::sync::{Arc, Mutex};
 
 pub struct MetaEventNode(inspect::Node);
 

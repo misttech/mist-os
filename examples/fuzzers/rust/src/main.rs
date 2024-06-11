@@ -4,7 +4,8 @@
 
 // This is the "library code" tested in this example.
 // Compare with https://llvm.org/docs/LibFuzzer.html#toy-example
-use {fuzz::fuzz, helper::toy_example};
+use fuzz::fuzz;
+use helper::toy_example;
 
 // Imports that are only used by `main` needs to be conditional included.
 #[cfg(not(fuzz))]

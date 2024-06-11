@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::zstd,
-    anyhow::{Error, Result},
-    byteorder::{LittleEndian, ReadBytesExt},
-    serde::{Deserialize, Serialize},
-    std::io::{Cursor, Read, Seek, SeekFrom},
-    thiserror::Error,
-    tracing::info,
-};
+use crate::zstd;
+use anyhow::{Error, Result};
+use byteorder::{LittleEndian, ReadBytesExt};
+use serde::{Deserialize, Serialize};
+use std::io::{Cursor, Read, Seek, SeekFrom};
+use thiserror::Error;
+use tracing::info;
 
 /// ZBIs must start with a container type that contains all of the sections in
 /// the ZBI. It is largely there to verify the binary blob is actually a ZBI and
@@ -259,7 +257,8 @@ impl VBootSeeker {
 
 /// Test helpers for pre-computed zbi images.
 pub mod test {
-    use {super::*, crate::bootfs::test::*};
+    use super::*;
+    use crate::bootfs::test::*;
 
     /// Returns raw bytes for a zbi container that has no sections.
     pub fn empty_zbi_bytes() -> Vec<u8> {
@@ -315,7 +314,9 @@ pub mod test {
 
 #[cfg(test)]
 mod tests {
-    use {super::test::*, super::*, crate::bootfs::test::*};
+    use super::test::*;
+    use super::*;
+    use crate::bootfs::test::*;
 
     #[test]
     fn test_zbi_empty_container() {

@@ -4,10 +4,8 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use component_debug::{
-    query::get_single_instance_from_query,
-    realm::{get_runtime, Runtime},
-};
+use component_debug::query::get_single_instance_from_query;
+use component_debug::realm::{get_runtime, Runtime};
 use errors::{ffx_error, FfxError};
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_debug_args::ComponentDebugCommand;

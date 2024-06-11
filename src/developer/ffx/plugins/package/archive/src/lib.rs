@@ -9,12 +9,10 @@ use fuchsia_merkle::{from_read, MerkleTree};
 use fuchsia_pkg::MetaContents;
 use mockall::automock;
 use serde::Serialize;
-use std::{
-    collections::{HashMap, HashSet},
-    fs::File,
-    io::Cursor,
-    path::PathBuf,
-};
+use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io::Cursor;
+use std::path::PathBuf;
 
 #[derive(Clone, Debug, PartialEq, PartialOrd, Ord, Eq, Serialize, Hash)]
 pub struct ArchiveEntry {
@@ -232,7 +230,8 @@ pub mod test_utils {
 
 #[cfg(test)]
 mod tests {
-    use {super::test_utils::BLOB1, super::*};
+    use super::test_utils::BLOB1;
+    use super::*;
 
     #[test]
     fn read_file_entries_handles_duplicate_content_blobs() {

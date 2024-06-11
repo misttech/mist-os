@@ -4,10 +4,9 @@
 
 pub mod args;
 
-use {
-    anyhow::anyhow, anyhow::Result, args::AddTestNodeCommand,
-    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf,
-};
+use anyhow::{anyhow, Result};
+use args::AddTestNodeCommand;
+use {fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf};
 
 fn string_to_property(prop: &str) -> Result<fdf::NodeProperty> {
     let split: Vec<&str> = prop.split("=").collect();

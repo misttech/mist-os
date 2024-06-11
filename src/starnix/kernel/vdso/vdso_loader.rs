@@ -2,18 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{arch::vdso::VDSO_SIGRETURN_NAME, mm::PAGE_SIZE, time::utc::update_utc_clock};
+use crate::arch::vdso::VDSO_SIGRETURN_NAME;
+use crate::mm::PAGE_SIZE;
+use crate::time::utc::update_utc_clock;
 use fidl::AsHandleRef;
 use fuchsia_zircon::{
     ClockTransformation, HandleBased, {self as zx},
 };
 use once_cell::sync::Lazy;
 use process_builder::elf_parse;
-use starnix_uapi::{errno, errors::Errno, from_status_like_fdio, uapi};
-use std::{
-    mem::size_of,
-    sync::{atomic::Ordering, Arc},
-};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::{errno, from_status_like_fdio, uapi};
+use std::mem::size_of;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 static VVAR_SIZE: Lazy<usize> = Lazy::new(|| *PAGE_SIZE as usize);
 pub static ZX_TIME_VALUES_VMO: Lazy<Arc<zx::Vmo>> =

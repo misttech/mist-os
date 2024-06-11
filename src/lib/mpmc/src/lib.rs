@@ -7,12 +7,14 @@
 //! A library with futures-aware mpmc channels.
 
 use crossbeam::queue::SegQueue;
-use futures::{channel::mpsc, lock::Mutex, sink::SinkExt, stream::FusedStream, Stream};
-use std::{
-    pin::Pin,
-    sync::{Arc, Weak},
-    task::{Context, Poll},
-};
+use futures::channel::mpsc;
+use futures::lock::Mutex;
+use futures::sink::SinkExt;
+use futures::stream::FusedStream;
+use futures::Stream;
+use std::pin::Pin;
+use std::sync::{Arc, Weak};
+use std::task::{Context, Poll};
 
 /// The default number of messages that will be buffered per-receiver.
 pub const DEFAULT_CHANNEL_BUFFER_SIZE: usize = 100;

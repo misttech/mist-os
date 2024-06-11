@@ -4,12 +4,10 @@
 
 // Interface to the Triage library.
 
-use {
-    crate::diagnostics::Selectors,
-    anyhow::Error,
-    fuchsia_triage::{ActionTagDirective, ParseResult, SnapshotTrigger},
-    std::collections::HashMap,
-};
+use crate::diagnostics::Selectors;
+use anyhow::Error;
+use fuchsia_triage::{ActionTagDirective, ParseResult, SnapshotTrigger};
+use std::collections::HashMap;
 
 pub fn evaluate_int_math(expression: &str) -> Result<i64, Error> {
     fuchsia_triage::evaluate_int_math(expression)

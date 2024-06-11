@@ -2,18 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{error, fmt, fmt::Debug, hash::Hash, io::Read, ops::Add, u32};
+use std::fmt::Debug;
+use std::hash::Hash;
+use std::io::Read;
+use std::ops::Add;
+use std::{error, fmt, u32};
 
 use anyhow::Error;
 use display_utils::PixelFormat;
-use euclid::{
-    default::{Point2D, Rect, Size2D, Transform2D, Vector2D},
-    point2, size2,
-};
+use euclid::default::{Point2D, Rect, Size2D, Transform2D, Vector2D};
+use euclid::{point2, size2};
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_sysmem2::BufferCollectionTokenMarker;
 
-use crate::{color::Color, drawing::DisplayRotation, Point, ViewAssistantContext};
+use crate::color::Color;
+use crate::drawing::DisplayRotation;
+use crate::{Point, ViewAssistantContext};
 
 pub mod forma;
 

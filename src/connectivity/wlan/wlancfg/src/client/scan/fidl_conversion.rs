@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::client::types;
+use anyhow::{format_err, Error};
+use fidl::prelude::*;
+use futures::stream::TryStreamExt;
+use ieee80211::MacAddrBytes;
+use measure_tape_for_scan_result::Measurable as _;
+use tracing::{debug, info};
 use {
-    crate::client::types,
-    anyhow::{format_err, Error},
-    fidl::prelude::*,
     fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme,
     fuchsia_zircon as zx,
-    futures::stream::TryStreamExt,
-    ieee80211::MacAddrBytes,
-    measure_tape_for_scan_result::Measurable as _,
-    tracing::{debug, info},
 };
 
 // TODO(https://fxbug.dev/42160765): Remove this.
@@ -167,16 +167,13 @@ pub async fn send_scan_error_over_fidl(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fuchsia_async as fasync, fuchsia_zircon as zx,
-        futures::task::Poll,
-        std::pin::pin,
-        wlan_common::assert_variant,
-        wlan_common::{
-            random_fidl_bss_description, scan::Compatibility, security::SecurityDescriptor,
-        },
-    };
+    use super::*;
+    use futures::task::Poll;
+    use std::pin::pin;
+    use wlan_common::scan::Compatibility;
+    use wlan_common::security::SecurityDescriptor;
+    use wlan_common::{assert_variant, random_fidl_bss_description};
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     fn generate_test_fidl_data() -> Vec<fidl_policy::ScanResult> {
         const CENTER_FREQ_CHAN_1: u32 = 2412;
@@ -287,7 +284,8 @@ mod tests {
 
     #[fuchsia::test]
     fn sme_protection_converts_to_policy_security() {
-        use {super::fidl_policy::SecurityType, super::fidl_sme::Protection};
+        use super::fidl_policy::SecurityType;
+        use super::fidl_sme::Protection;
         let wpa3_supported = true;
         let wpa3_not_supported = false;
         let test_pairs = vec![

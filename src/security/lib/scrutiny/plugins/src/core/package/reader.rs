@@ -2,30 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::core::{
-        package::{is_cf_v2_config_values, is_cf_v2_manifest},
-        util::types::{ComponentManifest, PackageDefinition, PartialPackageDefinition},
-    },
-    anyhow::{Context, Result},
-    fuchsia_archive::Utf8Reader as FarReader,
-    fuchsia_hash::Hash,
-    fuchsia_url::PinnedAbsolutePackageUrl,
-    scrutiny_utils::{
-        artifact::ArtifactReader,
-        io::ReadSeek,
-        key_value::parse_key_value,
-        package::{open_update_package, read_content_blob, META_CONTENTS_PATH},
-    },
-    std::{
-        collections::HashSet,
-        ffi::OsStr,
-        fs::File,
-        path::{Path, PathBuf},
-        str::{self, FromStr},
-    },
-    update_package::parse_packages_json,
-};
+use crate::core::package::{is_cf_v2_config_values, is_cf_v2_manifest};
+use crate::core::util::types::{ComponentManifest, PackageDefinition, PartialPackageDefinition};
+use anyhow::{Context, Result};
+use fuchsia_archive::Utf8Reader as FarReader;
+use fuchsia_hash::Hash;
+use fuchsia_url::PinnedAbsolutePackageUrl;
+use scrutiny_utils::artifact::ArtifactReader;
+use scrutiny_utils::io::ReadSeek;
+use scrutiny_utils::key_value::parse_key_value;
+use scrutiny_utils::package::{open_update_package, read_content_blob, META_CONTENTS_PATH};
+use std::collections::HashSet;
+use std::ffi::OsStr;
+use std::fs::File;
+use std::path::{Path, PathBuf};
+use std::str::{self, FromStr};
+use update_package::parse_packages_json;
 
 /// Trait that defines functions for the retrieval of the bytes that define package definitions.
 /// Used primarily to allow for nicer testing via mocking out the backing `fx serve` instance.
@@ -195,23 +187,20 @@ pub fn read_partial_package_definition(rs: impl ReadSeek) -> Result<PartialPacka
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{PackageReader, PackagesFromUpdateReader},
-        crate::core::util::types::ComponentManifest,
-        fuchsia_archive::write,
-        fuchsia_url::{PackageName, PackageVariant, PinnedAbsolutePackageUrl},
-        scrutiny_testing::{artifact::MockArtifactReader, TEST_REPO_URL},
-        scrutiny_utils::package::META_CONTENTS_PATH,
-        std::collections::BTreeMap,
-        std::{
-            fs::File,
-            io::{Cursor, Read},
-            path::{Path, PathBuf},
-            str::FromStr,
-        },
-        tempfile::tempdir,
-        update_package::serialize_packages_json,
-    };
+    use super::{PackageReader, PackagesFromUpdateReader};
+    use crate::core::util::types::ComponentManifest;
+    use fuchsia_archive::write;
+    use fuchsia_url::{PackageName, PackageVariant, PinnedAbsolutePackageUrl};
+    use scrutiny_testing::artifact::MockArtifactReader;
+    use scrutiny_testing::TEST_REPO_URL;
+    use scrutiny_utils::package::META_CONTENTS_PATH;
+    use std::collections::BTreeMap;
+    use std::fs::File;
+    use std::io::{Cursor, Read};
+    use std::path::{Path, PathBuf};
+    use std::str::FromStr;
+    use tempfile::tempdir;
+    use update_package::serialize_packages_json;
 
     fn fake_update_package<P: AsRef<Path>>(
         path: P,

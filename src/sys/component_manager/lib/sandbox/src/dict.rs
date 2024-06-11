@@ -4,12 +4,9 @@
 
 use crate::Capability;
 use derivative::Derivative;
-use fidl_fuchsia_component_sandbox as fsandbox;
-use fuchsia_async as fasync;
-use std::{
-    collections::BTreeMap,
-    sync::{Arc, Mutex, MutexGuard},
-};
+use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex, MutexGuard};
+use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
 pub type Key = cm_types::Name;
 

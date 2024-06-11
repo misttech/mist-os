@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{Package, PackageBuilder},
-    fuchsia_merkle::Hash,
-    fuchsia_pkg::PackagePath,
-    fuchsia_url::PinnedAbsolutePackageUrl,
-    std::future::Future,
-    system_image::{CachePackages, StaticPackages},
-};
+use crate::{Package, PackageBuilder};
+use fuchsia_merkle::Hash;
+use fuchsia_pkg::PackagePath;
+use fuchsia_url::PinnedAbsolutePackageUrl;
+use std::future::Future;
+use system_image::{CachePackages, StaticPackages};
 
 const DEFAULT_PACKAGE_REPO_URL: &str = "fuchsia-pkg://fuchsia.com";
 

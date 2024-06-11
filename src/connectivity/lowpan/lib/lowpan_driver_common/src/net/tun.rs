@@ -12,21 +12,19 @@ use crate::spinel::Subnet;
 use anyhow::Error;
 use async_trait::async_trait;
 use fidl::endpoints::{create_endpoints, create_proxy};
-use fidl_fuchsia_hardware_network as fhwnet;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_ext as fnetext;
-use fidl_fuchsia_net_interfaces_admin as fnetifadmin;
-use fidl_fuchsia_net_interfaces_ext as fnetifext;
-use fidl_fuchsia_net_stack as fnetstack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
-use fidl_fuchsia_net_tun as ftun;
 use fuchsia_async::net::DatagramSocket;
 use fuchsia_component::client::{connect_channel_to_protocol, connect_to_protocol};
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
 use futures::stream::BoxStream;
 use net_types::ip::{Ip as _, Ipv6};
 use socket2::{Domain, Protocol};
+use {
+    fidl_fuchsia_hardware_network as fhwnet, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_ext as fnetext, fidl_fuchsia_net_interfaces_admin as fnetifadmin,
+    fidl_fuchsia_net_interfaces_ext as fnetifext, fidl_fuchsia_net_stack as fnetstack,
+    fidl_fuchsia_net_tun as ftun, fuchsia_zircon as zx,
+};
 
 const TUN_PORT_ID: u8 = 0;
 

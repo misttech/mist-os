@@ -13,11 +13,9 @@ use crate::router::Router;
 use anyhow::{format_err, Context as _, Error};
 use fidl_fuchsia_overnet_protocol::{BeginTransfer, Empty, SignalUpdate, StreamControl};
 use fuchsia_zircon_status as zx_status;
-use futures::{
-    future::{poll_fn, BoxFuture},
-    prelude::*,
-    ready,
-};
+use futures::future::{poll_fn, BoxFuture};
+use futures::prelude::*;
+use futures::ready;
 use std::pin::Pin;
 use std::sync::Weak;
 use std::task::{Context, Poll};

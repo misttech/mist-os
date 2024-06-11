@@ -120,11 +120,9 @@ impl Puppet {
 mod tests {
     use super::*;
 
-    use {
-        fidl_fuchsia_driver_test as fdt,
-        fuchsia_component_test::RealmBuilder,
-        fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
-    };
+    use fidl_fuchsia_driver_test as fdt;
+    use fuchsia_component_test::RealmBuilder;
+    use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
 
     #[fuchsia::test]
     async fn log_test() {

@@ -7,19 +7,16 @@
 use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
 use netstack3_base::{BuildableCoreContext, ContextProvider, CoreTimerContext, CtxPair};
 use netstack3_device::{DeviceId, DeviceLayerState};
-use netstack3_ip::{
-    self as ip, icmp::IcmpState, nud::NudCounters, IpLayerIpExt, IpLayerTimerId, IpStateInner,
-    Ipv4State, Ipv6State,
-};
+use netstack3_ip::icmp::IcmpState;
+use netstack3_ip::nud::NudCounters;
+use netstack3_ip::{self as ip, IpLayerIpExt, IpLayerTimerId, IpStateInner, Ipv4State, Ipv6State};
 use netstack3_tcp::TcpCounters;
 use netstack3_udp::UdpCounters;
 
-use crate::{
-    api::CoreApi,
-    time::TimerId,
-    transport::{TransportLayerState, TransportStateBuilder},
-    BindingsContext, BindingsTypes, CoreCtx,
-};
+use crate::api::CoreApi;
+use crate::time::TimerId;
+use crate::transport::{TransportLayerState, TransportStateBuilder};
+use crate::{BindingsContext, BindingsTypes, CoreCtx};
 
 /// A builder for [`StackState`].
 #[derive(Default, Clone)]

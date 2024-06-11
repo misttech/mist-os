@@ -4,7 +4,9 @@
 
 //! Typesafe wrappers around verifying the board file.
 
-use {fidl_fuchsia_io as fio, fuchsia_zircon_status::Status, thiserror::Error};
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use thiserror::Error;
 
 /// An error encountered while verifying the board.
 #[derive(Debug, Error)]
@@ -52,9 +54,10 @@ pub(crate) async fn verify_board(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::TestUpdatePackage, assert_matches::assert_matches, fuchsia_async as fasync,
-    };
+    use super::*;
+    use crate::TestUpdatePackage;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
 
     #[fasync::run_singlethreaded(test)]
     async fn verify_board_success_file_exists() {

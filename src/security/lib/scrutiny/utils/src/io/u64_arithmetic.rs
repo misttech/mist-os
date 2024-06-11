@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    std::fmt::{Debug, Display, Formatter},
-    thiserror::Error,
-};
+use anyhow::{Context, Result};
+use std::fmt::{Debug, Display, Formatter};
+use thiserror::Error;
 
 /// Safe computation of `-i64::MIN as u64` without overflow.
 pub(crate) const NEGATIVE_I64_MIN_AS_U64: u64 = -(i64::MIN as i128) as u64;
@@ -152,10 +150,8 @@ impl<'lhs, 'rhs, LHS: U64Eval, RHS: U64Eval> U64Eval for U64Expression<'lhs, 'rh
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{named_u64, u64_add, u64_sub, U64ArithmeticError, U64Eval, U64Operation},
-        anyhow::Context,
-    };
+    use super::{named_u64, u64_add, u64_sub, U64ArithmeticError, U64Eval, U64Operation};
+    use anyhow::Context;
 
     #[fuchsia::test]
     fn add_ok() {

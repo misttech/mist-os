@@ -4,13 +4,13 @@
 use anyhow::*;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_archivist_test::*;
-use fidl_fuchsia_boot as fboot;
-use fidl_fuchsia_diagnostics as fdiagnostics;
-use fidl_fuchsia_inspect as finspect;
-use fidl_fuchsia_logger as flogger;
-use fidl_fuchsia_tracing_provider as ftracing;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
+};
+use {
+    fidl_fuchsia_boot as fboot, fidl_fuchsia_diagnostics as fdiagnostics,
+    fidl_fuchsia_inspect as finspect, fidl_fuchsia_logger as flogger,
+    fidl_fuchsia_tracing_provider as ftracing,
 };
 
 const ARCHIVIST_URL: &str = "#meta/archivist.cm";

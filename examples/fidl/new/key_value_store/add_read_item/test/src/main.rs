@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    example_tester::{assert_logs_eq_to_golden, run_test, Client, Server, TestKind},
-    fidl::prelude::*,
-    fidl_examples_keyvaluestore_addreaditem::StoreMarker,
-    fuchsia_async as fasync,
-    fuchsia_component_test::{ChildRef, RealmBuilder},
-};
+use anyhow::Error;
+use example_tester::{assert_logs_eq_to_golden, run_test, Client, Server, TestKind};
+use fidl::prelude::*;
+use fidl_examples_keyvaluestore_addreaditem::StoreMarker;
+use fuchsia_async as fasync;
+use fuchsia_component_test::{ChildRef, RealmBuilder};
 
 #[fasync::run_singlethreaded(test)]
 async fn test_read_item_success() -> Result<(), Error> {

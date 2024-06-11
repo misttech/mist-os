@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    component::Component,
-    component_dirt::ComponentDirt,
-    core::{Core, Object, ObjectRef, OnAdded},
-    option_cell::OptionCell,
-    shapes::{
-        command_path::{CommandPath, CommandPathBuilder},
-        PathSpace, Shape,
-    },
-    TransformComponent,
-};
+use crate::component::Component;
+use crate::component_dirt::ComponentDirt;
+use crate::core::{Core, Object, ObjectRef, OnAdded};
+use crate::option_cell::OptionCell;
+use crate::shapes::command_path::{CommandPath, CommandPathBuilder};
+use crate::shapes::{PathSpace, Shape};
+use crate::TransformComponent;
 
 #[derive(Debug, Default)]
 pub struct PathComposer {

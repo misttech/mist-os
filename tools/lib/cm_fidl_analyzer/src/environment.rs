@@ -2,23 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        component_instance::{ComponentInstanceForAnalyzer, TopInstanceForAnalyzer},
-        component_model::{BuildAnalyzerModelError, Child},
-    },
-    cm_config::RuntimeConfig,
-    cm_rust::{EnvironmentDecl, RegistrationSource, ResolverRegistration},
-    fidl_fuchsia_component_internal as component_internal,
-    routing::{
-        component_instance::{
-            ComponentInstanceInterface, ExtendedInstanceInterface, WeakExtendedInstanceInterface,
-        },
-        environment::{DebugRegistry, EnvironmentExtends, RunnerRegistry},
-        error::ComponentInstanceError,
-    },
-    std::{collections::HashMap, sync::Arc},
+use crate::component_instance::{ComponentInstanceForAnalyzer, TopInstanceForAnalyzer};
+use crate::component_model::{BuildAnalyzerModelError, Child};
+use cm_config::RuntimeConfig;
+use cm_rust::{EnvironmentDecl, RegistrationSource, ResolverRegistration};
+use fidl_fuchsia_component_internal as component_internal;
+use routing::component_instance::{
+    ComponentInstanceInterface, ExtendedInstanceInterface, WeakExtendedInstanceInterface,
 };
+use routing::environment::{DebugRegistry, EnvironmentExtends, RunnerRegistry};
+use routing::error::ComponentInstanceError;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 // Constants used to set up the built-in environment.
 pub static BOOT_RESOLVER_NAME: &str = "boot_resolver";

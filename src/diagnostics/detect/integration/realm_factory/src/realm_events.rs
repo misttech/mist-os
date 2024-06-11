@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::endpoints::{RequestStream, ServerEnd},
-    fidl_test_detect_factory::{TriageDetectEventsControlHandle, TriageDetectEventsMarker},
-    tracing::error,
-};
+use fidl::endpoints::{RequestStream, ServerEnd};
+use fidl_test_detect_factory::{TriageDetectEventsControlHandle, TriageDetectEventsMarker};
+use tracing::error;
 
 // A handle that emits TriageDetectEvents to the test suite.
 // local mock components use this when they receive FIDL requests from the

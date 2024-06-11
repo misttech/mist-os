@@ -4,33 +4,23 @@
 
 //! Contains the asynchronous version of [`Filesystem`][`crate::Filesystem`].
 
-use {
-    crate::{
-        error::{QueryError, ShutdownError},
-        ComponentType, FSConfig, Options,
-    },
-    anyhow::{anyhow, bail, ensure, Context, Error},
-    fidl::endpoints::{create_endpoints, create_proxy, ClientEnd, ServerEnd},
-    fidl_fuchsia_component::{self as fcomponent, RealmMarker},
-    fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_fs::AdminMarker,
-    fidl_fuchsia_fs_startup::{CheckOptions, StartupMarker},
-    fidl_fuchsia_fxfs::MountOptions,
-    fidl_fuchsia_io as fio,
-    fuchsia_component::client::{
-        connect_to_named_protocol_at_dir_root, connect_to_protocol,
-        connect_to_protocol_at_dir_root, connect_to_protocol_at_dir_svc,
-        open_childs_exposed_directory,
-    },
-    fuchsia_zircon::{self as zx, AsHandleRef as _, Status},
-    std::{
-        collections::HashMap,
-        sync::{
-            atomic::{AtomicBool, AtomicU64, Ordering},
-            Arc,
-        },
-    },
+use crate::error::{QueryError, ShutdownError};
+use crate::{ComponentType, FSConfig, Options};
+use anyhow::{anyhow, bail, ensure, Context, Error};
+use fidl::endpoints::{create_endpoints, create_proxy, ClientEnd, ServerEnd};
+use fidl_fuchsia_component::{self as fcomponent, RealmMarker};
+use fidl_fuchsia_fs::AdminMarker;
+use fidl_fuchsia_fs_startup::{CheckOptions, StartupMarker};
+use fidl_fuchsia_fxfs::MountOptions;
+use fuchsia_component::client::{
+    connect_to_named_protocol_at_dir_root, connect_to_protocol, connect_to_protocol_at_dir_root,
+    connect_to_protocol_at_dir_svc, open_childs_exposed_directory,
 };
+use fuchsia_zircon::{self as zx, AsHandleRef as _, Status};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Arc;
+use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio};
 
 /// Asynchronously manages a block device for filesystem operations.
 pub struct Filesystem {
@@ -705,16 +695,12 @@ impl Drop for ServingMultiVolumeFilesystem {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{BlobCompression, BlobEvictionPolicy, Blobfs, F2fs, Fxfs, Minfs},
-        fuchsia_async as fasync,
-        ramdevice_client::RamdiskClient,
-        std::{
-            io::{Read as _, Write as _},
-            time::Duration,
-        },
-    };
+    use super::*;
+    use crate::{BlobCompression, BlobEvictionPolicy, Blobfs, F2fs, Fxfs, Minfs};
+    use fuchsia_async as fasync;
+    use ramdevice_client::RamdiskClient;
+    use std::io::{Read as _, Write as _};
+    use std::time::Duration;
 
     async fn ramdisk(block_size: u64) -> RamdiskClient {
         RamdiskClient::create(block_size, 1 << 16).await.unwrap()

@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    access_vector_cache::{Manager as AvcManager, Query, QueryMut},
-    permission_check::{PermissionCheck, PermissionCheckImpl},
-    seq_lock::SeqLock,
-    SecurityId,
-};
+use crate::access_vector_cache::{Manager as AvcManager, Query, QueryMut};
+use crate::permission_check::{PermissionCheck, PermissionCheckImpl};
+use crate::seq_lock::SeqLock;
+use crate::SecurityId;
 
 use anyhow::Context as _;
 use fuchsia_zircon::{self as zx};
@@ -15,12 +13,16 @@ use selinux_common::{
     AbstractObjectClass, ClassPermission, FileClass, InitialSid, ObjectClass, Permission,
     FIRST_UNUSED_SID,
 };
+use selinux_policy::metadata::HandleUnknown;
+use selinux_policy::parser::ByValue;
 use selinux_policy::{
-    metadata::HandleUnknown, parse_policy_by_value, parser::ByValue, AccessVector,
-    AccessVectorComputer, Policy, SecurityContext,
+    parse_policy_by_value, AccessVector, AccessVectorComputer, Policy, SecurityContext,
 };
 use starnix_sync::Mutex;
-use std::{collections::HashMap, num::NonZeroU32, ops::DerefMut, sync::Arc};
+use std::collections::HashMap;
+use std::num::NonZeroU32;
+use std::ops::DerefMut;
+use std::sync::Arc;
 use zerocopy::{AsBytes, NoCell};
 
 /// The version of the SELinux "status" file this implementation implements.

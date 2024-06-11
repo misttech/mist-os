@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        component_id_index::make_index_file, generate_storage_path, CheckUse, ExpectedResult,
-        RoutingTestModel, RoutingTestModelBuilder,
-    },
-    cm_config::{CapabilityAllowlistKey, CapabilityAllowlistSource},
-    cm_rust::*,
-    cm_rust_testing::*,
-    component_id_index::InstanceId,
-    fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status,
-    moniker::{ExtendedMoniker, Moniker},
-    std::{collections::HashSet, marker::PhantomData},
+use crate::component_id_index::make_index_file;
+use crate::{
+    generate_storage_path, CheckUse, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,
 };
+use cm_config::{CapabilityAllowlistKey, CapabilityAllowlistSource};
+use cm_rust::*;
+use cm_rust_testing::*;
+use component_id_index::InstanceId;
+use moniker::{ExtendedMoniker, Moniker};
+use std::collections::HashSet;
+use std::marker::PhantomData;
+use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
 
 pub struct CommonStorageTest<T: RoutingTestModelBuilder> {
     builder: PhantomData<T>,

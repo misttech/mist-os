@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::io::{Directory, LocalDirectory, RemoteDirectory},
-    crate::path::{
-        add_source_filename_to_path_if_absent, LocalOrRemoteComponentStoragePath,
-        REMOTE_COMPONENT_STORAGE_PATH_HELP,
-    },
-    anyhow::{anyhow, bail, Result},
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_sys2::StorageAdminProxy,
-    std::path::PathBuf,
+use crate::io::{Directory, LocalDirectory, RemoteDirectory};
+use crate::path::{
+    add_source_filename_to_path_if_absent, LocalOrRemoteComponentStoragePath,
+    REMOTE_COMPONENT_STORAGE_PATH_HELP,
 };
+use anyhow::{anyhow, bail, Result};
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_sys2::StorageAdminProxy;
+use std::path::PathBuf;
 
 /// Transfer a file between the host machine and the Fuchsia device.
 /// Can be used to upload a file to or from the Fuchsia device.
@@ -89,17 +87,15 @@ async fn do_copy<S: Directory, D: Directory>(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::storage::test::{
-            node_to_file, setup_fake_storage_admin, setup_fake_storage_admin_with_tmp,
-        },
-        fidl_fuchsia_io as fio,
-        futures::TryStreamExt,
-        std::collections::HashMap,
-        std::fs::{read, write},
-        tempfile::tempdir,
+    use super::*;
+    use crate::storage::test::{
+        node_to_file, setup_fake_storage_admin, setup_fake_storage_admin_with_tmp,
     };
+    use fidl_fuchsia_io as fio;
+    use futures::TryStreamExt;
+    use std::collections::HashMap;
+    use std::fs::{read, write};
+    use tempfile::tempdir;
 
     const EXPECTED_DATA: [u8; 4] = [0x0, 0x1, 0x2, 0x3];
 

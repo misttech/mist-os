@@ -320,21 +320,19 @@ async fn tun_like_over_network_tun() {
 /// crate.
 mod helpers {
     use fidl::endpoints::Proxy as _;
-    use net_types::{
-        ethernet::Mac,
-        ip::{Ipv4, Ipv4Addr},
-    };
+    use net_types::ethernet::Mac;
+    use net_types::ip::{Ipv4, Ipv4Addr};
     use packet::{InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
-    use packet_formats::{
-        arp::{ArpOp, ArpPacket, ArpPacketBuilder},
-        ethernet::{
-            EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck,
-            ETHERNET_MIN_BODY_LEN_NO_TAG,
-        },
-        icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpParseArgs, IcmpUnusedCode, Icmpv4Packet},
-        ip::Ipv4Proto,
-        ipv4::{Ipv4Header as _, Ipv4Packet, Ipv4PacketBuilder},
+    use packet_formats::arp::{ArpOp, ArpPacket, ArpPacketBuilder};
+    use packet_formats::ethernet::{
+        EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck,
+        ETHERNET_MIN_BODY_LEN_NO_TAG,
     };
+    use packet_formats::icmp::{
+        IcmpEchoRequest, IcmpPacketBuilder, IcmpParseArgs, IcmpUnusedCode, Icmpv4Packet,
+    };
+    use packet_formats::ip::Ipv4Proto;
+    use packet_formats::ipv4::{Ipv4Header as _, Ipv4Packet, Ipv4PacketBuilder};
 
     fn ip_v4(fidl_ip: fidl_fuchsia_net::IpAddress) -> Ipv4Addr {
         match fidl_ip {

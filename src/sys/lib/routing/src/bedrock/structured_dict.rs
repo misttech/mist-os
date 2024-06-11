@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::DictExt,
-    cm_types::{IterablePath, Name},
-    fidl_fuchsia_component_sandbox as fsandbox,
-    lazy_static::lazy_static,
-    sandbox::{Capability, Dict},
-    std::{fmt, marker::PhantomData},
-};
+use crate::DictExt;
+use cm_types::{IterablePath, Name};
+use fidl_fuchsia_component_sandbox as fsandbox;
+use lazy_static::lazy_static;
+use sandbox::{Capability, Dict};
+use std::fmt;
+use std::marker::PhantomData;
 
 /// This trait is implemented by types that wrap a [Dict] and wish to present an abstracted
 /// interface over the [Dict].

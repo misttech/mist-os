@@ -3,21 +3,20 @@
 // found in the LICENSE file.
 
 use crate::task::{IntervalTimerHandle, ThreadGroupReadGuard, WaitQueue, WaiterRef};
-use starnix_sync::InterruptibleEvent;
-use starnix_sync::RwLock;
+use starnix_sync::{InterruptibleEvent, RwLock};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS};
+use starnix_uapi::union::struct_with_union_into_bytes;
+use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
     __sifields__bindgen_ty_1, __sifields__bindgen_ty_2, __sifields__bindgen_ty_4,
-    __sifields__bindgen_ty_7, c_int, c_uint, error,
-    errors::Errno,
-    pid_t, sigaction, sigaltstack, sigevent, siginfo_t,
-    signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS},
-    sigval_t, uapi, uid_t,
-    union::struct_with_union_into_bytes,
-    user_address::UserAddress,
-    SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID, SIG_DFL, SIG_IGN, SI_KERNEL,
-    SI_MAX_SIZE,
+    __sifields__bindgen_ty_7, c_int, c_uint, error, pid_t, sigaction, sigaltstack, sigevent,
+    siginfo_t, sigval_t, uapi, uid_t, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID,
+    SIG_DFL, SIG_IGN, SI_KERNEL, SI_MAX_SIZE,
 };
-use std::{cmp::Ordering, collections::VecDeque, sync::Arc};
+use std::cmp::Ordering;
+use std::collections::VecDeque;
+use std::sync::Arc;
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 /// `SignalActions` contains a `sigaction` for each valid signal.
@@ -592,10 +591,8 @@ impl From<SignalEventValue> for sigval_t {
 #[cfg(test)]
 mod test {
     use super::*;
-    use starnix_uapi::{
-        signals::{SIGCHLD, SIGPWR},
-        CLD_EXITED,
-    };
+    use starnix_uapi::signals::{SIGCHLD, SIGPWR};
+    use starnix_uapi::CLD_EXITED;
 
     #[::fuchsia::test]
     fn test_signal() {

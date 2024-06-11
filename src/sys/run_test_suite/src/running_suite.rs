@@ -2,32 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        artifacts,
-        cancel::{Cancelled, NamedFutureExt, OrCancel},
-        diagnostics,
-        outcome::{Lifecycle, Outcome, RunTestSuiteError, UnexpectedEventError},
-        output::{self, ArtifactType, CaseId, SuiteReporter, Timestamp},
-        stream_util::StreamUtil,
-        trace::duration,
-    },
-    diagnostics_data::Severity,
-    fidl_fuchsia_test_manager::{
-        self as ftest_manager, CaseArtifact, CaseFinished, CaseFound, CaseStarted, CaseStopped,
-        SuiteArtifact, SuiteStopped,
-    },
-    fuchsia_async as fasync,
-    futures::future::Either,
-    futures::{prelude::*, stream::FuturesUnordered, StreamExt},
-    std::collections::HashMap,
-    std::io::Write,
-    std::sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    tracing::{error, info, warn},
+use crate::cancel::{Cancelled, NamedFutureExt, OrCancel};
+use crate::outcome::{Lifecycle, Outcome, RunTestSuiteError, UnexpectedEventError};
+use crate::output::{self, ArtifactType, CaseId, SuiteReporter, Timestamp};
+use crate::stream_util::StreamUtil;
+use crate::trace::duration;
+use crate::{artifacts, diagnostics};
+use diagnostics_data::Severity;
+use fidl_fuchsia_test_manager::{
+    self as ftest_manager, CaseArtifact, CaseFinished, CaseFound, CaseStarted, CaseStopped,
+    SuiteArtifact, SuiteStopped,
 };
+use fuchsia_async as fasync;
+use futures::future::Either;
+use futures::prelude::*;
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
+use std::collections::HashMap;
+use std::io::Write;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use tracing::{error, info, warn};
 
 /// Struct used by |run_suite_and_collect_logs| to track the state of test cases and suites.
 struct CollectedEntityState<R> {
@@ -505,13 +500,11 @@ impl RunningSuite {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::output::{EntityId, SuiteId},
-        assert_matches::assert_matches,
-        fidl::endpoints::create_proxy_and_stream,
-        maplit::hashmap,
-    };
+    use super::*;
+    use crate::output::{EntityId, SuiteId};
+    use assert_matches::assert_matches;
+    use fidl::endpoints::create_proxy_and_stream;
+    use maplit::hashmap;
 
     async fn respond_to_get_events(
         request_stream: &mut ftest_manager::SuiteControllerRequestStream,

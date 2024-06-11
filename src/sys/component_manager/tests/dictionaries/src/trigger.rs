@@ -6,13 +6,14 @@
 //! manner (Trigger-c), and one from a dynamic dictionary that is exposed using the Router
 //! protocol. This lets us test a dictionary that is a composite of dynamic and static routes.
 
+use fidl::endpoints;
+use fuchsia_component::client;
+use fuchsia_component::server::ServiceFs;
+use futures::{StreamExt, TryStreamExt};
+use tracing::info;
 use {
-    fidl::endpoints,
     fidl_fidl_examples_routing_echo as fecho, fidl_fidl_test_components as ftest,
     fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync,
-    fuchsia_component::{client, server::ServiceFs},
-    futures::{StreamExt, TryStreamExt},
-    tracing::info,
 };
 
 enum IncomingRequest {

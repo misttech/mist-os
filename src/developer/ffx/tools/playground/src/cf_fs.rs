@@ -4,15 +4,12 @@
 
 use async_trait::async_trait;
 use component_debug::realm::{GetAllInstancesError, Instance};
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_sys2 as sys2;
 use fuchsia_zircon_status::Status;
 use futures::channel::oneshot;
 use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
 use std::ops::Bound;
 use std::sync::{Arc, Mutex, Weak};
-use vfs::attributes;
 use vfs::common::rights_to_posix_mode_bits;
 use vfs::directory::dirents_sink::{self, AppendResult};
 use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
@@ -21,7 +18,8 @@ use vfs::directory::immutable::connection::ImmutableConnection;
 use vfs::directory::traversal_position::TraversalPosition;
 use vfs::execution_scope::ExecutionScope;
 use vfs::node::Node;
-use vfs::ToObjectRequest;
+use vfs::{attributes, ToObjectRequest};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as sys2};
 
 /// This contains a cache of the entire component hierarchy, as a map from
 /// path-like string keys to instance information. We refresh this cache every

@@ -13,3 +13,6 @@ use_small_heuristics = "Max"
 
 # Prevent carriage returns
 newline_style = "Unix"
+
+# Format imports. See fxbug.dev/340943530#comment2 for discussion.
+imports_granularity = "Module"

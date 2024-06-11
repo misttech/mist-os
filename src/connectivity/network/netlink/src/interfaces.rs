@@ -6,30 +6,28 @@
 //! RTM_LINK and RTM_ADDR Netlink messages based on events received from
 //! Netstack's interface watcher.
 
-use std::{
-    collections::BTreeMap,
-    fmt::Debug,
-    net::IpAddr,
-    num::{NonZeroU32, NonZeroU64},
-};
+use std::collections::BTreeMap;
+use std::fmt::Debug;
+use std::net::IpAddr;
+use std::num::{NonZeroU32, NonZeroU64};
 
-use fidl_fuchsia_hardware_network as fhwnet;
-use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext::IntoExt as _;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin::{
     self as fnet_interfaces_admin, AddressRemovalReason, InterfaceRemovedReason,
 };
-use fidl_fuchsia_net_interfaces_ext::{
-    self as fnet_interfaces_ext,
-    admin::{wait_for_address_added_event, AddressStateProviderError, TerminalError},
-    Update as _,
+use fidl_fuchsia_net_interfaces_ext::admin::{
+    wait_for_address_added_event, AddressStateProviderError, TerminalError,
 };
-use fidl_fuchsia_net_root as fnet_root;
+use fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext, Update as _};
+use {
+    fidl_fuchsia_hardware_network as fhwnet, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_interfaces as fnet_interfaces, fidl_fuchsia_net_root as fnet_root,
+};
 
 use derivative::Derivative;
 use either::Either;
-use futures::{channel::oneshot, StreamExt as _};
+use futures::channel::oneshot;
+use futures::StreamExt as _;
 use linux_uapi::{
     net_device_flags_IFF_LOOPBACK, net_device_flags_IFF_LOWER_UP, net_device_flags_IFF_RUNNING,
     net_device_flags_IFF_UP, rtnetlink_groups_RTNLGRP_IPV4_IFADDR,
@@ -38,22 +36,24 @@ use linux_uapi::{
 };
 use net_types::ip::{AddrSubnetEither, IpVersion};
 use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
-use netlink_packet_route::{
-    address::{AddressAttribute, AddressFlags, AddressHeader, AddressHeaderFlags, AddressMessage},
-    link::{LinkAttribute, LinkFlags, LinkHeader, LinkLayerType, LinkMessage, State},
-    AddressFamily, RouteNetlinkMessage,
+use netlink_packet_route::address::{
+    AddressAttribute, AddressFlags, AddressHeader, AddressHeaderFlags, AddressMessage,
 };
+use netlink_packet_route::link::{
+    LinkAttribute, LinkFlags, LinkHeader, LinkLayerType, LinkMessage, State,
+};
+use netlink_packet_route::{AddressFamily, RouteNetlinkMessage};
 
-use crate::{
-    client::{ClientTable, InternalClient},
-    errors::WorkerInitializationError,
-    logging::{log_debug, log_error, log_warn},
-    messaging::Sender,
-    multicast_groups::ModernGroup,
-    netlink_packet::{errno::Errno, UNSPECIFIED_SEQUENCE_NUMBER},
-    protocol_family::{route::NetlinkRoute, ProtocolFamily},
-    util::respond_to_completer,
-};
+use crate::client::{ClientTable, InternalClient};
+use crate::errors::WorkerInitializationError;
+use crate::logging::{log_debug, log_error, log_warn};
+use crate::messaging::Sender;
+use crate::multicast_groups::ModernGroup;
+use crate::netlink_packet::errno::Errno;
+use crate::netlink_packet::UNSPECIFIED_SEQUENCE_NUMBER;
+use crate::protocol_family::route::NetlinkRoute;
+use crate::protocol_family::ProtocolFamily;
+use crate::util::respond_to_completer;
 
 /// A handler for interface events.
 pub trait InterfacesHandler: Send + Sync + 'static {
@@ -1371,13 +1371,13 @@ pub(crate) mod testutil {
 
     use std::sync::{Arc, Mutex};
 
-    use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
-    use fuchsia_zircon as zx;
-    use futures::{
-        channel::mpsc, future::Future, stream::Stream, FutureExt as _, TryStreamExt as _,
-    };
+    use futures::channel::mpsc;
+    use futures::future::Future;
+    use futures::stream::Stream;
+    use futures::{FutureExt as _, TryStreamExt as _};
     use net_declare::{fidl_subnet, net_addr_subnet};
     use net_types::ip::{Ipv4, Ipv6};
+    use {fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_zircon as zx};
 
     use crate::messaging::testutil::FakeSender;
 
@@ -1665,7 +1665,8 @@ pub(crate) mod testutil {
 
 #[cfg(test)]
 mod tests {
-    use super::{testutil::*, *};
+    use super::testutil::*;
+    use super::*;
 
     use std::pin::{pin, Pin};
 
@@ -1675,7 +1676,9 @@ mod tests {
     use fuchsia_async::{self as fasync};
 
     use assert_matches::assert_matches;
-    use futures::{sink::SinkExt as _, stream::Stream, FutureExt as _};
+    use futures::sink::SinkExt as _;
+    use futures::stream::Stream;
+    use futures::FutureExt as _;
     use linux_uapi::{rtnetlink_groups_RTNLGRP_IPV4_ROUTE, IFA_F_PERMANENT, IFA_F_TENTATIVE};
     use pretty_assertions::assert_eq;
     use test_case::test_case;

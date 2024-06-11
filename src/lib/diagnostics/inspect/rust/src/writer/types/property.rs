@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::writer::{private::InspectTypeInternal, Error, InnerType, State};
+use crate::writer::private::InspectTypeInternal;
+use crate::writer::{Error, InnerType, State};
 use inspect_format::BlockIndex;
 
 /// Trait implemented by properties.

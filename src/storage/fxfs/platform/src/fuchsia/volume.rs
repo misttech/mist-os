@@ -2,58 +2,42 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::fuchsia::{
-        component::map_to_raw_status,
-        directory::FxDirectory,
-        dirent_cache::DirentCache,
-        file::FxFile,
-        fxblob::blob::FxBlob,
-        memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
-        node::{FxNode, GetResult, NodeCache},
-        pager::Pager,
-        profile::ProfileState,
-        symlink::FxSymlink,
-        volumes_directory::VolumesDirectory,
-    },
-    anyhow::{bail, ensure, Error},
-    async_trait::async_trait,
-    fidl_fuchsia_fxfs::{
-        BlobCreatorRequestStream, BlobReaderRequestStream, BytesAndNodes, ProjectIdRequest,
-        ProjectIdRequestStream, ProjectIterToken,
-    },
-    fidl_fuchsia_io as fio,
-    fs_inspect::{FsInspectVolume, VolumeData},
-    fuchsia_async as fasync,
-    futures::{
-        channel::oneshot,
-        stream::{self, FusedStream, Stream},
-        FutureExt, StreamExt, TryStreamExt,
-    },
-    fxfs::{
-        errors::FxfsError,
-        filesystem::{self, SyncOptions},
-        log::*,
-        object_handle::ObjectHandle,
-        object_store::{
-            directory::{replace_child_with_object, Directory},
-            transaction::{lock_keys, LockKey, Options},
-            HandleOptions, HandleOwner, ObjectDescriptor, ObjectStore, Timestamp,
-        },
-    },
-    std::{
-        future::Future,
-        sync::{
-            atomic::{AtomicBool, Ordering},
-            Arc, Mutex, Weak,
-        },
-        time::Duration,
-    },
-    vfs::{
-        directory::{entry::DirectoryEntry, entry_container::Directory as VfsDirectory},
-        execution_scope::ExecutionScope,
-    },
+use crate::fuchsia::component::map_to_raw_status;
+use crate::fuchsia::directory::FxDirectory;
+use crate::fuchsia::dirent_cache::DirentCache;
+use crate::fuchsia::file::FxFile;
+use crate::fuchsia::fxblob::blob::FxBlob;
+use crate::fuchsia::memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor};
+use crate::fuchsia::node::{FxNode, GetResult, NodeCache};
+use crate::fuchsia::pager::Pager;
+use crate::fuchsia::profile::ProfileState;
+use crate::fuchsia::symlink::FxSymlink;
+use crate::fuchsia::volumes_directory::VolumesDirectory;
+use anyhow::{bail, ensure, Error};
+use async_trait::async_trait;
+use fidl_fuchsia_fxfs::{
+    BlobCreatorRequestStream, BlobReaderRequestStream, BytesAndNodes, ProjectIdRequest,
+    ProjectIdRequestStream, ProjectIterToken,
 };
+use fs_inspect::{FsInspectVolume, VolumeData};
+use futures::channel::oneshot;
+use futures::stream::{self, FusedStream, Stream};
+use futures::{FutureExt, StreamExt, TryStreamExt};
+use fxfs::errors::FxfsError;
+use fxfs::filesystem::{self, SyncOptions};
+use fxfs::log::*;
+use fxfs::object_handle::ObjectHandle;
+use fxfs::object_store::directory::{replace_child_with_object, Directory};
+use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
+use fxfs::object_store::{HandleOptions, HandleOwner, ObjectDescriptor, ObjectStore, Timestamp};
+use std::future::Future;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, Weak};
+use std::time::Duration;
+use vfs::directory::entry::DirectoryEntry;
+use vfs::directory::entry_container::Directory as VfsDirectory;
+use vfs::execution_scope::ExecutionScope;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 // LINT.IfChange
 // TODO:(b/299919008) Fix this number to something reasonable, or maybe just for fxblob.
@@ -874,51 +858,44 @@ pub fn info_to_filesystem_info(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::DIRENT_CACHE_LIMIT,
-        crate::fuchsia::{
-            directory::FxDirectory,
-            file::FxFile,
-            fxblob::{
-                testing::{self as blob_testing, BlobFixture},
-                BlobDirectory,
-            },
-            memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
-            pager::PagerBacked,
-            profile::new_profile_state,
-            testing::{
-                close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
-                open_file_checked, write_at, TestFixture,
-            },
-            volume::{FxVolumeAndRoot, MemoryPressureConfig, MemoryPressureLevelConfig},
-            volumes_directory::VolumesDirectory,
-        },
-        delivery_blob::CompressionMode,
-        fidl::endpoints::ServerEnd,
-        fidl_fuchsia_fxfs::{BytesAndNodes, ProjectIdMarker, VolumeMarker},
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_component::client::connect_to_protocol_at_dir_svc,
-        fuchsia_fs::file,
-        fuchsia_zircon::Status,
-        fxfs::{
-            filesystem::FxFilesystem,
-            fsck::{fsck, fsck_volume},
-            object_handle::ObjectHandle,
-            object_store::{
-                directory::replace_child,
-                transaction::{lock_keys, LockKey, Options},
-                volume::root_volume,
-                HandleOptions, ObjectDescriptor, ObjectStore,
-            },
-        },
-        fxfs_insecure_crypto::InsecureCrypt,
-        std::{
-            sync::{Arc, Weak},
-            time::Duration,
-        },
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
-        vfs::{directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path},
+    use super::DIRENT_CACHE_LIMIT;
+    use crate::fuchsia::directory::FxDirectory;
+    use crate::fuchsia::file::FxFile;
+    use crate::fuchsia::fxblob::testing::{self as blob_testing, BlobFixture};
+    use crate::fuchsia::fxblob::BlobDirectory;
+    use crate::fuchsia::memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor};
+    use crate::fuchsia::pager::PagerBacked;
+    use crate::fuchsia::profile::new_profile_state;
+    use crate::fuchsia::testing::{
+        close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
+        open_file_checked, write_at, TestFixture,
     };
+    use crate::fuchsia::volume::{
+        FxVolumeAndRoot, MemoryPressureConfig, MemoryPressureLevelConfig,
+    };
+    use crate::fuchsia::volumes_directory::VolumesDirectory;
+    use delivery_blob::CompressionMode;
+    use fidl::endpoints::ServerEnd;
+    use fidl_fuchsia_fxfs::{BytesAndNodes, ProjectIdMarker, VolumeMarker};
+    use fuchsia_component::client::connect_to_protocol_at_dir_svc;
+    use fuchsia_fs::file;
+    use fuchsia_zircon::Status;
+    use fxfs::filesystem::FxFilesystem;
+    use fxfs::fsck::{fsck, fsck_volume};
+    use fxfs::object_handle::ObjectHandle;
+    use fxfs::object_store::directory::replace_child;
+    use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
+    use fxfs::object_store::volume::root_volume;
+    use fxfs::object_store::{HandleOptions, ObjectDescriptor, ObjectStore};
+    use fxfs_insecure_crypto::InsecureCrypt;
+    use std::sync::{Arc, Weak};
+    use std::time::Duration;
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::DeviceHolder;
+    use vfs::directory::entry_container::Directory;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::path::Path;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     #[fuchsia::test(threads = 10)]
     async fn test_rename_different_dirs() {

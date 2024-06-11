@@ -6,10 +6,8 @@ use analytics::{add_custom_event, ga4_metrics, init_ga4_metrics_service};
 use anyhow::{Context, Result};
 use fidl_fuchsia_developer_ffx::VersionInfo;
 use fuchsia_async::TimeoutExt;
-use std::{
-    collections::BTreeMap,
-    time::{Duration, Instant},
-};
+use std::collections::BTreeMap;
+use std::time::{Duration, Instant};
 
 pub const GA4_PROPERTY_ID: &str = "G-L10R82HSYT";
 pub const GA4_KEY: &str = "mHeVJ5GxQTCvAVCmVHn_dw";

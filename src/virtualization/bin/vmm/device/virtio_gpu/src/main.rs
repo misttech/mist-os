@@ -8,15 +8,13 @@ mod resource;
 mod scanout;
 mod wire;
 
-use {
-    crate::gpu_device::GpuDevice,
-    crate::scanout::FlatlandScanout,
-    anyhow::{anyhow, Context},
-    fidl::endpoints::RequestStream,
-    fidl_fuchsia_virtualization_hardware::VirtioGpuRequestStream,
-    fuchsia_component::server,
-    futures::{select, FutureExt, StreamExt, TryFutureExt, TryStreamExt},
-};
+use crate::gpu_device::GpuDevice;
+use crate::scanout::FlatlandScanout;
+use anyhow::{anyhow, Context};
+use fidl::endpoints::RequestStream;
+use fidl_fuchsia_virtualization_hardware::VirtioGpuRequestStream;
+use fuchsia_component::server;
+use futures::{select, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 
 async fn run_virtio_gpu(mut virtio_gpu_fidl: VirtioGpuRequestStream) -> Result<(), anyhow::Error> {
     // Receive start info as first message.

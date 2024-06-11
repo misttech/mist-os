@@ -14,17 +14,12 @@
 // TODO(fmil): temporary, until all code is used.
 #![allow(dead_code)]
 
-use {
-    anyhow::Context,
-    anyhow::Error,
-    anyhow::Result,
-    intl_strings::{message_ids, parser, veprintln},
-    std::env,
-    std::fs::File,
-    std::io,
-    std::path::PathBuf,
-    structopt::StructOpt,
-};
+use anyhow::{Context, Error, Result};
+use intl_strings::{message_ids, parser, veprintln};
+use std::fs::File;
+use std::path::PathBuf;
+use std::{env, io};
+use structopt::StructOpt;
 
 // TODO(fmil): Add usage link here.
 #[derive(Debug, StructOpt)]

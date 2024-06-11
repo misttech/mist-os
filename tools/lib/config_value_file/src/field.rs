@@ -8,10 +8,8 @@ use cm_rust::{
     ConfigNestedValueType, ConfigSingleValue, ConfigValue, ConfigValueType, ConfigVectorValue,
 };
 use serde_json::Value as JsonValue;
-use std::{
-    fmt::{Display, Formatter, Result as FmtResult},
-    num::TryFromIntError,
-};
+use std::fmt::{Display, Formatter, Result as FmtResult};
+use std::num::TryFromIntError;
 
 /// Returns a FIDL value to encode in the file for the provided JSON value, if and only if the value
 /// matches the type from the declaration.

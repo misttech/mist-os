@@ -64,7 +64,8 @@ pub enum FileError {
 
 #[cfg(test)]
 mod tests {
-    use super::{field::JsonTy, *};
+    use super::field::JsonTy;
+    use super::*;
     use cm_rust::{ConfigChecksum, ConfigSingleValue, ConfigValue, ConfigVectorValue};
     use fidl_fuchsia_component_config_ext::{config_decl, values_data};
     use serde_json::json;

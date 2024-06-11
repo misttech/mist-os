@@ -2,14 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::buffer_reader::BufferReader;
+use crate::mac::ReasonCode;
+use crate::organization::Oui;
+use crate::UnalignedView;
+use ieee80211::MacAddr;
+use static_assertions::const_assert_eq;
+use std::mem::size_of;
+use wlan_bitfield::bitfield;
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 use {
-    crate::{buffer_reader::BufferReader, mac::ReasonCode, organization::Oui, UnalignedView},
     banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    ieee80211::MacAddr,
-    static_assertions::const_assert_eq,
-    std::mem::size_of,
-    wlan_bitfield::bitfield,
-    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned},
 };
 
 macro_rules! pub_const {

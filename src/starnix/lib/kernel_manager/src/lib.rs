@@ -3,19 +3,16 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
-use fidl::{
-    endpoints::{DiscoverableProtocolMarker, Proxy, ServerEnd},
-    HandleBased,
-};
-use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_component_decl as fdecl;
-use fidl_fuchsia_component_runner as frunner;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_starnix_container as fstarnix;
+use fidl::endpoints::{DiscoverableProtocolMarker, Proxy, ServerEnd};
+use fidl::HandleBased;
 use fuchsia_component::client as fclient;
-use fuchsia_zircon as zx;
 use rand::Rng;
 use std::future::Future;
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_component_runner as frunner, fidl_fuchsia_io as fio,
+    fidl_fuchsia_starnix_container as fstarnix, fuchsia_zircon as zx,
+};
 
 /// The name of the collection that the starnix_kernel is run in.
 const KERNEL_COLLECTION: &str = "kernels";

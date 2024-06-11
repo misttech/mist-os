@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::RegistrationDecl,
-    cm_rust::{
-        CapabilityDecl, ExposeDecl, ExposeDeclCommon, OfferDecl, OfferDeclCommon, SourceName,
-        UseDecl, UseDeclCommon,
-    },
-    cm_types::Name,
-    moniker::Moniker,
+use crate::RegistrationDecl;
+use cm_rust::{
+    CapabilityDecl, ExposeDecl, ExposeDeclCommon, OfferDecl, OfferDeclCommon, SourceName, UseDecl,
+    UseDeclCommon,
 };
+use cm_types::Name;
+use moniker::Moniker;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    collections::HashMap,
-    sync::{Arc, Weak},
-};
+use std::collections::HashMap;
+use std::sync::{Arc, Weak};
 
 use async_trait::async_trait;
 use errors::ModelError;
-use fuchsia_inspect as inspect;
 use fuchsia_inspect::{IntExponentialHistogramProperty, IntLinearHistogramProperty};
-use fuchsia_sync as fsync;
-use fuchsia_zircon as zx;
 use inspect::HistogramProperty;
 use moniker::Moniker;
+use {fuchsia_inspect as inspect, fuchsia_sync as fsync, fuchsia_zircon as zx};
 
 use hooks::{Event, EventPayload, EventType, HasEventType, Hook, HooksRegistration};
 

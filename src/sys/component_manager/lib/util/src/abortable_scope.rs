@@ -4,11 +4,9 @@
 
 use fuchsia_sync::Mutex;
 use futures::channel::oneshot::{self, Canceled};
-use futures::{
-    future::{FutureExt, Shared},
-    task::Poll,
-    Future,
-};
+use futures::future::{FutureExt, Shared};
+use futures::task::Poll;
+use futures::Future;
 use pin_project::pin_project;
 use std::fmt::Debug;
 use std::pin::Pin;
@@ -120,7 +118,8 @@ impl<T, Fut: Future<Output = T> + Send, InterruptFut: Future<Output = Result<(),
 
 #[cfg(test)]
 pub mod tests {
-    use {super::*, fuchsia_async as fasync};
+    use super::*;
+    use fuchsia_async as fasync;
 
     #[test]
     fn abort_a_future_pending() {

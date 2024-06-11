@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    file::{
-        BufferInfo, ConnectionInfo, ConnectionMap, DeviceMap, MagmaBuffer, MagmaConnection,
-        MagmaDevice, MagmaSemaphore,
-    },
-    image_file::{ImageFile, ImageInfo},
-    magma::create_drm_image,
+use crate::file::{
+    BufferInfo, ConnectionInfo, ConnectionMap, DeviceMap, MagmaBuffer, MagmaConnection,
+    MagmaDevice, MagmaSemaphore,
 };
+use crate::image_file::{ImageFile, ImageInfo};
+use crate::magma::create_drm_image;
 use fuchsia_zircon::{
     AsHandleRef, HandleBased, {self as zx},
 };
@@ -47,21 +45,18 @@ use magma::{
     MAGMA_QUERY_VENDOR_ID, MAGMA_STATUS_INVALID_ARGS, MAGMA_STATUS_OK, MAGMA_VENDOR_ID_INTEL,
     MAGMA_VENDOR_ID_MALI,
 };
-use starnix_core::{
-    mm::{MemoryAccessor, MemoryAccessorExt},
-    task::CurrentTask,
-    vfs::{Anon, FdFlags, FsNodeInfo, VmoFileObject},
-};
+use starnix_core::mm::{MemoryAccessor, MemoryAccessorExt};
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::{Anon, FdFlags, FsNodeInfo, VmoFileObject};
 use starnix_logging::track_stub;
-use starnix_uapi::{
-    errno,
-    errors::Errno,
-    file_mode::FileMode,
-    open_flags::OpenFlags,
-    user_address::{UserAddress, UserRef},
-    user_buffer::UserBuffer,
-};
-use std::{mem::ManuallyDrop, sync::Arc};
+use starnix_uapi::errno;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::user_buffer::UserBuffer;
+use std::mem::ManuallyDrop;
+use std::sync::Arc;
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 /// Reads a sequence of objects starting at `addr`, ensuring at least one element is in the returned

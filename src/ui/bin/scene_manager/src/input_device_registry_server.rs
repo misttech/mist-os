@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error, fidl_fuchsia_input_injection::InputDeviceRegistryRequestStream,
-    futures::channel::mpsc::UnboundedSender,
-};
+use anyhow::Error;
+use fidl_fuchsia_input_injection::InputDeviceRegistryRequestStream;
+use futures::channel::mpsc::UnboundedSender;
 
 /// A struct which forwards `InputDeviceRegistryRequestStream`s over an
 /// `mpsc::UnboundedSender`.
@@ -39,10 +38,11 @@ impl InputDeviceRegistryServer {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, assert_matches::assert_matches, fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_input_injection::InputDeviceRegistryMarker, fuchsia_async as fasync,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_input_injection::InputDeviceRegistryMarker;
+    use fuchsia_async as fasync;
 
     #[fasync::run_singlethreaded(test)]
     async fn test_handle_request_forwards_stream_and_returns_ok() {

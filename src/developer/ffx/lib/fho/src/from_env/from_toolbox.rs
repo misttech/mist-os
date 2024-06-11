@@ -7,7 +7,8 @@ use ffx_command::Result;
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use std::marker::PhantomData;
 
-use super::{helpers::*, FhoEnvironment, TryFromEnvWith, DEFAULT_PROXY_TIMEOUT};
+use super::helpers::*;
+use super::{FhoEnvironment, TryFromEnvWith, DEFAULT_PROXY_TIMEOUT};
 
 /// The implementation of the decorator returned by [`toolbox`] and
 /// [`toolbox_or`].

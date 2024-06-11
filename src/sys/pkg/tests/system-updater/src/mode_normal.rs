@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::*, crate::progress_reporting::assert_success_monitor_states,
-    fidl_fuchsia_update_installer_ext::StateId, pretty_assertions::assert_eq,
-};
+use super::*;
+use crate::progress_reporting::assert_success_monitor_states;
+use fidl_fuchsia_update_installer_ext::StateId;
+use pretty_assertions::assert_eq;
 
 #[fasync::run_singlethreaded(test)]
 async fn updates_the_system() {

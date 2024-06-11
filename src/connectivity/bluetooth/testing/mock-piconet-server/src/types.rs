@@ -226,11 +226,11 @@ impl ServiceRecord {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::profile::{build_l2cap_descriptor, tests::rfcomm_service_definition};
-    use {
-        bt_rfcomm::ServerChannel, fidl_fuchsia_bluetooth as fidl_bt,
-        fuchsia_bluetooth::profile::DataElement,
-    };
+    use crate::profile::build_l2cap_descriptor;
+    use crate::profile::tests::rfcomm_service_definition;
+    use bt_rfcomm::ServerChannel;
+    use fidl_fuchsia_bluetooth as fidl_bt;
+    use fuchsia_bluetooth::profile::DataElement;
 
     /// Returns the expected attributes in raw form.
     fn expected_attributes() -> Vec<bredr::Attribute> {

@@ -2,32 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    carnelian::{
-        color::Color,
-        input::{self},
-        make_app_assistant,
-        render::*,
-        App, AppAssistant, Point, Size, ViewAssistant, ViewAssistantContext, ViewAssistantPtr,
-        ViewKey,
-    },
-    euclid::{
-        default::{Rect, Transform2D, Vector2D},
-        point2, size2, vec2, Angle,
-    },
-    fidl_fuchsia_hardware_input as hid,
-    fuchsia_trace::duration,
-    fuchsia_zircon::{self as zx, AsHandleRef, Event, Signals, Time},
-    itertools::izip,
-    rand::{thread_rng, Rng},
-    std::{
-        collections::{BTreeMap, VecDeque},
-        f32, fs,
-        ops::Range,
-        time::Duration,
-    },
+use anyhow::Error;
+use carnelian::color::Color;
+use carnelian::input::{self};
+use carnelian::render::*;
+use carnelian::{
+    make_app_assistant, App, AppAssistant, Point, Size, ViewAssistant, ViewAssistantContext,
+    ViewAssistantPtr, ViewKey,
 };
+use euclid::default::{Rect, Transform2D, Vector2D};
+use euclid::{point2, size2, vec2, Angle};
+use fidl_fuchsia_hardware_input as hid;
+use fuchsia_trace::duration;
+use fuchsia_zircon::{self as zx, AsHandleRef, Event, Signals, Time};
+use itertools::izip;
+use rand::{thread_rng, Rng};
+use std::collections::{BTreeMap, VecDeque};
+use std::ops::Range;
+use std::time::Duration;
+use std::{f32, fs};
 
 const BACKGROUND_COLOR: Color = Color { r: 255, g: 255, b: 255, a: 255 };
 

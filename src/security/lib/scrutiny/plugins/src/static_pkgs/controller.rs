@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::static_pkgs::collection::StaticPkgsCollection,
-    anyhow::{Context, Result},
-    scrutiny::{model::controller::DataController, model::model::DataModel},
-    scrutiny_utils::usage::UsageBuilder,
-    serde::{Deserialize, Serialize},
-    serde_json::{json, value::Value},
-    std::sync::Arc,
-};
+use crate::static_pkgs::collection::StaticPkgsCollection;
+use anyhow::{Context, Result};
+use scrutiny::model::controller::DataController;
+use scrutiny::model::model::DataModel;
+use scrutiny_utils::usage::UsageBuilder;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use serde_json::value::Value;
+use std::sync::Arc;
 
 #[derive(Deserialize, Serialize)]
 pub struct ExtractStaticPkgsRequest;
@@ -45,18 +45,17 @@ by collectors.",
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::ExtractStaticPkgsController,
-        crate::static_pkgs::collection::{StaticPkgsCollection, StaticPkgsError},
-        anyhow::{Context, Result},
-        fuchsia_hash::Hash,
-        fuchsia_url::{PackageName, PackageVariant},
-        maplit::{hashmap, hashset},
-        scrutiny::model::controller::DataController,
-        scrutiny_testing::fake::*,
-        serde_json::{json, value::Value},
-        std::str::FromStr,
-    };
+    use super::ExtractStaticPkgsController;
+    use crate::static_pkgs::collection::{StaticPkgsCollection, StaticPkgsError};
+    use anyhow::{Context, Result};
+    use fuchsia_hash::Hash;
+    use fuchsia_url::{PackageName, PackageVariant};
+    use maplit::{hashmap, hashset};
+    use scrutiny::model::controller::DataController;
+    use scrutiny_testing::fake::*;
+    use serde_json::json;
+    use serde_json::value::Value;
+    use std::str::FromStr;
 
     #[fuchsia::test]
     fn test_err_results() -> Result<()> {

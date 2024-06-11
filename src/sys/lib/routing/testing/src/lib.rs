@@ -9,38 +9,34 @@ pub mod rights;
 pub mod storage;
 pub mod storage_admin;
 
+use ::component_id_index::InstanceId;
+use assert_matches::assert_matches;
+use async_trait::async_trait;
+use camino::Utf8PathBuf;
+use cm_config::{
+    AllowlistEntry, AllowlistEntryBuilder, CapabilityAllowlistKey, CapabilityAllowlistSource,
+    DebugCapabilityAllowlistEntry, DebugCapabilityKey,
+};
+use cm_rust::*;
+use cm_rust_testing::*;
+use cm_types::Name;
+use fidl::endpoints::ProtocolMarker;
+use moniker::{ExtendedMoniker, Moniker};
+use routing::capability_source::{
+    AggregateCapability, AggregateMember, CapabilitySource, ComponentCapability,
+    FilteredAggregateCapabilityRouteData, InternalCapability,
+};
+use routing::component_instance::ComponentInstanceInterface;
+use routing::error::RoutingError;
+use routing::mapper::NoopRouteMapper;
+use routing::{route_capability, RouteRequest, RouteSource};
+use std::collections::HashSet;
+use std::marker::PhantomData;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use {
-    ::component_id_index::InstanceId,
-    assert_matches::assert_matches,
-    async_trait::async_trait,
-    camino::Utf8PathBuf,
-    cm_config::{
-        AllowlistEntry, AllowlistEntryBuilder, CapabilityAllowlistKey, CapabilityAllowlistSource,
-        DebugCapabilityAllowlistEntry, DebugCapabilityKey,
-    },
-    cm_rust::*,
-    cm_rust_testing::*,
-    cm_types::Name,
-    fidl::endpoints::ProtocolMarker,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx,
-    moniker::{ExtendedMoniker, Moniker},
-    routing::{
-        capability_source::{
-            AggregateCapability, AggregateMember, CapabilitySource, ComponentCapability,
-            FilteredAggregateCapabilityRouteData, InternalCapability,
-        },
-        component_instance::ComponentInstanceInterface,
-        error::RoutingError,
-        mapper::NoopRouteMapper,
-        route_capability, RouteRequest, RouteSource,
-    },
-    std::{
-        collections::HashSet,
-        marker::PhantomData,
-        path::{Path, PathBuf},
-        sync::Arc,
-    },
 };
 
 /// Construct a capability path for the hippo service.

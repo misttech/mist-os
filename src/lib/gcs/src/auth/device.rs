@@ -5,13 +5,11 @@
 //! Use the "device" auth flow. In this flow the user is asked to visit an auth
 //! page on a separate machine and enter a short code.
 
-use {
-    crate::auth::info::{AUTH_SCOPE, CLIENT_ID, CLIENT_SECRET},
-    anyhow::{bail, Context, Result},
-    hyper::{Body, Method, Request},
-    serde::{Deserialize, Serialize},
-    std::time::{Duration, Instant},
-};
+use crate::auth::info::{AUTH_SCOPE, CLIENT_ID, CLIENT_SECRET};
+use anyhow::{bail, Context, Result};
+use hyper::{Body, Method, Request};
+use serde::{Deserialize, Serialize};
+use std::time::{Duration, Instant};
 
 use cfg_if::cfg_if;
 cfg_if! {

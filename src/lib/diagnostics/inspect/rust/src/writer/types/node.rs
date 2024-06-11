@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::writer::private::InspectTypeInternal;
 use crate::writer::{
-    private::InspectTypeInternal, BoolProperty, BytesProperty, DoubleArrayProperty,
-    DoubleExponentialHistogramProperty, DoubleLinearHistogramProperty, DoubleProperty, Error,
-    Inner, InnerData, InnerType, InspectType, InspectTypeReparentable, Inspector, IntArrayProperty,
-    IntExponentialHistogramProperty, IntLinearHistogramProperty, IntProperty, LazyNode, State,
-    StringArrayProperty, StringProperty, StringReference, UintArrayProperty,
-    UintExponentialHistogramProperty, UintLinearHistogramProperty, UintProperty, ValueList,
+    BoolProperty, BytesProperty, DoubleArrayProperty, DoubleExponentialHistogramProperty,
+    DoubleLinearHistogramProperty, DoubleProperty, Error, Inner, InnerData, InnerType, InspectType,
+    InspectTypeReparentable, Inspector, IntArrayProperty, IntExponentialHistogramProperty,
+    IntLinearHistogramProperty, IntProperty, LazyNode, State, StringArrayProperty, StringProperty,
+    StringReference, UintArrayProperty, UintExponentialHistogramProperty,
+    UintLinearHistogramProperty, UintProperty, ValueList,
 };
 use diagnostics_hierarchy::{ArrayFormat, ExponentialHistogramParams, LinearHistogramParams};
 use futures::future::BoxFuture;
@@ -558,13 +559,9 @@ impl InnerType for InnerNodeType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        reader,
-        writer::{
-            testing_utils::{get_state, GetBlockExt},
-            ArrayProperty,
-        },
-    };
+    use crate::reader;
+    use crate::writer::testing_utils::{get_state, GetBlockExt};
+    use crate::writer::ArrayProperty;
     use diagnostics_assertions::{assert_data_tree, assert_json_diff};
     use futures::FutureExt;
     use inspect_format::BlockType;
@@ -939,7 +936,8 @@ mod tests {
 #[cfg(all(test, target_os = "fuchsia"))]
 mod fuchsia_tests {
     use super::*;
-    use crate::{hierarchy::DiagnosticsHierarchy, reader, NumericProperty};
+    use crate::hierarchy::DiagnosticsHierarchy;
+    use crate::{reader, NumericProperty};
     use diagnostics_assertions::assert_json_diff;
     use fuchsia_zircon::{self as zx, AsHandleRef, Peered};
     use std::sync::Arc;

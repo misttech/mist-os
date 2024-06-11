@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::output::directory::{DirectoryReporter, SchemaVersion};
+use crate::output::mux::{MultiplexedDirectoryWriter, MultiplexedWriter};
+use crate::output::shell::ShellReporter;
 use crate::output::{
-    directory::{DirectoryReporter, SchemaVersion},
-    mux::{MultiplexedDirectoryWriter, MultiplexedWriter},
-    shell::ShellReporter,
     ArtifactType, DirectoryArtifactType, DynArtifact, DynDirectoryArtifact, EntityId, EntityInfo,
     ReportedOutcome, Reporter, SuiteId, Timestamp,
 };

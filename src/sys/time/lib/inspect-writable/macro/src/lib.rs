@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    proc_macro2::{Ident, Span, TokenStream},
-    quote::{format_ident, quote, quote_spanned},
-    syn::{
-        parse_macro_input, spanned::Spanned, Data, DataStruct, DeriveInput, Field, Fields, Type,
-        TypePath, Visibility,
-    },
+use proc_macro2::{Ident, Span, TokenStream};
+use quote::{format_ident, quote, quote_spanned};
+use syn::spanned::Spanned;
+use syn::{
+    parse_macro_input, Data, DataStruct, DeriveInput, Field, Fields, Type, TypePath, Visibility,
 };
 
 /// A collection of the properties for translating a field in the input struct to its inspect

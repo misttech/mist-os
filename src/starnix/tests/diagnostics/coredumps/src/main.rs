@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::Context as _;
-use component_events::{
-    events::{EventStream, Stopped},
-    matcher::EventMatcher,
-};
+use component_events::events::{EventStream, Stopped};
+use component_events::matcher::EventMatcher;
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fuchsia_component_test::ScopedInstance;
 use parse_starnix_inspect::CoredumpReport;

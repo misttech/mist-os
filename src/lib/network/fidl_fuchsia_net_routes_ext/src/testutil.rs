@@ -414,9 +414,9 @@ pub(crate) mod internal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        admin::FidlRouteAdminIpExt, get_watcher, testutil::internal as internal_testutil, watch,
-    };
+    use crate::admin::FidlRouteAdminIpExt;
+    use crate::testutil::internal as internal_testutil;
+    use crate::{get_watcher, watch};
     use assert_matches::assert_matches;
     use fuchsia_zircon_status as zx_status;
     use futures::FutureExt;

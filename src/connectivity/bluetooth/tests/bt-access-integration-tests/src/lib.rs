@@ -1,23 +1,18 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    anyhow::{format_err, Error},
-    bt_test_harness::{
-        access::{expectation, AccessHarness},
-        core_realm::DEFAULT_TEST_DEVICE_NAME,
-        host_watcher::{activate_fake_host, HostWatcherHarness},
-    },
-    fidl_fuchsia_bluetooth_sys::ProcedureTokenProxy,
-    fidl_fuchsia_hardware_bluetooth::{AdvertisingData, PeerSetLeAdvertisementRequest},
-    fidl_fuchsia_hardware_bluetooth::{PeerParameters, PeerProxy},
-    fuchsia_bluetooth::{
-        constants::INTEGRATION_TIMEOUT,
-        expectation::asynchronous::{ExpectableExt, ExpectableStateExt},
-        types::Address,
-    },
-    hci_emulator_client::Emulator,
+use anyhow::{format_err, Error};
+use bt_test_harness::access::{expectation, AccessHarness};
+use bt_test_harness::core_realm::DEFAULT_TEST_DEVICE_NAME;
+use bt_test_harness::host_watcher::{activate_fake_host, HostWatcherHarness};
+use fidl_fuchsia_bluetooth_sys::ProcedureTokenProxy;
+use fidl_fuchsia_hardware_bluetooth::{
+    AdvertisingData, PeerParameters, PeerProxy, PeerSetLeAdvertisementRequest,
 };
+use fuchsia_bluetooth::constants::INTEGRATION_TIMEOUT;
+use fuchsia_bluetooth::expectation::asynchronous::{ExpectableExt, ExpectableStateExt};
+use fuchsia_bluetooth::types::Address;
+use hci_emulator_client::Emulator;
 
 async fn create_le_peer(hci: &Emulator, address: Address) -> Result<PeerProxy, Error> {
     let (peer, remote) = fidl::endpoints::create_proxy()?;

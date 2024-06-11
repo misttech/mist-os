@@ -2,18 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{capability_source::CapabilitySource, component_instance::ComponentInstanceInterface},
-    cm_config::{
-        AllowlistEntry, AllowlistMatcher, CapabilityAllowlistKey, CapabilityAllowlistSource,
-        DebugCapabilityKey, SecurityPolicy,
-    },
-    fuchsia_zircon_status as zx,
-    moniker::{ExtendedMoniker, Moniker},
-    std::sync::Arc,
-    thiserror::Error,
-    tracing::{error, warn},
+use crate::capability_source::CapabilitySource;
+use crate::component_instance::ComponentInstanceInterface;
+use cm_config::{
+    AllowlistEntry, AllowlistMatcher, CapabilityAllowlistKey, CapabilityAllowlistSource,
+    DebugCapabilityKey, SecurityPolicy,
 };
+use fuchsia_zircon_status as zx;
+use moniker::{ExtendedMoniker, Moniker};
+use std::sync::Arc;
+use thiserror::Error;
+use tracing::{error, warn};
 
 use cm_rust::CapabilityTypeName;
 #[cfg(feature = "serde")]
@@ -303,13 +302,11 @@ impl ScopedPolicyChecker {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        cm_config::{AllowlistEntryBuilder, ChildPolicyAllowlists, JobPolicyAllowlists},
-        moniker::ChildName,
-        std::collections::HashMap,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use cm_config::{AllowlistEntryBuilder, ChildPolicyAllowlists, JobPolicyAllowlists};
+    use moniker::ChildName;
+    use std::collections::HashMap;
 
     #[test]
     fn scoped_policy_checker_vmex() {

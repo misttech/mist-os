@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_test_manager as ftest_manager,
-    ftest_manager::{CaseStatus, SuiteStatus},
-    fuchsia_component::client,
-    futures::prelude::*,
-    pretty_assertions::assert_eq,
-    test_diagnostics::collect_string_from_socket,
-    test_manager_test_lib::{
-        collect_suite_events, default_run_option, GroupRunEventByTestCase, RunEvent, TestBuilder,
-        TestRunEventPayload,
-    },
+use fidl_fuchsia_test_manager as ftest_manager;
+use ftest_manager::{CaseStatus, SuiteStatus};
+use fuchsia_component::client;
+use futures::prelude::*;
+use pretty_assertions::assert_eq;
+use test_diagnostics::collect_string_from_socket;
+use test_manager_test_lib::{
+    collect_suite_events, default_run_option, GroupRunEventByTestCase, RunEvent, TestBuilder,
+    TestRunEventPayload,
 };
 
 async fn debug_data_stress_test(case_name: &str, vmo_count: usize, vmo_size: usize) {

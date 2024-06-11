@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{Capability, ConversionError, RemotableCapability, RemoteError},
-    fidl::{AsHandleRef, HandleRef},
-    fidl_fuchsia_component_sandbox as fsandbox,
-    std::sync::Arc,
-    vfs::directory::entry::DirectoryEntry,
-};
+use crate::{Capability, ConversionError, RemotableCapability, RemoteError};
+use fidl::{AsHandleRef, HandleRef};
+use fidl_fuchsia_component_sandbox as fsandbox;
+use std::sync::Arc;
+use vfs::directory::entry::DirectoryEntry;
 
 /// Given a reference to a handle, returns a copy of a capability from the registry that was added
 /// with the handle's koid.

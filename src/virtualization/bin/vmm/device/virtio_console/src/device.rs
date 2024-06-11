@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Error},
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{AsyncReadExt, AsyncWriteExt, StreamExt},
-    machina_virtio_device::{GuestMem, WrappedDescChainStream},
-    virtio_device::{
-        chain::{ReadableChain, WritableChain},
-        mem::DriverMem,
-        queue::DriverNotify,
-    },
-};
+use anyhow::{anyhow, Error};
+use futures::{AsyncReadExt, AsyncWriteExt, StreamExt};
+use machina_virtio_device::{GuestMem, WrappedDescChainStream};
+use virtio_device::chain::{ReadableChain, WritableChain};
+use virtio_device::mem::DriverMem;
+use virtio_device::queue::DriverNotify;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub struct ConsoleDevice {
     // Guest end of a socket provided by the controller.
@@ -143,13 +139,12 @@ impl ConsoleDevice {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        async_utils::PollExt,
-        futures::FutureExt,
-        rand::{distributions::Standard, Rng},
-        virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue},
-    };
+    use super::*;
+    use async_utils::PollExt;
+    use futures::FutureExt;
+    use rand::distributions::Standard;
+    use rand::Rng;
+    use virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue};
 
     #[fuchsia::test]
     fn tx_blocked_on_full_socket() {

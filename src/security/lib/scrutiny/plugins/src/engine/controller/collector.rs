@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    scrutiny::{
-        engine::scheduler::{CollectorScheduler, CollectorState},
-        model::controller::DataController,
-        model::model::DataModel,
-    },
-    scrutiny_utils::usage::UsageBuilder,
-    serde::{Deserialize, Serialize},
-    serde_json::{json, value::Value},
-    std::sync::{Arc, Mutex},
-};
+use anyhow::Result;
+use scrutiny::engine::scheduler::{CollectorScheduler, CollectorState};
+use scrutiny::model::controller::DataController;
+use scrutiny::model::model::DataModel;
+use scrutiny_utils::usage::UsageBuilder;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use serde_json::value::Value;
+use std::sync::{Arc, Mutex};
 
 /// Displays a list of all the collectors.
 pub struct CollectorListController {

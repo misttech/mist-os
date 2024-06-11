@@ -13,21 +13,17 @@ pub mod unlock;
 ////////////////////////////////////////////////////////////////////////////////
 // tests
 pub mod test {
-    use crate::{
-        common::fastboot::{FastbootConnectionFactory, FastbootConnectionKind},
-        file_resolver::FileResolver,
-    };
+    use crate::common::fastboot::{FastbootConnectionFactory, FastbootConnectionKind};
+    use crate::file_resolver::FileResolver;
     use anyhow::{anyhow, Result};
     use async_trait::async_trait;
     use ffx_fastboot_interface::fastboot_interface::{
         Fastboot, FastbootError, FastbootInterface, RebootEvent, UploadProgress, Variable,
     };
-    use std::{
-        collections::HashMap,
-        default::Default,
-        io::Write,
-        sync::{Arc, Mutex},
-    };
+    use std::collections::HashMap;
+    use std::default::Default;
+    use std::io::Write;
+    use std::sync::{Arc, Mutex};
     use tokio::sync::mpsc::Sender;
 
     #[derive(Default, Debug)]

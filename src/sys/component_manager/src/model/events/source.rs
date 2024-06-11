@@ -2,28 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        capability::CapabilityProvider,
-        model::{
-            component::{ExtendedInstance, WeakExtendedInstance},
-            events::{
-                registry::{EventRegistry, EventSubscription},
-                serve::serve_event_stream,
-                stream::EventStream,
-                stream_provider::EventStreamProvider,
-            },
-        },
-    },
-    async_trait::async_trait,
-    cm_util::TaskGroup,
-    errors::{CapabilityProviderError, EventSourceError, EventsError, ModelError},
-    fidl::endpoints::RequestStream,
-    futures::{SinkExt, StreamExt},
-    moniker::ExtendedMoniker,
-    std::sync::{Mutex, Weak},
-    vfs::{directory::entry::OpenRequest, path::Path as VfsPath, service::endpoint},
-};
+use crate::capability::CapabilityProvider;
+use crate::model::component::{ExtendedInstance, WeakExtendedInstance};
+use crate::model::events::registry::{EventRegistry, EventSubscription};
+use crate::model::events::serve::serve_event_stream;
+use crate::model::events::stream::EventStream;
+use crate::model::events::stream_provider::EventStreamProvider;
+use async_trait::async_trait;
+use cm_util::TaskGroup;
+use errors::{CapabilityProviderError, EventSourceError, EventsError, ModelError};
+use fidl::endpoints::RequestStream;
+use futures::{SinkExt, StreamExt};
+use moniker::ExtendedMoniker;
+use std::sync::{Mutex, Weak};
+use vfs::directory::entry::OpenRequest;
+use vfs::path::Path as VfsPath;
+use vfs::service::endpoint;
 
 // Event source (supporting event streams)
 #[derive(Clone)]

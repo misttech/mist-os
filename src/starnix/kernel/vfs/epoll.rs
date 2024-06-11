@@ -2,30 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::{
-        CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, WaitCanceler,
-        WaitQueue, Waiter,
-    },
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps, WeakFileHandle,
-    },
+use crate::task::{
+    CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, WaitCanceler,
+    WaitQueue, Waiter,
 };
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::{fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps, WeakFileHandle};
 use fuchsia_zircon as zx;
 use itertools::Itertools;
 use starnix_logging::log_warn;
 use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
-use starnix_uapi::{
-    errno, error,
-    errors::{Errno, EBADF, EINTR, ETIMEDOUT},
-    open_flags::OpenFlags,
-    vfs::{EpollEvent, FdEvents},
-};
-use std::{
-    collections::{hash_map::Entry, HashMap, VecDeque},
-    sync::Arc,
-};
+use starnix_uapi::errors::{Errno, EBADF, EINTR, ETIMEDOUT};
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::vfs::{EpollEvent, FdEvents};
+use starnix_uapi::{errno, error};
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, VecDeque};
+use std::sync::Arc;
 
 /// Maximum depth of epoll instances monitoring one another.
 /// From https://man7.org/linux/man-pages/man2/epoll_ctl.2.html
@@ -483,17 +476,13 @@ impl FileOps for EpollFileObject {
 #[cfg(test)]
 mod tests {
     use super::{EpollFileObject, EventHandler, OpenFlags};
-    use crate::{
-        fs::fuchsia::create_fuchsia_pipe,
-        task::Waiter,
-        testing::{create_kernel_and_task, create_kernel_task_and_unlocked, create_task},
-        vfs::{
-            buffers::{VecInputBuffer, VecOutputBuffer},
-            eventfd::{new_eventfd, EventFdType},
-            pipe::new_pipe,
-            socket::{SocketDomain, SocketType, UnixSocket},
-        },
-    };
+    use crate::fs::fuchsia::create_fuchsia_pipe;
+    use crate::task::Waiter;
+    use crate::testing::{create_kernel_and_task, create_kernel_task_and_unlocked, create_task};
+    use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
+    use crate::vfs::eventfd::{new_eventfd, EventFdType};
+    use crate::vfs::pipe::new_pipe;
+    use crate::vfs::socket::{SocketDomain, SocketType, UnixSocket};
     use fuchsia_zircon::{
         HandleBased, {self as zx},
     };

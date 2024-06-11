@@ -5,18 +5,15 @@
 // This code is adapted and simplified from
 // fuchsia-mirror/src/diagnostics/archivist/src/server.rs
 
-use {
-    fidl::prelude::*,
-    fidl_fuchsia_diagnostics::FormattedContent,
-    fidl_fuchsia_diagnostics::{
-        BatchIteratorControlHandle, BatchIteratorRequest, BatchIteratorRequestStream,
-    },
-    fuchsia_zircon as zx,
-    fuchsia_zircon_status::Status as ZxStatus,
-    futures::prelude::*,
-    thiserror::Error,
-    tracing::warn,
+use fidl::prelude::*;
+use fidl_fuchsia_diagnostics::{
+    BatchIteratorControlHandle, BatchIteratorRequest, BatchIteratorRequestStream, FormattedContent,
 };
+use fuchsia_zircon as zx;
+use fuchsia_zircon_status::Status as ZxStatus;
+use futures::prelude::*;
+use thiserror::Error;
+use tracing::warn;
 
 pub struct AccessorServer {
     requests: BatchIteratorRequestStream,

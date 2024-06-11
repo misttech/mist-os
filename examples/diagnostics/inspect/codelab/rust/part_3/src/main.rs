@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::reverser::ReverserServerFactory,
-    anyhow::{Context, Error},
-    fidl_fuchsia_examples_inspect::FizzBuzzMarker,
-    fuchsia_component::{client, server::ServiceFs},
-    fuchsia_inspect::{component, health::Reporter},
-    futures::{FutureExt, StreamExt},
-    tracing::info,
-};
+use crate::reverser::ReverserServerFactory;
+use anyhow::{Context, Error};
+use fidl_fuchsia_examples_inspect::FizzBuzzMarker;
+use fuchsia_component::client;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_inspect::component;
+use fuchsia_inspect::health::Reporter;
+use futures::{FutureExt, StreamExt};
+use tracing::info;
 
 mod reverser;
 

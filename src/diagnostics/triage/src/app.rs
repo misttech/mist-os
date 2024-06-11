@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        config::{self, OutputFormat, ProgramStateHolder},
-        Options,
-    },
-    anyhow::{bail, Context as _, Error},
-    fuchsia_triage::{
-        analyze, analyze_structured, analyze_verbose, ActionResultFormatter, ActionResults,
-        DiagnosticData, ParseResult, TriageOutput,
-    },
+use crate::config::{self, OutputFormat, ProgramStateHolder};
+use crate::Options;
+use anyhow::{bail, Context as _, Error};
+use fuchsia_triage::{
+    analyze, analyze_structured, analyze_verbose, ActionResultFormatter, ActionResults,
+    DiagnosticData, ParseResult, TriageOutput,
 };
 
 /// The entry point for the CLI app.
@@ -135,7 +131,8 @@ impl StructuredRunResult {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fuchsia_triage::Action};
+    use super::*;
+    use fuchsia_triage::Action;
 
     #[fuchsia::test]
     fn test_output_text_no_warnings() -> Result<(), Error> {

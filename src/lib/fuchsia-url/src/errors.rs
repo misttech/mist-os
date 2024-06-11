@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::parse::{MAX_PACKAGE_PATH_SEGMENT_BYTES, MAX_RESOURCE_PATH_SEGMENT_BYTES},
-    thiserror::Error,
-};
+use crate::parse::{MAX_PACKAGE_PATH_SEGMENT_BYTES, MAX_RESOURCE_PATH_SEGMENT_BYTES};
+use thiserror::Error;
 
 #[derive(PartialEq, Debug, Error)]
 pub enum ParseError {

@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    common::{
-        cmd::ManifestParams, crypto::unlock_device, finish, flash_bootloader, flash_product,
-        is_locked, lock_device, verify_hardware, Boot, Flash, Unlock, MISSING_CREDENTIALS,
-        MISSING_PRODUCT,
-    },
-    file_resolver::FileResolver,
-    manifest::v1::FlashManifest as FlashManifestV1,
-    unlock::unlock,
+use crate::common::cmd::ManifestParams;
+use crate::common::crypto::unlock_device;
+use crate::common::{
+    finish, flash_bootloader, flash_product, is_locked, lock_device, verify_hardware, Boot, Flash,
+    Unlock, MISSING_CREDENTIALS, MISSING_PRODUCT,
 };
+use crate::file_resolver::FileResolver;
+use crate::manifest::v1::FlashManifest as FlashManifestV1;
+use crate::unlock::unlock;
 use anyhow::Result;
 use async_trait::async_trait;
 use errors::ffx_bail;
@@ -108,13 +107,9 @@ impl Boot for FlashManifest {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        common::{
-            cmd::{BootParams, Command},
-            vars::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR},
-        },
-        test::{setup, TestResolver},
-    };
+    use crate::common::cmd::{BootParams, Command};
+    use crate::common::vars::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR};
+    use crate::test::{setup, TestResolver};
     use serde_json::{from_str, json};
     use std::path::PathBuf;
     use tempfile::NamedTempFile;

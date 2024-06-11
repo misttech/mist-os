@@ -160,16 +160,15 @@ pub fn publish(inspector: &Inspector, options: PublishOptions) -> Option<fasync:
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use component_events::{
-        events::{EventStream, Started},
-        matcher::EventMatcher,
-    };
+    use component_events::events::{EventStream, Started};
+    use component_events::matcher::EventMatcher;
     use diagnostics_assertions::assert_json_diff;
     use diagnostics_reader::{ArchiveReader, Inspect};
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_inspect::{InspectSinkRequest, InspectSinkRequestStream};
     use fuchsia_component_test::ScopedInstance;
-    use fuchsia_inspect::{reader::read, InspectorConfig};
+    use fuchsia_inspect::reader::read;
+    use fuchsia_inspect::InspectorConfig;
     use fuchsia_zircon as zx;
     use futures::{FutureExt, StreamExt};
 

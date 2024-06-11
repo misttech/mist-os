@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::backend::{BlockBackend, DeviceAttrs, Request, Sector};
 #[cfg(test)]
 use crate::backend_test::BackendController;
-use {
-    crate::backend::{BlockBackend, DeviceAttrs, Request, Sector},
-    crate::wire,
-    anyhow::{anyhow, Error},
-    async_trait::async_trait,
-    fuchsia_trace as ftrace,
-    std::cell::RefCell,
-    std::rc::Rc,
-};
+use crate::wire;
+use anyhow::{anyhow, Error};
+use async_trait::async_trait;
+use fuchsia_trace as ftrace;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[allow(dead_code)]
 trait AsByteRange {
@@ -137,7 +135,8 @@ impl BlockBackend for MemoryBackend {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::backend_test::BackendTest};
+    use super::*;
+    use crate::backend_test::BackendTest;
 
     struct MemoryBackendTest;
 

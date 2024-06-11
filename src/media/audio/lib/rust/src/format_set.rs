@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 
 use crate::format::{Format, SampleSize, SampleType};
-use fidl_fuchsia_audio_device as fadevice;
-use fidl_fuchsia_hardware_audio as fhaudio;
 use itertools::iproduct;
 use std::num::NonZeroU32;
+use {fidl_fuchsia_audio_device as fadevice, fidl_fuchsia_hardware_audio as fhaudio};
 
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct PcmFormatSet {

@@ -4,14 +4,13 @@
 
 use anyhow::{anyhow, Context, Result};
 use errors::{ffx_bail, ffx_error};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    fs,
-    io::BufReader,
-    path::{Path, PathBuf},
-    process::Command,
-};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs;
+use std::io::BufReader;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use tracing::warn;
 
 use metadata::{CpuArchitecture, ElementType, FfxTool, HostTool, Manifest, Part};

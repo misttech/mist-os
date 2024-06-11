@@ -5,7 +5,8 @@
 use bitfield::bitfield;
 use packet_encoding::{Decodable, Encodable};
 
-use crate::{frame::FrameParseError, DLCI};
+use crate::frame::FrameParseError;
+use crate::DLCI;
 
 /// The length (in bytes) of a "short" RPN command - contains only 1 octet for the DLCI.
 /// A short RPN command is used to request the remote port settings.

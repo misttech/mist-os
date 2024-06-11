@@ -13,28 +13,22 @@ use netstack3_base::{
     RngContext, TimerBindingsTypes, TracingContext,
 };
 use netstack3_datagram as datagram;
-use netstack3_device::{
-    self as device,
-    ethernet::{EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId},
-    DeviceId, DeviceLayerTypes, WeakDeviceId,
-};
+use netstack3_device::ethernet::{EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId};
+use netstack3_device::{self as device, DeviceId, DeviceLayerTypes, WeakDeviceId};
 use netstack3_filter::{FilterBindingsContext, FilterBindingsTypes};
 use netstack3_icmp_echo::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpEchoStateContext};
-use netstack3_ip::{
-    self as ip,
-    device::{
-        IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceConfigurationHandler,
-        IpDeviceIpExt,
-    },
-    icmp::{IcmpBindingsContext, IcmpBindingsTypes},
-    nud::{NudBindingsContext, NudContext},
-    raw::{
-        RawIpSocketMapContext, RawIpSocketStateContext, RawIpSocketsBindingsContext,
-        RawIpSocketsBindingsTypes,
-    },
-    socket::IpSocketContext,
-    IpLayerBindingsContext, IpLayerContext, IpLayerIpExt,
+use netstack3_ip::device::{
+    IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceConfigurationHandler,
+    IpDeviceIpExt,
 };
+use netstack3_ip::icmp::{IcmpBindingsContext, IcmpBindingsTypes};
+use netstack3_ip::nud::{NudBindingsContext, NudContext};
+use netstack3_ip::raw::{
+    RawIpSocketMapContext, RawIpSocketStateContext, RawIpSocketsBindingsContext,
+    RawIpSocketsBindingsTypes,
+};
+use netstack3_ip::socket::IpSocketContext;
+use netstack3_ip::{self as ip, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt};
 use netstack3_tcp::{self as tcp, TcpBindingsContext, TcpBindingsTypes, TcpContext};
 use netstack3_udp::{self as udp, UdpBindingsContext, UdpBindingsTypes, UdpCounters};
 

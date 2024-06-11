@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        additional_boot_args::AdditionalBootConfigCollection, static_pkgs::StaticPkgsCollection,
-        zbi::Zbi,
-    },
-    anyhow::{anyhow, Context, Result},
-    scrutiny::{model::controller::DataController, model::model::*},
-    scrutiny_utils::{
-        artifact::{ArtifactReader, FileArtifactReader},
-        build_checks,
-    },
-    serde::{Deserialize, Serialize},
-    serde_json::{json, value::Value},
-    std::{collections::HashMap, fs::read_to_string, path::PathBuf, sync::Arc},
-};
+use crate::additional_boot_args::AdditionalBootConfigCollection;
+use crate::static_pkgs::StaticPkgsCollection;
+use crate::zbi::Zbi;
+use anyhow::{anyhow, Context, Result};
+use scrutiny::model::controller::DataController;
+use scrutiny::model::model::*;
+use scrutiny_utils::artifact::{ArtifactReader, FileArtifactReader};
+use scrutiny_utils::build_checks;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use serde_json::value::Value;
+use std::collections::HashMap;
+use std::fs::read_to_string;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 /// The input to the PreSigningController is the policy to validate against.
 /// The data to validate will be implicitly collected by inclusion of plugins and accessed by

@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::platform::PlatformServices,
-    fidl_fuchsia_virtualization::{
-        BalloonControllerMarker, BalloonControllerProxy, GuestMarker, GuestStatus,
-    },
-    guest_cli_args as arguments,
-    prettytable::{cell, format::consts::FORMAT_CLEAN, row, Table},
-    std::fmt,
+use crate::platform::PlatformServices;
+use fidl_fuchsia_virtualization::{
+    BalloonControllerMarker, BalloonControllerProxy, GuestMarker, GuestStatus,
 };
+use guest_cli_args as arguments;
+use prettytable::format::consts::FORMAT_CLEAN;
+use prettytable::{cell, row, Table};
+use std::fmt;
 
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 pub struct BalloonStats {
@@ -237,13 +236,11 @@ pub async fn handle_balloon<P: PlatformServices>(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        fidl::endpoints::{create_proxy_and_stream, ControlHandle, RequestStream},
-        fidl_fuchsia_virtualization::MemStat,
-        fuchsia_async as fasync, fuchsia_zircon_status as zx_status,
-        futures::StreamExt,
-    };
+    use super::*;
+    use fidl::endpoints::{create_proxy_and_stream, ControlHandle, RequestStream};
+    use fidl_fuchsia_virtualization::MemStat;
+    use futures::StreamExt;
+    use {fuchsia_async as fasync, fuchsia_zircon_status as zx_status};
 
     #[fasync::run_until_stalled(test)]
     async fn balloon_valid_page_num_returns_ok() {

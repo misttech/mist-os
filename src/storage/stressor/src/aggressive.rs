@@ -7,20 +7,15 @@
 //! operations. Note that 'truncate' is not exercised.
 //! This version also silently ignores errors such as out of space.
 
-use {
-    fidl_fuchsia_io as fio,
-    fuchsia_async::Time,
-    rand::{distributions::WeightedIndex, prelude::*},
-    std::{
-        fs::File,
-        io::ErrorKind,
-        os::unix::fs::FileExt,
-        sync::{
-            atomic::{AtomicU64, Ordering},
-            Arc, Mutex,
-        },
-    },
-};
+use fidl_fuchsia_io as fio;
+use fuchsia_async::Time;
+use rand::distributions::WeightedIndex;
+use rand::prelude::*;
+use std::fs::File;
+use std::io::ErrorKind;
+use std::os::unix::fs::FileExt;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 
 struct Inner {
     /// Used to round-robin across NUM_FILES in order.

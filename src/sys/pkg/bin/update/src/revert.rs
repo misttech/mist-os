@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminProxy, RebootReason},
-    fidl_fuchsia_paver::{BootManagerMarker, BootManagerProxy, PaverMarker},
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon::Status,
-};
+use anyhow::{Context, Error};
+use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminProxy, RebootReason};
+use fidl_fuchsia_paver::{BootManagerMarker, BootManagerProxy, PaverMarker};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_zircon::Status;
 
 /// Connects to FIDL services and reverts the update.
 pub async fn handle_revert() -> Result<(), Error> {

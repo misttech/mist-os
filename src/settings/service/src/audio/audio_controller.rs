@@ -14,13 +14,12 @@ use crate::handler::setting_handler::{
 };
 use crate::{trace, trace_guard};
 use async_trait::async_trait;
-use fuchsia_async as fasync;
-use fuchsia_trace as ftrace;
 use futures::lock::Mutex;
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
 use settings_storage::storage_factory::{DefaultLoader, StorageAccess};
 use std::collections::HashMap;
 use std::sync::Arc;
+use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
 type VolumeControllerHandle = Arc<Mutex<VolumeController>>;
 

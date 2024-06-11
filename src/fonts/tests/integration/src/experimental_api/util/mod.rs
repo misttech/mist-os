@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file
 
+pub use crate::util;
+pub use anyhow::Error;
+pub use fidl::endpoints::create_proxy;
+pub use fidl_fuchsia_intl::LocaleId;
 pub use {
-    crate::util, anyhow::Error, fidl::endpoints::create_proxy, fidl_fuchsia_fonts as fonts,
-    fidl_fuchsia_fonts_experimental as fonts_exp, fidl_fuchsia_intl::LocaleId,
+    fidl_fuchsia_fonts as fonts, fidl_fuchsia_fonts_experimental as fonts_exp,
     fuchsia_async as fasync,
 };
 

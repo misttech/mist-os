@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Error},
-    carnelian::color::Color,
-    std::str::FromStr,
-};
+use anyhow::{anyhow, Error};
+use carnelian::color::Color;
+use std::str::FromStr;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ColorScheme {

@@ -16,12 +16,12 @@ use assert_matches::assert_matches;
 use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
 use net_declare::{fidl_ip, fidl_ip_v4_with_prefix, fidl_mac};
 use netemul::{RealmUdpSocket as _, TestInterface, TestNetwork, TestRealm, TestSandbox};
-use netstack_testing_common::Result;
-use netstack_testing_common::{
-    interfaces::TestInterfaceExt as _,
-    nud::FrameMetadata,
-    realms::{Netstack, NetstackVersion, TestRealmExt as _, TestSandboxExt as _},
+use netstack_testing_common::interfaces::TestInterfaceExt as _;
+use netstack_testing_common::nud::FrameMetadata;
+use netstack_testing_common::realms::{
+    Netstack, NetstackVersion, TestRealmExt as _, TestSandboxExt as _,
 };
+use netstack_testing_common::Result;
 use netstack_testing_macros::netstack_test;
 use test_case::test_case;
 

@@ -6,7 +6,8 @@
 
 use core::num::NonZeroU16;
 
-use zerocopy::{byteorder::network_endian::U16, AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::byteorder::network_endian::U16;
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
 
 use super::{IcmpUnusedCode, IdAndSeq, OriginalPacket};
 

@@ -4,14 +4,12 @@
 
 use std::any::TypeId;
 
-use crate::{
-    animation::{KeyedProperty, LinearAnimation},
-    core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property},
-    dyn_vec::DynVec,
-    importers::{ImportStack, LinearAnimationImporter},
-    status_code::StatusCode,
-    Artboard,
-};
+use crate::animation::{KeyedProperty, LinearAnimation};
+use crate::core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property};
+use crate::dyn_vec::DynVec;
+use crate::importers::{ImportStack, LinearAnimationImporter};
+use crate::status_code::StatusCode;
+use crate::Artboard;
 
 #[derive(Debug, Default)]
 pub struct KeyedObject {

@@ -2,41 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_trait::async_trait,
-    fidl_fuchsia_process as fproc,
-    fidl_fuchsia_test::{
-        self as ftest, Invocation, Result_ as TestResult, RunListenerProxy, Status,
-    },
-    fuchsia_async as fasync,
-    fuchsia_runtime::{HandleInfo, HandleType},
-    fuchsia_zircon as zx,
-    futures::{
-        future::{abortable, AbortHandle, Future},
-        lock::Mutex,
-        stream, AsyncReadExt as _, FutureExt as _, StreamExt as _, TryStreamExt as _,
-    },
-    lazy_static::lazy_static,
-    namespace::NamespaceError,
-    regex::bytes::Regex,
-    std::{
-        collections::HashSet,
-        num::NonZeroUsize,
-        sync::{Arc, Weak},
-    },
-    test_runners_lib::{
-        cases::TestCaseInfo,
-        elf::{
-            Component, ComponentError, EnumeratedTestCases, FidlError, KernelError,
-            MemoizedFutureContainer, PinnedFuture, SuiteServer,
-        },
-        errors::*,
-        launch,
-        logs::{LogError, LogStreamReader, LoggerStream, SocketLogWriter},
-    },
-    tracing::{debug, error},
-    zx::HandleBased as _,
+use async_trait::async_trait;
+use fidl_fuchsia_test::{
+    self as ftest, Invocation, Result_ as TestResult, RunListenerProxy, Status,
 };
+use fuchsia_runtime::{HandleInfo, HandleType};
+use futures::future::{abortable, AbortHandle, Future};
+use futures::lock::Mutex;
+use futures::{stream, AsyncReadExt as _, FutureExt as _, StreamExt as _, TryStreamExt as _};
+use lazy_static::lazy_static;
+use namespace::NamespaceError;
+use regex::bytes::Regex;
+use std::collections::HashSet;
+use std::num::NonZeroUsize;
+use std::sync::{Arc, Weak};
+use test_runners_lib::cases::TestCaseInfo;
+use test_runners_lib::elf::{
+    Component, ComponentError, EnumeratedTestCases, FidlError, KernelError,
+    MemoizedFutureContainer, PinnedFuture, SuiteServer,
+};
+use test_runners_lib::errors::*;
+use test_runners_lib::launch;
+use test_runners_lib::logs::{LogError, LogStreamReader, LoggerStream, SocketLogWriter};
+use tracing::{debug, error};
+use zx::HandleBased as _;
+use {fidl_fuchsia_process as fproc, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// Implements `fuchsia.test.Suite` and runs provided test.
 pub struct TestServer {
@@ -442,17 +432,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::{Context as _, Error},
-        assert_matches::assert_matches,
-        fidl_fuchsia_test::{Result_ as TestResult, RunListenerMarker, RunOptions, SuiteMarker},
-        itertools::Itertools as _,
-        pretty_assertions::assert_eq,
-        test_runners_test_lib::{
-            assert_event_ord, collect_listener_event, names_to_invocation, test_component,
-            ListenerEvent,
-        },
+    use super::*;
+    use anyhow::{Context as _, Error};
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_test::{Result_ as TestResult, RunListenerMarker, RunOptions, SuiteMarker};
+    use itertools::Itertools as _;
+    use pretty_assertions::assert_eq;
+    use test_runners_test_lib::{
+        assert_event_ord, collect_listener_event, names_to_invocation, test_component,
+        ListenerEvent,
     };
 
     async fn sample_test_component() -> Result<Arc<Component>, Error> {

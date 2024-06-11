@@ -4,17 +4,15 @@
 
 //! Handles interfacing with the boot metadata (e.g. verifying a slot, committing a slot, etc).
 
-use {
-    crate::config::Config,
-    crate::metadata::verify::VerifierProxy,
-    commit::do_commit,
-    errors::MetadataError,
-    fidl_fuchsia_paver as paver, fuchsia_inspect as finspect,
-    fuchsia_zircon::{self as zx, EventPair, Peered},
-    futures::channel::oneshot,
-    policy::PolicyEngine,
-    verify::do_health_verification,
-};
+use crate::config::Config;
+use crate::metadata::verify::VerifierProxy;
+use commit::do_commit;
+use errors::MetadataError;
+use fuchsia_zircon::{self as zx, EventPair, Peered};
+use futures::channel::oneshot;
+use policy::PolicyEngine;
+use verify::do_health_verification;
+use {fidl_fuchsia_paver as paver, fuchsia_inspect as finspect};
 
 mod commit;
 mod configuration;
@@ -83,25 +81,20 @@ fn unblock_fidl_server(
 // test the functionality at different layers.
 #[cfg(test)]
 mod tests {
-    use {
-        super::errors::{VerifyError, VerifyErrors, VerifyFailureReason, VerifySource},
-        super::*,
-        crate::config::Mode,
-        ::fidl::endpoints::create_proxy,
-        assert_matches::assert_matches,
-        configuration::Configuration,
-        fasync::OnSignals,
-        fidl_fuchsia_update_verify as fidl,
-        fidl_fuchsia_update_verify::BlobfsVerifierProxy,
-        fuchsia_async as fasync,
-        fuchsia_zircon::{AsHandleRef, Status},
-        mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent},
-        mock_verifier::MockVerifierService,
-        std::sync::{
-            atomic::{AtomicU32, Ordering},
-            Arc,
-        },
-    };
+    use super::errors::{VerifyError, VerifyErrors, VerifyFailureReason, VerifySource};
+    use super::*;
+    use crate::config::Mode;
+    use ::fidl::endpoints::create_proxy;
+    use assert_matches::assert_matches;
+    use configuration::Configuration;
+    use fasync::OnSignals;
+    use fidl_fuchsia_update_verify::BlobfsVerifierProxy;
+    use fuchsia_zircon::{AsHandleRef, Status};
+    use mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent};
+    use mock_verifier::MockVerifierService;
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::Arc;
+    use {fidl_fuchsia_update_verify as fidl, fuchsia_async as fasync};
 
     fn blobfs_verifier_and_call_count(
         res: Result<(), fidl::VerifyError>,

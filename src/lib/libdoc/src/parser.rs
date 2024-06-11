@@ -5,8 +5,7 @@
 //! Defines the parser for the Documentation Compiler.
 //! It uses all the lexical items and creates a structured text.
 
-use crate::lexer::LexicalContent;
-use crate::lexer::LexicalItem;
+use crate::lexer::{LexicalContent, LexicalItem};
 use crate::source::Location;
 use crate::DocCompiler;
 use std::rc::Rc;
@@ -199,8 +198,7 @@ pub fn parse_sentence(
 #[cfg(test)]
 mod test {
     use crate::lexer::reduce_lexems;
-    use crate::parser::parse_text;
-    use crate::parser::Text;
+    use crate::parser::{parse_text, Text};
     use crate::source::Source;
     use crate::utils::test::lexical_items_to_errors;
     use crate::DocCompiler;

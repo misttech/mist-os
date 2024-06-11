@@ -2,33 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context, Error},
-    fidl_fuchsia_bluetooth_sys::{HostWatcherMarker, HostWatcherProxy},
-    fidl_fuchsia_hardware_bluetooth::EmulatorProxy,
-    fuchsia_bluetooth::{
-        expectation::asynchronous::{
-            expectable, Expectable, ExpectableExt, ExpectableState, ExpectableStateExt,
-        },
-        expectation::Predicate,
-        types::{Address, HostId, HostInfo},
-    },
-    fuchsia_zircon as zx,
-    futures::future::{self, BoxFuture, FutureExt, TryFutureExt},
-    hci_emulator_client::Emulator,
-    std::{
-        collections::HashMap,
-        ops::{Deref, DerefMut},
-        sync::Arc,
-    },
-    test_harness::{SharedState, TestHarness},
-    tracing::error,
+use anyhow::{format_err, Context, Error};
+use fidl_fuchsia_bluetooth_sys::{HostWatcherMarker, HostWatcherProxy};
+use fidl_fuchsia_hardware_bluetooth::EmulatorProxy;
+use fuchsia_bluetooth::expectation::asynchronous::{
+    expectable, Expectable, ExpectableExt, ExpectableState, ExpectableStateExt,
 };
+use fuchsia_bluetooth::expectation::Predicate;
+use fuchsia_bluetooth::types::{Address, HostId, HostInfo};
+use fuchsia_zircon as zx;
+use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
+use hci_emulator_client::Emulator;
+use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
+use test_harness::{SharedState, TestHarness};
+use tracing::error;
 
-use crate::{
-    core_realm::{CoreRealm, SHARED_STATE_INDEX},
-    timeout_duration,
-};
+use crate::core_realm::{CoreRealm, SHARED_STATE_INDEX};
+use crate::timeout_duration;
 
 #[derive(Clone, Default)]
 pub struct HostWatcherState {

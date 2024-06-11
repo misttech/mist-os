@@ -2,16 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    ie::{
-        rsn::{
-            akm::{Akm, PSK},
-            cipher::{Cipher, CCMP_128, TKIP},
-        },
-        wpa::WpaIe,
-    },
-    organization::Oui,
-};
+use crate::ie::rsn::akm::{Akm, PSK};
+use crate::ie::rsn::cipher::{Cipher, CCMP_128, TKIP};
+use crate::ie::wpa::WpaIe;
+use crate::organization::Oui;
 
 pub fn fake_deprecated_wpa1_vendor_ie() -> WpaIe {
     WpaIe {

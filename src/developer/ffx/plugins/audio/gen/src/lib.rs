@@ -10,9 +10,14 @@ use ffx_audio_gen_args::{
     TriangleCommand, WhiteNoiseCommand,
 };
 use fho::{FfxMain, FfxTool, SimpleWriter};
-use fuchsia_audio::{format::SampleType, Format};
-use rand::{rngs::ThreadRng, thread_rng, Rng};
-use std::{f64::consts::PI, io, io::Write, time::Duration};
+use fuchsia_audio::format::SampleType;
+use fuchsia_audio::Format;
+use rand::rngs::ThreadRng;
+use rand::{thread_rng, Rng};
+use std::f64::consts::PI;
+use std::io;
+use std::io::Write;
+use std::time::Duration;
 
 // Conversion constants for `SampleType::Uint8`.
 // Note: Sample data in WAV file are stored as unsigned 8 bit values. However, the hound rust

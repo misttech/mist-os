@@ -45,8 +45,8 @@ fn read_dir_path_no_dots<P: AsRef<Path>>(
         x.map(|entry| {
             let path = entry.path();
             let Some(name) = path.file_name().and_then(|x| x.to_str()) else {
-            return None;
-        };
+                return None;
+            };
 
             if name.contains('.') {
                 return None;

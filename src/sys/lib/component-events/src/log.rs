@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::descriptor::EventDescriptor,
-    futures::{future::AbortHandle, lock::Mutex},
-    std::sync::Arc,
-};
+use crate::descriptor::EventDescriptor;
+use futures::future::AbortHandle;
+use futures::lock::Mutex;
+use std::sync::Arc;
 
 /// Records events from an EventStream, allowing them to be
 /// flushed out into a vector at a later point in time.

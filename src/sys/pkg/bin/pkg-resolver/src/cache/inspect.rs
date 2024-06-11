@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::cache::BlobFetchParams,
-    fidl_fuchsia_pkg_ext::BlobId,
-    fuchsia_inspect::{
-        IntProperty, Node, NumericProperty as _, Property as _, StringProperty, UintProperty,
-    },
-    fuchsia_zircon as zx,
-    std::{
-        marker::PhantomData,
-        sync::atomic::{AtomicU32, Ordering},
-    },
+use crate::cache::BlobFetchParams;
+use fidl_fuchsia_pkg_ext::BlobId;
+use fuchsia_inspect::{
+    IntProperty, Node, NumericProperty as _, Property as _, StringProperty, UintProperty,
 };
+use fuchsia_zircon as zx;
+use std::marker::PhantomData;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 fn now_monotonic_nanos() -> i64 {
     zx::Time::get_monotonic().into_nanos()
@@ -157,12 +153,10 @@ impl<S: State> Attempt<S> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        diagnostics_assertions::{assert_data_tree, AnyProperty},
-        fuchsia_inspect::Inspector,
-        std::time::Duration,
-    };
+    use super::*;
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
+    use fuchsia_inspect::Inspector;
+    use std::time::Duration;
 
     const ZEROES_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
     const ONES_HASH: &str = "1111111111111111111111111111111111111111111111111111111111111111";

@@ -2,21 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        lsm_tree::{
-            types::{LayerIterator, MergeableKey, Value},
-            LSMTree, LockedLayer,
-        },
-        object_handle::WriteBytes,
-        object_store::journal,
-    },
-    anyhow::{Context, Error},
-    std::{
-        future::{ready, Future},
-        ops::Bound,
-    },
-};
+use crate::lsm_tree::types::{LayerIterator, MergeableKey, Value};
+use crate::lsm_tree::{LSMTree, LockedLayer};
+use crate::object_handle::WriteBytes;
+use crate::object_store::journal;
+use anyhow::{Context, Error};
+use std::future::{ready, Future};
+use std::ops::Bound;
 
 pub trait MajorCompactable<K: 'static, V: 'static> {
     /// Returns an iterator that wraps another iterator that is appropriate for major compactions.

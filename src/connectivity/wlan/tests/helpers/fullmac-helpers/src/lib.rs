@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::endpoints::{create_endpoints, create_proxy};
+use futures::StreamExt;
+use lazy_static::lazy_static;
+use wlan_common::test_utils::fake_stas::FakeProtectionCfg;
+use wlan_common::{assert_variant, bss, fake_fidl_bss_description};
 use {
-    fidl::endpoints::{create_endpoints, create_proxy},
     fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_sme as fidl_sme,
     fidl_test_wlan_testcontroller as fidl_testcontroller,
-    futures::StreamExt,
-    lazy_static::lazy_static,
-    wlan_common::{
-        assert_variant, bss, fake_fidl_bss_description, test_utils::fake_stas::FakeProtectionCfg,
-    },
 };
 
 pub mod config;

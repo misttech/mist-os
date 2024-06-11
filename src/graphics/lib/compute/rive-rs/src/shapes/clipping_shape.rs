@@ -4,20 +4,19 @@
 
 use std::{fmt, iter};
 
-use crate::{
-    component::Component,
-    component_dirt::ComponentDirt,
-    core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property},
-    drawable::Drawable,
-    dyn_vec::DynVec,
-    node::Node,
-    option_cell::OptionCell,
-    shapes::{FillRule, PathSpace, Shape},
-    status_code::StatusCode,
-    ContainerComponent,
-};
+use crate::component::Component;
+use crate::component_dirt::ComponentDirt;
+use crate::core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property};
+use crate::drawable::Drawable;
+use crate::dyn_vec::DynVec;
+use crate::node::Node;
+use crate::option_cell::OptionCell;
+use crate::shapes::{FillRule, PathSpace, Shape};
+use crate::status_code::StatusCode;
+use crate::ContainerComponent;
 
-use super::{command_path::CommandPathBuilder, CommandPath, ShapePaintContainer};
+use super::command_path::CommandPathBuilder;
+use super::{CommandPath, ShapePaintContainer};
 
 pub struct ClippingShape {
     component: Component,

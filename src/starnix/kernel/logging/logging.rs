@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
-use starnix_uapi::{errors::Errno, pid_t};
-use std::{ffi::CString, fmt};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::pid_t;
+use std::ffi::CString;
+use std::fmt;
 
 // This needs to be available to the macros in this module without clients having to depend on
 // tracing themselves.

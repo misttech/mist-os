@@ -2,20 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{
-        util::{
-            array_bounds, doesnt_use_error_syntax, for_banjo_transport, get_base_type_from_alias,
-            get_declarations, get_doc_comment, is_derive_debug, is_namespaced, name_buffer,
-            name_size, not_callback, primitive_type_to_c_str, to_c_name, Decl, ProtocolType,
-        },
-        Backend,
-    },
-    anyhow::{anyhow, Context, Error},
-    fidl_ir_lib::fidl::*,
-    std::io,
-    std::iter,
+use super::util::{
+    array_bounds, doesnt_use_error_syntax, for_banjo_transport, get_base_type_from_alias,
+    get_declarations, get_doc_comment, is_derive_debug, is_namespaced, name_buffer, name_size,
+    not_callback, primitive_type_to_c_str, to_c_name, Decl, ProtocolType,
 };
+use super::Backend;
+use anyhow::{anyhow, Context, Error};
+use fidl_ir_lib::fidl::*;
+use std::{io, iter};
 
 pub struct CBackend<'a, W: io::Write> {
     // Note: a mutable reference is used here instead of an owned object in

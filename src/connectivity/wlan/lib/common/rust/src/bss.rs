@@ -2,24 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::channel::Channel;
+use crate::ie::rsn::suite_filter;
+use crate::ie::wsc::{parse_probe_resp_wsc, ProbeRespWsc};
+use crate::ie::{self, IeType};
+use crate::mac::CapabilityInfo;
+use anyhow::format_err;
+use ieee80211::{Bssid, MacAddrBytes, Ssid};
+use static_assertions::assert_eq_size;
+use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::fmt;
+use std::hash::Hash;
+use std::ops::Range;
+use zerocopy::{AsBytes, Ref};
 use {
-    crate::{
-        channel::Channel,
-        ie::{
-            self,
-            rsn::suite_filter,
-            wsc::{parse_probe_resp_wsc, ProbeRespWsc},
-            IeType,
-        },
-        mac::CapabilityInfo,
-    },
-    anyhow::format_err,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
-    ieee80211::{Bssid, MacAddrBytes, Ssid},
-    static_assertions::assert_eq_size,
-    std::{cmp::Ordering, collections::HashMap, fmt, hash::Hash, ops::Range},
-    zerocopy::{AsBytes, Ref},
 };
 
 // TODO(https://fxbug.dev/42104685): Represent this as bitfield instead.
@@ -670,25 +669,18 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            assert_variant,
-            channel::Cbw,
-            fake_bss_description,
-            ie::{fake_ies::fake_wmm_param, IeType},
-            test_utils::{
-                fake_frames::{
-                    fake_unknown_rsne, fake_wmm_param_body, fake_wpa1_ie_body, fake_wpa2_mfpc_rsne,
-                    fake_wpa2_mfpr_rsne, fake_wpa2_rsne, fake_wpa2_wpa3_mfpr_rsne,
-                    fake_wpa2_wpa3_no_mfp_rsne, invalid_wpa3_enterprise_192_bit_rsne,
-                    invalid_wpa3_rsne,
-                },
-                fake_stas::IesOverrides,
-            },
-        },
-        test_case::test_case,
+    use super::*;
+    use crate::channel::Cbw;
+    use crate::ie::fake_ies::fake_wmm_param;
+    use crate::ie::IeType;
+    use crate::test_utils::fake_frames::{
+        fake_unknown_rsne, fake_wmm_param_body, fake_wpa1_ie_body, fake_wpa2_mfpc_rsne,
+        fake_wpa2_mfpr_rsne, fake_wpa2_rsne, fake_wpa2_wpa3_mfpr_rsne, fake_wpa2_wpa3_no_mfp_rsne,
+        invalid_wpa3_enterprise_192_bit_rsne, invalid_wpa3_rsne,
     };
+    use crate::test_utils::fake_stas::IesOverrides;
+    use crate::{assert_variant, fake_bss_description};
+    use test_case::test_case;
 
     #[test_case(fake_bss_description!(
         Wpa1Wpa2,

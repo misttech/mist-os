@@ -2,13 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    pretty::{BoxAllocator, DocAllocator},
-    std::{
-        fmt::{self, Debug, Display, Formatter},
-        sync::Arc,
-    },
-};
+use pretty::{BoxAllocator, DocAllocator};
+use std::fmt::{self, Debug, Display, Formatter};
+use std::sync::Arc;
 
 /// Asynchronous extensions to Expectation Predicates
 pub mod asynchronous;

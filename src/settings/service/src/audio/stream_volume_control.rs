@@ -5,19 +5,17 @@
 use crate::audio::types::AudioStream;
 use crate::audio::utils::round_volume_level;
 use crate::base::SettingType;
-use crate::clock;
 use crate::event::{Event, Publisher};
 use crate::handler::setting_handler::ControllerError;
 use crate::service_context::{ExternalServiceEvent, ExternalServiceProxy};
-use crate::{call, trace, trace_guard};
+use crate::{call, clock, trace, trace_guard};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_media::{AudioRenderUsage, Usage};
 use fidl_fuchsia_media_audio::VolumeControlProxy;
-use fuchsia_async as fasync;
-use fuchsia_trace as ftrace;
 use futures::channel::oneshot::Sender;
 use futures::TryStreamExt;
 use std::sync::Arc;
+use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
 const PUBLISHER_EVENT_NAME: &str = "volume_control_events";
 const CONTROLLER_ERROR_DEPENDENCY: &str = "fuchsia.media.audio";

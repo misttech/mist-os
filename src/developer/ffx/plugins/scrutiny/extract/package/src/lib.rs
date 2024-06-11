@@ -6,7 +6,8 @@ use anyhow::Error;
 use ffx_core::ffx_plugin;
 use ffx_scrutiny_package_args::ScrutinyPackageCommand;
 use scrutiny_config::{ConfigBuilder, ModelConfig};
-use scrutiny_frontend::{command_builder::CommandBuilder, launcher};
+use scrutiny_frontend::command_builder::CommandBuilder;
+use scrutiny_frontend::launcher;
 
 #[ffx_plugin()]
 pub async fn scrutiny_package(cmd: ScrutinyPackageCommand) -> Result<(), Error> {

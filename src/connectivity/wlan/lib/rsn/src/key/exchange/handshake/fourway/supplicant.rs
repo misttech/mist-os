@@ -8,15 +8,13 @@ use crate::key::gtk::Gtk;
 use crate::key::igtk::Igtk;
 use crate::key::ptk::Ptk;
 use crate::key::Tk;
-use crate::key_data;
 use crate::key_data::kde;
 use crate::nonce::Nonce;
 use crate::rsna::{
     Dot11VerifiedKeyFrame, IgtkSupport, NegotiatedProtection, ProtectionType, SecAssocUpdate,
     UnverifiedKeyData, UpdateSink,
 };
-use crate::Error;
-use crate::ProtectionInfo;
+use crate::{key_data, Error, ProtectionInfo};
 use anyhow::{ensure, format_err};
 use eapol::KeyFrameBuf;
 use tracing::error;

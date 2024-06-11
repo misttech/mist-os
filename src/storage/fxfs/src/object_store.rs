@@ -29,55 +29,42 @@ pub use store_object_handle::{
     EXTENDED_ATTRIBUTE_RANGE_START,
 };
 
-use {
-    crate::{
-        errors::FxfsError,
-        filesystem::{
-            ApplyContext, ApplyMode, FxFilesystem, JournalingObject, SyncOptions, MAX_FILE_SIZE,
-        },
-        log::*,
-        lsm_tree::{
-            cache::{NullCache, ObjectCache},
-            types::{Item, ItemRef, LayerIterator},
-            LSMTree,
-        },
-        object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID},
-        object_store::{
-            allocator::Allocator,
-            graveyard::Graveyard,
-            journal::{JournalCheckpoint, JournaledTransaction},
-            key_manager::KeyManager,
-            transaction::{
-                lock_keys, AssocObj, AssociatedObject, LockKey, ObjectStoreMutation, Operation,
-                Options, Transaction,
-            },
-        },
-        range::RangeExt,
-        round::round_up,
-        serialized_types::{migrate_to_version, Migrate, Version, Versioned, VersionedLatest},
-    },
-    anyhow::{anyhow, bail, ensure, Context, Error},
-    async_trait::async_trait,
-    fidl_fuchsia_io as fio,
-    fprint::TypeFingerprint,
-    fuchsia_inspect::ArrayProperty,
-    fxfs_crypto::{
-        ff1::Ff1, Crypt, KeyPurpose, StreamCipher, WrappedKey, WrappedKeyV32, WrappedKeys,
-    },
-    once_cell::sync::OnceCell,
-    scopeguard::ScopeGuard,
-    serde::{Deserialize, Serialize},
-    std::{
-        fmt,
-        ops::Bound,
-        sync::{
-            atomic::{AtomicBool, AtomicU64, Ordering},
-            Arc, Mutex, OnceLock, Weak,
-        },
-    },
-    storage_device::Device,
-    uuid::Uuid,
+use crate::errors::FxfsError;
+use crate::filesystem::{
+    ApplyContext, ApplyMode, FxFilesystem, JournalingObject, SyncOptions, MAX_FILE_SIZE,
 };
+use crate::log::*;
+use crate::lsm_tree::cache::{NullCache, ObjectCache};
+use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
+use crate::lsm_tree::LSMTree;
+use crate::object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID};
+use crate::object_store::allocator::Allocator;
+use crate::object_store::graveyard::Graveyard;
+use crate::object_store::journal::{JournalCheckpoint, JournaledTransaction};
+use crate::object_store::key_manager::KeyManager;
+use crate::object_store::transaction::{
+    lock_keys, AssocObj, AssociatedObject, LockKey, ObjectStoreMutation, Operation, Options,
+    Transaction,
+};
+use crate::range::RangeExt;
+use crate::round::round_up;
+use crate::serialized_types::{migrate_to_version, Migrate, Version, Versioned, VersionedLatest};
+use anyhow::{anyhow, bail, ensure, Context, Error};
+use async_trait::async_trait;
+use fidl_fuchsia_io as fio;
+use fprint::TypeFingerprint;
+use fuchsia_inspect::ArrayProperty;
+use fxfs_crypto::ff1::Ff1;
+use fxfs_crypto::{Crypt, KeyPurpose, StreamCipher, WrappedKey, WrappedKeyV32, WrappedKeys};
+use once_cell::sync::OnceCell;
+use scopeguard::ScopeGuard;
+use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::ops::Bound;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock, Weak};
+use storage_device::Device;
+use uuid::Uuid;
 
 pub use extent_record::{
     ExtentKey, ExtentValue, BLOB_MERKLE_ATTRIBUTE_ID, DEFAULT_DATA_ATTRIBUTE_ID,
@@ -2206,38 +2193,35 @@ pub async fn load_store_info(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{
-            StoreInfo, DEFAULT_DATA_ATTRIBUTE_ID, FSVERITY_MERKLE_ATTRIBUTE_ID,
-            MAX_STORE_INFO_SERIALIZED_SIZE, OBJECT_ID_HI_MASK,
-        },
-        crate::{
-            errors::FxfsError,
-            filesystem::{FxFilesystem, JournalingObject, OpenFxFilesystem, SyncOptions},
-            fsck::fsck,
-            lsm_tree::types::{Item, ItemRef, LayerIterator},
-            object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID},
-            object_store::{
-                directory::Directory,
-                object_record::{AttributeKey, ObjectKey, ObjectKind, ObjectValue},
-                transaction::{lock_keys, Options},
-                volume::root_volume,
-                FsverityMetadata, HandleOptions, LockKey, Mutation, ObjectStore, RootDigest,
-            },
-            serialized_types::VersionedLatest,
-        },
-        assert_matches::assert_matches,
-        fuchsia_async as fasync,
-        futures::join,
-        fxfs_crypto::{Crypt, WrappedKey, WrappedKeyBytes, WRAPPED_KEY_SIZE},
-        fxfs_insecure_crypto::InsecureCrypt,
-        std::{
-            ops::Bound,
-            sync::{Arc, Mutex},
-            time::Duration,
-        },
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
+    use super::{
+        StoreInfo, DEFAULT_DATA_ATTRIBUTE_ID, FSVERITY_MERKLE_ATTRIBUTE_ID,
+        MAX_STORE_INFO_SERIALIZED_SIZE, OBJECT_ID_HI_MASK,
     };
+    use crate::errors::FxfsError;
+    use crate::filesystem::{FxFilesystem, JournalingObject, OpenFxFilesystem, SyncOptions};
+    use crate::fsck::fsck;
+    use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
+    use crate::object_handle::{
+        ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID,
+    };
+    use crate::object_store::directory::Directory;
+    use crate::object_store::object_record::{AttributeKey, ObjectKey, ObjectKind, ObjectValue};
+    use crate::object_store::transaction::{lock_keys, Options};
+    use crate::object_store::volume::root_volume;
+    use crate::object_store::{
+        FsverityMetadata, HandleOptions, LockKey, Mutation, ObjectStore, RootDigest,
+    };
+    use crate::serialized_types::VersionedLatest;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use futures::join;
+    use fxfs_crypto::{Crypt, WrappedKey, WrappedKeyBytes, WRAPPED_KEY_SIZE};
+    use fxfs_insecure_crypto::InsecureCrypt;
+    use std::ops::Bound;
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::DeviceHolder;
 
     const TEST_DEVICE_BLOCK_SIZE: u32 = 512;
 

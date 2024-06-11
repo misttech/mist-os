@@ -2,24 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{dict::Key, fidl::registry, Capability, ConversionError, Dict, RemotableCapability},
-    fidl::endpoints::{self, create_request_stream, ClientEnd},
-    fidl::handle::AsHandleRef,
-    fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync,
-    fuchsia_zircon::Koid,
-    futures::TryStreamExt,
-    std::sync::Arc,
-    tracing::warn,
-    vfs::{
-        directory::{
-            entry::DirectoryEntry,
-            helper::{AlreadyExists, DirectlyMutable},
-            immutable::simple as pfs,
-        },
-        name::Name,
-    },
-};
+use crate::dict::Key;
+use crate::fidl::registry;
+use crate::{Capability, ConversionError, Dict, RemotableCapability};
+use fidl::endpoints::{self, create_request_stream, ClientEnd};
+use fidl::handle::AsHandleRef;
+use fuchsia_zircon::Koid;
+use futures::TryStreamExt;
+use std::sync::Arc;
+use tracing::warn;
+use vfs::directory::entry::DirectoryEntry;
+use vfs::directory::helper::{AlreadyExists, DirectlyMutable};
+use vfs::directory::immutable::simple as pfs;
+use vfs::name::Name;
+use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
 impl Dict {
     /// Serve the `fuchsia.component.sandbox.Dictionary` protocol for this `Dict`.
@@ -250,17 +246,13 @@ mod tests {
     use futures::try_join;
     use lazy_static::lazy_static;
     use test_util::Counter;
-    use vfs::{
-        directory::{
-            entry::{serve_directory, DirectoryEntry, EntryInfo, OpenRequest, SubNode},
-            entry_container::Directory as VfsDirectory,
-        },
-        execution_scope::ExecutionScope,
-        path::Path,
-        pseudo_directory,
-        remote::RemoteLike,
-        service::endpoint,
-    };
+    use vfs::directory::entry::{serve_directory, DirectoryEntry, EntryInfo, OpenRequest, SubNode};
+    use vfs::directory::entry_container::Directory as VfsDirectory;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::path::Path;
+    use vfs::pseudo_directory;
+    use vfs::remote::RemoteLike;
+    use vfs::service::endpoint;
 
     lazy_static! {
         static ref CAP_KEY: Key = "cap".parse().unwrap();

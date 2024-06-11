@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    fidl::endpoints::ServiceMarker,
-    fidl_fuchsia_driver_test as fdt, fidl_fuchsia_services_test as ft,
-    fuchsia_async::{self as fasync, DurationExt, Timer},
-    fuchsia_component::client,
-    fuchsia_component_test::RealmBuilder,
-    fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
-    fuchsia_zircon::DurationNum,
-};
+use anyhow::{Context, Result};
+use fidl::endpoints::ServiceMarker;
+use fuchsia_async::{self as fasync, DurationExt, Timer};
+use fuchsia_component::client;
+use fuchsia_component_test::RealmBuilder;
+use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
+use fuchsia_zircon::DurationNum;
+use {fidl_fuchsia_driver_test as fdt, fidl_fuchsia_services_test as ft};
 
 #[fasync::run_singlethreaded(test)]
 async fn test_services() -> Result<()> {

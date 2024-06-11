@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, Error},
-    fuchsia_triage::ActionTagDirective,
-    structopt::StructOpt,
-    triage_app_lib::file_io::config_from_files,
-};
+use anyhow::{bail, Error};
+use fuchsia_triage::ActionTagDirective;
+use structopt::StructOpt;
+use triage_app_lib::file_io::config_from_files;
 
 #[derive(StructOpt, Debug)]
 pub struct Options {

@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    rand::{rngs::SmallRng, seq::SliceRandom, Rng},
-    std::cmp::min,
-};
+use rand::rngs::SmallRng;
+use rand::seq::SliceRandom;
+use rand::Rng;
+use std::cmp::min;
 
 /// Controls the compressibility of data generated for a file.
 /// This parameter is only meaningful for filesystems that support transparent compression.

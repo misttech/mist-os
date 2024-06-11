@@ -7,14 +7,13 @@ mod controller;
 pub mod package;
 pub mod util;
 
-use {
-    crate::core::{
-        controller::{blob::*, component::*, package::*, package_extract::*},
-        package::collector::*,
-    },
-    scrutiny::prelude::*,
-    std::sync::Arc,
-};
+use crate::core::controller::blob::*;
+use crate::core::controller::component::*;
+use crate::core::controller::package::*;
+use crate::core::controller::package_extract::*;
+use crate::core::package::collector::*;
+use scrutiny::prelude::*;
+use std::sync::Arc;
 
 plugin!(
     CorePlugin,

@@ -5,7 +5,8 @@
 use analytics::add_custom_event;
 use fuchsia_async::TimeoutExt as _;
 use fuchsia_repo::repository::RepositorySpec;
-use std::{collections::BTreeMap, time::Duration};
+use std::collections::BTreeMap;
+use std::time::Duration;
 
 const CATEGORY: &str = "ffx_daemon_repo";
 

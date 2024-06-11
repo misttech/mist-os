@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::{CurrentTask, Kernel},
-    vfs::{CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr},
+use crate::task::{CurrentTask, Kernel};
+use crate::vfs::{
+    CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr,
 };
-use starnix_uapi::{errors::Errno, statfs, vfs::default_statfs, SOCKFS_MAGIC};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::vfs::default_statfs;
+use starnix_uapi::{statfs, SOCKFS_MAGIC};
 use std::sync::Arc;
 
 /// `SocketFs` is the file system where anonymous socket nodes are created, for example in

@@ -6,22 +6,18 @@ use anyhow::{Context as _, Result};
 use async_fs::File;
 use async_lock::{Mutex, MutexGuard};
 use async_trait::async_trait;
-use fidl_fuchsia_developer_ffx as ffx;
-use fidl_fuchsia_tracing_controller as trace;
 use fuchsia_async::Task;
-use futures::{
-    prelude::*,
-    task::{Context as FutContext, Poll},
-};
+use futures::prelude::*;
+use futures::task::{Context as FutContext, Poll};
 use protocols::prelude::*;
-use std::{
-    collections::{hash_map::Entry, BTreeSet, HashMap},
-    pin::Pin,
-    rc::{Rc, Weak},
-    time::{Duration, Instant},
-};
+use std::collections::hash_map::Entry;
+use std::collections::{BTreeSet, HashMap};
+use std::pin::Pin;
+use std::rc::{Rc, Weak};
+use std::time::{Duration, Instant};
 use tasks::TaskManager;
 use thiserror::Error;
+use {fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_tracing_controller as trace};
 
 #[derive(Debug)]
 struct TraceTask {

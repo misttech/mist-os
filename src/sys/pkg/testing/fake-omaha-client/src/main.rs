@@ -2,26 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_async::TimeoutExt,
-    futures::{future::BoxFuture, lock::Mutex, prelude::*},
-    hyper::{client::ResponseFuture, Body, Client, Request, Response},
-    omaha_client::{
-        app_set::VecAppSet,
-        common::App,
-        configuration::{Config, Updater},
-        cup_ecdsa::{PublicKeyAndId, PublicKeyId, PublicKeys, StandardCupv2Handler},
-        http_request::{Error, HttpRequest},
-        installer::stub::StubInstaller,
-        metrics::StubMetricsReporter,
-        policy::StubPolicyEngine,
-        protocol::{request::OS, Cohort},
-        state_machine::{update_check, StateMachineBuilder, StateMachineEvent, UpdateCheckError},
-        storage::MemStorage,
-        time::{timers::StubTimer, StandardTimeSource},
-    },
-    std::{error, rc::Rc, time::Duration},
+use fuchsia_async::TimeoutExt;
+use futures::future::BoxFuture;
+use futures::lock::Mutex;
+use futures::prelude::*;
+use hyper::client::ResponseFuture;
+use hyper::{Body, Client, Request, Response};
+use omaha_client::app_set::VecAppSet;
+use omaha_client::common::App;
+use omaha_client::configuration::{Config, Updater};
+use omaha_client::cup_ecdsa::{PublicKeyAndId, PublicKeyId, PublicKeys, StandardCupv2Handler};
+use omaha_client::http_request::{Error, HttpRequest};
+use omaha_client::installer::stub::StubInstaller;
+use omaha_client::metrics::StubMetricsReporter;
+use omaha_client::policy::StubPolicyEngine;
+use omaha_client::protocol::request::OS;
+use omaha_client::protocol::Cohort;
+use omaha_client::state_machine::{
+    update_check, StateMachineBuilder, StateMachineEvent, UpdateCheckError,
 };
+use omaha_client::storage::MemStorage;
+use omaha_client::time::timers::StubTimer;
+use omaha_client::time::StandardTimeSource;
+use std::error;
+use std::rc::Rc;
+use std::time::Duration;
 
 pub struct FuchsiaHyperHttpRequest {
     client: Client<hyper_rustls::HttpsConnector<fuchsia_hyper::HyperConnector>, Body>,

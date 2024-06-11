@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::generic::{CurrentStateCache, Listener, Message},
-    crate::access_point::types,
-    fidl_fuchsia_wlan_policy as fidl_policy,
-    futures::{channel::mpsc, future::BoxFuture, prelude::*},
-};
+use super::generic::{CurrentStateCache, Listener, Message};
+use crate::access_point::types;
+use fidl_fuchsia_wlan_policy as fidl_policy;
+use futures::channel::mpsc;
+use futures::future::BoxFuture;
+use futures::prelude::*;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ConnectedClientInformation {
@@ -109,7 +109,9 @@ pub type ApListenerMessageSender = mpsc::UnboundedSender<ApMessage>;
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::client::types::Ssid, fidl_fuchsia_wlan_policy as fidl_policy};
+    use super::*;
+    use crate::client::types::Ssid;
+    use fidl_fuchsia_wlan_policy as fidl_policy;
 
     fn create_network_id() -> types::NetworkIdentifier {
         types::NetworkIdentifier {

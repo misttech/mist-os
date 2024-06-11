@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::backend::{BlockBackend, DeviceAttrs, Request, Sector},
-    anyhow::{anyhow, Error},
-    async_trait::async_trait,
-    fuchsia_trace as ftrace, fuchsia_zircon as zx,
-    std::io::{Read, Seek},
-};
+use crate::backend::{BlockBackend, DeviceAttrs, Request, Sector};
+use anyhow::{anyhow, Error};
+use async_trait::async_trait;
+use std::io::{Read, Seek};
+use {fuchsia_trace as ftrace, fuchsia_zircon as zx};
 
 pub struct QcowBackend {
     file: std::cell::RefCell<std::fs::File>,
@@ -100,10 +98,11 @@ impl BlockBackend for QcowBackend {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::backend_test::check_range, crate::wire, fuchsia_async as fasync,
-        virtio_device::fake_queue::IdentityDriverMem,
-    };
+    use super::*;
+    use crate::backend_test::check_range;
+    use crate::wire;
+    use fuchsia_async as fasync;
+    use virtio_device::fake_queue::IdentityDriverMem;
 
     // We don't use the test cases in `crate::backend_test` directly because we don't currently
     // have the ability to write the test qcow files at runtime (which is something required by

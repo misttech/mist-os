@@ -2,21 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::core::{
-        collection::{Components, ManifestData, Manifests},
-        controller::utils::DefaultComponentRequest,
-    },
-    anyhow::{Error, Result},
-    scrutiny::{
-        model::controller::{DataController, HintDataType},
-        model::model::DataModel,
-    },
-    scrutiny_utils::usage::UsageBuilder,
-    serde_json::value::Value,
-    std::io::{self, ErrorKind},
-    std::sync::Arc,
-};
+use crate::core::collection::{Components, ManifestData, Manifests};
+use crate::core::controller::utils::DefaultComponentRequest;
+use anyhow::{Error, Result};
+use scrutiny::model::controller::{DataController, HintDataType};
+use scrutiny::model::model::DataModel;
+use scrutiny_utils::usage::UsageBuilder;
+use serde_json::value::Value;
+use std::io::{self, ErrorKind};
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct ComponentsGraphController {}
@@ -157,15 +151,12 @@ impl DataController for ComponentsUrlListController {
 #[cfg(test)]
 mod tests {
 
-    use {
-        super::*,
-        crate::core::collection::{
-            testing::fake_component_src_pkg, Component, ComponentSource, Manifest,
-        },
-        cm_types::Url,
-        scrutiny_testing::fake::*,
-        serde_json::json,
-    };
+    use super::*;
+    use crate::core::collection::testing::fake_component_src_pkg;
+    use crate::core::collection::{Component, ComponentSource, Manifest};
+    use cm_types::Url;
+    use scrutiny_testing::fake::*;
+    use serde_json::json;
 
     fn empty_value() -> Value {
         serde_json::from_str("{}").unwrap()

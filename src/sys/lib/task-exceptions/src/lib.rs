@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_async as fasync,
-    fuchsia_zircon::sys as zx_sys,
-    fuchsia_zircon::{self as zx, HandleBased},
-    std::{mem, ptr, task::Poll},
-};
+use fuchsia_async as fasync;
+use fuchsia_zircon::{self as zx, sys as zx_sys, HandleBased};
+use std::task::Poll;
+use std::{mem, ptr};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ExceptionType {
@@ -129,15 +127,12 @@ impl futures::Stream for ExceptionsStream {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::{format_err, Context, Error},
-        fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
-        fuchsia_component::client as fclient,
-        fuchsia_runtime as fruntime,
-        futures::TryStreamExt,
-        std::sync::Arc,
-    };
+    use super::*;
+    use anyhow::{format_err, Context, Error};
+    use fuchsia_component::client as fclient;
+    use futures::TryStreamExt;
+    use std::sync::Arc;
+    use {fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess, fuchsia_runtime as fruntime};
 
     #[fasync::run_singlethreaded(test)]
     async fn catch_exception() -> Result<(), Error> {

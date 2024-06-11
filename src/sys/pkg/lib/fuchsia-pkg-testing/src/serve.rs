@@ -4,37 +4,31 @@
 
 //! Test tools for serving TUF repositories.
 
-use {
-    crate::repo::Repository,
-    anyhow::{bail, format_err, Context as _, Error},
-    chrono::Utc,
-    fidl_fuchsia_pkg_ext::{
-        MirrorConfig, MirrorConfigBuilder, RepositoryConfig, RepositoryStorageType,
-    },
-    fuchsia_async::{self as fasync, net::TcpListener, Task},
-    fuchsia_url::RepositoryUrl,
-    futures::{future::BoxFuture, prelude::*},
-    http::Uri,
-    http_sse::{Event, EventSender, SseResponseCreator},
-    hyper::{
-        header,
-        server::{accept::from_stream, Server},
-        service::{make_service_fn, service_fn},
-        Body, Method, Request, Response, StatusCode,
-    },
-    std::{
-        convert::{Infallible, TryInto as _},
-        io::{Cursor, Read as _, Seek as _},
-        net::{IpAddr, Ipv6Addr, SocketAddr},
-        path::{Path, PathBuf},
-        pin::Pin,
-        sync::{
-            atomic::{AtomicU64, Ordering},
-            Arc,
-        },
-        time::Duration,
-    },
+use crate::repo::Repository;
+use anyhow::{bail, format_err, Context as _, Error};
+use chrono::Utc;
+use fidl_fuchsia_pkg_ext::{
+    MirrorConfig, MirrorConfigBuilder, RepositoryConfig, RepositoryStorageType,
 };
+use fuchsia_async::net::TcpListener;
+use fuchsia_async::{self as fasync, Task};
+use fuchsia_url::RepositoryUrl;
+use futures::future::BoxFuture;
+use futures::prelude::*;
+use http::Uri;
+use http_sse::{Event, EventSender, SseResponseCreator};
+use hyper::server::accept::from_stream;
+use hyper::server::Server;
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{header, Body, Method, Request, Response, StatusCode};
+use std::convert::{Infallible, TryInto as _};
+use std::io::{Cursor, Read as _, Seek as _};
+use std::net::{IpAddr, Ipv6Addr, SocketAddr};
+use std::path::{Path, PathBuf};
+use std::pin::Pin;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
 
 pub mod responder;
 
@@ -526,11 +520,10 @@ async fn get(url: impl AsRef<str>) -> Result<Vec<u8>, Error> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{package::PackageBuilder, repo::RepositoryBuilder},
-        assert_matches::assert_matches,
-    };
+    use super::*;
+    use crate::package::PackageBuilder;
+    use crate::repo::RepositoryBuilder;
+    use assert_matches::assert_matches;
 
     #[fuchsia_async::run_singlethreaded(test)]
     #[ignore]

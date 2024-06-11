@@ -8,25 +8,19 @@
 
 //! Concurrent work queue helpers
 
-use {
-    fuchsia_sync::Mutex,
-    futures::{
-        channel::mpsc,
-        future::{BoxFuture, Shared},
-        prelude::*,
-        ready,
-        stream::{FusedStream, FuturesUnordered},
-    },
-    pin_project::pin_project,
-    std::{
-        collections::HashMap,
-        hash::Hash,
-        pin::Pin,
-        sync::{Arc, Weak},
-        task::{Context, Poll},
-    },
-    thiserror::Error,
-};
+use fuchsia_sync::Mutex;
+use futures::channel::mpsc;
+use futures::future::{BoxFuture, Shared};
+use futures::prelude::*;
+use futures::ready;
+use futures::stream::{FusedStream, FuturesUnordered};
+use pin_project::pin_project;
+use std::collections::HashMap;
+use std::hash::Hash;
+use std::pin::Pin;
+use std::sync::{Arc, Weak};
+use std::task::{Context, Poll};
+use thiserror::Error;
 
 mod state;
 use state::{make_canceled_receiver, TaskFuture, TaskVariants};
@@ -441,15 +435,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        futures::{
-            channel::oneshot,
-            executor::{block_on, LocalSpawner},
-            task::{LocalSpawnExt, SpawnExt},
-        },
-        std::{borrow::Borrow, fmt},
-    };
+    use super::*;
+    use futures::channel::oneshot;
+    use futures::executor::{block_on, LocalSpawner};
+    use futures::task::{LocalSpawnExt, SpawnExt};
+    use std::borrow::Borrow;
+    use std::fmt;
 
     #[test]
     fn basic_usage() {

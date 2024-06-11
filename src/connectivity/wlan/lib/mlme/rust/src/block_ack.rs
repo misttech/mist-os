@@ -14,18 +14,16 @@
 //!
 //! See IEEE Std 802.11-2016, 10.24.
 
-use {
-    crate::error::Error,
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_zircon as zx,
-    tracing::error,
-    wlan_common::{
-        appendable::Appendable, buffer_reader::BufferReader, buffer_writer::BufferWriter,
-        frame_len, mac,
-    },
-    wlan_frame_writer::write_frame_with_dynamic_buffer,
-    wlan_statemachine::*,
-    zerocopy::{AsBytes, ByteSlice, Ref},
-};
+use crate::error::Error;
+use tracing::error;
+use wlan_common::appendable::Appendable;
+use wlan_common::buffer_reader::BufferReader;
+use wlan_common::buffer_writer::BufferWriter;
+use wlan_common::{frame_len, mac};
+use wlan_frame_writer::write_frame_with_dynamic_buffer;
+use wlan_statemachine::*;
+use zerocopy::{AsBytes, ByteSlice, Ref};
+use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_zircon as zx};
 
 pub const ADDBA_REQ_FRAME_LEN: usize = frame_len!(mac::MgmtHdr, mac::ActionHdr, mac::AddbaReqHdr);
 pub const ADDBA_RESP_FRAME_LEN: usize = frame_len!(mac::MgmtHdr, mac::ActionHdr, mac::AddbaRespHdr);
@@ -416,10 +414,9 @@ fn read_delba_hdr<B: ByteSlice>(body: B) -> Result<Ref<B, mac::DelbaHdr>, Error>
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, fuchsia_zircon as zx, wlan_common::assert_variant,
-        wlan_statemachine as statemachine,
-    };
+    use super::*;
+    use wlan_common::assert_variant;
+    use {fuchsia_zircon as zx, wlan_statemachine as statemachine};
 
     /// A STA that can send ADDBA frames (implements the `BlockAckTx` trait).
     enum Station {

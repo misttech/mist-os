@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    fmt::Debug,
-    io::{Cursor, Seek as _, SeekFrom},
-    ops::Deref,
-};
+use std::fmt::Debug;
+use std::io::{Cursor, Seek as _, SeekFrom};
+use std::ops::Deref;
 use zerocopy::{ByteSlice, FromBytes, NoCell, Ref, Unaligned};
 
 /// Trait for a cursor that can emit a slice of "remaining" data, and advance forward.

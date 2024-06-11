@@ -4,12 +4,10 @@
 
 //! Extensions for `fidl_fuchsia_ui_focus`.
 
-use {
-    fidl_fuchsia_ui_focus::{FocusChain, FocusKoidChain},
-    fidl_fuchsia_ui_views_ext::ViewRefExt,
-    fuchsia_scenic as scenic,
-    fuchsia_zircon::{Koid, Status},
-};
+use fidl_fuchsia_ui_focus::{FocusChain, FocusKoidChain};
+use fidl_fuchsia_ui_views_ext::ViewRefExt;
+use fuchsia_scenic as scenic;
+use fuchsia_zircon::{Koid, Status};
 
 /// Extension trait for [`fidl_fuchsia_ui_focus::FocusChain`] and
 /// [`fidl_fuchsia_ui_focus::FocusKoidChain`].
@@ -125,7 +123,8 @@ impl FocusChainExt for FocusKoidChain {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fidl_fuchsia_ui_focus_test_helpers::make_focus_chain};
+    use super::*;
+    use fidl_fuchsia_ui_focus_test_helpers::make_focus_chain;
 
     #[test]
     fn focus_chain_duplicate() {

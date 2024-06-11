@@ -7,81 +7,68 @@
 use anyhow::{anyhow, Context as _};
 use assert_matches::assert_matches;
 use async_trait::async_trait;
-use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _, IpExt as _};
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_ext::{self as fnet_routes_ext};
-use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
-use fidl_fuchsia_net_tun as fnet_tun;
-use fidl_fuchsia_posix as fposix;
-use fidl_fuchsia_posix_socket as fposix_socket;
-use fidl_fuchsia_posix_socket_packet as fpacket;
-use fuchsia_async::{
-    self as fasync,
-    net::{DatagramSocket, UdpSocket},
-    DurationExt, TimeoutExt as _,
-};
+use fuchsia_async::net::{DatagramSocket, UdpSocket};
+use fuchsia_async::{self as fasync, DurationExt, TimeoutExt as _};
 use fuchsia_zircon::{self as zx, AsHandleRef as _};
-use futures::{
-    future::{self, join_all, LocalBoxFuture},
-    io::AsyncReadExt as _,
-    io::AsyncWriteExt as _,
-    Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
-};
+use futures::future::{self, join_all, LocalBoxFuture};
+use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
+use futures::{Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::{
     fidl_ip_v4, fidl_ip_v6, fidl_mac, fidl_socket_addr, fidl_subnet, net_addr_subnet,
     net_subnet_v4, net_subnet_v6, std_ip_v4, std_socket_addr,
 };
-use net_types::{
-    ethernet::Mac,
-    ip::{
-        AddrSubnetEither, Ip, IpAddress as _, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6,
-        Ipv6Addr,
-    },
-    Witness as _,
+use net_types::ethernet::Mac;
+use net_types::ip::{
+    AddrSubnetEither, Ip, IpAddress as _, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
 };
+use net_types::Witness as _;
 use netemul::{
     InterfaceConfig, RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _,
     TestFakeEndpoint, TestInterface, TestNetwork,
 };
+use netstack_testing_common::constants::ipv6 as ipv6_consts;
+use netstack_testing_common::interfaces::TestInterfaceExt as _;
+use netstack_testing_common::realms::{
+    KnownServiceProvider, Netstack, NetstackVersion, TestSandboxExt as _,
+};
 use netstack_testing_common::{
-    constants::ipv6 as ipv6_consts,
-    devices,
-    interfaces::TestInterfaceExt as _,
-    ndp, ping,
-    realms::{KnownServiceProvider, Netstack, NetstackVersion, TestSandboxExt as _},
-    Result, ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+    devices, ndp, ping, Result, ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
+    ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+};
+use {
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_stack as fnet_stack, fidl_fuchsia_net_tun as fnet_tun,
+    fidl_fuchsia_posix as fposix, fidl_fuchsia_posix_socket as fposix_socket,
+    fidl_fuchsia_posix_socket_packet as fpacket,
 };
 
 use netstack_testing_macros::netstack_test;
 use packet::{InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
-use packet_formats::{
-    arp::{ArpOp, ArpPacketBuilder},
-    ethernet::{
-        EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
-    },
-    icmp::{
-        ndp::{
-            options::{NdpOptionBuilder, PrefixInformation},
-            NeighborAdvertisement,
-        },
-        IcmpDestUnreachable, IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode,
-        Icmpv4DestUnreachableCode, Icmpv4Packet, Icmpv6DestUnreachableCode, Icmpv6Packet,
-        MessageBody,
-    },
-    igmp::messages::IgmpPacket,
-    ip::{IpProto, Ipv4Proto, Ipv6Proto},
-    ipv4::{Ipv4Header as _, Ipv4Packet, Ipv4PacketBuilder},
-    ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder},
+use packet_formats::arp::{ArpOp, ArpPacketBuilder};
+use packet_formats::ethernet::{
+    EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
+use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
+use packet_formats::icmp::ndp::NeighborAdvertisement;
+use packet_formats::icmp::{
+    IcmpDestUnreachable, IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode,
+    Icmpv4DestUnreachableCode, Icmpv4Packet, Icmpv6DestUnreachableCode, Icmpv6Packet, MessageBody,
+};
+use packet_formats::igmp::messages::IgmpPacket;
+use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
+use packet_formats::ipv4::{Ipv4Header as _, Ipv4Packet, Ipv4PacketBuilder};
+use packet_formats::ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder};
 use sockaddr::{IntoSockAddr as _, PureIpSockaddr, TryToSockaddrLl};
 use socket2::SockRef;
-use std::{num::NonZeroU64, os::fd::AsFd, pin::pin};
+use std::num::NonZeroU64;
+use std::os::fd::AsFd;
+use std::pin::pin;
 use test_case::test_case;
 
 async fn run_udp_socket_test(

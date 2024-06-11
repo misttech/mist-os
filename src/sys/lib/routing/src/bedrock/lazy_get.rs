@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{DictExt, RoutingError},
-    async_trait::async_trait,
-    cm_types::IterablePath,
-    router_error::RouterError,
-    sandbox::{Capability, Request, Routable, Router},
-    std::fmt::Debug,
-};
+use crate::{DictExt, RoutingError};
+use async_trait::async_trait;
+use cm_types::IterablePath;
+use router_error::RouterError;
+use sandbox::{Capability, Request, Routable, Router};
+use std::fmt::Debug;
 
 /// Implements the `lazy_get` function for [`Routable`] objects.
 pub trait LazyGet: Routable {

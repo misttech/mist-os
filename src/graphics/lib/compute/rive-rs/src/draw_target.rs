@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    component::Component,
-    component_dirt::ComponentDirt,
-    core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property, TryFromU64},
-    drawable::Drawable,
-    dyn_vec::DynVec,
-    option_cell::OptionCell,
-    shapes::ClippingShape,
-    status_code::StatusCode,
-};
+use crate::component::Component;
+use crate::component_dirt::ComponentDirt;
+use crate::core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property, TryFromU64};
+use crate::drawable::Drawable;
+use crate::dyn_vec::DynVec;
+use crate::option_cell::OptionCell;
+use crate::shapes::ClippingShape;
+use crate::status_code::StatusCode;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DrawTargetPlacement {

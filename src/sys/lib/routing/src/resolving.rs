@@ -2,20 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::component_instance::{ComponentInstanceInterface, ExtendedInstanceInterface};
+use crate::error::ComponentInstanceError;
+use anyhow::Error;
+use clonable_error::ClonableError;
+use lazy_static::lazy_static;
+use std::sync::Arc;
+use thiserror::Error;
+use url::Url;
+use version_history::AbiRevision;
 use {
-    crate::{
-        component_instance::{ComponentInstanceInterface, ExtendedInstanceInterface},
-        error::ComponentInstanceError,
-    },
-    anyhow::Error,
-    clonable_error::ClonableError,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio,
     fuchsia_zircon_status as zx,
-    lazy_static::lazy_static,
-    std::sync::Arc,
-    thiserror::Error,
-    url::Url,
-    version_history::AbiRevision,
 };
 
 /// The prefix for relative URLs internally represented as url::Url.
@@ -652,7 +650,9 @@ struct RemoteError(fresolution::ResolverError);
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, fidl::endpoints::create_endpoints};
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::create_endpoints;
 
     fn from_absolute_url(url: &str) -> ComponentAddress {
         ComponentAddress::from_absolute_url(&url.parse().unwrap()).unwrap()

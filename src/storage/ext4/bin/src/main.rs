@@ -7,7 +7,9 @@
 // whilst all the files (not directories or symbolic links) are stored in files named with their
 // inode numbers.
 
-use {anyhow::Error, argh::FromArgs, ext4_extract::ext4_extract};
+use anyhow::Error;
+use argh::FromArgs;
+use ext4_extract::ext4_extract;
 
 fn ext4_to_pkg(
     path: &str,

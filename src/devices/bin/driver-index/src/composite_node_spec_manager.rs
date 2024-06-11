@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::match_common::{get_composite_rules_from_composite_driver, node_to_device_property},
-    crate::resolved_driver::ResolvedDriver,
-    bind::compiler::symbol_table::{get_deprecated_key_identifier, get_deprecated_key_value},
-    bind::compiler::Symbol,
-    bind::interpreter::decode_bind_rules::DecodedRules,
-    bind::interpreter::match_bind::{match_bind, DeviceProperties, MatchBindData, PropertyKey},
-    fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_index as fdi,
-    fuchsia_zircon::{zx_status_t, Status},
-    regex::Regex,
-    std::collections::{BTreeMap, HashMap, HashSet},
-};
+use crate::match_common::{get_composite_rules_from_composite_driver, node_to_device_property};
+use crate::resolved_driver::ResolvedDriver;
+use bind::compiler::symbol_table::{get_deprecated_key_identifier, get_deprecated_key_value};
+use bind::compiler::Symbol;
+use bind::interpreter::decode_bind_rules::DecodedRules;
+use bind::interpreter::match_bind::{match_bind, DeviceProperties, MatchBindData, PropertyKey};
+use fuchsia_zircon::{zx_status_t, Status};
+use regex::Regex;
+use std::collections::{BTreeMap, HashMap, HashSet};
+use {fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_index as fdi};
 
 const NAME_REGEX: &'static str = r"^[a-zA-Z0-9\-_]*$";
 

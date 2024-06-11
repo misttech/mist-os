@@ -2,14 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::bail;
+use std::slice;
+use tracing::warn;
 use {
-    anyhow::bail, banjo_fuchsia_wlan_common as banjo_wlan_common,
+    banjo_fuchsia_wlan_common as banjo_wlan_common,
     banjo_fuchsia_wlan_fullmac as banjo_wlan_fullmac,
     banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211,
     banjo_fuchsia_wlan_internal as banjo_wlan_internal, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_stats as fidl_stats, std::slice,
-    tracing::warn,
+    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_stats as fidl_stats,
 };
 
 pub fn unsafe_slice_to_vec<T: Clone>(data: *const T, len: usize) -> Vec<T> {
@@ -661,7 +663,8 @@ pub fn convert_iface_histogram_stats(
 // so only a few remaining ones are tested here.
 #[cfg(test)]
 mod tests {
-    use {super::*, wlan_common::assert_variant};
+    use super::*;
+    use wlan_common::assert_variant;
 
     #[test]
     fn test_convert_mac_sublayer_support() {

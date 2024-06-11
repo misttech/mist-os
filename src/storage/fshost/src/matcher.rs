@@ -2,27 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        device::{
-            constants::{
-                BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL,
-                FTL_PARTITION_LABEL, FUCHSIA_FVM_PARTITION_LABEL, FVM_DRIVER_PATH,
-                FVM_PARTITION_LABEL, GPT_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL, MBR_DRIVER_PATH,
-                NAND_BROKER_DRIVER_PATH, SUPER_PARTITION_LABEL,
-            },
-            Device,
-        },
-        environment::Environment,
-    },
-    anyhow::{bail, Context, Error},
-    async_trait::async_trait,
-    fs_management::format::DiskFormat,
-    std::{
-        collections::BTreeMap,
-        sync::atomic::{AtomicBool, Ordering},
-    },
+use crate::device::constants::{
+    BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, FTL_PARTITION_LABEL,
+    FUCHSIA_FVM_PARTITION_LABEL, FVM_DRIVER_PATH, FVM_PARTITION_LABEL, GPT_DRIVER_PATH,
+    LEGACY_DATA_PARTITION_LABEL, MBR_DRIVER_PATH, NAND_BROKER_DRIVER_PATH, SUPER_PARTITION_LABEL,
 };
+use crate::device::Device;
+use crate::environment::Environment;
+use anyhow::{bail, Context, Error};
+use async_trait::async_trait;
+use fs_management::format::DiskFormat;
+use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 #[async_trait]
 pub trait Matcher: Send {
@@ -407,24 +398,20 @@ impl Matcher for PartitionMapMatcher {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{Device, DiskFormat, Environment, Matchers},
-        crate::{
-            config::default_config,
-            device::constants::{
-                BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL,
-                FUCHSIA_FVM_PARTITION_LABEL, FVM_DRIVER_PATH, FVM_PARTITION_LABEL, GPT_DRIVER_PATH,
-                LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH,
-            },
-            environment::Filesystem,
-        },
-        anyhow::{anyhow, Error},
-        async_trait::async_trait,
-        fidl_fuchsia_device::ControllerProxy,
-        fidl_fuchsia_hardware_block::{BlockInfo, BlockProxy, Flag},
-        fidl_fuchsia_hardware_block_volume::VolumeProxy,
-        std::sync::Mutex,
+    use super::{Device, DiskFormat, Environment, Matchers};
+    use crate::config::default_config;
+    use crate::device::constants::{
+        BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL,
+        FUCHSIA_FVM_PARTITION_LABEL, FVM_DRIVER_PATH, FVM_PARTITION_LABEL, GPT_DRIVER_PATH,
+        LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH,
     };
+    use crate::environment::Filesystem;
+    use anyhow::{anyhow, Error};
+    use async_trait::async_trait;
+    use fidl_fuchsia_device::ControllerProxy;
+    use fidl_fuchsia_hardware_block::{BlockInfo, BlockProxy, Flag};
+    use fidl_fuchsia_hardware_block_volume::VolumeProxy;
+    use std::sync::Mutex;
 
     #[derive(Clone)]
     struct MockDevice {

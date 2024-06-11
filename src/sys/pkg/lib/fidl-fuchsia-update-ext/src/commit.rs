@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::anyhow,
-    fidl_fuchsia_update::CommitStatusProviderProxy,
-    fuchsia_zircon::{self as zx, AsHandleRef},
-};
+use anyhow::anyhow;
+use fidl_fuchsia_update::CommitStatusProviderProxy;
+use fuchsia_zircon::{self as zx, AsHandleRef};
 
 /// Whether the current system version is pending commit.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -31,14 +29,12 @@ pub async fn query_commit_status(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_update::{CommitStatusProviderMarker, CommitStatusProviderRequest},
-        fuchsia_async::{self as fasync},
-        fuchsia_zircon::{HandleBased, Peered},
-        futures::StreamExt,
-    };
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_update::{CommitStatusProviderMarker, CommitStatusProviderRequest};
+    use fuchsia_async::{self as fasync};
+    use fuchsia_zircon::{HandleBased, Peered};
+    use futures::StreamExt;
 
     // Verifies that query_commit_status returns the expected CommitStatus.
     #[fasync::run_singlethreaded(test)]

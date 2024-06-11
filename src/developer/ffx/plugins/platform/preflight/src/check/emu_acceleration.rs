@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::check::{PreflightCheck, PreflightCheckResult, PreflightCheckResult::*},
-    crate::command_runner::CommandRunner,
-    crate::config::*,
-    anyhow::{anyhow, Result},
-    async_trait::async_trait,
-    lazy_static::lazy_static,
-    regex::Regex,
-};
+use crate::check::PreflightCheckResult::*;
+use crate::check::{PreflightCheck, PreflightCheckResult};
+use crate::command_runner::CommandRunner;
+use crate::config::*;
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use lazy_static::lazy_static;
+use regex::Regex;
 
 lazy_static! {
     // Regex to check whether /proc/cpuinfo indicates either VT-x or AMD-V virtualization extensions.
@@ -89,7 +88,8 @@ impl PreflightCheck for EmuAcceleration<'_> {
 
 #[cfg(test)]
 mod test {
-    use {super::*, crate::command_runner::ExitStatus};
+    use super::*;
+    use crate::command_runner::ExitStatus;
 
     static CPUINFO_OUTPUT_GOOD_INTEL: &str = "processor	: 0
 vendor_id	: GenuineIntel

@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    chrono::{offset::TimeZone, Local},
-    fatfs::{DateTime, FatfsError},
-    fuchsia_zircon::Status,
-    std::io::{self, ErrorKind},
-};
+use chrono::offset::TimeZone;
+use chrono::Local;
+use fatfs::{DateTime, FatfsError};
+use fuchsia_zircon::Status;
+use std::io::{self, ErrorKind};
 
 /// Returns the equivalent of the given DOS time as ns past the unix epoch.
 pub fn dos_to_unix_time(dos_time: DateTime) -> u64 {
@@ -74,10 +73,8 @@ pub fn fatfs_error_to_status(error: io::Error) -> Status {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fatfs::{Date, Time},
-    };
+    use super::*;
+    use fatfs::{Date, Time};
 
     fn dos_datetime(
         year: u16,

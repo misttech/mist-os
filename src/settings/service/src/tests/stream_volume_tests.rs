@@ -3,17 +3,14 @@
 // found in the LICENSE file.
 
 use crate::audio::build_audio_default_settings;
-use crate::audio::types::AudioInfo;
-use crate::audio::types::AudioStreamType;
+use crate::audio::types::{AudioInfo, AudioStreamType};
 #[cfg(test)]
 use crate::audio::{create_default_audio_stream, StreamVolumeControl};
-use crate::clock;
-use crate::event;
 use crate::message::base::MessengerType;
-use crate::service;
 use crate::service_context::{ExternalServiceEvent, ServiceContext};
 use crate::tests::fakes::audio_core_service;
 use crate::tests::fakes::service_registry::ServiceRegistry;
+use crate::{clock, event, service};
 use futures::lock::Mutex;
 use futures::StreamExt;
 use std::sync::Arc;

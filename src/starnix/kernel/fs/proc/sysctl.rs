@@ -2,28 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    mm::PAGE_SIZE,
-    task::{
-        ptrace_get_scope, ptrace_set_scope, CurrentTask, NetstackDevicesDirectory, SeccompAction,
-    },
-    vfs::{
-        fs_args, inotify, inotify::InotifyLimits, BytesFile, BytesFileOps, FileSystemHandle,
-        FsNodeHandle, FsNodeInfo, FsNodeOps, FsString, SimpleFileNode, StaticDirectoryBuilder,
-    },
+use crate::mm::PAGE_SIZE;
+use crate::task::{
+    ptrace_get_scope, ptrace_set_scope, CurrentTask, NetstackDevicesDirectory, SeccompAction,
+};
+use crate::vfs::inotify::InotifyLimits;
+use crate::vfs::{
+    fs_args, inotify, BytesFile, BytesFileOps, FileSystemHandle, FsNodeHandle, FsNodeInfo,
+    FsNodeOps, FsString, SimpleFileNode, StaticDirectoryBuilder,
 };
 use starnix_logging::bug_ref;
 use starnix_sync::Mutex;
-use starnix_uapi::{
-    auth::{Capabilities, FsCred, CAP_NET_ADMIN, CAP_SYS_ADMIN, CAP_SYS_RESOURCE},
-    errno, error,
-    errors::Errno,
-    file_mode::mode,
-};
-use std::{
-    borrow::Cow,
-    sync::atomic::{AtomicI32, AtomicUsize, Ordering},
-};
+use starnix_uapi::auth::{Capabilities, FsCred, CAP_NET_ADMIN, CAP_SYS_ADMIN, CAP_SYS_RESOURCE};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::mode;
+use starnix_uapi::{errno, error};
+use std::borrow::Cow;
+use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 
 pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
     let mode = mode!(IFREG, 0o644);

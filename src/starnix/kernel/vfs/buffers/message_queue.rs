@@ -5,11 +5,11 @@
 use std::collections::VecDeque;
 
 use super::message_types::{AncillaryData, Message, MessageData};
-use crate::vfs::{
-    buffers::{InputBuffer, OutputBuffer},
-    socket::SocketAddress,
-};
-use starnix_uapi::{error, errors::Errno, vfs::FdEvents};
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::socket::SocketAddress;
+use starnix_uapi::error;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::vfs::FdEvents;
 
 #[derive(Debug, Default, Clone)]
 pub struct MessageReadInfo {

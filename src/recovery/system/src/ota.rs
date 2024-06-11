@@ -1,26 +1,23 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::{
-        config::{RecoveryUpdateConfig, UpdateType},
-        setup::DevhostConfig,
-    },
-    anyhow::{bail, format_err, Context, Error},
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_buildinfo::ProviderMarker as BuildInfoMarker,
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_component::client,
-    futures::prelude::*,
-    hyper::Uri,
-    isolated_ota::{download_and_apply_update, OmahaConfig},
-    serde_json::{json, Value},
-    std::sync::Arc,
-    std::{fs::File, str::FromStr},
-    vfs::directory::{
-        entry_container::Directory, helper::DirectlyMutable, immutable::simple::Simple,
-    },
-};
+use crate::config::{RecoveryUpdateConfig, UpdateType};
+use crate::setup::DevhostConfig;
+use anyhow::{bail, format_err, Context, Error};
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_buildinfo::ProviderMarker as BuildInfoMarker;
+use fuchsia_component::client;
+use futures::prelude::*;
+use hyper::Uri;
+use isolated_ota::{download_and_apply_update, OmahaConfig};
+use serde_json::{json, Value};
+use std::fs::File;
+use std::str::FromStr;
+use std::sync::Arc;
+use vfs::directory::entry_container::Directory;
+use vfs::directory::helper::DirectlyMutable;
+use vfs::directory::immutable::simple::Simple;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 const PATH_TO_CONFIGS_DIR: &'static str = "/config/data/ota-configs";
 
@@ -336,22 +333,17 @@ pub async fn run_wellknown_ota(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        blobfs_ramdisk::BlobfsRamdisk,
-        fidl_fuchsia_pkg_ext::RepositoryKey,
-        fuchsia_async as fasync,
-        fuchsia_pkg_testing::{
-            make_epoch_json, serve::HttpResponder, Package, PackageBuilder, RepositoryBuilder,
-        },
-        fuchsia_runtime::{take_startup_handle, HandleType},
-        futures::future::{ready, BoxFuture},
-        hyper::{header, Body, Request, Response, StatusCode},
-        std::{
-            collections::{BTreeSet, HashMap},
-            sync::Mutex,
-        },
-    };
+    use super::*;
+    use blobfs_ramdisk::BlobfsRamdisk;
+    use fidl_fuchsia_pkg_ext::RepositoryKey;
+    use fuchsia_async as fasync;
+    use fuchsia_pkg_testing::serve::HttpResponder;
+    use fuchsia_pkg_testing::{make_epoch_json, Package, PackageBuilder, RepositoryBuilder};
+    use fuchsia_runtime::{take_startup_handle, HandleType};
+    use futures::future::{ready, BoxFuture};
+    use hyper::{header, Body, Request, Response, StatusCode};
+    use std::collections::{BTreeSet, HashMap};
+    use std::sync::Mutex;
 
     /// Wrapper around a ramdisk blobfs.
     struct FakeStorage {

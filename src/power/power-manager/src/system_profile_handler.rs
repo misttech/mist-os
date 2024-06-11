@@ -2,24 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        error::PowerManagerError,
-        message::{Message, MessageReturn},
-        node::Node,
-    },
-    anyhow::Result,
-    async_trait::async_trait,
-    async_utils::hanging_get::server as hanging_get,
-    fidl_fuchsia_power_profile::{self as fprofile, Profile},
-    fuchsia_async as fasync,
-    fuchsia_component::server::{ServiceFs, ServiceObjLocal},
-    fuchsia_inspect::{self as inspect, Property},
-    futures::prelude::*,
-    serde_json as json,
-    std::{cell::RefCell, collections::HashMap, rc::Rc},
-    tracing::*,
-};
+use crate::error::PowerManagerError;
+use crate::message::{Message, MessageReturn};
+use crate::node::Node;
+use anyhow::Result;
+use async_trait::async_trait;
+use async_utils::hanging_get::server as hanging_get;
+use fidl_fuchsia_power_profile::{self as fprofile, Profile};
+use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
+use fuchsia_inspect::{self as inspect, Property};
+use futures::prelude::*;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
+use tracing::*;
+use {fuchsia_async as fasync, serde_json as json};
 
 /// Node: SystemProfileHandler
 ///
@@ -350,7 +347,9 @@ impl InspectData {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, diagnostics_assertions::assert_data_tree};
+    use super::*;
+    use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
 
     /// Tests for the presence and correctness of dynamically-added inspect data
     #[test]

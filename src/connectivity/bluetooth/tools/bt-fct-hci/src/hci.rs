@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context as _, Error},
-    fuchsia_async as fasync,
-    fuchsia_zircon::{Channel, MessageBuf},
-    futures::executor::block_on,
-    futures::Stream,
-    std::{
-        convert::TryFrom as _,
-        fmt,
-        pin::Pin,
-        task::{Context, Poll},
-    },
-};
+use anyhow::{format_err, Context as _, Error};
+use fuchsia_async as fasync;
+use fuchsia_zircon::{Channel, MessageBuf};
+use futures::executor::block_on;
+use futures::Stream;
+use std::convert::TryFrom as _;
+use std::fmt;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 use crate::types::{
     decode_opcode, parse_inquiry_result, EventPacketType, InquiryResult, StatusCode,
@@ -196,7 +192,9 @@ pub fn open_default_device() -> Result<CommandChannel, Error> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fuchsia_async as fasync, futures::StreamExt};
+    use super::*;
+    use fuchsia_async as fasync;
+    use futures::StreamExt;
 
     #[test]
     fn test_from_channel() {

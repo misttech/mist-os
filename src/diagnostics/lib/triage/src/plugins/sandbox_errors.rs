@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{helpers::analyze_logs, Plugin},
-    crate::{act::Action, metrics::fetch::FileDataFetcher},
-    regex::Regex,
-    std::collections::BTreeSet,
-};
+use super::helpers::analyze_logs;
+use super::Plugin;
+use crate::act::Action;
+use crate::metrics::fetch::FileDataFetcher;
+use regex::Regex;
+use std::collections::BTreeSet;
 
 pub struct SandboxErrorsPlugin();
 

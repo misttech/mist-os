@@ -2,11 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::*, anyhow::Error, async_trait::async_trait, fidl_fuchsia_io::MAX_BUF,
-    futures::future::try_join_all, std::slice, virtio_device::fake_queue::IdentityDriverMem,
-    virtio_device::mem::DeviceRange,
-};
+use super::*;
+use anyhow::Error;
+use async_trait::async_trait;
+use fidl_fuchsia_io::MAX_BUF;
+use futures::future::try_join_all;
+use std::slice;
+use virtio_device::fake_queue::IdentityDriverMem;
+use virtio_device::mem::DeviceRange;
 
 /// A `BackendController` allows tests to interface directly with the underlying storage of a
 /// `BlockBackend` to read or write bytes directly, bypassing the `BlockBackend`.

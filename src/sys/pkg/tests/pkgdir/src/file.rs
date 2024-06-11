@@ -6,18 +6,16 @@
 //! simplicity and speed, we don't test e.g. dir/file or meta/dir/file because there aren't any
 //! meaningful differences in File behavior.
 
-use {
-    crate::{dirs_to_test, repeat_by_n, PackageSource},
-    anyhow::{anyhow, Context as _, Error},
-    assert_matches::assert_matches,
-    fidl::endpoints::create_proxy,
-    fidl::AsHandleRef,
-    fidl_fuchsia_io as fio,
-    fuchsia_fs::directory::open_file,
-    fuchsia_zircon as zx,
-    futures::StreamExt,
-    std::{cmp, convert::TryFrom as _},
-};
+use crate::{dirs_to_test, repeat_by_n, PackageSource};
+use anyhow::{anyhow, Context as _, Error};
+use assert_matches::assert_matches;
+use fidl::endpoints::create_proxy;
+use fidl::AsHandleRef;
+use fuchsia_fs::directory::open_file;
+use futures::StreamExt;
+use std::cmp;
+use std::convert::TryFrom as _;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 const TEST_PKG_HASH: &str = "44e7704720706ffd287bf0d27133cec7d609581547095ab6c6fee94f83a5bcbc";
 

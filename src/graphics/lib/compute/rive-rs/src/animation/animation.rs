@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    animation::LinearAnimation,
-    core::{Core, CoreContext, ObjectRef, OnAdded, Property},
-    status_code::StatusCode,
-};
+use crate::animation::LinearAnimation;
+use crate::core::{Core, CoreContext, ObjectRef, OnAdded, Property};
+use crate::status_code::StatusCode;
 
 #[derive(Debug, Default)]
 pub struct Animation {

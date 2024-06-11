@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_test_detect_factory as ftest;
-use fuchsia_zircon as zx;
 use std::collections::HashMap;
+use {fidl_test_detect_factory as ftest, fuchsia_zircon as zx};
 
 /// An adaptor for the generated FIDL RealmOptions struct.
 #[derive(Default)]

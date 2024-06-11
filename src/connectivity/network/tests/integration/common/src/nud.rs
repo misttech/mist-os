@@ -5,10 +5,12 @@
 //! Useful NUD functions for tests.
 
 use anyhow::Context;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use futures::StreamExt as _;
 use net_types::SpecifiedAddress as _;
+use {
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
+};
 
 /// Frame metadata of interest to neighbor tests.
 #[derive(Debug, Eq, PartialEq)]
@@ -28,14 +30,13 @@ pub enum FrameMetadata {
 /// interesting metadata of interest to neighbor tests.
 fn extract_frame_metadata(data: Vec<u8>) -> crate::Result<FrameMetadata> {
     use packet::ParsablePacket;
-    use packet_formats::{
-        arp::{ArpOp, ArpPacket},
-        ethernet::{EtherType, EthernetFrame, EthernetFrameLengthCheck},
-        icmp::{ndp::NdpPacket, IcmpParseArgs, Icmpv6Packet},
-        ip::{IpPacket, IpProto, Ipv6Proto},
-        ipv4::Ipv4Packet,
-        ipv6::Ipv6Packet,
-    };
+    use packet_formats::arp::{ArpOp, ArpPacket};
+    use packet_formats::ethernet::{EtherType, EthernetFrame, EthernetFrameLengthCheck};
+    use packet_formats::icmp::ndp::NdpPacket;
+    use packet_formats::icmp::{IcmpParseArgs, Icmpv6Packet};
+    use packet_formats::ip::{IpPacket, IpProto, Ipv6Proto};
+    use packet_formats::ipv4::Ipv4Packet;
+    use packet_formats::ipv6::Ipv6Packet;
 
     let mut bv = &data[..];
     let ethernet = EthernetFrame::parse(&mut bv, EthernetFrameLengthCheck::NoCheck)

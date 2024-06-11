@@ -2,13 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::{hash_map::Entry, HashMap, HashSet};
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
 
-use {
-    fidl_fuchsia_test_manager as ftest_manager, ftest_manager::RunOptions, fuchsia_async as fasync,
-    futures::StreamExt, pretty_assertions::assert_eq, regex::Regex,
-    test_manager_test_lib::RunEvent,
-};
+use ftest_manager::RunOptions;
+use futures::StreamExt;
+use pretty_assertions::assert_eq;
+use regex::Regex;
+use test_manager_test_lib::RunEvent;
+use {fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync};
 
 pub async fn run_test(
     test_url: String,

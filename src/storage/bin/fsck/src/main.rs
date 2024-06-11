@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    argh::FromArgs,
-    component_debug::dirs::{connect_to_instance_protocol_at_dir_root, OpenDirType},
-    fidl::endpoints::create_endpoints,
-    fidl_fuchsia_device::ControllerMarker,
-    fidl_fuchsia_fs_realm as fs_realm,
-    fidl_fuchsia_sys2::RealmQueryMarker,
-    fuchsia_component::client::{connect_channel_to_protocol_at_path, connect_to_protocol_at_path},
-    fuchsia_zircon as zx,
-};
+use anyhow::{Context, Error};
+use argh::FromArgs;
+use component_debug::dirs::{connect_to_instance_protocol_at_dir_root, OpenDirType};
+use fidl::endpoints::create_endpoints;
+use fidl_fuchsia_device::ControllerMarker;
+use fidl_fuchsia_sys2::RealmQueryMarker;
+use fuchsia_component::client::{connect_channel_to_protocol_at_path, connect_to_protocol_at_path};
+use {fidl_fuchsia_fs_realm as fs_realm, fuchsia_zircon as zx};
 
 #[derive(FromArgs)]
 #[argh(description = "A utility for checking the consistency of a filesystem instance running on a

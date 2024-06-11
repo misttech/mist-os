@@ -2,22 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::agent::Payload;
-use crate::agent::{AgentError, Context as AgentContext, Invocation, InvocationResult, Lifespan};
+use crate::agent::{
+    AgentError, Context as AgentContext, Invocation, InvocationResult, Lifespan, Payload,
+};
 use crate::base::SettingType;
 use crate::event::{media_buttons, Event, Publisher};
 use crate::handler::base::{Payload as HandlerPayload, Request};
 use crate::input::{monitor_media_buttons, MediaButtons};
 use crate::message::base::Audience;
-use crate::service;
 use crate::service_context::ServiceContext;
-use crate::trace_guard;
+use crate::{service, trace_guard};
 use fidl_fuchsia_ui_input::MediaButtonsEvent;
-use fuchsia_async as fasync;
-use fuchsia_trace as ftrace;
 use futures::StreamExt;
 use std::collections::HashSet;
 use std::sync::Arc;
+use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
 /// Setting types that the media buttons agent will send media button events to, if they're
 /// available on the device.

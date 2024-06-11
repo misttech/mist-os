@@ -24,17 +24,14 @@
 
 use std::path::PathBuf;
 
+use anyhow::{format_err, Context};
+use lazy_static::lazy_static;
+use std::borrow::Cow;
+use std::sync::{Arc, Mutex, Weak};
+use std::{env, fs, io};
+use thiserror::Error;
 use {
-    anyhow::{format_err, Context},
-    fuchsia_zircon as zx,
-    lazy_static::lazy_static,
-    rust_icu_common as icu, rust_icu_ucal as ucal, rust_icu_udata as udata,
-    std::{
-        borrow::Cow,
-        env, fs, io,
-        sync::{Arc, Mutex, Weak},
-    },
-    thiserror::Error,
+    fuchsia_zircon as zx, rust_icu_common as icu, rust_icu_ucal as ucal, rust_icu_udata as udata,
 };
 
 lazy_static! {
@@ -221,7 +218,9 @@ impl Loader {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, rust_icu_uenum as uenum};
+    use super::*;
+    use assert_matches::assert_matches;
+    use rust_icu_uenum as uenum;
 
     // [START loader_example]
     #[test]

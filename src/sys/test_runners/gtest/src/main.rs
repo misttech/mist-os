@@ -4,17 +4,16 @@
 
 mod test_server;
 
-use {
-    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    futures::prelude::*,
-    rand::Rng,
-    std::{fs, path::Path},
-    test_runners_lib::elf,
-    test_server::TestServer,
-    thiserror::Error,
-    tracing::{info, warn},
-};
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
+use rand::Rng;
+use std::fs;
+use std::path::Path;
+use test_runners_lib::elf;
+use test_server::TestServer;
+use thiserror::Error;
+use tracing::{info, warn};
+use {fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[cfg(feature = "gtest")]
 #[fuchsia::main(logging_tags=["gtest_runner"])]

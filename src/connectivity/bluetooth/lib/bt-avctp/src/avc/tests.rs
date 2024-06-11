@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx, Status},
-    futures::executor::block_on,
-    std::result,
-    std::task::Poll,
-};
+use fuchsia_async as fasync;
+use fuchsia_zircon::{self as zx, Status};
+use futures::executor::block_on;
+use std::result;
+use std::task::Poll;
 
 use super::*;
 use crate::avctp::MessageType as AvctpMessageType;

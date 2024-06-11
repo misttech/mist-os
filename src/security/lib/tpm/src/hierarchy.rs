@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use hex;
 use std::fmt;
-use tpm2_tss_sys as tss_sys;
+use {hex, tpm2_tss_sys as tss_sys};
 
 /// Taken from TCG TPM v2.0 Provisioning Guidance. This gives 256 bits of
 /// random data per auth value.

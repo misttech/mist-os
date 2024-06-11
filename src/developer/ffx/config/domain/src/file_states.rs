@@ -5,11 +5,9 @@
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
-use std::{
-    collections::{HashMap, HashSet},
-    io::ErrorKind,
-    ops::Deref,
-};
+use std::collections::{HashMap, HashSet};
+use std::io::ErrorKind;
+use std::ops::Deref;
 
 #[derive(thiserror::Error, Debug)]
 #[non_exhaustive]

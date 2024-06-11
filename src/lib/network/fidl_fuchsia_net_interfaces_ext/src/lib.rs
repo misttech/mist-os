@@ -13,17 +13,14 @@ mod reachability;
 
 pub use reachability::{is_globally_routable, to_reachability_stream, wait_for_reachability};
 
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_table_validation::*;
-use fuchsia_zircon_types as zx;
 use futures::{Stream, TryStreamExt as _};
-use std::collections::{
-    btree_map::{self, BTreeMap},
-    hash_map::{self, HashMap},
-};
+use std::collections::btree_map::{self, BTreeMap};
+use std::collections::hash_map::{self, HashMap};
 use std::convert::TryFrom as _;
 use std::num::NonZeroU64;
 use thiserror::Error;
+use {fidl_fuchsia_net_interfaces as fnet_interfaces, fuchsia_zircon_types as zx};
 
 // TODO(https://fxbug.dev/42144953): Prevent this type from becoming stale.
 /// Properties of a network interface.
@@ -641,9 +638,13 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fidl_fuchsia_net as fnet;
-    use futures::{task::Poll, FutureExt as _};
+    use futures::task::Poll;
+    use futures::FutureExt as _;
     use net_declare::fidl_subnet;
-    use std::{cell::RefCell, convert::TryInto as _, pin::Pin, rc::Rc};
+    use std::cell::RefCell;
+    use std::convert::TryInto as _;
+    use std::pin::Pin;
+    use std::rc::Rc;
     use test_case::test_case;
 
     fn fidl_properties(id: u64) -> fnet_interfaces::Properties {

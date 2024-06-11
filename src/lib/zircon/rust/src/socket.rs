@@ -6,11 +6,10 @@
 
 #![allow(clippy::bad_bit_mask)] // TODO(https://fxbug.dev/42080521): stop using bitflags for SocketOpts
 
-use crate::{object_get_info, object_get_property, object_set_property};
-use crate::{ok, Status};
-use crate::{AsHandleRef, Handle, HandleBased, HandleRef, Peered};
-use crate::{ObjectQuery, Topic};
-use crate::{Property, PropertyQuery};
+use crate::{
+    object_get_info, object_get_property, object_set_property, ok, AsHandleRef, Handle,
+    HandleBased, HandleRef, ObjectQuery, Peered, Property, PropertyQuery, Status, Topic,
+};
 use bitflags::bitflags;
 use fuchsia_zircon_sys as sys;
 

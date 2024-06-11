@@ -8,17 +8,16 @@ use crate::zxio::{
 };
 use bitflags::bitflags;
 use bstr::BString;
-use fidl::{encoding::const_assert_eq, endpoints::ServerEnd};
+use fidl::encoding::const_assert_eq;
+use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _};
-use std::{
-    ffi::CStr,
-    marker::PhantomData,
-    mem::{size_of, size_of_val},
-    num::TryFromIntError,
-    os::raw::{c_char, c_int, c_uint, c_void},
-    pin::Pin,
-};
+use std::ffi::CStr;
+use std::marker::PhantomData;
+use std::mem::{size_of, size_of_val};
+use std::num::TryFromIntError;
+use std::os::raw::{c_char, c_int, c_uint, c_void};
+use std::pin::Pin;
 use zerocopy::{AsBytes, FromBytes};
 use zxio::{
     msghdr, sockaddr, sockaddr_storage, socklen_t, zx_handle_t, zx_status_t, zxio_object_type_t,
@@ -1607,9 +1606,8 @@ mod test {
 
     use anyhow::Error;
     use fidl::endpoints::Proxy as _;
-    use fidl_fuchsia_io as fio;
-    use fuchsia_async as fasync;
     use fuchsia_fs::directory;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     fn open_pkg() -> fio::DirectorySynchronousProxy {
         let pkg_proxy = directory::open_in_namespace(

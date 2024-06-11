@@ -4,66 +4,58 @@
 
 //! The integrations for protocols built on top of an IP device.
 
-use core::{
-    borrow::Borrow,
-    convert::Infallible as Never,
-    marker::PhantomData,
-    num::NonZeroU8,
-    ops::{Deref as _, DerefMut as _},
-    sync::atomic::AtomicU16,
-};
+use core::borrow::Borrow;
+use core::convert::Infallible as Never;
+use core::marker::PhantomData;
+use core::num::NonZeroU8;
+use core::ops::{Deref as _, DerefMut as _};
+use core::sync::atomic::AtomicU16;
 
-use lock_order::{
-    lock::{LockLevelFor, UnlockedAccess, UnlockedAccessMarkerFor},
-    relation::LockBefore,
+use lock_order::lock::{LockLevelFor, UnlockedAccess, UnlockedAccessMarkerFor};
+use lock_order::relation::LockBefore;
+use net_types::ip::{
+    AddrSubnet, Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu,
 };
-use net_types::{
-    ip::{AddrSubnet, Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu},
-    LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
-};
+use net_types::{LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _};
+use netstack3_base::sync::WeakRc;
 use netstack3_base::{
-    sync::WeakRc, AnyDevice, CoreEventContext, CoreTimerContext, CounterContext, DeviceIdContext,
-    ExistsError, NotFoundError, RemoveResourceResultWithContext,
+    AnyDevice, CoreEventContext, CoreTimerContext, CounterContext, DeviceIdContext, ExistsError,
+    NotFoundError, RemoveResourceResultWithContext,
 };
 use netstack3_device::{DeviceId, WeakDeviceId};
 use netstack3_filter::FilterImpl;
+use netstack3_ip::device::{
+    self, add_ip_addr_subnet_with_config, del_ip_addr_inner, get_ipv6_hop_limit,
+    is_ip_device_enabled, is_ip_forwarding_enabled, join_ip_multicast_with_config,
+    leave_ip_multicast_with_config, AddressRemovedReason, DadAddressContext, DadAddressStateRef,
+    DadContext, DadEvent, DadStateRef, DadTimerId, DefaultHopLimit, DelIpAddr,
+    DualStackIpDeviceState, IpAddressId, IpAddressIdSpec, IpAddressIdSpecContext, IpAddressState,
+    IpDeviceAddr, IpDeviceAddresses, IpDeviceConfiguration, IpDeviceEvent, IpDeviceFlags,
+    IpDeviceIpExt, IpDeviceMulticastGroups, IpDeviceStateBindingsTypes, IpDeviceStateContext,
+    IpDeviceStateIpExt, IpDeviceTimerId, Ipv4AddressEntry, Ipv4AddressState,
+    Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressEntry, Ipv6AddressFlags, Ipv6AddressState,
+    Ipv6DadState, Ipv6DeviceAddr, Ipv6DeviceConfiguration, Ipv6DeviceTimerId, Ipv6DiscoveredRoute,
+    Ipv6DiscoveredRoutesContext, Ipv6NetworkLearnedParameters, Ipv6RouteDiscoveryContext,
+    Ipv6RouteDiscoveryState, RsContext, RsState, SlaacAddressEntry, SlaacAddressEntryMut,
+    SlaacAddresses, SlaacAddrsMutAndConfig, SlaacConfig, SlaacContext, SlaacCounters, SlaacState,
+};
+use netstack3_ip::gmp::{
+    GmpQueryHandler, GmpStateRef, IgmpContext, IgmpGroupState, IgmpState, IgmpStateContext,
+    MldContext, MldGroupState, MldStateContext, MulticastGroupSet,
+};
+use netstack3_ip::nud::{self, ConfirmationFlags, NudCounters, NudIpHandler};
+use netstack3_ip::socket::SasCandidate;
 use netstack3_ip::{
-    self as ip,
-    device::{
-        self, add_ip_addr_subnet_with_config, del_ip_addr_inner, get_ipv6_hop_limit,
-        is_ip_device_enabled, is_ip_forwarding_enabled, join_ip_multicast_with_config,
-        leave_ip_multicast_with_config, AddressRemovedReason, DadAddressContext,
-        DadAddressStateRef, DadContext, DadEvent, DadStateRef, DadTimerId, DefaultHopLimit,
-        DelIpAddr, DualStackIpDeviceState, IpAddressId, IpAddressIdSpec, IpAddressIdSpecContext,
-        IpAddressState, IpDeviceAddr, IpDeviceAddresses, IpDeviceConfiguration, IpDeviceEvent,
-        IpDeviceFlags, IpDeviceIpExt, IpDeviceMulticastGroups, IpDeviceStateBindingsTypes,
-        IpDeviceStateContext, IpDeviceStateIpExt, IpDeviceTimerId, Ipv4AddressEntry,
-        Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressEntry,
-        Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState, Ipv6DeviceAddr, Ipv6DeviceConfiguration,
-        Ipv6DeviceTimerId, Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext,
-        Ipv6NetworkLearnedParameters, Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState,
-        RsContext, RsState, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses,
-        SlaacAddrsMutAndConfig, SlaacConfig, SlaacContext, SlaacCounters, SlaacState,
-    },
-    gmp::{
-        GmpQueryHandler, GmpStateRef, IgmpContext, IgmpGroupState, IgmpState, IgmpStateContext,
-        MldContext, MldGroupState, MldStateContext, MulticastGroupSet,
-    },
-    nud::{self, ConfirmationFlags, NudCounters, NudIpHandler},
-    socket::SasCandidate,
-    AddableMetric, AddressStatus, FilterHandlerProvider, IpLayerIpExt, IpStateContext,
+    self as ip, AddableMetric, AddressStatus, FilterHandlerProvider, IpLayerIpExt, IpStateContext,
     Ipv4PresentAddressStatus, RawMetric, DEFAULT_TTL,
 };
 use packet::{EmptyBuf, Serializer};
-use packet_formats::icmp::{
-    ndp::{NeighborSolicitation, RouterSolicitation},
-    IcmpUnusedCode,
-};
+use packet_formats::icmp::ndp::{NeighborSolicitation, RouterSolicitation};
+use packet_formats::icmp::IcmpUnusedCode;
 
-use crate::{
-    context::{prelude::*, WrapLockLevel},
-    BindingsContext, BindingsTypes, CoreCtx, StackState,
-};
+use crate::context::prelude::*;
+use crate::context::WrapLockLevel;
+use crate::{BindingsContext, BindingsTypes, CoreCtx, StackState};
 
 pub struct SlaacAddrs<'a, BC: BindingsContext> {
     pub(crate) core_ctx: CoreCtxWithIpDeviceConfiguration<

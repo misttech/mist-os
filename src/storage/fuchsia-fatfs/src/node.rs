@@ -2,18 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        directory::FatDirectory,
-        file::FatFile,
-        filesystem::{FatFilesystem, FatFilesystemInner},
-    },
-    fuchsia_zircon::Status,
-    std::{
-        ops::Deref,
-        sync::{Arc, Weak},
-    },
-};
+use crate::directory::FatDirectory;
+use crate::file::FatFile;
+use crate::filesystem::{FatFilesystem, FatFilesystemInner};
+use fuchsia_zircon::Status;
+use std::ops::Deref;
+use std::sync::{Arc, Weak};
 
 pub trait Node {
     /// Attach this FatNode to the given FatDirectory, with the given name.

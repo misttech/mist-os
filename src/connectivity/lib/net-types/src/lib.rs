@@ -74,10 +74,8 @@
 pub mod ethernet;
 pub mod ip;
 
-use core::{
-    fmt::{self, Debug, Display, Formatter},
-    ops::Deref,
-};
+use core::fmt::{self, Debug, Display, Formatter};
+use core::ops::Deref;
 
 use crate::ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersionMarker};
 

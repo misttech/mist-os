@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    diagnostics_assertions::{tree_assertion, AnyProperty},
-    diagnostics_reader::{ArchiveReader, Inspect},
-    fidl::endpoints::DiscoverableProtocolMarker,
-    fidl_fuchsia_power_topology_test as fpt,
-    fuchsia_component_test::{
-        Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route, DEFAULT_COLLECTION_NAME,
-    },
-    tracing::*,
+use anyhow::Result;
+use diagnostics_assertions::{tree_assertion, AnyProperty};
+use diagnostics_reader::{ArchiveReader, Inspect};
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl_fuchsia_power_topology_test as fpt;
+use fuchsia_component_test::{
+    Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route, DEFAULT_COLLECTION_NAME,
 };
+use tracing::*;
 
 const MACRO_LOOP_EXIT: bool = false; // useful in development; prevent hangs from inspect mismatch
 

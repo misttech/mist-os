@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{helpers::analyze_logs, Plugin},
-    crate::{act::Action, metrics::fetch::FileDataFetcher},
-    regex::Regex,
-};
+use super::helpers::analyze_logs;
+use super::Plugin;
+use crate::act::Action;
+use crate::metrics::fetch::FileDataFetcher;
+use regex::Regex;
 
 pub struct RoutingErrorsPlugin {}
 
@@ -61,13 +61,9 @@ impl Plugin for RoutingErrorsPlugin {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::RoutingErrorsPlugin,
-        crate::{
-            metrics::fetch::{FileDataFetcher, TextFetcher},
-            plugins::Plugin,
-        },
-    };
+    use super::RoutingErrorsPlugin;
+    use crate::metrics::fetch::{FileDataFetcher, TextFetcher};
+    use crate::plugins::Plugin;
 
     #[fuchsia::test]
     fn test_routing_errors() {

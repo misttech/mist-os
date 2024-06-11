@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{cli::format::format_create_error, lifecycle::create_instance_in_collection},
-    anyhow::{format_err, Result},
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys,
-    fuchsia_url::AbsoluteComponentUrl,
-    moniker::Moniker,
-};
+use crate::cli::format::format_create_error;
+use crate::lifecycle::create_instance_in_collection;
+use anyhow::{format_err, Result};
+use fuchsia_url::AbsoluteComponentUrl;
+use moniker::Moniker;
+use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
 
 pub async fn create_cmd<W: std::io::Write>(
     url: AbsoluteComponentUrl,
@@ -50,7 +49,9 @@ pub async fn create_cmd<W: std::io::Write>(
 
 #[cfg(test)]
 mod test {
-    use {super::*, fidl::endpoints::create_proxy_and_stream, futures::TryStreamExt};
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use futures::TryStreamExt;
 
     fn setup_fake_lifecycle_controller(
         expected_moniker: &'static str,

@@ -2,33 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        datatypes::{HttpsSample, Phase},
-        diagnostics::{Diagnostics, Event},
-    },
-    anyhow::{format_err, Context as _, Error},
-    cobalt_client::traits::AsEventCodes,
-    fidl_contrib::{
-        protocol_connector::ConnectedProtocol, protocol_connector::ProtocolSender,
-        ProtocolConnector,
-    },
-    fidl_fuchsia_metrics::{
-        HistogramBucket, MetricEvent, MetricEventLoggerFactoryMarker, MetricEventLoggerProxy,
-        ProjectSpec,
-    },
-    fuchsia_cobalt_builders::MetricEventExt,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_sync::Mutex,
-    fuchsia_zircon as zx,
-    futures::{future, Future, FutureExt as _},
-    time_metrics_registry::{
-        HttpsdateBoundSizeMigratedMetricDimensionPhase as CobaltPhase,
-        HTTPSDATE_BOUND_SIZE_MIGRATED_METRIC_ID, HTTPSDATE_POLL_LATENCY_MIGRATED_INT_BUCKETS_FLOOR,
-        HTTPSDATE_POLL_LATENCY_MIGRATED_INT_BUCKETS_NUM_BUCKETS as RTT_BUCKETS,
-        HTTPSDATE_POLL_LATENCY_MIGRATED_INT_BUCKETS_STEP_SIZE,
-        HTTPSDATE_POLL_LATENCY_MIGRATED_METRIC_ID, PROJECT_ID,
-    },
+use crate::datatypes::{HttpsSample, Phase};
+use crate::diagnostics::{Diagnostics, Event};
+use anyhow::{format_err, Context as _, Error};
+use cobalt_client::traits::AsEventCodes;
+use fidl_contrib::protocol_connector::{ConnectedProtocol, ProtocolSender};
+use fidl_contrib::ProtocolConnector;
+use fidl_fuchsia_metrics::{
+    HistogramBucket, MetricEvent, MetricEventLoggerFactoryMarker, MetricEventLoggerProxy,
+    ProjectSpec,
+};
+use fuchsia_cobalt_builders::MetricEventExt;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_sync::Mutex;
+use fuchsia_zircon as zx;
+use futures::{future, Future, FutureExt as _};
+use time_metrics_registry::{
+    HttpsdateBoundSizeMigratedMetricDimensionPhase as CobaltPhase,
+    HTTPSDATE_BOUND_SIZE_MIGRATED_METRIC_ID, HTTPSDATE_POLL_LATENCY_MIGRATED_INT_BUCKETS_FLOOR,
+    HTTPSDATE_POLL_LATENCY_MIGRATED_INT_BUCKETS_NUM_BUCKETS as RTT_BUCKETS,
+    HTTPSDATE_POLL_LATENCY_MIGRATED_INT_BUCKETS_STEP_SIZE,
+    HTTPSDATE_POLL_LATENCY_MIGRATED_METRIC_ID, PROJECT_ID,
 };
 
 const RTT_BUCKET_SIZE: zx::Duration =
@@ -162,14 +156,13 @@ impl Diagnostics for CobaltDiagnostics {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::datatypes::Poll,
-        fidl_fuchsia_metrics::MetricEventPayload,
-        futures::{channel::mpsc, stream::StreamExt},
-        lazy_static::lazy_static,
-        std::collections::HashSet,
-    };
+    use super::*;
+    use crate::datatypes::Poll;
+    use fidl_fuchsia_metrics::MetricEventPayload;
+    use futures::channel::mpsc;
+    use futures::stream::StreamExt;
+    use lazy_static::lazy_static;
+    use std::collections::HashSet;
 
     const TEST_INITIAL_PHASE: Phase = Phase::Initial;
     const TEST_BOUND_SIZE: zx::Duration = zx::Duration::from_millis(101);

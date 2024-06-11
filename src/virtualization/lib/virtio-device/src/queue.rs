@@ -13,15 +13,11 @@
 //! then required to have a mechanism to potentially signal the guest driver, via the
 //! [`DriverNotify`] trait.
 
-use {
-    crate::{
-        mem::{DeviceRange, DriverRange},
-        ring,
-    },
-    fuchsia_sync::Mutex,
-    std::sync::atomic,
-    thiserror::Error,
-};
+use crate::mem::{DeviceRange, DriverRange};
+use crate::ring;
+use fuchsia_sync::Mutex;
+use std::sync::atomic;
+use thiserror::Error;
 
 /// Informs device that driver needs a notification.
 ///
@@ -338,14 +334,10 @@ impl<'a, 'b, N: DriverNotify> Drop for DescChain<'a, 'b, N> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            fake_queue::{Chain, ChainBuilder, IdentityDriverMem, TestQueue},
-            ring::DescAccess,
-            util::NotificationCounter,
-        },
-    };
+    use super::*;
+    use crate::fake_queue::{Chain, ChainBuilder, IdentityDriverMem, TestQueue};
+    use crate::ring::DescAccess;
+    use crate::util::NotificationCounter;
 
     #[test]
     fn test_create() {

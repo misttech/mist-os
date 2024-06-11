@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{util::*, *},
-    fidl_ir_lib::fidl::*,
-};
+use super::util::*;
+use super::*;
+use fidl_ir_lib::fidl::*;
 
 pub struct CppInternalBackend<'a, W: io::Write> {
     w: &'a mut W,

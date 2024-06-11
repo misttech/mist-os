@@ -2,22 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    cell::Cell,
-    mem,
-    ops::{ControlFlow, RangeInclusive},
-};
+use std::cell::Cell;
+use std::mem;
+use std::ops::{ControlFlow, RangeInclusive};
 
 use rustc_hash::FxHashMap;
 
-use crate::{
-    painter::{
-        layer_workbench::passes::PassesSharedState, CachedTile, Channel, Color, Cover, CoverCarry,
-        FillRule, Func, LayerProps, Props, Style,
-    },
-    rasterizer::{self, PixelSegment},
-    TILE_HEIGHT, TILE_WIDTH,
+use crate::painter::layer_workbench::passes::PassesSharedState;
+use crate::painter::{
+    CachedTile, Channel, Color, Cover, CoverCarry, FillRule, Func, LayerProps, Props, Style,
 };
+use crate::rasterizer::{self, PixelSegment};
+use crate::{TILE_HEIGHT, TILE_WIDTH};
 
 mod passes;
 
@@ -318,11 +314,9 @@ mod tests {
 
     use std::borrow::Cow;
 
-    use crate::{
-        painter::{BlendMode, Fill, RGBA},
-        simd::{i8x16, Simd},
-        PIXEL_WIDTH,
-    };
+    use crate::painter::{BlendMode, Fill, RGBA};
+    use crate::simd::{i8x16, Simd};
+    use crate::PIXEL_WIDTH;
 
     const WHITEF: Color = Color { r: 1.0, g: 1.0, b: 1.0, a: 1.0 };
     const BLACKF: Color = Color { r: 0.0, g: 0.0, b: 0.0, a: 0.0 };

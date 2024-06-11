@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::aura_shell::AuraOutput,
-    crate::client::Client,
-    crate::object::{ObjectRef, RequestReceiver},
-    anyhow::Error,
-    fidl_fuchsia_ui_gfx::DisplayInfo,
-    fuchsia_wayland_core as wl,
-    wayland_server_protocol::{wl_output, WlOutput, WlOutputEvent, WlOutputRequest},
-};
+use crate::aura_shell::AuraOutput;
+use crate::client::Client;
+use crate::object::{ObjectRef, RequestReceiver};
+use anyhow::Error;
+use fidl_fuchsia_ui_gfx::DisplayInfo;
+use fuchsia_wayland_core as wl;
+use wayland_server_protocol::{wl_output, WlOutput, WlOutputEvent, WlOutputRequest};
 
 /// An implementation of the wl_output global.
 pub struct Output {

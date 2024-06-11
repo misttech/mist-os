@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use ffx_config_domain::ConfigDomain;
-use std::{
-    fmt,
-    path::{Path, PathBuf},
-};
+use std::fmt;
+use std::path::{Path, PathBuf};
 
 /// The type of environment we're running in, along with relevant information about
 /// that environment.

@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl::endpoints::{ClientEnd, Proxy as _},
-    fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy},
-    fidl_fuchsia_hardware_block_partition::{Guid, PartitionMarker},
-    fidl_fuchsia_io as fio,
-    fuchsia_fatfs::FatFs,
-    fuchsia_zircon as zx,
-    remote_block_device::RemoteBlockClientSync,
-    tracing::info,
-    vfs::execution_scope::ExecutionScope,
-};
+use anyhow::{Context as _, Error};
+use fidl::endpoints::{ClientEnd, Proxy as _};
+use fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy};
+use fidl_fuchsia_hardware_block_partition::{Guid, PartitionMarker};
+use fuchsia_fatfs::FatFs;
+use remote_block_device::RemoteBlockClientSync;
+use tracing::info;
+use vfs::execution_scope::ExecutionScope;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 const MICROSOFT_BASIC_DATA_GUID: [u8; 16] = [
     0xa2, 0xa0, 0xd0, 0xeb, 0xe5, 0xb9, 0x33, 0x44, 0x87, 0xc0, 0x68, 0xb6, 0xb7, 0x26, 0x99, 0xc7,
@@ -118,17 +115,17 @@ impl std::ops::Deref for FatDevice {
 
 #[cfg(test)]
 pub mod test {
-    use {
-        super::*,
-        fidl::endpoints::ServerEnd,
-        fidl_fuchsia_hardware_block_partition::PartitionRequest,
-        fuchsia_async as fasync,
-        fuchsia_component::server::ServiceFs,
-        futures::prelude::*,
-        ramdevice_client::RamdiskClient,
-        std::io::Write,
-        vfs::{directory::entry_container::Directory, node::Node as _, path::Path},
-    };
+    use super::*;
+    use fidl::endpoints::ServerEnd;
+    use fidl_fuchsia_hardware_block_partition::PartitionRequest;
+    use fuchsia_async as fasync;
+    use fuchsia_component::server::ServiceFs;
+    use futures::prelude::*;
+    use ramdevice_client::RamdiskClient;
+    use std::io::Write;
+    use vfs::directory::entry_container::Directory;
+    use vfs::node::Node as _;
+    use vfs::path::Path;
 
     /// Dictates the FIDL protocol a MockPartition should speak.
     enum MockPartitionMode {

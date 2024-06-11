@@ -4,12 +4,10 @@
 
 pub mod args;
 
-use {
-    anyhow::{format_err, Result},
-    args::DebugBindCommand,
-    fidl_fuchsia_driver_development as fdd,
-    std::io::Write,
-};
+use anyhow::{format_err, Result};
+use args::DebugBindCommand;
+use fidl_fuchsia_driver_development as fdd;
+use std::io::Write;
 
 pub async fn debug_bind(
     _cmd: DebugBindCommand,

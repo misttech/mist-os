@@ -17,8 +17,7 @@ use gcs::gs_url::split_gs_url;
 use lazy_static::lazy_static;
 use maplit::hashmap;
 use omaha_client::version::Version;
-use pbms::AuthFlowChoice;
-use pbms::{list_from_gcs, string_from_url};
+use pbms::{list_from_gcs, string_from_url, AuthFlowChoice};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -242,7 +241,9 @@ where
 
 #[cfg(test)]
 mod test {
-    use {super::*, ffx_writer::Format, temp_test_env::TempTestEnv};
+    use super::*;
+    use ffx_writer::Format;
+    use temp_test_env::TempTestEnv;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_pb_list_impl() {

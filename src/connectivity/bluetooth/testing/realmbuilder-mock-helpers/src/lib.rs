@@ -2,19 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy},
-    fidl_fuchsia_device::{NameProviderMarker, NameProviderRequestStream},
-    fidl_fuchsia_stash::SecureStoreMarker,
-    fuchsia_async as fasync,
-    fuchsia_component::server::{ServiceFs, ServiceObj},
-    fuchsia_component_test::LocalComponentHandles,
-    futures::{channel::mpsc, SinkExt, StreamExt, TryStream, TryStreamExt},
-    std::sync::Arc,
-    tracing::info,
-    vfs::directory::{entry_container::Directory, spawn_directory},
-};
+use anyhow::Error;
+use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy};
+use fidl_fuchsia_device::{NameProviderMarker, NameProviderRequestStream};
+use fidl_fuchsia_stash::SecureStoreMarker;
+use fuchsia_async as fasync;
+use fuchsia_component::server::{ServiceFs, ServiceObj};
+use fuchsia_component_test::LocalComponentHandles;
+use futures::channel::mpsc;
+use futures::{SinkExt, StreamExt, TryStream, TryStreamExt};
+use std::sync::Arc;
+use tracing::info;
+use vfs::directory::entry_container::Directory;
+use vfs::directory::spawn_directory;
 
 // #! Library for common utilities (mocks, definitions) for the manifest integration tests.
 

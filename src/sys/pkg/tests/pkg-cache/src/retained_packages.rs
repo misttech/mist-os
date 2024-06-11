@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        replace_retained_packages, verify_packages_cached, write_meta_far, write_needed_blobs,
-        TestEnv,
-    },
-    assert_matches::assert_matches,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_pkg::{self as fpkg},
-    fidl_fuchsia_pkg_ext::BlobId,
-    fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder},
-    fuchsia_zircon as zx,
-    futures::TryFutureExt,
+use crate::{
+    replace_retained_packages, verify_packages_cached, write_meta_far, write_needed_blobs, TestEnv,
 };
+use assert_matches::assert_matches;
+use fidl_fuchsia_pkg::{self as fpkg};
+use fidl_fuchsia_pkg_ext::BlobId;
+use fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder};
+use futures::TryFutureExt;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn cached_packages_are_retained() {

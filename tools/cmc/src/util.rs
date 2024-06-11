@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::error::Error,
-    cm_rust::ComponentDecl,
-    fidl::unpersist,
-    fidl_fuchsia_component_decl::Component,
-    serde_json::Value,
-    std::{
-        fs,
-        io::{Read, Write},
-        path::{Path, PathBuf},
-    },
-};
+use crate::error::Error;
+use cm_rust::ComponentDecl;
+use fidl::unpersist;
+use fidl_fuchsia_component_decl::Component;
+use serde_json::Value;
+use std::fs;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 
 /// Read a JSON or JSON5 file.
 /// Attempts to parse as JSON first.

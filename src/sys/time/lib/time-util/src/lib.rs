@@ -112,11 +112,9 @@ pub fn time_at_monotonic(clock: &zx::Clock, monotonic: zx::Time) -> zx::Time {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        test_util::{assert_geq, assert_leq},
-        zx::DurationNum,
-    };
+    use super::*;
+    use test_util::{assert_geq, assert_leq};
+    use zx::DurationNum;
 
     const BACKSTOP: zx::Time = zx::Time::from_nanos(1234567890);
     const TIME_DIFF: zx::Duration = zx::Duration::from_seconds(5);

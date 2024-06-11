@@ -4,20 +4,18 @@
 
 #![cfg(test)]
 
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_ext as fnet_ext;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_stack as fnet_stack;
 use futures_util::{AsyncReadExt as _, AsyncWriteExt as _};
 use net_declare::{fidl_ip, fidl_subnet, std_ip};
 use netemul::{RealmTcpListener as _, RealmTcpStream as _};
-use netstack_testing_common::{
-    interfaces::TestInterfaceExt,
-    realms::{Netstack, TestSandboxExt as _},
-};
+use netstack_testing_common::interfaces::TestInterfaceExt;
+use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 use test_case::test_case;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_stack as fnet_stack,
+};
 
 struct Setup {
     client_ip: std::net::IpAddr,

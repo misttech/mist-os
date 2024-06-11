@@ -2,22 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::args::{
-        FuzzCtlCommand, FuzzCtlSubcommand, ResetSubcommand, ResumeLibFuzzerSubcommand,
-        RunLibFuzzerSubcommand,
-    },
-    anyhow::{anyhow, bail, Context as _, Result},
-    argh::FromArgs,
-    fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult},
-    fuchsia_fuzzctl::{save_artifact, Controller, InputPair, Manager, OutputSink, Writer},
-    regex::Regex,
-    std::fs,
-    std::path::{Path, PathBuf},
-    std::vec::IntoIter as VecIter,
-    url::Url,
-    walkdir::WalkDir,
+use crate::args::{
+    FuzzCtlCommand, FuzzCtlSubcommand, ResetSubcommand, ResumeLibFuzzerSubcommand,
+    RunLibFuzzerSubcommand,
 };
+use anyhow::{anyhow, bail, Context as _, Result};
+use argh::FromArgs;
+use fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult};
+use fuchsia_fuzzctl::{save_artifact, Controller, InputPair, Manager, OutputSink, Writer};
+use regex::Regex;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::vec::IntoIter as VecIter;
+use url::Url;
+use walkdir::WalkDir;
 
 pub struct FuzzCtl<O: OutputSink> {
     manager: Manager,
@@ -454,19 +452,16 @@ impl<O: OutputSink> LibFuzzerWorkflow<O> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{FuzzCtl, LibFuzzerPathBuf},
-        anyhow::Result,
-        fidl::endpoints::create_proxy,
-        fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult},
-        fuchsia_async as fasync,
-        fuchsia_fuzzctl::constants::*,
-        fuchsia_fuzzctl::{digest_path, OutputSink},
-        fuchsia_fuzzctl_test::{create_task, serve_manager, BufferSink, Test, TEST_URL},
-        fuchsia_zircon as zx,
-        std::path::PathBuf,
-        url::Url,
-    };
+    use super::{FuzzCtl, LibFuzzerPathBuf};
+    use anyhow::Result;
+    use fidl::endpoints::create_proxy;
+    use fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult};
+    use fuchsia_fuzzctl::constants::*;
+    use fuchsia_fuzzctl::{digest_path, OutputSink};
+    use fuchsia_fuzzctl_test::{create_task, serve_manager, BufferSink, Test, TEST_URL};
+    use std::path::PathBuf;
+    use url::Url;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     // Test fixtures.
 

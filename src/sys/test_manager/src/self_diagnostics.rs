@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_inspect::Property,
-    fuchsia_sync::Mutex,
-    std::{
-        borrow::Cow,
-        collections::{hash_map::Entry, HashMap},
-        fmt::{Debug, Error, Formatter},
-        ops::Deref,
-        sync::Arc,
-    },
-};
+use fuchsia_inspect::Property;
+use fuchsia_sync::Mutex;
+use std::borrow::Cow;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+use std::fmt::{Debug, Error, Formatter};
+use std::ops::Deref;
+use std::sync::Arc;
 
 /// Container to store diagnostic content in inspect.
 pub struct RootDiagnosticNode {
@@ -175,7 +172,9 @@ impl Debug for DiagnosticNodeInner {
 
 #[cfg(test)]
 mod test {
-    use {super::*, diagnostics_assertions::assert_data_tree, fuchsia_inspect::Inspector};
+    use super::*;
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_inspect::Inspector;
 
     #[fuchsia::test]
     fn inspect_lifetimes() {

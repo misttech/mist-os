@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::error::ValidateError;
+use super::parser::ParseStrategy;
 use super::{
-    array_type, array_type_validate_deref_both, error::ValidateError, parser::ParseStrategy, Array,
-    Counted, Parse, ParseError, Validate, ValidateArray,
+    array_type, array_type_validate_deref_both, Array, Counted, Parse, ParseError, Validate,
+    ValidateArray,
 };
 
 use std::fmt::Debug;
@@ -192,13 +194,9 @@ impl Validate for Counts {
 mod tests {
     use crate::test::as_validate_error;
 
-    use super::{
-        super::{
-            parser::{ByRef, ByValue},
-            test::{as_parse_error, validate_test},
-        },
-        *,
-    };
+    use super::super::parser::{ByRef, ByValue};
+    use super::super::test::{as_parse_error, validate_test};
+    use super::*;
 
     // TODO: Run this test over `validate()`.
     #[test]

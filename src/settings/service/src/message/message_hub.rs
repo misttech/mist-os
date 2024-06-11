@@ -13,12 +13,11 @@ use crate::message::delegate::Delegate;
 use crate::message::messenger::{Messenger, MessengerClient};
 use crate::{trace, trace_guard};
 use anyhow::format_err;
-use fuchsia_async as fasync;
-use fuchsia_trace as ftrace;
 use futures::StreamExt;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
 /// Type definition for exit message sender.
 type ExitSender = futures::channel::mpsc::UnboundedSender<()>;

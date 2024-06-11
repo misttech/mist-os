@@ -6,13 +6,13 @@ use anyhow::{Context, Result};
 use errors::ffx_error;
 use fidl_fuchsia_debugger as fdebugger;
 use fuchsia_async::{unblock, Task};
-use signal_hook::{consts::signal::SIGUSR1, iterator::Signals};
-use std::{path::PathBuf, process::Command};
+use signal_hook::consts::signal::SIGUSR1;
+use signal_hook::iterator::Signals;
+use std::path::PathBuf;
+use std::process::Command;
 
-use crate::{
-    debug_agent::{DebugAgentSocket, DebuggerProxy},
-    spawn_forward_task, CommandBuilder,
-};
+use crate::debug_agent::{DebugAgentSocket, DebuggerProxy};
+use crate::{spawn_forward_task, CommandBuilder};
 
 pub struct Debugger {
     socket: DebugAgentSocket,

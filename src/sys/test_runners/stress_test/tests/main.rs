@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_test_manager::{CaseStatus, RunOptions, SuiteStatus},
-    fuchsia_async as fasync,
-    pretty_assertions::assert_eq,
-    test_manager_test_lib::RunEvent,
-};
+use anyhow::{Context as _, Error};
+use fidl_fuchsia_test_manager::{CaseStatus, RunOptions, SuiteStatus};
+use fuchsia_async as fasync;
+use pretty_assertions::assert_eq;
+use test_manager_test_lib::RunEvent;
 
 pub async fn run_test(test_url: &str) -> Result<(Vec<RunEvent>, Vec<String>), Error> {
     let run_builder = test_runners_test_lib::connect_to_test_manager().await?;

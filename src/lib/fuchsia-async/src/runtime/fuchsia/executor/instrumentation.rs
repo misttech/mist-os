@@ -11,11 +11,9 @@
 //! on minimal overhead.
 
 use fuchsia_zircon as zx;
-use std::{
-    cmp, mem,
-    panic::Location,
-    sync::atomic::{AtomicU64, AtomicUsize, Ordering},
-};
+use std::panic::Location;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::{cmp, mem};
 
 /// A low-overhead metrics collection type intended for use by an async executor.
 #[derive(Default)]
@@ -198,16 +196,13 @@ pub struct Snapshot {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            handle::channel::Channel, runtime::fuchsia::executor::Time, LocalExecutor,
-            SendExecutor, TestExecutor, Timer,
-        },
-        fuchsia_zircon::{self as zx, DurationNum},
-        futures::future,
-        std::pin::pin,
-    };
+    use super::*;
+    use crate::handle::channel::Channel;
+    use crate::runtime::fuchsia::executor::Time;
+    use crate::{LocalExecutor, SendExecutor, TestExecutor, Timer};
+    use fuchsia_zircon::{self as zx, DurationNum};
+    use futures::future;
+    use std::pin::pin;
 
     const MICROSECOND: std::time::Duration = std::time::Duration::from_micros(1);
     use std::thread::sleep;

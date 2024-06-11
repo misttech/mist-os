@@ -8,17 +8,15 @@ mod device;
 mod port_manager;
 mod wire;
 
-use {
-    crate::device::VsockDevice,
-    anyhow::{anyhow, Context, Error},
-    fidl::endpoints::RequestStream,
-    fidl_fuchsia_virtualization::{HostVsockEndpointRequest, HostVsockEndpointRequestStream},
-    fidl_fuchsia_virtualization_hardware::VirtioVsockRequestStream,
-    fuchsia_component::server,
-    fuchsia_zircon as zx,
-    futures::{StreamExt, TryFutureExt, TryStreamExt},
-    std::rc::Rc,
-};
+use crate::device::VsockDevice;
+use anyhow::{anyhow, Context, Error};
+use fidl::endpoints::RequestStream;
+use fidl_fuchsia_virtualization::{HostVsockEndpointRequest, HostVsockEndpointRequestStream};
+use fidl_fuchsia_virtualization_hardware::VirtioVsockRequestStream;
+use fuchsia_component::server;
+use fuchsia_zircon as zx;
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use std::rc::Rc;
 
 // Services exposed by the Virtio Vsock device.
 enum Services {

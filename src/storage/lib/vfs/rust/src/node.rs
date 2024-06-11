@@ -4,27 +4,23 @@
 
 //! Implementation of a (limited) node connection.
 
-use crate::{
-    common::{inherit_rights_for_clone, IntoAny},
-    directory::entry_container::MutableDirectory,
-    execution_scope::ExecutionScope,
-    name::Name,
-    node,
-    object_request::Representation,
-    protocols::ToNodeOptions,
-    ObjectRequestRef, ToObjectRequest,
-};
+use crate::common::{inherit_rights_for_clone, IntoAny};
+use crate::directory::entry_container::MutableDirectory;
+use crate::execution_scope::ExecutionScope;
+use crate::name::Name;
+use crate::object_request::Representation;
+use crate::protocols::ToNodeOptions;
+use crate::{node, ObjectRequestRef, ToObjectRequest};
 
-use {
-    anyhow::Error,
-    async_trait::async_trait,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status,
-    futures::stream::StreamExt,
-    libc::{S_IRUSR, S_IWUSR},
-    std::{future::Future, sync::Arc},
-};
+use anyhow::Error;
+use async_trait::async_trait;
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use futures::stream::StreamExt;
+use libc::{S_IRUSR, S_IWUSR};
+use std::future::Future;
+use std::sync::Arc;
 
 /// POSIX emulation layer access attributes for all services created with service().
 #[cfg(not(target_os = "macos"))]

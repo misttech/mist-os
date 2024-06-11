@@ -1,35 +1,32 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    anyhow::{format_err, Error},
-    bt_test_harness::{emulator, low_energy_peripheral::PeripheralHarness},
-    fidl::endpoints::{create_endpoints, Proxy, ServerEnd},
-    fidl_fuchsia_bluetooth::{ConnectionRole, Uuid},
-    fidl_fuchsia_bluetooth_le::{
-        AdvertisingData as LEAdvertisingData, AdvertisingHandleMarker, AdvertisingModeHint,
-        AdvertisingParameters, PeripheralError,
-        PeripheralStartAdvertisingResult as AdvertisingResult,
-    },
-    fidl_fuchsia_hardware_bluetooth::{
-        AdvertisingData, ConnectionState, EmulatorProxy, LegacyAdvertisingType, PeerParameters,
-        PeerProxy, MAX_LEGACY_ADVERTISING_DATA_LENGTH,
-    },
-    fuchsia_async::{self as fasync, DurationExt, TimeoutExt},
-    fuchsia_bluetooth::{
-        constants::INTEGRATION_TIMEOUT,
-        expectation::asynchronous::{ExpectableExt, ExpectableState, ExpectableStateExt},
-        types::Address,
-    },
-    futures::TryFutureExt,
-    std::{iter::repeat, ops::Deref},
+use anyhow::{format_err, Error};
+use bt_test_harness::emulator;
+use bt_test_harness::low_energy_peripheral::PeripheralHarness;
+use fidl::endpoints::{create_endpoints, Proxy, ServerEnd};
+use fidl_fuchsia_bluetooth::{ConnectionRole, Uuid};
+use fidl_fuchsia_bluetooth_le::{
+    AdvertisingData as LEAdvertisingData, AdvertisingHandleMarker, AdvertisingModeHint,
+    AdvertisingParameters, PeripheralError, PeripheralStartAdvertisingResult as AdvertisingResult,
 };
+use fidl_fuchsia_hardware_bluetooth::{
+    AdvertisingData, ConnectionState, EmulatorProxy, LegacyAdvertisingType, PeerParameters,
+    PeerProxy, MAX_LEGACY_ADVERTISING_DATA_LENGTH,
+};
+use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
+use fuchsia_bluetooth::constants::INTEGRATION_TIMEOUT;
+use fuchsia_bluetooth::expectation::asynchronous::{
+    ExpectableExt, ExpectableState, ExpectableStateExt,
+};
+use fuchsia_bluetooth::types::Address;
+use futures::TryFutureExt;
+use std::iter::repeat;
+use std::ops::Deref;
 
 mod expectation {
-    use {
-        bt_test_harness::low_energy_peripheral::PeripheralState,
-        fuchsia_bluetooth::expectation::Predicate,
-    };
+    use bt_test_harness::low_energy_peripheral::PeripheralState;
+    use fuchsia_bluetooth::expectation::Predicate;
 
     pub fn peripheral_received_connection() -> Predicate<PeripheralState> {
         Predicate::predicate(

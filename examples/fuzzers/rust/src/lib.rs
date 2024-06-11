@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {arbitrary::Arbitrary, fuzz::fuzz};
+use arbitrary::Arbitrary;
+use fuzz::fuzz;
 
 // This is the "library code" tested in this example.
 #[derive(Arbitrary)]

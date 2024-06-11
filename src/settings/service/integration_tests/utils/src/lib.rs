@@ -3,18 +3,17 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use fidl_fuchsia_io as fio;
 use fidl_fuchsia_metrics::{
     MetricEventLoggerFactoryRequest, MetricEventLoggerFactoryRequestStream,
     MetricEventLoggerRequest,
 };
 use fidl_fuchsia_ui_input::MediaButtonsEvent;
-use fuchsia_async as fasync;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_component_test::{
     Capability, ChildOptions, ChildRef, LocalComponentHandles, RealmBuilder, Ref, Route,
 };
 use futures::{StreamExt, TryStreamExt};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 pub struct SettingsRealmInfo<'a> {
     pub builder: RealmBuilder,

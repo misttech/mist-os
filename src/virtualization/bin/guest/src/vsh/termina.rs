@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    fidl_fuchsia_virtualization::{
-        ContainerStatus, LinuxGuestInfo, LinuxManagerEvent, LinuxManagerProxy,
-    },
-    fuchsia_async::{Duration, Interval},
-    fuchsia_zircon as zx,
-    futures::{future::ready, select, stream, StreamExt},
-    std::io::Write,
+use anyhow::{anyhow, Context, Result};
+use fidl_fuchsia_virtualization::{
+    ContainerStatus, LinuxGuestInfo, LinuxManagerEvent, LinuxManagerProxy,
 };
+use fuchsia_async::{Duration, Interval};
+use fuchsia_zircon as zx;
+use futures::future::ready;
+use futures::{select, stream, StreamExt};
+use std::io::Write;
 
 // ANSI Escape sequences for terminal manipulation.
 // see: https://en.wikipedia.org/wiki/ANSI_escape_code#CSI_(Control_Sequence_Introducer)_sequences
@@ -197,19 +196,15 @@ pub async fn launch(linux_manager: &LinuxManagerProxy, w: &mut impl Write) -> Re
 mod test {
     use super::*;
     use std::iter::repeat;
-    use term_model::{
-        ansi::{Color, NamedColor, Processor, TermInfo},
-        clipboard::Clipboard,
-        config::Config,
-        event::{Event, EventListener},
-        index::{Column, Line, Point},
-        term::{
-            cell::{Cell, Flags},
-            mode::TermMode,
-            SizeInfo,
-        },
-        Term,
-    };
+    use term_model::ansi::{Color, NamedColor, Processor, TermInfo};
+    use term_model::clipboard::Clipboard;
+    use term_model::config::Config;
+    use term_model::event::{Event, EventListener};
+    use term_model::index::{Column, Line, Point};
+    use term_model::term::cell::{Cell, Flags};
+    use term_model::term::mode::TermMode;
+    use term_model::term::SizeInfo;
+    use term_model::Term;
 
     struct TestListener;
     impl EventListener for TestListener {

@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    assert_matches::assert_matches,
-    fidl_fuchsia_update_installer::{
-        InstallerMarker, InstallerProxy, InstallerRequest, InstallerRequestStream, MonitorProxy,
-        Options, RebootControllerRequest, UpdateNotStartedReason,
-    },
-    fidl_fuchsia_update_installer_ext::{State, StateId},
-    fuchsia_async as fasync,
-    fuchsia_sync::Mutex,
-    futures::{channel::mpsc, prelude::*},
-    pretty_assertions::assert_eq,
-    std::sync::Arc,
+use assert_matches::assert_matches;
+use fidl_fuchsia_update_installer::{
+    InstallerMarker, InstallerProxy, InstallerRequest, InstallerRequestStream, MonitorProxy,
+    Options, RebootControllerRequest, UpdateNotStartedReason,
 };
+use fidl_fuchsia_update_installer_ext::{State, StateId};
+use fuchsia_async as fasync;
+use fuchsia_sync::Mutex;
+use futures::channel::mpsc;
+use futures::prelude::*;
+use pretty_assertions::assert_eq;
+use std::sync::Arc;
 
 #[derive(PartialEq, Debug)]
 pub enum CapturedUpdateInstallerRequest {
@@ -220,11 +219,9 @@ impl MockUpdateInstallerService {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_fuchsia_update_installer::{Initiator, MonitorMarker, MonitorRequest},
-        pretty_assertions::assert_eq,
-    };
+    use super::*;
+    use fidl_fuchsia_update_installer::{Initiator, MonitorMarker, MonitorRequest};
+    use pretty_assertions::assert_eq;
 
     #[fasync::run_singlethreaded(test)]
     async fn test_mock_installer() {

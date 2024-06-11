@@ -2,27 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::fuchsia::{
-        directory::FxDirectory, file::FxFile, fxblob::BlobDirectory, pager::PagerBacked,
-        volume::FxVolumeAndRoot, volumes_directory::VolumesDirectory,
-    },
-    anyhow::Context,
-    anyhow::Error,
-    fidl::endpoints::{create_proxy, ServerEnd},
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon::{self as zx, Status},
-    fxfs::{
-        filesystem::{FxFilesystem, FxFilesystemBuilder, OpenFxFilesystem},
-        fsck::{errors::FsckIssue, fsck_volume_with_options, fsck_with_options, FsckOptions},
-        log::*,
-        object_store::volume::root_volume,
-    },
-    fxfs_insecure_crypto::InsecureCrypt,
-    std::sync::{Arc, Weak},
-    storage_device::{fake_device::FakeDevice, DeviceHolder},
-    vfs::{path::Path, temp_clone::unblock},
-};
+use crate::fuchsia::directory::FxDirectory;
+use crate::fuchsia::file::FxFile;
+use crate::fuchsia::fxblob::BlobDirectory;
+use crate::fuchsia::pager::PagerBacked;
+use crate::fuchsia::volume::FxVolumeAndRoot;
+use crate::fuchsia::volumes_directory::VolumesDirectory;
+use anyhow::{Context, Error};
+use fidl::endpoints::{create_proxy, ServerEnd};
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon::{self as zx, Status};
+use fxfs::filesystem::{FxFilesystem, FxFilesystemBuilder, OpenFxFilesystem};
+use fxfs::fsck::errors::FsckIssue;
+use fxfs::fsck::{fsck_volume_with_options, fsck_with_options, FsckOptions};
+use fxfs::log::*;
+use fxfs::object_store::volume::root_volume;
+use fxfs_insecure_crypto::InsecureCrypt;
+use std::sync::{Arc, Weak};
+use storage_device::fake_device::FakeDevice;
+use storage_device::DeviceHolder;
+use vfs::path::Path;
+use vfs::temp_clone::unblock;
 
 struct State {
     filesystem: OpenFxFilesystem,

@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::anyhow,
-    serde::Deserialize,
-    std::{fs::File, io::Read},
-    thiserror::Error,
-    tracing::{error, info},
-    typed_builder::TypedBuilder,
-};
+use anyhow::anyhow;
+use serde::Deserialize;
+use std::fs::File;
+use std::io::Read;
+use thiserror::Error;
+use tracing::{error, info};
+use typed_builder::TypedBuilder;
 
 /// Static service configuration options.
 #[derive(Debug, PartialEq, Eq, TypedBuilder)]
@@ -96,7 +95,9 @@ enum ConfigLoadError {
 #[cfg(test)]
 pub(crate) mod tests {
 
-    use {super::*, assert_matches::assert_matches, serde_json::json};
+    use super::*;
+    use assert_matches::assert_matches;
+    use serde_json::json;
 
     fn verify_load(input: serde_json::Value, expected: Config) {
         assert_eq!(

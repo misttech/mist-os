@@ -6,57 +6,47 @@
 //! in the ethernet module.
 
 use alloc::vec::Vec;
-use lock_order::{
-    lock::{LockLevelFor, UnlockedAccessMarkerFor},
-    relation::LockBefore,
-};
+use lock_order::lock::{LockLevelFor, UnlockedAccessMarkerFor};
+use lock_order::relation::LockBefore;
 
 use log::debug;
-use net_types::{
-    ethernet::Mac,
-    ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
-    SpecifiedAddr, UnicastAddr, Witness,
+use net_types::ethernet::Mac;
+use net_types::ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use net_types::{SpecifiedAddr, UnicastAddr, Witness};
+use netstack3_base::socket::SocketIpAddr;
+use netstack3_base::{CoreTimerContext, CounterContext, DeviceIdContext};
+use netstack3_device::ethernet::{
+    self, DynamicEthernetDeviceState, EthernetDeviceCounters, EthernetDeviceId,
+    EthernetIpLinkDeviceDynamicStateContext, EthernetIpLinkDeviceStaticStateContext,
+    EthernetLinkDevice, EthernetTimerId, EthernetWeakDeviceId, StaticEthernetDeviceState,
 };
-use netstack3_base::DeviceIdContext;
-use netstack3_base::{socket::SocketIpAddr, CoreTimerContext, CounterContext};
+use netstack3_device::queue::{
+    BufVecU8Allocator, DequeueState, TransmitDequeueContext, TransmitQueueCommon,
+    TransmitQueueContext, TransmitQueueState,
+};
+use netstack3_device::socket::{ParseSentFrameError, SentFrame};
 use netstack3_device::{
-    ethernet::{
-        self, DynamicEthernetDeviceState, EthernetDeviceCounters, EthernetDeviceId,
-        EthernetIpLinkDeviceDynamicStateContext, EthernetIpLinkDeviceStaticStateContext,
-        EthernetLinkDevice, EthernetTimerId, EthernetWeakDeviceId, StaticEthernetDeviceState,
-    },
-    queue::{
-        BufVecU8Allocator, DequeueState, TransmitDequeueContext, TransmitQueueCommon,
-        TransmitQueueContext, TransmitQueueState,
-    },
-    socket::{ParseSentFrameError, SentFrame},
     ArpConfigContext, ArpContext, ArpNudCtx, ArpSenderContext, ArpState,
     DeviceLayerEventDispatcher, DeviceLayerTimerId, DeviceSendFrameError, IpLinkDeviceState,
 };
-use netstack3_ip::{
-    self as ip,
-    icmp::{self, NdpCounters},
-    nud::{
-        DelegateNudContext, NudConfigContext, NudContext, NudIcmpContext, NudSenderContext,
-        NudState, NudUserConfig, UseDelegateNudContext,
-    },
+use netstack3_ip::icmp::{self, NdpCounters};
+use netstack3_ip::nud::{
+    DelegateNudContext, NudConfigContext, NudContext, NudIcmpContext, NudSenderContext, NudState,
+    NudUserConfig, UseDelegateNudContext,
 };
+use netstack3_ip::{self as ip};
 use packet::{Buf, BufferMut, InnerPacketBuilder as _, Serializer};
-use packet_formats::{
-    ethernet::EtherType,
-    icmp::{
-        ndp::{options::NdpOptionBuilder, NeighborSolicitation, OptionSequenceBuilder},
-        IcmpUnusedCode,
-    },
-    ipv4::Ipv4FragmentType,
-    utils::NonZeroDuration,
-};
+use packet_formats::ethernet::EtherType;
+use packet_formats::icmp::ndp::options::NdpOptionBuilder;
+use packet_formats::icmp::ndp::{NeighborSolicitation, OptionSequenceBuilder};
+use packet_formats::icmp::IcmpUnusedCode;
+use packet_formats::ipv4::Ipv4FragmentType;
+use packet_formats::utils::NonZeroDuration;
 
-use crate::{
-    context::{prelude::*, WrapLockLevel},
-    device::integration,
-    BindingsContext, BindingsTypes, CoreCtx,
-};
+use crate::context::prelude::*;
+use crate::context::WrapLockLevel;
+use crate::device::integration;
+use crate::{BindingsContext, BindingsTypes, CoreCtx};
 
 pub struct CoreCtxWithDeviceId<'a, CC: DeviceIdContext<EthernetLinkDevice>> {
     core_ctx: &'a mut CC,

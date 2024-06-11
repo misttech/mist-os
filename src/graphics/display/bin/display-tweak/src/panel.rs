@@ -137,9 +137,8 @@ impl PanelCmd {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fidl_fuchsia_hardware_display_types as display_types;
-    use fuchsia_zircon as zx;
     use futures::StreamExt;
+    use {fidl_fuchsia_hardware_display_types as display_types, fuchsia_zircon as zx};
 
     #[fuchsia::test]
     async fn display_client_rpc_success() {

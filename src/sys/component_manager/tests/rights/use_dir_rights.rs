@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_fidl_test_components as ftest, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    futures::{StreamExt, TryStreamExt},
-    std::io,
-};
+use anyhow::Error;
+use fuchsia_component::server::ServiceFs;
+use futures::{StreamExt, TryStreamExt};
+use std::io;
+use {fidl_fidl_test_components as ftest, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// Contains all the information required to verify that a particular path contains some set of
 /// rights.

@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::Error, fidl_ir_lib::fidl::FidlIr, std::io};
+use anyhow::Error;
+use fidl_ir_lib::fidl::FidlIr;
+use std::io;
 
 pub use self::c::CBackend;
 pub use self::cpp::CppBackend;

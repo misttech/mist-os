@@ -2,27 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::client::convert_beacon::construct_bss_description;
+use crate::client::Context;
+use crate::ddk_converter::cssid_from_ssid_unchecked;
+use crate::device::{self, DeviceOps};
+use crate::error::Error;
+use crate::WlanSoftmacBandCapabilityExt as _;
+use anyhow::format_err;
+use ieee80211::{Bssid, MacAddr};
+use thiserror::Error;
+use tracing::{error, warn};
+use wlan_common::mac::{self, CapabilityInfo};
+use wlan_common::mgmt_writer;
+use wlan_common::time::TimeUnit;
+use wlan_frame_writer::write_frame_with_dynamic_buffer;
 use {
-    crate::{
-        client::{convert_beacon::construct_bss_description, Context},
-        ddk_converter::cssid_from_ssid_unchecked,
-        device::{self, DeviceOps},
-        error::Error,
-        WlanSoftmacBandCapabilityExt as _,
-    },
-    anyhow::format_err,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
-    ieee80211::{Bssid, MacAddr},
-    thiserror::Error,
-    tracing::{error, warn},
-    wlan_common::{
-        mac::{self, CapabilityInfo},
-        mgmt_writer,
-        time::TimeUnit,
-    },
-    wlan_frame_writer::write_frame_with_dynamic_buffer,
     wlan_trace as wtrace,
 };
 
@@ -541,26 +538,20 @@ fn send_scan_result<D: DeviceOps>(txn_id: u64, bss: fidl_internal::BssDescriptio
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            client::TimedEvent,
-            device::{FakeDevice, FakeDeviceState},
-            test_utils::{fake_wlan_channel, MockWlanRxInfo},
-        },
-        fidl_fuchsia_wlan_common as fidl_common,
-        fuchsia_sync::Mutex,
-        ieee80211::{MacAddrBytes, Ssid},
-        lazy_static::lazy_static,
-        std::sync::Arc,
-        test_case::test_case,
-        wlan_common::{
-            assert_variant,
-            sequence::SequenceManager,
-            timer::{self, create_timer, Timer},
-        },
-        wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider},
-    };
+    use super::*;
+    use crate::client::TimedEvent;
+    use crate::device::{FakeDevice, FakeDeviceState};
+    use crate::test_utils::{fake_wlan_channel, MockWlanRxInfo};
+    use fidl_fuchsia_wlan_common as fidl_common;
+    use fuchsia_sync::Mutex;
+    use ieee80211::{MacAddrBytes, Ssid};
+    use lazy_static::lazy_static;
+    use std::sync::Arc;
+    use test_case::test_case;
+    use wlan_common::assert_variant;
+    use wlan_common::sequence::SequenceManager;
+    use wlan_common::timer::{self, create_timer, Timer};
+    use wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider};
 
     lazy_static! {
         static ref BSSID_FOO: Bssid = [6u8; 6].into();

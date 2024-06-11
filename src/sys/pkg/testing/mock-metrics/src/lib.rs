@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_metrics::{self as fidl, MetricEvent},
-    fuchsia_async as fasync,
-    fuchsia_sync::Mutex,
-    futures::TryStreamExt as _,
-    std::{sync::Arc, time::Duration},
-};
+use fidl_fuchsia_metrics::{self as fidl, MetricEvent};
+use fuchsia_async as fasync;
+use fuchsia_sync::Mutex;
+use futures::TryStreamExt as _;
+use std::sync::Arc;
+use std::time::Duration;
 
 pub struct MockMetricEventLogger {
     cobalt_events: Mutex<Vec<MetricEvent>>,
@@ -105,7 +104,9 @@ impl MockMetricEventLoggerFactory {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, ::fidl::endpoints::create_proxy_and_stream, fidl_fuchsia_metrics::ProjectSpec};
+    use super::*;
+    use ::fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_metrics::ProjectSpec;
 
     #[fasync::run_singlethreaded(test)]
     async fn test_mock_metrics() {

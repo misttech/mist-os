@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::CurrentTask,
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        default_ioctl, fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps,
-    },
-};
+use crate::task::CurrentTask;
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::{default_ioctl, fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps};
 use starnix_logging::log_info;
 use starnix_sync::{FileOpsCore, Locked, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult};
-use starnix_uapi::{errors::Errno, open_flags::OpenFlags};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
 
 pub struct SyslogFile;
 

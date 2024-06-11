@@ -19,8 +19,7 @@ pub mod constants;
 pub mod utils;
 
 pub use bitfields::*;
-pub use block::testing as block_testing;
-pub use block::*;
+pub use block::{testing as block_testing, *};
 pub use block_index::*;
 pub use block_type::*;
 pub use container::*;

@@ -239,10 +239,8 @@ mod tests {
     use ffx_config::ConfigLevel;
     use fho::{Format, TestBuffers};
     use sdk_metadata::ProductBundleV2;
-    use std::{
-        fs::{self, File},
-        io::Write,
-    };
+    use std::fs::{self, File};
+    use std::io::Write;
     use tempfile::tempdir;
 
     const VIRTUAL_DEVICE_VALID: &str =

@@ -8,10 +8,11 @@ mod environment;
 mod instance_actor;
 mod read_actor;
 
-use {
-    crate::environment::BlobfsEnvironment, argh::FromArgs, fuchsia_async as fasync,
-    stress_test::run_test, tracing::Level,
-};
+use crate::environment::BlobfsEnvironment;
+use argh::FromArgs;
+use fuchsia_async as fasync;
+use stress_test::run_test;
+use tracing::Level;
 
 #[derive(Clone, Debug, FromArgs)]
 /// Creates an instance of fvm and performs stressful operations on it

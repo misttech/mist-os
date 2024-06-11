@@ -131,10 +131,8 @@ mod metadata;
 mod types;
 mod vertex;
 
-pub use {
-    digraph::{Digraph, DigraphOpts},
-    edge::Edge,
-    metadata::{EdgeGraphMetadata, Metadata, MetadataValue, VertexGraphMetadata},
-    types::VertexId,
-    vertex::Vertex,
-};
+pub use digraph::{Digraph, DigraphOpts};
+pub use edge::Edge;
+pub use metadata::{EdgeGraphMetadata, Metadata, MetadataValue, VertexGraphMetadata};
+pub use types::VertexId;
+pub use vertex::Vertex;

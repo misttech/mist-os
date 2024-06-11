@@ -83,7 +83,8 @@ impl ArithmeticArrayProperty for UintArrayProperty {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::writer::{testing_utils::GetBlockExt, Inspector, Length};
+    use crate::writer::testing_utils::GetBlockExt;
+    use crate::writer::{Inspector, Length};
 
     #[fuchsia::test]
     fn test_uint_array() {

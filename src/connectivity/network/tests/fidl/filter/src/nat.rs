@@ -4,22 +4,22 @@
 
 //! Tests for the NAT hooks.
 
-use std::{num::NonZeroU16, ops::RangeInclusive};
+use std::num::NonZeroU16;
+use std::ops::RangeInclusive;
 
 use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _};
 use fidl_fuchsia_net_filter_ext::{Action, NatHook};
 use heck::SnakeCase as _;
-use net_types::{ip::IpAddress as _, Witness as _};
+use net_types::ip::IpAddress as _;
+use net_types::Witness as _;
 use netstack_testing_macros::netstack_test;
 use test_case::test_case;
 
-use crate::{
-    ip_hooks::{
-        Addrs, ExpectedConnectivity, Ports, Realms, SockAddrs, SocketType as _, Subnets, TestIpExt,
-        TestNet, TestRealm, LOW_RULE_PRIORITY, MEDIUM_RULE_PRIORITY,
-    },
-    matchers::{Matcher, Tcp, Udp},
+use crate::ip_hooks::{
+    Addrs, ExpectedConnectivity, Ports, Realms, SockAddrs, SocketType as _, Subnets, TestIpExt,
+    TestNet, TestRealm, LOW_RULE_PRIORITY, MEDIUM_RULE_PRIORITY,
 };
+use crate::matchers::{Matcher, Tcp, Udp};
 
 // TODO(https://fxbug.dev/341128580): exercise ICMP once it can be NATed
 // correctly.

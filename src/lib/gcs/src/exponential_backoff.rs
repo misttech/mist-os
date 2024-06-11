@@ -4,13 +4,13 @@
 
 //! Common utilities for handling transient network errors.
 
-use {
-    crate::error::GcsError,
-    anyhow::Error,
-    fuchsia_backoff::Backoff,
-    rand::{rngs::StdRng, Rng, SeedableRng},
-    std::{cmp, time::Duration},
-};
+use crate::error::GcsError;
+use anyhow::Error;
+use fuchsia_backoff::Backoff;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
+use std::cmp;
+use std::time::Duration;
 
 pub struct ExponentialBackoff {
     rng: StdRng,

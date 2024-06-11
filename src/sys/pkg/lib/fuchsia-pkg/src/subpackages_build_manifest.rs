@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::PackageManifest,
-    anyhow::{Context as _, Result},
-    camino::Utf8PathBuf,
-    fuchsia_merkle::Hash,
-    fuchsia_url::RelativePackageUrl,
-    serde::{de::Deserializer, Deserialize, Serialize},
-    std::io,
-};
+use crate::PackageManifest;
+use anyhow::{Context as _, Result};
+use camino::Utf8PathBuf;
+use fuchsia_merkle::Hash;
+use fuchsia_url::RelativePackageUrl;
+use serde::de::Deserializer;
+use serde::{Deserialize, Serialize};
+use std::io;
 
 /// Helper type for reading the build-time information based on the subpackage
 /// declarations declared in a build file (such as the `subpackages` list in
@@ -167,15 +166,13 @@ pub enum SubpackagesBuildManifestEntryKind {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{MetaPackage, PackageBuilder},
-        assert_matches::assert_matches,
-        camino::Utf8Path,
-        fuchsia_url::PackageName,
-        serde_json::json,
-        std::fs::File,
-    };
+    use super::*;
+    use crate::{MetaPackage, PackageBuilder};
+    use assert_matches::assert_matches;
+    use camino::Utf8Path;
+    use fuchsia_url::PackageName;
+    use serde_json::json;
+    use std::fs::File;
 
     const FAKE_ABI_REVISION: version_history::AbiRevision =
         version_history::AbiRevision::from_u64(0xdc6e746980ce30a9);

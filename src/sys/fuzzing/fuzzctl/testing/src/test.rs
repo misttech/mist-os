@@ -2,22 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::controller::FakeController,
-    crate::writer::BufferSink,
-    anyhow::{anyhow, bail, Context as _, Result},
-    fidl_fuchsia_fuzzer as fuzz,
-    fuchsia_fuzzctl::{create_artifact_dir, create_corpus_dir, Writer},
-    serde_json::json,
-    std::cell::RefCell,
-    std::env,
-    std::fmt::Debug,
-    std::fmt::Display,
-    std::fs,
-    std::path::{Path, PathBuf},
-    std::rc::Rc,
-    tempfile::{tempdir, TempDir},
-};
+use crate::controller::FakeController;
+use crate::writer::BufferSink;
+use anyhow::{anyhow, bail, Context as _, Result};
+use fidl_fuchsia_fuzzer as fuzz;
+use fuchsia_fuzzctl::{create_artifact_dir, create_corpus_dir, Writer};
+use serde_json::json;
+use std::cell::RefCell;
+use std::fmt::{Debug, Display};
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
+use std::{env, fs};
+use tempfile::{tempdir, TempDir};
 
 pub const TEST_URL: &str = "fuchsia-pkg://fuchsia.com/fake#meta/foo-fuzzer.cm";
 

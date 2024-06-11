@@ -4,12 +4,11 @@
 
 //! Neighbor API structs.
 
-use core::{fmt::Display, marker::PhantomData};
+use core::fmt::Display;
+use core::marker::PhantomData;
 
-use net_types::{
-    ip::{Ip, IpAddress, IpVersionMarker, Ipv4, Ipv6},
-    SpecifiedAddr, UnicastAddress as _, Witness as _,
-};
+use net_types::ip::{Ip, IpAddress, IpVersionMarker, Ipv4, Ipv6};
+use net_types::{SpecifiedAddr, UnicastAddress as _, Witness as _};
 use netstack3_base::{
     ContextPair, DeviceIdContext, EventContext as _, Inspector, InstantContext as _, LinkDevice,
     NotFoundError,

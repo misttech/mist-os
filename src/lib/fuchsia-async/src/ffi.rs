@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_async as fasync;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon_status as zx_status;
 use fuchsia_zircon_types::{
     zx_handle_t, zx_packet_signal_t, zx_signals_t, zx_status_t, zx_time_t, ZX_ERR_NOT_SUPPORTED,
     ZX_OK,
 };
 use futures::channel::oneshot;
 use std::time::Duration;
+use {fuchsia_async as fasync, fuchsia_zircon_status as zx_status};
 
 struct EPtr(*mut Executor);
 unsafe impl Send for EPtr {}

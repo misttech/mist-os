@@ -33,7 +33,8 @@
 //! stats.record_data_to(root);  /* consume the stats node and persist the data */
 //! ```
 
-use super::{private::InspectTypeInternal, Inspector, Node, Property, UintProperty};
+use super::private::InspectTypeInternal;
+use super::{Inspector, Node, Property, UintProperty};
 use futures::FutureExt;
 
 // The metric node name, as exposed by the stats node.

@@ -373,9 +373,8 @@ mod test {
     use super::*;
     use crate::bytecode_encoder::encode_v1::{encode_instruction, to_raw_instruction};
     use crate::bytecode_encoder::error::BindRulesEncodeError;
-    use crate::compiler::compile_statements;
     use crate::compiler::instruction::{self, Instruction};
-    use crate::compiler::{Symbol, SymbolTable};
+    use crate::compiler::{compile_statements, Symbol, SymbolTable};
     use crate::make_identifier;
     use crate::parser::bind_rules::{Condition, ConditionOp, Statement};
     use crate::parser::common::{CompoundIdentifier, Span, Value};

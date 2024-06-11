@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context},
-    fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootReason},
-    fuchsia_component::client::connect_to_protocol,
-    tracing::error,
-};
+use anyhow::{anyhow, Context};
+use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootReason};
+use fuchsia_component::client::connect_to_protocol;
+use tracing::error;
 
 /// Reboots the system, logging errors instead of failing.
 pub(super) async fn reboot() {

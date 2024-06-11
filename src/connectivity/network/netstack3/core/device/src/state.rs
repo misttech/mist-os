@@ -9,19 +9,15 @@ use core::fmt::Debug;
 
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::ip::{Ipv4, Ipv6};
+use netstack3_base::sync::{RwLock, WeakRc};
 use netstack3_base::{
-    sync::{RwLock, WeakRc},
     CoreTimerContext, Device, DeviceIdContext, Inspectable, TimerContext, WeakDeviceIdentifier,
 };
-use netstack3_ip::{
-    device::{DualStackIpDeviceState, IpAddressIdSpec, IpDeviceTimerId},
-    RawMetric,
-};
+use netstack3_ip::device::{DualStackIpDeviceState, IpAddressIdSpec, IpDeviceTimerId};
+use netstack3_ip::RawMetric;
 
-use crate::internal::{
-    base::{DeviceCounters, DeviceLayerTypes, OriginTracker},
-    socket::HeldDeviceSockets,
-};
+use crate::internal::base::{DeviceCounters, DeviceLayerTypes, OriginTracker};
+use crate::internal::socket::HeldDeviceSockets;
 
 /// Provides the specifications for device state held by [`BaseDeviceId`] in
 /// [`BaseDeviceState`].

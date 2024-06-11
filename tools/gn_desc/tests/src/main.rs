@@ -20,7 +20,8 @@ use argh::FromArgs;
 use camino::Utf8PathBuf;
 use gn_json::target::{AllTargets, ConfigValues, Public, TargetDescription};
 use pretty_assertions::assert_eq;
-use std::{ffi::OsStr, process::Command};
+use std::ffi::OsStr;
+use std::process::Command;
 use tempfile::tempdir;
 
 /// Test arguments for the integration test

@@ -6,18 +6,15 @@ use crate::logs::repository::LogsRepository;
 use anyhow::Error;
 use diagnostics_data::{Data, Logs};
 use fidl_fuchsia_diagnostics::{Selector, StreamMode};
-use fuchsia_trace as ftrace;
-use fuchsia_zircon as zx;
 use futures::StreamExt;
 use selectors::FastError;
-use std::{
-    borrow::Cow,
-    collections::HashSet,
-    fmt::Display,
-    io::{self, Write},
-    sync::Arc,
-};
+use std::borrow::Cow;
+use std::collections::HashSet;
+use std::fmt::Display;
+use std::io::{self, Write};
+use std::sync::Arc;
 use tracing::warn;
+use {fuchsia_trace as ftrace, fuchsia_zircon as zx};
 
 const MAX_SERIAL_WRITE_SIZE: usize = 256;
 
@@ -193,14 +190,11 @@ impl<'a, S: Write> SerialWriter<'a, S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        identity::ComponentIdentity,
-        logs::stored_message::{GenericStoredMessage, StructuredStoredMessage},
-    };
+    use crate::identity::ComponentIdentity;
+    use crate::logs::stored_message::{GenericStoredMessage, StructuredStoredMessage};
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, LogsField, LogsProperty, Severity};
-    use diagnostics_log_encoding::{
-        encode::Encoder, Argument, Record, Severity as StreamSeverity, Value,
-    };
+    use diagnostics_log_encoding::encode::Encoder;
+    use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
     use fuchsia_async as fasync;
     use fuchsia_zircon::Time;
     use futures::channel::mpsc;

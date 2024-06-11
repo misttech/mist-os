@@ -2,32 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    collections::{HashMap, HashSet},
-    num::NonZeroU64,
-    pin::Pin,
-};
+use std::collections::{HashMap, HashSet};
+use std::num::NonZeroU64;
+use std::pin::Pin;
 
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
-use fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext;
-use fidl_fuchsia_net_ext as fnet_ext;
-use fidl_fuchsia_net_name as fnet_name;
-use fuchsia_zircon as zx;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6,
+    fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext, fidl_fuchsia_net_ext as fnet_ext,
+    fidl_fuchsia_net_name as fnet_name, fuchsia_zircon as zx,
+};
 
 use anyhow::Context as _;
-use async_utils::{
-    hanging_get::client::HangingGetStream,
-    stream::{StreamMap, Tagged},
-};
+use async_utils::hanging_get::client::HangingGetStream;
+use async_utils::stream::{StreamMap, Tagged};
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource};
-use futures::{
-    future::TryFutureExt as _,
-    stream::{BoxStream, Stream, TryStreamExt as _},
-};
+use futures::future::TryFutureExt as _;
+use futures::stream::{BoxStream, Stream, TryStreamExt as _};
 
-use crate::errors;
-use crate::{dns, DnsServerWatchers};
+use crate::{dns, errors, DnsServerWatchers};
 
 // TODO(https://fxbug.dev/329099228): Switch to using DUID-LLT and persisting it to disk.
 pub(super) fn duid(mac: fnet_ext::MacAddress) -> fnet_dhcpv6::Duid {
@@ -363,17 +355,14 @@ impl PrefixProviderHandler {
 
 #[cfg(test)]
 mod tests {
-    use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-    use fuchsia_zircon as zx;
+    use {fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin, fuchsia_zircon as zx};
 
     use const_unwrap::const_unwrap_option;
     use net_declare::{fidl_socket_addr_v6, net_subnet_v6};
     use test_case::test_case;
 
-    use crate::{
-        interface::{generate_identifier, InterfaceNamingIdentifier, ProvisioningAction},
-        DeviceClass, HostInterfaceState, InterfaceConfigState, InterfaceState,
-    };
+    use crate::interface::{generate_identifier, InterfaceNamingIdentifier, ProvisioningAction};
+    use crate::{DeviceClass, HostInterfaceState, InterfaceConfigState, InterfaceState};
 
     use super::*;
 

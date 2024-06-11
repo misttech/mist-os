@@ -5,16 +5,19 @@
 use argh::FromArgs;
 use async_trait::async_trait;
 use const_unwrap::const_unwrap_option;
-use fidl_fuchsia_net_debug as fnet_debug;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fuchsia_zircon as zx;
-use futures::{channel::oneshot, FutureExt as _};
+use futures::channel::oneshot;
+use futures::FutureExt as _;
 use humansize::FileSize as _;
 use netstack_testing_common::realms::{
     KnownServiceProvider, Netstack, ProdNetstack2, ProdNetstack3, TestSandboxExt as _,
 };
-use std::{collections::HashMap, num::NonZeroUsize, sync::Arc};
+use std::collections::HashMap;
+use std::num::NonZeroUsize;
+use std::sync::Arc;
+use {
+    fidl_fuchsia_net_debug as fnet_debug, fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fuchsia_zircon as zx,
+};
 
 mod interfaces;
 mod sockets;

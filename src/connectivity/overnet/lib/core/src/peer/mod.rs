@@ -7,12 +7,10 @@ mod framed_stream;
 pub(crate) use self::framed_stream::{
     FrameType, FramedStreamReadResult, FramedStreamReader, FramedStreamWriter,
 };
-use crate::{
-    coding::{decode_fidl, encode_fidl},
-    future_help::Observer,
-    labels::{Endpoint, NodeId, TransferKey},
-    router::{FoundTransfer, Router},
-};
+use crate::coding::{decode_fidl, encode_fidl};
+use crate::future_help::Observer;
+use crate::labels::{Endpoint, NodeId, TransferKey};
+use crate::router::{FoundTransfer, Router};
 use anyhow::{bail, format_err, Context as _, Error};
 use fidl::{Channel, HandleBased};
 use fidl_fuchsia_overnet_protocol::{
@@ -20,15 +18,11 @@ use fidl_fuchsia_overnet_protocol::{
     OpenTransfer, PeerDescription, PeerMessage, PeerReply, StreamId, ZirconHandle,
 };
 use fuchsia_async::{Task, TimeoutExt};
-use futures::{
-    channel::{mpsc, oneshot},
-    lock::Mutex,
-    prelude::*,
-};
-use std::{
-    sync::{Arc, Weak},
-    time::Duration,
-};
+use futures::channel::{mpsc, oneshot};
+use futures::lock::Mutex;
+use futures::prelude::*;
+use std::sync::{Arc, Weak};
+use std::time::Duration;
 
 #[derive(Debug)]
 struct Config {}

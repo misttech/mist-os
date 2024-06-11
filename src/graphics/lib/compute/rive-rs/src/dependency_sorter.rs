@@ -4,7 +4,8 @@
 
 use std::collections::{HashSet, VecDeque};
 
-use crate::{core::Object, Component};
+use crate::core::Object;
+use crate::Component;
 
 #[derive(Debug, Default)]
 pub struct DependencySorter {

@@ -7,15 +7,13 @@
 mod hci;
 mod types;
 
-use {
-    anyhow::{Context, Error},
-    argh::FromArgs,
-    fuchsia_async as fasync,
-    futures::StreamExt,
-    hci::CommandChannel,
-    hex::FromHex,
-    types::*,
-};
+use anyhow::{Context, Error};
+use argh::FromArgs;
+use fuchsia_async as fasync;
+use futures::StreamExt;
+use hci::CommandChannel;
+use hex::FromHex;
+use types::*;
 
 #[derive(Debug, FromArgs)]
 /// Command line args

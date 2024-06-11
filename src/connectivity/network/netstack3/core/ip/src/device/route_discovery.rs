@@ -9,10 +9,8 @@
 use core::hash::Hash;
 
 use fakealloc::collections::HashSet;
-use net_types::{
-    ip::{Ipv6Addr, Subnet},
-    LinkLocalUnicastAddr,
-};
+use net_types::ip::{Ipv6Addr, Subnet};
+use net_types::LinkLocalUnicastAddr;
 use netstack3_base::{
     AnyDevice, CoreTimerContext, DeviceIdContext, ExistsError, HandleableTimer,
     InstantBindingsTypes, LocalTimerHeap, TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
@@ -266,14 +264,11 @@ fn invalidate_route<BC: Ipv6RouteDiscoveryBindingsContext, CC: Ipv6DiscoveredRou
 mod tests {
     use alloc::vec::Vec;
 
-    use netstack3_base::IntoCoreTimerCtx;
-    use netstack3_base::{
-        testutil::{
-            FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeInstant, FakeTimerCtxExt as _,
-            FakeWeakDeviceId,
-        },
-        CtxPair,
+    use netstack3_base::testutil::{
+        FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeInstant, FakeTimerCtxExt as _,
+        FakeWeakDeviceId,
     };
+    use netstack3_base::{CtxPair, IntoCoreTimerCtx};
     use packet_formats::utils::NonZeroDuration;
 
     use super::*;

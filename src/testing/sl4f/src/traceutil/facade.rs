@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::engine::Engine as _;
 use serde_json::{to_value, Value};
 
 use std::collections::HashMap;

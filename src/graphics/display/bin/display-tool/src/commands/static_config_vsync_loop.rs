@@ -14,7 +14,9 @@ use {
     std::io::Write,
 };
 
-use crate::{draw::MappedImage, fps::Counter, rgb::Rgb888};
+use crate::draw::MappedImage;
+use crate::fps::Counter;
+use crate::rgb::Rgb888;
 
 const CLEAR: &str = "\x1B[2K\r";
 

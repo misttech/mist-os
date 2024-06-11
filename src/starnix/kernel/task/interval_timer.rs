@@ -2,21 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    signals::{send_signal, SignalDetail, SignalEvent, SignalEventNotify, SignalInfo},
-    task::{
-        timers::{ClockId, TimerId},
-        Kernel, ThreadGroup,
-    },
-    time::utc,
-};
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
+use crate::signals::{send_signal, SignalDetail, SignalEvent, SignalEventNotify, SignalInfo};
+use crate::task::timers::{ClockId, TimerId};
+use crate::task::{Kernel, ThreadGroup};
+use crate::time::utc;
 use futures::stream::AbortHandle;
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::Mutex;
-use starnix_uapi::{itimerspec, ownership::TempRef, time::timespec_from_duration, SI_TIMER};
+use starnix_uapi::ownership::TempRef;
+use starnix_uapi::time::timespec_from_duration;
+use starnix_uapi::{itimerspec, SI_TIMER};
 use std::sync::{Arc, Weak};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 #[derive(Default)]
 pub struct TimerRemaining {

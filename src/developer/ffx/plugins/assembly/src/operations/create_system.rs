@@ -5,8 +5,7 @@
 use crate::base_package::{construct_base_package, BasePackage};
 use crate::fvm::construct_fvm;
 use crate::fxfs::{construct_fxfs, ConstructedFxfs};
-use crate::vbmeta;
-use crate::zbi;
+use crate::{vbmeta, zbi};
 
 use anyhow::{anyhow, Context, Result};
 use assembly_config_schema::ImageAssemblyConfig;

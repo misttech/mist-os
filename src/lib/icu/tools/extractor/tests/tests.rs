@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{ensure, Error},
-    pretty_assertions::assert_eq,
-    regex::Regex,
-    std::{env, path::PathBuf, process::Command},
-};
+use anyhow::{ensure, Error};
+use pretty_assertions::assert_eq;
+use regex::Regex;
+use std::env;
+use std::path::PathBuf;
+use std::process::Command;
 
 fn test_path() -> PathBuf {
     let mut path = env::current_exe().unwrap();

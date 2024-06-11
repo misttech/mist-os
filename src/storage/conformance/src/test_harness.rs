@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::flags::Rights;
+use fidl::endpoints::create_proxy;
 use {
-    crate::flags::Rights, fidl::endpoints::create_proxy, fidl_fuchsia_component as fcomponent,
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fidl_fuchsia_io_test as io_test,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_io as fio, fidl_fuchsia_io_test as io_test, fuchsia_zircon as zx,
 };
 
 /// Helper struct for connecting to an io1 test harness and running a conformance test on it.

@@ -4,20 +4,19 @@
 
 use anyhow::{Context, Error};
 use fidl::endpoints::ServerEnd;
-use fidl_fuchsia_io as fio;
 use fidl_fuchsia_recovery_ui::{
     ProgressRendererMarker, ProgressRendererProxyInterface, ProgressRendererRender2Request, Status,
 };
-use fuchsia_async as fasync;
 use fuchsia_component::client;
 use fuchsia_runtime::{take_startup_handle, HandleType};
 use futures::future::{join, Future};
-use ota_lib::{ota::run_wellknown_ota, storage::wipe_storage};
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
-use vfs::directory::{entry_container::Directory, immutable::simple::Simple};
+use ota_lib::ota::run_wellknown_ota;
+use ota_lib::storage::wipe_storage;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use vfs::directory::entry_container::Directory;
+use vfs::directory::immutable::simple::Simple;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 fn to_render2_error(err: fidl::Error) -> Error {
     anyhow::format_err!("Error encountered while calling render2: {:?}", err)

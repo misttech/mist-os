@@ -3,17 +3,13 @@
 // found in the LICENSE file.
 
 use async_utils::hanging_get::client::HangingGetStream;
-use core::{
-    pin::Pin,
-    task::{Context, Poll},
-};
+use core::pin::Pin;
+use core::task::{Context, Poll};
 use fidl_fuchsia_bluetooth_sys as sys;
 use fuchsia_bluetooth::types::{Address, HostInfo};
 use fuchsia_bluetooth::Error;
-use futures::{
-    ready,
-    stream::{FusedStream, Stream, StreamExt},
-};
+use futures::ready;
+use futures::stream::{FusedStream, Stream, StreamExt};
 use tracing::trace;
 
 /// Item type returned by `<HostWatcher as Stream>::poll_next`.

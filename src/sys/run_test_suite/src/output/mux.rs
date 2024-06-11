@@ -6,10 +6,8 @@ use crate::output::{
     ArtifactType, DirectoryArtifactType, DirectoryWrite, DynArtifact, DynDirectoryArtifact,
     EntityId, EntityInfo, ReportedOutcome, Reporter, Timestamp,
 };
-use std::{
-    io::{Error, Write},
-    path::Path,
-};
+use std::io::{Error, Write};
+use std::path::Path;
 
 /// A writer that writes to two writers.
 pub struct MultiplexedWriter<A: Write, B: Write> {
@@ -124,10 +122,8 @@ impl DirectoryWrite for MultiplexedDirectoryWriter {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::output::{
-        directory::{DirectoryReporter, SchemaVersion},
-        RunReporter, SuiteId,
-    };
+    use crate::output::directory::{DirectoryReporter, SchemaVersion};
+    use crate::output::{RunReporter, SuiteId};
     use tempfile::tempdir;
     use test_output_directory as directory;
     use test_output_directory::testing::{

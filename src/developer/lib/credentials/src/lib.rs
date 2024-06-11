@@ -13,18 +13,14 @@
 //!          secrecy could be compromised. I.e. watch out when adding/reviewing
 //!          log::*, tracing::*, or `impl` of Display or Debug.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    gcs::auth::GcsCredentials,
-    serde::{Deserialize, Serialize},
-    std::{
-        env, fmt,
-        fs::{create_dir_all, set_permissions, Permissions},
-        io::{BufWriter, Write},
-        os::unix::fs::PermissionsExt,
-        path::PathBuf,
-    },
-};
+use anyhow::{anyhow, Context, Result};
+use gcs::auth::GcsCredentials;
+use serde::{Deserialize, Serialize};
+use std::fs::{create_dir_all, set_permissions, Permissions};
+use std::io::{BufWriter, Write};
+use std::os::unix::fs::PermissionsExt;
+use std::path::PathBuf;
+use std::{env, fmt};
 
 const FILE_NAME: &str = "credentials.json";
 const VERSION_1_LABEL: &str = "1";
@@ -171,7 +167,9 @@ fn developer_data_path() -> Result<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, serial_test::serial, temp_test_env::TempTestEnv};
+    use super::*;
+    use serial_test::serial;
+    use temp_test_env::TempTestEnv;
 
     #[test]
     fn test_new() {

@@ -12,18 +12,14 @@
 
 mod cubic;
 
-use core::{
-    cmp::Ordering,
-    num::{NonZeroU32, NonZeroU8},
-    time::Duration,
-};
+use core::cmp::Ordering;
+use core::num::{NonZeroU32, NonZeroU8};
+use core::time::Duration;
 
 use netstack3_base::Instant;
 
-use crate::internal::{
-    base::Mss,
-    seqnum::{SeqNum, WindowSize},
-};
+use crate::internal::base::Mss;
+use crate::internal::seqnum::{SeqNum, WindowSize};
 
 // Per RFC 5681 (https://www.rfc-editor.org/rfc/rfc5681#section-3.2):
 ///   The fast retransmit algorithm uses the arrival of 3 duplicate ACKs (...)

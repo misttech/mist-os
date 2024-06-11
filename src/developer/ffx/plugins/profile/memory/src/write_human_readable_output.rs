@@ -4,17 +4,15 @@
 
 //! Utilities that prints information in a human-readable format.
 
-use {
-    crate::digest,
-    crate::ProfileMemoryOutput,
-    anyhow::Result,
-    digest::processed,
-    humansize::{file_size_opts::BINARY, FileSize},
-    processed::RetainedMemory,
-    std::cmp::Reverse,
-    std::collections::HashMap,
-    std::io::Write,
-};
+use crate::{digest, ProfileMemoryOutput};
+use anyhow::Result;
+use digest::processed;
+use humansize::file_size_opts::BINARY;
+use humansize::FileSize;
+use processed::RetainedMemory;
+use std::cmp::Reverse;
+use std::collections::HashMap;
+use std::io::Write;
 
 // Returns a sorted list of names that match non-empty vmo groups.
 pub fn filter_and_order_vmo_groups_names_for_printing(

@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    component_events::{events::*, matcher::*},
-    fuchsia_async as fasync,
-    std::sync::{Arc, Mutex},
-};
+use component_events::events::*;
+use component_events::matcher::*;
+use fuchsia_async as fasync;
+use std::sync::{Arc, Mutex};
 
 // Helper for getting information about the child component using event_stream.
 pub struct AppMonitor {

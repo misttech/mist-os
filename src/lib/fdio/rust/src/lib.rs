@@ -10,25 +10,19 @@ mod spawn_builder;
 
 pub use spawn_builder::{Error as SpawnBuilderError, SpawnBuilder};
 
-use {
-    bitflags::bitflags,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _},
-    std::{
-        convert::TryInto as _,
-        ffi::{CStr, CString, NulError},
-        fs::File,
-        marker::PhantomData,
-        mem::{self, MaybeUninit},
-        num::TryFromIntError,
-        os::{
-            fd::{AsFd, BorrowedFd, OwnedFd},
-            raw,
-            unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd},
-        },
-        str::Utf8Error,
-    },
-};
+use bitflags::bitflags;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _};
+use std::convert::TryInto as _;
+use std::ffi::{CStr, CString, NulError};
+use std::fs::File;
+use std::marker::PhantomData;
+use std::mem::{self, MaybeUninit};
+use std::num::TryFromIntError;
+use std::os::fd::{AsFd, BorrowedFd, OwnedFd};
+use std::os::raw;
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::str::Utf8Error;
 
 /// Connects a channel to a named service.
 pub fn service_connect(service_path: &str, channel: zx::Channel) -> Result<(), zx::Status> {
@@ -752,11 +746,9 @@ pub struct NamespaceEntry {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fuchsia_zircon::{object_wait_many, Signals, Status, Time, WaitItem},
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_zircon::{object_wait_many, Signals, Status, Time, WaitItem};
 
     #[test]
     fn namespace_get_installed() {

@@ -7,28 +7,22 @@
 //! This module contains microbenchmarks for the Netstack3 Core, built on top
 //! of Criterion.
 
-use net_types::{ip::Ipv4, Witness as _};
-use netstack3_base::{bench, testutil::Bencher, testutil::TEST_ADDRS_V4};
-use netstack3_core::{
-    device::{DeviceId, EthernetLinkDevice, RecvEthernetFrameMeta},
-    testutil::{CtxPairExt as _, FakeCtxBuilder},
-    StackStateBuilder,
-};
+use net_types::ip::Ipv4;
+use net_types::Witness as _;
+use netstack3_base::bench;
+use netstack3_base::testutil::{Bencher, TEST_ADDRS_V4};
+use netstack3_core::device::{DeviceId, EthernetLinkDevice, RecvEthernetFrameMeta};
+use netstack3_core::testutil::{CtxPairExt as _, FakeCtxBuilder};
+use netstack3_core::StackStateBuilder;
 use packet::{Buf, InnerPacketBuilder, Serializer};
-use packet_formats::{
-    ethernet::{
-        testutil::{
-            ETHERNET_DST_MAC_BYTE_OFFSET, ETHERNET_HDR_LEN_NO_TAG, ETHERNET_MIN_BODY_LEN_NO_TAG,
-            ETHERNET_SRC_MAC_BYTE_OFFSET,
-        },
-        EtherType, EthernetFrameBuilder,
-    },
-    ip::IpProto,
-    ipv4::{
-        testutil::{IPV4_CHECKSUM_OFFSET, IPV4_MIN_HDR_LEN, IPV4_TTL_OFFSET},
-        Ipv4PacketBuilder,
-    },
+use packet_formats::ethernet::testutil::{
+    ETHERNET_DST_MAC_BYTE_OFFSET, ETHERNET_HDR_LEN_NO_TAG, ETHERNET_MIN_BODY_LEN_NO_TAG,
+    ETHERNET_SRC_MAC_BYTE_OFFSET,
 };
+use packet_formats::ethernet::{EtherType, EthernetFrameBuilder};
+use packet_formats::ip::IpProto;
+use packet_formats::ipv4::testutil::{IPV4_CHECKSUM_OFFSET, IPV4_MIN_HDR_LEN, IPV4_TTL_OFFSET};
+use packet_formats::ipv4::Ipv4PacketBuilder;
 
 // NOTE: Extra tests that are too expensive to run during benchmarks can be
 // added by gating them on the `debug_assertions` configuration option. This

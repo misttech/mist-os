@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    assert_matches::assert_matches,
-    fidl_fuchsia_pkg as fpkg, fidl_fuchsia_pkg_ext as pkg,
-    fuchsia_pkg_testing::{PackageBuilder, RepositoryBuilder, SystemImageBuilder},
-    futures::stream::StreamExt as _,
-    lib::{TestEnvBuilder, EMPTY_REPO_PATH},
-    std::sync::Arc,
-};
+use assert_matches::assert_matches;
+use fuchsia_pkg_testing::{PackageBuilder, RepositoryBuilder, SystemImageBuilder};
+use futures::stream::StreamExt as _;
+use lib::{TestEnvBuilder, EMPTY_REPO_PATH};
+use std::sync::Arc;
+use {fidl_fuchsia_pkg as fpkg, fidl_fuchsia_pkg_ext as pkg};
 
 #[fuchsia::test]
 async fn absolute_url_rejects_non_empty_context() {

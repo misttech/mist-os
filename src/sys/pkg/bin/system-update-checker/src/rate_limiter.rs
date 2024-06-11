@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fuchsia_sync::Mutex, fuchsia_zircon as zx};
+use fuchsia_sync::Mutex;
+use fuchsia_zircon as zx;
 
 pub(crate) trait Clock {
     fn now(&self) -> zx::Time;
@@ -65,10 +66,9 @@ impl RateLimiterMonotonic {
 #[allow(clippy::bool_assert_comparison)]
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        std::{cell::Cell, rc::Rc},
-    };
+    use super::*;
+    use std::cell::Cell;
+    use std::rc::Rc;
 
     #[derive(Clone)]
     struct FakeClock {

@@ -2,22 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::host_identifier::HostIdentifier;
+use anyhow::{Context as _, Result};
+use component_debug::dirs::*;
+use component_debug::lifecycle::*;
+use fidl::endpoints::ServerEnd;
+use fuchsia_component::client::connect_to_protocol_at_path;
+use futures::prelude::*;
+use moniker::Moniker;
+use std::borrow::Borrow;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::{Rc, Weak};
+use tracing::*;
 use {
-    crate::host_identifier::HostIdentifier,
-    anyhow::{Context as _, Result},
-    component_debug::dirs::*,
-    component_debug::lifecycle::*,
-    fidl::endpoints::ServerEnd,
     fidl_fuchsia_developer_remotecontrol as rcs,
     fidl_fuchsia_developer_remotecontrol_connector as connector,
     fidl_fuchsia_diagnostics as diagnostics, fidl_fuchsia_io as fio, fidl_fuchsia_io as io,
-    fidl_fuchsia_sys2 as fsys,
-    fuchsia_component::client::connect_to_protocol_at_path,
-    fuchsia_zircon as zx,
-    futures::prelude::*,
-    moniker::Moniker,
-    std::{borrow::Borrow, cell::RefCell, collections::HashMap, rc::Rc, rc::Weak},
-    tracing::*,
+    fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
 };
 
 mod host_identifier;
@@ -372,17 +374,13 @@ async fn check_entry_exists(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl_fuchsia_buildinfo as buildinfo;
-    use fidl_fuchsia_developer_remotecontrol as rcs;
-    use fidl_fuchsia_device as fdevice;
-    use fidl_fuchsia_hwinfo as hwinfo;
-    use fidl_fuchsia_io as fio;
-    use fidl_fuchsia_net as fnet;
-    use fidl_fuchsia_net_interfaces as fnet_interfaces;
-    use fidl_fuchsia_sysinfo as sysinfo;
-    use fuchsia_async as fasync;
     use fuchsia_component::server::ServiceFs;
-    use fuchsia_zircon as zx;
+    use {
+        fidl_fuchsia_buildinfo as buildinfo, fidl_fuchsia_developer_remotecontrol as rcs,
+        fidl_fuchsia_device as fdevice, fidl_fuchsia_hwinfo as hwinfo, fidl_fuchsia_io as fio,
+        fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces as fnet_interfaces,
+        fidl_fuchsia_sysinfo as sysinfo, fuchsia_async as fasync, fuchsia_zircon as zx,
+    };
 
     const NODENAME: &'static str = "thumb-set-human-shred";
     const BOOT_TIME: u64 = 123456789000000000;

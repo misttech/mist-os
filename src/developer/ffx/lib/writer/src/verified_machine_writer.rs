@@ -4,7 +4,8 @@
 use crate::{format_output, Format, MachineWriter, Result, TestBuffers, ToolIO};
 use serde::Serialize;
 use serde_json::Value;
-use std::{fmt::Display, io::Write};
+use std::fmt::Display;
+use std::io::Write;
 
 /// Structured output writer with schema.
 /// [`VerifiedMachineWriter`] is used to provide

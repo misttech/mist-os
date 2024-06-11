@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{server::Facade, wlan_deprecated::facade::WlanDeprecatedConfigurationFacade},
-    anyhow::{format_err, Error},
-    async_trait::async_trait,
-    serde_json::{to_value, Value},
-    tracing::info,
-};
+use crate::server::Facade;
+use crate::wlan_deprecated::facade::WlanDeprecatedConfigurationFacade;
+use anyhow::{format_err, Error};
+use async_trait::async_trait;
+use serde_json::{to_value, Value};
+use tracing::info;
 
 #[async_trait(?Send)]
 impl Facade for WlanDeprecatedConfigurationFacade {

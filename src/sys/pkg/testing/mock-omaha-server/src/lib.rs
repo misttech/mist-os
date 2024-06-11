@@ -2,22 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    derive_builder::Builder,
-    fuchsia_merkle::Hash,
-    fuchsia_sync::Mutex,
-    hyper::{body::Bytes, header, Body, Method, Request, Response, StatusCode},
-    omaha_client::cup_ecdsa::{
-        test_support::{make_default_private_key_for_test, make_default_public_key_id_for_test},
-        PublicKeyId,
-    },
-    serde::Deserialize,
-    serde_json::json,
-    sha2::{Digest, Sha256},
-    std::{collections::HashMap, str::FromStr},
-    url::Url,
+use anyhow::Error;
+use derive_builder::Builder;
+use fuchsia_merkle::Hash;
+use fuchsia_sync::Mutex;
+use hyper::body::Bytes;
+use hyper::{header, Body, Method, Request, Response, StatusCode};
+use omaha_client::cup_ecdsa::test_support::{
+    make_default_private_key_for_test, make_default_public_key_id_for_test,
 };
+use omaha_client::cup_ecdsa::PublicKeyId;
+use serde::Deserialize;
+use serde_json::json;
+use sha2::{Digest, Sha256};
+use std::collections::HashMap;
+use std::str::FromStr;
+use url::Url;
 
 #[cfg(target_os = "fuchsia")]
 use {
@@ -499,7 +499,9 @@ pub async fn handle_omaha_request(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, anyhow::Context, fuchsia_async as fasync};
+    use super::*;
+    use anyhow::Context;
+    use fuchsia_async as fasync;
 
     #[fasync::run_singlethreaded(test)]
     async fn test_no_validate_version() -> Result<(), Error> {

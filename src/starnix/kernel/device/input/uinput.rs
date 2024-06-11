@@ -9,24 +9,21 @@ use fidl_fuchsia_ui_test_input::{
     RegistryRegisterTouchScreenRequest,
 };
 use fuchsia_zircon as zx;
-use starnix_core::{
-    device::{
-        kobject::{Device, DeviceMetadata},
-        DeviceMode, DeviceOps,
-    },
-    fileops_impl_seekless,
-    fs::sysfs::DeviceDirectory,
-    mm::MemoryAccessorExt,
-    task::CurrentTask,
-    vfs::{self, default_ioctl, FileObject, FileOps, FsNode, FsString},
-};
+use starnix_core::device::kobject::{Device, DeviceMetadata};
+use starnix_core::device::{DeviceMode, DeviceOps};
+use starnix_core::fileops_impl_seekless;
+use starnix_core::fs::sysfs::DeviceDirectory;
+use starnix_core::mm::MemoryAccessorExt;
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::{self, default_ioctl, FileObject, FileOps, FsNode, FsString};
 use starnix_logging::log_warn;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
-use starnix_uapi::{
-    device_type, device_type::INPUT_MAJOR, errno, error, errors::Errno, open_flags::OpenFlags,
-    uapi, user_address::UserRef,
-};
+use starnix_uapi::device_type::INPUT_MAJOR;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::user_address::UserRef;
+use starnix_uapi::{device_type, errno, error, uapi};
 use std::sync::atomic::{AtomicU32, Ordering};
 use zerocopy::FromBytes;
 
@@ -455,11 +452,9 @@ impl DeviceOps for VirtualDevice {
 #[cfg(test)]
 mod test {
     use super::*;
-    use starnix_core::{
-        task::Kernel,
-        testing::{create_kernel_task_and_unlocked, AutoReleasableTask},
-        vfs::FileHandle,
-    };
+    use starnix_core::task::Kernel;
+    use starnix_core::testing::{create_kernel_task_and_unlocked, AutoReleasableTask};
+    use starnix_core::vfs::FileHandle;
     use std::sync::Arc;
     use test_case::test_case;
 

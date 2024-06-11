@@ -3,18 +3,15 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Error};
-use fidl_fuchsia_feedback as fidl_feedback;
-use fuchsia_async as fasync;
+use fidl_fuchsia_feedback::{
+    Annotation, CrashReporterMarker, CrashReporterProxy, FileReportResults,
+};
+use fuchsia_component::client::connect_to_protocol;
 use futures::channel::mpsc;
 use futures::stream::StreamExt;
 use std::cell::RefCell;
 use std::rc::Rc;
-use {
-    fidl_fuchsia_feedback::{
-        Annotation, CrashReporterMarker, CrashReporterProxy, FileReportResults,
-    },
-    fuchsia_component::client::connect_to_protocol,
-};
+use {fidl_fuchsia_feedback as fidl_feedback, fuchsia_async as fasync};
 
 #[macro_export]
 macro_rules! send_report {

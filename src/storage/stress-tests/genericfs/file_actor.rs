@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_trait::async_trait,
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_zircon::Status,
-    futures::{SinkExt as _, StreamExt as _},
-    once_cell::sync::OnceCell,
-    storage_stress_test_utils::{data::FileFactory, io::Directory},
-    stress_test::actor::{Actor, ActorError},
-    tracing::info,
-};
+use async_trait::async_trait;
+use fuchsia_zircon::Status;
+use futures::{SinkExt as _, StreamExt as _};
+use once_cell::sync::OnceCell;
+use storage_stress_test_utils::data::FileFactory;
+use storage_stress_test_utils::io::Directory;
+use stress_test::actor::{Actor, ActorError};
+use tracing::info;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 // TODO(https://fxbug.dev/42146417): This actor is very basic. At the moment, this is fine, since this is a
 // v0 implementation of minfs stress tests. Eventually, we should write stress tests that exercise

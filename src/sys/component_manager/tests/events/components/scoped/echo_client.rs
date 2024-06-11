@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::format_err, fidl_fidl_examples_routing_echo as fecho,
-    fuchsia_component::client::connect_to_protocol,
-};
+use anyhow::format_err;
+use fidl_fidl_examples_routing_echo as fecho;
+use fuchsia_component::client::connect_to_protocol;
 
 #[fuchsia::main(logging_tags = ["scoped_echo_client"])]
 async fn main() {

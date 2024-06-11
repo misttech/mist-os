@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error, elf_runner::crash_info::CrashRecords, fidl_fuchsia_component as fcomponent,
-    fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx, futures::TryStreamExt, std::sync::Arc,
-};
+use anyhow::Error;
+use elf_runner::crash_info::CrashRecords;
+use futures::TryStreamExt;
+use std::sync::Arc;
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx};
 
 pub struct CrashIntrospectSvc(CrashRecords);
 
@@ -35,10 +36,11 @@ impl CrashIntrospectSvc {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, elf_runner::crash_info::ComponentCrashInfo,
-        fidl::endpoints::create_proxy_and_stream, fuchsia_async as fasync, moniker::Moniker,
-    };
+    use super::*;
+    use elf_runner::crash_info::ComponentCrashInfo;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fuchsia_async as fasync;
+    use moniker::Moniker;
 
     #[fuchsia::test]
     async fn get_crash_report() -> Result<(), Error> {

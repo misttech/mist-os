@@ -14,14 +14,13 @@
 //! running tasks for either joining them or drop them.
 
 use fuchsia_async::Task;
-use futures::{future::ready, FutureExt};
-use std::{
-    cell::{Cell, RefCell},
-    collections::HashMap,
-    future::Future,
-    num::Wrapping,
-    rc::Rc,
-};
+use futures::future::ready;
+use futures::FutureExt;
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
+use std::future::Future;
+use std::num::Wrapping;
+use std::rc::Rc;
 
 #[derive(Debug, Default)]
 pub struct TaskManager {

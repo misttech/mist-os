@@ -6,11 +6,6 @@ use std::collections::HashSet;
 
 use anyhow::{anyhow, Error, Result};
 use fidl::endpoints::{create_endpoints, create_proxy, DiscoverableProtocolMarker, ServiceMarker};
-use fidl_fuchsia_basicdriver_ctftest as ctf;
-use fidl_fuchsia_driver_test as fdt;
-use fidl_fuchsia_driver_testing as ftest;
-use fidl_fuchsia_io as fio;
-use fuchsia_async as fasync;
 use fuchsia_component::client::{connect_to_protocol, connect_to_service_instance_at};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_fs::directory::WatchEvent;
@@ -18,6 +13,10 @@ use futures::channel::mpsc;
 use futures::prelude::*;
 use realm_client::{extend_namespace, InstalledNamespace};
 use tracing::info;
+use {
+    fidl_fuchsia_basicdriver_ctftest as ctf, fidl_fuchsia_driver_test as fdt,
+    fidl_fuchsia_driver_testing as ftest, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+};
 
 async fn run_waiter_server(mut stream: ctf::WaiterRequestStream, mut sender: mpsc::Sender<()>) {
     while let Some(ctf::WaiterRequest::Ack { .. }) = stream.try_next().await.expect("Stream failed")

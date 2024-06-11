@@ -4,12 +4,10 @@
 
 #![cfg(test)]
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_input as input, fidl_fuchsia_ui_input as ui_input,
-    fuchsia_async::{self as fasync},
-    fuchsia_component::client::connect_to_protocol,
-};
+use anyhow::{Context as _, Error};
+use fuchsia_async::{self as fasync};
+use fuchsia_component::client::connect_to_protocol;
+use {fidl_fuchsia_input as input, fidl_fuchsia_ui_input as ui_input};
 
 use test_helpers::{
     bind_editor, default_state, get_action, get_state_update, measure_utf16, setup_ime,

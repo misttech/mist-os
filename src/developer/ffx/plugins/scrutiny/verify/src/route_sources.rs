@@ -5,12 +5,11 @@
 use anyhow::{anyhow, Context, Error, Result};
 use ffx_scrutiny_verify_args::route_sources::Command;
 use scrutiny_config::{ConfigBuilder, ModelConfig};
-use scrutiny_frontend::{command_builder::CommandBuilder, launcher};
+use scrutiny_frontend::command_builder::CommandBuilder;
+use scrutiny_frontend::launcher;
 use scrutiny_plugins::verify::{RouteSourceError, VerifyRouteSourcesResults};
-use std::{
-    collections::{HashMap, HashSet},
-    path::PathBuf,
-};
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 
 struct Query {
     product_bundle: PathBuf,

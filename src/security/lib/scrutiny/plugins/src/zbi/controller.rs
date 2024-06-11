@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::zbi::Zbi,
-    anyhow::Result,
-    scrutiny::{model::controller::DataController, model::model::DataModel},
-    scrutiny_utils::bootfs::BootfsPackageIndex,
-    scrutiny_utils::usage::UsageBuilder,
-    serde_json::value::Value,
-    std::sync::Arc,
-};
+use crate::zbi::Zbi;
+use anyhow::Result;
+use scrutiny::model::controller::DataController;
+use scrutiny::model::model::DataModel;
+use scrutiny_utils::bootfs::BootfsPackageIndex;
+use scrutiny_utils::usage::UsageBuilder;
+use serde_json::value::Value;
+use std::sync::Arc;
 
 /// The controller for querying the bootfs files in a product.
 #[derive(Default)]
@@ -134,10 +133,11 @@ impl DataController for ZbiSectionsController {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, scrutiny_testing::fake::*, scrutiny_utils::bootfs::BootfsFileIndex,
-        serde_json::json, std::collections::HashSet,
-    };
+    use super::*;
+    use scrutiny_testing::fake::*;
+    use scrutiny_utils::bootfs::BootfsFileIndex;
+    use serde_json::json;
+    use std::collections::HashSet;
 
     #[test]
     fn bootfs_returns_files() {

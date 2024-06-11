@@ -4,11 +4,9 @@
 
 #![cfg(test)]
 
-use {
-    crate::client::{EventId, TimedEvent, TimedEventClass},
-    std::collections::HashMap,
-    wlan_common::timer,
-};
+use crate::client::{EventId, TimedEvent, TimedEventClass};
+use std::collections::HashMap;
+use wlan_common::timer;
 
 pub fn drain_timeouts(
     time_stream: &mut timer::EventStream<TimedEvent>,

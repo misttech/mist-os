@@ -7,7 +7,8 @@ use fuchsia_async::{self as fasync, TaskGroup};
 use fuchsia_sync::Mutex;
 use fuchsia_zircon as zx;
 use persistence_config::{Config, ServiceName, Tag, TagConfig};
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 // This contains the logic to decide which tags to fetch at what times. It contains the state of
 // each tag (when last fetched, whether currently queued). When a request arrives via FIDL, it's

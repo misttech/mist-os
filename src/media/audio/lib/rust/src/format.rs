@@ -4,15 +4,16 @@
 
 use anyhow::{anyhow, Error, Result};
 use const_unwrap::const_unwrap_option;
-use fidl_fuchsia_audio as faudio;
-use fidl_fuchsia_audio_controller as fac;
-use fidl_fuchsia_hardware_audio as fhaudio;
-use fidl_fuchsia_media as fmedia;
 use regex::Regex;
 use std::fmt::Display;
 use std::io::{Cursor, Seek, SeekFrom, Write};
 use std::num::NonZeroU32;
-use std::{str::FromStr, time::Duration};
+use std::str::FromStr;
+use std::time::Duration;
+use {
+    fidl_fuchsia_audio as faudio, fidl_fuchsia_audio_controller as fac,
+    fidl_fuchsia_hardware_audio as fhaudio, fidl_fuchsia_media as fmedia,
+};
 
 pub const DURATION_REGEX: &'static str = r"^(\d+)(h|m|s|ms)$";
 

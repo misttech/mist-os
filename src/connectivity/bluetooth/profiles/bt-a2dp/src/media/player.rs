@@ -2,36 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context as _, Error},
-    async_utils::hanging_get::client::HangingGetStream,
-    bitfield::bitfield,
-    bt_a2dp::codec::MediaCodecConfig,
-    bt_avdtp::{MediaCodecType, RtpHeader},
-    fidl::client::QueryResponseFut,
-    fidl_fuchsia_media::{
-        AudioConsumerProxy, AudioConsumerStartFlags, AudioConsumerStatus, AudioSampleFormat,
-        AudioStreamType, Compression, SessionAudioConsumerFactoryMarker,
-        SessionAudioConsumerFactoryProxy, StreamPacket, StreamSinkProxy, NO_TIMESTAMP,
-        STREAM_PACKET_FLAG_DISCONTINUITY,
-    },
-    fuchsia_async as fasync,
-    fuchsia_audio_codec::StreamProcessor,
-    fuchsia_trace as trace,
-    fuchsia_zircon::{self as zx, HandleBased},
-    futures::{
-        channel::mpsc,
-        future::MapOk,
-        io::{AsyncWrite, AsyncWriteExt},
-        ready,
-        stream::FuturesUnordered,
-        task::{Context, Poll},
-        Future, FutureExt, StreamExt, TryFutureExt,
-    },
-    std::collections::HashSet,
-    std::{io, pin::Pin},
-    tracing::{info, warn},
+use anyhow::{format_err, Context as _, Error};
+use async_utils::hanging_get::client::HangingGetStream;
+use bitfield::bitfield;
+use bt_a2dp::codec::MediaCodecConfig;
+use bt_avdtp::{MediaCodecType, RtpHeader};
+use fidl::client::QueryResponseFut;
+use fidl_fuchsia_media::{
+    AudioConsumerProxy, AudioConsumerStartFlags, AudioConsumerStatus, AudioSampleFormat,
+    AudioStreamType, Compression, SessionAudioConsumerFactoryMarker,
+    SessionAudioConsumerFactoryProxy, StreamPacket, StreamSinkProxy, NO_TIMESTAMP,
+    STREAM_PACKET_FLAG_DISCONTINUITY,
 };
+use fuchsia_audio_codec::StreamProcessor;
+use fuchsia_zircon::{self as zx, HandleBased};
+use futures::channel::mpsc;
+use futures::future::MapOk;
+use futures::io::{AsyncWrite, AsyncWriteExt};
+use futures::stream::FuturesUnordered;
+use futures::task::{Context, Poll};
+use futures::{ready, Future, FutureExt, StreamExt, TryFutureExt};
+use std::collections::HashSet;
+use std::io;
+use std::pin::Pin;
+use tracing::{info, warn};
+use {fuchsia_async as fasync, fuchsia_trace as trace};
 
 use crate::latm::AudioMuxElement;
 use crate::DEFAULT_SAMPLE_RATE;
@@ -489,17 +484,15 @@ pub(crate) mod tests {
     use super::*;
     use assert_matches::assert_matches;
 
-    use {
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_media::{
-            AudioConsumerMarker, AudioConsumerRequest, AudioConsumerRequestStream,
-            SessionAudioConsumerFactoryRequest, SessionAudioConsumerFactoryRequestStream,
-            StreamSinkRequest, StreamSinkRequestStream,
-        },
-        fuchsia_async as fasync,
-        futures_test::task::new_count_waker,
-        std::pin::pin,
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_media::{
+        AudioConsumerMarker, AudioConsumerRequest, AudioConsumerRequestStream,
+        SessionAudioConsumerFactoryRequest, SessionAudioConsumerFactoryRequestStream,
+        StreamSinkRequest, StreamSinkRequestStream,
     };
+    use fuchsia_async as fasync;
+    use futures_test::task::new_count_waker;
+    use std::pin::pin;
 
     #[test]
     fn test_frame_length() {

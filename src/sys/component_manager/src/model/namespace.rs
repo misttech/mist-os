@@ -2,42 +2,33 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        constants::PKG_PATH,
-        model::{
-            component::{ComponentInstance, Package, WeakComponentInstance},
-            routing::{
-                self, report_routing_failure, route_and_open_capability_with_reporting,
-                router_ext::RouterExt, BedrockUseRouteRequest,
-            },
-        },
-    },
-    ::routing::{
-        component_instance::ComponentInstanceInterface, mapper::NoopRouteMapper, rights::Rights,
-        route_to_storage_decl, verify_instance_in_component_id_index, RouteRequest,
-    },
-    cm_rust::{ComponentDecl, UseDecl, UseEventStreamDecl, UseStorageDecl},
-    errors::CreateNamespaceError,
-    fidl::{endpoints::ClientEnd, prelude::*},
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    futures::FutureExt,
-    futures::{
-        channel::mpsc::{unbounded, UnboundedSender},
-        StreamExt,
-    },
-    router_error::{Explain, RouterError},
-    sandbox::{Capability, Dict, Directory, Open},
-    serve_processargs::NamespaceBuilder,
-    std::{collections::HashSet, sync::Arc},
-    tracing::{error, warn},
-    vfs::{
-        directory::entry::{
-            serve_directory, DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest,
-        },
-        execution_scope::ExecutionScope,
-    },
+use crate::constants::PKG_PATH;
+use crate::model::component::{ComponentInstance, Package, WeakComponentInstance};
+use crate::model::routing::router_ext::RouterExt;
+use crate::model::routing::{
+    self, report_routing_failure, route_and_open_capability_with_reporting, BedrockUseRouteRequest,
 };
+use ::routing::component_instance::ComponentInstanceInterface;
+use ::routing::mapper::NoopRouteMapper;
+use ::routing::rights::Rights;
+use ::routing::{route_to_storage_decl, verify_instance_in_component_id_index, RouteRequest};
+use cm_rust::{ComponentDecl, UseDecl, UseEventStreamDecl, UseStorageDecl};
+use errors::CreateNamespaceError;
+use fidl::endpoints::ClientEnd;
+use fidl::prelude::*;
+use futures::channel::mpsc::{unbounded, UnboundedSender};
+use futures::{FutureExt, StreamExt};
+use router_error::{Explain, RouterError};
+use sandbox::{Capability, Dict, Directory, Open};
+use serve_processargs::NamespaceBuilder;
+use std::collections::HashSet;
+use std::sync::Arc;
+use tracing::{error, warn};
+use vfs::directory::entry::{
+    serve_directory, DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest,
+};
+use vfs::execution_scope::ExecutionScope;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// Creates a component's namespace.
 ///

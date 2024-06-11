@@ -13,32 +13,26 @@ use crate::{
     open_get_proxy_assert, open_get_vmo_file_proxy_assert_ok,
 };
 
-use crate::{
-    directory::{
-        entry::EntryInfo,
-        entry_container::Directory,
-        helper::DirectlyMutable,
-        immutable::Simple,
-        test_utils::{run_server_client, DirentsSameInodeBuilder},
-    },
-    execution_scope::ExecutionScope,
-    file,
-    path::Path,
-    test_utils::node::{open2_get_proxy, open_get_proxy},
-    test_utils::{build_flag_combinations, run_client},
-};
+use crate::directory::entry::EntryInfo;
+use crate::directory::entry_container::Directory;
+use crate::directory::helper::DirectlyMutable;
+use crate::directory::immutable::Simple;
+use crate::directory::test_utils::{run_server_client, DirentsSameInodeBuilder};
+use crate::execution_scope::ExecutionScope;
+use crate::file;
+use crate::path::Path;
+use crate::test_utils::node::{open2_get_proxy, open_get_proxy};
+use crate::test_utils::{build_flag_combinations, run_client};
 
-use {
-    assert_matches::assert_matches,
-    fidl::endpoints::{create_proxy, Proxy},
-    fidl_fuchsia_io as fio,
-    fuchsia_async::TestExecutor,
-    fuchsia_zircon_status::Status,
-    futures::TryStreamExt,
-    static_assertions::assert_eq_size,
-    std::sync::{Arc, Mutex},
-    vfs_macros::pseudo_directory,
-};
+use assert_matches::assert_matches;
+use fidl::endpoints::{create_proxy, Proxy};
+use fidl_fuchsia_io as fio;
+use fuchsia_async::TestExecutor;
+use fuchsia_zircon_status::Status;
+use futures::TryStreamExt;
+use static_assertions::assert_eq_size;
+use std::sync::{Arc, Mutex};
+use vfs_macros::pseudo_directory;
 
 // Redefine these constants as a u32 as in macos they are u16
 const S_IRUSR: u32 = libc::S_IRUSR as u32;

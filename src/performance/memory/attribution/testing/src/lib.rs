@@ -2,20 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_memory_attribution as fattribution;
-use fuchsia_zircon as zx;
-use futures::{
-    stream::{BoxStream, SelectAll},
-    FutureExt, Stream, StreamExt,
-};
+use futures::stream::{BoxStream, SelectAll};
+use futures::{FutureExt, Stream, StreamExt};
 use pin_project::pin_project;
-use std::{
-    collections::HashMap,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::collections::HashMap;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use zx::AsHandleRef;
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_memory_attribution as fattribution,
+    fuchsia_zircon as zx,
+};
 
 /// A simple tree breakdown of resource usage useful for tests.
 #[derive(Debug, Clone)]

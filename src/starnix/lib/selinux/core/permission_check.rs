@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{
-    access_vector_cache::{Fixed, Locked, Query, QueryMut, DEFAULT_SHARED_SIZE},
-    security_server::SecurityServer,
-    SecurityId,
-};
+use super::access_vector_cache::{Fixed, Locked, Query, QueryMut, DEFAULT_SHARED_SIZE};
+use super::security_server::SecurityServer;
+use super::SecurityId;
 
 use selinux_common::{AbstractObjectClass, ClassPermission, Permission};
 use selinux_policy::{AccessVector, AccessVectorComputer};
@@ -122,16 +120,15 @@ impl<'a> Query for PermissionCheckImpl<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::{super::access_vector_cache::DenyAll, *};
+    use super::super::access_vector_cache::DenyAll;
+    use super::*;
 
     use once_cell::sync::Lazy;
     use selinux_common::ProcessPermission;
     use selinux_policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
-    use std::{
-        any::Any,
-        num::NonZeroU32,
-        sync::atomic::{AtomicU32, Ordering},
-    };
+    use std::any::Any;
+    use std::num::NonZeroU32;
+    use std::sync::atomic::{AtomicU32, Ordering};
 
     /// SID to use where any value will do.
     static A_TEST_SID: Lazy<SecurityId> = Lazy::new(unique_sid);

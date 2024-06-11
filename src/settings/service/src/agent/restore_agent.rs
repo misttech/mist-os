@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::agent::Payload;
-use crate::agent::{AgentError, Context, Invocation, InvocationResult, Lifespan};
+use crate::agent::{AgentError, Context, Invocation, InvocationResult, Lifespan, Payload};
 use crate::base::SettingType;
 use crate::event::{restore, Event, Publisher};
 use crate::handler::base::{Error, Payload as HandlerPayload, Request};

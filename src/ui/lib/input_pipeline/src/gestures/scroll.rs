@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::gesture_arena::{
-        self, DetailedReasonFloat, DetailedReasonUint, EndGestureEvent, ExamineEventResult,
-        MouseEvent, ProcessBufferedEventsResult, ProcessNewEventResult, Reason, RecognizedGesture,
-        TouchpadEvent, VerifyEventResult,
-    },
-    crate::mouse_binding,
-    crate::utils::{euclidean_distance, Position},
-    maplit::hashset,
+use super::gesture_arena::{
+    self, DetailedReasonFloat, DetailedReasonUint, EndGestureEvent, ExamineEventResult, MouseEvent,
+    ProcessBufferedEventsResult, ProcessNewEventResult, Reason, RecognizedGesture, TouchpadEvent,
+    VerifyEventResult,
 };
+use crate::mouse_binding;
+use crate::utils::{euclidean_distance, Position};
+use maplit::hashset;
 
 /// The initial state of this recognizer, before 2 finger contact has been detected.
 #[derive(Debug)]
@@ -761,10 +759,11 @@ fn touchpad_event_to_mouse_scroll_event(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::touch_binding, assert_matches::assert_matches, fuchsia_zircon as zx,
-        test_case::test_case,
-    };
+    use super::*;
+    use crate::touch_binding;
+    use assert_matches::assert_matches;
+    use fuchsia_zircon as zx;
+    use test_case::test_case;
 
     const MOTION_THRESHOLD_IN_MM: f32 = 5.0;
     const MIN_MOVEMENT_IN_MM: f32 = 10.0;

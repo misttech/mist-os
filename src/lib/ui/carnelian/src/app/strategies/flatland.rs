@@ -2,23 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    app::{strategies::base::AppStrategy, InternalSender, MessageInternal},
-    view::{
-        strategies::{
-            base::{FlatlandParams, ViewStrategyParams, ViewStrategyPtr},
-            flatland::FlatlandViewStrategy,
-        },
-        ViewKey,
-    },
-};
+use crate::app::strategies::base::AppStrategy;
+use crate::app::{InternalSender, MessageInternal};
+use crate::view::strategies::base::{FlatlandParams, ViewStrategyParams, ViewStrategyPtr};
+use crate::view::strategies::flatland::FlatlandViewStrategy;
+use crate::view::ViewKey;
 use anyhow::{bail, Context as _, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_ui_app::{CreateView2Args, ViewProviderRequest, ViewProviderRequestStream};
 use fuchsia_async::{self as fasync};
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use fuchsia_scenic::flatland::ViewCreationTokenPair;
-use futures::{channel::mpsc::UnboundedSender, TryFutureExt, TryStreamExt};
+use futures::channel::mpsc::UnboundedSender;
+use futures::{TryFutureExt, TryStreamExt};
 
 pub(crate) struct FlatlandAppStrategy;
 

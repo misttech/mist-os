@@ -2,15 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    cm_rust::{ExposeDeclCommon, NativeIntoFidl, OfferDeclCommon},
-    fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd},
-    fidl_fuchsia_component as fcomponent,
-    fidl_fuchsia_component_decl::Offer,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    moniker::Moniker,
-    thiserror::Error,
-};
+use cm_rust::{ExposeDeclCommon, NativeIntoFidl, OfferDeclCommon};
+use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd};
+use fidl_fuchsia_component_decl::Offer;
+use moniker::Moniker;
+use thiserror::Error;
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
 const CAPABILITY_REQUESTED_EVENT: &str = "capability_requested";
 
 #[derive(Debug, Error)]

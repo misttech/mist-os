@@ -16,17 +16,14 @@ use core::ops::Range;
 use internet_checksum::Checksum;
 use log::debug;
 use net_types::ip::{GenericOverIp, IpAddress, Ipv4, Ipv4Addr, Ipv6Addr};
-use packet::records::options::OptionSequenceBuilder;
-use packet::records::options::OptionsRaw;
+use packet::records::options::{OptionSequenceBuilder, OptionsRaw};
 use packet::{
     BufferAlloc, BufferProvider, BufferView, BufferViewMut, EmptyBuf, FragmentedBytesMut, FromRaw,
     GrowBufferMut, InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints,
     ParsablePacket, ParseMetadata, ReusableBuffer, SerializeError, SerializeTarget, Serializer,
 };
-use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell,
-    Ref, Unaligned,
-};
+use zerocopy::byteorder::network_endian::U16;
+use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 use crate::error::{IpParseError, IpParseResult, ParseError};
 use crate::ip::{

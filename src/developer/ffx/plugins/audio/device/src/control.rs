@@ -4,11 +4,12 @@
 
 use async_trait::async_trait;
 use ffx_command::{bug, user_error, FfxContext};
-use fidl_fuchsia_audio_device as fadevice;
-use fidl_fuchsia_hardware_audio as fhaudio;
 use fuchsia_audio::dai::DaiFormat;
 use fuchsia_zircon_status::Status;
-use fuchsia_zircon_types as zx_types;
+use {
+    fidl_fuchsia_audio_device as fadevice, fidl_fuchsia_hardware_audio as fhaudio,
+    fuchsia_zircon_types as zx_types,
+};
 
 #[async_trait]
 pub trait DeviceControl {
@@ -213,10 +214,8 @@ mod tests {
     use assert_matches::assert_matches;
     use const_unwrap::const_unwrap_option;
     use fidl::endpoints::spawn_stream_handler;
-    use fuchsia_audio::{
-        dai::{DaiFrameFormat, DaiFrameFormatStandard, DaiSampleFormat},
-        format::{SampleSize, BITS_16, BITS_32},
-    };
+    use fuchsia_audio::dai::{DaiFrameFormat, DaiFrameFormatStandard, DaiSampleFormat};
+    use fuchsia_audio::format::{SampleSize, BITS_16, BITS_32};
     use std::sync::{Arc, Mutex};
 
     const TEST_CODEC_START_TIME: zx_types::zx_time_t = 123;

@@ -2,30 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        key::{
-            exchange::{
-                self,
-                handshake::{fourway::Fourway, group_key::GroupKey},
-                Key,
-            },
-            gtk::Gtk,
-            igtk::Igtk,
-            ptk::Ptk,
-        },
-        rsna::{
-            Dot11VerifiedKeyFrame, NegotiatedProtection, Role, SecAssocStatus, SecAssocUpdate,
-            UpdateSink,
-        },
-        Error,
-    },
-    fidl_fuchsia_wlan_mlme::EapolResultCode,
-    std::collections::HashSet,
-    tracing::{error, info},
-    wlan_statemachine::StateMachine,
-    zerocopy::ByteSlice,
+use crate::key::exchange::handshake::fourway::Fourway;
+use crate::key::exchange::handshake::group_key::GroupKey;
+use crate::key::exchange::{self, Key};
+use crate::key::gtk::Gtk;
+use crate::key::igtk::Igtk;
+use crate::key::ptk::Ptk;
+use crate::rsna::{
+    Dot11VerifiedKeyFrame, NegotiatedProtection, Role, SecAssocStatus, SecAssocUpdate, UpdateSink,
 };
+use crate::Error;
+use fidl_fuchsia_wlan_mlme::EapolResultCode;
+use std::collections::HashSet;
+use tracing::{error, info};
+use wlan_statemachine::StateMachine;
+use zerocopy::ByteSlice;
 
 const MAX_KEY_FRAME_RETRIES: u32 = 3;
 
@@ -637,18 +628,14 @@ impl EssSa {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            key::exchange::compute_mic,
-            rsna::{test_util, test_util::expect_eapol_resp, AuthStatus},
-            Authenticator, Supplicant,
-        },
-        wlan_common::{
-            assert_variant,
-            ie::{get_rsn_ie_bytes, rsn::fake_wpa2_s_rsne},
-        },
-    };
+    use super::*;
+    use crate::key::exchange::compute_mic;
+    use crate::rsna::test_util::expect_eapol_resp;
+    use crate::rsna::{test_util, AuthStatus};
+    use crate::{Authenticator, Supplicant};
+    use wlan_common::assert_variant;
+    use wlan_common::ie::get_rsn_ie_bytes;
+    use wlan_common::ie::rsn::fake_wpa2_s_rsne;
 
     const ANONCE: [u8; 32] = [0x1A; 32];
     const GTK: [u8; 16] = [0x1B; 16];

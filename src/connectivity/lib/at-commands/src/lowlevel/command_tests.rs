@@ -5,11 +5,9 @@
 //! Tests for the AT command AST.
 #![cfg(test)]
 
-use crate::lowlevel::{
-    arguments::{Argument, Arguments, DelimitedArguments},
-    command::Command,
-    write_to::WriteTo,
-};
+use crate::lowlevel::arguments::{Argument, Arguments, DelimitedArguments};
+use crate::lowlevel::command::Command;
+use crate::lowlevel::write_to::WriteTo;
 
 fn cr_terminate(str: &str) -> String {
     format!("{}\r", str)

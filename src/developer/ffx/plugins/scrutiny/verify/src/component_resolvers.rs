@@ -5,9 +5,12 @@
 use anyhow::{anyhow, Context, Result};
 use ffx_scrutiny_verify_args::component_resolvers::Command;
 use scrutiny_config::{ConfigBuilder, ModelConfig};
-use scrutiny_frontend::{command_builder::CommandBuilder, launcher};
+use scrutiny_frontend::command_builder::CommandBuilder;
+use scrutiny_frontend::launcher;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, fs, path::PathBuf};
+use std::collections::HashSet;
+use std::fs;
+use std::path::PathBuf;
 
 type Moniker = String;
 

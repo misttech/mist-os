@@ -3,12 +3,10 @@
 // found in the LICENSE file.
 
 use futures::Future;
-use std::{
-    cell::RefCell,
-    pin::Pin,
-    rc::Rc,
-    task::{Poll, Waker},
-};
+use std::cell::RefCell;
+use std::pin::Pin;
+use std::rc::Rc;
+use std::task::{Poll, Waker};
 
 #[derive(Clone, Debug)]
 struct ConditionVariableState {

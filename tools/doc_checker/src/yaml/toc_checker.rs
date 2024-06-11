@@ -5,18 +5,14 @@
 //! toc_checker checks the _toc.yaml files that part of the //docs publishing process
 //! for correctness.
 
-use {
-    super::check_path,
-    crate::checker::{DocCheckError, DocLine},
-    anyhow::Result,
-    serde::{Deserialize, Serialize},
-    serde_yaml::{Mapping, Value},
-    std::{
-        fs::File,
-        io::BufReader,
-        path::{Path, PathBuf},
-    },
-};
+use super::check_path;
+use crate::checker::{DocCheckError, DocLine};
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use serde_yaml::{Mapping, Value};
+use std::fs::File;
+use std::io::BufReader;
+use std::path::{Path, PathBuf};
 
 const KNOWN_STATUS: [&str; 7] =
     ["alpha", "beta", "deprecated", "experimental", "external", "limited", "new"];

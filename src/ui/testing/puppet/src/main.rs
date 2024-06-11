@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Error, Result},
-    fuchsia_component::server::ServiceFs,
-    futures::StreamExt,
-    tracing::info,
-};
+use anyhow::{Error, Result};
+use fuchsia_component::server::ServiceFs;
+use futures::StreamExt;
+use tracing::info;
 
 /// Note to contributors: This component is test-only, so it should panic liberally. Loud crashes
 /// are much easier to debug than silent failures. Please use `expect()` and `panic!` where

@@ -2,25 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        log::*,
-        lsm_tree::types::{
-            Item, ItemRef, Key, Layer, LayerIterator, LayerIteratorMut, LayerKey, MergeType,
-            OrdLowerBound, Value,
-        },
-    },
-    anyhow::Error,
-    async_trait::async_trait,
-    futures::try_join,
-    std::{
-        cmp::Ordering,
-        collections::BinaryHeap,
-        fmt::Debug,
-        fmt::Write,
-        ops::{Bound, Deref, DerefMut},
-    },
+use crate::log::*;
+use crate::lsm_tree::types::{
+    Item, ItemRef, Key, Layer, LayerIterator, LayerIteratorMut, LayerKey, MergeType, OrdLowerBound,
+    Value,
 };
+use anyhow::Error;
+use async_trait::async_trait;
+use futures::try_join;
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
+use std::fmt::{Debug, Write};
+use std::ops::{Bound, Deref, DerefMut};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum ItemOp<K, V> {
@@ -720,32 +713,22 @@ pub(super) fn merge_into<K: Debug + OrdLowerBound, V: Debug>(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{
-            ItemOp::{Discard, Keep, Replace},
-            MergeResult, Merger,
-        },
-        crate::{
-            lsm_tree::{
-                skip_list_layer::SkipListLayer,
-                types::{
-                    Item, ItemRef, Key, Layer, LayerIterator, LayerKey, MergeType, OrdLowerBound,
-                    OrdUpperBound, SortByU64,
-                },
-                Value,
-            },
-            serialized_types::{
-                versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
-            },
-        },
-        fprint::TypeFingerprint,
-        rand::Rng,
-        std::{
-            hash::Hash,
-            ops::{Bound, Range},
-            sync::Arc,
-        },
+    use super::ItemOp::{Discard, Keep, Replace};
+    use super::{MergeResult, Merger};
+    use crate::lsm_tree::skip_list_layer::SkipListLayer;
+    use crate::lsm_tree::types::{
+        Item, ItemRef, Key, Layer, LayerIterator, LayerKey, MergeType, OrdLowerBound,
+        OrdUpperBound, SortByU64,
     };
+    use crate::lsm_tree::Value;
+    use crate::serialized_types::{
+        versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
+    };
+    use fprint::TypeFingerprint;
+    use rand::Rng;
+    use std::hash::Hash;
+    use std::ops::{Bound, Range};
+    use std::sync::Arc;
 
     #[derive(
         Clone,

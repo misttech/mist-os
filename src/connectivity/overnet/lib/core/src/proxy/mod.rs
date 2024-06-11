@@ -21,11 +21,8 @@ use std::pin::Pin;
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll};
 
-pub(crate) use self::handle::IntoProxied;
-pub(crate) use self::handle::Proxyable;
-pub(crate) use self::handle::ProxyableRW;
-pub(crate) use self::run::spawn::recv as spawn_recv;
-pub(crate) use self::run::spawn::send as spawn_send;
+pub(crate) use self::handle::{IntoProxied, Proxyable, ProxyableRW};
+pub(crate) use self::run::spawn::{recv as spawn_recv, send as spawn_send};
 
 pub use self::run::set_proxy_drop_event_handler;
 

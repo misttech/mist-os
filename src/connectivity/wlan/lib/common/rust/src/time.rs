@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    std::ops,
-    zerocopy::{AsBytes, FromBytes, FromZeros, NoCell},
-};
+use std::ops;
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 /// Representation of N IEEE 802.11 TimeUnits.
 /// A TimeUnit is defined as 1024 micro seconds.

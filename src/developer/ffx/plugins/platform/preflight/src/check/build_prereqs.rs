@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::check::{PreflightCheck, PreflightCheckResult, PreflightCheckResult::*},
-    crate::command_runner::CommandRunner,
-    crate::config::*,
-    anyhow::{anyhow, Context, Result},
-    async_trait::async_trait,
-};
+use crate::check::PreflightCheckResult::*;
+use crate::check::{PreflightCheck, PreflightCheckResult};
+use crate::command_runner::CommandRunner;
+use crate::config::*;
+use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
 
 const LINUX_PACKAGES: &[&str] = &["curl", "git", "unzip"];
 const MACOS_MINIMUM_MAJOR_VERSION: u32 = 10;
@@ -152,7 +151,8 @@ impl PreflightCheck for BuildPrereqs<'_> {
 
 #[cfg(test)]
 mod test {
-    use {super::*, crate::command_runner::ExitStatus};
+    use super::*;
+    use crate::command_runner::ExitStatus;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_success_linux() -> Result<()> {

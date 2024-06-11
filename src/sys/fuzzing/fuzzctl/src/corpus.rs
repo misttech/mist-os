@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::input::save_input,
-    anyhow::{Context as _, Error, Result},
-    fidl_fuchsia_fuzzer as fuzz, fuchsia_zircon_status as zx,
-    futures::TryStreamExt,
-    std::cell::RefCell,
-    std::path::Path,
-};
+use crate::input::save_input;
+use anyhow::{Context as _, Error, Result};
+use futures::TryStreamExt;
+use std::cell::RefCell;
+use std::path::Path;
+use {fidl_fuchsia_fuzzer as fuzz, fuchsia_zircon_status as zx};
 
 /// Returns which type of corpus is represented by the `fuchsia.fuzzer.Corpus` enum.
 ///
@@ -80,16 +78,13 @@ pub async fn read<P: AsRef<Path>>(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{get_name, get_type, read, Stats},
-        crate::input::InputPair,
-        crate::util::digest_path,
-        anyhow::{Error, Result},
-        fidl_fuchsia_fuzzer as fuzz,
-        fuchsia_fuzzctl_test::{verify_saved, Test},
-        fuchsia_zircon_status as zx,
-        futures::join,
-    };
+    use super::{get_name, get_type, read, Stats};
+    use crate::input::InputPair;
+    use crate::util::digest_path;
+    use anyhow::{Error, Result};
+    use fuchsia_fuzzctl_test::{verify_saved, Test};
+    use futures::join;
+    use {fidl_fuchsia_fuzzer as fuzz, fuchsia_zircon_status as zx};
 
     // Writes a test input using the given `corpus_reader`.
     async fn send_one_input(corpus_reader: &fuzz::CorpusReaderProxy, data: Vec<u8>) -> Result<()> {

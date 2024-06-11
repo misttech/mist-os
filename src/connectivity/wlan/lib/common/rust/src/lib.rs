@@ -39,11 +39,9 @@ pub mod timer;
 pub mod tx_vector;
 pub mod wmm;
 
-use {
-    channel::{Cbw, Channel},
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_sme as fidl_sme,
-    zerocopy::{Ref, Unalign},
-};
+use channel::{Cbw, Channel};
+use zerocopy::{Ref, Unalign};
+use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_sme as fidl_sme};
 
 pub use time::TimeUnit;
 

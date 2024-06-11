@@ -6,12 +6,10 @@ pub mod args;
 mod common;
 mod subcommands;
 
-use {
-    anyhow::{Context, Result},
-    args::{DriverCommand, DriverSubCommand},
-    driver_connector::DriverConnector,
-    std::io,
-};
+use anyhow::{Context, Result};
+use args::{DriverCommand, DriverSubCommand};
+use driver_connector::DriverConnector;
+use std::io;
 
 #[cfg(not(target_os = "fuchsia"))]
 use {futures::lock::Mutex, std::sync::Arc};

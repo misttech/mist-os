@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    carnelian::{App, AppAssistantPtr, AppSender, AssistantCreator, AssistantCreatorFunc},
-    fuchsia_trace_provider::trace_provider_create_with_fdio,
-    std::env,
-    std::ffi::CString,
-    terminal_lib::TerminalAssistant,
-};
+use anyhow::Error;
+use carnelian::{App, AppAssistantPtr, AppSender, AssistantCreator, AssistantCreatorFunc};
+use fuchsia_trace_provider::trace_provider_create_with_fdio;
+use std::env;
+use std::ffi::CString;
+use terminal_lib::TerminalAssistant;
 
 fn make_app_assistant_fut(cmd: Vec<CString>) -> impl FnOnce(&AppSender) -> AssistantCreator<'_> {
     move |app_sender: &AppSender| {

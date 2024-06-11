@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    cm_stress_tests_lib::{create_child, stop_child, Child},
-    fidl::endpoints::RequestStream,
-    fidl_test_componentmanager_stresstests as fstresstests, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    futures::prelude::*,
-    std::sync::{Arc, Mutex},
-};
+use anyhow::Error;
+use cm_stress_tests_lib::{create_child, stop_child, Child};
+use fidl::endpoints::RequestStream;
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
+use std::sync::{Arc, Mutex};
+use {fidl_test_componentmanager_stresstests as fstresstests, fuchsia_async as fasync};
 
 #[fuchsia::main(logging_tags = ["child_for_stress_test"])]
 async fn main() -> Result<(), Error> {

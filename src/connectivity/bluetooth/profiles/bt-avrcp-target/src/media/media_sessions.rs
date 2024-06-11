@@ -14,16 +14,16 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::RwLock;
 use fuchsia_zircon::DurationNum;
 use futures::{future, Future, TryStreamExt};
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
+use std::sync::Arc;
 use tracing::{trace, warn};
 
-use crate::media::{
-    media_state::{MediaState, MEDIA_SESSION_ADDRESSED_PLAYER_ID, MEDIA_SESSION_DISPLAYABLE_NAME},
-    media_types::Notification,
+use crate::media::media_state::{
+    MediaState, MEDIA_SESSION_ADDRESSED_PLAYER_ID, MEDIA_SESSION_DISPLAYABLE_NAME,
 };
-use crate::types::{
-    bounded_queue::BoundedQueue, NotificationData, MAX_NOTIFICATION_EVENT_QUEUE_SIZE,
-};
+use crate::media::media_types::Notification;
+use crate::types::bounded_queue::BoundedQueue;
+use crate::types::{NotificationData, MAX_NOTIFICATION_EVENT_QUEUE_SIZE};
 
 /// The system-wide ID assigned to a specific MediaSession. This identifier is created and assigned
 /// by the Fuchsia media system.
@@ -472,7 +472,9 @@ pub(crate) mod tests {
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_bluetooth_avrcp::{NotificationEvent, TargetHandlerMarker};
     use fidl_fuchsia_media_sessions2 as fidl_media;
-    use futures::{future::join_all, task::Poll, FutureExt};
+    use futures::future::join_all;
+    use futures::task::Poll;
+    use futures::FutureExt;
 
     /// Creates the MediaSessions object and sets an active session if `is_active` = true.
     /// Returns the object and the id of the set active session.

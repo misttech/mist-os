@@ -12,7 +12,11 @@ use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_developer_ffx::{self as ffx};
 use futures::TryStreamExt;
 use protocols::Context;
-use std::{cell::RefCell, future::Future, pin::Pin, rc::Rc, time::Duration};
+use std::cell::RefCell;
+use std::future::Future;
+use std::pin::Pin;
+use std::rc::Rc;
+use std::time::Duration;
 
 // TODO(awdavies): Abstract this to use similar utilities to an actual protocol.
 // This functionally behaves the same with the only caveat being that some
@@ -192,17 +196,16 @@ mod tests {
     use ffx_daemon_events::TargetConnectionState;
     use ffx_daemon_target::target::{TargetAddrEntry, TargetAddrStatus, TargetUpdateBuilder};
     use fidl::prelude::*;
-    use fidl_fuchsia_developer_remotecontrol as fidl_rcs;
-    use fidl_fuchsia_io as fio;
-    use fidl_fuchsia_sys2 as fsys;
     use fuchsia_async::Task;
     use futures::StreamExt;
     use protocols::testing::FakeDaemonBuilder;
     use rcs::RcsConnection;
-    use std::{
-        net::{IpAddr, SocketAddr},
-        str::FromStr,
-        sync::Arc,
+    use std::net::{IpAddr, SocketAddr};
+    use std::str::FromStr;
+    use std::sync::Arc;
+    use {
+        fidl_fuchsia_developer_remotecontrol as fidl_rcs, fidl_fuchsia_io as fio,
+        fidl_fuchsia_sys2 as fsys,
     };
 
     #[test]

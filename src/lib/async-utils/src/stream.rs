@@ -10,17 +10,11 @@
 //! `epitaph` can be used to uniquely identify which stream has ended within a collection of
 //! streams.
 
-use {
-    core::{
-        pin::Pin,
-        task::{Context, Poll},
-    },
-    futures::{
-        stream::{FusedStream, Stream},
-        Future,
-    },
-    pin_project::pin_project,
-};
+use core::pin::Pin;
+use core::task::{Context, Poll};
+use futures::stream::{FusedStream, Stream};
+use futures::Future;
+use pin_project::pin_project;
 
 mod flatten_unordered;
 mod future_map;
@@ -211,18 +205,15 @@ mod test {
     //!   * Progress is always eventually made - the Stream cannot be stalled
     //!   * All inserted elements will eventually be yielded
     //!   * Elements are never duplicated
-    use {
-        super::*,
-        core::hash::Hash,
-        fuchsia_async as fasync,
-        futures::{
-            channel::mpsc,
-            future::ready,
-            stream::{empty, iter, once, Empty, StreamExt},
-        },
-        proptest::prelude::*,
-        std::{collections::HashSet, fmt::Debug},
-    };
+    use super::*;
+    use core::hash::Hash;
+    use fuchsia_async as fasync;
+    use futures::channel::mpsc;
+    use futures::future::ready;
+    use futures::stream::{empty, iter, once, Empty, StreamExt};
+    use proptest::prelude::*;
+    use std::collections::HashSet;
+    use std::fmt::Debug;
 
     #[fasync::run_until_stalled(test)]
     async fn empty_stream_returns_epitaph_only() {

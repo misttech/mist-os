@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::fmt;
 use std::future::Future;
 use std::marker::PhantomData;
-use std::mem;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::Poll;
+use std::{fmt, mem};
 
 use crate::runtime::{EHandle, PacketReceiver, ReceiverRegistration};
 use fuchsia_zircon::{self as zx, AsHandleRef};
@@ -232,10 +231,8 @@ mod test {
     use super::*;
     use crate::TestExecutor;
     use assert_matches::assert_matches;
-    use futures::{
-        future::{pending, FutureExt},
-        task::{waker, ArcWake},
-    };
+    use futures::future::{pending, FutureExt};
+    use futures::task::{waker, ArcWake};
     use std::pin::pin;
 
     #[test]

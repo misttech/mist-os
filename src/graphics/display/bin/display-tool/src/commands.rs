@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Result},
-    display_utils::{Coordinator, DisplayId, PixelFormat},
-};
+use anyhow::{format_err, Result};
+use display_utils::{Coordinator, DisplayId, PixelFormat};
 
 mod bouncing_squares;
 mod display_color_layer;

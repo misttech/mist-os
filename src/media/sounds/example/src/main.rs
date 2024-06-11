@@ -5,15 +5,14 @@
 #![recursion_limit = "512"]
 
 use anyhow::{Context as _, Error};
-use fidl_fuchsia_io as fio;
 use fidl_fuchsia_media::*;
 use fidl_fuchsia_media_sounds::*;
 use fuchsia_async::{self as fasync, Time, Timer};
-use fuchsia_component as component;
 use fuchsia_zircon::{self as zx, Vmo};
 use futures::{join, FutureExt};
 use std::fs::*;
 use zerocopy::AsBytes;
+use {fidl_fuchsia_io as fio, fuchsia_component as component};
 
 type Result<T> = std::result::Result<T, Error>;
 

@@ -10,10 +10,8 @@ use fidl_fuchsia_data as fdata;
 use fidl_fuchsia_data::Dictionary;
 use fuchsia_url::AbsoluteComponentUrl;
 use rayon::prelude::*;
-use std::{
-    collections::{BTreeSet, HashMap},
-    sync::Mutex,
-};
+use std::collections::{BTreeSet, HashMap};
+use std::sync::Mutex;
 
 use crate::{
     CategorizedTestInfo, FailureReason, HermeticityStatus, TestPackageInfo, ValidationStatus,

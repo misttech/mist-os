@@ -6,13 +6,12 @@ pub mod args;
 
 mod subcommands;
 
-use {
-    anyhow::{Context, Result},
-    args::{PrintInputReportCommand, PrintInputReportSubcommand},
-    fidl_fuchsia_io as fio,
-    futures::lock::Mutex,
-    std::{io::Write, sync::Arc},
-};
+use anyhow::{Context, Result};
+use args::{PrintInputReportCommand, PrintInputReportSubcommand};
+use fidl_fuchsia_io as fio;
+use futures::lock::Mutex;
+use std::io::Write;
+use std::sync::Arc;
 
 pub async fn print_input_report(
     cmd: &PrintInputReportCommand,
@@ -42,15 +41,13 @@ pub async fn print_input_report(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        argh::FromArgs,
-        fidl::endpoints::ServerEnd,
-        fidl_fuchsia_input as finput, fidl_fuchsia_input_report as fir, fidl_fuchsia_io as fio,
-        fuchsia_async::{self as fasync, Task},
-        fuchsia_component::server::{FidlService, ServiceFs},
-        futures::{Future, FutureExt, StreamExt, TryStreamExt},
-    };
+    use super::*;
+    use argh::FromArgs;
+    use fidl::endpoints::ServerEnd;
+    use fuchsia_async::{self as fasync, Task};
+    use fuchsia_component::server::{FidlService, ServiceFs};
+    use futures::{Future, FutureExt, StreamExt, TryStreamExt};
+    use {fidl_fuchsia_input as finput, fidl_fuchsia_input_report as fir, fidl_fuchsia_io as fio};
 
     enum InputDeviceRequestStream {
         InputDeviceA(fir::InputDeviceRequestStream),

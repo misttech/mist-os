@@ -5,7 +5,8 @@
 //! A Graph of GN Targets
 
 use gn_json::target::{AllTargets, TargetDescription};
-use petgraph::{graph::DiGraph, EdgeDirection};
+use petgraph::graph::DiGraph;
+use petgraph::EdgeDirection;
 use std::collections::BTreeMap;
 use thiserror::Error;
 

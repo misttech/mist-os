@@ -4,12 +4,9 @@
 
 use std::ops::ControlFlow;
 
-use crate::painter::{
-    layer_workbench::{
-        passes::PassesSharedState, Context, LayerWorkbenchState, OptimizerTileWriteOp,
-    },
-    LayerProps,
-};
+use crate::painter::layer_workbench::passes::PassesSharedState;
+use crate::painter::layer_workbench::{Context, LayerWorkbenchState, OptimizerTileWriteOp};
+use crate::painter::LayerProps;
 
 pub fn tile_unchanged_pass<'w, 'c, P: LayerProps>(
     workbench: &'w mut LayerWorkbenchState,

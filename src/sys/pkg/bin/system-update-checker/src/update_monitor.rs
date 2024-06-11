@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::anyhow,
-    event_queue::{ControlHandle, EventQueue, Notify},
-    fidl_fuchsia_update_ext::{AttemptOptions, State},
-    fuchsia_inspect_contrib::inspectable::InspectableDebugString,
-    futures::prelude::*,
-    std::time::Duration,
-    tracing::{error, warn},
-};
+use anyhow::anyhow;
+use event_queue::{ControlHandle, EventQueue, Notify};
+use fidl_fuchsia_update_ext::{AttemptOptions, State};
+use fuchsia_inspect_contrib::inspectable::InspectableDebugString;
+use futures::prelude::*;
+use std::time::Duration;
+use tracing::{error, warn};
 
 pub trait StateNotifier: Notify<Event = State> + Send + Sync + 'static {}
 
@@ -131,12 +129,14 @@ mod test {
     use super::*;
     use event_queue::{ClosedClient, Event};
     use fidl_fuchsia_update_ext::random_version_available;
-    use fuchsia_async as fasync;
     use fuchsia_sync::Mutex;
-    use fuchsia_zircon as zx;
-    use futures::{channel::mpsc, future::BoxFuture, pin_mut, task::Poll};
+    use futures::channel::mpsc;
+    use futures::future::BoxFuture;
+    use futures::pin_mut;
+    use futures::task::Poll;
     use proptest::prelude::*;
     use std::sync::Arc;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     const VERSION_AVAILABLE: &str = "fake-version-available";
 

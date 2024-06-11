@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::types::{Key, Value},
-    std::fmt,
-};
+use super::types::{Key, Value};
+use std::fmt;
 
 pub trait ObjectCachePlaceholder<V: Value>: Send + Sync {
     /// Consumes itself in delivering the cache value for which the placeholder was reserved.

@@ -2,23 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::config_management::{self};
+use crate::util::historical_list::Timestamped;
+use fuchsia_async::Time;
+use wlan_common::bss::BssDescription;
+use wlan_common::channel::Channel;
+use wlan_common::security::SecurityAuthenticator;
+use wlan_common::sequestered::Sequestered;
+use wlan_metrics_registry::{
+    PolicyConnectionAttemptMigratedMetricDimensionReason,
+    PolicyDisconnectionMigratedMetricDimensionReason,
+};
 use {
-    crate::{
-        config_management::{self},
-        util::historical_list::Timestamped,
-    },
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_async::Time,
-    fuchsia_zircon as zx,
-    wlan_common::{
-        bss::BssDescription, channel::Channel, security::SecurityAuthenticator,
-        sequestered::Sequestered,
-    },
-    wlan_metrics_registry::{
-        PolicyConnectionAttemptMigratedMetricDimensionReason,
-        PolicyDisconnectionMigratedMetricDimensionReason,
-    },
+    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
 };
 
 #[cfg(test)]
@@ -33,8 +30,7 @@ pub type DisconnectStatus = fidl_policy::DisconnectStatus;
 pub type Compatibility = fidl_policy::Compatibility;
 pub type WlanChan = wlan_common::channel::Channel;
 pub type Cbw = wlan_common::channel::Cbw;
-pub use ieee80211::Bssid;
-pub use ieee80211::Ssid;
+pub use ieee80211::{Bssid, Ssid};
 pub type DisconnectReason = PolicyDisconnectionMigratedMetricDimensionReason;
 pub type ConnectReason = PolicyConnectionAttemptMigratedMetricDimensionReason;
 pub type ScanError = fidl_policy::ScanErrorCode;

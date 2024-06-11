@@ -12,8 +12,9 @@ mod types;
 #[cfg(target_os = "fuchsia")]
 pub use crate::commit::{query_commit_status, CommitStatus};
 
+pub use crate::types::proptest_util::random_version_available;
 pub use crate::types::{
-    proptest_util::random_version_available, AttemptOptions, CheckOptions, CheckOptionsBuilder,
-    CheckOptionsDecodeError, Initiator, InstallationDeferredData, InstallationErrorData,
-    InstallationProgress, InstallingData, State, UpdateInfo,
+    AttemptOptions, CheckOptions, CheckOptionsBuilder, CheckOptionsDecodeError, Initiator,
+    InstallationDeferredData, InstallationErrorData, InstallationProgress, InstallingData, State,
+    UpdateInfo,
 };

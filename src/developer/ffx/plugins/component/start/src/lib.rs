@@ -4,9 +4,9 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use component_debug::{
-    cli::format::format_start_error, lifecycle::start_instance, query::get_cml_moniker_from_query,
-};
+use component_debug::cli::format::format_start_error;
+use component_debug::lifecycle::start_instance;
+use component_debug::query::get_cml_moniker_from_query;
 use errors::FfxError;
 use ffx_component::rcs::{connect_to_lifecycle_controller, connect_to_realm_query};
 use ffx_component_start_args::ComponentStartCommand;

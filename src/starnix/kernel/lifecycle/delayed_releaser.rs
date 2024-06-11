@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use starnix_uapi::ownership::ReleaseGuard;
-use std::{marker::PhantomData, mem::ManuallyDrop, ops::Deref};
+use std::marker::PhantomData;
+use std::mem::ManuallyDrop;
+use std::ops::Deref;
 
 pub trait ReleaserAction<T> {
     fn release(t: ReleaseGuard<T>);

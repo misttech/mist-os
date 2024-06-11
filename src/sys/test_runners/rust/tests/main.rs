@@ -4,12 +4,10 @@
 
 mod helpers;
 
-use {
-    crate::helpers::run_test,
-    fidl_fuchsia_test_manager::{CaseStatus, SuiteStatus},
-    pretty_assertions::assert_eq,
-    test_manager_test_lib::{GroupRunEventByTestCase as _, RunEvent},
-};
+use crate::helpers::run_test;
+use fidl_fuchsia_test_manager::{CaseStatus, SuiteStatus};
+use pretty_assertions::assert_eq;
+use test_manager_test_lib::{GroupRunEventByTestCase as _, RunEvent};
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn launch_and_test_echo_test() {

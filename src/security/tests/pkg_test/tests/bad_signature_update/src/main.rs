@@ -2,28 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, Result},
-    argh::{from_env, FromArgs},
-    fidl::endpoints::{create_endpoints, create_proxy, ServerEnd},
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_pkg::PackageUrl,
-    fidl_fuchsia_sys2::{StorageAdminMarker, StorageIteratorMarker},
-    fidl_fuchsia_update_installer::{
-        Initiator, InstallerMarker, MonitorMarker, MonitorRequest, Options, RebootControllerMarker,
-        State,
-    },
-    fidl_test_security_pkg::PackageServer_Marker,
-    fuchsia_async::Task,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_fs::directory::readdir,
-    fuchsia_hash::Hash,
-    fuchsia_merkle::MerkleTree,
-    futures::{channel::oneshot::channel, join, TryStreamExt},
-    security_pkg_test_util::{config::load_config, storage::mount_image_as_ramdisk},
-    std::fs::File,
-    tracing::info,
+use anyhow::{bail, Result};
+use argh::{from_env, FromArgs};
+use fidl::endpoints::{create_endpoints, create_proxy, ServerEnd};
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_pkg::PackageUrl;
+use fidl_fuchsia_sys2::{StorageAdminMarker, StorageIteratorMarker};
+use fidl_fuchsia_update_installer::{
+    Initiator, InstallerMarker, MonitorMarker, MonitorRequest, Options, RebootControllerMarker,
+    State,
 };
+use fidl_test_security_pkg::PackageServer_Marker;
+use fuchsia_async::Task;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_fs::directory::readdir;
+use fuchsia_hash::Hash;
+use fuchsia_merkle::MerkleTree;
+use futures::channel::oneshot::channel;
+use futures::{join, TryStreamExt};
+use security_pkg_test_util::config::load_config;
+use security_pkg_test_util::storage::mount_image_as_ramdisk;
+use std::fs::File;
+use tracing::info;
 
 /// Flags for bad_signature_update.
 #[derive(FromArgs, Debug, PartialEq)]

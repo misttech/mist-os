@@ -12,19 +12,17 @@ pub use self::service::Vsock;
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl::endpoints::{self, Proxy},
-        fidl_fuchsia_hardware_vsock::{
-            CallbacksProxy, DeviceMarker, DeviceRequest, DeviceRequestStream,
-        },
-        fidl_fuchsia_vsock::{
-            AcceptorMarker, AcceptorRequest, ConnectionMarker, ConnectionProxy,
-            ConnectionTransport, ConnectorMarker, ConnectorProxy,
-        },
-        fuchsia_async as fasync, fuchsia_zircon as zx,
-        futures::{channel, future, FutureExt, StreamExt, TryFutureExt},
+    use super::*;
+    use fidl::endpoints::{self, Proxy};
+    use fidl_fuchsia_hardware_vsock::{
+        CallbacksProxy, DeviceMarker, DeviceRequest, DeviceRequestStream,
     };
+    use fidl_fuchsia_vsock::{
+        AcceptorMarker, AcceptorRequest, ConnectionMarker, ConnectionProxy, ConnectionTransport,
+        ConnectorMarker, ConnectorProxy,
+    };
+    use futures::{channel, future, FutureExt, StreamExt, TryFutureExt};
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
     struct MockDriver {
         client: DeviceRequestStream,
         callbacks: CallbacksProxy,

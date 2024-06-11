@@ -2,22 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use alloc::{collections::HashMap, fmt::Debug, sync::Arc, vec::Vec};
-use core::{hash::Hash, time::Duration};
+use alloc::collections::HashMap;
+use alloc::fmt::Debug;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+use core::hash::Hash;
+use core::time::Duration;
 
 use derivative::Derivative;
 use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
 use packet_formats::ip::{IpExt, IpProto, Ipv4Proto, Ipv6Proto};
 
-use crate::{
-    context::{FilterBindingsContext, FilterBindingsTypes},
-    logic::FilterTimerId,
-    packets::TransportPacket,
-    packets::{IpPacket, MaybeTransportPacket},
-};
-use netstack3_base::{
-    sync::Mutex, CoreTimerContext, Inspectable, Inspector, Instant, TimerContext,
-};
+use crate::context::{FilterBindingsContext, FilterBindingsTypes};
+use crate::logic::FilterTimerId;
+use crate::packets::{IpPacket, MaybeTransportPacket, TransportPacket};
+use netstack3_base::sync::Mutex;
+use netstack3_base::{CoreTimerContext, Inspectable, Inspector, Instant, TimerContext};
 
 /// The time from the end of one GC cycle to the beginning of the next.
 const GC_INTERVAL: Duration = Duration::from_secs(10);
@@ -719,19 +719,16 @@ mod tests {
     use ip_test_macro::ip_test;
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::ip::{Ipv4, Ipv6};
-    use netstack3_base::{testutil::FakeTimerCtxExt, IntoCoreTimerCtx};
+    use netstack3_base::testutil::FakeTimerCtxExt;
+    use netstack3_base::IntoCoreTimerCtx;
     use packet_formats::ip::IpProto;
     use test_case::test_case;
 
     use super::*;
-    use crate::{
-        context::testutil::{FakeBindingsCtx, FakeCtx},
-        packets::{
-            testutil::internal::{FakeIpPacket, FakeTcpSegment, TransportPacketExt},
-            MaybeTransportPacketMut,
-        },
-        state::IpRoutines,
-    };
+    use crate::context::testutil::{FakeBindingsCtx, FakeCtx};
+    use crate::packets::testutil::internal::{FakeIpPacket, FakeTcpSegment, TransportPacketExt};
+    use crate::packets::MaybeTransportPacketMut;
+    use crate::state::IpRoutines;
 
     trait TestIpExt: Ip {
         const SRC_ADDR: Self::Addr;
@@ -1353,11 +1350,10 @@ mod tests {
     #[cfg(target_os = "fuchsia")]
     #[ip_test]
     fn inspect<I: Ip + IpExt + TestIpExt>() {
-        use alloc::{boxed::Box, string::ToString};
-        use netstack3_fuchsia::{
-            testutils::{assert_data_tree, Inspector},
-            FuchsiaInspector,
-        };
+        use alloc::boxed::Box;
+        use alloc::string::ToString;
+        use netstack3_fuchsia::testutils::{assert_data_tree, Inspector};
+        use netstack3_fuchsia::FuchsiaInspector;
 
         let mut bindings_ctx = FakeBindingsCtx::<I>::new();
         bindings_ctx.sleep(Duration::from_secs(1));

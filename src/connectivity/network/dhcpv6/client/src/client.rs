@@ -3,17 +3,15 @@
 // found in the LICENSE file.
 
 //! Implements a DHCPv6 client.
-use std::{
-    collections::{hash_map::DefaultHasher, HashMap, HashSet},
-    hash::{Hash, Hasher},
-    net::{IpAddr, SocketAddr},
-    ops::Add,
-    str::FromStr as _,
-    time::Duration,
-};
+use std::collections::hash_map::DefaultHasher;
+use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
+use std::net::{IpAddr, SocketAddr};
+use std::ops::Add;
+use std::str::FromStr as _;
+use std::time::Duration;
 
 use fidl::endpoints::{ControlHandle as _, ServerEnd};
-use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcpv6::{
     ClientMarker, ClientRequest, ClientRequestStream, ClientWatchAddressResponder,
     ClientWatchPrefixesResponder, ClientWatchServersResponder, Duid, Empty, Lifetimes,
@@ -23,15 +21,12 @@ use fidl_fuchsia_net_dhcpv6::{
 use fidl_fuchsia_net_dhcpv6_ext::{
     AddressConfig, ClientConfig, InformationConfig, NewClientParams,
 };
-use fidl_fuchsia_net_ext as fnet_ext;
-use fidl_fuchsia_net_name as fnet_name;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
-use futures::{
-    future::{AbortHandle, Abortable, Aborted},
-    select, stream,
-    stream::futures_unordered::FuturesUnordered,
-    Future, FutureExt as _, StreamExt as _, TryStreamExt as _,
+use futures::future::{AbortHandle, Abortable, Aborted};
+use futures::stream::futures_unordered::FuturesUnordered;
+use futures::{select, stream, Future, FutureExt as _, StreamExt as _, TryStreamExt as _};
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_name as fnet_name,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 use anyhow::{Context as _, Result};
@@ -39,13 +34,12 @@ use assert_matches::assert_matches;
 use async_utils::futures::{FutureExt as _, ReplaceValue};
 use byteorder::{NetworkEndian, WriteBytesExt as _};
 use dns_server_watcher::DEFAULT_DNS_PORT;
-use net_types::{
-    ip::{Ip as _, Ipv6, Ipv6Addr, Subnet, SubnetError},
-    MulticastAddress as _,
-};
+use net_types::ip::{Ip as _, Ipv6, Ipv6Addr, Subnet, SubnetError};
+use net_types::MulticastAddress as _;
 use packet::ParsablePacket;
 use packet_formats_dhcp::v6;
-use rand::{rngs::StdRng, SeedableRng};
+use rand::rngs::StdRng;
+use rand::SeedableRng;
 use tracing::{debug, error, warn};
 
 /// A thin wrapper around `zx::Time` that implements `dhcpv6_core::Instant`.
@@ -819,10 +813,8 @@ pub(crate) async fn serve_client(
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        pin::{pin, Pin},
-        task::Poll,
-    };
+    use std::pin::{pin, Pin};
+    use std::task::Poll;
 
     use fidl::endpoints::{
         create_proxy, create_proxy_and_stream, create_request_stream, ClientEnd,

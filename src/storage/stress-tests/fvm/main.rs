@@ -8,10 +8,11 @@ pub mod volume;
 pub mod volume_actor;
 pub mod vslice;
 
-use {
-    argh::FromArgs, environment::FvmEnvironment, fuchsia_async as fasync, stress_test::run_test,
-    tracing::Level,
-};
+use argh::FromArgs;
+use environment::FvmEnvironment;
+use fuchsia_async as fasync;
+use stress_test::run_test;
+use tracing::Level;
 
 #[derive(Clone, Debug, FromArgs)]
 /// Creates an instance of fvm and performs stressful operations on it

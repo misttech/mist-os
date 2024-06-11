@@ -2,20 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
-    vfs::{
-        buffers::{AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer},
-        socket::{
-            AcceptQueue, Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags,
-            SocketOps, SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType,
-            DEFAULT_LISTEN_BACKLOG,
-        },
-        FileHandle,
-    },
+use crate::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
+use crate::vfs::buffers::{AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer};
+use crate::vfs::socket::{
+    AcceptQueue, Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketOps,
+    SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType, DEFAULT_LISTEN_BACKLOG,
 };
+use crate::vfs::FileHandle;
 use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
-use starnix_uapi::{errno, error, errors::Errno, open_flags::OpenFlags, ucred, vfs::FdEvents};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::vfs::FdEvents;
+use starnix_uapi::{errno, error, ucred};
 
 // An implementation of AF_VSOCK.
 // See https://man7.org/linux/man-pages/man7/vsock.7.html
@@ -299,15 +297,11 @@ impl VsockSocketInner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        fs::fuchsia::create_fuchsia_pipe,
-        mm::PAGE_SIZE,
-        testing::*,
-        vfs::{
-            buffers::{VecInputBuffer, VecOutputBuffer},
-            EpollFileObject,
-        },
-    };
+    use crate::fs::fuchsia::create_fuchsia_pipe;
+    use crate::mm::PAGE_SIZE;
+    use crate::testing::*;
+    use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
+    use crate::vfs::EpollFileObject;
     use fuchsia_zircon as zx;
     use fuchsia_zircon::HandleBased;
     use starnix_uapi::vfs::EpollEvent;

@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::render::Renderer;
+use fidl::endpoints::ClientEnd;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_framebuffer::sysmem::{minimum_row_bytes, BufferCollectionAllocator};
+use fuchsia_framebuffer::FrameUsage;
+use fuchsia_scenic::{duplicate_buffer_collection_import_token, BufferCollectionTokenPair};
 use {
-    crate::render::Renderer,
-    fidl::endpoints::ClientEnd,
     fidl_fuchsia_images2 as fimages2, fidl_fuchsia_sysmem2 as fsysmem2,
-    fidl_fuchsia_ui_composition as fland,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_framebuffer::{
-        sysmem::{minimum_row_bytes, BufferCollectionAllocator},
-        FrameUsage,
-    },
-    fuchsia_scenic::{duplicate_buffer_collection_import_token, BufferCollectionTokenPair},
-    fuchsia_zircon as zx,
+    fidl_fuchsia_ui_composition as fland, fuchsia_zircon as zx,
 };
 
 pub struct CpuRenderer {

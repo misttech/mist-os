@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::act::ActionResults, std::fmt};
+use crate::act::ActionResults;
+use std::fmt;
 
 pub struct ActionResultFormatter<'a> {
     action_results: &'a ActionResults,

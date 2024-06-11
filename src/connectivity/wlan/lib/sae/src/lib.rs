@@ -12,18 +12,16 @@ mod frame;
 pub mod hmac_utils;
 mod state;
 
+use anyhow::{bail, Error};
+use boringssl::{Bignum, EcGroupId};
+use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
 pub use frame::{AntiCloggingTokenMsg, CommitMsg, ConfirmMsg};
-use {
-    anyhow::{bail, Error},
-    boringssl::{Bignum, EcGroupId},
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    hmac_utils::{HmacUtils, HmacUtilsImpl},
-    ieee80211::{MacAddr, Ssid},
-    mundane::hash::Sha256,
-    num::FromPrimitive,
-    tracing::warn,
-    wlan_common::ie::rsn::akm::{self, Akm, AKM_PSK, AKM_SAE},
-};
+use hmac_utils::{HmacUtils, HmacUtilsImpl};
+use ieee80211::{MacAddr, Ssid};
+use mundane::hash::Sha256;
+use num::FromPrimitive;
+use tracing::warn;
+use wlan_common::ie::rsn::akm::{self, Akm, AKM_PSK, AKM_SAE};
 
 /// Maximum number of incorrect frames sent before SAE fails.
 const MAX_RETRIES_PER_EXCHANGE: u16 = 3;
@@ -306,12 +304,11 @@ mod internal {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{internal::*, *},
-        lazy_static::lazy_static,
-        std::convert::TryFrom,
-        wlan_common::assert_variant,
-    };
+    use super::internal::*;
+    use super::*;
+    use lazy_static::lazy_static;
+    use std::convert::TryFrom;
+    use wlan_common::assert_variant;
 
     // IEEE 802.11-2016 Annex J.10 SAE test vector
     const TEST_SSID: &'static str = "SSID not in 802.11-2016";

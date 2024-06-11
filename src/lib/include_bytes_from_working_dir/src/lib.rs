@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use proc_macro2::{Literal, Span, TokenStream, TokenTree};
-use std::{env, path::Path};
+use std::env;
+use std::path::Path;
 use syn::{Error, LitStr, Result};
 
 /// Imports a file's content as a reference to a byte array like [`include_bytes!`] does but looks

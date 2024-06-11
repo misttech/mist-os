@@ -5,27 +5,24 @@
 use crate::realm_events::*;
 use crate::realm_options::*;
 
+use anyhow::*;
+use component_events::events::{EventStream, Stopped};
+use component_events::matcher::EventMatcher;
+use fake_archive_accessor::FakeArchiveAccessor;
+use fidl::endpoints::{create_endpoints, ClientEnd};
+use fidl_fuchsia_io::R_STAR_DIR;
+use fidl_server::*;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
+};
+use futures::lock::Mutex;
+use futures::StreamExt;
+use std::sync::Arc;
+use tracing::{error, info};
 use {
-    anyhow::*,
-    component_events::{
-        events::{EventStream, Stopped},
-        matcher::EventMatcher,
-    },
-    fake_archive_accessor::FakeArchiveAccessor,
-    fidl::endpoints::{create_endpoints, ClientEnd},
     fidl_fuchsia_diagnostics as diagnostics, fidl_fuchsia_feedback as fcrash,
-    fidl_fuchsia_io::R_STAR_DIR,
-    fidl_server::*,
-    fidl_test_detect_factory as ftest, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
-    },
-    fuchsia_zircon as zx,
-    futures::lock::Mutex,
-    futures::StreamExt,
-    std::sync::Arc,
-    tracing::{error, info},
+    fidl_test_detect_factory as ftest, fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 // Errors returned from this module.

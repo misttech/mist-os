@@ -6,11 +6,9 @@
 
 use fidl_fuchsia_bluetooth_sys::TechnologyType;
 
-use crate::{
-    expectation::Predicate,
-    over,
-    types::{Address, Peer, PeerId},
-};
+use crate::expectation::Predicate;
+use crate::over;
+use crate::types::{Address, Peer, PeerId};
 
 pub fn name(expected_name: &str) -> Predicate<Peer> {
     over!(Peer: name, Predicate::equal(Some(expected_name.to_string())))

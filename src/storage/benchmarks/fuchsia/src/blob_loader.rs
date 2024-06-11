@@ -2,17 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_io as fio,
-    fuchsia_fs::{
-        directory::{
-            open_file_no_describe, open_in_namespace, readdir_recursive, DirEntry, DirentKind,
-        },
-        OpenFlags,
-    },
-    fuchsia_zircon as zx,
-    futures::StreamExt as _,
+use fuchsia_fs::directory::{
+    open_file_no_describe, open_in_namespace, readdir_recursive, DirEntry, DirentKind,
 };
+use fuchsia_fs::OpenFlags;
+use futures::StreamExt as _;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// Pages in and retains all of the blobs in the pkg directory. This is done to avoid page faulting
 /// on a blob during a benchmark.

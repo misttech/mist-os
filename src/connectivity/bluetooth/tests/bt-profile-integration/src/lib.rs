@@ -2,30 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context, Error},
-    bt_test_harness::{
-        access::{expectation, AccessHarness},
-        profile::ProfileHarness,
-    },
-    fidl::endpoints::create_request_stream,
-    fidl_fuchsia_bluetooth::{ErrorCode, MAJOR_DEVICE_CLASS_MISCELLANEOUS},
-    fidl_fuchsia_bluetooth_bredr::{
-        ConnectParameters, ConnectionReceiverRequestStream, DataElement, L2capParameters,
-        ProfileAdvertiseRequest, ProfileDescriptor, ProfileSearchRequest, ProtocolDescriptor,
-        ProtocolIdentifier, SearchResultsRequest, SearchResultsRequestStream,
-        ServiceClassProfileIdentifier, ServiceDefinition, PSM_AVDTP,
-    },
-    fidl_fuchsia_bluetooth_sys::ProcedureTokenProxy,
-    fidl_fuchsia_hardware_bluetooth::{EmulatorProxy, PeerParameters, PeerProxy},
-    fuchsia_async::{DurationExt, TimeoutExt},
-    fuchsia_bluetooth::{
-        constants::INTEGRATION_TIMEOUT,
-        expectation::asynchronous::{ExpectableExt, ExpectableStateExt},
-        types::{Address, PeerId, Uuid},
-    },
-    futures::{FutureExt, StreamExt, TryFutureExt},
+use anyhow::{format_err, Context, Error};
+use bt_test_harness::access::{expectation, AccessHarness};
+use bt_test_harness::profile::ProfileHarness;
+use fidl::endpoints::create_request_stream;
+use fidl_fuchsia_bluetooth::{ErrorCode, MAJOR_DEVICE_CLASS_MISCELLANEOUS};
+use fidl_fuchsia_bluetooth_bredr::{
+    ConnectParameters, ConnectionReceiverRequestStream, DataElement, L2capParameters,
+    ProfileAdvertiseRequest, ProfileDescriptor, ProfileSearchRequest, ProtocolDescriptor,
+    ProtocolIdentifier, SearchResultsRequest, SearchResultsRequestStream,
+    ServiceClassProfileIdentifier, ServiceDefinition, PSM_AVDTP,
 };
+use fidl_fuchsia_bluetooth_sys::ProcedureTokenProxy;
+use fidl_fuchsia_hardware_bluetooth::{EmulatorProxy, PeerParameters, PeerProxy};
+use fuchsia_async::{DurationExt, TimeoutExt};
+use fuchsia_bluetooth::constants::INTEGRATION_TIMEOUT;
+use fuchsia_bluetooth::expectation::asynchronous::{ExpectableExt, ExpectableStateExt};
+use fuchsia_bluetooth::types::{Address, PeerId, Uuid};
+use futures::{FutureExt, StreamExt, TryFutureExt};
 
 /// This makes a custom BR/EDR service definition that runs over L2CAP.
 fn service_definition_for_testing() -> ServiceDefinition {

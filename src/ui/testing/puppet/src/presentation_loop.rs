@@ -2,18 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_ui_composition as ui_comp,
-    flatland_frame_scheduling_lib::*,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::channel::{
-        mpsc::{UnboundedReceiver, UnboundedSender},
-        oneshot,
-    },
-    futures::prelude::*,
-    std::rc::Weak,
-    tracing::warn,
-};
+use flatland_frame_scheduling_lib::*;
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use futures::channel::oneshot;
+use futures::prelude::*;
+use std::rc::Weak;
+use tracing::warn;
+use {fidl_fuchsia_ui_composition as ui_comp, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// Unbounded sender used for presentation messages.
 pub type PresentationSender = UnboundedSender<oneshot::Sender<()>>;

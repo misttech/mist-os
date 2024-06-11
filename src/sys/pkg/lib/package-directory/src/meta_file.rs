@@ -2,21 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::root_dir::RootDir,
-    anyhow::Context as _,
-    async_trait::async_trait,
-    fidl::HandleBased as _,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    once_cell::sync::OnceCell,
-    std::sync::Arc,
-    tracing::error,
-    vfs::{
-        execution_scope::ExecutionScope,
-        file::{FidlIoConnection, FileLike, FileOptions},
-        immutable_attributes, ObjectRequestRef,
-    },
-};
+use crate::root_dir::RootDir;
+use anyhow::Context as _;
+use async_trait::async_trait;
+use fidl::HandleBased as _;
+use once_cell::sync::OnceCell;
+use std::sync::Arc;
+use tracing::error;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::{FidlIoConnection, FileLike, FileOptions};
+use vfs::{immutable_attributes, ObjectRequestRef};
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// Location of MetaFile contents within a meta.far
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -229,20 +225,18 @@ impl<S: crate::NonMetaStorage> vfs::file::FileIo for MetaFile<S> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl::{endpoints::Proxy as _, AsHandleRef as _},
-        fuchsia_pkg_testing::{blobfs::Fake as FakeBlobfs, PackageBuilder},
-        futures::prelude::*,
-        std::convert::{TryFrom as _, TryInto as _},
-        vfs::{
-            directory::entry_container::Directory,
-            file::{File, FileIo},
-            node::Node,
-            ToObjectRequest,
-        },
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::Proxy as _;
+    use fidl::AsHandleRef as _;
+    use fuchsia_pkg_testing::blobfs::Fake as FakeBlobfs;
+    use fuchsia_pkg_testing::PackageBuilder;
+    use futures::prelude::*;
+    use std::convert::{TryFrom as _, TryInto as _};
+    use vfs::directory::entry_container::Directory;
+    use vfs::file::{File, FileIo};
+    use vfs::node::Node;
+    use vfs::ToObjectRequest;
 
     const TEST_FILE_CONTENTS: [u8; 4] = [0, 1, 2, 3];
     const LOCATION: &str = "meta/file";

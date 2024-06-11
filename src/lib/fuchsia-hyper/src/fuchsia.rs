@@ -2,27 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        connect_and_bind_device,
-        happy_eyeballs::{self, RealSocketConnector},
-        parse_ip_addr, HyperConnectorFuture, SocketOptions, TcpOptions, TcpStream,
-    },
-    fidl_connector::{Connect, ServiceReconnector},
-    fidl_fuchsia_net_name::{LookupIpOptions, LookupMarker, LookupProxy, LookupResult},
-    fidl_fuchsia_posix_socket::{ProviderMarker, ProviderProxy},
-    fuchsia_async::net,
-    fuchsia_zircon as zx,
-    futures::{
-        future::{Future, FutureExt},
-        io,
-        task::{Context, Poll},
-    },
-    http::uri::{Scheme, Uri},
-    hyper::service::Service,
-    rustls::ClientConfig,
-    std::{convert::TryFrom as _, net::SocketAddr, num::TryFromIntError},
+use crate::happy_eyeballs::{self, RealSocketConnector};
+use crate::{
+    connect_and_bind_device, parse_ip_addr, HyperConnectorFuture, SocketOptions, TcpOptions,
+    TcpStream,
 };
+use fidl_connector::{Connect, ServiceReconnector};
+use fidl_fuchsia_net_name::{LookupIpOptions, LookupMarker, LookupProxy, LookupResult};
+use fidl_fuchsia_posix_socket::{ProviderMarker, ProviderProxy};
+use fuchsia_async::net;
+use fuchsia_zircon as zx;
+use futures::future::{Future, FutureExt};
+use futures::io;
+use futures::task::{Context, Poll};
+use http::uri::{Scheme, Uri};
+use hyper::service::Service;
+use rustls::ClientConfig;
+use std::convert::TryFrom as _;
+use std::net::SocketAddr;
+use std::num::TryFromIntError;
 
 pub(crate) fn configure_cert_store(tls: &mut ClientConfig) {
     tls.root_store.add_server_trust_anchors(&webpki_roots_fuchsia::TLS_SERVER_ROOTS);
@@ -252,17 +250,16 @@ async fn parse_ip_addr_with_provider(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::*,
-        assert_matches::assert_matches,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_net_name::{LookupError, LookupRequest},
-        fidl_fuchsia_posix_socket::ProviderRequest,
-        fuchsia_async::{self as fasync, net::TcpListener, LocalExecutor},
-        futures::prelude::*,
-        std::cell::RefCell,
-    };
+    use super::*;
+    use crate::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_net_name::{LookupError, LookupRequest};
+    use fidl_fuchsia_posix_socket::ProviderRequest;
+    use fuchsia_async::net::TcpListener;
+    use fuchsia_async::{self as fasync, LocalExecutor};
+    use futures::prelude::*;
+    use std::cell::RefCell;
 
     struct PanicConnector;
 

@@ -8,16 +8,12 @@ use diagnostics_data::{
 use diagnostics_hierarchy::{DiagnosticsHierarchy, Property};
 use fidl_fuchsia_diagnostics::{DataType, Format};
 use fuchsia_async as fasync;
-use fuchsia_criterion::{
-    criterion::{self, Criterion},
-    FuchsiaCriterion,
-};
+use fuchsia_criterion::criterion::{self, Criterion};
+use fuchsia_criterion::FuchsiaCriterion;
 use futures::{stream, StreamExt};
 
-use archivist_lib::{
-    constants::FORMATTED_CONTENT_CHUNK_SIZE_TARGET,
-    formatter::{JsonPacketSerializer, SerializedVmo},
-};
+use archivist_lib::constants::FORMATTED_CONTENT_CHUNK_SIZE_TARGET;
+use archivist_lib::formatter::{JsonPacketSerializer, SerializedVmo};
 use std::time::Duration;
 
 fn bench_serialization(b: &mut criterion::Bencher, n: usize, m: usize, format: Format) {

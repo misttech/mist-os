@@ -16,32 +16,27 @@ mod rtc_testing;
 mod time_source;
 mod time_source_manager;
 
-use anyhow::{Context as _, Result};
-use fidl::AsHandleRef;
-use fidl_fuchsia_time_test as fftt;
-use futures::{
-    channel::mpsc,
-    future::{self, OptionFuture},
-    stream::StreamExt as _,
+use crate::clock_manager::ClockManager;
+use crate::diagnostics::{
+    CobaltDiagnostics, CompositeDiagnostics, Diagnostics, Event, InspectDiagnostics,
 };
+use crate::enums::{InitialClockState, InitializeRtcOutcome, Role, StartClockSource, Track};
+use crate::rtc::{Rtc, RtcCreationError, RtcImpl};
+use crate::time_source::{TimeSource, TimeSourceLauncher};
+use crate::time_source_manager::TimeSourceManager;
+use anyhow::{Context as _, Result};
+use chrono::prelude::*;
+use fidl::AsHandleRef;
+use fuchsia_component::server::ServiceFs;
+use futures::channel::mpsc;
+use futures::future::{self, OptionFuture};
+use futures::stream::StreamExt as _;
+use std::sync::Arc;
+use time_metrics_registry::TimeMetricDimensionExperiment;
+use tracing::{debug, error, info, warn};
 use {
-    crate::{
-        clock_manager::ClockManager,
-        diagnostics::{
-            CobaltDiagnostics, CompositeDiagnostics, Diagnostics, Event, InspectDiagnostics,
-        },
-        enums::{InitialClockState, InitializeRtcOutcome, Role, StartClockSource, Track},
-        rtc::{Rtc, RtcCreationError, RtcImpl},
-        time_source::{TimeSource, TimeSourceLauncher},
-        time_source_manager::TimeSourceManager,
-    },
-    chrono::prelude::*,
-    fidl_fuchsia_time as ftime, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
+    fidl_fuchsia_time as ftime, fidl_fuchsia_time_test as fftt, fuchsia_async as fasync,
     fuchsia_zircon as zx,
-    std::sync::Arc,
-    time_metrics_registry::TimeMetricDimensionExperiment,
-    tracing::{debug, error, info, warn},
 };
 
 /// A command sent from various FIDL clients.
@@ -518,20 +513,16 @@ use tests::{make_test_config, make_test_config_with_delay};
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::diagnostics::FakeDiagnostics;
+    use crate::enums::WriteRtcOutcome;
+    use crate::rtc::FakeRtc;
+    use crate::time_source::{Event as TimeSourceEvent, FakePushTimeSource, Sample};
+    use futures::FutureExt;
+    use lazy_static::lazy_static;
     use std::matches;
     use test_case::test_case;
-    use {
-        super::*,
-        crate::{
-            diagnostics::FakeDiagnostics,
-            enums::WriteRtcOutcome,
-            rtc::FakeRtc,
-            time_source::{Event as TimeSourceEvent, FakePushTimeSource, Sample},
-        },
-        fidl_fuchsia_time_external as ftexternal, fuchsia_zircon as zx,
-        futures::FutureExt,
-        lazy_static::lazy_static,
-    };
+    use {fidl_fuchsia_time_external as ftexternal, fuchsia_zircon as zx};
 
     const NANOS_PER_SECOND: i64 = 1_000_000_000;
     const OFFSET: zx::Duration = zx::Duration::from_seconds(1111_000);

@@ -4,16 +4,15 @@
 
 use core::fmt::Debug;
 
-use net_types::{
-    ip::{Ipv4, Ipv6},
-    NonMappedAddr, SpecifiedAddr,
-};
+use net_types::ip::{Ipv4, Ipv6};
+use net_types::{NonMappedAddr, SpecifiedAddr};
 use netstack3_base::{
     AnyDevice, DeviceIdContext, InstantBindingsTypes, RngContext, TimerBindingsTypes, TimerContext,
 };
 use packet_formats::ip::IpExt;
 
-use crate::{matchers::InterfaceProperties, state::State};
+use crate::matchers::InterfaceProperties;
+use crate::state::State;
 
 /// Trait defining required types for filtering provided by bindings.
 ///
@@ -93,20 +92,18 @@ pub(crate) mod testutil {
     use core::time::Duration;
 
     use net_types::ip::Ip;
-    use netstack3_base::{
-        testutil::{
-            FakeCryptoRng, FakeInstant, FakeTimerCtx, FakeWeakDeviceId, WithFakeTimerContext,
-        },
-        InstantContext, IntoCoreTimerCtx,
+    use netstack3_base::testutil::{
+        FakeCryptoRng, FakeInstant, FakeTimerCtx, FakeWeakDeviceId, WithFakeTimerContext,
     };
+    use netstack3_base::{InstantContext, IntoCoreTimerCtx};
 
     use super::*;
-    use crate::{
-        conntrack,
-        logic::{nat::NatConfig, FilterTimerId},
-        matchers::testutil::FakeDeviceId,
-        state::{validation::ValidRoutines, IpRoutines, Routines},
-    };
+    use crate::conntrack;
+    use crate::logic::nat::NatConfig;
+    use crate::logic::FilterTimerId;
+    use crate::matchers::testutil::FakeDeviceId;
+    use crate::state::validation::ValidRoutines;
+    use crate::state::{IpRoutines, Routines};
 
     #[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
     pub enum FakeDeviceClass {

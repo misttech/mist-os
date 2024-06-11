@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {component_events::events::EventStream, fidl_fidl_test_components as ftest};
+use component_events::events::EventStream;
+use fidl_fidl_test_components as ftest;
 
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_component::EventPayload;

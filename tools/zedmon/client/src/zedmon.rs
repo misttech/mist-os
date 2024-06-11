@@ -2,22 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::protocol::{self, ParameterValue, ReportFormat, Value, MAX_PACKET_SIZE},
-    anyhow::{bail, format_err, Error},
-    serde::{Deserialize, Serialize},
-    serde_json as json,
-    std::{
-        cell::RefCell,
-        collections::HashMap,
-        io::{Read, Write},
-        os::raw::{c_uchar, c_ushort},
-        sync::mpsc,
-        time::{Duration, SystemTime},
-    },
-    thiserror::Error,
-    usb_bulk::{InterfaceInfo, Open},
-};
+use crate::protocol::{self, ParameterValue, ReportFormat, Value, MAX_PACKET_SIZE};
+use anyhow::{bail, format_err, Error};
+use serde::{Deserialize, Serialize};
+use serde_json as json;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::io::{Read, Write};
+use std::os::raw::{c_uchar, c_ushort};
+use std::sync::mpsc;
+use std::time::{Duration, SystemTime};
+use thiserror::Error;
+use usb_bulk::{InterfaceInfo, Open};
 
 const GOOGLE_VENDOR_ID: c_ushort = 0x18d1;
 const ZEDMON_PRODUCT_ID: c_ushort = 0xaf00;
@@ -807,14 +803,13 @@ pub fn zedmon(serial: Option<&str>) -> Result<Client<usb_bulk::Interface>, InitE
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        num_traits::FromPrimitive,
-        protocol::{tests::serialize_reports, PacketType, Report, ScalarType},
-        std::collections::VecDeque,
-        std::rc::Rc,
-        test_util::assert_near,
-    };
+    use super::*;
+    use num_traits::FromPrimitive;
+    use protocol::tests::serialize_reports;
+    use protocol::{PacketType, Report, ScalarType};
+    use std::collections::VecDeque;
+    use std::rc::Rc;
+    use test_util::assert_near;
 
     // Used by `interface_info`, below, as a convenient means of constructing InterfaceInfo.
     struct ShortInterface<'a> {
@@ -957,10 +952,9 @@ mod tests {
     //  - CoordinatorBuilder, for producing a Coordinator instance with its various optional
     //    settings.
     mod fake_device {
-        use {
-            super::*,
-            protocol::{tests::*, Unit},
-        };
+        use super::*;
+        use protocol::tests::*;
+        use protocol::Unit;
 
         // Coordinates interactions between FakeZedmonInterface and a test.
         //

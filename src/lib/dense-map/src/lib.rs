@@ -850,15 +850,14 @@ impl<'a, K: EntryKey, T> Entry<'a, K, T> {
 
 #[cfg(test)]
 mod tests {
-    use alloc::{collections::HashMap, vec};
+    use alloc::collections::HashMap;
+    use alloc::vec;
 
     use rand::seq::SliceRandom as _;
 
-    use crate::{
-        testutil::assert_empty,
-        DenseMapEntry::{Allocated, Free},
-        *,
-    };
+    use crate::testutil::assert_empty;
+    use crate::DenseMapEntry::{Allocated, Free};
+    use crate::*;
 
     // Smart constructors
     fn free<T>(prev: usize, next: usize) -> DenseMapEntry<T> {

@@ -2,14 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_archive::{ChunkType, DIR_CHUNK_TYPE, DIR_NAMES_CHUNK_TYPE, MAGIC_INDEX_VALUE},
-    std::{
-        fs::{create_dir_all, File},
-        io::Write,
-        path::PathBuf,
-    },
-};
+use fuchsia_archive::{ChunkType, DIR_CHUNK_TYPE, DIR_NAMES_CHUNK_TYPE, MAGIC_INDEX_VALUE};
+use std::fs::{create_dir_all, File};
+use std::io::Write;
+use std::path::PathBuf;
 
 const ALL_ZEROES_CHUNK_TYPE: ChunkType = [0u8; 8];
 

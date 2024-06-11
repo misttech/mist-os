@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    async_trait::async_trait,
-    component_debug::cli::show_cmd_print,
-    ffx_session_show_args::SessionShowCommand,
-    fho::{FfxMain, FfxTool, SimpleWriter},
-    fidl_fuchsia_developer_remotecontrol as rc,
-};
+use anyhow::{Context, Result};
+use async_trait::async_trait;
+use component_debug::cli::show_cmd_print;
+use ffx_session_show_args::SessionShowCommand;
+use fho::{FfxMain, FfxTool, SimpleWriter};
+use fidl_fuchsia_developer_remotecontrol as rc;
 
 const DETAILS_FAILURE: &str = "Could not get session information from the target. This may be
 because there are no running sessions, or because the target is using a product configuration

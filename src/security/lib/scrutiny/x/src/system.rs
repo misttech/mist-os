@@ -3,17 +3,12 @@
 // found in the LICENSE file.
 
 use super::api;
-use super::api::BlobError;
-use super::api::Package as _;
-use super::api::PackageResolverUrl;
+use super::api::{BlobError, Package as _, PackageResolverUrl};
 use super::blob::BlobDirectoryError;
-use super::package::Error as PackageError;
-use super::package::Package;
+use super::package::{Error as PackageError, Package};
 use super::product_bundle::ProductBundle;
-use super::update_package::Error as UpdatePackageError;
-use super::update_package::UpdatePackage;
-use super::zbi::Error as ZbiError;
-use super::zbi::Zbi;
+use super::update_package::{Error as UpdatePackageError, UpdatePackage};
+use super::zbi::{Error as ZbiError, Zbi};
 use fuchsia_url::AbsolutePackageUrl;
 use std::rc::Rc;
 use thiserror::Error;

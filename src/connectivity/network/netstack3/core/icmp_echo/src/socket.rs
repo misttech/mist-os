@@ -5,32 +5,27 @@
 //! ICMP Echo Sockets.
 
 use alloc::vec::Vec;
-use core::{
-    borrow::Borrow,
-    convert::Infallible as Never,
-    fmt::Debug,
-    marker::PhantomData,
-    num::{NonZeroU16, NonZeroU8},
-    ops::ControlFlow,
-};
+use core::borrow::Borrow;
+use core::convert::Infallible as Never;
+use core::fmt::Debug;
+use core::marker::PhantomData;
+use core::num::{NonZeroU16, NonZeroU8};
+use core::ops::ControlFlow;
 use lock_order::lock::{DelegatedOrderedLockAccess, OrderedLockAccess, OrderedLockRef};
 
 use derivative::Derivative;
 use either::Either;
 use log::{debug, trace};
-use net_types::{
-    ip::{GenericOverIp, Ip, IpVersionMarker},
-    SpecifiedAddr, ZonedAddr,
+use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
+use net_types::{SpecifiedAddr, ZonedAddr};
+use netstack3_base::socket::{
+    self, AddrIsMappedError, AddrVec, AddrVecIter, ConnAddr, ConnInfoAddr, ConnIpAddr,
+    IncompatibleError, InsertError, ListenerAddrInfo, MaybeDualStack, ShutdownType, SocketIpAddr,
+    SocketMapAddrSpec, SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
 };
+use netstack3_base::socketmap::{IterShadows as _, SocketMap};
+use netstack3_base::sync::{RwLock, StrongRc};
 use netstack3_base::{
-    socket::{
-        self, AddrIsMappedError, AddrVec, AddrVecIter, ConnAddr, ConnInfoAddr, ConnIpAddr,
-        IncompatibleError, InsertError, ListenerAddrInfo, MaybeDualStack, ShutdownType,
-        SocketIpAddr, SocketMapAddrSpec, SocketMapAddrStateSpec, SocketMapConflictPolicy,
-        SocketMapStateSpec,
-    },
-    socketmap::{IterShadows as _, SocketMap},
-    sync::{RwLock, StrongRc},
     AnyDevice, ContextPair, CounterContext, DeviceIdContext, Inspector, InspectorDeviceExt,
     LocalAddressError, PortAllocImpl, ReferenceNotifiers, RemoveResourceResultWithContext,
     RngContext, SocketError, StrongDeviceIdentifier, UninstantiableWrapper, WeakDeviceIdentifier,
@@ -41,17 +36,15 @@ use netstack3_datagram::{
     DatagramStateContext, ExpectedUnboundError, NonDualStackConverter,
     NonDualStackDatagramSpecBoundStateContext,
 };
+use netstack3_ip::icmp::{EchoTransportContextMarker, IcmpIpExt, IcmpRxCounters};
+use netstack3_ip::socket::SocketHopLimits;
 use netstack3_ip::{
-    icmp::{EchoTransportContextMarker, IcmpIpExt, IcmpRxCounters},
-    socket::SocketHopLimits,
     IpTransportContext, MulticastMembershipHandler, TransparentLocalDelivery, TransportIpContext,
     TransportReceiveError,
 };
 use packet::{BufferMut, ParsablePacket as _, ParseBuffer as _, Serializer};
-use packet_formats::{
-    icmp::{IcmpEchoReply, IcmpEchoRequest, IcmpPacketBuilder, IcmpPacketRaw},
-    ip::{IpProtoExt, Ipv4Proto, Ipv6Proto},
-};
+use packet_formats::icmp::{IcmpEchoReply, IcmpEchoRequest, IcmpPacketBuilder, IcmpPacketRaw};
+use packet_formats::ip::{IpProtoExt, Ipv4Proto, Ipv6Proto};
 
 /// A marker trait for all IP extensions required by ICMP sockets.
 pub trait IpExt: datagram::IpExt + IcmpIpExt {}
@@ -1141,27 +1134,21 @@ impl<
 mod tests {
     use alloc::rc::Rc;
     use alloc::vec;
-    use core::{
-        cell::RefCell,
-        ops::{Deref, DerefMut},
-    };
+    use core::cell::RefCell;
+    use core::ops::{Deref, DerefMut};
 
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use net_declare::net_ip_v6;
-    use net_types::{
-        ip::{Ipv4, Ipv6},
-        Witness,
+    use net_types::ip::{Ipv4, Ipv6};
+    use net_types::Witness;
+    use netstack3_base::socket::StrictlyZonedAddr;
+    use netstack3_base::testutil::{
+        FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeWeakDeviceId, TestIpExt,
     };
-    use netstack3_base::{
-        socket::StrictlyZonedAddr,
-        testutil::{FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeWeakDeviceId, TestIpExt},
-        CtxPair,
-    };
-    use netstack3_ip::{
-        socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx, InnerFakeIpSocketCtx},
-        SendIpPacketMeta,
-    };
+    use netstack3_base::CtxPair;
+    use netstack3_ip::socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx, InnerFakeIpSocketCtx};
+    use netstack3_ip::SendIpPacketMeta;
     use packet::Buf;
     use packet_formats::icmp::{IcmpPacket, IcmpParseArgs, IcmpUnusedCode};
 

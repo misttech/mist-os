@@ -2,37 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    device::{kobject::DeviceMetadata, DeviceMode},
-    fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo},
-    mm::{MemoryAccessorExt, ProtectionFlags},
-    task::CurrentTask,
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        default_ioctl, default_seek, FileObject, FileOps, FsNode, FsString, SeekTarget,
-    },
-};
+use crate::device::kobject::DeviceMetadata;
+use crate::device::DeviceMode;
+use crate::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
+use crate::mm::{MemoryAccessorExt, ProtectionFlags};
+use crate::task::CurrentTask;
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::{default_ioctl, default_seek, FileObject, FileOps, FsNode, FsString, SeekTarget};
 use anyhow::Error;
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
-use starnix_uapi::{
-    device_type::{DeviceType, REMOTE_BLOCK_MAJOR},
-    errno,
-    errors::Errno,
-    from_status_like_fdio, off_t,
-    open_flags::OpenFlags,
-    user_address::UserRef,
-    BLKGETSIZE, BLKGETSIZE64,
-};
-use std::{
-    collections::btree_map::BTreeMap,
-    sync::{
-        atomic::{AtomicU32, Ordering},
-        Arc,
-    },
-};
+use starnix_uapi::device_type::{DeviceType, REMOTE_BLOCK_MAJOR};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::user_address::UserRef;
+use starnix_uapi::{errno, from_status_like_fdio, off_t, BLKGETSIZE, BLKGETSIZE64};
+use std::collections::btree_map::BTreeMap;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 
 /// A block device which is backed by a VMO.  Notably, the contents of the device are not persistent
 /// across reboots.
@@ -289,12 +278,11 @@ impl RemoteBlockDeviceRegistry {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        mm::MemoryAccessor as _,
-        testing::{create_kernel_task_and_unlocked, map_object_anywhere},
-        vfs::{Anon, SeekTarget, VecInputBuffer, VecOutputBuffer},
-    };
-    use starnix_uapi::{open_flags::OpenFlags, BLKGETSIZE, BLKGETSIZE64};
+    use crate::mm::MemoryAccessor as _;
+    use crate::testing::{create_kernel_task_and_unlocked, map_object_anywhere};
+    use crate::vfs::{Anon, SeekTarget, VecInputBuffer, VecOutputBuffer};
+    use starnix_uapi::open_flags::OpenFlags;
+    use starnix_uapi::{BLKGETSIZE, BLKGETSIZE64};
     use std::mem::MaybeUninit;
     use zerocopy::FromBytes as _;
 

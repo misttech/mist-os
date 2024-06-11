@@ -3,18 +3,16 @@
 // found in the LICENSE file.
 
 #![cfg(test)]
-use {
-    anyhow::Error,
-    fidl_fuchsia_factory::{
-        AlphaFactoryStoreProviderMarker, CastCredentialsFactoryStoreProviderMarker,
-        MiscFactoryStoreProviderMarker, PlayReadyFactoryStoreProviderMarker,
-        WeaveFactoryStoreProviderMarker, WidevineFactoryStoreProviderMarker,
-    },
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_fs::file::{AsyncFile, AsyncGetSizeExt},
-    std::fs,
-    std::path::Path,
+use anyhow::Error;
+use fidl_fuchsia_factory::{
+    AlphaFactoryStoreProviderMarker, CastCredentialsFactoryStoreProviderMarker,
+    MiscFactoryStoreProviderMarker, PlayReadyFactoryStoreProviderMarker,
+    WeaveFactoryStoreProviderMarker, WidevineFactoryStoreProviderMarker,
 };
+use fuchsia_fs::file::{AsyncFile, AsyncGetSizeExt};
+use std::fs;
+use std::path::Path;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 static DATA_FILE_PATH: &'static str = "/pkg/data";
 const FACTORY_DEVICE_CONFIG: &'static str = "/pkg/data/factory_ext4.img";

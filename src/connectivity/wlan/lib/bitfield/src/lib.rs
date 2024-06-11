@@ -6,15 +6,13 @@ use std::ops::Deref;
 
 mod parse;
 
-use {
-    parse::*,
-    proc_macro2::{Literal, Span, TokenStream, TokenTree},
-    syn::{
-        parse_macro_input, spanned::Spanned, Data, DataStruct, DeriveInput, Error, Expr, Fields,
-        Ident, Lit, Type,
-    },
-    synstructure::quote,
+use parse::*;
+use proc_macro2::{Literal, Span, TokenStream, TokenTree};
+use syn::spanned::Spanned;
+use syn::{
+    parse_macro_input, Data, DataStruct, DeriveInput, Error, Expr, Fields, Ident, Lit, Type,
 };
+use synstructure::quote;
 
 /// A custom attribute for defining bit fields.
 ///

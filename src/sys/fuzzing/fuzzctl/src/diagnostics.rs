@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::writer::{OutputSink, Writer},
-    anyhow::{anyhow, bail, Context as _, Error, Result},
-    diagnostics_data::LogsData,
-    fidl_fuchsia_fuzzer as fuzz,
-    futures::io::ReadHalf,
-    futures::{try_join, AsyncReadExt},
-    serde_json::Deserializer,
-    std::cell::RefCell,
-    std::path::Path,
-    std::rc::Rc,
-};
+use crate::writer::{OutputSink, Writer};
+use anyhow::{anyhow, bail, Context as _, Error, Result};
+use diagnostics_data::LogsData;
+use fidl_fuchsia_fuzzer as fuzz;
+use futures::io::ReadHalf;
+use futures::{try_join, AsyncReadExt};
+use serde_json::Deserializer;
+use std::cell::RefCell;
+use std::path::Path;
+use std::rc::Rc;
 
 /// Compostion of `SocketForwarder`s for standard output, standard errors, and system logs.
 #[derive(Debug)]
@@ -212,16 +210,14 @@ impl<O: OutputSink> SocketForwarder<O> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        anyhow::{Error, Result},
-        diagnostics_data::LogsData,
-        fidl::Socket,
-        fidl_fuchsia_fuzzer as fuzz,
-        fuchsia_fuzzctl::{Forwarder, SocketForwarder},
-        fuchsia_fuzzctl_test::{send_log_entry, Test},
-        futures::{try_join, AsyncWriteExt},
-        std::fs,
-    };
+    use anyhow::{Error, Result};
+    use diagnostics_data::LogsData;
+    use fidl::Socket;
+    use fidl_fuchsia_fuzzer as fuzz;
+    use fuchsia_fuzzctl::{Forwarder, SocketForwarder};
+    use fuchsia_fuzzctl_test::{send_log_entry, Test};
+    use futures::{try_join, AsyncWriteExt};
+    use std::fs;
 
     #[fuchsia::test]
     async fn test_forward_text() -> Result<()> {

@@ -2,23 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::client::{Client, EventQueue},
-    crate::compositor::Surface,
-    crate::object::{NewObjectExt, ObjectRef, ObjectRefSet, RequestReceiver},
-    crate::relative_pointer::RelativePointer,
-    anyhow::{Error, Result},
-    fidl_fuchsia_ui_input3::{KeyEvent, KeyEventType},
-    fidl_fuchsia_ui_pointer::EventPhase,
-    fuchsia_trace as ftrace, fuchsia_wayland_core as wl,
-    fuchsia_zircon::{self as zx, HandleBased},
-    std::collections::BTreeSet,
-    std::collections::HashSet,
-    wayland_server_protocol::{
-        wl_keyboard, wl_pointer, wl_seat, wl_touch, WlKeyboard, WlKeyboardEvent, WlKeyboardRequest,
-        WlPointer, WlPointerRequest, WlSeat, WlSeatEvent, WlSeatRequest, WlTouch, WlTouchRequest,
-    },
+use crate::client::{Client, EventQueue};
+use crate::compositor::Surface;
+use crate::object::{NewObjectExt, ObjectRef, ObjectRefSet, RequestReceiver};
+use crate::relative_pointer::RelativePointer;
+use anyhow::{Error, Result};
+use fidl_fuchsia_ui_input3::{KeyEvent, KeyEventType};
+use fidl_fuchsia_ui_pointer::EventPhase;
+use fuchsia_zircon::{self as zx, HandleBased};
+use std::collections::{BTreeSet, HashSet};
+use wayland_server_protocol::{
+    wl_keyboard, wl_pointer, wl_seat, wl_touch, WlKeyboard, WlKeyboardEvent, WlKeyboardRequest,
+    WlPointer, WlPointerRequest, WlSeat, WlSeatEvent, WlSeatRequest, WlTouch, WlTouchRequest,
 };
+use {fuchsia_trace as ftrace, fuchsia_wayland_core as wl};
 
 pub fn usb_to_linux_keycode(usb_keycode: u32) -> u16 {
     match usb_keycode {

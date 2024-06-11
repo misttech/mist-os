@@ -7,26 +7,21 @@ mod frame_writer;
 mod infra_bss;
 mod remote_client;
 
+use crate::ddk_converter;
+use crate::device::{self, DeviceOps};
+use crate::error::Error;
+use ieee80211::{Bssid, MacAddr, Ssid};
+use std::fmt;
+use tracing::{debug, error, info, trace, warn};
+use wlan_common::mac::{self, CapabilityInfo};
+use wlan_common::timer::{EventId, Timer};
+use wlan_common::TimeUnit;
+use wlan_ffi_transport::{Buffer, BufferProvider};
+use zerocopy::ByteSlice;
 use {
-    crate::{
-        ddk_converter,
-        device::{self, DeviceOps},
-        error::Error,
-    },
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_minstrel as fidl_minstrel,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
-    fuchsia_trace as trace, fuchsia_zircon as zx,
-    ieee80211::{Bssid, MacAddr, Ssid},
-    std::fmt,
-    tracing::{debug, error, info, trace, warn},
-    wlan_common::{
-        mac::{self, CapabilityInfo},
-        timer::{EventId, Timer},
-        TimeUnit,
-    },
-    wlan_ffi_transport::{Buffer, BufferProvider},
-    wlan_trace as wtrace,
-    zerocopy::ByteSlice,
+    fuchsia_trace as trace, fuchsia_zircon as zx, wlan_trace as wtrace,
 };
 
 use context::*;
@@ -475,25 +470,22 @@ impl<D: DeviceOps> Ap<D> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::device::{test_utils, FakeDevice, FakeDeviceConfig, FakeDeviceState, LinkStatus};
+    use crate::test_utils::MockWlanRxInfo;
+    use fuchsia_sync::Mutex;
+    use ieee80211::MacAddrBytes;
+    use lazy_static::lazy_static;
+    use std::sync::Arc;
+    use wlan_common::big_endian::BigEndianU16;
+    use wlan_common::test_utils::fake_frames::fake_wpa2_rsne;
+    use wlan_common::{assert_variant, timer};
+    use wlan_ffi_transport::FakeFfiBufferProvider;
+    use wlan_frame_writer::write_frame_with_dynamic_buffer;
+    use wlan_sme::responder::Responder;
     use {
-        super::*,
-        crate::{
-            device::{test_utils, FakeDevice, FakeDeviceConfig, FakeDeviceState, LinkStatus},
-            test_utils::MockWlanRxInfo,
-        },
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
         fidl_fuchsia_wlan_softmac as fidl_softmac,
-        fuchsia_sync::Mutex,
-        ieee80211::MacAddrBytes,
-        lazy_static::lazy_static,
-        std::sync::Arc,
-        wlan_common::{
-            assert_variant, big_endian::BigEndianU16, test_utils::fake_frames::fake_wpa2_rsne,
-            timer,
-        },
-        wlan_ffi_transport::FakeFfiBufferProvider,
-        wlan_frame_writer::write_frame_with_dynamic_buffer,
-        wlan_sme::responder::Responder,
     };
 
     lazy_static! {

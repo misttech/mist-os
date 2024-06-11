@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        client::{connection_selection::scoring_functions, roaming::lib::*, types},
-        telemetry::{TelemetryEvent, TelemetrySender},
-        util::pseudo_energy::EwmaSignalData,
-    },
-    fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::channel::mpsc,
-};
+use crate::client::connection_selection::scoring_functions;
+use crate::client::roaming::lib::*;
+use crate::client::types;
+use crate::telemetry::{TelemetryEvent, TelemetrySender};
+use crate::util::pseudo_energy::EwmaSignalData;
+use futures::channel::mpsc;
+use {fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// If there isn't a change in reasons to roam or significant change in RSSI, wait a while between
 /// scans. If there isn't a change, it is unlikely that there would be a reason to roam now.
@@ -145,16 +143,13 @@ fn check_signal_thresholds(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::{
-            telemetry::EWMA_SMOOTHING_FACTOR_FOR_METRICS,
-            util::{pseudo_energy::RssiVelocity, testing::generate_connect_selection},
-        },
-        fidl_fuchsia_wlan_internal as fidl_internal,
-        test_util::{assert_gt, assert_lt},
-        wlan_common::{assert_variant, channel},
-    };
+    use super::*;
+    use crate::telemetry::EWMA_SMOOTHING_FACTOR_FOR_METRICS;
+    use crate::util::pseudo_energy::RssiVelocity;
+    use crate::util::testing::generate_connect_selection;
+    use fidl_fuchsia_wlan_internal as fidl_internal;
+    use test_util::{assert_gt, assert_lt};
+    use wlan_common::{assert_variant, channel};
 
     #[fuchsia::test]
     fn test_check_signal_thresholds_2g() {

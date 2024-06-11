@@ -2,19 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{clock::create_reference_clock, error::ControllerError, wav_socket::WavSocket};
+use crate::clock::create_reference_clock;
+use crate::error::ControllerError;
+use crate::wav_socket::WavSocket;
 use anyhow::{anyhow, Context, Error};
 use fidl::endpoints::{create_proxy, ServerEnd};
-use fidl_fuchsia_audio_controller as fac;
-use fidl_fuchsia_media as fmedia;
-use fidl_fuchsia_media_audio as fmedia_audio;
-use fidl_fuchsia_ultrasound as fultrasound;
 use fuchsia_audio::{stop_listener, Format};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon::{self as zx, HandleBased};
 use futures::{AsyncWriteExt, TryStreamExt};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
+use {
+    fidl_fuchsia_audio_controller as fac, fidl_fuchsia_media as fmedia,
+    fidl_fuchsia_media_audio as fmedia_audio, fidl_fuchsia_ultrasound as fultrasound,
+};
 
 pub struct Capturer {
     proxy: fmedia::AudioCapturerProxy,

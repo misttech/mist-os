@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use argh::FromArgs;
+use fuchsia_component::client::connect_to_protocol;
+use system_validation_lib::app_monitor::AppMonitor;
+use system_validation_lib::screencapture::take_screenshot;
+use system_validation_lib::single_session_trace::SingleSessionTrace;
+use tracing::info;
 use {
-    argh::FromArgs,
     fidl_fuchsia_session_scene as scene, fidl_fuchsia_ui_app as ui_app, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
     fuchsia_scenic as scenic,
-    system_validation_lib::{
-        app_monitor::AppMonitor, screencapture::take_screenshot,
-        single_session_trace::SingleSessionTrace,
-    },
-    tracing::info,
 };
 
 /// Args to control how to run system validation test.

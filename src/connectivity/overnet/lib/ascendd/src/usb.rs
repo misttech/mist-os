@@ -10,7 +10,8 @@ use bind_fuchsia_usb::BIND_USB_CLASS_VENDOR_SPECIFIC;
 use futures::future::{select, try_join, Either, FutureExt};
 use futures::stream::StreamExt;
 use overnet_core::Router;
-use std::{pin::pin, sync::Weak};
+use std::pin::pin;
+use std::sync::Weak;
 
 static OVERNET_MAGIC: &[u8; 16] = b"OVERNET USB\xff\x00\xff\x00\xff";
 const MAGIC_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);

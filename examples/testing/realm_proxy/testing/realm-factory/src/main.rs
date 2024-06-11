@@ -2,16 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{Error, Result};
+use fidl::endpoints::{self, Proxy};
+use fidl_test_echoserver::{RealmFactoryRequest, RealmFactoryRequestStream, RealmOptions};
+use fuchsia_component::client;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use futures::{StreamExt, TryStreamExt};
+use tracing::*;
 use {
-    anyhow::{Error, Result},
-    fidl::endpoints::{self, Proxy},
     fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_component_sandbox as fsandbox,
-    fidl_test_echoserver::{RealmFactoryRequest, RealmFactoryRequestStream, RealmOptions},
     fuchsia_async as fasync,
-    fuchsia_component::{client, server::ServiceFs},
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    futures::{StreamExt, TryStreamExt},
-    tracing::*,
 };
 
 #[fuchsia::main]

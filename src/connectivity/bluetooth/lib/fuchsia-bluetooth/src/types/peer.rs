@@ -209,7 +209,9 @@ mod tests {
     use super::*;
 
     use fidl_fuchsia_bluetooth as fbt;
-    use proptest::{collection::vec, option, prelude::*};
+    use proptest::collection::vec;
+    use proptest::option;
+    use proptest::prelude::*;
 
     #[test]
     fn try_from_sys_id_not_present() {

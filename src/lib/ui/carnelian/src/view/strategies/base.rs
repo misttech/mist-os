@@ -1,12 +1,10 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{
-    app::strategies::framebuffer::{CoordinatorProxyPtr, DisplayId},
-    geometry::{IntSize, Size},
-    view::{UserInputMessage, ViewAssistantPtr, ViewDetails},
-    ViewAssistantContext, ViewKey,
-};
+use crate::app::strategies::framebuffer::{CoordinatorProxyPtr, DisplayId};
+use crate::geometry::{IntSize, Size};
+use crate::view::{UserInputMessage, ViewAssistantPtr, ViewDetails};
+use crate::{ViewAssistantContext, ViewKey};
 use anyhow::Error;
 use async_trait::async_trait;
 

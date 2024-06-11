@@ -6,12 +6,6 @@ mod bssid;
 mod mac_addr;
 mod ssid;
 
-pub use bssid::Bssid;
-pub use bssid::WILDCARD_BSSID;
-pub use mac_addr::MacAddr;
-pub use mac_addr::MacAddrBytes;
-pub use mac_addr::OuiFmt;
-pub use mac_addr::BROADCAST_ADDR;
-pub use mac_addr::NULL_ADDR;
-pub use ssid::Ssid;
-pub use ssid::SsidError;
+pub use bssid::{Bssid, WILDCARD_BSSID};
+pub use mac_addr::{MacAddr, MacAddrBytes, OuiFmt, BROADCAST_ADDR, NULL_ADDR};
+pub use ssid::{Ssid, SsidError};

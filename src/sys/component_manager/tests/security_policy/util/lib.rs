@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use component_events::events::*;
+use component_events::matcher::EventMatcher;
+use component_events::sequence::{EventSequence, Ordering};
+use fidl::endpoints::{create_proxy, ProtocolMarker};
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use {
-    anyhow::Error,
-    component_events::{
-        events::*,
-        matcher::EventMatcher,
-        sequence::{EventSequence, Ordering},
-    },
-    fidl::endpoints::{create_proxy, ProtocolMarker},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
 };
 
 pub async fn start_policy_test(

@@ -2,22 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{
-        errors::{VerifyError, VerifyErrors, VerifyFailureReason, VerifySource},
-        inspect::write_to_inspect,
-    },
-    ::fidl::client::QueryResponseFut,
-    fidl_fuchsia_update_verify as fidl,
-    fidl_fuchsia_update_verify::{VerifierVerifyResult, VerifyOptions},
-    fuchsia_async::TimeoutExt as _,
-    fuchsia_inspect as finspect,
-    futures::future::{join_all, FutureExt as _, TryFutureExt as _},
-    std::{
-        future::Future,
-        time::{Duration, Instant},
-    },
-};
+use super::errors::{VerifyError, VerifyErrors, VerifyFailureReason, VerifySource};
+use super::inspect::write_to_inspect;
+use ::fidl::client::QueryResponseFut;
+use fidl_fuchsia_update_verify::{VerifierVerifyResult, VerifyOptions};
+use fuchsia_async::TimeoutExt as _;
+use futures::future::{join_all, FutureExt as _, TryFutureExt as _};
+use std::future::Future;
+use std::time::{Duration, Instant};
+use {fidl_fuchsia_update_verify as fidl, fuchsia_inspect as finspect};
 
 // Each health verification should time out after 1 minute. This value should be at least 100X
 // larger than the expected verification duration. When adding a new health verification, consider
@@ -83,14 +76,14 @@ pub fn do_health_verification<'a>(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fuchsia_async as fasync,
-        futures::{future::BoxFuture, pin_mut, task::Poll},
-        mock_verifier::{Hook, MockVerifierService},
-        std::sync::Arc,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use futures::future::BoxFuture;
+    use futures::pin_mut;
+    use futures::task::Poll;
+    use mock_verifier::{Hook, MockVerifierService};
+    use std::sync::Arc;
 
     #[fasync::run_singlethreaded(test)]
     async fn blobfs_pass() {

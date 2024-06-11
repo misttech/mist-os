@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::errors::MetaContentsError,
-    fuchsia_merkle::Hash,
-    fuchsia_url::validate_resource_path,
-    std::{collections::HashMap, io, str::FromStr},
-};
+use crate::errors::MetaContentsError;
+use fuchsia_merkle::Hash;
+use fuchsia_url::validate_resource_path;
+use std::collections::HashMap;
+use std::io;
+use std::str::FromStr;
 
 /// A `MetaContents` represents the "meta/contents" file of a Fuchsia archive
 /// file of a Fuchsia package.
@@ -174,14 +174,13 @@ impl MetaContents {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::test::*,
-        assert_matches::assert_matches,
-        fuchsia_url::{errors::ResourcePathError, test::*},
-        maplit::hashmap,
-        proptest::prelude::*,
-    };
+    use super::*;
+    use crate::test::*;
+    use assert_matches::assert_matches;
+    use fuchsia_url::errors::ResourcePathError;
+    use fuchsia_url::test::*;
+    use maplit::hashmap;
+    use proptest::prelude::*;
 
     fn zeros_hash() -> Hash {
         Hash::from_str("0000000000000000000000000000000000000000000000000000000000000000").unwrap()

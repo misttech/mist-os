@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    future_help::{Observable, Observer},
-    labels::NodeId,
-};
+use crate::future_help::{Observable, Observer};
+use crate::labels::NodeId;
 use anyhow::{bail, format_err, Error};
 use fidl::Channel;
 use futures::lock::Mutex;

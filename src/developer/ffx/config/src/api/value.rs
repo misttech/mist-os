@@ -2,14 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    api::{
-        query::{ConfigQuery, SelectMode},
-        ConfigError,
-    },
-    mapping::{filter, flatten},
-    nested::RecursiveMap,
-};
+use crate::api::query::{ConfigQuery, SelectMode};
+use crate::api::ConfigError;
+use crate::mapping::{filter, flatten};
+use crate::nested::RecursiveMap;
 use anyhow::anyhow;
 use serde_json::{Map, Value};
 use std::path::PathBuf;

@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::client::Client,
-    crate::compositor::Surface,
-    crate::object::{NewObjectExt, ObjectRef, RequestReceiver},
-    anyhow::Error,
-    fuchsia_wayland_core as wl,
-    zcr_alpha_compositing_v1_server_protocol::{
-        ZcrAlphaCompositingV1, ZcrAlphaCompositingV1Request, ZcrBlendingV1, ZcrBlendingV1Request,
-    },
+use crate::client::Client;
+use crate::compositor::Surface;
+use crate::object::{NewObjectExt, ObjectRef, RequestReceiver};
+use anyhow::Error;
+use fuchsia_wayland_core as wl;
+use zcr_alpha_compositing_v1_server_protocol::{
+    ZcrAlphaCompositingV1, ZcrAlphaCompositingV1Request, ZcrBlendingV1, ZcrBlendingV1Request,
 };
 
 /// An implementation of the zcr_alpha_compositing_v1 global.

@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_scenic::flatland;
 use {
     fidl_fuchsia_ui_composition as fland, fidl_fuchsia_ui_pointer as fptr,
-    fidl_fuchsia_ui_views as fviews, fuchsia_scenic::flatland,
+    fidl_fuchsia_ui_views as fviews,
 };
 
 // This matches fuchsia.ui.pointer.Point2; once RFC-0052 is implemented, we can just use that type.

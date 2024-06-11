@@ -2,35 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    async_trait::async_trait,
-    blackout_target::{
-        static_tree::{DirectoryEntry, EntryDistribution},
-        Test, TestServer,
-    },
-    fidl::endpoints::{create_proxy, Proxy as _},
-    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
-    fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions},
-    fidl_fuchsia_hardware_block_volume::VolumeManagerMarker,
-    fidl_fuchsia_io as fio,
-    fs_management::{
-        filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem},
-        format::DiskFormat,
-        Fxfs, Minfs,
-    },
-    fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path},
-    fuchsia_zircon as zx,
-    rand::{rngs::StdRng, Rng, SeedableRng},
-    std::sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    storage_isolated_driver_manager::{
-        create_random_guid, find_block_device, into_guid, wait_for_block_device,
-        BlockDeviceMatcher, Guid,
-    },
+use anyhow::{Context, Result};
+use async_trait::async_trait;
+use blackout_target::static_tree::{DirectoryEntry, EntryDistribution};
+use blackout_target::{Test, TestServer};
+use fidl::endpoints::{create_proxy, Proxy as _};
+use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
+use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions};
+use fidl_fuchsia_hardware_block_volume::VolumeManagerMarker;
+use fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem};
+use fs_management::format::DiskFormat;
+use fs_management::{Fxfs, Minfs};
+use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use storage_isolated_driver_manager::{
+    create_random_guid, find_block_device, into_guid, wait_for_block_device, BlockDeviceMatcher,
+    Guid,
 };
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 const DATA_FILESYSTEM_FORMAT: &'static str = std::env!("DATA_FILESYSTEM_FORMAT");
 

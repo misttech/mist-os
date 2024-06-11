@@ -6,13 +6,11 @@ mod mocks;
 mod realm_factory;
 use crate::realm_factory::*;
 
-use {
-    anyhow::{Error, Result},
-    fidl_test_sampler::{RealmFactoryRequest, RealmFactoryRequestStream},
-    fuchsia_component::server::ServiceFs,
-    futures::{StreamExt, TryStreamExt},
-    tracing::error,
-};
+use anyhow::{Error, Result};
+use fidl_test_sampler::{RealmFactoryRequest, RealmFactoryRequestStream};
+use fuchsia_component::server::ServiceFs;
+use futures::{StreamExt, TryStreamExt};
+use tracing::error;
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

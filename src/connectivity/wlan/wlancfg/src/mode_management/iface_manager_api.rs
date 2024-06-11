@@ -2,20 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        access_point::{state_machine as ap_fsm, types as ap_types},
-        client::types as client_types,
-        config_management::network_config::Credential,
-        mode_management::{iface_manager_types::*, Defect, IfaceFailure},
-        regulatory_manager::REGION_CODE_LEN,
-    },
-    anyhow::Error,
-    async_trait::async_trait,
-    fidl_fuchsia_wlan_sme as fidl_sme,
-    futures::channel::{mpsc, oneshot},
-    tracing::warn,
-};
+use crate::access_point::{state_machine as ap_fsm, types as ap_types};
+use crate::client::types as client_types;
+use crate::config_management::network_config::Credential;
+use crate::mode_management::iface_manager_types::*;
+use crate::mode_management::{Defect, IfaceFailure};
+use crate::regulatory_manager::REGION_CODE_LEN;
+use anyhow::Error;
+use async_trait::async_trait;
+use fidl_fuchsia_wlan_sme as fidl_sme;
+use futures::channel::{mpsc, oneshot};
+use tracing::warn;
 
 #[async_trait]
 pub trait IfaceManagerApi {
@@ -279,18 +276,19 @@ impl From<client_types::ConnectSelection> for ConnectAttemptRequest {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::access_point::types,
-        anyhow::format_err,
-        fidl::endpoints::create_proxy,
-        fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync,
-        futures::{future::BoxFuture, task::Poll, StreamExt},
-        rand::Rng,
-        std::pin::pin,
-        test_case::test_case,
-        wlan_common::{assert_variant, channel::Cbw, RadioConfig},
-    };
+    use super::*;
+    use crate::access_point::types;
+    use anyhow::format_err;
+    use fidl::endpoints::create_proxy;
+    use futures::future::BoxFuture;
+    use futures::task::Poll;
+    use futures::StreamExt;
+    use rand::Rng;
+    use std::pin::pin;
+    use test_case::test_case;
+    use wlan_common::channel::Cbw;
+    use wlan_common::{assert_variant, RadioConfig};
+    use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync};
 
     struct TestValues {
         exec: fasync::TestExecutor,

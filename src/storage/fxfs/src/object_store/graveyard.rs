@@ -2,38 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        errors::FxfsError,
-        log::*,
-        lsm_tree::{
-            merge::{Merger, MergerIterator},
-            types::{ItemRef, LayerIterator},
-        },
-        object_handle::INVALID_OBJECT_ID,
-        object_store::{
-            object_manager::ObjectManager,
-            object_record::{
-                ObjectAttributes, ObjectKey, ObjectKeyData, ObjectKind, ObjectValue, Timestamp,
-            },
-            transaction::{Mutation, Options, Transaction},
-            ObjectStore,
-        },
-    },
-    anyhow::{anyhow, bail, Context, Error},
-    fuchsia_async::{self as fasync},
-    futures::{
-        channel::{
-            mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
-            oneshot,
-        },
-        StreamExt,
-    },
-    std::{
-        ops::Bound,
-        sync::{Arc, Mutex},
-    },
+use crate::errors::FxfsError;
+use crate::log::*;
+use crate::lsm_tree::merge::{Merger, MergerIterator};
+use crate::lsm_tree::types::{ItemRef, LayerIterator};
+use crate::object_handle::INVALID_OBJECT_ID;
+use crate::object_store::object_manager::ObjectManager;
+use crate::object_store::object_record::{
+    ObjectAttributes, ObjectKey, ObjectKeyData, ObjectKind, ObjectValue, Timestamp,
 };
+use crate::object_store::transaction::{Mutation, Options, Transaction};
+use crate::object_store::ObjectStore;
+use anyhow::{anyhow, bail, Context, Error};
+use fuchsia_async::{self as fasync};
+use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
+use futures::channel::oneshot;
+use futures::StreamExt;
+use std::ops::Bound;
+use std::sync::{Arc, Mutex};
 
 enum ReaperTask {
     None,
@@ -413,21 +399,18 @@ impl<'a, 'b> GraveyardIterator<'a, 'b> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{Graveyard, GraveyardEntryInfo, ObjectStore},
-        crate::{
-            errors::FxfsError,
-            filesystem::{FxFilesystem, FxFilesystemBuilder},
-            fsck::fsck,
-            object_handle::ObjectHandle,
-            object_store::data_object_handle::WRITE_ATTR_BATCH_SIZE,
-            object_store::object_record::ObjectValue,
-            object_store::transaction::{lock_keys, Options},
-            object_store::{HandleOptions, Mutation, ObjectKey, FSVERITY_MERKLE_ATTRIBUTE_ID},
-        },
-        assert_matches::assert_matches,
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
-    };
+    use super::{Graveyard, GraveyardEntryInfo, ObjectStore};
+    use crate::errors::FxfsError;
+    use crate::filesystem::{FxFilesystem, FxFilesystemBuilder};
+    use crate::fsck::fsck;
+    use crate::object_handle::ObjectHandle;
+    use crate::object_store::data_object_handle::WRITE_ATTR_BATCH_SIZE;
+    use crate::object_store::object_record::ObjectValue;
+    use crate::object_store::transaction::{lock_keys, Options};
+    use crate::object_store::{HandleOptions, Mutation, ObjectKey, FSVERITY_MERKLE_ATTRIBUTE_ID};
+    use assert_matches::assert_matches;
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::DeviceHolder;
 
     const TEST_DEVICE_BLOCK_SIZE: u32 = 512;
 

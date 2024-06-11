@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use argh::{ArgsInfo, FromArgs};
-use ffx_config::{api::query::SelectMode, ConfigLevel, ConfigQuery, EnvironmentContext};
+use ffx_config::api::query::SelectMode;
+use ffx_config::{ConfigLevel, ConfigQuery, EnvironmentContext};
 use ffx_core::ffx_command;
 use std::path::PathBuf;
 

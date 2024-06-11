@@ -2,18 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::error::{ParseError, ValidateError};
+use super::extensible_bitmap::ExtensibleBitmap;
+use super::parser::ParseStrategy;
 use super::{
     array_type, array_type_validate_deref_both, array_type_validate_deref_data,
-    array_type_validate_deref_metadata_data_vec, array_type_validate_deref_none_data_vec,
-    error::{ParseError, ValidateError},
-    extensible_bitmap::ExtensibleBitmap,
-    parser::ParseStrategy,
-    Array, CategoryId, Counted, Parse, ParseSlice, RoleId, SensitivityId, TypeId, UserId, Validate,
+    array_type_validate_deref_metadata_data_vec, array_type_validate_deref_none_data_vec, Array,
+    CategoryId, Counted, Parse, ParseSlice, RoleId, SensitivityId, TypeId, UserId, Validate,
     ValidateArray,
 };
 
 use anyhow::Context as _;
-use std::{fmt::Debug, num::NonZeroU32, ops::Deref};
+use std::fmt::Debug;
+use std::num::NonZeroU32;
+use std::ops::Deref;
 use zerocopy::{little_endian as le, FromBytes, FromZeroes, NoCell, Unaligned};
 
 /// The `type` field value for a [`Constraint`] that contains an [`ExtensibleBitmap`] and

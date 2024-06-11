@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_url::UnpinnedAbsolutePackageUrl,
-    omaha_client::cup_ecdsa::PublicKeys,
-    omaha_client::version::Version,
-    serde::{Deserialize, Serialize},
-};
+use fuchsia_url::UnpinnedAbsolutePackageUrl;
+use omaha_client::cup_ecdsa::PublicKeys;
+use omaha_client::version::Version;
+use serde::{Deserialize, Serialize};
 
 #[cfg(target_os = "fuchsia")]
 use {
@@ -97,13 +95,11 @@ fn is_false(b: &bool) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fuchsia_async as fasync,
-        omaha_client::cup_ecdsa::test_support::{
-            make_default_json_public_keys_for_test, make_default_public_keys_for_test,
-        },
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use omaha_client::cup_ecdsa::test_support::{
+        make_default_json_public_keys_for_test, make_default_public_keys_for_test,
     };
 
     #[fasync::run_singlethreaded(test)]

@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::*,
-    fidl_fuchsia_update_installer_ext::{
-        Progress, StageFailureReason, State, UpdateInfo, UpdateInfoAndProgress,
-    },
-    maplit::btreemap,
-    pretty_assertions::assert_eq,
+use super::*;
+use fidl_fuchsia_update_installer_ext::{
+    Progress, StageFailureReason, State, UpdateInfo, UpdateInfoAndProgress,
 };
+use maplit::btreemap;
+use pretty_assertions::assert_eq;
 
 #[fasync::run_singlethreaded(test)]
 async fn images_manifest_update_package_firmware_no_match() {

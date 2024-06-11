@@ -22,60 +22,55 @@ mod reader;
 pub mod super_block;
 mod writer;
 
-use {
-    crate::{
-        checksum::{Checksum, Checksums, ChecksumsV37, ChecksumsV38},
-        debug_assert_not_too_long,
-        errors::FxfsError,
-        filesystem::{ApplyContext, ApplyMode, FxFilesystem, SyncOptions},
-        log::*,
-        lsm_tree::{cache::NullCache, types::Layer},
-        object_handle::{ObjectHandle as _, ReadObjectHandle},
-        object_store::{
-            allocator::Allocator,
-            extent_record::{ExtentKey, ExtentMode, ExtentValue, DEFAULT_DATA_ATTRIBUTE_ID},
-            graveyard::Graveyard,
-            journal::{
-                bootstrap_handle::BootstrapObjectHandle,
-                checksum_list::ChecksumList,
-                reader::{JournalReader, ReadResult},
-                super_block::{SuperBlockHeader, SuperBlockInstance, SuperBlockManager},
-                writer::JournalWriter,
-            },
-            object_manager::ObjectManager,
-            object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue},
-            transaction::{
-                lock_keys, AllocatorMutation, Mutation, MutationV32, MutationV33, MutationV37,
-                MutationV38, ObjectStoreMutation, Options, Transaction, TxnMutation,
-                TRANSACTION_MAX_JOURNAL_USAGE,
-            },
-            AssocObj, DataObjectHandle, HandleOptions, HandleOwner, Item, ItemRef,
-            NewChildStoreOptions, ObjectStore, INVALID_OBJECT_ID,
-        },
-        range::RangeExt,
-        round::{round_div, round_down},
-        serialized_types::{migrate_to_version, Migrate, Version, Versioned, LATEST_VERSION},
-    },
-    anyhow::{anyhow, bail, ensure, Context, Error},
-    event_listener::Event,
-    fprint::TypeFingerprint,
-    futures::{future::poll_fn, FutureExt as _},
-    once_cell::sync::OnceCell,
-    rand::Rng,
-    rustc_hash::FxHashMap as HashMap,
-    serde::{Deserialize, Serialize},
-    static_assertions::const_assert,
-    std::{
-        clone::Clone,
-        collections::HashSet,
-        ops::{Bound, Range},
-        sync::{
-            atomic::{AtomicBool, Ordering},
-            Arc, Mutex,
-        },
-        task::{Poll, Waker},
-    },
+use crate::checksum::{Checksum, Checksums, ChecksumsV37, ChecksumsV38};
+use crate::debug_assert_not_too_long;
+use crate::errors::FxfsError;
+use crate::filesystem::{ApplyContext, ApplyMode, FxFilesystem, SyncOptions};
+use crate::log::*;
+use crate::lsm_tree::cache::NullCache;
+use crate::lsm_tree::types::Layer;
+use crate::object_handle::{ObjectHandle as _, ReadObjectHandle};
+use crate::object_store::allocator::Allocator;
+use crate::object_store::extent_record::{
+    ExtentKey, ExtentMode, ExtentValue, DEFAULT_DATA_ATTRIBUTE_ID,
 };
+use crate::object_store::graveyard::Graveyard;
+use crate::object_store::journal::bootstrap_handle::BootstrapObjectHandle;
+use crate::object_store::journal::checksum_list::ChecksumList;
+use crate::object_store::journal::reader::{JournalReader, ReadResult};
+use crate::object_store::journal::super_block::{
+    SuperBlockHeader, SuperBlockInstance, SuperBlockManager,
+};
+use crate::object_store::journal::writer::JournalWriter;
+use crate::object_store::object_manager::ObjectManager;
+use crate::object_store::object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue};
+use crate::object_store::transaction::{
+    lock_keys, AllocatorMutation, Mutation, MutationV32, MutationV33, MutationV37, MutationV38,
+    ObjectStoreMutation, Options, Transaction, TxnMutation, TRANSACTION_MAX_JOURNAL_USAGE,
+};
+use crate::object_store::{
+    AssocObj, DataObjectHandle, HandleOptions, HandleOwner, Item, ItemRef, NewChildStoreOptions,
+    ObjectStore, INVALID_OBJECT_ID,
+};
+use crate::range::RangeExt;
+use crate::round::{round_div, round_down};
+use crate::serialized_types::{migrate_to_version, Migrate, Version, Versioned, LATEST_VERSION};
+use anyhow::{anyhow, bail, ensure, Context, Error};
+use event_listener::Event;
+use fprint::TypeFingerprint;
+use futures::future::poll_fn;
+use futures::FutureExt as _;
+use once_cell::sync::OnceCell;
+use rand::Rng;
+use rustc_hash::FxHashMap as HashMap;
+use serde::{Deserialize, Serialize};
+use static_assertions::const_assert;
+use std::clone::Clone;
+use std::collections::HashSet;
+use std::ops::{Bound, Range};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::task::{Poll, Waker};
 
 // The journal file is written to in blocks of this size.
 pub const BLOCK_SIZE: u64 = 4096;
@@ -1794,18 +1789,14 @@ impl Writer<'_> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::{
-            filesystem::{FxFilesystem, SyncOptions},
-            fsck::fsck,
-            object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle},
-            object_store::{
-                directory::Directory, lock_keys, transaction::Options, HandleOptions, LockKey,
-                ObjectStore,
-            },
-        },
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
-    };
+    use crate::filesystem::{FxFilesystem, SyncOptions};
+    use crate::fsck::fsck;
+    use crate::object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle};
+    use crate::object_store::directory::Directory;
+    use crate::object_store::transaction::Options;
+    use crate::object_store::{lock_keys, HandleOptions, LockKey, ObjectStore};
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::DeviceHolder;
 
     const TEST_DEVICE_BLOCK_SIZE: u32 = 512;
 
@@ -2022,12 +2013,11 @@ mod fuzz {
 
     #[fuzz]
     fn fuzz_journal_bytes(input: Vec<u8>) {
-        use {
-            crate::filesystem::FxFilesystem,
-            fuchsia_async as fasync,
-            std::io::Write,
-            storage_device::{fake_device::FakeDevice, DeviceHolder},
-        };
+        use crate::filesystem::FxFilesystem;
+        use fuchsia_async as fasync;
+        use std::io::Write;
+        use storage_device::fake_device::FakeDevice;
+        use storage_device::DeviceHolder;
 
         fasync::SendExecutor::new(4).run(async move {
             let device = DeviceHolder::new(FakeDevice::new(32768, 512));
@@ -2046,11 +2036,10 @@ mod fuzz {
 
     #[fuzz]
     fn fuzz_journal(input: Vec<super::JournalRecord>) {
-        use {
-            crate::filesystem::FxFilesystem,
-            fuchsia_async as fasync,
-            storage_device::{fake_device::FakeDevice, DeviceHolder},
-        };
+        use crate::filesystem::FxFilesystem;
+        use fuchsia_async as fasync;
+        use storage_device::fake_device::FakeDevice;
+        use storage_device::DeviceHolder;
 
         fasync::SendExecutor::new(4).run(async move {
             let device = DeviceHolder::new(FakeDevice::new(32768, 512));

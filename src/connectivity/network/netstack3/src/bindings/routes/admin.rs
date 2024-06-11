@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{borrow::BorrowMut, collections::HashSet, pin::pin};
+use std::borrow::BorrowMut;
+use std::collections::HashSet;
+use std::pin::pin;
 
 use assert_matches::assert_matches;
 use async_utils::event::Event;
@@ -10,27 +12,27 @@ use fidl::endpoints::{
     ControlHandle as _, ProtocolMarker as _, RequestStream as _, Responder as _,
 };
 use fidl_fuchsia_net_interfaces_admin::ProofOfInterfaceAuthorization;
-use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
-use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
-use fnet_routes_ext::{
-    admin::{FidlRouteAdminIpExt, Responder as _, RouteSetRequest, RouteTableRequest},
-    FidlRouteIpExt,
+use fnet_routes_ext::admin::{
+    FidlRouteAdminIpExt, Responder as _, RouteSetRequest, RouteTableRequest,
 };
+use fnet_routes_ext::FidlRouteIpExt;
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased as _};
-use futures::{
-    channel::{mpsc, oneshot},
-    Future, FutureExt as _, StreamExt as _, TryStream, TryStreamExt as _,
-};
+use futures::channel::{mpsc, oneshot};
+use futures::{Future, FutureExt as _, StreamExt as _, TryStream, TryStreamExt as _};
 use log::{debug, error, warn};
 use net_types::ip::{GenericOverIp, Ip, IpVersion, Ipv4, Ipv6};
-use netstack3_core::{device::DeviceId, routes::AddableEntry};
-
-use crate::bindings::{
-    devices::StaticCommonInfo,
-    routes::{self, witness::TableId},
-    util::{TaskWaitGroupSpawner, TryFromFidlWithContext},
-    BindingsCtx, Ctx, DeviceIdExt,
+use netstack3_core::device::DeviceId;
+use netstack3_core::routes::AddableEntry;
+use {
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
 };
+
+use crate::bindings::devices::StaticCommonInfo;
+use crate::bindings::routes::witness::TableId;
+use crate::bindings::routes::{self};
+use crate::bindings::util::{TaskWaitGroupSpawner, TryFromFidlWithContext};
+use crate::bindings::{BindingsCtx, Ctx, DeviceIdExt};
 
 use super::{RouteWorkItem, WeakDeviceId};
 

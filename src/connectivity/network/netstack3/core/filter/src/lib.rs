@@ -37,8 +37,8 @@ pub use packets::{
     ForwardedPacket, IcmpMessage, IpPacket, MaybeTransportPacket, MaybeTransportPacketMut,
     NestedWithInnerIpPacket, RawIpBody, TransportPacketSerializer, TxPacket,
 };
+pub use state::validation::{ValidRoutines, ValidationError};
 pub use state::{
-    validation::{ValidRoutines, ValidationError},
     Action, FilterIpMetadata, Hook, IpRoutines, NatRoutines, Routine, Routines, Rule, State,
     TransparentProxy, UninstalledRoutine,
 };

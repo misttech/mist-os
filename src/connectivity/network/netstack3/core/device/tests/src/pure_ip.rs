@@ -6,27 +6,20 @@ use alloc::vec::Vec;
 
 use assert_matches::assert_matches;
 use ip_test_macro::ip_test;
-use net_types::{
-    ip::{AddrSubnet, Ip, IpAddress as _, IpVersion, Ipv4, Ipv6, Mtu},
-    Witness, ZonedAddr,
-};
+use net_types::ip::{AddrSubnet, Ip, IpAddress as _, IpVersion, Ipv4, Ipv6, Mtu};
+use net_types::{Witness, ZonedAddr};
 use netstack3_base::testutil::TestIpExt;
-use netstack3_core::{
-    sync::RemoveResourceResult,
-    testutil::{
-        CtxPairExt as _, FakeBindingsCtx, FakeCtx, PureIpDeviceAndIpVersion,
-        DEFAULT_INTERFACE_METRIC,
-    },
-    types::WorkQueueReport,
-    IpExt, StackState,
+use netstack3_core::sync::RemoveResourceResult;
+use netstack3_core::testutil::{
+    CtxPairExt as _, FakeBindingsCtx, FakeCtx, PureIpDeviceAndIpVersion, DEFAULT_INTERFACE_METRIC,
 };
-use netstack3_device::{
-    pure_ip::{
-        self, PureIpDevice, PureIpDeviceCreationProperties, PureIpDeviceReceiveFrameMetadata,
-    },
-    queue::TransmitQueueConfiguration,
-    DeviceId,
+use netstack3_core::types::WorkQueueReport;
+use netstack3_core::{IpExt, StackState};
+use netstack3_device::pure_ip::{
+    self, PureIpDevice, PureIpDeviceCreationProperties, PureIpDeviceReceiveFrameMetadata,
 };
+use netstack3_device::queue::TransmitQueueConfiguration;
+use netstack3_device::DeviceId;
 use netstack3_ip::IpPacketDestination;
 use packet::{Buf, Serializer as _};
 use packet_formats::ip::{IpPacketBuilder, IpProto};

@@ -5,8 +5,6 @@
 use anyhow::{format_err, Context, Error};
 use cm_rust::{ExposeDecl, ExposeProtocolDecl, ExposeSource, ExposeTarget};
 use fidl::endpoints::{self as f_end, DiscoverableProtocolMarker};
-use fidl_fuchsia_bluetooth_bredr as bredr;
-use fidl_fuchsia_component_test as ftest;
 use fidl_fuchsia_logger::LogSinkMarker;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_bluetooth::types as bt_types;
@@ -15,8 +13,10 @@ use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
 };
 use fuchsia_zircon::{self as zx, Duration, DurationNum};
-use futures::{stream::StreamExt, TryFutureExt, TryStreamExt};
+use futures::stream::StreamExt;
+use futures::{TryFutureExt, TryStreamExt};
 use tracing::info;
+use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_component_test as ftest};
 
 /// Timeout for updates over the PeerObserver of a MockPeer.
 ///
@@ -881,17 +881,15 @@ pub fn route_from_capabilities(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        cm_rust::{
-            Availability, ChildRef, DependencyType, OfferDecl, OfferProtocolDecl, OfferSource,
-            OfferTarget, UseDecl, UseProtocolDecl, UseSource,
-        },
-        cm_types::Name,
-        fidl_fuchsia_component_test as fctest,
-        fuchsia_component_test::error::Error as RealmBuilderError,
+    use super::*;
+    use assert_matches::assert_matches;
+    use cm_rust::{
+        Availability, ChildRef, DependencyType, OfferDecl, OfferProtocolDecl, OfferSource,
+        OfferTarget, UseDecl, UseProtocolDecl, UseSource,
     };
+    use cm_types::Name;
+    use fidl_fuchsia_component_test as fctest;
+    use fuchsia_component_test::error::Error as RealmBuilderError;
 
     fn offer_source_static_child(name: &str) -> OfferSource {
         OfferSource::Child(ChildRef { name: name.parse().unwrap(), collection: None })

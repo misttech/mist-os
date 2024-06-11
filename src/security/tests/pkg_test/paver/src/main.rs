@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_async::Task, fuchsia_component::server::ServiceFs, futures::StreamExt,
-    mock_paver::MockPaverServiceBuilder, std::sync::Arc, tracing::info,
-};
+use fuchsia_async::Task;
+use fuchsia_component::server::ServiceFs;
+use futures::StreamExt;
+use mock_paver::MockPaverServiceBuilder;
+use std::sync::Arc;
+use tracing::info;
 
 #[fuchsia::main]
 async fn main() {

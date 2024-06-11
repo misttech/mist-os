@@ -4,23 +4,22 @@
 
 #![cfg(test)]
 
-use std::{convert::TryFrom as _, num::NonZeroU64};
+use std::convert::TryFrom as _;
+use std::num::NonZeroU64;
 
-use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_tun as fnet_tun;
-use fidl_fuchsia_posix_socket_packet as fposix_socket_packet;
+use {
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin, fidl_fuchsia_net_tun as fnet_tun,
+    fidl_fuchsia_posix_socket_packet as fposix_socket_packet,
+};
 
 use fidl_fuchsia_net_ext::IntoExt as _;
 use fuchsia_async::TimeoutExt as _;
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryStreamExt as _};
 use net_declare::{fidl_mac, fidl_subnet, std_socket_addr_v4};
 use net_types::ip::Ipv4;
-use netstack_testing_common::{
-    realms::{Netstack, TestSandboxExt as _},
-    ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
-};
+use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
+use netstack_testing_common::ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT;
 use netstack_testing_macros::netstack_test;
 use packet::{Buf, ParsablePacket as _, Serializer};
 use packet_formats::error::ParseError;

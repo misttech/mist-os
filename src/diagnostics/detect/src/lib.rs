@@ -9,26 +9,24 @@ mod diagnostics;
 mod snapshot;
 mod triage_shim;
 
-use {
-    anyhow::{bail, Error},
-    argh::FromArgs,
-    delay_tracker::DelayTracker,
-    fidl_fuchsia_feedback::MAX_CRASH_SIGNATURE_LENGTH,
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_inspect::{self as inspect, health::Reporter, NumericProperty},
-    fuchsia_inspect_derive::{Inspect, WithInspect},
-    fuchsia_triage::SnapshotTrigger,
-    fuchsia_zircon as zx,
-    futures::StreamExt,
-    glob::glob,
-    injectable_time::MonotonicTime,
-    serde_derive::Deserialize,
-    snapshot::SnapshotRequest,
-    std::collections::HashMap,
-    tracing::{error, info, warn},
-    triage_detect_config::Config as ComponentConfig,
-};
+use anyhow::{bail, Error};
+use argh::FromArgs;
+use delay_tracker::DelayTracker;
+use fidl_fuchsia_feedback::MAX_CRASH_SIGNATURE_LENGTH;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_inspect::health::Reporter;
+use fuchsia_inspect::{self as inspect, NumericProperty};
+use fuchsia_inspect_derive::{Inspect, WithInspect};
+use fuchsia_triage::SnapshotTrigger;
+use futures::StreamExt;
+use glob::glob;
+use injectable_time::MonotonicTime;
+use serde_derive::Deserialize;
+use snapshot::SnapshotRequest;
+use std::collections::HashMap;
+use tracing::{error, info, warn};
+use triage_detect_config::Config as ComponentConfig;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 const MINIMUM_CHECK_TIME_NANOS: i64 = 60 * 1_000_000_000;
 const CONFIG_GLOB: &str = "/config/data/*.triage";

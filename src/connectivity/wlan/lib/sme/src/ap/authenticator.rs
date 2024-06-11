@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_wlan_mlme::EapolResultCode;
-use wlan_rsn::{rsna::UpdateSink, Error, NegotiatedProtection};
+use wlan_rsn::rsna::UpdateSink;
+use wlan_rsn::{Error, NegotiatedProtection};
 
 // Trait has to be Send because wlanstack wraps SME into a Future
 pub trait Authenticator: std::fmt::Debug + std::marker::Send {

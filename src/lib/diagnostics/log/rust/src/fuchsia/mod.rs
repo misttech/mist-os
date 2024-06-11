@@ -7,23 +7,28 @@ use fidl_fuchsia_logger::{LogSinkMarker, LogSinkProxy};
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon::{self as zx};
-use std::{cell::Cell, collections::HashSet, fmt::Debug, ops::Deref, sync::OnceLock};
+use std::cell::Cell;
+use std::collections::HashSet;
+use std::fmt::Debug;
+use std::ops::Deref;
+use std::sync::OnceLock;
 use thiserror::Error;
-use tracing::{
-    span::{Attributes, Id, Record},
-    subscriber::Subscriber,
-    Event, Metadata,
-};
+use tracing::span::{Attributes, Id, Record};
+use tracing::subscriber::Subscriber;
+use tracing::{Event, Metadata};
 use tracing_core::span::Current;
 use tracing_log::LogTracer;
-use tracing_subscriber::{layer::Layered, prelude::*, registry::Registry};
+use tracing_subscriber::layer::Layered;
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::registry::Registry;
 mod filter;
 mod sink;
 
 use filter::InterestFilter;
 use sink::{Sink, SinkConfig};
 
-pub use diagnostics_log_encoding::{encode::TestRecord, Metatag};
+pub use diagnostics_log_encoding::encode::TestRecord;
+pub use diagnostics_log_encoding::Metatag;
 pub use paste::paste;
 
 #[cfg(test)]

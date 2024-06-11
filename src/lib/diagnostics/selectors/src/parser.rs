@@ -2,21 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    error::ParseError,
-    types::*,
-    validate::{ValidateComponentSelectorExt, ValidateExt, ValidateTreeSelectorExt},
+use crate::error::ParseError;
+use crate::types::*;
+use crate::validate::{ValidateComponentSelectorExt, ValidateExt, ValidateTreeSelectorExt};
+use nom::branch::alt;
+use nom::bytes::complete::{escaped, is_not, tag, take_while, take_while1};
+use nom::character::complete::{
+    alphanumeric1, char, digit1, hex_digit1, multispace0, none_of, one_of,
 };
-use nom::{
-    branch::alt,
-    bytes::complete::{escaped, is_not, tag, take_while, take_while1},
-    character::complete::{alphanumeric1, char, digit1, hex_digit1, multispace0, none_of, one_of},
-    combinator::{all_consuming, complete, cond, map, map_res, opt, peek, recognize, verify},
-    error::{ErrorKind, ParseError as NomParseError},
-    multi::{many0, separated_nonempty_list},
-    sequence::{delimited, pair, preceded, tuple},
-    IResult,
-};
+use nom::combinator::{all_consuming, complete, cond, map, map_res, opt, peek, recognize, verify};
+use nom::error::{ErrorKind, ParseError as NomParseError};
+use nom::multi::{many0, separated_nonempty_list};
+use nom::sequence::{delimited, pair, preceded, tuple};
+use nom::IResult;
 
 macro_rules! comparison {
     ($tag:literal, $variant:ident) => {

@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::monitor_state::monitor_state,
-    anyhow::Context as _,
-    fidl_fuchsia_update::{
-        AttemptsMonitorMarker, AttemptsMonitorRequest, AttemptsMonitorRequestStream, ManagerMarker,
-    },
-    fuchsia_component::client::connect_to_protocol,
-    futures::prelude::*,
+use crate::monitor_state::monitor_state;
+use anyhow::Context as _;
+use fidl_fuchsia_update::{
+    AttemptsMonitorMarker, AttemptsMonitorRequest, AttemptsMonitorRequestStream, ManagerMarker,
 };
+use fuchsia_component::client::connect_to_protocol;
+use futures::prelude::*;
 
 pub async fn handle_monitor_updates_cmd() -> Result<(), anyhow::Error> {
     let update_manager =

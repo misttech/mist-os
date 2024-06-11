@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::format_err;
-use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::engine::Engine as _;
 use fidl_fuchsia_images::{AlphaFormat, ColorSpace, ImageInfo, PixelFormat, Tiling, Transform};
 use fidl_fuchsia_mem::Buffer;
 use fidl_fuchsia_ui_scenic::ScreenshotData;

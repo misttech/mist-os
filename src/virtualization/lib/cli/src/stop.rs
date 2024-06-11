@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::platform::PlatformServices,
-    anyhow::{anyhow, Error},
-    fidl::endpoints::{create_proxy, Proxy},
-    fidl_fuchsia_virtualization::{GuestManagerProxy, GuestMarker, GuestProxy, GuestStatus},
-    fuchsia_async::{self as fasync, TimeoutExt},
-    fuchsia_zircon_status::Status,
-    guest_cli_args as arguments,
-    std::fmt,
-};
+use crate::platform::PlatformServices;
+use anyhow::{anyhow, Error};
+use fidl::endpoints::{create_proxy, Proxy};
+use fidl_fuchsia_virtualization::{GuestManagerProxy, GuestMarker, GuestProxy, GuestStatus};
+use fuchsia_async::{self as fasync, TimeoutExt};
+use fuchsia_zircon_status::Status;
+use guest_cli_args as arguments;
+use std::fmt;
 
 #[derive(Default, serde::Serialize, serde::Deserialize, PartialEq, Debug)]
 pub enum StopStatus {
@@ -191,14 +189,13 @@ fn get_time_nanos(duration: fasync::Duration) -> i64 {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::platform::FuchsiaPlatformServices,
-        async_utils::PollExt,
-        fidl::{endpoints::create_proxy_and_stream, Socket},
-        fidl_fuchsia_virtualization::GuestManagerMarker,
-        futures::TryStreamExt,
-    };
+    use super::*;
+    use crate::platform::FuchsiaPlatformServices;
+    use async_utils::PollExt;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl::Socket;
+    use fidl_fuchsia_virtualization::GuestManagerMarker;
+    use futures::TryStreamExt;
 
     #[test]
     fn graceful_stop_waits_for_shutdown() {

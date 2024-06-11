@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{device::remote_block_device::RemoteBlockDevice, task::CurrentTask};
+use crate::device::remote_block_device::RemoteBlockDevice;
+use crate::task::CurrentTask;
 use anyhow::{anyhow, Error};
 use bstr::{BStr, ByteSlice as _};
 use starnix_logging::log_info;

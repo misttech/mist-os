@@ -2,61 +2,52 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use alloc::collections::{HashMap, VecDeque};
 use alloc::vec;
-use alloc::{
-    collections::{HashMap, VecDeque},
-    vec::Vec,
-};
+use alloc::vec::Vec;
 use core::num::{NonZeroU16, NonZeroUsize};
 
 use assert_matches::assert_matches;
 use ip_test_macro::ip_test;
 use net_declare::net_ip_v6;
-use net_types::{
-    ip::{AddrSubnet, Ip, IpAddress as _, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet},
-    SpecifiedAddr, UnicastAddr, Witness as _,
-};
+use net_types::ip::{AddrSubnet, Ip, IpAddress as _, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet};
+use net_types::{SpecifiedAddr, UnicastAddr, Witness as _};
 use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
-use packet_formats::{
-    ethernet::{EtherType, EthernetFrameLengthCheck},
-    icmp::{
-        ndp::{
-            options::NdpOptionBuilder, NeighborAdvertisement, NeighborSolicitation,
-            OptionSequenceBuilder, RouterAdvertisement,
-        },
-        IcmpDestUnreachable, IcmpPacketBuilder, IcmpUnusedCode,
-    },
-    ip::{IpProto, Ipv4Proto, Ipv6Proto},
-    ipv4::Ipv4PacketBuilder,
-    ipv6::Ipv6PacketBuilder,
-    testutil::{parse_ethernet_frame, parse_icmp_packet_in_ip_packet_in_ethernet_frame},
-    udp::UdpPacketBuilder,
+use packet_formats::ethernet::{EtherType, EthernetFrameLengthCheck};
+use packet_formats::icmp::ndp::options::NdpOptionBuilder;
+use packet_formats::icmp::ndp::{
+    NeighborAdvertisement, NeighborSolicitation, OptionSequenceBuilder, RouterAdvertisement,
 };
+use packet_formats::icmp::{IcmpDestUnreachable, IcmpPacketBuilder, IcmpUnusedCode};
+use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
+use packet_formats::ipv4::Ipv4PacketBuilder;
+use packet_formats::ipv6::Ipv6PacketBuilder;
+use packet_formats::testutil::{
+    parse_ethernet_frame, parse_icmp_packet_in_ip_packet_in_ethernet_frame,
+};
+use packet_formats::udp::UdpPacketBuilder;
 use test_case::test_case;
 
-use netstack3_base::{
-    testutil::{FakeNetwork, FakeNetworkLinks, TestAddrs, TestIpExt, WithFakeFrameContext},
-    DeviceIdContext, FrameDestination, InstantContext as _,
+use netstack3_base::testutil::{
+    FakeNetwork, FakeNetworkLinks, TestAddrs, TestIpExt, WithFakeFrameContext,
 };
-use netstack3_core::{
-    device::{EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, WeakDeviceId},
-    testutil::{
-        new_simple_fake_network, CtxPairExt, DispatchedFrame, FakeBindingsCtx, FakeCtx,
-        FakeCtxBuilder, FakeCtxNetworkSpec, DEFAULT_INTERFACE_METRIC,
-    },
-    IpExt, UnlockedCoreCtx,
+use netstack3_base::{DeviceIdContext, FrameDestination, InstantContext as _};
+use netstack3_core::device::{
+    EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, WeakDeviceId,
 };
+use netstack3_core::testutil::{
+    new_simple_fake_network, CtxPairExt, DispatchedFrame, FakeBindingsCtx, FakeCtx, FakeCtxBuilder,
+    FakeCtxNetworkSpec, DEFAULT_INTERFACE_METRIC,
+};
+use netstack3_core::{IpExt, UnlockedCoreCtx};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
-use netstack3_ip::{
-    self as ip,
-    device::{Ipv6DeviceConfigurationUpdate, SlaacConfiguration},
-    icmp::{self, REQUIRED_NDP_IP_PACKET_HOP_LIMIT},
-    nud::{
-        self, Delay, DynamicNeighborState, DynamicNeighborUpdateSource, Incomplete, NeighborState,
-        NudConfigContext, NudContext, NudHandler, Reachable, Stale,
-    },
-    AddableEntry, AddableMetric,
+use netstack3_ip::device::{Ipv6DeviceConfigurationUpdate, SlaacConfiguration};
+use netstack3_ip::icmp::{self, REQUIRED_NDP_IP_PACKET_HOP_LIMIT};
+use netstack3_ip::nud::{
+    self, Delay, DynamicNeighborState, DynamicNeighborUpdateSource, Incomplete, NeighborState,
+    NudConfigContext, NudContext, NudHandler, Reachable, Stale,
 };
+use netstack3_ip::{self as ip, AddableEntry, AddableMetric};
 use netstack3_tcp::{self as tcp, TcpSocketId};
 
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]

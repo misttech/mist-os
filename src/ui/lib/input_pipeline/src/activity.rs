@@ -2,23 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    async_utils::hanging_get::server::HangingGet,
-    fidl_fuchsia_input_interaction::{
-        NotifierRequest, NotifierRequestStream, NotifierWatchStateResponder, State,
-    },
-    fidl_fuchsia_input_interaction_observation::{
-        AggregatorRequest, AggregatorRequestStream, HandoffWakeError,
-    },
-    fuchsia_async::{Task, Timer},
-    fuchsia_zircon as zx,
-    futures::StreamExt,
-    std::{
-        cell::{Cell, RefCell},
-        rc::Rc,
-    },
+use anyhow::Error;
+use async_utils::hanging_get::server::HangingGet;
+use fidl_fuchsia_input_interaction::{
+    NotifierRequest, NotifierRequestStream, NotifierWatchStateResponder, State,
 };
+use fidl_fuchsia_input_interaction_observation::{
+    AggregatorRequest, AggregatorRequestStream, HandoffWakeError,
+};
+use fuchsia_async::{Task, Timer};
+use fuchsia_zircon as zx;
+use futures::StreamExt;
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
 
 type NotifyFn = Box<dyn Fn(&State, NotifierWatchStateResponder) -> bool>;
 type InteractionHangingGet = HangingGet<State, NotifierWatchStateResponder, NotifyFn>;
@@ -170,17 +166,15 @@ impl ActivityManager {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        async_utils::hanging_get::client::HangingGetStream,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_input_interaction::{NotifierMarker, NotifierProxy},
-        fidl_fuchsia_input_interaction_observation::{AggregatorMarker, AggregatorProxy},
-        fuchsia_async::TestExecutor,
-        futures::pin_mut,
-        std::task::Poll,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use async_utils::hanging_get::client::HangingGetStream;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_input_interaction::{NotifierMarker, NotifierProxy};
+    use fidl_fuchsia_input_interaction_observation::{AggregatorMarker, AggregatorProxy};
+    use fuchsia_async::TestExecutor;
+    use futures::pin_mut;
+    use std::task::Poll;
 
     const ACTIVITY_TIMEOUT: zx::Duration = zx::Duration::from_millis(5000);
 

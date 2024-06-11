@@ -6,8 +6,7 @@ use anyhow::{Context, Error};
 use fdr_lib::execute_reset;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_fshost::AdminMarker;
-use fidl_fuchsia_io as fio;
-use fuchsia_zircon as zx;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 // Wipe and re-provision FVM. This will wipe both data and blobfs. This should only
 // be used in OTA flows, since wiping blobfs will result in an unusable primary system.

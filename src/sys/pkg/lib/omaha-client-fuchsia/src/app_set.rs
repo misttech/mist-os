@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    channel_config::ChannelConfigs,
-    omaha_client::{app_set::AppSet, common::App},
-};
+use channel_config::ChannelConfigs;
+use omaha_client::app_set::AppSet;
+use omaha_client::common::App;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum AppIdSource {

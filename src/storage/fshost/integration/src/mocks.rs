@@ -2,22 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use ffeedback::FileReportResults;
+use fidl::prelude::*;
+use fuchsia_component_test::LocalComponentHandles;
+use futures::channel::mpsc::{self};
+use futures::future::BoxFuture;
+use futures::{FutureExt as _, SinkExt as _, StreamExt as _};
+use std::sync::Arc;
+use vfs::directory::entry_container::Directory;
+use vfs::execution_scope::ExecutionScope;
+use vfs::path::Path;
+use vfs::service;
 use {
-    anyhow::Error,
-    ffeedback::FileReportResults,
-    fidl::prelude::*,
     fidl_fuchsia_boot as fboot, fidl_fuchsia_feedback as ffeedback, fidl_fuchsia_io as fio,
-    fuchsia_component_test::LocalComponentHandles,
     fuchsia_zircon as zx,
-    futures::{
-        channel::mpsc::{self},
-        future::BoxFuture,
-        FutureExt as _, SinkExt as _, StreamExt as _,
-    },
-    std::sync::Arc,
-    vfs::{
-        directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path, service,
-    },
 };
 
 /// Identifier for ramdisk storage. Defined in sdk/lib/zbi-format/include/lib/zbi-format/zbi.h.

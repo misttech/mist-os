@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{target::GnTarget, types::*},
-    anyhow::{anyhow, Context as _, Result},
-    cargo_metadata::{DependencyKind, Metadata, Package, PackageId},
-    std::collections::{HashMap, HashSet},
-};
+use crate::target::GnTarget;
+use crate::types::*;
+use anyhow::{anyhow, Context as _, Result};
+use cargo_metadata::{DependencyKind, Metadata, Package, PackageId};
+use std::collections::{HashMap, HashSet};
 
 pub struct GnBuildGraph<'a> {
     metadata: &'a Metadata,

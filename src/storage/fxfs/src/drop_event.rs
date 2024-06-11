@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {event_listener::Event, std::ops::Deref};
+use event_listener::Event;
+use std::ops::Deref;
 
 /// Same as Event but notifies when dropped.
 pub struct DropEvent(Event);

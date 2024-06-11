@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        channel::{CurrentChannelManager, TargetChannelManager},
-        rate_limiter::RateLimiterMonotonic,
-    },
-    anyhow::{anyhow, Context as _, Error},
-    fidl_fuchsia_update_channel::{ProviderRequest, ProviderRequestStream},
-    fidl_fuchsia_update_channelcontrol::{ChannelControlRequest, ChannelControlRequestStream},
-    fuchsia_zircon as zx,
-    futures::prelude::*,
-    std::sync::Arc,
-    tracing::warn,
-};
+use crate::channel::{CurrentChannelManager, TargetChannelManager};
+use crate::rate_limiter::RateLimiterMonotonic;
+use anyhow::{anyhow, Context as _, Error};
+use fidl_fuchsia_update_channel::{ProviderRequest, ProviderRequestStream};
+use fidl_fuchsia_update_channelcontrol::{ChannelControlRequest, ChannelControlRequestStream};
+use fuchsia_zircon as zx;
+use futures::prelude::*;
+use std::sync::Arc;
+use tracing::warn;
 
 pub(crate) struct ChannelHandler {
     current_channel_manager: Arc<CurrentChannelManager>,
@@ -98,15 +94,14 @@ impl ChannelHandler {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_update_channel::{ProviderMarker, ProviderProxy},
-        fidl_fuchsia_update_channelcontrol::{ChannelControlMarker, ChannelControlProxy},
-        fuchsia_async as fasync,
-        std::{fs, path::Path},
-        tempfile::TempDir,
-    };
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_update_channel::{ProviderMarker, ProviderProxy};
+    use fidl_fuchsia_update_channelcontrol::{ChannelControlMarker, ChannelControlProxy};
+    use fuchsia_async as fasync;
+    use std::fs;
+    use std::path::Path;
+    use tempfile::TempDir;
 
     fn new_test_channel_handler(info_dir: &TempDir) -> ChannelHandler {
         new_test_channel_handler_with_channel(info_dir, "example")

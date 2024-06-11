@@ -5,17 +5,17 @@
 //! The loopback device.
 
 use alloc::vec::Vec;
-use core::{convert::Infallible as Never, fmt::Debug};
+use core::convert::Infallible as Never;
+use core::fmt::Debug;
 use derivative::Derivative;
 
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use log::trace;
-use net_types::{
-    ethernet::Mac,
-    ip::{Ipv4, Ipv6, Mtu},
-};
+use net_types::ethernet::Mac;
+use net_types::ip::{Ipv4, Ipv6, Mtu};
+use netstack3_base::sync::Mutex;
 use netstack3_base::{
-    sync::Mutex, AnyDevice, CoreTimerContext, Device, DeviceIdAnyCompatContext, DeviceIdContext,
+    AnyDevice, CoreTimerContext, Device, DeviceIdAnyCompatContext, DeviceIdContext,
     FrameDestination, RecvFrameContext, RecvIpFrameMeta, ResourceCounterContext, SendableFrameMeta,
     StrongDeviceIdentifier, TimerContext, WeakDeviceIdentifier,
 };
@@ -25,20 +25,22 @@ use packet_formats::ethernet::{
     EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
 };
 
-use crate::internal::{
-    base::{DeviceCounters, DeviceLayerTypes, DeviceReceiveFrameSpec, EthernetDeviceCounters},
-    id::{BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, WeakDeviceId},
-    queue::{
-        rx::{ReceiveDequeFrameContext, ReceiveQueue, ReceiveQueueState, ReceiveQueueTypes},
-        tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState},
-        DequeueState, TransmitQueueFrameError,
-    },
-    socket::{
-        DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, EthernetHeaderParams,
-        ReceivedFrame,
-    },
-    state::{DeviceStateSpec, IpLinkDeviceState},
+use crate::internal::base::{
+    DeviceCounters, DeviceLayerTypes, DeviceReceiveFrameSpec, EthernetDeviceCounters,
 };
+use crate::internal::id::{BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, WeakDeviceId};
+use crate::internal::queue::rx::{
+    ReceiveDequeFrameContext, ReceiveQueue, ReceiveQueueState, ReceiveQueueTypes,
+};
+use crate::internal::queue::tx::{
+    BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState,
+};
+use crate::internal::queue::{DequeueState, TransmitQueueFrameError};
+use crate::internal::socket::{
+    DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, EthernetHeaderParams,
+    ReceivedFrame,
+};
+use crate::internal::state::{DeviceStateSpec, IpLinkDeviceState};
 
 /// The MAC address corresponding to the loopback interface.
 const LOOPBACK_MAC: Mac = Mac::UNSPECIFIED;

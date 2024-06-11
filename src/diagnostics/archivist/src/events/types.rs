@@ -2,16 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{events::error::EventError, identity::ComponentIdentity};
+use crate::events::error::EventError;
+use crate::identity::ComponentIdentity;
 use fidl::endpoints::ServerEnd;
 use fidl::prelude::*;
-use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_inspect as finspect;
-use fidl_fuchsia_logger as flogger;
 use fidl_table_validation::ValidFidlTable;
-use fuchsia_zircon as zx;
 use moniker::ExtendedMoniker;
 use std::sync::Arc;
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_inspect as finspect,
+    fidl_fuchsia_logger as flogger, fuchsia_zircon as zx,
+};
 
 /// Event types that contain singleton data. When these events are cloned, their singleton data
 /// won't be cloned.
@@ -167,10 +168,11 @@ mod tests {
     use super::*;
     use crate::logs::testing::create_log_sink_requested_event;
     use assert_matches::assert_matches;
-    use fidl_fuchsia_component as fcomponent;
-    use fidl_fuchsia_inspect as finspect;
     use fidl_fuchsia_logger::LogSinkMarker;
-    use fuchsia_zircon as zx;
+    use {
+        fidl_fuchsia_component as fcomponent, fidl_fuchsia_inspect as finspect,
+        fuchsia_zircon as zx,
+    };
 
     fn create_inspect_sink_requested_event(
         target_moniker: String,

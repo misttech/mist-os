@@ -2,24 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::events::{event::Event, registry::ComponentEventRoute, stream::EventStream},
-    async_utils::stream::FlattenUnorderedExt,
-    cm_rust::{ChildRef, EventScope},
-    cm_types::{LongName, Name},
-    cm_util::io::clone_dir,
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
-    fuchsia_zircon::{
-        self as zx, sys::ZX_CHANNEL_MAX_MSG_BYTES, sys::ZX_CHANNEL_MAX_MSG_HANDLES, HandleBased,
-    },
-    futures::{stream, stream::Peekable, Stream, StreamExt},
-    hooks::{CapabilityReceiver, EventPayload, EventType, HasEventType},
-    measure_tape_for_events::Measurable,
-    moniker::{ExtendedMoniker, Moniker},
-    std::{pin::Pin, sync::Arc, task::Poll},
-    tracing::{error, warn},
-};
+use crate::model::events::event::Event;
+use crate::model::events::registry::ComponentEventRoute;
+use crate::model::events::stream::EventStream;
+use async_utils::stream::FlattenUnorderedExt;
+use cm_rust::{ChildRef, EventScope};
+use cm_types::{LongName, Name};
+use cm_util::io::clone_dir;
+use fidl::endpoints::Proxy;
+use fuchsia_zircon::sys::{ZX_CHANNEL_MAX_MSG_BYTES, ZX_CHANNEL_MAX_MSG_HANDLES};
+use fuchsia_zircon::{self as zx, HandleBased};
+use futures::stream::Peekable;
+use futures::{stream, Stream, StreamExt};
+use hooks::{CapabilityReceiver, EventPayload, EventType, HasEventType};
+use measure_tape_for_events::Measurable;
+use moniker::{ExtendedMoniker, Moniker};
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::Poll;
+use tracing::{error, warn};
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio};
 
 // Number of bytes the header of a vector occupies in a fidl message.
 // TODO(https://fxbug.dev/42181010): This should be a constant in a FIDL library.
@@ -477,13 +479,9 @@ fn create_event_fidl_objects(event: Event) -> BoxStream<Result<fcomponent::Event
 
 #[cfg(test)]
 mod tests {
-    use crate::model::events::serve::validate_and_filter_event;
-    use crate::model::events::serve::ComponentEventRoute;
-    use cm_rust::ChildRef;
-    use cm_rust::EventScope;
-    use moniker::ChildName;
-    use moniker::ExtendedMoniker;
-    use moniker::Moniker;
+    use crate::model::events::serve::{validate_and_filter_event, ComponentEventRoute};
+    use cm_rust::{ChildRef, EventScope};
+    use moniker::{ChildName, ExtendedMoniker, Moniker};
 
     // Route: /root(coll)
     // Event: /root

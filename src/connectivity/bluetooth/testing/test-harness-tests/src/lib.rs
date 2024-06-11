@@ -20,20 +20,18 @@ mod test {
     // This mod tests the ability for TestHarnesses to share state via the `TestHarness::init`'s
     // `SharedState` map parameter.
     mod shared_state {
-        use {
-            super::*,
-            anyhow::format_err,
-            assert_matches::assert_matches,
-            fuchsia_async as fasync,
-            fuchsia_sync::Mutex,
-            futures::{
-                channel::oneshot,
-                future::{self, BoxFuture},
-                FutureExt,
-            },
-            std::{pin::pin, sync::Arc, task::Poll},
-            test_harness::{SharedState, TestHarness},
-        };
+        use super::*;
+        use anyhow::format_err;
+        use assert_matches::assert_matches;
+        use fuchsia_async as fasync;
+        use fuchsia_sync::Mutex;
+        use futures::channel::oneshot;
+        use futures::future::{self, BoxFuture};
+        use futures::FutureExt;
+        use std::pin::pin;
+        use std::sync::Arc;
+        use std::task::Poll;
+        use test_harness::{SharedState, TestHarness};
         const SHARED_KEY: &'static str = "U64";
         const INITIAL_VAL: u64 = 12;
         struct IntHarness {

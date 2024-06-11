@@ -2,26 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        blob_actor::BlobActor, deletion_actor::DeletionActor, instance_actor::InstanceActor,
-        read_actor::ReadActor, Args, BLOBFS_MOUNT_PATH,
-    },
-    async_trait::async_trait,
-    fidl_fuchsia_io as fio,
-    fs_management::Blobfs,
-    fuchsia_zircon::Vmo,
-    futures::lock::Mutex,
-    rand::{rngs::SmallRng, Rng, SeedableRng},
-    std::sync::Arc,
-    std::time::Duration,
-    storage_stress_test_utils::{
-        data::{Compressibility, FileFactory, UncompressedSize},
-        fvm::{get_volume_path, FvmInstance, Guid},
-        io::Directory,
-    },
-    stress_test::{actor::ActorRunner, environment::Environment, random_seed},
-};
+use crate::blob_actor::BlobActor;
+use crate::deletion_actor::DeletionActor;
+use crate::instance_actor::InstanceActor;
+use crate::read_actor::ReadActor;
+use crate::{Args, BLOBFS_MOUNT_PATH};
+use async_trait::async_trait;
+use fidl_fuchsia_io as fio;
+use fs_management::Blobfs;
+use fuchsia_zircon::Vmo;
+use futures::lock::Mutex;
+use rand::rngs::SmallRng;
+use rand::{Rng, SeedableRng};
+use std::sync::Arc;
+use std::time::Duration;
+use storage_stress_test_utils::data::{Compressibility, FileFactory, UncompressedSize};
+use storage_stress_test_utils::fvm::{get_volume_path, FvmInstance, Guid};
+use storage_stress_test_utils::io::Directory;
+use stress_test::actor::ActorRunner;
+use stress_test::environment::Environment;
+use stress_test::random_seed;
 
 // All partitions in this test have their type set to this arbitrary GUID.
 const TYPE_GUID: Guid =

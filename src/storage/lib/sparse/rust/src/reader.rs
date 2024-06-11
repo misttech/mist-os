@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{deserialize_from, Chunk, Reader, SparseHeader},
-    anyhow::{ensure, Context, Result},
-    byteorder::{ByteOrder as _, LE},
-    std::io::{Read, Seek, SeekFrom},
-};
+use crate::{deserialize_from, Chunk, Reader, SparseHeader};
+use anyhow::{ensure, Context, Result};
+use byteorder::{ByteOrder as _, LE};
+use std::io::{Read, Seek, SeekFrom};
 
 /// SparseReader is an implementation of std::io::Read which transparently unpacks the underlying
 /// sparse image as it is read.
@@ -150,15 +148,12 @@ impl Seek for SparseReader {
 
 #[cfg(test)]
 mod test {
-    use {
-        crate::{
-            builder::{DataSource, SparseImageBuilder},
-            reader::SparseReader,
-        },
-        rand::{rngs::SmallRng, RngCore, SeedableRng},
-        std::io::{Read as _, Seek as _, SeekFrom, Write as _},
-        tempfile::{NamedTempFile, TempDir},
-    };
+    use crate::builder::{DataSource, SparseImageBuilder};
+    use crate::reader::SparseReader;
+    use rand::rngs::SmallRng;
+    use rand::{RngCore, SeedableRng};
+    use std::io::{Read as _, Seek as _, SeekFrom, Write as _};
+    use tempfile::{NamedTempFile, TempDir};
 
     #[test]
     fn empty_reader() {

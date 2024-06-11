@@ -7,7 +7,9 @@
 //! Defines [`PortAllocImpl`] trait and [`simple_randomized_port_alloc`], used
 //! for ephemeral port allocations in transport protocols.
 
-use core::{hash::Hash, marker::PhantomData, ops::RangeInclusive};
+use core::hash::Hash;
+use core::marker::PhantomData;
+use core::ops::RangeInclusive;
 
 use rand::Rng;
 

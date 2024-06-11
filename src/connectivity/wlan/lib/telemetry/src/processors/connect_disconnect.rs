@@ -2,24 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::util::cobalt_logger::log_cobalt_1dot1_batch;
+use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
+use fuchsia_inspect::Node as InspectNode;
+use fuchsia_inspect_contrib::auto_persist::{
+    AutoPersist, {self},
+};
+use fuchsia_inspect_contrib::nodes::BoundedListNode;
+use fuchsia_inspect_contrib::{inspect_insert, inspect_log};
+use fuchsia_sync::Mutex;
+use std::sync::Arc;
+use tracing::info;
+use wlan_common::bss::BssDescription;
 use {
-    crate::util::cobalt_logger::log_cobalt_1dot1_batch,
-    fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload},
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_inspect::Node as InspectNode,
-    fuchsia_inspect_contrib::{
-        auto_persist::{
-            AutoPersist, {self},
-        },
-        inspect_insert, inspect_log,
-        nodes::BoundedListNode,
-    },
-    fuchsia_sync::Mutex,
-    fuchsia_zircon as zx,
-    std::sync::Arc,
-    tracing::info,
-    wlan_common::bss::BssDescription,
-    wlan_legacy_metrics_registry as metrics,
+    fuchsia_zircon as zx, wlan_legacy_metrics_registry as metrics,
 };
 
 const INSPECT_CONNECT_EVENTS_LIMIT: usize = 7;
@@ -114,19 +111,15 @@ impl ConnectDisconnectLogger {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::testing::*,
-        diagnostics_assertions::{assert_data_tree, AnyNumericProperty},
-        futures::task::Poll,
-        ieee80211_testutils::{BSSID_REGEX, SSID_REGEX},
-        rand::Rng,
-        std::pin::pin,
-        wlan_common::{
-            channel::{Cbw, Channel},
-            random_bss_description,
-        },
-    };
+    use super::*;
+    use crate::testing::*;
+    use diagnostics_assertions::{assert_data_tree, AnyNumericProperty};
+    use futures::task::Poll;
+    use ieee80211_testutils::{BSSID_REGEX, SSID_REGEX};
+    use rand::Rng;
+    use std::pin::pin;
+    use wlan_common::channel::{Cbw, Channel};
+    use wlan_common::random_bss_description;
 
     #[fuchsia::test]
     fn test_log_connect_attempt_inspect() {

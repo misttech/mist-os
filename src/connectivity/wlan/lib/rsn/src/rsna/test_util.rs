@@ -3,37 +3,27 @@
 // found in the LICENSE file.
 
 use super::*;
-use crate::auth;
 use crate::key::exchange::handshake::fourway::{self, Fourway, SupplicantKeyReplayCounter};
 use crate::key::exchange::{compute_mic, compute_mic_from_buf};
-use crate::key::{
-    gtk::{Gtk, GtkProvider},
-    igtk::{Igtk, IgtkProvider},
-    ptk::Ptk,
-};
+use crate::key::gtk::{Gtk, GtkProvider};
+use crate::key::igtk::{Igtk, IgtkProvider};
+use crate::key::ptk::Ptk;
 use crate::key_data::kde;
 use crate::nonce::NonceReader;
-use crate::psk;
-use crate::{Authenticator, Supplicant};
+use crate::{auth, psk, Authenticator, Supplicant};
 use eapol::KeyFrameTx;
 use hex::FromHex;
 use ieee80211::{MacAddr, Ssid};
 use lazy_static::lazy_static;
 use std::sync::{Arc, Mutex};
-use wlan_common::{
-    ie::{
-        fake_wpa_ie,
-        rsn::{
-            akm,
-            cipher::{self},
-            fake_wpa2_a_rsne, fake_wpa2_s_rsne, fake_wpa3_a_rsne, fake_wpa3_s_rsne,
-            suite_filter::DEFAULT_GROUP_MGMT_CIPHER,
-            suite_selector::OUI,
-        },
-        write_wpa1_ie,
-    },
-    organization::Oui,
+use wlan_common::ie::rsn::cipher::{self};
+use wlan_common::ie::rsn::suite_filter::DEFAULT_GROUP_MGMT_CIPHER;
+use wlan_common::ie::rsn::suite_selector::OUI;
+use wlan_common::ie::rsn::{
+    akm, fake_wpa2_a_rsne, fake_wpa2_s_rsne, fake_wpa3_a_rsne, fake_wpa3_s_rsne,
 };
+use wlan_common::ie::{fake_wpa_ie, write_wpa1_ie};
+use wlan_common::organization::Oui;
 
 lazy_static! {
     static ref S_ADDR: MacAddr = MacAddr::from([0x81, 0x76, 0x61, 0x14, 0xDF, 0xC9]);

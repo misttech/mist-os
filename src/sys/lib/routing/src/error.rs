@@ -2,17 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{policy::PolicyError, rights::Rights},
-    clonable_error::ClonableError,
-    cm_rust::CapabilityTypeName,
-    cm_types::Name,
-    fidl_fuchsia_component as fcomponent, fuchsia_zircon_status as zx,
-    moniker::{ChildName, Moniker, MonikerError},
-    router_error::{Explain, RouterError},
-    std::sync::Arc,
-    thiserror::Error,
-};
+use crate::policy::PolicyError;
+use crate::rights::Rights;
+use clonable_error::ClonableError;
+use cm_rust::CapabilityTypeName;
+use cm_types::Name;
+use moniker::{ChildName, Moniker, MonikerError};
+use router_error::{Explain, RouterError};
+use std::sync::Arc;
+use thiserror::Error;
+use {fidl_fuchsia_component as fcomponent, fuchsia_zircon_status as zx};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

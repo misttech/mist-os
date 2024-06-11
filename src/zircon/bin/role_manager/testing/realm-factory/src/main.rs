@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Error, Result},
-    fidl_test_rolemanager::*,
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    futures::{StreamExt, TryStreamExt},
-    tracing::*,
-};
+use anyhow::{Error, Result};
+use fidl_test_rolemanager::*;
+use fuchsia_async as fasync;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use futures::{StreamExt, TryStreamExt};
+use tracing::*;
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

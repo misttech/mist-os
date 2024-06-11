@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::traits::test_realm_component::TestRealmComponent,
-    fidl::endpoints::DiscoverableProtocolMarker,
-    fuchsia_component_test::{Capability, DirectoryContents, RealmBuilder, Ref, Route},
-};
+use crate::traits::test_realm_component::TestRealmComponent;
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fuchsia_component_test::{Capability, DirectoryContents, RealmBuilder, Ref, Route};
 
 /// *Deprecated*: See https://fxbug.dev/42058891
 ///

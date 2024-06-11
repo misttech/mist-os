@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_bluetooth as fidl_bt;
 use fidl_fuchsia_bluetooth_bredr::{
     self as fidl_bredr, ProfileDescriptor, ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST,
     ATTR_SERVICE_CLASS_ID_LIST,
 };
 use fidl_table_validation::ValidFidlTable;
-use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::{AttachError, Inspect, Unit};
 use std::cmp::min;
 use std::collections::HashSet;
+use {fidl_fuchsia_bluetooth as fidl_bt, fuchsia_inspect as inspect};
 
-use crate::assigned_numbers::{constants::SERVICE_CLASS_UUIDS, AssignedNumber};
+use crate::assigned_numbers::constants::SERVICE_CLASS_UUIDS;
+use crate::assigned_numbers::AssignedNumber;
 use crate::error::Error;
 use crate::types::Uuid;
 

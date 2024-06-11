@@ -4,16 +4,12 @@
 
 use std::fmt::Display;
 
-use fidl_fuchsia_device as fdev;
-use fidl_fuchsia_hardware_network as fhwnet;
-use fuchsia_zircon as zx;
+use {fidl_fuchsia_device as fdev, fidl_fuchsia_hardware_network as fhwnet, fuchsia_zircon as zx};
 
 use anyhow::Context as _;
 
-use crate::{
-    errors::{self, ContextExt as _},
-    exit_with_fidl_error,
-};
+use crate::errors::{self, ContextExt as _};
+use crate::exit_with_fidl_error;
 
 /// An error when adding a device.
 pub(super) enum AddDeviceError {

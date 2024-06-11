@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    animation::TransitionValueCondition,
-    core::{Core, ObjectRef, OnAdded, Property},
-};
+use crate::animation::TransitionValueCondition;
+use crate::core::{Core, ObjectRef, OnAdded, Property};
 
 #[derive(Debug, Default)]
 pub struct TransitionDoubleCondition {

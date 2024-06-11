@@ -4,20 +4,16 @@
 
 #[cfg(test)]
 mod tests {
-    use {
-        anyhow::Result,
-        fable_lib::fable,
-        fidl_fuchsia_intl::{
-            self as fintl, CivilTime, CivilToAbsoluteTimeOptions, DayOfWeek, Month,
-            RepeatedTimeConversion, SkippedTimeConversion, TimeZoneId, TimeZoneInfo,
-            TimeZonesProxy,
-        },
-        fuchsia_async as fasync,
-        fuchsia_component_test::{
-            Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route,
-        },
-        fuchsia_zircon as zx,
+    use anyhow::Result;
+    use fable_lib::fable;
+    use fidl_fuchsia_intl::{
+        self as fintl, CivilTime, CivilToAbsoluteTimeOptions, DayOfWeek, Month,
+        RepeatedTimeConversion, SkippedTimeConversion, TimeZoneId, TimeZoneInfo, TimeZonesProxy,
     };
+    use fuchsia_component_test::{
+        Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route,
+    };
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     static SVC_URL: &str =
         "fuchsia-pkg://fuchsia.com/time-zone-info-service-test#meta/time-zone-info-service.cm";

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    diagnostics_assertions::assert_data_tree,
-    fuchsia_inspect::{Inspector, Node},
-    inspect_writable::{InspectWritable, InspectWritableNode},
-};
+use diagnostics_assertions::assert_data_tree;
+use fuchsia_inspect::{Inspector, Node};
+use inspect_writable::{InspectWritable, InspectWritableNode};
 
 #[derive(Debug)]
 enum Summary {

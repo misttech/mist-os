@@ -23,50 +23,45 @@
 //! of the journal code, which must hold a lock to avoid concurrent updates. However, this lock
 //! must NOT be held when saving the superblock as additional extents may need to be allocated as
 //! part of the save process.
-use {
-    crate::{
-        errors::FxfsError,
-        filesystem::{ApplyContext, ApplyMode, FxFilesystem, JournalingObject},
-        log::*,
-        lsm_tree::{types::LayerIterator, LSMTree, LayerSet},
-        metrics,
-        object_handle::ObjectHandle as _,
-        object_store::{
-            allocator::Reservation,
-            journal::{
-                bootstrap_handle::BootstrapObjectHandle,
-                reader::{JournalReader, ReadResult},
-                writer::JournalWriter,
-                JournalCheckpoint, JournalCheckpointV32, JournalHandle as _, BLOCK_SIZE,
-            },
-            object_record::{ObjectItemV32, ObjectItemV33, ObjectItemV37, ObjectItemV38},
-            transaction::{AssocObj, Options},
-            tree::MajorCompactable,
-            DataObjectHandle, HandleOptions, HandleOwner, Mutation, ObjectKey, ObjectStore,
-            ObjectValue,
-        },
-        range::RangeExt,
-        serialized_types::{
-            migrate_to_version, Migrate, Version, Versioned, VersionedLatest,
-            EARLIEST_SUPPORTED_VERSION,
-        },
-    },
-    anyhow::{bail, ensure, Context, Error},
-    fprint::TypeFingerprint,
-    fuchsia_inspect::{Property as _, UintProperty},
-    futures::FutureExt,
-    rustc_hash::FxHashMap as HashMap,
-    serde::{Deserialize, Serialize},
-    std::{
-        fmt,
-        io::{Read, Write},
-        ops::{Bound, Range},
-        sync::{Arc, Mutex},
-        time::SystemTime,
-    },
-    storage_device::Device,
-    uuid::Uuid,
+use crate::errors::FxfsError;
+use crate::filesystem::{ApplyContext, ApplyMode, FxFilesystem, JournalingObject};
+use crate::log::*;
+use crate::lsm_tree::types::LayerIterator;
+use crate::lsm_tree::{LSMTree, LayerSet};
+use crate::metrics;
+use crate::object_handle::ObjectHandle as _;
+use crate::object_store::allocator::Reservation;
+use crate::object_store::journal::bootstrap_handle::BootstrapObjectHandle;
+use crate::object_store::journal::reader::{JournalReader, ReadResult};
+use crate::object_store::journal::writer::JournalWriter;
+use crate::object_store::journal::{
+    JournalCheckpoint, JournalCheckpointV32, JournalHandle as _, BLOCK_SIZE,
 };
+use crate::object_store::object_record::{
+    ObjectItemV32, ObjectItemV33, ObjectItemV37, ObjectItemV38,
+};
+use crate::object_store::transaction::{AssocObj, Options};
+use crate::object_store::tree::MajorCompactable;
+use crate::object_store::{
+    DataObjectHandle, HandleOptions, HandleOwner, Mutation, ObjectKey, ObjectStore, ObjectValue,
+};
+use crate::range::RangeExt;
+use crate::serialized_types::{
+    migrate_to_version, Migrate, Version, Versioned, VersionedLatest, EARLIEST_SUPPORTED_VERSION,
+};
+use anyhow::{bail, ensure, Context, Error};
+use fprint::TypeFingerprint;
+use fuchsia_inspect::{Property as _, UintProperty};
+use futures::FutureExt;
+use rustc_hash::FxHashMap as HashMap;
+use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::io::{Read, Write};
+use std::ops::{Bound, Range};
+use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
+use storage_device::Device;
+use uuid::Uuid;
 
 // These only exist in the root store.
 const SUPER_BLOCK_A_OBJECT_ID: u64 = 1;
@@ -642,23 +637,20 @@ impl RecordReader {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{
-            compact_root_parent, write, SuperBlockHeader, SuperBlockInstance, UuidWrapper,
-            MIN_SUPER_BLOCK_SIZE,
-        },
-        crate::{
-            filesystem::{FxFilesystem, OpenFxFilesystem},
-            object_handle::ReadObjectHandle,
-            object_store::{
-                journal::JournalCheckpoint,
-                transaction::{lock_keys, Options},
-                DataObjectHandle, HandleOptions, ObjectHandle, ObjectKey, ObjectStore,
-            },
-            serialized_types::LATEST_VERSION,
-        },
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
+    use super::{
+        compact_root_parent, write, SuperBlockHeader, SuperBlockInstance, UuidWrapper,
+        MIN_SUPER_BLOCK_SIZE,
     };
+    use crate::filesystem::{FxFilesystem, OpenFxFilesystem};
+    use crate::object_handle::ReadObjectHandle;
+    use crate::object_store::journal::JournalCheckpoint;
+    use crate::object_store::transaction::{lock_keys, Options};
+    use crate::object_store::{
+        DataObjectHandle, HandleOptions, ObjectHandle, ObjectKey, ObjectStore,
+    };
+    use crate::serialized_types::LATEST_VERSION;
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::DeviceHolder;
 
     // We require 512kiB each for A/B super-blocks, 256kiB for the journal (128kiB before flush)
     // and compactions require double the layer size to complete.

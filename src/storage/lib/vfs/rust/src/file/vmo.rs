@@ -7,24 +7,18 @@
 #[cfg(test)]
 mod tests;
 
-use crate::{
-    common::rights_to_posix_mode_bits,
-    directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
-    execution_scope::ExecutionScope,
-    file::{
-        common::vmo_flags_to_rights, File, FileLike, FileOptions, GetVmo, StreamIoConnection,
-        SyncMode,
-    },
-    node::Node,
-    ObjectRequestRef,
-};
+use crate::common::rights_to_posix_mode_bits;
+use crate::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use crate::execution_scope::ExecutionScope;
+use crate::file::common::vmo_flags_to_rights;
+use crate::file::{File, FileLike, FileOptions, GetVmo, StreamIoConnection, SyncMode};
+use crate::node::Node;
+use crate::ObjectRequestRef;
 
-use {
-    async_trait::async_trait,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon::{self as zx, HandleBased as _, Status, Vmo},
-    std::sync::Arc,
-};
+use async_trait::async_trait;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon::{self as zx, HandleBased as _, Status, Vmo};
+use std::sync::Arc;
 
 /// Creates a new read-only `VmoFile` with the specified `content`.
 ///

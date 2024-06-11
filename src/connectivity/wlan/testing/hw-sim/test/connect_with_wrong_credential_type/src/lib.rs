@@ -1,20 +1,17 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_test_wlan_realm::WlanConfig,
-    fuchsia_zircon::{self as zx, prelude::*},
-    ieee80211::Bssid,
-    lazy_static::lazy_static,
-    std::pin::pin,
-    tracing::info,
-    wlan_common::{
-        bss::Protection,
-        ie::rsn::cipher::{CIPHER_CCMP_128, CIPHER_TKIP},
-    },
-    wlan_hw_sim::*,
-};
+use fidl_fuchsia_wlan_policy as fidl_policy;
+use fidl_test_wlan_realm::WlanConfig;
+use fuchsia_zircon::prelude::*;
+use fuchsia_zircon::{self as zx};
+use ieee80211::Bssid;
+use lazy_static::lazy_static;
+use std::pin::pin;
+use tracing::info;
+use wlan_common::bss::Protection;
+use wlan_common::ie::rsn::cipher::{CIPHER_CCMP_128, CIPHER_TKIP};
+use wlan_hw_sim::*;
 
 lazy_static! {
     static ref BSSID: Bssid = Bssid::from(*b"bessid");

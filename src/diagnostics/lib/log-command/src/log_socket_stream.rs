@@ -6,7 +6,8 @@ use crate::LogError;
 use async_stream::stream;
 use diagnostics_data::LogsData;
 use futures_util::{AsyncReadExt, Stream, StreamExt};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use std::pin::Pin;
 use thiserror::Error;
 

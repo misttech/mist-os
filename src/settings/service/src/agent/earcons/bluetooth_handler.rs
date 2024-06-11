@@ -6,26 +6,22 @@ use crate::agent::earcons::agent::CommonEarconsParams;
 use crate::agent::earcons::sound_ids::{
     BLUETOOTH_CONNECTED_SOUND_ID, BLUETOOTH_DISCONNECTED_SOUND_ID,
 };
-use crate::agent::earcons::utils::connect_to_sound_player;
-use crate::agent::earcons::utils::play_sound;
+use crate::agent::earcons::utils::{connect_to_sound_player, play_sound};
 use crate::audio::types::{AudioSettingSource, AudioStreamType, SetAudioStream};
 use crate::base::{SettingInfo, SettingType};
-use crate::call;
 use crate::event::Publisher;
 use crate::handler::base::{Payload, Request};
 use crate::message::base::Audience;
-use crate::service;
-use crate::trace;
+use crate::{call, service, trace};
 
 use anyhow::{format_err, Context, Error};
 use fidl::endpoints::create_request_stream;
 use fidl_fuchsia_media_sessions2::{
     DiscoveryMarker, SessionsWatcherRequest, SessionsWatcherRequestStream, WatchOptions,
 };
-use fuchsia_async as fasync;
-use fuchsia_trace as ftrace;
 use futures::stream::TryStreamExt;
 use std::collections::HashSet;
+use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
 /// Type for uniquely identifying bluetooth media sessions.
 type SessionId = u64;

@@ -2,24 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    argh::FromArgs,
-    cm_types::{symmetrical_enums, Url},
-    cml::{
-        error::{Error, Location},
-        translate::CompileOptions,
-    },
-    fidl::persist,
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal,
-    itertools::Itertools,
-    serde::Deserialize,
-    std::{
-        collections::HashSet,
-        fs::{self, File},
-        io::Write,
-        path::PathBuf,
-    },
-};
+use argh::FromArgs;
+use cm_types::{symmetrical_enums, Url};
+use cml::error::{Error, Location};
+use cml::translate::CompileOptions;
+use fidl::persist;
+use itertools::Itertools;
+use serde::Deserialize;
+use std::collections::HashSet;
+use std::fs::{self, File};
+use std::io::Write;
+use std::path::PathBuf;
+use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal};
 
 fn remove_duplicates<T: Ord>(mut v: Vec<T>) -> Vec<T> {
     v.sort();
@@ -775,10 +769,11 @@ pub fn compile(args: Args) -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {
-        assert_matches::assert_matches, fidl::unpersist, fidl_fuchsia_component_decl as fdecl,
-        fidl_fuchsia_io as fio, std::io::Read, tempfile::TempDir,
-    };
+    use assert_matches::assert_matches;
+    use fidl::unpersist;
+    use std::io::Read;
+    use tempfile::TempDir;
+    use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio};
 
     fn compile_str(input: &str) -> Result<component_internal::Config, Error> {
         let tmp_dir = TempDir::new().unwrap();

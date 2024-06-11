@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    fidl_fuchsia_io::DirectoryProxy,
-    fuchsia_fs::file::{ReadError, WriteError},
-    fuchsia_zircon::Status,
-    futures::{future::BoxFuture, FutureExt},
-};
+use anyhow::{Context, Error};
+use fidl_fuchsia_io::DirectoryProxy;
+use fuchsia_fs::file::{ReadError, WriteError};
+use fuchsia_zircon::Status;
+use futures::future::BoxFuture;
+use futures::FutureExt;
 
 /// Copies all data from src to dst recursively.
 pub fn recursive_copy<'a>(

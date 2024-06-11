@@ -23,13 +23,11 @@ use {
     std::collections::HashSet,
 };
 
-use crate::store::{
-    keys::{
-        bonding_data_key, host_data_key, host_id_from_key, BONDING_DATA_PREFIX, HOST_DATA_PREFIX,
-    },
-    serde::{
-        BondingDataDeserializer, BondingDataSerializer, HostDataDeserializer, HostDataSerializer,
-    },
+use crate::store::keys::{
+    bonding_data_key, host_data_key, host_id_from_key, BONDING_DATA_PREFIX, HOST_DATA_PREFIX,
+};
+use crate::store::serde::{
+    BondingDataDeserializer, BondingDataSerializer, HostDataDeserializer, HostDataSerializer,
 };
 
 #[cfg(test)]
@@ -451,10 +449,11 @@ fn build_stash(inner: StashInner) -> (Stash, impl Future<Output = Result<(), Err
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {
-        core::hash::Hash, fidl_fuchsia_bluetooth_sys::Key,
-        fuchsia_component::client::connect_to_protocol, futures::select, std::pin::pin,
-    };
+    use core::hash::Hash;
+    use fidl_fuchsia_bluetooth_sys::Key;
+    use fuchsia_component::client::connect_to_protocol;
+    use futures::select;
+    use std::pin::pin;
 
     static TEST_INSPECT_ROOT: &'static str = "test";
     // create_stash_accessor will create a new accessor to stash scoped under the given test name.

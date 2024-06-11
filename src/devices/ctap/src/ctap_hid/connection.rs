@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::ctap_hid::message::Message, anyhow::Error, async_trait::async_trait, std::fmt::Debug};
+use crate::ctap_hid::message::Message;
+use anyhow::Error;
+use async_trait::async_trait;
+use std::fmt::Debug;
 
 #[cfg(test)]
 pub use self::fake::FakeConnection;
@@ -25,8 +28,7 @@ pub mod fidl {
     use crate::ctap_hid::message::Message;
     use anyhow::{format_err, Error};
     use async_trait::async_trait;
-    use fidl_fuchsia_fido_report::Message as FidoMessage;
-    use fidl_fuchsia_fido_report::SecurityKeyDeviceProxy;
+    use fidl_fuchsia_fido_report::{Message as FidoMessage, SecurityKeyDeviceProxy};
     use fuchsia_async::{Time, TimeoutExt};
     use fuchsia_zircon as zx;
     use futures::TryFutureExt;
@@ -200,15 +202,13 @@ pub mod fidl {
 /// A fake implementation of a `Connection` to simplify unit testing.
 #[cfg(test)]
 pub mod fake {
-    use {
-        crate::ctap_hid::connection::Connection,
-        crate::ctap_hid::message::Message,
-        anyhow::{format_err, Error},
-        async_trait::async_trait,
-        futures::lock::Mutex,
-        std::collections::VecDeque,
-        std::thread,
-    };
+    use crate::ctap_hid::connection::Connection;
+    use crate::ctap_hid::message::Message;
+    use anyhow::{format_err, Error};
+    use async_trait::async_trait;
+    use futures::lock::Mutex;
+    use std::collections::VecDeque;
+    use std::thread;
 
     /// A single operation for a fake connection
     #[derive(Debug)]

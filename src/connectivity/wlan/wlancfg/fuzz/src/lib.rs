@@ -2,18 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    futures::channel::mpsc,
-    fuzz::fuzz,
-    wlan_common::assert_variant,
-    wlancfg_lib::{
-        config_management::{
-            network_config::{Credential, NetworkIdentifier},
-            SavedNetworksManager, SavedNetworksManagerApi,
-        },
-        telemetry::{TelemetryEvent, TelemetrySender},
-    },
-};
+use futures::channel::mpsc;
+use fuzz::fuzz;
+use wlan_common::assert_variant;
+use wlancfg_lib::config_management::network_config::{Credential, NetworkIdentifier};
+use wlancfg_lib::config_management::{SavedNetworksManager, SavedNetworksManagerApi};
+use wlancfg_lib::telemetry::{TelemetryEvent, TelemetrySender};
 
 #[fuzz]
 async fn fuzz_saved_networks_manager_store(id: NetworkIdentifier, credential: Credential) {

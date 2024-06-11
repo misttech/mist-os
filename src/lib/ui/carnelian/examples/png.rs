@@ -2,27 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    argh::FromArgs,
-    carnelian::{
-        color::Color,
-        drawing::path_for_rectangle,
-        input::{self},
-        make_app_assistant,
-        render::{
-            BlendMode, Composition, Context, CopyRegion, Fill, FillRule, Image, Layer, Order,
-            PostCopy, PreClear, Raster, RenderExt, Style,
-        },
-        App, AppAssistant, Size, ViewAssistant, ViewAssistantContext, ViewAssistantPtr, ViewKey,
-    },
-    euclid::{
-        default::{Point2D, Rect},
-        point2, size2,
-    },
-    fuchsia_zircon::{AsHandleRef, Event, Signals},
-    std::{collections::BTreeMap, fs::File},
+use anyhow::Error;
+use argh::FromArgs;
+use carnelian::color::Color;
+use carnelian::drawing::path_for_rectangle;
+use carnelian::input::{self};
+use carnelian::render::{
+    BlendMode, Composition, Context, CopyRegion, Fill, FillRule, Image, Layer, Order, PostCopy,
+    PreClear, Raster, RenderExt, Style,
 };
+use carnelian::{
+    make_app_assistant, App, AppAssistant, Size, ViewAssistant, ViewAssistantContext,
+    ViewAssistantPtr, ViewKey,
+};
+use euclid::default::{Point2D, Rect};
+use euclid::{point2, size2};
+use fuchsia_zircon::{AsHandleRef, Event, Signals};
+use std::collections::BTreeMap;
+use std::fs::File;
 
 const WHITE_COLOR: Color = Color { r: 255, g: 255, b: 255, a: 255 };
 

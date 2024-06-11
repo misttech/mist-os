@@ -2,27 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    power::{SuspendState, SuspendStats},
-    task::CurrentTask,
-};
+use crate::power::{SuspendState, SuspendStats};
+use crate::task::CurrentTask;
 
-use std::{collections::HashSet, sync::Arc};
+use std::collections::HashSet;
+use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
 use async_utils::hanging_get::client::HangingGetStream;
 use fidl::endpoints::{create_request_stream, create_sync_proxy};
-use fidl_fuchsia_power_broker as fbroker;
-use fidl_fuchsia_power_suspend as fsuspend;
-use fidl_fuchsia_power_system as fsystem;
-use fidl_fuchsia_session_power as fpower;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_sync};
-use fuchsia_zircon as zx;
 use futures::StreamExt;
 use once_cell::sync::OnceCell;
 use starnix_logging::{log_error, log_info};
 use starnix_sync::{Mutex, MutexGuard};
-use starnix_uapi::{errno, error, errors::Errno};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::{errno, error};
+use {
+    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_suspend as fsuspend,
+    fidl_fuchsia_power_system as fsystem, fidl_fuchsia_session_power as fpower,
+    fuchsia_zircon as zx,
+};
 
 /// Power Mode power element is owned and registered by Starnix kernel. This power element is
 /// added in the power topology as a dependent on Application Activity element that is owned by

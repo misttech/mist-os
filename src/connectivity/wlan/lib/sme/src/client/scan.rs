@@ -2,23 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::client::inspect;
+use crate::Error;
+use fuchsia_inspect::NumericProperty;
+use ieee80211::{Bssid, Ssid};
+use std::collections::{hash_map, HashMap, HashSet};
+use std::mem;
+use std::sync::Arc;
+use tracing::warn;
+use wlan_common::bss::BssDescription;
+use wlan_common::channel::{Cbw, Channel};
+use wlan_common::ie::IesMerger;
 use {
-    crate::{client::inspect, Error},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_inspect::NumericProperty,
-    ieee80211::{Bssid, Ssid},
-    std::{
-        collections::{hash_map, HashMap, HashSet},
-        mem,
-        sync::Arc,
-    },
-    tracing::warn,
-    wlan_common::{
-        bss::BssDescription,
-        channel::{Cbw, Channel},
-        ie::IesMerger,
-    },
 };
 
 const PASSIVE_SCAN_CHANNEL_MS: u32 = 200;
@@ -364,13 +361,9 @@ mod tests {
     use regex::bytes::Regex;
     use std::fmt::Write;
     use test_case::test_case;
-    use wlan_common::{
-        assert_variant, fake_bss_description, fake_fidl_bss_description,
-        test_utils::{
-            fake_capabilities::fake_5ghz_band_capability,
-            fake_features::fake_spectrum_management_support_empty,
-        },
-    };
+    use wlan_common::test_utils::fake_capabilities::fake_5ghz_band_capability;
+    use wlan_common::test_utils::fake_features::fake_spectrum_management_support_empty;
+    use wlan_common::{assert_variant, fake_bss_description, fake_fidl_bss_description};
 
     lazy_static! {
         static ref CLIENT_ADDR: MacAddr = [0x7A, 0xE7, 0x76, 0xD9, 0xF2, 0x67].into();

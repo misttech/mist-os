@@ -219,10 +219,10 @@ async fn reap_watchers<P, I>(
 mod tests {
     use super::*;
     use fidl_fuchsia_wlan_device_service::DeviceWatcherEvent;
-    use fuchsia_async as fasync;
-    use fuchsia_zircon as zx;
     use futures::task::Poll;
-    use std::{mem, pin::pin};
+    use std::mem;
+    use std::pin::pin;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     #[fuchsia::test]
     fn reap_watchers() {

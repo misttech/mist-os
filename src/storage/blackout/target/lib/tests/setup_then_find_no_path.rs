@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    blackout_target::{find_partition, set_up_partition},
-    device_watcher::recursive_wait,
-    fuchsia_async as fasync,
-    ramdevice_client::RamdiskClient,
-    storage_isolated_driver_manager::fvm,
-    uuid::Uuid,
-};
+use blackout_target::{find_partition, set_up_partition};
+use device_watcher::recursive_wait;
+use fuchsia_async as fasync;
+use ramdevice_client::RamdiskClient;
+use storage_isolated_driver_manager::fvm;
+use uuid::Uuid;
 
 #[fasync::run_singlethreaded(test)]
 async fn setup_then_find_no_path() {

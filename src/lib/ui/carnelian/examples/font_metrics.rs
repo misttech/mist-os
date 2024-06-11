@@ -3,22 +3,19 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
+use carnelian::app::ViewCreationParameters;
+use carnelian::color::Color;
+use carnelian::drawing::{load_font, FontFace};
+use carnelian::input::{self};
+use carnelian::scene::facets::{
+    FacetId, SetBackgroundColorMessage, SetColorMessage, SetTextMessage, TextFacetOptions,
+    TextVerticalAlignment,
+};
+use carnelian::scene::layout::{Alignment, StackMemberDataBuilder};
+use carnelian::scene::scene::{Scene, SceneBuilder};
 use carnelian::{
-    app::ViewCreationParameters,
-    color::Color,
-    drawing::{load_font, FontFace},
-    input::{self},
-    make_app_assistant,
-    scene::{
-        facets::{
-            FacetId, SetBackgroundColorMessage, SetColorMessage, SetTextMessage, TextFacetOptions,
-            TextVerticalAlignment,
-        },
-        layout::{Alignment, StackMemberDataBuilder},
-        scene::{Scene, SceneBuilder},
-    },
-    App, AppAssistant, AppSender, Coord, Point, Size, ViewAssistant, ViewAssistantContext,
-    ViewAssistantPtr, ViewKey,
+    make_app_assistant, App, AppAssistant, AppSender, Coord, Point, Size, ViewAssistant,
+    ViewAssistantContext, ViewAssistantPtr, ViewKey,
 };
 use euclid::point2;
 use lipsum::lipsum_words;

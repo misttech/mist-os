@@ -4,12 +4,10 @@
 
 //! parser handles parsing markdown via pulldown_cmark into higher level elements.
 
-use pulldown_cmark::{
-    Event::{
-        self, Code, End, FootnoteReference, HardBreak, Html, SoftBreak, Start, TaskListMarker, Text,
-    },
-    Tag,
+use pulldown_cmark::Event::{
+    self, Code, End, FootnoteReference, HardBreak, Html, SoftBreak, Start, TaskListMarker, Text,
 };
+use pulldown_cmark::Tag;
 use std::ops::Range;
 
 use crate::md_element::{DocContext, Element};
@@ -244,7 +242,8 @@ mod test {
 
     use super::*;
     use crate::DocLine;
-    use pulldown_cmark::{CowStr::Borrowed, LinkType};
+    use pulldown_cmark::CowStr::Borrowed;
+    use pulldown_cmark::LinkType;
     #[test]
     fn test_basic_elements() {
         let doc_line1 = DocLine { line_num: 1, file_name: PathBuf::from("test1") };

@@ -1,8 +1,6 @@
-use crate::{
-    animation::{KeyFrame, KeyedProperty, LinearAnimation},
-    core::Object,
-    importers::ImportStackObject,
-};
+use crate::animation::{KeyFrame, KeyedProperty, LinearAnimation};
+use crate::core::Object;
+use crate::importers::ImportStackObject;
 
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be

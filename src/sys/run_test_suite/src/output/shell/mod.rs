@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::output::noop::NoopDirectoryWriter;
 use crate::output::{
-    noop::NoopDirectoryWriter, ArtifactType, DirectoryArtifactType, DynArtifact,
-    DynDirectoryArtifact, EntityId, EntityInfo, ReportedOutcome, Reporter, Timestamp,
+    ArtifactType, DirectoryArtifactType, DynArtifact, DynDirectoryArtifact, EntityId, EntityInfo,
+    ReportedOutcome, Reporter, Timestamp,
 };
 use fuchsia_async as fasync;
 use fuchsia_sync::Mutex;
-use std::{
-    collections::HashMap,
-    io::{Error, Write},
-    sync::{atomic::AtomicU32, Arc},
-    time::Duration,
-};
+use std::collections::HashMap;
+use std::io::{Error, Write};
+use std::sync::atomic::AtomicU32;
+use std::sync::Arc;
+use std::time::Duration;
 use tracing::error;
 
 mod writer;

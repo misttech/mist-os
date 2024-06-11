@@ -4,10 +4,8 @@
 
 //! Utilities for parsing and serializing LCP options.
 
-use {
-    crate::records::options::{OptionsImpl, OptionsImplLayout, OptionsSerializerImpl},
-    byteorder::{ByteOrder, NetworkEndian},
-};
+use crate::records::options::{OptionsImpl, OptionsImplLayout, OptionsSerializerImpl};
+use byteorder::{ByteOrder, NetworkEndian};
 
 /// An LCP control option.
 #[derive(Clone, Eq, Hash, PartialEq, Debug)]

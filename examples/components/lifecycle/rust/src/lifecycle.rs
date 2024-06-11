@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::{handle::AsyncChannel, prelude::*},
-    fuchsia_runtime::{HandleInfo, HandleType},
-    futures_util::stream::TryStreamExt,
-    std::process,
-    tracing::{error, info},
-};
+use fidl::handle::AsyncChannel;
+use fidl::prelude::*;
+use fuchsia_runtime::{HandleInfo, HandleType};
+use futures_util::stream::TryStreamExt;
+use std::process;
+use tracing::{error, info};
 
 // [START imports]
 use fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream};

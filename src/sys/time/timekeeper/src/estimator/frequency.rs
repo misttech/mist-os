@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{enums::FrequencyDiscardReason, time_source::Sample, Config},
-    chrono::{Datelike, Duration, TimeZone, Utc},
-    fuchsia_zircon as zx,
-    std::mem,
-    std::sync::Arc,
-};
+use crate::enums::FrequencyDiscardReason;
+use crate::time_source::Sample;
+use crate::Config;
+use chrono::{Datelike, Duration, TimeZone, Utc};
+use fuchsia_zircon as zx;
+use std::mem;
+use std::sync::Arc;
 
 /// The time period over which a set of time samples are collected to update the frequency estimate.
 const FREQUENCY_ESTIMATION_WINDOW: zx::Duration = zx::Duration::from_hours(24);
@@ -230,10 +230,11 @@ impl FrequencyEstimator {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*, crate::make_test_config, chrono::DateTime, test_util::assert_near,
-        zx::DurationNum,
-    };
+    use super::*;
+    use crate::make_test_config;
+    use chrono::DateTime;
+    use test_util::assert_near;
+    use zx::DurationNum;
 
     const INITIAL_MONO: zx::Time = zx::Time::from_nanos(7_000_000_000);
     const STD_DEV: zx::Duration = zx::Duration::from_millis(88);

@@ -13,7 +13,10 @@ use std::convert::Infallible as Never;
 
 use net_types::ip::{IpAddress as _, Ipv4, PrefixLength};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, io, net::Ipv4Addr, num::TryFromIntError};
+use std::collections::HashMap;
+use std::io;
+use std::net::Ipv4Addr;
+use std::num::TryFromIntError;
 use thiserror::Error;
 
 /// A collection of the basic configuration parameters needed by the server.
@@ -299,7 +302,8 @@ pub struct SubnetMask {
 
 mod serde_impls {
     use net_types::ip::PrefixLength;
-    use serde::{de::Error as _, Deserialize, Serialize};
+    use serde::de::Error as _;
+    use serde::{Deserialize, Serialize};
 
     // In order to preserve compatibility with a previous representation of
     // `SubnetMask`, we implement Serialize and Deserialize by forwarding those

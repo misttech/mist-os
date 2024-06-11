@@ -2,27 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::channel::{Cbw, Channel};
+use crate::ie::fake_ies::fake_wmm_param;
+use crate::ie::{self, write_wmm_param, IeType};
+use crate::mac;
+use crate::test_utils::fake_frames::{
+    fake_eap_rsne, fake_wpa1_ie, fake_wpa2_enterprise_rsne, fake_wpa2_rsne,
+    fake_wpa2_tkip_ccmp_rsne, fake_wpa2_tkip_only_rsne, fake_wpa2_wpa3_rsne,
+    fake_wpa3_enterprise_192_bit_rsne, fake_wpa3_rsne, fake_wpa3_transition_rsne,
+};
+use anyhow::Context;
+use ieee80211::Ssid;
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
+use rand::distributions::{Distribution, Standard};
+use rand::Rng;
 use {
-    crate::{
-        channel::{Cbw, Channel},
-        ie::{self, fake_ies::fake_wmm_param, write_wmm_param, IeType},
-        mac,
-        test_utils::fake_frames::{
-            fake_eap_rsne, fake_wpa1_ie, fake_wpa2_enterprise_rsne, fake_wpa2_rsne,
-            fake_wpa2_tkip_ccmp_rsne, fake_wpa2_tkip_only_rsne, fake_wpa2_wpa3_rsne,
-            fake_wpa3_enterprise_192_bit_rsne, fake_wpa3_rsne, fake_wpa3_transition_rsne,
-        },
-    },
-    anyhow::Context,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
-    ieee80211::Ssid,
-    num_derive::FromPrimitive,
-    num_traits::FromPrimitive,
-    rand::{
-        distributions::{Distribution, Standard},
-        Rng,
-    },
 };
 
 #[rustfmt::skip]
@@ -519,13 +516,9 @@ macro_rules! random_bss_description {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            bss::{BssDescription, Protection},
-            test_utils::fake_frames::{fake_wmm_param_body, fake_wmm_param_header},
-        },
-    };
+    use super::*;
+    use crate::bss::{BssDescription, Protection};
+    use crate::test_utils::fake_frames::{fake_wmm_param_body, fake_wmm_param_header};
 
     #[test]
     fn check_simplest_macro_use() {

@@ -3,11 +3,9 @@
 // found in the LICENSE file.
 
 use argh::FromArgs;
-use component_debug::{
-    cli::{GraphFilter, GraphOrientation, ListFilter},
-    config::RawConfigOverride,
-    explore::DashNamespaceLayout,
-};
+use component_debug::cli::{GraphFilter, GraphOrientation, ListFilter};
+use component_debug::config::RawConfigOverride;
+use component_debug::explore::DashNamespaceLayout;
 use fuchsia_url::AbsoluteComponentUrl;
 use moniker::Moniker;
 

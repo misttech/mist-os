@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::TEST_REPO_URL,
-    fuchsia_url::{AbsolutePackageUrl, PackageName, UnpinnedAbsolutePackageUrl},
-    scrutiny::model::model::DataModel,
-    scrutiny_config::ModelConfig,
-    std::{str::FromStr, sync::Arc},
-    tempfile::tempdir,
-};
+use crate::TEST_REPO_URL;
+use fuchsia_url::{AbsolutePackageUrl, PackageName, UnpinnedAbsolutePackageUrl};
+use scrutiny::model::model::DataModel;
+use scrutiny_config::ModelConfig;
+use std::str::FromStr;
+use std::sync::Arc;
+use tempfile::tempdir;
 
 /// Creates a simple fake model configuration that uses an in memory uri and
 /// tempdata() directories for the required build locations.

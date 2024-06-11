@@ -9,13 +9,12 @@ use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::{Stream, StreamExt};
 use lazy_static::lazy_static;
 use selectors::SelectorExt;
-use std::{
-    cmp::Ordering,
-    fmt::Debug,
-    pin::Pin,
-    sync::{atomic::AtomicUsize, Arc},
-    task::{Context, Poll},
-};
+use std::cmp::Ordering;
+use std::fmt::Debug;
+use std::pin::Pin;
+use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
+use std::task::{Context, Poll};
 use tracing::trace;
 
 pub type PinStream<I> = Pin<Box<dyn DebugStream<Item = I> + Send + 'static>>;
@@ -258,7 +257,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::{prelude::*, stream::iter as iter2stream};
+    use futures::prelude::*;
+    use futures::stream::iter as iter2stream;
     use selectors::FastError;
 
     #[fuchsia::test]

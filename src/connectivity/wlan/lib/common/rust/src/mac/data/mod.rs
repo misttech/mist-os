@@ -6,17 +6,17 @@ mod amsdu;
 mod fields;
 mod msdu;
 
-pub use {amsdu::*, fields::*, msdu::*};
+pub use amsdu::*;
+pub use fields::*;
+pub use msdu::*;
 
 /// Test harnesses and fixtures.
 #[cfg(test)]
 pub mod harness {
-    use {
-        super::*,
-        itertools::{EitherOrBoth, Itertools},
-        std::fmt::Debug,
-        zerocopy::ByteSlice,
-    };
+    use super::*;
+    use itertools::{EitherOrBoth, Itertools};
+    use std::fmt::Debug;
+    use zerocopy::ByteSlice;
 
     pub fn assert_msdus_exactly_one_eq<M, E>(
         msdus: impl IntoIterator<Item = Msdu<M>>,
@@ -76,10 +76,8 @@ pub mod harness {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::mac,
-        crate::{assert_variant, test_utils::fake_frames::*},
-    };
+    use crate::test_utils::fake_frames::*;
+    use crate::{assert_variant, mac};
 
     #[test]
     fn parse_data_frame() {

@@ -6,82 +6,77 @@
 
 #![cfg(any(test, feature = "testutils"))]
 
+use alloc::borrow::ToOwned;
+use alloc::collections::HashMap;
+use alloc::sync::Arc;
 use alloc::vec;
-use alloc::{borrow::ToOwned, collections::HashMap, sync::Arc, vec::Vec};
+use alloc::vec::Vec;
 use assert_matches::assert_matches;
 
-use core::{
-    borrow::Borrow,
-    convert::Infallible as Never,
-    ffi::CStr,
-    fmt::Debug,
-    hash::Hash,
-    ops::{Deref, DerefMut},
-    time::Duration,
-};
+use core::borrow::Borrow;
+use core::convert::Infallible as Never;
+use core::ffi::CStr;
+use core::fmt::Debug;
+use core::hash::Hash;
+use core::ops::{Deref, DerefMut};
+use core::time::Duration;
 
 use derivative::Derivative;
-use net_types::{
-    ethernet::Mac,
-    ip::{
-        AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion,
-        Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu, Subnet, SubnetEither,
-    },
-    MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
+use net_types::ethernet::Mac;
+use net_types::ip::{
+    AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion,
+    Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu, Subnet, SubnetEither,
+};
+use net_types::{MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _};
+use netstack3_base::sync::{DynDebugReferences, Mutex};
+use netstack3_base::testutil::{
+    FakeCryptoRng, FakeFrameCtx, FakeInstant, FakeNetwork, FakeNetworkLinks, FakeNetworkSpec,
+    FakeTimerCtx, FakeTimerCtxExt, MonotonicIdentifier, TestAddrs, WithFakeFrameContext,
+    WithFakeTimerContext,
 };
 use netstack3_base::{
-    sync::{DynDebugReferences, Mutex},
-    testutil::{
-        FakeCryptoRng, FakeFrameCtx, FakeInstant, FakeNetwork, FakeNetworkLinks, FakeNetworkSpec,
-        FakeTimerCtx, FakeTimerCtxExt, MonotonicIdentifier, TestAddrs, WithFakeFrameContext,
-        WithFakeTimerContext,
-    },
     AddressResolutionFailed, CtxPair, DeferredResourceRemovalContext, EventContext,
     FrameDestination, InstantBindingsTypes, InstantContext, LinkDevice, NotFoundError,
     ReferenceNotifiers, RemoveResourceResult, RngContext, TimerBindingsTypes, TimerContext,
     TimerHandler, TracingContext, WorkQueueReport,
 };
+use netstack3_device::ethernet::{
+    EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
+    RecvEthernetFrameMeta,
+};
+use netstack3_device::loopback::{LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId};
+use netstack3_device::pure_ip::{PureIpDeviceId, PureIpWeakDeviceId};
+use netstack3_device::queue::{ReceiveQueueBindingsContext, TransmitQueueBindingsContext};
+use netstack3_device::socket::{DeviceSocketBindingsContext, DeviceSocketTypes};
+use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_device::{
-    self as device,
-    ethernet::{
-        EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
-        RecvEthernetFrameMeta,
-    },
-    loopback::{LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId},
-    pure_ip::{PureIpDeviceId, PureIpWeakDeviceId},
-    queue::{ReceiveQueueBindingsContext, TransmitQueueBindingsContext},
-    socket::{DeviceSocketBindingsContext, DeviceSocketTypes},
-    testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-    DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceLayerTypes,
+    self as device, DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceLayerTypes,
     DeviceSendFrameError, WeakDeviceId,
 };
 use netstack3_filter::{FilterBindingsTypes, FilterTimerId};
 use netstack3_icmp_echo::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId};
+use netstack3_ip::device::{
+    IpDeviceConfiguration, IpDeviceConfigurationUpdate, IpDeviceEvent,
+    Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+};
+use netstack3_ip::nud::{self, LinkResolutionContext, LinkResolutionNotifier};
+use netstack3_ip::raw::{RawIpSocketId, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes};
 use netstack3_ip::{
-    self as ip,
-    device::{
-        IpDeviceConfiguration, IpDeviceConfigurationUpdate, IpDeviceEvent,
-        Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
-    },
-    nud::{self, LinkResolutionContext, LinkResolutionNotifier},
-    raw::{RawIpSocketId, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes},
-    AddRouteError, AddableEntryEither, AddableMetric, IpLayerEvent, IpLayerTimerId, RawMetric,
+    self as ip, AddRouteError, AddableEntryEither, AddableMetric, IpLayerEvent, IpLayerTimerId,
+    RawMetric,
 };
-use netstack3_tcp::{
-    testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer},
-    BufferSizes, RingBuffer, TcpBindingsTypes,
-};
+use netstack3_tcp::testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer};
+use netstack3_tcp::{BufferSizes, RingBuffer, TcpBindingsTypes};
 use netstack3_udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId};
 use packet::{Buf, BufferMut};
 use zerocopy::ByteSlice;
 
-use crate::{
-    api::CoreApi,
-    context::{prelude::*, UnlockedCoreCtx},
-    state::{StackState, StackStateBuilder},
-    time::{TimerId, TimerIdInner},
-    BindingsContext, BindingsTypes, IpExt,
-};
+use crate::api::CoreApi;
+use crate::context::prelude::*;
+use crate::context::UnlockedCoreCtx;
+use crate::state::{StackState, StackStateBuilder};
+use crate::time::{TimerId, TimerIdInner};
+use crate::{BindingsContext, BindingsTypes, IpExt};
 
 /// The default interface routing metric for test interfaces.
 pub const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);

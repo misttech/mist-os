@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::error::RightsRoutingError;
+use crate::walk_state::WalkStateUnit;
+use fidl_fuchsia_io as fio;
 #[cfg(feature = "serde")]
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
-use {
-    crate::{error::RightsRoutingError, walk_state::WalkStateUnit},
-    fidl_fuchsia_io as fio,
-    std::fmt,
-};
+use std::fmt;
 
 /// All the fio rights required to represent fio::OpenFlags::RIGHT_READABLE.
 const LEGACY_READABLE_RIGHTS: fio::Operations = fio::Operations::empty()

@@ -5,18 +5,17 @@
 //! Clidoc generates documentation for host tool commands consisting of their --help output.
 use anyhow::{bail, Context, Result};
 use argh::FromArgs;
-use flate2::{write::GzEncoder, Compression};
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use lazy_static::lazy_static;
-use std::{
-    collections::{HashMap, HashSet},
-    env,
-    ffi::{OsStr, OsString},
-    fs::{self, File},
-    io::{BufWriter, Write},
-    path::{Path, PathBuf},
-    process::Command,
-    sync::Once,
-};
+use std::collections::{HashMap, HashSet};
+use std::env;
+use std::ffi::{OsStr, OsString};
+use std::fs::{self, File};
+use std::io::{BufWriter, Write};
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::sync::Once;
 use tar::Builder;
 use tracing::{debug, info};
 

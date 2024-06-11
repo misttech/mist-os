@@ -2,45 +2,42 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::key_util::get_input_sequence_for_key_event,
-    crate::ui::{
-        PointerEventResponse, ScrollContext, TerminalConfig, TerminalFacet, TerminalMessages,
-        TerminalScene,
-    },
-    anyhow::{Context as _, Error},
-    carnelian::{
-        color::Color,
-        drawing::load_font,
-        input::{self},
-        render::Context as RenderContext,
-        scene::{
-            facets::FacetId,
-            scene::{Scene, SceneBuilder, SceneOrder},
-        },
-        AppSender, Message, Size, ViewAssistant, ViewAssistantContext, ViewKey,
-    },
-    euclid::size2,
-    fidl_fuchsia_hardware_pty::WindowSize,
-    fuchsia_async as fasync, fuchsia_trace as ftrace,
-    futures::{channel::mpsc, io::AsyncReadExt, select, FutureExt, StreamExt},
-    pty::ServerPty,
-    std::{
-        any::Any, cell::RefCell, ffi::CStr, ffi::CString, fs::File, io::prelude::*, path::PathBuf,
-        rc::Rc,
-    },
-    term_model::{
-        ansi::Processor,
-        clipboard::Clipboard,
-        event::{Event, EventListener},
-        grid::Scroll,
-        index::{Column, Line, Point},
-        term::{SizeInfo, TermMode},
-        Term,
-    },
-    terminal::{cell_size_from_cell_height, get_scale_factor, FontSet},
-    tracing::error,
+use crate::key_util::get_input_sequence_for_key_event;
+use crate::ui::{
+    PointerEventResponse, ScrollContext, TerminalConfig, TerminalFacet, TerminalMessages,
+    TerminalScene,
 };
+use anyhow::{Context as _, Error};
+use carnelian::color::Color;
+use carnelian::drawing::load_font;
+use carnelian::input::{self};
+use carnelian::render::Context as RenderContext;
+use carnelian::scene::facets::FacetId;
+use carnelian::scene::scene::{Scene, SceneBuilder, SceneOrder};
+use carnelian::{AppSender, Message, Size, ViewAssistant, ViewAssistantContext, ViewKey};
+use euclid::size2;
+use fidl_fuchsia_hardware_pty::WindowSize;
+use futures::channel::mpsc;
+use futures::io::AsyncReadExt;
+use futures::{select, FutureExt, StreamExt};
+use pty::ServerPty;
+use std::any::Any;
+use std::cell::RefCell;
+use std::ffi::{CStr, CString};
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::PathBuf;
+use std::rc::Rc;
+use term_model::ansi::Processor;
+use term_model::clipboard::Clipboard;
+use term_model::event::{Event, EventListener};
+use term_model::grid::Scroll;
+use term_model::index::{Column, Line, Point};
+use term_model::term::{SizeInfo, TermMode};
+use term_model::Term;
+use terminal::{cell_size_from_cell_height, get_scale_factor, FontSet};
+use tracing::error;
+use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
 // Font files.
 const FONT: &'static str = "/pkg/data/font.ttf";
@@ -716,13 +713,11 @@ impl ViewAssistant for TerminalViewAssistant {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::anyhow,
-        fuchsia_async::{DurationExt, Timer},
-        fuchsia_zircon::DurationNum,
-        futures::future::Either,
-    };
+    use super::*;
+    use anyhow::anyhow;
+    use fuchsia_async::{DurationExt, Timer};
+    use fuchsia_zircon::DurationNum;
+    use futures::future::Either;
 
     fn unit_metrics() -> Size {
         Size::new(1.0, 1.0)

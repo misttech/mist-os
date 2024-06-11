@@ -2,19 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use fidl::endpoints::ProtocolMarker;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::LocalComponentHandles;
+use fuchsia_url::{ComponentUrl, PackageUrl};
+use futures::{StreamExt, TryStreamExt};
+use itertools::Itertools;
+use std::collections::HashSet;
+use std::sync::Arc;
+use tracing::warn;
 use {
-    anyhow::Error,
-    diagnostics_log as flog,
-    fidl::endpoints::ProtocolMarker,
-    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_logger as flogger,
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::LocalComponentHandles,
-    fuchsia_url::{ComponentUrl, PackageUrl},
-    futures::{StreamExt, TryStreamExt},
-    itertools::Itertools,
-    std::{collections::HashSet, sync::Arc},
-    tracing::warn,
+    diagnostics_log as flog, fidl_fuchsia_component_resolution as fresolution,
+    fidl_fuchsia_logger as flogger, fuchsia_async as fasync,
 };
 
 type LogSubscriber = dyn tracing::Subscriber + std::marker::Send + std::marker::Sync + 'static;

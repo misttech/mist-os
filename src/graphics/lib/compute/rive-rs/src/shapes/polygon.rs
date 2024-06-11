@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{cmp::Ordering, rc::Rc};
+use std::cmp::Ordering;
+use std::rc::Rc;
 
-use crate::{
-    component::Component,
-    component_dirt::ComponentDirt,
-    core::{Core, Object, ObjectRef, OnAdded, Property},
-    dyn_vec::DynVec,
-    shapes::{ParametricPath, Path, PathVertex, StraightVertex},
-};
+use crate::component::Component;
+use crate::component_dirt::ComponentDirt;
+use crate::core::{Core, Object, ObjectRef, OnAdded, Property};
+use crate::dyn_vec::DynVec;
+use crate::shapes::{ParametricPath, Path, PathVertex, StraightVertex};
 
 #[derive(Debug, Default)]
 pub struct Polygon {

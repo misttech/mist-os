@@ -8,13 +8,12 @@
 
 #![doc(html_no_source)]
 
-use quote::quote;
-use quote::ToTokens;
+use quote::{quote, ToTokens};
 use std::str::Chars;
 use syn::parse::{Parse, ParseStream};
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, DeriveInput, GenericParam, LifetimeDef, LitStr};
-use syn::{punctuated::Punctuated, Token};
+use syn::{parse_macro_input, DeriveInput, GenericParam, LifetimeDef, LitStr, Token};
 
 const SPINEL_DATATYPE_VOID_C: char = '.';
 const SPINEL_DATATYPE_BOOL_C: char = 'b';

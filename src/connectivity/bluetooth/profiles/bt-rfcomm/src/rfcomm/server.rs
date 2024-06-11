@@ -3,20 +3,20 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Error};
-use bt_rfcomm::{profile::build_rfcomm_protocol, ServerChannel};
+use bt_rfcomm::profile::build_rfcomm_protocol;
+use bt_rfcomm::ServerChannel;
 use fidl::prelude::*;
 use fidl_fuchsia_bluetooth::ErrorCode;
-use fidl_fuchsia_bluetooth_bredr as bredr;
 use fidl_fuchsia_bluetooth_rfcomm_test::RfcommTestRequest;
-use fuchsia_async as fasync;
 use fuchsia_bluetooth::detachable_map::DetachableMap;
 use fuchsia_bluetooth::types::{Channel, PeerId};
-use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::{AttachError, Inspect};
-use futures::{lock::Mutex, FutureExt};
+use futures::lock::Mutex;
+use futures::FutureExt;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tracing::{debug, info, trace, warn};
+use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync, fuchsia_inspect as inspect};
 
 use crate::rfcomm::session::Session;
 use crate::rfcomm::types::{status_to_rls_error, SignaledTask};
@@ -289,13 +289,16 @@ mod tests {
 
     use assert_matches::assert_matches;
     use async_utils::PollExt;
-    use bt_rfcomm::{frame::mux_commands::*, frame::*, Role, DLCI};
+    use bt_rfcomm::frame::mux_commands::*;
+    use bt_rfcomm::frame::*;
+    use bt_rfcomm::{Role, DLCI};
     use diagnostics_assertions::assert_data_tree;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream};
     use fidl_fuchsia_bluetooth_bredr::ConnectionReceiverMarker;
     use fuchsia_async as fasync;
     use fuchsia_inspect_derive::WithInspect;
-    use futures::{task::Poll, AsyncWriteExt, StreamExt};
+    use futures::task::Poll;
+    use futures::{AsyncWriteExt, StreamExt};
     use std::pin::pin;
 
     use crate::rfcomm::test_util::{expect_frame_received_by_peer, send_peer_frame};

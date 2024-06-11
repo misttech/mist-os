@@ -2,20 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    assert_matches::assert_matches,
-    component_debug::{
-        capability,
-        cli::*,
-        config::{resolve_raw_config_overrides, RawConfigOverride},
-        realm::{get_resolved_declaration, resolve_declaration},
-        route::{DeclType, RouteReport},
-    },
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys,
-    fuchsia_component::client::connect_to_protocol,
-    moniker::Moniker,
-    std::str::FromStr,
-};
+use assert_matches::assert_matches;
+use component_debug::capability;
+use component_debug::cli::*;
+use component_debug::config::{resolve_raw_config_overrides, RawConfigOverride};
+use component_debug::realm::{get_resolved_declaration, resolve_declaration};
+use component_debug::route::{DeclType, RouteReport};
+use fuchsia_component::client::connect_to_protocol;
+use moniker::Moniker;
+use std::str::FromStr;
+use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
 
 #[fuchsia::test]
 async fn list() {

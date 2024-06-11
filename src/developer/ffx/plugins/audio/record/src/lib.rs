@@ -6,12 +6,10 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use blocking::Unblock;
 use ffx_audio_record_args::{AudioCaptureUsageExtended, RecordCommand};
-use fho::ToolIO;
-use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fho::{moniker, FfxMain, FfxTool, SimpleWriter, ToolIO};
 use fidl::endpoints::create_proxy;
-use fidl_fuchsia_audio_controller as fac;
-use fidl_fuchsia_media as fmedia;
 use futures::{AsyncWrite, FutureExt};
+use {fidl_fuchsia_audio_controller as fac, fidl_fuchsia_media as fmedia};
 
 #[derive(FfxTool)]
 pub struct RecordTool {

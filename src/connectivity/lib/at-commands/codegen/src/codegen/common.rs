@@ -6,7 +6,8 @@
 
 #![macro_use]
 
-use {super::error::Result, std::io};
+use super::error::Result;
+use std::io;
 
 pub mod type_names {
     pub static HIGHLEVEL_COMMAND_TYPE: &str = "Command";

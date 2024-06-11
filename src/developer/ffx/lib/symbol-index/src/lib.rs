@@ -7,11 +7,9 @@ use errors::ffx_error;
 use glob::glob as _glob;
 use sdk::Sdk;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashSet,
-    fs::File,
-    path::{Path, PathBuf},
-};
+use std::collections::HashSet;
+use std::fs::File;
+use std::path::{Path, PathBuf};
 
 pub fn global_symbol_index_path() -> Result<String> {
     Ok(pathbuf_to_string(home::home_dir().ok_or(anyhow!("cannot find home directory"))?)?

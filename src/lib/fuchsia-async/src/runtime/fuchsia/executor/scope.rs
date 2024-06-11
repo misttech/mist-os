@@ -6,18 +6,14 @@
 #![doc(hidden)]
 
 use super::common::{Executor, Task};
-use fuchsia_sync::Mutex;
-use fuchsia_sync::MutexGuard;
+use fuchsia_sync::{Mutex, MutexGuard};
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
-use std::{
-    borrow::Borrow,
-    fmt,
-    future::Future,
-    hash,
-    ops::Deref,
-    sync::{Arc, Weak},
-    task::{Context, Poll, Waker},
-};
+use std::borrow::Borrow;
+use std::future::Future;
+use std::ops::Deref;
+use std::sync::{Arc, Weak};
+use std::task::{Context, Poll, Waker};
+use std::{fmt, hash};
 
 /// A unique handle to a scope.
 ///

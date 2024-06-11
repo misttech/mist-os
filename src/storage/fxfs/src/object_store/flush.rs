@@ -4,32 +4,24 @@
 
 // This module is responsible for flushing (a.k.a. compacting) the object store trees.
 
-use {
-    crate::{
-        filesystem::TxnGuard,
-        log::*,
-        lsm_tree::{
-            layers_from_handles,
-            types::{ItemRef, LayerIterator},
-            LSMTree,
-        },
-        object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID},
-        object_store::{
-            extent_record::ExtentValue,
-            layer_size_from_encrypted_mutations_size,
-            object_manager::{ObjectManager, ReservationUpdate},
-            object_record::{ObjectKey, ObjectValue},
-            transaction::{lock_keys, AssociatedObject, LockKey, Mutation},
-            tree, AssocObj, DirectWriter, EncryptedMutations, HandleOptions, LockState,
-            ObjectStore, Options, StoreInfo, Transaction, MAX_ENCRYPTED_MUTATIONS_SIZE,
-        },
-        serialized_types::{Version, VersionedLatest},
-    },
-    anyhow::Context,
-    anyhow::Error,
-    once_cell::sync::OnceCell,
-    std::sync::atomic::Ordering,
+use crate::filesystem::TxnGuard;
+use crate::log::*;
+use crate::lsm_tree::types::{ItemRef, LayerIterator};
+use crate::lsm_tree::{layers_from_handles, LSMTree};
+use crate::object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID};
+use crate::object_store::extent_record::ExtentValue;
+use crate::object_store::object_manager::{ObjectManager, ReservationUpdate};
+use crate::object_store::object_record::{ObjectKey, ObjectValue};
+use crate::object_store::transaction::{lock_keys, AssociatedObject, LockKey, Mutation};
+use crate::object_store::{
+    layer_size_from_encrypted_mutations_size, tree, AssocObj, DirectWriter, EncryptedMutations,
+    HandleOptions, LockState, ObjectStore, Options, StoreInfo, Transaction,
+    MAX_ENCRYPTED_MUTATIONS_SIZE,
 };
+use crate::serialized_types::{Version, VersionedLatest};
+use anyhow::{Context, Error};
+use once_cell::sync::OnceCell;
+use std::sync::atomic::Ordering;
 
 #[derive(Debug)]
 pub enum Reason {
@@ -434,21 +426,16 @@ impl ObjectStore {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::{
-            filesystem::{FxFilesystem, FxFilesystemBuilder, JournalingObject, SyncOptions},
-            object_handle::ObjectHandle,
-            object_store::{
-                directory::Directory,
-                transaction::{lock_keys, Options},
-                volume::root_volume,
-                HandleOptions, LockKey, ObjectStore,
-            },
-        },
-        fxfs_insecure_crypto::InsecureCrypt,
-        std::sync::Arc,
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
-    };
+    use crate::filesystem::{FxFilesystem, FxFilesystemBuilder, JournalingObject, SyncOptions};
+    use crate::object_handle::ObjectHandle;
+    use crate::object_store::directory::Directory;
+    use crate::object_store::transaction::{lock_keys, Options};
+    use crate::object_store::volume::root_volume;
+    use crate::object_store::{HandleOptions, LockKey, ObjectStore};
+    use fxfs_insecure_crypto::InsecureCrypt;
+    use std::sync::Arc;
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::DeviceHolder;
 
     async fn run_key_roll_test(flush_before_unlock: bool) {
         let device = DeviceHolder::new(FakeDevice::new(8192, 1024));

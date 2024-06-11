@@ -2,26 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{format_sources, get_policy, unseal_sources, KeyConsumer},
-    anyhow::{anyhow, Context, Error},
-    fidl::endpoints::{ClientEnd, Proxy},
-    fidl_fuchsia_component::{self as fcomponent, RealmMarker},
-    fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions},
-    fidl_fuchsia_io as fio,
-    fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingVolume},
-    fuchsia_component::client::{
-        connect_to_protocol, connect_to_protocol_at_dir_root, open_childs_exposed_directory,
-    },
-    fuchsia_zircon as zx,
-    key_bag::{Aes256Key, KeyBagManager, WrappingKey, AES128_KEY_SIZE, AES256_KEY_SIZE},
-    std::{
-        ops::Deref,
-        path::Path,
-        sync::atomic::{AtomicU64, Ordering},
-    },
+use super::{format_sources, get_policy, unseal_sources, KeyConsumer};
+use anyhow::{anyhow, Context, Error};
+use fidl::endpoints::{ClientEnd, Proxy};
+use fidl_fuchsia_component::{self as fcomponent, RealmMarker};
+use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions};
+use fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingVolume};
+use fuchsia_component::client::{
+    connect_to_protocol, connect_to_protocol_at_dir_root, open_childs_exposed_directory,
 };
+use key_bag::{Aes256Key, KeyBagManager, WrappingKey, AES128_KEY_SIZE, AES256_KEY_SIZE};
+use std::ops::Deref;
+use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
+use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 async fn unwrap_or_create_keys(
     mut keybag: KeyBagManager,

@@ -5,54 +5,50 @@
 //! A module for managing RTM_ROUTE information by receiving RTM_ROUTE
 //! Netlink messages and maintaining route table state from Netstack.
 
-use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
-    fmt::Debug,
-    hash::{Hash, Hasher},
-    num::{NonZeroU32, NonZeroU64},
-};
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
+use std::fmt::Debug;
+use std::hash::{Hash, Hasher};
+use std::num::{NonZeroU32, NonZeroU64};
 
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_net_interfaces_admin::{
     self as fnet_interfaces_admin, ProofOfInterfaceAuthorization,
 };
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_root as fnet_root;
-use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_admin::RouteSetError;
-use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
+use {
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_root as fnet_root,
+    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext,
+};
 
 use derivative::Derivative;
-use futures::{channel::oneshot, StreamExt as _};
+use futures::channel::oneshot;
+use futures::StreamExt as _;
 use itertools::Itertools as _;
 use linux_uapi::{
     rt_class_t_RT_TABLE_COMPAT, rt_class_t_RT_TABLE_MAIN, rtnetlink_groups_RTNLGRP_IPV4_ROUTE,
     rtnetlink_groups_RTNLGRP_IPV6_ROUTE,
 };
-use net_types::{
-    ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Subnet},
-    SpecifiedAddr, SpecifiedAddress as _, Witness as _,
-};
+use net_types::ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Subnet};
+use net_types::{SpecifiedAddr, SpecifiedAddress as _, Witness as _};
 use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
-use netlink_packet_route::{
-    route::{
-        RouteAddress, RouteAttribute, RouteHeader, RouteMessage, RouteProtocol, RouteScope,
-        RouteType,
-    },
-    AddressFamily, RouteNetlinkMessage,
+use netlink_packet_route::route::{
+    RouteAddress, RouteAttribute, RouteHeader, RouteMessage, RouteProtocol, RouteScope, RouteType,
 };
-use netlink_packet_utils::{nla::Nla, DecodeError};
+use netlink_packet_route::{AddressFamily, RouteNetlinkMessage};
+use netlink_packet_utils::nla::Nla;
+use netlink_packet_utils::DecodeError;
 
-use crate::{
-    client::{ClientTable, InternalClient},
-    errors::WorkerInitializationError,
-    logging::{log_debug, log_error, log_warn},
-    messaging::Sender,
-    multicast_groups::ModernGroup,
-    netlink_packet::{errno::Errno, UNSPECIFIED_SEQUENCE_NUMBER},
-    protocol_family::{route::NetlinkRoute, ProtocolFamily},
-    util::respond_to_completer,
-};
+use crate::client::{ClientTable, InternalClient};
+use crate::errors::WorkerInitializationError;
+use crate::logging::{log_debug, log_error, log_warn};
+use crate::messaging::Sender;
+use crate::multicast_groups::ModernGroup;
+use crate::netlink_packet::errno::Errno;
+use crate::netlink_packet::UNSPECIFIED_SEQUENCE_NUMBER;
+use crate::protocol_family::route::NetlinkRoute;
+use crate::protocol_family::ProtocolFamily;
+use crate::util::respond_to_completer;
 
 // TODO(https://fxbug.dev/336382905): Remove special constant and rely on table
 // ids provided by the Netstack.
@@ -1505,30 +1501,25 @@ mod tests {
     use super::*;
 
     use fidl::endpoints::{ControlHandle, RequestStream};
-    use fidl_fuchsia_net_routes as fnet_routes;
-    use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
+    use {
+        fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+    };
 
     use assert_matches::assert_matches;
-    use futures::{
-        channel::mpsc,
-        future::{Future, FutureExt as _},
-        stream::BoxStream,
-        SinkExt as _, Stream,
-    };
+    use futures::channel::mpsc;
+    use futures::future::{Future, FutureExt as _};
+    use futures::stream::BoxStream;
+    use futures::{SinkExt as _, Stream};
     use linux_uapi::rtnetlink_groups_RTNLGRP_LINK;
     use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
-    use net_types::{
-        ip::{GenericOverIp, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
-        SpecifiedAddr,
-    };
+    use net_types::ip::{GenericOverIp, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+    use net_types::SpecifiedAddr;
     use netlink_packet_core::NetlinkPayload;
     use std::pin::pin;
     use test_case::test_case;
 
-    use crate::{
-        interfaces::testutil::FakeInterfacesHandler,
-        messaging::testutil::{FakeSender, SentMessage},
-    };
+    use crate::interfaces::testutil::FakeInterfacesHandler;
+    use crate::messaging::testutil::{FakeSender, SentMessage};
 
     const V4_DFLT: Subnet<Ipv4Addr> = net_subnet_v4!("0.0.0.0/0");
     const V4_SUB1: Subnet<Ipv4Addr> = net_subnet_v4!("192.0.2.0/32");

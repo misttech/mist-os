@@ -2,52 +2,41 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::client::roaming::local_roam_manager::{LocalRoamManager, LocalRoamManagerService};
+use crate::client::{connection_selection, scan, serve_provider_requests, types};
+use crate::config_management::{SavedNetworksManager, SavedNetworksManagerApi};
+use crate::legacy;
+use crate::mode_management::iface_manager_api::IfaceManagerApi;
+use crate::mode_management::phy_manager::{PhyManager, PhyManagerApi};
+use crate::mode_management::{create_iface_manager, device_monitor, recovery};
+use crate::telemetry::{TelemetryEvent, TelemetrySender};
+use crate::util::listener;
+use crate::util::testing::{create_inspect_persistence_channel, run_while};
+use anyhow::{format_err, Error};
+use fidl::endpoints::{create_proxy, create_request_stream};
+use fidl_fuchsia_wlan_device_service::DeviceWatcherEvent;
+use fuchsia_async::{self as fasync, TestExecutor};
+use fuchsia_inspect::{self as inspect};
+use futures::channel::mpsc;
+use futures::future::{join_all, JoinAll};
+use futures::lock::Mutex;
+use futures::prelude::*;
+use futures::stream::StreamExt;
+use futures::task::Poll;
+use lazy_static::lazy_static;
+use std::convert::Infallible;
+use std::pin::{pin, Pin};
+use std::sync::Arc;
+use test_case::test_case;
+use tracing::{debug, info, trace};
+use wlan_common::scan::write_vmo;
+use wlan_common::test_utils::ExpectWithin;
+use wlan_common::{assert_variant, random_fidl_bss_description};
 use {
-    crate::{
-        client::{
-            connection_selection,
-            roaming::local_roam_manager::{LocalRoamManager, LocalRoamManagerService},
-            scan, serve_provider_requests, types,
-        },
-        config_management::{SavedNetworksManager, SavedNetworksManagerApi},
-        legacy,
-        mode_management::{
-            create_iface_manager, device_monitor,
-            iface_manager_api::IfaceManagerApi,
-            phy_manager::{PhyManager, PhyManagerApi},
-            recovery,
-        },
-        telemetry::{TelemetryEvent, TelemetrySender},
-        util::listener,
-        util::testing::{create_inspect_persistence_channel, run_while},
-    },
-    anyhow::{format_err, Error},
-    fidl::endpoints::{create_proxy, create_request_stream},
     fidl_fuchsia_stash as fidl_stash, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_common_security as fidl_common_security,
-    fidl_fuchsia_wlan_device_service::DeviceWatcherEvent,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_async::{self as fasync, TestExecutor},
-    fuchsia_inspect::{self as inspect},
-    fuchsia_zircon as zx,
-    futures::{
-        channel::mpsc,
-        future::{join_all, JoinAll},
-        lock::Mutex,
-        prelude::*,
-        stream::StreamExt,
-        task::Poll,
-    },
-    hex,
-    lazy_static::lazy_static,
-    std::pin::pin,
-    std::{convert::Infallible, pin::Pin, sync::Arc},
-    test_case::test_case,
-    tracing::{debug, info, trace},
-    wlan_common::{
-        assert_variant, random_fidl_bss_description, scan::write_vmo, test_utils::ExpectWithin,
-    },
+    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx, hex,
 };
 
 pub const TEST_CLIENT_IFACE_ID: u16 = 42;

@@ -2,20 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{events::types::*, identity::ComponentIdentity};
+use crate::events::types::*;
+use crate::identity::ComponentIdentity;
 use fuchsia_inspect::{self as inspect, NumericProperty};
-use fuchsia_inspect_contrib::{inspect_log, nodes::BoundedListNode};
-use futures::{
-    channel::{mpsc, oneshot},
-    task::{Context, Poll},
-    Future, Stream, StreamExt,
-};
+use fuchsia_inspect_contrib::inspect_log;
+use fuchsia_inspect_contrib::nodes::BoundedListNode;
+use futures::channel::{mpsc, oneshot};
+use futures::task::{Context, Poll};
+use futures::{Future, Stream, StreamExt};
 use pin_project::pin_project;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    pin::Pin,
-    sync::{Arc, Weak},
-};
+use std::collections::{BTreeMap, BTreeSet};
+use std::pin::Pin;
+use std::sync::{Arc, Weak};
 use thiserror::Error;
 use tracing::{debug, error};
 
@@ -379,13 +377,12 @@ mod tests {
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_inspect::InspectSinkMarker;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequestStream};
-    use fuchsia_async as fasync;
     use fuchsia_sync::Mutex;
-    use fuchsia_zircon as zx;
     use fuchsia_zircon::AsHandleRef;
     use futures::FutureExt;
     use lazy_static::lazy_static;
     use moniker::ExtendedMoniker;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     const TEST_URL: &str = "NO-OP URL";
     const FAKE_TIMESTAMP: i64 = 5;

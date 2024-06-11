@@ -12,8 +12,9 @@ use fuchsia_async as fasync;
 use fuchsia_component::client;
 use fuchsia_sync::RwLock;
 use futures::stream::StreamExt;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use std::sync::Arc;
-use std::{collections::hash_map::Entry, collections::HashMap};
 use tracing::*;
 
 use crate::bluetooth::types::PeerFactoryMap;

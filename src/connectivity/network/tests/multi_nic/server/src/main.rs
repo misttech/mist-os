@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    io::IoSlice,
-    net::{Ipv6Addr, SocketAddr},
-};
+use std::io::IoSlice;
+use std::net::{Ipv6Addr, SocketAddr};
 
 use fuchsia_async as fasync;
 

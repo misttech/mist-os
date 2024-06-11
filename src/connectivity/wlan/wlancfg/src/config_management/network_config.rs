@@ -2,29 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::client::types as client_types;
+use crate::util::historical_list::{HistoricalList, Timestamped};
+use arbitrary::Arbitrary;
 #[cfg(test)]
 use fidl_fuchsia_wlan_common_security as fidl_security;
-use {
-    crate::{
-        client::types as client_types,
-        util::historical_list::{HistoricalList, Timestamped},
-    },
-    arbitrary::Arbitrary,
-    fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_async as fasync, fuchsia_zircon as zx,
-    std::{
-        cmp::Reverse,
-        collections::{HashMap, HashSet},
-        fmt::{self, Debug},
-    },
-    wlan_common::security::{
-        wep::WepKey,
-        wpa::{
-            credential::{Passphrase, Psk},
-            WpaDescriptor,
-        },
-        SecurityAuthenticator, SecurityDescriptor,
-    },
-};
+use std::cmp::Reverse;
+use std::collections::{HashMap, HashSet};
+use std::fmt::{self, Debug};
+use wlan_common::security::wep::WepKey;
+use wlan_common::security::wpa::credential::{Passphrase, Psk};
+use wlan_common::security::wpa::WpaDescriptor;
+use wlan_common::security::{SecurityAuthenticator, SecurityDescriptor};
+use {fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// The max number of connection results we will store per BSS at a time. For now, this number is
 /// chosen arbitartily.
@@ -796,19 +786,15 @@ pub fn select_authentication_method(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::util::testing::random_connection_data,
-        std::collections::VecDeque,
-        test_case::test_case,
-        wlan_common::assert_variant,
-        wlan_common::security::{
-            wep::WepAuthenticator,
-            wpa::{
-                Authentication, Wpa1Credentials, Wpa2PersonalCredentials, Wpa3PersonalCredentials,
-                WpaAuthenticator,
-            },
-        },
+    use super::*;
+    use crate::util::testing::random_connection_data;
+    use std::collections::VecDeque;
+    use test_case::test_case;
+    use wlan_common::assert_variant;
+    use wlan_common::security::wep::WepAuthenticator;
+    use wlan_common::security::wpa::{
+        Authentication, Wpa1Credentials, Wpa2PersonalCredentials, Wpa3PersonalCredentials,
+        WpaAuthenticator,
     };
 
     #[fuchsia::test]

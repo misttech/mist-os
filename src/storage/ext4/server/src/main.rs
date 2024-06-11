@@ -12,31 +12,29 @@
 //! - Otherwise, the binary implements the `fuchsia.storage.ext4.Server` protocol and runs
 //!   indefinitely to process FIDL messages.
 
-use {
-    anyhow::{format_err, Context as _, Error},
-    ext4_parser::{construct_fs, ConstructFsError, FsSourceType},
-    ext4_read_only::structs::{InvalidAddressErrorType, ParsingError},
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_storage_ext4::{
-        BadDirectory, BadEntryType, BadFile, BannedFeatureIncompat, BlockNumberOutOfBounds,
-        BlockSizeInvalid, DirEntry2NonUtf8, ExtentUnexpectedLength, Incompatible, InvalidAddress,
-        InvalidBlockGroupDesc, InvalidDirEntry2, InvalidExtent, InvalidExtentHeader,
-        InvalidExtentHeaderMagic, InvalidINode, InvalidInputPath, InvalidSuperBlock,
-        InvalidSuperBlockMagic, MountVmoResult, OutOfBoundsDirection, ParseError, PathNotFound,
-        ReaderReadError, RequiredFeatureIncompat, Server_Request, Server_RequestStream,
-        ServiceRequest, Success,
-    },
-    fuchsia_component::server::ServiceFs,
-    fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
-    fuchsia_zircon::{Channel, Vmo},
-    futures::{
-        future::TryFutureExt,
-        stream::{StreamExt, TryStreamExt},
-    },
-    tracing::info,
-    vfs::{directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path},
+use anyhow::{format_err, Context as _, Error};
+use ext4_parser::{construct_fs, ConstructFsError, FsSourceType};
+use ext4_read_only::structs::{InvalidAddressErrorType, ParsingError};
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_storage_ext4::{
+    BadDirectory, BadEntryType, BadFile, BannedFeatureIncompat, BlockNumberOutOfBounds,
+    BlockSizeInvalid, DirEntry2NonUtf8, ExtentUnexpectedLength, Incompatible, InvalidAddress,
+    InvalidBlockGroupDesc, InvalidDirEntry2, InvalidExtent, InvalidExtentHeader,
+    InvalidExtentHeaderMagic, InvalidINode, InvalidInputPath, InvalidSuperBlock,
+    InvalidSuperBlockMagic, MountVmoResult, OutOfBoundsDirection, ParseError, PathNotFound,
+    ReaderReadError, RequiredFeatureIncompat, Server_Request, Server_RequestStream, ServiceRequest,
+    Success,
 };
+use fuchsia_component::server::ServiceFs;
+use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
+use fuchsia_zircon::{Channel, Vmo};
+use futures::future::TryFutureExt;
+use futures::stream::{StreamExt, TryStreamExt};
+use tracing::info;
+use vfs::directory::entry_container::Directory;
+use vfs::execution_scope::ExecutionScope;
+use vfs::path::Path;
 
 async fn run_ext4_server(mut stream: Server_RequestStream) -> Result<(), Error> {
     while let Some(req) = stream.try_next().await.context("Error while reading request")? {

@@ -4,19 +4,17 @@
 
 //! A simple interactive test runner for the GCS lib.
 
-use {
-    anyhow::{Context, Result},
-    fuchsia_hyper::new_https_client,
-    gcs::{
-        auth::{new_access_token, pkce::new_refresh_token, GcsCredentials},
-        client::Client,
-    },
-};
+use anyhow::{Context, Result};
+use fuchsia_hyper::new_https_client;
+use gcs::auth::pkce::new_refresh_token;
+use gcs::auth::{new_access_token, GcsCredentials};
+use gcs::client::Client;
 
 /// A simple test to be sure the base libs haven't changed in an incompatible
 /// way.
 async fn hyper_test() -> Result<()> {
-    use hyper::{body::HttpBody, Body, Method, Request, Response, StatusCode};
+    use hyper::body::HttpBody;
+    use hyper::{Body, Method, Request, Response, StatusCode};
     use std::io::{self, Write};
     println!("hyper_test");
 

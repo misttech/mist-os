@@ -4,28 +4,27 @@
 
 #![cfg(test)]
 
-use std::{borrow::Cow, convert::TryFrom as _, pin::pin};
+use std::borrow::Cow;
+use std::convert::TryFrom as _;
+use std::pin::pin;
 
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_ext as fnet_ext;
-use fidl_fuchsia_net_filter_deprecated as fnetfilter;
-use fidl_fuchsia_net_interfaces_admin as finterfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_root as fnet_root;
-use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use futures::FutureExt as _;
 use net_declare::fidl_subnet;
 use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _};
 use netfilter::FidlReturn as _;
-use netstack_testing_common::{
-    ping as ping_helper,
-    realms::{Netstack2, TestSandboxExt as _},
-    ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
-};
+use netstack_testing_common::realms::{Netstack2, TestSandboxExt as _};
+use netstack_testing_common::{ping as ping_helper, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT};
 use netstack_testing_macros::netstack_test;
 use test_case::test_case;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext,
+    fidl_fuchsia_net_filter_deprecated as fnetfilter,
+    fidl_fuchsia_net_interfaces_admin as finterfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_root as fnet_root,
+    fidl_fuchsia_net_stack as fnet_stack,
+};
 
 pub enum NatNic {
     RouterNic1,

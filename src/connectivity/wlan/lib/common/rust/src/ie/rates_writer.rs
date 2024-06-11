@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        appendable::Appendable,
-        error::FrameWriteError,
-        ie::{
-            write_extended_supported_rates, write_supported_rates,
-            EXTENDED_SUPPORTED_RATES_MAX_LEN, SUPPORTED_RATES_MAX_LEN,
-        },
-    },
-    zerocopy::ByteSlice,
+use crate::appendable::Appendable;
+use crate::error::FrameWriteError;
+use crate::ie::{
+    write_extended_supported_rates, write_supported_rates, EXTENDED_SUPPORTED_RATES_MAX_LEN,
+    SUPPORTED_RATES_MAX_LEN,
 };
+use zerocopy::ByteSlice;
 
 pub struct RatesWriter<S>(S);
 

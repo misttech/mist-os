@@ -4,13 +4,13 @@
 
 //! Type definitions for common errors related to running component or tests.
 
-use {
-    crate::{elf::ComponentError, elf::KernelError, launch::LaunchError, logs::LogError},
-    fuchsia_zircon as zx,
-    namespace::NamespaceError,
-    std::sync::Arc,
-    thiserror::Error,
-};
+use crate::elf::{ComponentError, KernelError};
+use crate::launch::LaunchError;
+use crate::logs::LogError;
+use fuchsia_zircon as zx;
+use namespace::NamespaceError;
+use std::sync::Arc;
+use thiserror::Error;
 
 /// Error encountered while enumerating test.
 ///

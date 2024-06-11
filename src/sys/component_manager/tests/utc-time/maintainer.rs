@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_componentmanager_test as ftest;
-use fidl_fuchsia_time as ftime;
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_component::{client, server};
 use fuchsia_zircon::{ClockUpdate, Duration, Signals, Status, Time};
 use futures::StreamExt;
 use test_util::assert_geq;
 use tracing::*;
+use {fidl_componentmanager_test as ftest, fidl_fuchsia_time as ftime};
 
 enum ExposedServices {
     TestOutcome(ftest::TestOutcomeReportRequestStream),

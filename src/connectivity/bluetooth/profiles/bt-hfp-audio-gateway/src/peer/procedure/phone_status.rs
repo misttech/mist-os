@@ -6,7 +6,8 @@ use at_commands as at;
 use tracing::debug;
 
 use super::{Procedure, ProcedureError, ProcedureMarker, ProcedureRequest};
-use crate::peer::{service_level_connection::SlcState, update::AgUpdate};
+use crate::peer::service_level_connection::SlcState;
+use crate::peer::update::AgUpdate;
 
 /// Represents the Transfer of Phone Status Indication procedures as defined in
 /// HFP v1.8 Section 4.4 - 4.7.

@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::helpers::*,
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_component_runner as frunner,
-    fidl_fuchsia_test::{self as ftest},
-    fuchsiaperf::FuchsiaPerfBenchmarkResult,
-    heck::CamelCase,
-    serde::{Deserialize, Serialize},
-};
+use crate::helpers::*;
+use anyhow::{Context as _, Error};
+use fidl_fuchsia_component_runner as frunner;
+use fidl_fuchsia_test::{self as ftest};
+use fuchsiaperf::FuchsiaPerfBenchmarkResult;
+use heck::CamelCase;
+use serde::{Deserialize, Serialize};
 
 /// The results returned by gBenchmark.
 #[derive(Serialize, Deserialize, Debug, Default)]

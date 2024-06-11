@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error, fidl_fuchsia_test_pwrbtn as test_pwrbtn, fuchsia_component::client as fclient,
-    tracing::info,
-};
+use anyhow::Error;
+use fidl_fuchsia_test_pwrbtn as test_pwrbtn;
+use fuchsia_component::client as fclient;
+use tracing::info;
 
 #[fuchsia::test(logging_tags = ["critical-services-integration-test"])]
 async fn run() -> Result<(), Error> {

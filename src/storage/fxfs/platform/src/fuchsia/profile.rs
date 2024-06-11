@@ -2,41 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::fuchsia::{
-        file::FxFile,
-        fxblob::{blob::FxBlob, BlobDirectory},
-        node::FxNode,
-        pager::PagerBacked,
-        volume::FxVolume,
-    },
-    anyhow::{anyhow, Error},
-    arrayref::{array_refs, mut_array_refs},
-    async_trait::async_trait,
-    event_listener::EventListener,
-    fuchsia_async as fasync,
-    fuchsia_hash::Hash,
-    fuchsia_zircon as zx,
-    fxfs::{
-        drop_event::DropEvent,
-        errors::FxfsError,
-        log::*,
-        object_handle::{ReadObjectHandle, WriteObjectHandle},
-        object_store::ObjectDescriptor,
-    },
-    linked_hash_map::LinkedHashMap,
-    std::{
-        cmp::{Eq, PartialEq},
-        collections::btree_map::{BTreeMap, Entry},
-        marker::PhantomData,
-        mem::size_of,
-        sync::{
-            atomic::{AtomicBool, Ordering},
-            Arc,
-        },
-    },
-    storage_device::buffer::{Buffer, BufferRef},
-};
+use crate::fuchsia::file::FxFile;
+use crate::fuchsia::fxblob::blob::FxBlob;
+use crate::fuchsia::fxblob::BlobDirectory;
+use crate::fuchsia::node::FxNode;
+use crate::fuchsia::pager::PagerBacked;
+use crate::fuchsia::volume::FxVolume;
+use anyhow::{anyhow, Error};
+use arrayref::{array_refs, mut_array_refs};
+use async_trait::async_trait;
+use event_listener::EventListener;
+use fuchsia_hash::Hash;
+use fxfs::drop_event::DropEvent;
+use fxfs::errors::FxfsError;
+use fxfs::log::*;
+use fxfs::object_handle::{ReadObjectHandle, WriteObjectHandle};
+use fxfs::object_store::ObjectDescriptor;
+use linked_hash_map::LinkedHashMap;
+use std::cmp::{Eq, PartialEq};
+use std::collections::btree_map::{BTreeMap, Entry};
+use std::marker::PhantomData;
+use std::mem::size_of;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use storage_device::buffer::{Buffer, BufferRef};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 const FILE_OPEN_MARKER: u64 = u64::MAX;
 const REPLAY_THREADS: usize = 2;
@@ -623,47 +613,33 @@ impl<T: RecordedVolume> Drop for ProfileStateImpl<T> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{
-            new_profile_state, BlobMessage, BlobVolume, FileMessage, FileVolume, Message,
-            ReplayState, Request, IO_SIZE,
-        },
-        crate::fuchsia::{
-            file::FxFile,
-            fxblob::{
-                blob::FxBlob,
-                testing::{new_blob_fixture, open_blob_fixture, BlobFixture},
-                BlobDirectory,
-            },
-            node::FxNode,
-            pager::PagerBacked,
-            testing::{open_file_checked, TestFixture, TestFixtureOptions},
-        },
-        anyhow::Error,
-        async_trait::async_trait,
-        delivery_blob::CompressionMode,
-        event_listener::{Event, EventListener},
-        fidl_fuchsia_io::OpenFlags,
-        fuchsia_async as fasync,
-        fuchsia_hash::Hash,
-        fxfs::{
-            object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle},
-            object_store::{
-                transaction::{lock_keys, LockKey, Options},
-                ObjectDescriptor,
-            },
-        },
-        std::{
-            collections::BTreeMap,
-            mem::size_of,
-            sync::{Arc, Mutex},
-            time::Duration,
-        },
-        storage_device::{
-            buffer::{BufferRef, MutableBufferRef},
-            buffer_allocator::{BufferAllocator, BufferFuture, BufferSource},
-        },
+    use super::{
+        new_profile_state, BlobMessage, BlobVolume, FileMessage, FileVolume, Message, ReplayState,
+        Request, IO_SIZE,
     };
+    use crate::fuchsia::file::FxFile;
+    use crate::fuchsia::fxblob::blob::FxBlob;
+    use crate::fuchsia::fxblob::testing::{new_blob_fixture, open_blob_fixture, BlobFixture};
+    use crate::fuchsia::fxblob::BlobDirectory;
+    use crate::fuchsia::node::FxNode;
+    use crate::fuchsia::pager::PagerBacked;
+    use crate::fuchsia::testing::{open_file_checked, TestFixture, TestFixtureOptions};
+    use anyhow::Error;
+    use async_trait::async_trait;
+    use delivery_blob::CompressionMode;
+    use event_listener::{Event, EventListener};
+    use fidl_fuchsia_io::OpenFlags;
+    use fuchsia_async as fasync;
+    use fuchsia_hash::Hash;
+    use fxfs::object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle};
+    use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
+    use fxfs::object_store::ObjectDescriptor;
+    use std::collections::BTreeMap;
+    use std::mem::size_of;
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
+    use storage_device::buffer::{BufferRef, MutableBufferRef};
+    use storage_device::buffer_allocator::{BufferAllocator, BufferFuture, BufferSource};
 
     struct FakeReaderWriterInner {
         data: Vec<u8>,

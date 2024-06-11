@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_hash::Hash,
-    futures::future::FutureExt as _,
-    std::collections::{HashMap, HashSet},
-    tracing::error,
-};
+use fuchsia_hash::Hash;
+use futures::future::FutureExt as _;
+use std::collections::{HashMap, HashSet};
+use tracing::error;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum ErrorStrategy {
@@ -107,10 +105,10 @@ pub(crate) fn find_required_blobs_recursive<'a>(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::test_utils::add_meta_far_to_blobfs, assert_matches::assert_matches,
-        async_lock::RwLock,
-    };
+    use super::*;
+    use crate::test_utils::add_meta_far_to_blobfs;
+    use assert_matches::assert_matches;
+    use async_lock::RwLock;
 
     fn hash(n: u8) -> Hash {
         Hash::from([n; 32])

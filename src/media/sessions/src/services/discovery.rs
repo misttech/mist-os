@@ -5,21 +5,23 @@
 pub mod filter;
 mod watcher;
 
-use self::{filter::*, watcher::*};
-use crate::{
-    interrupter::*,
-    proxies::{observer::*, player::*},
-    Result, SessionId, CHANNEL_BUFFER_SIZE,
-};
+use self::filter::*;
+use self::watcher::*;
+use crate::interrupter::*;
+use crate::proxies::observer::*;
+use crate::proxies::player::*;
+use crate::{Result, SessionId, CHANNEL_BUFFER_SIZE};
 use async_utils::stream::StreamMap;
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl_fuchsia_media::UsageReporterProxy;
 use fidl_fuchsia_media_sessions2::*;
-use futures::{channel::mpsc, future::BoxFuture, prelude::*, stream::Once, StreamExt};
-use std::{
-    collections::{HashMap, HashSet},
-    ops::RangeFrom,
-};
+use futures::channel::mpsc;
+use futures::future::BoxFuture;
+use futures::prelude::*;
+use futures::stream::Once;
+use futures::StreamExt;
+use std::collections::{HashMap, HashSet};
+use std::ops::RangeFrom;
 use tracing::{info, warn};
 
 const LOG_TAG: &str = "discovery";
@@ -359,7 +361,8 @@ impl Discovery {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{id::Id, spawn_log_error};
+    use crate::id::Id;
+    use crate::spawn_log_error;
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_endpoints, create_proxy};
     use fidl_fuchsia_media::UsageReporterMarker;

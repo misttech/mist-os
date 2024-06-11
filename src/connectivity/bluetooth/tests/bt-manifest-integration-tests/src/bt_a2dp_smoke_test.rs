@@ -2,34 +2,35 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileRequestStream};
+use fidl_fuchsia_bluetooth_internal_a2dp::{ControllerMarker, ControllerProxy};
+use fidl_fuchsia_media::{
+    AudioDeviceEnumeratorMarker, AudioDeviceEnumeratorRequestStream,
+    SessionAudioConsumerFactoryMarker, SessionAudioConsumerFactoryRequestStream,
+};
+use fidl_fuchsia_media_sessions2::{
+    DiscoveryMarker, DiscoveryRequestStream, PublisherMarker, PublisherRequestStream,
+};
+use fidl_fuchsia_mediacodec::{CodecFactoryMarker, CodecFactoryRequestStream};
+use fidl_fuchsia_metrics::{MetricEventLoggerFactoryMarker, MetricEventLoggerFactoryRequestStream};
+use fidl_fuchsia_power_battery::{BatteryManagerMarker, BatteryManagerRequestStream};
+use fidl_fuchsia_settings::{AudioMarker, AudioRequestStream};
+use fidl_fuchsia_sysmem2::{AllocatorMarker, AllocatorRequestStream};
+use fidl_fuchsia_tracing_provider::{RegistryMarker, RegistryRequestStream};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
+};
+use futures::channel::mpsc;
+use futures::{SinkExt, StreamExt};
+use realmbuilder_mock_helpers::add_fidl_service_handler;
+use std::collections::HashSet;
+use tracing::info;
 use {
-    anyhow::Error,
-    fidl::endpoints::DiscoverableProtocolMarker,
     fidl_fuchsia_bluetooth_a2dp as fidl_a2dp, fidl_fuchsia_bluetooth_avdtp_test as fidl_avdtp,
     fidl_fuchsia_bluetooth_avrcp as fidl_avrcp,
-    fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileRequestStream},
-    fidl_fuchsia_bluetooth_internal_a2dp::{ControllerMarker, ControllerProxy},
-    fidl_fuchsia_media::{
-        AudioDeviceEnumeratorMarker, AudioDeviceEnumeratorRequestStream,
-        SessionAudioConsumerFactoryMarker, SessionAudioConsumerFactoryRequestStream,
-    },
-    fidl_fuchsia_media_sessions2::{
-        DiscoveryMarker, DiscoveryRequestStream, PublisherMarker, PublisherRequestStream,
-    },
-    fidl_fuchsia_mediacodec::{CodecFactoryMarker, CodecFactoryRequestStream},
-    fidl_fuchsia_metrics::{MetricEventLoggerFactoryMarker, MetricEventLoggerFactoryRequestStream},
-    fidl_fuchsia_power_battery::{BatteryManagerMarker, BatteryManagerRequestStream},
-    fidl_fuchsia_settings::{AudioMarker, AudioRequestStream},
-    fidl_fuchsia_sysmem2::{AllocatorMarker, AllocatorRequestStream},
-    fidl_fuchsia_tracing_provider::{RegistryMarker, RegistryRequestStream},
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
-    },
-    futures::{channel::mpsc, SinkExt, StreamExt},
-    realmbuilder_mock_helpers::add_fidl_service_handler,
-    std::collections::HashSet,
-    tracing::info,
 };
 
 /// A2DP component URL.

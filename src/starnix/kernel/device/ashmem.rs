@@ -6,14 +6,13 @@ use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 use std::sync::Arc;
 
-use crate::{
-    device::{kobject::DeviceMetadata, DeviceMode},
-    fs::sysfs::DeviceDirectory,
-    mm::{MemoryAccessor, MemoryAccessorExt},
-    task::CurrentTask,
-    vfs::{
-        default_ioctl, fileops_impl_vmo, FileObject, FileOps, FileSystemCreator, FsNode, FsString,
-    },
+use crate::device::kobject::DeviceMetadata;
+use crate::device::DeviceMode;
+use crate::fs::sysfs::DeviceDirectory;
+use crate::mm::{MemoryAccessor, MemoryAccessorExt};
+use crate::task::CurrentTask;
+use crate::vfs::{
+    default_ioctl, fileops_impl_vmo, FileObject, FileOps, FileSystemCreator, FsNode, FsString,
 };
 use linux_uapi::{
     ASHMEM_GET_NAME, ASHMEM_GET_PIN_STATUS, ASHMEM_GET_PROT_MASK, ASHMEM_GET_SIZE, ASHMEM_PIN,
@@ -22,10 +21,9 @@ use linux_uapi::{
 use starnix_logging::track_stub;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
-use starnix_uapi::{
-    device_type, errno, error, errors::Errno, open_flags::OpenFlags, ASHMEM_GET_FILE_ID,
-    ASHMEM_NAME_LEN,
-};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::{device_type, errno, error, ASHMEM_GET_FILE_ID, ASHMEM_NAME_LEN};
 
 /// Initializes the ashmem device.
 pub fn ashmem_device_init<L>(locked: &mut Locked<'_, L>, system_task: &CurrentTask)

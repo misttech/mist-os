@@ -2,26 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    bt_a2dp::permits::{Permit, Permits},
-    core::pin::Pin,
-    core::task::{Context, Poll},
-    fidl::prelude::*,
-    fidl_fuchsia_bluetooth_internal_a2dp::{
-        ControllerRequest, ControllerRequestStream, ControllerSuspendResponder,
-        StreamSuspenderRequestStream,
-    },
-    fuchsia_async as fasync,
-    fuchsia_bluetooth::types::PeerId,
-    fuchsia_component::server::{ServiceFs, ServiceObj},
-    futures::select,
-    futures::stream::{SelectAll, Stream},
-    futures::StreamExt,
-    std::cell::RefCell,
-    std::sync::{Arc, Weak},
-    tracing::{info, trace, warn},
+use anyhow::Error;
+use bt_a2dp::permits::{Permit, Permits};
+use core::pin::Pin;
+use core::task::{Context, Poll};
+use fidl::prelude::*;
+use fidl_fuchsia_bluetooth_internal_a2dp::{
+    ControllerRequest, ControllerRequestStream, ControllerSuspendResponder,
+    StreamSuspenderRequestStream,
 };
+use fuchsia_async as fasync;
+use fuchsia_bluetooth::types::PeerId;
+use fuchsia_component::server::{ServiceFs, ServiceObj};
+use futures::stream::{SelectAll, Stream};
+use futures::{select, StreamExt};
+use std::cell::RefCell;
+use std::sync::{Arc, Weak};
+use tracing::{info, trace, warn};
 
 /// An interface for managing the state of streaming connections with remote peers.
 pub trait StreamController {

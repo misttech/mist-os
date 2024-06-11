@@ -5,25 +5,27 @@
 //! General-purpose socket utilities common to device layer and IP layer
 //! sockets.
 
-use core::{
-    convert::Infallible as Never, fmt::Debug, hash::Hash, marker::PhantomData, num::NonZeroU16,
-};
+use core::convert::Infallible as Never;
+use core::fmt::Debug;
+use core::hash::Hash;
+use core::marker::PhantomData;
+use core::num::NonZeroU16;
 
 use derivative::Derivative;
+use net_types::ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6};
 use net_types::{
-    ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6},
     AddrAndZone, MulticastAddress, ScopeableAddress, SpecifiedAddr, Witness, ZonedAddr,
 };
 
-use crate::{
-    data_structures::socketmap::{
-        Entry, IterShadows, OccupiedEntry as SocketMapOccupiedEntry, SocketMap, Tagged,
-    },
-    device::{DeviceIdentifier, EitherDeviceId, StrongDeviceIdentifier, WeakDeviceIdentifier},
-    error::{ExistsError, NotFoundError, ZonedAddressError},
-    socket::address::{
-        AddrVecIter, ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr, SocketIpAddr,
-    },
+use crate::data_structures::socketmap::{
+    Entry, IterShadows, OccupiedEntry as SocketMapOccupiedEntry, SocketMap, Tagged,
+};
+use crate::device::{
+    DeviceIdentifier, EitherDeviceId, StrongDeviceIdentifier, WeakDeviceIdentifier,
+};
+use crate::error::{ExistsError, NotFoundError, ZonedAddressError};
+use crate::socket::address::{
+    AddrVecIter, ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr, SocketIpAddr,
 };
 
 /// A dual stack IP extention trait that provides the `OtherVersion` associated
@@ -1251,7 +1253,9 @@ impl<I: Ip, D: DeviceIdentifier, A: SocketMapAddrSpec, S: SocketMapStateSpec>
 
 #[cfg(test)]
 mod tests {
-    use alloc::{collections::HashSet, vec, vec::Vec};
+    use alloc::collections::HashSet;
+    use alloc::vec;
+    use alloc::vec::Vec;
 
     use assert_matches::assert_matches;
     use const_unwrap::const_unwrap_option;
@@ -1259,10 +1263,8 @@ mod tests {
     use net_types::ip::{Ipv4Addr, Ipv6, Ipv6Addr};
     use test_case::test_case;
 
-    use crate::{
-        device::testutil::{FakeDeviceId, FakeWeakDeviceId},
-        testutil::set_logger_for_test,
-    };
+    use crate::device::testutil::{FakeDeviceId, FakeWeakDeviceId};
+    use crate::testutil::set_logger_for_test;
 
     use super::*;
 

@@ -24,7 +24,9 @@
 //                         already be implemented for `Option` and `Result`, so `core::ops::Try`
 //                         and `core::ops::FromResidual` must only be implemented for `Handled`.
 
-use std::{convert::Infallible, fmt::Display, ops::ControlFlow};
+use std::convert::Infallible;
+use std::fmt::Display;
+use std::ops::ControlFlow;
 
 // This trait provides methods that (at time of writing) are unstable. They must be invoked using
 // fully qualified syntax since they share the same names as their unstable counterparts.

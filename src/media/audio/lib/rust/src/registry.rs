@@ -8,7 +8,8 @@ use async_utils::event::Event as AsyncEvent;
 use async_utils::hanging_get::client::HangingGetStream;
 use fidl_fuchsia_audio_device as fadevice;
 use fuchsia_async::Task;
-use futures::{lock::Mutex, StreamExt};
+use futures::lock::Mutex;
+use futures::StreamExt;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 

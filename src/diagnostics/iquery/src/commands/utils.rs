@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    commands::{types::DiagnosticsProvider, Command, ListCommand},
-    types::Error,
-};
+use crate::commands::types::DiagnosticsProvider;
+use crate::commands::{Command, ListCommand};
+use crate::types::Error;
 use cm_rust::SourceName;
 use component_debug::realm::*;
 use fidl_fuchsia_sys2 as fsys2;
@@ -127,10 +126,10 @@ pub async fn get_accessor_selectors(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*, assert_matches::assert_matches, iquery_test_support::MockRealmQuery,
-        std::sync::Arc,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use iquery_test_support::MockRealmQuery;
+    use std::sync::Arc;
 
     #[fuchsia::test]
     async fn test_get_accessors() {

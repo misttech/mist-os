@@ -4,8 +4,7 @@
 
 //! Type-safe bindings for Zircon event pairs.
 
-use crate::ok;
-use crate::{AsHandleRef, Handle, HandleBased, HandleRef, Peered};
+use crate::{ok, AsHandleRef, Handle, HandleBased, HandleRef, Peered};
 use fuchsia_zircon_sys as sys;
 
 /// An object representing a Zircon

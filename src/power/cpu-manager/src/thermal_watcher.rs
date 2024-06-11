@@ -2,23 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::log_if_err,
-    crate::message::Message,
-    crate::node::Node,
-    crate::types::ThermalLoad,
-    anyhow::Result,
-    async_trait::async_trait,
-    fidl_fuchsia_thermal as fthermal,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_inspect::{self as inspect, Property},
-    futures::future::{FutureExt as _, LocalBoxFuture},
-    futures::stream::FuturesUnordered,
-    serde_derive::Deserialize,
-    serde_json as json,
-    std::collections::HashMap,
-    std::rc::Rc,
-};
+use crate::log_if_err;
+use crate::message::Message;
+use crate::node::Node;
+use crate::types::ThermalLoad;
+use anyhow::Result;
+use async_trait::async_trait;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_inspect::{self as inspect, Property};
+use futures::future::{FutureExt as _, LocalBoxFuture};
+use futures::stream::FuturesUnordered;
+use serde_derive::Deserialize;
+use std::collections::HashMap;
+use std::rc::Rc;
+use {fidl_fuchsia_thermal as fthermal, serde_json as json};
 
 /// Node: ThermalWatcher
 ///
@@ -178,15 +175,14 @@ impl InspectData {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::test::mock_node::{create_dummy_node, MessageMatcher, MockNodeMaker},
-        crate::{msg_eq, msg_ok_return},
-        assert_matches::assert_matches,
-        diagnostics_assertions::assert_data_tree,
-        fuchsia_async as fasync,
-        futures::{task::Poll, StreamExt, TryStreamExt},
-    };
+    use super::*;
+    use crate::test::mock_node::{create_dummy_node, MessageMatcher, MockNodeMaker};
+    use crate::{msg_eq, msg_ok_return};
+    use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_async as fasync;
+    use futures::task::Poll;
+    use futures::{StreamExt, TryStreamExt};
 
     // A fake ThermalState provider service implementation for testing
     struct FakeThermalStateProvider {

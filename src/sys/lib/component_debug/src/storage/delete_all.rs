@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Result},
-    fidl_fuchsia_sys2::StorageAdminProxy,
-};
+use anyhow::{anyhow, Result};
+use fidl_fuchsia_sys2::StorageAdminProxy;
 
 /// Delete the contents of all the storage of this component.
 ///
@@ -27,12 +25,10 @@ pub async fn delete_all(storage_admin: StorageAdminProxy, moniker: String) -> Re
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        fidl::endpoints::{create_proxy_and_stream, Proxy},
-        fidl_fuchsia_sys2 as fsys,
-        futures::TryStreamExt,
-    };
+    use super::*;
+    use fidl::endpoints::{create_proxy_and_stream, Proxy};
+    use fidl_fuchsia_sys2 as fsys;
+    use futures::TryStreamExt;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_delete_all() -> Result<()> {

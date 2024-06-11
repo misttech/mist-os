@@ -4,15 +4,14 @@
 
 use starnix_sync::Mutex;
 
-use crate::{
-    task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
-    vfs::{
-        buffers::{InputBuffer, InputBufferExt as _, OutputBuffer},
-        fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps,
-    },
-};
+use crate::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
+use crate::vfs::buffers::{InputBuffer, InputBufferExt as _, OutputBuffer};
+use crate::vfs::{fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps};
 use starnix_sync::{FileOpsCore, Locked, WriteOps};
-use starnix_uapi::{error, errors::Errno, open_flags::OpenFlags, vfs::FdEvents};
+use starnix_uapi::error;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::vfs::FdEvents;
 
 const DATA_SIZE: usize = 8;
 

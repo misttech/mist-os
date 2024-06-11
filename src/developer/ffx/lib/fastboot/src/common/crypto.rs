@@ -6,21 +6,19 @@ use crate::common::{done_time, handle_upload_progress_for_staging, is_locked};
 use crate::file_resolver::FileResolver;
 use anyhow::{anyhow, bail, Result};
 use async_fs::OpenOptions;
-use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::engine::Engine as _;
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::Utc;
 use errors::{ffx_bail, ffx_error};
 use ffx_fastboot_interface::fastboot_interface::{FastbootInterface, UploadProgress};
-use futures::{prelude::*, try_join};
-use ring::{
-    rand,
-    signature::{RsaKeyPair, RSA_PKCS1_SHA512},
-};
-use std::{
-    fs::File,
-    io::{copy, Write},
-    path::{Path, PathBuf},
-};
+use futures::prelude::*;
+use futures::try_join;
+use ring::rand;
+use ring::signature::{RsaKeyPair, RSA_PKCS1_SHA512};
+use std::fs::File;
+use std::io::{copy, Write};
+use std::path::{Path, PathBuf};
 use tempfile::tempdir;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};

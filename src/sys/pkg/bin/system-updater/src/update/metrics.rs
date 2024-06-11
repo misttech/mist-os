@@ -2,33 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::update::{
-        config::Initiator, AttemptError, FetchError, PrepareError, ResolveError, StageError,
-    },
-    anyhow::{format_err, Context, Error},
-    cobalt_client::traits::AsEventCode,
-    cobalt_sw_delivery_registry as metrics,
-    fidl_contrib::{
-        protocol_connector::{ConnectedProtocol, ProtocolSender},
-        ProtocolConnector,
-    },
-    fidl_fuchsia_metrics::{
-        MetricEvent, MetricEventLoggerFactoryMarker, MetricEventLoggerProxy, ProjectSpec,
-    },
-    fuchsia_cobalt_builders::MetricEventExt,
-    fuchsia_component::client::connect_to_protocol,
-    futures::{
-        future::{self, Future},
-        FutureExt,
-    },
-    std::time::{Duration, Instant, SystemTime},
+use crate::update::config::Initiator;
+use crate::update::{AttemptError, FetchError, PrepareError, ResolveError, StageError};
+use anyhow::{format_err, Context, Error};
+use cobalt_client::traits::AsEventCode;
+use cobalt_sw_delivery_registry as metrics;
+use fidl_contrib::protocol_connector::{ConnectedProtocol, ProtocolSender};
+use fidl_contrib::ProtocolConnector;
+use fidl_fuchsia_metrics::{
+    MetricEvent, MetricEventLoggerFactoryMarker, MetricEventLoggerProxy, ProjectSpec,
 };
+use fuchsia_cobalt_builders::MetricEventExt;
+use fuchsia_component::client::connect_to_protocol;
+use futures::future::{self, Future};
+use futures::FutureExt;
+use std::time::{Duration, Instant, SystemTime};
 
 // See $FUCHSIA_OUT_DIR/gen/src/sys/pkg/bin/amber/cobalt_sw_delivery_registry.rs for more info.
-pub use {
-    metrics::SoftwareDeliveryMetricDimensionPhase as Phase,
-    metrics::SoftwareDeliveryMetricDimensionStatusCode as StatusCode,
+pub use metrics::{
+    SoftwareDeliveryMetricDimensionPhase as Phase,
+    SoftwareDeliveryMetricDimensionStatusCode as StatusCode,
 };
 
 pub struct CobaltConnectedService;
@@ -186,7 +179,8 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, chrono::prelude::*};
+    use super::*;
+    use chrono::prelude::*;
 
     #[test]
     fn hour_of_day_returns_hour_of_day() {

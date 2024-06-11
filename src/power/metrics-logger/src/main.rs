@@ -8,38 +8,32 @@ mod gpu_usage_logger;
 mod network_activity_logger;
 mod sensor_logger;
 
+use crate::cpu_load_logger::{generate_cpu_stats_driver, CpuLoadLogger, CpuStatsDriver};
+use crate::driver_utils::Config;
+use crate::gpu_usage_logger::{generate_gpu_drivers, GpuDriver, GpuUsageLogger};
+use crate::network_activity_logger::{generate_network_devices, NetworkActivityLoggerBuilder};
+use crate::sensor_logger::{
+    generate_power_drivers, generate_temperature_drivers, ActivityListener, PowerDriver,
+    PowerLogger, PowerLoggerArgs, TemperatureDriver, TemperatureLogger, TemperatureLoggerArgs,
+};
+use anyhow::{Error, Result};
+use argh::FromArgs;
+use fidl::endpoints::ProtocolMarker;
+use fidl_fuchsia_power_metrics::{self as fmetrics, RecorderRequest};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use futures::future::join_all;
+use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
+use futures::task::Context;
+use futures::{FutureExt, TryFutureExt};
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
+use std::pin::Pin;
+use std::rc::Rc;
+use tracing::{error, info, warn};
 use {
-    crate::cpu_load_logger::{generate_cpu_stats_driver, CpuLoadLogger, CpuStatsDriver},
-    crate::driver_utils::Config,
-    crate::gpu_usage_logger::{generate_gpu_drivers, GpuDriver, GpuUsageLogger},
-    crate::network_activity_logger::{generate_network_devices, NetworkActivityLoggerBuilder},
-    crate::sensor_logger::{
-        generate_power_drivers, generate_temperature_drivers, ActivityListener, PowerDriver,
-        PowerLogger, PowerLoggerArgs, TemperatureDriver, TemperatureLogger, TemperatureLoggerArgs,
-    },
-    anyhow::{Error, Result},
-    argh::FromArgs,
-    fidl::endpoints::ProtocolMarker,
-    fidl_fuchsia_hardware_network as fhwnet,
-    fidl_fuchsia_power_metrics::{self as fmetrics, RecorderRequest},
-    fidl_fuchsia_ui_activity as factivity, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_inspect as inspect,
-    futures::{
-        future::join_all,
-        stream::{FuturesUnordered, StreamExt, TryStreamExt},
-        task::Context,
-        FutureExt, TryFutureExt,
-    },
-    serde_json as json,
-    std::{
-        cell::RefCell,
-        collections::{HashMap, HashSet},
-        pin::Pin,
-        rc::Rc,
-    },
-    tracing::{error, info, warn},
+    fidl_fuchsia_hardware_network as fhwnet, fidl_fuchsia_ui_activity as factivity,
+    fuchsia_async as fasync, fuchsia_inspect as inspect, serde_json as json,
 };
 
 // Max number of clients that can log concurrently. This limit is chosen mostly arbitrarily to allow
@@ -636,18 +630,16 @@ async fn inner_main(args: CmdArgs) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::cpu_load_logger::tests::create_cpu_stats_driver,
-        crate::gpu_usage_logger::tests::create_gpu_drivers,
-        crate::sensor_logger::tests::{create_power_drivers, create_temperature_drivers},
-        assert_matches::assert_matches,
-        diagnostics_assertions::assert_data_tree,
-        fmetrics::{
-            CpuLoad, GpuUsage, Metric, NetworkActivity, Power, StatisticsArgs, Temperature,
-        },
-        futures::task::Poll,
+    use super::*;
+    use crate::cpu_load_logger::tests::create_cpu_stats_driver;
+    use crate::gpu_usage_logger::tests::create_gpu_drivers;
+    use crate::sensor_logger::tests::{create_power_drivers, create_temperature_drivers};
+    use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
+    use fmetrics::{
+        CpuLoad, GpuUsage, Metric, NetworkActivity, Power, StatisticsArgs, Temperature,
     };
+    use futures::task::Poll;
 
     // A helper struct to create Fuchsia Executor and optionally add drivers for different logging
     // request tests.

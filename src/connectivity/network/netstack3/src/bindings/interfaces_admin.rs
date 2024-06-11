@@ -31,50 +31,46 @@
 //! ownership semantics (removing the interface closes the protocol; closing
 //! protocol does not remove the interface).
 
-use std::{collections::hash_map, num::NonZeroU16, ops::DerefMut as _, pin::pin};
+use std::collections::hash_map;
+use std::num::NonZeroU16;
+use std::ops::DerefMut as _;
+use std::pin::pin;
 
 use assert_matches::assert_matches;
 use fidl::endpoints::{ProtocolMarker, ServerEnd};
-use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fnet_interfaces_admin::GrantForInterfaceAuthorization;
-use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, HandleBased, Rights};
-use futures::{
-    future::FusedFuture as _, stream::FusedStream as _, FutureExt as _, SinkExt as _,
-    StreamExt as _, TryFutureExt as _, TryStreamExt as _,
-};
+use futures::future::FusedFuture as _;
+use futures::stream::FusedStream as _;
+use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use log::{debug, error, info, warn};
-use net_types::{
-    ip::{AddrSubnetEither, IpAddr, Ipv4, Ipv6},
-    SpecifiedAddr, Witness,
+use net_types::ip::{AddrSubnetEither, IpAddr, Ipv4, Ipv6};
+use net_types::{SpecifiedAddr, Witness};
+use netstack3_core::device::{
+    DeviceConfiguration, DeviceConfigurationUpdate, DeviceConfigurationUpdateError, DeviceId,
+    NdpConfiguration, NdpConfigurationUpdate,
 };
-use netstack3_core::{
-    device::{
-        DeviceConfiguration, DeviceConfigurationUpdate, DeviceConfigurationUpdateError, DeviceId,
-        NdpConfiguration, NdpConfigurationUpdate,
-    },
-    ip::{
-        AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, IpDeviceConfiguration,
-        IpDeviceConfigurationUpdate, Ipv4AddrConfig, Ipv4DeviceConfigurationUpdate,
-        Ipv6AddrManualConfig, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags,
-        Ipv6DeviceConfigurationUpdate, Lifetime, SetIpAddressPropertiesError,
-        UpdateIpConfigurationError,
-    },
+use netstack3_core::ip::{
+    AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, IpDeviceConfiguration,
+    IpDeviceConfigurationUpdate, Ipv4AddrConfig, Ipv4DeviceConfigurationUpdate,
+    Ipv6AddrManualConfig, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags,
+    Ipv6DeviceConfigurationUpdate, Lifetime, SetIpAddressPropertiesError,
+    UpdateIpConfigurationError,
+};
+use {
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin, fuchsia_async as fasync,
 };
 
-use crate::bindings::{
-    devices::{self, EthernetInfo, StaticCommonInfo},
-    netdevice_worker,
-    routes::{self, admin::RouteSet},
-    util::{
-        IllegalNonPositiveValueError, IntoCore as _, IntoFidl, RemoveResourceResultExt as _,
-        TryIntoCore,
-    },
-    BindingId, Ctx, DeviceIdExt as _, Netstack, StackTime,
+use crate::bindings::devices::{self, EthernetInfo, StaticCommonInfo};
+use crate::bindings::routes::admin::RouteSet;
+use crate::bindings::routes::{self};
+use crate::bindings::util::{
+    IllegalNonPositiveValueError, IntoCore as _, IntoFidl, RemoveResourceResultExt as _,
+    TryIntoCore,
 };
+use crate::bindings::{netdevice_worker, BindingId, Ctx, DeviceIdExt as _, Netstack, StackTime};
 
 pub(crate) async fn serve(ns: Netstack, req: fnet_interfaces_admin::InstallerRequestStream) {
     req.filter_map(|req| {
@@ -1926,10 +1922,8 @@ mod tests {
 
     use net_declare::fidl_subnet;
 
-    use crate::bindings::{
-        integration_tests::{StackSetupBuilder, TestSetup, TestSetupBuilder},
-        interfaces_watcher::{InterfaceEvent, InterfaceUpdate},
-    };
+    use crate::bindings::integration_tests::{StackSetupBuilder, TestSetup, TestSetupBuilder};
+    use crate::bindings::interfaces_watcher::{InterfaceEvent, InterfaceUpdate};
 
     // Verifies that when an an interface is removed, its addresses are
     // implicitly removed, rather then explicitly removed one-by-one. Explicit

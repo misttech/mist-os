@@ -5,13 +5,12 @@
 mod guest_config;
 mod guest_manager;
 
-use {
-    anyhow::{anyhow, Error},
-    fidl_fuchsia_virtualization::{GuestLifecycleMarker, GuestManagerRequestStream},
-    fuchsia_component::{client::connect_to_protocol, server},
-    guest_manager::GuestManager,
-    std::rc::Rc,
-};
+use anyhow::{anyhow, Error};
+use fidl_fuchsia_virtualization::{GuestLifecycleMarker, GuestManagerRequestStream};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server;
+use guest_manager::GuestManager;
+use std::rc::Rc;
 
 #[fuchsia::main(logging = true, threads = 1)]
 async fn main() -> Result<(), Error> {

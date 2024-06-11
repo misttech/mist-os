@@ -162,8 +162,11 @@ mod tests {
     use super::*;
     use crate::*;
     use assert_matches::assert_matches;
-    use rand::{distributions::Alphanumeric, Rng};
-    use std::{collections::HashMap, ffi::OsStr, io::Cursor};
+    use rand::distributions::Alphanumeric;
+    use rand::Rng;
+    use std::collections::HashMap;
+    use std::ffi::OsStr;
+    use std::io::Cursor;
 
     fn default_args() -> TestPilotArgs {
         TestPilotArgs {

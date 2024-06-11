@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::CurrentTask,
-    vfs::{
-        emit_dotdot, fileops_impl_directory, unbounded_seek, DirectoryEntryType, DirentSink,
-        FileObject, FileOps, FsString, SeekTarget,
-    },
+use crate::task::CurrentTask;
+use crate::vfs::{
+    emit_dotdot, fileops_impl_directory, unbounded_seek, DirectoryEntryType, DirentSink,
+    FileObject, FileOps, FsString, SeekTarget,
 };
 use starnix_sync::{FileOpsCore, Locked};
-use starnix_uapi::{errors::Errno, ino_t, off_t};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::{ino_t, off_t};
 
 /// A directory entry used for [`VecDirectory`].
 #[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_ldsvc as fldsvc;
-use fuchsia_zircon as zx;
 use std::sync::Arc;
 use tracing::warn;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_ldsvc as fldsvc, fuchsia_zircon as zx};
 
 mod serve;
 pub use serve::serve;

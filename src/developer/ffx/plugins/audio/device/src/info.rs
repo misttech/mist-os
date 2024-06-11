@@ -5,19 +5,15 @@
 use crate::{connect, serde_ext};
 use camino::Utf8PathBuf;
 use ffx_command::{bug, user_error, FfxContext};
-use fidl_fuchsia_audio_device as fadevice;
-use fidl_fuchsia_hardware_audio as fhaudio;
-use fidl_fuchsia_hardware_audio_signalprocessing as fhaudio_sigproc;
-use fidl_fuchsia_io as fio;
-use fuchsia_audio::{
-    dai::{DaiFormatSet, DaiFrameFormat, DaiFrameFormatClocking, DaiFrameFormatJustification},
-    device::{
-        ClockDomain, DevfsSelector, GainCapabilities, GainState, Info as DeviceInfo,
-        PlugDetectCapabilities, PlugEvent, Selector, UniqueInstanceId,
-    },
-    format_set::{ChannelAttributes, ChannelSet, PcmFormatSet},
-    Registry,
+use fuchsia_audio::dai::{
+    DaiFormatSet, DaiFrameFormat, DaiFrameFormatClocking, DaiFrameFormatJustification,
 };
+use fuchsia_audio::device::{
+    ClockDomain, DevfsSelector, GainCapabilities, GainState, Info as DeviceInfo,
+    PlugDetectCapabilities, PlugEvent, Selector, UniqueInstanceId,
+};
+use fuchsia_audio::format_set::{ChannelAttributes, ChannelSet, PcmFormatSet};
+use fuchsia_audio::Registry;
 use fuchsia_zircon_status::Status;
 use itertools::Itertools;
 use lazy_static::lazy_static;
@@ -25,6 +21,10 @@ use prettytable::{cell, format, row, Table};
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fmt::Display;
+use {
+    fidl_fuchsia_audio_device as fadevice, fidl_fuchsia_hardware_audio as fhaudio,
+    fidl_fuchsia_hardware_audio_signalprocessing as fhaudio_sigproc, fidl_fuchsia_io as fio,
+};
 
 lazy_static! {
     // No padding, no borders.
@@ -877,10 +877,9 @@ pub async fn get_info(
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl_fuchsia_audio_device as fadevice;
-    use fidl_fuchsia_hardware_audio as fhaudio;
     use fuchsia_audio::format::SampleType;
     use serde_json::json;
+    use {fidl_fuchsia_audio_device as fadevice, fidl_fuchsia_hardware_audio as fhaudio};
 
     lazy_static! {
         pub static ref TEST_INFO_RESULT: InfoResult = InfoResult {

@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Result},
-    flate2::write::GzEncoder,
-    flate2::Compression,
-    serde::{Deserialize, Serialize},
-    std::fs,
-    std::path::{Path, PathBuf},
-    std::str::FromStr,
-    test_output_directory::{ArtifactSubDirectory, MaybeUnknown, Outcome, TestRunResult},
-    walkdir::WalkDir,
-};
+use anyhow::{anyhow, Result};
+use flate2::write::GzEncoder;
+use flate2::Compression;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
+use test_output_directory::{ArtifactSubDirectory, MaybeUnknown, Outcome, TestRunResult};
+use walkdir::WalkDir;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Eq, Hash)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]

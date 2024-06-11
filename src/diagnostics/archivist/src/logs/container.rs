@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    identity::ComponentIdentity,
-    logs::{
-        budget::BudgetHandle,
-        buffer::{ArcList, LazyItem},
-        multiplex::PinStream,
-        socket::{Encoding, LogMessageSocket},
-        stats::LogStreamStats,
-        stored_message::GenericStoredMessage,
-    },
-    utils::AutoCall,
-};
+use crate::identity::ComponentIdentity;
+use crate::logs::budget::BudgetHandle;
+use crate::logs::buffer::{ArcList, LazyItem};
+use crate::logs::multiplex::PinStream;
+use crate::logs::socket::{Encoding, LogMessageSocket};
+use crate::logs::stats::LogStreamStats;
+use crate::logs::stored_message::GenericStoredMessage;
+use crate::utils::AutoCall;
 use derivative::Derivative;
 use diagnostics_data::{BuilderArgs, Data, LogError, Logs, LogsData, LogsDataBuilder};
 use fidl_fuchsia_diagnostics::{Interest as FidlInterest, LogInterestSelector, StreamMode};
@@ -21,24 +17,21 @@ use fidl_fuchsia_logger::{
     InterestChangeError, LogSinkRequest, LogSinkRequestStream,
     LogSinkWaitForInterestChangeResponder,
 };
-use fuchsia_async as fasync;
 use fuchsia_async::Task;
-use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::WithInspect;
 use fuchsia_sync::Mutex;
-use fuchsia_trace as ftrace;
-use fuchsia_zircon as zx;
-use futures::{
-    channel::{mpsc, oneshot},
-    prelude::*,
-};
+use futures::channel::{mpsc, oneshot};
+use futures::prelude::*;
 use selectors::SelectorExt;
-use std::{
-    cmp::Ordering,
-    collections::BTreeMap,
-    sync::{atomic::AtomicUsize, Arc},
-};
+use std::cmp::Ordering;
+use std::collections::BTreeMap;
+use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
 use tracing::{debug, error, warn};
+use {
+    fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_trace as ftrace,
+    fuchsia_zircon as zx,
+};
 
 #[derive(Derivative)]
 #[derivative(Debug)]

@@ -4,13 +4,15 @@
 
 use anyhow::Error;
 use argh::FromArgs;
-use component_events::{events::*, matcher::*};
-use diagnostics_log_encoding::{parse::parse_record, Argument, Record, Severity, Value};
+use component_events::events::*;
+use component_events::matcher::*;
+use diagnostics_log_encoding::parse::parse_record;
+use diagnostics_log_encoding::{Argument, Record, Severity, Value};
 use fidl_fuchsia_diagnostics::Interest;
 use fidl_fuchsia_diagnostics_stream::{MAX_ARGS, MAX_ARG_NAME_LENGTH};
-use fidl_fuchsia_logger::LogSinkWaitForInterestChangeResponder;
 use fidl_fuchsia_logger::{
-    LogSinkMarker, LogSinkRequest, LogSinkRequestStream, MAX_DATAGRAM_LEN_BYTES,
+    LogSinkMarker, LogSinkRequest, LogSinkRequestStream, LogSinkWaitForInterestChangeResponder,
+    MAX_DATAGRAM_LEN_BYTES,
 };
 use fidl_fuchsia_validate_logs::{LogSinkPuppetMarker, LogSinkPuppetProxy, PuppetInfo, RecordSpec};
 use fuchsia_async::{Socket, Task};
@@ -19,15 +21,16 @@ use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
 };
 use fuchsia_zircon as zx;
-use futures::{channel::mpsc, prelude::*};
-use proptest::{
-    collection::vec,
-    prelude::{any, Arbitrary, Just, ProptestConfig, Strategy, TestCaseError},
-    prop_oneof,
-    test_runner::{Reason, RngAlgorithm, TestRng, TestRunner},
-};
+use futures::channel::mpsc;
+use futures::prelude::*;
+use proptest::collection::vec;
+use proptest::prelude::{any, Arbitrary, Just, ProptestConfig, Strategy, TestCaseError};
+use proptest::prop_oneof;
+use proptest::test_runner::{Reason, RngAlgorithm, TestRng, TestRunner};
 use proptest_derive::Arbitrary;
-use std::{collections::BTreeMap, io::Cursor, ops::Range};
+use std::collections::BTreeMap;
+use std::io::Cursor;
+use std::ops::Range;
 use tracing::*;
 
 /// Validate Log VMO formats written by 'puppet' programs controlled by

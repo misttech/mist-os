@@ -6,16 +6,13 @@
 
 use core::sync::atomic::AtomicU16;
 
-use lock_order::{
-    lock::{DelegatedOrderedLockAccess, LockLevelFor, UnlockedAccess},
-    relation::LockBefore,
-};
+use lock_order::lock::{DelegatedOrderedLockAccess, LockLevelFor, UnlockedAccess};
+use lock_order::relation::LockBefore;
 use log::trace;
-use net_types::{
-    ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr},
-    MulticastAddr, SpecifiedAddr,
-};
-use netstack3_base::{socket::SocketIpAddr, CounterContext, TokenBucket, WeakDeviceIdentifier};
+use net_types::ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr};
+use net_types::{MulticastAddr, SpecifiedAddr};
+use netstack3_base::socket::SocketIpAddr;
+use netstack3_base::{CounterContext, TokenBucket, WeakDeviceIdentifier};
 use netstack3_datagram as datagram;
 use netstack3_device::{DeviceId, WeakDeviceId};
 use netstack3_icmp_echo::{
@@ -23,28 +20,26 @@ use netstack3_icmp_echo::{
     IcmpEchoIpTransportContext, IcmpEchoStateContext, IcmpSocketId, IcmpSocketSet, IcmpSocketState,
     IcmpSockets,
 };
+use netstack3_ip::device::{self, IpDeviceBindingsContext, IpDeviceIpExt};
+use netstack3_ip::icmp::{
+    self, IcmpIpTransportContext, IcmpRxCounters, IcmpState, IcmpTxCounters, Icmpv4ErrorCode,
+    Icmpv6ErrorCode, InnerIcmpContext, InnerIcmpv4Context, NdpCounters,
+};
+use netstack3_ip::raw::RawIpSocketMap;
 use netstack3_ip::{
-    self as ip,
-    device::{self, IpDeviceBindingsContext, IpDeviceIpExt},
-    icmp::{
-        self, IcmpIpTransportContext, IcmpRxCounters, IcmpState, IcmpTxCounters, Icmpv4ErrorCode,
-        Icmpv6ErrorCode, InnerIcmpContext, InnerIcmpv4Context, NdpCounters,
-    },
-    raw::RawIpSocketMap,
-    ForwardingTable, FragmentContext, IpCounters, IpLayerBindingsContext, IpLayerContext,
-    IpLayerIpExt, IpPacketFragmentCache, IpStateContext, IpStateInner, IpTransportContext,
-    IpTransportDispatchContext, MulticastMembershipHandler, PmtuCache, PmtuContext,
-    ResolveRouteError, ResolvedRoute, TransparentLocalDelivery, TransportReceiveError,
+    self as ip, ForwardingTable, FragmentContext, IpCounters, IpLayerBindingsContext,
+    IpLayerContext, IpLayerIpExt, IpPacketFragmentCache, IpStateContext, IpStateInner,
+    IpTransportContext, IpTransportDispatchContext, MulticastMembershipHandler, PmtuCache,
+    PmtuContext, ResolveRouteError, ResolvedRoute, TransparentLocalDelivery, TransportReceiveError,
 };
 use netstack3_tcp::TcpIpTransportContext;
 use netstack3_udp::UdpIpTransportContext;
 use packet::BufferMut;
 use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
 
-use crate::{
-    context::{prelude::*, WrapLockLevel},
-    BindingsContext, BindingsTypes, CoreCtx, StackState,
-};
+use crate::context::prelude::*;
+use crate::context::WrapLockLevel;
+use crate::{BindingsContext, BindingsTypes, CoreCtx, StackState};
 
 impl<I, BT, L> FragmentContext<I, BT> for CoreCtx<'_, BT, L>
 where

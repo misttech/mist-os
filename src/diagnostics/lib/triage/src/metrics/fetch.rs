@@ -2,20 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{missing, syntax_error, MetricValue},
-    crate::config::{DataFetcher, DiagnosticData, Source},
-    anyhow::{anyhow, bail, Context, Error, Result},
-    diagnostics_hierarchy::DiagnosticsHierarchy,
-    fidl_fuchsia_diagnostics::Selector,
-    lazy_static::lazy_static,
-    regex::Regex,
-    selectors::VerboseError,
-    serde::Serialize,
-    serde_derive::Deserialize,
-    serde_json::{map::Map as JsonMap, Value as JsonValue},
-    std::{collections::HashMap, str::FromStr, sync::Arc},
-};
+use super::{missing, syntax_error, MetricValue};
+use crate::config::{DataFetcher, DiagnosticData, Source};
+use anyhow::{anyhow, bail, Context, Error, Result};
+use diagnostics_hierarchy::DiagnosticsHierarchy;
+use fidl_fuchsia_diagnostics::Selector;
+use lazy_static::lazy_static;
+use regex::Regex;
+use selectors::VerboseError;
+use serde::Serialize;
+use serde_derive::Deserialize;
+use serde_json::map::Map as JsonMap;
+use serde_json::Value as JsonValue;
+use std::collections::HashMap;
+use std::str::FromStr;
+use std::sync::Arc;
 
 /// [Fetcher] is a source of values to feed into the calculations. It may contain data either
 /// from snapshot.zip files (e.g. inspect.json data that can be accessed via "select" entries)
@@ -421,14 +422,11 @@ impl InspectFetcher {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::{
-            assert_problem, make_metrics,
-            metrics::{variable::VariableName, Metric, MetricState, Problem, ValueSource},
-        },
-        serde_json::Value as JsonValue,
-    };
+    use super::*;
+    use crate::metrics::variable::VariableName;
+    use crate::metrics::{Metric, MetricState, Problem, ValueSource};
+    use crate::{assert_problem, make_metrics};
+    use serde_json::Value as JsonValue;
 
     lazy_static! {
         static ref LOCAL_M: HashMap<String, JsonValue> = {

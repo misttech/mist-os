@@ -12,13 +12,11 @@ use ffx_emulator_config::ShowDetail;
 use ffx_emulator_engines::EngineBuilder;
 use fho::{return_bug, Connector, FfxContext, Result};
 use fidl_fuchsia_developer_ffx::TargetInfo;
-use fidl_fuchsia_developer_remotecontrol as rc;
-use fidl_fuchsia_starnix_container as fstarcontainer;
-use fuchsia_async as fasync;
 use futures::io::AsyncReadExt;
 use futures::stream::StreamExt;
 use futures::FutureExt;
-use signal_hook::{consts::signal::SIGINT, iterator::Signals};
+use signal_hook::consts::signal::SIGINT;
+use signal_hook::iterator::Signals;
 use std::io::ErrorKind;
 use std::net::{SocketAddr, SocketAddrV4, TcpListener as SyncTcpListener};
 use std::path::PathBuf;
@@ -26,6 +24,10 @@ use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tracing::info;
+use {
+    fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_starnix_container as fstarcontainer,
+    fuchsia_async as fasync,
+};
 
 use crate::common::*;
 

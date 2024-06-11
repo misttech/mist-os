@@ -2,37 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::above_root_capabilities::AboveRootCapabilitiesForTest;
+use crate::constants::{self, HERMETIC_TESTS_COLLECTION};
+use crate::debug_data_processor::{DebugDataDirectory, DebugDataProcessor, DebugDataSender};
+use crate::error::*;
+use crate::facet::SuiteFacets;
+use crate::run_events::{RunEvent, SuiteEvents};
+use crate::scheduler::Scheduler;
+use crate::self_diagnostics::DiagnosticNode;
+use crate::{facet, running_suite, scheduler};
+use anyhow::Error;
+use fidl::endpoints::{ControlHandle, Responder};
+use fidl_fuchsia_component::RealmProxy;
+use fidl_fuchsia_component_resolution::ResolverProxy;
+use ftest_manager::{
+    LaunchError, RunControllerRequest, RunControllerRequestStream, SchedulingOptions,
+    SuiteControllerRequest, SuiteControllerRequestStream,
+};
+use futures::channel::{mpsc, oneshot};
+use futures::future::Either;
+use futures::prelude::*;
+use futures::StreamExt;
+use std::sync::Arc;
+use tracing::{error, info, warn};
 use {
-    crate::{
-        above_root_capabilities::AboveRootCapabilitiesForTest,
-        constants::{self, HERMETIC_TESTS_COLLECTION},
-        debug_data_processor::{DebugDataDirectory, DebugDataProcessor, DebugDataSender},
-        error::*,
-        facet,
-        facet::SuiteFacets,
-        run_events::{RunEvent, SuiteEvents},
-        running_suite, scheduler,
-        scheduler::Scheduler,
-        self_diagnostics::DiagnosticNode,
-    },
-    anyhow::Error,
-    fidl::endpoints::{ControlHandle, Responder},
-    fidl_fuchsia_component::RealmProxy,
-    fidl_fuchsia_component_resolution::ResolverProxy,
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_test_manager as ftest_manager,
-    ftest_manager::{
-        LaunchError, RunControllerRequest, RunControllerRequestStream, SchedulingOptions,
-        SuiteControllerRequest, SuiteControllerRequestStream,
-    },
     fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{
-        channel::{mpsc, oneshot},
-        future::Either,
-        prelude::*,
-        StreamExt,
-    },
-    std::sync::Arc,
-    tracing::{error, info, warn},
 };
 
 const EXECUTION_PROPERTY: &'static str = "execution";
@@ -671,10 +666,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_component_resolution as fresolution, fuchsia_async as fasync,
-    };
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use {fidl_fuchsia_component_resolution as fresolution, fuchsia_async as fasync};
 
     fn new_run_inspect_node() -> DiagnosticNode {
         DiagnosticNode::new("root", Arc::new(fuchsia_inspect::types::Node::default()))

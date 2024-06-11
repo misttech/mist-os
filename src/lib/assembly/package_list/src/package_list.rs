@@ -2,20 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    fuchsia_hash::Hash,
-    fuchsia_pkg::{PackageManifest, PackagePath},
-    fuchsia_url::{PinnedAbsolutePackageUrl, RepositoryUrl},
-    serde_json::json,
-    std::{
-        collections::{BTreeMap, BTreeSet},
-        fs::File,
-        io::Write,
-        path::Path,
-        str::FromStr,
-    },
-};
+use anyhow::{anyhow, Context, Result};
+use fuchsia_hash::Hash;
+use fuchsia_pkg::{PackageManifest, PackagePath};
+use fuchsia_url::{PinnedAbsolutePackageUrl, RepositoryUrl};
+use serde_json::json;
+use std::collections::{BTreeMap, BTreeSet};
+use std::fs::File;
+use std::io::Write;
+use std::path::Path;
+use std::str::FromStr;
 
 /// `WritablePackageList` represents a collection of packages that can be populated and
 /// written into a file. This allows for gradual migration for packages index config

@@ -5,16 +5,14 @@
 mod mem_device;
 mod wire;
 
-use {
-    crate::mem_device::{MemDevice, VmoMemoryBackend},
-    anyhow::{anyhow, Context},
-    fidl::endpoints::RequestStream,
-    fidl_fuchsia_virtualization_hardware::VirtioMemRequestStream,
-    fuchsia_component::server,
-    fuchsia_inspect as inspect,
-    futures::{future, StreamExt, TryFutureExt, TryStreamExt},
-    virtio_device::chain::ReadableChain,
-};
+use crate::mem_device::{MemDevice, VmoMemoryBackend};
+use anyhow::{anyhow, Context};
+use fidl::endpoints::RequestStream;
+use fidl_fuchsia_virtualization_hardware::VirtioMemRequestStream;
+use fuchsia_component::server;
+use fuchsia_inspect as inspect;
+use futures::{future, StreamExt, TryFutureExt, TryStreamExt};
+use virtio_device::chain::ReadableChain;
 
 async fn run_virtio_mem(mut virtio_mem_fidl: VirtioMemRequestStream) -> Result<(), anyhow::Error> {
     // Receive start info as first message.

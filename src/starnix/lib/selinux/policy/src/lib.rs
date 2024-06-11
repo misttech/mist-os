@@ -15,18 +15,18 @@ mod symbols;
 
 pub use security_context::{SecurityContext, SecurityContextError};
 
-use {
-    anyhow::Context as _,
-    error::{NewSecurityContextError, ParseError, QueryError},
-    index::PolicyIndex,
-    metadata::HandleUnknown,
-    parsed_policy::ParsedPolicy,
-    parser::ByValue,
-    parser::{ByRef, ParseStrategy},
-    selinux_common::{self as sc, FileClass, ObjectClass},
-    std::{fmt::Debug, marker::PhantomData, num::NonZeroU32, ops::Deref},
-    zerocopy::{little_endian as le, ByteSlice, FromBytes, NoCell, Ref, Unaligned},
-};
+use anyhow::Context as _;
+use error::{NewSecurityContextError, ParseError, QueryError};
+use index::PolicyIndex;
+use metadata::HandleUnknown;
+use parsed_policy::ParsedPolicy;
+use parser::{ByRef, ByValue, ParseStrategy};
+use selinux_common::{self as sc, FileClass, ObjectClass};
+use std::fmt::Debug;
+use std::marker::PhantomData;
+use std::num::NonZeroU32;
+use std::ops::Deref;
+use zerocopy::{little_endian as le, ByteSlice, FromBytes, NoCell, Ref, Unaligned};
 
 #[cfg(feature = "selinux_policy_test_api")]
 use selinux_common::ClassPermission as _;

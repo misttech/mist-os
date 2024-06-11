@@ -5,12 +5,10 @@
 use futures::future::join_all;
 use io::BufWriter;
 use json5format::{Json5Format, ParsedDocument};
-use std::{
-    ffi::OsString,
-    io::{self, Read, Write},
-    path::{Path, PathBuf},
-    process::{Command, Stdio},
-};
+use std::ffi::OsString;
+use std::io::{self, Read, Write};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use structopt::StructOpt;
 
 mod reader;

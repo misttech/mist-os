@@ -2,33 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        core::collection::{Component, ComponentSource, Components},
-        verify::collection::V2ComponentModel,
-    },
-    anyhow::{anyhow, Context, Error, Result},
-    cm_fidl_analyzer::{
-        component_model::{AnalyzerModelError, ComponentModelForAnalyzer},
-        route::VerifyRouteResult,
-    },
-    cm_rust::{CapabilityDecl, CapabilityTypeName, ComponentDecl, ExposeDecl, OfferDecl, UseDecl},
-    cm_types::{Name, Path, RelativePath},
-    moniker::Moniker,
-    routing::{component_instance::ComponentInstanceInterface, mapper::RouteSegment},
-    scrutiny::model::{controller::DataController, model::DataModel},
-    serde::{Deserialize, Serialize},
-    serde_json::{json, value::Value},
-    std::{
-        collections::{HashMap, HashSet},
-        fmt,
-        fs::read_to_string,
-        path::PathBuf,
-        str::FromStr,
-        sync::Arc,
-    },
-    thiserror::Error as ThisError,
-};
+use crate::core::collection::{Component, ComponentSource, Components};
+use crate::verify::collection::V2ComponentModel;
+use anyhow::{anyhow, Context, Error, Result};
+use cm_fidl_analyzer::component_model::{AnalyzerModelError, ComponentModelForAnalyzer};
+use cm_fidl_analyzer::route::VerifyRouteResult;
+use cm_rust::{CapabilityDecl, CapabilityTypeName, ComponentDecl, ExposeDecl, OfferDecl, UseDecl};
+use cm_types::{Name, Path, RelativePath};
+use moniker::Moniker;
+use routing::component_instance::ComponentInstanceInterface;
+use routing::mapper::RouteSegment;
+use scrutiny::model::controller::DataController;
+use scrutiny::model::model::DataModel;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use serde_json::value::Value;
+use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::fs::read_to_string;
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::Arc;
+use thiserror::Error as ThisError;
 
 const BAD_REQUEST_CTX: &str = "Failed to parse RouteSourcesController request";
 const MISSING_TARGET_INSTANCE: &str = "Target instance is missing from component model";
@@ -605,36 +600,34 @@ impl DataController for RouteSourcesController {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{
-            Matches, RouteMatch, RouteSourceError, RouteSourcesConfig, RouteSourcesController,
-            RouteSourcesSpec, Source, SourceDeclSpec, SourceSpec, UseSpec,
-            VerifyRouteSourcesResult, BAD_REQUEST_CTX, MISSING_TARGET_INSTANCE,
-            ROUTE_LISTS_INCOMPLETE, ROUTE_LISTS_OVERLAP,
-        },
-        crate::{
-            core::collection::{Component, ComponentSource, Components},
-            verify::{collection::V2ComponentModel, collector::component_model::DEFAULT_ROOT_URL},
-        },
-        anyhow::Result,
-        cm_config::RuntimeConfig,
-        cm_fidl_analyzer::component_model::ModelBuilderForAnalyzer,
-        cm_rust::{
-            Availability, CapabilityTypeName, DependencyType, DirectoryDecl, ExposeSource,
-            OfferSource, ProgramDecl, UseDirectoryDecl, UseSource, UseStorageDecl,
-        },
-        cm_rust_testing::*,
-        cm_types::{Path, Url},
-        fidl_fuchsia_io as fio,
-        fuchsia_merkle::{Hash, HASH_SIZE},
-        maplit::{hashmap, hashset},
-        moniker::Moniker,
-        routing::{environment::RunnerRegistry, mapper::RouteSegment},
-        scrutiny::prelude::{DataController, DataModel},
-        scrutiny_testing::fake::fake_data_model,
-        serde_json::json,
-        std::{str::FromStr, sync::Arc},
+    use super::{
+        Matches, RouteMatch, RouteSourceError, RouteSourcesConfig, RouteSourcesController,
+        RouteSourcesSpec, Source, SourceDeclSpec, SourceSpec, UseSpec, VerifyRouteSourcesResult,
+        BAD_REQUEST_CTX, MISSING_TARGET_INSTANCE, ROUTE_LISTS_INCOMPLETE, ROUTE_LISTS_OVERLAP,
     };
+    use crate::core::collection::{Component, ComponentSource, Components};
+    use crate::verify::collection::V2ComponentModel;
+    use crate::verify::collector::component_model::DEFAULT_ROOT_URL;
+    use anyhow::Result;
+    use cm_config::RuntimeConfig;
+    use cm_fidl_analyzer::component_model::ModelBuilderForAnalyzer;
+    use cm_rust::{
+        Availability, CapabilityTypeName, DependencyType, DirectoryDecl, ExposeSource, OfferSource,
+        ProgramDecl, UseDirectoryDecl, UseSource, UseStorageDecl,
+    };
+    use cm_rust_testing::*;
+    use cm_types::{Path, Url};
+    use fidl_fuchsia_io as fio;
+    use fuchsia_merkle::{Hash, HASH_SIZE};
+    use maplit::{hashmap, hashset};
+    use moniker::Moniker;
+    use routing::environment::RunnerRegistry;
+    use routing::mapper::RouteSegment;
+    use scrutiny::prelude::{DataController, DataModel};
+    use scrutiny_testing::fake::fake_data_model;
+    use serde_json::json;
+    use std::str::FromStr;
+    use std::sync::Arc;
 
     const TEST_URL_PREFIX: &str = "fuchsia-pkg://test.fuchsia.com";
 

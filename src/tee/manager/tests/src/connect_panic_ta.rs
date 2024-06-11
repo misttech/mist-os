@@ -7,11 +7,9 @@
 use anyhow::{Context, Error};
 use fidl::endpoints::Proxy;
 use fidl::AsHandleRef;
-use fidl_fuchsia_io;
-use fidl_fuchsia_tee;
 use fuchsia_component::client::{connect_to_protocol_at, connect_to_protocol_at_path};
-use fuchsia_fs;
 use fuchsia_zircon::{self as zx};
+use {fidl_fuchsia_io, fidl_fuchsia_tee, fuchsia_fs};
 
 #[fuchsia::test]
 async fn connect_panic_ta() -> Result<(), Error> {

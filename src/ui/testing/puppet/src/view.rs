@@ -2,26 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::presentation_loop;
+use async_utils::event::Event as AsyncEvent;
+use async_utils::hanging_get::client::HangingGetStream;
+use euclid::{Point2D, Transform2D};
+use fidl::endpoints::{create_proxy, create_request_stream, ServerEnd};
+use fidl_fuchsia_ui_input3::{self as ui_input3, KeyEvent};
+use fidl_fuchsia_ui_pointer::{
+    self as ui_pointer, MouseEvent, TouchEvent, TouchInteractionId, TouchInteractionStatus,
+    TouchResponse,
+};
+use futures::channel::{mpsc, oneshot};
+use futures::StreamExt;
+use once_cell::unsync::OnceCell;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
+use std::slice::Iter;
+use tracing::info;
 use {
-    crate::presentation_loop,
-    async_utils::event::Event as AsyncEvent,
-    async_utils::hanging_get::client::HangingGetStream,
-    euclid::{Point2D, Transform2D},
-    fidl::endpoints::{create_proxy, create_request_stream, ServerEnd},
     fidl_fuchsia_math as fmath, fidl_fuchsia_ui_composition as ui_comp,
-    fidl_fuchsia_ui_input3::{self as ui_input3, KeyEvent},
-    fidl_fuchsia_ui_pointer::{
-        self as ui_pointer, MouseEvent, TouchEvent, TouchInteractionId, TouchInteractionStatus,
-        TouchResponse,
-    },
     fidl_fuchsia_ui_test_conformance as ui_conformance, fidl_fuchsia_ui_test_input as test_input,
     fidl_fuchsia_ui_views as ui_views, fuchsia_async as fasync, fuchsia_scenic as scenic,
-    futures::channel::{mpsc, oneshot},
-    futures::StreamExt,
-    once_cell::unsync::OnceCell,
-    std::collections::HashMap,
-    std::{cell::RefCell, rc::Rc, slice::Iter},
-    tracing::info,
 };
 
 pub type FlatlandPtr = Rc<ui_comp::FlatlandProxy>;

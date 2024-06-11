@@ -16,28 +16,22 @@ pub(crate) mod validate;
 #[allow(unused)] // A test-only macro is defined outside of a test builds.
 pub mod translate;
 
-use {
-    crate::error::Error,
-    cml_macro::{CheckedVec, OneOrMany, Reference},
-    fidl_fuchsia_io as fio,
-    indexmap::IndexMap,
-    itertools::Itertools,
-    json5format::{FormatOptions, PathOption},
-    lazy_static::lazy_static,
-    maplit::{hashmap, hashset},
-    reference_doc::ReferenceDoc,
-    serde::{de, ser, Deserialize, Serialize},
-    serde_json::{Map, Value},
-    std::{
-        cmp,
-        collections::{BTreeMap, HashMap, HashSet},
-        fmt,
-        hash::Hash,
-        num::NonZeroU32,
-        path,
-        str::FromStr,
-    },
-};
+use crate::error::Error;
+use cml_macro::{CheckedVec, OneOrMany, Reference};
+use fidl_fuchsia_io as fio;
+use indexmap::IndexMap;
+use itertools::Itertools;
+use json5format::{FormatOptions, PathOption};
+use lazy_static::lazy_static;
+use maplit::{hashmap, hashset};
+use reference_doc::ReferenceDoc;
+use serde::{de, ser, Deserialize, Serialize};
+use serde_json::{Map, Value};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::hash::Hash;
+use std::num::NonZeroU32;
+use std::str::FromStr;
+use std::{cmp, fmt, path};
 
 pub use cm_types::{
     AllowedOffers, Availability, DeliveryType, DependencyType, Durability, Name, NamespacePath,
@@ -45,10 +39,9 @@ pub use cm_types::{
 };
 use error::Location;
 
-pub use crate::{
-    one_or_many::OneOrMany, translate::compile, translate::CompileOptions,
-    validate::ProtocolRequirements,
-};
+pub use crate::one_or_many::OneOrMany;
+pub use crate::translate::{compile, CompileOptions};
+pub use crate::validate::ProtocolRequirements;
 
 lazy_static! {
     static ref DEFAULT_EVENT_STREAM_NAME: Name = "EventStream".parse().unwrap();
@@ -4489,13 +4482,11 @@ pub fn create_offer(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {
-        assert_matches::assert_matches,
-        difference::Changeset,
-        serde_json::{json, to_string_pretty, to_value},
-        std::path::Path,
-        test_case::test_case,
-    };
+    use assert_matches::assert_matches;
+    use difference::Changeset;
+    use serde_json::{json, to_string_pretty, to_value};
+    use std::path::Path;
+    use test_case::test_case;
 
     macro_rules! assert_json_eq {
         ($a:expr, $e:expr) => {{

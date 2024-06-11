@@ -1,18 +1,13 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    anyhow::{anyhow, Context, Error},
-    fidl_fuchsia_paver::Configuration,
-    fidl_fuchsia_paver::{BootManagerMarker, PaverMarker, PaverProxy},
-    fidl_fuchsia_update_installer::{InstallerMarker, InstallerProxy, RebootControllerMarker},
-    fidl_fuchsia_update_installer_ext::{
-        options::{Initiator, Options},
-        start_update, UpdateAttempt,
-    },
-    fuchsia_zircon as zx,
-    futures::prelude::*,
-};
+use anyhow::{anyhow, Context, Error};
+use fidl_fuchsia_paver::{BootManagerMarker, Configuration, PaverMarker, PaverProxy};
+use fidl_fuchsia_update_installer::{InstallerMarker, InstallerProxy, RebootControllerMarker};
+use fidl_fuchsia_update_installer_ext::options::{Initiator, Options};
+use fidl_fuchsia_update_installer_ext::{start_update, UpdateAttempt};
+use fuchsia_zircon as zx;
+use futures::prelude::*;
 
 pub const DEFAULT_UPDATE_PACKAGE_URL: &str = "fuchsia-pkg://fuchsia.com/update";
 
@@ -122,23 +117,20 @@ impl Updater {
 
 #[cfg(test)]
 pub(crate) mod for_tests {
-    use {
-        super::*,
-        crate::resolver::for_tests::{ResolverForTest, EMPTY_REPO_PATH},
-        blobfs_ramdisk::BlobfsRamdisk,
-        fidl_fuchsia_metrics as fmetrics,
-        fidl_fuchsia_paver::PaverRequestStream,
-        fuchsia_async as fasync,
-        fuchsia_component_test::{
-            Capability, ChildOptions, DirectoryContents, RealmBuilder, RealmInstance, Ref, Route,
-        },
-        fuchsia_merkle::Hash,
-        fuchsia_pkg_testing::serve::ServedRepository,
-        fuchsia_pkg_testing::{Package, RepositoryBuilder, SystemImageBuilder},
-        mock_paver::{MockPaverService, MockPaverServiceBuilder, PaverEvent},
-        std::collections::BTreeSet,
-        std::sync::Arc,
+    use super::*;
+    use crate::resolver::for_tests::{ResolverForTest, EMPTY_REPO_PATH};
+    use blobfs_ramdisk::BlobfsRamdisk;
+    use fidl_fuchsia_paver::PaverRequestStream;
+    use fuchsia_component_test::{
+        Capability, ChildOptions, DirectoryContents, RealmBuilder, RealmInstance, Ref, Route,
     };
+    use fuchsia_merkle::Hash;
+    use fuchsia_pkg_testing::serve::ServedRepository;
+    use fuchsia_pkg_testing::{Package, RepositoryBuilder, SystemImageBuilder};
+    use mock_paver::{MockPaverService, MockPaverServiceBuilder, PaverEvent};
+    use std::collections::BTreeSet;
+    use std::sync::Arc;
+    use {fidl_fuchsia_metrics as fmetrics, fuchsia_async as fasync};
 
     pub const TEST_REPO_URL: &str = "fuchsia-pkg://fuchsia.com";
     pub struct UpdaterBuilder {
@@ -523,10 +515,12 @@ pub(crate) mod for_tests {
 
 #[cfg(test)]
 pub mod tests {
-    use {
-        super::for_tests::UpdaterBuilder, super::*, fidl_fuchsia_paver::Asset,
-        fuchsia_async as fasync, fuchsia_pkg_testing::PackageBuilder, mock_paver::PaverEvent,
-    };
+    use super::for_tests::UpdaterBuilder;
+    use super::*;
+    use fidl_fuchsia_paver::Asset;
+    use fuchsia_async as fasync;
+    use fuchsia_pkg_testing::PackageBuilder;
+    use mock_paver::PaverEvent;
 
     #[fasync::run_singlethreaded(test)]
     pub async fn test_updater() {

@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    fidl_fuchsia_driver_test as fdt, fuchsia_async as fasync,
-    fuchsia_component_test::RealmBuilder,
-    fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
-    fuchsia_zircon as zx,
-};
+use anyhow::Result;
+use fuchsia_component_test::RealmBuilder;
+use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
+use {fidl_fuchsia_driver_test as fdt, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 // This test checks for a very specific bug in the compat driver, where
 // adding devices would fail if it was in the same driver in the same driver host,

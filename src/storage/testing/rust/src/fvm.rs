@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::Guid,
-    anyhow::{Context, Result},
-    device_watcher::recursive_wait_and_open,
-    fidl::endpoints::Proxy as _,
-    fidl_fuchsia_device::ControllerProxy,
-    fidl_fuchsia_hardware_block::BlockMarker,
-    fidl_fuchsia_hardware_block_partition::Guid as FidlGuid,
-    fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeManagerProxy},
-    fidl_fuchsia_io as fio,
-    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
-    fuchsia_zircon::{self as zx, sys::zx_handle_t, zx_status_t, AsHandleRef},
-};
+use crate::Guid;
+use anyhow::{Context, Result};
+use device_watcher::recursive_wait_and_open;
+use fidl::endpoints::Proxy as _;
+use fidl_fuchsia_device::ControllerProxy;
+use fidl_fuchsia_hardware_block::BlockMarker;
+use fidl_fuchsia_hardware_block_partition::Guid as FidlGuid;
+use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeManagerProxy};
+use fidl_fuchsia_io as fio;
+use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
+use fuchsia_zircon::sys::zx_handle_t;
+use fuchsia_zircon::{self as zx, zx_status_t, AsHandleRef};
 
 const FVM_DRIVER_PATH: &str = "fvm.cm";
 
@@ -103,14 +102,11 @@ pub async fn create_fvm_volume(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{wait_for_block_device, BlockDeviceMatcher},
-        fidl_fuchsia_hardware_block_volume::VolumeMarker,
-        fidl_fuchsia_hardware_block_volume::ALLOCATE_PARTITION_FLAG_INACTIVE,
-        fuchsia_component::client::connect_to_protocol_at_path,
-        ramdevice_client::RamdiskClient,
-    };
+    use super::*;
+    use crate::{wait_for_block_device, BlockDeviceMatcher};
+    use fidl_fuchsia_hardware_block_volume::{VolumeMarker, ALLOCATE_PARTITION_FLAG_INACTIVE};
+    use fuchsia_component::client::connect_to_protocol_at_path;
+    use ramdevice_client::RamdiskClient;
 
     const BLOCK_SIZE: u64 = 512;
     const BLOCK_COUNT: u64 = 64 * 1024 * 1024 / BLOCK_SIZE;

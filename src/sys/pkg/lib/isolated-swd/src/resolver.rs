@@ -4,23 +4,21 @@
 
 #[cfg(test)]
 pub(crate) mod for_tests {
+    use crate::cache::for_tests::CacheForTest;
+    use anyhow::{anyhow, Context, Error};
+    use blobfs_ramdisk::BlobfsRamdisk;
+    use fidl_fuchsia_pkg_ext::RepositoryConfigs;
+    use fuchsia_component_test::{
+        Capability, ChildOptions, ChildRef, DirectoryContents, RealmBuilder, RealmInstance, Ref,
+        Route,
+    };
+    use fuchsia_pkg_testing::serve::ServedRepository;
+    use fuchsia_url::RepositoryUrl;
+    use futures::{FutureExt as _, StreamExt as _};
+    use std::sync::Arc;
     use {
-        crate::cache::for_tests::CacheForTest,
-        anyhow::Error,
-        anyhow::{anyhow, Context},
-        blobfs_ramdisk::BlobfsRamdisk,
         fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics, fidl_fuchsia_pkg as fpkg,
-        fidl_fuchsia_pkg_ext as pkg,
-        fidl_fuchsia_pkg_ext::RepositoryConfigs,
-        fuchsia_async as fasync,
-        fuchsia_component_test::ChildRef,
-        fuchsia_component_test::{
-            Capability, ChildOptions, DirectoryContents, RealmBuilder, RealmInstance, Ref, Route,
-        },
-        fuchsia_pkg_testing::serve::ServedRepository,
-        fuchsia_url::RepositoryUrl,
-        futures::{FutureExt as _, StreamExt as _},
-        std::sync::Arc,
+        fidl_fuchsia_pkg_ext as pkg, fuchsia_async as fasync,
     };
 
     const SSL_TEST_CERTS_PATH: &str = "/pkg/data/ssl/cert.pem";
@@ -217,15 +215,12 @@ pub(crate) mod for_tests {
 
 #[cfg(test)]
 pub mod tests {
-    use {
-        super::for_tests::{ResolverForTest, EMPTY_REPO_PATH},
-        anyhow::Context,
-        anyhow::Error,
-        fuchsia_async as fasync,
-        fuchsia_component_test::RealmBuilder,
-        fuchsia_pkg_testing::{PackageBuilder, RepositoryBuilder},
-        std::sync::Arc,
-    };
+    use super::for_tests::{ResolverForTest, EMPTY_REPO_PATH};
+    use anyhow::{Context, Error};
+    use fuchsia_async as fasync;
+    use fuchsia_component_test::RealmBuilder;
+    use fuchsia_pkg_testing::{PackageBuilder, RepositoryBuilder};
+    use std::sync::Arc;
 
     const TEST_REPO_URL: &str = "fuchsia-pkg://test";
 

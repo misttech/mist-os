@@ -4,11 +4,11 @@
 
 pub mod handshake;
 
-use self::handshake::{
-    fourway::{self, Fourway},
-    group_key::{self, GroupKey},
-};
-use crate::key::{gtk::Gtk, igtk::Igtk, ptk::Ptk};
+use self::handshake::fourway::{self, Fourway};
+use self::handshake::group_key::{self, GroupKey};
+use crate::key::gtk::Gtk;
+use crate::key::igtk::Igtk;
+use crate::key::ptk::Ptk;
 use crate::rsna::{Dot11VerifiedKeyFrame, NegotiatedProtection, UpdateSink};
 use crate::Error;
 use zerocopy::ByteSlice;
@@ -126,7 +126,8 @@ mod tests {
     use super::*;
     use crate::integrity::{self, Algorithm};
     use crate::rsna::test_util;
-    use wlan_common::{assert_variant, ie::rsn::akm::Akm};
+    use wlan_common::assert_variant;
+    use wlan_common::ie::rsn::akm::Akm;
 
     fn fake_key_frame(mic_len: usize) -> eapol::KeyFrameTx {
         let key_info = eapol::KeyInformation(0).with_key_mic(true);

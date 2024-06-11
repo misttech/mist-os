@@ -5,35 +5,33 @@
 //! A pure IP device, capable of directly sending/receiving IPv4 & IPv6 packets.
 
 use alloc::vec::Vec;
-use core::{convert::Infallible as Never, fmt::Debug};
+use core::convert::Infallible as Never;
+use core::fmt::Debug;
 
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use log::warn;
 use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6, Mtu};
+use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{
-    sync::{Mutex, RwLock},
     CoreTimerContext, Device, DeviceIdContext, ReceivableFrameMeta, RecvFrameContext,
     RecvIpFrameMeta, ResourceCounterContext, SendableFrameMeta, TimerContext, WeakDeviceIdentifier,
 };
 use netstack3_ip::{IpPacketDestination, IpTypesIpExt};
 use packet::{Buf, BufferMut, Serializer};
 
-use crate::internal::{
-    base::{
-        DeviceCounters, DeviceLayerTypes, DeviceReceiveFrameSpec, DeviceSendFrameError,
-        PureIpDeviceCounters,
-    },
-    id::{BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, DeviceId},
-    queue::{
-        tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState},
-        DequeueState, TransmitQueueFrameError,
-    },
-    socket::{
-        DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, Frame, IpFrame,
-        ReceivedFrame,
-    },
-    state::{DeviceStateSpec, IpLinkDeviceState},
+use crate::internal::base::{
+    DeviceCounters, DeviceLayerTypes, DeviceReceiveFrameSpec, DeviceSendFrameError,
+    PureIpDeviceCounters,
 };
+use crate::internal::id::{BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, DeviceId};
+use crate::internal::queue::tx::{
+    BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState,
+};
+use crate::internal::queue::{DequeueState, TransmitQueueFrameError};
+use crate::internal::socket::{
+    DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, Frame, IpFrame, ReceivedFrame,
+};
+use crate::internal::state::{DeviceStateSpec, IpLinkDeviceState};
 
 /// A weak device ID identifying a pure IP device.
 ///

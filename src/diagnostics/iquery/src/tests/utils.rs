@@ -8,12 +8,15 @@ use argh::FromArgs;
 use fuchsia_async as fasync;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use fuchsia_zircon::{self as zx, DurationNum};
-use iquery::{command_line::CommandLine, commands::*, types::Error};
+use iquery::command_line::CommandLine;
+use iquery::commands::*;
+use iquery::types::Error;
 use pretty_assertions::assert_eq;
 use regex::Regex;
 use serde::ser::Serialize;
 use serde_json::ser::{PrettyFormatter, Serializer};
-use std::{fmt, fs, path::Path};
+use std::path::Path;
+use std::{fmt, fs};
 
 pub const BASIC_COMPONENT_URL: &'static str =
     "fuchsia-pkg://fuchsia.com/iquery-tests#meta/basic_component.cm";

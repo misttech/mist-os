@@ -9,18 +9,15 @@ use core::num::{NonZeroU16, NonZeroU8};
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 use netstack3_base::{AnyDevice, DeviceIdContext, DeviceIdentifier};
 
-use crate::internal::{
-    device::{
-        self,
-        router_solicitation::RsHandler,
-        slaac::SlaacConfiguration,
-        state::{IpDeviceFlags, Ipv4DeviceConfiguration},
-        IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt,
-        Ipv6DeviceConfigurationContext, WithIpDeviceConfigurationMutInner as _,
-        WithIpv6DeviceConfigurationMutInner as _,
-    },
-    gmp::GmpHandler,
+use crate::internal::device::router_solicitation::RsHandler;
+use crate::internal::device::slaac::SlaacConfiguration;
+use crate::internal::device::state::{IpDeviceFlags, Ipv4DeviceConfiguration};
+use crate::internal::device::{
+    self, IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt,
+    Ipv6DeviceConfigurationContext, WithIpDeviceConfigurationMutInner as _,
+    WithIpv6DeviceConfigurationMutInner as _,
 };
+use crate::internal::gmp::GmpHandler;
 
 /// A trait abstracting configuration between IPv4 and IPv6.
 ///

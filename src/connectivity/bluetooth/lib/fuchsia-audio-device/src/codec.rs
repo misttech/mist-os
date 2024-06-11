@@ -9,14 +9,13 @@ use fidl_fuchsia_hardware_audio::{
     CodecWatchPlugStateResponder, PlugState,
 };
 use fidl_fuchsia_hardware_audio_signalprocessing::SignalProcessingRequestStream;
-use fuchsia_async as fasync;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
 use futures::stream::FusedStream;
 use futures::task::{Context, Poll};
 use futures::{Stream, StreamExt};
 use std::fmt::Debug;
 use std::sync::Arc;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 use crate::types::{Error, Result};
 

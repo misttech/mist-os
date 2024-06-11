@@ -2,19 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{cell::RefCell, rc::Rc};
+use std::cell::RefCell;
+use std::rc::Rc;
 
-use crate::{
-    core::{Core, Object, ObjectRef, OnAdded, Property},
-    math::Mat,
-    renderer::Style,
-    shapes::{
-        paint::{ShapePaint, ShapePaintMutator},
-        path_space::PathSpace,
-        CommandPath, FillRule,
-    },
-    RenderPaint, Renderer,
-};
+use crate::core::{Core, Object, ObjectRef, OnAdded, Property};
+use crate::math::Mat;
+use crate::renderer::Style;
+use crate::shapes::paint::{ShapePaint, ShapePaintMutator};
+use crate::shapes::path_space::PathSpace;
+use crate::shapes::{CommandPath, FillRule};
+use crate::{RenderPaint, Renderer};
 
 #[derive(Debug, Default)]
 pub struct Fill {

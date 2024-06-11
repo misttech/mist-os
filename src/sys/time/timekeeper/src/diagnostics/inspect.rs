@@ -2,28 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        diagnostics::{Diagnostics, Event},
-        enums::{
-            ClockCorrectionStrategy, ClockUpdateReason, FrequencyDiscardReason,
-            InitializeRtcOutcome, Role, SampleValidationError, TimeSourceError, Track,
-            WriteRtcOutcome,
-        },
-        MonitorTrack, PrimaryTrack, TimeSource,
-    },
-    fidl_fuchsia_time_external::Status,
-    fuchsia_inspect::{
-        Inspector, IntProperty, Node, NumericProperty, Property, StringProperty, UintProperty,
-    },
-    fuchsia_sync::Mutex,
-    fuchsia_zircon as zx,
-    futures::FutureExt,
-    inspect_writable::{InspectWritable, InspectWritableNode},
-    lazy_static::lazy_static,
-    std::{collections::HashMap, sync::Arc},
-    tracing::warn,
+use crate::diagnostics::{Diagnostics, Event};
+use crate::enums::{
+    ClockCorrectionStrategy, ClockUpdateReason, FrequencyDiscardReason, InitializeRtcOutcome, Role,
+    SampleValidationError, TimeSourceError, Track, WriteRtcOutcome,
 };
+use crate::{MonitorTrack, PrimaryTrack, TimeSource};
+use fidl_fuchsia_time_external::Status;
+use fuchsia_inspect::{
+    Inspector, IntProperty, Node, NumericProperty, Property, StringProperty, UintProperty,
+};
+use fuchsia_sync::Mutex;
+use fuchsia_zircon as zx;
+use futures::FutureExt;
+use inspect_writable::{InspectWritable, InspectWritableNode};
+use lazy_static::lazy_static;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tracing::warn;
 
 const ONE_MILLION: i32 = 1_000_000;
 /// The value stored in place of any time that could not be generated.
@@ -522,18 +518,14 @@ impl Diagnostics for InspectDiagnostics {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            enums::{
-                FrequencyDiscardReason as FDR, SampleValidationError as SVE, StartClockSource,
-                TimeSourceError as TSE,
-            },
-            time_source::FakePushTimeSource,
-        },
-        diagnostics_assertions::{assert_data_tree, AnyProperty},
-        lazy_static::lazy_static,
+    use super::*;
+    use crate::enums::{
+        FrequencyDiscardReason as FDR, SampleValidationError as SVE, StartClockSource,
+        TimeSourceError as TSE,
     };
+    use crate::time_source::FakePushTimeSource;
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
+    use lazy_static::lazy_static;
 
     const BACKSTOP_TIME: i64 = 111111111;
     const RTC_INITIAL_TIME: i64 = 111111234;

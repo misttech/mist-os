@@ -7,18 +7,14 @@ use fidl::endpoints::RequestStream;
 use fidl_fuchsia_bluetooth_avrcp::*;
 use fidl_fuchsia_bluetooth_avrcp_test::*;
 use fuchsia_async as fasync;
-use futures::{
-    future::{FutureExt, TryFutureExt},
-    stream::StreamExt,
-};
+use futures::future::{FutureExt, TryFutureExt};
+use futures::stream::StreamExt;
 use std::collections::VecDeque;
 use tracing::{error, trace, warn};
 
-use crate::{
-    packets::PlaybackStatus as PacketPlaybackStatus,
-    peer::{Controller, ControllerEvent as PeerControllerEvent},
-    types::PeerError,
-};
+use crate::packets::PlaybackStatus as PacketPlaybackStatus;
+use crate::peer::{Controller, ControllerEvent as PeerControllerEvent};
+use crate::types::PeerError;
 
 impl From<PeerError> for ControllerError {
     fn from(e: PeerError) -> Self {
@@ -429,8 +425,7 @@ mod tests {
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
     use fuchsia_bluetooth::profile::Psm;
-    use fuchsia_bluetooth::types::Channel;
-    use fuchsia_bluetooth::types::PeerId;
+    use fuchsia_bluetooth::types::{Channel, PeerId};
     use packet_encoding::Decodable;
     use std::pin::pin;
     use std::sync::Arc;

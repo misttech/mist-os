@@ -4,8 +4,7 @@
 
 //! Type-safe bindings for Zircon bti objects.
 
-use crate::ok;
-use crate::{AsHandleRef, Handle, HandleBased, HandleRef, Iommu, Status};
+use crate::{ok, AsHandleRef, Handle, HandleBased, HandleRef, Iommu, Status};
 use fuchsia_zircon_sys as sys;
 
 /// An object representing a Zircon Bus Transaction Initiator object.

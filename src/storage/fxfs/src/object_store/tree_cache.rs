@@ -2,18 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::object_record::{ObjectKey, ObjectKeyData, ObjectValue},
-    crate::lsm_tree::cache::{ObjectCache, ObjectCachePlaceholder, ObjectCacheResult},
-    linked_hash_map::{Entry, LinkedHashMap},
-    std::{
-        hash::BuildHasherDefault,
-        sync::{
-            atomic::{AtomicU64, Ordering},
-            Mutex,
-        },
-    },
-};
+use super::object_record::{ObjectKey, ObjectKeyData, ObjectValue};
+use crate::lsm_tree::cache::{ObjectCache, ObjectCachePlaceholder, ObjectCacheResult};
+use linked_hash_map::{Entry, LinkedHashMap};
+use std::hash::BuildHasherDefault;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
 
 fn filter(key: &ObjectKey) -> bool {
     match key.data {
@@ -138,13 +132,9 @@ impl ObjectCache<ObjectKey, ObjectValue> for TreeCache {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{
-            super::object_record::{ObjectKey, ObjectValue, Timestamp},
-            TreeCache,
-        },
-        crate::lsm_tree::cache::{ObjectCache, ObjectCacheResult},
-    };
+    use super::super::object_record::{ObjectKey, ObjectValue, Timestamp};
+    use super::TreeCache;
+    use crate::lsm_tree::cache::{ObjectCache, ObjectCacheResult};
     #[fuchsia::test]
     async fn test_basic_operations() {
         let cache = TreeCache::new();

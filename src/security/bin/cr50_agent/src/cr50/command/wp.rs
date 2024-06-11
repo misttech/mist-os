@@ -1,10 +1,8 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{
-    cr50::command::{Deserializable, Header, Serializable, Subcommand, TpmRequest},
-    util::{DeserializeError, Deserializer, Serializer},
-};
+use crate::cr50::command::{Deserializable, Header, Serializable, Subcommand, TpmRequest};
+use crate::util::{DeserializeError, Deserializer, Serializer};
 use fidl_fuchsia_tpm_cr50::WpState;
 
 #[derive(Debug, PartialEq)]

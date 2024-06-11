@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy},
-    fuchsia_component::client::connect_to_protocol_at_path,
-    fuchsia_sync::RwLock,
-    std::sync::Arc,
-};
+use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy};
+use fuchsia_component::client::connect_to_protocol_at_path;
+use fuchsia_sync::RwLock;
+use std::sync::Arc;
 
 const SVC_DIR: &str = "/svc";
 
@@ -115,14 +113,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_test_fidl_connector::{TestMarker, TestRequest, TestRequestStream},
-        fuchsia_async as fasync,
-        fuchsia_component::server::ServiceFs,
-        futures::prelude::*,
-        std::cell::Cell,
-    };
+    use super::*;
+    use fidl_test_fidl_connector::{TestMarker, TestRequest, TestRequestStream};
+    use fuchsia_async as fasync;
+    use fuchsia_component::server::ServiceFs;
+    use futures::prelude::*;
+    use std::cell::Cell;
 
     #[fasync::run_singlethreaded(test)]
     async fn test_service_reconnector() {

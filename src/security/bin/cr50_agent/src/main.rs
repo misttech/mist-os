@@ -6,19 +6,22 @@ mod cr50;
 mod power_button;
 mod util;
 
-use crate::{cr50::Cr50, power_button::PowerButton};
+use crate::cr50::Cr50;
+use crate::power_button::PowerButton;
 use anyhow::{anyhow, Context, Error};
-use fidl_fuchsia_io as fio;
 use fidl_fuchsia_tpm::{TpmDeviceMarker, TpmDeviceProxy};
 use fidl_fuchsia_tpm_cr50::{Cr50RequestStream, PinWeaverRequestStream};
 use fuchsia_async::TimeoutExt;
-use fuchsia_component::{client::connect_to_named_protocol_at_dir_root, server::ServiceFs};
+use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
+use fuchsia_component::server::ServiceFs;
 use fuchsia_fs::OpenFlags;
-use fuchsia_inspect::{component, health::Reporter};
-use fuchsia_zircon as zx;
-use futures::{prelude::*, stream::TryStreamExt};
+use fuchsia_inspect::component;
+use fuchsia_inspect::health::Reporter;
+use futures::prelude::*;
+use futures::stream::TryStreamExt;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// Wraps all hosted protocols into a single type that can be matched against
 /// and dispatched.

@@ -4,7 +4,8 @@
 
 //! `launcher` launches librarified subprograms. See README.md.
 
-use {anyhow::Error, argh::FromArgs};
+use anyhow::Error;
+use argh::FromArgs;
 
 /// Top-level command.
 #[derive(FromArgs, PartialEq, Debug)]

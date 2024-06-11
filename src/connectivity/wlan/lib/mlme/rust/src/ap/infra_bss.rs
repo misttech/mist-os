@@ -2,36 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::ap::remote_client::{ClientRejection, RemoteClient};
+use crate::ap::{frame_writer, BeaconOffloadParams, BufferedFrame, Context, Rejection, TimedEvent};
+use crate::ddk_converter::softmac_key_configuration_from_mlme;
+use crate::device::{self, DeviceOps};
+use crate::error::Error;
+use crate::WlanTxPacketExt as _;
+use anyhow::format_err;
+use ieee80211::{MacAddr, MacAddrBytes, Ssid};
+use std::collections::{HashMap, VecDeque};
+use std::fmt::Display;
+use tracing::error;
+use wlan_common::mac::{self, CapabilityInfo, EthernetIIHdr};
+use wlan_common::timer::EventId;
+use wlan_common::{ie, tim, TimeUnit};
+use wlan_ffi_transport::Buffer;
+use zerocopy::ByteSlice;
 use {
-    crate::{
-        ap::{
-            frame_writer,
-            remote_client::{ClientRejection, RemoteClient},
-            BeaconOffloadParams, BufferedFrame, Context, Rejection, TimedEvent,
-        },
-        ddk_converter::softmac_key_configuration_from_mlme,
-        device::{self, DeviceOps},
-        error::Error,
-        WlanTxPacketExt as _,
-    },
-    anyhow::format_err,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
-    ieee80211::{MacAddr, MacAddrBytes, Ssid},
-    std::{
-        collections::{HashMap, VecDeque},
-        fmt::Display,
-    },
-    tracing::error,
-    wlan_common::{
-        ie,
-        mac::{self, CapabilityInfo, EthernetIIHdr},
-        tim,
-        timer::EventId,
-        TimeUnit,
-    },
-    wlan_ffi_transport::Buffer,
-    zerocopy::ByteSlice,
 };
 
 pub struct InfraBss {
@@ -632,27 +621,21 @@ impl InfraBss {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            ap::remote_client::ClientEvent,
-            device::{FakeDevice, FakeDeviceConfig, FakeDeviceState},
-        },
-        fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-        fuchsia_sync::Mutex,
-        ieee80211::Bssid,
-        lazy_static::lazy_static,
-        std::sync::Arc,
-        test_case::test_case,
-        wlan_common::{
-            assert_variant,
-            big_endian::BigEndianU16,
-            mac::AsBytesExt as _,
-            test_utils::fake_frames::fake_wpa2_rsne,
-            timer::{self, create_timer},
-        },
-        wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider},
-    };
+    use super::*;
+    use crate::ap::remote_client::ClientEvent;
+    use crate::device::{FakeDevice, FakeDeviceConfig, FakeDeviceState};
+    use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
+    use fuchsia_sync::Mutex;
+    use ieee80211::Bssid;
+    use lazy_static::lazy_static;
+    use std::sync::Arc;
+    use test_case::test_case;
+    use wlan_common::assert_variant;
+    use wlan_common::big_endian::BigEndianU16;
+    use wlan_common::mac::AsBytesExt as _;
+    use wlan_common::test_utils::fake_frames::fake_wpa2_rsne;
+    use wlan_common::timer::{self, create_timer};
+    use wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider};
 
     lazy_static! {
         static ref CLIENT_ADDR: MacAddr = [4u8; 6].into();

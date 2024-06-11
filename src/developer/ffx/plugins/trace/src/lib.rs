@@ -20,13 +20,11 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{
-    collections::{BTreeSet, HashMap},
-    future::Future,
-    io::{stdin, LineWriter, Stdin, Write},
-    path::{Component, PathBuf},
-    time::Duration,
-};
+use std::collections::{BTreeSet, HashMap};
+use std::future::Future;
+use std::io::{stdin, LineWriter, Stdin, Write};
+use std::path::{Component, PathBuf};
+use std::time::Duration;
 use term_grid::Grid;
 use termion::terminal_size;
 
@@ -811,14 +809,15 @@ mod tests {
     use ffx_trace_args::{ListCategories, ListProviders, Start, Status, Stop, Symbolize};
     use ffx_writer::{Format, TestBuffers};
     use fidl::endpoints::{ControlHandle, Responder};
-    use fidl_fuchsia_developer_ffx as ffx;
-    use fidl_fuchsia_tracing as tracing;
-    use fidl_fuchsia_tracing_controller as tracing_controller;
     use futures::TryStreamExt;
     use pretty_assertions::assert_eq;
     use serde_json::json;
     use std::matches;
     use tempfile::NamedTempFile;
+    use {
+        fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_tracing as tracing,
+        fidl_fuchsia_tracing_controller as tracing_controller,
+    };
 
     #[test]
     fn test_canonical_path_has_root() {

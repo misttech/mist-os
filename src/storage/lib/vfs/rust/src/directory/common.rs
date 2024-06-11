@@ -4,15 +4,15 @@
 
 //! Common utilities used by several directory implementations.
 
-use crate::{common::stricter_or_same_rights, directory::entry::EntryInfo};
+use crate::common::stricter_or_same_rights;
+use crate::directory::entry::EntryInfo;
 
-use {
-    byteorder::{LittleEndian, WriteBytesExt as _},
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status,
-    static_assertions::assert_eq_size,
-    std::{io::Write as _, mem::size_of},
-};
+use byteorder::{LittleEndian, WriteBytesExt as _};
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use static_assertions::assert_eq_size;
+use std::io::Write as _;
+use std::mem::size_of;
 
 /// Directories need to make sure that connections to child entries do not receive more rights than
 /// the connection to the directory itself.  Plus there is special handling of the OPEN_FLAG_POSIX_*
@@ -109,9 +109,11 @@ pub(crate) fn encode_dirent(
 #[cfg(test)]
 mod tests {
     use super::check_child_connection_flags;
-    use crate::{test_utils::build_flag_combinations, ProtocolsExt};
+    use crate::test_utils::build_flag_combinations;
+    use crate::ProtocolsExt;
 
-    use {fidl_fuchsia_io as fio, fuchsia_zircon_status::Status};
+    use fidl_fuchsia_io as fio;
+    use fuchsia_zircon_status::Status;
 
     fn new_connection_validate_flags(flags: fio::OpenFlags) -> Result<fio::OpenFlags, Status> {
         flags

@@ -5,14 +5,17 @@
 //! Implementations for raw IP sockets that integrate with traits/types from
 //! foreign modules.
 
-use lock_order::{lock::LockLevelFor, relation::LockBefore, wrap::LockedWrapperApi};
+use lock_order::lock::LockLevelFor;
+use lock_order::relation::LockBefore;
+use lock_order::wrap::LockedWrapperApi;
 use netstack3_device::WeakDeviceId;
 use netstack3_ip::raw::{
     RawIpSocketId, RawIpSocketLockedState, RawIpSocketMap, RawIpSocketMapContext, RawIpSocketState,
     RawIpSocketStateContext,
 };
 
-use crate::{lock_ordering, marker::IpExt, BindingsContext, BindingsTypes, CoreCtx};
+use crate::marker::IpExt;
+use crate::{lock_ordering, BindingsContext, BindingsTypes, CoreCtx};
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<I: IpExt, BC: BindingsContext, L: LockBefore<lock_ordering::RawIpSocketState<I>>>

@@ -10,11 +10,9 @@ use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, Channel, DurationNum, MessageBuf};
 use futures::Stream;
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
-    time::Duration,
-};
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use std::time::Duration;
 
 use crate::bounded_queue::{CreatedAt, SizeOf};
 

@@ -121,11 +121,9 @@ where
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        fho::{Format, TestBuffers},
-        temp_test_env::TempTestEnv,
-    };
+    use super::*;
+    use fho::{Format, TestBuffers};
+    use temp_test_env::TempTestEnv;
 
     const PB_MANIFEST_NAME: &'static str = "product_bundles.json";
 

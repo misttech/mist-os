@@ -88,11 +88,10 @@ pub mod hierarchy {
     pub use diagnostics_hierarchy::*;
 }
 
-pub use {
-    crate::{state::Stats, writer::*},
-    diagnostics_hierarchy::{
-        DiagnosticsHierarchyGetter, ExponentialHistogramParams, LinearHistogramParams,
-    },
+pub use crate::state::Stats;
+pub use crate::writer::*;
+pub use diagnostics_hierarchy::{
+    DiagnosticsHierarchyGetter, ExponentialHistogramParams, LinearHistogramParams,
 };
 
 /// Directiory within the outgoing directory of a component where the diagnostics service should be

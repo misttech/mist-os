@@ -2,20 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::{actions::ShutdownType, component::ComponentInstance, model::Model},
-    anyhow::{format_err, Context as _, Error},
-    fidl_fuchsia_sys2::*,
-    fuchsia_async::{self as fasync},
-    fuchsia_zircon as zx,
-    futures::prelude::*,
-    std::{
-        collections::VecDeque,
-        sync::{Arc, Weak},
-        time::Duration,
-    },
-    tracing::*,
-};
+use crate::model::actions::ShutdownType;
+use crate::model::component::ComponentInstance;
+use crate::model::model::Model;
+use anyhow::{format_err, Context as _, Error};
+use fidl_fuchsia_sys2::*;
+use fuchsia_async::{self as fasync};
+use fuchsia_zircon as zx;
+use futures::prelude::*;
+use std::collections::VecDeque;
+use std::sync::{Arc, Weak};
+use std::time::Duration;
+use tracing::*;
 
 const SHUTDOWN_WATCHDOG_INTERVAL: zx::Duration = zx::Duration::from_seconds(15);
 
@@ -104,19 +102,17 @@ async fn get_all_remaining_monikers(root: &Arc<ComponentInstance>) -> Vec<String
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::model::testing::test_helpers::{
-            component_decl_with_test_runner, ActionsTest, ComponentInfo,
-        },
-        async_trait::async_trait,
-        cm_rust_testing::*,
-        errors::ModelError,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
-        hooks::{Event, EventType, Hook, HooksRegistration},
-        moniker::Moniker,
+    use super::*;
+    use crate::model::testing::test_helpers::{
+        component_decl_with_test_runner, ActionsTest, ComponentInfo,
     };
+    use async_trait::async_trait;
+    use cm_rust_testing::*;
+    use errors::ModelError;
+    use fidl::endpoints::create_proxy_and_stream;
+    use hooks::{Event, EventType, Hook, HooksRegistration};
+    use moniker::Moniker;
+    use {fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync};
 
     /// Use SystemController to shut down a system whose root has the child `a`
     /// and `a` has descendents as shown in the diagram below.

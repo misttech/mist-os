@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _},
-    fidl_fuchsia_feedback::{DataProviderMarker, GetSnapshotParameters},
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon::DurationNum,
-};
+use anyhow::{Context, Error};
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::engine::Engine as _;
+use fidl_fuchsia_feedback::{DataProviderMarker, GetSnapshotParameters};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_zircon::DurationNum;
 
 /// Facade providing access to feedback interface.
 #[derive(Debug)]

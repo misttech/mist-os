@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    drawing::path_for_corner_knockouts,
-    render::{BlendMode, Context as RenderContext, FillRule, Layer, Raster},
-    Coord, Rect, Size,
-};
+use crate::drawing::path_for_corner_knockouts;
+use crate::render::{BlendMode, Context as RenderContext, FillRule, Layer, Raster};
+use crate::{Coord, Rect, Size};
 
 pub use crate::scene::scene::SceneOrder;
 

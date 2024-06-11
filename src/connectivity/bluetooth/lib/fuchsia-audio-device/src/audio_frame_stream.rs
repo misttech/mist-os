@@ -5,12 +5,11 @@
 use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use fuchsia_sync::Mutex;
-use futures::{
-    stream::FusedStream,
-    task::{Context, Poll},
-    FutureExt, Stream,
-};
-use std::{pin::Pin, sync::Arc};
+use futures::stream::FusedStream;
+use futures::task::{Context, Poll};
+use futures::{FutureExt, Stream};
+use std::pin::Pin;
+use std::sync::Arc;
 use tracing::info;
 
 use crate::frame_vmo;
@@ -129,9 +128,8 @@ mod tests {
     use async_utils::PollExt;
     use fidl_fuchsia_hardware_audio::*;
     use fixture::fixture;
-    use fuchsia_async as fasync;
-    use fuchsia_zircon as zx;
     use futures::StreamExt;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     use crate::stream_config::tests::with_audio_frame_stream;
 

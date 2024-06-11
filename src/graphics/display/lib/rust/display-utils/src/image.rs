@@ -9,24 +9,20 @@ use fsysmem2::{
     BufferCollectionTokenDuplicateRequest, NodeSetNameRequest,
 };
 
-use {
-    fidl::endpoints::{create_endpoints, create_proxy, Proxy},
-    fidl_fuchsia_hardware_display_types as fdisplay_types,
-    fidl_fuchsia_images2::{self as fimages2},
-    fidl_fuchsia_sysmem2::{
-        self as fsysmem2, AllocatorMarker, BufferCollectionInfo, BufferCollectionMarker,
-        BufferCollectionProxy, BufferCollectionTokenMarker, BufferCollectionTokenProxy,
-    },
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
+use fidl::endpoints::{create_endpoints, create_proxy, Proxy};
+use fidl_fuchsia_hardware_display_types as fdisplay_types;
+use fidl_fuchsia_images2::{self as fimages2};
+use fidl_fuchsia_sysmem2::{
+    self as fsysmem2, AllocatorMarker, BufferCollectionInfo, BufferCollectionMarker,
+    BufferCollectionProxy, BufferCollectionTokenMarker, BufferCollectionTokenProxy,
 };
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 
-use crate::{
-    controller::Coordinator,
-    error::{Error, Result},
-    pixel_format::PixelFormat,
-    types::{BufferCollectionId, ImageId},
-};
+use crate::controller::Coordinator;
+use crate::error::{Error, Result};
+use crate::pixel_format::PixelFormat;
+use crate::types::{BufferCollectionId, ImageId};
 
 /// Input parameters for constructing an image.
 #[derive(Clone)]

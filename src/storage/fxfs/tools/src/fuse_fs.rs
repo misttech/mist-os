@@ -2,36 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        fuse_attr::{create_dir_attr, create_file_attr, create_symlink_attr},
-        fuse_errors::FxfsResult,
-    },
-    event_listener::Event,
-    fuse3::raw::prelude::*,
-    fxfs::{
-        errors::FxfsError,
-        filesystem::{FxFilesystem, OpenFxFilesystem},
-        log::info,
-        object_handle::ObjectProperties,
-        object_store::{
-            volume::root_volume, DataObjectHandle, Directory, HandleOptions, ObjectDescriptor,
-            ObjectKey, ObjectKind, ObjectStore, ObjectValue, Timestamp,
-        },
-    },
-    fxfs_crypto::Crypt,
-    once_cell::sync::OnceCell,
-    rustc_hash::FxHashMap as HashMap,
-    std::{
-        ffi::OsStr,
-        fs::{File, OpenOptions},
-        path::PathBuf,
-        process,
-        sync::Arc,
-    },
-    storage_device::{fake_device::FakeDevice, file_backed_device::FileBackedDevice, DeviceHolder},
-    tokio::sync::RwLock,
+use crate::fuse_attr::{create_dir_attr, create_file_attr, create_symlink_attr};
+use crate::fuse_errors::FxfsResult;
+use event_listener::Event;
+use fuse3::raw::prelude::*;
+use fxfs::errors::FxfsError;
+use fxfs::filesystem::{FxFilesystem, OpenFxFilesystem};
+use fxfs::log::info;
+use fxfs::object_handle::ObjectProperties;
+use fxfs::object_store::volume::root_volume;
+use fxfs::object_store::{
+    DataObjectHandle, Directory, HandleOptions, ObjectDescriptor, ObjectKey, ObjectKind,
+    ObjectStore, ObjectValue, Timestamp,
 };
+use fxfs_crypto::Crypt;
+use once_cell::sync::OnceCell;
+use rustc_hash::FxHashMap as HashMap;
+use std::ffi::OsStr;
+use std::fs::{File, OpenOptions};
+use std::path::PathBuf;
+use std::process;
+use std::sync::Arc;
+use storage_device::fake_device::FakeDevice;
+use storage_device::file_backed_device::FileBackedDevice;
+use storage_device::DeviceHolder;
+use tokio::sync::RwLock;
 
 const DEFAULT_DEVICE_BLOCK_SIZE: u32 = 512;
 const DEFAULT_DEVICE_SIZE: u64 = 1024u64.pow(4);
@@ -383,13 +378,9 @@ impl FuseStrParser for OsStr {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::fuse_fs::FuseFs,
-        fxfs::{
-            object_handle::ObjectHandle,
-            object_store::transaction::{lock_keys, LockKey, Options},
-        },
-    };
+    use crate::fuse_fs::FuseFs;
+    use fxfs::object_handle::ObjectHandle;
+    use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
 
     /// Load object handle for three times, then continuously release the object handle.
     /// Check the handle counter value after each release.

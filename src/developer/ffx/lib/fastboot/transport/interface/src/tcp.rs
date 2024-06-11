@@ -4,13 +4,13 @@
 
 use anyhow::{bail, Context as _, Result};
 use async_net::TcpStream;
-use futures::{
-    prelude::*,
-    task::{Context, Poll},
-};
+use futures::prelude::*;
+use futures::task::{Context, Poll};
 use std::fmt;
+use std::io::ErrorKind;
+use std::net::SocketAddr;
+use std::pin::Pin;
 use std::time::Duration;
-use std::{io::ErrorKind, net::SocketAddr, pin::Pin};
 use timeout::timeout;
 
 const FB_HANDSHAKE: [u8; 4] = *b"FB01";

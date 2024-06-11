@@ -2,17 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        log::*,
-        lsm_tree::types::ItemRef,
-        object_store::{
-            allocator::{AllocatorKey, AllocatorValue},
-            ObjectDescriptor,
-        },
-    },
-    std::ops::Range,
-};
+use crate::log::*;
+use crate::lsm_tree::types::ItemRef;
+use crate::object_store::allocator::{AllocatorKey, AllocatorValue};
+use crate::object_store::ObjectDescriptor;
+use std::ops::Range;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum FsckIssue {

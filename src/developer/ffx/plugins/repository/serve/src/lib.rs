@@ -2,44 +2,43 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context as _},
-    async_trait::async_trait,
-    camino::{Utf8Path, Utf8PathBuf},
-    errors::ffx_bail,
-    ffx_config::{environment::EnvironmentKind, EnvironmentContext},
-    ffx_repository_serve_args::ServeCommand,
-    ffx_target::{get_target_specifier, knock_target_by_name},
-    fho::{daemon_protocol, AvailabilityFlag, FfxMain, FfxTool, Result, SimpleWriter},
-    fidl_fuchsia_developer_ffx::{
-        RepositoryStorageType, RepositoryTarget as FfxCliRepositoryTarget, TargetCollectionProxy,
-        TargetCollectionReaderMarker, TargetCollectionReaderRequest, TargetInfo,
-        TargetQuery as FfxTargetQuery,
-    },
-    fidl_fuchsia_developer_ffx_ext::{
-        RepositoryRegistrationAliasConflictMode as FfxRepositoryRegistrationAliasConflictMode,
-        RepositoryTarget as FfxDaemonRepositoryTarget,
-    },
-    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
-    fidl_fuchsia_pkg::RepositoryManagerMarker,
-    fidl_fuchsia_pkg_rewrite::EngineMarker,
-    fuchsia_async as fasync,
-    fuchsia_repo::{
-        manager::RepositoryManager,
-        repo_client::RepoClient,
-        repository::{PmRepository, RepoProvider},
-        server::RepositoryServer,
-    },
-    futures::{executor::block_on, SinkExt, StreamExt, TryStreamExt as _},
-    pkg::repo::register_target_with_fidl_proxies,
-    signal_hook::{
-        consts::signal::{SIGHUP, SIGINT, SIGTERM},
-        iterator::Signals,
-    },
-    std::{fs, io::Write, sync::Arc, time::Duration},
-    timeout::timeout,
-    tuf::metadata::RawSignedMetadata,
+use anyhow::{anyhow, Context as _};
+use async_trait::async_trait;
+use camino::{Utf8Path, Utf8PathBuf};
+use errors::ffx_bail;
+use ffx_config::environment::EnvironmentKind;
+use ffx_config::EnvironmentContext;
+use ffx_repository_serve_args::ServeCommand;
+use ffx_target::{get_target_specifier, knock_target_by_name};
+use fho::{daemon_protocol, AvailabilityFlag, FfxMain, FfxTool, Result, SimpleWriter};
+use fidl_fuchsia_developer_ffx::{
+    RepositoryStorageType, RepositoryTarget as FfxCliRepositoryTarget, TargetCollectionProxy,
+    TargetCollectionReaderMarker, TargetCollectionReaderRequest, TargetInfo,
+    TargetQuery as FfxTargetQuery,
 };
+use fidl_fuchsia_developer_ffx_ext::{
+    RepositoryRegistrationAliasConflictMode as FfxRepositoryRegistrationAliasConflictMode,
+    RepositoryTarget as FfxDaemonRepositoryTarget,
+};
+use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use fidl_fuchsia_pkg::RepositoryManagerMarker;
+use fidl_fuchsia_pkg_rewrite::EngineMarker;
+use fuchsia_async as fasync;
+use fuchsia_repo::manager::RepositoryManager;
+use fuchsia_repo::repo_client::RepoClient;
+use fuchsia_repo::repository::{PmRepository, RepoProvider};
+use fuchsia_repo::server::RepositoryServer;
+use futures::executor::block_on;
+use futures::{SinkExt, StreamExt, TryStreamExt as _};
+use pkg::repo::register_target_with_fidl_proxies;
+use signal_hook::consts::signal::{SIGHUP, SIGINT, SIGTERM};
+use signal_hook::iterator::Signals;
+use std::fs;
+use std::io::Write;
+use std::sync::Arc;
+use std::time::Duration;
+use timeout::timeout;
+use tuf::metadata::RawSignedMetadata;
 
 const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 const SERVE_KNOCK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
@@ -420,35 +419,37 @@ $ ffx doctor --restart-daemon"#,
 // tests
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        ffx_config::{keys::TARGET_DEFAULT_KEY, ConfigLevel, TestEnv},
-        fho::macro_deps::ffx_writer::TestBuffer,
-        fidl::endpoints::DiscoverableProtocolMarker,
-        fidl_fuchsia_developer_ffx::{
-            RemoteControlState, RepositoryRegistrationAliasConflictMode, SshHostAddrInfo,
-            TargetAddrInfo, TargetCollectionRequest, TargetIpPort, TargetRequest, TargetState,
-        },
-        fidl_fuchsia_developer_remotecontrol as frcs,
-        fidl_fuchsia_net::{IpAddress, Ipv4Address},
-        fidl_fuchsia_pkg::{
-            MirrorConfig, RepositoryConfig, RepositoryManagerRequest,
-            RepositoryManagerRequestStream,
-        },
-        fidl_fuchsia_pkg_rewrite::{
-            EditTransactionRequest, EngineRequest, EngineRequestStream, RuleIteratorRequest,
-        },
-        fidl_fuchsia_pkg_rewrite_ext::Rule,
-        frcs::RemoteControlMarker,
-        fuchsia_repo::{
-            repo_builder::RepoBuilder, repo_keys::RepoKeys, repository::HttpRepository, test_utils,
-        },
-        futures::channel::mpsc::{self, Receiver},
-        std::{collections::BTreeSet, sync::Mutex, time},
-        tuf::{crypto::Ed25519PrivateKey, metadata::Metadata},
-        url::Url,
+    use super::*;
+    use assert_matches::assert_matches;
+    use ffx_config::keys::TARGET_DEFAULT_KEY;
+    use ffx_config::{ConfigLevel, TestEnv};
+    use fho::macro_deps::ffx_writer::TestBuffer;
+    use fidl::endpoints::DiscoverableProtocolMarker;
+    use fidl_fuchsia_developer_ffx::{
+        RemoteControlState, RepositoryRegistrationAliasConflictMode, SshHostAddrInfo,
+        TargetAddrInfo, TargetCollectionRequest, TargetIpPort, TargetRequest, TargetState,
     };
+    use fidl_fuchsia_developer_remotecontrol as frcs;
+    use fidl_fuchsia_net::{IpAddress, Ipv4Address};
+    use fidl_fuchsia_pkg::{
+        MirrorConfig, RepositoryConfig, RepositoryManagerRequest, RepositoryManagerRequestStream,
+    };
+    use fidl_fuchsia_pkg_rewrite::{
+        EditTransactionRequest, EngineRequest, EngineRequestStream, RuleIteratorRequest,
+    };
+    use fidl_fuchsia_pkg_rewrite_ext::Rule;
+    use frcs::RemoteControlMarker;
+    use fuchsia_repo::repo_builder::RepoBuilder;
+    use fuchsia_repo::repo_keys::RepoKeys;
+    use fuchsia_repo::repository::HttpRepository;
+    use fuchsia_repo::test_utils;
+    use futures::channel::mpsc::{self, Receiver};
+    use std::collections::BTreeSet;
+    use std::sync::Mutex;
+    use std::time;
+    use tuf::crypto::Ed25519PrivateKey;
+    use tuf::metadata::Metadata;
+    use url::Url;
 
     const REPO_NAME: &str = "some-repo";
     const REPO_IPV4_ADDR: [u8; 4] = [127, 0, 0, 1];

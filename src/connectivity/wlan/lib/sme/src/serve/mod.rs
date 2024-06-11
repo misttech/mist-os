@@ -5,22 +5,23 @@
 pub mod ap;
 pub mod client;
 
+use crate::{MlmeEventStream, MlmeStream, Station};
+use anyhow::format_err;
+use fidl::endpoints::ServerEnd;
+use fuchsia_inspect_contrib::auto_persist;
+use futures::channel::mpsc;
+use futures::future::FutureObj;
+use futures::prelude::*;
+use futures::select;
+use futures::stream::FuturesUnordered;
+use std::convert::Infallible;
+use std::pin::Pin;
+use std::sync::{Arc, Mutex};
+use tracing::{error, info, warn};
+use wlan_common::timer::{self, ScheduledEvent};
 use {
-    crate::{MlmeEventStream, MlmeStream, Station},
-    anyhow::format_err,
-    fidl::endpoints::ServerEnd,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_inspect_contrib::auto_persist,
-    fuchsia_zircon as zx,
-    futures::{channel::mpsc, future::FutureObj, prelude::*, select, stream::FuturesUnordered},
-    std::{
-        convert::Infallible,
-        pin::Pin,
-        sync::{Arc, Mutex},
-    },
-    tracing::{error, info, warn},
-    wlan_common::timer::{self, ScheduledEvent},
+    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
 };
 
 pub type ClientSmeServer = mpsc::UnboundedSender<client::Endpoint>;
@@ -315,22 +316,17 @@ async fn serve_fidl_endpoint<
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::test_utils,
-        fidl::endpoints::{create_proxy, create_proxy_and_stream},
-        fuchsia_async as fasync,
-        fuchsia_inspect::Inspector,
-        futures::task::Poll,
-        std::pin::pin,
-        test_case::test_case,
-        wlan_common::{
-            assert_variant,
-            test_utils::fake_features::{
-                fake_mac_sublayer_support, fake_security_support,
-                fake_spectrum_management_support_empty,
-            },
-        },
+    use super::*;
+    use crate::test_utils;
+    use fidl::endpoints::{create_proxy, create_proxy_and_stream};
+    use fuchsia_async as fasync;
+    use fuchsia_inspect::Inspector;
+    use futures::task::Poll;
+    use std::pin::pin;
+    use test_case::test_case;
+    use wlan_common::assert_variant;
+    use wlan_common::test_utils::fake_features::{
+        fake_mac_sublayer_support, fake_security_support, fake_spectrum_management_support_empty,
     };
 
     #[test]

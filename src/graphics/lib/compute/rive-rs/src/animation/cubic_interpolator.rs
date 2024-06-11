@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{any::TypeId, cell::RefCell};
+use std::any::TypeId;
+use std::cell::RefCell;
 
-use crate::{
-    core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property},
-    importers::{ArtboardImporter, ImportStack},
-    status_code::StatusCode,
-    Artboard,
-};
+use crate::core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property};
+use crate::importers::{ArtboardImporter, ImportStack};
+use crate::status_code::StatusCode;
+use crate::Artboard;
 
 const SPLINE_TABLE_SIZE: usize = 11;
 const SAMPLE_STEP_SIZE: f32 = 1.0 / (SPLINE_TABLE_SIZE as f32 - 1.0);

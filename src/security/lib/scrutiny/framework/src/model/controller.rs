@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {super::model::DataModel, anyhow::Result, serde_json::value::Value, std::sync::Arc};
+use super::model::DataModel;
+use anyhow::Result;
+use serde_json::value::Value;
+use std::sync::Arc;
 
 /// The data type of the hint improving the intelligence of the hinter about how
 /// to fill in the next parameter.

@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use chrono::{Offset, TimeZone};
-use fho::FfxContext;
-use fho::Result;
+use fho::{FfxContext, Result};
 use fidl_fuchsia_developer_ffx::{self as ffx};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::{fmt::Display, io::Write};
+use std::fmt::Display;
+use std::io::Write;
 
 const UNKNOWN_BUILD_HASH: &str = "(unknown)";
 

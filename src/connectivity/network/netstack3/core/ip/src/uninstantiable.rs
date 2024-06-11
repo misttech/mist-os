@@ -4,17 +4,14 @@
 
 use explicit::UnreachableExt as _;
 use net_types::SpecifiedAddr;
-use netstack3_base::{
-    socket::SocketIpAddr, AnyDevice, DeviceIdContext, EitherDeviceId, UninstantiableWrapper,
-};
+use netstack3_base::socket::SocketIpAddr;
+use netstack3_base::{AnyDevice, DeviceIdContext, EitherDeviceId, UninstantiableWrapper};
 use packet::{BufferMut, Serializer};
 
-use crate::internal::{
-    base::{BaseTransportIpContext, HopLimits, IpExt, IpLayerIpExt},
-    socket::{
-        DeviceIpSocketHandler, IpSock, IpSockCreationError, IpSockSendError, IpSocketHandler, Mms,
-        MmsError, SendOptions,
-    },
+use crate::internal::base::{BaseTransportIpContext, HopLimits, IpExt, IpLayerIpExt};
+use crate::internal::socket::{
+    DeviceIpSocketHandler, IpSock, IpSockCreationError, IpSockSendError, IpSocketHandler, Mms,
+    MmsError, SendOptions,
 };
 
 impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> BaseTransportIpContext<I, C>

@@ -10,10 +10,8 @@ use fidl_fuchsia_net::IpAddress;
 use netext::IsLocalAddr;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::{
-    cmp::max,
-    fmt::{self, Display, Write},
-};
+use std::cmp::max;
+use std::fmt::{self, Display, Write};
 
 const NAME: &'static str = "NAME";
 const SERIAL: &'static str = "SERIAL";

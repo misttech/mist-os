@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{convert::TryInto as _, os::unix::io::AsRawFd as _};
+use std::convert::TryInto as _;
+use std::os::unix::io::AsRawFd as _;
 
 pub trait TcpStreamExt {
     /// Sets TCP_USER_TIMEOUT. Fuchsia supports `1..=i32::max_value()`

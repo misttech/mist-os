@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_io as fio,
-    fuchsia_fs::directory::{WatchEvent, WatchMessage, Watcher},
-    fuchsia_zircon as zx,
-    futures::StreamExt,
-    io_conformance_util::{test_harness::TestHarness, *},
-    std::path::PathBuf,
-};
+use fidl::endpoints::create_proxy;
+use fuchsia_fs::directory::{WatchEvent, WatchMessage, Watcher};
+use futures::StreamExt;
+use io_conformance_util::test_harness::TestHarness;
+use io_conformance_util::*;
+use std::path::PathBuf;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 #[fuchsia::test]
 async fn watch_dir_existing() {

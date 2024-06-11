@@ -9,7 +9,9 @@ mod linuxfb;
 #[cfg(target_os = "fuchsia")]
 mod zirconfb;
 
-use {crate::framebuffer::Framebuffer, anyhow::Error, argh::FromArgs};
+use crate::framebuffer::Framebuffer;
+use anyhow::Error;
+use argh::FromArgs;
 
 /// Detect details about the framebuffer.
 #[derive(FromArgs, Debug)]

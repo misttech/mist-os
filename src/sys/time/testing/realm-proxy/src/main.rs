@@ -6,14 +6,15 @@ mod realm_factory;
 
 use anyhow::{Context, Result};
 use fidl::endpoints::{self, ClientEnd, ControlHandle, Proxy};
-use fidl_fuchsia_metrics_test as ffmt;
-use fidl_test_time_realm as fttr;
-use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_zircon_status as zx_status;
-use futures::{future::BoxFuture, FutureExt, StreamExt, TryStreamExt};
+use futures::future::BoxFuture;
+use futures::{FutureExt, StreamExt, TryStreamExt};
 use std::sync::Arc;
 use timekeeper_integration_lib::{PushSourcePuppet, RtcUpdates};
+use {
+    fidl_fuchsia_metrics_test as ffmt, fidl_test_time_realm as fttr, fuchsia_async as fasync,
+    fuchsia_zircon_status as zx_status,
+};
 
 use fidl_fuchsia_testing as _; // TODO: fmil - Figure out why this is needed.
 

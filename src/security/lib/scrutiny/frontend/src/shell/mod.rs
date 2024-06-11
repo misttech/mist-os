@@ -6,36 +6,26 @@ pub mod args;
 pub mod builtin;
 pub mod error;
 
-use {
-    crate::shell::{
-        args::args_to_json,
-        builtin::{Builtin, BuiltinCommand},
-        error::ShellError,
-    },
-    anyhow::{Error, Result},
-    rustyline::{
-        completion::{Completer, FilenameCompleter, Pair},
-        error::ReadlineError,
-        highlight::Highlighter,
-        hint::Hinter,
-        CompletionType, Config, Editor, Helper,
-    },
-    scrutiny::engine::{
-        dispatcher::{ControllerDispatcher, DispatcherError},
-        manager::{PluginManager, PluginState},
-        plugin::PluginDescriptor,
-    },
-    serde_json::{json, Value},
-    std::{
-        borrow::Cow::{self, Borrowed},
-        collections::{HashMap, VecDeque},
-        fmt::Write,
-        process,
-        sync::{Arc, Mutex, RwLock},
-    },
-    termion::{clear, color, cursor, style},
-    tracing::{error, info, warn},
-};
+use crate::shell::args::args_to_json;
+use crate::shell::builtin::{Builtin, BuiltinCommand};
+use crate::shell::error::ShellError;
+use anyhow::{Error, Result};
+use rustyline::completion::{Completer, FilenameCompleter, Pair};
+use rustyline::error::ReadlineError;
+use rustyline::highlight::Highlighter;
+use rustyline::hint::Hinter;
+use rustyline::{CompletionType, Config, Editor, Helper};
+use scrutiny::engine::dispatcher::{ControllerDispatcher, DispatcherError};
+use scrutiny::engine::manager::{PluginManager, PluginState};
+use scrutiny::engine::plugin::PluginDescriptor;
+use serde_json::{json, Value};
+use std::borrow::Cow::{self, Borrowed};
+use std::collections::{HashMap, VecDeque};
+use std::fmt::Write;
+use std::process;
+use std::sync::{Arc, Mutex, RwLock};
+use termion::{clear, color, cursor, style};
+use tracing::{error, info, warn};
 
 /// A CommandResponse is an internal type to define whether a command was acted
 /// on by a submodule or not.
@@ -404,15 +394,11 @@ impl Shell {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        scrutiny::model::{
-            controller::{DataController, HintDataType},
-            model::DataModel,
-        },
-        scrutiny_testing::fake::*,
-        uuid::Uuid,
-    };
+    use super::*;
+    use scrutiny::model::controller::{DataController, HintDataType};
+    use scrutiny::model::model::DataModel;
+    use scrutiny_testing::fake::*;
+    use uuid::Uuid;
 
     #[derive(Default)]
     struct FakeController {}

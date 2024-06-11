@@ -2,37 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    arch::{
-        registers::RegisterState,
-        signal_handling::{
-            align_stack_pointer, restore_registers, update_register_state_for_restart,
-            SignalStackFrame, RED_ZONE_SIZE, SIG_STACK_SIZE, SYSCALL_INSTRUCTION_SIZE_BYTES,
-        },
-    },
-    mm::{MemoryAccessor, MemoryAccessorExt},
-    signals::{SignalDetail, SignalInfo, SignalState},
-    task::{CurrentTask, ExitStatus, StopState, Task, TaskFlags, TaskWriteGuard},
+use crate::arch::registers::RegisterState;
+use crate::arch::signal_handling::{
+    align_stack_pointer, restore_registers, update_register_state_for_restart, SignalStackFrame,
+    RED_ZONE_SIZE, SIG_STACK_SIZE, SYSCALL_INSTRUCTION_SIZE_BYTES,
 };
+use crate::mm::{MemoryAccessor, MemoryAccessorExt};
+use crate::signals::{SignalDetail, SignalInfo, SignalState};
+use crate::task::{CurrentTask, ExitStatus, StopState, Task, TaskFlags, TaskWriteGuard};
 use extended_pstate::ExtendedPstateState;
 use starnix_logging::{log_trace, log_warn};
 use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::SyscallResult;
+use starnix_uapi::errors::{
+    Errno, ErrnoCode, EINTR, ERESTARTNOHAND, ERESTARTNOINTR, ERESTARTSYS, ERESTART_RESTARTBLOCK,
+};
+use starnix_uapi::resource_limits::Resource;
+use starnix_uapi::signals::{
+    sigaltstack_contains_pointer, SigSet, SIGABRT, SIGALRM, SIGBUS, SIGCHLD, SIGCONT, SIGFPE,
+    SIGHUP, SIGILL, SIGINT, SIGIO, SIGKILL, SIGPIPE, SIGPROF, SIGPWR, SIGQUIT, SIGSEGV, SIGSTKFLT,
+    SIGSTOP, SIGSYS, SIGTERM, SIGTRAP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGUSR1, SIGUSR2,
+    SIGVTALRM, SIGWINCH, SIGXCPU, SIGXFSZ,
+};
+use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
-    errno, error,
-    errors::{
-        Errno, ErrnoCode, EINTR, ERESTARTNOHAND, ERESTARTNOINTR, ERESTARTSYS, ERESTART_RESTARTBLOCK,
-    },
-    resource_limits::Resource,
-    sigaction as sigaction_t,
-    signals::{
-        sigaltstack_contains_pointer, SigSet, SIGABRT, SIGALRM, SIGBUS, SIGCHLD, SIGCONT, SIGFPE,
-        SIGHUP, SIGILL, SIGINT, SIGIO, SIGKILL, SIGPIPE, SIGPROF, SIGPWR, SIGQUIT, SIGSEGV,
-        SIGSTKFLT, SIGSTOP, SIGSYS, SIGTERM, SIGTRAP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGUSR1,
-        SIGUSR2, SIGVTALRM, SIGWINCH, SIGXCPU, SIGXFSZ,
-    },
-    user_address::UserAddress,
-    SA_NODEFER, SA_ONSTACK, SA_RESETHAND, SA_RESTART, SA_SIGINFO, SIG_DFL, SIG_IGN,
+    errno, error, sigaction as sigaction_t, SA_NODEFER, SA_ONSTACK, SA_RESETHAND, SA_RESTART,
+    SA_SIGINFO, SIG_DFL, SIG_IGN,
 };
 
 /// Indicates where in the signal queue a signal should go.  Signals
@@ -466,7 +461,8 @@ pub fn sys_restart_syscall(
 /// Test utilities for signal handling.
 #[cfg(test)]
 pub(crate) mod testing {
-    use crate::{signals::dequeue_signal, testing::AutoReleasableTask};
+    use crate::signals::dequeue_signal;
+    use crate::testing::AutoReleasableTask;
     use std::ops::DerefMut as _;
 
     pub(crate) fn dequeue_signal_for_test(current_task: &mut AutoReleasableTask) {

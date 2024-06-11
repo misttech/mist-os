@@ -10,7 +10,8 @@ use fidl_fuchsia_media::*;
 use fuchsia_image_format::images2_image_format_from_sysmem_image_format;
 use hex::encode;
 use mundane::hash::{Digest, Hasher, Sha256};
-use std::{convert::*, fmt};
+use std::convert::*;
+use std::fmt;
 use stream_processor_test::{ExpectedDigest, FatalError, Output, OutputPacket, OutputValidator};
 use thiserror::Error;
 

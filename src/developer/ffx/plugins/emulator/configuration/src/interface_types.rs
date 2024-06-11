@@ -12,7 +12,8 @@ use async_trait::async_trait;
 use emulator_instance::{EmulatorConfiguration, EmulatorInstanceData, EngineState, EngineType};
 use ffx_config::EnvironmentContext;
 use fho::Result;
-use std::{backtrace::Backtrace, process::Command};
+use std::backtrace::Backtrace;
+use std::process::Command;
 
 #[async_trait(?Send)]
 pub trait EmulatorEngine: Send + Sync {

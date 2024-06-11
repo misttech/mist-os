@@ -19,17 +19,14 @@ use argh::FromArgs;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    env,
-    ffi::OsStr,
-    fs::File,
-    io::Write,
-    iter,
-    path::{Path, PathBuf},
-    process::Command,
-    sync::Mutex,
-};
+use std::collections::{BTreeMap, BTreeSet};
+use std::ffi::OsStr;
+use std::fs::File;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::sync::Mutex;
+use std::{env, iter};
 use tempfile::TempDir;
 use walkdir::WalkDir;
 

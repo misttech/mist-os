@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    assert_matches::assert_matches,
-    component_events::{
-        events::*,
-        matcher::*,
-        sequence::{EventSequence, Ordering},
-    },
-    fidl_fuchsia_component as fcomponent, fidl_test_policy as ftest, fuchsia_async as fasync,
-    fuchsia_component::client,
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    security_policy_test_util::{open_exposed_dir, start_policy_test},
-};
+use anyhow::{Context, Error};
+use assert_matches::assert_matches;
+use component_events::events::*;
+use component_events::matcher::*;
+use component_events::sequence::{EventSequence, Ordering};
+use fuchsia_component::client;
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use security_policy_test_util::{open_exposed_dir, start_policy_test};
+use {fidl_fuchsia_component as fcomponent, fidl_test_policy as ftest, fuchsia_async as fasync};
 
 const CM_URL: &str = "#meta/cm_for_test.cm";
 const ROOT_URL: &str = "#meta/test_root.cm";

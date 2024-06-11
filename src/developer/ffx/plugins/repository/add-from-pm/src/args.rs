@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    argh::{ArgsInfo, FromArgs},
-    ffx_core::ffx_command,
-    std::path::PathBuf,
-};
+use argh::{ArgsInfo, FromArgs};
+use ffx_core::ffx_command;
+use std::path::PathBuf;
 
 #[ffx_command()]
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]

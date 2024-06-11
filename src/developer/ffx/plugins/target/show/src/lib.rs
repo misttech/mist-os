@@ -16,7 +16,8 @@ use fidl_fuchsia_update_channelcontrol::ChannelControlProxy;
 use show::{
     AddressData, BoardData, BuildData, DeviceData, ProductData, TargetShowInfo, UpdateData,
 };
-use std::{net::IpAddr, time::Duration};
+use std::net::IpAddr;
+use std::time::Duration;
 use timeout::timeout;
 
 mod show;

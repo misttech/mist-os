@@ -2,23 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    app::{
-        strategies::framebuffer::{CoordinatorProxyPtr, DisplayId},
-        Config, MessageInternal,
-    },
-    drawing::DisplayRotation,
-    input,
-    render::{
-        generic::{self, Backend},
-        Context as RenderContext, ContextInner,
-    },
-    view::{
-        strategies::base::{ViewStrategy, ViewStrategyPtr},
-        DisplayInfo, UserInputMessage, ViewAssistantContext, ViewAssistantPtr, ViewDetails,
-    },
-    IntPoint, IntSize, Size, ViewKey,
+use crate::app::strategies::framebuffer::{CoordinatorProxyPtr, DisplayId};
+use crate::app::{Config, MessageInternal};
+use crate::drawing::DisplayRotation;
+use crate::render::generic::{self, Backend};
+use crate::render::{Context as RenderContext, ContextInner};
+use crate::view::strategies::base::{ViewStrategy, ViewStrategyPtr};
+use crate::view::{
+    DisplayInfo, UserInputMessage, ViewAssistantContext, ViewAssistantPtr, ViewDetails,
 };
+use crate::{input, IntPoint, IntSize, Size, ViewKey};
 use anyhow::{bail, ensure, Context, Error};
 use async_trait::async_trait;
 use display_utils::{
@@ -30,16 +23,15 @@ use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_hardware_display::{CoordinatorEvent, CoordinatorProxy};
 use fidl_fuchsia_hardware_display_types::{ImageBufferUsage, ImageMetadata};
 use fuchsia_async::{self as fasync, OnSignals};
-use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameSet, FrameUsage, ImageId};
+use fuchsia_framebuffer::sysmem::BufferCollectionAllocator;
+use fuchsia_framebuffer::{FrameSet, FrameUsage, ImageId};
 use fuchsia_trace::{duration, instant};
 use fuchsia_zircon::{
     self as zx, AsHandleRef, Duration, Event, HandleBased, Signals, Status, Time,
 };
 use futures::channel::mpsc::UnboundedSender;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    sync::atomic::{AtomicU64, Ordering},
-};
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 type WaitEvents = BTreeMap<ImageId, (Event, EventId)>;
 

@@ -33,13 +33,12 @@ async fn find_devices_internal(
 
 #[cfg(test)]
 mod tests {
-    use {
-        fuchsia_component_test::{
-            Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Route,
-        },
-        futures::{channel::mpsc, SinkExt, StreamExt},
-        realmbuilder_mock_helpers::mock_dev,
+    use fuchsia_component_test::{
+        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Route,
     };
+    use futures::channel::mpsc;
+    use futures::{SinkExt, StreamExt};
+    use realmbuilder_mock_helpers::mock_dev;
 
     use super::*;
     use crate::test::mock_dai_dev_with_io_devices;

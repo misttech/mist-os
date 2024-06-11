@@ -2,35 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        errors::FxfsError,
-        lsm_tree::{
-            merge::{Merger, MergerIterator},
-            types::{ItemRef, LayerIterator},
-        },
-        object_handle::{ObjectHandle, ObjectProperties, INVALID_OBJECT_ID},
-        object_store::{
-            object_record::{
-                ChildValue, ObjectAttributes, ObjectDescriptor, ObjectItem, ObjectKey,
-                ObjectKeyData, ObjectKind, ObjectValue, PosixAttributes, Timestamp,
-            },
-            transaction::{LockKey, LockKeys, Mutation, Options, Transaction},
-            DataObjectHandle, HandleOptions, HandleOwner, ObjectStore, SetExtendedAttributeMode,
-            StoreObjectHandle,
-        },
-    },
-    anyhow::{anyhow, bail, ensure, Error},
-    fidl_fuchsia_io as fio,
-    std::{
-        fmt,
-        ops::Bound,
-        sync::{
-            atomic::{AtomicBool, Ordering},
-            Arc,
-        },
-    },
+use crate::errors::FxfsError;
+use crate::lsm_tree::merge::{Merger, MergerIterator};
+use crate::lsm_tree::types::{ItemRef, LayerIterator};
+use crate::object_handle::{ObjectHandle, ObjectProperties, INVALID_OBJECT_ID};
+use crate::object_store::object_record::{
+    ChildValue, ObjectAttributes, ObjectDescriptor, ObjectItem, ObjectKey, ObjectKeyData,
+    ObjectKind, ObjectValue, PosixAttributes, Timestamp,
 };
+use crate::object_store::transaction::{LockKey, LockKeys, Mutation, Options, Transaction};
+use crate::object_store::{
+    DataObjectHandle, HandleOptions, HandleOwner, ObjectStore, SetExtendedAttributeMode,
+    StoreObjectHandle,
+};
+use anyhow::{anyhow, bail, ensure, Error};
+use fidl_fuchsia_io as fio;
+use std::fmt;
+use std::ops::Bound;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 /// This contains the transaction with the appropriate locks to replace src with dst, and also the
 /// ID and type of the src and dst.
@@ -870,25 +860,22 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
 mod tests {
     use crate::object_store::StoreObjectHandle;
 
-    use {
-        crate::{
-            errors::FxfsError,
-            filesystem::{FxFilesystem, JournalingObject, SyncOptions},
-            object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle},
-            object_store::{
-                directory::{replace_child, Directory, ReplacedChild},
-                object_record::Timestamp,
-                transaction::{lock_keys, Options},
-                volume::root_volume,
-                HandleOptions, LockKey, ObjectDescriptor, ObjectStore, SetExtendedAttributeMode,
-            },
-        },
-        assert_matches::assert_matches,
-        fidl_fuchsia_io as fio,
-        fxfs_insecure_crypto::InsecureCrypt,
-        std::sync::Arc,
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
+    use crate::errors::FxfsError;
+    use crate::filesystem::{FxFilesystem, JournalingObject, SyncOptions};
+    use crate::object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle};
+    use crate::object_store::directory::{replace_child, Directory, ReplacedChild};
+    use crate::object_store::object_record::Timestamp;
+    use crate::object_store::transaction::{lock_keys, Options};
+    use crate::object_store::volume::root_volume;
+    use crate::object_store::{
+        HandleOptions, LockKey, ObjectDescriptor, ObjectStore, SetExtendedAttributeMode,
     };
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_io as fio;
+    use fxfs_insecure_crypto::InsecureCrypt;
+    use std::sync::Arc;
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::DeviceHolder;
 
     const TEST_DEVICE_BLOCK_SIZE: u32 = 512;
 

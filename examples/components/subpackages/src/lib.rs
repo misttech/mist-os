@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    component_events::{events::*, matcher::*},
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
-    tracing::*,
-};
+use component_events::events::*;
+use component_events::matcher::*;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
+use tracing::*;
 
 // This test demonstrates constructing a realm with two child components
 // and verifying the `fidl.examples.routing.Echo` protocol.

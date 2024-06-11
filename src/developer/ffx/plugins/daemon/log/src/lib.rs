@@ -8,14 +8,12 @@ use ffx_config::EnvironmentContext;
 use ffx_daemon_log_args::LogCommand;
 use fho::{FfxContext, FfxMain, FfxTool};
 use notify::Watcher;
-use std::{
-    collections::VecDeque,
-    fs::File,
-    io::{self, BufRead, BufReader, Seek},
-    path::{Path, PathBuf},
-    sync::{mpsc, Arc, Mutex},
-    time::Duration,
-};
+use std::collections::VecDeque;
+use std::fs::File;
+use std::io::{self, BufRead, BufReader, Seek};
+use std::path::{Path, PathBuf};
+use std::sync::{mpsc, Arc, Mutex};
+use std::time::Duration;
 use tracing::error;
 
 #[derive(FfxTool)]
@@ -206,7 +204,8 @@ impl LogWatcher {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{fs, io::Write};
+    use std::fs;
+    use std::io::Write;
 
     fn write_log(file: &mut impl Write, lines: std::ops::Range<usize>) {
         for line_idx in lines {

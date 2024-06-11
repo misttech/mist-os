@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_update_verify as fidl,
-    fuchsia_async::Task,
-    futures::{future, FutureExt as _, StreamExt as _},
-    std::sync::Arc,
-};
+use fidl_fuchsia_update_verify as fidl;
+use fuchsia_async::Task;
+use futures::{future, FutureExt as _, StreamExt as _};
+use std::sync::Arc;
 
 /// A call hook that can be used to inject responses into the Verifier service.
 pub trait Hook: Send + Sync {
@@ -117,12 +115,10 @@ impl MockVerifierService {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_fuchsia_update_verify::VerifyError,
-        fuchsia_async as fasync,
-        std::sync::atomic::{AtomicU32, Ordering},
-    };
+    use super::*;
+    use fidl_fuchsia_update_verify::VerifyError;
+    use fuchsia_async as fasync;
+    use std::sync::atomic::{AtomicU32, Ordering};
 
     #[fasync::run_singlethreaded(test)]
     async fn test_mock_verifier() {

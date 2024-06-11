@@ -2,23 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    fuchsia_archive::Utf8Reader as FarReader,
-    scrutiny::{
-        model::controller::{DataController, HintDataType},
-        model::model::*,
-    },
-    scrutiny_utils::usage::*,
-    serde::{Deserialize, Serialize},
-    serde_json::{json, value::Value},
-    std::{
-        collections::HashMap,
-        fs::File,
-        io::{prelude::*, Cursor},
-        sync::Arc,
-    },
-};
+use anyhow::Result;
+use fuchsia_archive::Utf8Reader as FarReader;
+use scrutiny::model::controller::{DataController, HintDataType};
+use scrutiny::model::model::*;
+use scrutiny_utils::usage::*;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use serde_json::value::Value;
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::prelude::*;
+use std::io::Cursor;
+use std::sync::Arc;
 
 /// Given an `input` far file extracts the meta/ data from the package into
 /// a dictionary of key,value pairs where the key is the file name and the

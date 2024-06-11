@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::wire,
-    crate::wire::LE32,
-    anyhow::{anyhow, Error},
-    std::io::Write,
-    zerocopy::AsBytes,
-};
+use crate::wire;
+use crate::wire::LE32;
+use anyhow::{anyhow, Error};
+use std::io::Write;
+use zerocopy::AsBytes;
 
 /// Type alias to reduce generic parameter noise.
 pub type ReadableChain<'a, 'b> = virtio_device::chain::ReadableChain<

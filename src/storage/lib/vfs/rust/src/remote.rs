@@ -7,18 +7,14 @@
 #[cfg(test)]
 mod tests;
 
-use {
-    crate::{
-        directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
-        execution_scope::ExecutionScope,
-        path::Path,
-        ObjectRequestRef, ToObjectRequest,
-    },
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status,
-    std::sync::Arc,
-};
+use crate::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use crate::execution_scope::ExecutionScope;
+use crate::path::Path;
+use crate::{ObjectRequestRef, ToObjectRequest};
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use std::sync::Arc;
 
 pub trait RemoteLike {
     fn open(

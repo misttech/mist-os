@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    fidl_fuchsia_bluetooth_hfp::{CallManagerProxy, HfpRequest, HfpRequestStream},
-    fidl_fuchsia_bluetooth_hfp_test::{HfpTestRequest, HfpTestRequestStream},
-    fuchsia_component::server::{ServiceFs, ServiceObj},
-    futures::{channel::mpsc::Sender, FutureExt, SinkExt, StreamExt, TryStreamExt},
-    tracing::info,
-};
+use anyhow::{Context, Error};
+use fidl_fuchsia_bluetooth_hfp::{CallManagerProxy, HfpRequest, HfpRequestStream};
+use fidl_fuchsia_bluetooth_hfp_test::{HfpTestRequest, HfpTestRequestStream};
+use fuchsia_component::server::{ServiceFs, ServiceObj};
+use futures::channel::mpsc::Sender;
+use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
+use tracing::info;
 
 /// The maximum number of fidl service client connections that will be serviced concurrently.
 const MAX_CONCURRENT_CONNECTIONS: usize = 10;
@@ -86,11 +85,12 @@ pub async fn run_services(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, assert_matches::assert_matches, fidl::endpoints::RequestStream,
-        fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_hfp::*,
-        futures::channel::mpsc,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::RequestStream;
+    use fidl_fuchsia_bluetooth_bredr as bredr;
+    use fidl_fuchsia_bluetooth_hfp::*;
+    use futures::channel::mpsc;
 
     #[fuchsia::test(allow_stalls = false)]
     async fn successful_no_op_hfp_connection() {

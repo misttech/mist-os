@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::format_err, std::fmt::Display};
+use anyhow::format_err;
+use std::fmt::Display;
 
 pub trait SendResultExt<T>: Sized {
     fn format_send_err(self) -> Result<T, anyhow::Error>;

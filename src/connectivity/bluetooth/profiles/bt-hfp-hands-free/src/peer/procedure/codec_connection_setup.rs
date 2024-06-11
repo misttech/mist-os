@@ -6,8 +6,7 @@ use anyhow::{format_err, Error};
 use at_commands as at;
 use tracing::warn;
 
-use super::{at_cmd, at_ok, at_resp};
-use super::{Procedure, ProcedureInput, ProcedureOutput};
+use super::{at_cmd, at_ok, at_resp, Procedure, ProcedureInput, ProcedureOutput};
 
 use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
 

@@ -6,9 +6,9 @@
 
 #![allow(clippy::bad_bit_mask)] // TODO(https://fxbug.dev/42080521): stop using bitflags for ResourceKind
 
-use crate::ok;
-use crate::{object_get_info, ObjectQuery, Topic};
-use crate::{AsHandleRef, Handle, HandleBased, HandleRef, Status};
+use crate::{
+    object_get_info, ok, AsHandleRef, Handle, HandleBased, HandleRef, ObjectQuery, Status, Topic,
+};
 use bitflags::bitflags;
 use fuchsia_zircon_sys::{self as sys, zx_duration_t, ZX_MAX_NAME_LEN};
 

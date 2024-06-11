@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{Benchmark, CacheClearableFilesystem, Filesystem, OperationDuration, OperationTimer},
-    async_trait::async_trait,
-    std::{
-        collections::VecDeque,
-        ffi::{CStr, CString},
-        mem::MaybeUninit,
-        ops::Range,
-        os::{fd::RawFd, unix::ffi::OsStringExt},
-        path::{Path, PathBuf},
-    },
-};
+use crate::{Benchmark, CacheClearableFilesystem, Filesystem, OperationDuration, OperationTimer};
+use async_trait::async_trait;
+use std::collections::VecDeque;
+use std::ffi::{CStr, CString};
+use std::mem::MaybeUninit;
+use std::ops::Range;
+use std::os::fd::RawFd;
+use std::os::unix::ffi::OsStringExt;
+use std::path::{Path, PathBuf};
 
 /// Describes the structure of a directory tree to be benchmarked.
 #[derive(Copy, Clone)]
@@ -488,7 +485,8 @@ pub fn open_path_at(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::testing::TestFilesystem};
+    use super::*;
+    use crate::testing::TestFilesystem;
 
     const ITERATION_COUNT: u64 = 3;
 

@@ -151,11 +151,9 @@ pub mod executor {
     use super::LOCAL_EXECUTOR;
 
     use crate::runtime::WakeupTime;
-    use std::{
-        future::Future,
-        ops::{Deref, DerefMut},
-        rc::Rc,
-    };
+    use std::future::Future;
+    use std::ops::{Deref, DerefMut};
+    use std::rc::Rc;
 
     pub use std::time::Duration;
     /// A time relative to the executor's clock.

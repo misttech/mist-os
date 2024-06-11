@@ -6,15 +6,14 @@ use lazy_static::lazy_static;
 use proc_macro2::{Punct, Span, TokenStream};
 use quote::{quote, ToTokens};
 use std::collections::HashMap;
+use syn::parse::{Parse, ParseStream};
+use syn::punctuated::Punctuated;
+use syn::spanned::Spanned;
+use syn::token::Comma;
+use syn::Type::Path;
 use syn::{
-    parse::{Parse, ParseStream},
-    punctuated::Punctuated,
-    spanned::Spanned,
-    token::Comma,
     AngleBracketedGenericArguments, Error, FnArg, GenericArgument, Ident, ItemFn, ItemStruct, Lit,
-    LitStr, Pat, PatIdent, PatType, PathArguments, PathSegment, Token,
-    Type::Path,
-    TypePath,
+    LitStr, Pat, PatIdent, PatType, PathArguments, PathSegment, Token, TypePath,
 };
 
 const ATTRIBUTE_ON_WRONG_PROXY_TYPE: &str = "The ffx attribute for specifying the output type is \

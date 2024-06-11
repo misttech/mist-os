@@ -6,31 +6,24 @@
 // only build in test configuration
 #![cfg(test)]
 
-use {
-    anyhow::{format_err, Context, Error},
-    bt_test_harness::host_realm::HostRealm,
-    bt_test_harness::{
-        emulator::{self, add_bredr_peer, add_le_peer, default_bredr_peer, default_le_peer},
-        host::{expectation as host_expectation, HostHarness},
-    },
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_bluetooth::{self as fbt, DeviceClass, MAJOR_DEVICE_CLASS_TOY},
-    fidl_fuchsia_bluetooth_host::{self as _, HostStartDiscoveryRequest},
-    fidl_fuchsia_bluetooth_sys::{self as fsys, TechnologyType},
-    fidl_fuchsia_hardware_bluetooth::{HciError, PeerProxy},
-    fuchsia_async::TimeoutExt,
-    fuchsia_bluetooth::{
-        constants::INTEGRATION_TIMEOUT,
-        expectation::{
-            self,
-            asynchronous::{ExpectableExt, ExpectableStateExt},
-            peer,
-        },
-        types::{Address, HostInfo, PeerId},
-    },
-    hci_emulator_client::Emulator,
-    std::sync::Arc,
+use anyhow::{format_err, Context, Error};
+use bt_test_harness::emulator::{
+    self, add_bredr_peer, add_le_peer, default_bredr_peer, default_le_peer,
 };
+use bt_test_harness::host::{expectation as host_expectation, HostHarness};
+use bt_test_harness::host_realm::HostRealm;
+use fidl::endpoints::Proxy;
+use fidl_fuchsia_bluetooth::{self as fbt, DeviceClass, MAJOR_DEVICE_CLASS_TOY};
+use fidl_fuchsia_bluetooth_host::{self as _, HostStartDiscoveryRequest};
+use fidl_fuchsia_bluetooth_sys::{self as fsys, TechnologyType};
+use fidl_fuchsia_hardware_bluetooth::{HciError, PeerProxy};
+use fuchsia_async::TimeoutExt;
+use fuchsia_bluetooth::constants::INTEGRATION_TIMEOUT;
+use fuchsia_bluetooth::expectation::asynchronous::{ExpectableExt, ExpectableStateExt};
+use fuchsia_bluetooth::expectation::{self, peer};
+use fuchsia_bluetooth::types::{Address, HostInfo, PeerId};
+use hci_emulator_client::Emulator;
+use std::sync::Arc;
 
 static ADV_DATA: &'static [u8] = &[
     // Flags field set to "general discoverable"

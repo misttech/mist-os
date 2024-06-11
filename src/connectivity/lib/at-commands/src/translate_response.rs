@@ -5,11 +5,9 @@
 //! Code to raise and lower Response types.  This wraps the generated code to raise and lower
 //! the generated Success types with handling for errors and other types of responses.
 
-use crate::{
-    generated::translate::{lower_success, raise_success},
-    highlevel, lowlevel,
-    serde::DeserializeErrorCause,
-};
+use crate::generated::translate::{lower_success, raise_success};
+use crate::serde::DeserializeErrorCause;
+use crate::{highlevel, lowlevel};
 
 pub fn raise_response(
     lowlevel: &lowlevel::Response,

@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::ServeNeededBlobsError, fidl_fuchsia_pkg as fpkg, fidl_fuchsia_pkg_ext as fpkg_ext,
-    fuchsia_hash::Hash, futures::future::FutureExt as _, std::collections::HashSet,
-};
+use super::ServeNeededBlobsError;
+use fuchsia_hash::Hash;
+use futures::future::FutureExt as _;
+use std::collections::HashSet;
+use {fidl_fuchsia_pkg as fpkg, fidl_fuchsia_pkg_ext as fpkg_ext};
 
 /// fuchsia.pkg/PackageCache.Get helper for extracting needed blob hashes (content blobs and
 /// subpackage meta.fars) from package_directory::RootDirs and sending them to a stream that can be
@@ -252,10 +253,10 @@ fn to_sorted_vec(missing: &HashSet<Hash>) -> Vec<fpkg::BlobInfo> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, blobfs_ramdisk::BlobfsRamdisk, fuchsia_pkg_testing::PackageBuilder,
-        futures::stream::StreamExt as _,
-    };
+    use super::*;
+    use blobfs_ramdisk::BlobfsRamdisk;
+    use fuchsia_pkg_testing::PackageBuilder;
+    use futures::stream::StreamExt as _;
 
     #[derive(Clone, Debug)]
     struct MockBlobRecorder {

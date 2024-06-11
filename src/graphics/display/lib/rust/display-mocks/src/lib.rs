@@ -6,14 +6,12 @@
 
 //! Unit test utilities for clients of the `fuchsia.hardware.display` FIDL API.
 
-use {
-    fidl::endpoints::{RequestStream, ServerEnd},
-    fidl_fuchsia_hardware_display::{self as display, CoordinatorMarker, CoordinatorRequestStream},
-    fidl_fuchsia_hardware_display_types as display_types, fuchsia_zircon as zx,
-    itertools::Itertools,
-    std::collections::HashMap,
-    thiserror::Error,
-};
+use fidl::endpoints::{RequestStream, ServerEnd};
+use fidl_fuchsia_hardware_display::{self as display, CoordinatorMarker, CoordinatorRequestStream};
+use itertools::Itertools;
+use std::collections::HashMap;
+use thiserror::Error;
+use {fidl_fuchsia_hardware_display_types as display_types, fuchsia_zircon as zx};
 
 /// Errors that can be returned by `MockCoordinator`.
 #[derive(Error, Debug)]
@@ -114,11 +112,9 @@ pub fn create_proxy_and_mock() -> Result<(display::CoordinatorProxy, MockCoordin
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {
-        anyhow::{Context, Result},
-        fidl_fuchsia_hardware_display as display,
-        futures::{future, TryStreamExt},
-    };
+    use anyhow::{Context, Result};
+    use fidl_fuchsia_hardware_display as display;
+    use futures::{future, TryStreamExt};
 
     async fn wait_for_displays_changed_event(
         events: &mut display::CoordinatorEventStream,

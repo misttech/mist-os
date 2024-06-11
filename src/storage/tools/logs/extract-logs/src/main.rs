@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    argh::FromArgs,
-    byteorder::{LittleEndian, ReadBytesExt},
-    std::{fs::File, io::Read},
-};
+use argh::FromArgs;
+use byteorder::{LittleEndian, ReadBytesExt};
+use std::fs::File;
+use std::io::Read;
 
 /// Magic number we write to the disk before the log data. This allows the extractor to
 /// differentiate between failures of this harness and a successful run where no output was

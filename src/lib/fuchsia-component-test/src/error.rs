@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::Ref, fidl_fuchsia_component_test as ftest, thiserror::Error};
+use crate::Ref;
+use fidl_fuchsia_component_test as ftest;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {

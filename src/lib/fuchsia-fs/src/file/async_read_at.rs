@@ -2,21 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::client::QueryResponseFut,
-    fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status,
-    futures::{
-        future::Future,
-        io::{AsyncRead, AsyncSeek, SeekFrom},
-    },
-    std::{
-        cmp::min,
-        convert::TryInto as _,
-        io,
-        pin::Pin,
-        task::{Context, Poll},
-    },
-};
+use fidl::client::QueryResponseFut;
+use futures::future::Future;
+use futures::io::{AsyncRead, AsyncSeek, SeekFrom};
+use std::cmp::min;
+use std::convert::TryInto as _;
+use std::io;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
 
 /// Trait for reading at a given offset asynchronously.
 /// This is basically `futures::io::AsyncRead` with an extra offset.
@@ -242,19 +236,16 @@ impl<T: AsyncSeek + Unpin> AsyncGetSize for Adapter<T> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::file::{self, AsyncReadAtExt},
-        assert_matches::assert_matches,
-        fidl::endpoints,
-        fuchsia_async as fasync,
-        futures::{
-            future::{self, poll_fn},
-            StreamExt as _, TryStreamExt as _,
-        },
-        std::{convert::TryFrom as _, io::Write},
-        tempfile::{NamedTempFile, TempDir},
-    };
+    use super::*;
+    use crate::file::{self, AsyncReadAtExt};
+    use assert_matches::assert_matches;
+    use fidl::endpoints;
+    use fuchsia_async as fasync;
+    use futures::future::{self, poll_fn};
+    use futures::{StreamExt as _, TryStreamExt as _};
+    use std::convert::TryFrom as _;
+    use std::io::Write;
+    use tempfile::{NamedTempFile, TempDir};
 
     async fn poll_read_at_with_specific_buf_size(
         poll_read_size: u64,

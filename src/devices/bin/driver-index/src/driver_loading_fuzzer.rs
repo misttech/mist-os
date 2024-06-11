@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::resolved_driver::ResolvedDriver,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::SinkExt,
-    futures::StreamExt,
-    rand::{rngs::SmallRng, seq::SliceRandom, RngCore, SeedableRng},
-};
+use crate::resolved_driver::ResolvedDriver;
+use futures::{SinkExt, StreamExt};
+use rand::rngs::SmallRng;
+use rand::seq::SliceRandom;
+use rand::{RngCore, SeedableRng};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub struct Session {
     sender: futures::channel::mpsc::UnboundedSender<Vec<ResolvedDriver>>,

@@ -19,9 +19,8 @@
 //! associates and maintains any supporting data for jobs, such as caches.
 //!
 //! [Jobs]: Job
-use crate::payload_convert;
 use crate::service::message;
-use crate::trace;
+use crate::{payload_convert, trace};
 
 use core::fmt::{Debug, Formatter};
 use core::pin::Pin;

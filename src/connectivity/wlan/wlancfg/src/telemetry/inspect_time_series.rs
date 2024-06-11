@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_inspect::{Inspector, LazyNode, Node as InspectNode},
-    fuchsia_sync::Mutex,
-    futures::FutureExt,
-    std::sync::Arc,
-    windowed_stats::{
-        aggregations::create_saturating_add_fn, FifteenMinutelyWindows, HourlyWindows,
-        MinutelyWindows, TimeSeries,
-    },
-};
+use fuchsia_inspect::{Inspector, LazyNode, Node as InspectNode};
+use fuchsia_sync::Mutex;
+use futures::FutureExt;
+use std::sync::Arc;
+use windowed_stats::aggregations::create_saturating_add_fn;
+use windowed_stats::{FifteenMinutelyWindows, HourlyWindows, MinutelyWindows, TimeSeries};
 
 #[derive(Debug)]
 pub struct TimeSeriesStats {

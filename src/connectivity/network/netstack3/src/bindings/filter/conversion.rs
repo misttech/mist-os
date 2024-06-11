@@ -8,18 +8,15 @@ mod matchers;
 use std::collections::{BTreeMap, HashMap};
 
 use assert_matches::assert_matches;
-use fidl_fuchsia_net_filter as fnet_filter;
-use fidl_fuchsia_net_filter_ext as fnet_filter_ext;
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 use packet_formats::ip::IpExt;
+use {fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext};
 
-use crate::bindings::filter::{
-    controller::{
-        InstalledIpRoutine, InstalledNatRoutine, IpRoutineType, Namespace, NatRoutineType, Routine,
-        Rule,
-    },
-    CommitError,
+use crate::bindings::filter::controller::{
+    InstalledIpRoutine, InstalledNatRoutine, IpRoutineType, Namespace, NatRoutineType, Routine,
+    Rule,
 };
+use crate::bindings::filter::CommitError;
 
 // The requirement or lack thereof that a particular resource's IP version (for
 // example, whether an address matcher is IPv4 or IPv6) must match the version

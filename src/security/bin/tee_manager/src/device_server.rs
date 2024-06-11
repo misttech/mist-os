@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::provider_server::ProviderServer,
-    anyhow::{Context as _, Error},
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_hardware_tee::DeviceConnectorProxy,
-    fidl_fuchsia_tee as fuchsia_tee,
-};
+use crate::provider_server::ProviderServer;
+use anyhow::{Context as _, Error};
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_hardware_tee::DeviceConnectorProxy;
+use fidl_fuchsia_tee as fuchsia_tee;
 
 const STORAGE_DIR: &str = "/data";
 

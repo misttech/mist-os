@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{context_authenticator::ContextAuthenticator, ResolverError},
-    anyhow::Context as _,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
-    futures::stream::TryStreamExt as _,
-    std::{collections::HashMap, sync::Arc},
-    tracing::error,
-    vfs::directory::entry_container::Directory,
-};
+use super::context_authenticator::ContextAuthenticator;
+use super::ResolverError;
+use anyhow::Context as _;
+use fidl::endpoints::ServerEnd;
+use futures::stream::TryStreamExt as _;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tracing::error;
+use vfs::directory::entry_container::Directory;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg};
 
 pub(crate) async fn serve_request_stream(
     mut stream: fpkg::PackageResolverRequestStream,
@@ -236,7 +236,8 @@ async fn resolve_subpackage(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     #[fuchsia::test]
     async fn resolve_rejects_pinned_url() {

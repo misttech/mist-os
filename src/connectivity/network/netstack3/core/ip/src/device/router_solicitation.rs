@@ -6,17 +6,18 @@
 //!
 //! [RFC 4861 section 6.3.7]: https://datatracker.ietf.org/doc/html/rfc4861#section-6.3.7
 
-use core::{num::NonZeroU8, time::Duration};
+use core::num::NonZeroU8;
+use core::time::Duration;
 
-use net_types::{ip::Ipv6Addr, UnicastAddr};
+use net_types::ip::Ipv6Addr;
+use net_types::UnicastAddr;
 use netstack3_base::{
     AnyDevice, CoreTimerContext, DeviceIdContext, HandleableTimer, RngContext, TimerBindingsTypes,
     TimerContext, TimerHandler, WeakDeviceIdentifier,
 };
 use packet::{EitherSerializer, EmptyBuf, InnerPacketBuilder as _, Serializer};
-use packet_formats::icmp::ndp::{
-    options::NdpOptionBuilder, OptionSequenceBuilder, RouterSolicitation,
-};
+use packet_formats::icmp::ndp::options::NdpOptionBuilder;
+use packet_formats::icmp::ndp::{OptionSequenceBuilder, RouterSolicitation};
 use rand::Rng as _;
 
 /// Amount of time to wait after sending `MAX_RTR_SOLICITATIONS` Router
@@ -237,16 +238,16 @@ fn do_router_solicitation<BC: RsBindingsContext, CC: RsContext<BC>>(
 
 #[cfg(test)]
 mod tests {
-    use alloc::{vec, vec::Vec};
+    use alloc::vec;
+    use alloc::vec::Vec;
 
     use net_declare::net_ip_v6;
-    use netstack3_base::{
-        testutil::{
-            FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeTimerCtxExt as _, FakeWeakDeviceId,
-        },
-        CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext as _,
+    use netstack3_base::testutil::{
+        FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeTimerCtxExt as _, FakeWeakDeviceId,
     };
-    use packet_formats::icmp::ndp::{options::NdpOption, Options};
+    use netstack3_base::{CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext as _};
+    use packet_formats::icmp::ndp::options::NdpOption;
+    use packet_formats::icmp::ndp::Options;
     use test_case::test_case;
 
     use super::*;

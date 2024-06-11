@@ -22,75 +22,60 @@ pub(crate) mod demux;
 pub(crate) mod isn;
 
 use alloc::collections::{hash_map, HashMap};
-use core::{
-    convert::Infallible as Never,
-    fmt::{self, Debug},
-    marker::PhantomData,
-    num::{NonZeroU16, NonZeroUsize},
-    ops::{Deref, DerefMut, RangeInclusive},
-};
+use core::convert::Infallible as Never;
+use core::fmt::{self, Debug};
+use core::marker::PhantomData;
+use core::num::{NonZeroU16, NonZeroUsize};
+use core::ops::{Deref, DerefMut, RangeInclusive};
 
 use assert_matches::assert_matches;
 use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use log::{debug, error, trace};
-use net_types::{
-    ip::{
-        GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion, IpVersionMarker, Ipv4,
-        Ipv4Addr, Ipv6, Ipv6Addr,
-    },
-    AddrAndPortFormatter, AddrAndZone, SpecifiedAddr, ZonedAddr,
+use net_types::ip::{
+    GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion, IpVersionMarker, Ipv4, Ipv4Addr,
+    Ipv6, Ipv6Addr,
 };
-use netstack3_base::{
-    socket::{
-        self, AddrIsMappedError, AddrVec, Bound, ConnAddr, ConnIpAddr, DualStackListenerIpAddr,
-        DualStackLocalIp, DualStackRemoteIp, EitherStack, IncompatibleError, InsertError, Inserter,
-        ListenerAddr, ListenerAddrInfo, ListenerIpAddr, MaybeDualStack, NotDualStackCapableError,
-        RemoveResult, SetDualStackEnabledError, ShutdownType, SocketDeviceUpdate,
-        SocketDeviceUpdateNotAllowedError, SocketIpAddr, SocketIpExt, SocketMapAddrSpec,
-        SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy,
-        SocketMapStateSpec, SocketMapUpdateSharingPolicy, SocketZonedAddrExt as _,
-        UpdateSharingError,
-    },
-    socketmap::{IterShadows as _, SocketMap},
-    sync::RwLock,
-    ExistsError, Inspector, InspectorDeviceExt, LocalAddressError, PortAllocImpl,
-    RemoveResourceResult, ZonedAddressError,
+use net_types::{AddrAndPortFormatter, AddrAndZone, SpecifiedAddr, ZonedAddr};
+use netstack3_base::socket::{
+    self, AddrIsMappedError, AddrVec, Bound, ConnAddr, ConnIpAddr, DualStackListenerIpAddr,
+    DualStackLocalIp, DualStackRemoteIp, EitherStack, IncompatibleError, InsertError, Inserter,
+    ListenerAddr, ListenerAddrInfo, ListenerIpAddr, MaybeDualStack, NotDualStackCapableError,
+    RemoveResult, SetDualStackEnabledError, ShutdownType, SocketDeviceUpdate,
+    SocketDeviceUpdateNotAllowedError, SocketIpAddr, SocketIpExt, SocketMapAddrSpec,
+    SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy,
+    SocketMapStateSpec, SocketMapUpdateSharingPolicy, SocketZonedAddrExt as _, UpdateSharingError,
 };
+use netstack3_base::socketmap::{IterShadows as _, SocketMap};
+use netstack3_base::sync::RwLock;
 use netstack3_base::{
     AnyDevice, BidirectionalConverter as _, ContextPair, CoreTimerContext, CounterContext, CtxPair,
-    DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId, HandleableTimer, Instant,
-    InstantBindingsTypes, OwnedOrRefsBidirectionalConverter, ReferenceNotifiersExt as _,
-    RngContext, StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext, TracingContext,
-    WeakDeviceIdentifier,
+    DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId, ExistsError, HandleableTimer,
+    Inspector, InspectorDeviceExt, Instant, InstantBindingsTypes, LocalAddressError,
+    OwnedOrRefsBidirectionalConverter, PortAllocImpl, ReferenceNotifiersExt as _,
+    RemoveResourceResult, RngContext, StrongDeviceIdentifier as _, TimerBindingsTypes,
+    TimerContext, TracingContext, WeakDeviceIdentifier, ZonedAddressError,
 };
-use netstack3_ip::{
-    self as ip,
-    icmp::IcmpErrorCode,
-    socket::{
-        DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError,
-        IpSockCreationError, IpSocketHandler,
-    },
-    IpExt, TransportIpContext,
+use netstack3_ip::icmp::IcmpErrorCode;
+use netstack3_ip::socket::{
+    DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError,
+    IpSockCreationError, IpSocketHandler,
 };
+use netstack3_ip::{self as ip, IpExt, TransportIpContext};
 use packet_formats::ip::IpProto;
 use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
 
-use crate::internal::{
-    base::{
-        BufferSizes, ConnectionError, Control, Mss, OptionalBufferSizes, SocketOptions, TcpCounters,
-    },
-    buffer::{IntoBuffers, ReceiveBuffer, SendBuffer, SendPayload},
-    segment::Segment,
-    seqnum::SeqNum,
-    socket::{
-        accept_queue::{AcceptQueue, ListenerNotifier},
-        demux::tcp_serialize_segment,
-        isn::IsnGenerator,
-    },
-    state::{CloseError, CloseReason, Closed, Initial, State, Takeable},
+use crate::internal::base::{
+    BufferSizes, ConnectionError, Control, Mss, OptionalBufferSizes, SocketOptions, TcpCounters,
 };
+use crate::internal::buffer::{IntoBuffers, ReceiveBuffer, SendBuffer, SendPayload};
+use crate::internal::segment::Segment;
+use crate::internal::seqnum::SeqNum;
+use crate::internal::socket::accept_queue::{AcceptQueue, ListenerNotifier};
+use crate::internal::socket::demux::tcp_serialize_segment;
+use crate::internal::socket::isn::IsnGenerator;
+use crate::internal::state::{CloseError, CloseReason, Closed, Initial, State, Takeable};
 
 /// A marker trait for dual-stack socket features.
 ///
@@ -5024,58 +5009,54 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
 
 #[cfg(test)]
 mod tests {
-    use alloc::{format, rc::Rc, string::String, sync::Arc, vec, vec::Vec};
-    use core::{cell::RefCell, ffi::CStr, num::NonZeroU16, time::Duration};
+    use alloc::rc::Rc;
+    use alloc::string::String;
+    use alloc::sync::Arc;
+    use alloc::vec::Vec;
+    use alloc::{format, vec};
+    use core::cell::RefCell;
+    use core::ffi::CStr;
+    use core::num::NonZeroU16;
+    use core::time::Duration;
 
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use net_declare::net_ip_v6;
-    use net_types::{
-        ip::{Ip, Ipv4, Ipv6, Ipv6SourceAddr, Mtu},
-        LinkLocalAddr,
+    use net_types::ip::{Ip, Ipv4, Ipv6, Ipv6SourceAddr, Mtu};
+    use net_types::LinkLocalAddr;
+    use netstack3_base::sync::{DynDebugReferences, Mutex};
+    use netstack3_base::testutil::{
+        new_rng, run_with_many_seeds, set_logger_for_test, FakeCoreCtx, FakeCryptoRng,
+        FakeDeviceId, FakeInstant, FakeNetwork, FakeNetworkSpec, FakeStrongDeviceId, FakeTimerCtx,
+        FakeWeakDeviceId, InstantAndData, MultipleDevicesId, PendingFrameData, StepResult,
+        TestIpExt, WithFakeFrameContext, WithFakeTimerContext,
     };
     use netstack3_base::{
-        sync::{DynDebugReferences, Mutex},
-        testutil::{
-            new_rng, run_with_many_seeds, set_logger_for_test, FakeCoreCtx, FakeCryptoRng,
-            FakeInstant, FakeNetwork, FakeNetworkSpec, FakeTimerCtx, InstantAndData,
-            PendingFrameData, StepResult, TestIpExt, WithFakeFrameContext, WithFakeTimerContext,
-        },
-        ContextProvider, Instant as _, InstantContext, ReferenceNotifiers,
-    };
-    use netstack3_base::{
-        testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
-        LinkDevice, StrongDeviceIdentifier, Uninstantiable, UninstantiableWrapper,
+        ContextProvider, Instant as _, InstantContext, LinkDevice, ReferenceNotifiers,
+        StrongDeviceIdentifier, Uninstantiable, UninstantiableWrapper,
     };
     use netstack3_filter::TransportPacketSerializer;
-    use netstack3_ip::{
-        device::IpDeviceStateIpExt,
-        icmp::{IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode},
-        nud::{testutil::FakeLinkResolutionNotifier, LinkResolutionContext},
-        socket::{
-            testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
-            IpSockSendError, Mms, MmsError, SendOptions,
-        },
-        testutil::DualStackSendIpPacketMeta,
-        BaseTransportIpContext, HopLimits, IpTransportContext,
-    };
+    use netstack3_ip::device::IpDeviceStateIpExt;
+    use netstack3_ip::icmp::{IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode};
+    use netstack3_ip::nud::testutil::FakeLinkResolutionNotifier;
+    use netstack3_ip::nud::LinkResolutionContext;
+    use netstack3_ip::socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx};
+    use netstack3_ip::socket::{IpSockSendError, Mms, MmsError, SendOptions};
+    use netstack3_ip::testutil::DualStackSendIpPacketMeta;
+    use netstack3_ip::{BaseTransportIpContext, HopLimits, IpTransportContext};
     use packet::{Buf, BufferMut, ParseBuffer as _};
-    use packet_formats::{
-        icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode},
-        tcp::{TcpParseArgs, TcpSegment},
-    };
+    use packet_formats::icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode};
+    use packet_formats::tcp::{TcpParseArgs, TcpSegment};
     use rand::Rng as _;
     use test_case::test_case;
 
     use super::*;
-    use crate::internal::{
-        base::{ConnectionError, DEFAULT_FIN_WAIT2_TIMEOUT},
-        buffer::{
-            testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer, WriteBackClientBuffers},
-            RingBuffer,
-        },
-        state::{TimeWait, MSL},
+    use crate::internal::base::{ConnectionError, DEFAULT_FIN_WAIT2_TIMEOUT};
+    use crate::internal::buffer::testutil::{
+        ClientBuffers, ProvidedBuffers, TestSendBuffer, WriteBackClientBuffers,
     };
+    use crate::internal::buffer::RingBuffer;
+    use crate::internal::state::{TimeWait, MSL};
 
     trait TcpTestIpExt: DualStackIpExt + TestIpExt + IpDeviceStateIpExt + DualStackIpExt {
         type SingleStackConverter: OwnedOrRefsBidirectionalConverter<

@@ -5,9 +5,8 @@
 use crate::test_topology;
 use diagnostics_data::Logs;
 use diagnostics_reader::{ArchiveReader, RetryConfig};
-use fidl_fuchsia_archivist_test as ftest;
-use fidl_fuchsia_diagnostics as fdiagnostics;
 use futures::StreamExt;
+use {fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics as fdiagnostics};
 
 const SPAM_COUNT: usize = 9001;
 

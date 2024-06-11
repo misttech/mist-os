@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{
-    akm::{self, AKM_PSK, AKM_SAE},
-    cipher::{self, CIPHER_CCMP_128},
-    pmkid,
-    suite_filter::DEFAULT_GROUP_MGMT_CIPHER,
-    suite_selector,
-};
+use super::akm::{self, AKM_PSK, AKM_SAE};
+use super::cipher::{self, CIPHER_CCMP_128};
+use super::suite_filter::DEFAULT_GROUP_MGMT_CIPHER;
+use super::{pmkid, suite_selector};
 
 use crate::appendable::{Appendable, BufferTooSmall};
 use crate::organization::Oui;
@@ -603,11 +600,9 @@ named_attr!(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        akm::{AKM_EAP, AKM_FT_PSK},
-        cipher::{CIPHER_BIP_CMAC_256, CIPHER_GCMP_256, CIPHER_TKIP},
-        *,
-    };
+    use super::akm::{AKM_EAP, AKM_FT_PSK};
+    use super::cipher::{CIPHER_BIP_CMAC_256, CIPHER_GCMP_256, CIPHER_TKIP};
+    use super::*;
     use crate::test_utils::fake_features::fake_security_support_empty;
     use crate::test_utils::FixedSizedTestBuffer;
     use test_case::test_case;

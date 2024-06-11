@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    argh::{ArgsInfo, FromArgs, SubCommand},
-    ffx_core::ffx_command,
-    shell_args::{derive_subcommand, valid_when},
-    std::collections::HashMap,
-};
+use argh::{ArgsInfo, FromArgs, SubCommand};
+use ffx_core::ffx_command;
+use shell_args::{derive_subcommand, valid_when};
+use std::collections::HashMap;
 
 // This file describes two argh-style argument parsing schemas. The first, `FuzzCommand`, is for
 // commands provided at the command line. The second, `FuzzShellCommand`, is for commands provided
@@ -669,7 +667,8 @@ mod test_fixtures {
 
 #[cfg(test)]
 mod tests {
-    use {super::test_fixtures::*, super::*};
+    use super::test_fixtures::*;
+    use super::*;
 
     #[fuchsia::test]
     async fn test_shell() {

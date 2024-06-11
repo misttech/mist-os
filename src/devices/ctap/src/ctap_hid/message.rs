@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    bytes::Bytes,
-    fidl_fuchsia_fido_report::CtapHidCommand,
-    std::convert::{TryFrom, TryInto},
-    std::fmt,
-};
+use anyhow::{format_err, Error};
+use bytes::Bytes;
+use fidl_fuchsia_fido_report::CtapHidCommand;
+use std::convert::{TryFrom, TryInto};
+use std::fmt;
 
 /// A CTAPHID message to be either received or sent over a `Connection`.
 #[derive(PartialEq, Clone)]

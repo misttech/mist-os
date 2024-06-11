@@ -2,60 +2,48 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::above_root_capabilities::AboveRootCapabilitiesForTest;
+use crate::constants::{
+    CUSTOM_ARTIFACTS_CAPABILITY_NAME, HERMETIC_RESOLVER_REALM_NAME, TEST_ENVIRONMENT_NAME,
+    TEST_ROOT_COLLECTION, TEST_ROOT_REALM_NAME, WRAPPER_REALM_NAME,
+};
+use crate::debug_data_processor::{serve_debug_data_publisher, DebugDataSender};
+use crate::error::LaunchTestError;
+use crate::offers::apply_offers;
+use crate::run_events::SuiteEvents;
+use crate::self_diagnostics::DiagnosticNode;
+use crate::test_suite::SuiteRealm;
+use crate::utilities::stream_fn;
+use crate::{diagnostics, facet, resolver};
+use anyhow::{anyhow, format_err, Context, Error};
+use fidl::endpoints::{create_proxy, ClientEnd};
+use fidl_fuchsia_component_resolution::ResolverProxy;
+use ftest::Invocation;
+use ftest_manager::{CaseStatus, LaunchError, SuiteStatus};
+use fuchsia_async::{self as fasync, TimeoutExt};
+use fuchsia_component::client::connect_to_protocol_at_dir_root;
+use fuchsia_component_test::error::Error as RealmBuilderError;
+use fuchsia_component_test::{
+    Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
+};
+use fuchsia_url::AbsoluteComponentUrl;
+use futures::channel::{mpsc, oneshot};
+use futures::future::join_all;
+use futures::prelude::*;
+use futures::{lock, FutureExt};
+use moniker::{ChildName, Moniker};
+use resolver::AllowedPackages;
+use std::collections::HashSet;
+use std::fmt;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
+use thiserror::Error;
+use tracing::{debug, error, info, warn};
 use {
-    crate::{
-        above_root_capabilities::AboveRootCapabilitiesForTest,
-        constants::{
-            CUSTOM_ARTIFACTS_CAPABILITY_NAME, HERMETIC_RESOLVER_REALM_NAME, TEST_ENVIRONMENT_NAME,
-            TEST_ROOT_COLLECTION, TEST_ROOT_REALM_NAME, WRAPPER_REALM_NAME,
-        },
-        debug_data_processor::{serve_debug_data_publisher, DebugDataSender},
-        diagnostics,
-        error::LaunchTestError,
-        facet,
-        offers::apply_offers,
-        resolver,
-        run_events::SuiteEvents,
-        self_diagnostics::DiagnosticNode,
-        test_suite::SuiteRealm,
-        utilities::stream_fn,
-    },
-    anyhow::{anyhow, format_err, Context, Error},
-    fidl::endpoints::{create_proxy, ClientEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_component_resolution::ResolverProxy,
     fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_diagnostics_host as fhost,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fidl_fuchsia_test as ftest,
-    fidl_fuchsia_test_manager as ftest_manager,
-    ftest::Invocation,
-    ftest_manager::{CaseStatus, LaunchError, SuiteStatus},
-    fuchsia_async::{self as fasync, TimeoutExt},
-    fuchsia_component::client::connect_to_protocol_at_dir_root,
-    fuchsia_component_test::{
-        error::Error as RealmBuilderError, Capability, ChildOptions, RealmBuilder,
-        RealmBuilderParams, RealmInstance, Ref, Route,
-    },
-    fuchsia_url::AbsoluteComponentUrl,
-    fuchsia_zircon as zx,
-    futures::{
-        channel::{mpsc, oneshot},
-        future::join_all,
-        lock,
-        prelude::*,
-        FutureExt,
-    },
-    moniker::{ChildName, Moniker},
-    resolver::AllowedPackages,
-    std::{
-        collections::HashSet,
-        fmt,
-        sync::{
-            atomic::{AtomicU32, Ordering},
-            Arc,
-        },
-    },
-    thiserror::Error,
-    tracing::{debug, error, info, warn},
+    fidl_fuchsia_test_manager as ftest_manager, fuchsia_zircon as zx,
 };
 
 const DEBUG_DATA_REALM_NAME: &'static str = "debug-data";
@@ -1145,7 +1133,8 @@ async fn listen_for_completion(mut listener: ftest::CaseListenerRequestStream) -
 mod tests {
     use crate::constants::{HERMETIC_TESTS_COLLECTION, SYSTEM_TESTS_COLLECTION};
 
-    use {super::*, maplit::hashset};
+    use super::*;
+    use maplit::hashset;
 
     #[test]
     fn case_matcher_tests() {

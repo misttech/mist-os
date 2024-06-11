@@ -2,33 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, ensure, Context, Error},
-    argh::FromArgs,
-    assembly_partitions_config::{Partition, PartitionsConfig, Slot},
-    byteorder::{BigEndian, WriteBytesExt},
-    camino::{Utf8Path, Utf8PathBuf},
-    crc::crc32,
-    fatfs::{FsOptions, NullTimeProvider, OemCpConverter, TimeProvider},
-    gpt::{
-        partition_types::{OperatingSystem, Type as PartType},
-        GptDisk,
-    },
-    rand::{RngCore, SeedableRng},
-    rand_xorshift::XorShiftRng,
-    sdk_metadata::{LoadedProductBundle, ProductBundle},
-    serde::{Deserialize, Serialize},
-    std::{
-        collections::{BTreeMap, HashMap},
-        fs::{File, OpenOptions},
-        io::{BufReader, Read, Seek, SeekFrom, Write},
-        ops::Range,
-        os::unix::fs::FileExt,
-        process::Command,
-        str::FromStr,
-    },
-    zerocopy::{AsBytes, NoCell},
-};
+use anyhow::{bail, ensure, Context, Error};
+use argh::FromArgs;
+use assembly_partitions_config::{Partition, PartitionsConfig, Slot};
+use byteorder::{BigEndian, WriteBytesExt};
+use camino::{Utf8Path, Utf8PathBuf};
+use crc::crc32;
+use fatfs::{FsOptions, NullTimeProvider, OemCpConverter, TimeProvider};
+use gpt::partition_types::{OperatingSystem, Type as PartType};
+use gpt::GptDisk;
+use rand::{RngCore, SeedableRng};
+use rand_xorshift::XorShiftRng;
+use sdk_metadata::{LoadedProductBundle, ProductBundle};
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap};
+use std::fs::{File, OpenOptions};
+use std::io::{BufReader, Read, Seek, SeekFrom, Write};
+use std::ops::Range;
+use std::os::unix::fs::FileExt;
+use std::process::Command;
+use std::str::FromStr;
+use zerocopy::{AsBytes, NoCell};
 
 const fn part_type(guid: &'static str) -> PartType {
     PartType { guid, os: OperatingSystem::None }

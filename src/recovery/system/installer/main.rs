@@ -3,34 +3,30 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Error};
+use carnelian::app::{Config, ViewCreationParameters};
+use carnelian::color::Color;
+use carnelian::drawing::{load_font, DisplayRotation, FontFace};
+use carnelian::render::rive::load_rive;
+use carnelian::scene::facets::{
+    FacetId, RiveFacet, SetColorMessage, SetTextMessage, TextFacet, TextFacetOptions,
+    TextHorizontalAlignment,
+};
+use carnelian::scene::group::GroupId;
+use carnelian::scene::layout::{Alignment, CrossAxisAlignment};
+use carnelian::scene::scene::{Scene, SceneBuilder};
 use carnelian::{
-    app::{Config, ViewCreationParameters},
-    color::Color,
-    drawing::{load_font, DisplayRotation, FontFace},
-    input, make_message,
-    render::rive::load_rive,
-    scene::{
-        facets::{
-            FacetId, RiveFacet, SetColorMessage, SetTextMessage, TextFacet, TextFacetOptions,
-            TextHorizontalAlignment,
-        },
-        group::GroupId,
-        layout::{Alignment, CrossAxisAlignment},
-        scene::{Scene, SceneBuilder},
-    },
-    App, AppAssistant, AppAssistantPtr, AppSender, MessageTarget, Point, Size, ViewAssistant,
-    ViewAssistantContext, ViewAssistantPtr, ViewKey,
+    input, make_message, App, AppAssistant, AppAssistantPtr, AppSender, MessageTarget, Point, Size,
+    ViewAssistant, ViewAssistantContext, ViewAssistantPtr, ViewKey,
 };
 use euclid::{point2, size2};
 use fidl_fuchsia_boot::ArgumentsMarker;
 use fidl_fuchsia_hardware_display::VirtconMode;
 use fuchsia_async::{self as fasync, DurationExt};
 use fuchsia_fs::directory::{WatchEvent, Watcher};
-use fuchsia_zircon as zx;
 use futures::StreamExt;
 use recovery_ui_config::Config as UiConfig;
-use rive_rs as rive;
 use std::path::PathBuf;
+use {fuchsia_zircon as zx, rive_rs as rive};
 
 mod menu;
 use menu::{Key, MenuButtonType, MenuEvent, MenuState, MenuStateMachine};

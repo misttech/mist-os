@@ -2,30 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    apply_selectors::{
-        filter::filter_data_to_lines,
-        screen::{Line, Screen},
-        terminal::{Terminal, Termion},
-    },
-    HostArchiveReader,
-};
+use crate::apply_selectors::filter::filter_data_to_lines;
+use crate::apply_selectors::screen::{Line, Screen};
+use crate::apply_selectors::terminal::{Terminal, Termion};
+use crate::HostArchiveReader;
 use anyhow::{Context, Result};
 use diagnostics_data::{Inspect, InspectData};
 use ffx_inspect_args::ApplySelectorsCommand;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorProxy;
 use iquery::commands::DiagnosticsProvider;
-use std::{
-    fs::read_to_string,
-    io::{stdin, stdout},
-    path::Path,
-};
-use termion::{
-    event::{Event, Key},
-    input::TermRead,
-    raw::IntoRawMode,
-};
+use std::fs::read_to_string;
+use std::io::{stdin, stdout};
+use std::path::Path;
+use termion::event::{Event, Key};
+use termion::input::TermRead;
+use termion::raw::IntoRawMode;
 
 mod filter;
 pub(crate) mod screen;
@@ -110,7 +102,8 @@ fn interactive_apply(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{apply_selectors::test_utils::FakeTerminal, tests::utils::get_v1_json_dump};
+    use crate::apply_selectors::test_utils::FakeTerminal;
+    use crate::tests::utils::get_v1_json_dump;
     use std::io::Write;
     use tempfile::NamedTempFile;
 

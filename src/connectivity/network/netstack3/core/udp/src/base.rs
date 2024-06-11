@@ -4,35 +4,34 @@
 
 //! The User Datagram Protocol (UDP).
 
-use alloc::{collections::hash_map::DefaultHasher, vec::Vec};
-use core::{
-    borrow::Borrow,
-    convert::Infallible as Never,
-    fmt::Debug,
-    hash::{Hash, Hasher},
-    marker::PhantomData,
-    num::{NonZeroU16, NonZeroU8, NonZeroUsize},
-    ops::RangeInclusive,
-};
+use alloc::collections::hash_map::DefaultHasher;
+use alloc::vec::Vec;
+use core::borrow::Borrow;
+use core::convert::Infallible as Never;
+use core::fmt::Debug;
+use core::hash::{Hash, Hasher};
+use core::marker::PhantomData;
+use core::num::{NonZeroU16, NonZeroU8, NonZeroUsize};
+use core::ops::RangeInclusive;
 
 use derivative::Derivative;
 use either::Either;
 use lock_order::lock::{DelegatedOrderedLockAccess, OrderedLockAccess, OrderedLockRef};
 use log::{debug, trace};
-use net_types::{
-    ip::{GenericOverIp, Ip, IpInvariant, IpMarked, IpVersion, IpVersionMarker, Ipv4, Ipv6},
-    MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
+use net_types::ip::{
+    GenericOverIp, Ip, IpInvariant, IpMarked, IpVersion, IpVersionMarker, Ipv4, Ipv6,
 };
+use net_types::{MulticastAddr, SpecifiedAddr, Witness, ZonedAddr};
+use netstack3_base::socket::{
+    AddrEntry, AddrIsMappedError, AddrVec, Bound, ConnAddr, ConnInfoAddr, ConnIpAddr, FoundSockets,
+    IncompatibleError, InsertError, Inserter, ListenerAddr, ListenerAddrInfo, ListenerIpAddr,
+    MaybeDualStack, NotDualStackCapableError, RemoveResult, SetDualStackEnabledError, ShutdownType,
+    SocketAddrType, SocketIpAddr, SocketMapAddrSpec, SocketMapAddrStateSpec,
+    SocketMapConflictPolicy, SocketMapStateSpec,
+};
+use netstack3_base::socketmap::{IterShadows as _, SocketMap, Tagged};
+use netstack3_base::sync::{RwLock, StrongRc};
 use netstack3_base::{
-    socket::{
-        AddrEntry, AddrIsMappedError, AddrVec, Bound, ConnAddr, ConnInfoAddr, ConnIpAddr,
-        FoundSockets, IncompatibleError, InsertError, Inserter, ListenerAddr, ListenerAddrInfo,
-        ListenerIpAddr, MaybeDualStack, NotDualStackCapableError, RemoveResult,
-        SetDualStackEnabledError, ShutdownType, SocketAddrType, SocketIpAddr, SocketMapAddrSpec,
-        SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
-    },
-    socketmap::{IterShadows as _, SocketMap, Tagged},
-    sync::{RwLock, StrongRc},
     trace_duration, AnyDevice, BidirectionalConverter, ContextPair, Counter, CounterContext,
     DeviceIdContext, Inspector, InspectorDeviceExt, InstantContext, LocalAddressError,
     PortAllocImpl, ReferenceNotifiers, RemoveResourceResultWithContext, RngContext, SocketError,
@@ -51,16 +50,16 @@ use netstack3_datagram::{
     SendError as DatagramSendError, SetMulticastMembershipError, SocketInfo,
     SocketState as DatagramSocketState, WrapOtherStackIpOptions, WrapOtherStackIpOptionsMut,
 };
+use netstack3_ip::socket::{
+    IpSockCreateAndSendError, IpSockCreationError, IpSockSendError, SocketHopLimits,
+};
 use netstack3_ip::{
-    socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError, SocketHopLimits},
     HopLimits, IpTransportContext, MulticastMembershipHandler, TransparentLocalDelivery,
     TransportIpContext, TransportReceiveError,
 };
 use packet::{BufferMut, Nested, ParsablePacket, Serializer};
-use packet_formats::{
-    ip::{IpProto, IpProtoExt},
-    udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs},
-};
+use packet_formats::ip::{IpProto, IpProtoExt};
+use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs};
 use thiserror::Error;
 
 /// A builder for UDP layer state.
@@ -2595,42 +2594,33 @@ impl<
 
 #[cfg(test)]
 mod tests {
-    use alloc::{
-        borrow::ToOwned,
-        collections::{HashMap, HashSet},
-        vec,
-    };
+    use alloc::borrow::ToOwned;
+    use alloc::collections::{HashMap, HashSet};
+    use alloc::vec;
     use const_unwrap::const_unwrap_option;
-    use core::{
-        convert::TryInto as _,
-        ops::{Deref, DerefMut},
-    };
+    use core::convert::TryInto as _;
+    use core::ops::{Deref, DerefMut};
 
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use itertools::Itertools as _;
-    use net_declare::net_ip_v4 as ip_v4;
-    use net_declare::net_ip_v6;
+    use net_declare::{net_ip_v4 as ip_v4, net_ip_v6};
+    use net_types::ip::{IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr};
     use net_types::{
-        ip::{IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr},
         AddrAndZone, LinkLocalAddr, MulticastAddr, Scope as _, ScopeableAddress as _, ZonedAddr,
     };
-    use netstack3_base::{
-        socket::{SocketIpAddrExt as _, StrictlyZonedAddr},
-        sync::PrimaryRc,
-        testutil::{
-            set_logger_for_test, FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeReferencyDeviceId,
-            FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId, TestIpExt as _,
-        },
-        CtxPair, RemoteAddressError, UninstantiableWrapper,
+    use netstack3_base::socket::{SocketIpAddrExt as _, StrictlyZonedAddr};
+    use netstack3_base::sync::PrimaryRc;
+    use netstack3_base::testutil::{
+        set_logger_for_test, FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeReferencyDeviceId,
+        FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId, TestIpExt as _,
     };
+    use netstack3_base::{CtxPair, RemoteAddressError, UninstantiableWrapper};
     use netstack3_datagram::MulticastInterfaceSelector;
-    use netstack3_ip::{
-        device::IpDeviceStateIpExt,
-        socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
-        testutil::DualStackSendIpPacketMeta,
-        IpPacketDestination, ResolveRouteError, SendIpPacketMeta,
-    };
+    use netstack3_ip::device::IpDeviceStateIpExt;
+    use netstack3_ip::socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx};
+    use netstack3_ip::testutil::DualStackSendIpPacketMeta;
+    use netstack3_ip::{IpPacketDestination, ResolveRouteError, SendIpPacketMeta};
     use packet::Buf;
     use test_case::test_case;
 

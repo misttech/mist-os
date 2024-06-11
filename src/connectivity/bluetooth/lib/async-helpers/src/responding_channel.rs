@@ -19,18 +19,12 @@
 //! to prevent further messages from being sent into the channel. Then, the receiver can handle all
 //! messages in the channel and be dropped.
 
-use {
-    anyhow::Error,
-    futures::{
-        channel::{mpsc, oneshot},
-        stream::{FusedStream, Stream},
-        SinkExt,
-    },
-    std::{
-        pin::Pin,
-        task::{Context, Poll},
-    },
-};
+use anyhow::Error;
+use futures::channel::{mpsc, oneshot};
+use futures::stream::{FusedStream, Stream};
+use futures::SinkExt;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// The requesting end of a channel.
 pub struct Sender<Req, Resp> {
@@ -120,7 +114,10 @@ pub fn channel<Req, Resp>(buffer: usize) -> (Sender<Req, Resp>, Receiver<Req, Re
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fuchsia_async as fasync, futures::StreamExt, std::pin::pin};
+    use super::*;
+    use fuchsia_async as fasync;
+    use futures::StreamExt;
+    use std::pin::pin;
 
     macro_rules! unwrap_ready {
         ($poll:expr) => {

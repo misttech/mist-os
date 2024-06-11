@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    bpf::{map::Map, program::ProgramType},
-    task::CurrentTask,
-};
+use crate::bpf::map::Map;
+use crate::bpf::program::ProgramType;
+use crate::task::CurrentTask;
 use ebpf::{
     new_bpf_type_identifier, BpfValue, EbpfHelper, EpbfRunContext, FieldMapping, FieldType,
     FunctionSignature, Type,

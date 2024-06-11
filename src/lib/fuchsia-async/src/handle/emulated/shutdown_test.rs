@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_async::emulated_handle::{shut_down_handles, Channel, MessageBuf},
-    fuchsia_zircon_status::Status,
-    std::{
-        future::Future,
-        pin::pin,
-        task::{Context, Poll},
-    },
-};
+use fuchsia_async::emulated_handle::{shut_down_handles, Channel, MessageBuf};
+use fuchsia_zircon_status::Status;
+use std::future::Future;
+use std::pin::pin;
+use std::task::{Context, Poll};
 
 fn main() {
     let mut noop_ctx = Context::from_waker(futures::task::noop_waker_ref());

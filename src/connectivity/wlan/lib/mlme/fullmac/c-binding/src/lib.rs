@@ -2,13 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    tracing::error,
-    wlan_fullmac_mlme::{
-        device::{FullmacDevice, RawFullmacDeviceInterface},
-        FullmacMlme, FullmacMlmeHandle,
-    },
-};
+use tracing::error;
+use wlan_fullmac_mlme::device::{FullmacDevice, RawFullmacDeviceInterface};
+use wlan_fullmac_mlme::{FullmacMlme, FullmacMlmeHandle};
 
 #[no_mangle]
 pub extern "C" fn start_fullmac_mlme(

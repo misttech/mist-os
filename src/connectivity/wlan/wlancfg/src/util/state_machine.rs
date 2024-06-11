@@ -2,14 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    futures::{
-        future::{Future, FutureExt, FutureObj},
-        ready,
-        task::{Context, Poll},
-    },
-    std::{convert::Infallible, pin::Pin},
-};
+use futures::future::{Future, FutureExt, FutureObj};
+use futures::ready;
+use futures::task::{Context, Poll};
+use std::convert::Infallible;
+use std::pin::Pin;
 
 #[derive(Debug)]
 pub struct ExitReason(pub Result<(), anyhow::Error>);
@@ -57,7 +54,8 @@ impl<F, E> IntoStateExt<E> for F where F: Future<Output = Result<State<E>, E>> {
 mod tests {
     use super::*;
     use fuchsia_async as fasync;
-    use futures::{channel::mpsc, stream::StreamExt};
+    use futures::channel::mpsc;
+    use futures::stream::StreamExt;
     use std::mem;
 
     #[fuchsia::test]

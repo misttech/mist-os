@@ -7,11 +7,10 @@ use async_lock::Mutex;
 use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_io::OpenFlags;
-use fidl_fuchsia_sys2 as fsys;
 use fidl_test_proxy_stress::{StressorMarker, StressorProxy};
-use fuchsia_async as fasync;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use {fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync};
 
 /// Effectively arbitrarily high timeout. We don't use Duration::MAX here to avoid
 /// overflow errors in underlying libraries.

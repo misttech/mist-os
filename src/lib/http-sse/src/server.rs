@@ -2,21 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::Event,
-    futures::{
-        channel::{mpsc, oneshot},
-        future::Future,
-        lock::Mutex,
-        stream::Stream,
-        task::{Context, Poll},
-    },
-    hyper::{
-        body::{Body, Bytes},
-        Response, StatusCode,
-    },
-    std::{mem::replace, ops::DerefMut, pin::Pin, sync::Arc},
-};
+use crate::Event;
+use futures::channel::{mpsc, oneshot};
+use futures::future::Future;
+use futures::lock::Mutex;
+use futures::stream::Stream;
+use futures::task::{Context, Poll};
+use hyper::body::{Body, Bytes};
+use hyper::{Response, StatusCode};
+use std::mem::replace;
+use std::ops::DerefMut;
+use std::pin::Pin;
+use std::sync::Arc;
 
 pub struct SseResponseCreator {
     buffer_size: usize,
@@ -121,12 +118,10 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fuchsia_async::{self as fasync},
-        futures::StreamExt,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_async::{self as fasync};
+    use futures::StreamExt;
 
     #[fasync::run_singlethreaded(test)]
     async fn response_headers() {

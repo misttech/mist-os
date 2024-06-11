@@ -12,7 +12,8 @@ use ffx_target::{KnockError, TargetInfoQuery};
 use fho::{daemon_protocol, deferred, Deferred, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::TimeoutExt;
-use futures::{future::join_all, TryStreamExt};
+use futures::future::join_all;
+use futures::TryStreamExt;
 use std::time::Duration;
 
 mod target_formatter;

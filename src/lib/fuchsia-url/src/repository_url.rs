@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{errors::ParseError, Host, Scheme, UrlParts};
+use crate::errors::ParseError;
+use crate::{Host, Scheme, UrlParts};
 
 pub const SCHEME: &str = "fuchsia-pkg";
 
@@ -98,10 +99,10 @@ impl<'de> serde::Deserialize<'de> for RepositoryUrl {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::errors::PackagePathSegmentError, assert_matches::assert_matches,
-        std::convert::TryFrom as _,
-    };
+    use super::*;
+    use crate::errors::PackagePathSegmentError;
+    use assert_matches::assert_matches;
+    use std::convert::TryFrom as _;
 
     #[test]
     fn parse_err() {

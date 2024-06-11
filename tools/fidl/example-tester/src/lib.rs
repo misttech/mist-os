@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    component_events::{events::*, matcher::*, sequence::*},
-    diagnostics_data::{Data, Logs},
-    diagnostics_reader::ArchiveReader,
-    fuchsia_async as fasync,
-    fuchsia_component_test::{Capability, ChildOptions, ChildRef, RealmBuilder, Ref, Route},
-    fuchsia_zircon::DurationNum,
-    regex::Regex,
-    std::future::Future,
-};
+use anyhow::{Context, Error};
+use component_events::events::*;
+use component_events::matcher::*;
+use component_events::sequence::*;
+use diagnostics_data::{Data, Logs};
+use diagnostics_reader::ArchiveReader;
+use fuchsia_async as fasync;
+use fuchsia_component_test::{Capability, ChildOptions, ChildRef, RealmBuilder, Ref, Route};
+use fuchsia_zircon::DurationNum;
+use regex::Regex;
+use std::future::Future;
 
 /// Represents a component under test. The `name` is the test-local name assigned to the component,
 /// whereas the path is the relative path to its component manifest (ex: "#meta/client.cm").

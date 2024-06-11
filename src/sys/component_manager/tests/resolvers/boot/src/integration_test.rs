@@ -12,13 +12,11 @@
 //! The test then calls the expected test FIDL protocol in component manager's outgoing namespace.
 //! If the call is successful, then the boot resolver was correctly routed.
 
-use {
-    fidl::endpoints::{create_proxy, ProtocolMarker},
-    fidl_fidl_test_components as ftest, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
-    futures::prelude::*,
-    vfs::directory::entry_container::Directory as _,
-};
+use fidl::endpoints::{create_proxy, ProtocolMarker};
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
+use futures::prelude::*;
+use vfs::directory::entry_container::Directory as _;
+use {fidl_fidl_test_components as ftest, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
 
 #[fuchsia::test]
 async fn boot_resolver_can_be_routed_from_component_manager() {

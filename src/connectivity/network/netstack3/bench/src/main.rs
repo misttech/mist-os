@@ -14,7 +14,8 @@
 
 mod forwarding;
 
-use fuchsia_criterion::{criterion::Criterion, FuchsiaCriterion};
+use fuchsia_criterion::criterion::Criterion;
+use fuchsia_criterion::FuchsiaCriterion;
 
 fn main() {
     let benches = forwarding::get_benchmark();

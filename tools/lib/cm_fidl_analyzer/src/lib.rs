@@ -7,18 +7,15 @@ pub mod component_model;
 pub mod environment;
 pub mod route;
 
-use {
-    crate::{
-        component_instance::ComponentInstanceForAnalyzer,
-        component_model::ComponentModelForAnalyzer,
-    },
-    fuchsia_merkle::Hash,
-    fuchsia_url::{
-        AbsoluteComponentUrl, AbsolutePackageUrl, PackageName, PackageVariant, RepositoryUrl,
-    },
-    routing::component_instance::ComponentInstanceInterface,
-    std::{collections::VecDeque, sync::Arc},
+use crate::component_instance::ComponentInstanceForAnalyzer;
+use crate::component_model::ComponentModelForAnalyzer;
+use fuchsia_merkle::Hash;
+use fuchsia_url::{
+    AbsoluteComponentUrl, AbsolutePackageUrl, PackageName, PackageVariant, RepositoryUrl,
 };
+use routing::component_instance::ComponentInstanceInterface;
+use std::collections::VecDeque;
+use std::sync::Arc;
 
 /// Output for package URL matching functions.
 #[derive(Debug, Eq, PartialEq)]
@@ -230,20 +227,19 @@ impl ComponentInstanceVisitor for ModelMappingVisitor {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{
-            match_absolute_component_urls, BreadthFirstModelWalker, ComponentModelWalker,
-            ModelMappingVisitor, PkgUrlMatch,
-        },
-        crate::component_model::ModelBuilderForAnalyzer,
-        cm_config::RuntimeConfig,
-        cm_rust::ComponentDecl,
-        cm_rust_testing::ComponentDeclBuilder,
-        cm_types::Url,
-        fuchsia_url::AbsoluteComponentUrl,
-        routing::environment::RunnerRegistry,
-        std::{collections::HashMap, sync::Arc},
+    use super::{
+        match_absolute_component_urls, BreadthFirstModelWalker, ComponentModelWalker,
+        ModelMappingVisitor, PkgUrlMatch,
     };
+    use crate::component_model::ModelBuilderForAnalyzer;
+    use cm_config::RuntimeConfig;
+    use cm_rust::ComponentDecl;
+    use cm_rust_testing::ComponentDeclBuilder;
+    use cm_types::Url;
+    use fuchsia_url::AbsoluteComponentUrl;
+    use routing::environment::RunnerRegistry;
+    use std::collections::HashMap;
+    use std::sync::Arc;
 
     const TEST_URL_PREFIX: &str = "test:///";
 

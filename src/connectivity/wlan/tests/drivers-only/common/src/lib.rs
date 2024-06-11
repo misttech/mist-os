@@ -2,16 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::{
-        endpoints::{create_endpoints, create_proxy, Proxy},
-        HandleBased,
-    },
-    fidl_test_wlan_realm as fidl_realm, fidl_test_wlan_testcontroller as fidl_testcontroller,
-    fuchsia_component::client::connect_to_protocol,
-    realm_client::{extend_namespace, InstalledNamespace},
-    test_realm_helpers::{constants::TESTCONTROLLER_DRIVER_TOPOLOGICAL_PATH, tracing::Tracing},
-};
+use fidl::endpoints::{create_endpoints, create_proxy, Proxy};
+use fidl::HandleBased;
+use fuchsia_component::client::connect_to_protocol;
+use realm_client::{extend_namespace, InstalledNamespace};
+use test_realm_helpers::constants::TESTCONTROLLER_DRIVER_TOPOLOGICAL_PATH;
+use test_realm_helpers::tracing::Tracing;
+use {fidl_test_wlan_realm as fidl_realm, fidl_test_wlan_testcontroller as fidl_testcontroller};
 
 pub mod sme_helpers;
 

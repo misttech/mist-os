@@ -6,10 +6,8 @@ use fidl::endpoints::*;
 use fidl_fuchsia_media::*;
 use fidl_fuchsia_mediacodec::*;
 use fuchsia_component::client;
-use futures::{
-    future::{self, BoxFuture},
-    FutureExt,
-};
+use futures::future::{self, BoxFuture};
+use futures::FutureExt;
 use stream_processor_test::*;
 
 pub struct DecoderFactory;

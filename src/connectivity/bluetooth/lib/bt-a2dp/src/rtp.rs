@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    bitfield::bitfield,
-    std::{cmp::min, collections::VecDeque},
-};
+use anyhow::{format_err, Error};
+use bitfield::bitfield;
+use std::cmp::min;
+use std::collections::VecDeque;
 
 bitfield! {
     /// The header for an RTP packet.

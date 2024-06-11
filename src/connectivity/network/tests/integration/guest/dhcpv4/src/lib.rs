@@ -7,7 +7,8 @@
 use fidl_fuchsia_netemul_network as _;
 use net_declare::fidl_subnet;
 use netemul::InStack;
-use netstack_testing_common::{interfaces, realms::Netstack2, setup_network};
+use netstack_testing_common::realms::Netstack2;
+use netstack_testing_common::{interfaces, setup_network};
 use netstack_testing_macros::netstack_test;
 
 #[netstack_test]

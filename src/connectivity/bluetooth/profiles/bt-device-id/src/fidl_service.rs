@@ -5,7 +5,8 @@
 use anyhow::{Context, Error};
 use fidl_fuchsia_bluetooth_deviceid::DeviceIdentificationRequestStream;
 use fuchsia_component::server::{ServiceFs, ServiceObj};
-use futures::{channel::mpsc::Sender, FutureExt, SinkExt, StreamExt};
+use futures::channel::mpsc::Sender;
+use futures::{FutureExt, SinkExt, StreamExt};
 use tracing::warn;
 
 /// The maximum number of fidl service client connections that will be serviced concurrently.

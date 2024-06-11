@@ -4,16 +4,12 @@
 
 use anyhow::{anyhow, Result};
 use chrono::prelude::*;
-use std::{
-    collections::HashMap,
-    fs::File,
-    io::{copy, Seek, SeekFrom, Write},
-    path::PathBuf,
-};
-use zip::{
-    write::{FileOptions, ZipWriter},
-    CompressionMethod,
-};
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{copy, Seek, SeekFrom, Write};
+use std::path::PathBuf;
+use zip::write::{FileOptions, ZipWriter};
+use zip::CompressionMethod;
 
 const FILE_MAX_BYTES: i64 = 4_000_000; // 4MB
 
@@ -106,7 +102,8 @@ impl Recorder for DoctorRecorder {
 mod test {
     use super::*;
     use fuchsia_async as fasync;
-    use std::{collections::HashSet, io::Read};
+    use std::collections::HashSet;
+    use std::io::Read;
     use tempfile::tempdir;
     use zip::read::ZipArchive;
 

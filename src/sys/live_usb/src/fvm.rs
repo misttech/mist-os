@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::gpt,
-    anyhow::{Context, Error},
-    fidl_fuchsia_fshost::{BlockWatcherMarker, BlockWatcherProxy},
-    fidl_fuchsia_hardware_block::BlockMarker,
-    fidl_fuchsia_hardware_block_partition::PartitionMarker,
-    fuchsia_zircon as zx,
-    futures::future::try_join,
-    futures::TryFutureExt,
-    payload_streamer::{BlockDevicePayloadStreamer, PayloadStreamer},
-    ramdevice_client::{RamdiskClient, RamdiskClientBuilder},
-    tracing::{error, info},
-};
+use crate::gpt;
+use anyhow::{Context, Error};
+use fidl_fuchsia_fshost::{BlockWatcherMarker, BlockWatcherProxy};
+use fidl_fuchsia_hardware_block::BlockMarker;
+use fidl_fuchsia_hardware_block_partition::PartitionMarker;
+use fuchsia_zircon as zx;
+use futures::future::try_join;
+use futures::TryFutureExt;
+use payload_streamer::{BlockDevicePayloadStreamer, PayloadStreamer};
+use ramdevice_client::{RamdiskClient, RamdiskClientBuilder};
+use tracing::{error, info};
 
 /// Block size of the ramdisk.
 const BLOCK_SIZE: u64 = 512;

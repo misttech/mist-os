@@ -29,11 +29,10 @@ use anyhow::Error;
 use async_utils::stream::{IndexedStreams, StreamItem, WithEpitaph, WithTag};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_bluetooth_host::HostProxy;
+use fidl_fuchsia_bluetooth_sys::PairingDelegateRequest::{self, *};
 use fidl_fuchsia_bluetooth_sys::{
     InputCapability, OutputCapability, PairingDelegateEvent, PairingDelegateEventStream,
-    PairingDelegateProxy,
-    PairingDelegateRequest::{self, *},
-    PairingDelegateRequestStream,
+    PairingDelegateProxy, PairingDelegateRequestStream,
 };
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::{HostId, Peer, PeerId};
@@ -309,16 +308,12 @@ impl PairingDispatcherHandle {
 #[cfg(test)]
 mod test {
     use super::*;
-    use {
-        assert_matches::assert_matches,
-        fidl_fuchsia_bluetooth::Appearance,
-        fidl_fuchsia_bluetooth_sys as sys,
-        fuchsia_bluetooth::types::Address,
-        futures::{
-            future::{self, Future},
-            stream::TryStreamExt,
-        },
-    };
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_bluetooth::Appearance;
+    use fidl_fuchsia_bluetooth_sys as sys;
+    use fuchsia_bluetooth::types::Address;
+    use futures::future::{self, Future};
+    use futures::stream::TryStreamExt;
 
     fn simple_test_peer(id: PeerId) -> Peer {
         Peer {

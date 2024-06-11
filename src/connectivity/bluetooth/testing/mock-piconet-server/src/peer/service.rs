@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_bluetooth_bredr::ServiceClassProfileIdentifier,
-    fuchsia_bluetooth::{profile::Psm, types::PeerId},
-    slab::Slab,
-    std::collections::{HashMap, HashSet},
-    tracing::warn,
-};
+use fidl_fuchsia_bluetooth_bredr::ServiceClassProfileIdentifier;
+use fuchsia_bluetooth::profile::Psm;
+use fuchsia_bluetooth::types::PeerId;
+use slab::Slab;
+use std::collections::{HashMap, HashSet};
+use tracing::warn;
 
 use crate::types::{RegisteredServiceId, ServiceRecord};
 
@@ -175,7 +174,8 @@ impl ServiceSet {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::profile::{build_l2cap_descriptor, tests::a2dp_service_definition};
+    use crate::profile::build_l2cap_descriptor;
+    use crate::profile::tests::a2dp_service_definition;
 
     fn avrcp_service_record(psm: Psm) -> ServiceRecord {
         let service_ids = vec![

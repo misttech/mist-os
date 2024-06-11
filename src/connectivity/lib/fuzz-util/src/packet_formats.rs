@@ -5,21 +5,18 @@
 //! Arbitrary packet generators.
 
 use arbitrary::{Arbitrary, Result, Unstructured};
-use net_types::{
-    ethernet::Mac,
-    ip::{IpAddress, Ipv4Addr},
-};
-use packet_formats::{
-    ethernet::{EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck},
-    icmp::IcmpParseArgs,
-    ipv4::Ipv4PacketBuilder,
-    ipv6::Ipv6PacketBuilder,
-    tcp::TcpParseArgs,
-    udp::UdpParseArgs,
-};
+use net_types::ethernet::Mac;
+use net_types::ip::{IpAddress, Ipv4Addr};
+use packet_formats::ethernet::{EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck};
+use packet_formats::icmp::IcmpParseArgs;
+use packet_formats::ipv4::Ipv4PacketBuilder;
+use packet_formats::ipv6::Ipv6PacketBuilder;
+use packet_formats::tcp::TcpParseArgs;
+use packet_formats::udp::UdpParseArgs;
 use zerocopy::FromBytes;
 
-use crate::{zerocopy::ArbitraryFromBytes, Fuzzed};
+use crate::zerocopy::ArbitraryFromBytes;
+use crate::Fuzzed;
 
 impl<'a> Arbitrary<'a> for Fuzzed<EtherType> {
     fn arbitrary(u: &mut Unstructured<'a>) -> Result<Self> {

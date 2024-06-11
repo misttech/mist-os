@@ -2,22 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::flatland_instance::{DISPLAY_HEIGHT, DISPLAY_WIDTH},
-    crate::{
-        flatland_actor::FlatlandActor, flatland_instance::FlatlandInstance,
-        input_actor::InputActor, Args,
-    },
-    async_trait::async_trait,
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker,
-    fidl_fuchsia_ui_composition as flatland, fidl_fuchsia_ui_pointerinjector as pointerinjector,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    futures::lock::Mutex,
-    rand::{rngs::SmallRng, SeedableRng},
-    std::{sync::Arc, time::Duration},
-    stress_test::{actor::ActorRunner, environment::Environment},
-};
+use crate::flatland_actor::FlatlandActor;
+use crate::flatland_instance::{FlatlandInstance, DISPLAY_HEIGHT, DISPLAY_WIDTH};
+use crate::input_actor::InputActor;
+use crate::Args;
+use async_trait::async_trait;
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use futures::lock::Mutex;
+use rand::rngs::SmallRng;
+use rand::SeedableRng;
+use std::sync::Arc;
+use std::time::Duration;
+use stress_test::actor::ActorRunner;
+use stress_test::environment::Environment;
+use {fidl_fuchsia_ui_composition as flatland, fidl_fuchsia_ui_pointerinjector as pointerinjector};
 
 /// Contains the running instance of scenic and the actors that operate on it.
 /// This object lives for the entire duration of the test.

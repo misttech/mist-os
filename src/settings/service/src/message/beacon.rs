@@ -11,8 +11,7 @@ use anyhow::{format_err, Error};
 use fuchsia_async::{self as fasync, DurationExt};
 use fuchsia_zircon::Duration;
 use futures::channel::mpsc::UnboundedSender;
-use futures::future::TryFutureExt;
-use futures::future::{AbortHandle, Abortable};
+use futures::future::{AbortHandle, Abortable, TryFutureExt};
 use futures::lock::Mutex;
 use std::sync::Arc;
 

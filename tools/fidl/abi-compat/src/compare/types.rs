@@ -7,10 +7,8 @@ use super::{
     Protocol, Transport,
 };
 use itertools::Itertools;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    fmt::Display,
-};
+use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Display;
 
 fn value_list(values: &BTreeSet<i128>) -> String {
     let v: Vec<String> = values.iter().sorted().map(|o| format!("{o}")).collect();

@@ -6,17 +6,15 @@ mod battery_manager;
 mod battery_simulator;
 mod power;
 
-use {
-    crate::battery_manager::{BatteryManager, BatterySimulationStateObserver},
-    crate::battery_simulator::SimulatedBatteryInfoSource,
-    anyhow::Error,
-    fidl_fuchsia_power_battery::BatteryManagerRequestStream,
-    fidl_fuchsia_power_battery_test as spower, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    futures::prelude::*,
-    std::sync::{Arc, Weak},
-    tracing::{error, info},
-};
+use crate::battery_manager::{BatteryManager, BatterySimulationStateObserver};
+use crate::battery_simulator::SimulatedBatteryInfoSource;
+use anyhow::Error;
+use fidl_fuchsia_power_battery::BatteryManagerRequestStream;
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
+use std::sync::{Arc, Weak};
+use tracing::{error, info};
+use {fidl_fuchsia_power_battery_test as spower, fuchsia_async as fasync};
 
 enum IncomingService {
     BatteryManager(BatteryManagerRequestStream),

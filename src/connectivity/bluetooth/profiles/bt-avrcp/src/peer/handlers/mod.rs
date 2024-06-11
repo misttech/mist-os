@@ -9,12 +9,12 @@ use fidl_fuchsia_bluetooth_avrcp::{
 use fuchsia_async as fasync;
 use fuchsia_sync::Mutex;
 use fuchsia_zircon::Duration;
-use futures::{future::Either, Future, FutureExt};
-use std::collections::{
-    hash_map::Entry::{Occupied, Vacant},
-    HashMap, VecDeque,
-};
-use std::{pin::pin, sync::Arc};
+use futures::future::Either;
+use futures::{Future, FutureExt};
+use std::collections::hash_map::Entry::{Occupied, Vacant};
+use std::collections::{HashMap, VecDeque};
+use std::pin::pin;
+use std::sync::Arc;
 use tracing::{trace, warn};
 
 pub mod browse_channel;

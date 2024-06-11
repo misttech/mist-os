@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::filesystems::FsManagementFilesystemInstance,
-    async_trait::async_trait,
-    storage_benchmarks::{BlockDeviceConfig, BlockDeviceFactory, FilesystemConfig},
-};
+use crate::filesystems::FsManagementFilesystemInstance;
+use async_trait::async_trait;
+use storage_benchmarks::{BlockDeviceConfig, BlockDeviceFactory, FilesystemConfig};
 
 /// Config object for starting Minfs instances.
 #[derive(Clone)]
@@ -38,7 +36,8 @@ impl FilesystemConfig for Minfs {
 
 #[cfg(test)]
 mod tests {
-    use {super::Minfs, crate::filesystems::testing::check_filesystem};
+    use super::Minfs;
+    use crate::filesystems::testing::check_filesystem;
 
     #[fuchsia::test]
     async fn start_minfs() {

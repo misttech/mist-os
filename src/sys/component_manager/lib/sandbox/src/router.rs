@@ -7,8 +7,9 @@ use async_trait::async_trait;
 use cm_types::Availability;
 use futures::future::BoxFuture;
 use router_error::RouterError;
+use std::fmt;
 use std::fmt::Debug;
-use std::{fmt, sync::Arc};
+use std::sync::Arc;
 
 /// Types that implement [`Routable`] let the holder asynchronously request
 /// capabilities from them.

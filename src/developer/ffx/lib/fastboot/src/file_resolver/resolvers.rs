@@ -9,11 +9,9 @@ use async_trait::async_trait;
 use chrono::Utc;
 use errors::{ffx_bail, ffx_error};
 use flate2::read::GzDecoder;
-use std::{
-    fs::{create_dir_all, File},
-    io::{copy, Write},
-    path::{Path, PathBuf},
-};
+use std::fs::{create_dir_all, File};
+use std::io::{copy, Write};
+use std::path::{Path, PathBuf};
 use tar::Archive;
 use tempfile::{tempdir, TempDir};
 use zip::read::ZipArchive;
@@ -198,7 +196,8 @@ mod test {
     // use tempfile::NamedTempFile;
 
     use super::*;
-    use std::{io::Read, str::FromStr};
+    use std::io::Read;
+    use std::str::FromStr;
     use zip::write::{FileOptions, ZipWriter};
     use zip::CompressionMethod;
 

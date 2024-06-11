@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::compiler::{compiler, SymbolTable, SymbolicInstructionInfo},
-    crate::debugger::device_specification::DeviceSpecification,
-    crate::debugger::offline_debugger::{self, debug_from_device_specification},
-    crate::errors::UserError,
-    crate::parser,
-    serde::Deserialize,
-    std::collections::HashMap,
-    std::fmt,
-    thiserror::Error,
-    valico::json_schema,
-};
+use crate::compiler::{compiler, SymbolTable, SymbolicInstructionInfo};
+use crate::debugger::device_specification::DeviceSpecification;
+use crate::debugger::offline_debugger::{self, debug_from_device_specification};
+use crate::errors::UserError;
+use crate::parser;
+use serde::Deserialize;
+use std::collections::HashMap;
+use std::fmt;
+use thiserror::Error;
+use valico::json_schema;
 
 const BIND_SCHEMA: &str = include_str!("../tests_schema.json");
 const COMPOSITE_SCHEMA: &str = include_str!("../composite_tests_schema.json");

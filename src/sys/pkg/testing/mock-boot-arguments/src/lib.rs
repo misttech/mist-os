@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_hash::Hash,
-    futures::TryStreamExt as _,
-    std::{collections::HashMap, sync::Arc},
-};
+use fuchsia_hash::Hash;
+use futures::TryStreamExt as _;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 static PKGFS_BOOT_ARG_KEY: &str = "zircon.system.pkgfs.cmd";
 static PKGFS_BOOT_ARG_VALUE_PREFIX: &str = "bin/pkgsvr+";
@@ -69,7 +68,9 @@ impl MockBootArgumentsService {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fuchsia_async as fasync, maplit::hashmap};
+    use super::*;
+    use fuchsia_async as fasync;
+    use maplit::hashmap;
 
     #[test]
     fn insert_pkgfs_boot_arg_some() {

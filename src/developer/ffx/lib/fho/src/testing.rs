@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    subtool::{FfxTool, ToolCommand},
-    FhoEnvironment,
-};
+use crate::subtool::{FfxTool, ToolCommand};
+use crate::FhoEnvironment;
 use argh::FromArgs;
 use async_trait::async_trait;
 use ffx_command::{FfxCommandLine, Result};
@@ -14,7 +12,9 @@ use ffx_core::{downcast_injector_error, FfxInjectorError, Injector};
 use ffx_writer::Writer;
 use fidl_fuchsia_developer_ffx::{DaemonProxy, TargetProxy, VersionInfo};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
-use std::{future::Future, pin::Pin, sync::Arc};
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
 
 pub struct ToolEnv {
     injector: FakeInjector,

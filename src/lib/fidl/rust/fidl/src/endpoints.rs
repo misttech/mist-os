@@ -4,17 +4,16 @@
 
 //! Wrapper types for the endpoints of a connection.
 
-use {
-    crate::{
-        epitaph::ChannelEpitaphExt, AsHandleRef, AsyncChannel, Channel, Error, Handle, HandleBased,
-        HandleRef, OnSignalsRef, ServeInner,
-    },
-    fuchsia_async as fasync, fuchsia_zircon_status as zx_status,
-    futures::{Future, FutureExt, Stream, TryFutureExt, TryStream, TryStreamExt},
-    std::marker::PhantomData,
-    std::sync::Arc,
-    tracing::error,
+use crate::epitaph::ChannelEpitaphExt;
+use crate::{
+    AsHandleRef, AsyncChannel, Channel, Error, Handle, HandleBased, HandleRef, OnSignalsRef,
+    ServeInner,
 };
+use futures::{Future, FutureExt, Stream, TryFutureExt, TryStream, TryStreamExt};
+use std::marker::PhantomData;
+use std::sync::Arc;
+use tracing::error;
+use {fuchsia_async as fasync, fuchsia_zircon_status as zx_status};
 
 /// A marker for a particular FIDL protocol.
 ///

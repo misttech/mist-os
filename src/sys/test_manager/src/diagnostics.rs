@@ -2,17 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_diagnostics::{
+    BatchIteratorMarker, ClientSelectorConfiguration, DataType, Format, StreamMode,
+    StreamParameters,
+};
+use tracing::warn;
 use {
-    anyhow::Error,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_diagnostics as fdiagnostics,
-    fidl_fuchsia_diagnostics::{
-        BatchIteratorMarker, ClientSelectorConfiguration, DataType, Format, StreamMode,
-        StreamParameters,
-    },
-    fidl_fuchsia_diagnostics_host as fhost, fidl_fuchsia_test_manager as ftest_manager,
-    fuchsia_async as fasync,
-    tracing::warn,
+    fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_diagnostics_host as fhost,
+    fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync,
 };
 
 pub(crate) struct ServeSyslogOutcome {

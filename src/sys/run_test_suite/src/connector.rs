@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::outcome::ConnectionError, fidl_fuchsia_test_manager::RunBuilderProxy,
-    futures::lock::Mutex,
-};
+use crate::outcome::ConnectionError;
+use fidl_fuchsia_test_manager::RunBuilderProxy;
+use futures::lock::Mutex;
 
 /// Implementing this trait allows configuring the number of suites to
 /// run on a single RunBuilder connection.

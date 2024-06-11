@@ -1,20 +1,18 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use anyhow::{format_err, Context as _, Error};
+use fuchsia_async::{self as fasync, TimeoutExt};
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use futures::lock::Mutex;
+use futures::{future, TryStreamExt};
+use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 use {
-    anyhow::{format_err, Context as _, Error},
     fidl_fuchsia_input as input, fidl_fuchsia_ui_input3 as ui_input3,
-    fidl_fuchsia_ui_views as ui_views,
-    fuchsia_async::{self as fasync, TimeoutExt},
-    fuchsia_scenic as scenic,
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::{future, lock::Mutex, TryStreamExt},
-    std::{
-        collections::{HashMap, HashSet},
-        fmt,
-        hash::{Hash, Hasher},
-        sync::Arc,
-    },
+    fidl_fuchsia_ui_views as ui_views, fuchsia_scenic as scenic,
 };
 
 const DEFAULT_LISTENER_TIMEOUT: zx::Duration = zx::Duration::from_seconds(2);
@@ -415,13 +413,11 @@ impl KeyListenerStore {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_fuchsia_input as input, fuchsia_async as fasync,
-        futures::{StreamExt, TryFutureExt},
-        maplit::hashset,
-        std::task::Poll,
-    };
+    use super::*;
+    use futures::{StreamExt, TryFutureExt};
+    use maplit::hashset;
+    use std::task::Poll;
+    use {fidl_fuchsia_input as input, fuchsia_async as fasync};
 
     type Client = (ui_views::ViewRef, ui_input3::KeyboardListenerRequestStream);
 

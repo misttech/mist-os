@@ -7,18 +7,13 @@
 //! This contains some commonly useful wrappers and trait implementations that are obvious enough to
 //! warrant an implementation, but have an amount of policy that you may want to opt out of.
 
-use {
-    crate::queue::{DescChain, DriverNotify, Queue},
-    futures::{task::AtomicWaker, Stream},
-    std::{
-        pin::Pin,
-        sync::{
-            atomic::{AtomicBool, AtomicU32, Ordering},
-            Arc,
-        },
-        task::{Context, Poll},
-    },
-};
+use crate::queue::{DescChain, DriverNotify, Queue};
+use futures::task::AtomicWaker;
+use futures::Stream;
+use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::Arc;
+use std::task::{Context, Poll};
 
 struct BufferedNotifyInner<N: DriverNotify> {
     notify: N,

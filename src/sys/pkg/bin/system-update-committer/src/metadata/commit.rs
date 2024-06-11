@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::configuration::Configuration,
-    super::errors::{BootManagerError, BootManagerResultExt},
-    fidl_fuchsia_paver as paver,
-};
+use super::configuration::Configuration;
+use super::errors::{BootManagerError, BootManagerResultExt};
+use fidl_fuchsia_paver as paver;
 
 /// Commit the slot by updating the boot metadata.
 pub async fn do_commit(
@@ -42,14 +40,12 @@ pub async fn do_commit(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fuchsia_async as fasync,
-        fuchsia_zircon::Status,
-        mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent},
-        std::sync::Arc,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use fuchsia_zircon::Status;
+    use mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent};
+    use std::sync::Arc;
 
     /// Helper fn to verify that do_commit succeeds.
     async fn run_success_test(current_config: &Configuration) {

@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::target::GnTarget,
-    anyhow::{anyhow, Result},
-    std::process::Command,
-    std::{path::PathBuf, str::FromStr},
-};
+use crate::target::GnTarget;
+use anyhow::{anyhow, Result};
+use std::path::PathBuf;
+use std::process::Command;
+use std::str::FromStr;
 
 pub struct BuildScriptOutput {
     pub rustflags: Vec<String>,

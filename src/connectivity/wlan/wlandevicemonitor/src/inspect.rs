@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_inspect::Inspector, fuchsia_inspect_contrib::nodes::BoundedListNode,
-    fuchsia_sync::Mutex,
-};
+use fuchsia_inspect::Inspector;
+use fuchsia_inspect_contrib::nodes::BoundedListNode;
+use fuchsia_sync::Mutex;
 
 pub const VMO_SIZE_BYTES: usize = 1000 * 1024;
 

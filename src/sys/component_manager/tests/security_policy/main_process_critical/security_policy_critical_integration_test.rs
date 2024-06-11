@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{Context, Error};
+use component_events::events::*;
+use component_events::matcher::*;
+use component_events::sequence::{EventSequence, Ordering};
+use fidl::endpoints::Proxy;
+use fuchsia_component::client;
+use futures::future::{select, Either};
+use security_policy_test_util::{open_exposed_dir, start_policy_test};
 use {
-    anyhow::{Context, Error},
-    component_events::{
-        events::*,
-        matcher::*,
-        sequence::{EventSequence, Ordering},
-    },
-    fidl::endpoints::Proxy,
     fidl_fuchsia_component as fcomponent, fidl_test_policy as ftest, fuchsia_async as fasync,
-    fuchsia_component::client,
     fuchsia_zircon as zx,
-    futures::future::{select, Either},
-    security_policy_test_util::{open_exposed_dir, start_policy_test},
 };
 
 const COMPONENT_MANAGER_URL: &str = "#meta/cm_for_test.cm";

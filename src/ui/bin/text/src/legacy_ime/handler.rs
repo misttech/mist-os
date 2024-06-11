@@ -4,22 +4,22 @@
 
 //! This module contains an implementation of `LegacyIme` itself.
 
-use {
-    anyhow::{format_err, Context, Error, Result},
-    fidl_fuchsia_ui_input::{self as uii, InputMethodEditorRequest as ImeReq},
-    fidl_fuchsia_ui_input3 as ui_input3,
-    futures::{lock::Mutex, prelude::*},
-    std::{
-        collections::{HashMap, HashSet},
-        sync::{Arc, Weak},
-    },
-};
+use anyhow::{format_err, Context, Error, Result};
+use fidl_fuchsia_ui_input::{self as uii, InputMethodEditorRequest as ImeReq};
+use fidl_fuchsia_ui_input3 as ui_input3;
+use futures::lock::Mutex;
+use futures::prelude::*;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Weak};
 
+use super::state::ImeState;
 use super::{
-    state::ImeState, HID_USAGE_KEY_BACKSPACE, HID_USAGE_KEY_DELETE, HID_USAGE_KEY_ENTER,
-    HID_USAGE_KEY_LEFT, HID_USAGE_KEY_RIGHT,
+    HID_USAGE_KEY_BACKSPACE, HID_USAGE_KEY_DELETE, HID_USAGE_KEY_ENTER, HID_USAGE_KEY_LEFT,
+    HID_USAGE_KEY_RIGHT,
 };
-use crate::{index_convert as idx, keyboard::events, text_manager::TextManager};
+use crate::index_convert as idx;
+use crate::keyboard::events;
+use crate::text_manager::TextManager;
 
 /// An input method provides edits and cursor updates to a text field. This Legacy Input Method
 /// provides edits to a text field over the legacy pair of interfaces `InputMethodEditor` and

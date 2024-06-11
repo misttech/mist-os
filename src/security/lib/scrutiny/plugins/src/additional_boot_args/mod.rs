@@ -10,10 +10,10 @@ pub use collection::{
     AdditionalBootConfigCollection, AdditionalBootConfigContents, AdditionalBootConfigError,
 };
 
-use {
-    collector::AdditionalBootConfigCollector, controller::ExtractAdditionalBootConfigController,
-    scrutiny::prelude::*, std::sync::Arc,
-};
+use collector::AdditionalBootConfigCollector;
+use controller::ExtractAdditionalBootConfigController;
+use scrutiny::prelude::*;
+use std::sync::Arc;
 
 plugin!(
     AdditionalBootConfigPlugin,

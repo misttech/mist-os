@@ -173,14 +173,12 @@ impl std::fmt::Debug for Counter {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        lazy_static::lazy_static,
-        std::collections::BTreeSet,
-        std::sync::mpsc,
-        std::sync::mpsc::{Receiver, Sender},
-        std::thread,
-    };
+    use super::*;
+    use lazy_static::lazy_static;
+    use std::collections::BTreeSet;
+    use std::sync::mpsc;
+    use std::sync::mpsc::{Receiver, Sender};
+    use std::thread;
 
     #[derive(Debug, PartialEq, PartialOrd)]
     struct NotDisplay {

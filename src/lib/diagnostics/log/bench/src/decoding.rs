@@ -3,13 +3,12 @@
 // found in the LICENSE file.
 
 use assert_matches::assert_matches;
-use diagnostics_log_encoding::{
-    encode::{Argument, Encoder, TracingEvent, Value, WriteEventParams},
-    parse::{parse_argument, parse_record},
-};
+use diagnostics_log_encoding::encode::{Argument, Encoder, TracingEvent, Value, WriteEventParams};
+use diagnostics_log_encoding::parse::{parse_argument, parse_record};
 use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
-use std::{io::Cursor, time::Duration};
+use std::io::Cursor;
+use std::time::Duration;
 use tracing::Event;
 use tracing_core::field;
 use tracing_subscriber::Registry;

@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_net as net;
-use fidl_fuchsia_net_ext as net_ext;
 use fuchsia_sync::Mutex;
 use std::collections::HashSet;
+use {fidl_fuchsia_net as net, fidl_fuchsia_net_ext as net_ext};
 
 /// Alias for a list of [`net::SocketAddress`].
 ///

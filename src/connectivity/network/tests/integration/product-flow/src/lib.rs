@@ -4,22 +4,20 @@
 
 #![cfg(test)]
 
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_dhcp as fnet_dhcp;
 use fidl_fuchsia_net_ext::IntoExt as _;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fuchsia_async::{self as fasync};
-use fuchsia_zircon as zx;
 use futures::{AsyncReadExt as _, AsyncWriteExt as _, FutureExt as _, StreamExt as _};
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcp as fnet_dhcp,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fuchsia_zircon as zx,
+};
 
 use assert_matches::assert_matches;
 use netemul::{InStack, RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _};
-use netstack_testing_common::{
-    constants::ipv6 as ipv6_consts,
-    dhcpv4, interfaces, ndp,
-    realms::{KnownServiceProvider, Netstack, TestSandboxExt as _},
-};
+use netstack_testing_common::constants::ipv6 as ipv6_consts;
+use netstack_testing_common::realms::{KnownServiceProvider, Netstack, TestSandboxExt as _};
+use netstack_testing_common::{dhcpv4, interfaces, ndp};
 use netstack_testing_macros::netstack_test;
 use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
 use std::pin::pin;

@@ -2,19 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::collector::DataCollector,
-    crate::model::model::DataModel,
-    anyhow::Result,
-    serde::{Deserialize, Serialize},
-    std::collections::{HashMap, HashSet},
-    std::fmt,
-    std::sync::{mpsc, Arc, Condvar, Mutex},
-    std::thread,
-    thiserror::Error,
-    tracing::{error, info},
-    uuid::Uuid,
-};
+use crate::model::collector::DataCollector;
+use crate::model::model::DataModel;
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::sync::{mpsc, Arc, Condvar, Mutex};
+use std::{fmt, thread};
+use thiserror::Error;
+use tracing::{error, info};
+use uuid::Uuid;
 
 #[derive(Error, Debug)]
 pub enum SchedulerError {
@@ -299,7 +296,8 @@ impl CollectorScheduler {
 }
 #[cfg(test)]
 mod tests {
-    use {super::*, scrutiny_testing::fake::fake_model_config};
+    use super::*;
+    use scrutiny_testing::fake::fake_model_config;
 
     struct MockCollector {
         id: u32,

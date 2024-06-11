@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuse3::{raw::prelude::FileAttr, FileType},
-    fxfs::object_store::Timestamp,
-    std::time::SystemTime,
-};
+use fuse3::raw::prelude::FileAttr;
+use fuse3::FileType;
+use fxfs::object_store::Timestamp;
+use std::time::SystemTime;
 
 // Fxfs does not support file mode, so all files have mode 755.
 const DEFAULT_FILE_MODE: u32 = 0o755;

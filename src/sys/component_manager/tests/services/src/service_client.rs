@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error, fidl_fuchsia_examples as fexamples, fuchsia_component::client,
-    fuchsia_component::server::ServiceFs, futures::StreamExt,
-};
+use anyhow::Error;
+use fidl_fuchsia_examples as fexamples;
+use fuchsia_component::client;
+use fuchsia_component::server::ServiceFs;
+use futures::StreamExt;
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

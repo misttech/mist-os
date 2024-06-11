@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Result},
-    std::fs,
-    std::path::Path,
-};
+use anyhow::{Context as _, Result};
+use std::fs;
+use std::path::Path;
 
 /// Verifies that the input was actually written and matches its expected contents.
 pub fn verify_saved<P: AsRef<Path>>(saved: P, data: &[u8]) -> Result<()> {

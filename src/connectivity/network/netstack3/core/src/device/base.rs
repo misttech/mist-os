@@ -4,64 +4,61 @@
 
 //! Implementations of device layer traits for [`CoreCtx`].
 
-use core::{fmt::Debug, num::NonZeroU8, ops::Deref as _};
+use core::fmt::Debug;
+use core::num::NonZeroU8;
+use core::ops::Deref as _;
 
-use lock_order::{
-    lock::{DelegatedOrderedLockAccess, LockLevelFor, UnlockedAccess, UnlockedAccessMarkerFor},
-    relation::LockBefore,
+use lock_order::lock::{
+    DelegatedOrderedLockAccess, LockLevelFor, UnlockedAccess, UnlockedAccessMarkerFor,
 };
-use net_types::{
-    ethernet::Mac,
-    ip::{
-        AddrSubnet, Ip, IpAddress, IpInvariant, IpVersion, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6,
-        Ipv6Addr, Mtu,
-    },
-    map_ip_twice, MulticastAddr, SpecifiedAddr, Witness as _,
+use lock_order::relation::LockBefore;
+use net_types::ethernet::Mac;
+use net_types::ip::{
+    AddrSubnet, Ip, IpAddress, IpInvariant, IpVersion, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6,
+    Ipv6Addr, Mtu,
 };
+use net_types::{map_ip_twice, MulticastAddr, SpecifiedAddr, Witness as _};
+use netstack3_base::sync::{PrimaryRc, StrongRc, WeakRc};
 use netstack3_base::{
-    sync::{PrimaryRc, StrongRc, WeakRc},
-    CounterContext, ExistsError, NotFoundError, ReceivableFrameMeta, ReferenceNotifiersExt,
-    RemoveResourceResultWithContext, ResourceCounterContext,
+    AnyDevice, CounterContext, DeviceIdContext, ExistsError, NotFoundError, ReceivableFrameMeta,
+    RecvIpFrameMeta, ReferenceNotifiersExt, RemoveResourceResultWithContext,
+    ResourceCounterContext,
 };
-use netstack3_base::{AnyDevice, DeviceIdContext, RecvIpFrameMeta};
+use netstack3_device::ethernet::{
+    self, EthernetDeviceCounters, EthernetDeviceId, EthernetIpLinkDeviceDynamicStateContext,
+    EthernetLinkDevice, EthernetPrimaryDeviceId, EthernetWeakDeviceId,
+};
+use netstack3_device::loopback::{self, LoopbackDevice, LoopbackDeviceId, LoopbackPrimaryDeviceId};
+use netstack3_device::pure_ip::{self, PureIpDeviceCounters, PureIpDeviceId};
+use netstack3_device::queue::TransmitQueueHandler;
 use netstack3_device::{
-    ethernet::{
-        self, EthernetDeviceCounters, EthernetDeviceId, EthernetIpLinkDeviceDynamicStateContext,
-        EthernetLinkDevice, EthernetPrimaryDeviceId, EthernetWeakDeviceId,
-    },
-    for_any_device_id,
-    loopback::{self, LoopbackDevice, LoopbackDeviceId, LoopbackPrimaryDeviceId},
-    pure_ip::{self, PureIpDeviceCounters, PureIpDeviceId},
-    queue::TransmitQueueHandler,
-    socket, ArpCounters, BaseDeviceId, DeviceCollectionContext, DeviceConfigurationContext,
-    DeviceCounters, DeviceId, DeviceLayerState, DeviceStateSpec, Devices, DevicesIter,
-    IpLinkDeviceState, IpLinkDeviceStateInner, Ipv6DeviceLinkLayerAddr, OriginTracker,
-    OriginTrackerContext, WeakDeviceId,
+    for_any_device_id, socket, ArpCounters, BaseDeviceId, DeviceCollectionContext,
+    DeviceConfigurationContext, DeviceCounters, DeviceId, DeviceLayerState, DeviceStateSpec,
+    Devices, DevicesIter, IpLinkDeviceState, IpLinkDeviceStateInner, Ipv6DeviceLinkLayerAddr,
+    OriginTracker, OriginTrackerContext, WeakDeviceId,
 };
 use netstack3_filter::{IpPacket, ProofOfEgressCheck};
+use netstack3_ip::device::{
+    AddressIdIter, AssignedAddress as _, DualStackIpDeviceState, IpDeviceAddressContext,
+    IpDeviceAddressIdContext, IpDeviceConfigurationContext, IpDeviceFlags, IpDeviceIpExt,
+    IpDeviceSendContext, IpDeviceStateContext, Ipv4AddressEntry, Ipv4AddressState,
+    Ipv4DeviceConfiguration, Ipv6AddressEntry, Ipv6AddressState, Ipv6DadState, Ipv6DeviceAddr,
+    Ipv6DeviceConfiguration, Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
+    Ipv6NetworkLearnedParameters,
+};
+use netstack3_ip::nud::{
+    ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler, NudIpHandler, NudUserConfig,
+};
 use netstack3_ip::{
-    self as ip,
-    device::{
-        AddressIdIter, AssignedAddress as _, DualStackIpDeviceState, IpDeviceAddressContext,
-        IpDeviceAddressIdContext, IpDeviceConfigurationContext, IpDeviceFlags, IpDeviceIpExt,
-        IpDeviceSendContext, IpDeviceStateContext, Ipv4AddressEntry, Ipv4AddressState,
-        Ipv4DeviceConfiguration, Ipv6AddressEntry, Ipv6AddressState, Ipv6DadState, Ipv6DeviceAddr,
-        Ipv6DeviceConfiguration, Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
-        Ipv6NetworkLearnedParameters,
-    },
-    nud::{
-        ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler, NudIpHandler, NudUserConfig,
-    },
-    IpForwardingDeviceContext, IpPacketDestination, IpTypesIpExt, RawMetric,
+    self as ip, IpForwardingDeviceContext, IpPacketDestination, IpTypesIpExt, RawMetric,
 };
 use packet::{BufferMut, Serializer};
 use packet_formats::ethernet::EthernetIpExt;
 
-use crate::{
-    context::{prelude::*, CoreCtxAndResource, Locked, WrapLockLevel},
-    ip::integration::CoreCtxWithIpDeviceConfiguration,
-    BindingsContext, BindingsTypes, CoreCtx, StackState,
-};
+use crate::context::prelude::*;
+use crate::context::{CoreCtxAndResource, Locked, WrapLockLevel};
+use crate::ip::integration::CoreCtxWithIpDeviceConfiguration;
+use crate::{BindingsContext, BindingsTypes, CoreCtx, StackState};
 
 impl<BC: BindingsTypes> UnlockedAccess<crate::lock_ordering::DeviceLayerStateOrigin>
     for StackState<BC>

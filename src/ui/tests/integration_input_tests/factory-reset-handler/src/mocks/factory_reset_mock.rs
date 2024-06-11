@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_recovery::{FactoryResetRequest, FactoryResetRequestStream},
-    fuchsia_component_test::{ChildOptions, RealmBuilder},
-    fuchsia_zircon as zx,
-    futures::{channel::mpsc::UnboundedSender, TryStreamExt},
-};
+use fidl_fuchsia_recovery::{FactoryResetRequest, FactoryResetRequestStream};
+use fuchsia_component_test::{ChildOptions, RealmBuilder};
+use fuchsia_zircon as zx;
+use futures::channel::mpsc::UnboundedSender;
+use futures::TryStreamExt;
 
 /// A mock implementation of `fuchsia.recovery.FactoryReset`, which
 /// a) responds to every request with ZX_OK, and

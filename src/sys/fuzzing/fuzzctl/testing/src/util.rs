@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    fuchsia_async as fasync,
-    fuchsia_fuzzctl::{OutputSink, Writer},
-    futures::Future,
-};
+use anyhow::Result;
+use fuchsia_async as fasync;
+use fuchsia_fuzzctl::{OutputSink, Writer};
+use futures::Future;
 
 /// Wraps a given `future` to display any returned errors using the given `writer`.
 pub fn create_task<F, O>(future: F, writer: &Writer<O>) -> fasync::Task<()>

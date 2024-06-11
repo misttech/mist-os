@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use component_events::{
-    events::{EventStream, ExitStatus, Stopped},
-    matcher::EventMatcher,
-};
+use component_events::events::{EventStream, ExitStatus, Stopped};
+use component_events::matcher::EventMatcher;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_component::{CreateChildArgs, RealmMarker};
 use fidl_fuchsia_component_decl::{Child, CollectionRef, StartupMode};
@@ -20,10 +18,8 @@ use fuchsia_component_test::{
 };
 use fuchsia_runtime::{HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use futures::{
-    channel::mpsc::{UnboundedReceiver, UnboundedSender},
-    StreamExt,
-};
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use futures::StreamExt;
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use tracing::info;

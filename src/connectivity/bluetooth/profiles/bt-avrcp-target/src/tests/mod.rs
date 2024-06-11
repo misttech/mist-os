@@ -5,11 +5,13 @@
 use super::*;
 
 use anyhow::Error;
-use fidl::{client::QueryResponseFut, endpoints::create_proxy_and_stream};
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::create_proxy_and_stream;
 use fidl_fuchsia_bluetooth_avrcp::*;
 use fidl_fuchsia_media_sessions2::*;
 use fuchsia_async as fasync;
-use futures::{task::Poll, StreamExt, TryStreamExt};
+use futures::task::Poll;
+use futures::{StreamExt, TryStreamExt};
 use std::pin::pin;
 
 use crate::avrcp_handler::handle_target_requests;

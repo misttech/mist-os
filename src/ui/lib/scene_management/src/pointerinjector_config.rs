@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use async_utils::hanging_get::server as hanging_get;
 use {
-    async_utils::hanging_get::server as hanging_get,
     fidl_fuchsia_ui_pointerinjector as ui_pointerinjector,
     fidl_fuchsia_ui_pointerinjector_configuration as ui_pointerinjector_config,
 };

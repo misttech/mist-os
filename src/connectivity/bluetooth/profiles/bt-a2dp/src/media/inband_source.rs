@@ -3,20 +3,21 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use bt_a2dp::{codec::MediaCodecConfig, media_task::*};
+use bt_a2dp::codec::MediaCodecConfig;
+use bt_a2dp::media_task::*;
 use bt_avdtp::MediaStream;
 use fidl_fuchsia_bluetooth_bredr::AudioOffloadExtProxy;
 use fidl_fuchsia_media::{AudioChannelId, AudioPcmMode, PcmFormat};
-use fuchsia_async as fasync;
-use fuchsia_bluetooth::{inspect::DataStreamInspect, types::PeerId};
+use fuchsia_bluetooth::inspect::DataStreamInspect;
+use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect::Node;
 use fuchsia_inspect_derive::{AttachError, Inspect};
-use fuchsia_trace as trace;
 use futures::channel::oneshot;
 use futures::future::{BoxFuture, Shared, WeakShared};
 use futures::{AsyncWriteExt, FutureExt, TryFutureExt, TryStreamExt};
 use std::time::Duration;
 use tracing::{info, trace, warn};
+use {fuchsia_async as fasync, fuchsia_trace as trace};
 
 use super::sources;
 use crate::encoding::EncodedStream;

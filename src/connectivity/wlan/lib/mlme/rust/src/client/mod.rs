@@ -10,45 +10,39 @@ mod state;
 #[cfg(test)]
 mod test_utils;
 
+use crate::block_ack::BlockAckTx;
+use crate::device::{self, DeviceOps};
+use crate::disconnect::LocallyInitiated;
+use crate::error::Error;
+use crate::{akm_algorithm, ddk_converter};
+use anyhow::format_err;
+use channel_switch::ChannelState;
+use ieee80211::{Bssid, MacAddr, MacAddrBytes, Ssid};
+use scanner::Scanner;
+use state::States;
+use tracing::{error, warn};
+use wlan_common::appendable::Appendable;
+use wlan_common::bss::BssDescription;
+use wlan_common::buffer_writer::BufferWriter;
+use wlan_common::capabilities::{derive_join_capabilities, ClientCapabilities};
+use wlan_common::channel::Channel;
+use wlan_common::ie::rsn::rsne;
+use wlan_common::ie::{self, Id};
+use wlan_common::mac::{self, Aid, CapabilityInfo, PowerState};
+use wlan_common::sequence::SequenceManager;
+use wlan_common::time::TimeUnit;
+use wlan_common::timer::{EventId, Timer};
+use wlan_common::{data_writer, mgmt_writer, wmm};
+use wlan_ffi_transport::{BufferProvider, FinalizedBuffer};
+use wlan_frame_writer::{
+    write_frame, write_frame_with_dynamic_buffer, write_frame_with_fixed_buffer,
+};
+use zerocopy::ByteSlice;
 use {
-    crate::{
-        akm_algorithm,
-        block_ack::BlockAckTx,
-        ddk_converter,
-        device::{self, DeviceOps},
-        disconnect::LocallyInitiated,
-        error::Error,
-    },
-    anyhow::format_err,
-    channel_switch::ChannelState,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_minstrel as fidl_minstrel, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
-    ieee80211::{Bssid, MacAddr, MacAddrBytes, Ssid},
-    scanner::Scanner,
-    state::States,
-    tracing::{error, warn},
-    wlan_common::{
-        appendable::Appendable,
-        bss::BssDescription,
-        buffer_writer::BufferWriter,
-        capabilities::{derive_join_capabilities, ClientCapabilities},
-        channel::Channel,
-        data_writer,
-        ie::{self, rsn::rsne, Id},
-        mac::{self, Aid, CapabilityInfo, PowerState},
-        mgmt_writer,
-        sequence::SequenceManager,
-        time::TimeUnit,
-        timer::{EventId, Timer},
-        wmm,
-    },
-    wlan_ffi_transport::{BufferProvider, FinalizedBuffer},
-    wlan_frame_writer::{
-        write_frame, write_frame_with_dynamic_buffer, write_frame_with_fixed_buffer,
-    },
     wlan_trace as wtrace,
-    zerocopy::ByteSlice,
 };
 
 pub use scanner::ScanError;
@@ -1320,31 +1314,29 @@ fn write_block_ack_hdr<B: Appendable>(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{state::DEFAULT_AUTO_DEAUTH_TIMEOUT_BEACON_COUNT, *},
-        crate::{
-            block_ack::{self, BlockAckState, Closed, ADDBA_REQ_FRAME_LEN, ADDBA_RESP_FRAME_LEN},
-            client::{lost_bss::LostBssCounter, test_utils::drain_timeouts},
-            device::{test_utils, FakeDevice, FakeDeviceConfig, FakeDeviceState, LinkStatus},
-            test_utils::{fake_wlan_channel, MockWlanRxInfo},
-        },
-        fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
-        fuchsia_sync::Mutex,
-        lazy_static::lazy_static,
-        std::sync::Arc,
-        wlan_common::{
-            assert_variant,
-            capabilities::StaCapabilities,
-            channel::Cbw,
-            fake_bss_description, fake_fidl_bss_description,
-            stats::SignalStrengthAverage,
-            test_utils::{fake_capabilities::fake_client_capabilities, fake_frames::*},
-            timer::{self, create_timer},
-        },
-        wlan_ffi_transport::FakeFfiBufferProvider,
-        wlan_sme::responder::Responder,
-        wlan_statemachine::*,
+    use super::state::DEFAULT_AUTO_DEAUTH_TIMEOUT_BEACON_COUNT;
+    use super::*;
+    use crate::block_ack::{
+        self, BlockAckState, Closed, ADDBA_REQ_FRAME_LEN, ADDBA_RESP_FRAME_LEN,
     };
+    use crate::client::lost_bss::LostBssCounter;
+    use crate::client::test_utils::drain_timeouts;
+    use crate::device::{test_utils, FakeDevice, FakeDeviceConfig, FakeDeviceState, LinkStatus};
+    use crate::test_utils::{fake_wlan_channel, MockWlanRxInfo};
+    use fuchsia_sync::Mutex;
+    use lazy_static::lazy_static;
+    use std::sync::Arc;
+    use wlan_common::capabilities::StaCapabilities;
+    use wlan_common::channel::Cbw;
+    use wlan_common::stats::SignalStrengthAverage;
+    use wlan_common::test_utils::fake_capabilities::fake_client_capabilities;
+    use wlan_common::test_utils::fake_frames::*;
+    use wlan_common::timer::{self, create_timer};
+    use wlan_common::{assert_variant, fake_bss_description, fake_fidl_bss_description};
+    use wlan_ffi_transport::FakeFfiBufferProvider;
+    use wlan_sme::responder::Responder;
+    use wlan_statemachine::*;
+    use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal};
     lazy_static! {
         static ref BSSID: Bssid = [6u8; 6].into();
         static ref IFACE_MAC: MacAddr = [7u8; 6].into();

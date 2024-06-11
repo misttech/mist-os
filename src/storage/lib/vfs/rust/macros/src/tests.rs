@@ -4,7 +4,9 @@
 
 use super::pseudo_directory_impl;
 
-use {indoc::indoc, proc_macro2::TokenStream, std::str::FromStr};
+use indoc::indoc;
+use proc_macro2::TokenStream;
+use std::str::FromStr;
 
 fn check_pseudo_directory_impl(input: &str, expected_immutable: &str) {
     let input = TokenStream::from_str(input).unwrap();

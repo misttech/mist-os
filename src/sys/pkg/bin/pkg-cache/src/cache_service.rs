@@ -2,40 +2,35 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::base_packages::{BasePackages, CachePackages};
+use crate::index::PackageIndex;
+use anyhow::{anyhow, Error};
+use fidl::endpoints::ServerEnd;
+use fidl::prelude::*;
+use fidl_contrib::protocol_connector::ProtocolSender;
+use fidl_fuchsia_metrics::MetricEvent;
+use fidl_fuchsia_pkg::{
+    self as fpkg, NeededBlobsMarker, NeededBlobsRequest, NeededBlobsRequestStream,
+    PackageCacheRequest, PackageCacheRequestStream, PackageIndexEntry,
+    PackageIndexIteratorRequestStream,
+};
+use fidl_fuchsia_pkg_ext::{
+    serve_fidl_iterator_from_slice, serve_fidl_iterator_from_stream, BlobId, BlobInfo,
+};
+use fuchsia_async::Task;
+use fuchsia_cobalt_builders::MetricEventExt as _;
+use fuchsia_hash::Hash;
+use fuchsia_inspect::{self as finspect, NumericProperty as _, Property as _, StringProperty};
+use fuchsia_zircon::Status;
+use futures::{FutureExt as _, TryFutureExt as _, TryStreamExt as _};
+use std::collections::HashSet;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
+use tracing::{error, warn};
+use vfs::directory::entry_container::Directory;
 use {
-    crate::base_packages::{BasePackages, CachePackages},
-    crate::index::PackageIndex,
-    anyhow::{anyhow, Error},
-    cobalt_sw_delivery_registry as metrics,
-    fidl::endpoints::ServerEnd,
-    fidl::prelude::*,
-    fidl_contrib::protocol_connector::ProtocolSender,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_metrics::MetricEvent,
-    fidl_fuchsia_pkg::{
-        self as fpkg, NeededBlobsMarker, NeededBlobsRequest, NeededBlobsRequestStream,
-        PackageCacheRequest, PackageCacheRequestStream, PackageIndexEntry,
-        PackageIndexIteratorRequestStream,
-    },
-    fidl_fuchsia_pkg_ext::{
-        serve_fidl_iterator_from_slice, serve_fidl_iterator_from_stream, BlobId, BlobInfo,
-    },
-    fuchsia_async::Task,
-    fuchsia_cobalt_builders::MetricEventExt as _,
-    fuchsia_hash::Hash,
-    fuchsia_inspect::{self as finspect, NumericProperty as _, Property as _, StringProperty},
-    fuchsia_trace as ftrace, fuchsia_zircon as zx,
-    fuchsia_zircon::Status,
-    futures::{FutureExt as _, TryFutureExt as _, TryStreamExt as _},
-    std::{
-        collections::HashSet,
-        sync::{
-            atomic::{AtomicU32, Ordering},
-            Arc,
-        },
-    },
-    tracing::{error, warn},
-    vfs::directory::entry_container::Directory,
+    cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fuchsia_trace as ftrace,
+    fuchsia_zircon as zx,
 };
 
 mod missing_blobs;
@@ -189,7 +184,8 @@ fn executability_status(
     base_packages: &BasePackages,
     package: fuchsia_hash::Hash,
 ) -> ExecutabilityStatus {
-    use {system_image::ExecutabilityRestrictions::*, ExecutabilityStatus::*};
+    use system_image::ExecutabilityRestrictions::*;
+    use ExecutabilityStatus::*;
     let is_base = base_packages.is_package(package);
     match (is_base, executability_restrictions) {
         (true, _) => Allowed,
@@ -724,7 +720,9 @@ async fn open_blob(
         _ => false,
     };
 
-    use {blobfs::CreateError::*, fpkg::OpenBlobError as fErr, OpenBlobSuccess::*};
+    use blobfs::CreateError::*;
+    use fpkg::OpenBlobError as fErr;
+    use OpenBlobSuccess::*;
     let (fidl_resp, fn_ret) = match create_res {
         Ok(blob) => (Ok(Some(blob)), Ok(Needed)),
         Err(AlreadyExists) if is_readable => (Ok(None), Ok(AlreadyCached)),
@@ -855,15 +853,14 @@ impl CobaltSenderExt for ProtocolSender<MetricEvent> {
 
 #[cfg(test)]
 mod serve_needed_blobs_tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl_fuchsia_pkg::{BlobInfoIteratorMarker, BlobInfoIteratorProxy, NeededBlobsProxy},
-        fuchsia_hash::HashRangeFull,
-        fuchsia_inspect as finspect,
-        futures::{future, stream, stream::StreamExt as _},
-        test_case::test_case,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_pkg::{BlobInfoIteratorMarker, BlobInfoIteratorProxy, NeededBlobsProxy};
+    use fuchsia_hash::HashRangeFull;
+    use fuchsia_inspect as finspect;
+    use futures::stream::StreamExt as _;
+    use futures::{future, stream};
+    use test_case::test_case;
 
     #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
     #[test_case(fpkg::GcProtection::Retained; "retained")]
@@ -2284,10 +2281,8 @@ mod serve_needed_blobs_tests {
 
 #[cfg(test)]
 mod get_handler_tests {
-    use {
-        super::*,
-        crate::{CobaltConnectedService, ProtocolConnector, COBALT_CONNECTOR_BUFFER_SIZE},
-    };
+    use super::*;
+    use crate::{CobaltConnectedService, ProtocolConnector, COBALT_CONNECTOR_BUFFER_SIZE};
 
     #[fuchsia::test]
     async fn everything_closed() {
@@ -2328,7 +2323,9 @@ mod get_handler_tests {
 
 #[cfg(test)]
 mod serve_package_index_tests {
-    use {super::*, fpkg::PackageIndexIteratorMarker, fuchsia_url::UnpinnedAbsolutePackageUrl};
+    use super::*;
+    use fpkg::PackageIndexIteratorMarker;
+    use fuchsia_url::UnpinnedAbsolutePackageUrl;
 
     #[fuchsia::test]
     async fn entries_converted_correctly() {

@@ -9,7 +9,6 @@ use ffx_daemon_events::{DaemonEvent, TargetEvent};
 use ffx_daemon_target::target::Target;
 use ffx_ssh::ssh::build_ssh_command;
 use ffx_target::Description;
-use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx_ext::{
     self as ffx_ext, RepositoryRegistrationAliasConflictMode, RepositoryTarget, ServerStatus,
 };
@@ -17,24 +16,23 @@ use fidl_fuchsia_net_ext::SocketAddress;
 use fidl_fuchsia_pkg::RepositoryManagerMarker;
 use fidl_fuchsia_pkg_rewrite::{EngineMarker as RewriteEngineMarker, EngineProxy};
 use fidl_fuchsia_pkg_rewrite_ext::RuleConfig;
-use fuchsia_async as fasync;
-use fuchsia_repo::{
-    repo_client::RepoClient,
-    repository::{self, RepoProvider, RepositorySpec},
-};
+use fuchsia_repo::repo_client::RepoClient;
+use fuchsia_repo::repository::{self, RepoProvider, RepositorySpec};
 use fuchsia_zircon_types::ZX_CHANNEL_MAX_MSG_BYTES;
 use futures::{FutureExt as _, StreamExt as _};
 use measure_fuchsia_developer_ffx::Measurable;
-use pkg::config as pkg_config;
-use pkg::metrics;
-use pkg::repo::repo_spec_to_backend;
 use pkg::repo::{
-    aliases_to_rules, create_repo_host, register_target_with_fidl_proxies, update_repository,
-    Registrar, RepoInner, SaveConfig, ServerState,
+    aliases_to_rules, create_repo_host, register_target_with_fidl_proxies, repo_spec_to_backend,
+    update_repository, Registrar, RepoInner, SaveConfig, ServerState,
 };
+use pkg::{config as pkg_config, metrics};
 use protocols::prelude::*;
 use shared_child::SharedChild;
-use std::{net::SocketAddr, rc::Rc, sync::Arc, time::Duration};
+use std::net::SocketAddr;
+use std::rc::Rc;
+use std::sync::Arc;
+use std::time::Duration;
+use {fidl_fuchsia_developer_ffx as ffx, fuchsia_async as fasync};
 
 const PKG_RESOLVER_MONIKER: &str = "/core/pkg-resolver";
 
@@ -1135,9 +1133,7 @@ mod tests {
     use assert_matches::assert_matches;
     use ffx_config::ConfigLevel;
     use fidl::endpoints::Request;
-    use fidl_fuchsia_developer_ffx as ffx;
     use fidl_fuchsia_developer_ffx_ext::RepositoryStorageType;
-    use fidl_fuchsia_developer_remotecontrol as rcs;
     use fidl_fuchsia_net::{IpAddress, Ipv4Address};
     use fidl_fuchsia_pkg::{
         MirrorConfig, RepositoryConfig, RepositoryKeyConfig, RepositoryManagerRequest,
@@ -1147,18 +1143,19 @@ mod tests {
         EngineRequest as RewriteEngineRequest, RuleIteratorRequest,
     };
     use fidl_fuchsia_pkg_rewrite_ext::Rule;
-    use fidl_fuchsia_posix_socket as fsock;
     use futures::TryStreamExt;
     use pretty_assertions::assert_eq;
     use protocols::testing::FakeDaemonBuilder;
-    use std::{
-        cell::RefCell,
-        collections::BTreeSet,
-        fs,
-        future::Future,
-        net::{IpAddr, Ipv4Addr, Ipv6Addr},
-        str::FromStr,
-        sync::Mutex,
+    use std::cell::RefCell;
+    use std::collections::BTreeSet;
+    use std::fs;
+    use std::future::Future;
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+    use std::str::FromStr;
+    use std::sync::Mutex;
+    use {
+        fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_developer_remotecontrol as rcs,
+        fidl_fuchsia_posix_socket as fsock,
     };
 
     const REPO_NAME: &str = "some-repo";

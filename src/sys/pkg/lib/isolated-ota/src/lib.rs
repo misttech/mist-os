@@ -4,10 +4,9 @@
 
 #![allow(clippy::let_unit_value)]
 
-use {
-    isolated_swd::{omaha, updater::Updater},
-    thiserror::Error,
-};
+use isolated_swd::omaha;
+use isolated_swd::updater::Updater;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum UpdateError {

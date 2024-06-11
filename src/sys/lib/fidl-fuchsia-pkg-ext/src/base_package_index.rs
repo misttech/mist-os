@@ -4,13 +4,11 @@
 
 //! Retrives and serves the base package index.
 
-use {
-    crate::BlobId,
-    anyhow::Error,
-    fidl_fuchsia_pkg::{PackageCacheProxy, PackageIndexIteratorMarker},
-    fuchsia_url::{AbsolutePackageUrl, UnpinnedAbsolutePackageUrl},
-    std::collections::HashMap,
-};
+use crate::BlobId;
+use anyhow::Error;
+use fidl_fuchsia_pkg::{PackageCacheProxy, PackageIndexIteratorMarker};
+use fuchsia_url::{AbsolutePackageUrl, UnpinnedAbsolutePackageUrl};
+use std::collections::HashMap;
 
 /// Represents the set of base packages.
 #[derive(Debug)]
@@ -76,18 +74,16 @@ impl BasePackageIndex {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_pkg::{
-            self as fpkg, PackageCacheMarker, PackageCacheRequest, PackageCacheRequestStream,
-            PackageIndexEntry, PackageIndexIteratorRequest, PackageIndexIteratorRequestStream,
-        },
-        fuchsia_async as fasync,
-        futures::prelude::*,
-        std::sync::Arc,
-        tracing::error,
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_pkg::{
+        self as fpkg, PackageCacheMarker, PackageCacheRequest, PackageCacheRequestStream,
+        PackageIndexEntry, PackageIndexIteratorRequest, PackageIndexIteratorRequestStream,
     };
+    use fuchsia_async as fasync;
+    use futures::prelude::*;
+    use std::sync::Arc;
+    use tracing::error;
 
     // The actual pkg-cache will fit as many items per chunk as possible.  Intentionally choose a
     // small, fixed value here to verify the BasePackageIndex behavior with multiple chunks without

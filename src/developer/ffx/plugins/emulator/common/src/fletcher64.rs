@@ -13,12 +13,10 @@
 //! third_party dependencies.
 
 use byteorder::{ByteOrder, LittleEndian};
-use std::{
-    fs::File,
-    io::{Error, Read},
-    path::Path,
-    time::Instant,
-};
+use std::fs::File;
+use std::io::{Error, Read};
+use std::path::Path;
+use std::time::Instant;
 
 const BUF_SIZE: usize = 8192;
 

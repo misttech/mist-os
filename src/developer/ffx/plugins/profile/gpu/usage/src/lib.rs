@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    async_trait::async_trait,
-    errors::ffx_bail,
-    ffx_gpu_usage_args as args_mod,
-    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
-    fidl_fuchsia_power_metrics::{self as fmetrics, GpuUsage, Metric},
-};
+use anyhow::Result;
+use async_trait::async_trait;
+use errors::ffx_bail;
+use ffx_gpu_usage_args as args_mod;
+use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fidl_fuchsia_power_metrics::{self as fmetrics, GpuUsage, Metric};
 
 #[derive(FfxTool)]
 pub struct GpuUsageTool {
@@ -97,13 +95,11 @@ pub async fn stop(gpu_loggger: fmetrics::RecorderProxy) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl_fuchsia_power_metrics::{self as fmetrics},
-        futures::channel::mpsc,
-        std::time::Duration,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_power_metrics::{self as fmetrics};
+    use futures::channel::mpsc;
+    use std::time::Duration;
 
     // Create a metrics-logger that expects a specific request type (Start, StartForever, or
     // Stop), and returns a specific error

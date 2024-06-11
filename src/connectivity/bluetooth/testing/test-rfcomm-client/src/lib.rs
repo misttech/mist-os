@@ -3,17 +3,22 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Error};
-use bt_rfcomm::{profile::server_channel_from_protocol, ServerChannel};
+use bt_rfcomm::profile::server_channel_from_protocol;
+use bt_rfcomm::ServerChannel;
 use derivative::Derivative;
-use fidl_fuchsia_bluetooth_bredr as bredr;
-use fidl_fuchsia_bluetooth_rfcomm_test as rfcomm;
-use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::{Channel, PeerId, Uuid};
 use fuchsia_sync::Mutex;
-use futures::{channel::mpsc, select, StreamExt};
+use futures::channel::mpsc;
+use futures::{select, StreamExt};
 use profile_client::{ProfileClient, ProfileEvent};
-use std::{cell::Cell, collections::HashMap, sync::Arc};
+use std::cell::Cell;
+use std::collections::HashMap;
+use std::sync::Arc;
 use tracing::{info, warn};
+use {
+    fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_rfcomm_test as rfcomm,
+    fuchsia_async as fasync,
+};
 
 /// The default buffer size for the mpsc channels used to relay user data packets to be sent to the
 /// remote peer.

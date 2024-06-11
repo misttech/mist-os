@@ -10,21 +10,20 @@ use crate::shutdown_request::ShutdownRequest;
 use anyhow::{format_err, Context, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_hardware_input::{ControllerMarker, DeviceMarker, DeviceProxy};
-use fuchsia_async as fasync;
-use fuchsia_fs::directory as vfs;
-use fuchsia_fs::OpenFlags;
+use fuchsia_fs::{directory as vfs, OpenFlags};
 use fuchsia_inspect::{self as inspect, NumericProperty, Property};
-use fuchsia_inspect_contrib::{inspect_log, nodes::BoundedListNode};
-use fuchsia_zircon as zx;
+use fuchsia_inspect_contrib::inspect_log;
+use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use futures::channel::mpsc;
-use futures::{
-    future::{FutureExt, LocalBoxFuture},
-    StreamExt, TryStreamExt,
-};
+use futures::future::{FutureExt, LocalBoxFuture};
+use futures::{StreamExt, TryStreamExt};
 use serde_derive::Deserialize;
-use serde_json as json;
-use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::rc::Rc;
 use tracing::*;
+use {fuchsia_async as fasync, fuchsia_zircon as zx, serde_json as json};
 
 /// Node: LidShutdown
 ///
@@ -383,13 +382,11 @@ mod tests {
     use crate::test::mock_node::create_dummy_node;
     use crate::utils::run_all_tasks_until_stalled::run_all_tasks_until_stalled;
     use assert_matches::assert_matches;
-    use diagnostics_assertions::assert_data_tree;
-    use diagnostics_assertions::TreeAssertion;
+    use diagnostics_assertions::{assert_data_tree, TreeAssertion};
     use fidl::endpoints::create_proxy_and_stream;
-    use fidl_fuchsia_hardware_input as finput;
-    use fuchsia_async as fasync;
     use fuchsia_zircon::{AsHandleRef, HandleBased};
     use std::cell::Cell;
+    use {fidl_fuchsia_hardware_input as finput, fuchsia_async as fasync};
 
     const LID_OPEN: u8 = 0x1;
 

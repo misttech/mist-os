@@ -3,24 +3,17 @@
 // found in the LICENSE file.
 
 use super::blob::BlobOpenError;
-use super::bootfs::AdditionalBootConfigurationError;
-use super::bootfs::BootfsPackageError;
-use super::bootfs::BootfsPackageIndexError;
-use super::bootfs::ComponentManagerConfigurationError;
-use cm_rust::CapabilityDecl;
-use cm_rust::ComponentDecl;
-use dyn_clone::clone_trait_object;
-use dyn_clone::DynClone;
+use super::bootfs::{
+    AdditionalBootConfigurationError, BootfsPackageError, BootfsPackageIndexError,
+    ComponentManagerConfigurationError,
+};
+use cm_rust::{CapabilityDecl, ComponentDecl};
+use dyn_clone::{clone_trait_object, DynClone};
 use fuchsia_url as furl;
-use std::cmp;
 use std::collections::HashMap;
-use std::fmt;
-use std::fmt::Debug;
-use std::fmt::Display;
-use std::hash;
-use std::io::Read;
-use std::io::Seek;
-use std::path;
+use std::fmt::{Debug, Display};
+use std::io::{Read, Seek};
+use std::{cmp, fmt, hash, path};
 use thiserror::Error;
 
 /// The type of readable, seekable objects returned by API interfaces.
@@ -837,12 +830,10 @@ pub trait Environment {}
 #[cfg(test)]
 mod tests {
     use super::super::data_source as ds;
-    use super::ComponentResolverUrl;
-    use super::DataSource;
-    use super::DataSourceKind;
-    use super::DataSourceVersion;
-    use super::PackageResolverUrl;
-    use super::Path;
+    use super::{
+        ComponentResolverUrl, DataSource, DataSourceKind, DataSourceVersion, PackageResolverUrl,
+        Path,
+    };
 
     #[fuchsia::test]
     fn test_data_source_eq() {

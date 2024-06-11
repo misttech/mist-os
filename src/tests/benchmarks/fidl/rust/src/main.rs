@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    criterion::Criterion,
-    fuchsia_criterion::{criterion::Benchmark, FuchsiaCriterion},
-    std::{mem, time::Duration},
-};
+use criterion::Criterion;
+use fuchsia_criterion::criterion::Benchmark;
+use fuchsia_criterion::FuchsiaCriterion;
+use std::mem;
+use std::time::Duration;
 
 fn main() {
     let all = &benchmark_suite::ALL_BENCHMARKS;

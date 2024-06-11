@@ -4,21 +4,19 @@
 
 use fuchsia_zircon as zx;
 
-use crate::{
-    task::{CurrentTask, EventHandler, WaitCanceler, Waiter},
-    vfs::{
-        buffers::{AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer},
-        fileops_impl_nonseekable,
-        socket::{
-            Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketProtocol,
-            SocketType,
-        },
-        FileHandle, FileObject, FileOps,
-    },
+use crate::task::{CurrentTask, EventHandler, WaitCanceler, Waiter};
+use crate::vfs::buffers::{AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer};
+use crate::vfs::socket::{
+    Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketProtocol,
+    SocketType,
 };
+use crate::vfs::{fileops_impl_nonseekable, FileHandle, FileObject, FileOps};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult};
-use starnix_uapi::{error, errors::Errno, open_flags::OpenFlags, vfs::FdEvents};
+use starnix_uapi::error;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::vfs::FdEvents;
 
 pub fn new_socket_file(
     current_task: &CurrentTask,

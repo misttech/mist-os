@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::ui::{terminal_scroll_bar::ScrollBar, TerminalMessages},
-    carnelian::{
-        input::{self},
-        make_message, AppSender, Coord, MessageTarget, Point, Rect, Size, ViewAssistantContext,
-        ViewKey,
-    },
-    fuchsia_async as fasync, fuchsia_trace as ftrace,
-    std::time::{Duration, Instant},
+use crate::ui::terminal_scroll_bar::ScrollBar;
+use crate::ui::TerminalMessages;
+use carnelian::input::{self};
+use carnelian::{
+    make_message, AppSender, Coord, MessageTarget, Point, Rect, Size, ViewAssistantContext, ViewKey,
 };
+use std::time::{Duration, Instant};
+use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
 // Hide scroll thumb after 1 second of scrolling or mouse leaving
 // the scroll bar frame.

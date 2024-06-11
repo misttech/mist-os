@@ -4,29 +4,23 @@
 
 //! A module for managing individual clients (aka sockets) of Netlink.
 
-use std::{
-    collections::HashMap,
-    fmt::{Debug, Display, Formatter},
-    num::NonZeroU32,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, Mutex,
-    },
-};
+use std::collections::HashMap;
+use std::fmt::{Debug, Display, Formatter};
+use std::num::NonZeroU32;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 
 use assert_matches::assert_matches;
 use derivative::Derivative;
 use netlink_packet_core::NetlinkMessage;
 
-use crate::{
-    logging::{log_debug, log_warn},
-    messaging::Sender,
-    multicast_groups::{
-        InvalidLegacyGroupsError, InvalidModernGroupError, LegacyGroups, ModernGroup,
-        MulticastGroupMemberships,
-    },
-    protocol_family::ProtocolFamily,
+use crate::logging::{log_debug, log_warn};
+use crate::messaging::Sender;
+use crate::multicast_groups::{
+    InvalidLegacyGroupsError, InvalidModernGroupError, LegacyGroups, ModernGroup,
+    MulticastGroupMemberships,
 };
+use crate::protocol_family::ProtocolFamily;
 
 /// A unique identifier for a client.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -279,11 +273,9 @@ mod tests {
     use assert_matches::assert_matches;
     use test_case::test_case;
 
-    use crate::{
-        messaging::testutil::{fake_sender_with_sink, SentMessage},
-        protocol_family::testutil::{
-            new_fake_netlink_message, FakeProtocolFamily, MODERN_GROUP1, MODERN_GROUP2,
-        },
+    use crate::messaging::testutil::{fake_sender_with_sink, SentMessage};
+    use crate::protocol_family::testutil::{
+        new_fake_netlink_message, FakeProtocolFamily, MODERN_GROUP1, MODERN_GROUP2,
     };
 
     impl<F: ProtocolFamily, S: Sender<F::InnerMessage>> ClientTable<F, S> {

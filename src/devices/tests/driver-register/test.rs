@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{anyhow, Context, Result};
+use fuchsia_async::{self as fasync};
+use fuchsia_component_test::{RealmBuilder, RealmInstance};
+use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
 use {
-    anyhow::{anyhow, Context, Result},
     fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf,
     fidl_fuchsia_driver_registrar as fdr, fidl_fuchsia_driver_test as fdt,
-    fuchsia_async::{self as fasync},
-    fuchsia_component_test::{RealmBuilder, RealmInstance},
-    fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
 };
 
 // Note: The component manifest name is the same for FAKE_DRIVER_URL and EPHEMERAL_FAKE_DRIVER_URL

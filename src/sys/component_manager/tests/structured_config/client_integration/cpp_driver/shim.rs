@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::prelude::*;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::RealmBuilder;
+use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
+use futures::StreamExt;
+use std::time::Duration;
+use tracing::info;
 use {
-    fidl::prelude::*,
     fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio,
     fidl_test_structuredconfig_receiver as scr, fidl_test_structuredconfig_receiver_shim as scrs,
     fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::RealmBuilder,
-    fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
-    futures::StreamExt,
-    std::time::Duration,
-    tracing::info,
 };
 
 enum IncomingRequest {

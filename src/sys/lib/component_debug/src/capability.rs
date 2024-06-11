@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::realm::{
-        get_all_instances, get_resolved_declaration, GetAllInstancesError, GetDeclarationError,
-    },
-    cm_rust::{
-        CapabilityDecl, ComponentDecl, ExposeDecl, ExposeDeclCommon, OfferDecl, OfferDeclCommon,
-        SourceName, UseDecl, UseDeclCommon,
-    },
-    fidl_fuchsia_sys2 as fsys,
-    moniker::Moniker,
-    thiserror::Error,
+use crate::realm::{
+    get_all_instances, get_resolved_declaration, GetAllInstancesError, GetDeclarationError,
 };
+use cm_rust::{
+    CapabilityDecl, ComponentDecl, ExposeDecl, ExposeDeclCommon, OfferDecl, OfferDeclCommon,
+    SourceName, UseDecl, UseDeclCommon,
+};
+use fidl_fuchsia_sys2 as fsys;
+use moniker::Moniker;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum FindInstancesError {

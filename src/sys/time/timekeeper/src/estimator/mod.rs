@@ -5,21 +5,17 @@
 mod frequency;
 mod kalman_filter;
 
-use {
-    crate::{
-        diagnostics::{Diagnostics, Event},
-        enums::{FrequencyDiscardReason, Track},
-        time_source::Sample,
-        Config,
-    },
-    chrono::prelude::*,
-    frequency::FrequencyEstimator,
-    fuchsia_zircon as zx,
-    kalman_filter::KalmanFilter,
-    std::sync::Arc,
-    time_util::Transform,
-    tracing::{info, warn},
-};
+use crate::diagnostics::{Diagnostics, Event};
+use crate::enums::{FrequencyDiscardReason, Track};
+use crate::time_source::Sample;
+use crate::Config;
+use chrono::prelude::*;
+use frequency::FrequencyEstimator;
+use fuchsia_zircon as zx;
+use kalman_filter::KalmanFilter;
+use std::sync::Arc;
+use time_util::Transform;
+use tracing::{info, warn};
 
 /// The maximum change in Kalman filter estimate that can occur before we discard any previous
 /// samples being used as part of a long term frequency assessment. This is similar to the value
@@ -141,12 +137,11 @@ impl<D: Diagnostics> Estimator<D> {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::{diagnostics::FakeDiagnostics, make_test_config},
-        fuchsia_zircon::{self as zx, DurationNum},
-        test_util::assert_near,
-    };
+    use super::*;
+    use crate::diagnostics::FakeDiagnostics;
+    use crate::make_test_config;
+    use fuchsia_zircon::{self as zx, DurationNum};
+    use test_util::assert_near;
 
     // Note: we need to ensure the absolute times are not near the January 1st leap second.
     const TIME_1: zx::Time = zx::Time::from_nanos(100_010_000_000_000);

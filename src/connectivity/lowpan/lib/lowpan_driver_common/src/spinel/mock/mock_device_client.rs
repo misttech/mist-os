@@ -4,12 +4,12 @@
 
 use super::*;
 
-use fidl_fuchsia_lowpan_spinel::DeviceEvent as SpinelDeviceEvent;
-use fidl_fuchsia_lowpan_spinel::{DeviceCloseResult, DeviceOpenResult, DeviceProxyInterface};
+use fidl_fuchsia_lowpan_spinel::{
+    DeviceCloseResult, DeviceEvent as SpinelDeviceEvent, DeviceOpenResult, DeviceProxyInterface,
+};
 use futures::channel::mpsc;
 use futures::future::{ready, Ready};
-use std::sync::Arc;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum DeviceRequest {

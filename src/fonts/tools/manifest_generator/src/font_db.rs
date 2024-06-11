@@ -4,27 +4,22 @@
 
 #![allow(deprecated)]
 
-use {
-    crate::{
-        constants::PKG_URL_PREFIX,
-        font_catalog as fc,
-        font_catalog::{AssetInFamilyIndex, FamilyIndex},
-        product_config, FallbackChainEntry, FontCatalog, FontPackageListing, FontSet, FontSets,
-        ProductConfig, TypefaceInAssetIndex,
-    },
-    anyhow::{format_err, Error},
-    char_set::CharSet,
-    font_info::{FontAssetSource, FontInfo, FontInfoLoader},
-    fuchsia_url::AbsolutePackageUrl,
-    itertools::{Either, Itertools},
-    manifest::v2,
-    std::{
-        collections::{BTreeMap, BTreeSet},
-        fmt,
-        path::{Path, PathBuf},
-    },
-    thiserror::Error,
+use crate::constants::PKG_URL_PREFIX;
+use crate::font_catalog::{AssetInFamilyIndex, FamilyIndex};
+use crate::{
+    font_catalog as fc, product_config, FallbackChainEntry, FontCatalog, FontPackageListing,
+    FontSet, FontSets, ProductConfig, TypefaceInAssetIndex,
 };
+use anyhow::{format_err, Error};
+use char_set::CharSet;
+use font_info::{FontAssetSource, FontInfo, FontInfoLoader};
+use fuchsia_url::AbsolutePackageUrl;
+use itertools::{Either, Itertools};
+use manifest::v2;
+use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
+use std::path::{Path, PathBuf};
+use thiserror::Error;
 
 /// Index of a font asset within a font family, combined with the index of the family within the
 /// `families` table.
@@ -553,20 +548,16 @@ pub struct TypefaceMetatada {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            constants,
-            fake_font_info_loader::FakeFontInfoLoaderImpl,
-            font_catalog::{Asset, Family, Typeface},
-            font_pkgs::FontPackageEntry,
-            product_config::Settings,
-        },
-        assert_matches::assert_matches,
-        fidl_fuchsia_fonts::{GenericFontFamily, Slant, Width},
-        manifest::v2::Style,
-        maplit::btreemap,
-    };
+    use super::*;
+    use crate::constants;
+    use crate::fake_font_info_loader::FakeFontInfoLoaderImpl;
+    use crate::font_catalog::{Asset, Family, Typeface};
+    use crate::font_pkgs::FontPackageEntry;
+    use crate::product_config::Settings;
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_fonts::{GenericFontFamily, Slant, Width};
+    use manifest::v2::Style;
+    use maplit::btreemap;
 
     fn make_font_db_contents() -> (FontCatalog, FontPackageListing, FontSets) {
         let font_catalog = FontCatalog {

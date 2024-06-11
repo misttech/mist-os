@@ -3,16 +3,16 @@
 // found in the LICENSE file.
 
 use super::filter::*;
-use crate::{proxies::player::PlayerProxyEvent, Result, SessionId, MAX_EVENTS_SENT_WITHOUT_ACK};
+use crate::proxies::player::PlayerProxyEvent;
+use crate::{Result, SessionId, MAX_EVENTS_SENT_WITHOUT_ACK};
 use fidl::client::QueryResponseFut;
 use fidl_fuchsia_media_sessions2::*;
-use futures::{
-    future::{self, Ready},
-    stream::FuturesOrdered,
-    task::{Context, Poll},
-    Sink, Stream,
-};
-use std::{collections::HashSet, pin::Pin};
+use futures::future::{self, Ready};
+use futures::stream::FuturesOrdered;
+use futures::task::{Context, Poll};
+use futures::{Sink, Stream};
+use std::collections::HashSet;
+use std::pin::Pin;
 
 /// Implements a sink to a client implementation of `fuchsia.media.sessions2.SessionsWatcher`.
 ///

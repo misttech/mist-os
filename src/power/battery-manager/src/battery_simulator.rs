@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::battery_manager::BatterySimulationStateObserver,
-    anyhow::{format_err, Error},
-    fidl_fuchsia_power_battery as fpower, fidl_fuchsia_power_battery_test as spower,
-    futures::lock::Mutex,
-    std::sync::{Arc, Weak},
-};
+use crate::battery_manager::BatterySimulationStateObserver;
+use anyhow::{format_err, Error};
+use futures::lock::Mutex;
+use std::sync::{Arc, Weak};
+use {fidl_fuchsia_power_battery as fpower, fidl_fuchsia_power_battery_test as spower};
 
 fn get_current_time() -> Option<i64> {
     let t = fuchsia_runtime::utc_time();

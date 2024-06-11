@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::{
-        actions::{Action, ActionKey},
-        component::instance::{InstanceState, UnresolvedInstanceState},
-        component::ComponentInstance,
-    },
-    async_trait::async_trait,
-    errors::{ActionError, DiscoverActionError},
-    hooks::EventPayload,
-    routing::bedrock::structured_dict::ComponentInput,
-    std::sync::Arc,
-};
+use crate::model::actions::{Action, ActionKey};
+use crate::model::component::instance::{InstanceState, UnresolvedInstanceState};
+use crate::model::component::ComponentInstance;
+use async_trait::async_trait;
+use errors::{ActionError, DiscoverActionError};
+use hooks::EventPayload;
+use routing::bedrock::structured_dict::ComponentInput;
+use std::sync::Arc;
 
 /// Dispatches a `Discovered` event for a component instance. This action should be registered
 /// when a component instance is created.

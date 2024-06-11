@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_bluetooth_bredr as bredr,
-    fuchsia_component::server::ServiceObj,
-    profile_client::ProfileClient,
-    tracing::{debug, error},
-};
+use anyhow::{Context as _, Error};
+use fidl_fuchsia_bluetooth_bredr as bredr;
+use fuchsia_component::server::ServiceObj;
+use profile_client::ProfileClient;
+use tracing::{debug, error};
 
 use crate::peers::Peers;
 

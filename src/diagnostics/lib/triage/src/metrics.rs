@@ -9,19 +9,15 @@ pub(crate) mod metric_value;
 pub(crate) mod parse;
 pub(crate) mod variable;
 
-use {
-    fetch::{Fetcher, FileDataFetcher, SelectorString, TrialDataFetcher},
-    metric_value::{MetricValue, Problem},
-    regex::Regex,
-    serde::{Deserialize, Serialize},
-    std::{
-        cell::RefCell,
-        clone::Clone,
-        cmp::min,
-        collections::{HashMap, HashSet},
-    },
-    variable::VariableName,
-};
+use fetch::{Fetcher, FileDataFetcher, SelectorString, TrialDataFetcher};
+use metric_value::{MetricValue, Problem};
+use regex::Regex;
+use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
+use std::clone::Clone;
+use std::cmp::min;
+use std::collections::{HashMap, HashSet};
+use variable::VariableName;
 
 /// The contents of a single Metric. Metrics produce a value for use in Actions or other Metrics.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -1145,11 +1141,9 @@ impl<'a> MetricState<'a> {
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
-    use {
-        crate::config::{DiagnosticData, Source},
-        anyhow::Error,
-        lazy_static::lazy_static,
-    };
+    use crate::config::{DiagnosticData, Source};
+    use anyhow::Error;
+    use lazy_static::lazy_static;
 
     #[macro_export]
     macro_rules! make_metrics {

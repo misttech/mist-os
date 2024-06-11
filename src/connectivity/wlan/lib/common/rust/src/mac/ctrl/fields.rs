@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    ieee80211::{Bssid, MacAddr},
-    zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned},
-};
+use ieee80211::{Bssid, MacAddr};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
 
 // IEEE Std 802.11-2016, 9.3.1.5
 #[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq, Eq, Clone, Copy, Debug)]

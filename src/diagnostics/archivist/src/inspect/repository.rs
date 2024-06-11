@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    identity::ComponentIdentity,
-    inspect::container::{
-        InspectArtifactsContainer, InspectHandle, UnpopulatedInspectDataContainer,
-    },
-    pipeline::Pipeline,
+use crate::identity::ComponentIdentity;
+use crate::inspect::container::{
+    InspectArtifactsContainer, InspectHandle, UnpopulatedInspectDataContainer,
 };
+use crate::pipeline::Pipeline;
 use diagnostics_hierarchy::HierarchyMatcher;
 use fidl_fuchsia_diagnostics::Selector;
 use fuchsia_async as fasync;
@@ -18,10 +16,8 @@ use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
 use moniker::ExtendedMoniker;
 use selectors::SelectorExt;
-use std::{
-    collections::HashMap,
-    sync::{Arc, Weak},
-};
+use std::collections::HashMap;
+use std::sync::{Arc, Weak};
 use tracing::{debug, warn};
 
 pub struct InspectRepository {

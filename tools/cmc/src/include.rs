@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::error::Error,
-    crate::util,
-    crate::util::{json_or_json5_from_file, write_depfile},
-    serde_json::Value,
-    std::{
-        collections::HashSet,
-        fs,
-        io::{BufRead, BufReader, Write},
-        path::PathBuf,
-    },
-};
+use crate::error::Error;
+use crate::util;
+use crate::util::{json_or_json5_from_file, write_depfile};
+use serde_json::Value;
+use std::collections::HashSet;
+use std::fs;
+use std::io::{BufRead, BufReader, Write};
+use std::path::PathBuf;
 
 /// Read in the provided JSON file and add includes.
 /// If the JSON file is an object with a key "include" that references an array of strings then

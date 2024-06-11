@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_examples_inspect::{ReverserRequest, ReverserRequestStream},
-    fuchsia_async as fasync,
-    fuchsia_zircon::DurationNum,
-    futures::TryStreamExt,
-};
+use fidl_fuchsia_examples_inspect::{ReverserRequest, ReverserRequestStream};
+use fuchsia_async as fasync;
+use fuchsia_zircon::DurationNum;
+use futures::TryStreamExt;
 
 // [START reverser_def]
 pub struct ReverserServerFactory {}
@@ -49,11 +47,9 @@ impl ReverserServer {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::Error,
-        fidl_fuchsia_examples_inspect::{ReverserMarker, ReverserProxy},
-    };
+    use super::*;
+    use anyhow::Error;
+    use fidl_fuchsia_examples_inspect::{ReverserMarker, ReverserProxy};
 
     #[fuchsia::test]
     async fn test_reverser() -> Result<(), Error> {

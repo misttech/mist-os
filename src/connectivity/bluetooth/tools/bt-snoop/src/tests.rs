@@ -5,7 +5,8 @@
 use argh::FromArgs;
 use async_utils::PollExt;
 use diagnostics_assertions::assert_data_tree;
-use fidl::{endpoints::RequestStream, Error as FidlError};
+use fidl::endpoints::RequestStream;
+use fidl::Error as FidlError;
 use fidl_fuchsia_bluetooth_snoop::{
     PacketFormat, PacketObserverMarker, PacketObserverRequestStream, SnoopMarker, SnoopProxy,
     SnoopRequestStream, SnoopStartRequest,
@@ -14,14 +15,15 @@ use fuchsia_async::{Channel, TestExecutor};
 use fuchsia_inspect::Inspector;
 use fuchsia_zircon as zx;
 use futures::StreamExt;
-use std::{pin::pin, task::Poll, time::Duration};
+use std::pin::pin;
+use std::task::Poll;
+use std::time::Duration;
 
+use crate::packet_logs::{append_pcap, write_pcap_header};
 use crate::{
-    handle_client_request,
-    packet_logs::{append_pcap, write_pcap_header},
-    register_new_client, Args, ClientId, ClientRequest, ConcurrentClientRequestFutures,
-    ConcurrentSnooperPacketFutures, IdGenerator, PacketLogs, SnoopConfig, SnoopPacket,
-    SubscriptionManager, HCI_DEVICE_CLASS_PATH,
+    handle_client_request, register_new_client, Args, ClientId, ClientRequest,
+    ConcurrentClientRequestFutures, ConcurrentSnooperPacketFutures, IdGenerator, PacketLogs,
+    SnoopConfig, SnoopPacket, SubscriptionManager, HCI_DEVICE_CLASS_PATH,
 };
 
 fn setup() -> (

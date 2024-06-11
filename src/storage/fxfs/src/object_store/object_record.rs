@@ -3,26 +3,20 @@
 // found in the LICENSE file.
 
 // TODO(https://fxbug.dev/42178223): need validation after deserialization.
-use {
-    crate::{
-        checksum::Checksums,
-        lsm_tree::types::{
-            Item, ItemRef, LayerKey, MergeType, OrdLowerBound, OrdUpperBound, RangeKey, SortByU64,
-        },
-        object_store::extent_record::{
-            ExtentKey, ExtentKeyV32, ExtentValue, ExtentValueV32, ExtentValueV37, ExtentValueV38,
-        },
-        serialized_types::{migrate_to_version, Migrate, Versioned},
-    },
-    fprint::TypeFingerprint,
-    fxfs_crypto::WrappedKeysV32,
-    serde::{Deserialize, Serialize},
-    std::{
-        default::Default,
-        hash::Hash,
-        time::{Duration, SystemTime, UNIX_EPOCH},
-    },
+use crate::checksum::Checksums;
+use crate::lsm_tree::types::{
+    Item, ItemRef, LayerKey, MergeType, OrdLowerBound, OrdUpperBound, RangeKey, SortByU64,
 };
+use crate::object_store::extent_record::{
+    ExtentKey, ExtentKeyV32, ExtentValue, ExtentValueV32, ExtentValueV37, ExtentValueV38,
+};
+use crate::serialized_types::{migrate_to_version, Migrate, Versioned};
+use fprint::TypeFingerprint;
+use fxfs_crypto::WrappedKeysV32;
+use serde::{Deserialize, Serialize};
+use std::default::Default;
+use std::hash::Hash;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// ObjectDescriptor is the set of possible records in the object store.
 pub type ObjectDescriptor = ObjectDescriptorV32;
@@ -761,11 +755,9 @@ impl<'a> From<ItemRef<'a, ObjectKey, ObjectValue>>
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::ObjectKey,
-        crate::lsm_tree::types::{LayerKey, OrdLowerBound, OrdUpperBound, RangeKey},
-        std::cmp::Ordering,
-    };
+    use super::ObjectKey;
+    use crate::lsm_tree::types::{LayerKey, OrdLowerBound, OrdUpperBound, RangeKey};
+    use std::cmp::Ordering;
 
     #[test]
     fn test_next_key() {

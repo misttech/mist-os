@@ -4,14 +4,13 @@
 
 use anyhow::Context;
 use fidl_fuchsia_memory_heapdump_client::{self as fheapdump_client, CollectorError};
-use fidl_fuchsia_memory_heapdump_process as fheapdump_process;
-use fuchsia_async as fasync;
 use fuchsia_zircon::Koid;
 use futures::lock::Mutex;
 use futures::StreamExt;
 use std::collections::hash_map::{Entry, HashMap};
 use std::sync::Arc;
 use tracing::{info, warn};
+use {fidl_fuchsia_memory_heapdump_process as fheapdump_process, fuchsia_async as fasync};
 
 use crate::process::Process;
 use crate::process_v1::ProcessV1;
@@ -283,7 +282,8 @@ mod tests {
     use async_trait::async_trait;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream};
     use fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES;
-    use futures::{channel::oneshot, pin_mut};
+    use futures::channel::oneshot;
+    use futures::pin_mut;
     use itertools::{assert_equal, Itertools};
     use test_case::test_case;
 

@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::WeakComponentToken,
-    fidl::handle::{EventPair, Signals},
-    fuchsia_async as fasync,
-    fuchsia_zircon::Koid,
-};
+use crate::WeakComponentToken;
+use fidl::handle::{EventPair, Signals};
+use fuchsia_async as fasync;
+use fuchsia_zircon::Koid;
 
 impl crate::RemotableCapability for WeakComponentToken {}
 

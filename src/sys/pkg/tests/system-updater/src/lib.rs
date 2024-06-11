@@ -5,41 +5,38 @@
 #![allow(clippy::let_unit_value)]
 #![cfg(test)]
 
+use self::SystemUpdaterInteraction::*;
+use anyhow::{anyhow, Context as _, Error};
+use assert_matches::assert_matches;
+use fidl_fuchsia_update_installer_ext::{
+    start_update, Initiator, Options, UpdateAttempt, UpdateAttemptError,
+};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use fuchsia_hash::Hash;
+use fuchsia_pkg_testing::{
+    make_current_epoch_json, make_epoch_json, make_packages_json, SOURCE_EPOCH,
+};
+use fuchsia_sync::Mutex;
+use fuchsia_url::AbsoluteComponentUrl;
+use fuchsia_zircon::Status;
+use futures::prelude::*;
+use mock_metrics::MockMetricEventLoggerFactory;
+use mock_paver::{hooks as mphooks, MockPaverService, MockPaverServiceBuilder, PaverEvent};
+use mock_reboot::{MockRebootService, RebootReason};
+use mock_resolver::MockResolverService;
+use pretty_assertions::assert_eq;
+use serde_json::json;
+use std::collections::HashSet;
+use std::fs::{create_dir, File};
+use std::io::Write;
+use std::path::PathBuf;
+use std::sync::Arc;
+use tempfile::TempDir;
 use {
-    self::SystemUpdaterInteraction::*,
-    anyhow::{anyhow, Context as _, Error},
-    assert_matches::assert_matches,
     cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fidl_fuchsia_paver as paver,
     fidl_fuchsia_pkg as fpkg, fidl_fuchsia_space as fspace,
-    fidl_fuchsia_update_installer as finstaller,
-    fidl_fuchsia_update_installer_ext::{
-        start_update, Initiator, Options, UpdateAttempt, UpdateAttemptError,
-    },
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    fuchsia_hash::Hash,
-    fuchsia_pkg_testing::{
-        make_current_epoch_json, make_epoch_json, make_packages_json, SOURCE_EPOCH,
-    },
-    fuchsia_sync::Mutex,
-    fuchsia_url::AbsoluteComponentUrl,
-    fuchsia_zircon::Status,
-    futures::prelude::*,
-    mock_metrics::MockMetricEventLoggerFactory,
-    mock_paver::{hooks as mphooks, MockPaverService, MockPaverServiceBuilder, PaverEvent},
-    mock_reboot::{MockRebootService, RebootReason},
-    mock_resolver::MockResolverService,
-    pretty_assertions::assert_eq,
-    serde_json::json,
-    std::{
-        collections::HashSet,
-        fs::{create_dir, File},
-        io::Write,
-        path::PathBuf,
-        sync::Arc,
-    },
-    tempfile::TempDir,
+    fidl_fuchsia_update_installer as finstaller, fuchsia_async as fasync,
 };
 
 mod board;

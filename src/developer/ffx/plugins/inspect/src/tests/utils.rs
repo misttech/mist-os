@@ -4,12 +4,8 @@
 
 use anyhow::Result;
 use diagnostics_data::{Data, DiagnosticsHierarchy, InspectData, InspectHandleName, Property};
-use errors as _;
-use ffx_writer as _;
-use fidl::{
-    endpoints::{create_proxy_and_stream, ServerEnd},
-    Channel,
-};
+use fidl::endpoints::{create_proxy_and_stream, ServerEnd};
+use fidl::Channel;
 use fidl_fuchsia_developer_remotecontrol::{
     RemoteControlMarker, RemoteControlOpenCapabilityResponder, RemoteControlProxy,
     RemoteControlRequest,
@@ -20,9 +16,9 @@ use fidl_fuchsia_diagnostics::{
 use fidl_fuchsia_diagnostics_host::{
     ArchiveAccessorMarker, ArchiveAccessorProxy, ArchiveAccessorRequest,
 };
-use fidl_fuchsia_sys2 as fsys;
 use futures::{AsyncWriteExt, StreamExt, TryStreamExt};
 use std::sync::{Arc, Mutex};
+use {errors as _, ffx_writer as _, fidl_fuchsia_sys2 as fsys};
 
 #[derive(Default)]
 pub struct FakeArchiveIteratorResponse {

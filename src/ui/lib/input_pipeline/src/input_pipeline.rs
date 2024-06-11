@@ -2,29 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        autorepeater::Autorepeater, display_ownership::DisplayOwnership,
-        focus_listener::FocusListener, input_device, input_handler, metrics,
-    },
-    anyhow::{format_err, Context, Error},
-    fidl_fuchsia_io as fio,
-    focus_chain_provider::FocusChainProviderPublisher,
-    fuchsia_async as fasync,
-    fuchsia_fs::directory::{WatchEvent, Watcher},
-    fuchsia_inspect::health::Reporter,
-    fuchsia_inspect::NumericProperty,
-    fuchsia_zircon as zx,
-    futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
-    futures::lock::Mutex,
-    futures::{StreamExt, TryStreamExt},
-    itertools::Itertools,
-    metrics_registry::*,
-    std::collections::HashMap,
-    std::path::PathBuf,
-    std::rc::Rc,
-    std::sync::Arc,
-};
+use crate::autorepeater::Autorepeater;
+use crate::display_ownership::DisplayOwnership;
+use crate::focus_listener::FocusListener;
+use crate::{input_device, input_handler, metrics};
+use anyhow::{format_err, Context, Error};
+use focus_chain_provider::FocusChainProviderPublisher;
+use fuchsia_fs::directory::{WatchEvent, Watcher};
+use fuchsia_inspect::health::Reporter;
+use fuchsia_inspect::NumericProperty;
+use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use futures::lock::Mutex;
+use futures::{StreamExt, TryStreamExt};
+use itertools::Itertools;
+use metrics_registry::*;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::rc::Rc;
+use std::sync::Arc;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 type BoxedInputDeviceBinding = Box<dyn input_device::InputDeviceBinding>;
 
@@ -708,26 +704,24 @@ async fn add_device_bindings(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::fake_input_device_binding,
-        crate::input_device::InputDeviceBinding,
-        crate::mouse_binding,
-        crate::mouse_model_database,
-        crate::observe_fake_events_input_handler,
-        crate::utils::Position,
-        diagnostics_assertions::AnyProperty,
-        fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream},
-        fuchsia_async as fasync, fuchsia_zircon as zx,
-        futures::FutureExt,
-        pretty_assertions::assert_eq,
-        rand::Rng,
-        std::collections::HashSet,
-        vfs::{
-            directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path,
-            pseudo_directory, service as pseudo_fs_service,
-        },
+    use super::*;
+    use crate::input_device::InputDeviceBinding;
+    use crate::utils::Position;
+    use crate::{
+        fake_input_device_binding, mouse_binding, mouse_model_database,
+        observe_fake_events_input_handler,
     };
+    use diagnostics_assertions::AnyProperty;
+    use fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream};
+    use futures::FutureExt;
+    use pretty_assertions::assert_eq;
+    use rand::Rng;
+    use std::collections::HashSet;
+    use vfs::directory::entry_container::Directory;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::path::Path;
+    use vfs::{pseudo_directory, service as pseudo_fs_service};
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     const COUNTS_PER_MM: u32 = 12;
 

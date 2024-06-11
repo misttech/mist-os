@@ -2,14 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_async as fasync,
-    fuchsia_inspect::{self as inspect, Node, NumericProperty, Property},
-    fuchsia_inspect_contrib::nodes::NodeExt,
-    fuchsia_inspect_derive::Inspect,
-    fuchsia_zircon as zx,
-    std::fmt,
-};
+use fuchsia_inspect::{self as inspect, Node, NumericProperty, Property};
+use fuchsia_inspect_contrib::nodes::NodeExt;
+use fuchsia_inspect_derive::Inspect;
+use std::fmt;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 const FALSE_VALUE: u64 = 0;
 const TRUE_VALUE: u64 = 1;

@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_test_wlan_realm::WlanConfig,
-    fuchsia_zircon::DurationNum,
-    ieee80211::MacAddrBytes,
-    wlan_hw_sim::{
-        default_wlantap_config_client, loop_until_iface_is_found, netdevice_helper, test_utils,
-        CLIENT_MAC_ADDR,
-    },
+use fidl_test_wlan_realm::WlanConfig;
+use fuchsia_zircon::DurationNum;
+use ieee80211::MacAddrBytes;
+use wlan_hw_sim::{
+    default_wlantap_config_client, loop_until_iface_is_found, netdevice_helper, test_utils,
+    CLIENT_MAC_ADDR,
 };
 
 /// Test ethernet device is created successfully by verifying a ethernet client with specified

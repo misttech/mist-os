@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::*,
-    fidl_fuchsia_pkg::ResolveError,
-    fidl_fuchsia_update_installer_ext::{PrepareFailureReason, State},
-    maplit::btreemap,
-    pretty_assertions::assert_eq,
-};
+use super::*;
+use fidl_fuchsia_pkg::ResolveError;
+use fidl_fuchsia_update_installer_ext::{PrepareFailureReason, State};
+use maplit::btreemap;
+use pretty_assertions::assert_eq;
 
 #[fasync::run_singlethreaded(test)]
 async fn rejects_invalid_package_name() {

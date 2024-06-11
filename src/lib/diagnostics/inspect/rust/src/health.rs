@@ -38,10 +38,8 @@
 //! health.set_ok(); // The component is healthy again.
 //! ```
 
-use {
-    super::{InspectType, Property, StringProperty},
-    injectable_time::TimeSource,
-};
+use super::{InspectType, Property, StringProperty};
+use injectable_time::TimeSource;
 
 #[cfg(not(target_os = "fuchsia"))]
 use injectable_time::UtcTime as TimeType;
@@ -174,10 +172,10 @@ impl Node {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::Inspector, diagnostics_assertions::assert_data_tree,
-        injectable_time::FakeTime,
-    };
+    use super::*;
+    use crate::Inspector;
+    use diagnostics_assertions::assert_data_tree;
+    use injectable_time::FakeTime;
 
     #[fuchsia::test]
     fn health_checker_lifecycle() {

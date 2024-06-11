@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::format_err;
-use base64::engine::{
-    general_purpose::{GeneralPurpose, GeneralPurposeConfig},
-    DecodePaddingMode, Engine as _,
-};
+use base64::engine::general_purpose::{GeneralPurpose, GeneralPurposeConfig};
+use base64::engine::{DecodePaddingMode, Engine as _};
 use fastpair_provider_config::Config as StructuredConfig;
 use p256::SecretKey;
 

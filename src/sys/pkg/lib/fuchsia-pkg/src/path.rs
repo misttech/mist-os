@@ -62,10 +62,10 @@ impl std::fmt::Display for PackagePath {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*, crate::test::random_package_path, fuchsia_url::errors::PackagePathSegmentError,
-        proptest::prelude::*,
-    };
+    use super::*;
+    use crate::test::random_package_path;
+    use fuchsia_url::errors::PackagePathSegmentError;
+    use proptest::prelude::*;
 
     #[test]
     fn reject_invalid_name() {

@@ -17,17 +17,16 @@ use wav_socket::WavSocket;
 
 use anyhow::{anyhow, Context, Error};
 use error::ControllerError;
-use fidl_fuchsia_audio_controller as fac;
-use fuchsia_async as fasync;
-use fuchsia_audio::{device::Selector, Format};
+use fuchsia_audio::device::Selector;
+use fuchsia_audio::Format;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_inspect::{component, health::Reporter};
+use fuchsia_inspect::component;
+use fuchsia_inspect::health::Reporter;
 use futures::{StreamExt, TryStreamExt};
-use std::{
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tracing::error;
+use {fidl_fuchsia_audio_controller as fac, fuchsia_async as fasync};
 
 /// Wraps all hosted protocols into a single type that can be matched against and dispatched.
 enum IncomingRequest {

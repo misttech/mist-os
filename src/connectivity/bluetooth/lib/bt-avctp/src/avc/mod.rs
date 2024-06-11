@@ -2,27 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_async::{Time, TimeoutExt},
-    fuchsia_bluetooth::types::Channel,
-    fuchsia_zircon::Duration,
-    futures::{future, future::Ready, stream::FilterMap, Stream, StreamExt},
-    packet_encoding::{Decodable, Encodable},
-    tracing::{info, trace},
-};
+use fuchsia_async::{Time, TimeoutExt};
+use fuchsia_bluetooth::types::Channel;
+use fuchsia_zircon::Duration;
+use futures::future::Ready;
+use futures::stream::FilterMap;
+use futures::{future, Stream, StreamExt};
+use packet_encoding::{Decodable, Encodable};
+use tracing::{info, trace};
 
 #[cfg(test)]
 mod tests;
 
 mod types;
 
-use crate::{
-    avctp::{
-        Command as AvctpCommand, CommandStream as AvctpCommandStream, Header as AvctpHeader,
-        Packet as AvctpPacket, Peer as AvctpPeer,
-    },
-    Error, Result,
+use crate::avctp::{
+    Command as AvctpCommand, CommandStream as AvctpCommandStream, Header as AvctpHeader,
+    Packet as AvctpPacket, Peer as AvctpPeer,
 };
+use crate::{Error, Result};
 
 use self::types::BT_SIG_COMPANY_ID;
 

@@ -3,17 +3,16 @@
 // found in the LICENSE file.
 
 use explicit::UnreachableExt as _;
-use netstack3_base::{socket::MaybeDualStack, Uninstantiable, UninstantiableWrapper};
+use netstack3_base::socket::MaybeDualStack;
+use netstack3_base::{Uninstantiable, UninstantiableWrapper};
 
-use crate::internal::{
-    datagram::{
-        BoundSockets, DatagramBoundStateContext, DatagramSocketMapSpec, DatagramSocketOptions,
-        DatagramSocketSpec, DualStackConverter, IpExt, IpOptions, NonDualStackConverter,
-    },
-    spec_context::{
-        DatagramSpecBoundStateContext, DualStackDatagramSpecBoundStateContext,
-        NonDualStackDatagramSpecBoundStateContext,
-    },
+use crate::internal::datagram::{
+    BoundSockets, DatagramBoundStateContext, DatagramSocketMapSpec, DatagramSocketOptions,
+    DatagramSocketSpec, DualStackConverter, IpExt, IpOptions, NonDualStackConverter,
+};
+use crate::internal::spec_context::{
+    DatagramSpecBoundStateContext, DualStackDatagramSpecBoundStateContext,
+    NonDualStackDatagramSpecBoundStateContext,
 };
 
 impl<I: IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>

@@ -3,13 +3,12 @@
 // found in the LICENSE file.
 
 use fuchsia_sync::RwLock;
-use std::{
-    borrow::Borrow,
-    collections::{hash_map::Entry, HashMap},
-    hash::Hash,
-    sync::atomic::{AtomicBool, Ordering},
-    sync::{Arc, Weak},
-};
+use std::borrow::Borrow;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+use std::hash::Hash;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Weak};
 
 // TODO(https://fxbug.dev/42154109): This would be so so much easier with Arc::new_cyclic.
 

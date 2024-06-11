@@ -6,22 +6,17 @@
 //! (`.cml` files and binary `.cm` files). These types come with `serde` serialization
 //! and deserialization implementations that perform the required validation.
 
-use {
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
-    flyweights::FlyStr,
-    lazy_static::lazy_static,
-    serde::{de, ser, Deserialize, Serialize},
-    std::{
-        borrow::Borrow,
-        cmp,
-        ffi::CString,
-        fmt::{self, Display},
-        iter,
-        path::PathBuf,
-        str::FromStr,
-    },
-    thiserror::Error,
-};
+use flyweights::FlyStr;
+use lazy_static::lazy_static;
+use serde::{de, ser, Deserialize, Serialize};
+use std::borrow::Borrow;
+use std::ffi::CString;
+use std::fmt::{self, Display};
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::{cmp, iter};
+use thiserror::Error;
+use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio};
 
 lazy_static! {
     /// A default base URL from which to parse relative component URL
@@ -1302,7 +1297,10 @@ symmetrical_enums!(StorageId, fdecl::StorageId, StaticInstanceId, StaticInstance
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, serde_json::json, std::iter::repeat};
+    use super::*;
+    use assert_matches::assert_matches;
+    use serde_json::json;
+    use std::iter::repeat;
 
     macro_rules! expect_ok {
         ($type_:ty, $($input:tt)+) => {

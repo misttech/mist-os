@@ -2,18 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_wlan_device_service::{
-        DeviceMonitorMarker, DeviceMonitorProxy, SetCountryRequest,
-    },
-    fidl_test_wlan_realm::WlanConfig,
-    fuchsia_component::client::connect_to_protocol_at,
-    fuchsia_zircon::sys::ZX_OK,
-    fuchsia_zircon::DurationNum,
-    futures::channel::oneshot,
-    std::pin::pin,
-    wlan_hw_sim::{event::Handler, *},
+use fidl_fuchsia_wlan_device_service::{
+    DeviceMonitorMarker, DeviceMonitorProxy, SetCountryRequest,
 };
+use fidl_test_wlan_realm::WlanConfig;
+use fuchsia_component::client::connect_to_protocol_at;
+use fuchsia_zircon::sys::ZX_OK;
+use fuchsia_zircon::DurationNum;
+use futures::channel::oneshot;
+use std::pin::pin;
+use wlan_hw_sim::event::Handler;
+use wlan_hw_sim::*;
 
 async fn set_country_and_await_match<'a>(
     receiver: oneshot::Receiver<()>,

@@ -2,38 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        access_point::{state_machine as ap_fsm, state_machine::AccessPointApi, types as ap_types},
-        client::{
-            connection_selection::ConnectionSelectionRequester,
-            roaming::local_roam_manager::LocalRoamManagerApi, state_machine as client_fsm,
-            types as client_types,
-        },
-        config_management::SavedNetworksManagerApi,
-        mode_management::{
-            iface_manager_api::{ConnectAttemptRequest, SmeForScan},
-            iface_manager_types::*,
-            phy_manager::{CreateClientIfacesReason, PhyManagerApi},
-            recovery, Defect,
-        },
-        telemetry::{TelemetryEvent, TelemetrySender},
-        util::{atomic_oneshot_stream, future_with_metadata, listener},
-    },
-    anyhow::{format_err, Error},
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{
-        channel::{mpsc, oneshot},
-        future::{ready, BoxFuture, Fuse},
-        lock::Mutex,
-        select,
-        stream::FuturesUnordered,
-        FutureExt, StreamExt,
-    },
-    std::{convert::Infallible, fmt::Debug, pin::pin, sync::Arc, unimplemented},
-    tracing::{debug, error, info, warn},
-};
+use crate::access_point::state_machine::AccessPointApi;
+use crate::access_point::{state_machine as ap_fsm, types as ap_types};
+use crate::client::connection_selection::ConnectionSelectionRequester;
+use crate::client::roaming::local_roam_manager::LocalRoamManagerApi;
+use crate::client::{state_machine as client_fsm, types as client_types};
+use crate::config_management::SavedNetworksManagerApi;
+use crate::mode_management::iface_manager_api::{ConnectAttemptRequest, SmeForScan};
+use crate::mode_management::iface_manager_types::*;
+use crate::mode_management::phy_manager::{CreateClientIfacesReason, PhyManagerApi};
+use crate::mode_management::{recovery, Defect};
+use crate::telemetry::{TelemetryEvent, TelemetrySender};
+use crate::util::{atomic_oneshot_stream, future_with_metadata, listener};
+use anyhow::{format_err, Error};
+use fidl::endpoints::create_proxy;
+use futures::channel::{mpsc, oneshot};
+use futures::future::{ready, BoxFuture, Fuse};
+use futures::lock::Mutex;
+use futures::stream::FuturesUnordered;
+use futures::{select, FutureExt, StreamExt};
+use std::convert::Infallible;
+use std::fmt::Debug;
+use std::pin::pin;
+use std::sync::Arc;
+use std::unimplemented;
+use tracing::{debug, error, info, warn};
+use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 // Maximum allowed interval between scans when attempting to reconnect client interfaces.  This
 // value is taken from legacy state machine.
@@ -1453,36 +1447,36 @@ pub(crate) async fn serve_iface_manager_requests(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::access_point::types;
+    use crate::client::connection_selection::ConnectionSelectionRequest;
+    use crate::client::types as client_types;
+    use crate::config_management::{
+        Credential, NetworkIdentifier, SavedNetworksManager, SecurityType,
+    };
+    use crate::mode_management::phy_manager::{self, PhyManagerError};
+    use crate::mode_management::recovery::RecoverySummary;
+    use crate::mode_management::{IfaceFailure, PhyFailure};
+    use crate::regulatory_manager::REGION_CODE_LEN;
+    use crate::util::testing::fakes::{FakeLocalRoamManager, FakeScanRequester};
+    use crate::util::testing::{
+        generate_connect_selection, generate_random_bss, generate_random_scanned_candidate,
+        poll_sme_req,
+    };
+    use async_trait::async_trait;
+    use fuchsia_async::{DurationExt, TestExecutor};
+    use futures::stream::StreamFuture;
+    use futures::task::Poll;
+    use futures::TryStreamExt;
+    use ieee80211::MacAddr;
+    use lazy_static::lazy_static;
+    use std::pin::pin;
+    use test_case::test_case;
+    use wlan_common::channel::Cbw;
+    use wlan_common::{assert_variant, random_fidl_bss_description, RadioConfig};
     use {
-        super::*,
-        crate::{
-            access_point::types,
-            client::{connection_selection::ConnectionSelectionRequest, types as client_types},
-            config_management::{
-                Credential, NetworkIdentifier, SavedNetworksManager, SecurityType,
-            },
-            mode_management::{
-                phy_manager::{self, PhyManagerError},
-                recovery::RecoverySummary,
-                IfaceFailure, PhyFailure,
-            },
-            regulatory_manager::REGION_CODE_LEN,
-            util::testing::{
-                fakes::{FakeLocalRoamManager, FakeScanRequester},
-                generate_connect_selection, generate_random_bss, generate_random_scanned_candidate,
-                poll_sme_req,
-            },
-        },
-        async_trait::async_trait,
         fidl_fuchsia_stash as fidl_stash, fidl_fuchsia_wlan_common as fidl_common,
-        fuchsia_async::{DurationExt, TestExecutor},
         fuchsia_inspect as inspect,
-        futures::{stream::StreamFuture, task::Poll, TryStreamExt},
-        ieee80211::MacAddr,
-        lazy_static::lazy_static,
-        std::pin::pin,
-        test_case::test_case,
-        wlan_common::{assert_variant, channel::Cbw, random_fidl_bss_description, RadioConfig},
     };
 
     // Responses that FakePhyManager will provide

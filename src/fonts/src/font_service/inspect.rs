@@ -4,19 +4,13 @@
 
 #![warn(missing_docs)]
 
-use {
-    super::{
-        family::{FamilyInspectData, FamilyOrAlias},
-        typeface::{Collection as TypefaceCollection, Typeface, TypefaceInspectData},
-        AssetCollection, AssetId, AssetLoader,
-    },
-    fuchsia_inspect::{Node, StringProperty},
-    std::{
-        collections::{BTreeMap, HashMap},
-        sync::Arc,
-    },
-    unicase::UniCase,
-};
+use super::family::{FamilyInspectData, FamilyOrAlias};
+use super::typeface::{Collection as TypefaceCollection, Typeface, TypefaceInspectData};
+use super::{AssetCollection, AssetId, AssetLoader};
+use fuchsia_inspect::{Node, StringProperty};
+use std::collections::{BTreeMap, HashMap};
+use std::sync::Arc;
+use unicase::UniCase;
 
 /// Inspect data for the font service as a whole, meant to be part of `FontService`.
 ///
@@ -183,24 +177,20 @@ pub(crate) fn zero_pad(val: usize, max_val: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::font_service::{
-            asset::{AssetCollectionBuilder, AssetCollectionError},
-            family::FontFamilyBuilder,
-            typeface::TypefaceCollectionBuilder,
-        },
-        anyhow::Error,
-        async_trait::async_trait,
-        char_collection::char_collect,
-        diagnostics_assertions::assert_data_tree,
-        fidl_fuchsia_fonts::{GenericFontFamily, Slant, Width},
-        fidl_fuchsia_io as io, fidl_fuchsia_mem as mem,
-        fuchsia_inspect::{self as finspect},
-        manifest::v2,
-        maplit::btreemap,
-        std::path::Path,
-    };
+    use super::*;
+    use crate::font_service::asset::{AssetCollectionBuilder, AssetCollectionError};
+    use crate::font_service::family::FontFamilyBuilder;
+    use crate::font_service::typeface::TypefaceCollectionBuilder;
+    use anyhow::Error;
+    use async_trait::async_trait;
+    use char_collection::char_collect;
+    use diagnostics_assertions::assert_data_tree;
+    use fidl_fuchsia_fonts::{GenericFontFamily, Slant, Width};
+    use fuchsia_inspect::{self as finspect};
+    use manifest::v2;
+    use maplit::btreemap;
+    use std::path::Path;
+    use {fidl_fuchsia_io as io, fidl_fuchsia_mem as mem};
 
     #[fuchsia::test]
     fn test_zero_pad() {

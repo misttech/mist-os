@@ -41,6 +41,4 @@ pub mod input_pipeline;
 pub mod metrics;
 
 pub use gestures::make_touchpad_gestures_handler;
-pub use utils::CursorMessage;
-pub use utils::Position;
-pub use utils::Size;
+pub use utils::{CursorMessage, Position, Size};

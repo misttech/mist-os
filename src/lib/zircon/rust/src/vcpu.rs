@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{ok, AsHandleRef, Guest, Handle, HandleBased, HandleRef, Packet, Status},
-    fuchsia_zircon_sys as sys,
-};
+use crate::{ok, AsHandleRef, Guest, Handle, HandleBased, HandleRef, Packet, Status};
+use fuchsia_zircon_sys as sys;
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(transparent)]
@@ -89,10 +87,11 @@ pub enum VcpuContents {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::Resource, fidl_fuchsia_kernel as fkernel,
-        fuchsia_component::client::connect_to_protocol, fuchsia_zircon::HandleBased,
-    };
+    use super::*;
+    use crate::Resource;
+    use fidl_fuchsia_kernel as fkernel;
+    use fuchsia_component::client::connect_to_protocol;
+    use fuchsia_zircon::HandleBased;
 
     async fn get_hypervisor() -> Resource {
         let resource = connect_to_protocol::<fkernel::HypervisorResourceMarker>()

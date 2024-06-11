@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_async as fasync,
-    std::{env, time::Duration},
-    structopt::StructOpt,
-};
+use fuchsia_async as fasync;
+use std::env;
+use std::time::Duration;
+use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "input")]

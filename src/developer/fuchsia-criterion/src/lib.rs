@@ -28,15 +28,12 @@
 
 #![deny(missing_docs)]
 
-use std::{
-    collections::HashMap,
-    env,
-    fs::OpenOptions,
-    io::Write,
-    ops::{Deref, DerefMut},
-    path::{Path, PathBuf},
-    process,
-};
+use std::collections::HashMap;
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::ops::{Deref, DerefMut};
+use std::path::{Path, PathBuf};
+use std::{env, process};
 
 use criterion::Criterion;
 use tempfile::TempDir;
@@ -224,10 +221,8 @@ impl Drop for FuchsiaCriterion {
 mod tests {
     use super::*;
 
-    use std::{
-        fs::{self, File},
-        io,
-    };
+    use std::fs::{self, File};
+    use std::io;
 
     #[test]
     fn criterion_results_conversion() -> io::Result<()> {

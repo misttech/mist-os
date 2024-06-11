@@ -5,10 +5,8 @@
 use async_helpers::maybe_stream::MaybeStream;
 use async_utils::stream::FutureMap;
 use bt_metrics::MetricsLogger;
-use core::{
-    pin::Pin,
-    task::{Context, Poll},
-};
+use core::pin::Pin;
+use core::task::{Context, Poll};
 use fidl::endpoints::{ControlHandle, Proxy, RequestStream};
 use fidl_fuchsia_bluetooth_sys::{
     InputCapability, OutputCapability, PairingDelegateMarker,
@@ -21,8 +19,9 @@ use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use fuchsia_zircon as zx;
+use futures::future::BoxFuture;
 use futures::stream::{FusedStream, FuturesUnordered, Stream, StreamExt};
-use futures::{future::BoxFuture, Future, FutureExt};
+use futures::{Future, FutureExt};
 use std::collections::HashMap;
 use tracing::{debug, info, trace, warn};
 

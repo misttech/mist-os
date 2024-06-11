@@ -2,21 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    bt_test_harness::{
-        emulator::{add_le_peer, default_le_peer},
-        low_energy_central::CentralHarness,
-    },
-    fidl_fuchsia_hardware_bluetooth::{AdvertisingData, PeerSetLeAdvertisementRequest},
-    fuchsia_async::{DurationExt, TimeoutExt},
-    fuchsia_bluetooth::{
-        constants::INTEGRATION_TIMEOUT,
-        expectation::asynchronous::{ExpectableExt, ExpectableStateExt},
-        types::Address,
-    },
-    futures::TryFutureExt,
-};
+use anyhow::{format_err, Error};
+use bt_test_harness::emulator::{add_le_peer, default_le_peer};
+use bt_test_harness::low_energy_central::CentralHarness;
+use fidl_fuchsia_hardware_bluetooth::{AdvertisingData, PeerSetLeAdvertisementRequest};
+use fuchsia_async::{DurationExt, TimeoutExt};
+use fuchsia_bluetooth::constants::INTEGRATION_TIMEOUT;
+use fuchsia_bluetooth::expectation::asynchronous::{ExpectableExt, ExpectableStateExt};
+use fuchsia_bluetooth::types::Address;
+use futures::TryFutureExt;
 
 mod expect {
     use bt_test_harness::low_energy_central::{CentralState, ScanStateChange};

@@ -2,26 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use fidl::endpoints::ControlHandle;
+use fidl_fuchsia_logger::LogSinkMarker;
+use fidl_fuchsia_scheduler::RoleManagerMarker;
+use fidl_fuchsia_tracing_provider::RegistryMarker;
+use fidl_fuchsia_ui_composition::FlatlandMarker;
+use fidl_fuchsia_ui_display_singleton::InfoMarker;
+use fidl_fuchsia_ui_focus::FocusChainListenerRegistryMarker;
+use fidl_fuchsia_ui_input3::KeyboardMarker;
+use fidl_fuchsia_ui_policy::DeviceListenerRegistryMarker;
+use fidl_fuchsia_vulkan_loader::LoaderMarker;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use futures::{StreamExt, TryStreamExt};
 use {
-    anyhow::Error,
-    fidl::endpoints::ControlHandle,
-    fidl_fuchsia_logger::LogSinkMarker,
-    fidl_fuchsia_scheduler::RoleManagerMarker,
     fidl_fuchsia_sysmem as fsysmem, fidl_fuchsia_sysmem2 as fsysmem2,
-    fidl_fuchsia_tracing_provider::RegistryMarker,
-    fidl_fuchsia_ui_composition::FlatlandMarker,
-    fidl_fuchsia_ui_display_singleton::InfoMarker,
-    fidl_fuchsia_ui_focus::FocusChainListenerRegistryMarker,
-    fidl_fuchsia_ui_input3::KeyboardMarker,
-    fidl_fuchsia_ui_policy::DeviceListenerRegistryMarker,
     fidl_fuchsia_ui_test_context as ui_test_context, fidl_fuchsia_ui_test_input as ui_input,
-    fidl_fuchsia_ui_test_scene as test_scene,
-    fidl_fuchsia_vulkan_loader::LoaderMarker,
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
+    fidl_fuchsia_ui_test_scene as test_scene, fuchsia_async as fasync,
     fuchsia_zircon_status as zx_status,
-    futures::{StreamExt, TryStreamExt},
 };
 
 // TODO(https://fxbug.dev/42069041): Use subpackages here.

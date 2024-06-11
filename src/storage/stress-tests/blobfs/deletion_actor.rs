@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_trait::async_trait,
-    fuchsia_zircon::Status,
-    rand::{rngs::SmallRng, seq::SliceRandom, Rng},
-    storage_stress_test_utils::io::Directory,
-    stress_test::actor::{Actor, ActorError},
-    tracing::{debug, info},
-};
+use async_trait::async_trait;
+use fuchsia_zircon::Status;
+use rand::rngs::SmallRng;
+use rand::seq::SliceRandom;
+use rand::Rng;
+use storage_stress_test_utils::io::Directory;
+use stress_test::actor::{Actor, ActorError};
+use tracing::{debug, info};
 
 // An actor responsible for deleting blobs randomly
 pub struct DeletionActor {

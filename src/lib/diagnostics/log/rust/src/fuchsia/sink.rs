@@ -2,26 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
 use crate::PublishError;
-use diagnostics_log_encoding::{
-    encode::{
-        EncodedSpanArguments, Encoder, EncodingError, MutableBuffer, TestRecord, TracingEvent,
-        WriteEventParams,
-    },
-    Metatag,
+use diagnostics_log_encoding::encode::{
+    EncodedSpanArguments, Encoder, EncodingError, MutableBuffer, TestRecord, TracingEvent,
+    WriteEventParams,
 };
+use diagnostics_log_encoding::Metatag;
 use fidl_fuchsia_logger::{LogSinkProxy, MAX_DATAGRAM_LEN_BYTES};
 use fuchsia_runtime as rt;
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use std::{
-    collections::HashSet,
-    io::Cursor,
-    sync::atomic::{AtomicU32, Ordering},
-};
-use tracing::{span, subscriber::Subscriber, Event};
-use tracing_subscriber::{
-    layer::{Context, Layer},
-    registry::LookupSpan,
-};
+use std::collections::HashSet;
+use std::io::Cursor;
+use std::sync::atomic::{AtomicU32, Ordering};
+use tracing::subscriber::Subscriber;
+use tracing::{span, Event};
+use tracing_subscriber::layer::{Context, Layer};
+use tracing_subscriber::registry::LookupSpan;
 
 #[derive(Default)]
 pub(crate) struct SinkConfig {
@@ -155,13 +150,16 @@ mod tests {
     use crate::{increment_clock, log_every_n_seconds};
 
     use super::*;
-    use diagnostics_log_encoding::{parse::parse_record, Severity};
+    use diagnostics_log_encoding::parse::parse_record;
+    use diagnostics_log_encoding::Severity;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_diagnostics_stream::{Argument, Record, Value};
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest};
-    use futures::{stream::StreamExt, AsyncReadExt};
+    use futures::stream::StreamExt;
+    use futures::AsyncReadExt;
     use tracing::{debug, error, info, info_span, trace, warn};
-    use tracing_subscriber::{layer::SubscriberExt, Registry};
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::Registry;
     use zx::Status;
 
     const TARGET: &str = "diagnostics_log_lib_test::fuchsia::sink::tests";

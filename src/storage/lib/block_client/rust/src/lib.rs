@@ -2,29 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{ensure, Error},
-    async_trait::async_trait,
-    fidl_fuchsia_hardware_block as block, fidl_fuchsia_hardware_block_driver as block_driver,
-    fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _},
-    fuchsia_zircon::sys::zx_handle_t,
-    fuchsia_zircon::{self as zx, HandleBased as _},
-    futures::{channel::oneshot, executor::block_on},
-    lazy_static::lazy_static,
-    std::{
-        collections::HashMap,
-        future::Future,
-        hash::{Hash, Hasher},
-        ops::{DerefMut, Range},
-        pin::Pin,
-        sync::{
-            atomic::{AtomicU16, Ordering},
-            Arc, Mutex,
-        },
-        task::{Context, Poll, Waker},
-    },
-    storage_trace::{self as trace, TraceFutureExt},
-};
+use anyhow::{ensure, Error};
+use async_trait::async_trait;
+use fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _};
+use fuchsia_zircon::sys::zx_handle_t;
+use fuchsia_zircon::{self as zx, HandleBased as _};
+use futures::channel::oneshot;
+use futures::executor::block_on;
+use lazy_static::lazy_static;
+use std::collections::HashMap;
+use std::future::Future;
+use std::hash::{Hash, Hasher};
+use std::ops::{DerefMut, Range};
+use std::pin::Pin;
+use std::sync::atomic::{AtomicU16, Ordering};
+use std::sync::{Arc, Mutex};
+use std::task::{Context, Poll, Waker};
+use storage_trace::{self as trace, TraceFutureExt};
+use {fidl_fuchsia_hardware_block as block, fidl_fuchsia_hardware_block_driver as block_driver};
 
 pub use cache::Cache;
 
@@ -763,21 +758,17 @@ impl Future for FifoPoller {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{
-            BlockClient, BlockFifoRequest, BlockFifoResponse, BufferSlice, MutableBufferSlice,
-            RemoteBlockClient, RemoteBlockClientSync,
-        },
-        fidl_fuchsia_hardware_block as block,
-        fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _},
-        fuchsia_zircon as zx,
-        futures::{
-            future::{AbortHandle, Abortable, TryFutureExt as _},
-            join,
-            stream::{futures_unordered::FuturesUnordered, StreamExt as _},
-        },
-        ramdevice_client::RamdiskClient,
+    use super::{
+        BlockClient, BlockFifoRequest, BlockFifoResponse, BufferSlice, MutableBufferSlice,
+        RemoteBlockClient, RemoteBlockClientSync,
     };
+    use fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _};
+    use futures::future::{AbortHandle, Abortable, TryFutureExt as _};
+    use futures::join;
+    use futures::stream::futures_unordered::FuturesUnordered;
+    use futures::stream::StreamExt as _;
+    use ramdevice_client::RamdiskClient;
+    use {fidl_fuchsia_hardware_block as block, fuchsia_zircon as zx};
 
     const RAMDISK_BLOCK_SIZE: u64 = 1024;
     const RAMDISK_BLOCK_COUNT: u64 = 1024;

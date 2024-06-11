@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    pixel_format::PixelFormat,
-    types::{DisplayId, EventId, ImageId, LayerId},
-};
+use crate::pixel_format::PixelFormat;
+use crate::types::{DisplayId, EventId, ImageId, LayerId};
 use fidl_fuchsia_hardware_display_types as fdisplay_types;
 
 /// LayerConfig is a variant type of the two distinct layer configuration types that are

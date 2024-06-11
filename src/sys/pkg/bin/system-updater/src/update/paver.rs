@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context as _},
-    fidl_fuchsia_mem as fmem, fidl_fuchsia_paver as fpaver, fuchsia_zircon as zx,
-    tracing::{info, warn},
-};
+use anyhow::{anyhow, Context as _};
+use tracing::{info, warn};
+use {fidl_fuchsia_mem as fmem, fidl_fuchsia_paver as fpaver, fuchsia_zircon as zx};
 
 mod configuration;
 pub use configuration::{CurrentConfiguration, NonCurrentConfiguration, TargetConfiguration};
@@ -422,12 +420,10 @@ fn make_buffer(contents: impl AsRef<[u8]>) -> fmem::Buffer {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent},
-        std::sync::Arc,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent};
+    use std::sync::Arc;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn query_non_current_configuration_with_a_current() {
@@ -868,12 +864,10 @@ mod tests {
 
 #[cfg(test)]
 mod abr_not_supported_tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent},
-        std::sync::Arc,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent};
+    use std::sync::Arc;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn query_non_current_configuration_returns_not_supported() {

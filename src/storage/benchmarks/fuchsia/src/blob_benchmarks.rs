@@ -2,25 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_trait::async_trait,
-    delivery_blob::CompressionMode,
-    fidl_fuchsia_io as fio,
-    fuchsia_pkg_testing::PackageBuilder,
-    fuchsia_storage_benchmarks_lib::filesystems::{BlobFilesystem, DeliveryBlob, PkgDirInstance},
-    fuchsia_zircon as zx,
-    futures::stream::{self, StreamExt},
-    rand::{
-        distributions::{Distribution, WeightedIndex},
-        seq::SliceRandom,
-        Rng, SeedableRng,
-    },
-    rand_xorshift::XorShiftRng,
-    std::{iter::StepBy, ops::Range},
-    storage_benchmarks::{
-        Benchmark, CacheClearableFilesystem as _, OperationDuration, OperationTimer,
-    },
+use async_trait::async_trait;
+use delivery_blob::CompressionMode;
+use fuchsia_pkg_testing::PackageBuilder;
+use fuchsia_storage_benchmarks_lib::filesystems::{BlobFilesystem, DeliveryBlob, PkgDirInstance};
+use futures::stream::{self, StreamExt};
+use rand::distributions::{Distribution, WeightedIndex};
+use rand::seq::SliceRandom;
+use rand::{Rng, SeedableRng};
+use rand_xorshift::XorShiftRng;
+use std::iter::StepBy;
+use std::ops::Range;
+use storage_benchmarks::{
+    Benchmark, CacheClearableFilesystem as _, OperationDuration, OperationTimer,
 };
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 const RNG_SEED: u64 = 0xda782a0c3ce1819a;
 
@@ -395,15 +391,11 @@ async fn page_in_blob_benchmark(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fuchsia_storage_benchmarks_lib::{
-            block_devices::RamdiskFactory,
-            filesystems::{Blobfs, Fxblob, PkgDirTest},
-        },
-        storage_benchmarks::FilesystemConfig,
-        test_util::assert_lt,
-    };
+    use super::*;
+    use fuchsia_storage_benchmarks_lib::block_devices::RamdiskFactory;
+    use fuchsia_storage_benchmarks_lib::filesystems::{Blobfs, Fxblob, PkgDirTest};
+    use storage_benchmarks::FilesystemConfig;
+    use test_util::assert_lt;
     const PAGE_COUNT: usize = 32;
 
     fn page_size() -> usize {

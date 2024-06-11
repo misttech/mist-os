@@ -12,15 +12,14 @@ use crate::temperature_handler::TemperatureFilter;
 use crate::types::{Celsius, Seconds, ThermalLoad};
 use anyhow::{format_err, Error, Result};
 use async_trait::async_trait;
-use fuchsia_async as fasync;
 use fuchsia_inspect::{self as inspect, Property};
 use futures::{StreamExt, TryFutureExt as _};
 use serde_derive::Deserialize;
-use serde_json as json;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use tracing::*;
+use {fuchsia_async as fasync, serde_json as json};
 
 /// Node: ThermalLoadDriver
 ///

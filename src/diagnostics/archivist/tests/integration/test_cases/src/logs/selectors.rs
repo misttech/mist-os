@@ -5,13 +5,11 @@
 use crate::test_topology;
 use diagnostics_assertions::assert_data_tree;
 use diagnostics_reader::{ArchiveReader, Logs};
-use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_archivist_test::LogPuppetLogRequest;
-use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
-use fidl_fuchsia_diagnostics::Severity;
-use fuchsia_async as fasync;
+use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, Severity};
 use futures::{FutureExt, StreamExt};
 use realm_proxy_client::RealmProxyClient;
+use {fidl_fuchsia_archivist_test as ftest, fuchsia_async as fasync};
 
 const HELLO_WORLD: &'static str = "Hello, world!!!";
 

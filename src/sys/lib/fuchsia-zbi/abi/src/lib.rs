@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    num_derive::{FromPrimitive, ToPrimitive},
-    zerocopy::{byteorder::little_endian::U32, AsBytes, FromBytes, FromZeros, NoCell, Unaligned},
-};
+use num_derive::{FromPrimitive, ToPrimitive};
+use zerocopy::byteorder::little_endian::U32;
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
 
 const ZBI_MAX_SMT: usize = 4;
 

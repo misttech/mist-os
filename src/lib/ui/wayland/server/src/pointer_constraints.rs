@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::client::Client,
-    crate::object::{NewObjectExt, ObjectRef, RequestReceiver},
-    anyhow::Error,
-    zwp_pointer_constraints_v1_server_protocol::{
-        ZwpConfinedPointerV1, ZwpConfinedPointerV1Request, ZwpLockedPointerV1,
-        ZwpLockedPointerV1Request, ZwpPointerConstraintsV1, ZwpPointerConstraintsV1Request,
-    },
+use crate::client::Client;
+use crate::object::{NewObjectExt, ObjectRef, RequestReceiver};
+use anyhow::Error;
+use zwp_pointer_constraints_v1_server_protocol::{
+    ZwpConfinedPointerV1, ZwpConfinedPointerV1Request, ZwpLockedPointerV1,
+    ZwpLockedPointerV1Request, ZwpPointerConstraintsV1, ZwpPointerConstraintsV1Request,
 };
 
 /// An implementation of the zwp_pointer_constraints_v1 global.

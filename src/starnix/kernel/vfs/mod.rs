@@ -70,10 +70,13 @@ pub use vmo_file::*;
 pub use wd_number::*;
 pub use xattr::*;
 
-use crate::{device::BinderDriver, task::CurrentTask};
+use crate::device::BinderDriver;
+use crate::task::CurrentTask;
 use starnix_lifecycle::{ObjectReleaser, ReleaserAction};
 use starnix_uapi::ownership::{Releasable, ReleaseGuard};
-use std::{cell::RefCell, ops::DerefMut, sync::Arc};
+use std::cell::RefCell;
+use std::ops::DerefMut;
+use std::sync::Arc;
 
 pub enum FileObjectReleaserAction {}
 impl ReleaserAction<FileObject> for FileObjectReleaserAction {

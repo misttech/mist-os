@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::mac::{FrameControl, MgmtHdr, SequenceControl},
-    ieee80211::{Bssid, MacAddr},
-};
+use crate::mac::{FrameControl, MgmtHdr, SequenceControl};
+use ieee80211::{Bssid, MacAddr};
 
 pub fn mgmt_hdr_to_ap(
     frame_ctrl: FrameControl,

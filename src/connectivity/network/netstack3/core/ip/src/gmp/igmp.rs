@@ -7,42 +7,37 @@
 //! IGMPv2 is a communications protocol used by hosts and adjacent routers on
 //! IPv4 networks to establish multicast group memberships.
 
-use core::{fmt::Debug, time::Duration};
+use core::fmt::Debug;
+use core::time::Duration;
 
 use log::{debug, error};
-use net_types::{
-    ip::{AddrSubnet, Ip as _, Ipv4, Ipv4Addr},
-    MulticastAddr, SpecifiedAddr, Witness,
-};
+use net_types::ip::{AddrSubnet, Ip as _, Ipv4, Ipv4Addr};
+use net_types::{MulticastAddr, SpecifiedAddr, Witness};
 use netstack3_base::{
     AnyDevice, CoreTimerContext, DeviceIdContext, HandleableTimer, Instant, TimerContext,
     WeakDeviceIdentifier,
 };
 use packet::{BufferMut, EmptyBuf, InnerPacketBuilder, Serializer};
-use packet_formats::{
-    igmp::{
-        messages::{IgmpLeaveGroup, IgmpMembershipReportV1, IgmpMembershipReportV2, IgmpPacket},
-        IgmpMessage, IgmpPacketBuilder, MessageType,
-    },
-    ip::Ipv4Proto,
-    ipv4::{
-        options::{Ipv4Option, Ipv4OptionData},
-        Ipv4OptionsTooLongError, Ipv4PacketBuilder, Ipv4PacketBuilderWithOptions,
-    },
-    utils::NonZeroDuration,
+use packet_formats::igmp::messages::{
+    IgmpLeaveGroup, IgmpMembershipReportV1, IgmpMembershipReportV2, IgmpPacket,
 };
+use packet_formats::igmp::{IgmpMessage, IgmpPacketBuilder, MessageType};
+use packet_formats::ip::Ipv4Proto;
+use packet_formats::ipv4::options::{Ipv4Option, Ipv4OptionData};
+use packet_formats::ipv4::{
+    Ipv4OptionsTooLongError, Ipv4PacketBuilder, Ipv4PacketBuilderWithOptions,
+};
+use packet_formats::utils::NonZeroDuration;
 use thiserror::Error;
 use zerocopy::ByteSlice;
 
-use crate::internal::{
-    base::{IpLayerHandler, IpPacketDestination},
-    device::IpDeviceSendContext,
-    gmp::{
-        gmp_handle_timer, handle_query_message, handle_report_message, GmpBindingsContext,
-        GmpBindingsTypes, GmpContext, GmpDelayedReportTimerId, GmpMessage, GmpMessageType,
-        GmpStateContext, GmpStateMachine, GmpStateRef, GmpTypeLayout, IpExt, MulticastGroupSet,
-        ProtocolSpecific, QueryTarget,
-    },
+use crate::internal::base::{IpLayerHandler, IpPacketDestination};
+use crate::internal::device::IpDeviceSendContext;
+use crate::internal::gmp::{
+    gmp_handle_timer, handle_query_message, handle_report_message, GmpBindingsContext,
+    GmpBindingsTypes, GmpContext, GmpDelayedReportTimerId, GmpMessage, GmpMessageType,
+    GmpStateContext, GmpStateMachine, GmpStateRef, GmpTypeLayout, IpExt, MulticastGroupSet,
+    ProtocolSpecific, QueryTarget,
 };
 
 /// The bindings types for IGMP.
@@ -555,25 +550,25 @@ mod tests {
     use assert_matches::assert_matches;
 
     use net_types::ip::{Ip, IpVersionMarker};
-    use netstack3_base::{
-        testutil::{
-            assert_empty, new_rng, run_with_many_seeds, FakeDeviceId, FakeInstant, FakeTimerCtxExt,
-            FakeWeakDeviceId,
-        },
-        CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext as _,
+    use netstack3_base::testutil::{
+        assert_empty, new_rng, run_with_many_seeds, FakeDeviceId, FakeInstant, FakeTimerCtxExt,
+        FakeWeakDeviceId,
     };
+    use netstack3_base::{CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext as _};
     use netstack3_filter::ProofOfEgressCheck;
-    use packet::{serialize::Buf, ParsablePacket as _};
-    use packet_formats::{igmp::messages::IgmpMembershipQueryV2, testutil::parse_ip_packet};
+    use packet::serialize::Buf;
+    use packet::ParsablePacket as _;
+    use packet_formats::igmp::messages::IgmpMembershipQueryV2;
+    use packet_formats::testutil::parse_ip_packet;
     use test_case::test_case;
 
     use super::*;
-    use crate::internal::{
-        base::{self, IpLayerPacketMetadata, IpPacketDestination, SendIpPacketMeta},
-        gmp::{
-            GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
-            QueryReceivedActions, ReportReceivedActions, ReportTimerExpiredActions,
-        },
+    use crate::internal::base::{
+        self, IpLayerPacketMetadata, IpPacketDestination, SendIpPacketMeta,
+    };
+    use crate::internal::gmp::{
+        GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
+        QueryReceivedActions, ReportReceivedActions, ReportTimerExpiredActions,
     };
 
     /// Metadata for sending an IGMP packet.

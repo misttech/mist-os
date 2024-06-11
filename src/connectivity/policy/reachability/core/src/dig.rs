@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::FIDL_TIMEOUT_ID, anyhow::anyhow, async_trait::async_trait, fidl_fuchsia_net as fnet,
-    fidl_fuchsia_net_name as fnet_name, fuchsia_zircon as zx, futures::TryFutureExt,
-    named_timer::NamedTimeoutExt, tracing::warn,
-};
+use crate::FIDL_TIMEOUT_ID;
+use anyhow::anyhow;
+use async_trait::async_trait;
+use futures::TryFutureExt;
+use named_timer::NamedTimeoutExt;
+use tracing::warn;
+use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_name as fnet_name, fuchsia_zircon as zx};
 
 const DNS_FIDL_TIMEOUT: zx::Duration = zx::Duration::from_seconds(90);
 
@@ -80,16 +82,13 @@ impl<F: Fn() -> anyhow::Result<fnet_name::LookupProxy> + std::marker::Sync> Dig 
 #[cfg(test)]
 mod test {
     use super::*;
-    use {
-        assert_matches::assert_matches,
-        fuchsia_async as fasync,
-        futures::{prelude::*, task::Poll},
-        net_declare::fidl_ip,
-        std::{
-            pin::pin,
-            sync::{Arc, Mutex},
-        },
-    };
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use futures::prelude::*;
+    use futures::task::Poll;
+    use net_declare::fidl_ip;
+    use std::pin::pin;
+    use std::sync::{Arc, Mutex};
 
     const DNS_DOMAIN: &str = "www.gstatic.com";
 

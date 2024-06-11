@@ -4,11 +4,13 @@
 
 use super::{Procedure, ProcedureError, ProcedureMarker, ProcedureRequest};
 
-use crate::peer::{
-    calls::Call, service_level_connection::SlcState, slc_request::SlcRequest, update::AgUpdate,
-};
+use crate::peer::calls::Call;
+use crate::peer::service_level_connection::SlcState;
+use crate::peer::slc_request::SlcRequest;
+use crate::peer::update::AgUpdate;
 
-use {at_commands as at, fidl_fuchsia_bluetooth_hfp::CallState};
+use at_commands as at;
+use fidl_fuchsia_bluetooth_hfp::CallState;
 
 /// Represents the current state of the Hf request to query the list of current calls as defined
 /// in HFP v1.8, Section 4.32.1.

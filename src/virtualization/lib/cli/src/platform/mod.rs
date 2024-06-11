@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    async_trait::async_trait,
-    blocking::Unblock,
-    fidl_fuchsia_virtualization::{GuestManagerProxy, GuestMarker, GuestProxy, LinuxManagerProxy},
-    fuchsia_async as fasync,
-    guest_cli_args::GuestType,
-    std::{
-        io::{Read, Write},
-        os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd},
-    },
-};
+use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
+use blocking::Unblock;
+use fidl_fuchsia_virtualization::{GuestManagerProxy, GuestMarker, GuestProxy, LinuxManagerProxy};
+use fuchsia_async as fasync;
+use guest_cli_args::GuestType;
+use std::io::{Read, Write};
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 
 #[cfg(target_os = "fuchsia")]
 mod fuchsia;
@@ -153,7 +149,8 @@ pub trait PlatformServices {
 
 #[cfg(test)]
 mod test {
-    use {super::*, fidl::HandleBased};
+    use super::*;
+    use fidl::HandleBased;
 
     #[fasync::run_singlethreaded(test)]
     async fn guest_console_copies_async_stream() {

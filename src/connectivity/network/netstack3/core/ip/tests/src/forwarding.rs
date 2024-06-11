@@ -4,19 +4,17 @@
 
 use ip_test_macro::ip_test;
 use net_declare::{net_subnet_v4, net_subnet_v6};
-use net_types::{
-    ip::{Ip, IpAddress as _, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
-    SpecifiedAddr,
-};
+use net_types::ip::{Ip, IpAddress as _, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use net_types::SpecifiedAddr;
 use test_case::test_case;
 
 use netstack3_base::testutil::TestIpExt;
-use netstack3_core::{
-    device::{DeviceId, EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
-    error::NotFoundError,
-    testutil::{CtxPairExt as _, FakeCtx, DEFAULT_INTERFACE_METRIC},
-    StackStateBuilder,
+use netstack3_core::device::{
+    DeviceId, EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize,
 };
+use netstack3_core::error::NotFoundError;
+use netstack3_core::testutil::{CtxPairExt as _, FakeCtx, DEFAULT_INTERFACE_METRIC};
+use netstack3_core::StackStateBuilder;
 use netstack3_ip::{
     AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, Metric, RawMetric,
 };

@@ -2,25 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::common::mac::WlanGi;
+use crate::error::Error;
+use anyhow::format_err;
+use futures::channel::mpsc;
+use futures::Future;
+use ieee80211::MacAddr;
+use std::fmt::Display;
+use std::sync::Arc;
+use trace::Id as TraceId;
+use tracing::error;
+use wlan_common::mac::FrameControl;
+use wlan_common::{tx_vector, TimeUnit};
+use wlan_ffi_transport::{
+    EthernetRx, EthernetTx, FfiEthernetTx, FfiWlanRx, FinalizedBuffer, WlanRx, WlanTx,
+};
 use {
-    crate::{common::mac::WlanGi, error::Error},
-    anyhow::format_err,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
-    futures::{channel::mpsc, Future},
-    ieee80211::MacAddr,
-    std::{fmt::Display, sync::Arc},
-    trace::Id as TraceId,
-    tracing::error,
-    wlan_common::{mac::FrameControl, tx_vector, TimeUnit},
-    wlan_ffi_transport::{
-        EthernetRx, EthernetTx, FfiEthernetTx, FfiWlanRx, FinalizedBuffer, WlanRx, WlanTx,
-    },
     wlan_trace as wtrace,
 };
 
 pub mod completers {
-    use {fuchsia_zircon as zx, tracing::error};
+    use fuchsia_zircon as zx;
+    use tracing::error;
 
     pub struct InitCompleter<F>
     where
@@ -642,15 +647,15 @@ impl DeviceOps for Device {
 }
 
 pub mod test_utils {
+    use super::*;
+    use crate::ddk_converter;
+    use fuchsia_sync::Mutex;
+    use paste::paste;
+    use std::collections::VecDeque;
+    use wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider};
     use {
-        super::*,
-        crate::ddk_converter,
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
         fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
-        fuchsia_sync::Mutex,
-        paste::paste,
-        std::collections::VecDeque,
-        wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider},
     };
 
     pub trait FromMlmeEvent {
@@ -1327,13 +1332,11 @@ pub mod test_utils {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{ddk_converter, WlanTxPacketExt as _},
-        fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-        ieee80211::Ssid,
-        wlan_common::assert_variant,
-    };
+    use super::*;
+    use crate::{ddk_converter, WlanTxPacketExt as _};
+    use ieee80211::Ssid;
+    use wlan_common::assert_variant;
+    use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211};
 
     fn make_deauth_confirm_msg() -> fidl_mlme::DeauthenticateConfirm {
         fidl_mlme::DeauthenticateConfirm { peer_sta_address: [1; 6] }

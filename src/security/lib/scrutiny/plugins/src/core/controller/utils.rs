@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::core::collection::{Component, Components},
-    anyhow::{Context, Error, Result},
-    cm_types::Url,
-    scrutiny::model::model::DataModel,
-    serde::{Deserialize, Serialize},
-    serde_json::value::Value,
-    std::io::{self, ErrorKind},
-    std::sync::Arc,
-};
+use crate::core::collection::{Component, Components};
+use anyhow::{Context, Error, Result};
+use cm_types::Url;
+use scrutiny::model::model::DataModel;
+use serde::{Deserialize, Serialize};
+use serde_json::value::Value;
+use std::io::{self, ErrorKind};
+use std::sync::Arc;
 
 /// Converts a component_url to an internal component_id.
 pub fn component_from_url(model: Arc<DataModel>, url: &Url) -> Option<Component> {
@@ -98,15 +96,12 @@ impl DefaultComponentRequest {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::DefaultComponentRequest,
-        crate::core::collection::{
-            testing::fake_component_src_pkg, Component, ComponentSource, Components,
-        },
-        cm_types::Url,
-        scrutiny_testing::fake::*,
-        serde_json::json,
-    };
+    use super::DefaultComponentRequest;
+    use crate::core::collection::testing::fake_component_src_pkg;
+    use crate::core::collection::{Component, ComponentSource, Components};
+    use cm_types::Url;
+    use scrutiny_testing::fake::*;
+    use serde_json::json;
 
     fn make_component(id: i32, url: &str, source: ComponentSource) -> Component {
         let url = Url::new(url).unwrap();

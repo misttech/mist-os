@@ -2,23 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{bail, Context, Error};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_sync::Mutex;
+use futures::StreamExt;
+use ieee80211::{Bssid, MacAddrBytes};
+use netlink_packet_core::{NetlinkDeserializable, NetlinkHeader, NetlinkSerializable};
+use netlink_packet_generic::GenlMessage;
+use std::convert::{TryFrom, TryInto};
+use std::sync::Arc;
+use tracing::{error, info, warn};
+use wlan_common::channel::{Cbw, Channel};
 use {
-    anyhow::{bail, Context, Error},
     fidl_fuchsia_wlan_sme as fidl_sme, fidl_fuchsia_wlan_wlanix as fidl_wlanix,
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_sync::Mutex,
-    fuchsia_zircon as zx,
-    futures::StreamExt,
-    ieee80211::{Bssid, MacAddrBytes},
-    netlink_packet_core::{NetlinkDeserializable, NetlinkHeader, NetlinkSerializable},
-    netlink_packet_generic::GenlMessage,
-    std::{
-        convert::{TryFrom, TryInto},
-        sync::Arc,
-    },
-    tracing::{error, info, warn},
-    wlan_common::channel::{Cbw, Channel},
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 mod bss_scorer;
@@ -27,11 +24,9 @@ mod ifaces;
 mod nl80211;
 mod security;
 
-use {
-    default_drop::{DefaultDrop, WithDefaultDrop},
-    ifaces::{ClientIface, ConnectResult, IfaceManager, ScanEnd},
-    nl80211::{Nl80211, Nl80211Attr, Nl80211BandAttr, Nl80211Cmd, Nl80211FrequencyAttr},
-};
+use default_drop::{DefaultDrop, WithDefaultDrop};
+use ifaces::{ClientIface, ConnectResult, IfaceManager, ScanEnd};
+use nl80211::{Nl80211, Nl80211Attr, Nl80211BandAttr, Nl80211Cmd, Nl80211FrequencyAttr};
 
 const IFACE_NAME: &str = "wlan";
 
@@ -1346,15 +1341,16 @@ async fn main() {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream, Proxy};
+    use futures::task::Poll;
+    use futures::Future;
+    use ifaces::test_utils::{ClientIfaceCall, TestIfaceManager};
+    use std::pin::{pin, Pin};
+    use test_case::test_case;
+    use wlan_common::assert_variant;
     use {
-        super::*,
-        fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream, Proxy},
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-        futures::{task::Poll, Future},
-        ifaces::test_utils::{ClientIfaceCall, TestIfaceManager},
-        std::pin::{pin, Pin},
-        test_case::test_case,
-        wlan_common::assert_variant,
     };
 
     const CHIP_ID: u32 = 1;

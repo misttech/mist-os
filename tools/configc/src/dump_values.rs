@@ -7,7 +7,8 @@ use argh::FromArgs;
 use cm_rust::FidlIntoNative;
 use fidl::unpersist;
 use fidl_fuchsia_component_decl as fdecl;
-use std::{collections::BTreeMap, path::PathBuf};
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 /// dump configuration values for a component in a human-readable format
 #[derive(FromArgs, PartialEq, Debug)]

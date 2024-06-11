@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    target::{
-        self, DiscoveredTarget, Identity, IdentityCmp, SharedIdentity, Target, TargetAddrEntry,
-        TargetAddrStatus, TargetUpdate, WeakIdentity,
-    },
-    MDNS_MAX_AGE,
+use crate::target::{
+    self, DiscoveredTarget, Identity, IdentityCmp, SharedIdentity, Target, TargetAddrEntry,
+    TargetAddrStatus, TargetUpdate, WeakIdentity,
 };
+use crate::MDNS_MAX_AGE;
 use addr::TargetAddr;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -19,17 +17,15 @@ use ffx_daemon_events::{DaemonEvent, TargetEvent};
 use ffx_target::TargetInfoQuery;
 use fidl_fuchsia_developer_ffx as ffx;
 use netext::IsLocalAddr;
-use std::{
-    borrow::Borrow,
-    cell::RefCell,
-    collections::{hash_map::Entry, HashMap},
-    fmt::Debug,
-    net::IpAddr,
-    net::SocketAddr,
-    ops::ControlFlow,
-    rc::Rc,
-    sync::Arc,
-};
+use std::borrow::Borrow;
+use std::cell::RefCell;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::net::{IpAddr, SocketAddr};
+use std::ops::ControlFlow;
+use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct TargetCollection {
     targets: RefCell<HashMap<u64, Rc<Target>>>,
@@ -1116,13 +1112,11 @@ mod tests {
     use ffx_target::Description;
     use fuchsia_async::Task;
     use futures::prelude::*;
-    use std::{
-        collections::BTreeSet,
-        net::{Ipv4Addr, Ipv6Addr, SocketAddrV6},
-        pin::Pin,
-        task::{Context, Poll},
-        time::Instant,
-    };
+    use std::collections::BTreeSet;
+    use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV6};
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
+    use std::time::Instant;
 
     mod update;
 

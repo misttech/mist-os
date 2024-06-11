@@ -2,41 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    blob_writer::BlobWriter,
-    delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob},
-    device_watcher::{recursive_wait_and_open, recursive_wait_and_open_directory},
-    fidl::endpoints::{create_proxy, Proxy as _, ServerEnd},
-    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
-    fidl_fuchsia_fxfs::{
-        BlobCreatorProxy, CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions,
-    },
-    fidl_fuchsia_hardware_block::BlockMarker,
-    fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger,
-    fs_management::{
-        filesystem::ServingMultiVolumeFilesystem,
-        format::constants::{F2FS_MAGIC, FXFS_MAGIC, MINFS_MAGIC},
-        Blobfs, Fxfs, BLOBFS_TYPE_GUID, DATA_TYPE_GUID, FVM_TYPE_GUID_STR,
-    },
-    fuchsia_component::client::{
-        connect_to_named_protocol_at_dir_root, connect_to_protocol_at_dir_svc,
-    },
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    fuchsia_hash::Hash,
-    fuchsia_runtime::vmar_root_self,
-    fuchsia_zircon::{self as zx, HandleBased},
-    gpt::{partition_types, GptConfig},
-    key_bag::Aes256Key,
-    ramdevice_client::{RamdiskClient, RamdiskClientBuilder},
-    remote_block_device::BlockClient as _,
-    std::{io::Write, ops::Deref},
-    storage_isolated_driver_manager::{
-        fvm::{create_fvm_volume, set_up_fvm},
-        zxcrypt,
-    },
-    uuid::Uuid,
-    zerocopy::{AsBytes, NoCell},
+use blob_writer::BlobWriter;
+use delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob};
+use device_watcher::{recursive_wait_and_open, recursive_wait_and_open_directory};
+use fidl::endpoints::{create_proxy, Proxy as _, ServerEnd};
+use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
+use fidl_fuchsia_fxfs::{
+    BlobCreatorProxy, CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions,
 };
+use fidl_fuchsia_hardware_block::BlockMarker;
+use fs_management::filesystem::ServingMultiVolumeFilesystem;
+use fs_management::format::constants::{F2FS_MAGIC, FXFS_MAGIC, MINFS_MAGIC};
+use fs_management::{Blobfs, Fxfs, BLOBFS_TYPE_GUID, DATA_TYPE_GUID, FVM_TYPE_GUID_STR};
+use fuchsia_component::client::{
+    connect_to_named_protocol_at_dir_root, connect_to_protocol_at_dir_svc,
+};
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use fuchsia_hash::Hash;
+use fuchsia_runtime::vmar_root_self;
+use fuchsia_zircon::{self as zx, HandleBased};
+use gpt::{partition_types, GptConfig};
+use key_bag::Aes256Key;
+use ramdevice_client::{RamdiskClient, RamdiskClientBuilder};
+use remote_block_device::BlockClient as _;
+use std::io::Write;
+use std::ops::Deref;
+use storage_isolated_driver_manager::fvm::{create_fvm_volume, set_up_fvm};
+use storage_isolated_driver_manager::zxcrypt;
+use uuid::Uuid;
+use zerocopy::{AsBytes, NoCell};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger};
 
 const GPT_DRIVER_PATH: &str = "gpt.cm";
 

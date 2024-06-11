@@ -148,11 +148,11 @@ impl RepositoryService {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::repository_manager::RepositoryManagerBuilder,
-        fidl::endpoints::create_proxy_and_stream, fidl_fuchsia_pkg::RepositoryIteratorMarker,
-        fidl_fuchsia_pkg_ext::RepositoryConfigBuilder,
-    };
+    use super::*;
+    use crate::repository_manager::RepositoryManagerBuilder;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_pkg::RepositoryIteratorMarker;
+    use fidl_fuchsia_pkg_ext::RepositoryConfigBuilder;
 
     async fn list(service: &RepositoryService) -> Vec<RepositoryConfig> {
         let (list_iterator, stream) =

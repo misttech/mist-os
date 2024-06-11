@@ -4,12 +4,11 @@
 
 // This actor has one action that fails immediately.
 
-use {
-    anyhow::{anyhow, Result},
-    futures::{future::BoxFuture, FutureExt},
-    rand::rngs::SmallRng,
-    stress_test_actor::{actor_loop, Action},
-};
+use anyhow::{anyhow, Result};
+use futures::future::BoxFuture;
+use futures::FutureExt;
+use rand::rngs::SmallRng;
+use stress_test_actor::{actor_loop, Action};
 
 #[fuchsia::main(logging = false)]
 pub async fn main() -> Result<()> {

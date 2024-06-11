@@ -2,15 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Result},
-    scrutiny_utils::{artifact::ArtifactReader, io::ReadSeek},
-    std::{
-        collections::{HashMap, HashSet},
-        io::Cursor,
-        path::{Path, PathBuf},
-    },
-};
+use anyhow::{anyhow, Result};
+use scrutiny_utils::artifact::ArtifactReader;
+use scrutiny_utils::io::ReadSeek;
+use std::collections::{HashMap, HashSet};
+use std::io::Cursor;
+use std::path::{Path, PathBuf};
 
 /// The result of appending data to a mock implementation.
 pub enum AppendResult {

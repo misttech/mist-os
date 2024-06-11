@@ -2,26 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::FullmacDriverFixture;
+use drivers_only_common::sme_helpers;
+use fullmac_helpers::config::FullmacDriverConfig;
+use fullmac_helpers::recorded_request_stream::FullmacRequest;
+use fullmac_helpers::{COMPATIBLE_OPEN_BSS, COMPATIBLE_WPA2_BSS, COMPATIBLE_WPA3_BSS};
+use futures::StreamExt;
+use ieee80211::{MacAddr, MacAddrBytes};
+use rand::Rng;
+use wlan_common::{assert_variant, random_fidl_bss_description};
+use wlan_rsn::key::exchange::Key;
+use wlan_rsn::key::Tk;
+use wlan_rsn::rsna::{AuthStatus, SecAssocStatus, SecAssocUpdate, UpdateSink};
 use {
-    crate::FullmacDriverFixture,
-    drivers_only_common::sme_helpers,
     fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_common_security as fidl_wlan_security,
     fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
     fuchsia_zircon as zx,
-    fullmac_helpers::{
-        config::FullmacDriverConfig, recorded_request_stream::FullmacRequest, COMPATIBLE_OPEN_BSS,
-        COMPATIBLE_WPA2_BSS, COMPATIBLE_WPA3_BSS,
-    },
-    futures::StreamExt,
-    ieee80211::{MacAddr, MacAddrBytes},
-    rand::Rng,
-    wlan_common::{assert_variant, random_fidl_bss_description},
-    wlan_rsn::{
-        key::{exchange::Key, Tk},
-        rsna::{AuthStatus, SecAssocStatus, SecAssocUpdate, UpdateSink},
-    },
 };
 
 /// Many tests will want to start from a connected state, so this will create and start the test

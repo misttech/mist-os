@@ -2,27 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::MIN_INTERVAL_FOR_SYSLOG_MS;
+use anyhow::{format_err, Result};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_inspect::{self as inspect, Property};
+use fuchsia_zbi_abi::{ZbiTopologyEntityType, ZbiTopologyNode, ZbiType};
+use futures::stream::StreamExt;
+use num_traits::FromPrimitive;
+use std::cmp::max;
+use std::collections::hash_map::DefaultHasher;
+use std::collections::BTreeMap;
+use std::hash::{Hash, Hasher};
+use std::mem;
+use std::rc::Rc;
+use tracing::{error, info};
+use zerocopy::FromBytes;
 use {
-    crate::MIN_INTERVAL_FOR_SYSLOG_MS,
-    anyhow::{format_err, Result},
     fidl_fuchsia_boot as fboot, fidl_fuchsia_kernel as fkernel,
-    fidl_fuchsia_power_metrics as fmetrics, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_inspect::{self as inspect, Property},
-    fuchsia_zbi_abi::ZbiType,
-    fuchsia_zbi_abi::{ZbiTopologyEntityType, ZbiTopologyNode},
-    fuchsia_zircon as zx,
-    futures::stream::StreamExt,
-    num_traits::FromPrimitive,
-    std::{
-        cmp::max,
-        collections::{hash_map::DefaultHasher, BTreeMap},
-        hash::{Hash, Hasher},
-        mem,
-        rc::Rc,
-    },
-    tracing::{error, info},
-    zerocopy::FromBytes,
+    fidl_fuchsia_power_metrics as fmetrics, fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 pub const ZBI_TOPOLOGY_NODE_SIZE: usize = mem::size_of::<ZbiTopologyNode>();
@@ -340,19 +337,19 @@ impl InspectData {
 
 #[cfg(test)]
 pub mod tests {
-    use {
-        super::*,
-        anyhow::{format_err, Error},
-        assert_matches::assert_matches,
-        diagnostics_assertions::assert_data_tree,
-        fidl_fuchsia_kernel::{CpuStats, PerCpuStats},
-        fuchsia_zbi_abi::{
-            ArchitectureInfo, Entity, ZbiTopologyArchitecture, ZbiTopologyArm64Info,
-            ZbiTopologyCluster, ZbiTopologyProcessor,
-        },
-        futures::{task::Poll, FutureExt, TryStreamExt},
-        std::{cell::Cell, pin::Pin},
+    use super::*;
+    use anyhow::{format_err, Error};
+    use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
+    use fidl_fuchsia_kernel::{CpuStats, PerCpuStats};
+    use fuchsia_zbi_abi::{
+        ArchitectureInfo, Entity, ZbiTopologyArchitecture, ZbiTopologyArm64Info,
+        ZbiTopologyCluster, ZbiTopologyProcessor,
     };
+    use futures::task::Poll;
+    use futures::{FutureExt, TryStreamExt};
+    use std::cell::Cell;
+    use std::pin::Pin;
 
     fn generate_cluster_node(performance_class: u8) -> ZbiTopologyNode {
         const ZBI_TOPOLOGY_NO_PARENT: u16 = 0xFFFF;

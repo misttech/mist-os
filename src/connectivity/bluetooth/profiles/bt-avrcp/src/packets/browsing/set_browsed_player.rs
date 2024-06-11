@@ -278,7 +278,8 @@ impl Encodable for SetBrowsedPlayerResponseParams {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     #[fuchsia::test]
     fn test_set_browsed_player_command_encode() {

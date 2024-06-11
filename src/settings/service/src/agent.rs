@@ -3,12 +3,10 @@
 // found in the LICENSE file.
 
 use crate::base::SettingType;
-use crate::event;
 use crate::message::base::MessengerType;
-use crate::payload_convert;
-use crate::service;
 use crate::service::message::Receptor;
 use crate::service_context::ServiceContext;
+use crate::{event, payload_convert, service};
 
 use futures::future::BoxFuture;
 use std::collections::HashSet;

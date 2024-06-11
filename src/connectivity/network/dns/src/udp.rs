@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::FuchsiaTime,
-    async_trait::async_trait,
-    fuchsia_async::net::UdpSocket,
-    futures::FutureExt as _,
-    std::{
-        io,
-        net::{Ipv4Addr, Ipv6Addr, SocketAddr},
-        pin::pin,
-        task::{Context, Poll},
-    },
-    trust_dns_proto::udp,
-};
+use crate::FuchsiaTime;
+use async_trait::async_trait;
+use fuchsia_async::net::UdpSocket;
+use futures::FutureExt as _;
+use std::io;
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::pin::pin;
+use std::task::{Context, Poll};
+use trust_dns_proto::udp;
 
 /// A Fuchsia-compatible implementation of trust-dns's `UdpSocket` trait which allows
 /// creating a UdpSocket to a particular destination.

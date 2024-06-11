@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    component::Component,
-    core::{Core, CoreContext, ObjectRef, OnAdded, Property},
-    shapes::paint::{Color32, ShapePaintMutator},
-    status_code::StatusCode,
-    PaintColor,
-};
+use crate::component::Component;
+use crate::core::{Core, CoreContext, ObjectRef, OnAdded, Property};
+use crate::shapes::paint::{Color32, ShapePaintMutator};
+use crate::status_code::StatusCode;
+use crate::PaintColor;
 
 #[derive(Debug)]
 pub struct SolidColor {

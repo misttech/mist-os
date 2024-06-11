@@ -2,31 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, Context, Error},
-    fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, RequestStream},
-    fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream},
-    fidl_fuchsia_fs_startup::{
-        CheckOptions, FormatOptions, StartOptions, StartupMarker, StartupRequest,
-        StartupRequestStream,
-    },
-    fidl_fuchsia_hardware_block::BlockMarker,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream},
-    fuchsia_async as fasync,
-    fuchsia_fatfs::{fatfs_error_to_status, FatDirectory, FatFs},
-    fuchsia_zircon as zx,
-    futures::{lock::Mutex, TryStreamExt},
-    remote_block_device::RemoteBlockClientSync,
-    std::sync::Arc,
-    tracing::{error, info, warn},
-    vfs::{
-        directory::{entry_container::Directory, helper::DirectlyMutable},
-        execution_scope::ExecutionScope,
-        node::Node as _,
-        path::Path,
-    },
+use anyhow::{bail, Context, Error};
+use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, RequestStream};
+use fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream};
+use fidl_fuchsia_fs_startup::{
+    CheckOptions, FormatOptions, StartOptions, StartupMarker, StartupRequest, StartupRequestStream,
 };
+use fidl_fuchsia_hardware_block::BlockMarker;
+use fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream};
+use fuchsia_fatfs::{fatfs_error_to_status, FatDirectory, FatFs};
+use futures::lock::Mutex;
+use futures::TryStreamExt;
+use remote_block_device::RemoteBlockClientSync;
+use std::sync::Arc;
+use tracing::{error, info, warn};
+use vfs::directory::entry_container::Directory;
+use vfs::directory::helper::DirectlyMutable;
+use vfs::execution_scope::ExecutionScope;
+use vfs::node::Node as _;
+use vfs::path::Path;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 fn map_to_raw_status(e: Error) -> zx::sys::zx_status_t {
     map_to_status(e).into_raw()

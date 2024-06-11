@@ -6,22 +6,19 @@
 //! in this module provide a common interface for platform-specific buffers
 //! used by TCP.
 
-use alloc::{vec, vec::Vec};
-use core::{
-    cmp,
-    fmt::Debug,
-    num::{NonZeroUsize, TryFromIntError},
-    ops::Range,
-};
+use alloc::vec;
+use alloc::vec::Vec;
+use core::cmp;
+use core::fmt::Debug;
+use core::num::{NonZeroUsize, TryFromIntError};
+use core::ops::Range;
 use either::Either;
 use packet::InnerPacketBuilder;
 
-use crate::internal::{
-    base::BufferSizes,
-    segment::Payload,
-    seqnum::{SeqNum, WindowSize},
-    state::Takeable,
-};
+use crate::internal::base::BufferSizes;
+use crate::internal::segment::Payload;
+use crate::internal::seqnum::{SeqNum, WindowSize};
+use crate::internal::state::Takeable;
 
 /// Common super trait for both sending and receiving buffer.
 pub trait Buffer: Takeable + Debug + Sized {
@@ -879,11 +876,9 @@ mod test {
         Buf, FragmentedBytesMut, PacketBuilder, PacketConstraints, SerializeError, SerializeTarget,
         Serializer,
     };
-    use proptest::{
-        proptest,
-        strategy::{Just, Strategy},
-        test_runner::Config,
-    };
+    use proptest::proptest;
+    use proptest::strategy::{Just, Strategy};
+    use proptest::test_runner::Config;
     use proptest_support::failed_seeds;
     use test_case::test_case;
 

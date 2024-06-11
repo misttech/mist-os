@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use pest::{iterators::Pair, Parser};
+use pest::iterators::Pair;
+use pest::Parser;
 
-use fidl_fuchsia_hardware_network as fhnet;
-use fidl_fuchsia_net as net;
-use fidl_fuchsia_net_filter_deprecated as filter;
-
-use crate::{
-    grammar::{Error, FilterRuleParser, InvalidReason, Rule},
-    util,
+use {
+    fidl_fuchsia_hardware_network as fhnet, fidl_fuchsia_net as net,
+    fidl_fuchsia_net_filter_deprecated as filter,
 };
+
+use crate::grammar::{Error, FilterRuleParser, InvalidReason, Rule};
+use crate::util;
 
 fn parse_action(pair: Pair<'_, Rule>) -> filter::Action {
     assert_eq!(pair.as_rule(), Rule::action);

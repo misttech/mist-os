@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{identity::ComponentIdentity, logs::container::LogsArtifactsContainer};
+use crate::identity::ComponentIdentity;
+use crate::logs::container::LogsArtifactsContainer;
 use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
 use std::sync::{Arc, Weak};
@@ -128,25 +129,18 @@ impl BudgetHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        logs::{
-            multiplex::PinStream,
-            stored_message::{GenericStoredMessage, StructuredStoredMessage},
-        },
-        testing::TEST_IDENTITY,
-    };
+    use crate::logs::multiplex::PinStream;
+    use crate::logs::stored_message::{GenericStoredMessage, StructuredStoredMessage};
+    use crate::testing::TEST_IDENTITY;
     use diagnostics_data::{LogsData, Severity};
-    use diagnostics_log_encoding::{
-        encode::Encoder, Argument, Record, Severity as StreamSeverity, Value,
-    };
+    use diagnostics_log_encoding::encode::Encoder;
+    use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
     use fidl_fuchsia_diagnostics::StreamMode;
     use fuchsia_trace as ftrace;
     use futures::{Stream, StreamExt};
-    use std::{
-        io::Cursor,
-        pin::Pin,
-        task::{Context, Poll},
-    };
+    use std::io::Cursor;
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
 
     struct CursorWrapper(PinStream<Arc<LogsData>>);
 

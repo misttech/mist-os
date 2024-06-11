@@ -2,22 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    app::{
-        strategies::{
-            flatland::FlatlandAppStrategy,
-            framebuffer::{
-                first_display_device_path, DisplayCoordinator, DisplayDirectAppStrategy, DisplayId,
-            },
-        },
-        Config, InternalSender, MessageInternal, ViewMode,
-    },
-    input::{self},
-    view::{
-        strategies::base::{ViewStrategyParams, ViewStrategyPtr},
-        ViewKey,
-    },
+use crate::app::strategies::flatland::FlatlandAppStrategy;
+use crate::app::strategies::framebuffer::{
+    first_display_device_path, DisplayCoordinator, DisplayDirectAppStrategy, DisplayId,
 };
+use crate::app::{Config, InternalSender, MessageInternal, ViewMode};
+use crate::input::{self};
+use crate::view::strategies::base::{ViewStrategyParams, ViewStrategyPtr};
+use crate::view::ViewKey;
 use anyhow::Error;
 use async_trait::async_trait;
 use fidl_fuchsia_hardware_display::VirtconMode;

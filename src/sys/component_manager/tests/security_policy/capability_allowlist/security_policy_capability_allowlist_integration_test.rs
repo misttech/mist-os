@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_test_policy as ftest, fuchsia_async as fasync,
-    fuchsia_component::client,
-    security_policy_test_util::{open_exposed_dir, start_policy_test},
-};
+use anyhow::Error;
+use fuchsia_component::client;
+use security_policy_test_util::{open_exposed_dir, start_policy_test};
+use {fidl_test_policy as ftest, fuchsia_async as fasync};
 
 const COMPONENT_MANAGER_URL: &str = "#meta/cm_for_test.cm";
 const ROOT_URL: &str = "#meta/test_root.cm";

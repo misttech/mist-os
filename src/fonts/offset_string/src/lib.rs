@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    serde::{Deserialize, Serialize},
-    std::ops::RangeInclusive,
-};
+use anyhow::{format_err, Error};
+use serde::{Deserialize, Serialize};
+use std::ops::RangeInclusive;
 
 mod conversions;
 

@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    common::cmd::{ManifestParams, OemFile},
-    file_resolver::FileResolver,
-    manifest::{
-        v1::{FlashManifest as FlashManifestV1, Partition as PartitionV1, Product as ProductV1},
-        v2::FlashManifest as FlashManifestV2,
-        Boot, Flash, Unlock,
-    },
+use crate::common::cmd::{ManifestParams, OemFile};
+use crate::file_resolver::FileResolver;
+use crate::manifest::v1::{
+    FlashManifest as FlashManifestV1, Partition as PartitionV1, Product as ProductV1,
 };
+use crate::manifest::v2::FlashManifest as FlashManifestV2;
+use crate::manifest::{Boot, Flash, Unlock};
 use anyhow::Result;
 use async_trait::async_trait;
 use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
@@ -161,10 +159,8 @@ impl Boot for FlashManifest {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        common::vars::{IS_USERSPACE_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR},
-        test::{setup, TestResolver},
-    };
+    use crate::common::vars::{IS_USERSPACE_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR};
+    use crate::test::{setup, TestResolver};
     use serde_json::{from_str, json};
     use std::path::PathBuf;
     use tempfile::NamedTempFile;

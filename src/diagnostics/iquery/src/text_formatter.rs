@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    diagnostics_data::{InspectData, InspectHandleName},
-    diagnostics_hierarchy::{
-        ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property,
-    },
-    either::Either,
-    nom::HexDisplay,
-    num_traits::{Bounded, Zero},
-    std::{
-        fmt,
-        ops::{Add, AddAssign, Mul, MulAssign},
-    },
+use diagnostics_data::{InspectData, InspectHandleName};
+use diagnostics_hierarchy::{
+    ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property,
 };
+use either::Either;
+use nom::HexDisplay;
+use num_traits::{Bounded, Zero};
+use std::fmt;
+use std::ops::{Add, AddAssign, Mul, MulAssign};
 
 const INDENT: usize = 2;
 const HEX_DISPLAY_CHUNK_SIZE: usize = 16;

@@ -4,14 +4,12 @@
 
 #![warn(missing_docs)]
 
-use {
-    anyhow::{format_err, Context as _, Error},
-    fidl_fuchsia_input_report::{
-        InputReport, InputReportsReaderRequest, InputReportsReaderRequestStream,
-    },
-    futures::{StreamExt, TryStreamExt},
-    std::convert::TryFrom as _,
+use anyhow::{format_err, Context as _, Error};
+use fidl_fuchsia_input_report::{
+    InputReport, InputReportsReaderRequest, InputReportsReaderRequestStream,
 };
+use futures::{StreamExt, TryStreamExt};
+use std::convert::TryFrom as _;
 
 /// Implements the server side of the `fuchsia.input.report.InputReportsReader`
 /// protocol. Used by `modern_backend::InputDevice`.
@@ -78,20 +76,17 @@ impl InputReportsReader {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{InputReport, InputReportsReader},
-        anyhow::{Context as _, Error},
-        fidl::endpoints,
-        fidl_fuchsia_input_report::{InputReportsReaderMarker, MAX_DEVICE_REPORT_COUNT},
-        fuchsia_async as fasync, fuchsia_zircon as zx,
-        futures::future,
-    };
+    use super::{InputReport, InputReportsReader};
+    use anyhow::{Context as _, Error};
+    use fidl::endpoints;
+    use fidl_fuchsia_input_report::{InputReportsReaderMarker, MAX_DEVICE_REPORT_COUNT};
+    use futures::future;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     mod report_count {
-        use {
-            super::*,
-            futures::{pin_mut, task::Poll},
-        };
+        use super::*;
+        use futures::pin_mut;
+        use futures::task::Poll;
 
         #[fasync::run_until_stalled(test)]
         async fn serves_single_report() -> Result<(), Error> {
@@ -290,11 +285,10 @@ mod tests {
     }
 
     mod fidl_interactions {
-        use {
-            super::*,
-            assert_matches::assert_matches,
-            futures::{pin_mut, task::Poll},
-        };
+        use super::*;
+        use assert_matches::assert_matches;
+        use futures::pin_mut;
+        use futures::task::Poll;
 
         #[test]
         fn closes_channel_after_reports_are_consumed() -> Result<(), Error> {

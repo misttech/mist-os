@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::endpoints::ClientEnd,
-    fidl_fuchsia_test_manager as ftest_manager,
-    ftest_manager::{
-        CaseStatus, DebugDataIteratorMarker, Event as FidlEvent, EventDetails as FidlEventDetails,
-        RunEvent as FidlRunEvent, RunEventPayload as FidlRunEventPayload,
-        SuiteEvent as FidlSuiteEvent, SuiteEventPayload as FidlSuiteEventPayload, SuiteResult,
-        SuiteStatus, TestCaseResult,
-    },
-    fuchsia_zircon as zx,
+use fidl::endpoints::ClientEnd;
+use ftest_manager::{
+    CaseStatus, DebugDataIteratorMarker, Event as FidlEvent, EventDetails as FidlEventDetails,
+    RunEvent as FidlRunEvent, RunEventPayload as FidlRunEventPayload, SuiteEvent as FidlSuiteEvent,
+    SuiteEventPayload as FidlSuiteEventPayload, SuiteResult, SuiteStatus, TestCaseResult,
 };
+use {fidl_fuchsia_test_manager as ftest_manager, fuchsia_zircon as zx};
 
 pub(crate) enum RunEventPayload {
     DebugData(ClientEnd<DebugDataIteratorMarker>),
@@ -393,7 +389,8 @@ impl SuiteEvents {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn suite_events() {

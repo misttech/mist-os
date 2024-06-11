@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        buffer::{BufferFuture, BufferRef, MutableBufferRef},
-        buffer_allocator::{BufferAllocator, BufferSource},
-        Device,
-    },
-    anyhow::{bail, ensure, Error},
-    async_trait::async_trait,
-    fuchsia_zircon::Status,
-    remote_block_device::{BlockClient, BlockFlags, BufferSlice, MutableBufferSlice, VmoId},
-    std::ops::Range,
-};
+use crate::buffer::{BufferFuture, BufferRef, MutableBufferRef};
+use crate::buffer_allocator::{BufferAllocator, BufferSource};
+use crate::Device;
+use anyhow::{bail, ensure, Error};
+use async_trait::async_trait;
+use fuchsia_zircon::Status;
+use remote_block_device::{BlockClient, BlockFlags, BufferSlice, MutableBufferSlice, VmoId};
+use std::ops::Range;
 
 /// BlockDevice is an implementation of Device backed by a real block device behind a FIFO.
 pub struct BlockDevice {
@@ -130,11 +126,10 @@ impl Drop for BlockDevice {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::{block_device::BlockDevice, Device},
-        fuchsia_zircon::Status,
-        remote_block_device::testing::FakeBlockClient,
-    };
+    use crate::block_device::BlockDevice;
+    use crate::Device;
+    use fuchsia_zircon::Status;
+    use remote_block_device::testing::FakeBlockClient;
 
     #[fuchsia::test]
     async fn test_lifecycle() {

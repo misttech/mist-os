@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    component_events::{events::EventStream, matcher::EventMatcher, sequence::*},
-    fidl_fidl_test_components as ftest,
-    fuchsia_component::client::connect_to_protocol,
-};
+use component_events::events::EventStream;
+use component_events::matcher::EventMatcher;
+use component_events::sequence::*;
+use fidl_fidl_test_components as ftest;
+use fuchsia_component::client::connect_to_protocol;
 
 #[fuchsia::main]
 async fn main() {

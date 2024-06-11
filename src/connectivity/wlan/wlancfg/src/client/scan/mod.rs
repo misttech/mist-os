@@ -3,31 +3,28 @@
 // found in the LICENSE file.
 
 //! Manages Scan requests for the Client Policy API.
+use crate::client::types;
+use crate::config_management::SavedNetworksManagerApi;
+use crate::mode_management::iface_manager_api::{IfaceManagerApi, SmeForScan};
+use crate::telemetry::{ScanEventInspectData, ScanIssue, TelemetryEvent, TelemetrySender};
+use anyhow::{format_err, Error};
+use async_trait::async_trait;
+use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
+use fuchsia_component::client::connect_to_protocol;
+use futures::channel::{mpsc, oneshot};
+use futures::future::{Fuse, FusedFuture, FutureExt};
+use futures::lock::Mutex;
+use futures::select;
+use futures::stream::{FuturesUnordered, StreamExt};
+use itertools::Itertools;
+use std::collections::HashMap;
+use std::pin::pin;
+use std::sync::Arc;
+use tracing::{debug, error, info, trace, warn};
 use {
-    crate::{
-        client::types,
-        config_management::SavedNetworksManagerApi,
-        mode_management::iface_manager_api::{IfaceManagerApi, SmeForScan},
-        telemetry::{ScanEventInspectData, ScanIssue, TelemetryEvent, TelemetrySender},
-    },
-    anyhow::{format_err, Error},
-    async_trait::async_trait,
     fidl_fuchsia_location_sensor as fidl_location_sensor,
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_async::{self as fasync, DurationExt, TimeoutExt},
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon as zx,
-    futures::{
-        channel::{mpsc, oneshot},
-        future::{Fuse, FusedFuture, FutureExt},
-        lock::Mutex,
-        select,
-        stream::{FuturesUnordered, StreamExt},
-    },
-    itertools::Itertools,
-    std::{collections::HashMap, pin::pin, sync::Arc},
-    tracing::{debug, error, info, trace, warn},
+    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
 };
 
 mod fidl_conversion;
@@ -462,29 +459,26 @@ async fn report_scan_defects_to_sme(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::access_point::state_machine as ap_fsm;
+    use crate::mode_management::iface_manager_api::ConnectAttemptRequest;
+    use crate::mode_management::{Defect, IfaceFailure};
+    use crate::util::testing::fakes::FakeSavedNetworksManager;
+    use crate::util::testing::{generate_channel, generate_random_sme_scan_result};
+    use fidl::endpoints::{create_proxy, ControlHandle, Responder};
+    use futures::future;
+    use futures::task::Poll;
+    use std::pin::pin;
+    use test_case::test_case;
+    use wlan_common::ie::IeType;
+    use wlan_common::scan::{write_vmo, Compatibility};
+    use wlan_common::security::SecurityDescriptor;
+    use wlan_common::test_utils::fake_frames::fake_unknown_rsne;
+    use wlan_common::test_utils::fake_stas::IesOverrides;
+    use wlan_common::{assert_variant, fake_bss_description, random_fidl_bss_description};
     use {
-        super::*,
-        crate::{
-            access_point::state_machine as ap_fsm,
-            mode_management::{iface_manager_api::ConnectAttemptRequest, Defect, IfaceFailure},
-            util::testing::{
-                fakes::FakeSavedNetworksManager, generate_channel, generate_random_sme_scan_result,
-            },
-        },
-        fidl::endpoints::{create_proxy, ControlHandle, Responder},
         fidl_fuchsia_wlan_common_security as fidl_security, fuchsia_async as fasync,
         fuchsia_zircon as zx,
-        futures::{future, task::Poll},
-        std::pin::pin,
-        test_case::test_case,
-        wlan_common::{
-            assert_variant, fake_bss_description,
-            ie::IeType,
-            random_fidl_bss_description,
-            scan::{write_vmo, Compatibility},
-            security::SecurityDescriptor,
-            test_utils::{fake_frames::fake_unknown_rsne, fake_stas::IesOverrides},
-        },
     };
 
     fn active_sme_req(ssids: Vec<&str>, channels: Vec<u8>) -> fidl_sme::ScanRequest {

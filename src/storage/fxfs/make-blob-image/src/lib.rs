@@ -2,34 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Error},
-    delivery_blob::compression::ChunkedArchive,
-    fuchsia_async as fasync,
-    fuchsia_merkle::{Hash, HASH_SIZE},
-    futures::{try_join, SinkExt as _, StreamExt as _, TryStreamExt as _},
-    fxfs::{
-        errors::FxfsError,
-        filesystem::{FxFilesystem, FxFilesystemBuilder, SyncOptions},
-        object_handle::WriteBytes,
-        object_store::{
-            directory::Directory,
-            transaction::{lock_keys, LockKey},
-            volume::root_volume,
-            DirectWriter, HandleOptions, ObjectStore, BLOB_MERKLE_ATTRIBUTE_ID,
-        },
-        round::round_up,
-        serialized_types::BlobMetadata,
-    },
-    rayon::{prelude::*, ThreadPoolBuilder},
-    serde::{Deserialize, Serialize},
-    std::{
-        io::{BufWriter, Read},
-        path::PathBuf,
-        sync::Arc,
-    },
-    storage_device::{file_backed_device::FileBackedDevice, DeviceHolder},
-};
+use anyhow::{anyhow, Context, Error};
+use delivery_blob::compression::ChunkedArchive;
+use fuchsia_async as fasync;
+use fuchsia_merkle::{Hash, HASH_SIZE};
+use futures::{try_join, SinkExt as _, StreamExt as _, TryStreamExt as _};
+use fxfs::errors::FxfsError;
+use fxfs::filesystem::{FxFilesystem, FxFilesystemBuilder, SyncOptions};
+use fxfs::object_handle::WriteBytes;
+use fxfs::object_store::directory::Directory;
+use fxfs::object_store::transaction::{lock_keys, LockKey};
+use fxfs::object_store::volume::root_volume;
+use fxfs::object_store::{DirectWriter, HandleOptions, ObjectStore, BLOB_MERKLE_ATTRIBUTE_ID};
+use fxfs::round::round_up;
+use fxfs::serialized_types::BlobMetadata;
+use rayon::prelude::*;
+use rayon::ThreadPoolBuilder;
+use serde::{Deserialize, Serialize};
+use std::io::{BufWriter, Read};
+use std::path::PathBuf;
+use std::sync::Arc;
+use storage_device::file_backed_device::FileBackedDevice;
+use storage_device::DeviceHolder;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 struct BlobsJsonOutputEntry {
@@ -370,24 +364,20 @@ fn maybe_compress(buf: Vec<u8>, block_size: usize, filesystem_block_size: usize)
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{make_blob_image, BlobsJsonOutput, BlobsJsonOutputEntry},
-        assert_matches::assert_matches,
-        fuchsia_async as fasync,
-        fxfs::{
-            filesystem::FxFilesystem,
-            object_store::{directory::Directory, volume::root_volume},
-        },
-        sparse::reader::SparseReader,
-        std::{
-            fs::File,
-            io::{Seek as _, SeekFrom, Write as _},
-            path::Path,
-            str::from_utf8,
-        },
-        storage_device::{file_backed_device::FileBackedDevice, DeviceHolder},
-        tempfile::TempDir,
-    };
+    use super::{make_blob_image, BlobsJsonOutput, BlobsJsonOutputEntry};
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use fxfs::filesystem::FxFilesystem;
+    use fxfs::object_store::directory::Directory;
+    use fxfs::object_store::volume::root_volume;
+    use sparse::reader::SparseReader;
+    use std::fs::File;
+    use std::io::{Seek as _, SeekFrom, Write as _};
+    use std::path::Path;
+    use std::str::from_utf8;
+    use storage_device::file_backed_device::FileBackedDevice;
+    use storage_device::DeviceHolder;
+    use tempfile::TempDir;
 
     #[fasync::run(10, test)]
     async fn test_make_blob_image() {

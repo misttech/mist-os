@@ -7,11 +7,9 @@
 #![allow(dead_code)]
 
 mod tests {
-    use {
-        pretty_assertions::assert_eq,
-        reference_doc::{MarkdownReferenceDocGenerator, ReferenceDoc},
-        std::collections::HashMap,
-    };
+    use pretty_assertions::assert_eq;
+    use reference_doc::{MarkdownReferenceDocGenerator, ReferenceDoc};
+    use std::collections::HashMap;
 
     /// # Big picture
     ///

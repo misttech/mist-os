@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, Context, Error},
-    fidl_fuchsia_boot::{ArgumentsMarker, ArgumentsProxy},
-    fidl_fuchsia_buildinfo::{ProviderMarker as BuildInfoMarker, ProviderProxy as BuildInfoProxy},
-    serde::{Deserialize, Serialize},
-    std::{fs::File, io::BufReader},
-};
+use anyhow::{bail, Context, Error};
+use fidl_fuchsia_boot::{ArgumentsMarker, ArgumentsProxy};
+use fidl_fuchsia_buildinfo::{ProviderMarker as BuildInfoMarker, ProviderProxy as BuildInfoProxy};
+use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::io::BufReader;
 
 const PATH_TO_RECOVERY_CONFIG: &'static str = "/config/data/recovery-config.json";
 const DEFAULT_OMAHA_SERVICE_URL: &'static str =
@@ -175,18 +174,17 @@ impl BootloaderArgs {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_buildinfo::{BuildInfo, ProviderRequest as BuildInfoRequest},
-        fuchsia_async as fasync,
-        futures::prelude::*,
-        maplit::hashmap,
-        mock_boot_arguments::MockBootArgumentsService,
-        pretty_assertions::assert_eq,
-        std::{collections::HashMap, sync::Arc},
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_buildinfo::{BuildInfo, ProviderRequest as BuildInfoRequest};
+    use fuchsia_async as fasync;
+    use futures::prelude::*;
+    use maplit::hashmap;
+    use mock_boot_arguments::MockBootArgumentsService;
+    use pretty_assertions::assert_eq;
+    use std::collections::HashMap;
+    use std::sync::Arc;
 
     fn empty_bootloader_args() -> BootloaderArgs {
         BootloaderArgs { omaha_app_id: None, omaha_url: None, ota_channel: None }

@@ -14,34 +14,31 @@ mod wpa;
 #[cfg(test)]
 pub mod test_utils;
 
+use self::event::Event;
+use self::protection::{Protection, SecurityContext};
+use self::scan::{DiscoveryScan, ScanScheduler};
+use self::state::{ClientState, ConnectCommand};
+use crate::responder::Responder;
+use crate::{Config, MlmeRequest, MlmeSink, MlmeStream};
+use fuchsia_inspect_contrib::auto_persist::{self, AutoPersist};
+use futures::channel::{mpsc, oneshot};
+use ieee80211::{Bssid, MacAddrBytes, Ssid};
+use std::sync::Arc;
+use tracing::{error, info, warn};
+use wlan_common::bss::{BssDescription, Protection as BssProtection};
+use wlan_common::capabilities::derive_join_capabilities;
+use wlan_common::channel::Channel;
+use wlan_common::ie::rsn::rsne;
+use wlan_common::ie::{self, wsc};
+use wlan_common::scan::{Compatibility, ScanResult};
+use wlan_common::security::{SecurityAuthenticator, SecurityDescriptor};
+use wlan_common::sink::UnboundedSink;
+use wlan_common::timer;
+use wlan_rsn::auth;
 use {
-    self::{
-        event::Event,
-        protection::{Protection, SecurityContext},
-        scan::{DiscoveryScan, ScanScheduler},
-        state::{ClientState, ConnectCommand},
-    },
-    crate::{responder::Responder, Config, MlmeRequest, MlmeSink, MlmeStream},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_inspect_contrib::auto_persist::{self, AutoPersist},
-    fuchsia_zircon as zx,
-    futures::channel::{mpsc, oneshot},
-    ieee80211::{Bssid, MacAddrBytes, Ssid},
-    std::sync::Arc,
-    tracing::{error, info, warn},
-    wlan_common::{
-        bss::{BssDescription, Protection as BssProtection},
-        capabilities::derive_join_capabilities,
-        channel::Channel,
-        ie::{self, rsn::rsne, wsc},
-        scan::{Compatibility, ScanResult},
-        security::{SecurityAuthenticator, SecurityDescriptor},
-        sink::UnboundedSink,
-        timer,
-    },
-    wlan_rsn::auth,
+    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
 };
 
 // This is necessary to trick the private-in-public checker.
@@ -49,15 +46,12 @@ use {
 // even though the module itself is private and will never be exported.
 // As a workaround, we add another private module with public types.
 mod internal {
-    use {
-        crate::{
-            client::{event::Event, inspect, ConnectionAttemptId},
-            MlmeSink,
-        },
-        fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
-        std::sync::Arc,
-        wlan_common::timer::Timer,
-    };
+    use crate::client::event::Event;
+    use crate::client::{inspect, ConnectionAttemptId};
+    use crate::MlmeSink;
+    use std::sync::Arc;
+    use wlan_common::timer::Timer;
+    use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme};
 
     pub struct Context {
         pub device_info: Arc<fidl_mlme::DeviceInfo>,
@@ -796,11 +790,6 @@ fn report_connect_finished(connect_txn_sink: &mut ConnectTransactionSink, result
 mod tests {
     use super::*;
     use crate::Config as SmeConfig;
-    use fidl_fuchsia_wlan_common as fidl_common;
-    use fidl_fuchsia_wlan_common_security as fidl_security;
-    use fidl_fuchsia_wlan_internal as fidl_internal;
-    use fidl_fuchsia_wlan_mlme as fidl_mlme;
-    use fuchsia_inspect as finspect;
     use ieee80211::MacAddr;
     use lazy_static::lazy_static;
     use test_case::test_case;
@@ -818,11 +807,16 @@ mod tests {
             fake_stas::{FakeProtectionCfg, IesOverrides},
         },
     };
+    use {
+        fidl_fuchsia_wlan_common as fidl_common,
+        fidl_fuchsia_wlan_common_security as fidl_security,
+        fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_mlme as fidl_mlme,
+        fuchsia_inspect as finspect,
+    };
 
     use super::test_utils::{create_on_wmm_status_resp, fake_wmm_param, fake_wmm_status_resp};
 
-    use crate::test_utils;
-    use crate::Station;
+    use crate::{test_utils, Station};
 
     lazy_static! {
         static ref CLIENT_ADDR: MacAddr = [0x7A, 0xE7, 0x76, 0xD9, 0xF2, 0x67].into();

@@ -10,8 +10,7 @@ use assembly_manifest::{AssemblyManifest, Image};
 use camino::{Utf8Path, Utf8PathBuf};
 use std::path::Path;
 use utf8_path::path_relative_from_current_dir;
-use vbmeta::VBMeta as VBMetaImage;
-use vbmeta::{HashDescriptor, Key, Salt};
+use vbmeta::{HashDescriptor, Key, Salt, VBMeta as VBMetaImage};
 
 pub fn construct_vbmeta(
     assembly_manifest: &mut AssemblyManifest,

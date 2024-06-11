@@ -6,20 +6,23 @@ use anyhow::Result;
 use async_utils::hanging_get::server::HangingGet;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
-use fidl_fuchsia_power_suspend as fsuspend;
 use fidl_fuchsia_power_system::{
     self as fsystem, ApplicationActivityLevel, ExecutionStateLevel, FullWakeHandlingLevel,
     WakeHandlingLevel,
 };
-use fidl_test_sagcontrol as fctrl;
-use fuchsia_async as fasync;
 use fuchsia_component::client as fclient;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
-use futures::{lock::Mutex, prelude::*};
+use futures::lock::Mutex;
+use futures::prelude::*;
 use power_broker_client::PowerElementContext;
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
 use tracing::error;
+use {
+    fidl_fuchsia_power_suspend as fsuspend, fidl_test_sagcontrol as fctrl, fuchsia_async as fasync,
+};
 
 // TODO(b/336692041): Set up a more complex topology to allow fake SAG to override power element
 // states.

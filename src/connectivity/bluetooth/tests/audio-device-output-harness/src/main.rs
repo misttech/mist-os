@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Context,
-    fidl_fuchsia_media::{AudioChannelId, AudioDeviceEnumeratorMarker, AudioPcmMode, PcmFormat},
-    fuchsia_audio_device::stream_config::SoftStreamConfig,
-    fuchsia_zircon::DurationNum,
-    futures::StreamExt,
-    tracing::info,
-};
+use anyhow::Context;
+use fidl_fuchsia_media::{AudioChannelId, AudioDeviceEnumeratorMarker, AudioPcmMode, PcmFormat};
+use fuchsia_audio_device::stream_config::SoftStreamConfig;
+use fuchsia_zircon::DurationNum;
+use futures::StreamExt;
+use tracing::info;
 
 #[fuchsia::main(logging_tags = ["audio-device-output-harness"])]
 async fn main() -> Result<(), anyhow::Error> {

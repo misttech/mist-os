@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::Config;
-use crate::ManualTargets;
+use crate::{Config, ManualTargets};
 
 use anyhow::{anyhow, Context as _, Result};
 use async_net::TcpStream;
@@ -320,11 +319,9 @@ mod test {
     use futures::channel::mpsc::unbounded;
     use pretty_assertions::assert_eq;
     use serde_json::{json, Map, Value};
-    use std::{
-        collections::HashMap,
-        net::{Ipv4Addr, Ipv6Addr},
-        sync::{Arc, Mutex},
-    };
+    use std::collections::HashMap;
+    use std::net::{Ipv4Addr, Ipv6Addr};
+    use std::sync::{Arc, Mutex};
 
     struct TestManualTargets {
         inner_mocks: Mutex<Vec<Mock>>,

@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{key::Tk, rsn_ensure, Error};
+use crate::key::Tk;
+use crate::{rsn_ensure, Error};
 use mundane::bytes;
 use std::hash::{Hash, Hasher};
 use wlan_common::ie::rsn::cipher::Cipher;
@@ -110,7 +111,8 @@ impl Tk for Gtk {
 mod tests {
     use super::*;
     use std::collections::HashSet;
-    use wlan_common::ie::rsn::{cipher, suite_selector::OUI};
+    use wlan_common::ie::rsn::cipher;
+    use wlan_common::ie::rsn::suite_selector::OUI;
 
     #[test]
     fn generated_gtks_are_not_zero_and_not_constant_with_high_probability() {

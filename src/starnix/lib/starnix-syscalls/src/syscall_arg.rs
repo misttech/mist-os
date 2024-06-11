@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_uapi::{
-    device_type::DeviceType,
-    file_mode::FileMode,
-    signals::UncheckedSignal,
-    user_address::{UserAddress, UserCString, UserRef},
-};
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::signals::UncheckedSignal;
+use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct SyscallArg(u64);

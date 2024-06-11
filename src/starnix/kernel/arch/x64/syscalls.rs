@@ -3,39 +3,33 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
-use starnix_sync::{InterruptibleEvent, WakeReason};
-use starnix_sync::{Locked, Unlocked};
+use starnix_sync::{InterruptibleEvent, Locked, Unlocked, WakeReason};
 
-use crate::{
-    mm::MemoryAccessorExt,
-    signals::{syscalls::sys_signalfd4, RunState},
-    task::{syscalls::do_clone, CurrentTask},
-    time::utc,
-    vfs::{
-        syscalls::{
-            poll, sys_dup3, sys_epoll_create1, sys_epoll_pwait, sys_eventfd2, sys_faccessat,
-            sys_fchmodat, sys_fchownat, sys_inotify_init1, sys_linkat, sys_mkdirat, sys_mknodat,
-            sys_newfstatat, sys_openat, sys_pipe2, sys_readlinkat, sys_renameat2, sys_symlinkat,
-            sys_unlinkat,
-        },
-        DirentSink32, FdNumber,
-    },
+use crate::mm::MemoryAccessorExt;
+use crate::signals::syscalls::sys_signalfd4;
+use crate::signals::RunState;
+use crate::task::syscalls::do_clone;
+use crate::task::CurrentTask;
+use crate::time::utc;
+use crate::vfs::syscalls::{
+    poll, sys_dup3, sys_epoll_create1, sys_epoll_pwait, sys_eventfd2, sys_faccessat, sys_fchmodat,
+    sys_fchownat, sys_inotify_init1, sys_linkat, sys_mkdirat, sys_mknodat, sys_newfstatat,
+    sys_openat, sys_pipe2, sys_readlinkat, sys_renameat2, sys_symlinkat, sys_unlinkat,
 };
+use crate::vfs::{DirentSink32, FdNumber};
 use starnix_logging::track_stub;
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::{Errno, ErrnoResultExt};
+use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::signals::{SigSet, SIGCHLD};
+use starnix_uapi::time::{
+    duration_from_poll_timeout, duration_from_timeval, timeval_from_duration,
+};
+use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+use starnix_uapi::vfs::EpollEvent;
 use starnix_uapi::{
-    __kernel_time_t, clone_args,
-    device_type::DeviceType,
-    errno, error,
-    errors::{Errno, ErrnoResultExt},
-    file_mode::FileMode,
-    gid_t, itimerval,
-    open_flags::OpenFlags,
-    pid_t, pollfd,
-    signals::{SigSet, SIGCHLD},
-    time::{duration_from_poll_timeout, duration_from_timeval, timeval_from_duration},
-    uapi, uid_t,
-    user_address::{UserAddress, UserCString, UserRef},
-    vfs::EpollEvent,
+    __kernel_time_t, clone_args, errno, error, gid_t, itimerval, pid_t, pollfd, uapi, uid_t,
     ARCH_SET_FS, ARCH_SET_GS, AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW, CLONE_VFORK, CLONE_VM, CSIGNAL,
     ITIMER_REAL,
 };
@@ -481,11 +475,9 @@ pub fn sys_vfork(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        mm::{MemoryAccessor, PAGE_SIZE},
-        testing::*,
-        vfs::FdFlags,
-    };
+    use crate::mm::{MemoryAccessor, PAGE_SIZE};
+    use crate::testing::*;
+    use crate::vfs::FdFlags;
 
     #[::fuchsia::test]
     async fn test_sys_dup2() {

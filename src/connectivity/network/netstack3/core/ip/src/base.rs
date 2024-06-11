@@ -2,29 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::{
-    cmp::Ordering,
-    fmt::Debug,
-    hash::Hash,
-    marker::PhantomData,
-    num::{NonZeroU16, NonZeroU32, NonZeroU8},
-    sync::atomic::{self, AtomicU16},
-};
+use core::cmp::Ordering;
+use core::fmt::Debug;
+use core::hash::Hash;
+use core::marker::PhantomData;
+use core::num::{NonZeroU16, NonZeroU32, NonZeroU8};
+use core::sync::atomic::{self, AtomicU16};
 
 use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use explicit::ResultExt as _;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use log::{debug, error, trace};
-use net_types::{
-    ip::{
-        GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu, Subnet,
-    },
-    MulticastAddr, SpecifiedAddr, SpecifiedAddress as _, UnicastAddr, Witness,
+use net_types::ip::{
+    GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu, Subnet,
 };
+use net_types::{MulticastAddr, SpecifiedAddr, SpecifiedAddress as _, UnicastAddr, Witness};
+use netstack3_base::socket::SocketIpAddrExt as _;
+use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{
-    socket::SocketIpAddrExt as _,
-    sync::{Mutex, RwLock},
     AnyDevice, CoreTimerContext, Counter, CounterContext, DeviceIdContext, DeviceIdentifier as _,
     EventContext, FrameDestination, HandleableTimer, Inspectable, Inspector, InstantContext,
     NestedIntoCoreTimerCtx, NotFoundError, RngContext, StrongDeviceIdentifier, TimerContext,
@@ -36,44 +32,37 @@ use netstack3_filter::{
     NestedWithInnerIpPacket, TransportPacketSerializer,
 };
 use packet::{Buf, BufferMut, ParseMetadata, Serializer};
-use packet_formats::{
-    error::IpParseError,
-    ip::{IpPacket as _, IpPacketBuilder as _, IpProtoExt},
-    ipv4::{Ipv4FragmentType, Ipv4Packet},
-    ipv6::Ipv6Packet,
-};
+use packet_formats::error::IpParseError;
+use packet_formats::ip::{IpPacket as _, IpPacketBuilder as _, IpProtoExt};
+use packet_formats::ipv4::{Ipv4FragmentType, Ipv4Packet};
+use packet_formats::ipv6::Ipv6Packet;
 use thiserror::Error;
 
-use crate::internal::{
-    device::{
-        self,
-        slaac::SlaacCounters,
-        state::{
-            IpDeviceStateBindingsTypes, IpDeviceStateIpExt, Ipv6AddressFlags, Ipv6AddressState,
-        },
-        IpAddressId as _, IpDeviceAddr, IpDeviceBindingsContext, IpDeviceIpExt,
-        IpDeviceSendContext,
-    },
-    forwarding::{ForwardingTable, IpForwardingDeviceContext},
-    gmp::GmpQueryHandler,
-    icmp::{
-        IcmpBindingsTypes, IcmpErrorHandler, IcmpHandlerIpExt, IcmpIpExt, Icmpv4Error,
-        Icmpv4ErrorKind, Icmpv4State, Icmpv4StateBuilder, Icmpv6ErrorKind, Icmpv6State,
-        Icmpv6StateBuilder,
-    },
-    ipv6,
-    ipv6::Ipv6PacketAction,
-    path_mtu::{PmtuBindingsTypes, PmtuCache, PmtuTimerId},
-    raw::{RawIpSocketHandler, RawIpSocketMap, RawIpSocketsBindingsTypes},
-    reassembly::{
-        FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
-        IpPacketFragmentCache,
-    },
-    socket::{IpSocketBindingsContext, IpSocketContext, IpSocketHandler},
-    types::{
-        self, Destination, IpTypesIpExt, NextHop, ResolvedRoute, RoutableIpAddr,
-        WrapBroadcastMarker,
-    },
+use crate::internal::device::slaac::SlaacCounters;
+use crate::internal::device::state::{
+    IpDeviceStateBindingsTypes, IpDeviceStateIpExt, Ipv6AddressFlags, Ipv6AddressState,
+};
+use crate::internal::device::{
+    self, IpAddressId as _, IpDeviceAddr, IpDeviceBindingsContext, IpDeviceIpExt,
+    IpDeviceSendContext,
+};
+use crate::internal::forwarding::{ForwardingTable, IpForwardingDeviceContext};
+use crate::internal::gmp::GmpQueryHandler;
+use crate::internal::icmp::{
+    IcmpBindingsTypes, IcmpErrorHandler, IcmpHandlerIpExt, IcmpIpExt, Icmpv4Error, Icmpv4ErrorKind,
+    Icmpv4State, Icmpv4StateBuilder, Icmpv6ErrorKind, Icmpv6State, Icmpv6StateBuilder,
+};
+use crate::internal::ipv6;
+use crate::internal::ipv6::Ipv6PacketAction;
+use crate::internal::path_mtu::{PmtuBindingsTypes, PmtuCache, PmtuTimerId};
+use crate::internal::raw::{RawIpSocketHandler, RawIpSocketMap, RawIpSocketsBindingsTypes};
+use crate::internal::reassembly::{
+    FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
+    IpPacketFragmentCache,
+};
+use crate::internal::socket::{IpSocketBindingsContext, IpSocketContext, IpSocketHandler};
+use crate::internal::types::{
+    self, Destination, IpTypesIpExt, NextHop, ResolvedRoute, RoutableIpAddr, WrapBroadcastMarker,
 };
 
 /// Default IPv4 TTL.
@@ -3111,10 +3100,8 @@ pub(crate) mod testutil {
     use super::*;
 
     use net_types::ip::IpInvariant;
-    use netstack3_base::{
-        testutil::{FakeCoreCtx, FakeStrongDeviceId},
-        SendFrameContext, SendableFrameMeta,
-    };
+    use netstack3_base::testutil::{FakeCoreCtx, FakeStrongDeviceId};
+    use netstack3_base::{SendFrameContext, SendableFrameMeta};
 
     /// A [`SendIpPacketMeta`] for dual stack contextx.
     #[derive(Debug, GenericOverIp)]

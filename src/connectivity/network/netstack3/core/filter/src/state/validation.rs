@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use alloc::{
-    collections::{hash_map::Entry, HashMap},
-    sync::Arc,
-    vec::Vec,
-};
+use alloc::collections::hash_map::Entry;
+use alloc::collections::HashMap;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::fmt::Debug;
 
 use assert_matches::assert_matches;
@@ -431,9 +430,8 @@ mod tests {
     use test_case::test_case;
 
     use super::*;
-    use crate::{
-        context::testutil::FakeDeviceClass, InterfaceMatcher, PacketMatcher, TransparentProxy,
-    };
+    use crate::context::testutil::FakeDeviceClass;
+    use crate::{InterfaceMatcher, PacketMatcher, TransparentProxy};
 
     #[derive(Debug, Clone, PartialEq)]
     enum RuleId {

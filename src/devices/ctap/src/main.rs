@@ -6,13 +6,11 @@ mod ctap_agent;
 mod ctap_device;
 mod ctap_hid;
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_identity_ctap as fidl_ctap, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_inspect::component,
-    futures::prelude::*,
-};
+use anyhow::{Context as _, Error};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_inspect::component;
+use futures::prelude::*;
+use {fidl_fuchsia_identity_ctap as fidl_ctap, fuchsia_async as fasync};
 
 pub use crate::ctap_agent::CtapAgent;
 pub use crate::ctap_device::CtapDevice;

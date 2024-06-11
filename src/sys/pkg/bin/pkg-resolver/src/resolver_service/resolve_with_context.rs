@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::QueuedResolver;
+use crate::eager_package_manager::EagerPackageManager;
+use anyhow::anyhow;
+use tracing::{error, info};
 use {
-    super::QueuedResolver,
-    crate::eager_package_manager::EagerPackageManager,
-    anyhow::anyhow,
     fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics, fidl_fuchsia_pkg as fpkg,
     fidl_fuchsia_pkg_ext as pkg,
-    tracing::{error, info},
 };
 
 pub(super) async fn resolve_with_context(
@@ -117,7 +117,8 @@ enum ResolveWithContextError {
 
 impl ResolveWithContextError {
     fn to_fidl_err(&self) -> pkg::ResolveError {
-        use {pkg::ResolveError as pErr, ResolveWithContextError::*};
+        use pkg::ResolveError as pErr;
+        use ResolveWithContextError::*;
         match self {
             GetSubpackage(pkg::cache::GetSubpackageError::DoesNotExist) => pErr::PackageNotFound,
             InvalidContext(_) | EmptyContext => pErr::InvalidContext,

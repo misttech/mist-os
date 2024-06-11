@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    cell::RefCell,
-    rc::{Rc, Weak},
-};
+use std::cell::RefCell;
+use std::rc::{Rc, Weak};
 
 pub use surpass::layout;
 use surpass::painter::{CachedTile, Color};

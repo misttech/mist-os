@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    bytes::{Bytes, BytesMut},
-    camino::{Utf8Path, Utf8PathBuf},
-    futures::{stream, Stream, TryStreamExt as _},
-    std::{cmp::min, io, task::Poll},
-};
+use bytes::{Bytes, BytesMut};
+use camino::{Utf8Path, Utf8PathBuf};
+use futures::{stream, Stream, TryStreamExt as _};
+use std::cmp::min;
+use std::io;
+use std::task::Poll;
 
 /// Read files in chunks of this size off the local storage.
 // Note: this is internally public to allow repository tests to check they work across chunks.
@@ -113,7 +113,8 @@ pub(super) fn file_stream(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, proptest::prelude::*};
+    use super::*;
+    use proptest::prelude::*;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_file_stream() {

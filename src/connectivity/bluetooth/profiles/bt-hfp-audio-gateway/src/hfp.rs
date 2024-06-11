@@ -6,31 +6,29 @@ use async_helpers::maybe_stream::MaybeStream;
 use async_utils::stream::FutureMap;
 use battery_client::{BatteryClient, BatteryClientError, BatteryInfo};
 use fidl::endpoints::{Proxy, ServerEnd};
-use fidl_fuchsia_bluetooth_bredr as bredr;
 use fidl_fuchsia_bluetooth_hfp::{CallManagerProxy, PeerHandlerMarker};
-use fidl_fuchsia_bluetooth_hfp_test as hfp_test;
 use fuchsia_bluetooth::profile::find_service_classes;
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use fuchsia_sync::Mutex;
-use futures::{
-    channel::mpsc::{self, Receiver, Sender},
-    select,
-    stream::StreamExt,
-};
+use futures::channel::mpsc::{self, Receiver, Sender};
+use futures::select;
+use futures::stream::StreamExt;
 use profile_client::{ProfileClient, ProfileEvent};
-use std::{collections::hash_map::Entry, matches, sync::Arc};
+use std::collections::hash_map::Entry;
+use std::matches;
+use std::sync::Arc;
 use tracing::{debug, info};
+use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_hfp_test as hfp_test};
 
-use crate::{
-    audio::AudioControl,
-    config::AudioGatewayFeatureSupport,
-    error::Error,
-    inspect::{CallManagerInspect, HfpInspect},
-    peer::{indicators::battery_level_to_battchg_value, ConnectionBehavior, Peer, PeerImpl},
-    sco_connector::ScoConnector,
-};
+use crate::audio::AudioControl;
+use crate::config::AudioGatewayFeatureSupport;
+use crate::error::Error;
+use crate::inspect::{CallManagerInspect, HfpInspect};
+use crate::peer::indicators::battery_level_to_battchg_value;
+use crate::peer::{ConnectionBehavior, Peer, PeerImpl};
+use crate::sco_connector::ScoConnector;
 
 #[derive(Debug)]
 pub enum Event {
@@ -331,27 +329,27 @@ mod tests {
     use assert_matches::assert_matches;
     use async_test_helpers::run_while;
     use async_utils::PollExt;
-    use bt_rfcomm::{profile::build_rfcomm_protocol, ServerChannel};
+    use bt_rfcomm::profile::build_rfcomm_protocol;
+    use bt_rfcomm::ServerChannel;
     use diagnostics_assertions::assert_data_tree;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream, ControlHandle};
-    use fidl_fuchsia_bluetooth as bt;
-    use fidl_fuchsia_bluetooth_bredr as bredr;
     use fidl_fuchsia_bluetooth_hfp::{
         CallManagerMarker, CallManagerRequest, CallManagerRequestStream,
     };
-    use fidl_fuchsia_power_battery as fpower;
-    use fuchsia_async as fasync;
     use fuchsia_bluetooth::types::Uuid;
-    use fuchsia_zircon as zx;
     use futures::{SinkExt, TryStreamExt};
-    use std::{collections::HashSet, pin::pin};
+    use std::collections::HashSet;
+    use std::pin::pin;
     use test_battery_manager::TestBatteryManager;
+    use {
+        fidl_fuchsia_bluetooth as bt, fidl_fuchsia_bluetooth_bredr as bredr,
+        fidl_fuchsia_power_battery as fpower, fuchsia_async as fasync, fuchsia_zircon as zx,
+    };
 
     use crate::audio::TestAudioControl;
-    use crate::{
-        peer::{fake::PeerFake, PeerRequest},
-        profile::test_server::{setup_profile_and_test_server, LocalProfileTestServer},
-    };
+    use crate::peer::fake::PeerFake;
+    use crate::peer::PeerRequest;
+    use crate::profile::test_server::{setup_profile_and_test_server, LocalProfileTestServer};
 
     #[fuchsia::test(allow_stalls = false)]
     async fn profile_error_propagates_error_from_hfp_run() {

@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    chrono::NaiveDateTime,
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_factory::MiscFactoryStoreProviderProxy,
-    fidl_fuchsia_intl::{LocaleId, RegulatoryDomain},
-    fidl_fuchsia_io as fio,
-    serde::{Deserialize, Serialize},
-    std::{fs::File, io},
-};
+use anyhow::Error;
+use chrono::NaiveDateTime;
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_factory::MiscFactoryStoreProviderProxy;
+use fidl_fuchsia_intl::{LocaleId, RegulatoryDomain};
+use fidl_fuchsia_io as fio;
+use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::io;
 
 // CONFIG AND FACTORY FILE NAMES
 const BOARD_CONFIG_JSON_FILE: &str = "/config/data/board_config.json";

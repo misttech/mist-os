@@ -2,22 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::reply::Reply,
-    anyhow::{anyhow, bail, Error, Result},
-    async_trait::async_trait,
-    chrono::Duration,
-    command::Command,
-    fuchsia_async::TimeoutExt,
-    futures::{
-        io::{AsyncRead, AsyncWrite},
-        lock::Mutex,
-        AsyncReadExt, AsyncWriteExt,
-    },
-    lazy_static::lazy_static,
-    std::io::Read,
-    thiserror::Error,
-};
+use crate::reply::Reply;
+use anyhow::{anyhow, bail, Error, Result};
+use async_trait::async_trait;
+use chrono::Duration;
+use command::Command;
+use fuchsia_async::TimeoutExt;
+use futures::io::{AsyncRead, AsyncWrite};
+use futures::lock::Mutex;
+use futures::{AsyncReadExt, AsyncWriteExt};
+use lazy_static::lazy_static;
+use std::io::Read;
+use thiserror::Error;
 
 pub mod command;
 pub mod reply;

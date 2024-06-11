@@ -2,38 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        errors::FxfsError,
-        filesystem::{ApplyContext, ApplyMode, JournalingObject},
-        log::*,
-        metrics,
-        object_handle::INVALID_OBJECT_ID,
-        object_store::{
-            allocator::{Allocator, Reservation},
-            directory::Directory,
-            journal::{self, JournalCheckpoint},
-            transaction::{
-                AssocObj, AssociatedObject, MetadataReservation, Mutation, Transaction, TxnMutation,
-            },
-            tree_cache::TreeCache,
-            volume::{list_volumes, VOLUMES_DIRECTORY},
-            ObjectDescriptor, ObjectStore,
-        },
-        round::round_div,
-        serialized_types::{Version, LATEST_VERSION},
-    },
-    anyhow::{anyhow, bail, ensure, Context, Error},
-    fuchsia_inspect::{Property as _, UintProperty},
-    futures::FutureExt as _,
-    once_cell::sync::OnceCell,
-    rustc_hash::FxHashMap as HashMap,
-    std::{
-        collections::hash_map::Entry,
-        num::Saturating,
-        sync::{Arc, RwLock},
-    },
+use crate::errors::FxfsError;
+use crate::filesystem::{ApplyContext, ApplyMode, JournalingObject};
+use crate::log::*;
+use crate::metrics;
+use crate::object_handle::INVALID_OBJECT_ID;
+use crate::object_store::allocator::{Allocator, Reservation};
+use crate::object_store::directory::Directory;
+use crate::object_store::journal::{self, JournalCheckpoint};
+use crate::object_store::transaction::{
+    AssocObj, AssociatedObject, MetadataReservation, Mutation, Transaction, TxnMutation,
 };
+use crate::object_store::tree_cache::TreeCache;
+use crate::object_store::volume::{list_volumes, VOLUMES_DIRECTORY};
+use crate::object_store::{ObjectDescriptor, ObjectStore};
+use crate::round::round_div;
+use crate::serialized_types::{Version, LATEST_VERSION};
+use anyhow::{anyhow, bail, ensure, Context, Error};
+use fuchsia_inspect::{Property as _, UintProperty};
+use futures::FutureExt as _;
+use once_cell::sync::OnceCell;
+use rustc_hash::FxHashMap as HashMap;
+use std::collections::hash_map::Entry;
+use std::num::Saturating;
+use std::sync::{Arc, RwLock};
 
 // Data written to the journal eventually needs to be flushed somewhere (typically into layer
 // files).  Here we conservatively assume that could take up to four times as much space as it does

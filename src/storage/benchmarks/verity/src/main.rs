@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_fxfs_test::TestFxfsAdminMarker,
-    fidl_fuchsia_io as fio,
-    fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path},
-    fuchsiaperf::FuchsiaPerfBenchmarkResult,
-    storage_verity_benchmarks_lib::{
-        results_file_name, ENABLE_BENCHMARK_NAME, READ_BENCHMARK_NAME,
-    },
+use fidl_fuchsia_fxfs_test::TestFxfsAdminMarker;
+use fidl_fuchsia_io as fio;
+use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
+use fuchsiaperf::FuchsiaPerfBenchmarkResult;
+use storage_verity_benchmarks_lib::{
+    results_file_name, ENABLE_BENCHMARK_NAME, READ_BENCHMARK_NAME,
 };
 
 #[fuchsia::main]

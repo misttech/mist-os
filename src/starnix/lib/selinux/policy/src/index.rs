@@ -2,20 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{
-    error::NewSecurityContextError,
-    extensible_bitmap::ExtensibleBitmapSpan,
-    parser::ParseStrategy,
-    security_context::{self, SecurityLevel},
-    symbols::{
-        Class, ClassDefault, ClassDefaultRange, Classes, CommonSymbol, CommonSymbols, MlsLevel,
-        Permission,
-    },
-    CategoryId, ParsedPolicy, RoleId, SecurityContext, TypeId,
+use super::error::NewSecurityContextError;
+use super::extensible_bitmap::ExtensibleBitmapSpan;
+use super::parser::ParseStrategy;
+use super::security_context::{self, SecurityLevel};
+use super::symbols::{
+    Class, ClassDefault, ClassDefaultRange, Classes, CommonSymbol, CommonSymbols, MlsLevel,
+    Permission,
 };
+use super::{CategoryId, ParsedPolicy, RoleId, SecurityContext, TypeId};
 
 use selinux_common::{self as sc, ClassPermission as _};
-use std::{collections::HashMap, num::NonZeroU32};
+use std::collections::HashMap;
+use std::num::NonZeroU32;
 
 /// An index for facilitating fast lookup of common abstractions inside parsed binary policy data
 /// structures. Typically, data is indexed by an enum that describes a well-known value and the

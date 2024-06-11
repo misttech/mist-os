@@ -15,37 +15,32 @@
 //! You can also start walking from halfway in this chain, e.g. [route_from_offer],
 //! [route_from_expose].
 
-use {
-    crate::{
-        capability_source::{
-            AggregateCapability, AggregateMember, CapabilitySource, ComponentCapability,
-            InternalCapability,
-        },
-        collection::{
-            AnonymizedAggregateServiceProvider, OfferAggregateServiceProvider,
-            OfferFilteredServiceProvider,
-        },
-        component_instance::{
-            ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
-            TopInstanceInterface,
-        },
-        error::RoutingError,
-        mapper::DebugRouteMapper,
-        RegistrationDecl,
-    },
-    cm_rust::{
-        Availability, CapabilityDecl, CapabilityTypeName, ExposeDecl, ExposeDeclCommon,
-        ExposeSource, ExposeTarget, OfferDecl, OfferDeclCommon, OfferServiceDecl, OfferSource,
-        OfferTarget, RegistrationDeclCommon, RegistrationSource, SourceName, SourcePath, UseDecl,
-        UseDeclCommon, UseSource,
-    },
-    cm_types::Name,
-    derivative::Derivative,
-    moniker::{ChildName, Moniker},
-    std::collections::HashSet,
-    std::{fmt, slice},
-    std::{marker::PhantomData, sync::Arc},
+use crate::capability_source::{
+    AggregateCapability, AggregateMember, CapabilitySource, ComponentCapability, InternalCapability,
 };
+use crate::collection::{
+    AnonymizedAggregateServiceProvider, OfferAggregateServiceProvider, OfferFilteredServiceProvider,
+};
+use crate::component_instance::{
+    ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
+    TopInstanceInterface,
+};
+use crate::error::RoutingError;
+use crate::mapper::DebugRouteMapper;
+use crate::RegistrationDecl;
+use cm_rust::{
+    Availability, CapabilityDecl, CapabilityTypeName, ExposeDecl, ExposeDeclCommon, ExposeSource,
+    ExposeTarget, OfferDecl, OfferDeclCommon, OfferServiceDecl, OfferSource, OfferTarget,
+    RegistrationDeclCommon, RegistrationSource, SourceName, SourcePath, UseDecl, UseDeclCommon,
+    UseSource,
+};
+use cm_types::Name;
+use derivative::Derivative;
+use moniker::{ChildName, Moniker};
+use std::collections::HashSet;
+use std::marker::PhantomData;
+use std::sync::Arc;
+use std::{fmt, slice};
 
 /// Routes a capability from its `Use` declaration to its source by following `Offer` and `Expose`
 /// declarations.
@@ -1614,9 +1609,10 @@ impl CapabilityVisitor for NoopVisitor {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, assert_matches::assert_matches, cm_rust::ExposeServiceDecl, cm_rust_testing::*,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use cm_rust::ExposeServiceDecl;
+    use cm_rust_testing::*;
 
     #[test]
     fn route_bundle_iter_single() {

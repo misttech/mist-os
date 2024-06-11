@@ -5,7 +5,9 @@
 use crate::task::{
     EventHandler, SignalHandler, SignalHandlerInner, WaitCanceler, Waiter, ZxioSignalHandler,
 };
-use starnix_uapi::{error, errors::Errno, vfs::FdEvents};
+use starnix_uapi::error;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::vfs::FdEvents;
 
 use fuchsia_zircon as zx;
 use std::sync::Arc;

@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    hex::FromHex,
-    ieee80211::{MacAddr, MacAddrBytes},
-    std::ops::Deref,
-    thiserror::Error,
-    wlan_common::ie::rsn::{cipher, suite_selector::OUI},
-};
+use hex::FromHex;
+use ieee80211::{MacAddr, MacAddrBytes};
+use std::ops::Deref;
+use thiserror::Error;
+use wlan_common::ie::rsn::cipher;
+use wlan_common::ie::rsn::suite_selector::OUI;
+use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme};
 
 #[derive(Debug, Error, PartialEq)]
 pub enum Error {

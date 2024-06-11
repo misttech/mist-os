@@ -2,24 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::client::rsn::Supplicant;
+use crate::client::{EstablishRsnaFailureReason, ServingApInfo};
+use futures::channel::mpsc;
+use ieee80211::{Bssid, MacAddrBytes, Ssid};
+use lazy_static::lazy_static;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use wlan_common::bss::Protection;
+use wlan_common::ie::fake_ies::{fake_ht_cap_bytes, fake_vht_cap_bytes};
+use wlan_common::{assert_variant, channel};
+use wlan_rsn::rsna::UpdateSink;
+use wlan_rsn::{auth, format_rsn_err, psk, Error};
 use {
-    crate::client::{rsn::Supplicant, EstablishRsnaFailureReason, ServingApInfo},
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_zircon as zx,
-    futures::channel::mpsc,
-    ieee80211::{Bssid, MacAddrBytes, Ssid},
-    lazy_static::lazy_static,
-    std::sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
-    },
-    wlan_common::{
-        assert_variant,
-        bss::Protection,
-        channel,
-        ie::fake_ies::{fake_ht_cap_bytes, fake_vht_cap_bytes},
-    },
-    wlan_rsn::{auth, format_rsn_err, psk, rsna::UpdateSink, Error},
 };
 
 pub fn fake_serving_ap_info() -> ServingApInfo {

@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_fidl_examples_routing_echo::{self as fecho},
-    fidl_fuchsia_component as fcomponent,
-    fuchsia_component::client as fclient,
-    fuchsia_component_test::{
-        Capability, ChildOptions, RealmBuilder, RealmBuilderParams, Ref, Route,
-    },
+use anyhow::Error;
+use fidl_fidl_examples_routing_echo::{self as fecho};
+use fidl_fuchsia_component as fcomponent;
+use fuchsia_component::client as fclient;
+use fuchsia_component_test::{
+    Capability, ChildOptions, RealmBuilder, RealmBuilderParams, Ref, Route,
 };
 
 const V2_ECHO_SERVER_ABSOLUTE_URL: &'static str =

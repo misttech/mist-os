@@ -1,23 +1,23 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::{
-        capability::CapabilityProvider,
-        model::{component::WeakComponentInstance, routing::router_ext::WeakComponentTokenExt},
-    },
-    ::routing::{error::RoutingError, DictExt},
-    async_trait::async_trait,
-    clonable_error::ClonableError,
-    cm_rust::Availability,
-    cm_types::{Name, OPEN_FLAGS_MAX_POSSIBLE_RIGHTS},
-    cm_util::TaskGroup,
-    errors::{CapabilityProviderError, OpenError},
-    router_error::RouterError,
-    sandbox::{RemotableCapability, Request, WeakComponentToken},
-    std::sync::Arc,
-    vfs::{directory::entry::OpenRequest, path::Path as VfsPath, remote::remote_dir},
-};
+use crate::capability::CapabilityProvider;
+use crate::model::component::WeakComponentInstance;
+use crate::model::routing::router_ext::WeakComponentTokenExt;
+use ::routing::error::RoutingError;
+use ::routing::DictExt;
+use async_trait::async_trait;
+use clonable_error::ClonableError;
+use cm_rust::Availability;
+use cm_types::{Name, OPEN_FLAGS_MAX_POSSIBLE_RIGHTS};
+use cm_util::TaskGroup;
+use errors::{CapabilityProviderError, OpenError};
+use router_error::RouterError;
+use sandbox::{RemotableCapability, Request, WeakComponentToken};
+use std::sync::Arc;
+use vfs::directory::entry::OpenRequest;
+use vfs::path::Path as VfsPath;
+use vfs::remote::remote_dir;
 
 /// The default provider for a ComponentCapability.
 /// This provider will start the source component instance and open the capability `name` at

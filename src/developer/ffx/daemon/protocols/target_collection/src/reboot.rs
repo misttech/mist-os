@@ -6,17 +6,16 @@ use addr::TargetAddr;
 use anyhow::{anyhow, Result};
 use async_utils::async_once::Once;
 use ffx_daemon_events::TargetConnectionState;
-use ffx_daemon_target::{
-    target::Target,
-    zedboot::{reboot, reboot_to_bootloader, reboot_to_recovery},
-};
+use ffx_daemon_target::target::Target;
+use ffx_daemon_target::zedboot::{reboot, reboot_to_bootloader, reboot_to_recovery};
 use ffx_fastboot::common::fastboot::{
     ConnectionFactory, FastbootConnectionFactory, FastbootConnectionKind,
 };
 use ffx_fastboot_interface::fastboot_interface::RebootEvent;
 use ffx_ssh::ssh::build_ssh_command;
 use ffx_target::FastbootInterface;
-use fidl::{endpoints::DiscoverableProtocolMarker as _, Error};
+use fidl::endpoints::DiscoverableProtocolMarker as _;
+use fidl::Error;
 use fidl_fuchsia_developer_ffx::{TargetRebootError, TargetRebootResponder, TargetRebootState};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminProxy, RebootReason};
@@ -24,17 +23,13 @@ use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_sys2 as fsys;
 use fuchsia_async::TimeoutExt;
 use futures::TryFutureExt;
-use std::{
-    net::SocketAddr,
-    process::Command,
-    rc::{Rc, Weak},
-    sync::Arc,
-    time::Duration,
-};
-use tokio::sync::{
-    mpsc,
-    mpsc::{Receiver, Sender},
-};
+use std::net::SocketAddr;
+use std::process::Command;
+use std::rc::{Rc, Weak};
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::{Receiver, Sender};
 
 // TODO(125639): Remove when Power Manager stabilizes
 /// Configuration flag which enables using `dm` over ssh to reboot the target

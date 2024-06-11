@@ -4,8 +4,10 @@
 
 use async_utils::PollExt;
 use fuchsia_async as fasync;
+use futures::future::Either;
 use futures::stream::{Stream, StreamExt};
-use futures::{future::Either, task::Poll, Future};
+use futures::task::Poll;
+use futures::Future;
 use std::pin::pin;
 
 ///! Utilities for tests

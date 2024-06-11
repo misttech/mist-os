@@ -2,42 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::capability::{
+    CapabilityProvider, CapabilitySource, FrameworkCapability, InternalCapabilityProvider,
+};
+use crate::model::component::instance::ResolvedInstanceState;
+use crate::model::component::{ComponentInstance, WeakComponentInstance};
+use crate::model::model::Model;
+use crate::model::routing::router_ext::WeakComponentTokenExt;
+use crate::model::routing::service::AnonymizedServiceRoute;
+use crate::model::routing::{
+    self, BedrockRouteRequest, Route, RouteRequest as LegacyRouteRequest, RoutingError,
+};
+use ::routing::capability_source::InternalCapability;
+use ::routing::component_instance::ComponentInstanceInterface;
+use async_trait::async_trait;
+use cm_rust::{ExposeDecl, SourceName, UseDecl};
+use cm_types::Name;
+use errors::{ActionError, StartActionError};
+use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
+use futures::future::join_all;
+use futures::TryStreamExt;
+use lazy_static::lazy_static;
+use moniker::{ExtendedMoniker, Moniker};
+use router_error::{Explain, RouterError};
+use sandbox::{Request, Router};
+use std::cmp::Ordering;
+use std::sync::{Arc, Weak};
+use tracing::warn;
 use {
-    crate::{
-        capability::{
-            CapabilityProvider, CapabilitySource, FrameworkCapability, InternalCapabilityProvider,
-        },
-        model::{
-            component::instance::ResolvedInstanceState,
-            component::{ComponentInstance, WeakComponentInstance},
-            model::Model,
-            routing::{
-                self, router_ext::WeakComponentTokenExt, service::AnonymizedServiceRoute,
-                BedrockRouteRequest, Route, RouteRequest as LegacyRouteRequest, RoutingError,
-            },
-        },
-    },
-    ::routing::{
-        capability_source::InternalCapability, component_instance::ComponentInstanceInterface,
-    },
-    async_trait::async_trait,
-    cm_rust::{ExposeDecl, SourceName, UseDecl},
-    cm_types::Name,
-    errors::{ActionError, StartActionError},
-    fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
-    futures::{future::join_all, TryStreamExt},
-    lazy_static::lazy_static,
-    moniker::{ExtendedMoniker, Moniker},
-    router_error::Explain,
-    router_error::RouterError,
-    sandbox::{Request, Router},
-    std::{
-        cmp::Ordering,
-        sync::{Arc, Weak},
-    },
-    tracing::warn,
 };
 
 lazy_static! {
@@ -535,23 +529,17 @@ async fn validate_exposes(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::model::{
-            component::StartReason,
-            start::Start,
-            testing::{
-                out_dir::OutDir,
-                test_helpers::{TestEnvironmentBuilder, TestModelResult},
-            },
-        },
-        ::routing::bedrock::structured_dict::ComponentInput,
-        assert_matches::assert_matches,
-        cm_rust::*,
-        cm_rust_testing::*,
-        fidl::endpoints,
-        fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    };
+    use super::*;
+    use crate::model::component::StartReason;
+    use crate::model::start::Start;
+    use crate::model::testing::out_dir::OutDir;
+    use crate::model::testing::test_helpers::{TestEnvironmentBuilder, TestModelResult};
+    use ::routing::bedrock::structured_dict::ComponentInput;
+    use assert_matches::assert_matches;
+    use cm_rust::*;
+    use cm_rust_testing::*;
+    use fidl::endpoints;
+    use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     #[derive(Ord, PartialOrd, Eq, PartialEq)]
     struct Key {

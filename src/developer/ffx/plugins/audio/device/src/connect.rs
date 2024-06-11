@@ -6,10 +6,11 @@ use crate::control::{self as control, DeviceControl};
 use ffx_command::{bug, FfxContext};
 use fho::return_bug;
 use fidl::endpoints::create_proxy;
-use fidl_fuchsia_audio_device as fadevice;
-use fidl_fuchsia_hardware_audio as fhaudio;
-use fidl_fuchsia_io as fio;
 use fuchsia_audio::device::Selector;
+use {
+    fidl_fuchsia_audio_device as fadevice, fidl_fuchsia_hardware_audio as fhaudio,
+    fidl_fuchsia_io as fio,
+};
 
 /// Connect to an instance of a FIDL protocol hosted in `directory` using the given `path`.
 // This is essentially the same as `fuchsia_component::client::connect_to_named_protocol_at_dir_root`.

@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io::DirectoryMarker,
-    fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::LocalComponentHandles,
-    futures::{StreamExt, TryStreamExt},
-    std::sync::{Arc, Mutex},
-    tracing::*,
-};
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io::DirectoryMarker;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::LocalComponentHandles;
+use futures::{StreamExt, TryStreamExt};
+use std::sync::{Arc, Mutex};
+use tracing::*;
+use {fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync};
 
 /// Mocks the fuchsia.kernel.Stats service to be used in integration tests.
 pub struct MockKernelService {
@@ -68,7 +66,8 @@ impl MockKernelService {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fuchsia_component::client::connect_to_protocol_at_dir_svc};
+    use super::*;
+    use fuchsia_component::client::connect_to_protocol_at_dir_svc;
 
     #[fuchsia::test]
     async fn test_set_cpu_stats() {

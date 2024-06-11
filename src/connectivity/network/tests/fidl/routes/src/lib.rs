@@ -14,23 +14,23 @@ use assert_matches::assert_matches;
 use either::Either;
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_net_ext::IntoExt;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_routes as fnet_routes;
-use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fuchsia_async::TimeoutExt;
-use fuchsia_zircon_status as zx_status;
 use futures::{FutureExt, StreamExt};
 use net_declare::{fidl_ip, fidl_ip_v4, fidl_mac, fidl_subnet, net_subnet_v4, net_subnet_v6};
 use net_types::ip::{
     GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
 };
 use netemul::{InStack, InterfaceConfig};
-use netstack_testing_common::{
-    interfaces,
-    realms::{Netstack, Netstack3, NetstackVersion, TestRealmExt as _, TestSandboxExt as _},
+use netstack_testing_common::interfaces;
+use netstack_testing_common::realms::{
+    Netstack, Netstack3, NetstackVersion, TestRealmExt as _, TestSandboxExt as _,
 };
 use netstack_testing_macros::netstack_test;
 use routes_common::{test_route, TestSetup};
+use {
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_zircon_status as zx_status,
+};
 
 async fn resolve(
     routes: &fidl_fuchsia_net_routes::StateProxy,

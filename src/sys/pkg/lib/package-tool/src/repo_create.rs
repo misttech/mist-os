@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::args::RepoCreateCommand,
-    anyhow::Result,
-    fuchsia_repo::{repo_builder::RepoBuilder, repo_keys::RepoKeys, repository::PmRepository},
-};
+use crate::args::RepoCreateCommand;
+use anyhow::Result;
+use fuchsia_repo::repo_builder::RepoBuilder;
+use fuchsia_repo::repo_keys::RepoKeys;
+use fuchsia_repo::repository::PmRepository;
 
 pub async fn cmd_repo_create(cmd: RepoCreateCommand) -> Result<()> {
     let repo_keys = if let Some(keys_dir) = &cmd.keys {
@@ -26,16 +26,16 @@ pub async fn cmd_repo_create(cmd: RepoCreateCommand) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{args::RepoPublishCommand, repo_publish::cmd_repo_publish},
-        assert_matches::assert_matches,
-        camino::Utf8Path,
-        chrono::Utc,
-        fuchsia_repo::{repo_client::RepoClient, repository::CopyMode},
-        pretty_assertions::assert_eq,
-        tuf::metadata::Metadata as _,
-    };
+    use super::*;
+    use crate::args::RepoPublishCommand;
+    use crate::repo_publish::cmd_repo_publish;
+    use assert_matches::assert_matches;
+    use camino::Utf8Path;
+    use chrono::Utc;
+    use fuchsia_repo::repo_client::RepoClient;
+    use fuchsia_repo::repository::CopyMode;
+    use pretty_assertions::assert_eq;
+    use tuf::metadata::Metadata as _;
 
     fn default_command_for_test() -> RepoPublishCommand {
         RepoPublishCommand {

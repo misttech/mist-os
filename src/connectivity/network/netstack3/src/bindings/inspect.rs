@@ -10,20 +10,16 @@
 use std::string::ToString as _;
 
 use fuchsia_inspect::Node;
-use net_types::{
-    ethernet::Mac,
-    ip::{Ipv4, Ipv6},
-    UnicastAddr, Witness as _,
-};
+use net_types::ethernet::Mac;
+use net_types::ip::{Ipv4, Ipv6};
+use net_types::{UnicastAddr, Witness as _};
 use netstack3_core::device::{DeviceId, EthernetLinkDevice, WeakDeviceId};
 use netstack3_fuchsia::{FuchsiaInspector, InspectorDeviceIdProvider};
 
-use crate::bindings::{
-    devices::{
-        DeviceIdAndName, DeviceSpecificInfo, DynamicCommonInfo, DynamicNetdeviceInfo, EthernetInfo,
-    },
-    BindingsCtx, Ctx, DeviceIdExt as _,
+use crate::bindings::devices::{
+    DeviceIdAndName, DeviceSpecificInfo, DynamicCommonInfo, DynamicNetdeviceInfo, EthernetInfo,
 };
+use crate::bindings::{BindingsCtx, Ctx, DeviceIdExt as _};
 
 /// An opaque struct that encapsulates the process of starting the Inspect
 /// publisher task.

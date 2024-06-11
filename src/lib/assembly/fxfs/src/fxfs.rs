@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    assembly_blobfs::BlobManifest,
-    camino::{Utf8Path, Utf8PathBuf},
-    fuchsia_pkg::PackageManifest,
-    serde::Deserialize,
-    std::fs::File,
-};
+use anyhow::{Context, Result};
+use assembly_blobfs::BlobManifest;
+use camino::{Utf8Path, Utf8PathBuf};
+use fuchsia_pkg::PackageManifest;
+use serde::Deserialize;
+use std::fs::File;
 
 /// Builder for Fxfs images which can be preinstalled with a set of initial packages.
 ///
@@ -119,14 +117,12 @@ pub struct BlobJsonEntry {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fuchsia_merkle::MerkleTree,
-        fuchsia_pkg::{BlobInfo, MetaPackage, PackageManifestBuilder},
-        std::io::Write as _,
-        std::path::Path,
-        tempfile::TempDir,
-    };
+    use super::*;
+    use fuchsia_merkle::MerkleTree;
+    use fuchsia_pkg::{BlobInfo, MetaPackage, PackageManifestBuilder};
+    use std::io::Write as _;
+    use std::path::Path;
+    use tempfile::TempDir;
 
     // Generates a package manifest to be used for testing. The `name` is used in the blob file
     // names to make each manifest somewhat unique.

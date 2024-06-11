@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    io_conformance_util::{test_harness::TestHarness, *},
-};
+use fidl::endpoints::create_proxy;
+use io_conformance_util::test_harness::TestHarness;
+use io_conformance_util::*;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 #[fuchsia::test]
 async fn create_directory_with_create_if_absent_flag() {

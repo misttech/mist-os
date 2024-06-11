@@ -4,42 +4,37 @@
 
 //! Socket features exposed by netstack3.
 
-use std::{convert::Infallible as Never, num::NonZeroU64, panic::Location};
+use std::convert::Infallible as Never;
+use std::num::NonZeroU64;
+use std::panic::Location;
 
 use const_unwrap::const_unwrap_option;
 use either::Either;
 use fidl::endpoints::ProtocolMarker as _;
-use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_posix::Errno;
-use fidl_fuchsia_posix_socket as psocket;
-use fuchsia_zircon as zx;
 use futures::StreamExt as _;
 use log::{debug, error};
-use net_types::{
-    ip::{Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
-    ScopeableAddress, SpecifiedAddr, Witness, ZonedAddr,
+use net_types::ip::{Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use net_types::{ScopeableAddress, SpecifiedAddr, Witness, ZonedAddr};
+use netstack3_core::device::DeviceId;
+use netstack3_core::error::{
+    LocalAddressError, RemoteAddressError, SocketError, ZonedAddressError,
 };
-use netstack3_core::{
-    device::DeviceId,
-    error::{LocalAddressError, RemoteAddressError, SocketError, ZonedAddressError},
-    ip::{IpSockCreationError, IpSockSendError, ResolveRouteError},
-    socket::{
-        ConnectError, NotDualStackCapableError, SetDualStackEnabledError,
-        SetMulticastMembershipError,
-    },
-    tcp, udp,
+use netstack3_core::ip::{IpSockCreationError, IpSockSendError, ResolveRouteError};
+use netstack3_core::socket::{
+    ConnectError, NotDualStackCapableError, SetDualStackEnabledError, SetMulticastMembershipError,
 };
+use netstack3_core::{tcp, udp};
+use {fidl_fuchsia_net as fnet, fidl_fuchsia_posix_socket as psocket, fuchsia_zircon as zx};
 
-use crate::bindings::{
-    devices::{
-        BindingId, DeviceIdAndName, DeviceSpecificInfo, Devices, DynamicCommonInfo,
-        DynamicEthernetInfo, DynamicNetdeviceInfo,
-    },
-    util::{
-        DeviceNotFoundError, IntoCore as _, IntoFidl as _, ResultExt as _, TryIntoCoreWithContext,
-    },
-    Ctx, DeviceIdExt as _,
+use crate::bindings::devices::{
+    BindingId, DeviceIdAndName, DeviceSpecificInfo, Devices, DynamicCommonInfo,
+    DynamicEthernetInfo, DynamicNetdeviceInfo,
 };
+use crate::bindings::util::{
+    DeviceNotFoundError, IntoCore as _, IntoFidl as _, ResultExt as _, TryIntoCoreWithContext,
+};
+use crate::bindings::{Ctx, DeviceIdExt as _};
 
 #[track_caller]
 fn log_not_supported(name: &str) {

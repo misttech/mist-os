@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{anyhow, Error, Result};
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{ChildOptions, LocalComponentHandles, RealmBuilder};
+use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
+use futures::channel::mpsc;
+use futures::{StreamExt, TryStreamExt};
 use {
-    anyhow::{anyhow, Error, Result},
-    fidl::endpoints::DiscoverableProtocolMarker,
     fidl_fuchsia_compat_nodegroup_test as fcdt, fidl_fuchsia_driver_test as fdt,
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{ChildOptions, LocalComponentHandles, RealmBuilder},
-    fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
-    fuchsia_zircon as zx,
-    futures::{channel::mpsc, StreamExt, TryStreamExt},
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 const WAITER_NAME: &'static str = "waiter";

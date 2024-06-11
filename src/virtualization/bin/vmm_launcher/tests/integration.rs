@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Error},
-    fidl_fuchsia_component::{ChildIteratorMarker, RealmMarker},
-    fidl_fuchsia_component_decl as cdecl,
-    fidl_fuchsia_virtualization::{GuestError, GuestLifecycleMarker, GuestLifecycleProxy},
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-};
+use anyhow::{anyhow, Error};
+use fidl_fuchsia_component::{ChildIteratorMarker, RealmMarker};
+use fidl_fuchsia_component_decl as cdecl;
+use fidl_fuchsia_virtualization::{GuestError, GuestLifecycleMarker, GuestLifecycleProxy};
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 
 static VMM_URL: &'static str = "#meta/vmm.cm";
 

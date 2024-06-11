@@ -8,43 +8,37 @@
 //! IGMPv2. One important difference to note is that MLD uses ICMPv6 (IP
 //! Protocol 58) message types, rather than IGMP (IP Protocol 2) message types.
 
-use core::{convert::Infallible as Never, time::Duration};
+use core::convert::Infallible as Never;
+use core::time::Duration;
 
 use log::{debug, error};
-use net_types::{
-    ip::{Ip, Ipv6, Ipv6Addr, Ipv6ReservedScope, Ipv6Scope, Ipv6SourceAddr},
-    LinkLocalUnicastAddr, MulticastAddr, ScopeableAddress, SpecifiedAddr, Witness,
-};
+use net_types::ip::{Ip, Ipv6, Ipv6Addr, Ipv6ReservedScope, Ipv6Scope, Ipv6SourceAddr};
+use net_types::{LinkLocalUnicastAddr, MulticastAddr, ScopeableAddress, SpecifiedAddr, Witness};
 use netstack3_base::{AnyDevice, DeviceIdContext, HandleableTimer, Instant, WeakDeviceIdentifier};
 use netstack3_filter as filter;
-use packet::{serialize::Serializer, InnerPacketBuilder};
-use packet_formats::{
-    icmp::{
-        mld::{
-            IcmpMldv1MessageType, MldPacket, Mldv1Body, Mldv1MessageBuilder, MulticastListenerDone,
-            MulticastListenerReport,
-        },
-        IcmpPacketBuilder, IcmpUnusedCode,
-    },
-    ip::Ipv6Proto,
-    ipv6::{
-        ext_hdrs::{ExtensionHeaderOptionAction, HopByHopOption, HopByHopOptionData},
-        Ipv6PacketBuilder, Ipv6PacketBuilderWithHbhOptions,
-    },
-    utils::NonZeroDuration,
+use packet::serialize::Serializer;
+use packet::InnerPacketBuilder;
+use packet_formats::icmp::mld::{
+    IcmpMldv1MessageType, MldPacket, Mldv1Body, Mldv1MessageBuilder, MulticastListenerDone,
+    MulticastListenerReport,
 };
+use packet_formats::icmp::{IcmpPacketBuilder, IcmpUnusedCode};
+use packet_formats::ip::Ipv6Proto;
+use packet_formats::ipv6::ext_hdrs::{
+    ExtensionHeaderOptionAction, HopByHopOption, HopByHopOptionData,
+};
+use packet_formats::ipv6::{Ipv6PacketBuilder, Ipv6PacketBuilderWithHbhOptions};
+use packet_formats::utils::NonZeroDuration;
 use thiserror::Error;
 use zerocopy::ByteSlice;
 
-use crate::internal::{
-    base::{IpLayerHandler, IpPacketDestination},
-    device::IpDeviceSendContext,
-    gmp::{
-        gmp_handle_timer, handle_query_message, handle_report_message, GmpBindingsContext,
-        GmpBindingsTypes, GmpContext, GmpDelayedReportTimerId, GmpMessage, GmpMessageType,
-        GmpStateContext, GmpStateMachine, GmpStateRef, GmpTypeLayout, IpExt, MulticastGroupSet,
-        ProtocolSpecific, QueryTarget,
-    },
+use crate::internal::base::{IpLayerHandler, IpPacketDestination};
+use crate::internal::device::IpDeviceSendContext;
+use crate::internal::gmp::{
+    gmp_handle_timer, handle_query_message, handle_report_message, GmpBindingsContext,
+    GmpBindingsTypes, GmpContext, GmpDelayedReportTimerId, GmpMessage, GmpMessageType,
+    GmpStateContext, GmpStateMachine, GmpStateRef, GmpTypeLayout, IpExt, MulticastGroupSet,
+    ProtocolSpecific, QueryTarget,
 };
 
 /// The bindings types for MLD.
@@ -420,30 +414,25 @@ fn send_mld_packet<
 mod tests {
 
     use assert_matches::assert_matches;
-    use net_types::{
-        ethernet::Mac,
-        ip::{Ip as _, IpVersionMarker},
+    use net_types::ethernet::Mac;
+    use net_types::ip::{Ip as _, IpVersionMarker};
+    use netstack3_base::testutil::{
+        assert_empty, new_rng, run_with_many_seeds, FakeDeviceId, FakeInstant, FakeTimerCtxExt,
+        FakeWeakDeviceId,
     };
-    use netstack3_base::{
-        testutil::{
-            assert_empty, new_rng, run_with_many_seeds, FakeDeviceId, FakeInstant, FakeTimerCtxExt,
-            FakeWeakDeviceId,
-        },
-        CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext,
-    };
+    use netstack3_base::{CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext};
     use netstack3_filter::ProofOfEgressCheck;
     use packet::{BufferMut, ParseBuffer};
-    use packet_formats::icmp::{
-        mld::MulticastListenerQuery, IcmpParseArgs, Icmpv6MessageType, Icmpv6Packet,
-    };
+    use packet_formats::icmp::mld::MulticastListenerQuery;
+    use packet_formats::icmp::{IcmpParseArgs, Icmpv6MessageType, Icmpv6Packet};
 
     use super::*;
-    use crate::internal::{
-        base::{self, IpLayerPacketMetadata, IpPacketDestination, SendIpPacketMeta},
-        gmp::{
-            GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
-            QueryReceivedActions, QueryReceivedGenericAction,
-        },
+    use crate::internal::base::{
+        self, IpLayerPacketMetadata, IpPacketDestination, SendIpPacketMeta,
+    };
+    use crate::internal::gmp::{
+        GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
+        QueryReceivedActions, QueryReceivedGenericAction,
     };
 
     /// Metadata for sending an MLD packet in an IP packet.

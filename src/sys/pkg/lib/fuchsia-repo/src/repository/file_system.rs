@@ -2,36 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        range::{ContentRange, Range},
-        repository::{Error, RepoProvider, RepoStorage, Resource},
-        util::file_stream,
-    },
-    anyhow::{anyhow, Context as _, Result},
-    camino::{Utf8Component, Utf8Path, Utf8PathBuf},
-    delivery_blob::DeliveryBlobType,
-    fuchsia_async as fasync,
-    fuchsia_merkle::Hash,
-    futures::{future::BoxFuture, AsyncRead, FutureExt as _},
-    std::{
-        collections::BTreeSet,
-        fs::{self, DirBuilder},
-        io::{Seek as _, SeekFrom},
-        os::unix::fs::MetadataExt,
-        time::SystemTime,
-    },
-    tempfile::{NamedTempFile, TempPath},
-    tracing::warn,
-    tuf::{
-        metadata::{MetadataPath, MetadataVersion, TargetPath},
-        pouf::Pouf1,
-        repository::{
-            FileSystemRepository as TufFileSystemRepository,
-            FileSystemRepositoryBuilder as TufFileSystemRepositoryBuilder,
-            RepositoryProvider as TufRepositoryProvider, RepositoryStorage as TufRepositoryStorage,
-        },
-    },
+use crate::range::{ContentRange, Range};
+use crate::repository::{Error, RepoProvider, RepoStorage, Resource};
+use crate::util::file_stream;
+use anyhow::{anyhow, Context as _, Result};
+use camino::{Utf8Component, Utf8Path, Utf8PathBuf};
+use delivery_blob::DeliveryBlobType;
+use fuchsia_async as fasync;
+use fuchsia_merkle::Hash;
+use futures::future::BoxFuture;
+use futures::{AsyncRead, FutureExt as _};
+use std::collections::BTreeSet;
+use std::fs::{self, DirBuilder};
+use std::io::{Seek as _, SeekFrom};
+use std::os::unix::fs::MetadataExt;
+use std::time::SystemTime;
+use tempfile::{NamedTempFile, TempPath};
+use tracing::warn;
+use tuf::metadata::{MetadataPath, MetadataVersion, TargetPath};
+use tuf::pouf::Pouf1;
+use tuf::repository::{
+    FileSystemRepository as TufFileSystemRepository,
+    FileSystemRepositoryBuilder as TufFileSystemRepositoryBuilder,
+    RepositoryProvider as TufRepositoryProvider, RepositoryStorage as TufRepositoryStorage,
 };
 
 #[cfg(not(target_os = "fuchsia"))]
@@ -701,17 +694,15 @@ struct BlobSizeMismatchError {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            repository::repo_tests::{self, TestEnv as _},
-            util::CHUNK_SIZE,
-        },
-        assert_matches::assert_matches,
-        fuchsia_async as fasync,
-        futures::{FutureExt, StreamExt},
-        std::{fs::File, io::Write as _, time::Duration},
-    };
+    use super::*;
+    use crate::repository::repo_tests::{self, TestEnv as _};
+    use crate::util::CHUNK_SIZE;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use futures::{FutureExt, StreamExt};
+    use std::fs::File;
+    use std::io::Write as _;
+    use std::time::Duration;
     struct TestEnv {
         _tmp: tempfile::TempDir,
         metadata_path: Utf8PathBuf,

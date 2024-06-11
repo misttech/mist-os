@@ -2,40 +2,34 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::{
-        component::{
-            ComponentInstance, ExtendedInstance, WeakComponentInstance, WeakExtendedInstance,
-        },
-        routing::router_ext::{RouterExt, WeakComponentTokenExt},
-    },
-    ::routing::{
-        capability_source::CapabilitySource, component_instance::ComponentInstanceInterface,
-        error::ComponentInstanceError, error::RoutingError, policy::GlobalPolicyChecker,
-    },
-    async_trait::async_trait,
-    cm_util::WeakTaskGroup,
-    fidl::{
-        endpoints::{ProtocolMarker, RequestStream},
-        epitaph::ChannelEpitaphExt,
-        AsyncChannel,
-    },
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    futures::{future::BoxFuture, FutureExt},
-    router_error::RouterError,
-    sandbox::{
-        Capability, Connectable, Connector, Message, Open, Request, Routable, Router,
-        WeakComponentToken,
-    },
-    std::{fmt::Debug, sync::Arc},
-    tracing::warn,
-    vfs::{
-        directory::entry::{DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest},
-        execution_scope::ExecutionScope,
-        path::Path,
-        ToObjectRequest,
-    },
+use crate::model::component::{
+    ComponentInstance, ExtendedInstance, WeakComponentInstance, WeakExtendedInstance,
 };
+use crate::model::routing::router_ext::{RouterExt, WeakComponentTokenExt};
+use ::routing::capability_source::CapabilitySource;
+use ::routing::component_instance::ComponentInstanceInterface;
+use ::routing::error::{ComponentInstanceError, RoutingError};
+use ::routing::policy::GlobalPolicyChecker;
+use async_trait::async_trait;
+use cm_util::WeakTaskGroup;
+use fidl::endpoints::{ProtocolMarker, RequestStream};
+use fidl::epitaph::ChannelEpitaphExt;
+use fidl::AsyncChannel;
+use futures::future::BoxFuture;
+use futures::FutureExt;
+use router_error::RouterError;
+use sandbox::{
+    Capability, Connectable, Connector, Message, Open, Request, Routable, Router,
+    WeakComponentToken,
+};
+use std::fmt::Debug;
+use std::sync::Arc;
+use tracing::warn;
+use vfs::directory::entry::{DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest};
+use vfs::execution_scope::ExecutionScope;
+use vfs::path::Path;
+use vfs::ToObjectRequest;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::RequestStream {
     let channel = AsyncChannel::from_channel(channel);
@@ -307,7 +301,8 @@ impl<T: Routable + 'static> RoutableExt for T {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::model::{context::ModelContext, environment::Environment};
+    use crate::model::context::ModelContext;
+    use crate::model::environment::Environment;
 
     use super::*;
     use assert_matches::assert_matches;
@@ -318,7 +313,9 @@ pub mod tests {
     use router_error::DowncastErrorForTest;
     use routing::{DictExt, LazyGet};
     use sandbox::{Data, Dict, Receiver, RemotableCapability, WeakComponentToken};
-    use std::{pin::pin, sync::Weak, task::Poll};
+    use std::pin::pin;
+    use std::sync::Weak;
+    use std::task::Poll;
 
     #[fuchsia::test]
     async fn get_capability() {

@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context, Result},
-    fidl_fuchsia_device::ControllerMarker,
-    fidl_fuchsia_io as fio,
-    fuchsia_fs::directory::{WatchEvent, Watcher},
-    futures::stream::{Stream, StreamExt as _, TryStreamExt as _},
-    std::path::PathBuf,
-};
+use anyhow::{format_err, Context, Result};
+use fidl_fuchsia_device::ControllerMarker;
+use fidl_fuchsia_io as fio;
+use fuchsia_fs::directory::{WatchEvent, Watcher};
+use futures::stream::{Stream, StreamExt as _, TryStreamExt as _};
+use std::path::PathBuf;
 
 // Device metadata.
 pub struct DeviceInfo<'a> {
@@ -197,16 +195,15 @@ pub async fn recursive_wait_and_open<P: fidl::endpoints::ProtocolMarker>(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_fuchsia_device as fdev, fuchsia_async as fasync,
-        futures::StreamExt,
-        std::{collections::HashSet, str::FromStr, sync::Arc},
-        vfs::{
-            directory::entry_container::Directory, execution_scope::ExecutionScope,
-            file::vmo::read_only,
-        },
-    };
+    use super::*;
+    use futures::StreamExt;
+    use std::collections::HashSet;
+    use std::str::FromStr;
+    use std::sync::Arc;
+    use vfs::directory::entry_container::Directory;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::file::vmo::read_only;
+    use {fidl_fuchsia_device as fdev, fuchsia_async as fasync};
 
     fn create_controller_service(topo_path: &'static str) -> Arc<vfs::service::Service> {
         vfs::service::host(move |mut stream: fdev::ControllerRequestStream| async move {

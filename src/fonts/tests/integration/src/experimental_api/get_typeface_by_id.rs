@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file
 
-use {super::util::*, crate::FONTS_SMALL_CM, anyhow::format_err};
+use super::util::*;
+use crate::FONTS_SMALL_CM;
+use anyhow::format_err;
 
 #[fuchsia::test]
 async fn test_get_typeface_by_id_basic() {

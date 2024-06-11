@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    rc::Rc,
-    sync::{Mutex, MutexGuard},
-};
+use std::rc::Rc;
+use std::sync::{Mutex, MutexGuard};
 
 use anyhow::{Error, Result};
 use fidl::endpoints::create_request_stream;

@@ -2,21 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context as _, Error},
-    fidl::endpoints,
-    fidl_fuchsia_vsock::{
-        AcceptorMarker, AcceptorRequest, ConnectionMarker, ConnectionProxy, ConnectionTransport,
-        ConnectorMarker,
-    },
-    fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::{
-        io::{AsyncReadExt, AsyncWriteExt},
-        StreamExt,
-    },
+use anyhow::{format_err, Context as _, Error};
+use fidl::endpoints;
+use fidl_fuchsia_vsock::{
+    AcceptorMarker, AcceptorRequest, ConnectionMarker, ConnectionProxy, ConnectionTransport,
+    ConnectorMarker,
 };
+use fuchsia_async as fasync;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use futures::io::{AsyncReadExt, AsyncWriteExt};
+use futures::StreamExt;
 
 const TEST_DATA_LEN: u64 = 60000;
 

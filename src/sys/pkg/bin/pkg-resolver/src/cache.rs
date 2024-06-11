@@ -2,32 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{repository::Repository, repository_manager::Stats, TCP_KEEPALIVE_TIMEOUT},
-    cobalt_sw_delivery_registry as metrics,
-    delivery_blob::DeliveryBlobType,
-    fidl_contrib::protocol_connector::ProtocolSender,
-    fidl_fuchsia_metrics::MetricEvent,
-    fidl_fuchsia_pkg::{self as fpkg},
-    fidl_fuchsia_pkg_ext::{self as pkg, BlobId, BlobInfo, MirrorConfig, RepositoryConfig},
-    fuchsia_cobalt_builders::MetricEventExt as _,
-    fuchsia_pkg::PackageDirectory,
-    fuchsia_sync::Mutex,
-    fuchsia_trace as ftrace,
-    fuchsia_url::AbsolutePackageUrl,
-    fuchsia_zircon::Status,
-    futures::{lock::Mutex as AsyncMutex, prelude::*, stream::FuturesUnordered},
-    http_uri_ext::HttpUriExt as _,
-    hyper::StatusCode,
-    std::{
-        sync::{
-            atomic::{AtomicBool, AtomicU64, Ordering},
-            Arc,
-        },
-        time::Duration,
-    },
-    tuf::metadata::{MetadataPath, MetadataVersion, TargetPath},
-};
+use crate::repository::Repository;
+use crate::repository_manager::Stats;
+use crate::TCP_KEEPALIVE_TIMEOUT;
+use delivery_blob::DeliveryBlobType;
+use fidl_contrib::protocol_connector::ProtocolSender;
+use fidl_fuchsia_metrics::MetricEvent;
+use fidl_fuchsia_pkg::{self as fpkg};
+use fidl_fuchsia_pkg_ext::{self as pkg, BlobId, BlobInfo, MirrorConfig, RepositoryConfig};
+use fuchsia_cobalt_builders::MetricEventExt as _;
+use fuchsia_pkg::PackageDirectory;
+use fuchsia_sync::Mutex;
+use fuchsia_url::AbsolutePackageUrl;
+use fuchsia_zircon::Status;
+use futures::lock::Mutex as AsyncMutex;
+use futures::prelude::*;
+use futures::stream::FuturesUnordered;
+use http_uri_ext::HttpUriExt as _;
+use hyper::StatusCode;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
+use tuf::metadata::{MetadataPath, MetadataVersion, TargetPath};
+use {cobalt_sw_delivery_registry as metrics, fuchsia_trace as ftrace};
 
 pub use fidl_fuchsia_pkg_ext::BasePackageIndex;
 
@@ -960,7 +957,8 @@ pub enum FetchError {
 
 impl From<&FetchError> for metrics::FetchBlobMigratedMetricDimensionResult {
     fn from(error: &FetchError) -> Self {
-        use {metrics::FetchBlobMigratedMetricDimensionResult as EventCodes, FetchError::*};
+        use metrics::FetchBlobMigratedMetricDimensionResult as EventCodes;
+        use FetchError::*;
         match error {
             CreateBlob { .. } => EventCodes::CreateBlob,
             BadHttpStatus { code, .. } => match *code {
@@ -1097,7 +1095,8 @@ pub enum FetchErrorKind {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, http::Uri};
+    use super::*;
+    use http::Uri;
 
     #[test]
     fn test_make_blob_url() {

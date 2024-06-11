@@ -5,12 +5,10 @@
 use anyhow::{bail, Context};
 use argh::FromArgs;
 use serde::Deserialize;
-use std::{
-    collections::BTreeSet,
-    env, iter,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::collections::BTreeSet;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
+use std::{env, iter};
 use toml_edit::{decorated, Document, Item, Value};
 
 /// update outdated crates in the provided manifest

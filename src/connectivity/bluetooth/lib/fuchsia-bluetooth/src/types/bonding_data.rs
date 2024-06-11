@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_bluetooth as bt;
-use fidl_fuchsia_bluetooth_sys as sys;
-use fuchsia_inspect as inspect;
+use {fidl_fuchsia_bluetooth as bt, fidl_fuchsia_bluetooth_sys as sys, fuchsia_inspect as inspect};
 
 use crate::error::Error;
 use crate::inspect::{InspectData, IsInspectable, ToProperty};
-use crate::types::{uuid::Uuid, Address, OneOrBoth, PeerId};
+use crate::types::uuid::Uuid;
+use crate::types::{Address, OneOrBoth, PeerId};
 
 #[derive(Debug)]
 struct LeInspect {
@@ -384,7 +383,8 @@ impl From<Identity> for sys::Identity {
 pub mod proptest_util {
     use super::*;
     use crate::types::address::proptest_util::any_address;
-    use proptest::{option, prelude::*};
+    use proptest::option;
+    use proptest::prelude::*;
 
     pub fn any_bonding_data() -> impl Strategy<Value = BondingData> {
         let any_data = prop_oneof![
@@ -520,7 +520,8 @@ pub mod example {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fidl_fuchsia_bluetooth_sys as sys};
+    use super::*;
+    use fidl_fuchsia_bluetooth_sys as sys;
 
     // Tests for conversions from fuchsia.bluetooth.sys API
     mod from_sys {
@@ -660,10 +661,8 @@ mod tests {
     // The test cases below use proptest to exercise round-trip conversions between FIDL and the
     // library type across several permutations.
     mod roundtrip {
-        use super::{
-            proptest_util::{any_bonding_data, any_bredr_data, any_le_data},
-            *,
-        };
+        use super::proptest_util::{any_bonding_data, any_bredr_data, any_le_data};
+        use super::*;
         use proptest::prelude::*;
 
         proptest! {

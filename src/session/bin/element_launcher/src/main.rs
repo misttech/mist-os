@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_element as element,
-    fuchsia_component::client::connect_to_protocol,
-    tracing::{info, warn},
-};
+use fidl_fuchsia_element as element;
+use fuchsia_component::client::connect_to_protocol;
+use tracing::{info, warn};
 
 async fn propose_element(
     element_manager: element::ManagerProxy,

@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl_fidl_examples_routing_echo as fecho,
-    fuchsia_component_test::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
-    },
-    futures::{channel::mpsc, FutureExt as _, SinkExt as _, StreamExt as _},
+use anyhow::{format_err, Error};
+use fidl_fidl_examples_routing_echo as fecho;
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
 };
+use futures::channel::mpsc;
+use futures::{FutureExt as _, SinkExt as _, StreamExt as _};
 
 #[fuchsia::test]
 async fn offered_capability_passed_through_nested_component_manager() {

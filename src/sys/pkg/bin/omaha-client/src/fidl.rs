@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    api_metrics::{ApiEvent, ApiMetricsReporter},
-    app_set::FuchsiaAppSet,
-    inspect::{AppsNode, StateNode},
-};
+use crate::api_metrics::{ApiEvent, ApiMetricsReporter};
+use crate::app_set::FuchsiaAppSet;
+use crate::inspect::{AppsNode, StateNode};
 use anyhow::{anyhow, Context as _, Error};
 use channel_config::ChannelConfigs;
 use event_queue::{ClosedClient, ControlHandle, Event, EventQueue, Notify};
@@ -22,22 +20,21 @@ use fidl_fuchsia_update::{
 use fidl_fuchsia_update_channel::{ProviderRequest, ProviderRequestStream};
 use fidl_fuchsia_update_channelcontrol::{ChannelControlRequest, ChannelControlRequestStream};
 use fidl_fuchsia_update_ext::AttemptOptions;
-use fuchsia_async as fasync;
-use fuchsia_component::{
-    client::connect_to_protocol,
-    server::{ServiceFs, ServiceObjLocal},
-};
-use fuchsia_zircon as zx;
-use futures::{future::BoxFuture, lock::Mutex, prelude::*};
-use omaha_client::{
-    app_set::{AppSet as _, AppSetExt as _},
-    common::CheckOptions,
-    protocol::request::InstallSource,
-    state_machine::{self, StartUpdateCheckResponse, StateMachineGone},
-    storage::{Storage, StorageExt},
-};
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
+use futures::future::BoxFuture;
+use futures::lock::Mutex;
+use futures::prelude::*;
+use omaha_client::app_set::{AppSet as _, AppSetExt as _};
+use omaha_client::common::CheckOptions;
+use omaha_client::protocol::request::InstallSource;
+use omaha_client::state_machine::{self, StartUpdateCheckResponse, StateMachineGone};
+use omaha_client::storage::{Storage, StorageExt};
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::time::Duration;
 use tracing::{error, info, warn};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct State {
@@ -664,26 +661,23 @@ pub use stub::{
 #[cfg(test)]
 mod stub {
     use super::*;
+    use crate::api_metrics::StubApiMetricsReporter;
     use crate::app_set::{AppIdSource, AppMetadata};
-    use crate::{
-        api_metrics::StubApiMetricsReporter,
-        configuration,
-        inspect::{LastResultsNode, ProtocolStateNode, ScheduleNode},
-        observer::FuchsiaObserver,
-    };
+    use crate::configuration;
+    use crate::inspect::{LastResultsNode, ProtocolStateNode, ScheduleNode};
+    use crate::observer::FuchsiaObserver;
     use fuchsia_inspect::Inspector;
-    use omaha_client::{
-        common::{App, CheckTiming, ProtocolState, UpdateCheckSchedule},
-        cup_ecdsa::StandardCupv2Handler,
-        http_request::StubHttpRequest,
-        installer::stub::{StubInstaller, StubPlan},
-        metrics::StubMetricsReporter,
-        policy::{CheckDecision, PolicyEngine, UpdateDecision},
-        request_builder::RequestParams,
-        state_machine::StateMachineBuilder,
-        storage::MemStorage,
-        time::{timers::InfiniteTimer, MockTimeSource, TimeSource},
-    };
+    use omaha_client::common::{App, CheckTiming, ProtocolState, UpdateCheckSchedule};
+    use omaha_client::cup_ecdsa::StandardCupv2Handler;
+    use omaha_client::http_request::StubHttpRequest;
+    use omaha_client::installer::stub::{StubInstaller, StubPlan};
+    use omaha_client::metrics::StubMetricsReporter;
+    use omaha_client::policy::{CheckDecision, PolicyEngine, UpdateDecision};
+    use omaha_client::request_builder::RequestParams;
+    use omaha_client::state_machine::StateMachineBuilder;
+    use omaha_client::storage::MemStorage;
+    use omaha_client::time::timers::InfiniteTimer;
+    use omaha_client::time::{MockTimeSource, TimeSource};
 
     #[derive(Clone)]
     pub struct MockStateMachineController {
@@ -945,7 +939,8 @@ mod tests {
     use fidl_fuchsia_update_channel::ProviderMarker;
     use fidl_fuchsia_update_channelcontrol::ChannelControlMarker;
     use fuchsia_inspect::Inspector;
-    use omaha_client::{common::App, protocol::Cohort};
+    use omaha_client::common::App;
+    use omaha_client::protocol::Cohort;
 
     fn spawn_fidl_server<M: fidl::endpoints::ProtocolMarker>(
         fidl: Rc<RefCell<stub::StubFidlServer>>,

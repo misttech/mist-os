@@ -2,24 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        capability_source::{BuiltinCapabilities, NamespaceCapabilities},
-        environment,
-        error::ComponentInstanceError,
-        policy::GlobalPolicyChecker,
-        resolving::{ComponentAddress, ComponentResolutionContext},
-    },
-    async_trait::async_trait,
-    cm_rust::{CapabilityDecl, CollectionDecl, ExposeDecl, OfferDecl, OfferSource, UseDecl},
-    cm_types::{Name, Url},
-    derivative::Derivative,
-    moniker::{ChildName, ExtendedMoniker, Moniker},
-    std::{
-        clone::Clone,
-        sync::{Arc, Weak},
-    },
-};
+use crate::capability_source::{BuiltinCapabilities, NamespaceCapabilities};
+use crate::environment;
+use crate::error::ComponentInstanceError;
+use crate::policy::GlobalPolicyChecker;
+use crate::resolving::{ComponentAddress, ComponentResolutionContext};
+use async_trait::async_trait;
+use cm_rust::{CapabilityDecl, CollectionDecl, ExposeDecl, OfferDecl, OfferSource, UseDecl};
+use cm_types::{Name, Url};
+use derivative::Derivative;
+use moniker::{ChildName, ExtendedMoniker, Moniker};
+use std::clone::Clone;
+use std::sync::{Arc, Weak};
 
 /// A trait providing a representation of a component instance.
 #[async_trait]

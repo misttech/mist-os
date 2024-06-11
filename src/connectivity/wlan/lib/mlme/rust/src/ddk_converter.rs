@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::WlanSoftmacBandCapabilityExt as _;
+use anyhow::format_err;
+use std::fmt::Display;
 use {
-    crate::WlanSoftmacBandCapabilityExt as _, anyhow::format_err,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
-    std::fmt::Display,
 };
 
 #[macro_export]

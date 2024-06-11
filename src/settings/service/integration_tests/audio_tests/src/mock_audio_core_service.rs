@@ -14,8 +14,7 @@ use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_component_test::LocalComponentHandles;
 use fuchsia_sync::RwLock;
 use futures::channel::mpsc::Sender;
-use futures::TryStreamExt;
-use futures::{SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt, TryStreamExt};
 
 pub(crate) async fn audio_core_service_mock(
     handles: LocalComponentHandles,

@@ -2,22 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use lock_order::{
-    lock::{DelegatedOrderedLockAccess, LockLevelFor},
-    relation::LockBefore,
-};
-use net_types::{
-    ip::{Ip, Ipv4, Ipv6},
-    NonMappedAddr, SpecifiedAddr,
-};
+use lock_order::lock::{DelegatedOrderedLockAccess, LockLevelFor};
+use lock_order::relation::LockBefore;
+use net_types::ip::{Ip, Ipv4, Ipv6};
+use net_types::{NonMappedAddr, SpecifiedAddr};
 use netstack3_device::DeviceId;
 use netstack3_filter::{FilterContext, FilterImpl, FilterIpContext, NatContext, State};
 use netstack3_ip::{FilterHandlerProvider, IpDeviceStateContext, IpLayerIpExt, IpStateInner};
 
-use crate::{
-    context::{prelude::*, WrapLockLevel},
-    BindingsContext, BindingsTypes, CoreCtx, StackState,
-};
+use crate::context::prelude::*;
+use crate::context::WrapLockLevel;
+use crate::{BindingsContext, BindingsTypes, CoreCtx, StackState};
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<'a, I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<I>>>

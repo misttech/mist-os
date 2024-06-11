@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{Event, EventSource},
-    fuchsia_hyper::HttpsClient,
-    futures::{
-        stream::Stream,
-        task::{Context, Poll},
-    },
-    hyper::{Body, Request, StatusCode},
-    std::pin::Pin,
-    thiserror::Error,
-};
+use crate::{Event, EventSource};
+use fuchsia_hyper::HttpsClient;
+use futures::stream::Stream;
+use futures::task::{Context, Poll};
+use hyper::{Body, Request, StatusCode};
+use std::pin::Pin;
+use thiserror::Error;
 
 /// An http SSE client.
 #[derive(Debug)]
@@ -91,25 +87,19 @@ pub enum ClientPollError {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fuchsia_async::{self as fasync, net::TcpListener},
-        fuchsia_hyper::new_https_client,
-        futures::{
-            future::{Future, TryFutureExt},
-            stream::{StreamExt, TryStreamExt},
-        },
-        hyper::{
-            server::{accept::from_stream, Server},
-            service::{make_service_fn, service_fn},
-            Response,
-        },
-        std::{
-            convert::Infallible,
-            net::{Ipv4Addr, SocketAddr},
-        },
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_async::net::TcpListener;
+    use fuchsia_async::{self as fasync};
+    use fuchsia_hyper::new_https_client;
+    use futures::future::{Future, TryFutureExt};
+    use futures::stream::{StreamExt, TryStreamExt};
+    use hyper::server::accept::from_stream;
+    use hyper::server::Server;
+    use hyper::service::{make_service_fn, service_fn};
+    use hyper::Response;
+    use std::convert::Infallible;
+    use std::net::{Ipv4Addr, SocketAddr};
 
     fn spawn_server<F>(handle_req: fn(Request<Body>) -> F) -> String
     where

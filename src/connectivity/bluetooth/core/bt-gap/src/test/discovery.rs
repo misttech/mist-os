@@ -2,22 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{host_device, host_dispatcher, services::access};
-use {
-    fidl_fuchsia_bluetooth_sys::AccessMarker,
-    fuchsia_async as fasync,
-    fuchsia_bluetooth::types::HostId,
-    fuchsia_sync::RwLock,
-    futures::{future::join, stream::FuturesUnordered},
-    proptest::prelude::*,
-    std::{
-        collections::HashMap,
-        fmt::Debug,
-        iter,
-        pin::{pin, Pin},
-        sync::Arc,
-    },
-};
+use crate::services::access;
+use crate::{host_device, host_dispatcher};
+use fidl_fuchsia_bluetooth_sys::AccessMarker;
+use fuchsia_async as fasync;
+use fuchsia_bluetooth::types::HostId;
+use fuchsia_sync::RwLock;
+use futures::future::join;
+use futures::stream::FuturesUnordered;
+use proptest::prelude::*;
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::iter;
+use std::pin::{pin, Pin};
+use std::sync::Arc;
 
 // Maximum number of mock access.fidl clients we simulate.
 // For a more comprehensive test, increase this number.

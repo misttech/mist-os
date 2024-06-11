@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use carnelian::{
-    input, render::Context, Message, Size, ViewAssistant, ViewAssistantContext, ViewAssistantPtr,
-};
+use carnelian::render::Context;
+use carnelian::{input, Message, Size, ViewAssistant, ViewAssistantContext, ViewAssistantPtr};
 use fuchsia_zircon::Event;
 use recovery_util::ota::controller::SendEvent;
 use recovery_util::ota::state_machine::Event as StateMachineEvent;

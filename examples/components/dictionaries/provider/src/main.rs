@@ -4,11 +4,11 @@
 
 use fidl::endpoints;
 use fidl_fidl_examples_routing_echo::{EchoMarker, EchoRequest, EchoRequestStream};
-use fidl_fuchsia_component_sandbox as fsandbox;
-use fuchsia_async as fasync;
-use fuchsia_component::{client, server::ServiceFs};
+use fuchsia_component::client;
+use fuchsia_component::server::ServiceFs;
 use futures::{StreamExt, TryStreamExt};
 use tracing::*;
+use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
 enum IncomingRequest {
     Router(fsandbox::RouterRequestStream),

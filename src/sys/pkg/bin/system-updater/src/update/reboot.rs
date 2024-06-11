@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::update::CommitAction,
-    anyhow::{anyhow, Context},
-    fidl_fuchsia_hardware_power_statecontrol::AdminProxy as PowerStateControlProxy,
-    fuchsia_async::{Task, TimeoutExt},
-    futures::prelude::*,
-    std::time::Duration,
-    tracing::error,
-};
+use crate::update::CommitAction;
+use anyhow::{anyhow, Context};
+use fidl_fuchsia_hardware_power_statecontrol::AdminProxy as PowerStateControlProxy;
+use fuchsia_async::{Task, TimeoutExt};
+use futures::prelude::*;
+use std::time::Duration;
+use tracing::error;
 
 // The system-updater does not want to manage the policy of when to schedule a reboot.  As a
 // failsafe against an initiator holding onto a controller and never scheduling a time to reboot,
@@ -76,7 +74,8 @@ pub(super) async fn reboot(proxy: &PowerStateControlProxy) {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, futures::task::Poll};
+    use super::*;
+    use futures::task::Poll;
     #[allow(clippy::bool_assert_comparison)]
     #[test]
     fn wait_to_reboot_times_out() {

@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use async_trait::async_trait;
+use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
 use {
-    anyhow::Error,
-    async_trait::async_trait,
     ffx_wlan_deprecated_args as arg_types,
-    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_wlan_product_deprecatedconfiguration as wlan_deprecated,
 };
 

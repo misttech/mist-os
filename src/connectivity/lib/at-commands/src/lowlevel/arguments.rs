@@ -7,7 +7,8 @@
 //! The format of of these is not specifed in any one place in the spec, but they are
 //! described thoughout HFP 1.8.
 
-use {crate::lowlevel::write_to::WriteTo, std::io};
+use crate::lowlevel::write_to::WriteTo;
+use std::io;
 
 /// An argument list set off from a command or response by a delimiter such as "=" or ":".
 #[derive(Debug, Clone, PartialEq)]

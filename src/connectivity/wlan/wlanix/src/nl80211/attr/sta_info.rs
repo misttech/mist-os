@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use netlink_packet_utils::{
-    byteorder::{ByteOrder, NativeEndian},
-    nla::Nla,
-};
+use netlink_packet_utils::byteorder::{ByteOrder, NativeEndian};
+use netlink_packet_utils::nla::Nla;
 use std::mem::size_of_val;
 
 use crate::nl80211::constants::*;
@@ -48,7 +46,8 @@ impl Nla for Nl80211StaInfoAttr {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, netlink_packet_utils::Emitable};
+    use super::*;
+    use netlink_packet_utils::Emitable;
 
     #[test]
     fn test_sta_info_attrs() {

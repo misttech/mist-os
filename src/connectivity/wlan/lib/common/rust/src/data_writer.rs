@@ -2,13 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        big_endian::BigEndianU16,
-        mac::{self, FixedDataHdrFields, FrameControl, SequenceControl},
-    },
-    ieee80211::{Bssid, MacAddr},
-};
+use crate::big_endian::BigEndianU16;
+use crate::mac::{self, FixedDataHdrFields, FrameControl, SequenceControl};
+use ieee80211::{Bssid, MacAddr};
 
 pub fn data_hdr_client_to_ap(
     mut frame_ctrl: FrameControl,

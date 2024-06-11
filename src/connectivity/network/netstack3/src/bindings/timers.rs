@@ -2,20 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    cmp,
-    collections::BinaryHeap,
-    fmt::Debug,
-    sync::{
-        atomic::{self, AtomicI64, AtomicUsize},
-        Arc,
-    },
-    task::Poll,
-};
+use std::cmp;
+use std::collections::BinaryHeap;
+use std::fmt::Debug;
+use std::sync::atomic::{self, AtomicI64, AtomicUsize};
+use std::sync::Arc;
+use std::task::Poll;
 
 use async_utils::futures::YieldToExecutorOnce;
 use fuchsia_async as fasync;
-use futures::{future::FusedFuture, Future, FutureExt, StreamExt as _};
+use futures::future::FusedFuture;
+use futures::{Future, FutureExt, StreamExt as _};
 use log::{trace, warn};
 use netstack3_core::sync::Mutex as CoreMutex;
 

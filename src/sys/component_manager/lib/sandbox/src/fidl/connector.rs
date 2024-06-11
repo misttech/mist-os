@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{fidl::registry, Connector, ConversionError, Message},
-    fidl::handle::Channel,
-    fidl_fuchsia_component_sandbox as fsandbox,
-    std::sync::Arc,
-    vfs::directory::entry::DirectoryEntry,
-};
+use crate::fidl::registry;
+use crate::{Connector, ConversionError, Message};
+use fidl::handle::Channel;
+use fidl_fuchsia_component_sandbox as fsandbox;
+use std::sync::Arc;
+use vfs::directory::entry::DirectoryEntry;
 
 impl Connector {
     pub(crate) fn send_channel(&self, channel: Channel) -> Result<(), ()> {

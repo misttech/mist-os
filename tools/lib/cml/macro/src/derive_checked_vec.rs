@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::common::{
-        extract_expected, extract_min_length, extract_unique_items, gen_visit_seq, ident_from_path,
-    },
-    proc_macro2::TokenStream as TokenStream2,
-    quote::{quote, ToTokens, TokenStreamExt},
-    syn::{punctuated::Punctuated, Meta, Token},
+use crate::common::{
+    extract_expected, extract_min_length, extract_unique_items, gen_visit_seq, ident_from_path,
 };
+use proc_macro2::TokenStream as TokenStream2;
+use quote::{quote, ToTokens, TokenStreamExt};
+use syn::punctuated::Punctuated;
+use syn::{Meta, Token};
 
 pub fn impl_derive_checked_vec(ast: syn::DeriveInput) -> Result<TokenStream2, syn::Error> {
     let attrs = parse_checked_vec_attributes(&ast)?;

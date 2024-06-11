@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::BlockDeviceFactory,
-    async_trait::async_trait,
-    std::{
-        future::Future,
-        path::{Path, PathBuf},
-        pin::Pin,
-    },
-};
+use crate::BlockDeviceFactory;
+use async_trait::async_trait;
+use std::future::Future;
+use std::path::{Path, PathBuf};
+use std::pin::Pin;
 
 /// A trait for creating `Filesystem`s.
 #[async_trait]

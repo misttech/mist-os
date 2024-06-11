@@ -5,8 +5,7 @@
 use anyhow::Result;
 use ffx_setui_display_args::{Field, GetArgs};
 use fidl_fuchsia_settings::DisplayProxy;
-use utils::handle_mixed_result;
-use utils::{Either, WatchOrSetResult};
+use utils::{handle_mixed_result, Either, WatchOrSetResult};
 
 pub async fn get<W: std::io::Write>(proxy: DisplayProxy, args: GetArgs, w: &mut W) -> Result<()> {
     handle_mixed_result("DisplayGet", command(proxy, args).await, w).await

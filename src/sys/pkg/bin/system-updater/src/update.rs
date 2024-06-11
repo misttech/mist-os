@@ -2,26 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{anyhow, Context as _, Error};
+use async_trait::async_trait;
+use fidl::endpoints::ProtocolMarker as _;
+use fuchsia_async::TimeoutExt as _;
+use fuchsia_hash::Hash;
+use fuchsia_sync::Mutex;
+use fuchsia_url::{AbsoluteComponentUrl, AbsolutePackageUrl, PinnedAbsolutePackageUrl};
+use futures::channel::oneshot;
+use futures::future::FutureExt as _;
+use futures::stream::{FusedStream, TryStreamExt as _};
+use futures::Future;
+use include_str_from_working_dir::include_str_from_working_dir_env;
+use std::collections::HashSet;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::time::Duration;
+use tracing::{error, info, warn};
 use {
-    anyhow::{anyhow, Context as _, Error},
-    async_trait::async_trait,
-    fidl::endpoints::ProtocolMarker as _,
     fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fidl_fuchsia_paver as fpaver,
     fidl_fuchsia_pkg as fpkg, fidl_fuchsia_space as fspace,
     fidl_fuchsia_update_installer_ext as fupdate_installer_ext,
-    fuchsia_async::TimeoutExt as _,
-    fuchsia_hash::Hash,
-    fuchsia_sync::Mutex,
-    fuchsia_url::{AbsoluteComponentUrl, AbsolutePackageUrl, PinnedAbsolutePackageUrl},
-    futures::{
-        channel::oneshot,
-        future::FutureExt as _,
-        stream::{FusedStream, TryStreamExt as _},
-        Future,
-    },
-    include_str_from_working_dir::include_str_from_working_dir_env,
-    std::{collections::HashSet, pin::Pin, sync::Arc, time::Duration},
-    tracing::{error, info, warn},
 };
 
 mod config;
@@ -34,17 +35,15 @@ mod reboot;
 mod resolver;
 mod state;
 
-pub(super) use {
-    config::Config,
-    environment::{
-        BuildInfo, CobaltConnector, Environment, EnvironmentConnector,
-        NamespaceEnvironmentConnector, SystemInfo,
-    },
-    genutil::GeneratorExt,
-    history::{UpdateAttempt, UpdateHistory},
-    reboot::{ControlRequest, RebootController},
-    resolver::ResolveError,
+pub(super) use config::Config;
+pub(super) use environment::{
+    BuildInfo, CobaltConnector, Environment, EnvironmentConnector, NamespaceEnvironmentConnector,
+    SystemInfo,
 };
+pub(super) use genutil::GeneratorExt;
+pub(super) use history::{UpdateAttempt, UpdateHistory};
+pub(super) use reboot::{ControlRequest, RebootController};
+pub(super) use resolver::ResolveError;
 
 #[cfg(test)]
 pub(super) use {
@@ -1426,12 +1425,10 @@ async fn replace_retained_packages(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fuchsia_async as fasync,
-        fuchsia_pkg_testing::{make_epoch_json, FakeUpdatePackage},
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use fuchsia_pkg_testing::{make_epoch_json, FakeUpdatePackage};
 
     // Simulate the cobalt test hanging indefinitely, and ensure we time out correctly.
     // This test deliberately logs an error.
@@ -1499,7 +1496,8 @@ mod tests {
 
 #[cfg(test)]
 mod test_sha256_buffer {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     fn make_buffer(payload: Vec<u8>) -> fmem::Buffer {
         let vmo = fuchsia_zircon::Vmo::create(payload.len().try_into().unwrap()).unwrap();

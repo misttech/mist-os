@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::backend::{BlockBackend, DeviceAttrs, Request, Sector},
-    crate::wire,
-    anyhow::anyhow,
-    fidl_fuchsia_virtualization::BlockMode,
-    fuchsia_trace as ftrace,
-    std::io::{Read, Write},
-    thiserror::Error,
-    virtio_device::chain::{ReadableChain, WritableChain},
-    virtio_device::mem::{DeviceRange, DriverMem},
-    virtio_device::queue::DriverNotify,
-    zerocopy::FromBytes,
-};
+use crate::backend::{BlockBackend, DeviceAttrs, Request, Sector};
+use crate::wire;
+use anyhow::anyhow;
+use fidl_fuchsia_virtualization::BlockMode;
+use fuchsia_trace as ftrace;
+use std::io::{Read, Write};
+use thiserror::Error;
+use virtio_device::chain::{ReadableChain, WritableChain};
+use virtio_device::mem::{DeviceRange, DriverMem};
+use virtio_device::queue::DriverNotify;
+use zerocopy::FromBytes;
 
 #[derive(Error, Debug, PartialEq, Eq)]
 enum BlockError {
@@ -381,13 +379,11 @@ impl BlockDevice {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::backend_test::BackendController,
-        crate::memory_backend::MemoryBackend,
-        fuchsia_async as fasync,
-        virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue},
-    };
+    use super::*;
+    use crate::backend_test::BackendController;
+    use crate::memory_backend::MemoryBackend;
+    use fuchsia_async as fasync;
+    use virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue};
 
     #[fuchsia::test]
     fn test_check_request() -> Result<(), anyhow::Error> {

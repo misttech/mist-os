@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    at_commands as at, bt_hfp::call::indicators as call_indicators, core::fmt::Debug, tracing::warn,
-};
+use at_commands as at;
+use bt_hfp::call::indicators as call_indicators;
+use core::fmt::Debug;
+use tracing::warn;
 
 use crate::peer::update::AgUpdate;
 

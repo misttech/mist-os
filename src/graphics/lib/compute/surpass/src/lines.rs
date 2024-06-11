@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{cell::Cell, num::NonZeroU64};
+use std::cell::Cell;
+use std::num::NonZeroU64;
 
 use rayon::prelude::*;
 
-use crate::{
-    extend::ExtendTuple10, extend::ExtendTuple3, AffineTransform, Layer, Path, PIXEL_WIDTH,
-};
+use crate::extend::{ExtendTuple10, ExtendTuple3};
+use crate::{AffineTransform, Layer, Path, PIXEL_WIDTH};
 
 const MIN_LEN: usize = 1_024;
 

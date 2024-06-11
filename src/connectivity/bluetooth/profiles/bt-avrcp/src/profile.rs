@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context, Error},
-    bitflags::bitflags,
-    fidl_fuchsia_bluetooth_bredr::*,
-    fuchsia_bluetooth::{
-        profile::{elem_to_profile_descriptor, psm_from_protocol, Psm},
-        types::Uuid,
-    },
-    profile_client::ProfileClient,
-    std::fmt::Debug,
-    tracing::info,
-};
+use anyhow::{format_err, Context, Error};
+use bitflags::bitflags;
+use fidl_fuchsia_bluetooth_bredr::*;
+use fuchsia_bluetooth::profile::{elem_to_profile_descriptor, psm_from_protocol, Psm};
+use fuchsia_bluetooth::types::Uuid;
+use profile_client::ProfileClient;
+use std::fmt::Debug;
+use tracing::info;
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

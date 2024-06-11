@@ -415,8 +415,7 @@ impl UpdatePackageBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assembly_partitions_config::Slot as PartitionSlot;
-    use assembly_partitions_config::{BootloaderPartition, Partition};
+    use assembly_partitions_config::{BootloaderPartition, Partition, Slot as PartitionSlot};
     use assembly_tool::testing::{blobfs_side_effect, FakeToolProvider};
     use assembly_util::write_json_file;
     use fuchsia_archive::Utf8Reader;

@@ -2,46 +2,41 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        constants::FORMATTED_CONTENT_CHUNK_SIZE_TARGET,
-        diagnostics::BatchIteratorConnectionStats,
-        error::AccessorError,
-        formatter::{new_batcher, FormattedStream, JsonPacketSerializer, SerializedVmo},
-        inspect::{repository::InspectRepository, ReaderServer},
-        logs::repository::LogsRepository,
-        pipeline::Pipeline,
-        ImmutableString,
-    },
-    diagnostics_data::{Data, DiagnosticsData, Metadata},
-    fidl::endpoints::{ControlHandle, RequestStream},
-    fidl_fuchsia_diagnostics::{
-        ArchiveAccessorRequest, ArchiveAccessorRequestStream, BatchIteratorControlHandle,
-        BatchIteratorRequest, BatchIteratorRequestStream, ClientSelectorConfiguration, DataType,
-        Format, FormattedContent, PerformanceConfiguration, Selector, SelectorArgument, StreamMode,
-        StreamParameters, StringSelector, TreeSelector, TreeSelectorUnknown,
-    },
-    fidl_fuchsia_diagnostics_host as fhost,
-    fidl_fuchsia_mem::Buffer,
-    flyweights::FlyStr,
-    fuchsia_async::{self as fasync, Task},
-    fuchsia_inspect::NumericProperty,
-    fuchsia_sync::Mutex,
-    fuchsia_trace as ftrace, fuchsia_zircon as zx,
-    futures::{
-        channel::mpsc,
-        future::{select, Either},
-        pin_mut,
-        prelude::*,
-        stream::Peekable,
-        StreamExt,
-    },
-    selectors::FastError,
-    serde::Serialize,
-    std::{collections::HashMap, pin::Pin, sync::Arc},
-    thiserror::Error,
-    tracing::warn,
+use crate::constants::FORMATTED_CONTENT_CHUNK_SIZE_TARGET;
+use crate::diagnostics::BatchIteratorConnectionStats;
+use crate::error::AccessorError;
+use crate::formatter::{new_batcher, FormattedStream, JsonPacketSerializer, SerializedVmo};
+use crate::inspect::repository::InspectRepository;
+use crate::inspect::ReaderServer;
+use crate::logs::repository::LogsRepository;
+use crate::pipeline::Pipeline;
+use crate::ImmutableString;
+use diagnostics_data::{Data, DiagnosticsData, Metadata};
+use fidl::endpoints::{ControlHandle, RequestStream};
+use fidl_fuchsia_diagnostics::{
+    ArchiveAccessorRequest, ArchiveAccessorRequestStream, BatchIteratorControlHandle,
+    BatchIteratorRequest, BatchIteratorRequestStream, ClientSelectorConfiguration, DataType,
+    Format, FormattedContent, PerformanceConfiguration, Selector, SelectorArgument, StreamMode,
+    StreamParameters, StringSelector, TreeSelector, TreeSelectorUnknown,
 };
+use fidl_fuchsia_mem::Buffer;
+use flyweights::FlyStr;
+use fuchsia_async::{self as fasync, Task};
+use fuchsia_inspect::NumericProperty;
+use fuchsia_sync::Mutex;
+use futures::channel::mpsc;
+use futures::future::{select, Either};
+use futures::prelude::*;
+use futures::stream::Peekable;
+use futures::{pin_mut, StreamExt};
+use selectors::FastError;
+use serde::Serialize;
+use std::collections::HashMap;
+use std::pin::Pin;
+use std::sync::Arc;
+use thiserror::Error;
+use tracing::warn;
+use {fidl_fuchsia_diagnostics_host as fhost, fuchsia_trace as ftrace, fuchsia_zircon as zx};
 
 #[derive(Debug, Copy, Clone)]
 pub struct BatchRetrievalTimeout(i64);

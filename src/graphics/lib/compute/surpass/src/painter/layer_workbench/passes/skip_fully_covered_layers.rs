@@ -4,12 +4,9 @@
 
 use std::ops::ControlFlow;
 
-use crate::painter::{
-    layer_workbench::{
-        passes::PassesSharedState, Context, LayerWorkbenchState, OptimizerTileWriteOp,
-    },
-    BlendMode, Color, Fill, Func, LayerProps, Style,
-};
+use crate::painter::layer_workbench::passes::PassesSharedState;
+use crate::painter::layer_workbench::{Context, LayerWorkbenchState, OptimizerTileWriteOp};
+use crate::painter::{BlendMode, Color, Fill, Func, LayerProps, Style};
 
 pub fn skip_fully_covered_layers_pass<'w, 'c, P: LayerProps>(
     workbench: &'w mut LayerWorkbenchState,

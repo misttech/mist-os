@@ -4,18 +4,16 @@
 
 //! This module contains an implementation of `ImeState`, the internal state object of `LegacyIme`.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_input as input, fidl_fuchsia_ui_input as uii,
-    std::{
-        char,
-        collections::{HashMap, HashSet},
-        ops::Range,
-    },
-};
+use anyhow::{Context as _, Error};
+use std::char;
+use std::collections::{HashMap, HashSet};
+use std::ops::Range;
+use {fidl_fuchsia_input as input, fidl_fuchsia_ui_input as uii};
 
 use super::position;
-use crate::{index_convert as idx, keyboard::events::KeyEvent, text_manager::TextManager};
+use crate::index_convert as idx;
+use crate::keyboard::events::KeyEvent;
+use crate::text_manager::TextManager;
 
 /// The internal state of the IME, held within `LegacyIme` inside `Arc<Mutex<ImeState>>`, so it can
 /// be accessed from multiple message handler async tasks. Methods that aren't message handlers

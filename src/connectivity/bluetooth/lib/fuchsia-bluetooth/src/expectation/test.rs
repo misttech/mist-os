@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fidl_fuchsia_bluetooth_sys::TechnologyType, std::collections::HashMap};
+use fidl_fuchsia_bluetooth_sys::TechnologyType;
+use std::collections::HashMap;
 
-use crate::{
-    assert_satisfies,
-    expectation::{Predicate as P, *},
-    over,
-    types::{Address, Peer, PeerId},
-};
+use crate::expectation::{Predicate as P, *};
+use crate::types::{Address, Peer, PeerId};
+use crate::{assert_satisfies, over};
 
 const TEST_PEER_NAME: &'static str = "TestPeer";
 const INCORRECT_PEER_NAME: &'static str = "IncorrectPeer";

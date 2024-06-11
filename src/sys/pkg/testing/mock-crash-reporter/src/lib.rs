@@ -2,15 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_feedback::{
-        CrashReporterMarker, CrashReporterProxy, CrashReporterRequestStream, FileReportResults,
-        FilingError,
-    },
-    fuchsia_async::Task,
-    futures::{channel::mpsc, future::BoxFuture, lock::Mutex, prelude::*, TryStreamExt},
-    std::sync::Arc,
+use fidl_fuchsia_feedback::{
+    CrashReporterMarker, CrashReporterProxy, CrashReporterRequestStream, FileReportResults,
+    FilingError,
 };
+use fuchsia_async::Task;
+use futures::channel::mpsc;
+use futures::future::BoxFuture;
+use futures::lock::Mutex;
+use futures::prelude::*;
+use futures::TryStreamExt;
+use std::sync::Arc;
 
 pub use fidl_fuchsia_feedback::CrashReport;
 
@@ -109,11 +111,9 @@ impl Hook for ThrottleHook {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fuchsia_async as fasync,
-        std::sync::atomic::{AtomicU32, Ordering},
-    };
+    use super::*;
+    use fuchsia_async as fasync;
+    use std::sync::atomic::{AtomicU32, Ordering};
 
     #[fasync::run_singlethreaded(test)]
     async fn test_mock_crash_reporter() {

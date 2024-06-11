@@ -2,13 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_hash::Hash,
-    std::{
-        collections::BTreeMap,
-        io::{Read, Write},
-    },
-};
+use fuchsia_hash::Hash;
+use std::collections::BTreeMap;
+use std::io::{Read, Write};
 
 pub struct PackageArchiveBuilder {
     entries: BTreeMap<String, (u64, Box<dyn Read>)>,

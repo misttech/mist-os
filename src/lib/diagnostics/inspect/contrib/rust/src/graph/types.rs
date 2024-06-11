@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use fuchsia_inspect as inspect;
-use std::{borrow::Cow, marker::PhantomData};
+use std::borrow::Cow;
+use std::marker::PhantomData;
 
 pub trait GraphObject {
     type Id;

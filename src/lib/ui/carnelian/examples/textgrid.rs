@@ -2,36 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    argh::FromArgs,
-    carnelian::{
-        app::Config,
-        color::Color,
-        drawing::{load_font, DisplayRotation, FontFace, Glyph, GlyphMap, TextGrid},
-        make_app_assistant,
-        render::{BlendMode, Context as RenderContext, Fill, FillRule, Layer, Raster, Style},
-        scene::{
-            facets::{Facet, FacetId},
-            scene::{Scene, SceneBuilder, SceneOrder},
-            LayerGroup,
-        },
-        App, AppAssistant, Point, Size, ViewAssistant, ViewAssistantContext, ViewAssistantPtr,
-        ViewKey,
-    },
-    fuchsia_trace::duration,
-    fuchsia_zircon::Event,
-    rustc_hash::FxHashMap,
-    std::{
-        any::Any,
-        collections::hash_map::Entry,
-        f32,
-        fs::File,
-        io::{prelude::*, BufReader},
-        path::Path,
-        path::PathBuf,
-    },
+use anyhow::Error;
+use argh::FromArgs;
+use carnelian::app::Config;
+use carnelian::color::Color;
+use carnelian::drawing::{load_font, DisplayRotation, FontFace, Glyph, GlyphMap, TextGrid};
+use carnelian::render::{
+    BlendMode, Context as RenderContext, Fill, FillRule, Layer, Raster, Style,
 };
+use carnelian::scene::facets::{Facet, FacetId};
+use carnelian::scene::scene::{Scene, SceneBuilder, SceneOrder};
+use carnelian::scene::LayerGroup;
+use carnelian::{
+    make_app_assistant, App, AppAssistant, Point, Size, ViewAssistant, ViewAssistantContext,
+    ViewAssistantPtr, ViewKey,
+};
+use fuchsia_trace::duration;
+use fuchsia_zircon::Event;
+use rustc_hash::FxHashMap;
+use std::any::Any;
+use std::collections::hash_map::Entry;
+use std::f32;
+use std::fs::File;
+use std::io::prelude::*;
+use std::io::BufReader;
+use std::path::{Path, PathBuf};
 
 /// Text Grid.
 #[derive(Debug, FromArgs)]

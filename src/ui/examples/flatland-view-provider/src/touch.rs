@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::internal_message::*,
-    fidl_fuchsia_ui_pointer::{
-        self as fptr, TouchEvent, TouchInteractionId, TouchInteractionStatus, TouchResponse,
-    },
-    fuchsia_async as fasync,
-    futures::channel::mpsc::UnboundedSender,
-    std::{collections::HashMap, slice::Iter},
-    tracing::{error, info},
+use crate::internal_message::*;
+use fidl_fuchsia_ui_pointer::{
+    self as fptr, TouchEvent, TouchInteractionId, TouchInteractionStatus, TouchResponse,
 };
+use fuchsia_async as fasync;
+use futures::channel::mpsc::UnboundedSender;
+use std::collections::HashMap;
+use std::slice::Iter;
+use tracing::{error, info};
 
 /// Generate a vector of responses to the input `TouchEvents`, as required by
 /// `fuchsia.ui.pointer.TouchSource.Watch()`.
@@ -168,16 +167,15 @@ pub fn spawn_touch_source_watcher(
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::internal_message::*,
-        anyhow::anyhow,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_ui_pointer::{
-            self as fptr, EventPhase, TouchEvent, TouchInteractionId, TouchInteractionStatus,
-        },
-        fuchsia_async as fasync,
-        futures::{channel::mpsc::unbounded, StreamExt, TryStreamExt},
+    use crate::internal_message::*;
+    use anyhow::anyhow;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_ui_pointer::{
+        self as fptr, EventPhase, TouchEvent, TouchInteractionId, TouchInteractionStatus,
     };
+    use fuchsia_async as fasync;
+    use futures::channel::mpsc::unbounded;
+    use futures::{StreamExt, TryStreamExt};
 
     // Handles `Watch()` requests from the stream by iterating over the responses.  Does only
     // minimal validation of the request arguments.  Specifically, only checks that the correct

@@ -24,10 +24,8 @@
 //!
 
 use anyhow::format_err;
-use core::{
-    pin::Pin,
-    task::{Context, Poll},
-};
+use core::pin::Pin;
+use core::task::{Context, Poll};
 use derivative::Derivative;
 use fidl::endpoints::create_request_stream;
 use fidl_fuchsia_power_battery as fpower;

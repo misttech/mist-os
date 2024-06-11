@@ -3,19 +3,16 @@
 // found in the LICENSE file.
 
 //!
-use {
-    crate::{
-        input_device,
-        input_handler::{InputHandlerStatus, UnhandledInputHandler},
-        metrics, mouse_binding,
-        utils::Position,
-    },
-    async_trait::async_trait,
-    fuchsia_inspect::health::Reporter,
-    fuchsia_zircon as zx,
-    metrics_registry::*,
-    std::{cell::RefCell, num::FpCategory, rc::Rc},
-};
+use crate::input_handler::{InputHandlerStatus, UnhandledInputHandler};
+use crate::utils::Position;
+use crate::{input_device, metrics, mouse_binding};
+use async_trait::async_trait;
+use fuchsia_inspect::health::Reporter;
+use fuchsia_zircon as zx;
+use metrics_registry::*;
+use std::cell::RefCell;
+use std::num::FpCategory;
+use std::rc::Rc;
 
 pub struct PointerSensorScaleHandler {
     mutable_state: RefCell<MutableState>,
@@ -439,17 +436,15 @@ impl PointerSensorScaleHandler {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::input_handler::InputHandler,
-        crate::testing_utilities,
-        assert_matches::assert_matches,
-        fuchsia_async as fasync, fuchsia_inspect, fuchsia_zircon as zx,
-        maplit::hashset,
-        std::cell::Cell,
-        std::ops::Add,
-        test_util::{assert_gt, assert_lt, assert_near},
-    };
+    use super::*;
+    use crate::input_handler::InputHandler;
+    use crate::testing_utilities;
+    use assert_matches::assert_matches;
+    use maplit::hashset;
+    use std::cell::Cell;
+    use std::ops::Add;
+    use test_util::{assert_gt, assert_lt, assert_near};
+    use {fuchsia_async as fasync, fuchsia_inspect, fuchsia_zircon as zx};
 
     const COUNTS_PER_MM: f32 = 12.0;
     const DEVICE_DESCRIPTOR: input_device::InputDeviceDescriptor =
@@ -838,7 +833,8 @@ mod tests {
     }
 
     mod scroll_scaling_tick {
-        use {super::*, test_case::test_case};
+        use super::*;
+        use test_case::test_case;
 
         #[test_case(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
@@ -911,7 +907,8 @@ mod tests {
     }
 
     mod scroll_scaling_mm {
-        use {super::*, pretty_assertions::assert_eq};
+        use super::*;
+        use pretty_assertions::assert_eq;
 
         async fn get_scaled_scroll_mm(
             wheel_delta_v_mm: Option<f32>,
@@ -1195,7 +1192,8 @@ mod tests {
     }
 
     mod metadata_preservation {
-        use {super::*, test_case::test_case};
+        use super::*;
+        use test_case::test_case;
 
         #[test_case(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {

@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_pkg_ext::{MirrorConfig, RepositoryConfig},
-    fuchsia_inspect::{self as inspect, NumericProperty, StringReference},
-    fuchsia_inspect_contrib::inspectable::{Inspectable, Watch},
-    std::sync::Arc,
-};
+use fidl_fuchsia_pkg_ext::{MirrorConfig, RepositoryConfig};
+use fuchsia_inspect::{self as inspect, NumericProperty, StringReference};
+use fuchsia_inspect_contrib::inspectable::{Inspectable, Watch};
+use std::sync::Arc;
 
 pub type InspectableRepositoryConfig =
     Inspectable<Arc<RepositoryConfig>, InspectableRepositoryConfigWatcher>;
@@ -99,12 +97,10 @@ impl MirrorConfigInspectState {
 
 #[cfg(test)]
 mod test_inspectable_repository_config {
-    use {
-        super::*,
-        diagnostics_assertions::assert_data_tree,
-        fidl_fuchsia_pkg_ext::{MirrorConfigBuilder, RepositoryConfigBuilder, RepositoryKey},
-        http::Uri,
-    };
+    use super::*;
+    use diagnostics_assertions::assert_data_tree;
+    use fidl_fuchsia_pkg_ext::{MirrorConfigBuilder, RepositoryConfigBuilder, RepositoryKey};
+    use http::Uri;
 
     #[test]
     fn test_initialization() {

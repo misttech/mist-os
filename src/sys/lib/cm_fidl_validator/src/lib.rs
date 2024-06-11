@@ -8,18 +8,15 @@ pub mod error;
 
 pub use crate::util::check_url;
 
-use {
-    crate::{error::*, util::*},
-    cm_types::{IterablePath, RelativePath},
-    directed_graph::DirectedGraph,
-    fidl_fuchsia_component_decl as fdecl,
-    itertools::Itertools,
-    std::{
-        collections::{BTreeSet, HashMap, HashSet},
-        fmt,
-        path::Path,
-    },
-};
+use crate::error::*;
+use crate::util::*;
+use cm_types::{IterablePath, RelativePath};
+use directed_graph::DirectedGraph;
+use fidl_fuchsia_component_decl as fdecl;
+use itertools::Itertools;
+use std::collections::{BTreeSet, HashMap, HashSet};
+use std::fmt;
+use std::path::Path;
 
 trait HasAvailability {
     fn availability(&self) -> fdecl::Availability;
@@ -2841,9 +2838,11 @@ impl<'a> ValidationContext<'a> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use cm_types::MAX_LONG_NAME_LENGTH;
+    use test_case::test_case;
     use {
-        super::*, cm_types::MAX_LONG_NAME_LENGTH, fidl_fuchsia_component_decl as fdecl,
-        fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, test_case::test_case,
+        fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     };
 
     macro_rules! test_validate {

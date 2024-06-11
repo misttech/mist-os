@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    component_events::{events::*, matcher::*},
-    fidl_fuchsia_component as fcomponent,
-};
+use component_events::events::*;
+use component_events::matcher::*;
+use fidl_fuchsia_component as fcomponent;
 
 #[fuchsia::main]
 async fn main() {

@@ -2,25 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    borrow::Cow,
-    cell::{Cell, RefCell, RefMut},
-    collections::BTreeMap,
-    mem,
-    ops::ControlFlow,
-    ops::Range,
-    slice::ChunksExactMut,
-};
+use std::borrow::Cow;
+use std::cell::{Cell, RefCell, RefMut};
+use std::collections::BTreeMap;
+use std::mem;
+use std::ops::{ControlFlow, Range};
+use std::slice::ChunksExactMut;
 
 use rayon::prelude::*;
 
-use crate::{
-    layout::{Flusher, Layout, Slice, TileFill},
-    painter::layer_workbench::{OptimizerTileWriteOp, TileWriteOp},
-    rasterizer::{search_last_by_key, PixelSegment},
-    simd::{f32x4, f32x8, i16x16, i32x8, i8x16, u32x4, u32x8, u8x32, Simd},
-    PIXEL_DOUBLE_WIDTH, PIXEL_WIDTH, TILE_HEIGHT, TILE_WIDTH,
-};
+use crate::layout::{Flusher, Layout, Slice, TileFill};
+use crate::painter::layer_workbench::{OptimizerTileWriteOp, TileWriteOp};
+use crate::rasterizer::{search_last_by_key, PixelSegment};
+use crate::simd::{f32x4, f32x8, i16x16, i32x8, i8x16, u32x4, u32x8, u8x32, Simd};
+use crate::{PIXEL_DOUBLE_WIDTH, PIXEL_WIDTH, TILE_HEIGHT, TILE_WIDTH};
 
 mod layer_workbench;
 #[macro_use]
@@ -770,12 +765,13 @@ pub fn painter_fill_at_bench(width: usize, height: usize, style: &Style) -> f32x
 mod tests {
     use super::*;
 
-    use std::{collections::HashMap, iter};
+    use std::collections::HashMap;
+    use std::iter;
 
-    use crate::{
-        layout::LinearLayout, point::Point, rasterizer::Rasterizer, GeomId, Layer, LinesBuilder,
-        Order,
-    };
+    use crate::layout::LinearLayout;
+    use crate::point::Point;
+    use crate::rasterizer::Rasterizer;
+    use crate::{GeomId, Layer, LinesBuilder, Order};
 
     const RED: Color = Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0 };
     const RED_GREEN_50: Color = Color { r: 1.0, g: 0.5, b: 0.0, a: 1.0 };

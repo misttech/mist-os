@@ -5,22 +5,19 @@
 mod authenticator;
 mod supplicant;
 
-use crate::key::{
-    exchange,
-    gtk::{Gtk, GtkProvider},
-    igtk::{Igtk, IgtkProvider},
-    ptk::Ptk,
-};
+use crate::key::exchange;
+use crate::key::gtk::{Gtk, GtkProvider};
+use crate::key::igtk::{Igtk, IgtkProvider};
+use crate::key::ptk::Ptk;
 use crate::nonce::NonceReader;
 use crate::rsna::{Dot11VerifiedKeyFrame, NegotiatedProtection, Role, UpdateSink};
-use crate::ProtectionInfo;
-use crate::{rsn_ensure, Error};
+use crate::{rsn_ensure, Error, ProtectionInfo};
 use ieee80211::MacAddr;
-use std::{
-    ops::Deref,
-    sync::{Arc, Mutex},
-};
-use wlan_common::ie::rsn::{cipher::Cipher, rsne::Rsne, suite_filter::DEFAULT_GROUP_MGMT_CIPHER};
+use std::ops::Deref;
+use std::sync::{Arc, Mutex};
+use wlan_common::ie::rsn::cipher::Cipher;
+use wlan_common::ie::rsn::rsne::Rsne;
+use wlan_common::ie::rsn::suite_filter::DEFAULT_GROUP_MGMT_CIPHER;
 use wlan_statemachine::StateMachine;
 use zerocopy::ByteSlice;
 
@@ -628,14 +625,10 @@ fn is_zero(slice: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        rsna::{test_util, SecAssocUpdate},
-        rsne::RsnCapabilities,
-    };
-    use wlan_common::ie::{
-        rsn::cipher::{CIPHER_BIP_CMAC_128, CIPHER_BIP_CMAC_256},
-        wpa::fake_wpa_ies::fake_deprecated_wpa1_vendor_ie,
-    };
+    use crate::rsna::{test_util, SecAssocUpdate};
+    use crate::rsne::RsnCapabilities;
+    use wlan_common::ie::rsn::cipher::{CIPHER_BIP_CMAC_128, CIPHER_BIP_CMAC_256};
+    use wlan_common::ie::wpa::fake_wpa_ies::fake_deprecated_wpa1_vendor_ie;
 
     #[test]
     fn correct_value_returned_by_authenticator_key_replay_counter() {

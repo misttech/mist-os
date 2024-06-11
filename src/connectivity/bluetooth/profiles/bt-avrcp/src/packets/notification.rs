@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_bluetooth_avrcp as fidl_avrcp,
-    packet_encoding::{decodable_enum, Decodable, Encodable},
-    std::{u32, u64},
-};
+use fidl_fuchsia_bluetooth_avrcp as fidl_avrcp;
+use packet_encoding::{decodable_enum, Decodable, Encodable};
+use std::{u32, u64};
 
 use crate::packets::{
     AvcCommandType, Error, PacketResult, PduId, PlaybackStatus,

@@ -2,21 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{Context as _, Error};
+use fidl::endpoints::ClientEnd;
+use ftest_manager::{CaseStatus, RunOptions, SuiteStatus};
+use fuchsia_component::client;
+use futures::prelude::*;
+use pretty_assertions::assert_eq;
+use test_diagnostics::collect_string_from_socket;
+use test_manager_test_lib::{
+    collect_suite_events, default_run_option, AttributedLog, GroupRunEventByTestCase, RunEvent,
+    TestBuilder, TestRunEventPayload,
+};
 use {
-    anyhow::{Context as _, Error},
-    fidl::endpoints::ClientEnd,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_test_manager as ftest_manager,
-    ftest_manager::{CaseStatus, RunOptions, SuiteStatus},
-    fuchsia_async as fasync,
-    fuchsia_component::client,
-    futures::prelude::*,
-    pretty_assertions::assert_eq,
-    test_diagnostics::collect_string_from_socket,
-    test_manager_test_lib::{
-        collect_suite_events, default_run_option, AttributedLog, GroupRunEventByTestCase, RunEvent,
-        TestBuilder, TestRunEventPayload,
-    },
+    fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync,
 };
 
 const ECHO_TEST_COL: &str = "echo_test_coll";

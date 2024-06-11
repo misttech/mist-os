@@ -10,13 +10,13 @@ use anyhow::{format_err, Context as _, Error};
 use fidl::prelude::*;
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_inspect::{self as inspect, health::Reporter};
+use fuchsia_inspect::health::Reporter;
+use fuchsia_inspect::{self as inspect};
 use futures::lock::Mutex;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
-use std::env;
 use std::path::PathBuf;
-use std::process;
 use std::sync::Arc;
+use std::{env, process};
 use tracing::error;
 
 mod accessor;

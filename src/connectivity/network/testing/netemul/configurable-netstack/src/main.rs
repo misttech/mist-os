@@ -3,22 +3,20 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context as _};
-use async_utils::{hanging_get::client::HangingGetStream, stream::FlattenUnorderedExt as _};
+use async_utils::hanging_get::client::HangingGetStream;
+use async_utils::stream::FlattenUnorderedExt as _;
 use fidl::endpoints::Proxy as _;
-use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_ext as fnet_ext;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_stack as fnet_stack;
-use fidl_fuchsia_netemul as fnetemul;
-use fuchsia_component::{
-    client::connect_to_protocol,
-    server::{ServiceFs, ServiceFsDir},
-};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use futures_util::{StreamExt as _, TryStreamExt as _};
 use tracing::{error, info};
+use {
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_stack as fnet_stack,
+    fidl_fuchsia_netemul as fnetemul,
+};
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() {

@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::endpoints::{create_proxy, ServiceMarker};
+use fuchsia_component::client;
+use std::collections::HashMap;
+use tracing::*;
 use {
-    fidl::endpoints::{create_proxy, ServiceMarker},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_examples as fexamples, fidl_fuchsia_io as fio,
-    fuchsia_component::client,
-    std::collections::HashMap,
-    tracing::*,
 };
 
 /// Child component which provides the echo service.

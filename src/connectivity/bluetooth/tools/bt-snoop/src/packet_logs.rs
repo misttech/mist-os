@@ -17,7 +17,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::warn;
 
-use crate::{bounded_queue::BoundedQueue, snooper::SnoopPacket, DeviceId};
+use crate::bounded_queue::BoundedQueue;
+use crate::snooper::SnoopPacket;
+use crate::DeviceId;
 
 fn generate_lazy_values_for_packet_log(
     device_name: String,

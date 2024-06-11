@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        commands::{types::*, utils},
-        text_formatter,
-        types::Error,
-    },
-    argh::{ArgsInfo, FromArgs},
-    async_trait::async_trait,
-    derivative::Derivative,
-    diagnostics_data::{Inspect, InspectData, InspectHandleName},
-    serde::Serialize,
-    std::{cmp::Ordering, fmt, ops::Deref},
-};
+use crate::commands::types::*;
+use crate::commands::utils;
+use crate::text_formatter;
+use crate::types::Error;
+use argh::{ArgsInfo, FromArgs};
+use async_trait::async_trait;
+use derivative::Derivative;
+use diagnostics_data::{Inspect, InspectData, InspectHandleName};
+use serde::Serialize;
+use std::cmp::Ordering;
+use std::fmt;
+use std::ops::Deref;
 
 #[derive(Derivative, Serialize, PartialEq)]
 #[derivative(Eq)]

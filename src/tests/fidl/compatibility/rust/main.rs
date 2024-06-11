@@ -2,24 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context as _, Error},
-    fidl_fidl_test_compatibility::{
-        EchoEchoArraysWithErrorResult, EchoEchoMinimalWithErrorResult,
-        EchoEchoStructWithErrorResult, EchoEchoTableWithErrorResult,
-        EchoEchoUnionPayloadWithErrorRequest, EchoEchoUnionPayloadWithErrorRequestUnknown,
-        EchoEchoVectorsWithErrorResult, EchoEchoXunionsWithErrorResult, EchoEvent, EchoMarker,
-        EchoProxy, EchoRequest, EchoRequestStream, RequestUnion, RequestUnionUnknown, RespondWith,
-        ResponseTable, ResponseUnion,
-    },
-    fidl_fidl_test_imported::{
-        ComposedEchoUnionResponseWithErrorComposedResponse, SimpleStruct, WantResponse,
-    },
-    fuchsia_async as fasync,
-    fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
-    futures::{StreamExt, TryStreamExt},
-    std::thread,
+use anyhow::{format_err, Context as _, Error};
+use fidl_fidl_test_compatibility::{
+    EchoEchoArraysWithErrorResult, EchoEchoMinimalWithErrorResult, EchoEchoStructWithErrorResult,
+    EchoEchoTableWithErrorResult, EchoEchoUnionPayloadWithErrorRequest,
+    EchoEchoUnionPayloadWithErrorRequestUnknown, EchoEchoVectorsWithErrorResult,
+    EchoEchoXunionsWithErrorResult, EchoEvent, EchoMarker, EchoProxy, EchoRequest,
+    EchoRequestStream, RequestUnion, RequestUnionUnknown, RespondWith, ResponseTable,
+    ResponseUnion,
 };
+use fidl_fidl_test_imported::{
+    ComposedEchoUnionResponseWithErrorComposedResponse, SimpleStruct, WantResponse,
+};
+use fuchsia_async as fasync;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use futures::{StreamExt, TryStreamExt};
+use std::thread;
 
 fn connect_to_echo() -> Result<EchoProxy, Error> {
     let echo = connect_to_protocol::<EchoMarker>()?;

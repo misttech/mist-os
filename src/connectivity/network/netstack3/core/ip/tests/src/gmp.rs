@@ -4,41 +4,35 @@
 
 use assert_matches::assert_matches;
 
-use net_types::{
-    ethernet::Mac,
-    ip::{AddrSubnet, Ip, Ipv4, Ipv4Addr, Ipv6},
-    MulticastAddr, SpecifiedAddr, Witness as _,
-};
+use net_types::ethernet::Mac;
+use net_types::ip::{AddrSubnet, Ip, Ipv4, Ipv4Addr, Ipv6};
+use net_types::{MulticastAddr, SpecifiedAddr, Witness as _};
 use packet::ParsablePacket as _;
-use packet_formats::{
-    ethernet::EthernetFrameLengthCheck,
-    icmp::{
-        mld::{MulticastListenerDone, MulticastListenerReport},
-        IcmpUnusedCode,
-    },
-    igmp::messages::IgmpPacket,
-    ip::Ipv4Proto,
-    testutil::{
-        parse_icmp_packet_in_ip_packet_in_ethernet_frame, parse_ip_packet_in_ethernet_frame,
-    },
+use packet_formats::ethernet::EthernetFrameLengthCheck;
+use packet_formats::icmp::mld::{MulticastListenerDone, MulticastListenerReport};
+use packet_formats::icmp::IcmpUnusedCode;
+use packet_formats::igmp::messages::IgmpPacket;
+use packet_formats::ip::Ipv4Proto;
+use packet_formats::testutil::{
+    parse_icmp_packet_in_ip_packet_in_ethernet_frame, parse_ip_packet_in_ethernet_frame,
 };
 
 use netstack3_base::testutil::{TestAddrs, TestIpExt as _};
-use netstack3_core::{
-    device::{DeviceId, EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
-    testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC},
-    InstantContext as _, StackStateBuilder, TimerId,
+use netstack3_core::device::{
+    DeviceId, EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize,
 };
+use netstack3_core::testutil::{
+    CtxPairExt as _, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC,
+};
+use netstack3_core::{InstantContext as _, StackStateBuilder, TimerId};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
-use netstack3_ip::{
-    device::{
-        IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv4DeviceTimerId,
-        Ipv6DeviceConfigurationUpdate, Ipv6DeviceTimerId, SlaacConfiguration,
-    },
-    gmp::{
-        IgmpTimerId, MldTimerId, IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
-        MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
-    },
+use netstack3_ip::device::{
+    IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv4DeviceTimerId,
+    Ipv6DeviceConfigurationUpdate, Ipv6DeviceTimerId, SlaacConfiguration,
+};
+use netstack3_ip::gmp::{
+    IgmpTimerId, MldTimerId, IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
+    MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
 };
 
 const V4_HOST_ADDR: SpecifiedAddr<Ipv4Addr> =

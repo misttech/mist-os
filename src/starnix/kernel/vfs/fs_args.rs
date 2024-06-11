@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::vfs::{FsStr, FsString};
-use starnix_uapi::{errno, errors::Errno};
+use starnix_uapi::errno;
+use starnix_uapi::errors::Errno;
 use std::collections::HashMap;
 
 /// Parses a comma-separated list of options of the form `key` or `key=value` or `key="value"`.
@@ -39,14 +40,12 @@ where
 
 mod parse_mount_options {
     use crate::vfs::{FsStr, FsString};
-    use nom::{
-        branch::alt,
-        bytes::complete::{is_not, tag},
-        combinator::opt,
-        multi::separated_list,
-        sequence::{delimited, separated_pair, terminated},
-        IResult,
-    };
+    use nom::branch::alt;
+    use nom::bytes::complete::{is_not, tag};
+    use nom::combinator::opt;
+    use nom::multi::separated_list;
+    use nom::sequence::{delimited, separated_pair, terminated};
+    use nom::IResult;
     use starnix_uapi::errors::{errno, error, Errno};
     use std::collections::HashMap;
 

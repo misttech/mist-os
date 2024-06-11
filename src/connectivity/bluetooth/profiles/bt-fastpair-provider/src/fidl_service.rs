@@ -7,8 +7,9 @@ use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_bluetooth_fastpair::{ProviderMarker, ProviderRequest, ProviderRequestStream};
 use fidl_fuchsia_bluetooth_sys::{PairingRequest, PairingRequestStream};
 use fuchsia_component::server::{ServiceFs, ServiceObj};
+use futures::channel::mpsc::Sender;
 use futures::future::BoxFuture;
-use futures::{channel::mpsc::Sender, FutureExt, SinkExt, StreamExt};
+use futures::{FutureExt, SinkExt, StreamExt};
 use tracing::{trace, warn};
 
 use crate::pairing::PairingArgs;

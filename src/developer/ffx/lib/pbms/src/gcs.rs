@@ -6,12 +6,10 @@
 
 use crate::AuthFlowChoice;
 use anyhow::{bail, Context, Result};
-use gcs::{
-    auth,
-    client::{Client, DirectoryProgress, FileProgress, ProgressResponse, ProgressResult},
-    error::GcsError,
-    gs_url::split_gs_url,
-};
+use gcs::auth;
+use gcs::client::{Client, DirectoryProgress, FileProgress, ProgressResponse, ProgressResult};
+use gcs::error::GcsError;
+use gcs::gs_url::split_gs_url;
 use std::path::Path;
 
 /// Download from a given `gcs_url`.

@@ -4,15 +4,12 @@
 
 use anyhow::{anyhow, Result};
 use argh::{ArgsInfo, FromArgs};
-use async_fs as afs;
 use async_trait::async_trait;
 use crossterm::tty::IsTty;
 use errors::ffx_bail;
 use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl::endpoints::Proxy;
 use fidl_codec::library as lib;
-use fidl_fuchsia_developer_remotecontrol as rc;
-use fuchsia_async as fasync;
 use futures::channel::oneshot::channel as oneshot;
 use futures::future::{select, Either, FutureExt};
 use futures::io::AllowStdIo;
@@ -24,6 +21,7 @@ use std::io::{self, stdin, BufRead as _, BufReader};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use vfs::directory::helper::DirectlyMutable;
+use {async_fs as afs, fidl_fuchsia_developer_remotecontrol as rc, fuchsia_async as fasync};
 
 mod analytics;
 mod cf_fs;

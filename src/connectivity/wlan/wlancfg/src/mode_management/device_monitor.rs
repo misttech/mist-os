@@ -2,20 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        legacy::{Iface, IfaceRef},
-        mode_management::{iface_manager_api::IfaceManagerApi, phy_manager::PhyManagerApi},
-    },
-    anyhow::format_err,
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_wlan_common as fidl_common,
-    fidl_fuchsia_wlan_device_service::{DeviceMonitorProxy, DeviceWatcherEvent},
-    fuchsia_zircon as zx,
-    futures::lock::Mutex,
-    std::sync::Arc,
-    tracing::{error, info},
-};
+use crate::legacy::{Iface, IfaceRef};
+use crate::mode_management::iface_manager_api::IfaceManagerApi;
+use crate::mode_management::phy_manager::PhyManagerApi;
+use anyhow::format_err;
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_wlan_device_service::{DeviceMonitorProxy, DeviceWatcherEvent};
+use futures::lock::Mutex;
+use std::sync::Arc;
+use tracing::{error, info};
+use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_zircon as zx};
 
 pub struct Listener {
     proxy: DeviceMonitorProxy,
@@ -145,27 +141,25 @@ impl Listener {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::access_point::{state_machine as ap_fsm, types as ap_types};
+    use crate::client::types as client_types;
+    use crate::mode_management::iface_manager_api::{ConnectAttemptRequest, SmeForScan};
+    use crate::mode_management::phy_manager::{CreateClientIfacesReason, PhyManagerError};
+    use crate::mode_management::recovery::RecoverySummary;
+    use crate::mode_management::Defect;
+    use crate::regulatory_manager::REGION_CODE_LEN;
+    use anyhow::Error;
+    use async_trait::async_trait;
+    use futures::channel::oneshot;
+    use futures::task::Poll;
+    use futures::StreamExt;
+    use ieee80211::MacAddr;
+    use std::pin::pin;
+    use wlan_common::assert_variant;
     use {
-        super::*,
-        crate::{
-            access_point::{state_machine as ap_fsm, types as ap_types},
-            client::types as client_types,
-            mode_management::{
-                iface_manager_api::{ConnectAttemptRequest, SmeForScan},
-                phy_manager::{CreateClientIfacesReason, PhyManagerError},
-                recovery::RecoverySummary,
-                Defect,
-            },
-            regulatory_manager::REGION_CODE_LEN,
-        },
-        anyhow::Error,
-        async_trait::async_trait,
         fidl_fuchsia_wlan_device_service as fidl_service, fidl_fuchsia_wlan_sme as fidl_sme,
         fuchsia_async as fasync,
-        futures::{channel::oneshot, task::Poll, StreamExt},
-        ieee80211::MacAddr,
-        std::pin::pin,
-        wlan_common::assert_variant,
     };
 
     struct TestValues {

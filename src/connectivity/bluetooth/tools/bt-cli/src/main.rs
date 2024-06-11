@@ -14,19 +14,21 @@ use fuchsia_bluetooth::types::io_capabilities::{InputCapability, OutputCapabilit
 use fuchsia_bluetooth::types::{addresses_to_custom_string, HostId, HostInfo, Peer, PeerId};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::Mutex;
-use futures::{channel::mpsc, select, FutureExt, Sink, SinkExt, Stream, StreamExt, TryFutureExt};
+use futures::channel::mpsc;
+use futures::{select, FutureExt, Sink, SinkExt, Stream, StreamExt, TryFutureExt};
 use prettytable::{cell, format, row, Row, Table};
 use regex::Regex;
-use rustyline::{error::ReadlineError, CompletionType, Config, EditMode, Editor};
+use rustyline::error::ReadlineError;
+use rustyline::{CompletionType, Config, EditMode, Editor};
+use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::pin::pin;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
-use std::{cmp::Ordering, collections::HashMap, str::FromStr};
 
-use crate::{
-    commands::{Cmd, CmdHelper, ReplControl},
-    types::{DeviceClass, MajorClass, MinorClass, TryInto},
-};
+use crate::commands::{Cmd, CmdHelper, ReplControl};
+use crate::types::{DeviceClass, MajorClass, MinorClass, TryInto};
 
 mod commands;
 mod types;
@@ -770,17 +772,15 @@ async fn main() -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {
-        assert_matches::assert_matches,
-        bt_fidl_mocks::sys::{AccessMock, PairingMock},
-        fidl::endpoints::Proxy,
-        fidl_fuchsia_bluetooth as fbt, fidl_fuchsia_bluetooth_sys as fsys,
-        fidl_fuchsia_bluetooth_sys::{InputCapability, OutputCapability},
-        fuchsia_bluetooth::types::Address,
-        fuchsia_zircon::{Duration, DurationNum},
-        futures::join,
-        std::task::Poll,
-    };
+    use assert_matches::assert_matches;
+    use bt_fidl_mocks::sys::{AccessMock, PairingMock};
+    use fidl::endpoints::Proxy;
+    use fidl_fuchsia_bluetooth_sys::{InputCapability, OutputCapability};
+    use fuchsia_bluetooth::types::Address;
+    use fuchsia_zircon::{Duration, DurationNum};
+    use futures::join;
+    use std::task::Poll;
+    use {fidl_fuchsia_bluetooth as fbt, fidl_fuchsia_bluetooth_sys as fsys};
 
     fn peer(connected: bool, bonded: bool) -> Peer {
         Peer {

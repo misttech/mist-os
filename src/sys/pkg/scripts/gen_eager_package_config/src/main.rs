@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    lib::{
-        generate_omaha_client_config, generate_pkg_resolver_config, Args, InputConfig,
-        PublicKeysByServiceUrl,
-    },
-    std::{fs::File, io::BufReader},
+use lib::{
+    generate_omaha_client_config, generate_pkg_resolver_config, Args, InputConfig,
+    PublicKeysByServiceUrl,
 };
+use std::fs::File;
+use std::io::BufReader;
 
 fn main_inner(args: &Args) -> Result<(), anyhow::Error> {
     let key_config: PublicKeysByServiceUrl =

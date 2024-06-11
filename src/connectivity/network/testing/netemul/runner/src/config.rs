@@ -3,17 +3,14 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context as _};
-use fidl_fuchsia_data as fdata;
-use fidl_fuchsia_net_ext as fnet_ext;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_netemul as fnetemul;
-use fidl_fuchsia_netemul_network as fnetemul_network;
-use fidl_fuchsia_sys2 as fsys2;
-use std::{
-    collections::{hash_map, HashMap, HashSet},
-    str::FromStr,
-};
+use std::collections::{hash_map, HashMap, HashSet};
+use std::str::FromStr;
 use tracing::{debug, info};
+use {
+    fidl_fuchsia_data as fdata, fidl_fuchsia_net_ext as fnet_ext,
+    fidl_fuchsia_net_interfaces as fnet_interfaces, fidl_fuchsia_netemul as fnetemul,
+    fidl_fuchsia_netemul_network as fnetemul_network, fidl_fuchsia_sys2 as fsys2,
+};
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct Network {
@@ -526,7 +523,8 @@ impl Config {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use futures::{channel::mpsc, StreamExt as _, TryStreamExt as _};
+    use futures::channel::mpsc;
+    use futures::{StreamExt as _, TryStreamExt as _};
     use net_declare::{fidl_ip, fidl_mac, fidl_subnet};
     use test_case::test_case;
 

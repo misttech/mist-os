@@ -8,12 +8,11 @@ use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
-use fidl_fuchsia_feedback as fidl_feedback;
-use fuchsia_async as fasync;
 use futures::channel::mpsc;
 use futures::stream::StreamExt;
 use std::cell::RefCell;
 use std::rc::Rc;
+use {fidl_fuchsia_feedback as fidl_feedback, fuchsia_async as fasync};
 
 /// Node: CrashReportHandler
 ///

@@ -4,16 +4,13 @@
 
 // This file contains a few helper routines that don't fit nicely anywhere else.
 
-use {
-    anyhow::{bail, Context as _, Result},
-    fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult},
-    serde_json::Value,
-    sha2::{Digest, Sha256},
-    std::env,
-    std::fs,
-    std::path::{Path, PathBuf},
-    url::Url,
-};
+use anyhow::{bail, Context as _, Result};
+use fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult};
+use serde_json::Value;
+use sha2::{Digest, Sha256};
+use std::path::{Path, PathBuf};
+use std::{env, fs};
+use url::Url;
 
 /// Creates a directory under the given `parent` directory, if it does not already exist.
 pub fn create_dir_at<P: AsRef<Path>, S: AsRef<str>>(parent: P, dirname: S) -> Result<PathBuf> {
@@ -138,12 +135,10 @@ fn parse_tests_json(json_data: String) -> Result<Vec<Url>> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{get_fuzzer_urls, test_json_path},
-        anyhow::Result,
-        fuchsia_fuzzctl_test::Test,
-        serde_json::json,
-    };
+    use super::{get_fuzzer_urls, test_json_path};
+    use anyhow::Result;
+    use fuchsia_fuzzctl_test::Test;
+    use serde_json::json;
 
     #[fuchsia::test]
     async fn test_test_json_path() -> Result<()> {

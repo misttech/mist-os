@@ -2,26 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    diagnostics_assertions::{assert_data_tree, AnyProperty},
-    diagnostics_hierarchy::DiagnosticsHierarchy,
-    diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect},
-    fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_test_wlan_realm::WlanConfig,
-    fuchsia_zircon::DurationNum,
-    ieee80211::Bssid,
-    lazy_static::lazy_static,
-    std::pin::pin,
-    wlan_common::{
-        bss::Protection,
-        channel::{Cbw, Channel},
-    },
-    wlan_hw_sim::{
-        event::{action, Handler},
-        *,
-    },
-};
+use anyhow::{format_err, Error};
+use diagnostics_assertions::{assert_data_tree, AnyProperty};
+use diagnostics_hierarchy::DiagnosticsHierarchy;
+use diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect};
+use fidl_fuchsia_wlan_policy as fidl_policy;
+use fidl_test_wlan_realm::WlanConfig;
+use fuchsia_zircon::DurationNum;
+use ieee80211::Bssid;
+use lazy_static::lazy_static;
+use std::pin::pin;
+use wlan_common::bss::Protection;
+use wlan_common::channel::{Cbw, Channel};
+use wlan_hw_sim::event::{action, Handler};
+use wlan_hw_sim::*;
 
 lazy_static! {
     static ref BSSID: Bssid = Bssid::from([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);

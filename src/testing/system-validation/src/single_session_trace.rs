@@ -7,13 +7,13 @@ use fidl_fuchsia_tracing_controller::{
     ControllerMarker, ControllerProxy, StartErrorCode, StartOptions, StopOptions, TerminateOptions,
     TraceConfig,
 };
-use fuchsia_async;
 use fuchsia_component::{self as app};
 use fuchsia_sync::RwLock;
-use fuchsia_zircon as zx;
-use futures::{future, io::AsyncReadExt, TryFutureExt};
+use futures::io::AsyncReadExt;
+use futures::{future, TryFutureExt};
 use std::fs;
 use std::io::Write;
+use {fuchsia_async, fuchsia_zircon as zx};
 
 const TRACE_FILE: &'static str = "/custom_artifacts/trace.fxt";
 const BUFFER_SIZE_MB: u32 = 36;

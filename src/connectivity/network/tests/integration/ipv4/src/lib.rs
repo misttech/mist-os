@@ -4,38 +4,29 @@
 
 #![cfg(test)]
 
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_routes as fnet_routes;
-use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext,
+};
 
 use futures::{FutureExt as _, StreamExt as _};
 use net_declare::{net_ip_v4, std_ip_v4};
-use net_types::{
-    ip::{self as net_types_ip, Ipv4, Ipv4Addr},
-    MulticastAddress as _,
-};
+use net_types::ip::{self as net_types_ip, Ipv4, Ipv4Addr};
+use net_types::MulticastAddress as _;
 use netemul::RealmUdpSocket;
-use netstack_testing_common::{
-    interfaces::{self, TestInterfaceExt},
-    realms::{Netstack, NetstackVersion, TestSandboxExt},
-    setup_network, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
-};
+use netstack_testing_common::interfaces::{self, TestInterfaceExt};
+use netstack_testing_common::realms::{Netstack, NetstackVersion, TestSandboxExt};
+use netstack_testing_common::{setup_network, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT};
 use netstack_testing_macros::netstack_test;
 use packet::ParsablePacket as _;
-use packet_formats::{
-    ethernet::{EtherType, EthernetFrame, EthernetFrameLengthCheck},
-    igmp::{
-        messages::{
-            IgmpGroupRecordType, IgmpMembershipReportV1, IgmpMembershipReportV2,
-            IgmpMembershipReportV3,
-        },
-        IgmpMessage, MessageType,
-    },
-    ip::Ipv4Proto,
-    testutil::parse_ip_packet,
+use packet_formats::ethernet::{EtherType, EthernetFrame, EthernetFrameLengthCheck};
+use packet_formats::igmp::messages::{
+    IgmpGroupRecordType, IgmpMembershipReportV1, IgmpMembershipReportV2, IgmpMembershipReportV3,
 };
+use packet_formats::igmp::{IgmpMessage, MessageType};
+use packet_formats::ip::Ipv4Proto;
+use packet_formats::testutil::parse_ip_packet;
 use std::pin::pin;
 use test_case::test_case;
 

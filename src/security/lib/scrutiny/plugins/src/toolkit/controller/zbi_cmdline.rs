@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    scrutiny::{
-        model::controller::{DataController, HintDataType},
-        model::model::*,
-    },
-    scrutiny_utils::{usage::*, zbi::*},
-    serde::{Deserialize, Serialize},
-    serde_json::{json, value::Value},
-    std::fs::File,
-    std::io::prelude::*,
-    std::sync::Arc,
-};
+use anyhow::{anyhow, Context, Result};
+use scrutiny::model::controller::{DataController, HintDataType};
+use scrutiny::model::model::*;
+use scrutiny_utils::usage::*;
+use scrutiny_utils::zbi::*;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use serde_json::value::Value;
+use std::fs::File;
+use std::io::prelude::*;
+use std::sync::Arc;
 
 #[derive(Deserialize, Serialize)]
 pub struct ZbiExtractCmdlineRequest {

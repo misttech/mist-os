@@ -2,21 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::fuchsia::{
-        testing::{TestFixture, TestFixtureOptions},
-        volume::FxVolume,
-    },
-    async_trait::async_trait,
-    blob_writer::BlobWriter,
-    delivery_blob::{CompressionMode, Type1Blob},
-    fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobReaderMarker, BlobWriterProxy, CreateBlobError},
-    fuchsia_component::client::connect_to_protocol_at_dir_svc,
-    fuchsia_merkle::Hash,
-    fuchsia_zircon as zx,
-    fxfs::object_store::{directory::Directory, DataObjectHandle, HandleOptions, ObjectStore},
-    storage_device::{fake_device::FakeDevice, DeviceHolder},
-};
+use crate::fuchsia::testing::{TestFixture, TestFixtureOptions};
+use crate::fuchsia::volume::FxVolume;
+use async_trait::async_trait;
+use blob_writer::BlobWriter;
+use delivery_blob::{CompressionMode, Type1Blob};
+use fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobReaderMarker, BlobWriterProxy, CreateBlobError};
+use fuchsia_component::client::connect_to_protocol_at_dir_svc;
+use fuchsia_merkle::Hash;
+use fuchsia_zircon as zx;
+use fxfs::object_store::directory::Directory;
+use fxfs::object_store::{DataObjectHandle, HandleOptions, ObjectStore};
+use storage_device::fake_device::FakeDevice;
+use storage_device::DeviceHolder;
 
 pub async fn new_blob_fixture() -> TestFixture {
     TestFixture::open(

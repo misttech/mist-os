@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    std::{collections::HashMap, io::Write, os::fd::AsRawFd},
-    tracing::{error, info, warn},
-    wlan_stash_constants::{FileContent, PersistentStorageData},
-};
+use anyhow::{format_err, Error};
+use std::collections::HashMap;
+use std::io::Write;
+use std::os::fd::AsRawFd;
+use tracing::{error, info, warn};
+use wlan_stash_constants::{FileContent, PersistentStorageData};
 
 type FileContents = HashMap<String, FileContent>;
 
@@ -104,11 +104,9 @@ impl StorageStore {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::tests::rand_string,
-        wlan_stash_constants::{Credential, SecurityType},
-    };
+    use super::*;
+    use crate::tests::rand_string;
+    use wlan_stash_constants::{Credential, SecurityType};
 
     #[fuchsia::test]
     fn test_write() {

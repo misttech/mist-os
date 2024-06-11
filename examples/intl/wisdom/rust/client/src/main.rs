@@ -8,13 +8,12 @@
 //! It shows how one can use the available ICU bindings for rust to build a
 //! program that makes use of the Unicode support within ICU.
 
+use anyhow::{Context as _, Error};
+use fuchsia_component::client::connect_to_protocol;
+use structopt::StructOpt;
 use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_examples_intl_wisdom as fwisdom, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    rust_icu_sys as usys, rust_icu_udat as udat, rust_icu_uloc as uloc,
-    rust_icu_ustring as ustring,
-    structopt::StructOpt,
+    fidl_fuchsia_examples_intl_wisdom as fwisdom, fuchsia_async as fasync, rust_icu_sys as usys,
+    rust_icu_udat as udat, rust_icu_uloc as uloc, rust_icu_ustring as ustring,
 };
 
 pub(crate) mod wisdom_client_impl;

@@ -5,18 +5,19 @@
 //! Special cases of `Array<Bytes, Metadata, Data>` and instances of `Metadata` and `Data` that
 //! appear in binary SELinux policies.
 
+use super::error::{ParseError, ValidateError};
+use super::extensible_bitmap::ExtensibleBitmap;
+use super::parser::ParseStrategy;
+use super::symbols::{MlsLevel, MlsRange};
 use super::{
-    array_type, array_type_validate_deref_both,
-    error::{ParseError, ValidateError},
-    extensible_bitmap::ExtensibleBitmap,
-    parser::ParseStrategy,
-    symbols::{MlsLevel, MlsRange},
-    Array, Counted, Parse, RoleId, TypeId, UserId, Validate, ValidateArray,
+    array_type, array_type_validate_deref_both, Array, Counted, Parse, RoleId, TypeId, UserId,
+    Validate, ValidateArray,
 };
 
 use anyhow::Context as _;
 use selinux_common as sc;
-use std::{fmt::Debug, num::NonZeroU32};
+use std::fmt::Debug;
+use std::num::NonZeroU32;
 use zerocopy::{little_endian as le, FromBytes, FromZeroes, NoCell, Unaligned};
 
 pub(crate) const EXTENDED_PERMISSIONS_IS_SPECIFIED_DRIVER_PERMISSIONS_MASK: u16 = 0x0700;

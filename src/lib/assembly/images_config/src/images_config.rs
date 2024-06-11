@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::board_filesystem_config as bfc;
-use crate::product_filesystem_config as pfc;
+use crate::{board_filesystem_config as bfc, product_filesystem_config as pfc};
 use anyhow::{anyhow, bail, Context, Result};
 use bfc::{PostProcessingScript, VBMetaDescriptor, ZbiCompression};
 use camino::Utf8PathBuf;

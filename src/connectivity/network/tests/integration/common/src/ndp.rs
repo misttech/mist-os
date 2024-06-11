@@ -8,23 +8,20 @@ use crate::constants;
 use anyhow::Context as _;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use futures::{future, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _};
-use net_types::{ip::Ip as _, Witness as _};
+use net_types::ip::Ip as _;
+use net_types::Witness as _;
 use packet::serialize::{InnerPacketBuilder, Serializer};
-use packet_formats::{
-    ethernet::{
-        EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
-    },
-    icmp::{
-        ndp::{
-            options::NdpOptionBuilder, NeighborAdvertisement, NeighborSolicitation,
-            OptionSequenceBuilder, RouterAdvertisement,
-        },
-        IcmpMessage, IcmpPacketBuilder, IcmpUnusedCode,
-    },
-    ip::Ipv6Proto,
-    ipv6::Ipv6PacketBuilder,
-    testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame,
+use packet_formats::ethernet::{
+    EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
+use packet_formats::icmp::ndp::options::NdpOptionBuilder;
+use packet_formats::icmp::ndp::{
+    NeighborAdvertisement, NeighborSolicitation, OptionSequenceBuilder, RouterAdvertisement,
+};
+use packet_formats::icmp::{IcmpMessage, IcmpPacketBuilder, IcmpUnusedCode};
+use packet_formats::ip::Ipv6Proto;
+use packet_formats::ipv6::Ipv6PacketBuilder;
+use packet_formats::testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame;
 use std::fmt::Debug;
 use zerocopy::ByteSlice;
 

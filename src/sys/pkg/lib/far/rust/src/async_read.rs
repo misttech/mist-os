@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        DirectoryEntry, Error, Index, IndexEntry, DIRECTORY_ENTRY_LEN, DIR_CHUNK_TYPE,
-        DIR_NAMES_CHUNK_TYPE, INDEX_ENTRY_LEN, INDEX_LEN, MAGIC_INDEX_VALUE,
-    },
-    fuchsia_fs::file::{AsyncGetSize, AsyncGetSizeExt, AsyncReadAt, AsyncReadAtExt},
-    std::convert::TryInto as _,
-    zerocopy::AsBytes as _,
+use crate::{
+    DirectoryEntry, Error, Index, IndexEntry, DIRECTORY_ENTRY_LEN, DIR_CHUNK_TYPE,
+    DIR_NAMES_CHUNK_TYPE, INDEX_ENTRY_LEN, INDEX_LEN, MAGIC_INDEX_VALUE,
 };
+use fuchsia_fs::file::{AsyncGetSize, AsyncGetSizeExt, AsyncReadAt, AsyncReadAtExt};
+use std::convert::TryInto as _;
+use zerocopy::AsBytes as _;
 
 /// A struct to open and read a FAR-formatted archive asynchronously.
 #[derive(Debug)]
@@ -191,10 +189,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::tests::example_archive, assert_matches::assert_matches,
-        fuchsia_async as fasync, fuchsia_fs::file::Adapter, futures::io::Cursor,
-    };
+    use super::*;
+    use crate::tests::example_archive;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use fuchsia_fs::file::Adapter;
+    use futures::io::Cursor;
 
     #[fasync::run_singlethreaded(test)]
     async fn list() {

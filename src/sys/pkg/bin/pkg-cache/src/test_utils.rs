@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_hash::Hash,
-    fuchsia_pkg::{MetaContents, MetaPackage, MetaSubpackages},
-    std::{collections::BTreeMap, convert::TryInto as _, io},
-};
+use fuchsia_hash::Hash;
+use fuchsia_pkg::{MetaContents, MetaPackage, MetaSubpackages};
+use std::collections::BTreeMap;
+use std::convert::TryInto as _;
+use std::io;
 
 pub fn add_meta_far_to_blobfs(
     blobfs: &fuchsia_pkg_testing::blobfs::Fake,

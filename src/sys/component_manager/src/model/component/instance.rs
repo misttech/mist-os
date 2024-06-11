@@ -2,85 +2,69 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::bedrock::program::{self as program, ComponentStopOutcome, Program, StopRequestSuccess};
+use crate::bedrock::program_output_dict::build_program_output_dictionary;
+use crate::framework::{build_framework_dictionary, controller};
+use crate::model::actions::{shutdown, ActionsManager, DiscoverAction, StopAction};
+use crate::model::component::{
+    Component, ComponentInstance, ExtendedInstance, IncarnationId, Package, StartReason,
+    WeakComponentInstance, WeakExtendedInstance,
+};
+use crate::model::context::ModelContext;
+use crate::model::environment::Environment;
+use crate::model::escrow::{self, EscrowedState};
+use crate::model::namespace::create_namespace;
+use crate::model::routing::router_ext::{RouterExt, WeakComponentTokenExt};
+use crate::model::routing::service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute};
+use crate::model::routing::{self, RoutingError};
+use crate::model::routing_fns::RouteEntry;
+use crate::model::start::Start;
+use crate::model::storage::build_storage_admin_dictionary;
+use crate::model::token::{InstanceToken, InstanceTokenState};
+use crate::sandbox_util::RoutableExt;
+use ::routing::bedrock::sandbox_construction::{
+    self, build_component_sandbox, extend_dict_with_offers, ComponentSandbox,
+};
+use ::routing::bedrock::structured_dict::{ComponentInput, StructuredDictMap};
+use ::routing::capability_source::ComponentCapability;
+use ::routing::component_instance::{
+    ComponentInstanceInterface, ResolvedInstanceInterface, ResolvedInstanceInterfaceExt,
+};
+use ::routing::error::ComponentInstanceError;
+use ::routing::resolving::{ComponentAddress, ComponentResolutionContext};
+use ::routing::DictExt;
+use async_trait::async_trait;
+use async_utils::async_once::Once;
+use clonable_error::ClonableError;
+use cm_fidl_validator::error::{DeclType, Error as ValidatorError};
+use cm_logger::scoped::ScopedLogger;
+use cm_rust::{
+    CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, DeliveryType,
+    FidlIntoNative, NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl,
+};
+use cm_types::Name;
+use config_encoder::ConfigFields;
+use errors::{
+    AddChildError, AddDynamicChildError, CreateNamespaceError, DynamicCapabilityError,
+    OpenOutgoingDirError, ResolveActionError, StopError,
+};
+use fidl::endpoints::ServerEnd;
+use futures::future::BoxFuture;
+use hooks::{CapabilityReceiver, EventPayload};
+use moniker::{ChildName, ExtendedMoniker, Moniker};
+use router_error::RouterError;
+use sandbox::{
+    Capability, Dict, Open, RemotableCapability, Request, Routable, Router, WeakComponentToken,
+};
+use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::sync::Arc;
+use tracing::warn;
+use vfs::directory::immutable::simple as pfs;
+use vfs::path::Path;
 use {
-    crate::{
-        bedrock::{
-            program::{self as program, ComponentStopOutcome, Program, StopRequestSuccess},
-            program_output_dict::build_program_output_dictionary,
-        },
-        framework::{build_framework_dictionary, controller},
-        model::{
-            actions::{shutdown, ActionsManager, DiscoverAction, StopAction},
-            component::{
-                Component, ComponentInstance, ExtendedInstance, IncarnationId, Package,
-                StartReason, WeakComponentInstance, WeakExtendedInstance,
-            },
-            context::ModelContext,
-            environment::Environment,
-            escrow::{self, EscrowedState},
-            namespace::create_namespace,
-            routing::{
-                self,
-                router_ext::RouterExt,
-                router_ext::WeakComponentTokenExt,
-                service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
-                RoutingError,
-            },
-            routing_fns::RouteEntry,
-            start::Start,
-            storage::build_storage_admin_dictionary,
-            token::{InstanceToken, InstanceTokenState},
-        },
-        sandbox_util::RoutableExt,
-    },
-    ::routing::{
-        bedrock::{
-            sandbox_construction::{
-                self, build_component_sandbox, extend_dict_with_offers, ComponentSandbox,
-            },
-            structured_dict::{ComponentInput, StructuredDictMap},
-        },
-        capability_source::ComponentCapability,
-        component_instance::{
-            ComponentInstanceInterface, ResolvedInstanceInterface, ResolvedInstanceInterfaceExt,
-        },
-        error::ComponentInstanceError,
-        resolving::{ComponentAddress, ComponentResolutionContext},
-        DictExt,
-    },
-    async_trait::async_trait,
-    async_utils::async_once::Once,
-    clonable_error::ClonableError,
-    cm_fidl_validator::error::DeclType,
-    cm_fidl_validator::error::Error as ValidatorError,
-    cm_logger::scoped::ScopedLogger,
-    cm_rust::{
-        CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, DeliveryType,
-        FidlIntoNative, NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl,
-    },
-    cm_types::Name,
-    config_encoder::ConfigFields,
-    errors::{
-        AddChildError, AddDynamicChildError, CreateNamespaceError, DynamicCapabilityError,
-        OpenOutgoingDirError, ResolveActionError, StopError,
-    },
-    fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::future::BoxFuture,
-    hooks::{CapabilityReceiver, EventPayload},
-    moniker::{ChildName, ExtendedMoniker, Moniker},
-    router_error::RouterError,
-    sandbox::{
-        Capability, Dict, Open, RemotableCapability, Request, Routable, Router, WeakComponentToken,
-    },
-    std::{
-        collections::{HashMap, HashSet},
-        fmt,
-        sync::Arc,
-    },
-    tracing::warn,
-    vfs::{directory::immutable::simple as pfs, path::Path},
 };
 
 /// The mutable state of a component instance.

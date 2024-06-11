@@ -4,14 +4,17 @@
 
 pub mod args;
 
-use {
-    anyhow::{Context, Result},
-    args::DescriptorCommand,
-    fidl_fuchsia_input_report as fir, fidl_fuchsia_io as fio,
-    fuchsia_async::Task,
-    futures::{lock::Mutex, stream::TryStreamExt},
-    std::{fmt::Debug, io::Write, ops::DerefMut, path::Path, sync::Arc},
-};
+use anyhow::{Context, Result};
+use args::DescriptorCommand;
+use fuchsia_async::Task;
+use futures::lock::Mutex;
+use futures::stream::TryStreamExt;
+use std::fmt::Debug;
+use std::io::Write;
+use std::ops::DerefMut;
+use std::path::Path;
+use std::sync::Arc;
+use {fidl_fuchsia_input_report as fir, fidl_fuchsia_io as fio};
 
 async fn get_and_write_descriptor(
     input_device_proxy: fir::InputDeviceProxy,

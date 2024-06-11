@@ -10,16 +10,14 @@ mod manager;
 #[cfg(test)]
 mod test_support;
 
-use {
-    crate::manager::Manager,
-    anyhow::{Context as _, Error, Result},
-    fidl_fuchsia_fuzzer as fuzz, fidl_fuchsia_test_manager as test_manager,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_component::server::ServiceFs,
-    futures::channel::mpsc,
-    futures::{try_join, SinkExt, StreamExt, TryStreamExt},
-    tracing::warn,
-};
+use crate::manager::Manager;
+use anyhow::{Context as _, Error, Result};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use futures::channel::mpsc;
+use futures::{try_join, SinkExt, StreamExt, TryStreamExt};
+use tracing::warn;
+use {fidl_fuchsia_fuzzer as fuzz, fidl_fuchsia_test_manager as test_manager};
 
 enum IncomingService {
     FuzzManager(fuzz::ManagerRequestStream),

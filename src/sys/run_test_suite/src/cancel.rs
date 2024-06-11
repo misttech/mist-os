@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    futures::{
-        future::Future,
-        task::{Context, Poll},
-    },
-    pin_project::pin_project,
-    std::pin::Pin,
-    tracing::warn,
-};
+use futures::future::Future;
+use futures::task::{Context, Poll};
+use pin_project::pin_project;
+use std::pin::Pin;
+use tracing::warn;
 
 /// An extension trait that allows futures to be cancelled. Cancellation is signalled
 /// by a second future.
@@ -140,10 +136,8 @@ impl OnIncompleteHook for LogWarn {
 #[cfg(test)]
 mod test {
     use super::*;
-    use futures::{
-        channel::oneshot,
-        future::{pending, ready, FutureExt},
-    };
+    use futures::channel::oneshot;
+    use futures::future::{pending, ready, FutureExt};
     use std::cell::RefCell;
 
     #[fuchsia::test]

@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    fidl_fuchsia_wlan_device_service::DeviceMonitorMarker,
-    fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    structopt::StructOpt,
-};
+use anyhow::{Context, Error};
+use fidl_fuchsia_wlan_device_service::DeviceMonitorMarker;
+use fuchsia_async as fasync;
+use fuchsia_component::client::connect_to_protocol;
+use structopt::StructOpt;
 
 fn main() -> Result<(), Error> {
     println!(

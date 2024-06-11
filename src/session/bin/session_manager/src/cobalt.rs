@@ -2,15 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context, Error},
-    fidl_fuchsia_metrics::{MetricEventLoggerFactoryMarker, MetricEventLoggerProxy, ProjectSpec},
-    fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon as zx,
-    session_framework_metrics_registry::cobalt_registry as metrics,
-    tracing::warn,
-};
+use anyhow::{format_err, Context, Error};
+use fidl_fuchsia_metrics::{MetricEventLoggerFactoryMarker, MetricEventLoggerProxy, ProjectSpec};
+use fuchsia_component::client::connect_to_protocol;
+use session_framework_metrics_registry::cobalt_registry as metrics;
+use tracing::warn;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// Creates a LoggerProxy connected to Cobalt.
 ///
@@ -76,12 +73,10 @@ pub async fn log_session_launch_time(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_metrics::{MetricEventLoggerMarker, MetricEventLoggerRequest},
-        futures::TryStreamExt,
-    };
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_metrics::{MetricEventLoggerMarker, MetricEventLoggerRequest};
+    use futures::TryStreamExt;
 
     /// Tests that the right payload is sent to Cobalt when logging the session launch time.
     #[fasync::run_singlethreaded(test)]

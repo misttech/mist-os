@@ -4,29 +4,22 @@
 
 //! Support for running the ServiceFs until stalled.
 
-use std::{
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll},
-};
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
 
 use detect_stall::StallableRequestStream;
 use fidl::endpoints::ServerEnd;
-use fidl_fuchsia_io as fio;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
-use futures::{
-    channel::oneshot::{self, Canceled},
-    future::FusedFuture,
-    FutureExt, Stream, StreamExt,
-};
+use futures::channel::oneshot::{self, Canceled};
+use futures::future::FusedFuture;
+use futures::{FutureExt, Stream, StreamExt};
 use pin_project::pin_project;
-use vfs::{
-    directory::immutable::{connection::ImmutableConnection, Simple},
-    execution_scope::{ActiveGuard, ExecutionScope},
-    ToObjectRequest,
-};
+use vfs::directory::immutable::connection::ImmutableConnection;
+use vfs::directory::immutable::Simple;
+use vfs::execution_scope::{ActiveGuard, ExecutionScope};
+use vfs::ToObjectRequest;
 use zx::Duration;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 use super::{ServiceFs, ServiceObjTrait};
 
@@ -218,10 +211,8 @@ impl<ServiceObjTy: ServiceObjTrait> StallableServiceFs<ServiceObjTy> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{
-        atomic::{AtomicBool, Ordering},
-        Mutex,
-    };
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Mutex;
 
     use assert_matches::assert_matches;
     use fasync::TestExecutor;
@@ -229,7 +220,8 @@ mod tests {
     use fidl_fuchsia_component_client_test::{
         ServiceAMarker, ServiceARequest, ServiceARequestStream,
     };
-    use futures::{future::BoxFuture, pin_mut, select, TryStreamExt};
+    use futures::future::BoxFuture;
+    use futures::{pin_mut, select, TryStreamExt};
     use test_util::Counter;
     use zx::AsHandleRef;
 

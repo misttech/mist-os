@@ -2,32 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        capability_source::{
-            AggregateInstance, AggregateMember, AnonymizedAggregateCapabilityProvider,
-            CapabilitySource, ComponentCapability, FilteredAggregateCapabilityProvider,
-            FilteredAggregateCapabilityRouteData,
-        },
-        component_instance::{
-            ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
-            WeakComponentInstanceInterface,
-        },
-        error::RoutingError,
-        legacy_router::{
-            self, CapabilityVisitor, ErrorNotFoundFromParent, ErrorNotFoundInChild, ExposeVisitor,
-            OfferVisitor, RouteBundle, Sources,
-        },
-        mapper::NoopRouteMapper,
-    },
-    async_trait::async_trait,
-    cm_rust::{ExposeDecl, NameMapping, OfferDecl, OfferServiceDecl},
-    cm_types::Name,
-    derivative::Derivative,
-    futures::future::BoxFuture,
-    moniker::ChildName,
-    std::collections::HashSet,
+use crate::capability_source::{
+    AggregateInstance, AggregateMember, AnonymizedAggregateCapabilityProvider, CapabilitySource,
+    ComponentCapability, FilteredAggregateCapabilityProvider, FilteredAggregateCapabilityRouteData,
 };
+use crate::component_instance::{
+    ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
+    WeakComponentInstanceInterface,
+};
+use crate::error::RoutingError;
+use crate::legacy_router::{
+    self, CapabilityVisitor, ErrorNotFoundFromParent, ErrorNotFoundInChild, ExposeVisitor,
+    OfferVisitor, RouteBundle, Sources,
+};
+use crate::mapper::NoopRouteMapper;
+use async_trait::async_trait;
+use cm_rust::{ExposeDecl, NameMapping, OfferDecl, OfferServiceDecl};
+use cm_types::Name;
+use derivative::Derivative;
+use futures::future::BoxFuture;
+use moniker::ChildName;
+use std::collections::HashSet;
 
 /// Provides capabilities exposed by an anonymized aggregates.
 ///

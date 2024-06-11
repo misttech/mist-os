@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    scrutiny::{
-        engine::dispatcher::ControllerDispatcher, model::controller::DataController,
-        model::model::DataModel,
-    },
-    scrutiny_utils::usage::UsageBuilder,
-    serde_json::{json, value::Value},
-    std::sync::{Arc, RwLock},
-};
+use anyhow::Result;
+use scrutiny::engine::dispatcher::ControllerDispatcher;
+use scrutiny::model::controller::DataController;
+use scrutiny::model::model::DataModel;
+use scrutiny_utils::usage::UsageBuilder;
+use serde_json::json;
+use serde_json::value::Value;
+use std::sync::{Arc, RwLock};
 
 /// Lists all of the controllers.
 pub struct ControllerListController {

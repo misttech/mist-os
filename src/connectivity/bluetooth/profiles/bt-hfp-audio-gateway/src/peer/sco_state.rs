@@ -10,7 +10,9 @@ use futures::FutureExt;
 use std::fmt;
 use vigil::Vigil;
 
-use crate::{a2dp, error::ScoConnectError, sco_connector::ScoConnection};
+use crate::a2dp;
+use crate::error::ScoConnectError;
+use crate::sco_connector::ScoConnection;
 
 #[derive(Debug)]
 pub struct ScoActive {
@@ -134,9 +136,8 @@ mod tests {
     use super::*;
 
     use diagnostics_assertions::assert_data_tree;
-    use fidl_fuchsia_bluetooth as fidl_bt;
-    use fidl_fuchsia_bluetooth_bredr as bredr;
     use fuchsia_inspect_derive::WithInspect;
+    use {fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr};
 
     #[fuchsia::test]
     async fn sco_state_inspect_tree() {

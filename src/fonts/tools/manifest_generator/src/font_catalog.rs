@@ -6,27 +6,19 @@
 
 #![allow(deprecated)]
 
-use {
-    crate::{
-        merge::{MergeError, TryMerge, TryMergeGroups},
-        serde_ext::{self, LoadError},
-    },
-    anyhow::Error,
-    fidl_fuchsia_fonts::GenericFontFamily,
-    itertools::Itertools,
-    manifest::{
-        serde_ext::*,
-        v2::{FontFamilyAliasSet, Style},
-    },
-    rayon::prelude::*,
-    serde::de::Deserializer,
-    serde::Deserialize,
-    std::{
-        collections::{BTreeMap, HashSet},
-        path::{Path, PathBuf},
-    },
-    unicase::UniCase,
-};
+use crate::merge::{MergeError, TryMerge, TryMergeGroups};
+use crate::serde_ext::{self, LoadError};
+use anyhow::Error;
+use fidl_fuchsia_fonts::GenericFontFamily;
+use itertools::Itertools;
+use manifest::serde_ext::*;
+use manifest::v2::{FontFamilyAliasSet, Style};
+use rayon::prelude::*;
+use serde::de::Deserializer;
+use serde::Deserialize;
+use std::collections::{BTreeMap, HashSet};
+use std::path::{Path, PathBuf};
+use unicase::UniCase;
 
 /// Possible versions of [FontCatalog].
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -250,13 +242,11 @@ pub struct Typeface {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_fuchsia_fonts::{Slant, Style2 as FidlStyle, Width, WEIGHT_NORMAL},
-        maplit::btreemap,
-        pretty_assertions::assert_eq,
-        std::iter,
-    };
+    use super::*;
+    use fidl_fuchsia_fonts::{Slant, Style2 as FidlStyle, Width, WEIGHT_NORMAL};
+    use maplit::btreemap;
+    use pretty_assertions::assert_eq;
+    use std::iter;
 
     #[test]
     fn test_try_merge_aliases() -> Result<(), Error> {

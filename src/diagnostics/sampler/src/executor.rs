@@ -92,33 +92,31 @@
 //! fetches its own data from Archivist, so there's no need for a moniker_to_project_map. But
 //! on reboot, all projects' data is fetched at once, and needs to be sorted out.
 
-use {
-    crate::diagnostics::*,
-    anyhow::{format_err, Context, Error},
-    diagnostics_data::{Data, InspectHandleName},
-    diagnostics_hierarchy::{
-        ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property,
-    },
-    diagnostics_reader::{ArchiveReader, Inspect, RetryConfig},
-    fidl_fuchsia_metrics::{
-        HistogramBucket, MetricEvent, MetricEventLoggerFactoryMarker,
-        MetricEventLoggerFactoryProxy, MetricEventLoggerProxy, MetricEventPayload, ProjectSpec,
-    },
-    fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_inspect::{self as inspect, NumericProperty},
-    fuchsia_inspect_derive::WithInspect,
-    fuchsia_zircon as zx,
-    futures::{channel::oneshot, future::join_all, select, stream::FuturesUnordered, StreamExt},
-    sampler_config::{
-        DataType, MetricConfig, ParsedSelector, ProjectConfig, SamplerConfig, SelectorList,
-    },
-    std::{
-        collections::{HashMap, HashSet},
-        sync::Arc,
-    },
-    tracing::{info, warn},
+use crate::diagnostics::*;
+use anyhow::{format_err, Context, Error};
+use diagnostics_data::{Data, InspectHandleName};
+use diagnostics_hierarchy::{
+    ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property,
 };
+use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
+use fidl_fuchsia_metrics::{
+    HistogramBucket, MetricEvent, MetricEventLoggerFactoryMarker, MetricEventLoggerFactoryProxy,
+    MetricEventLoggerProxy, MetricEventPayload, ProjectSpec,
+};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_inspect::{self as inspect, NumericProperty};
+use fuchsia_inspect_derive::WithInspect;
+use futures::channel::oneshot;
+use futures::future::join_all;
+use futures::stream::FuturesUnordered;
+use futures::{select, StreamExt};
+use sampler_config::{
+    DataType, MetricConfig, ParsedSelector, ProjectConfig, SamplerConfig, SelectorList,
+};
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+use tracing::{info, warn};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// An event to be logged to the cobalt logger. Events are generated first,
 /// then logged. (This permits unit-testing the code that generates events from

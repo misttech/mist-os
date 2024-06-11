@@ -2,48 +2,42 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{num::NonZeroU16, ops::ControlFlow};
+use std::num::NonZeroU16;
+use std::ops::ControlFlow;
 
-use fidl_fuchsia_posix as fposix;
-use fidl_fuchsia_posix_socket as fpsocket;
-use fidl_fuchsia_posix_socket_packet as fppacket;
-
-use fidl::{
-    endpoints::{ProtocolMarker as _, RequestStream as _},
-    Peered as _,
+use {
+    fidl_fuchsia_posix as fposix, fidl_fuchsia_posix_socket as fpsocket,
+    fidl_fuchsia_posix_socket_packet as fppacket,
 };
+
+use fidl::endpoints::{ProtocolMarker as _, RequestStream as _};
+use fidl::Peered as _;
 use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::StreamExt as _;
 use log::{error, warn};
-use net_types::{ethernet::Mac, ip::IpVersion};
-use netstack3_core::{
-    device::{
-        DeviceId, EthernetLinkDevice, LoopbackDevice, PureIpDevice, PureIpHeaderParams,
-        WeakDeviceId,
-    },
-    device_socket::{
-        DeviceSocketBindingsContext, DeviceSocketMetadata, DeviceSocketTypes, EthernetFrame,
-        EthernetHeaderParams, Frame, FrameDestination, IpFrame, Protocol, ReceivedFrame,
-        SendFrameError, SentFrame, SocketId, SocketInfo, TargetDevice,
-    },
-    sync::Mutex,
+use net_types::ethernet::Mac;
+use net_types::ip::IpVersion;
+use netstack3_core::device::{
+    DeviceId, EthernetLinkDevice, LoopbackDevice, PureIpDevice, PureIpHeaderParams, WeakDeviceId,
 };
+use netstack3_core::device_socket::{
+    DeviceSocketBindingsContext, DeviceSocketMetadata, DeviceSocketTypes, EthernetFrame,
+    EthernetHeaderParams, Frame, FrameDestination, IpFrame, Protocol, ReceivedFrame,
+    SendFrameError, SentFrame, SocketId, SocketInfo, TargetDevice,
+};
+use netstack3_core::sync::Mutex;
 use packet::Buf;
 use packet_formats::ethernet::EtherType;
 
-use crate::bindings::{
-    devices::BindingId,
-    socket::{
-        queue::{BodyLen, MessageQueue},
-        worker::{self, CloseResponder, SocketWorker},
-        IntoErrno, SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING,
-    },
-    util::{
-        DeviceNotFoundError, IntoCore as _, IntoFidl as _, ResultExt as _, TryFromFidl,
-        TryIntoCoreWithContext as _, TryIntoFidlWithContext,
-    },
-    BindingsCtx, Ctx,
+use crate::bindings::devices::BindingId;
+use crate::bindings::socket::queue::{BodyLen, MessageQueue};
+use crate::bindings::socket::worker::{self, CloseResponder, SocketWorker};
+use crate::bindings::socket::{IntoErrno, SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING};
+use crate::bindings::util::{
+    DeviceNotFoundError, IntoCore as _, IntoFidl as _, ResultExt as _, TryFromFidl,
+    TryIntoCoreWithContext as _, TryIntoFidlWithContext,
 };
+use crate::bindings::{BindingsCtx, Ctx};
 
 /// State held in the bindings context for a single socket.
 #[derive(Debug)]

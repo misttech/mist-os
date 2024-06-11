@@ -6,7 +6,8 @@ use anyhow::Context as _;
 use cm_rust::{ComponentDecl, FidlIntoNative};
 use fidl::unpersist;
 use fidl_fuchsia_component_decl as fdecl;
-use std::{fs, path::Path};
+use std::fs;
+use std::path::Path;
 
 pub fn load_manifest(cm: impl AsRef<Path>) -> anyhow::Result<ComponentDecl> {
     let cm_raw = fs::read(cm).context("reading component manifest")?;

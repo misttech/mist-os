@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 use crate::{Format, Result, SimpleWriter, TestBuffers, ToolIO};
 use serde::Serialize;
-use std::{fmt::Display, io::Write};
+use std::fmt::Display;
+use std::io::Write;
 
 /// Type-safe machine output implementation of [`crate::ToolIO`]
 pub struct MachineWriter<T> {

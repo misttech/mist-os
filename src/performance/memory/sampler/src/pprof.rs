@@ -9,11 +9,9 @@
 //! `pprof`-compatible profile.
 pub use profile_rust_proto::perfetto::third_party::perftools::profiles as pproto;
 
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    ops::Bound::{Excluded, Unbounded},
-    rc::Rc,
-};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::ops::Bound::{Excluded, Unbounded};
+use std::rc::Rc;
 
 use fidl_fuchsia_memory_sampler::ModuleMap;
 use itertools::Itertools;
@@ -256,8 +254,7 @@ mod test {
     }
 
     mod mapping {
-        use crate::pprof::Mapping;
-        use crate::pprof::StringTable;
+        use crate::pprof::{Mapping, StringTable};
         use fidl_fuchsia_memory_sampler::{ExecutableSegment, ModuleMap};
 
         #[fuchsia::test]

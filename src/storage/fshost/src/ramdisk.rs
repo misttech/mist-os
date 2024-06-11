@@ -7,12 +7,10 @@
 //! ramdisk_image option, in run modes where we need to operate on the real disk and can't run
 //! filesystems off it, such as recovery.
 
-use {
-    anyhow::{ensure, Context, Error},
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon as zx,
-    zerocopy::{FromBytes, FromZeros, NoCell},
-};
+use anyhow::{ensure, Context, Error};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_zircon as zx;
+use zerocopy::{FromBytes, FromZeros, NoCell};
 
 /// The following types and constants are defined in sdk/lib/zbi-format/include/lib/zbi-format/zbi.h.
 const ZBI_TYPE_STORAGE_RAMDISK: u32 = 0x4b534452;

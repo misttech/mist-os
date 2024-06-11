@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::component::{ComponentInstance, WeakComponentInstance},
-    ::routing::capability_source::InternalCapability,
-    async_trait::async_trait,
-    cm_util::TaskGroup,
-    errors::CapabilityProviderError,
-    fuchsia_zircon as zx,
-    std::sync,
-    vfs::{directory::entry::OpenRequest, execution_scope::ExecutionScope},
-};
+use crate::model::component::{ComponentInstance, WeakComponentInstance};
+use ::routing::capability_source::InternalCapability;
+use async_trait::async_trait;
+use cm_util::TaskGroup;
+use errors::CapabilityProviderError;
+use fuchsia_zircon as zx;
+use std::sync;
+use vfs::directory::entry::OpenRequest;
+use vfs::execution_scope::ExecutionScope;
 
 pub type CapabilitySource = ::routing::capability_source::CapabilitySource<ComponentInstance>;
 

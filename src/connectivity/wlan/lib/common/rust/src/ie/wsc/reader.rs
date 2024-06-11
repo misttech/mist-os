@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{AttributeHeader, Id},
-    crate::buffer_reader::BufferReader,
-    std::mem::size_of,
-    zerocopy::ByteSlice,
-};
+use super::{AttributeHeader, Id};
+use crate::buffer_reader::BufferReader;
+use std::mem::size_of;
+use zerocopy::ByteSlice;
 
 pub struct Reader<B>(BufferReader<B>);
 

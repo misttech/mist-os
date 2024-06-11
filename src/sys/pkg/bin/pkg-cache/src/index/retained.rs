@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_hash::Hash,
-    fuchsia_inspect::{self as finspect},
-    std::collections::{HashMap, HashSet},
-};
+use fuchsia_hash::Hash;
+use fuchsia_inspect::{self as finspect};
+use std::collections::{HashMap, HashSet};
 
 /// An index of packages considered to be part of a new system's base package set.
 #[derive(Clone, Debug, Default)]
@@ -133,11 +131,9 @@ pub async fn populate_retained_index(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::test_utils::add_meta_far_to_blobfs,
-        maplit::{hashmap, hashset},
-    };
+    use super::*;
+    use crate::test_utils::add_meta_far_to_blobfs;
+    use maplit::{hashmap, hashset};
 
     fn hash(n: u8) -> Hash {
         Hash::from([n; 32])

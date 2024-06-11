@@ -2,46 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        core::{
-            collection::{
-                Component, ComponentSource, Components, CoreDataDeps, Manifest, ManifestData,
-                Manifests, Package, Packages,
-            },
-            package::{
-                is_cf_v2_manifest,
-                reader::{
-                    read_partial_package_definition, PackageReader, PackagesFromUpdateReader,
-                },
-            },
-            util::types::{ComponentManifest, PackageDefinition},
-        },
-        static_pkgs::StaticPkgsCollection,
-        zbi::Zbi,
-    },
-    anyhow::{anyhow, Context, Result},
-    base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _},
-    cm_fidl_analyzer::{match_absolute_pkg_urls, PkgUrlMatch},
-    fidl::unpersist,
-    fidl_fuchsia_component_decl as fdecl,
-    fuchsia_merkle::Hash,
-    fuchsia_url::{
-        boot_url::BootUrl, AbsoluteComponentUrl, AbsolutePackageUrl, PackageName, PackageVariant,
-    },
-    scrutiny::model::collector::DataCollector,
-    scrutiny::prelude::DataModel,
-    scrutiny_utils::artifact::{ArtifactReader, FileArtifactReader},
-    std::{
-        collections::{HashMap, HashSet},
-        io::Cursor,
-        path::PathBuf,
-        str,
-        sync::Arc,
-    },
-    tracing::{info, warn},
-    url::Url,
+use crate::core::collection::{
+    Component, ComponentSource, Components, CoreDataDeps, Manifest, ManifestData, Manifests,
+    Package, Packages,
 };
+use crate::core::package::is_cf_v2_manifest;
+use crate::core::package::reader::{
+    read_partial_package_definition, PackageReader, PackagesFromUpdateReader,
+};
+use crate::core::util::types::{ComponentManifest, PackageDefinition};
+use crate::static_pkgs::StaticPkgsCollection;
+use crate::zbi::Zbi;
+use anyhow::{anyhow, Context, Result};
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::engine::Engine as _;
+use cm_fidl_analyzer::{match_absolute_pkg_urls, PkgUrlMatch};
+use fidl::unpersist;
+use fidl_fuchsia_component_decl as fdecl;
+use fuchsia_merkle::Hash;
+use fuchsia_url::boot_url::BootUrl;
+use fuchsia_url::{AbsoluteComponentUrl, AbsolutePackageUrl, PackageName, PackageVariant};
+use scrutiny::model::collector::DataCollector;
+use scrutiny::prelude::DataModel;
+use scrutiny_utils::artifact::{ArtifactReader, FileArtifactReader};
+use std::collections::{HashMap, HashSet};
+use std::io::Cursor;
+use std::path::PathBuf;
+use std::str;
+use std::sync::Arc;
+use tracing::{info, warn};
+use url::Url;
 
 // The root v2 component manifest.
 pub const ROOT_RESOURCE: &str = "meta/root.cm";
@@ -545,41 +535,32 @@ impl DataCollector for PackageDataCollector {
 pub mod tests {
     use fidl::persist;
 
-    use {
-        super::{PackageDataCollector, StaticPackageDescription},
-        crate::core::{
-            collection::{
-                testing::fake_component_src_pkg, Components, CoreDataDeps, ManifestData, Manifests,
-                Packages,
-            },
-            package::{
-                collector::{Component, ComponentSource},
-                reader::PackageReader,
-                test_utils::{
-                    create_model, create_test_cm_map, create_test_package_with_cms,
-                    create_test_package_with_contents, MockPackageReader,
-                },
-            },
-            util::types::{PackageDefinition, PartialPackageDefinition},
-        },
-        crate::zbi::Zbi,
-        base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _},
-        cm_rust::{ComponentDecl, NativeIntoFidl},
-        fidl_fuchsia_component_decl as fdecl,
-        fuchsia_hash::{Hash, HASH_SIZE},
-        fuchsia_url::{AbsolutePackageUrl, PackageName, PackageVariant},
-        maplit::{hashmap, hashset},
-        scrutiny_testing::artifact::MockArtifactReader,
-        scrutiny_utils::artifact::ArtifactReader,
-        scrutiny_utils::bootfs::{BootfsFileIndex, BootfsPackageIndex},
-        std::{
-            collections::{HashMap, HashSet},
-            path::PathBuf,
-            str::FromStr,
-            sync::Arc,
-        },
-        url::Url,
+    use super::{PackageDataCollector, StaticPackageDescription};
+    use crate::core::collection::testing::fake_component_src_pkg;
+    use crate::core::collection::{Components, CoreDataDeps, ManifestData, Manifests, Packages};
+    use crate::core::package::collector::{Component, ComponentSource};
+    use crate::core::package::reader::PackageReader;
+    use crate::core::package::test_utils::{
+        create_model, create_test_cm_map, create_test_package_with_cms,
+        create_test_package_with_contents, MockPackageReader,
     };
+    use crate::core::util::types::{PackageDefinition, PartialPackageDefinition};
+    use crate::zbi::Zbi;
+    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+    use base64::engine::Engine as _;
+    use cm_rust::{ComponentDecl, NativeIntoFidl};
+    use fidl_fuchsia_component_decl as fdecl;
+    use fuchsia_hash::{Hash, HASH_SIZE};
+    use fuchsia_url::{AbsolutePackageUrl, PackageName, PackageVariant};
+    use maplit::{hashmap, hashset};
+    use scrutiny_testing::artifact::MockArtifactReader;
+    use scrutiny_utils::artifact::ArtifactReader;
+    use scrutiny_utils::bootfs::{BootfsFileIndex, BootfsPackageIndex};
+    use std::collections::{HashMap, HashSet};
+    use std::path::PathBuf;
+    use std::str::FromStr;
+    use std::sync::Arc;
+    use url::Url;
 
     fn make_v2_manifest_data(decl: ComponentDecl) -> ManifestData {
         let decl_fidl: fdecl::Component = decl.native_into_fidl();

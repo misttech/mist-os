@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    assembly_package_list::{PackageList, PackageUrlList, WritablePackageList},
-    assembly_util::PackageDestination,
-    camino::{Utf8Path, Utf8PathBuf},
-    fuchsia_pkg::{PackageBuilder, PackageManifest, RelativeTo},
-    std::collections::BTreeMap,
-};
+use anyhow::Result;
+use assembly_package_list::{PackageList, PackageUrlList, WritablePackageList};
+use assembly_util::PackageDestination;
+use camino::{Utf8Path, Utf8PathBuf};
+use fuchsia_pkg::{PackageBuilder, PackageManifest, RelativeTo};
+use std::collections::BTreeMap;
 
 /// The path to the static package index file in the `base` package.
 const STATIC_PACKAGE_INDEX: &str = "data/static_packages";

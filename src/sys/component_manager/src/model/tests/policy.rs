@@ -2,27 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::{
-        component::{
-            manager::ComponentManagerInstance, ComponentInstance, WeakComponentInstance,
-            WeakExtendedInstance,
-        },
-        context::ModelContext,
-        environment::Environment,
-        resolver::ResolverRegistry,
-    },
-    anyhow::Error,
-    async_trait::async_trait,
-    fidl_fuchsia_component_decl as fdecl,
-    hooks::Hooks,
-    moniker::Moniker,
-    routing::environment::{DebugRegistry, RunnerRegistry},
-    routing_test_helpers::{
-        instantiate_global_policy_checker_tests, policy::GlobalPolicyCheckerTest,
-    },
-    std::sync::Arc,
-};
+use crate::model::component::manager::ComponentManagerInstance;
+use crate::model::component::{ComponentInstance, WeakComponentInstance, WeakExtendedInstance};
+use crate::model::context::ModelContext;
+use crate::model::environment::Environment;
+use crate::model::resolver::ResolverRegistry;
+use anyhow::Error;
+use async_trait::async_trait;
+use fidl_fuchsia_component_decl as fdecl;
+use hooks::Hooks;
+use moniker::Moniker;
+use routing::environment::{DebugRegistry, RunnerRegistry};
+use routing_test_helpers::instantiate_global_policy_checker_tests;
+use routing_test_helpers::policy::GlobalPolicyCheckerTest;
+use std::sync::Arc;
 
 // Tests `GlobalPolicyChecker` methods for `ComponentInstance`s.
 #[derive(Default)]

@@ -25,12 +25,11 @@ use nom::character::complete::{
 use nom::combinator::{
     all_consuming, cond, flat_map, map, map_parser, not, opt, peek, recognize, rest, verify,
 };
-use nom::error as nom_error;
 use nom::multi::{
     fold_many0, many0, many0_count, many1, many_till, separated_list, separated_nonempty_list,
 };
 use nom::sequence::{delimited, pair, preceded, separated_pair, terminated, tuple};
-use nom::Slice;
+use nom::{error as nom_error, Slice};
 use nom_locate::LocatedSpan;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashSet, VecDeque};

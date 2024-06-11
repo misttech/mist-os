@@ -2,46 +2,37 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        filesystem::{
-            FxFilesystem, FxFilesystemBuilder, JournalingObject, OpenFxFilesystem, SyncOptions,
-        },
-        fsck::{
-            errors::{FsckError, FsckFatal, FsckIssue, FsckWarning},
-            fsck_volume_with_options, fsck_with_options, FsckOptions,
-        },
-        lsm_tree::{
-            simple_persistent_layer::SimplePersistentLayerWriter,
-            types::{Item, ItemRef, Key, LayerIterator, LayerWriter, Value},
-        },
-        object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID},
-        object_store::{
-            allocator::{AllocatorKey, AllocatorValue, CoalescingIterator},
-            directory::{self, Directory},
-            transaction::{self, lock_keys, LockKey, ObjectStoreMutation, Options},
-            volume::root_volume,
-            AttributeKey, ChildValue, EncryptionKeys, ExtentValue, FsverityMetadata, HandleOptions,
-            Mutation, ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind,
-            ObjectStore, ObjectValue, RootDigest, StoreInfo, Timestamp, DEFAULT_DATA_ATTRIBUTE_ID,
-            FSVERITY_MERKLE_ATTRIBUTE_ID,
-        },
-        round::round_down,
-        serialized_types::VersionedLatest,
-        testing::writer::Writer,
-    },
-    anyhow::{Context, Error},
-    assert_matches::assert_matches,
-    fidl_fuchsia_io as fio,
-    fxfs_crypto::{Crypt, WrappedKeys},
-    fxfs_insecure_crypto::InsecureCrypt,
-    mundane::hash::{Digest, Hasher, Sha256},
-    std::{
-        ops::{Bound, Deref},
-        sync::{Arc, Mutex},
-    },
-    storage_device::{fake_device::FakeDevice, DeviceHolder},
+use crate::filesystem::{
+    FxFilesystem, FxFilesystemBuilder, JournalingObject, OpenFxFilesystem, SyncOptions,
 };
+use crate::fsck::errors::{FsckError, FsckFatal, FsckIssue, FsckWarning};
+use crate::fsck::{fsck_volume_with_options, fsck_with_options, FsckOptions};
+use crate::lsm_tree::simple_persistent_layer::SimplePersistentLayerWriter;
+use crate::lsm_tree::types::{Item, ItemRef, Key, LayerIterator, LayerWriter, Value};
+use crate::object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID};
+use crate::object_store::allocator::{AllocatorKey, AllocatorValue, CoalescingIterator};
+use crate::object_store::directory::{self, Directory};
+use crate::object_store::transaction::{self, lock_keys, LockKey, ObjectStoreMutation, Options};
+use crate::object_store::volume::root_volume;
+use crate::object_store::{
+    AttributeKey, ChildValue, EncryptionKeys, ExtentValue, FsverityMetadata, HandleOptions,
+    Mutation, ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind,
+    ObjectStore, ObjectValue, RootDigest, StoreInfo, Timestamp, DEFAULT_DATA_ATTRIBUTE_ID,
+    FSVERITY_MERKLE_ATTRIBUTE_ID,
+};
+use crate::round::round_down;
+use crate::serialized_types::VersionedLatest;
+use crate::testing::writer::Writer;
+use anyhow::{Context, Error};
+use assert_matches::assert_matches;
+use fidl_fuchsia_io as fio;
+use fxfs_crypto::{Crypt, WrappedKeys};
+use fxfs_insecure_crypto::InsecureCrypt;
+use mundane::hash::{Digest, Hasher, Sha256};
+use std::ops::{Bound, Deref};
+use std::sync::{Arc, Mutex};
+use storage_device::fake_device::FakeDevice;
+use storage_device::DeviceHolder;
 
 const TEST_DEVICE_BLOCK_SIZE: u32 = 512;
 const TEST_DEVICE_BLOCK_COUNT: u64 = 8192;

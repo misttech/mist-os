@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    heapdump_snapshot::Snapshot,
-    itertools::Itertools,
-    prost::Message,
-    std::collections::hash_map::{Entry, HashMap},
-    std::io::Write,
-};
+use anyhow::Result;
+use heapdump_snapshot::Snapshot;
+use itertools::Itertools;
+use prost::Message;
+use std::collections::hash_map::{Entry, HashMap};
+use std::io::Write;
 
 fn build_profile(snapshot: &Snapshot, with_tags: bool) -> Result<pprof::Profile> {
     let mut st = pprof::StringTableBuilder::default();

@@ -1,21 +1,18 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::{
-        capability::{BuiltinCapability, CapabilityProvider},
-        model::component::WeakComponentInstance,
-    },
-    ::routing::{capability_source::InternalCapability, policy::ScopedPolicyChecker},
-    async_trait::async_trait,
-    cm_config::SecurityPolicy,
-    cm_types::Name,
-    cm_util::TaskGroup,
-    errors::CapabilityProviderError,
-    fuchsia_zircon as zx,
-    std::sync::Arc,
-    vfs::directory::entry::OpenRequest,
-};
+use crate::capability::{BuiltinCapability, CapabilityProvider};
+use crate::model::component::WeakComponentInstance;
+use ::routing::capability_source::InternalCapability;
+use ::routing::policy::ScopedPolicyChecker;
+use async_trait::async_trait;
+use cm_config::SecurityPolicy;
+use cm_types::Name;
+use cm_util::TaskGroup;
+use errors::CapabilityProviderError;
+use fuchsia_zircon as zx;
+use std::sync::Arc;
+use vfs::directory::entry::OpenRequest;
 
 /// Trait for built-in runner services. Wraps the generic Runner trait to provide a
 /// ScopedPolicyChecker for the realm of the component being started, so that runners can enforce
@@ -90,18 +87,19 @@ impl CapabilityProvider for RunnerCapabilityProvider {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::model::testing::{mocks::MockRunner, routing_test_helpers::*},
-        anyhow::Error,
-        assert_matches::assert_matches,
-        cm_rust::{CapabilityDecl, RunnerDecl},
-        cm_rust_testing::*,
-        fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio,
-        futures::prelude::*,
-        moniker::Moniker,
-        vfs::{execution_scope::ExecutionScope, path::Path, ToObjectRequest},
-    };
+    use super::*;
+    use crate::model::testing::mocks::MockRunner;
+    use crate::model::testing::routing_test_helpers::*;
+    use anyhow::Error;
+    use assert_matches::assert_matches;
+    use cm_rust::{CapabilityDecl, RunnerDecl};
+    use cm_rust_testing::*;
+    use futures::prelude::*;
+    use moniker::Moniker;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::path::Path;
+    use vfs::ToObjectRequest;
+    use {fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio};
 
     fn sample_start_info(name: &str) -> fcrunner::ComponentStartInfo {
         fcrunner::ComponentStartInfo {

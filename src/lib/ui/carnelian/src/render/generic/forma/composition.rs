@@ -5,14 +5,10 @@
 use euclid::default::{Transform2D, Vector2D};
 use forma::{Color as FormaColor, GeomPresTransform, Order as FormaOrder};
 
-use crate::{
-    color::Color,
-    geometry::Coord,
-    render::generic::{
-        forma::{Forma, FormaRaster},
-        BlendMode, Composition, Fill, FillRule, GradientType, Layer, Order,
-    },
-};
+use crate::color::Color;
+use crate::geometry::Coord;
+use crate::render::generic::forma::{Forma, FormaRaster};
+use crate::render::generic::{BlendMode, Composition, Fill, FillRule, GradientType, Layer, Order};
 
 #[derive(Debug)]
 pub struct FormaComposition {

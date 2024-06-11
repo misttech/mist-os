@@ -10,21 +10,18 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ffx::DaemonError;
 use ffx_daemon_events::TargetConnectionState;
-use ffx_daemon_target::{target::Target, target_collection::TargetCollection};
+use ffx_daemon_target::target::Target;
+use ffx_daemon_target::target_collection::TargetCollection;
 use ffx_target::Description;
-use fidl::{
-    endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy, Request, RequestStream},
-    server::ServeInner,
-};
-use fidl_fuchsia_developer_ffx as ffx;
-use fidl_fuchsia_developer_remotecontrol as rcs;
-use futures::{future::LocalBoxFuture, prelude::*};
-use std::{
-    cell::{Cell, RefCell},
-    rc::Rc,
-    sync::Arc,
-    time::Instant,
-};
+use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy, Request, RequestStream};
+use fidl::server::ServeInner;
+use futures::future::LocalBoxFuture;
+use futures::prelude::*;
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
+use std::sync::Arc;
+use std::time::Instant;
+use {fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_developer_remotecontrol as rcs};
 
 #[derive(Default)]
 struct InjectedStreamHandler<F: FidlProtocol> {

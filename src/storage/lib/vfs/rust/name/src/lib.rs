@@ -9,10 +9,13 @@
 //!
 //! These should be aligned with the library comments in sdk/fidl/fuchsia.io/io.fidl.
 
-use {
-    fidl_fuchsia_io as fio, fuchsia_zircon_status::Status, static_assertions::const_assert_eq,
-    std::borrow::Borrow, std::fmt::Display, std::ops::Deref, thiserror::Error,
-};
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use static_assertions::const_assert_eq;
+use std::borrow::Borrow;
+use std::fmt::Display;
+use std::ops::Deref;
+use thiserror::Error;
 
 /// The type for the name of a node, i.e. a single path component, e.g. `foo`.
 ///
@@ -135,7 +138,8 @@ impl Borrow<str> for Name {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn test_parse_name() {

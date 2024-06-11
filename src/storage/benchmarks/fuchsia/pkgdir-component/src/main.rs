@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Context,
-    fidl::endpoints::ClientEnd,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    futures::{StreamExt, TryFutureExt, TryStreamExt},
-    tracing::error,
-};
+use anyhow::Context;
+use fidl::endpoints::ClientEnd;
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use tracing::error;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 enum IncomingService {
     PkgDir(fidl_test_pkgdir::PkgDirRequestStream),

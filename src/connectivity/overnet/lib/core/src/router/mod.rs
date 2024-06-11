@@ -21,12 +21,12 @@
 mod service_map;
 
 use self::service_map::ServiceMap;
-use crate::{
-    future_help::{log_errors, Observer},
-    handle_info::{handle_info, HandleKey, HandleType},
-    labels::{NodeId, TransferKey},
-    peer::{FramedStreamReader, FramedStreamWriter, Peer, PeerConnRef},
-    proxy::{IntoProxied, ProxyTransferInitiationReceiver, RemoveFromProxyTable, StreamRefSender},
+use crate::future_help::{log_errors, Observer};
+use crate::handle_info::{handle_info, HandleKey, HandleType};
+use crate::labels::{NodeId, TransferKey};
+use crate::peer::{FramedStreamReader, FramedStreamWriter, Peer, PeerConnRef};
+use crate::proxy::{
+    IntoProxied, ProxyTransferInitiationReceiver, RemoveFromProxyTable, StreamRefSender,
 };
 use anyhow::{bail, format_err, Context as _, Error};
 use async_utils::mutex_ticket::MutexTicket;
@@ -37,16 +37,17 @@ use fidl_fuchsia_overnet_protocol::{
 };
 use fuchsia_async::Task;
 use futures::channel::oneshot;
-use futures::{future::poll_fn, lock::Mutex, prelude::*, ready};
+use futures::future::poll_fn;
+use futures::lock::Mutex;
+use futures::prelude::*;
+use futures::ready;
 use rand::Rng;
-use std::{
-    collections::{BTreeMap, HashMap},
-    pin::pin,
-    sync::atomic::{AtomicBool, AtomicU64, Ordering},
-    sync::{Arc, Weak},
-    task::{Context, Poll, Waker},
-    time::Duration,
-};
+use std::collections::{BTreeMap, HashMap};
+use std::pin::pin;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Weak};
+use std::task::{Context, Poll, Waker};
+use std::time::Duration;
 
 pub use self::service_map::ListablePeer;
 

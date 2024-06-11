@@ -6,28 +6,25 @@
 // setting handling.
 use crate::base::{SettingInfo, SettingType};
 use crate::handler::base::{
-    Error as HandlerError, Payload as HandlerPayload, Request as HandlerRequest,
+    Error as HandlerError, Payload as HandlerPayload, Payload, Request as HandlerRequest, Request,
     SettingHandlerFactory,
 };
-use crate::handler::base::{Payload, Request};
 use crate::handler::setting_handler;
-use crate::handler::setting_handler::Command;
 use crate::handler::setting_handler::{
-    ControllerError, Event, ExitResult, SettingHandlerResult, State,
+    Command, ControllerError, Event, ExitResult, SettingHandlerResult, State,
 };
 use crate::inspect::listener_logger::ListenerInspectLogger;
 use crate::message::action_fuse::ActionFuse;
 use crate::message::base::{Audience, MessageEvent, MessengerType, Status};
 use crate::{clock, event, service, trace, trace_guard};
 use anyhow::Error;
-use fuchsia_async as fasync;
-use fuchsia_trace as ftrace;
 use fuchsia_zircon::Duration;
 use futures::channel::mpsc::UnboundedSender;
 use futures::lock::Mutex;
 use futures::{FutureExt, StreamExt};
 use std::collections::VecDeque;
 use std::sync::Arc;
+use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
 /// Maximum number of errors tracked per setting proxy before errors are rolled over.
 // The value was chosen arbitrarily. Feel free to increase if it's too small.

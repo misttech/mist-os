@@ -10,33 +10,26 @@
 //! direct access to the backing directory, with the goal of making it easier for clients to work
 //! with isolated storage without needing to understand component_manager's storage layout.
 
-use {
-    crate::{
-        capability::CapabilitySource,
-        model::{
-            component::{ComponentInstance, WeakComponentInstance},
-            routing::{Route, RouteSource},
-            storage::{self, BackingDirectoryInfo},
-        },
-    },
-    ::routing::capability_source::ComponentCapability,
-    anyhow::{format_err, Context, Error},
-    cm_rust::{StorageDecl, UseDecl},
-    component_id_index::InstanceId,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_component as fcomponent,
-    fidl_fuchsia_io::{self as fio, DirectoryProxy, DirentType},
-    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
-    fuchsia_fs::directory as ffs_dir,
-    futures::{
-        stream::{FuturesUnordered, StreamExt},
-        Future, TryFutureExt, TryStreamExt,
-    },
-    moniker::Moniker,
-    routing::{component_instance::ComponentInstanceInterface, RouteRequest},
-    std::{path::PathBuf, sync::Arc},
-    tracing::{debug, error, warn},
-};
+use crate::capability::CapabilitySource;
+use crate::model::component::{ComponentInstance, WeakComponentInstance};
+use crate::model::routing::{Route, RouteSource};
+use crate::model::storage::{self, BackingDirectoryInfo};
+use ::routing::capability_source::ComponentCapability;
+use anyhow::{format_err, Context, Error};
+use cm_rust::{StorageDecl, UseDecl};
+use component_id_index::InstanceId;
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io::{self as fio, DirectoryProxy, DirentType};
+use fuchsia_fs::directory as ffs_dir;
+use futures::stream::{FuturesUnordered, StreamExt};
+use futures::{Future, TryFutureExt, TryStreamExt};
+use moniker::Moniker;
+use routing::component_instance::ComponentInstanceInterface;
+use routing::RouteRequest;
+use std::path::PathBuf;
+use std::sync::Arc;
+use tracing::{debug, error, warn};
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync};
 
 #[derive(Debug, PartialEq)]
 enum DirType {
@@ -661,25 +654,21 @@ impl StorageAdmin {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{DirType, StorageAdmin, StorageError},
-        async_trait::async_trait,
-        fidl::endpoints::ServerEnd,
-        fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-        std::{fmt::Formatter, path::PathBuf, sync::Arc},
-        test_case::test_case,
-        vfs::{
-            directory::{
-                dirents_sink,
-                entry_container::{Directory, DirectoryWatcher},
-                immutable::connection::ImmutableConnection,
-                traversal_position::TraversalPosition,
-            },
-            execution_scope::ExecutionScope,
-            path::Path,
-            ObjectRequestRef, ToObjectRequest,
-        },
-    };
+    use super::{DirType, StorageAdmin, StorageError};
+    use async_trait::async_trait;
+    use fidl::endpoints::ServerEnd;
+    use std::fmt::Formatter;
+    use std::path::PathBuf;
+    use std::sync::Arc;
+    use test_case::test_case;
+    use vfs::directory::dirents_sink;
+    use vfs::directory::entry_container::{Directory, DirectoryWatcher};
+    use vfs::directory::immutable::connection::ImmutableConnection;
+    use vfs::directory::traversal_position::TraversalPosition;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::path::Path;
+    use vfs::{ObjectRequestRef, ToObjectRequest};
+    use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
     #[test_case(
         "aabbccddeeff11223344556677889900aabbccddeeff11223344556677889900",

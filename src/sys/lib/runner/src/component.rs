@@ -2,23 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use async_trait::async_trait;
+use cm_types::NamespacePath;
+use fidl::endpoints::ServerEnd;
+use fidl::epitaph::ChannelEpitaphExt;
+use fidl::prelude::*;
+use fuchsia_runtime::{job_default, HandleInfo, HandleType};
+use fuchsia_zircon::{self as zx, HandleBased, Status};
+use futures::future::{BoxFuture, Either};
+use futures::prelude::*;
+use futures::stream::BoxStream;
+use lazy_static::lazy_static;
+use namespace::Namespace;
+use thiserror::Error;
+use tracing::*;
 use {
-    async_trait::async_trait,
-    cm_types::NamespacePath,
-    fidl::{endpoints::ServerEnd, epitaph::ChannelEpitaphExt, prelude::*},
     fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc, fuchsia_async as fasync,
-    fuchsia_runtime::{job_default, HandleInfo, HandleType},
-    fuchsia_zircon::{self as zx, HandleBased, Status},
-    futures::{
-        future::{BoxFuture, Either},
-        prelude::*,
-        stream::BoxStream,
-    },
-    lazy_static::lazy_static,
-    namespace::Namespace,
-    thiserror::Error,
-    tracing::*,
 };
 
 lazy_static! {
@@ -425,23 +425,24 @@ pub fn report_start_error(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{
-            configure_launcher, truncate_str, ChannelEpitaph, Controllable, Controller,
-            LaunchError, LauncherConfigArgs,
-        },
-        anyhow::{Context, Error},
-        assert_matches::assert_matches,
-        async_trait::async_trait,
-        fidl::endpoints::{create_endpoints, create_proxy, ClientEnd},
-        fidl_fuchsia_component_runner::{self as fcrunner, ComponentControllerProxy},
-        fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc, fuchsia_async as fasync,
-        fuchsia_runtime::{HandleInfo, HandleType},
-        fuchsia_zircon::{self as zx, HandleBased},
-        futures::{future::BoxFuture, poll, prelude::*},
-        namespace::{Namespace, NamespaceError},
-        std::{pin::Pin, task::Poll},
+    use super::{
+        configure_launcher, truncate_str, ChannelEpitaph, Controllable, Controller, LaunchError,
+        LauncherConfigArgs,
     };
+    use anyhow::{Context, Error};
+    use assert_matches::assert_matches;
+    use async_trait::async_trait;
+    use fidl::endpoints::{create_endpoints, create_proxy, ClientEnd};
+    use fidl_fuchsia_component_runner::{self as fcrunner, ComponentControllerProxy};
+    use fuchsia_runtime::{HandleInfo, HandleType};
+    use fuchsia_zircon::{self as zx, HandleBased};
+    use futures::future::BoxFuture;
+    use futures::poll;
+    use futures::prelude::*;
+    use namespace::{Namespace, NamespaceError};
+    use std::pin::Pin;
+    use std::task::Poll;
+    use {fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc, fuchsia_async as fasync};
 
     #[test]
     fn test_truncate_str() {
@@ -662,7 +663,9 @@ mod tests {
     mod launch_info {
         use fidl::endpoints::Proxy;
 
-        use {super::*, anyhow::format_err, futures::channel::oneshot};
+        use super::*;
+        use anyhow::format_err;
+        use futures::channel::oneshot;
 
         fn setup_empty_namespace() -> Result<Namespace, NamespaceError> {
             setup_namespace(false, vec![])

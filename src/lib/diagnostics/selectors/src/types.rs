@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_diagnostics as fdiagnostics;
-use std::{borrow::Cow, fmt::Debug};
+use std::borrow::Cow;
+use std::fmt::Debug;
 
 /// Severity
 #[derive(Clone, Debug, Eq, PartialEq)]

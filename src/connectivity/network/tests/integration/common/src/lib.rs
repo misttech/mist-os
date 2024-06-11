@@ -23,18 +23,13 @@ use diagnostics_hierarchy::{filter_hierarchy, DiagnosticsHierarchy, HierarchyMat
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_diagnostics::Selector;
 use fidl_fuchsia_inspect_deprecated::InspectMarker;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_netemul as fnetemul;
 use fuchsia_async::{self as fasync, DurationExt as _};
 use fuchsia_component::client;
-use fuchsia_zircon as zx;
-use futures::{
-    future::FutureExt as _,
-    select,
-    stream::{Stream, StreamExt as _, TryStreamExt as _},
-    Future,
-};
+use futures::future::FutureExt as _;
+use futures::stream::{Stream, StreamExt as _, TryStreamExt as _};
+use futures::{select, Future};
 use std::pin::pin;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_netemul as fnetemul, fuchsia_zircon as zx};
 
 use crate::realms::TestSandboxExt as _;
 

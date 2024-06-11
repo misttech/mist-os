@@ -43,14 +43,13 @@
 //!   // property is the debug string of the vector "[0, 3]".
 //!   ```
 
-use {
-    core::ops::{Deref, DerefMut},
-    derivative::Derivative,
-    fuchsia_inspect::{
-        BoolProperty, Node, Property, StringProperty, StringReference, UintProperty,
-    },
-    std::{borrow::Borrow, collections::HashSet},
+use core::ops::{Deref, DerefMut};
+use derivative::Derivative;
+use fuchsia_inspect::{
+    BoolProperty, Node, Property, StringProperty, StringReference, UintProperty,
 };
+use std::borrow::Borrow;
+use std::collections::HashSet;
 
 /// Generic wrapper for exporting variables via Inspect. Mutations to
 /// the wrapped `value` occur through an `InspectableGuard`, which
@@ -262,11 +261,9 @@ pub type InspectableBool = Inspectable<bool, InspectableBoolWatcher>;
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        diagnostics_assertions::assert_data_tree,
-        fuchsia_inspect::{Inspector, IntProperty},
-    };
+    use super::*;
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_inspect::{Inspector, IntProperty};
 
     struct InspectableIntWatcher {
         i: IntProperty,

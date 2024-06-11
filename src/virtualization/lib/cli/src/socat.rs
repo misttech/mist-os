@@ -1,17 +1,14 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::platform::{GuestConsole, PlatformServices},
-    fidl_fuchsia_virtualization::{
-        GuestManagerProxy, GuestMarker, GuestStatus, HostVsockAcceptorMarker,
-        HostVsockEndpointMarker, HostVsockEndpointProxy,
-    },
-    fuchsia_zircon_status as zx_status,
-    futures::TryStreamExt,
-    guest_cli_args as arguments,
-    std::fmt,
+use crate::platform::{GuestConsole, PlatformServices};
+use fidl_fuchsia_virtualization::{
+    GuestManagerProxy, GuestMarker, GuestStatus, HostVsockAcceptorMarker, HostVsockEndpointMarker,
+    HostVsockEndpointProxy,
 };
+use futures::TryStreamExt;
+use std::fmt;
+use {fuchsia_zircon_status as zx_status, guest_cli_args as arguments};
 
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SocatResult {
@@ -224,10 +221,11 @@ pub async fn handle_socat<P: PlatformServices>(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*, fidl::endpoints::create_proxy_and_stream, fuchsia_async as fasync,
-        futures::future::join, futures::StreamExt,
-    };
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fuchsia_async as fasync;
+    use futures::future::join;
+    use futures::StreamExt;
 
     #[fasync::run_until_stalled(test)]
     async fn socat_listen_invalid_host_returns_err() {

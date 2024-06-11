@@ -9,17 +9,16 @@ use core::convert::Infallible as Never;
 
 use derivative::Derivative;
 use log::trace;
-use netstack3_base::{sync::Mutex, Device, DeviceIdContext};
+use netstack3_base::sync::Mutex;
+use netstack3_base::{Device, DeviceIdContext};
 use packet::{
     new_buf_vec, Buf, BufferAlloc, ContiguousBuffer, GrowBufferMut, NoReuseBufferProvider,
     ReusableBuffer, Serializer,
 };
 
-use crate::internal::{
-    base::DeviceSendFrameError,
-    queue::{fifo, DequeueState, EnqueueResult, TransmitQueueFrameError},
-    socket::{DeviceSocketHandler, ParseSentFrameError, SentFrame},
-};
+use crate::internal::base::DeviceSendFrameError;
+use crate::internal::queue::{fifo, DequeueState, EnqueueResult, TransmitQueueFrameError};
+use crate::internal::socket::{DeviceSocketHandler, ParseSentFrameError, SentFrame};
 
 /// State associated with a device transmit queue.
 #[derive(Derivative)]
@@ -295,16 +294,15 @@ mod tests {
 
     use net_declare::net_mac;
     use net_types::ethernet::Mac;
-    use netstack3_base::{
-        testutil::{FakeBindingsCtx, FakeCoreCtx, FakeLinkDevice, FakeLinkDeviceId},
-        ContextPair, CtxPair, WorkQueueReport,
+    use netstack3_base::testutil::{
+        FakeBindingsCtx, FakeCoreCtx, FakeLinkDevice, FakeLinkDeviceId,
     };
+    use netstack3_base::{ContextPair, CtxPair, WorkQueueReport};
     use test_case::test_case;
 
-    use crate::internal::{
-        queue::{api::TransmitQueueApi, MAX_BATCH_SIZE, MAX_TX_QUEUED_LEN},
-        socket::{EthernetFrame, Frame},
-    };
+    use crate::internal::queue::api::TransmitQueueApi;
+    use crate::internal::queue::{MAX_BATCH_SIZE, MAX_TX_QUEUED_LEN};
+    use crate::internal::socket::{EthernetFrame, Frame};
 
     #[derive(Default)]
     struct FakeTxQueueState {

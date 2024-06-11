@@ -7,7 +7,8 @@
 //! Extension types and helpers for the fuchsia.net.dhcpv6 FIDL library.
 
 use fidl_table_validation::{ValidFidlTable, Validate};
-use futures::{future::Either, FutureExt as _};
+use futures::future::Either;
+use futures::FutureExt as _;
 
 /// Parameters to configure a new client.
 ///

@@ -5,17 +5,13 @@
 mod protocol;
 mod zedmon;
 
-use {
-    anyhow::{format_err, Error},
-    clap::{App, Arg, ArgMatches, SubCommand},
-    serde_json as json,
-    std::{
-        fs::File,
-        io::{Read, Write},
-        sync::mpsc,
-        time::Duration,
-    },
-};
+use anyhow::{format_err, Error};
+use clap::{App, Arg, ArgMatches, SubCommand};
+use serde_json as json;
+use std::fs::File;
+use std::io::{Read, Write};
+use std::sync::mpsc;
+use std::time::Duration;
 
 /// Describes allowable values for the --duration arg of `record`.
 const DURATION_REGEX: &'static str = r"^(\d+)(h|m|s|ms)$";

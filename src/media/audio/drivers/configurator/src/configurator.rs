@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::config::Config, anyhow::Error, fuchsia_async as fasync};
+use crate::config::Config;
+use anyhow::Error;
+use fuchsia_async as fasync;
 
 #[async_trait::async_trait]
 pub trait Configurator {

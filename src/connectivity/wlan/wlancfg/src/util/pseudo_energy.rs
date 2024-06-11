@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::client::types as client_types,
-    anyhow::{format_err, Error},
-    tracing::error,
-};
+use crate::client::types as client_types;
+use anyhow::{format_err, Error};
+use tracing::error;
 
 /// Update a weighted average with a new measurement
 fn calculate_ewma_update(current: f64, next: f64, weighting_factor: f64) -> f64 {
@@ -155,10 +153,8 @@ impl RssiVelocity {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        test_util::{assert_gt, assert_lt},
-    };
+    use super::*;
+    use test_util::{assert_gt, assert_lt};
 
     #[fuchsia::test]
     fn test_ewma_pseudo_decibel_simple_averaging_calculations() {

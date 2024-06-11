@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::errors::{VerifyError, VerifyErrors, VerifyFailureReason, VerifySource},
-    fuchsia_inspect as finspect,
-    std::time::Duration,
-};
+use super::errors::{VerifyError, VerifyErrors, VerifyFailureReason, VerifySource};
+use fuchsia_inspect as finspect;
+use std::time::Duration;
 
 fn reason_to_string(reason: &VerifyFailureReason) -> &'static str {
     match reason {
@@ -61,10 +59,11 @@ pub(super) fn write_to_inspect(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, diagnostics_assertions::assert_data_tree, fidl_fuchsia_update_verify as verify,
-        fuchsia_inspect::Inspector, proptest::prelude::*,
-    };
+    use super::*;
+    use diagnostics_assertions::assert_data_tree;
+    use fidl_fuchsia_update_verify as verify;
+    use fuchsia_inspect::Inspector;
+    use proptest::prelude::*;
 
     #[test]
     fn success() {

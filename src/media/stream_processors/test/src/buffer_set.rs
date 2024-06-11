@@ -4,7 +4,8 @@
 
 //! Handles negotiating buffer sets with the codec server and sysmem.
 
-use crate::{buffer_collection_constraints::*, Result};
+use crate::buffer_collection_constraints::*;
+use crate::Result;
 use anyhow::Context as _;
 use fidl::endpoints::{create_endpoints, ClientEnd, Proxy};
 use fidl_fuchsia_media::*;
@@ -12,7 +13,9 @@ use fidl_fuchsia_sysmem2::*;
 use fuchsia_component::client;
 use fuchsia_stream_processors::*;
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use std::{fmt, iter::StepBy, ops::RangeFrom};
+use std::fmt;
+use std::iter::StepBy;
+use std::ops::RangeFrom;
 use thiserror::Error;
 use tracing::debug;
 

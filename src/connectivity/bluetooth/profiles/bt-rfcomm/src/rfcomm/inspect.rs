@@ -4,11 +4,13 @@
 
 use bt_rfcomm::{Role, DLCI};
 use fuchsia_async as fasync;
-use fuchsia_bluetooth::{inspect::DataStreamInspect, types::PeerId};
+use fuchsia_bluetooth::inspect::DataStreamInspect;
+use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_inspect_derive::{AttachError, IValue, Inspect};
 
-use crate::rfcomm::session::{channel::FlowControlMode, multiplexer::SessionParameters};
+use crate::rfcomm::session::channel::FlowControlMode;
+use crate::rfcomm::session::multiplexer::SessionParameters;
 
 pub(crate) const FLOW_CONTROLLER: &str = "flow_controller";
 pub(crate) const CREDIT_FLOW_CONTROL: &str = "Credit-Based";

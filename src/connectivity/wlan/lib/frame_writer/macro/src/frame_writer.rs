@@ -2,21 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::ie::Ie;
-use {
-    crate::{header::HeaderDefinition, ie::IeDefinition},
-    proc_macro::TokenStream,
-    quote::quote,
-    std::collections::HashMap,
-    syn::{
-        braced,
-        parse::{Parse, ParseStream},
-        parse_macro_input,
-        punctuated::Punctuated,
-        spanned::Spanned,
-        Error, Expr, Ident, Result, Token,
-    },
-};
+use crate::header::HeaderDefinition;
+use crate::ie::{Ie, IeDefinition};
+use proc_macro::TokenStream;
+use quote::quote;
+use std::collections::HashMap;
+use syn::parse::{Parse, ParseStream};
+use syn::punctuated::Punctuated;
+use syn::spanned::Spanned;
+use syn::{braced, parse_macro_input, Error, Expr, Ident, Result, Token};
 
 macro_rules! unwrap_or_bail {
     ($x:expr) => {

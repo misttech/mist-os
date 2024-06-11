@@ -9,7 +9,7 @@ mod matcher;
 mod test_util;
 mod typeface;
 
-pub use {
-    collection::{Collection, TypefaceCollectionBuilder},
-    typeface::{Typeface, TypefaceError, TypefaceId, TypefaceInfoAndCharSet, TypefaceInspectData},
+pub use collection::{Collection, TypefaceCollectionBuilder};
+pub use typeface::{
+    Typeface, TypefaceError, TypefaceId, TypefaceInfoAndCharSet, TypefaceInspectData,
 };

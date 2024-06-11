@@ -16,17 +16,16 @@ mod annotation;
 mod element;
 mod element_manager;
 
-use {
-    crate::element_manager::{CollectionConfig, ElementManager},
-    anyhow::Error,
-    element_config::Config,
-    fidl_connector::ServiceReconnector,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement,
-    fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
-    futures::StreamExt,
-    std::rc::Rc,
-    tracing::{error, info},
-};
+use crate::element_manager::{CollectionConfig, ElementManager};
+use anyhow::Error;
+use element_config::Config;
+use fidl_connector::ServiceReconnector;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use futures::StreamExt;
+use std::rc::Rc;
+use tracing::{error, info};
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement};
 
 /// This enum allows the session to match on incoming messages.
 enum ExposedServices {
@@ -92,19 +91,19 @@ async fn main() -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
+    use crate::element_manager::{CollectionConfig, ElementManager};
+    use fidl::endpoints::{create_proxy_and_stream, spawn_stream_handler, Proxy};
+    use fidl_connector::Connect;
+    use fuchsia_zircon::sys::ZX_OK;
+    use futures::channel::mpsc;
+    use futures::{SinkExt, StreamExt};
+    use lazy_static::lazy_static;
+    use session_testing::spawn_directory_server;
+    use std::collections::HashMap;
+    use test_util::Counter;
     use {
-        crate::element_manager::{CollectionConfig, ElementManager},
-        fidl::endpoints::Proxy,
-        fidl::endpoints::{create_proxy_and_stream, spawn_stream_handler},
-        fidl_connector::Connect,
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
         fidl_fuchsia_element as felement, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_zircon::sys::ZX_OK,
-        futures::{channel::mpsc, SinkExt, StreamExt},
-        lazy_static::lazy_static,
-        session_testing::spawn_directory_server,
-        std::collections::HashMap,
-        test_util::Counter,
     };
 
     /// Spawns a local `Manager` server.

@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_fidl_test_components as ftest, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_fs::OpenFlags,
-    futures::{StreamExt, TryStreamExt},
-};
+use anyhow::Error;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_fs::OpenFlags;
+use futures::{StreamExt, TryStreamExt};
+use {fidl_fidl_test_components as ftest, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[fuchsia::main]
 async fn main() {

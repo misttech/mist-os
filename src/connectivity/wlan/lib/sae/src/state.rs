@@ -2,19 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{
-        boringssl::{Bignum, BignumCtx},
-        frame::{write_commit, write_confirm},
-        internal::FiniteCyclicGroup,
-        internal::SaeParameters,
-        AntiCloggingTokenMsg, CommitMsg, ConfirmMsg, Key, PweMethod, RejectReason, SaeHandshake,
-        SaeUpdate, SaeUpdateSink, Timeout,
-    },
-    anyhow::{bail, format_err, Error},
-    tracing::{error, warn},
-    wlan_statemachine::*,
+use super::boringssl::{Bignum, BignumCtx};
+use super::frame::{write_commit, write_confirm};
+use super::internal::{FiniteCyclicGroup, SaeParameters};
+use super::{
+    AntiCloggingTokenMsg, CommitMsg, ConfirmMsg, Key, PweMethod, RejectReason, SaeHandshake,
+    SaeUpdate, SaeUpdateSink, Timeout,
 };
+use anyhow::{bail, format_err, Error};
+use tracing::{error, warn};
+use wlan_statemachine::*;
 
 // TODO(https://fxbug.dev/42118302): Handle received timeouts.
 // TODO(https://fxbug.dev/42118769): Handle BadGrp/DiffGrp.
@@ -720,21 +717,16 @@ impl<E> SaeHandshake for SaeHandshakeImpl<E> {
 // Most testing is done in sae/mod.rs, so we only test internal functions here.
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::{
-            self as sae,
-            boringssl::{Bignum, EcGroupId},
-            ecc,
-            hmac_utils::HmacUtilsImpl,
-        },
-        hex::FromHex,
-        ieee80211::{MacAddr, Ssid},
-        lazy_static::lazy_static,
-        mundane::hash::Sha256,
-        std::convert::TryFrom,
-        wlan_common::assert_variant,
-    };
+    use super::*;
+    use crate::boringssl::{Bignum, EcGroupId};
+    use crate::hmac_utils::HmacUtilsImpl;
+    use crate::{self as sae, ecc};
+    use hex::FromHex;
+    use ieee80211::{MacAddr, Ssid};
+    use lazy_static::lazy_static;
+    use mundane::hash::Sha256;
+    use std::convert::TryFrom;
+    use wlan_common::assert_variant;
 
     // IEEE Std 802.11-18/1104r0: "New Test Vectors for SAE" provides all of these values.
     // TEST_PWD is slightly modified by concatenating the password identifier field; IEEE Std

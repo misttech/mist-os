@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_test_wlan_realm::WlanConfig,
-    fuchsia_zircon::prelude::*,
-    ieee80211::{Bssid, Ssid},
-    tracing::info,
-    wlan_common::bss::Protection,
-    wlan_hw_sim::*,
-};
+use fidl_fuchsia_wlan_policy as fidl_policy;
+use fidl_test_wlan_realm::WlanConfig;
+use fuchsia_zircon::prelude::*;
+use ieee80211::{Bssid, Ssid};
+use tracing::info;
+use wlan_common::bss::Protection;
+use wlan_hw_sim::*;
 
 /// Test connections against all modern bool (non-WEP/WPA1) BSS protection types.
 #[fuchsia::test]

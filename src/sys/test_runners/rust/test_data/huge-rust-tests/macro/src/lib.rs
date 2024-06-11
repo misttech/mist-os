@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    proc_macro::TokenStream,
-    proc_macro2::TokenStream as TokenStream2,
-    quote::{format_ident, quote},
-};
+use proc_macro::TokenStream;
+use proc_macro2::TokenStream as TokenStream2;
+use quote::{format_ident, quote};
 
 /// Generates many trivial tests.
 #[proc_macro]

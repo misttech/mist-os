@@ -15,23 +15,19 @@
 pub mod admin;
 pub mod testutil;
 
-use std::{
-    collections::HashSet,
-    fmt::{Debug, Display},
-};
+use std::collections::HashSet;
+use std::fmt::{Debug, Display};
 
 use async_utils::fold;
-use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext::{IntoExt as _, TryIntoExt as _};
-use fidl_fuchsia_net_routes as fnet_routes;
-use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
-use fidl_fuchsia_net_stack as fnet_stack;
 use futures::{Future, Stream, StreamExt as _, TryStreamExt as _};
-use net_types::{
-    ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6, Ipv6Addr, Subnet},
-    SpecifiedAddr, UnicastAddress, Witness as _,
-};
+use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6, Ipv6Addr, Subnet};
+use net_types::{SpecifiedAddr, UnicastAddress, Witness as _};
 use thiserror::Error;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin, fidl_fuchsia_net_stack as fnet_stack,
+};
 
 /// Conversion errors from `fnet_routes` FIDL types to the generic equivalents
 /// defined in this module.
@@ -1051,8 +1047,6 @@ mod tests {
     use super::*;
     use crate::testutil::internal as internal_testutil;
     use assert_matches::assert_matches;
-    use fidl_fuchsia_net as _;
-    use fuchsia_zircon_status as zx_status;
     use futures::FutureExt;
     use net_declare::{
         fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix, net_ip_v4,
@@ -1060,6 +1054,7 @@ mod tests {
     };
     use netstack_testing_macros::netstack_test;
     use test_case::test_case;
+    use {fidl_fuchsia_net as _, fuchsia_zircon_status as zx_status};
 
     const ARBITRARY_TABLE_ID: u32 = 0;
 

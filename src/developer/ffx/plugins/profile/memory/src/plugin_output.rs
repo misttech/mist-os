@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::digest, digest::processed, serde::Serialize};
+use crate::digest;
+use digest::processed;
+use serde::Serialize;
 
 /// Contains the memory usage of processes, and the time at which the
 /// data was captured.

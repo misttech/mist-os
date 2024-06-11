@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{
-    errors::{errno, Errno},
-    PAGE_SIZE,
-};
+use super::errors::{errno, Errno};
+use super::PAGE_SIZE;
 
 pub fn round_up_to_increment(size: usize, increment: usize) -> Result<usize, Errno> {
     let spare = size % increment;

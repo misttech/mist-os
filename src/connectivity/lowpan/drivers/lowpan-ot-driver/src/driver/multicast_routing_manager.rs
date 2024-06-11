@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{fasync, stream::TryStreamExt as _};
+use super::fasync;
+use super::stream::TryStreamExt as _;
 use fidl::Error::ClientChannelClosed;
 use fidl_fuchsia_net_ext::FromExt as _;
 use fidl_fuchsia_net_multicast_admin as fnet_mcast;

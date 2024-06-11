@@ -23,17 +23,16 @@ use crate::input_handler::InputHandlerStatus;
 use crate::keyboard_binding::KeyboardEvent;
 use crate::metrics;
 use anyhow::{anyhow, Context, Result};
-use fidl_fuchsia_settings as fsettings;
 use fidl_fuchsia_ui_input3::{self as finput3, KeyEventType, KeyMeaning};
 use fuchsia_async::{Task, Time, Timer};
 use fuchsia_inspect::health::Reporter;
-use fuchsia_zircon as zx;
 use fuchsia_zircon::Duration;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::StreamExt;
 use metrics_registry::*;
 use std::cell::RefCell;
 use std::rc::Rc;
+use {fidl_fuchsia_settings as fsettings, fuchsia_zircon as zx};
 
 /// The value range reserved for the modifier key meanings.  See the documentation for
 /// `fuchsia.ui.input3/NonPrintableKey` for details.
@@ -478,7 +477,8 @@ mod tests {
     use fuchsia_zircon as zx;
     use futures::Future;
     use pretty_assertions::assert_eq;
-    use std::{pin::pin, task::Poll};
+    use std::pin::pin;
+    use std::task::Poll;
 
     // Default autorepeat settings used for test.  If these settings are changed,
     // any tests may fail, since the tests are tuned to the precise timing that

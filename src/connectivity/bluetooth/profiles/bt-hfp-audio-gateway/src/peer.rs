@@ -3,24 +3,21 @@
 // found in the LICENSE file.
 
 use self::task::PeerTask;
-use {
-    async_trait::async_trait,
-    async_utils::channel::TrySend,
-    core::{
-        pin::Pin,
-        task::{Context, Poll},
-    },
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_bluetooth_bredr::ProfileProxy,
-    fidl_fuchsia_bluetooth_hfp::{PeerHandlerMarker, PeerHandlerProxy},
-    fuchsia_async::Task,
-    fuchsia_bluetooth::types::PeerId,
-    fuchsia_inspect as inspect,
-    fuchsia_sync::Mutex,
-    futures::{channel::mpsc, Future, FutureExt, SinkExt, TryFutureExt},
-    profile_client::ProfileEvent,
-    std::sync::Arc,
-};
+use async_trait::async_trait;
+use async_utils::channel::TrySend;
+use core::pin::Pin;
+use core::task::{Context, Poll};
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_bluetooth_bredr::ProfileProxy;
+use fidl_fuchsia_bluetooth_hfp::{PeerHandlerMarker, PeerHandlerProxy};
+use fuchsia_async::Task;
+use fuchsia_bluetooth::types::PeerId;
+use fuchsia_inspect as inspect;
+use fuchsia_sync::Mutex;
+use futures::channel::mpsc;
+use futures::{Future, FutureExt, SinkExt, TryFutureExt};
+use profile_client::ProfileEvent;
+use std::sync::Arc;
 
 use crate::audio::AudioControl;
 use crate::config::AudioGatewayFeatureSupport;

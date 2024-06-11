@@ -6,17 +6,14 @@
 
 use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
-use netstack3_base::{sync::RwLock, WeakDeviceIdentifier};
+use netstack3_base::sync::RwLock;
+use netstack3_base::WeakDeviceIdentifier;
 
-use crate::{
-    internal::{
-        raw::{
-            filter::RawIpSocketIcmpFilter, protocol::RawIpSocketProtocol, RawIpSocketsBindingsTypes,
-        },
-        socket::SocketHopLimits,
-    },
-    IpExt,
-};
+use crate::internal::raw::filter::RawIpSocketIcmpFilter;
+use crate::internal::raw::protocol::RawIpSocketProtocol;
+use crate::internal::raw::RawIpSocketsBindingsTypes;
+use crate::internal::socket::SocketHopLimits;
+use crate::IpExt;
 
 /// State for a raw IP socket that can be modified, and is lock protected.
 #[derive(Derivative)]

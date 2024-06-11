@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error, fidl_fuchsia_kernel as fkernel, fuchsia_runtime::job_default,
-    fuchsia_zircon as zx, futures::TryStreamExt,
-};
+use anyhow::Error;
+use fuchsia_runtime::job_default;
+use futures::TryStreamExt;
+use {fidl_fuchsia_kernel as fkernel, fuchsia_zircon as zx};
 
 /// An implementation of the `fuchsia.kernel.RootJob` protocol.
 pub struct RootJob;
@@ -25,7 +25,10 @@ impl RootJob {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fuchsia_async as fasync, fuchsia_zircon::AsHandleRef, futures::TryFutureExt};
+    use super::*;
+    use fuchsia_async as fasync;
+    use fuchsia_zircon::AsHandleRef;
+    use futures::TryFutureExt;
 
     #[fuchsia::test]
     async fn has_correct_rights() -> Result<(), Error> {

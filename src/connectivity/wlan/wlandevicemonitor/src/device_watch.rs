@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Context as _,
-    fidl_fuchsia_io as fio, fidl_fuchsia_wlan_device as fidl_wlan_dev,
-    fuchsia_fs::directory::{WatchEvent, WatchMessage, Watcher},
-    futures::{
-        future::TryFutureExt as _,
-        stream::{Stream, TryStreamExt as _},
-    },
-    std::hash::{Hash as _, Hasher as _},
-    tracing::error,
-};
+use anyhow::Context as _;
+use fuchsia_fs::directory::{WatchEvent, WatchMessage, Watcher};
+use futures::future::TryFutureExt as _;
+use futures::stream::{Stream, TryStreamExt as _};
+use std::hash::{Hash as _, Hasher as _};
+use tracing::error;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_wlan_device as fidl_wlan_dev};
 
 pub struct NewPhyDevice {
     pub id: u16,
@@ -81,20 +77,21 @@ pub fn watch_phy_devices<'a>(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_fuchsia_wlan_device::{ConnectorRequest, ConnectorRequestStream},
-        fuchsia_async as fasync,
-        fuchsia_zircon::DurationNum as _,
-        futures::{poll, stream::StreamExt as _, task::Poll},
-        std::{pin::pin, sync::Arc},
-        tracing::info,
-        vfs::{
-            directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path,
-            pseudo_directory,
-        },
-        wlan_common::test_utils::ExpectWithin,
-    };
+    use super::*;
+    use fidl_fuchsia_wlan_device::{ConnectorRequest, ConnectorRequestStream};
+    use fuchsia_async as fasync;
+    use fuchsia_zircon::DurationNum as _;
+    use futures::poll;
+    use futures::stream::StreamExt as _;
+    use futures::task::Poll;
+    use std::pin::pin;
+    use std::sync::Arc;
+    use tracing::info;
+    use vfs::directory::entry_container::Directory;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::path::Path;
+    use vfs::pseudo_directory;
+    use wlan_common::test_utils::ExpectWithin;
 
     #[fasync::run_singlethreaded(test)]
     async fn watch_single_phy() {

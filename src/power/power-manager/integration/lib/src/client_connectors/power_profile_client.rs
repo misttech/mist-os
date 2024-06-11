@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::TestEnv,
-    fidl_fuchsia_power_profile as fprofile, fuchsia_async as fasync,
-    futures::{channel::mpsc, StreamExt},
-    tracing::*,
-};
+use crate::TestEnv;
+use futures::channel::mpsc;
+use futures::StreamExt;
+use tracing::*;
+use {fidl_fuchsia_power_profile as fprofile, fuchsia_async as fasync};
 
 /// Convenience type for interacting with the Power Manager's power profile service.
 pub struct PowerProfileClient {

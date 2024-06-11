@@ -5,19 +5,15 @@
 // TODO(https://fxbug.dev/42066994): Remove.
 #![allow(unused_variables, unused_imports, dead_code)]
 
-use {
-    anyhow::{anyhow, Error},
-    fidl::endpoints::{ClientEnd, ProtocolMarker, ServerEnd},
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_virtualization::{
-        BlockFormat, BlockMode, BlockSpec, GuestConfig, KernelType, MAX_BLOCK_DEVICE_ID,
-    },
-    fuchsia_fs::{file, OpenFlags},
-    fuchsia_zircon as zx,
-    serde::{de, Deserialize},
-    static_assertions as sa,
-    std::path::Path,
+use anyhow::{anyhow, Error};
+use fidl::endpoints::{ClientEnd, ProtocolMarker, ServerEnd};
+use fidl_fuchsia_virtualization::{
+    BlockFormat, BlockMode, BlockSpec, GuestConfig, KernelType, MAX_BLOCK_DEVICE_ID,
 };
+use fuchsia_fs::{file, OpenFlags};
+use serde::{de, Deserialize};
+use std::path::Path;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx, static_assertions as sa};
 
 // Memory is specified by a string containing either a plain u64 value in bytes, or a u64
 // followed by an optional unit suffix.
@@ -250,7 +246,9 @@ pub fn merge_configs(mut base: GuestConfig, overrides: GuestConfig) -> GuestConf
 
 #[cfg(test)]
 mod tests {
-    use {super::*, std::path::PathBuf, tempfile::tempdir};
+    use super::*;
+    use std::path::PathBuf;
+    use tempfile::tempdir;
 
     // Empty strings are an error.
     #[fuchsia::test]

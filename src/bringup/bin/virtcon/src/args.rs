@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::colors::ColorScheme,
-    anyhow::Error,
-    carnelian::drawing::DisplayRotation,
-    fidl_fuchsia_boot::{ArgumentsProxy, BoolPair},
-    std::str::FromStr,
-};
+use crate::colors::ColorScheme;
+use anyhow::Error;
+use carnelian::drawing::DisplayRotation;
+use fidl_fuchsia_boot::{ArgumentsProxy, BoolPair};
+use std::str::FromStr;
 
 pub const MIN_FONT_SIZE: f32 = 16.0;
 pub const MAX_FONT_SIZE: f32 = 160.0;
@@ -122,14 +120,12 @@ impl VirtualConsoleArgs {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::colors::LIGHT_COLOR_SCHEME,
-        fidl_fuchsia_boot::{ArgumentsMarker, ArgumentsRequest},
-        fuchsia_async as fasync,
-        futures::TryStreamExt,
-        std::collections::HashMap,
-    };
+    use super::*;
+    use crate::colors::LIGHT_COLOR_SCHEME;
+    use fidl_fuchsia_boot::{ArgumentsMarker, ArgumentsRequest};
+    use fuchsia_async as fasync;
+    use futures::TryStreamExt;
+    use std::collections::HashMap;
 
     fn serve_bootargs(env: HashMap<String, String>) -> Result<ArgumentsProxy, Error> {
         let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<ArgumentsMarker>()?;

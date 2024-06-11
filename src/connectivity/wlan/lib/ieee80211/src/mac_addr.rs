@@ -5,7 +5,8 @@
 use crate::Bssid;
 use anyhow::{format_err, Error};
 use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
-use std::{fmt, str::FromStr};
+use std::fmt;
+use std::str::FromStr;
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
 
 // Strictly speaking, the MAC address is not defined in 802.11, but it's defined

@@ -2,16 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{format_err, Context, Error};
+use fidl::endpoints::ServerEnd;
+use futures::future::BoxFuture;
+use futures::lock::Mutex;
+use futures::TryStreamExt;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tracing::*;
+use vfs::execution_scope::ExecutionScope;
 use {
-    anyhow::{format_err, Context, Error},
-    fidl::endpoints::ServerEnd,
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     fuchsia_async as fasync,
-    futures::lock::Mutex,
-    futures::{future::BoxFuture, TryStreamExt},
-    std::{collections::HashMap, sync::Arc},
-    tracing::*,
-    vfs::execution_scope::ExecutionScope,
 };
 
 pub const RUNNER_NAME: &'static str = "realm_builder";
@@ -230,12 +232,11 @@ async fn run_builtin_controller(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl::endpoints::{create_endpoints, create_proxy_and_stream},
-        futures::{channel::mpsc, FutureExt, SinkExt, StreamExt},
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::{create_endpoints, create_proxy_and_stream};
+    use futures::channel::mpsc;
+    use futures::{FutureExt, SinkExt, StreamExt};
 
     // There are two separate `fuchsia.component.runner/ComponentRunner` channels for every local
     // component that's launched: one connecting component manager to the realm builder runner, and

@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    carnelian::{
-        drawing::TextGrid,
-        render::{Context as RenderContext, Path},
-        Size,
-    },
-    euclid::{point2, vec2},
-    term_model::ansi::CursorStyle,
-};
+use carnelian::drawing::TextGrid;
+use carnelian::render::{Context as RenderContext, Path};
+use carnelian::Size;
+use euclid::{point2, vec2};
+use term_model::ansi::CursorStyle;
 
 // Thickness of lines is determined by multiplying thickness factor
 // with the cell height. 1/16 has been chosen as that results in 1px
@@ -596,16 +592,12 @@ pub fn maybe_path_for_char(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::Error,
-        carnelian::{
-            drawing::{DisplayRotation, FontFace},
-            render::{generic, ContextInner},
-        },
-        euclid::size2,
-        once_cell::sync::Lazy,
-    };
+    use super::*;
+    use anyhow::Error;
+    use carnelian::drawing::{DisplayRotation, FontFace};
+    use carnelian::render::{generic, ContextInner};
+    use euclid::size2;
+    use once_cell::sync::Lazy;
 
     // This font creation method isn't ideal. The correct method would be to ask the Fuchsia
     // font service for the font data.

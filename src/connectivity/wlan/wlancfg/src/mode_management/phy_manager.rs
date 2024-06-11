@@ -2,26 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::mode_management::iface_manager::wpa3_supported;
+use crate::mode_management::recovery::{
+    self, IfaceRecoveryOperation, PhyRecoveryOperation, RecoveryAction,
+};
+use crate::mode_management::{Defect, EventHistory, IfaceFailure, PhyFailure};
+use crate::regulatory_manager::REGION_CODE_LEN;
+use crate::telemetry::{TelemetryEvent, TelemetrySender};
+use anyhow::{format_err, Error};
+use async_trait::async_trait;
+use fidl::endpoints::create_proxy;
+use fuchsia_inspect::{self as inspect, NumericProperty};
+use ieee80211::{MacAddr, MacAddrBytes, NULL_ADDR};
+use std::collections::{HashMap, HashSet};
+use thiserror::Error;
+use tracing::{error, info, warn};
 use {
-    crate::{
-        mode_management::{
-            iface_manager::wpa3_supported,
-            recovery::{self, IfaceRecoveryOperation, PhyRecoveryOperation, RecoveryAction},
-            Defect, EventHistory, IfaceFailure, PhyFailure,
-        },
-        regulatory_manager::REGION_CODE_LEN,
-        telemetry::{TelemetryEvent, TelemetrySender},
-    },
-    anyhow::{format_err, Error},
-    async_trait::async_trait,
-    fidl::endpoints::create_proxy,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_device_service as fidl_service,
     fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_inspect::{self as inspect, NumericProperty},
-    ieee80211::{MacAddr, MacAddrBytes, NULL_ADDR},
-    std::collections::{HashMap, HashSet},
-    thiserror::Error,
-    tracing::{error, info, warn},
 };
 
 // Number of seconds that recoverable event histories should be stored.  Store past events for 24
@@ -1024,22 +1022,22 @@ async fn stop_ap(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::telemetry;
+    use crate::util::testing::{poll_ap_sme_req, poll_sme_req};
+    use diagnostics_assertions::assert_data_tree;
+    use fidl::endpoints;
+    use fuchsia_async::{run_singlethreaded, TestExecutor};
+    use fuchsia_zircon::sys::{ZX_ERR_NOT_FOUND, ZX_OK};
+    use futures::channel::mpsc;
+    use futures::stream::StreamExt;
+    use futures::task::Poll;
+    use std::pin::pin;
+    use test_case::test_case;
+    use wlan_common::assert_variant;
     use {
-        super::*,
-        crate::{
-            telemetry,
-            util::testing::{poll_ap_sme_req, poll_sme_req},
-        },
-        diagnostics_assertions::assert_data_tree,
-        fidl::endpoints,
         fidl_fuchsia_wlan_device_service as fidl_service, fidl_fuchsia_wlan_sme as fidl_sme,
-        fuchsia_async::{run_singlethreaded, TestExecutor},
         fuchsia_inspect as inspect,
-        fuchsia_zircon::sys::{ZX_ERR_NOT_FOUND, ZX_OK},
-        futures::{channel::mpsc, stream::StreamExt, task::Poll},
-        std::pin::pin,
-        test_case::test_case,
-        wlan_common::assert_variant,
     };
 
     /// Hold the client and service ends for DeviceMonitor to allow mocking DeviceMonitor responses

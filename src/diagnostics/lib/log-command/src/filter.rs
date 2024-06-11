@@ -9,10 +9,8 @@ use moniker::Moniker;
 use selectors::match_moniker_against_component_selector;
 use std::str::FromStr;
 
-use crate::{
-    log_formatter::{LogData, LogEntry},
-    LogCommand,
-};
+use crate::log_formatter::{LogData, LogEntry};
+use crate::LogCommand;
 
 /// A struct that holds the criteria for filtering logs.
 pub struct LogFilterCriteria {

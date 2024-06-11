@@ -4,7 +4,8 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use ffx_config::{keys::TARGET_DEFAULT_KEY, EnvironmentContext};
+use ffx_config::keys::TARGET_DEFAULT_KEY;
+use ffx_config::EnvironmentContext;
 use ffx_target_default_args::{SubCommand, TargetDefaultCommand, TargetDefaultGetCommand};
 use fho::{FfxMain, FfxTool, SimpleWriter};
 

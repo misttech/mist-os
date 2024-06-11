@@ -4,16 +4,16 @@
 
 // This actor has actions to write/read logs to/from Archivist.
 
-use {
-    anyhow::{Context, Result},
-    diagnostics_reader::{ArchiveReader, Data, Logs, Subscription},
-    fidl_fuchsia_diagnostics::ArchiveAccessorMarker,
-    fuchsia_component::client::connect_to_protocol,
-    futures::{future::BoxFuture, FutureExt, StreamExt},
-    rand::{rngs::SmallRng, Rng},
-    stress_test_actor::{actor_loop, Action},
-    tracing::info,
-};
+use anyhow::{Context, Result};
+use diagnostics_reader::{ArchiveReader, Data, Logs, Subscription};
+use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
+use fuchsia_component::client::connect_to_protocol;
+use futures::future::BoxFuture;
+use futures::{FutureExt, StreamExt};
+use rand::rngs::SmallRng;
+use rand::Rng;
+use stress_test_actor::{actor_loop, Action};
+use tracing::info;
 
 /// Stores all data needed by this Worker. This singleton gets passed into every action.
 struct WorkerData {

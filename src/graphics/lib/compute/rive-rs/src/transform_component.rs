@@ -4,16 +4,14 @@
 
 use std::cell::Cell;
 
-use crate::{
-    bones::{Bone, RootBone},
-    component_dirt::ComponentDirt,
-    container_component::ContainerComponent,
-    core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property},
-    math::{self, Mat},
-    node::Node,
-    option_cell::OptionCell,
-    Component, StatusCode,
-};
+use crate::bones::{Bone, RootBone};
+use crate::component_dirt::ComponentDirt;
+use crate::container_component::ContainerComponent;
+use crate::core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property};
+use crate::math::{self, Mat};
+use crate::node::Node;
+use crate::option_cell::OptionCell;
+use crate::{Component, StatusCode};
 
 #[derive(Debug)]
 pub struct TransformComponent {

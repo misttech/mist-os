@@ -14,16 +14,16 @@ use fidl_fuchsia_bluetooth_le::{
     CentralMarker, CentralProxy, ConnectionEventStream, ConnectionOptions, ConnectionProxy, Filter,
     ScanOptions, ScanResultWatcherMarker, ScanResultWatcherProxy,
 };
-use fuchsia_async as fasync;
-use fuchsia_component as app;
 use fuchsia_sync::RwLock;
 use futures::{select, StreamExt};
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 use tracing::*;
+use {fuchsia_async as fasync, fuchsia_component as app};
 
-use fuchsia_bluetooth::types::{le::Peer, PeerId, Uuid};
+use fuchsia_bluetooth::types::le::Peer;
+use fuchsia_bluetooth::types::{PeerId, Uuid};
 
 use crate::bluetooth::types::{BleScanResponse, SerializableReadByTypeResult};
 use crate::common_utils::common::macros::with_line;

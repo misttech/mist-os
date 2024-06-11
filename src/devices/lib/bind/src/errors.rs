@@ -5,8 +5,7 @@
 use crate::bytecode_encoder::error::BindRulesEncodeError;
 use crate::compiler::dependency_graph::DependencyError;
 use crate::compiler::{BindRulesDecodeError, CompilerError};
-use crate::debugger::debugger;
-use crate::debugger::offline_debugger;
+use crate::debugger::{debugger, offline_debugger};
 use crate::interpreter::common::BytecodeError;
 use crate::linter::LinterError;
 use crate::parser::common::{BindParserError, CompoundIdentifier};

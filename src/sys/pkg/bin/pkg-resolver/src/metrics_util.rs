@@ -2,29 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::error,
-    anyhow::{format_err, Context as _, Error},
-    cobalt_sw_delivery_registry::{
-        self as metrics, CreateTufClientMigratedMetricDimensionResult,
-        UpdateTufClientMigratedMetricDimensionResult,
-    },
-    fidl_contrib::protocol_connector::ConnectedProtocol,
-    fidl_fuchsia_metrics::{
-        MetricEvent, MetricEventLoggerFactoryMarker, MetricEventLoggerProxy, ProjectSpec,
-    },
-    fuchsia_component::client::connect_to_protocol,
-    futures::{future, FutureExt as _},
-    hyper::StatusCode,
+use crate::error;
+use anyhow::{format_err, Context as _, Error};
+use cobalt_sw_delivery_registry::{
+    self as metrics, CreateTufClientMigratedMetricDimensionResult,
+    UpdateTufClientMigratedMetricDimensionResult,
 };
+use fidl_contrib::protocol_connector::ConnectedProtocol;
+use fidl_fuchsia_metrics::{
+    MetricEvent, MetricEventLoggerFactoryMarker, MetricEventLoggerProxy, ProjectSpec,
+};
+use fuchsia_component::client::connect_to_protocol;
+use futures::{future, FutureExt as _};
+use hyper::StatusCode;
 
 pub fn tuf_error_as_update_tuf_client_event_code(
     e: &error::TufOrTimeout,
 ) -> UpdateTufClientMigratedMetricDimensionResult {
-    use {
-        error::TufOrTimeout::*, tuf::error::Error::*,
-        UpdateTufClientMigratedMetricDimensionResult as EventCodes,
-    };
+    use error::TufOrTimeout::*;
+    use tuf::error::Error::*;
+    use UpdateTufClientMigratedMetricDimensionResult as EventCodes;
     match e {
         Tuf(BadSignature(_)) => EventCodes::BadSignature,
         Tuf(Encoding(_)) => EventCodes::Encoding,
@@ -67,10 +64,9 @@ pub fn tuf_error_as_update_tuf_client_event_code(
 pub fn tuf_error_as_create_tuf_client_event_code(
     e: &error::TufOrTimeout,
 ) -> CreateTufClientMigratedMetricDimensionResult {
-    use {
-        error::TufOrTimeout::*, tuf::error::Error::*,
-        CreateTufClientMigratedMetricDimensionResult as EventCodes,
-    };
+    use error::TufOrTimeout::*;
+    use tuf::error::Error::*;
+    use CreateTufClientMigratedMetricDimensionResult as EventCodes;
     match e {
         Tuf(BadSignature(_)) => EventCodes::BadSignature,
         Tuf(Encoding(_)) => EventCodes::Encoding,

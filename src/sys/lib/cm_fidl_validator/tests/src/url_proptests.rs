@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    cm_fidl_validator::check_url, cm_fidl_validator::error::DeclType, cm_types::MAX_URL_LENGTH,
-    lazy_static::lazy_static, proptest::prelude::*, url::Url,
-};
+use cm_fidl_validator::check_url;
+use cm_fidl_validator::error::DeclType;
+use cm_types::MAX_URL_LENGTH;
+use lazy_static::lazy_static;
+use proptest::prelude::*;
+use url::Url;
 
 #[macro_use]
 mod url_regex {

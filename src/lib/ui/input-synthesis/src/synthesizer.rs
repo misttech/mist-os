@@ -2,17 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::derive_key_sequence;
+use anyhow::{ensure, Error};
+use async_trait::async_trait;
+use fidl_fuchsia_input_report::MouseInputReport;
+use fidl_fuchsia_ui_input::{KeyboardReport, Touch};
+use serde::{Deserialize, Deserializer};
+use std::thread;
+use std::time::Duration;
+use tracing::debug;
 use {
-    crate::derive_key_sequence,
-    anyhow::{ensure, Error},
-    async_trait::async_trait,
-    fidl_fuchsia_input as input,
-    fidl_fuchsia_input_report::MouseInputReport,
-    fidl_fuchsia_ui_input::{KeyboardReport, Touch},
-    fidl_fuchsia_ui_input3 as input3, fuchsia_async as fasync, fuchsia_zircon as zx,
-    serde::{Deserialize, Deserializer},
-    std::{thread, time::Duration},
-    tracing::debug,
+    fidl_fuchsia_input as input, fidl_fuchsia_ui_input3 as input3, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
 };
 
 // Abstracts over input injection services (which are provided by input device registries).
@@ -581,7 +582,10 @@ pub async fn add_mouse_device(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, anyhow::Context as _, fuchsia_async as fasync, serde::Deserialize};
+    use super::*;
+    use anyhow::Context as _;
+    use fuchsia_async as fasync;
+    use serde::Deserialize;
 
     #[derive(Deserialize, Debug, Eq, PartialEq)]
     struct KeyEventsRequest {
@@ -672,18 +676,16 @@ mod tests {
     }
 
     mod event_synthesis {
-        use {
-            super::*,
-            fidl::endpoints,
-            fidl_fuchsia_input_report::MOUSE_MAX_NUM_BUTTONS,
-            fidl_fuchsia_ui_input::{
-                InputDeviceMarker, InputDeviceProxy as FidlInputDeviceProxy, InputDeviceRequest,
-                InputDeviceRequestStream, InputReport, MediaButtonsReport, MouseReport,
-                TouchscreenReport,
-            },
-            futures::stream::StreamExt,
-            std::collections::HashSet,
+        use super::*;
+        use fidl::endpoints;
+        use fidl_fuchsia_input_report::MOUSE_MAX_NUM_BUTTONS;
+        use fidl_fuchsia_ui_input::{
+            InputDeviceMarker, InputDeviceProxy as FidlInputDeviceProxy, InputDeviceRequest,
+            InputDeviceRequestStream, InputReport, MediaButtonsReport, MouseReport,
+            TouchscreenReport,
         };
+        use futures::stream::StreamExt;
+        use std::collections::HashSet;
 
         // Like `InputReport`, but with the `Box`-ed items inlined.
         struct InlineInputReport {
@@ -1423,7 +1425,8 @@ mod tests {
     }
 
     mod device_registration {
-        use {super::*, assert_matches::assert_matches};
+        use super::*;
+        use assert_matches::assert_matches;
 
         #[derive(Debug)]
         enum DeviceType {

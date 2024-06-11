@@ -7,10 +7,9 @@ mod test_suite;
 
 use crate::test_suite::*;
 use fidl_fuchsia_media::*;
-use fidl_fuchsia_sysmem as sysmem;
-use fuchsia_async as fasync;
 use std::rc::Rc;
 use stream_processor_test::*;
+use {fidl_fuchsia_sysmem as sysmem, fuchsia_async as fasync};
 
 // Instructions for capturing output of encoder:
 // 1. Set the `output_file` field to write the encoded output into "/tmp/".

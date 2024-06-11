@@ -6,7 +6,8 @@
 use anyhow::Context;
 use fidl_fidl_examples_routing_echo::{EchoRequest, EchoRequestStream};
 use fuchsia_component::server::ServiceFs;
-use fuchsia_inspect::{component, health::Reporter};
+use fuchsia_inspect::component;
+use fuchsia_inspect::health::Reporter;
 use futures::prelude::*;
 // [END imports]
 

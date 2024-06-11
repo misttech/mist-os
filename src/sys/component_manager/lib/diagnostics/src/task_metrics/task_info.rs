@@ -2,25 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::task_metrics::{
-        constants::{COMPONENT_CPU_MAX_SAMPLES, CPU_SAMPLE_PERIOD},
-        measurement::{Measurement, MeasurementsQueue},
-        runtime_stats_source::RuntimeStatsSource,
-    },
-    fuchsia_async as fasync,
-    fuchsia_inspect::{self as inspect, HistogramProperty, UintLinearHistogramProperty},
-    fuchsia_zircon as zx,
-    fuchsia_zircon::sys::{self as zx_sys, zx_system_get_num_cpus},
-    futures::{future::BoxFuture, lock::Mutex, FutureExt},
-    injectable_time::TimeSource,
-    moniker::ExtendedMoniker,
-    std::{
-        fmt::Debug,
-        sync::{Arc, Weak},
-    },
-    tracing::debug,
-};
+use crate::task_metrics::constants::{COMPONENT_CPU_MAX_SAMPLES, CPU_SAMPLE_PERIOD};
+use crate::task_metrics::measurement::{Measurement, MeasurementsQueue};
+use crate::task_metrics::runtime_stats_source::RuntimeStatsSource;
+use fuchsia_inspect::{self as inspect, HistogramProperty, UintLinearHistogramProperty};
+use fuchsia_zircon::sys::{self as zx_sys, zx_system_get_num_cpus};
+use futures::future::BoxFuture;
+use futures::lock::Mutex;
+use futures::FutureExt;
+use injectable_time::TimeSource;
+use moniker::ExtendedMoniker;
+use std::fmt::Debug;
+use std::sync::{Arc, Weak};
+use tracing::debug;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub(crate) fn create_cpu_histogram(
     node: &inspect::Node,

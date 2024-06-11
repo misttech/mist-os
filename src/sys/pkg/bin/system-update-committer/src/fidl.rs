@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Error},
-    fidl_fuchsia_update::{CommitStatusProviderRequest, CommitStatusProviderRequestStream},
-    fuchsia_component::server::{ServiceFs, ServiceObjLocal},
-    fuchsia_zircon::{self as zx, EventPair, HandleBased},
-    futures::{channel::oneshot, prelude::*},
-    std::sync::Arc,
-    tracing::warn,
-};
+use anyhow::{anyhow, Context, Error};
+use fidl_fuchsia_update::{CommitStatusProviderRequest, CommitStatusProviderRequestStream};
+use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
+use fuchsia_zircon::{self as zx, EventPair, HandleBased};
+use futures::channel::oneshot;
+use futures::prelude::*;
+use std::sync::Arc;
+use tracing::warn;
 
 pub struct FidlServer {
     p_external: EventPair,

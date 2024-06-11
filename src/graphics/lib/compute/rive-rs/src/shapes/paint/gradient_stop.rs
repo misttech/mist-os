@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    component::Component,
-    core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property},
-    shapes::paint::{Color32, LinearGradient},
-    status_code::StatusCode,
-};
+use crate::component::Component;
+use crate::core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property};
+use crate::shapes::paint::{Color32, LinearGradient};
+use crate::status_code::StatusCode;
 
 #[derive(Debug)]
 pub struct GradientStop {

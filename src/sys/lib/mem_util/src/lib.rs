@@ -4,10 +4,8 @@
 
 //! Utilities for working with the `fuchsia.mem` FIDL library.
 
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_mem as fmem;
-use fuchsia_zircon_status as zxs;
 use std::borrow::Cow;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_zircon_status as zxs};
 
 /// Open `path` from given `parent` directory, returning an [`fmem::Data`] of the contents.
 ///
@@ -91,17 +89,13 @@ mod tests {
     use fuchsia_zircon_status::Status;
     use futures::StreamExt;
     use std::sync::Arc;
-    use vfs::{
-        directory::{
-            entry::{DirectoryEntry, EntryInfo, OpenRequest},
-            entry_container::Directory,
-        },
-        execution_scope::ExecutionScope,
-        file::vmo::read_only,
-        file::{FileLike, FileOptions},
-        object_request::Representation,
-        pseudo_directory, ObjectRequestRef,
-    };
+    use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+    use vfs::directory::entry_container::Directory;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::file::vmo::read_only;
+    use vfs::file::{FileLike, FileOptions};
+    use vfs::object_request::Representation;
+    use vfs::{pseudo_directory, ObjectRequestRef};
 
     #[fuchsia::test]
     async fn bytes_from_read_only() {

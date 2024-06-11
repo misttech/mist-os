@@ -4,13 +4,10 @@
 
 //! Additional functionality for use with asynchronous channels (futures::channel::mpsc).
 
-use {
-    core::{
-        pin::Pin,
-        task::{Context, Poll},
-    },
-    futures::{channel::mpsc, ready, Future},
-};
+use core::pin::Pin;
+use core::task::{Context, Poll};
+use futures::channel::mpsc;
+use futures::{ready, Future};
 
 /// Extends the functionality of a channel to include `try_send_fut`.
 pub trait TrySend<Item> {
@@ -89,11 +86,10 @@ impl<'a, Item> Future for TrySendFut<'a, Item> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fuchsia_async as fasync,
-        futures::{future::join, StreamExt},
-    };
+    use super::*;
+    use fuchsia_async as fasync;
+    use futures::future::join;
+    use futures::StreamExt;
 
     #[fasync::run_until_stalled(test)]
     async fn item_future_completes_on_receive() {

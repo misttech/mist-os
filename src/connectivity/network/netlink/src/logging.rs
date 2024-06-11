@@ -53,8 +53,4 @@ macro_rules! log_error {
 // access `__log_inner` as it is invoked by the `log_*` implementations. See
 // https://doc.rust-lang.org/reference/macros-by-example.html#hygiene for more
 // details.
-pub(crate) use __log_inner;
-pub(crate) use log_debug;
-pub(crate) use log_error;
-pub(crate) use log_info;
-pub(crate) use log_warn;
+pub(crate) use {__log_inner, log_debug, log_error, log_info, log_warn};

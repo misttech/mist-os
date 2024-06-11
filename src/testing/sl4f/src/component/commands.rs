@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::component::{facade::ComponentFacade, types::ComponentMethod};
+use crate::component::facade::ComponentFacade;
+use crate::component::types::ComponentMethod;
 use crate::server::Facade;
 use anyhow::Error;
 use async_trait::async_trait;

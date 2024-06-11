@@ -5,18 +5,19 @@ use crate::accessibility::types::AccessibilityInfo;
 use crate::base::{get_all_setting_types, SettingInfo, SettingType, UnknownInfo};
 use crate::config::base::AgentType;
 use crate::handler::base::{ContextBuilder, Request};
-use crate::handler::setting_handler::persist::WriteResult;
+use crate::handler::setting_handler::persist::{
+    controller as data_controller, ClientProxy as DataClientProxy, Handler as DataHandler,
+    WriteResult,
+};
 use crate::handler::setting_handler::{
-    controller, persist, persist::controller as data_controller,
-    persist::ClientProxy as DataClientProxy, persist::Handler as DataHandler, BoxedController,
-    ClientImpl, Command, ControllerError, ControllerStateResult, Event, GenerateController,
-    IntoHandlerResult, Payload, SettingHandlerResult, State,
+    controller, persist, BoxedController, ClientImpl, Command, ControllerError,
+    ControllerStateResult, Event, GenerateController, IntoHandlerResult, Payload,
+    SettingHandlerResult, State,
 };
 use crate::message::base::{Audience, MessengerType};
-use crate::service;
 use crate::storage::testing::InMemoryStorageFactory;
 use crate::tests::message_utils::verify_payload;
-use crate::EnvironmentBuilder;
+use crate::{service, EnvironmentBuilder};
 use async_trait::async_trait;
 use fidl::endpoints::create_proxy_and_stream;
 use fidl_fuchsia_io::DirectoryMarker;

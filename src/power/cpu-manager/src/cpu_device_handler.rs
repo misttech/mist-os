@@ -10,14 +10,12 @@ use crate::types::{Hertz, OperatingPoint, Volts};
 use anyhow::{format_err, Context as _, Error};
 use async_trait::async_trait;
 use async_utils::event::Event as AsyncEvent;
-use fidl_fuchsia_hardware_cpu_ctrl as fcpu_ctrl;
-use fidl_fuchsia_io as fio;
 use fuchsia_inspect::{self as inspect, NumericProperty, Property};
 use serde_derive::Deserialize;
-use serde_json as json;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use {fidl_fuchsia_hardware_cpu_ctrl as fcpu_ctrl, fidl_fuchsia_io as fio, serde_json as json};
 
 /// Node: CpuDeviceHandler
 ///
@@ -428,10 +426,9 @@ impl InspectData {
 mod tests {
     use super::*;
     use diagnostics_assertions::assert_data_tree;
-    use fuchsia_async as fasync;
-    use fuchsia_zircon as zx;
     use futures::TryStreamExt;
     use std::cell::Cell;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     /// Creates a fake fuchsia.hardware.cpu_ctrl.Device proxy
     fn setup_fake_cpu_ctrl_proxy(opps: Vec<OperatingPoint>) -> fcpu_ctrl::DeviceProxy {

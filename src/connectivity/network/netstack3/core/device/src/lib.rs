@@ -80,10 +80,9 @@ pub mod socket {
 /// Device RX and TX queueing.
 pub mod queue {
     pub use crate::internal::queue::api::{ReceiveQueueApi, TransmitQueueApi};
-    pub use crate::internal::queue::rx::ReceiveQueueBindingsContext;
     pub use crate::internal::queue::rx::{
-        ReceiveDequeContext, ReceiveQueueContext, ReceiveQueueHandler, ReceiveQueueState,
-        ReceiveQueueTypes,
+        ReceiveDequeContext, ReceiveQueueBindingsContext, ReceiveQueueContext, ReceiveQueueHandler,
+        ReceiveQueueState, ReceiveQueueTypes,
     };
     pub use crate::internal::queue::tx::{
         BufVecU8Allocator, TransmitDequeueContext, TransmitQueueBindingsContext,

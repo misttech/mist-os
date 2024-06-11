@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    arch::wasm32::{self, *},
-    array, mem,
-    ops::{Add, AddAssign, BitAnd, BitOr, BitOrAssign, BitXor, Div, Mul, MulAssign, Neg, Not, Sub},
+use std::arch::wasm32::{self, *};
+use std::ops::{
+    Add, AddAssign, BitAnd, BitOr, BitOrAssign, BitXor, Div, Mul, MulAssign, Neg, Not, Sub,
 };
+use std::{array, mem};
 
 #[derive(Clone, Copy, Debug)]
 pub struct m8x16(v128);

@@ -4,28 +4,22 @@
 
 //! fuchsia io conformance testing harness for the rust pseudo-fs-mt library
 
-use {
-    anyhow::{anyhow, Context as _, Error},
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_io_test::{
-        self as io_test, Io1Config, Io1HarnessRequest, Io1HarnessRequestStream,
-    },
-    fuchsia_component::server::ServiceFs,
-    futures::prelude::*,
-    std::sync::Arc,
-    tracing::error,
-    vfs::{
-        directory::{
-            entry_container::Directory,
-            helper::DirectlyMutable,
-            immutable::{simple, Simple},
-        },
-        execution_scope::ExecutionScope,
-        file::vmo,
-        path::Path,
-        remote::remote_dir,
-    },
+use anyhow::{anyhow, Context as _, Error};
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_io_test::{
+    self as io_test, Io1Config, Io1HarnessRequest, Io1HarnessRequestStream,
 };
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
+use std::sync::Arc;
+use tracing::error;
+use vfs::directory::entry_container::Directory;
+use vfs::directory::helper::DirectlyMutable;
+use vfs::directory::immutable::{simple, Simple};
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::vmo;
+use vfs::path::Path;
+use vfs::remote::remote_dir;
 
 struct Harness(Io1HarnessRequestStream);
 

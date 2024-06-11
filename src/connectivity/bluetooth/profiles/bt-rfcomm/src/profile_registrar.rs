@@ -9,18 +9,18 @@ use core::pin::Pin;
 use core::task::{Context, Poll};
 use fidl::endpoints::{create_request_stream, RequestStream};
 use fidl_fuchsia_bluetooth::ErrorCode;
-use fidl_fuchsia_bluetooth_bredr as bredr;
-use fuchsia_async as fasync;
 use fuchsia_bluetooth::profile::{
     l2cap_connect_parameters, psm_from_protocol, ChannelParameters, Psm, ServiceDefinition,
 };
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect_derive::Inspect;
+use futures::channel::mpsc;
+use futures::select;
 use futures::stream::{FusedStream, Stream, StreamExt};
-use futures::{channel::mpsc, select};
 use std::collections::HashSet;
 use std::ops::RangeFrom;
 use tracing::{info, trace, warn};
+use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync};
 
 use crate::fidl_service::Service;
 use crate::profile::*;

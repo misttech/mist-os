@@ -2,21 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    fs::proc::{
-        pid_directory::pid_directory,
-        sysctl::{net_directory, sysctl_directory},
-        sysrq::SysRqNode,
-    },
-    task::{CurrentTask, EventHandler, Kernel, KernelStats, TaskStateCode, WaitCanceler, Waiter},
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        emit_dotdot, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
-        fileops_impl_seekless, fs_node_impl_dir_readonly, fs_node_impl_symlink, unbounded_seek,
-        BytesFile, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource,
-        FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-        FsString, SeekTarget, SimpleFileNode, StaticDirectoryBuilder, StubEmptyFile, SymlinkTarget,
-    },
+use crate::fs::proc::pid_directory::pid_directory;
+use crate::fs::proc::sysctl::{net_directory, sysctl_directory};
+use crate::fs::proc::sysrq::SysRqNode;
+use crate::task::{
+    CurrentTask, EventHandler, Kernel, KernelStats, TaskStateCode, WaitCanceler, Waiter,
+};
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::{
+    emit_dotdot, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
+    fileops_impl_seekless, fs_node_impl_dir_readonly, fs_node_impl_symlink, unbounded_seek,
+    BytesFile, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource,
+    FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
+    FsString, SeekTarget, SimpleFileNode, StaticDirectoryBuilder, StubEmptyFile, SymlinkTarget,
 };
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_zircon as zx;
@@ -24,15 +22,16 @@ use maplit::btreemap;
 use once_cell::sync::Lazy;
 use starnix_logging::{bug_ref, log_error, track_stub};
 use starnix_sync::{FileOpsCore, Locked, WriteOps};
-use starnix_uapi::{
-    auth::FsCred, errno, error, errors::Errno, file_mode::mode, off_t, open_flags::OpenFlags,
-    pid_t, time::duration_to_scheduler_clock, vfs::FdEvents,
-};
-use std::{
-    collections::BTreeMap,
-    sync::{Arc, Weak},
-    time::SystemTime,
-};
+use starnix_uapi::auth::FsCred;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::mode;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::time::duration_to_scheduler_clock;
+use starnix_uapi::vfs::FdEvents;
+use starnix_uapi::{errno, error, off_t, pid_t};
+use std::collections::BTreeMap;
+use std::sync::{Arc, Weak};
+use std::time::SystemTime;
 
 /// `ProcDirectory` represents the top-level directory in `procfs`.
 ///

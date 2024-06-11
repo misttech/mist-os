@@ -12,18 +12,18 @@
 
 mod instance_counter;
 
-use {
-    crate::instance_counter::InstanceCounter,
-    async_utils::hanging_get::server as hanging_get,
-    fidl_fuchsia_ui_focus::{
-        self as focus, FocusChainProviderWatchFocusKoidChainResponder, FocusKoidChain,
-    },
-    fidl_fuchsia_ui_focus_ext::FocusChainExt,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{lock::Mutex, stream::TryStreamExt, TryFutureExt},
-    std::sync::Arc,
-    tracing::error,
+use crate::instance_counter::InstanceCounter;
+use async_utils::hanging_get::server as hanging_get;
+use fidl_fuchsia_ui_focus::{
+    self as focus, FocusChainProviderWatchFocusKoidChainResponder, FocusKoidChain,
 };
+use fidl_fuchsia_ui_focus_ext::FocusChainExt;
+use futures::lock::Mutex;
+use futures::stream::TryStreamExt;
+use futures::TryFutureExt;
+use std::sync::Arc;
+use tracing::error;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 // Local shorthand type aliases
 type HangingGetNotifyFn =
@@ -158,7 +158,8 @@ impl FocusChainProviderRequestStreamHandler {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fidl_fuchsia_ui_focus_test_helpers::make_focus_chain};
+    use super::*;
+    use fidl_fuchsia_ui_focus_test_helpers::make_focus_chain;
 
     // Most of the testing happens in `async_utils::hanging_get`.
     #[fuchsia::test]

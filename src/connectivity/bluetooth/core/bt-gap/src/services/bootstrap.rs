@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl_fuchsia_bluetooth_sys::{self as sys, BootstrapRequest, BootstrapRequestStream},
-    fuchsia_bluetooth::types::{BondingData, Identity, PeerId},
-    futures::prelude::*,
-    std::{iter, mem},
-};
+use anyhow::{format_err, Error};
+use fidl_fuchsia_bluetooth_sys::{self as sys, BootstrapRequest, BootstrapRequestStream};
+use fuchsia_bluetooth::types::{BondingData, Identity, PeerId};
+use futures::prelude::*;
+use std::{iter, mem};
 
 use crate::host_dispatcher::*;
 

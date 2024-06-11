@@ -2,53 +2,40 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::fuchsia::{
-        device::BlockServer,
-        errors::map_to_status,
-        file::FxFile,
-        node::{FxNode, GetResult, OpenedNode},
-        symlink::FxSymlink,
-        volume::{info_to_filesystem_info, FxVolume, RootDir},
-    },
-    anyhow::{bail, Error},
-    async_trait::async_trait,
-    either::{Left, Right},
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    futures::FutureExt,
-    fxfs::{
-        errors::FxfsError,
-        filesystem::SyncOptions,
-        log::*,
-        object_store::{
-            self,
-            directory::{self, ReplacedChild},
-            transaction::{lock_keys, LockKey, Options, Transaction},
-            Directory, ObjectDescriptor, ObjectStore, Timestamp,
-        },
-    },
-    fxfs_macros::ToWeakNode,
-    std::{
-        any::Any,
-        sync::{Arc, Mutex},
-    },
-    vfs::{
-        attributes,
-        common::rights_to_posix_mode_bits,
-        directory::{
-            dirents_sink::{self, AppendResult, Sink},
-            entry::{DirectoryEntry, EntryInfo, OpenRequest},
-            entry_container::{Directory as VfsDirectory, DirectoryWatcher, MutableDirectory},
-            mutable::connection::MutableConnection,
-            traversal_position::TraversalPosition,
-            watchers::{event_producers::SingleNameEventProducer, Watchers},
-        },
-        execution_scope::ExecutionScope,
-        path::Path,
-        symlink, ObjectRequestRef, ProtocolsExt, ToObjectRequest,
-    },
+use crate::fuchsia::device::BlockServer;
+use crate::fuchsia::errors::map_to_status;
+use crate::fuchsia::file::FxFile;
+use crate::fuchsia::node::{FxNode, GetResult, OpenedNode};
+use crate::fuchsia::symlink::FxSymlink;
+use crate::fuchsia::volume::{info_to_filesystem_info, FxVolume, RootDir};
+use anyhow::{bail, Error};
+use async_trait::async_trait;
+use either::{Left, Right};
+use fidl::endpoints::ServerEnd;
+use futures::FutureExt;
+use fxfs::errors::FxfsError;
+use fxfs::filesystem::SyncOptions;
+use fxfs::log::*;
+use fxfs::object_store::directory::{self, ReplacedChild};
+use fxfs::object_store::transaction::{lock_keys, LockKey, Options, Transaction};
+use fxfs::object_store::{self, Directory, ObjectDescriptor, ObjectStore, Timestamp};
+use fxfs_macros::ToWeakNode;
+use std::any::Any;
+use std::sync::{Arc, Mutex};
+use vfs::common::rights_to_posix_mode_bits;
+use vfs::directory::dirents_sink::{self, AppendResult, Sink};
+use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use vfs::directory::entry_container::{
+    Directory as VfsDirectory, DirectoryWatcher, MutableDirectory,
 };
+use vfs::directory::mutable::connection::MutableConnection;
+use vfs::directory::traversal_position::TraversalPosition;
+use vfs::directory::watchers::event_producers::SingleNameEventProducer;
+use vfs::directory::watchers::Watchers;
+use vfs::execution_scope::ExecutionScope;
+use vfs::path::Path;
+use vfs::{attributes, symlink, ObjectRequestRef, ProtocolsExt, ToObjectRequest};
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 #[derive(ToWeakNode)]
 pub struct FxDirectory {
@@ -963,37 +950,29 @@ impl From<Directory<FxVolume>> for FxDirectory {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::{
-            directory::FxDirectory,
-            file::FxFile,
-            fuchsia::testing::{
-                close_dir_checked, close_file_checked, open2_dir, open2_dir_checked, open_dir,
-                open_dir_checked, open_file, open_file_checked, TestFixture, TestFixtureOptions,
-            },
-        },
-        assert_matches::assert_matches,
-        fidl::endpoints::{create_proxy, ClientEnd, Proxy, ServerEnd},
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_fs::{
-            directory::{DirEntry, DirentKind},
-            file,
-        },
-        fuchsia_zircon as zx,
-        futures::StreamExt,
-        fxfs::object_store::Timestamp,
-        rand::Rng,
-        std::{
-            os::fd::AsRawFd,
-            sync::{
-                atomic::{AtomicU64, Ordering},
-                Arc,
-            },
-            time::Duration,
-        },
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
-        vfs::{common::rights_to_posix_mode_bits, node::Node, path::Path},
+    use crate::directory::FxDirectory;
+    use crate::file::FxFile;
+    use crate::fuchsia::testing::{
+        close_dir_checked, close_file_checked, open2_dir, open2_dir_checked, open_dir,
+        open_dir_checked, open_file, open_file_checked, TestFixture, TestFixtureOptions,
     };
+    use assert_matches::assert_matches;
+    use fidl::endpoints::{create_proxy, ClientEnd, Proxy, ServerEnd};
+    use fuchsia_fs::directory::{DirEntry, DirentKind};
+    use fuchsia_fs::file;
+    use futures::StreamExt;
+    use fxfs::object_store::Timestamp;
+    use rand::Rng;
+    use std::os::fd::AsRawFd;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
+    use std::time::Duration;
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::DeviceHolder;
+    use vfs::common::rights_to_posix_mode_bits;
+    use vfs::node::Node;
+    use vfs::path::Path;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
 
     #[fuchsia::test]
     async fn test_open_root_dir() {

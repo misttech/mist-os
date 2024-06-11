@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    converter::cbpf_to_ebpf,
-    executor::{execute, execute_with_arguments},
-    verifier::{
-        verify, CallingContext, FunctionSignature, NullVerifierLogger, Type, VerifierLogger,
-    },
-    EbpfError, MapSchema, MemoryId,
+use crate::converter::cbpf_to_ebpf;
+use crate::executor::{execute, execute_with_arguments};
+use crate::verifier::{
+    verify, CallingContext, FunctionSignature, NullVerifierLogger, Type, VerifierLogger,
 };
+use crate::{EbpfError, MapSchema, MemoryId};
 use linux_uapi::{bpf_insn, sock_filter};
-use std::{collections::HashMap, fmt::Formatter, sync::Arc};
+use std::collections::HashMap;
+use std::fmt::Formatter;
+use std::sync::Arc;
 use zerocopy::{AsBytes, FromBytes, NoCell};
 
 /// A counter that allows to generate new ids for parameters. The namespace is the same as for id
@@ -287,7 +287,8 @@ impl EbpfProgram<()> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{conformance::test::parse_asm, FieldMapping, FieldType};
+    use crate::conformance::test::parse_asm;
+    use crate::{FieldMapping, FieldType};
     use linux_uapi::*;
     use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 

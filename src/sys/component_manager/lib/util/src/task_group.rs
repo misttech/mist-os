@@ -2,14 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_async as fasync,
-    futures::Future,
-    std::{
-        fmt,
-        sync::{self, Arc, Weak},
-    },
-};
+use fuchsia_async as fasync;
+use futures::Future;
+use std::fmt;
+use std::sync::{self, Arc, Weak};
 
 /// A simple wrapper for `TaskGroup` that stores the `TaskGroup` in an `Arc` so it can be passed
 /// between threads.

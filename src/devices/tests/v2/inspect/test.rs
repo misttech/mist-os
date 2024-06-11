@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::format_err,
-    anyhow::Error,
-    anyhow::Result,
-    diagnostics_assertions::assert_data_tree,
-    diagnostics_reader::{ArchiveReader, DiagnosticsHierarchy, Inspect},
-    fidl_fuchsia_driver_test as fdt, fuchsia_async as fasync,
-    fuchsia_component_test::RealmBuilder,
-    fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
-};
+use anyhow::{format_err, Error, Result};
+use diagnostics_assertions::assert_data_tree;
+use diagnostics_reader::{ArchiveReader, DiagnosticsHierarchy, Inspect};
+use fuchsia_component_test::RealmBuilder;
+use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
+use {fidl_fuchsia_driver_test as fdt, fuchsia_async as fasync};
 
 async fn get_inspect_hierarchy(moniker: String) -> Result<DiagnosticsHierarchy, Error> {
     ArchiveReader::new()

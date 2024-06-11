@@ -2,21 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::ash_extensions::fuchsia;
+use crate::render::Renderer;
+use anyhow::Error;
+use ash::extensions::ext;
+use ash::vk;
+use fidl::endpoints::{create_endpoints, ClientEnd, Proxy};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_scenic::{
+    duplicate_buffer_collection_import_token, duplicate_buffer_collection_token,
+    BufferCollectionTokenPair,
+};
+use fuchsia_zircon::{AsHandleRef, HandleBased};
+use std::ffi::{c_char, c_void, CString};
 use {
-    crate::ash_extensions::fuchsia,
-    crate::render::Renderer,
-    anyhow::Error,
-    ash::{extensions::ext, vk},
-    fidl::endpoints::{create_endpoints, ClientEnd, Proxy},
     fidl_fuchsia_images2 as fimages2, fidl_fuchsia_sysmem2 as fsysmem2,
     fidl_fuchsia_ui_composition as fland,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_scenic::{
-        duplicate_buffer_collection_import_token, duplicate_buffer_collection_token,
-        BufferCollectionTokenPair,
-    },
-    fuchsia_zircon::{AsHandleRef, HandleBased},
-    std::ffi::{c_char, c_void, CString},
 };
 
 // Constants

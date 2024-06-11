@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use async_utils::hanging_get::error::HangingGetServerError;
 use bt_hfp::call::list as call_list;
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fidl_fuchsia_bluetooth_hfp::CallState;
-use {
-    async_utils::hanging_get::error::HangingGetServerError, profile_client::Error as ProfileError,
-    std::error::Error as StdError, thiserror::Error,
-};
+use profile_client::Error as ProfileError;
+use std::error::Error as StdError;
+use thiserror::Error;
 
 /// Errors that occur during the operation of the HFP Bluetooth Profile component.
 #[derive(Error, Debug)]

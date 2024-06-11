@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{mem::MaybeUninit, ops::Range};
+use std::mem::MaybeUninit;
+use std::ops::Range;
 
 use fuchsia_zircon as zx;
 use zerocopy::FromBytes;

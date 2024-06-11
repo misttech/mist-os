@@ -3,15 +3,10 @@
 // found in the LICENSE file.
 
 use crate::operations::size_check::common::{PackageBlobSizeInfo, PackageSizeInfo};
-use anyhow::anyhow;
-use anyhow::format_err;
-use anyhow::Context;
-use anyhow::Result;
+use anyhow::{anyhow, format_err, Context, Result};
 use assembly_blob_size::BlobSizeCalculator;
-use assembly_tool::SdkToolProvider;
-use assembly_tool::ToolProvider;
-use assembly_util::read_config;
-use assembly_util::write_json_file;
+use assembly_tool::{SdkToolProvider, ToolProvider};
+use assembly_util::{read_config, write_json_file};
 use camino::{Utf8Path, Utf8PathBuf};
 use errors::ffx_bail;
 use ffx_assembly_args::PackageSizeCheckArgs;
@@ -410,8 +405,7 @@ mod tests {
     use anyhow::Result;
     use assembly_images_config::BlobfsLayout;
     use assembly_tool::testing::FakeToolProvider;
-    use assembly_util::read_config;
-    use assembly_util::write_json_file;
+    use assembly_util::{read_config, write_json_file};
     use camino::Utf8PathBuf;
     use errors::IntoExitCode;
     use ffx_assembly_args::PackageSizeCheckArgs;

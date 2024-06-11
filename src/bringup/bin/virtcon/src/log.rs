@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::terminal::Terminal,
-    anyhow::Error,
-    fuchsia_async::{self as fasync, OnSignals},
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    std::io::sink,
-    term_model::{ansi::Processor, event::EventListener},
-};
+use crate::terminal::Terminal;
+use anyhow::Error;
+use fuchsia_async::{self as fasync, OnSignals};
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use std::io::sink;
+use term_model::ansi::Processor;
+use term_model::event::EventListener;
 
 pub trait LogClient: 'static + Clone {
     type Listener;
@@ -112,7 +111,10 @@ impl Log {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::colors::ColorScheme, fuchsia_async as fasync, term_model::event::Event};
+    use super::*;
+    use crate::colors::ColorScheme;
+    use fuchsia_async as fasync;
+    use term_model::event::Event;
 
     #[derive(Default)]
     struct TestListener;

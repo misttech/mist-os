@@ -10,13 +10,11 @@ use crate::handler::setting_handler::{
 };
 use crate::intl::types::{HourCycle, IntlInfo, LocaleId, TemperatureUnit};
 use async_trait::async_trait;
-use fuchsia_trace as ftrace;
-use rust_icu_uenum as uenum;
-use rust_icu_uloc as uloc;
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
 use settings_storage::fidl_storage::FidlStorageConvertible;
 use settings_storage::storage_factory::{NoneT, StorageAccess};
 use std::collections::HashSet;
+use {fuchsia_trace as ftrace, rust_icu_uenum as uenum, rust_icu_uloc as uloc};
 
 impl DeviceStorageCompatible for IntlInfo {
     type Loader = NoneT;

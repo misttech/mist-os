@@ -4,24 +4,16 @@
 
 //! HttpResponder implementations
 
-use {
-    crate::serve::HttpResponder,
-    fuchsia_sync::Mutex,
-    futures::{
-        channel::{mpsc, oneshot},
-        future::{pending, ready, BoxFuture, Shared},
-        prelude::*,
-    },
-    hyper::{Body, Request, Response, StatusCode},
-    std::{
-        collections::HashSet,
-        path::{Path, PathBuf},
-        sync::{
-            atomic::{AtomicBool, AtomicU16, AtomicU32, Ordering},
-            Arc,
-        },
-    },
-};
+use crate::serve::HttpResponder;
+use fuchsia_sync::Mutex;
+use futures::channel::{mpsc, oneshot};
+use futures::future::{pending, ready, BoxFuture, Shared};
+use futures::prelude::*;
+use hyper::{Body, Request, Response, StatusCode};
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU32, Ordering};
+use std::sync::Arc;
 
 /// hyper::Request extension trait that makes writing `HttpResponder`s more convienent.
 pub trait RequestExt {

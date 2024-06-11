@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Result},
-    async_trait::async_trait,
-    ffx_session_launch_args::SessionLaunchCommand,
-    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
-    fidl_fuchsia_session::{LaunchConfiguration, LauncherProxy},
-};
+use anyhow::{format_err, Result};
+use async_trait::async_trait;
+use ffx_session_launch_args::SessionLaunchCommand;
+use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fidl_fuchsia_session::{LaunchConfiguration, LauncherProxy};
 
 #[derive(FfxTool)]
 pub struct LaunchTool {
@@ -41,7 +39,8 @@ pub async fn launch_impl<W: std::io::Write>(
 
 #[cfg(test)]
 mod test {
-    use {super::*, fidl_fuchsia_session::LauncherRequest};
+    use super::*;
+    use fidl_fuchsia_session::LauncherRequest;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_launch_session() {

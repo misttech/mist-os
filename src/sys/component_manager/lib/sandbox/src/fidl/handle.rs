@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{fidl::registry, OneShotHandle},
-    fidl_fuchsia_component_sandbox as fsandbox,
-};
+use crate::fidl::registry;
+use crate::OneShotHandle;
+use fidl_fuchsia_component_sandbox as fsandbox;
 
 impl crate::RemotableCapability for OneShotHandle {}
 

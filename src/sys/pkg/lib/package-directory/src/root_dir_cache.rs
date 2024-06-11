@@ -2,14 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_inspect as finspect,
-    futures::{future::BoxFuture, FutureExt as _},
-    std::{
-        collections::HashMap,
-        sync::{Arc, Weak},
-    },
-};
+use fuchsia_inspect as finspect;
+use futures::future::BoxFuture;
+use futures::FutureExt as _;
+use std::collections::HashMap;
+use std::sync::{Arc, Weak};
 
 /// `RootDirCache` is a cache of `Arc<RootDir>`s indexed by their hash.
 /// The cache internally stores `Weak<RootDir>`s and installs a custom `dropper` in its managed
@@ -189,14 +186,13 @@ impl<S> std::fmt::Debug for Dropper<S> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        diagnostics_assertions::assert_data_tree,
-        fidl_fuchsia_io as fio,
-        fuchsia_pkg_testing::{blobfs::Fake as FakeBlobfs, PackageBuilder},
-        vfs::directory::entry_container::Directory as _,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
+    use fidl_fuchsia_io as fio;
+    use fuchsia_pkg_testing::blobfs::Fake as FakeBlobfs;
+    use fuchsia_pkg_testing::PackageBuilder;
+    use vfs::directory::entry_container::Directory as _;
 
     #[fuchsia::test]
     async fn get_or_insert_new_entry() {

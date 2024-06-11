@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl::endpoints::{ClientEnd, ServerEnd},
-    fidl_fuchsia_ui_input as uii,
-    futures::lock::Mutex,
-    std::sync::{Arc, Weak},
-};
+use anyhow::Error;
+use fidl::endpoints::{ClientEnd, ServerEnd};
+use fidl_fuchsia_ui_input as uii;
+use futures::lock::Mutex;
+use std::sync::{Arc, Weak};
 
-use crate::{
-    keyboard::events::KeyEvent,
-    legacy_ime::{ImeState, LegacyIme},
-};
+use crate::keyboard::events::KeyEvent;
+use crate::legacy_ime::{ImeState, LegacyIme};
 
 pub struct TextManagerState {
     pub keyboard_visible: bool,

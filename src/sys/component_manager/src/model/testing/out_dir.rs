@@ -2,22 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::mocks::HostFn,
-    fidl::endpoints::ServerEnd,
-    fidl_fidl_examples_routing_echo::{EchoRequest, EchoRequestStream},
-    fidl_fuchsia_io as fio,
-    futures::TryStreamExt,
-    std::{collections::HashMap, sync::Arc},
-    vfs::{
-        directory::{entry::DirectoryEntry, entry_container::Directory, immutable::simple as pfs},
-        execution_scope::ExecutionScope,
-        file::vmo::read_only,
-        remote::remote_dir,
-        service::host,
-        tree_builder::TreeBuilder,
-    },
-};
+use super::mocks::HostFn;
+use fidl::endpoints::ServerEnd;
+use fidl_fidl_examples_routing_echo::{EchoRequest, EchoRequestStream};
+use fidl_fuchsia_io as fio;
+use futures::TryStreamExt;
+use std::collections::HashMap;
+use std::sync::Arc;
+use vfs::directory::entry::DirectoryEntry;
+use vfs::directory::entry_container::Directory;
+use vfs::directory::immutable::simple as pfs;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::vmo::read_only;
+use vfs::remote::remote_dir;
+use vfs::service::host;
+use vfs::tree_builder::TreeBuilder;
 
 /// Used to construct and then host an outgoing directory.
 #[derive(Clone)]

@@ -9,10 +9,8 @@ use {
     std::cmp::min,
 };
 
-use crate::{
-    draw::{Frame, MappedImage},
-    runner::DoubleBufferedFenceLoop,
-};
+use crate::draw::{Frame, MappedImage};
+use crate::runner::DoubleBufferedFenceLoop;
 
 use crate::runner::Scene;
 

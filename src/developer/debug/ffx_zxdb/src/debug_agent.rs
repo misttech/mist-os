@@ -6,14 +6,10 @@ use anyhow::Result;
 use async_net::unix::UnixListener;
 use fidl_fuchsia_debugger as fdebugger;
 use fuchsia_zircon_status::Status;
-use futures_util::{
-    future::FutureExt,
-    io::{AsyncReadExt, AsyncWriteExt},
-};
-use std::{
-    env, io,
-    path::{Path, PathBuf},
-};
+use futures_util::future::FutureExt;
+use futures_util::io::{AsyncReadExt, AsyncWriteExt};
+use std::path::{Path, PathBuf};
+use std::{env, io};
 
 pub enum DebuggerProxy {
     LauncherProxy(fdebugger::LauncherProxy),

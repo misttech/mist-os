@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::gesture_arena::{
-        self, DetailedReasonFloat, DetailedReasonInt, DetailedReasonUint, ExamineEventResult,
-        ProcessBufferedEventsResult, Reason, RecognizedGesture, TouchpadEvent, VerifyEventResult,
-        SECONDARY_BUTTON,
-    },
-    crate::mouse_binding::{MouseEvent, MouseLocation, MousePhase, RelativeLocation},
-    crate::utils::{euclidean_distance, Position},
-    fuchsia_zircon as zx,
-    maplit::hashset,
+use super::gesture_arena::{
+    self, DetailedReasonFloat, DetailedReasonInt, DetailedReasonUint, ExamineEventResult,
+    ProcessBufferedEventsResult, Reason, RecognizedGesture, TouchpadEvent, VerifyEventResult,
+    SECONDARY_BUTTON,
 };
+use crate::mouse_binding::{MouseEvent, MouseLocation, MousePhase, RelativeLocation};
+use crate::utils::{euclidean_distance, Position};
+use fuchsia_zircon as zx;
+use maplit::hashset;
 
 /// The initial state of this recognizer, before a secondary tap has been
 /// detected.
@@ -514,13 +512,11 @@ fn position_from_event(event: &TouchpadEvent, index: usize) -> Position {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::gestures::gesture_arena::{Contender, MatchedContender as _},
-        crate::testing_utilities::create_touch_contact,
-        assert_matches::assert_matches,
-        std::any::TypeId,
-    };
+    use super::*;
+    use crate::gestures::gesture_arena::{Contender, MatchedContender as _};
+    use crate::testing_utilities::create_touch_contact;
+    use assert_matches::assert_matches;
+    use std::any::TypeId;
 
     const MAX_TIME_ELAPSED: zx::Duration = zx::Duration::from_nanos(10000);
     const MAX_FINGER_DISPLACEMENT_IN_MM: f32 = 10.0;

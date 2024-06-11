@@ -2,44 +2,35 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider};
+use crate::model::component::{ComponentInstance, WeakComponentInstance};
+use crate::model::model::Model;
+use crate::model::namespace::create_namespace;
+use crate::model::resolver::Resolver;
+use crate::model::storage::admin_protocol::StorageAdmin;
+use ::routing::capability_source::InternalCapability;
+use async_trait::async_trait;
+use cm_rust::NativeIntoFidl;
+use cm_types::{Name, Url};
+use errors::OpenExposedDirError;
+use fidl::endpoints::{ClientEnd, ServerEnd};
+use fidl::prelude::*;
+use fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES;
+use futures::StreamExt;
+use lazy_static::lazy_static;
+use measure_tape_for_instance::Measurable;
+use moniker::Moniker;
+use router_error::Explain;
+use routing::component_instance::{ComponentInstanceInterface, ResolvedInstanceInterface};
+use routing::resolving::ComponentAddress;
+use std::sync::{Arc, Weak};
+use tracing::warn;
+use vfs::directory::entry::OpenRequest;
+use vfs::directory::entry_container::Directory;
+use vfs::ToObjectRequest;
 use {
-    crate::{
-        capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
-        model::{
-            component::{ComponentInstance, WeakComponentInstance},
-            model::Model,
-            namespace::create_namespace,
-            resolver::Resolver,
-            storage::admin_protocol::StorageAdmin,
-        },
-    },
-    ::routing::capability_source::InternalCapability,
-    async_trait::async_trait,
-    cm_rust::NativeIntoFidl,
-    cm_types::{Name, Url},
-    errors::OpenExposedDirError,
-    fidl::{
-        endpoints::{ClientEnd, ServerEnd},
-        prelude::*,
-    },
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
-    fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES,
-    futures::StreamExt,
-    lazy_static::lazy_static,
-    measure_tape_for_instance::Measurable,
-    moniker::Moniker,
-    router_error::Explain,
-    routing::{
-        component_instance::{ComponentInstanceInterface, ResolvedInstanceInterface},
-        resolving::ComponentAddress,
-    },
-    std::sync::{Arc, Weak},
-    tracing::warn,
-    vfs::{
-        directory::{entry::OpenRequest, entry_container::Directory},
-        ToObjectRequest,
-    },
 };
 
 lazy_static! {
@@ -726,21 +717,19 @@ async fn serve_manifest_bytes_iterator(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::model::component::StartReason;
+    use crate::model::testing::test_helpers::{TestEnvironmentBuilder, TestModelResult};
+    use assert_matches::assert_matches;
+    use cm_rust::*;
+    use cm_rust_testing::*;
+    use component_id_index::InstanceId;
+    use fidl::endpoints::{create_endpoints, create_proxy, create_proxy_and_stream};
+    use routing::bedrock::structured_dict::ComponentInput;
+    use routing_test_helpers::component_id_index::make_index_file;
     use {
-        super::*,
-        crate::model::{
-            component::StartReason,
-            testing::test_helpers::{TestEnvironmentBuilder, TestModelResult},
-        },
-        assert_matches::assert_matches,
-        cm_rust::*,
-        cm_rust_testing::*,
-        component_id_index::InstanceId,
-        fidl::endpoints::{create_endpoints, create_proxy, create_proxy_and_stream},
         fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_zircon as zx,
-        routing::bedrock::structured_dict::ComponentInput,
-        routing_test_helpers::component_id_index::make_index_file,
     };
 
     fn is_closed(handle: impl fidl::AsHandleRef) -> bool {

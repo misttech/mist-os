@@ -8,12 +8,10 @@ use core::cmp::Ordering;
 use core::convert::Infallible;
 use core::num::{NonZeroU32, NonZeroU8};
 
-use net_types::{
-    ip::{Ip, IpVersionMarker, Ipv6Addr, Ipv6SourceAddr, Mtu},
-    MulticastAddress, SpecifiedAddr,
-};
+use net_types::ip::{Ip, IpVersionMarker, Ipv6Addr, Ipv6SourceAddr, Mtu};
+use net_types::{MulticastAddress, SpecifiedAddr};
+use netstack3_base::socket::{SocketIpAddr, SocketIpAddrExt as _};
 use netstack3_base::{
-    socket::{SocketIpAddr, SocketIpAddrExt as _},
     trace_duration, AnyDevice, CounterContext, DeviceIdContext, EitherDeviceId, InstantContext,
     StrongDeviceIdentifier, TracingContext, WeakDeviceIdentifier as _,
 };
@@ -24,17 +22,14 @@ use netstack3_filter::{
 use packet::{BufferMut, SerializeError};
 use thiserror::Error;
 
-use crate::{
-    internal::{
-        base::{
-            FilterHandlerProvider, IpCounters, IpDeviceContext, IpExt, IpLayerIpExt,
-            IpLayerPacketMetadata, IpPacketDestination, ResolveRouteError, SendIpPacketMeta,
-        },
-        device::{state::IpDeviceStateIpExt, IpDeviceAddr},
-        types::{ResolvedRoute, RoutableIpAddr},
-    },
-    HopLimits, NextHop,
+use crate::internal::base::{
+    FilterHandlerProvider, IpCounters, IpDeviceContext, IpExt, IpLayerIpExt, IpLayerPacketMetadata,
+    IpPacketDestination, ResolveRouteError, SendIpPacketMeta,
 };
+use crate::internal::device::state::IpDeviceStateIpExt;
+use crate::internal::device::IpDeviceAddr;
+use crate::internal::types::{ResolvedRoute, RoutableIpAddr};
+use crate::{HopLimits, NextHop};
 
 /// An execution context defining a type of IP socket.
 pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
@@ -710,7 +705,8 @@ pub(crate) mod ipv6_source_address_selection {
 
     use super::*;
 
-    use crate::internal::device::{state::Ipv6AddressFlags, Ipv6DeviceAddr};
+    use crate::internal::device::state::Ipv6AddressFlags;
+    use crate::internal::device::Ipv6DeviceAddr;
 
     /// A source address selection candidate.
     pub struct SasCandidate<D> {
@@ -1021,25 +1017,26 @@ pub(crate) mod ipv6_source_address_selection {
 /// Test fake implementations of the traits defined in the `socket` module.
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
-    use alloc::{boxed::Box, collections::HashMap, vec::Vec};
+    use alloc::boxed::Box;
+    use alloc::collections::HashMap;
+    use alloc::vec::Vec;
     use core::num::NonZeroUsize;
 
     use derivative::Derivative;
-    use net_types::{
-        ip::{GenericOverIp, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Subnet},
-        MulticastAddr, Witness as _,
+    use net_types::ip::{
+        GenericOverIp, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Subnet,
     };
-    use netstack3_base::{
-        testutil::{FakeCoreCtx, FakeStrongDeviceId, FakeWeakDeviceId},
-        SendFrameContext,
-    };
+    use net_types::{MulticastAddr, Witness as _};
+    use netstack3_base::testutil::{FakeCoreCtx, FakeStrongDeviceId, FakeWeakDeviceId};
+    use netstack3_base::SendFrameContext;
 
     use super::*;
-    use crate::internal::{
-        base::{BaseTransportIpContext, HopLimits, MulticastMembershipHandler, DEFAULT_HOP_LIMITS},
-        forwarding::{self, testutil::FakeIpForwardingCtx, ForwardingTable},
-        types::{Destination, Entry, Metric, RawMetric},
+    use crate::internal::base::{
+        BaseTransportIpContext, HopLimits, MulticastMembershipHandler, DEFAULT_HOP_LIMITS,
     };
+    use crate::internal::forwarding::testutil::FakeIpForwardingCtx;
+    use crate::internal::forwarding::{self, ForwardingTable};
+    use crate::internal::types::{Destination, Entry, Metric, RawMetric};
 
     /// A fake implementation of the traits required by the transport layer from
     /// the IP layer.

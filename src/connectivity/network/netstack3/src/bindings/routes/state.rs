@@ -4,39 +4,32 @@
 
 //! FIDL Worker for the `fuchsia.net.routes` suite of protocols.
 
-use std::{collections::HashSet, pin::pin};
+use std::collections::HashSet;
+use std::pin::pin;
 
 use async_utils::event::Event;
 use either::Either;
 use fidl::endpoints::{DiscoverableProtocolMarker as _, ProtocolMarker};
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_routes as fnet_routes;
-use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
-use fuchsia_zircon as zx;
-use futures::{
-    channel::mpsc, channel::oneshot, future::FusedFuture as _, FutureExt, StreamExt as _,
-    TryStream, TryStreamExt as _,
-};
+use futures::channel::{mpsc, oneshot};
+use futures::future::FusedFuture as _;
+use futures::{FutureExt, StreamExt as _, TryStream, TryStreamExt as _};
 use itertools::Itertools as _;
 use log::{debug, error, info, warn};
-use net_types::{
-    ethernet::Mac,
-    ip::{GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv6},
-    SpecifiedAddr,
-};
-use netstack3_core::{
-    device::{DeviceId, EthernetDeviceId, EthernetLinkDevice},
-    error::AddressResolutionFailed,
-    neighbor::{LinkResolutionContext, LinkResolutionResult},
-    routes::{NextHop, ResolvedRoute, WrapBroadcastMarker},
-};
+use net_types::ethernet::Mac;
+use net_types::ip::{GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv6};
+use net_types::SpecifiedAddr;
+use netstack3_core::device::{DeviceId, EthernetDeviceId, EthernetLinkDevice};
+use netstack3_core::error::AddressResolutionFailed;
+use netstack3_core::neighbor::{LinkResolutionContext, LinkResolutionResult};
+use netstack3_core::routes::{NextHop, ResolvedRoute, WrapBroadcastMarker};
 use thiserror::Error;
-
-use crate::bindings::{
-    routes,
-    util::{ConversionContext as _, IntoCore as _, IntoFidl as _, ResultExt as _},
-    BindingsCtx, Ctx, IpExt,
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_zircon as zx,
 };
+
+use crate::bindings::util::{ConversionContext as _, IntoCore as _, IntoFidl as _, ResultExt as _};
+use crate::bindings::{routes, BindingsCtx, Ctx, IpExt};
 
 // The maximum number of events a client for the `fuchsia.net.routes/Watcher`
 // is allowed to have queued. Clients will be dropped if they exceed this limit.

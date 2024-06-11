@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::storage::{copy, delete, delete_all, list, make_directory},
-    anyhow::{format_err, Result},
-    fidl_fuchsia_sys2 as fsys,
-    moniker::Moniker,
-};
+use crate::storage::{copy, delete, delete_all, list, make_directory};
+use anyhow::{format_err, Result};
+use fidl_fuchsia_sys2 as fsys;
+use moniker::Moniker;
 
 async fn get_storage_admin(
     realm_query: fsys::RealmQueryProxy,

@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_async as fasync,
-    fuchsia_bluetooth::types::PeerId,
-    fuchsia_inspect as inspect,
-    fuchsia_inspect_contrib::{
-        inspect_log,
-        nodes::{BoundedListNode, NodeExt, TimeProperty},
-    },
-    fuchsia_inspect_derive::{AttachError, Inspect},
-};
+use fuchsia_bluetooth::types::PeerId;
+use fuchsia_inspect_contrib::inspect_log;
+use fuchsia_inspect_contrib::nodes::{BoundedListNode, NodeExt, TimeProperty};
+use fuchsia_inspect_derive::{AttachError, Inspect};
+use {fuchsia_async as fasync, fuchsia_inspect as inspect};
 
-use crate::{metrics::MetricsNode, profile::AvrcpService};
+use crate::metrics::MetricsNode;
+use crate::profile::AvrcpService;
 
 /// The maximum number of feature sets we store for a remote peer.
 /// This is useful in the case of peer disconnecting/reconnecting, as we will
@@ -115,11 +111,9 @@ mod tests {
     use super::*;
     use crate::profile::{AvrcpControllerFeatures, AvrcpProtocolVersion, AvrcpTargetFeatures};
 
-    use {
-        diagnostics_assertions::{assert_data_tree, AnyProperty},
-        fuchsia_bluetooth::profile::Psm,
-        fuchsia_inspect_derive::WithInspect,
-    };
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
+    use fuchsia_bluetooth::profile::Psm;
+    use fuchsia_inspect_derive::WithInspect;
 
     #[test]
     fn remote_peer_inspect_tree() {

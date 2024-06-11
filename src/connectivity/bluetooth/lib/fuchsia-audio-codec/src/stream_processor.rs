@@ -2,35 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context as _, Error},
-    fidl::endpoints::ClientEnd,
-    fidl_fuchsia_media::*,
-    fidl_fuchsia_mediacodec::*,
-    fidl_fuchsia_sysmem2::*,
-    fuchsia_stream_processors::*,
-    fuchsia_sync::{Mutex, RwLock},
-    futures::{
-        future::{maybe_done, MaybeDone},
-        io::{self, AsyncWrite},
-        ready,
-        stream::{FusedStream, Stream},
-        task::{Context, Poll, Waker},
-        Future, StreamExt,
-    },
-    std::{
-        collections::{HashSet, VecDeque},
-        mem,
-        pin::Pin,
-        sync::Arc,
-    },
-    tracing::{trace, warn},
-};
+use anyhow::{format_err, Context as _, Error};
+use fidl::endpoints::ClientEnd;
+use fidl_fuchsia_media::*;
+use fidl_fuchsia_mediacodec::*;
+use fidl_fuchsia_sysmem2::*;
+use fuchsia_stream_processors::*;
+use fuchsia_sync::{Mutex, RwLock};
+use futures::future::{maybe_done, MaybeDone};
+use futures::io::{self, AsyncWrite};
+use futures::stream::{FusedStream, Stream};
+use futures::task::{Context, Poll, Waker};
+use futures::{ready, Future, StreamExt};
+use std::collections::{HashSet, VecDeque};
+use std::mem;
+use std::pin::Pin;
+use std::sync::Arc;
+use tracing::{trace, warn};
 
-use crate::{
-    buffer_collection_constraints::buffer_collection_constraints_default,
-    sysmem_allocator::{BufferName, SysmemAllocatedBuffers, SysmemAllocation},
-};
+use crate::buffer_collection_constraints::buffer_collection_constraints_default;
+use crate::sysmem_allocator::{BufferName, SysmemAllocatedBuffers, SysmemAllocation};
 
 fn fidl_error_to_io_error(e: fidl::Error) -> io::Error {
     io::Error::new(io::ErrorKind::Other, format_err!("Fidl Error: {}", e))
@@ -749,7 +740,8 @@ mod tests {
     use byteorder::{ByteOrder, NativeEndian};
     use fixture::fixture;
     use fuchsia_async as fasync;
-    use futures::{io::AsyncWriteExt, FutureExt};
+    use futures::io::AsyncWriteExt;
+    use futures::FutureExt;
     use futures_test::task::new_count_waker;
     use sha2::{Digest as _, Sha256};
     use std::fs::File;

@@ -2,22 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        accessor::PerformanceConfig,
-        diagnostics::BatchIteratorConnectionStats,
-        inspect::container::{ReadSnapshot, SnapshotData, UnpopulatedInspectDataContainer},
-    },
-    diagnostics_data::{self as schema, Data, Inspect, InspectHandleName},
-    diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher},
-    fidl_fuchsia_diagnostics::Selector,
-    fuchsia_inspect::reader::PartialNodeHierarchy,
-    fuchsia_trace as ftrace, fuchsia_zircon as zx,
-    futures::prelude::*,
-    selectors::SelectorExt,
-    std::sync::Arc,
-    tracing::error,
-};
+use crate::accessor::PerformanceConfig;
+use crate::diagnostics::BatchIteratorConnectionStats;
+use crate::inspect::container::{ReadSnapshot, SnapshotData, UnpopulatedInspectDataContainer};
+use diagnostics_data::{self as schema, Data, Inspect, InspectHandleName};
+use diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher};
+use fidl_fuchsia_diagnostics::Selector;
+use fuchsia_inspect::reader::PartialNodeHierarchy;
+use futures::prelude::*;
+use selectors::SelectorExt;
+use std::sync::Arc;
+use tracing::error;
+use {fuchsia_trace as ftrace, fuchsia_zircon as zx};
 
 pub mod collector;
 pub mod container;
@@ -378,39 +374,33 @@ impl ReaderServer {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            accessor::BatchIterator,
-            diagnostics::AccessorStats,
-            events::{
-                router::EventConsumer,
-                types::{Event, EventPayload, InspectSinkRequestedPayload},
-            },
-            identity::ComponentIdentity,
-            inspect::{
-                container::InspectHandle, repository::InspectRepository, servers::InspectSinkServer,
-            },
-            pipeline::Pipeline,
-        },
-        diagnostics_assertions::{assert_data_tree, AnyProperty},
-        fidl::endpoints::{create_proxy_and_stream, ClientEnd},
-        fidl_fuchsia_diagnostics::{BatchIteratorMarker, BatchIteratorProxy, Format, StreamMode},
-        fidl_fuchsia_inspect::{
-            InspectSinkMarker, InspectSinkPublishRequest, TreeMarker, TreeProxy,
-        },
-        fuchsia_async::{self as fasync, Task},
-        fuchsia_inspect::{Inspector, InspectorConfig},
-        fuchsia_zircon as zx,
-        fuchsia_zircon::Peered,
-        futures::StreamExt,
-        inspect_runtime::{service, TreeServerSendPreference},
-        moniker::ExtendedMoniker,
-        selectors::VerboseError,
-        serde_json::json,
-        std::collections::HashMap,
-        test_case::test_case,
+    use super::*;
+    use crate::accessor::BatchIterator;
+    use crate::diagnostics::AccessorStats;
+    use crate::events::router::EventConsumer;
+    use crate::events::types::{Event, EventPayload, InspectSinkRequestedPayload};
+    use crate::identity::ComponentIdentity;
+    use crate::inspect::container::InspectHandle;
+    use crate::inspect::repository::InspectRepository;
+    use crate::inspect::servers::InspectSinkServer;
+    use crate::pipeline::Pipeline;
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
+    use fidl::endpoints::{create_proxy_and_stream, ClientEnd};
+    use fidl_fuchsia_diagnostics::{BatchIteratorMarker, BatchIteratorProxy, Format, StreamMode};
+    use fidl_fuchsia_inspect::{
+        InspectSinkMarker, InspectSinkPublishRequest, TreeMarker, TreeProxy,
     };
+    use fuchsia_async::{self as fasync, Task};
+    use fuchsia_inspect::{Inspector, InspectorConfig};
+    use fuchsia_zircon as zx;
+    use fuchsia_zircon::Peered;
+    use futures::StreamExt;
+    use inspect_runtime::{service, TreeServerSendPreference};
+    use moniker::ExtendedMoniker;
+    use selectors::VerboseError;
+    use serde_json::json;
+    use std::collections::HashMap;
+    use test_case::test_case;
 
     const TEST_URL: &str = "fuchsia-pkg://test";
     const BATCH_RETRIEVAL_TIMEOUT_SECONDS: i64 = 300;

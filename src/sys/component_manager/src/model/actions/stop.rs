@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::{
-        actions::{Action, ActionKey},
-        component::ComponentInstance,
-    },
-    async_trait::async_trait,
-    errors::ActionError,
-    std::sync::Arc,
-};
+use crate::model::actions::{Action, ActionKey};
+use crate::model::component::ComponentInstance;
+use async_trait::async_trait;
+use errors::ActionError;
+use std::sync::Arc;
 
 /// Stops a component instance.
 pub struct StopAction {
@@ -35,23 +31,18 @@ impl Action for StopAction {
 
 #[cfg(test)]
 pub mod tests {
-    use {
-        super::*,
-        crate::model::{
-            actions::{test_utils::is_stopped, ActionsManager},
-            testing::{
-                test_helpers::{component_decl_with_test_runner, ActionsTest},
-                test_hook::Lifecycle,
-            },
-        },
-        cm_rust_testing::ComponentDeclBuilder,
-        errors::ModelError,
-        futures::channel::oneshot,
-        futures::lock::Mutex,
-        hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
-        moniker::Moniker,
-        std::sync::Weak,
-    };
+    use super::*;
+    use crate::model::actions::test_utils::is_stopped;
+    use crate::model::actions::ActionsManager;
+    use crate::model::testing::test_helpers::{component_decl_with_test_runner, ActionsTest};
+    use crate::model::testing::test_hook::Lifecycle;
+    use cm_rust_testing::ComponentDeclBuilder;
+    use errors::ModelError;
+    use futures::channel::oneshot;
+    use futures::lock::Mutex;
+    use hooks::{Event, EventPayload, EventType, Hook, HooksRegistration};
+    use moniker::Moniker;
+    use std::sync::Weak;
 
     #[fuchsia::test]
     async fn stopped() {

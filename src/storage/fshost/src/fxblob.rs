@@ -2,23 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        device::BlockDevice,
-        environment::{Filesystem, FilesystemLauncher},
-    },
-    anyhow::{Context, Error, Result},
-    fidl_fuchsia_device::ControllerProxy,
-    fs_management::{
-        filesystem::ServingMultiVolumeFilesystem,
-        format::DiskFormat,
-        partition::{find_partition, PartitionMatcher},
-    },
-    fuchsia_zircon::{self as zx, Duration},
-    futures::StreamExt,
-    std::sync::Arc,
-    vfs::service,
-};
+use crate::device::BlockDevice;
+use crate::environment::{Filesystem, FilesystemLauncher};
+use anyhow::{Context, Error, Result};
+use fidl_fuchsia_device::ControllerProxy;
+use fs_management::filesystem::ServingMultiVolumeFilesystem;
+use fs_management::format::DiskFormat;
+use fs_management::partition::{find_partition, PartitionMatcher};
+use fuchsia_zircon::{self as zx, Duration};
+use futures::StreamExt;
+use std::sync::Arc;
+use vfs::service;
 
 /// Make a new vfs service node that implements fuchsia.update.verify.BlobfsVerifier
 pub fn blobfs_verifier_service() -> Arc<service::Service> {

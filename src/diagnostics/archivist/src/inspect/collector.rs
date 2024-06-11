@@ -2,17 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::inspect::container::InspectHandle,
-    diagnostics_data::InspectHandleName,
-    fidl::endpoints::{DiscoverableProtocolMarker, Proxy},
-    fidl_fuchsia_inspect::{TreeMarker, TreeProxy},
-    fidl_fuchsia_inspect_deprecated::{InspectMarker, InspectProxy},
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    futures::stream::StreamExt,
-    std::{collections::HashMap, pin::pin},
-    tracing::error,
-};
+use crate::inspect::container::InspectHandle;
+use diagnostics_data::InspectHandleName;
+use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
+use fidl_fuchsia_inspect::{TreeMarker, TreeProxy};
+use fidl_fuchsia_inspect_deprecated::{InspectMarker, InspectProxy};
+use futures::stream::StreamExt;
+use std::collections::HashMap;
+use std::pin::pin;
+use tracing::error;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// Mapping from a diagnostics filename to the underlying encoding of that
 /// diagnostics data.
@@ -159,18 +158,16 @@ async fn populate_data_map_from_dir(inspect_proxy: &fio::DirectoryProxy) -> Data
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        diagnostics_assertions::assert_data_tree,
-        fidl::endpoints::create_request_stream,
-        fuchsia_async as fasync,
-        fuchsia_component::server::ServiceFs,
-        fuchsia_inspect::{reader, Inspector},
-        fuchsia_zircon as zx,
-        fuchsia_zircon::Peered,
-        inspect_runtime::{service::spawn_tree_server_with_stream, TreeServerSendPreference},
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
+    use fidl::endpoints::create_request_stream;
+    use fuchsia_component::server::ServiceFs;
+    use fuchsia_inspect::{reader, Inspector};
+    use fuchsia_zircon::Peered;
+    use inspect_runtime::service::spawn_tree_server_with_stream;
+    use inspect_runtime::TreeServerSendPreference;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     fn get_vmo(text: &[u8]) -> zx::Vmo {
         let vmo = zx::Vmo::create(4096).unwrap();

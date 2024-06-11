@@ -5,10 +5,8 @@
 use fidl_fuchsia_diagnostics::Selector;
 use fuchsia_inspect as inspect;
 use selectors::{contains_recursive_glob, parse_selector_file, FastError};
-use std::{
-    collections::BTreeMap,
-    path::{Path, PathBuf},
-};
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
 static DISABLE_FILTER_FILE_NAME: &str = "DISABLE_FILTERING.txt";
 

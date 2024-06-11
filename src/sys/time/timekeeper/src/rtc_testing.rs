@@ -8,7 +8,8 @@
 use crate::Command;
 use anyhow::Result;
 use fidl_fuchsia_time_test as fftt;
-use futures::{channel::mpsc, SinkExt, StreamExt};
+use futures::channel::mpsc;
+use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;

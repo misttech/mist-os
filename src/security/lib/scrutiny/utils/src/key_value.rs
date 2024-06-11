@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Result},
-    std::collections::HashMap,
-};
+use anyhow::{anyhow, Result};
+use std::collections::HashMap;
 
 /// Given a String containing potentially multiple lines of foo=bar returns
 /// a HashMap with the keys and values. This assumes that each key is unique.

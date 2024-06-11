@@ -2,48 +2,47 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    arch::execution::new_syscall_from_state,
-    mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt},
-    security,
-    signals::{
-        send_signal_first, send_standard_signal, syscalls::WaitingOptions, SignalDetail,
-        SignalInfo, SignalInfoHeader, SI_HEADER_SIZE,
-    },
-    task::{
-        waiter::WaitQueue, CurrentTask, Kernel, PidTable, ProcessSelector, StopState, Task,
-        TaskMutableState, ThreadGroup, ThreadState, ZombieProcess,
-    },
-    vfs::parse_unsigned_file,
+use crate::arch::execution::new_syscall_from_state;
+use crate::mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt};
+use crate::security;
+use crate::signals::syscalls::WaitingOptions;
+use crate::signals::{
+    send_signal_first, send_standard_signal, SignalDetail, SignalInfo, SignalInfoHeader,
+    SI_HEADER_SIZE,
 };
+use crate::task::waiter::WaitQueue;
+use crate::task::{
+    CurrentTask, Kernel, PidTable, ProcessSelector, StopState, Task, TaskMutableState, ThreadGroup,
+    ThreadState, ZombieProcess,
+};
+use crate::vfs::parse_unsigned_file;
 use bitflags::bitflags;
 use starnix_logging::track_stub;
 use starnix_sync::{LockBefore, Locked, MmDumpable};
-use starnix_syscalls::{decls::SyscallDecl, SyscallResult};
+use starnix_syscalls::decls::SyscallDecl;
+use starnix_syscalls::SyscallResult;
+use starnix_uapi::auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS};
+use starnix_uapi::elf::ElfNoteType;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::ownership::{OwnedRef, Releasable, WeakRef};
+use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, SIGCHLD, SIGKILL, SIGSTOP, SIGTRAP};
+use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::{
-    auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
-    clone_args,
-    elf::ElfNoteType,
-    errno, error,
-    errors::Errno,
-    iovec,
-    ownership::{OwnedRef, Releasable, WeakRef},
-    pid_t, ptrace_syscall_info,
-    signals::{SigSet, Signal, UncheckedSignal, SIGCHLD, SIGKILL, SIGSTOP, SIGTRAP},
-    user_address::{UserAddress, UserRef},
-    user_regs_struct, PTRACE_CONT, PTRACE_DETACH, PTRACE_EVENT_CLONE, PTRACE_EVENT_EXEC,
-    PTRACE_EVENT_EXIT, PTRACE_EVENT_FORK, PTRACE_EVENT_SECCOMP, PTRACE_EVENT_STOP,
-    PTRACE_EVENT_VFORK, PTRACE_EVENT_VFORK_DONE, PTRACE_GETEVENTMSG, PTRACE_GETREGSET,
-    PTRACE_GETSIGINFO, PTRACE_GETSIGMASK, PTRACE_GET_SYSCALL_INFO, PTRACE_INTERRUPT, PTRACE_KILL,
-    PTRACE_LISTEN, PTRACE_O_TRACECLONE, PTRACE_O_TRACEEXEC, PTRACE_O_TRACEEXIT, PTRACE_O_TRACEFORK,
-    PTRACE_O_TRACESYSGOOD, PTRACE_O_TRACEVFORK, PTRACE_O_TRACEVFORKDONE, PTRACE_PEEKDATA,
-    PTRACE_PEEKTEXT, PTRACE_PEEKUSR, PTRACE_POKEDATA, PTRACE_POKETEXT, PTRACE_POKEUSR,
-    PTRACE_SETOPTIONS, PTRACE_SETSIGINFO, PTRACE_SETSIGMASK, PTRACE_SYSCALL,
-    PTRACE_SYSCALL_INFO_ENTRY, PTRACE_SYSCALL_INFO_EXIT, PTRACE_SYSCALL_INFO_NONE, SI_MAX_SIZE,
+    clone_args, errno, error, iovec, pid_t, ptrace_syscall_info, user_regs_struct, PTRACE_CONT,
+    PTRACE_DETACH, PTRACE_EVENT_CLONE, PTRACE_EVENT_EXEC, PTRACE_EVENT_EXIT, PTRACE_EVENT_FORK,
+    PTRACE_EVENT_SECCOMP, PTRACE_EVENT_STOP, PTRACE_EVENT_VFORK, PTRACE_EVENT_VFORK_DONE,
+    PTRACE_GETEVENTMSG, PTRACE_GETREGSET, PTRACE_GETSIGINFO, PTRACE_GETSIGMASK,
+    PTRACE_GET_SYSCALL_INFO, PTRACE_INTERRUPT, PTRACE_KILL, PTRACE_LISTEN, PTRACE_O_TRACECLONE,
+    PTRACE_O_TRACEEXEC, PTRACE_O_TRACEEXIT, PTRACE_O_TRACEFORK, PTRACE_O_TRACESYSGOOD,
+    PTRACE_O_TRACEVFORK, PTRACE_O_TRACEVFORKDONE, PTRACE_PEEKDATA, PTRACE_PEEKTEXT, PTRACE_PEEKUSR,
+    PTRACE_POKEDATA, PTRACE_POKETEXT, PTRACE_POKEUSR, PTRACE_SETOPTIONS, PTRACE_SETSIGINFO,
+    PTRACE_SETSIGMASK, PTRACE_SYSCALL, PTRACE_SYSCALL_INFO_ENTRY, PTRACE_SYSCALL_INFO_EXIT,
+    PTRACE_SYSCALL_INFO_NONE, SI_MAX_SIZE,
 };
 
 use std::collections::BTreeMap;
-use std::sync::{atomic::Ordering, Arc};
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use zerocopy::FromBytes;
 
 #[cfg(any(target_arch = "x86_64"))]
@@ -1273,10 +1272,8 @@ pub fn ptrace_syscall_exit(current_task: &mut CurrentTask, is_error: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        task::syscalls::sys_prctl,
-        testing::{create_kernel_task_and_unlocked, create_task},
-    };
+    use crate::task::syscalls::sys_prctl;
+    use crate::testing::{create_kernel_task_and_unlocked, create_task};
     use starnix_uapi::PR_SET_PTRACER;
 
     #[::fuchsia::test]

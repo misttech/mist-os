@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    animation::{KeyedObject, KeyedProperty},
-    core::Object,
-    importers::ImportStackObject,
-};
+use crate::animation::{KeyedObject, KeyedProperty};
+use crate::core::Object;
+use crate::importers::ImportStackObject;
 
 #[derive(Debug)]
 pub struct KeyedObjectImporter {

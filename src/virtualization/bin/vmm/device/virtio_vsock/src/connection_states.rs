@@ -55,33 +55,25 @@
 //! │ ShutdownForced│
 //! └───────────────┘
 
-use {
-    crate::connection::{ConnectionCredit, VsockConnectionKey},
-    crate::wire::{OpType, VirtioVsockFlags, VirtioVsockHeader, VsockType, LE16, LE32, LE64},
-    anyhow::{anyhow, Error},
-    fidl::client::QueryResponseFut,
-    fidl_fuchsia_virtualization::HostVsockEndpointConnectResponder,
-    fuchsia_async::{
-        self as fasync, ReadableHandle as _, ReadableState, WritableHandle as _, WritableState,
-    },
-    fuchsia_zircon::{self as zx, AsHandleRef as _},
-    futures::{
-        channel::mpsc::UnboundedSender,
-        future::{self, poll_fn},
-        task::noop_waker_ref,
-    },
-    std::{
-        cell::{Cell, RefCell},
-        io::Write,
-        task::{ready, Context, Poll},
-    },
-    virtio_device::{
-        chain::{ReadableChain, WritableChain},
-        mem::DriverMem,
-        queue::DriverNotify,
-    },
-    zerocopy::AsBytes,
+use crate::connection::{ConnectionCredit, VsockConnectionKey};
+use crate::wire::{OpType, VirtioVsockFlags, VirtioVsockHeader, VsockType, LE16, LE32, LE64};
+use anyhow::{anyhow, Error};
+use fidl::client::QueryResponseFut;
+use fidl_fuchsia_virtualization::HostVsockEndpointConnectResponder;
+use fuchsia_async::{
+    self as fasync, ReadableHandle as _, ReadableState, WritableHandle as _, WritableState,
 };
+use fuchsia_zircon::{self as zx, AsHandleRef as _};
+use futures::channel::mpsc::UnboundedSender;
+use futures::future::{self, poll_fn};
+use futures::task::noop_waker_ref;
+use std::cell::{Cell, RefCell};
+use std::io::Write;
+use std::task::{ready, Context, Poll};
+use virtio_device::chain::{ReadableChain, WritableChain};
+use virtio_device::mem::DriverMem;
+use virtio_device::queue::DriverNotify;
+use zerocopy::AsBytes;
 
 #[derive(Debug)]
 pub struct GuestInitiated {
@@ -1069,20 +1061,22 @@ impl VsockConnectionState {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        async_utils::PollExt,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_virtualization::{
-            HostVsockAcceptorMarker, HostVsockEndpointMarker, DEFAULT_GUEST_CID, HOST_CID,
-        },
-        fuchsia_async::TestExecutor,
-        futures::{channel::mpsc, FutureExt, TryStreamExt},
-        rand::{distributions::Standard, Rng},
-        std::{collections::HashSet, io::Read, pin::Pin},
-        virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue},
-        zerocopy::FromBytes,
+    use super::*;
+    use async_utils::PollExt;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_virtualization::{
+        HostVsockAcceptorMarker, HostVsockEndpointMarker, DEFAULT_GUEST_CID, HOST_CID,
     };
+    use fuchsia_async::TestExecutor;
+    use futures::channel::mpsc;
+    use futures::{FutureExt, TryStreamExt};
+    use rand::distributions::Standard;
+    use rand::Rng;
+    use std::collections::HashSet;
+    use std::io::Read;
+    use std::pin::Pin;
+    use virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue};
+    use zerocopy::FromBytes;
 
     fn send_header_to_rw_state(header: VirtioVsockHeader, state: &ReadWrite) {
         let mem = IdentityDriverMem::new();

@@ -4,7 +4,8 @@
 
 use crate::Error;
 
-use {super::Algorithm, mundane::insecure::InsecureRc4Key};
+use super::Algorithm;
+use mundane::insecure::InsecureRc4Key;
 
 #[allow(unused, dead_code)]
 pub struct Rc4;

@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::clock;
-use crate::config;
+use crate::{clock, config};
 use fuchsia_inspect::{self as inspect, component, NumericProperty, Property};
 use fuchsia_inspect_derive::Inspect;
 use futures::lock::Mutex;

@@ -7,11 +7,12 @@ use std::collections::HashSet;
 use crate::route_table::{Route, RouteTable};
 
 use assert_matches::assert_matches;
-use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext::IntoExt;
-use fidl_fuchsia_net_routes as fnet_routes;
-use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use net_types::{ip, SpecifiedAddr};
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
+};
 
 // Converts the given `Route` into an `InstalledRoute` of the given `Ip`,
 // panicking if the protocol versions don't match. The extra data held by the

@@ -5,11 +5,9 @@
 //! The qemu_base module encapsulates traits and functions specific
 //! for engines using QEMU as the emulator platform.
 
-use crate::{
-    arg_templates::process_flag_template,
-    qemu_based::comms::{spawn_pipe_thread, QemuSocket},
-    show_output,
-};
+use crate::arg_templates::process_flag_template;
+use crate::qemu_based::comms::{spawn_pipe_thread, QemuSocket};
+use crate::show_output;
 use async_trait::async_trait;
 use cfg_if::cfg_if;
 use emulator_instance::{
@@ -18,12 +16,9 @@ use emulator_instance::{
 };
 use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
-use ffx_emulator_common::{
-    config,
-    config::EMU_START_TIMEOUT,
-    dump_log_to_out, host_is_mac, process,
-    tuntap::{tap_ready, TAP_INTERFACE_NAME},
-};
+use ffx_emulator_common::config::EMU_START_TIMEOUT;
+use ffx_emulator_common::tuntap::{tap_ready, TAP_INTERFACE_NAME};
+use ffx_emulator_common::{config, dump_log_to_out, host_is_mac, process};
 use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
 use ffx_ssh::SshKeyFiles;
 use ffx_target::KnockError;
@@ -32,18 +27,16 @@ use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::Timer;
 use serde_json::{json, Deserializer, Value};
 use shared_child::SharedChild;
-use std::{
-    env,
-    fs::{self, File},
-    io::Write,
-    net::Shutdown,
-    os::unix::net::UnixStream,
-    path::{Path, PathBuf},
-    process::Command,
-    str,
-    sync::{mpsc::channel, Arc},
-    time::{Duration, Instant},
-};
+use std::fs::{self, File};
+use std::io::Write;
+use std::net::Shutdown;
+use std::os::unix::net::UnixStream;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::sync::mpsc::channel;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use std::{env, str};
 use tempfile::NamedTempFile;
 
 #[cfg(test)]
@@ -894,7 +887,8 @@ mod tests {
     };
     use ffx_config::ConfigLevel;
     use serde::{Deserialize, Serialize};
-    use std::{io::Read, os::unix::net::UnixListener};
+    use std::io::Read;
+    use std::os::unix::net::UnixListener;
     use tempfile::{tempdir, TempDir};
 
     #[derive(Default, Serialize)]

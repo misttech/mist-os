@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 use fuchsia_sync::Mutex;
-use rustyline::{
-    completion::Completer, error::ReadlineError, highlight::Highlighter, hint::Hinter, Helper,
-};
+use rustyline::completion::Completer;
+use rustyline::error::ReadlineError;
+use rustyline::highlight::Highlighter;
+use rustyline::hint::Hinter;
+use rustyline::Helper;
 use std::borrow::Cow::{self, Borrowed, Owned};
 use std::fmt;
 use std::str::FromStr;

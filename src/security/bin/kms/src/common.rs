@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::fmt;
-use std::str;
+use std::{fmt, str};
 
 use crate::crypto_provider::CryptoProvider;
 use fidl_fuchsia_kms::{

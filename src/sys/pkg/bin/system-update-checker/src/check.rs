@@ -2,25 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        errors::{self, Error},
-        update_manager::TargetChannelUpdater,
-        DEFAULT_UPDATE_PACKAGE_URL,
-    },
-    anyhow::{anyhow, Context as _},
-    fidl_fuchsia_mem as fmem,
-    fidl_fuchsia_paver::{
-        self as fpaver, Asset, BootManagerMarker, DataSinkMarker, PaverMarker, PaverProxy,
-    },
-    fidl_fuchsia_pkg::{self as fpkg, PackageResolverMarker, PackageResolverProxyInterface},
-    fidl_fuchsia_space as fspace,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_hash::Hash,
-    fuchsia_zircon as zx,
-    std::io,
-    tracing::{error, info, warn},
+use crate::errors::{self, Error};
+use crate::update_manager::TargetChannelUpdater;
+use crate::DEFAULT_UPDATE_PACKAGE_URL;
+use anyhow::{anyhow, Context as _};
+use fidl_fuchsia_paver::{
+    self as fpaver, Asset, BootManagerMarker, DataSinkMarker, PaverMarker, PaverProxy,
 };
+use fidl_fuchsia_pkg::{self as fpkg, PackageResolverMarker, PackageResolverProxyInterface};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_hash::Hash;
+use std::io;
+use tracing::{error, info, warn};
+use {fidl_fuchsia_mem as fmem, fidl_fuchsia_space as fspace, fuchsia_zircon as zx};
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum SystemUpdateStatus {
@@ -275,24 +269,23 @@ fn sha256_buffer(
 
 #[cfg(test)]
 pub mod test_check_for_system_update_impl {
-    use {
-        super::*,
-        crate::update_manager::tests::FakeTargetChannelUpdater,
-        assert_matches::assert_matches,
-        fidl_fuchsia_io as fio,
-        fidl_fuchsia_paver::Configuration,
-        fidl_fuchsia_pkg::{
-            PackageResolverGetHashResult, PackageResolverResolveResult,
-            PackageResolverResolveWithContextResult, PackageUrl,
-        },
-        fuchsia_async as fasync,
-        fuchsia_sync::Mutex,
-        futures::{future, TryFutureExt, TryStreamExt},
-        lazy_static::lazy_static,
-        maplit::hashmap,
-        mock_paver::MockPaverServiceBuilder,
-        std::{collections::hash_map::HashMap, fs, sync::Arc},
+    use super::*;
+    use crate::update_manager::tests::FakeTargetChannelUpdater;
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_paver::Configuration;
+    use fidl_fuchsia_pkg::{
+        PackageResolverGetHashResult, PackageResolverResolveResult,
+        PackageResolverResolveWithContextResult, PackageUrl,
     };
+    use fuchsia_sync::Mutex;
+    use futures::{future, TryFutureExt, TryStreamExt};
+    use lazy_static::lazy_static;
+    use maplit::hashmap;
+    use mock_paver::MockPaverServiceBuilder;
+    use std::collections::hash_map::HashMap;
+    use std::fs;
+    use std::sync::Arc;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     const ACTIVE_SYSTEM_IMAGE_MERKLE: &str =
         "0000000000000000000000000000000000000000000000000000000000000000";

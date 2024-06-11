@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    std::{fmt, sync::Arc},
-    thiserror::Error,
-};
+use anyhow::Error;
+use std::fmt;
+use std::sync::Arc;
+use thiserror::Error;
 
 /// A wrapper for `Error` that implements `Clone`.
 #[derive(Clone, Error)]

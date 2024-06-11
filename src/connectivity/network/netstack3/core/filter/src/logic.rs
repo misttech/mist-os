@@ -4,19 +4,18 @@
 
 pub(crate) mod nat;
 
-use core::{num::NonZeroU16, ops::RangeInclusive};
+use core::num::NonZeroU16;
+use core::ops::RangeInclusive;
 
 use log::error;
 use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
 use netstack3_base::{AnyDevice, DeviceIdContext, HandleableTimer};
 use packet_formats::ip::IpExt;
 
-use crate::{
-    context::{FilterBindingsContext, FilterBindingsTypes, FilterIpContext},
-    matchers::InterfaceProperties,
-    packets::{IpPacket, MaybeTransportPacket, TransportPacket},
-    state::{Action, FilterIpMetadata, Hook, Routine, Rule, TransparentProxy},
-};
+use crate::context::{FilterBindingsContext, FilterBindingsTypes, FilterIpContext};
+use crate::matchers::InterfaceProperties;
+use crate::packets::{IpPacket, MaybeTransportPacket, TransportPacket};
+use crate::state::{Action, FilterIpMetadata, Hook, Routine, Rule, TransparentProxy};
 
 /// The final result of packet processing at a given filtering hook.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -662,25 +661,22 @@ pub mod testutil {
 
 #[cfg(test)]
 mod tests {
-    use alloc::{vec, vec::Vec};
+    use alloc::vec;
+    use alloc::vec::Vec;
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use net_types::ip::{Ipv4, Ipv6};
     use test_case::test_case;
 
     use super::*;
-    use crate::{
-        context::testutil::{FakeBindingsCtx, FakeCtx, FakeDeviceClass},
-        logic::nat::NatConfig,
-        matchers::{
-            testutil::{ethernet_interface, wlan_interface, FakeDeviceId},
-            InterfaceMatcher, PacketMatcher, PortMatcher, TransportProtocolMatcher,
-        },
-        packets::testutil::internal::{
-            ArbitraryValue, FakeIpPacket, FakeTcpSegment, TestIpExt, TransportPacketExt,
-        },
-        state::{IpRoutines, UninstalledRoutine},
+    use crate::context::testutil::{FakeBindingsCtx, FakeCtx, FakeDeviceClass};
+    use crate::logic::nat::NatConfig;
+    use crate::matchers::testutil::{ethernet_interface, wlan_interface, FakeDeviceId};
+    use crate::matchers::{InterfaceMatcher, PacketMatcher, PortMatcher, TransportProtocolMatcher};
+    use crate::packets::testutil::internal::{
+        ArbitraryValue, FakeIpPacket, FakeTcpSegment, TestIpExt, TransportPacketExt,
     };
+    use crate::state::{IpRoutines, UninstalledRoutine};
 
     impl<I: IpExt> Rule<I, FakeDeviceClass, ()> {
         pub(crate) fn new(

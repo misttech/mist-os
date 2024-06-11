@@ -2,17 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    cell::RefCell, cmp::Ordering, convert::TryFrom, error::Error, fmt, iter::FromIterator, mem,
-};
+use std::cell::RefCell;
+use std::cmp::Ordering;
+use std::convert::TryFrom;
+use std::error::Error;
+use std::iter::FromIterator;
+use std::{fmt, mem};
 
 use rustc_hash::FxHashMap;
-use surpass::{self, painter::Props, GeomPresTransform, LinesBuilder, Path, LAYER_LIMIT};
+use surpass::painter::Props;
+use surpass::{self, GeomPresTransform, LinesBuilder, Path, LAYER_LIMIT};
 
-use crate::{
-    composition::{self, CompositionId},
-    LayerId,
-};
+use crate::composition::{self, CompositionId};
+use crate::LayerId;
 
 const IDENTITY: &[f32; 6] = &[1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
 

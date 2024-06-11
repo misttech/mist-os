@@ -4,13 +4,13 @@
 
 use fidl::endpoints::{ClientEnd, Proxy, RequestStream, ServerEnd};
 use fidl_fidl_test_components::{TriggerMarker, TriggerRequestStream};
-use fidl_fuchsia_component_sandbox as fsandbox;
-use fidl_fuchsia_process_lifecycle as flifecycle;
-use fuchsia_async as fasync;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_runtime::{HandleInfo, HandleType};
-use fuchsia_zircon as zx;
 use futures::{StreamExt, TryStreamExt};
+use {
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_process_lifecycle as flifecycle,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
+};
 
 /// See the `stop_with_escrowed_dictionary` test case.
 ///

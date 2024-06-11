@@ -4,23 +4,18 @@
 
 use anyhow::{format_err, Context as _, Error};
 use fidl::endpoints;
-use fidl_fuchsia_wlan_common as fidl_common;
 use fidl_fuchsia_wlan_common::WlanMacRole;
-use fidl_fuchsia_wlan_common_security as fidl_security;
 use fidl_fuchsia_wlan_device_service::DeviceMonitorProxy;
-use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
-use fidl_fuchsia_wlan_internal as fidl_internal;
-use fidl_fuchsia_wlan_sme as fidl_sme;
-use fuchsia_zircon as zx;
 use futures::stream::TryStreamExt;
 use ieee80211::Ssid;
-use wlan_common::{
-    bss::{BssDescription, Protection},
-    security::{
-        wep::WepKey,
-        wpa::credential::{Passphrase, Psk},
-        SecurityError,
-    },
+use wlan_common::bss::{BssDescription, Protection};
+use wlan_common::security::wep::WepKey;
+use wlan_common::security::wpa::credential::{Passphrase, Psk};
+use wlan_common::security::SecurityError;
+use {
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_common_security as fidl_security,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
+    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
 };
 
 type WlanService = DeviceMonitorProxy;
@@ -319,32 +314,28 @@ pub async fn passive_scan(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::*;
+    use fidl::endpoints::RequestStream;
+    use fidl_fuchsia_wlan_device_service::{
+        self as wlan_service, DeviceMonitorMarker, DeviceMonitorProxy, DeviceMonitorRequest,
+        DeviceMonitorRequestStream,
+    };
+    use fidl_fuchsia_wlan_sme::{
+        ClientSmeMarker, ClientSmeRequest, ClientSmeRequestStream, Protection,
+    };
+    use fuchsia_async::TestExecutor;
+    use futures::stream::{StreamExt, StreamFuture};
+    use futures::task::Poll;
+    use ieee80211::Ssid;
+    use rand::Rng as _;
+    use std::convert::{TryFrom, TryInto};
+    use std::pin::pin;
+    use wlan_common::channel::{Cbw, Channel};
+    use wlan_common::scan::write_vmo;
+    use wlan_common::{assert_variant, fake_fidl_bss_description};
     use {
-        super::*,
-        crate::*,
-        fidl::endpoints::RequestStream,
-        fidl_fuchsia_wlan_common as fidl_common,
-        fidl_fuchsia_wlan_common_security as fidl_security,
-        fidl_fuchsia_wlan_device_service::{
-            self as wlan_service, DeviceMonitorMarker, DeviceMonitorProxy, DeviceMonitorRequest,
-            DeviceMonitorRequestStream,
-        },
-        fidl_fuchsia_wlan_sme::{
-            ClientSmeMarker, ClientSmeRequest, ClientSmeRequestStream, Protection,
-        },
-        fuchsia_async::TestExecutor,
-        futures::stream::{StreamExt, StreamFuture},
-        futures::task::Poll,
-        ieee80211::Ssid,
-        rand::Rng as _,
-        std::convert::{TryFrom, TryInto},
-        std::pin::pin,
-        wlan_common::{
-            assert_variant,
-            channel::{Cbw, Channel},
-            fake_fidl_bss_description,
-            scan::write_vmo,
-        },
+        fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_common_security as fidl_security,
     };
 
     fn generate_random_wpa2_bss_description() -> fidl_fuchsia_wlan_internal::BssDescription {

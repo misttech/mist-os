@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    collections::HashMap,
-    fs::{create_dir_all, read_to_string, File},
-    io::{BufWriter, Write},
-    path::Path,
-    process::{Command, Output},
-};
+use std::collections::HashMap;
+use std::fs::{create_dir_all, read_to_string, File};
+use std::io::{BufWriter, Write};
+use std::path::Path;
+use std::process::{Command, Output};
 
 use anyhow::{bail, Context as _, Result};
 use argh::FromArgs;

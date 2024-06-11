@@ -223,7 +223,8 @@ mod lock_guard {
 
 #[cfg(feature = "recursive-lock-panic")]
 mod lock_tracker {
-    use core::{cell::RefCell, panic::Location};
+    use core::cell::RefCell;
+    use core::panic::Location;
     use std::collections::HashMap;
 
     std::thread_local! {

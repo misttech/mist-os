@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Error},
-    fidl_ir_lib::fidl::{self, *},
-    heck::SnakeCase,
-    std::iter,
-};
+use anyhow::{anyhow, Error};
+use fidl_ir_lib::fidl::{self, *};
+use heck::SnakeCase;
+use std::iter;
 
 static ATTR_NAME_DERIVE_DEBUG: &'static str = "derive_debug";
 static ATTR_NAME_DOC: &'static str = "doc";

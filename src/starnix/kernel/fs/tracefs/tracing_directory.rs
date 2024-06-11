@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::CurrentTask,
-    vfs::{
-        buffers::InputBuffer, fileops_impl_delegate_read_and_seek, DynamicFile, DynamicFileBuf,
-        DynamicFileSource, FileObject, FileOps, FsNodeOps, SimpleFileNode,
-    },
+use crate::task::CurrentTask;
+use crate::vfs::buffers::InputBuffer;
+use crate::vfs::{
+    fileops_impl_delegate_read_and_seek, DynamicFile, DynamicFileBuf, DynamicFileSource,
+    FileObject, FileOps, FsNodeOps, SimpleFileNode,
 };
 use starnix_logging::CATEGORY_ATRACE;
 use starnix_sync::{Locked, WriteOps};
 use starnix_uapi::errors::Errno;
 
-use std::{collections::HashMap, sync::Mutex};
+use std::collections::HashMap;
+use std::sync::Mutex;
 
 use fuchsia_trace::{ArgValue, Scope, TraceCategoryContext};
 use fuchsia_zircon as zx;

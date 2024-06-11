@@ -2,28 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_trait::async_trait,
-    fidl::endpoints::{create_proxy, Proxy},
-    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
-    fidl_fuchsia_hardware_block::BlockMarker,
-    fidl_fuchsia_hardware_block_volume::ALLOCATE_PARTITION_FLAG_INACTIVE,
-    fidl_fuchsia_hardware_block_volume::{
-        VolumeManagerMarker, VolumeManagerProxy, VolumeSynchronousProxy,
-    },
-    fidl_fuchsia_io as fio,
-    fs_management::{format::DiskFormat, BLOBFS_TYPE_GUID},
-    fuchsia_component::client::{
-        connect_to_named_protocol_at_dir_root, connect_to_protocol_at_path,
-    },
-    fuchsia_zircon::{self as zx},
-    ramdevice_client::RamdiskClient,
-    std::path::PathBuf,
-    storage_benchmarks::{block_device::BlockDevice, BlockDeviceConfig, BlockDeviceFactory},
-    storage_isolated_driver_manager::{
-        create_random_guid, find_block_device, fvm, into_guid, wait_for_block_device, zxcrypt,
-        BlockDeviceMatcher, Guid,
-    },
+use async_trait::async_trait;
+use fidl::endpoints::{create_proxy, Proxy};
+use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
+use fidl_fuchsia_hardware_block::BlockMarker;
+use fidl_fuchsia_hardware_block_volume::{
+    VolumeManagerMarker, VolumeManagerProxy, VolumeSynchronousProxy,
+    ALLOCATE_PARTITION_FLAG_INACTIVE,
+};
+use fidl_fuchsia_io as fio;
+use fs_management::format::DiskFormat;
+use fs_management::BLOBFS_TYPE_GUID;
+use fuchsia_component::client::{
+    connect_to_named_protocol_at_dir_root, connect_to_protocol_at_path,
+};
+use fuchsia_zircon::{self as zx};
+use ramdevice_client::RamdiskClient;
+use std::path::PathBuf;
+use storage_benchmarks::block_device::BlockDevice;
+use storage_benchmarks::{BlockDeviceConfig, BlockDeviceFactory};
+use storage_isolated_driver_manager::{
+    create_random_guid, find_block_device, fvm, into_guid, wait_for_block_device, zxcrypt,
+    BlockDeviceMatcher, Guid,
 };
 
 const RAMDISK_FVM_SLICE_SIZE: usize = 1024 * 1024;
@@ -363,11 +363,11 @@ async fn set_up_fvm_volume(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, fidl_fuchsia_hardware_block_volume::VolumeMarker,
-        fuchsia_runtime::vmar_root_self, ramdevice_client::RamdiskClientBuilder,
-        test_util::assert_gt,
-    };
+    use super::*;
+    use fidl_fuchsia_hardware_block_volume::VolumeMarker;
+    use fuchsia_runtime::vmar_root_self;
+    use ramdevice_client::RamdiskClientBuilder;
+    use test_util::assert_gt;
 
     const BLOCK_SIZE: u64 = 4 * 1024;
     const BLOCK_COUNT: u64 = 1024;

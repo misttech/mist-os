@@ -1,17 +1,20 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::{configs, constants, diagnostics::AccessorStats, error::Error},
-    diagnostics_hierarchy::HierarchyMatcher,
-    fidl::prelude::*,
-    fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, Selector},
-    fuchsia_inspect as inspect,
-    fuchsia_sync::RwLock,
-    moniker::ExtendedMoniker,
-    selectors::SelectorExt,
-    std::{collections::HashMap, ops::Deref, path::Path, sync::Arc},
-};
+use crate::diagnostics::AccessorStats;
+use crate::error::Error;
+use crate::{configs, constants};
+use diagnostics_hierarchy::HierarchyMatcher;
+use fidl::prelude::*;
+use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, Selector};
+use fuchsia_inspect as inspect;
+use fuchsia_sync::RwLock;
+use moniker::ExtendedMoniker;
+use selectors::SelectorExt;
+use std::collections::HashMap;
+use std::ops::Deref;
+use std::path::Path;
+use std::sync::Arc;
 
 struct PipelineParameters {
     has_config: bool,

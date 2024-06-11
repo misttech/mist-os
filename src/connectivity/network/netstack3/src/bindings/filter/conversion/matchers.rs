@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext::IntoExt as _;
-use fidl_fuchsia_net_filter as fnet_filter;
-use fidl_fuchsia_net_filter_ext as fnet_filter_ext;
 use net_types::ip::{GenericOverIp, Ip, IpInvariant};
 use packet_formats::ip::{IpExt, IpProto, Ipv4Proto, Ipv6Proto};
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter as fnet_filter,
+    fidl_fuchsia_net_filter_ext as fnet_filter_ext,
+};
 
 use super::{ConversionResult, IpVersionMismatchError, IpVersionStrictness, TryConvertToCoreState};
 

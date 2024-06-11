@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::endpoints::Proxy, fidl_fuchsia_bluetooth_avrcp::*, fuchsia_sync::Mutex,
-    futures::TryFutureExt, std::sync::Arc,
-};
+use fidl::endpoints::Proxy;
+use fidl_fuchsia_bluetooth_avrcp::*;
+use fuchsia_sync::Mutex;
+use futures::TryFutureExt;
+use std::sync::Arc;
 
 use crate::types::PeerError as Error;
 
@@ -276,7 +277,8 @@ mod tests {
     use fidl::endpoints::create_proxy_and_stream;
     use fuchsia_async as fasync;
     use futures::StreamExt;
-    use std::{pin::pin, task::Poll};
+    use std::pin::pin;
+    use std::task::Poll;
 
     // This also gets tested at a service level. Test that we get a TargetBound error on double set.
     // Test that we can set again after the target handler has closed.

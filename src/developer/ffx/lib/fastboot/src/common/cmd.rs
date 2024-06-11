@@ -4,10 +4,8 @@
 
 use anyhow::{bail, Error, Result};
 use serde::{Deserialize, Serialize};
-use std::{
-    default::Default,
-    path::{Path, PathBuf},
-};
+use std::default::Default;
+use std::path::{Path, PathBuf};
 
 pub(crate) const OEM_FILE_ERROR_MSG: &str =
     "Unrecognized OEM staged file. Expected comma-separated pair: \"<OEM_COMMAND>,<PATH_TO_FILE>\"";

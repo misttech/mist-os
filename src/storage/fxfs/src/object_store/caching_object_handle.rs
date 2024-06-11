@@ -2,19 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        errors::FxfsError,
-        object_handle::{ObjectHandle, ReadObjectHandle},
-    },
-    anyhow::{anyhow, ensure, Error},
-    event_listener::{Event, EventListener},
-    std::{
-        ops::Deref,
-        sync::{Arc, Mutex},
-    },
-    storage_device::buffer::BufferFuture,
-};
+use crate::errors::FxfsError;
+use crate::object_handle::{ObjectHandle, ReadObjectHandle};
+use anyhow::{anyhow, ensure, Error};
+use event_listener::{Event, EventListener};
+use std::ops::Deref;
+use std::sync::{Arc, Mutex};
+use storage_device::buffer::BufferFuture;
 
 pub const CHUNK_SIZE: usize = 128 * 1024;
 
@@ -233,22 +227,16 @@ impl<S: ReadObjectHandle> ObjectHandle for CachingObjectHandle<S> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{CachingObjectHandle, CHUNK_SIZE},
-        crate::object_handle::{ObjectHandle, ReadObjectHandle},
-        anyhow::{anyhow, ensure, Error},
-        async_trait::async_trait,
-        event_listener::Event,
-        std::sync::{
-            atomic::{AtomicBool, AtomicU8, Ordering},
-            Arc,
-        },
-        storage_device::{
-            buffer::{BufferFuture, MutableBufferRef},
-            fake_device::FakeDevice,
-            Device,
-        },
-    };
+    use super::{CachingObjectHandle, CHUNK_SIZE};
+    use crate::object_handle::{ObjectHandle, ReadObjectHandle};
+    use anyhow::{anyhow, ensure, Error};
+    use async_trait::async_trait;
+    use event_listener::Event;
+    use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+    use std::sync::Arc;
+    use storage_device::buffer::{BufferFuture, MutableBufferRef};
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::Device;
 
     // Fills a buffer with a pattern seeded by counter.
     fn fill_buf(buf: &mut [u8], counter: u8) {

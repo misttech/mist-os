@@ -42,17 +42,13 @@ use fuchsia_inspect::{Inspector, Node};
 use fuchsia_sync::Mutex;
 use fuchsia_zircon::{self as zx, Task as _};
 use once_cell::sync::Lazy;
-use std::{
-    cell::RefCell,
-    collections::BTreeMap,
-    future::Future,
-    panic::Location,
-    pin::Pin,
-    sync::{
-        atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
-        Arc,
-    },
-};
+use std::cell::RefCell;
+use std::collections::BTreeMap;
+use std::future::Future;
+use std::panic::Location;
+use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
+use std::sync::Arc;
 
 static PROFILING_ENABLED: AtomicBool = AtomicBool::new(false);
 

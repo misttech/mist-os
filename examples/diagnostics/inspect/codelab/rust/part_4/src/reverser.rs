@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_examples_inspect::{ReverserRequest, ReverserRequestStream},
-    fuchsia_async as fasync,
-    fuchsia_inspect::{self as inspect, NumericProperty},
-    futures::TryStreamExt,
-    std::sync::Arc,
-};
+use fidl_fuchsia_examples_inspect::{ReverserRequest, ReverserRequestStream};
+use fuchsia_async as fasync;
+use fuchsia_inspect::{self as inspect, NumericProperty};
+use futures::TryStreamExt;
+use std::sync::Arc;
 
 pub struct ReverserServerFactory {
     node: inspect::Node,
@@ -95,12 +93,10 @@ impl ReverserServer {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::Error,
-        fidl_fuchsia_examples_inspect::{ReverserMarker, ReverserProxy},
-        futures::channel::oneshot,
-    };
+    use super::*;
+    use anyhow::Error;
+    use fidl_fuchsia_examples_inspect::{ReverserMarker, ReverserProxy};
+    use futures::channel::oneshot;
 
     // [START include_testing]
     use diagnostics_assertions::assert_data_tree;

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::WriteInspect,
-    fuchsia_inspect::{ArrayProperty, Node, StringReference},
-    std::marker::PhantomData,
-};
+use super::WriteInspect;
+use fuchsia_inspect::{ArrayProperty, Node, StringReference};
+use std::marker::PhantomData;
 
 /// Wrapper to log bytes in an `inspect_log!` or `inspect_insert!` macro.
 ///

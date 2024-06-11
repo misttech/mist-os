@@ -1,19 +1,18 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    anyhow::{Context as _, Error},
-    fidl::endpoints::ControlHandle,
-    fidl::endpoints::RequestStream,
-    fidl_fuchsia_hardware_sensors as playback_fidl,
-    fidl_fuchsia_sensors::*,
-    fidl_fuchsia_sensors_types::*,
-    fuchsia_component::server::ServiceFs,
-    futures::{channel::mpsc, select, stream::FusedStream, SinkExt},
-    futures_util::{StreamExt, TryStreamExt},
-    itertools::Itertools,
-    std::collections::HashMap,
-};
+use anyhow::{Context as _, Error};
+use fidl::endpoints::{ControlHandle, RequestStream};
+use fidl_fuchsia_hardware_sensors as playback_fidl;
+use fidl_fuchsia_sensors::*;
+use fidl_fuchsia_sensors_types::*;
+use fuchsia_component::server::ServiceFs;
+use futures::channel::mpsc;
+use futures::stream::FusedStream;
+use futures::{select, SinkExt};
+use futures_util::{StreamExt, TryStreamExt};
+use itertools::Itertools;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct SensorManager {

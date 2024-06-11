@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::core::collection::{Components, Manifests, Packages},
-    crate::zbi::Zbi,
-    anyhow::Result,
-    scrutiny::{model::controller::DataController, model::model::DataModel},
-    scrutiny_utils::usage::UsageBuilder,
-    serde::{Deserialize, Serialize},
-    serde_json::{json, value::Value},
-    std::sync::Arc,
-};
+use crate::core::collection::{Components, Manifests, Packages};
+use crate::zbi::Zbi;
+use anyhow::Result;
+use scrutiny::model::controller::DataController;
+use scrutiny::model::model::DataModel;
+use scrutiny_utils::usage::UsageBuilder;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use serde_json::value::Value;
+use std::sync::Arc;
 
 /// Displays basic stats from the model controller.
 #[derive(Default)]

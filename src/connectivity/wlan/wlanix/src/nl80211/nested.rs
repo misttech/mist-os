@@ -8,11 +8,9 @@
 //! 1-based index. `to_nested_nlas` and `to_nested_values` are helpers to easily
 //! add these indices.
 
-use netlink_packet_utils::{
-    byteorder::{ByteOrder, NativeEndian},
-    nla::Nla,
-    Emitable,
-};
+use netlink_packet_utils::byteorder::{ByteOrder, NativeEndian};
+use netlink_packet_utils::nla::Nla;
+use netlink_packet_utils::Emitable;
 use std::mem::size_of_val;
 
 pub(crate) struct NestedNla<'a, T> {

@@ -7,15 +7,12 @@ use async_lock::RwLock;
 use async_trait::async_trait;
 use async_utils::async_once::Once;
 use core::marker::PhantomData;
-use fidl::{
-    endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Request, RequestStream},
-    server::ServeInner,
-};
-use futures::{
-    future::{LocalBoxFuture, Shared},
-    prelude::*,
-};
-use std::{rc::Rc, sync::Arc};
+use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Request, RequestStream};
+use fidl::server::ServeInner;
+use futures::future::{LocalBoxFuture, Shared};
+use futures::prelude::*;
+use std::rc::Rc;
+use std::sync::Arc;
 
 /// A `FidlProtocol` type represents a protocol that can be run on the FFX
 /// Daemon.
@@ -300,9 +297,8 @@ mod tests {
     use super::*;
     use crate::testing::FakeDaemonBuilder;
     use anyhow::anyhow;
-    use fidl_fuchsia_developer_ffx as ffx;
-    use fidl_fuchsia_ffx_test as ffx_test;
     use std::sync::atomic::{AtomicU64, Ordering};
+    use {fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_ffx_test as ffx_test};
 
     fn noop_protocol_closure() -> impl Fn(&Context, ffx_test::NoopRequest) -> Result<()> {
         |_, req| match req {

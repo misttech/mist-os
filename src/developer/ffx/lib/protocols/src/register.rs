@@ -5,15 +5,12 @@ use crate::{Context, StreamHandler};
 use anyhow::Result;
 use fidl::server::ServeInner;
 use fuchsia_async::Task;
-use std::{
-    cell::RefCell,
-    collections::{hash_map::Entry, HashMap},
-    rc::Rc,
-    sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc, Weak,
-    },
-};
+use std::cell::RefCell;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Weak};
 use thiserror::Error;
 
 pub type NameToStreamHandlerMap = HashMap<String, Box<dyn StreamHandler>>;
@@ -229,8 +226,7 @@ mod test {
     use async_trait::async_trait;
     use ffx::DaemonError;
     use fidl::endpoints::DiscoverableProtocolMarker;
-    use fidl_fuchsia_developer_ffx as ffx;
-    use fidl_fuchsia_ffx_test as ffx_test;
+    use {fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_ffx_test as ffx_test};
 
     #[derive(Default, Clone)]
     struct TestDaemon;

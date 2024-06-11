@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context, Error},
-    cache_manager_config_lib::Config,
-    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
-    fuchsia_component::client as fclient,
-    std::process,
-    tracing::*,
-};
+use anyhow::{format_err, Context, Error};
+use cache_manager_config_lib::Config;
+use fuchsia_component::client as fclient;
+use std::process;
+use tracing::*;
+use {fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync};
 
 #[fuchsia::main(logging_tags=["cache_manager"])]
 async fn main() -> Result<(), Error> {
@@ -171,18 +169,15 @@ async fn clear_cache_storage(storage_admin: &fsys::StorageAdminProxy) -> Result<
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::monitor_storage,
-        cache_manager_config_lib::Config,
-        fidl::endpoints::{ClientEnd, ServerEnd},
-        fidl_fuchsia_sys2 as fsys,
-        fuchsia_async::{self as fasync, Duration, TestExecutor},
-        futures::{
-            channel::mpsc::{self as mpsc, UnboundedReceiver},
-            TryStreamExt,
-        },
-        std::{future::Future, pin::Pin},
-    };
+    use crate::monitor_storage;
+    use cache_manager_config_lib::Config;
+    use fidl::endpoints::{ClientEnd, ServerEnd};
+    use fidl_fuchsia_sys2 as fsys;
+    use fuchsia_async::{self as fasync, Duration, TestExecutor};
+    use futures::channel::mpsc::{self as mpsc, UnboundedReceiver};
+    use futures::TryStreamExt;
+    use std::future::Future;
+    use std::pin::Pin;
 
     struct FakeStorageServer {
         storage_statuses: Vec<fsys::StorageStatus>,

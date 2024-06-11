@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_metrics::{
-        MetricEventLoggerFactoryRequest, MetricEventLoggerFactoryRequestStream,
-        MetricEventLoggerRequestStream,
-    },
-    fuchsia_component_test::LocalComponentHandles,
-    futures::StreamExt as _,
+use fidl_fuchsia_metrics::{
+    MetricEventLoggerFactoryRequest, MetricEventLoggerFactoryRequestStream,
+    MetricEventLoggerRequestStream,
 };
+use fuchsia_component_test::LocalComponentHandles;
+use futures::StreamExt as _;
 
 /// Registers a discoverable endpoint for connecting to `fuchsia.metrics.MetricEventLoggerFactory`.
 ///

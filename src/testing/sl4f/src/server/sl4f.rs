@@ -16,12 +16,10 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 
 // Standardized sl4f types and constants
-use crate::{
-    bluetooth::avrcp_facade::AvrcpFacade,
-    server::sl4f_types::{
-        AsyncCommandRequest, AsyncRequest, ClientData, CommandRequest, CommandResponse, Facade,
-        MethodId, RequestId,
-    },
+use crate::bluetooth::avrcp_facade::AvrcpFacade;
+use crate::server::sl4f_types::{
+    AsyncCommandRequest, AsyncRequest, ClientData, CommandRequest, CommandResponse, Facade,
+    MethodId, RequestId,
 };
 
 // Audio related includes

@@ -4,47 +4,38 @@
 
 //! Tests for the IP filtering hooks.
 
-use std::{
-    num::NonZeroU64,
-    sync::atomic::{AtomicU32, Ordering},
-};
+use std::num::NonZeroU64;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use assert_matches::assert_matches;
 use fidl::endpoints::ProtocolMarker;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_ext as fnet_ext;
-use fidl_fuchsia_net_filter as fnet_filter;
 use fidl_fuchsia_net_filter_ext::{
     Action, Change, Controller, ControllerId, Domain, InstalledIpRoutine, InstalledNatRoutine,
     InterfaceMatcher, IpHook, Namespace, NamespaceId, NatHook, Resource, ResourceId, Routine,
     RoutineId, RoutineType, Rule, RuleId,
 };
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_routes as fnet_routes;
-use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
-use fidl_fuchsia_posix_socket as fposix_socket;
 use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _};
-use futures::{
-    future::LocalBoxFuture,
-    io::{AsyncReadExt as _, AsyncWriteExt as _},
-    FutureExt as _, StreamExt as _, TryFutureExt as _,
-};
+use futures::future::LocalBoxFuture;
+use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
+use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _};
 use heck::SnakeCase as _;
 use net_declare::{fidl_subnet, net_ip_v4, net_ip_v6};
-use net_types::{
-    ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
-    SpecifiedAddr,
-};
+use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use net_types::SpecifiedAddr;
 use netemul::{RealmTcpListener as _, RealmUdpSocket as _};
-use netstack_testing_common::{
-    interfaces::TestInterfaceExt as _,
-    realms::{Netstack3, TestSandboxExt as _},
-    ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
-};
+use netstack_testing_common::interfaces::TestInterfaceExt as _;
+use netstack_testing_common::realms::{Netstack3, TestSandboxExt as _};
+use netstack_testing_common::ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT;
 use netstack_testing_macros::netstack_test;
 use test_case::test_case;
 use tracing::info;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext,
+    fidl_fuchsia_net_filter as fnet_filter,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_posix_socket as fposix_socket,
+};
 
 use crate::matchers::{
     AllTraffic, DstAddressRange, DstAddressSubnet, Icmp, InterfaceDeviceClass, InterfaceId,

@@ -7,33 +7,28 @@
 
 use alloc::vec::Vec;
 
-use lock_order::{
-    lock::{LockLevelFor, UnlockedAccessMarkerFor},
-    relation::LockBefore,
-};
+use lock_order::lock::{LockLevelFor, UnlockedAccessMarkerFor};
+use lock_order::relation::LockBefore;
 use log::error;
 use netstack3_base::DeviceIdContext;
-use netstack3_device::{
-    ethernet::EthernetDeviceCounters,
-    loopback::{
-        LoopbackDevice, LoopbackDeviceId, LoopbackRxQueueMeta, LoopbackTxQueueMeta,
-        LoopbackWeakDeviceId,
-    },
-    queue::{
-        BufVecU8Allocator, DequeueState, ReceiveDequeContext, ReceiveQueueContext,
-        ReceiveQueueFullError, ReceiveQueueHandler, ReceiveQueueState, ReceiveQueueTypes,
-        TransmitDequeueContext, TransmitQueueCommon, TransmitQueueContext, TransmitQueueState,
-    },
-    socket::{ParseSentFrameError, SentFrame},
-    DeviceLayerTypes, DeviceSendFrameError, IpLinkDeviceState, WeakDeviceId,
+use netstack3_device::ethernet::EthernetDeviceCounters;
+use netstack3_device::loopback::{
+    LoopbackDevice, LoopbackDeviceId, LoopbackRxQueueMeta, LoopbackTxQueueMeta,
+    LoopbackWeakDeviceId,
 };
+use netstack3_device::queue::{
+    BufVecU8Allocator, DequeueState, ReceiveDequeContext, ReceiveQueueContext,
+    ReceiveQueueFullError, ReceiveQueueHandler, ReceiveQueueState, ReceiveQueueTypes,
+    TransmitDequeueContext, TransmitQueueCommon, TransmitQueueContext, TransmitQueueState,
+};
+use netstack3_device::socket::{ParseSentFrameError, SentFrame};
+use netstack3_device::{DeviceLayerTypes, DeviceSendFrameError, IpLinkDeviceState, WeakDeviceId};
 use packet::Buf;
 
-use crate::{
-    context::{prelude::*, WrapLockLevel},
-    device::integration,
-    BindingsContext, BindingsTypes, CoreCtx,
-};
+use crate::context::prelude::*;
+use crate::context::WrapLockLevel;
+use crate::device::integration;
+use crate::{BindingsContext, BindingsTypes, CoreCtx};
 
 impl<BT: BindingsTypes, L> DeviceIdContext<LoopbackDevice> for CoreCtx<'_, BT, L> {
     type DeviceId = LoopbackDeviceId<BT>;

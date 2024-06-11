@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    once_cell::sync::Lazy,
-    scrutiny_utils::artifact::{ArtifactReader, BlobFsArtifactReader, CompoundArtifactReader},
-    std::path::PathBuf,
-};
+use once_cell::sync::Lazy;
+use scrutiny_utils::artifact::{ArtifactReader, BlobFsArtifactReader, CompoundArtifactReader};
+use std::path::PathBuf;
 
 const TESTDATA_DIR: &str = env!("TESTDATA_DIR");
 const ALPHA_BETA_BLOBFS_FILE: &str = concat!("alpha_beta_blobfs.blk");

@@ -4,17 +4,16 @@
 
 //! Provide Google Cloud Storage (GCS) access.
 
-use {
-    crate::{error::GcsError, exponential_backoff::default_backoff_strategy},
-    anyhow::{bail, Context, Result},
-    async_lock::Mutex,
-    fuchsia_backoff::retry_or_last_error,
-    fuchsia_hyper::HttpsClient,
-    http::{request, StatusCode},
-    hyper::{Body, Method, Request, Response},
-    std::fmt,
-    url::Url,
-};
+use crate::error::GcsError;
+use crate::exponential_backoff::default_backoff_strategy;
+use anyhow::{bail, Context, Result};
+use async_lock::Mutex;
+use fuchsia_backoff::retry_or_last_error;
+use fuchsia_hyper::HttpsClient;
+use http::{request, StatusCode};
+use hyper::{Body, Method, Request, Response};
+use std::fmt;
+use url::Url;
 
 /// Base URL for JSON API access.
 const API_BASE: &str = "https://www.googleapis.com/storage/v1";
@@ -305,7 +304,8 @@ impl fmt::Debug for TokenStore {
 
 #[cfg(test)]
 mod test {
-    use {super::*, fuchsia_hyper::new_https_client};
+    use super::*;
+    use fuchsia_hyper::new_https_client;
 
     #[should_panic(expected = "Connection refused")]
     #[fuchsia_async::run_singlethreaded(test)]

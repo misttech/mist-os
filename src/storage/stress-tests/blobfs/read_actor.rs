@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_trait::async_trait,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon::Status,
-    rand::{prelude::SliceRandom, rngs::SmallRng, Rng},
-    storage_stress_test_utils::io::Directory,
-    stress_test::actor::{Actor, ActorError},
-    tracing::{debug, info},
-};
+use async_trait::async_trait;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon::Status;
+use rand::prelude::SliceRandom;
+use rand::rngs::SmallRng;
+use rand::Rng;
+use storage_stress_test_utils::io::Directory;
+use stress_test::actor::{Actor, ActorError};
+use tracing::{debug, info};
 
 // Performs operations on blobs expected to exist on disk
 pub struct ReadActor {

@@ -1,14 +1,16 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-use diagnostics_log_encoding::{encode::TestRecord, FromSeverity as _, Severity, SeverityExt};
+use diagnostics_log_encoding::encode::TestRecord;
+use diagnostics_log_encoding::{FromSeverity as _, Severity, SeverityExt};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_diagnostics::Interest;
 use fidl_fuchsia_logger::{LogSinkProxy, LogSinkSynchronousProxy};
 use fuchsia_zircon as zx;
-use std::sync::{Mutex, RwLock};
-use std::{future::Future, sync::Arc};
-use tracing::{subscriber::Subscriber, Metadata};
+use std::future::Future;
+use std::sync::{Arc, Mutex, RwLock};
+use tracing::subscriber::Subscriber;
+use tracing::Metadata;
 use tracing_subscriber::layer::{Context, Layer};
 
 use crate::OnInterestChanged;
@@ -111,9 +113,11 @@ mod tests {
     use super::*;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest, LogSinkRequestStream};
-    use futures::{channel::mpsc, StreamExt, TryStreamExt};
+    use futures::channel::mpsc;
+    use futures::{StreamExt, TryStreamExt};
     use tracing::{debug, error, info, trace, warn, Event};
-    use tracing_subscriber::{layer::SubscriberExt, Registry};
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::Registry;
 
     struct SeverityTracker {
         counts: Arc<Mutex<SeverityCount>>,

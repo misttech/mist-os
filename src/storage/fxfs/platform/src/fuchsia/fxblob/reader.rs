@@ -4,14 +4,12 @@
 
 //! Implements fuchsia.fxfs/BlobReader for reading blobs as VMOs from a [`BlobDirectory`].
 
-use {
-    crate::fxblob::directory::BlobDirectory,
-    anyhow::Error,
-    fuchsia_hash::Hash,
-    fuchsia_zircon::{self as zx},
-    fxfs::errors::FxfsError,
-    std::sync::Arc,
-};
+use crate::fxblob::directory::BlobDirectory;
+use anyhow::Error;
+use fuchsia_hash::Hash;
+use fuchsia_zircon::{self as zx};
+use fxfs::errors::FxfsError;
+use std::sync::Arc;
 
 impl BlobDirectory {
     /// Get a pager-backed VMO for the blob identified by `hash` in this [`BlobDirectory`]. The blob
@@ -31,14 +29,12 @@ impl BlobDirectory {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::fuchsia::fxblob::testing::{new_blob_fixture, BlobFixture},
-        delivery_blob::CompressionMode,
-        fidl_fuchsia_io::{self as fio},
-        fuchsia_async as fasync,
-        fuchsia_component::client::connect_to_protocol_at_dir_svc,
-    };
+    use super::*;
+    use crate::fuchsia::fxblob::testing::{new_blob_fixture, BlobFixture};
+    use delivery_blob::CompressionMode;
+    use fidl_fuchsia_io::{self as fio};
+    use fuchsia_async as fasync;
+    use fuchsia_component::client::connect_to_protocol_at_dir_svc;
 
     /// Read a blob using BlobReader API and return its contents as a boxed slice.
     async fn read_blob(

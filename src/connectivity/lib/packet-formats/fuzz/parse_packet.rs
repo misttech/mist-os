@@ -8,22 +8,20 @@ use arbitrary::{Arbitrary, Unstructured};
 use fuzz::fuzz;
 use fuzz_util::Fuzzed;
 use mdns::protocol::Message as MdnsMessage;
-use net_types::{
-    ethernet::Mac,
-    ip::{Ipv4Addr, Ipv6Addr},
-};
-use netsvc_proto::{debuglog::DebugLogPacket, netboot::NetbootPacket, tftp::TftpPacket};
+use net_types::ethernet::Mac;
+use net_types::ip::{Ipv4Addr, Ipv6Addr};
+use netsvc_proto::debuglog::DebugLogPacket;
+use netsvc_proto::netboot::NetbootPacket;
+use netsvc_proto::tftp::TftpPacket;
 use packet::{BufferView, ParsablePacket};
-use packet_formats::{
-    arp::ArpPacket,
-    ethernet::{EthernetFrame, EthernetFrameLengthCheck},
-    icmp::{IcmpParseArgs, Icmpv4Packet, Icmpv6Packet},
-    igmp::messages::IgmpPacket,
-    ipv4::Ipv4Packet,
-    ipv6::Ipv6Packet,
-    tcp::{TcpParseArgs, TcpSegment},
-    udp::{UdpPacket, UdpParseArgs},
-};
+use packet_formats::arp::ArpPacket;
+use packet_formats::ethernet::{EthernetFrame, EthernetFrameLengthCheck};
+use packet_formats::icmp::{IcmpParseArgs, Icmpv4Packet, Icmpv6Packet};
+use packet_formats::igmp::messages::IgmpPacket;
+use packet_formats::ipv4::Ipv4Packet;
+use packet_formats::ipv6::Ipv6Packet;
+use packet_formats::tcp::{TcpParseArgs, TcpSegment};
+use packet_formats::udp::{UdpPacket, UdpParseArgs};
 use packet_formats_dhcp::v6::Message as Dhcpv6Message;
 use zerocopy::ByteSlice;
 

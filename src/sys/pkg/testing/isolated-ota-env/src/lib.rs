@@ -4,35 +4,30 @@
 
 #![allow(clippy::let_unit_value)]
 
-use {
-    anyhow::{Context, Error},
-    async_trait::async_trait,
-    fidl::endpoints::{ClientEnd, Proxy},
-    fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_io::DirectoryProxy,
-    fidl_fuchsia_paver::PaverRequestStream,
-    fidl_fuchsia_pkg_ext::RepositoryConfigs,
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::LocalComponentHandles,
-    fuchsia_merkle::Hash,
-    fuchsia_pkg_testing::{serve::ServedRepository, Package, RepositoryBuilder},
-    fuchsia_sync::Mutex,
-    futures::prelude::*,
-    isolated_ota::{OmahaConfig, UpdateUrlSource},
-    mock_omaha_server::{
-        OmahaResponse, OmahaServer, OmahaServerBuilder, ResponseAndMetadata, ResponseMap,
-    },
-    mock_paver::{MockPaverService, MockPaverServiceBuilder},
-    std::{
-        collections::{BTreeMap, BTreeSet},
-        io::Write,
-        str::FromStr,
-        sync::Arc,
-    },
-    tempfile::TempDir,
+use anyhow::{Context, Error};
+use async_trait::async_trait;
+use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, Proxy, ServerEnd};
+use fidl_fuchsia_io::DirectoryProxy;
+use fidl_fuchsia_paver::PaverRequestStream;
+use fidl_fuchsia_pkg_ext::RepositoryConfigs;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::LocalComponentHandles;
+use fuchsia_merkle::Hash;
+use fuchsia_pkg_testing::serve::ServedRepository;
+use fuchsia_pkg_testing::{Package, RepositoryBuilder};
+use fuchsia_sync::Mutex;
+use futures::prelude::*;
+use isolated_ota::{OmahaConfig, UpdateUrlSource};
+use mock_omaha_server::{
+    OmahaResponse, OmahaServer, OmahaServerBuilder, ResponseAndMetadata, ResponseMap,
 };
+use mock_paver::{MockPaverService, MockPaverServiceBuilder};
+use std::collections::{BTreeMap, BTreeSet};
+use std::io::Write;
+use std::str::FromStr;
+use std::sync::Arc;
+use tempfile::TempDir;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 pub const GLOBAL_SSL_CERTS_PATH: &str = "/config/ssl";
 const EMPTY_REPO_PATH: &str = "/pkg/empty-repo";

@@ -6,72 +6,58 @@
 
 pub mod virtualization;
 
-use std::{
-    collections::{HashMap, HashSet},
-    net::SocketAddr,
-    num::NonZeroU16,
-    pin::pin,
-};
+use std::collections::{HashMap, HashSet};
+use std::net::SocketAddr;
+use std::num::NonZeroU16;
+use std::pin::pin;
 
-use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_dhcp as fnet_dhcp;
-use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
-use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_ext::IntoExt as _;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_masquerade as fnet_masquerade;
-use fidl_fuchsia_net_root as fnet_root;
-use fidl_fuchsia_net_routes as fnet_routes;
-use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
-use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
-use fidl_fuchsia_net_stack as fnet_stack;
-use fidl_fuchsia_netemul_network as fnetemul_network;
 use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _};
-use fuchsia_zircon as zx;
+use {
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_dhcp as fnet_dhcp, fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6,
+    fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
+    fidl_fuchsia_net_masquerade as fnet_masquerade, fidl_fuchsia_net_root as fnet_root,
+    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_net_stack as fnet_stack,
+    fidl_fuchsia_netemul_network as fnetemul_network, fuchsia_zircon as zx,
+};
 
 use anyhow::Context as _;
 use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
 use fidl::endpoints::Proxy as _;
-use futures::{
-    future::{FutureExt as _, LocalBoxFuture, TryFutureExt as _},
-    stream::{self, StreamExt as _, TryStreamExt as _},
-};
+use futures::future::{FutureExt as _, LocalBoxFuture, TryFutureExt as _};
+use futures::stream::{self, StreamExt as _, TryStreamExt as _};
 use futures_util::AsyncWriteExt;
 use net_declare::{
     fidl_ip, fidl_ip_v4, fidl_subnet, net_ip_v6, net_prefix_length_v4, net_subnet_v6, std_ip,
 };
-use net_types::{
-    ethernet::Mac,
-    ip::{self as net_types_ip, Ipv4},
-};
+use net_types::ethernet::Mac;
+use net_types::ip::{self as net_types_ip, Ipv4};
 use netemul::{RealmTcpListener, RealmTcpStream, RealmUdpSocket};
+use netstack_testing_common::interfaces::{self, TestInterfaceExt as _};
+use netstack_testing_common::nud::apply_nud_flake_workaround;
+use netstack_testing_common::realms::{
+    KnownServiceProvider, ManagementAgent, Manager, ManagerConfig, NetCfgBasic, NetCfgVersion,
+    Netstack, Netstack3, TestRealmExt as _, TestSandboxExt,
+};
 use netstack_testing_common::{
-    dhcpv4 as dhcpv4_helper,
-    interfaces::{self, TestInterfaceExt as _},
-    nud::apply_nud_flake_workaround,
-    realms::{
-        KnownServiceProvider, ManagementAgent, Manager, ManagerConfig, NetCfgBasic, NetCfgVersion,
-        Netstack, Netstack3, TestRealmExt as _, TestSandboxExt,
-    },
-    try_all, try_any, wait_for_component_stopped, ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
-    ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+    dhcpv4 as dhcpv4_helper, try_all, try_any, wait_for_component_stopped,
+    ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
 use packet::{EmptyBuf, InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
-use packet_formats::{
-    ethernet::{
-        EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck,
-        ETHERNET_MIN_BODY_LEN_NO_TAG,
-    },
-    ip::{IpProto, Ipv6Proto},
-    ipv6::Ipv6PacketBuilder,
-    testutil::parse_ip_packet,
-    udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs},
+use packet_formats::ethernet::{
+    EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck,
+    ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
+use packet_formats::ip::{IpProto, Ipv6Proto};
+use packet_formats::ipv6::Ipv6PacketBuilder;
+use packet_formats::testutil::parse_ip_packet;
+use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs};
 use packet_formats_dhcp::v6 as dhcpv6;
 use test_case::test_case;
 

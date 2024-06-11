@@ -105,8 +105,9 @@ impl EmuShowTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use emulator_instance::NetworkingMode;
-    use emulator_instance::{write_to_disk, EmulatorInstanceData, EngineState, FlagData};
+    use emulator_instance::{
+        write_to_disk, EmulatorInstanceData, EngineState, FlagData, NetworkingMode,
+    };
     use ffx_config::ConfigLevel;
     use ffx_emulator_config::VirtualDeviceInfo;
     use ffx_writer::{Format, TestBuffers};

@@ -8,13 +8,11 @@ use alloc::vec::Vec;
 
 use either::Either;
 use log::trace;
-use net_types::{
-    ip::{
-        AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant,
-        IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
-    },
-    SpecifiedAddr,
+use net_types::ip::{
+    AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant,
+    IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
 };
+use net_types::SpecifiedAddr;
 use netstack3_base::{
     AnyDevice, ContextPair, DeviceIdContext, EventContext as _, ExistsError, Inspector, Instant,
     InstantBindingsTypes, NotFoundError, ReferenceNotifiers, RemoveResourceResult,
@@ -22,24 +20,20 @@ use netstack3_base::{
 };
 use thiserror::Error;
 
-use crate::internal::{
-    device::{
-        self,
-        config::{
-            IpDeviceConfigurationHandler, PendingIpDeviceConfigurationUpdate,
-            UpdateIpConfigurationError,
-        },
-        state::{
-            Ipv4AddrConfig, Ipv4AddressState, Ipv6AddrConfig, Ipv6AddrManualConfig,
-            Ipv6AddressState, Lifetime,
-        },
-        AddressRemovedReason, DelIpAddr, IpAddressId as _, IpDeviceAddressContext as _,
-        IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt,
-        IpDeviceStateContext as _,
-    },
-    forwarding::IpForwardingDeviceContext,
-    types::RawMetric,
+use crate::internal::device::config::{
+    IpDeviceConfigurationHandler, PendingIpDeviceConfigurationUpdate, UpdateIpConfigurationError,
 };
+use crate::internal::device::state::{
+    Ipv4AddrConfig, Ipv4AddressState, Ipv6AddrConfig, Ipv6AddrManualConfig, Ipv6AddressState,
+    Lifetime,
+};
+use crate::internal::device::{
+    self, AddressRemovedReason, DelIpAddr, IpAddressId as _, IpDeviceAddressContext as _,
+    IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt,
+    IpDeviceStateContext as _,
+};
+use crate::internal::forwarding::IpForwardingDeviceContext;
+use crate::internal::types::RawMetric;
 
 /// Provides an API for dealing with devices at the IP layer, aka interfaces.
 pub struct DeviceIpApi<I: Ip, C>(C, IpVersionMarker<I>);

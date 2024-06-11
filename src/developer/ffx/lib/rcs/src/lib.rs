@@ -15,11 +15,9 @@ use fidl_fuchsia_sys2::{
     RouteValidatorMarker, RouteValidatorProxy,
 };
 use futures::{StreamExt, TryFutureExt};
-use std::{
-    hash::{Hash, Hasher},
-    sync::Arc,
-    time::Duration,
-};
+use std::hash::{Hash, Hasher};
+use std::sync::Arc;
+use std::time::Duration;
 use timeout::{timeout, TimeoutError};
 
 pub use fidl_fuchsia_io::OpenFlags;

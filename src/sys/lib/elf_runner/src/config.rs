@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::error::ProgramError, ::routing::policy::ScopedPolicyChecker, fidl_fuchsia_data as fdata,
-    fuchsia_zircon as zx, runner::StartInfoProgramError,
-};
+use crate::error::ProgramError;
+use ::routing::policy::ScopedPolicyChecker;
+use runner::StartInfoProgramError;
+use {fidl_fuchsia_data as fdata, fuchsia_zircon as zx};
 
 const CREATE_RAW_PROCESSES_KEY: &str = "job_policy_create_raw_processes";
 const SHARED_PROCESS_KEY: &str = "is_shared_process";
@@ -134,19 +134,18 @@ fn get_stream_sink(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        ::routing::policy::PolicyError,
-        assert_matches::assert_matches,
-        cm_config::{
-            AllowlistEntryBuilder, ChildPolicyAllowlists, JobPolicyAllowlists, SecurityPolicy,
-        },
-        fidl_fuchsia_data as fdata,
-        lazy_static::lazy_static,
-        moniker::Moniker,
-        std::{collections::HashMap, sync::Arc},
-        test_case::test_case,
+    use super::*;
+    use ::routing::policy::PolicyError;
+    use assert_matches::assert_matches;
+    use cm_config::{
+        AllowlistEntryBuilder, ChildPolicyAllowlists, JobPolicyAllowlists, SecurityPolicy,
     };
+    use fidl_fuchsia_data as fdata;
+    use lazy_static::lazy_static;
+    use moniker::Moniker;
+    use std::collections::HashMap;
+    use std::sync::Arc;
+    use test_case::test_case;
 
     const BINARY_KEY: &str = "binary";
     const TEST_BINARY: &str = "test_binary";

@@ -50,10 +50,8 @@ pub mod wpa;
 use fidl_fuchsia_wlan_common_security as fidl_security;
 use thiserror::Error;
 
-use crate::security::{
-    wep::WepKey,
-    wpa::credential::{Passphrase, PassphraseError, Psk, PskError},
-};
+use crate::security::wep::WepKey;
+use crate::security::wpa::credential::{Passphrase, PassphraseError, Psk, PskError};
 
 /// Extension methods for the `Credentials` FIDL datagram.
 pub trait CredentialsExt {
@@ -538,10 +536,8 @@ mod tests {
 
     use test_case::test_case;
 
-    use crate::security::{
-        wpa::{self, Authentication, Wpa2PersonalCredentials},
-        SecurityAuthenticator, SecurityError,
-    };
+    use crate::security::wpa::{self, Authentication, Wpa2PersonalCredentials};
+    use crate::security::{SecurityAuthenticator, SecurityError};
 
     pub trait AuthenticationTestCase: Sized {
         fn wpa2_personal_psk() -> Self;

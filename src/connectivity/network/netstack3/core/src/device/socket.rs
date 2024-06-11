@@ -5,25 +5,19 @@
 //! Implementations of traits defined in foreign modules for the types defined
 //! in the device socket module.
 
-use lock_order::{
-    lock::{DelegatedOrderedLockAccess, LockLevelFor},
-    relation::LockBefore,
+use lock_order::lock::{DelegatedOrderedLockAccess, LockLevelFor};
+use lock_order::relation::LockBefore;
+use netstack3_device::socket::{
+    AllSockets, AnyDeviceSockets, DeviceSocketAccessor, DeviceSocketContext,
+    DeviceSocketContextTypes, DeviceSocketId, DeviceSockets, HeldSockets, PrimaryDeviceSocketId,
+    SocketStateAccessor, Target,
 };
-use netstack3_device::{
-    for_any_device_id,
-    socket::{
-        AllSockets, AnyDeviceSockets, DeviceSocketAccessor, DeviceSocketContext,
-        DeviceSocketContextTypes, DeviceSocketId, DeviceSockets, HeldSockets,
-        PrimaryDeviceSocketId, SocketStateAccessor, Target,
-    },
-    DeviceId, WeakDeviceId,
-};
+use netstack3_device::{for_any_device_id, DeviceId, WeakDeviceId};
 
-use crate::{
-    context::{prelude::*, WrapLockLevel},
-    device::integration,
-    BindingsContext, BindingsTypes, CoreCtx, StackState,
-};
+use crate::context::prelude::*;
+use crate::context::WrapLockLevel;
+use crate::device::integration;
+use crate::{BindingsContext, BindingsTypes, CoreCtx, StackState};
 
 impl<BT: BindingsTypes, L> DeviceSocketContextTypes<BT> for CoreCtx<'_, BT, L> {
     type SocketId = DeviceSocketId<BT::SocketState, WeakDeviceId<BT>>;

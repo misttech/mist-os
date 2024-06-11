@@ -2,20 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Context;
+use fidl::endpoints::{ControlHandle, ServerEnd};
+use fidl_fuchsia_ldsvc::{LoaderMarker, LoaderRequest};
+use ftestrunner::LibraryLoaderCacheMarker;
+use futures::lock::Mutex as FutMutex;
+use futures::prelude::*;
+use std::collections::HashMap;
+use std::sync::{Arc, Weak};
+use tracing::warn;
 use {
-    anyhow::Context,
-    fidl::endpoints::ControlHandle,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_ldsvc::{LoaderMarker, LoaderRequest},
-    fidl_fuchsia_test_runner as ftestrunner,
-    ftestrunner::LibraryLoaderCacheMarker,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::lock::Mutex as FutMutex,
-    futures::prelude::*,
-    std::collections::HashMap,
-    std::sync::{Arc, Weak},
-    tracing::warn,
+    fidl_fuchsia_io as fio, fidl_fuchsia_test_runner as ftestrunner, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
 };
 
 /// maps vmo key with vmo result.
@@ -153,7 +151,9 @@ fn serve_lib_loader(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, anyhow::Error, assert_matches::assert_matches};
+    use super::*;
+    use anyhow::Error;
+    use assert_matches::assert_matches;
 
     async fn list_directory<'a>(root_proxy: &'a fio::DirectoryProxy) -> Vec<String> {
         let entries = fuchsia_fs::directory::readdir(root_proxy).await.expect("readdir failed");

@@ -2,13 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    scene::{
-        group::{GroupId, GroupMemberData},
-        scene::{GroupBuilder, SceneBuilder},
-    },
-    Coord, Point, Rect, Size,
-};
+use crate::scene::group::{GroupId, GroupMemberData};
+use crate::scene::scene::{GroupBuilder, SceneBuilder};
+use crate::{Coord, Point, Rect, Size};
 use euclid::{point2, size2};
 use std::ops::Deref;
 

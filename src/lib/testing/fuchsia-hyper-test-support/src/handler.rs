@@ -4,15 +4,11 @@
 
 //! Handler implementations
 
-use {
-    crate::Handler,
-    futures::{
-        future::{ready, BoxFuture},
-        prelude::*,
-    },
-    hyper::{Body, Request, Response, StatusCode},
-    std::path::PathBuf,
-};
+use crate::Handler;
+use futures::future::{ready, BoxFuture};
+use futures::prelude::*;
+use hyper::{Body, Request, Response, StatusCode};
+use std::path::PathBuf;
 
 /// Returns a fixed response for any request (it doesn't match on any path)
 #[derive(Default)]

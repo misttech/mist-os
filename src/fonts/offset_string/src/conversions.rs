@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::OffsetString,
-    anyhow::{format_err, Error},
-    char_collection::{CharCollection, MultiCharRange},
-    char_set::CharSet,
-    unic_char_range::{chars, CharRange},
-};
+use crate::OffsetString;
+use anyhow::{format_err, Error};
+use char_collection::{CharCollection, MultiCharRange};
+use char_set::CharSet;
+use unic_char_range::{chars, CharRange};
 
 impl TryFrom<String> for OffsetString {
     type Error = anyhow::Error;
@@ -116,7 +114,8 @@ impl TryFrom<&OffsetString> for CharSet {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, char_collection::char_collect};
+    use super::*;
+    use char_collection::char_collect;
 
     #[test]
     fn test_char_collection_to_offset_string() -> Result<(), Error> {

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::capability_source::CapabilitySource;
-use crate::capability_source::ComponentCapability;
+use crate::capability_source::{CapabilitySource, ComponentCapability};
 use crate::component_instance::ComponentInstanceInterface;
-use crate::RouteRequest;
-use crate::RoutingError;
+use crate::{RouteRequest, RoutingError};
 use std::sync::Arc;
 
 /// Get a specific configuration use declaration from the structured

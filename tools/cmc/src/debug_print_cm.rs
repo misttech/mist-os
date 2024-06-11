@@ -6,7 +6,8 @@ use crate::error::Error;
 use cm_rust::FidlIntoNative;
 use fidl::unpersist;
 use fidl_fuchsia_component_decl as fdecl;
-use std::{fs::read, path::PathBuf};
+use std::fs::read;
+use std::path::PathBuf;
 
 pub(crate) fn debug_print_cm(file: &PathBuf) -> Result<(), Error> {
     let bytes = read(file).map_err(Error::Io)?;

@@ -14,9 +14,12 @@ use fidl_fuchsia_sys2::RealmQueryProxy;
 use log_formatter::FormatterError;
 use moniker::Moniker;
 use selectors::{sanitize_moniker_for_selectors, SelectorExt};
-use std::{
-    borrow::Cow, io::Write, ops::Deref, str::FromStr, string::FromUtf8Error, time::Duration,
-};
+use std::borrow::Cow;
+use std::io::Write;
+use std::ops::Deref;
+use std::str::FromStr;
+use std::string::FromUtf8Error;
+use std::time::Duration;
 use thiserror::Error;
 pub mod filter;
 pub mod log_formatter;
@@ -519,7 +522,9 @@ mod test {
     use async_trait::async_trait;
     use fidl::endpoints::create_proxy;
     use fidl_fuchsia_diagnostics::{LogSettingsMarker, LogSettingsRequest};
-    use futures_util::{future::Either, stream::FuturesUnordered, StreamExt};
+    use futures_util::future::Either;
+    use futures_util::stream::FuturesUnordered;
+    use futures_util::StreamExt;
     use selectors::parse_log_interest_selector;
 
     #[derive(Default)]

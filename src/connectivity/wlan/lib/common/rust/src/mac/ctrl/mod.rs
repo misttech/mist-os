@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{CtrlFrame, CtrlSubtype},
-    zerocopy::{ByteSlice, Ref},
-};
+use super::{CtrlFrame, CtrlSubtype};
+use zerocopy::{ByteSlice, Ref};
 
 mod fields;
 
@@ -42,11 +40,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::assert_variant,
-        ieee80211::{Bssid, MacAddr},
-    };
+    use super::*;
+    use crate::assert_variant;
+    use ieee80211::{Bssid, MacAddr};
 
     #[test]
     fn parse_ps_poll_frame() {

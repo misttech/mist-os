@@ -2,20 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{ensure, Context as AnyhowContext, Error},
-    argh::FromArgs,
-    carnelian::{
-        color::Color,
-        render::{Composition, Context, CopyRegion, Image, PreClear, PreCopy, RenderExt},
-        App, AppAssistant, AppAssistantPtr, IntSize, ViewAssistant, ViewAssistantContext,
-        ViewAssistantPtr, ViewKey,
-    },
-    euclid::default::{Point2D, Rect},
-    fuchsia_async as fasync,
-    fuchsia_zircon::{AsHandleRef, Duration, Event, Signals},
-    std::{fs::File, process},
+use anyhow::{ensure, Context as AnyhowContext, Error};
+use argh::FromArgs;
+use carnelian::color::Color;
+use carnelian::render::{Composition, Context, CopyRegion, Image, PreClear, PreCopy, RenderExt};
+use carnelian::{
+    App, AppAssistant, AppAssistantPtr, IntSize, ViewAssistant, ViewAssistantContext,
+    ViewAssistantPtr, ViewKey,
 };
+use euclid::default::{Point2D, Rect};
+use fuchsia_async as fasync;
+use fuchsia_zircon::{AsHandleRef, Duration, Event, Signals};
+use std::fs::File;
+use std::process;
 
 const WHITE_COLOR: Color = Color { r: 255, g: 255, b: 255, a: 255 };
 

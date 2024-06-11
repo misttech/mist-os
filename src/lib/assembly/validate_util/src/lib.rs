@@ -5,13 +5,11 @@
 //! Utilities for validating packages and components, separate from the `assembly_validate_product`
 //! crate so they can be depended upon by libraries used to implement product validation.
 
-use std::{
-    collections::BTreeMap,
-    error::Error,
-    fmt::{Debug, Display},
-    io::{Read, Seek},
-    path::{Path, PathBuf},
-};
+use std::collections::BTreeMap;
+use std::error::Error;
+use std::fmt::{Debug, Display};
+use std::io::{Read, Seek};
+use std::path::{Path, PathBuf};
 
 mod inner_impl {
     use super::*;

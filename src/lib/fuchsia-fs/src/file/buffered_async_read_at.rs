@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::file::{AsyncGetSize, AsyncReadAt},
-    fidl_fuchsia_io as fio,
-    pin_project::pin_project,
-    std::{
-        cmp::min,
-        convert::TryInto as _,
-        pin::Pin,
-        task::{Context, Poll},
-    },
-};
+use crate::file::{AsyncGetSize, AsyncReadAt};
+use fidl_fuchsia_io as fio;
+use pin_project::pin_project;
+use std::cmp::min;
+use std::convert::TryInto as _;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 // Checked addition on `usize` that fails with `std::io::Error` instead of `None` to reduce clutter.
 trait UsizeExt {
@@ -108,12 +104,12 @@ impl<T: AsyncGetSize> AsyncGetSize for BufferedAsyncReadAt<T> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::file::{AsyncGetSizeExt as _, AsyncReadAtExt as _},
-        assert_matches::assert_matches,
-        std::{cell::RefCell, convert::TryFrom as _, rc::Rc},
-    };
+    use super::*;
+    use crate::file::{AsyncGetSizeExt as _, AsyncReadAtExt as _};
+    use assert_matches::assert_matches;
+    use std::cell::RefCell;
+    use std::convert::TryFrom as _;
+    use std::rc::Rc;
 
     #[test]
     fn max_transfer_size_fits_in_usize() {

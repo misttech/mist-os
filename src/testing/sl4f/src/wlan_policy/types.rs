@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fidl_fuchsia_wlan_policy as fidl_policy, serde::Serialize};
+use fidl_fuchsia_wlan_policy as fidl_policy;
+use serde::Serialize;
 
 /// Structs for wlan policy to go through SL4F
 #[derive(Serialize)]

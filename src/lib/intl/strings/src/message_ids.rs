@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::parser,
-    anyhow::{Context, Result},
-    handlebars::Handlebars,
-    serde::Serialize,
-    std::collections::hash_map::DefaultHasher,
-    std::collections::HashSet,
-    std::hash::{Hash, Hasher},
-    std::io,
-};
+use crate::parser;
+use anyhow::{Context, Result};
+use handlebars::Handlebars;
+use serde::Serialize;
+use std::collections::hash_map::DefaultHasher;
+use std::collections::HashSet;
+use std::hash::{Hash, Hasher};
+use std::io;
 
 /// One constant:
 ///
@@ -172,7 +170,9 @@ pub fn render<W: io::Write>(fidl: Model, output: &mut W) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, anyhow::Error, xml::reader::EventReader};
+    use super::*;
+    use anyhow::Error;
+    use xml::reader::EventReader;
 
     #[test]
     fn render_template() -> Result<()> {

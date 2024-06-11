@@ -11,7 +11,8 @@ use fidl_fuchsia_tpm::{
     CommandRequestStream, DeprovisionRequestStream, ProvisionRequestStream, TpmDeviceMarker,
 };
 use fuchsia_component::server::ServiceFs;
-use fuchsia_inspect::{component, health::Reporter};
+use fuchsia_inspect::component;
+use fuchsia_inspect::health::Reporter;
 use fuchsia_tpm_protocol::TpmProtocol;
 use futures::prelude::*;
 use std::sync::Arc;

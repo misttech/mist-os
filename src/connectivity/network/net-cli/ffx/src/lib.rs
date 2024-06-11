@@ -9,20 +9,15 @@ use anyhow::Context as _;
 use errors::FfxError;
 use ffx_core::ffx_plugin;
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
-use fidl_fuchsia_developer_remotecontrol as fremotecontrol;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_net_debug as fdebug;
-use fidl_fuchsia_net_dhcp as fdhcp;
-use fidl_fuchsia_net_filter as ffilter;
-use fidl_fuchsia_net_filter_deprecated as ffilter_deprecated;
-use fidl_fuchsia_net_interfaces as finterfaces;
-use fidl_fuchsia_net_name as fname;
-use fidl_fuchsia_net_neighbor as fneighbor;
-use fidl_fuchsia_net_root as froot;
-use fidl_fuchsia_net_routes as froutes;
-use fidl_fuchsia_net_stack as fstack;
-use fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration;
-use fidl_fuchsia_sys2 as fsys;
+use {
+    fidl_fuchsia_developer_remotecontrol as fremotecontrol, fidl_fuchsia_io as fio,
+    fidl_fuchsia_net_debug as fdebug, fidl_fuchsia_net_dhcp as fdhcp,
+    fidl_fuchsia_net_filter as ffilter, fidl_fuchsia_net_filter_deprecated as ffilter_deprecated,
+    fidl_fuchsia_net_interfaces as finterfaces, fidl_fuchsia_net_name as fname,
+    fidl_fuchsia_net_neighbor as fneighbor, fidl_fuchsia_net_root as froot,
+    fidl_fuchsia_net_routes as froutes, fidl_fuchsia_net_stack as fstack,
+    fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration, fidl_fuchsia_sys2 as fsys,
+};
 
 const NETSTACK_MONIKER_SUFFIX: &str = "/netstack";
 const DHCPD_MONIKER_SUFFIX: &str = "/dhcpd";

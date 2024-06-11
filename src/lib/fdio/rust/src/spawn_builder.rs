@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{spawn_etc, transfer_fd, SpawnAction, SpawnOptions},
-    fuchsia_zircon as zx,
-    std::{ffi::CString, fs::File},
-};
+use crate::{spawn_etc, transfer_fd, SpawnAction, SpawnOptions};
+use fuchsia_zircon as zx;
+use std::ffi::CString;
+use std::fs::File;
 
 #[derive(Default)]
 /// Convience wrapper for `spawn_etc`.
@@ -131,7 +130,10 @@ pub enum Error {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fidl::AsHandleRef as _, fuchsia_async as fasync, std::io::Write as _};
+    use super::*;
+    use fidl::AsHandleRef as _;
+    use fuchsia_async as fasync;
+    use std::io::Write as _;
 
     async fn process_exit_success(proc: zx::Process) {
         assert_eq!(

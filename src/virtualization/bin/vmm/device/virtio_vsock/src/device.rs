@@ -2,39 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::connection::{VsockConnection, VsockConnectionKey, WantRxChainResult},
-    crate::connection_states::{StateAction, VsockConnectionState},
-    crate::port_manager::PortManager,
-    crate::wire::{OpType, VirtioVsockConfig, VirtioVsockHeader, VsockType, LE64},
-    anyhow::{anyhow, Error},
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_virtualization::{
-        HostVsockAcceptorProxy, HostVsockEndpointConnectResponder, HOST_CID,
-    },
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{
-        channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
-        future::{self, LocalBoxFuture},
-        select,
-        stream::FuturesUnordered,
-        StreamExt,
-    },
-    machina_virtio_device::{GuestMem, WrappedDescChainStream},
-    std::{
-        cell::{Cell, RefCell},
-        collections::HashMap,
-        io::{Read, Write},
-        mem,
-        rc::Rc,
-    },
-    virtio_device::{
-        chain::{ReadableChain, WritableChain},
-        mem::DriverMem,
-        queue::DriverNotify,
-    },
-    zerocopy::{AsBytes, FromBytes},
+use crate::connection::{VsockConnection, VsockConnectionKey, WantRxChainResult};
+use crate::connection_states::{StateAction, VsockConnectionState};
+use crate::port_manager::PortManager;
+use crate::wire::{OpType, VirtioVsockConfig, VirtioVsockHeader, VsockType, LE64};
+use anyhow::{anyhow, Error};
+use fidl::endpoints::Proxy;
+use fidl_fuchsia_virtualization::{
+    HostVsockAcceptorProxy, HostVsockEndpointConnectResponder, HOST_CID,
 };
+use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use futures::future::{self, LocalBoxFuture};
+use futures::stream::FuturesUnordered;
+use futures::{select, StreamExt};
+use machina_virtio_device::{GuestMem, WrappedDescChainStream};
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
+use std::io::{Read, Write};
+use std::mem;
+use std::rc::Rc;
+use virtio_device::chain::{ReadableChain, WritableChain};
+use virtio_device::mem::DriverMem;
+use virtio_device::queue::DriverNotify;
+use zerocopy::{AsBytes, FromBytes};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub struct VsockDevice {
     // Device configuration. This currently only stores the guest CID, which should not change
@@ -574,19 +565,17 @@ impl VsockDevice {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::wire::{LE16, LE32},
-        async_utils::PollExt,
-        fidl::endpoints::{create_proxy_and_stream, create_request_stream},
-        fidl_fuchsia_virtualization::{
-            HostVsockAcceptorMarker, HostVsockEndpointMarker, HostVsockEndpointProxy,
-            HostVsockEndpointRequest, DEFAULT_GUEST_CID,
-        },
-        futures::{FutureExt, TryStreamExt},
-        std::task::Poll,
-        virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue},
+    use super::*;
+    use crate::wire::{LE16, LE32};
+    use async_utils::PollExt;
+    use fidl::endpoints::{create_proxy_and_stream, create_request_stream};
+    use fidl_fuchsia_virtualization::{
+        HostVsockAcceptorMarker, HostVsockEndpointMarker, HostVsockEndpointProxy,
+        HostVsockEndpointRequest, DEFAULT_GUEST_CID,
     };
+    use futures::{FutureExt, TryStreamExt};
+    use std::task::Poll;
+    use virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue};
 
     async fn handle_host_vsock_endpoint_stream(
         device: Rc<VsockDevice>,

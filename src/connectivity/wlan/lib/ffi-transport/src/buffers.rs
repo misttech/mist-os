@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::errors::{Error, InvalidFfiBuffer},
-    std::{
-        marker::{PhantomData, PhantomPinned},
-        mem::ManuallyDrop,
-        ops::{Deref, DerefMut},
-        ptr::{self, NonNull},
-        slice,
-        sync::atomic::AtomicPtr,
-    },
-};
+use crate::errors::{Error, InvalidFfiBuffer};
+use std::marker::{PhantomData, PhantomPinned};
+use std::mem::ManuallyDrop;
+use std::ops::{Deref, DerefMut};
+use std::ptr::{self, NonNull};
+use std::slice;
+use std::sync::atomic::AtomicPtr;
 
 #[repr(C)]
 pub struct FfiBufferProvider {
@@ -317,11 +313,11 @@ impl FakeFfiBufferProvider {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        std::{cell::RefCell, ptr, rc::Rc},
-        test_case::test_case,
-    };
+    use super::*;
+    use std::cell::RefCell;
+    use std::ptr;
+    use std::rc::Rc;
+    use test_case::test_case;
 
     unsafe extern "C" fn no_op_free(_ctx: *mut FfiBufferCtx) {}
 

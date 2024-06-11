@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::check::{PreflightCheck, PreflightCheckResult, PreflightCheckResult::*},
-    crate::command_runner::CommandRunner,
-    crate::config::*,
-    anyhow::{anyhow, Context, Result},
-    async_trait::async_trait,
-    lazy_static::lazy_static,
-    regex::Regex,
-};
+use crate::check::PreflightCheckResult::*;
+use crate::check::{PreflightCheck, PreflightCheckResult};
+use crate::command_runner::CommandRunner;
+use crate::config::*;
+use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
+use lazy_static::lazy_static;
+use regex::Regex;
 
 lazy_static! {
     // Regex to extract video cards on Linux. Matches output strings from `lspci` like:
@@ -188,7 +187,8 @@ impl PreflightCheck for FemuGraphics<'_> {
 
 #[cfg(test)]
 mod test {
-    use {super::*, crate::command_runner::ExitStatus};
+    use super::*;
+    use crate::command_runner::ExitStatus;
 
     // Contains a "VGA compatible controller" line with an NVIDIA Quadro chipset.
     static LSPCI_OUTPUT_GOOD: &str =

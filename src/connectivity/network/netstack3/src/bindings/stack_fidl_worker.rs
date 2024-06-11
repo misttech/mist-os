@@ -2,11 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{
-    routes,
-    util::{ResultExt as _, TryFromFidlWithContext as _, TryIntoCore as _},
-    Ctx,
-};
+use super::util::{ResultExt as _, TryFromFidlWithContext as _, TryIntoCore as _};
+use super::{routes, Ctx};
 
 use fidl_fuchsia_net as fidl_net;
 use fidl_fuchsia_net_stack::{

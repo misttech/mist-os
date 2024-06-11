@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context as _, Error},
-    fidl_fuchsia_wlan_common::WlanMacRole,
-    fidl_fuchsia_wlan_device_service::{
-        CreateIfaceRequest, DestroyIfaceRequest, DeviceMonitorProxy, QueryIfaceResponse,
-    },
-    fuchsia_zircon as zx,
-    ieee80211::{MacAddr, MacAddrBytes},
+use anyhow::{format_err, Context as _, Error};
+use fidl_fuchsia_wlan_common::WlanMacRole;
+use fidl_fuchsia_wlan_device_service::{
+    CreateIfaceRequest, DestroyIfaceRequest, DeviceMonitorProxy, QueryIfaceResponse,
 };
+use fuchsia_zircon as zx;
+use ieee80211::{MacAddr, MacAddrBytes};
 
 pub mod ap;
 pub mod client;
@@ -106,18 +104,16 @@ pub async fn get_wlan_sta_addr(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_fuchsia_wlan_common::WlanMacRole,
-        fidl_fuchsia_wlan_device_service::{
-            CreateIfaceResponse, DeviceMonitorMarker, DeviceMonitorRequest,
-            DeviceMonitorRequestStream,
-        },
-        fuchsia_async::TestExecutor,
-        futures::{task::Poll, StreamExt},
-        std::pin::pin,
-        wlan_common::assert_variant,
+    use super::*;
+    use fidl_fuchsia_wlan_common::WlanMacRole;
+    use fidl_fuchsia_wlan_device_service::{
+        CreateIfaceResponse, DeviceMonitorMarker, DeviceMonitorRequest, DeviceMonitorRequestStream,
     };
+    use fuchsia_async::TestExecutor;
+    use futures::task::Poll;
+    use futures::StreamExt;
+    use std::pin::pin;
+    use wlan_common::assert_variant;
 
     pub(crate) fn setup_fake_service<M: fidl::endpoints::ProtocolMarker>(
     ) -> (fuchsia_async::TestExecutor, M::Proxy, M::RequestStream) {

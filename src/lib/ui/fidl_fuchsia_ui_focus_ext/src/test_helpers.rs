@@ -4,10 +4,9 @@
 
 //! Helper methods for tests involving `FocusChain`.
 
-use {
-    fidl_fuchsia_ui_focus::FocusChain, fidl_fuchsia_ui_views::ViewRefControl,
-    fuchsia_scenic::ViewRefPair,
-};
+use fidl_fuchsia_ui_focus::FocusChain;
+use fidl_fuchsia_ui_views::ViewRefControl;
+use fuchsia_scenic::ViewRefPair;
 
 /// Makes a focus chain of the given length, returning both the `FocusChain` instance and a vector
 /// of all the corresponding `ViewRefControl`s, in the same order.

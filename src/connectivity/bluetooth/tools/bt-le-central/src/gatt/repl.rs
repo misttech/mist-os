@@ -5,15 +5,14 @@
 use anyhow::{format_err, Context as _, Error};
 use fidl_fuchsia_bluetooth_gatt2::ClientProxy;
 use fuchsia_async as fasync;
-use futures::{
-    channel::mpsc::{channel, SendError},
-    Sink, SinkExt, Stream, StreamExt,
-};
-use rustyline::{error::ReadlineError, CompletionType, Config, EditMode, Editor};
+use futures::channel::mpsc::{channel, SendError};
+use futures::{Sink, SinkExt, Stream, StreamExt};
+use rustyline::error::ReadlineError;
+use rustyline::{CompletionType, Config, EditMode, Editor};
 use std::thread;
 
+use super::commands::{Cmd, CmdHelper};
 use super::{
-    commands::{Cmd, CmdHelper},
     do_connect, do_disable_notify, do_enable_notify, do_list, do_read_by_type, do_read_chr,
     do_read_desc, do_read_long_chr, do_read_long_desc, do_write_chr, do_write_desc,
     do_write_long_chr, do_write_long_desc, GattClient, GattClientPtr,

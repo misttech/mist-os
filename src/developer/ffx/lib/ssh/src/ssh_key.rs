@@ -2,25 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use base64::{
-    display::Base64Display,
-    prelude::{Engine as _, BASE64_STANDARD},
-};
-use ffx_config::{api::ConfigError, query, ConfigQuery, EnvironmentContext};
-use ring::{
-    rand::{self, SystemRandom},
-    signature::{Ed25519KeyPair, KeyPair},
-};
+use base64::display::Base64Display;
+use base64::prelude::{Engine as _, BASE64_STANDARD};
+use ffx_config::api::ConfigError;
+use ffx_config::{query, ConfigQuery, EnvironmentContext};
+use ring::rand::{self, SystemRandom};
+use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::Serialize;
-use std::{
-    error::Error,
-    fmt,
-    fs::{self, DirBuilder, File, OpenOptions},
-    io::{BufRead, BufReader, Cursor, Read, Write},
-    os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt},
-    path::PathBuf,
-    str,
-};
+use std::error::Error;
+use std::fs::{self, DirBuilder, File, OpenOptions};
+use std::io::{BufRead, BufReader, Cursor, Read, Write};
+use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
+use std::path::PathBuf;
+use std::{fmt, str};
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub enum SshKeyErrorKind {

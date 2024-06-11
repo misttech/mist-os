@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Error},
-    fidl_fuchsia_io as fio,
-    fuchsia_component::server::ServiceFs,
-    futures::StreamExt,
-};
+use anyhow::{anyhow, Context, Error};
+use fidl_fuchsia_io as fio;
+use fuchsia_component::server::ServiceFs;
+use futures::StreamExt;
 
 const DATA_FOR_TEST_DIR_NAME: &str = "data_for_test";
 const DATA_FOR_TESTS_PATH: &str = "/data/data_for_test";

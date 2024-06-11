@@ -2,20 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::filesystems::{BlobFilesystem, DeliveryBlob, FsManagementFilesystemInstance},
-    async_trait::async_trait,
-    blob_writer::BlobWriter,
-    fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobCreatorProxy, BlobReaderMarker, BlobReaderProxy},
-    fidl_fuchsia_io as fio,
-    fuchsia_component::client::connect_to_protocol_at_dir_svc,
-    fuchsia_zircon as zx,
-    std::path::Path,
-    storage_benchmarks::{
-        BlockDeviceConfig, BlockDeviceFactory, CacheClearableFilesystem, Filesystem,
-        FilesystemConfig,
-    },
+use crate::filesystems::{BlobFilesystem, DeliveryBlob, FsManagementFilesystemInstance};
+use async_trait::async_trait;
+use blob_writer::BlobWriter;
+use fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobCreatorProxy, BlobReaderMarker, BlobReaderProxy};
+use fuchsia_component::client::connect_to_protocol_at_dir_svc;
+use std::path::Path;
+use storage_benchmarks::{
+    BlockDeviceConfig, BlockDeviceFactory, CacheClearableFilesystem, Filesystem, FilesystemConfig,
 };
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// Config object for starting Fxblob instances.
 #[derive(Clone)]
@@ -112,7 +108,8 @@ impl BlobFilesystem for FxblobInstance {
 
 #[cfg(test)]
 mod tests {
-    use {super::Fxblob, crate::filesystems::testing::check_blob_filesystem};
+    use super::Fxblob;
+    use crate::filesystems::testing::check_blob_filesystem;
 
     #[fuchsia::test]
     async fn start_fxblob_new() {

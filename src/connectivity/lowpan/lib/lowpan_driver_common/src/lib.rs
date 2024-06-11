@@ -43,8 +43,7 @@ pub(crate) mod prelude_internal {
     #[allow(unused_imports)]
     pub use tracing::{debug, error, info, trace, warn};
 
-    pub use crate::ServeTo as _;
-    pub use crate::{ZxResult, ZxStatus};
+    pub use crate::{ServeTo as _, ZxResult, ZxStatus};
     pub use anyhow::{format_err, Context as _};
     pub use async_trait::async_trait;
 }
@@ -53,27 +52,20 @@ pub mod lowpan_fidl {
     pub use fidl_fuchsia_factory_lowpan::*;
     pub use fidl_fuchsia_lowpan::*;
     pub use fidl_fuchsia_lowpan_device::*;
-    pub use fidl_fuchsia_lowpan_experimental::DeviceConnectorMarker as ExperimentalDeviceConnectorMarker;
-    pub use fidl_fuchsia_lowpan_experimental::DeviceConnectorRequest as ExperimentalDeviceConnectorRequest;
-    pub use fidl_fuchsia_lowpan_experimental::DeviceConnectorRequestStream as ExperimentalDeviceConnectorRequestStream;
-    pub use fidl_fuchsia_lowpan_experimental::DeviceExtraConnectorMarker as ExperimentalDeviceExtraConnectorMarker;
-    pub use fidl_fuchsia_lowpan_experimental::DeviceExtraConnectorRequest as ExperimentalDeviceExtraConnectorRequest;
-    pub use fidl_fuchsia_lowpan_experimental::DeviceExtraConnectorRequestStream as ExperimentalDeviceExtraConnectorRequestStream;
-    pub use fidl_fuchsia_lowpan_experimental::DeviceExtraMarker as ExperimentalDeviceExtraMarker;
-    pub use fidl_fuchsia_lowpan_experimental::DeviceExtraRequest as ExperimentalDeviceExtraRequest;
-    pub use fidl_fuchsia_lowpan_experimental::DeviceExtraRequestStream as ExperimentalDeviceExtraRequestStream;
-    pub use fidl_fuchsia_lowpan_experimental::DeviceMarker as ExperimentalDeviceMarker;
-    pub use fidl_fuchsia_lowpan_experimental::DeviceRequest as ExperimentalDeviceRequest;
-    pub use fidl_fuchsia_lowpan_experimental::DeviceRequestStream as ExperimentalDeviceRequestStream;
-    pub use fidl_fuchsia_lowpan_experimental::TelemetryProviderConnectorMarker;
-    pub use fidl_fuchsia_lowpan_experimental::TelemetryProviderConnectorRequest;
-    pub use fidl_fuchsia_lowpan_experimental::TelemetryProviderConnectorRequestStream;
-    pub use fidl_fuchsia_lowpan_experimental::TelemetryProviderMarker;
-    pub use fidl_fuchsia_lowpan_experimental::TelemetryProviderRequest;
-    pub use fidl_fuchsia_lowpan_experimental::TelemetryProviderRequestStream;
     pub use fidl_fuchsia_lowpan_experimental::{
         BeaconInfo, BeaconInfoStreamMarker, BeaconInfoStreamRequest, ChannelInfo,
-        DeviceRouteConnectorMarker, DeviceRouteConnectorRequest, DeviceRouteConnectorRequestStream,
+        DeviceConnectorMarker as ExperimentalDeviceConnectorMarker,
+        DeviceConnectorRequest as ExperimentalDeviceConnectorRequest,
+        DeviceConnectorRequestStream as ExperimentalDeviceConnectorRequestStream,
+        DeviceExtraConnectorMarker as ExperimentalDeviceExtraConnectorMarker,
+        DeviceExtraConnectorRequest as ExperimentalDeviceExtraConnectorRequest,
+        DeviceExtraConnectorRequestStream as ExperimentalDeviceExtraConnectorRequestStream,
+        DeviceExtraMarker as ExperimentalDeviceExtraMarker,
+        DeviceExtraRequest as ExperimentalDeviceExtraRequest,
+        DeviceExtraRequestStream as ExperimentalDeviceExtraRequestStream,
+        DeviceMarker as ExperimentalDeviceMarker, DeviceRequest as ExperimentalDeviceRequest,
+        DeviceRequestStream as ExperimentalDeviceRequestStream, DeviceRouteConnectorMarker,
+        DeviceRouteConnectorRequest, DeviceRouteConnectorRequestStream,
         DeviceRouteExtraConnectorMarker, DeviceRouteExtraConnectorRequest,
         DeviceRouteExtraConnectorRequestStream, DeviceRouteExtraMarker, DeviceRouteExtraRequest,
         DeviceRouteExtraRequestStream, DeviceRouteMarker, DeviceRouteRequest,
@@ -83,6 +75,9 @@ pub mod lowpan_fidl {
         LegacyJoiningRequestStream, NetworkScanParameters, OnMeshPrefix, ProvisionError,
         ProvisioningMonitorRequest, ProvisioningProgress, RoutePreference, SrpServerAddressMode,
         SrpServerInfo, SrpServerRegistration, SrpServerState, Telemetry,
+        TelemetryProviderConnectorMarker, TelemetryProviderConnectorRequest,
+        TelemetryProviderConnectorRequestStream, TelemetryProviderMarker, TelemetryProviderRequest,
+        TelemetryProviderRequestStream,
     };
     pub use fidl_fuchsia_lowpan_test::*;
     pub use fidl_fuchsia_lowpan_thread::*;
@@ -97,10 +92,7 @@ pub type ZxResult<T = ()> = Result<T, ZxStatus>;
 const MAX_CONCURRENT: usize = 100;
 
 pub mod pii {
-    use core::fmt::Debug;
-    use core::fmt::Display;
-    use core::fmt::Formatter;
-    use core::fmt::Result;
+    use core::fmt::{Debug, Display, Formatter, Result};
 
     fn should_display_pii() -> bool {
         true

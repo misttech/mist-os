@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_ui_pointerinjector as pointerinjector,
-    fidl_fuchsia_ui_pointerinjector_configuration::{
-        SetupRequest, SetupRequestStream, SetupWatchViewportResponder,
-    },
-    fuchsia_component_test::{ChildOptions, RealmBuilder},
-    futures::TryStreamExt,
+use fidl_fuchsia_ui_pointerinjector as pointerinjector;
+use fidl_fuchsia_ui_pointerinjector_configuration::{
+    SetupRequest, SetupRequestStream, SetupWatchViewportResponder,
 };
+use fuchsia_component_test::{ChildOptions, RealmBuilder};
+use futures::TryStreamExt;
 
 /// A mock implementation of `fuchsia.ui.pointerinjector.configuration.Setup`, which
 /// a) responds to every `GetViewRefs` request with a new `(context, target)`

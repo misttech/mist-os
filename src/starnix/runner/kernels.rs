@@ -4,18 +4,20 @@
 
 use anyhow::Error;
 use attribution::{AttributionServer, AttributionServerHandle};
-use fidl::{endpoints::ServerEnd, HandleBased};
-use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_component_runner as frunner;
-use fidl_fuchsia_memory_attribution as fattribution;
+use fidl::endpoints::ServerEnd;
+use fidl::HandleBased;
 use frunner::{ComponentControllerMarker, ComponentStartInfo};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
 use kernel_manager::StarnixKernel;
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
+use std::sync::Arc;
 use vfs::execution_scope::ExecutionScope;
 use zx::AsHandleRef;
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner,
+    fidl_fuchsia_memory_attribution as fattribution, fuchsia_zircon as zx,
+};
 
 /// The component URL of the Starnix kernel.
 const KERNEL_URL: &str = "starnix_kernel#meta/starnix_kernel.cm";

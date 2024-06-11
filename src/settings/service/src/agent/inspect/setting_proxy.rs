@@ -10,16 +10,14 @@
 //!
 //! [SettingProxyInspectAgent]: inspect::SettingProxyInspectAgent
 
-use crate::agent::Context;
-use crate::agent::Payload;
+use crate::agent::{Context, Payload};
 use crate::base::{SettingInfo, SettingType};
-use crate::clock;
 use crate::handler::base::{Error, Payload as HandlerPayload, Request};
 use crate::inspect::utils::enums::ResponseType;
 use crate::message::base::{MessageEvent, MessengerType};
 use crate::message::receptor::Receptor;
 use crate::service::TryFromWithClient;
-use crate::{service, trace};
+use crate::{clock, service, trace};
 use settings_inspect_utils::joinable_inspect_vecdeque::JoinableInspectVecDeque;
 use settings_inspect_utils::managed_inspect_map::ManagedInspectMap;
 use settings_inspect_utils::managed_inspect_queue::ManagedInspectQueue;
@@ -454,8 +452,7 @@ mod tests {
     use super::*;
     use crate::display::types::SetDisplayInfo;
     use crate::intl::types::{IntlInfo, LocaleId, TemperatureUnit};
-    use diagnostics_assertions::assert_data_tree;
-    use diagnostics_assertions::TreeAssertion;
+    use diagnostics_assertions::{assert_data_tree, TreeAssertion};
     use fuchsia_zircon::Time;
     use std::collections::HashSet;
 

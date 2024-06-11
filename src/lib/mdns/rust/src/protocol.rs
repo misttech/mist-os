@@ -11,10 +11,8 @@ use std::mem;
 use std::net::IpAddr;
 
 use packet::{BufferView, BufferViewMut, InnerPacketBuilder, ParsablePacket, ParseMetadata};
-use zerocopy::{
-    byteorder::network_endian::{U16, U32},
-    AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, Ref, Unaligned,
-};
+use zerocopy::byteorder::network_endian::{U16, U32};
+use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 const IPV4_SIZE: usize = 4;
 const IPV6_SIZE: usize = 16;

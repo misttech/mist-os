@@ -6,39 +6,32 @@
 //! Use [`crate::directory::immutable::Simple::new()`]
 //! to construct actual instances.  See [`Simple`] for details.
 
-use crate::{
-    common::{rights_to_posix_mode_bits, CreationMode},
-    directory::{
-        dirents_sink,
-        entry::{DirectoryEntry, EntryInfo, FlagsOrProtocols, OpenRequest},
-        entry_container::{Directory, DirectoryWatcher},
-        helper::{AlreadyExists, DirectlyMutable, NotDirectory},
-        immutable::connection::ImmutableConnection,
-        traversal_position::TraversalPosition,
-        watchers::{
-            event_producers::{SingleNameEventProducer, StaticVecEventProducer},
-            Watchers,
-        },
-    },
-    execution_scope::ExecutionScope,
-    name::Name,
-    node::Node,
-    path::Path,
-    protocols::ProtocolsExt,
-    ObjectRequestRef, ToObjectRequest,
+use crate::common::{rights_to_posix_mode_bits, CreationMode};
+use crate::directory::dirents_sink;
+use crate::directory::entry::{DirectoryEntry, EntryInfo, FlagsOrProtocols, OpenRequest};
+use crate::directory::entry_container::{Directory, DirectoryWatcher};
+use crate::directory::helper::{AlreadyExists, DirectlyMutable, NotDirectory};
+use crate::directory::immutable::connection::ImmutableConnection;
+use crate::directory::traversal_position::TraversalPosition;
+use crate::directory::watchers::event_producers::{
+    SingleNameEventProducer, StaticVecEventProducer,
 };
+use crate::directory::watchers::Watchers;
+use crate::execution_scope::ExecutionScope;
+use crate::name::Name;
+use crate::node::Node;
+use crate::path::Path;
+use crate::protocols::ProtocolsExt;
+use crate::{ObjectRequestRef, ToObjectRequest};
 
-use {
-    async_trait::async_trait,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status,
-    std::{
-        collections::{btree_map::Entry, BTreeMap},
-        iter,
-        sync::{Arc, Mutex},
-    },
-};
+use async_trait::async_trait;
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use std::collections::btree_map::Entry;
+use std::collections::BTreeMap;
+use std::iter;
+use std::sync::{Arc, Mutex};
 
 /// An implementation of a "simple" pseudo directory.  This directory holds a set of entries,
 /// allowing the server to add or remove entries via the
@@ -400,7 +393,8 @@ impl ToFlagsOrProtocols for fio::ConnectionProtocols {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{assert_event, directory::immutable::Simple, file};
+    use crate::directory::immutable::Simple;
+    use crate::{assert_event, file};
     use fidl::endpoints::create_proxy;
 
     #[test]

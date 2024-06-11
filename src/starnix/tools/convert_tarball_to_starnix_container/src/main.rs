@@ -5,7 +5,8 @@
 use anyhow::{bail, Context, Result};
 use fuchsia_async as fasync;
 use fuchsia_pkg::PackageBuilder;
-use std::{fs::File, path::Path};
+use std::fs::File;
+use std::path::Path;
 use tar_img_extract::docker_archive::{DockerArchive, DockerArchiveArchitecture};
 use tar_img_extract::{tar_img_extract_docker_archive, tar_img_extract_tarball, InputFormat};
 use tempfile::TempDir;

@@ -15,62 +15,53 @@ pub(crate) mod slaac;
 pub(crate) mod state;
 
 use alloc::vec::Vec;
-use core::{
-    fmt::{Debug, Display},
-    hash::Hash,
-    num::NonZeroU8,
-};
+use core::fmt::{Debug, Display};
+use core::hash::Hash;
+use core::num::NonZeroU8;
 
 use derivative::Derivative;
 use log::info;
-use net_types::{
-    ip::{
-        AddrSubnet, GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr,
-        Mtu, Subnet,
-    },
-    MulticastAddr, NonMappedAddr, SpecifiedAddr, UnicastAddr, Witness,
+use net_types::ip::{
+    AddrSubnet, GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu,
+    Subnet,
 };
+use net_types::{MulticastAddr, NonMappedAddr, SpecifiedAddr, UnicastAddr, Witness};
+use netstack3_base::socket::SocketIpAddr;
 use netstack3_base::{
-    socket::SocketIpAddr, AnyDevice, DeferredResourceRemovalContext, DeviceIdContext, EventContext,
-    ExistsError, HandleableTimer, Inspectable, Instant, InstantBindingsTypes, InstantContext,
-    NotFoundError, RemoveResourceResultWithContext, RngContext, StrongDeviceIdentifier,
-    TimerContext, TimerHandler, WeakDeviceIdentifier,
+    AnyDevice, DeferredResourceRemovalContext, DeviceIdContext, EventContext, ExistsError,
+    HandleableTimer, Inspectable, Instant, InstantBindingsTypes, InstantContext, NotFoundError,
+    RemoveResourceResultWithContext, RngContext, StrongDeviceIdentifier, TimerContext,
+    TimerHandler, WeakDeviceIdentifier,
 };
 use netstack3_filter::{IpPacket, ProofOfEgressCheck};
 use packet::{BufferMut, Serializer};
-use packet_formats::{
-    icmp::{mld::MldPacket, ndp::NonZeroNdpLifetime},
-    utils::NonZeroDuration,
-};
+use packet_formats::icmp::mld::MldPacket;
+use packet_formats::icmp::ndp::NonZeroNdpLifetime;
+use packet_formats::utils::NonZeroDuration;
 use zerocopy::ByteSlice;
 
-use crate::internal::{
-    base::IpPacketDestination,
-    device::{
-        config::{
-            IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
-            Ipv6DeviceConfigurationUpdate,
-        },
-        dad::{DadHandler, DadTimerId},
-        nud::NudIpHandler,
-        route_discovery::{Ipv6DiscoveredRoute, Ipv6DiscoveredRouteTimerId, RouteDiscoveryHandler},
-        router_solicitation::{RsHandler, RsTimerId},
-        slaac::{SlaacHandler, SlaacTimerId},
-        state::{
-            IpDeviceConfiguration, IpDeviceFlags, IpDeviceState, IpDeviceStateBindingsTypes,
-            IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressState, Ipv4DeviceConfiguration,
-            Ipv4DeviceConfigurationAndFlags, Ipv4DeviceState, Ipv6AddrConfig, Ipv6AddrManualConfig,
-            Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration,
-            Ipv6DeviceConfigurationAndFlags, Ipv6DeviceState, Lifetime,
-        },
-    },
-    gmp::{
-        igmp::{IgmpPacketHandler, IgmpTimerId},
-        mld::{MldPacketHandler, MldTimerId},
-        GmpHandler, GmpQueryHandler, GroupJoinResult, GroupLeaveResult,
-    },
-    types::IpTypesIpExt,
+use crate::internal::base::IpPacketDestination;
+use crate::internal::device::config::{
+    IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
 };
+use crate::internal::device::dad::{DadHandler, DadTimerId};
+use crate::internal::device::nud::NudIpHandler;
+use crate::internal::device::route_discovery::{
+    Ipv6DiscoveredRoute, Ipv6DiscoveredRouteTimerId, RouteDiscoveryHandler,
+};
+use crate::internal::device::router_solicitation::{RsHandler, RsTimerId};
+use crate::internal::device::slaac::{SlaacHandler, SlaacTimerId};
+use crate::internal::device::state::{
+    IpDeviceConfiguration, IpDeviceFlags, IpDeviceState, IpDeviceStateBindingsTypes,
+    IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressState, Ipv4DeviceConfiguration,
+    Ipv4DeviceConfigurationAndFlags, Ipv4DeviceState, Ipv6AddrConfig, Ipv6AddrManualConfig,
+    Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags,
+    Ipv6DeviceState, Lifetime,
+};
+use crate::internal::gmp::igmp::{IgmpPacketHandler, IgmpTimerId};
+use crate::internal::gmp::mld::{MldPacketHandler, MldTimerId};
+use crate::internal::gmp::{GmpHandler, GmpQueryHandler, GroupJoinResult, GroupLeaveResult};
+use crate::internal::types::IpTypesIpExt;
 
 use self::state::Ipv6NetworkLearnedParameters;
 

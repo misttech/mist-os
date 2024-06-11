@@ -2,40 +2,37 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::SuiteServer;
+use crate::errors::ArgumentError;
+use anyhow::{anyhow, Context};
+use async_trait::async_trait;
+use fidl::endpoints::{create_proxy, ClientEnd, ProtocolMarker, Proxy, ServerEnd};
+use fidl_fuchsia_ldsvc::LoaderMarker;
+use fidl_fuchsia_test_runner::{
+    LibraryLoaderCacheBuilderMarker, LibraryLoaderCacheMarker, LibraryLoaderCacheProxy,
+};
+use fuchsia_async::{self as fasync, TimeoutExt};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_runtime::job_default;
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use futures::future::{abortable, BoxFuture};
+use futures::prelude::*;
+use namespace::Namespace;
+use std::mem;
+use std::ops::Deref;
+use std::path::Path;
+use std::sync::{Arc, Mutex};
+use thiserror::Error;
+use tracing::{error, info, warn};
+use vfs::directory::entry_container::Directory;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::vmo::read_only;
+use vfs::tree_builder::TreeBuilder;
+use zx::{HandleBased, Task};
 use {
-    super::SuiteServer,
-    crate::errors::ArgumentError,
-    anyhow::{anyhow, Context},
-    async_trait::async_trait,
-    fidl::endpoints::create_proxy,
-    fidl::endpoints::{ClientEnd, ProtocolMarker, Proxy, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_io as fio,
-    fidl_fuchsia_ldsvc::LoaderMarker,
-    fidl_fuchsia_test_runner::{
-        LibraryLoaderCacheBuilderMarker, LibraryLoaderCacheMarker, LibraryLoaderCacheProxy,
-    },
-    fuchsia_async::{self as fasync, TimeoutExt},
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_runtime::job_default,
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::future::abortable,
-    futures::{future::BoxFuture, prelude::*},
-    namespace::Namespace,
-    std::{
-        mem,
-        ops::Deref,
-        path::Path,
-        sync::{Arc, Mutex},
-    },
-    thiserror::Error,
-    tracing::{error, info, warn},
-    vfs::{
-        directory::entry_container::Directory, execution_scope::ExecutionScope,
-        file::vmo::read_only, tree_builder::TreeBuilder,
-    },
-    zx::{HandleBased, Task},
 };
 
 static PKG_PATH: &'static str = "/pkg";
@@ -601,20 +598,16 @@ fn take_server_end<P: ProtocolMarker>(end: &mut ServerEnd<P>) -> ServerEnd<P> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            elf::EnumeratedTestCases,
-            errors::{EnumerationError, RunTestError},
-        },
-        anyhow::Error,
-        assert_matches::assert_matches,
-        fidl::endpoints::{self},
-        fidl_fuchsia_test::{Invocation, RunListenerProxy},
-        futures::future::{AbortHandle, Aborted},
-        namespace::NamespaceError,
-        std::sync::Weak,
-    };
+    use super::*;
+    use crate::elf::EnumeratedTestCases;
+    use crate::errors::{EnumerationError, RunTestError};
+    use anyhow::Error;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::{self};
+    use fidl_fuchsia_test::{Invocation, RunListenerProxy};
+    use futures::future::{AbortHandle, Aborted};
+    use namespace::NamespaceError;
+    use std::sync::Weak;
 
     fn create_ns_from_current_ns(
         dir_paths: Vec<(&str, fio::OpenFlags)>,

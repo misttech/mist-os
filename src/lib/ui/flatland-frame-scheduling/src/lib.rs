@@ -6,16 +6,14 @@ mod throughput_scheduler;
 
 pub use throughput_scheduler::ThroughputScheduler;
 
+use async_trait::async_trait;
+use std::cell::RefCell;
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll, Waker};
 use {
-    async_trait::async_trait,
     fidl_fuchsia_scenic_scheduling as frame_scheduling, fidl_fuchsia_ui_composition as flatland,
     fuchsia_zircon as zx,
-    std::{
-        cell::RefCell,
-        future::Future,
-        pin::Pin,
-        task::{Context, Poll, Waker},
-    },
 };
 
 #[derive(Debug, PartialEq, Copy, Clone)]

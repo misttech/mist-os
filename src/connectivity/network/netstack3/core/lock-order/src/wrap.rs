@@ -357,7 +357,8 @@ where
 }
 
 pub mod disable {
-    use core::{marker::PhantomData, ops::Deref};
+    use core::marker::PhantomData;
+    use core::ops::Deref;
 
     use super::LockedWrapper;
     use crate::{
@@ -367,7 +368,8 @@ pub mod disable {
     /// A prelude to include all the *disabled* wrapper traits into scope and
     /// thus wrappers can be used as if they were raw [`Locked`] instances.
     pub mod prelude {
-        pub use super::{super::LockedWrapperUnlockedApi as _, LockedDisabledWrapperApi as _};
+        pub use super::super::LockedWrapperUnlockedApi as _;
+        pub use super::LockedDisabledWrapperApi as _;
     }
 
     /// A trait enabling [`LockedDisabledWrapperApi`].

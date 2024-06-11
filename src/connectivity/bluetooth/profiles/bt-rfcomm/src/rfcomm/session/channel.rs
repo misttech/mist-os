@@ -5,14 +5,13 @@
 use async_trait::async_trait;
 use bt_rfcomm::frame::{Frame, UserData};
 use bt_rfcomm::{Role, DLCI};
-use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::Channel;
-use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::{AttachError, IValue, Inspect};
 use futures::channel::{mpsc, oneshot};
 use futures::future::{BoxFuture, Shared};
 use futures::{select, FutureExt, SinkExt, StreamExt};
 use tracing::{error, info, trace};
+use {fuchsia_async as fasync, fuchsia_inspect as inspect};
 
 use crate::rfcomm::inspect::{DuplexDataStreamInspect, SessionChannelInspect, FLOW_CONTROLLER};
 use crate::rfcomm::types::{Error, SignaledTask};

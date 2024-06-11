@@ -14,35 +14,30 @@ use netstack3_base::{
     Inspector, RecvFrameContext, ReferenceNotifiers, ReferenceNotifiersExt as _,
     RemoveResourceResultWithContext, ResourceCounterContext, TimerContext,
 };
-use netstack3_ip::{
-    self as ip,
-    device::{
-        IpAddressIdSpecContext, IpDeviceBindingsContext, IpDeviceConfigurationContext,
-        IpDeviceTimerId, Ipv6DeviceConfigurationContext,
-    },
-    RawMetric,
+use netstack3_ip::device::{
+    IpAddressIdSpecContext, IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceTimerId,
+    Ipv6DeviceConfigurationContext,
 };
+use netstack3_ip::{self as ip, RawMetric};
 use packet::BufferMut;
 
-use crate::internal::{
-    base::{
-        DeviceCollectionContext, DeviceCounters, DeviceLayerStateTypes, DeviceLayerTypes,
-        DeviceReceiveFrameSpec, OriginTrackerContext,
-    },
-    config::{
-        ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration, DeviceConfigurationContext,
-        DeviceConfigurationUpdate, DeviceConfigurationUpdateError, NdpConfiguration,
-        NdpConfigurationUpdate,
-    },
-    ethernet::EthernetLinkDevice,
-    id::{
-        for_any_device_id, BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, DeviceId,
-        DeviceProvider,
-    },
-    loopback::LoopbackDevice,
-    pure_ip::PureIpDevice,
-    state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceStateInner},
+use crate::internal::base::{
+    DeviceCollectionContext, DeviceCounters, DeviceLayerStateTypes, DeviceLayerTypes,
+    DeviceReceiveFrameSpec, OriginTrackerContext,
 };
+use crate::internal::config::{
+    ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration, DeviceConfigurationContext,
+    DeviceConfigurationUpdate, DeviceConfigurationUpdateError, NdpConfiguration,
+    NdpConfigurationUpdate,
+};
+use crate::internal::ethernet::EthernetLinkDevice;
+use crate::internal::id::{
+    for_any_device_id, BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, DeviceId,
+    DeviceProvider,
+};
+use crate::internal::loopback::LoopbackDevice;
+use crate::internal::pure_ip::PureIpDevice;
+use crate::internal::state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceStateInner};
 
 /// Pending device configuration update.
 ///

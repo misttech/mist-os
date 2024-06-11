@@ -2,37 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::resolver_service::Resolver,
-    anyhow::{anyhow, Context as _, Error},
-    async_lock::RwLock as AsyncRwLock,
-    cobalt_sw_delivery_registry as metrics,
-    eager_package_config::pkg_resolver::{EagerPackageConfig, EagerPackageConfigs},
-    fidl_contrib::protocol_connector::ProtocolSender,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_metrics::MetricEvent,
-    fidl_fuchsia_pkg::{self as fpkg, CupRequest, CupRequestStream, GetInfoError, WriteError},
-    fidl_fuchsia_pkg_ext::{cache, CupData, CupMissingField, ResolutionContext},
-    fidl_fuchsia_pkg_internal::{PersistentEagerPackage, PersistentEagerPackages},
-    fuchsia_cobalt_builders::MetricEventExt as _,
-    fuchsia_pkg::PackageDirectory,
-    fuchsia_url::{AbsolutePackageUrl, Hash, PinnedAbsolutePackageUrl, UnpinnedAbsolutePackageUrl},
-    fuchsia_zircon as zx,
-    futures::prelude::*,
-    omaha_client::{
-        cup_ecdsa::{CupVerificationError, Cupv2Verifier, PublicKeys, StandardCupv2Handler},
-        protocol::response::{App, Response},
-        version::Version,
-    },
-    p256::ecdsa::{signature::Signature, DerSignature},
-    std::{
-        collections::{BTreeMap, HashMap},
-        str::FromStr,
-        sync::Arc,
-    },
-    system_image::CachePackages,
-    tracing::{error, warn},
+use crate::resolver_service::Resolver;
+use anyhow::{anyhow, Context as _, Error};
+use async_lock::RwLock as AsyncRwLock;
+use eager_package_config::pkg_resolver::{EagerPackageConfig, EagerPackageConfigs};
+use fidl_contrib::protocol_connector::ProtocolSender;
+use fidl_fuchsia_metrics::MetricEvent;
+use fidl_fuchsia_pkg::{self as fpkg, CupRequest, CupRequestStream, GetInfoError, WriteError};
+use fidl_fuchsia_pkg_ext::{cache, CupData, CupMissingField, ResolutionContext};
+use fidl_fuchsia_pkg_internal::{PersistentEagerPackage, PersistentEagerPackages};
+use fuchsia_cobalt_builders::MetricEventExt as _;
+use fuchsia_pkg::PackageDirectory;
+use fuchsia_url::{AbsolutePackageUrl, Hash, PinnedAbsolutePackageUrl, UnpinnedAbsolutePackageUrl};
+use futures::prelude::*;
+use omaha_client::cup_ecdsa::{
+    CupVerificationError, Cupv2Verifier, PublicKeys, StandardCupv2Handler,
 };
+use omaha_client::protocol::response::{App, Response};
+use omaha_client::version::Version;
+use p256::ecdsa::signature::Signature;
+use p256::ecdsa::DerSignature;
+use std::collections::{BTreeMap, HashMap};
+use std::str::FromStr;
+use std::sync::Arc;
+use system_image::CachePackages;
+use tracing::{error, warn};
+use {cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 const EAGER_PACKAGE_PERSISTENT_FIDL_NAME: &str = "eager_packages.pf";
 
@@ -690,31 +685,22 @@ fn load_result_to_event_code(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            resolver_service::MockResolver,
-            test_util::{get_mock_cobalt_sender, verify_cobalt_emits_event},
-        },
-        assert_matches::assert_matches,
-        fidl_fuchsia_pkg::{
-            BlobInfoIteratorRequest, NeededBlobsRequest, PackageCacheMarker, PackageCacheRequest,
-            PackageCacheRequestStream,
-        },
-        fuchsia_async as fasync, fuchsia_zircon as zx,
-        omaha_client::{
-            cup_ecdsa::{
-                test_support::{
-                    make_default_public_key_for_test, make_default_public_key_id_for_test,
-                    make_default_public_keys_for_test, make_expected_signature_for_test,
-                    make_keys_for_test, make_public_keys_for_test,
-                    make_standard_intermediate_for_test, RAW_PUBLIC_KEY_FOR_TEST,
-                },
-                Cupv2RequestHandler, PublicKeyAndId, PublicKeyId,
-            },
-            protocol::request::Request,
-        },
+    use super::*;
+    use crate::resolver_service::MockResolver;
+    use crate::test_util::{get_mock_cobalt_sender, verify_cobalt_emits_event};
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_pkg::{
+        BlobInfoIteratorRequest, NeededBlobsRequest, PackageCacheMarker, PackageCacheRequest,
+        PackageCacheRequestStream,
     };
+    use omaha_client::cup_ecdsa::test_support::{
+        make_default_public_key_for_test, make_default_public_key_id_for_test,
+        make_default_public_keys_for_test, make_expected_signature_for_test, make_keys_for_test,
+        make_public_keys_for_test, make_standard_intermediate_for_test, RAW_PUBLIC_KEY_FOR_TEST,
+    };
+    use omaha_client::cup_ecdsa::{Cupv2RequestHandler, PublicKeyAndId, PublicKeyId};
+    use omaha_client::protocol::request::Request;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     const TEST_URL: &str = "fuchsia-pkg://example.com/package";
     const TEST_HASH: &str = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";

@@ -7,14 +7,12 @@ use crate::parser::common::{
     compound_identifier, many_until_eof, map_err, using_list, ws, BindParserError,
     CompoundIdentifier, Include, NodeType, NomSpan,
 };
-use nom::{
-    branch::alt,
-    bytes::complete::{escaped, is_not, tag},
-    character::complete::{char, one_of},
-    combinator::{map, opt},
-    sequence::{delimited, tuple},
-    IResult,
-};
+use nom::branch::alt;
+use nom::bytes::complete::{escaped, is_not, tag};
+use nom::character::complete::{char, one_of};
+use nom::combinator::{map, opt};
+use nom::sequence::{delimited, tuple};
+use nom::IResult;
 use std::collections::HashSet;
 
 #[derive(Debug, PartialEq)]

@@ -11,13 +11,11 @@ mod test;
 mod util;
 mod writer;
 
-pub use {
-    self::controller::{serve_controller, FakeController},
-    self::diagnostics::send_log_entry,
-    self::input::verify_saved,
-    self::manager::serve_manager,
-    self::options::add_defaults,
-    self::test::{Test, TEST_URL},
-    self::util::create_task,
-    self::writer::BufferSink,
-};
+pub use self::controller::{serve_controller, FakeController};
+pub use self::diagnostics::send_log_entry;
+pub use self::input::verify_saved;
+pub use self::manager::serve_manager;
+pub use self::options::add_defaults;
+pub use self::test::{Test, TEST_URL};
+pub use self::util::create_task;
+pub use self::writer::BufferSink;

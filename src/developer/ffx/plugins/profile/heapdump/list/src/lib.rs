@@ -2,21 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    async_trait::async_trait,
-    ffx_profile_heapdump_common::{
-        build_process_selector, connect_to_collector, prettify_collector_error,
-    },
-    ffx_profile_heapdump_list_args::ListCommand,
-    ffx_writer::ToolIO,
-    fho::{AvailabilityFlag, FfxMain, FfxTool, MachineWriter},
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
-    fidl_fuchsia_memory_heapdump_client as fheapdump_client,
-    prettytable::{cell, row, Table},
-    serde::Serialize,
+use anyhow::{Context, Result};
+use async_trait::async_trait;
+use ffx_profile_heapdump_common::{
+    build_process_selector, connect_to_collector, prettify_collector_error,
 };
+use ffx_profile_heapdump_list_args::ListCommand;
+use ffx_writer::ToolIO;
+use fho::{AvailabilityFlag, FfxMain, FfxTool, MachineWriter};
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
+use prettytable::{cell, row, Table};
+use serde::Serialize;
 
 /// Representation of the [fheapdump_client::StoredSnapshot] FIDL type for machine output.
 #[derive(Serialize)]

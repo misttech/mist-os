@@ -2,23 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    carnelian::{
-        color::Color,
-        input, make_app_assistant,
-        render::Context,
-        scene::{
-            facets::{FacetId, ShedFacet},
-            scene::{Scene, SceneBuilder},
-        },
-        App, AppAssistant, Point, Rect, Size, ViewAssistant, ViewAssistantContext,
-        ViewAssistantPtr, ViewKey,
-    },
-    euclid::{default::Point2D, size2},
-    fuchsia_zircon::Event,
-    std::{collections::BTreeMap, path::PathBuf},
+use anyhow::Error;
+use carnelian::color::Color;
+use carnelian::render::Context;
+use carnelian::scene::facets::{FacetId, ShedFacet};
+use carnelian::scene::scene::{Scene, SceneBuilder};
+use carnelian::{
+    input, make_app_assistant, App, AppAssistant, Point, Rect, Size, ViewAssistant,
+    ViewAssistantContext, ViewAssistantPtr, ViewKey,
 };
+use euclid::default::Point2D;
+use euclid::size2;
+use fuchsia_zircon::Event;
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 const BACKGROUND_COLOR: Color = Color { r: 255, g: 255, b: 255, a: 255 };
 const SPACING_FRACTION: f32 = 0.8;

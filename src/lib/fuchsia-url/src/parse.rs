@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::errors::{PackagePathSegmentError, ResourcePathError},
-    serde::{Deserialize, Serialize},
-    std::convert::TryInto as _,
-};
+use crate::errors::{PackagePathSegmentError, ResourcePathError};
+use serde::{Deserialize, Serialize};
+use std::convert::TryInto as _;
 
 pub const MAX_PACKAGE_PATH_SEGMENT_BYTES: usize = 255;
 pub const MAX_RESOURCE_PATH_SEGMENT_BYTES: usize = 255;
@@ -187,7 +185,9 @@ pub fn validate_resource_path(input: &str) -> Result<(), ResourcePathError> {
 
 #[cfg(test)]
 mod test_validate_package_path_segment {
-    use {super::*, crate::test::random_package_segment, proptest::prelude::*};
+    use super::*;
+    use crate::test::random_package_segment;
+    use proptest::prelude::*;
 
     #[test]
     fn reject_empty_segment() {
@@ -373,7 +373,9 @@ mod test_package_variant {
 
 #[cfg(test)]
 mod test_validate_resource_path {
-    use {super::*, crate::test::*, proptest::prelude::*};
+    use super::*;
+    use crate::test::*;
+    use proptest::prelude::*;
 
     // Tests for invalid paths
     #[test]

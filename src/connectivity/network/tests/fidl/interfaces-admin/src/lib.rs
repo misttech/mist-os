@@ -6,44 +6,39 @@
 
 use assert_matches::assert_matches;
 use fidl_fuchsia_hardware_network::{self as fhardware_network, FrameType};
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_ext::IntoExt;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_admin as finterfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_root as fnet_root;
-use fidl_fuchsia_net_routes as fnet_routes;
-use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
-use fidl_fuchsia_posix_socket as fposix_socket;
 use finterfaces_admin::GrantForInterfaceAuthorization;
 use fnet_interfaces_ext::admin::TerminalError;
-use fuchsia_async::{
-    self as fasync,
-    net::{DatagramSocket, UdpSocket},
-    TimeoutExt as _,
-};
+use fuchsia_async::net::{DatagramSocket, UdpSocket};
+use fuchsia_async::{self as fasync, TimeoutExt as _};
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use fuchsia_zircon_status as zx_status;
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::{fidl_ip, fidl_mac, fidl_subnet, std_ip, std_ip_v6, std_socket_addr};
 use net_types::ip::{IpAddress as _, IpVersion, Ipv4, Ipv6};
 use netemul::{InterfaceConfig, RealmUdpSocket as _};
-use netstack_testing_common::{
-    devices::{
-        add_pure_ip_interface, create_ip_tun_port, create_tun_device, create_tun_port_with,
-        install_device, TUN_DEFAULT_PORT_ID,
-    },
-    interfaces::{self, add_address_wait_assigned, TestInterfaceExt as _},
-    realms::{Netstack, NetstackVersion, TestRealmExt as _, TestSandboxExt as _},
-    ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+use netstack_testing_common::devices::{
+    add_pure_ip_interface, create_ip_tun_port, create_tun_device, create_tun_port_with,
+    install_device, TUN_DEFAULT_PORT_ID,
 };
+use netstack_testing_common::interfaces::{self, add_address_wait_assigned, TestInterfaceExt as _};
+use netstack_testing_common::realms::{
+    Netstack, NetstackVersion, TestRealmExt as _, TestSandboxExt as _,
+};
+use netstack_testing_common::ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT;
 use netstack_testing_macros::netstack_test;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto as _;
 use std::ops::Not as _;
 use std::pin::pin;
 use test_case::test_case;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_admin as finterfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_root as fnet_root,
+    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext,
+    fidl_fuchsia_posix_socket as fposix_socket, fuchsia_zircon_status as zx_status,
+};
 
 #[netstack_test]
 async fn address_deprecation<N: Netstack>(name: &str) {

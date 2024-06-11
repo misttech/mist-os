@@ -2,26 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, format_err, Context, Result},
-    fuchsia_hash::Hash,
-    fuchsia_url::{PackageName, PackageVariant},
-    scrutiny::{
-        model::controller::{DataController, HintDataType},
-        model::model::*,
-    },
-    scrutiny_utils::{
-        bootfs::*, key_value::parse_key_value, url::from_package_name_variant_path, usage::*,
-        zbi::*,
-    },
-    serde::{Deserialize, Serialize},
-    serde_json::{json, value::Value},
-    std::collections::HashMap,
-    std::fs::File,
-    std::io::prelude::*,
-    std::str::FromStr,
-    std::sync::Arc,
-};
+use anyhow::{anyhow, format_err, Context, Result};
+use fuchsia_hash::Hash;
+use fuchsia_url::{PackageName, PackageVariant};
+use scrutiny::model::controller::{DataController, HintDataType};
+use scrutiny::model::model::*;
+use scrutiny_utils::bootfs::*;
+use scrutiny_utils::key_value::parse_key_value;
+use scrutiny_utils::url::from_package_name_variant_path;
+use scrutiny_utils::usage::*;
+use scrutiny_utils::zbi::*;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use serde_json::value::Value;
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::prelude::*;
+use std::str::FromStr;
+use std::sync::Arc;
 
 static BOOT_PACKAGE_INDEX: &str = "data/bootfs_packages";
 
@@ -152,7 +150,8 @@ impl DataController for ZbiExtractBootfsPackageIndex {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, maplit::hashmap};
+    use super::*;
+    use maplit::hashmap;
 
     #[fuchsia::test]
     fn test_bootfs_package_serde() {

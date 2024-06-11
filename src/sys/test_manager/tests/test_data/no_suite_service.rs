@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error, fuchsia_async as fasync, fuchsia_component::server::ServiceFs,
-    futures::StreamExt,
-};
+use anyhow::Error;
+use fuchsia_async as fasync;
+use fuchsia_component::server::ServiceFs;
+use futures::StreamExt;
 
 fn main() -> Result<(), Error> {
     let mut executor = fasync::LocalExecutor::new();

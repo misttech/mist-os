@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_runtime as runtime;
-use fuchsia_zircon as zx;
 use lazy_static::lazy_static;
 use std::borrow::Borrow;
 use std::ffi::CStr;
 use std::ops::Deref;
 use std::panic;
 use tracing::error;
+use {fuchsia_runtime as runtime, fuchsia_zircon as zx};
 
 lazy_static! {
     static ref SCOPED_JOB: Scoped<zx::Job> = initialize();

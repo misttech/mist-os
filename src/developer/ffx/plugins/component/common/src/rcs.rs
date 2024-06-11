@@ -4,8 +4,7 @@
 
 use anyhow::Result;
 use errors::ffx_error;
-use fidl_fuchsia_developer_remotecontrol as rc;
-use fidl_fuchsia_sys2 as fsys;
+use {fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_sys2 as fsys};
 
 /// Obtain the root LifecycleController protocol using the RemoteControl protocol.
 pub async fn connect_to_lifecycle_controller(

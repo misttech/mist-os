@@ -4,29 +4,21 @@
 
 //! Neighbor unreachability detection.
 
-use alloc::{
-    collections::{
-        hash_map::{self, Entry, HashMap},
-        BinaryHeap, VecDeque,
-    },
-    vec::Vec,
-};
-use core::{
-    fmt::Debug,
-    hash::Hash,
-    marker::PhantomData,
-    num::{NonZeroU16, NonZeroU32},
-};
+use alloc::collections::hash_map::{self, Entry, HashMap};
+use alloc::collections::{BinaryHeap, VecDeque};
+use alloc::vec::Vec;
+use core::fmt::Debug;
+use core::hash::Hash;
+use core::marker::PhantomData;
+use core::num::{NonZeroU16, NonZeroU32};
 
 use assert_matches::assert_matches;
 use derivative::Derivative;
 use log::{debug, error, warn};
-use net_types::{
-    ip::{GenericOverIp, Ip, IpMarked, Ipv4, Ipv6},
-    SpecifiedAddr,
-};
+use net_types::ip::{GenericOverIp, Ip, IpMarked, Ipv4, Ipv6};
+use net_types::SpecifiedAddr;
+use netstack3_base::socket::{SocketIpAddr, SocketIpAddrExt as _};
 use netstack3_base::{
-    socket::{SocketIpAddr, SocketIpAddrExt as _},
     AddressResolutionFailed, AnyDevice, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
     DeviceIdentifier, EventContext, HandleableTimer, Instant, InstantBindingsTypes, LinkAddress,
     LinkDevice, LinkUnicastAddress, LocalTimerHeap, StrongDeviceIdentifier, TimerBindingsTypes,
@@ -35,12 +27,10 @@ use netstack3_base::{
 use packet::{
     Buf, BufferMut, GrowBuffer as _, ParsablePacket as _, ParseBufferMut as _, Serializer,
 };
-use packet_formats::{
-    ip::IpPacket as _,
-    ipv4::{Ipv4FragmentType, Ipv4Header as _, Ipv4Packet},
-    ipv6::Ipv6Packet,
-    utils::NonZeroDuration,
-};
+use packet_formats::ip::IpPacket as _;
+use packet_formats::ipv4::{Ipv4FragmentType, Ipv4Header as _, Ipv4Packet};
+use packet_formats::ipv6::Ipv6Packet;
+use packet_formats::utils::NonZeroDuration;
 use zerocopy::ByteSlice;
 
 pub(crate) mod api;
@@ -1393,10 +1383,8 @@ pub(crate) mod testutil {
 
     use alloc::sync::Arc;
 
-    use netstack3_base::{
-        sync::Mutex,
-        testutil::{FakeBindingsCtx, FakeCoreCtx},
-    };
+    use netstack3_base::sync::Mutex;
+    use netstack3_base::testutil::{FakeBindingsCtx, FakeCoreCtx};
 
     /// Asserts that `device_id`'s `neighbor` resolved to `expected_link_addr`.
     pub fn assert_dynamic_neighbor_with_addr<
@@ -2749,13 +2737,11 @@ mod tests {
     use ip_test_macro::ip_test;
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::ip::{IpInvariant, Ipv4Addr, Ipv6Addr};
-    use netstack3_base::{
-        testutil::{
-            FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeLinkAddress, FakeLinkDevice,
-            FakeLinkDeviceId, FakeTimerCtxExt as _, FakeWeakDeviceId,
-        },
-        CtxPair, InstantContext, IntoCoreTimerCtx, SendFrameContext as _,
+    use netstack3_base::testutil::{
+        FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeLinkAddress, FakeLinkDevice,
+        FakeLinkDeviceId, FakeTimerCtxExt as _, FakeWeakDeviceId,
     };
+    use netstack3_base::{CtxPair, InstantContext, IntoCoreTimerCtx, SendFrameContext as _};
     use test_case::test_case;
 
     use super::*;

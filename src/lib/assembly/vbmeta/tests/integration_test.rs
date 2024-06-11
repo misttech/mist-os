@@ -5,9 +5,7 @@
 use include_bytes_from_working_dir::include_bytes_from_working_dir_env;
 use include_str_from_working_dir::include_str_from_working_dir_env;
 
-use vbmeta::Key;
-use vbmeta::VBMeta;
-use vbmeta::{HashDescriptor, Salt};
+use vbmeta::{HashDescriptor, Key, Salt, VBMeta};
 
 const PEM: &str = include_str_from_working_dir_env!("AVB_KEY");
 const METADATA: &[u8] = include_bytes_from_working_dir_env!("AVB_METADATA");

@@ -2,22 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::ConfigOverridePolicy;
+use anyhow::{Context, Error};
+use cm_rust::NativeIntoFidl;
+use fidl::endpoints::{create_endpoints, ServerEnd};
+use fidl::Vmo;
+use futures::lock::{Mutex, MutexGuard};
+use futures::TryStreamExt;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tracing::*;
+use url::Url;
+use version_history::AbiRevision;
 use {
-    crate::ConfigOverridePolicy,
-    anyhow::{Context, Error},
-    cm_rust::NativeIntoFidl,
-    fidl::endpoints::{create_endpoints, ServerEnd},
-    fidl::Vmo,
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
-    futures::{
-        lock::{Mutex, MutexGuard},
-        TryStreamExt,
-    },
-    std::{collections::HashMap, sync::Arc},
-    tracing::*,
-    url::Url,
-    version_history::AbiRevision,
 };
 
 const RESOLVER_SCHEME: &'static str = "realm-builder";

@@ -6,8 +6,7 @@ use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths
 use serde::{Deserialize, Serialize};
 
 // Needed by SupportsFileRelativePaths implementation
-use anyhow as _;
-use camino as _;
+use {anyhow as _, camino as _};
 
 #[derive(SupportsFileRelativePaths, Debug, Deserialize, Serialize, PartialEq)]
 struct SimpleStruct {

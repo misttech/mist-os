@@ -28,29 +28,28 @@
 //! The test cases make assertions on the behavior of Introspector with the
 //! observed tokens.
 
-use component_events::{
-    events::*,
-    matcher::*,
-    sequence::{EventSequence, Ordering},
-};
+use component_events::events::*;
+use component_events::matcher::*;
+use component_events::sequence::{EventSequence, Ordering};
 use fasync::Task;
 use fcomponent::{IntrospectorProxy, RealmProxy};
 use fdecl::StartupMode;
-use fidl::{endpoints::DiscoverableProtocolMarker, HandleBased};
-use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_component_decl as fdecl;
-use fidl_fuchsia_component_runner as fcrunner;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_sys2 as fsys2;
-use fuchsia_async as fasync;
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl::HandleBased;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
 };
-use fuchsia_zircon as zx;
-use futures::{channel::mpsc, lock::Mutex, SinkExt};
+use futures::channel::mpsc;
+use futures::lock::Mutex;
+use futures::SinkExt;
 use futures_util::{FutureExt, StreamExt, TryStreamExt};
 use std::sync::{Arc, Mutex as StdMutex};
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys2,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
+};
 
 struct SenderReceiver {
     sender: Mutex<mpsc::UnboundedSender<fcrunner::ComponentRunnerRequest>>,

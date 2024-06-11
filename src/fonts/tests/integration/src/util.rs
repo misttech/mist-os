@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl::endpoints::DiscoverableProtocolMarker,
-    fuchsia_component_test::ScopedInstance,
-    futures::lock::Mutex,
-    std::collections::HashMap,
-};
+use anyhow::{Context as _, Error};
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fuchsia_component_test::ScopedInstance;
+use futures::lock::Mutex;
+use std::collections::HashMap;
 
 pub struct ProviderFactory {
     providers: Mutex<HashMap<&'static str, ScopedInstance>>,

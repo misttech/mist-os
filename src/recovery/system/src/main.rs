@@ -2,46 +2,38 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    carnelian::{
-        app::{Config, ViewMode},
-        color::Color,
-        drawing::{path_for_circle, DisplayRotation, FontFace},
-        input, make_message,
-        render::{
-            rive::load_rive, BlendMode, Context as RenderContext, Fill, FillRule, Raster, Style,
-        },
-        scene::{
-            facets::{
-                RasterFacet, RiveFacet, TextFacetOptions, TextHorizontalAlignment,
-                TextVerticalAlignment,
-            },
-            layout::{
-                CrossAxisAlignment, Flex, FlexOptions, MainAxisAlignment, MainAxisSize, Stack,
-                StackOptions,
-            },
-            scene::{Scene, SceneBuilder},
-        },
-        App, AppAssistant, AppAssistantPtr, AppSender, AssistantCreatorFunc, Coord, LocalBoxFuture,
-        MessageTarget, Point, Size, ViewAssistant, ViewAssistantContext, ViewAssistantPtr, ViewKey,
-    },
-    euclid::size2,
-    fdr_lib::{self as fdr, FactoryResetState, ResetEvent},
-    fidl_fuchsia_input_report::ConsumerControlButton,
-    fidl_fuchsia_recovery_policy::FactoryResetMarker as FactoryResetPolicyMarker,
-    fuchsia_async::{self as fasync, Task},
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon::{Duration, Event},
-    futures::StreamExt,
-    recovery_ui::{font, proxy_view_assistant::ProxyViewAssistant},
-    recovery_ui_config::Config as UiConfig,
-    rive_rs::{self as rive},
-    std::{
-        borrow::{Borrow, Cow},
-        path::Path,
-    },
+use anyhow::{format_err, Error};
+use carnelian::app::{Config, ViewMode};
+use carnelian::color::Color;
+use carnelian::drawing::{path_for_circle, DisplayRotation, FontFace};
+use carnelian::render::rive::load_rive;
+use carnelian::render::{BlendMode, Context as RenderContext, Fill, FillRule, Raster, Style};
+use carnelian::scene::facets::{
+    RasterFacet, RiveFacet, TextFacetOptions, TextHorizontalAlignment, TextVerticalAlignment,
 };
+use carnelian::scene::layout::{
+    CrossAxisAlignment, Flex, FlexOptions, MainAxisAlignment, MainAxisSize, Stack, StackOptions,
+};
+use carnelian::scene::scene::{Scene, SceneBuilder};
+use carnelian::{
+    input, make_message, App, AppAssistant, AppAssistantPtr, AppSender, AssistantCreatorFunc,
+    Coord, LocalBoxFuture, MessageTarget, Point, Size, ViewAssistant, ViewAssistantContext,
+    ViewAssistantPtr, ViewKey,
+};
+use euclid::size2;
+use fdr_lib::{self as fdr, FactoryResetState, ResetEvent};
+use fidl_fuchsia_input_report::ConsumerControlButton;
+use fidl_fuchsia_recovery_policy::FactoryResetMarker as FactoryResetPolicyMarker;
+use fuchsia_async::{self as fasync, Task};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_zircon::{Duration, Event};
+use futures::StreamExt;
+use recovery_ui::font;
+use recovery_ui::proxy_view_assistant::ProxyViewAssistant;
+use recovery_ui_config::Config as UiConfig;
+use rive_rs::{self as rive};
+use std::borrow::{Borrow, Cow};
+use std::path::Path;
 
 #[cfg(feature = "ota_ui")]
 mod ui_v2;
@@ -1336,7 +1328,8 @@ fn main() -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::{make_app_assistant, FdrRestriction, RecoveryAppAssistant};
-    use carnelian::{drawing::DisplayRotation, App, AppAssistant, AppSender};
+    use carnelian::drawing::DisplayRotation;
+    use carnelian::{App, AppAssistant, AppSender};
     use std::sync::Arc;
 
     #[ignore] //TODO(https://fxbug.dev/42053153) Move to integration test

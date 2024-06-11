@@ -5,17 +5,15 @@
 //! This module implements the ability to use, offer, or expose the `pkg` directory with a source
 //! of `framework`.
 
-use {
-    crate::{
-        capability::{CapabilityProvider, FrameworkCapability},
-        model::component::WeakComponentInstance,
-    },
-    ::routing::{capability_source::InternalCapability, error::ComponentInstanceError},
-    async_trait::async_trait,
-    cm_util::TaskGroup,
-    errors::{CapabilityProviderError, PkgDirError},
-    vfs::{directory::entry::OpenRequest, remote::remote_dir},
-};
+use crate::capability::{CapabilityProvider, FrameworkCapability};
+use crate::model::component::WeakComponentInstance;
+use ::routing::capability_source::InternalCapability;
+use ::routing::error::ComponentInstanceError;
+use async_trait::async_trait;
+use cm_util::TaskGroup;
+use errors::{CapabilityProviderError, PkgDirError};
+use vfs::directory::entry::OpenRequest;
+use vfs::remote::remote_dir;
 
 struct PkgDirectoryProvider {
     scope: WeakComponentInstance,

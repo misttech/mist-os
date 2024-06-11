@@ -2,22 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{dirs_to_test, repeat_by_n, PackageSource},
-    anyhow::{anyhow, Context as _, Error},
-    assert_matches::assert_matches,
-    fidl::{
-        endpoints::{create_proxy, Proxy as _},
-        AsHandleRef as _,
-    },
-    fidl_fuchsia_io as fio,
-    fuchsia_fs::directory::{open_directory, DirEntry, DirentKind},
-    fuchsia_zircon as zx,
-    futures::{future::Future, StreamExt},
-    itertools::Itertools as _,
-    pretty_assertions::assert_eq,
-    std::collections::HashSet,
-};
+use crate::{dirs_to_test, repeat_by_n, PackageSource};
+use anyhow::{anyhow, Context as _, Error};
+use assert_matches::assert_matches;
+use fidl::endpoints::{create_proxy, Proxy as _};
+use fidl::AsHandleRef as _;
+use fuchsia_fs::directory::{open_directory, DirEntry, DirentKind};
+use futures::future::Future;
+use futures::StreamExt;
+use itertools::Itertools as _;
+use pretty_assertions::assert_eq;
+use std::collections::HashSet;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 #[fuchsia::test]
 async fn open() {

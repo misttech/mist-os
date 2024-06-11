@@ -6,16 +6,14 @@ pub(super) mod fs;
 
 use super::ProcAttr;
 
-use selinux::{
-    permission_check::PermissionCheck, security_server::SecurityServer, InitialSid, SecurityId,
-};
+use selinux::permission_check::PermissionCheck;
+use selinux::security_server::SecurityServer;
+use selinux::{InitialSid, SecurityId};
 use selinux_common::{ClassPermission, FilePermission, ObjectClass, Permission, ProcessPermission};
 use starnix_logging::log_debug;
-use starnix_uapi::{
-    errno, error,
-    errors::Errno,
-    signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP},
-};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP};
+use starnix_uapi::{errno, error};
 use std::sync::Arc;
 
 /// Checks if creating a task is allowed.

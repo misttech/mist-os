@@ -18,9 +18,9 @@ use ffx_core::ffx_plugin;
 use ffx_fastboot::manifest::FlashManifestVersion;
 use ffx_product_create_args::CreateCommand;
 use fuchsia_pkg::PackageManifest;
-use fuchsia_repo::{
-    repo_builder::RepoBuilder, repo_keys::RepoKeys, repository::FileSystemRepository,
-};
+use fuchsia_repo::repo_builder::RepoBuilder;
+use fuchsia_repo::repo_keys::RepoKeys;
+use fuchsia_repo::repository::FileSystemRepository;
 use sdk_metadata::{
     ProductBundle, ProductBundleV2, Repository, VirtualDevice, VirtualDeviceManifest,
 };

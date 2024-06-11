@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    argh::{ArgsInfo, FromArgs},
-    fidl_fuchsia_input_report as fir,
-    std::{path::PathBuf, str::FromStr},
-};
+use argh::{ArgsInfo, FromArgs};
+use fidl_fuchsia_input_report as fir;
+use std::path::PathBuf;
+use std::str::FromStr;
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(

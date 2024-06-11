@@ -2,14 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    std::{
-        fs::File,
-        io::{self, ErrorKind, Read as _, Seek as _, SeekFrom},
-        path::Path,
-    },
-    tempfile::{NamedTempFile, PersistError},
-};
+use std::fs::File;
+use std::io::{self, ErrorKind, Read as _, Seek as _, SeekFrom};
+use std::path::Path;
+use tempfile::{NamedTempFile, PersistError};
 
 const CHUNK_SIZE: usize = 8192;
 
@@ -127,11 +123,10 @@ fn files_after_checking_length_have_same_content(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        std::{io::Write as _, os::unix::fs::MetadataExt as _},
-        tempfile::TempDir,
-    };
+    use super::*;
+    use std::io::Write as _;
+    use std::os::unix::fs::MetadataExt as _;
+    use tempfile::TempDir;
 
     #[test]
     fn test_persist_if_changed() {

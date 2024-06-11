@@ -13,21 +13,21 @@
 // two handles and replaces the method ordinal, so that the "wrong" FIDL method
 // can be called, triggering specific rights checks.
 
-use {
-    fidl::{endpoints::ServerEnd, AsHandleRef, Channel, Event},
-    fidl_test_external::{
-        EchoHandleProtocolMarker, EchoHandleProtocolProxy, EchoHandleProtocolRequest,
-        EchoHandleProtocolSynchronousProxy, ErrorSyntaxProtocolMarker, ErrorSyntaxProtocolProxy,
-        ErrorSyntaxProtocolRequest, ErrorSyntaxProtocolSynchronousProxy,
-        PushEventProtocolControlHandle, PushEventProtocolEvent, PushEventProtocolMarker,
-        PushEventProtocolProxy, SendHandleProtocolMarker, SendHandleProtocolProxy,
-        SendHandleProtocolRequest, SendHandleProtocolSynchronousProxy,
-    },
-    fuchsia_async as fasync,
-    fuchsia_zircon::{Handle, ObjectType, Rights, Signals, Time},
-    futures::{future, stream::StreamExt},
-    std::io::prelude::*,
+use fidl::endpoints::ServerEnd;
+use fidl::{AsHandleRef, Channel, Event};
+use fidl_test_external::{
+    EchoHandleProtocolMarker, EchoHandleProtocolProxy, EchoHandleProtocolRequest,
+    EchoHandleProtocolSynchronousProxy, ErrorSyntaxProtocolMarker, ErrorSyntaxProtocolProxy,
+    ErrorSyntaxProtocolRequest, ErrorSyntaxProtocolSynchronousProxy,
+    PushEventProtocolControlHandle, PushEventProtocolEvent, PushEventProtocolMarker,
+    PushEventProtocolProxy, SendHandleProtocolMarker, SendHandleProtocolProxy,
+    SendHandleProtocolRequest, SendHandleProtocolSynchronousProxy,
 };
+use fuchsia_async as fasync;
+use fuchsia_zircon::{Handle, ObjectType, Rights, Signals, Time};
+use futures::future;
+use futures::stream::StreamExt;
+use std::io::prelude::*;
 
 const SEND_HANDLE_REDUCED_RIGHTS_ORDINAL: u64 = 0x7675407e0eb5f825;
 const SEND_HANDLE_SAME_RIGHTS_ORDINAL: u64 = 0x1d43414e5560333a;

@@ -2,47 +2,39 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        crypt::zxcrypt::{UnsealOutcome, ZxcryptDevice},
-        debug_log,
-        device::{constants, BlockDevice, Device},
-        environment::{Environment, FilesystemLauncher, ServeFilesystemStatus},
-        fxblob,
-        service::constants::{
-            DATA_PARTITION_LABEL, LEGACY_DATA_PARTITION_LABEL, ZXCRYPT_DRIVER_PATH,
-        },
-        watcher,
-    },
-    anyhow::{anyhow, Context, Error},
-    device_watcher::recursive_wait_and_open,
-    fidl::endpoints::{Proxy, RequestStream, ServerEnd},
-    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
-    fidl_fuchsia_fshost as fshost,
-    fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy},
-    fidl_fuchsia_hardware_block_volume::VolumeManagerMarker,
-    fidl_fuchsia_io::{self as fio, DirectoryMarker, OpenFlags},
-    fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream},
-    fs_management::{
-        filesystem,
-        format::DiskFormat,
-        partition::{
-            find_partition, fvm_allocate_partition, partition_matches_with_proxy, PartitionMatcher,
-        },
-        Blobfs, F2fs, Fxfs, Minfs,
-    },
-    fuchsia_async as fasync,
-    fuchsia_fs::{
-        directory::{clone_onto_no_describe, create_directory_recursive, open_file},
-        file::write,
-    },
-    fuchsia_runtime::HandleType,
-    fuchsia_zircon::{self as zx, sys::zx_handle_t, zx_status_t, AsHandleRef, Duration},
-    futures::{channel::mpsc, lock::Mutex, StreamExt, TryStreamExt},
-    std::{collections::HashSet, sync::Arc},
-    uuid::Uuid,
-    vfs::service,
+use crate::crypt::zxcrypt::{UnsealOutcome, ZxcryptDevice};
+use crate::device::{constants, BlockDevice, Device};
+use crate::environment::{Environment, FilesystemLauncher, ServeFilesystemStatus};
+use crate::service::constants::{
+    DATA_PARTITION_LABEL, LEGACY_DATA_PARTITION_LABEL, ZXCRYPT_DRIVER_PATH,
 };
+use crate::{debug_log, fxblob, watcher};
+use anyhow::{anyhow, Context, Error};
+use device_watcher::recursive_wait_and_open;
+use fidl::endpoints::{Proxy, RequestStream, ServerEnd};
+use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
+use fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy};
+use fidl_fuchsia_hardware_block_volume::VolumeManagerMarker;
+use fidl_fuchsia_io::{self as fio, DirectoryMarker, OpenFlags};
+use fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream};
+use fs_management::format::DiskFormat;
+use fs_management::partition::{
+    find_partition, fvm_allocate_partition, partition_matches_with_proxy, PartitionMatcher,
+};
+use fs_management::{filesystem, Blobfs, F2fs, Fxfs, Minfs};
+use fuchsia_fs::directory::{clone_onto_no_describe, create_directory_recursive, open_file};
+use fuchsia_fs::file::write;
+use fuchsia_runtime::HandleType;
+use fuchsia_zircon::sys::zx_handle_t;
+use fuchsia_zircon::{self as zx, zx_status_t, AsHandleRef, Duration};
+use futures::channel::mpsc;
+use futures::lock::Mutex;
+use futures::{StreamExt, TryStreamExt};
+use std::collections::HashSet;
+use std::sync::Arc;
+use uuid::Uuid;
+use vfs::service;
+use {fidl_fuchsia_fshost as fshost, fuchsia_async as fasync};
 
 pub enum FshostShutdownResponder {
     Lifecycle(

@@ -4,16 +4,14 @@
 
 #![recursion_limit = "128"]
 
-use {
-    anyhow::Error,
-    fidl_fuchsia_wayland::{Server_Request, Server_RequestStream},
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_trace_provider::trace_provider_create_with_fdio,
-    futures::prelude::*,
-    wayland_bridge::dispatcher::WaylandDispatcher,
-    wayland_bridge::display::Display,
-};
+use anyhow::Error;
+use fidl_fuchsia_wayland::{Server_Request, Server_RequestStream};
+use fuchsia_async as fasync;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_trace_provider::trace_provider_create_with_fdio;
+use futures::prelude::*;
+use wayland_bridge::dispatcher::WaylandDispatcher;
+use wayland_bridge::display::Display;
 
 fn spawn_wayland_server_service(mut stream: Server_RequestStream, display: Display) {
     fasync::Task::local(

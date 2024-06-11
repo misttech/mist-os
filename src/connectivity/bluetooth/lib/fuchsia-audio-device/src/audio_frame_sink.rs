@@ -5,12 +5,10 @@
 use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use fuchsia_sync::Mutex;
-use futures::{
-    io,
-    task::{Context, Poll},
-    FutureExt,
-};
-use std::{pin::Pin, sync::Arc};
+use futures::task::{Context, Poll};
+use futures::{io, FutureExt};
+use std::pin::Pin;
+use std::sync::Arc;
 use tracing::warn;
 
 use crate::frame_vmo;
@@ -123,9 +121,8 @@ mod tests {
     use fidl_fuchsia_hardware_audio::*;
     use fidl_fuchsia_media::{AudioChannelId, AudioPcmMode, PcmFormat};
     use fixture::fixture;
-    use fuchsia_async as fasync;
-    use fuchsia_zircon as zx;
     use futures::AsyncWriteExt;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     const TEST_UNIQUE_ID: &[u8; 16] = &[5; 16];
     const TEST_CLOCK_DOMAIN: u32 = 0x00010203;

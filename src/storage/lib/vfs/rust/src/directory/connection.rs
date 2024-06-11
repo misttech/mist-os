@@ -2,30 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    common::{inherit_rights_for_clone, send_on_open_with_error, CreationMode},
-    directory::{
-        common::check_child_connection_flags,
-        entry_container::{Directory, DirectoryWatcher},
-        read_dirents,
-        traversal_position::TraversalPosition,
-        DirectoryOptions,
-    },
-    execution_scope::{yield_to_executor, ExecutionScope},
-    node::OpenNode,
-    object_request::Representation,
-    path::Path,
-    ObjectRequestRef, ProtocolsExt, ToObjectRequest,
-};
+use crate::common::{inherit_rights_for_clone, send_on_open_with_error, CreationMode};
+use crate::directory::common::check_child_connection_flags;
+use crate::directory::entry_container::{Directory, DirectoryWatcher};
+use crate::directory::traversal_position::TraversalPosition;
+use crate::directory::{read_dirents, DirectoryOptions};
+use crate::execution_scope::{yield_to_executor, ExecutionScope};
+use crate::node::OpenNode;
+use crate::object_request::Representation;
+use crate::path::Path;
+use crate::{ObjectRequestRef, ProtocolsExt, ToObjectRequest};
 
-use {
-    anyhow::Error,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status,
-    std::convert::TryInto as _,
-    storage_trace::{self as trace, TraceFutureExt},
-};
+use anyhow::Error;
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use std::convert::TryInto as _;
+use storage_trace::{self as trace, TraceFutureExt};
 
 /// Return type for `BaseConnection::handle_request`.
 pub enum ConnectionState {
@@ -486,10 +479,11 @@ impl<DirectoryType: Directory> Representation for BaseConnection<DirectoryType> 
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::directory::immutable::Simple, assert_matches::assert_matches,
-        fidl_fuchsia_io as fio, futures::prelude::*,
-    };
+    use super::*;
+    use crate::directory::immutable::Simple;
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_io as fio;
+    use futures::prelude::*;
 
     #[fuchsia::test]
     async fn test_open_not_found() {

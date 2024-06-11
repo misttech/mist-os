@@ -12,35 +12,31 @@ mod family;
 mod inspect;
 mod typeface;
 
+use self::asset::AssetCollection;
+use self::debug::{TypefaceRequestFormatter, TypefaceResponseFormatter};
+use self::family::{FamilyOrAlias, FontFamily, TypefaceQueryOverrides};
+use self::typeface::{Collection as TypefaceCollection, Typeface, TypefaceInfoAndCharSet};
+use anyhow::{format_err, Context as _, Error};
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_fonts::{self as fonts, CacheMissPolicy};
+use fidl_fuchsia_fonts_ext::{
+    FontFamilyInfoExt, RequestExt, TypefaceRequestExt, TypefaceResponseExt,
+};
+use fidl_fuchsia_intl::LocaleId;
+use fuchsia_component::server::{ServiceFs, ServiceObj};
+use futures::prelude::*;
+use itertools::Itertools;
+use std::collections::BTreeMap;
+use std::iter;
+use std::sync::Arc;
+use tracing::{debug, error, warn};
+use unicase::UniCase;
 use {
-    self::{
-        asset::AssetCollection,
-        debug::{TypefaceRequestFormatter, TypefaceResponseFormatter},
-        family::{FamilyOrAlias, FontFamily, TypefaceQueryOverrides},
-        typeface::{Collection as TypefaceCollection, Typeface, TypefaceInfoAndCharSet},
-    },
-    anyhow::{format_err, Context as _, Error},
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_fonts::{self as fonts, CacheMissPolicy},
-    fidl_fuchsia_fonts_experimental as fonts_exp,
-    fidl_fuchsia_fonts_ext::{
-        FontFamilyInfoExt, RequestExt, TypefaceRequestExt, TypefaceResponseExt,
-    },
-    fidl_fuchsia_intl::LocaleId,
-    fuchsia_async as fasync,
-    fuchsia_component::server::{ServiceFs, ServiceObj},
-    fuchsia_trace as trace,
-    futures::prelude::*,
-    itertools::Itertools,
-    std::{collections::BTreeMap, iter, sync::Arc},
-    tracing::{debug, error, warn},
-    unicase::UniCase,
+    fidl_fuchsia_fonts_experimental as fonts_exp, fuchsia_async as fasync, fuchsia_trace as trace,
 };
 
-pub use {
-    asset::{AssetId, AssetLoader},
-    builder::FontServiceBuilder,
-};
+pub use asset::{AssetId, AssetLoader};
+pub use builder::FontServiceBuilder;
 
 /// Get a field out of a `TypefaceRequest`'s `query` field as a reference, or returns early with a
 /// `anyhow::Error` if the query is missing.

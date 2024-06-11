@@ -2,24 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::AsHandleRef as _,
-    fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync,
-    fuchsia_bootfs::{BootfsParser, BootfsParserError},
-    fuchsia_component::client,
-    fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
-    fuchsia_zircon::{self as zx, HandleBased, Resource},
-    std::sync::Arc,
-    thiserror::Error,
-    tracing::info,
-    vfs::{
-        directory::immutable::connection::ImmutableConnection,
-        execution_scope::ExecutionScope,
-        file::vmo,
-        tree_builder::{self, TreeBuilder},
-        ToObjectRequest,
-    },
-};
+use fidl::AsHandleRef as _;
+use fuchsia_bootfs::{BootfsParser, BootfsParserError};
+use fuchsia_component::client;
+use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
+use fuchsia_zircon::{self as zx, HandleBased, Resource};
+use std::sync::Arc;
+use thiserror::Error;
+use tracing::info;
+use vfs::directory::immutable::connection::ImmutableConnection;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::vmo;
+use vfs::tree_builder::{self, TreeBuilder};
+use vfs::ToObjectRequest;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync};
 
 // Used to create executable VMOs.
 const BOOTFS_VMEX_NAME: &str = "bootfs_vmex";

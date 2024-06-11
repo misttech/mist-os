@@ -5,7 +5,8 @@
 use diagnostics_log_encoding::encode::{Argument, Encoder, TracingEvent, Value, WriteEventParams};
 use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
-use std::{io::Cursor, time::Duration};
+use std::io::Cursor;
+use std::time::Duration;
 use tracing::{Event, Metadata};
 use tracing_core::field;
 use tracing_subscriber::Registry;

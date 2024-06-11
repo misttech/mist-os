@@ -6,10 +6,8 @@ use anyhow::{format_err, Error};
 use fidl::endpoints::{Proxy, ServerEnd};
 use fidl_fuchsia_hardware_audio::*;
 use fuchsia_zircon as zx;
-use futures::{
-    future::{self, Either},
-    Future, FutureExt, TryFutureExt,
-};
+use futures::future::{self, Either};
+use futures::{Future, FutureExt, TryFutureExt};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
@@ -159,7 +157,8 @@ mod tests {
 
     use async_utils::PollExt;
     use fuchsia_async as fasync;
-    use futures::{task::Poll, StreamExt};
+    use futures::task::Poll;
+    use futures::StreamExt;
     use std::pin::pin;
 
     fn connected_dai() -> (DigitalAudioInterface, DaiRequestStream) {

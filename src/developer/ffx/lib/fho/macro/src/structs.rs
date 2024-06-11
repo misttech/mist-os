@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    errors::ParseError,
-    types::{FromEnvAttributes, NamedField, NamedFieldTy},
-};
+use crate::errors::ParseError;
+use crate::types::{FromEnvAttributes, NamedField, NamedFieldTy};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
-use syn::{spanned::Spanned, ExprCall};
+use syn::spanned::Spanned;
+use syn::ExprCall;
 
 /// Creates the top-level struct declaration before any brackets are used.
 ///

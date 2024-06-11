@@ -3,32 +3,33 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use fidl::{endpoints::ServerEnd, AsHandleRef};
-use fidl_fuchsia_component_runner as frunner;
-use fidl_fuchsia_element as felement;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_starnix_container as fstarcontainer;
-use fidl_fuchsia_starnix_device as fstardevice;
+use fidl::endpoints::ServerEnd;
+use fidl::AsHandleRef;
 use fuchsia_async::{
     DurationExt, {self as fasync},
 };
-use fuchsia_zircon as zx;
-use futures::{channel::oneshot, AsyncReadExt, AsyncWriteExt, TryStreamExt};
-use starnix_core::{
-    execution::execute_task_with_prerun_result,
-    fs::{devpts::create_main_and_replica, fuchsia::create_fuchsia_pipe},
-    task::{CurrentTask, ExitStatus, Kernel},
-    vfs::{
-        buffers::{VecInputBuffer, VecOutputBuffer},
-        file_server::serve_file_at,
-        socket::VsockSocket,
-        FdFlags, FileHandle,
-    },
-};
+use futures::channel::oneshot;
+use futures::{AsyncReadExt, AsyncWriteExt, TryStreamExt};
+use starnix_core::execution::execute_task_with_prerun_result;
+use starnix_core::fs::devpts::create_main_and_replica;
+use starnix_core::fs::fuchsia::create_fuchsia_pipe;
+use starnix_core::task::{CurrentTask, ExitStatus, Kernel};
+use starnix_core::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
+use starnix_core::vfs::file_server::serve_file_at;
+use starnix_core::vfs::socket::VsockSocket;
+use starnix_core::vfs::{FdFlags, FileHandle};
 use starnix_logging::{log_error, log_warn};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
-use starnix_uapi::{open_flags::OpenFlags, uapi};
-use std::{ffi::CString, ops::DerefMut, sync::Arc};
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::uapi;
+use std::ffi::CString;
+use std::ops::DerefMut;
+use std::sync::Arc;
+use {
+    fidl_fuchsia_component_runner as frunner, fidl_fuchsia_element as felement,
+    fidl_fuchsia_io as fio, fidl_fuchsia_starnix_container as fstarcontainer,
+    fidl_fuchsia_starnix_device as fstardevice, fuchsia_zircon as zx,
+};
 
 use super::start_component;
 

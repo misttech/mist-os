@@ -14,7 +14,9 @@ use fidl_fuchsia_component_decl::{Child, ChildRef, CollectionRef, StartupMode};
 use fidl_fuchsia_logger as flog;
 use fuchsia_component::client;
 use fuchsia_syslog_listener::LogProcessor;
-use futures::{channel::oneshot, lock::Mutex, Future, FutureExt};
+use futures::channel::oneshot;
+use futures::lock::Mutex;
+use futures::{Future, FutureExt};
 use std::pin::Pin;
 
 const COLLECTION_NAME: &str = "ota";
@@ -222,10 +224,8 @@ mod tests {
     use fidl_fuchsia_component::{Error, RealmRequest};
     use fuchsia_async as fasync;
     use futures::StreamExt;
-    use std::sync::{
-        atomic::{AtomicU8, Ordering},
-        Arc,
-    };
+    use std::sync::atomic::{AtomicU8, Ordering};
+    use std::sync::Arc;
 
     fn create_child_launcher(call_count: Arc<AtomicU8>) -> ChildLauncherFn {
         Box::new(move || {

@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::modular::{facade::ModularFacade, types::ModularMethod};
+use crate::modular::facade::ModularFacade;
+use crate::modular::types::ModularMethod;
 use crate::server::Facade;
 use anyhow::Error;
 use async_trait::async_trait;

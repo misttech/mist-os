@@ -2,47 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use alloc::{collections::HashMap, vec::Vec};
-use core::{convert::TryInto as _, time::Duration};
+use alloc::collections::HashMap;
+use alloc::vec::Vec;
+use core::convert::TryInto as _;
+use core::time::Duration;
 
 use assert_matches::assert_matches;
-use net_types::{
-    ip::{Ipv6, Ipv6Addr, Subnet},
-    LinkLocalUnicastAddr, Witness as _,
-};
+use net_types::ip::{Ipv6, Ipv6Addr, Subnet};
+use net_types::{LinkLocalUnicastAddr, Witness as _};
 use packet::{BufferMut, InnerPacketBuilder as _, Serializer as _};
-use packet_formats::{
-    icmp::{
-        ndp::{
-            options::{NdpOptionBuilder, PrefixInformation, RouteInformation},
-            OptionSequenceBuilder, RoutePreference, RouterAdvertisement,
-        },
-        IcmpPacketBuilder, IcmpUnusedCode,
-    },
-    ip::Ipv6Proto,
-    ipv6::Ipv6PacketBuilder,
-    utils::NonZeroDuration,
-};
+use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation, RouteInformation};
+use packet_formats::icmp::ndp::{OptionSequenceBuilder, RoutePreference, RouterAdvertisement};
+use packet_formats::icmp::{IcmpPacketBuilder, IcmpUnusedCode};
+use packet_formats::ip::Ipv6Proto;
+use packet_formats::ipv6::Ipv6PacketBuilder;
+use packet_formats::utils::NonZeroDuration;
 
-use netstack3_base::{
-    testutil::{FakeInstant, TestAddrs, TestIpExt as _},
-    FrameDestination,
-};
-use netstack3_core::{
-    device::{DeviceId, EthernetCreationProperties, EthernetLinkDevice},
-    testutil::{
-        CtxPairExt as _, DispatchedEvent, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC,
-    },
+use netstack3_base::testutil::{FakeInstant, TestAddrs, TestIpExt as _};
+use netstack3_base::FrameDestination;
+use netstack3_core::device::{DeviceId, EthernetCreationProperties, EthernetLinkDevice};
+use netstack3_core::testutil::{
+    CtxPairExt as _, DispatchedEvent, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC,
 };
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
+use netstack3_ip::device::{
+    IpDeviceBindingsContext, IpDeviceConfigurationUpdate, IpDeviceEvent,
+    Ipv6DeviceConfigurationContext, Ipv6DeviceConfigurationUpdate, Ipv6DiscoveredRoute,
+    Ipv6RouteDiscoveryBindingsContext, Ipv6RouteDiscoveryContext,
+};
 use netstack3_ip::{
-    self as ip,
-    device::{
-        IpDeviceBindingsContext, IpDeviceConfigurationUpdate, IpDeviceEvent,
-        Ipv6DeviceConfigurationContext, Ipv6DeviceConfigurationUpdate, Ipv6DiscoveredRoute,
-        Ipv6RouteDiscoveryBindingsContext, Ipv6RouteDiscoveryContext,
-    },
-    AddableEntry, AddableEntryEither, AddableMetric, Entry, IpLayerEvent, Metric,
+    self as ip, AddableEntry, AddableEntryEither, AddableMetric, Entry, IpLayerEvent, Metric,
     IPV6_DEFAULT_SUBNET,
 };
 

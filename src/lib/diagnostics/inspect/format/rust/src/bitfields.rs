@@ -8,10 +8,8 @@
 //!
 //! [inspect-vmo]: https://fuchsia.dev/fuchsia-src/reference/diagnostics/inspect/vmo-format
 
-use crate::{
-    block::Block,
-    container::{ReadBytes, WriteBytes},
-};
+use crate::block::Block;
+use crate::container::{ReadBytes, WriteBytes};
 use std::ops::{Deref, DerefMut};
 
 macro_rules! bitfield_fields {

@@ -7,27 +7,23 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use chrono::Duration;
 use errors::ffx_bail;
-use ffx_bootloader_args::{
-    BootCommand, BootloaderCommand,
-    SubCommand::{Boot, Info, Lock, Unlock},
-    UnlockCommand,
+use ffx_bootloader_args::SubCommand::{Boot, Info, Lock, Unlock};
+use ffx_bootloader_args::{BootCommand, BootloaderCommand, UnlockCommand};
+use ffx_fastboot::boot::boot;
+use ffx_fastboot::common::fastboot::{
+    tcp_proxy, udp_proxy, usb_proxy, FastbootNetworkConnectionConfig,
 };
-use ffx_fastboot::{
-    boot::boot,
-    common::fastboot::tcp_proxy,
-    common::fastboot::udp_proxy,
-    common::fastboot::usb_proxy,
-    common::fastboot::FastbootNetworkConnectionConfig,
-    common::{from_manifest, prepare},
-    file_resolver::resolvers::EmptyResolver,
-    info::info,
-    lock::lock,
-    unlock::unlock,
-};
+use ffx_fastboot::common::{from_manifest, prepare};
+use ffx_fastboot::file_resolver::resolvers::EmptyResolver;
+use ffx_fastboot::info::info;
+use ffx_fastboot::lock::lock;
+use ffx_fastboot::unlock::unlock;
 use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
 use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_developer_ffx::FastbootInterface as FidlFastbootInterface;
-use fidl_fuchsia_developer_ffx::{TargetInfo, TargetProxy, TargetRebootState, TargetState};
+use fidl_fuchsia_developer_ffx::{
+    FastbootInterface as FidlFastbootInterface, TargetInfo, TargetProxy, TargetRebootState,
+    TargetState,
+};
 use fuchsia_async::{Time, Timer};
 use std::io::{stdin, Write};
 use std::net::SocketAddr;
@@ -267,7 +263,8 @@ pub async fn bootloader_impl<W: Write>(
 mod test {
     use super::*;
     use ffx_bootloader_args::LockCommand;
-    use ffx_fastboot::{common::vars::LOCKED_VAR, test::setup};
+    use ffx_fastboot::common::vars::LOCKED_VAR;
+    use ffx_fastboot::test::setup;
     use tempfile::NamedTempFile;
 
     #[fuchsia_async::run_singlethreaded(test)]

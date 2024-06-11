@@ -4,14 +4,11 @@
 
 use anyhow::{anyhow, Context, Result};
 use fidl::endpoints::{create_proxy, ProtocolMarker};
-use fidl_fuchsia_power_broker as fpb;
-use fidl_fuchsia_power_system as fps;
-use fuchsia_async as fasync;
 use fuchsia_component::client;
 use futures::channel::mpsc;
-use futures::future;
-use futures::{Future, SinkExt, StreamExt};
+use futures::{future, Future, SinkExt, StreamExt};
 use tracing::{debug, error};
+use {fidl_fuchsia_power_broker as fpb, fidl_fuchsia_power_system as fps, fuchsia_async as fasync};
 
 const ELEMENT_NAME: &str = "timekeeper-pe";
 

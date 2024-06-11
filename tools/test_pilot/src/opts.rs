@@ -255,8 +255,7 @@ fn dir_parse_path(path: &str) -> Result<PathBuf, Error> {
 mod tests {
     use super::*;
     use structopt::clap::ErrorKind::MissingRequiredArgument;
-    use tempfile::tempdir;
-    use tempfile::NamedTempFile;
+    use tempfile::{tempdir, NamedTempFile};
     use test_config::*;
 
     struct MockEnvironment {

@@ -4,7 +4,9 @@
 
 //! Fake implementation of blobfs for blobfs::Client.
 
-use {fidl_fuchsia_io as fio, fuchsia_hash::Hash, tempfile::TempDir};
+use fidl_fuchsia_io as fio;
+use fuchsia_hash::Hash;
+use tempfile::TempDir;
 
 /// A fake blobfs backed by temporary storage.
 /// The name of the blob file is not guaranteed to match the merkle root of the content.

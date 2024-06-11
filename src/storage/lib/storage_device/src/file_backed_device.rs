@@ -127,11 +127,10 @@ impl Device for FileBackedDevice {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::{file_backed_device::FileBackedDevice, Device},
-        std::fs::{File, OpenOptions},
-        std::path::PathBuf,
-    };
+    use crate::file_backed_device::FileBackedDevice;
+    use crate::Device;
+    use std::fs::{File, OpenOptions};
+    use std::path::PathBuf;
 
     fn create_file() -> (PathBuf, File) {
         let mut temp_path = std::env::temp_dir();

@@ -5,15 +5,13 @@
 //! A safe rust wrapper for creating and using ramdisks.
 
 #![deny(missing_docs)]
+use anyhow::{anyhow, Context as _, Error};
+use fidl::endpoints::{ClientEnd, Proxy as _};
+use fidl_fuchsia_device::{ControllerMarker, ControllerProxy, ControllerSynchronousProxy};
+use fidl_fuchsia_hardware_ramdisk::{Guid, RamdiskControllerMarker};
+use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use {
-    anyhow::{anyhow, Context as _, Error},
-    fidl::endpoints::{ClientEnd, Proxy as _},
-    fidl_fuchsia_device::{ControllerMarker, ControllerProxy, ControllerSynchronousProxy},
-    fidl_fuchsia_hardware_block as fhardware_block,
-    fidl_fuchsia_hardware_ramdisk::{Guid, RamdiskControllerMarker},
-    fidl_fuchsia_io as fio,
-    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_hardware_block as fhardware_block, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
 };
 
 const GUID_LEN: usize = 16;
@@ -289,7 +287,8 @@ impl Drop for RamdiskClient {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     // Note that if these tests flake, all downstream tests that depend on this crate may too.
 

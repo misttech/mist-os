@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use lock_order::{
-    lock::{DelegatedOrderedLockAccess, LockLevelFor, UnlockedAccess},
-    relation::LockBefore,
-};
+use lock_order::lock::{DelegatedOrderedLockAccess, LockLevelFor, UnlockedAccess};
+use lock_order::relation::LockBefore;
 use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
+use netstack3_base::socket::MaybeDualStack;
 use netstack3_base::{
-    socket::MaybeDualStack, CoreTimerContext, CounterContext, Uninstantiable,
-    UninstantiableWrapper, WeakDeviceIdentifier,
+    CoreTimerContext, CounterContext, Uninstantiable, UninstantiableWrapper, WeakDeviceIdentifier,
 };
 use netstack3_datagram as datagram;
 use netstack3_device::WeakDeviceId;
@@ -19,11 +17,10 @@ use netstack3_tcp::{
 };
 use netstack3_udp::{self as udp, UdpCounters, UdpSocketId, UdpSocketSet, UdpSocketState};
 
-use crate::{
-    context::{prelude::*, WrapLockLevel},
-    transport::TransportLayerTimerId,
-    BindingsContext, BindingsTypes, CoreCtx, StackState,
-};
+use crate::context::prelude::*;
+use crate::context::WrapLockLevel;
+use crate::transport::TransportLayerTimerId;
+use crate::{BindingsContext, BindingsTypes, CoreCtx, StackState};
 
 impl<I, BC, L> CoreTimerContext<WeakTcpSocketId<I, WeakDeviceId<BC>, BC>, BC> for CoreCtx<'_, BC, L>
 where

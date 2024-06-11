@@ -10,8 +10,7 @@ use assembly_util::read_config;
 use camino::Utf8Path;
 use fuchsia_hash::Hash;
 use serde::Deserialize;
-use tempfile::NamedTempFile;
-use tempfile::TempDir;
+use tempfile::{NamedTempFile, TempDir};
 
 /// The result of a blob size measurement.
 #[derive(Debug, Deserialize, PartialEq)]

@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::{trace_header, ParseError, ParseResult, THREAD_RECORD_TYPE};
-use nom::{combinator::all_consuming, number::complete::le_u64};
+use nom::combinator::all_consuming;
+use nom::number::complete::le_u64;
 use std::num::NonZeroU8;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]

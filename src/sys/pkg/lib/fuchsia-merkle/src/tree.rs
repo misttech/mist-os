@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::Hash;
-use crate::BLOCK_SIZE;
+use crate::{Hash, BLOCK_SIZE};
 use std::io;
 
 /// A `MerkleTree` contains levels of hashes that can be used to verify the integrity of data.
@@ -88,8 +87,7 @@ impl AsRef<[Vec<Hash>]> for MerkleTree {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::util::HASHES_PER_BLOCK;
-    use crate::util::{hash_block, hash_hashes};
+    use crate::util::{hash_block, hash_hashes, HASHES_PER_BLOCK};
 
     impl MerkleTree {
         /// Given the index of a block of data, lookup its hash.

@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_fuchsia_boot as fboot,
-    fuchsia_zircon::{self as zx, DebugLog, DebugLogOpts, HandleBased, Resource},
-    futures::prelude::*,
-    std::sync::Arc,
-};
+use anyhow::Error;
+use fidl_fuchsia_boot as fboot;
+use fuchsia_zircon::{self as zx, DebugLog, DebugLogOpts, HandleBased, Resource};
+use futures::prelude::*;
+use std::sync::Arc;
 
 /// An implementation of the `fuchsia.boot.ReadOnlyLog` protocol.
 pub struct ReadOnlyLog {
@@ -65,10 +63,10 @@ impl WriteOnlyLog {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync,
-        fuchsia_component::client::connect_to_protocol, fuchsia_zircon::AsHandleRef,
-    };
+    use super::*;
+    use fuchsia_component::client::connect_to_protocol;
+    use fuchsia_zircon::AsHandleRef;
+    use {fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync};
 
     async fn get_debuglog_resource() -> Result<zx::Resource, Error> {
         let debuglog_resource_provider = connect_to_protocol::<fkernel::DebuglogResourceMarker>()?;

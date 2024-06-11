@@ -2,20 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assert_matches::assert_matches;
+use blobfs_ramdisk::BlobfsRamdisk;
+use fidl::endpoints::DiscoverableProtocolMarker as _;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use futures::future::{BoxFuture, FutureExt as _};
+use futures::stream::TryStreamExt as _;
+use std::sync::Arc;
+use vfs::directory::entry_container::Directory;
+use vfs::execution_scope::ExecutionScope;
 use {
-    assert_matches::assert_matches,
-    blobfs_ramdisk::BlobfsRamdisk,
-    fidl::endpoints::DiscoverableProtocolMarker as _,
     fidl_fuchsia_boot as fboot, fidl_fuchsia_component_decl as fcomponent_decl,
     fidl_fuchsia_component_resolution as fcomponent_resolution, fidl_fuchsia_io as fio,
     fidl_fuchsia_pkg as fpkg, fidl_fuchsia_space as fspace,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    futures::{
-        future::{BoxFuture, FutureExt as _},
-        stream::TryStreamExt as _,
-    },
-    std::sync::Arc,
-    vfs::{directory::entry_container::Directory, execution_scope::ExecutionScope},
 };
 
 static PKGFS_BOOT_ARG_KEY: &'static str = "zircon.system.pkgfs.cmd";

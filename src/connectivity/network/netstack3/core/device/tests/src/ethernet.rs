@@ -7,39 +7,36 @@ use assert_matches::assert_matches;
 
 use ip_test_macro::ip_test;
 use net_declare::net_mac;
-use net_types::{
-    ethernet::Mac,
-    ip::{AddrSubnet, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv6, Ipv6Addr},
-    MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
+use net_types::ethernet::Mac;
+use net_types::ip::{AddrSubnet, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv6, Ipv6Addr};
+use net_types::{MulticastAddr, SpecifiedAddr, UnicastAddr, Witness};
+use netstack3_base::testutil::{new_rng, TestIpExt, TEST_ADDRS_V4};
+use netstack3_base::FrameDestination;
+use netstack3_core::device::{
+    DeviceId, EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta,
 };
-use netstack3_base::{
-    testutil::{new_rng, TestIpExt, TEST_ADDRS_V4},
-    FrameDestination,
+use netstack3_core::error::NotFoundError;
+use netstack3_core::ip::{
+    AddIpAddrSubnetError, IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+    SlaacConfiguration,
 };
-use netstack3_core::{
-    device::{DeviceId, EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta},
-    error::NotFoundError,
-    ip::{
-        AddIpAddrSubnetError, IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
-        SlaacConfiguration,
-    },
-    testutil::{
-        CtxPairExt as _, FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeCtxBuilder,
-        DEFAULT_INTERFACE_METRIC,
-    },
-    IpExt,
+use netstack3_core::testutil::{
+    CtxPairExt as _, FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeCtxBuilder,
+    DEFAULT_INTERFACE_METRIC,
 };
-use netstack3_device::{ethernet, testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE};
+use netstack3_core::IpExt;
+use netstack3_device::ethernet;
+use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::device::{IpAddressId as _, IpDeviceStateContext};
 use packet::{Buf, Serializer as _};
-use packet_formats::{
-    ethernet::{EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG},
-    icmp::IcmpDestUnreachable,
-    ip::{IpPacketBuilder, IpProto},
-    testdata::{dns_request_v4, dns_request_v6},
-    testutil::{
-        parse_icmp_packet_in_ip_packet_in_ethernet_frame, parse_ip_packet_in_ethernet_frame,
-    },
+use packet_formats::ethernet::{
+    EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
+};
+use packet_formats::icmp::IcmpDestUnreachable;
+use packet_formats::ip::{IpPacketBuilder, IpProto};
+use packet_formats::testdata::{dns_request_v4, dns_request_v6};
+use packet_formats::testutil::{
+    parse_icmp_packet_in_ip_packet_in_ethernet_frame, parse_ip_packet_in_ethernet_frame,
 };
 use rand::Rng;
 use test_case::test_case;

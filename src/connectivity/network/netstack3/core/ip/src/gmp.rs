@@ -38,15 +38,14 @@ pub(crate) mod igmp;
 pub(crate) mod mld;
 
 use alloc::vec::Vec;
-use core::{fmt::Debug, time::Duration};
+use core::fmt::Debug;
+use core::time::Duration;
 
 use assert_matches::assert_matches;
-use net_types::{
-    ip::{Ip, IpAddress, IpVersionMarker},
-    MulticastAddr,
-};
+use net_types::ip::{Ip, IpAddress, IpVersionMarker};
+use net_types::MulticastAddr;
+use netstack3_base::ref_counted_hash_map::{InsertResult, RefCountedHashMap, RemoveResult};
 use netstack3_base::{
-    ref_counted_hash_map::{InsertResult, RefCountedHashMap, RemoveResult},
     AnyDevice, CoreTimerContext, DeviceIdContext, Instant, InstantBindingsTypes, LocalTimerHeap,
     RngContext, TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
 };

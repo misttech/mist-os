@@ -5,26 +5,22 @@
 //! This file tests how FIDL handles unknown interactions.
 
 use assert_matches::assert_matches;
-use {
-    fidl::{
-        endpoints::{Proxy, RequestStream},
-        AsyncChannel, Channel, Error,
-    },
-    fidl_test_unknown_interactions::{
-        UnknownInteractionsAjarProtocolEvent, UnknownInteractionsAjarProtocolProxy,
-        UnknownInteractionsAjarProtocolRequest, UnknownInteractionsAjarProtocolRequestStream,
-        UnknownInteractionsAjarProtocolSynchronousProxy, UnknownInteractionsClosedProtocolProxy,
-        UnknownInteractionsClosedProtocolRequestStream,
-        UnknownInteractionsClosedProtocolSynchronousProxy,
-        UnknownInteractionsProtocolControlHandle, UnknownInteractionsProtocolEvent,
-        UnknownInteractionsProtocolProxy, UnknownInteractionsProtocolRequest,
-        UnknownInteractionsProtocolRequestStream, UnknownInteractionsProtocolSynchronousProxy,
-    },
-    fuchsia_async as fasync,
-    fuchsia_zircon::{AsHandleRef, DurationNum, MessageBuf, Signals, Time},
-    futures::stream::StreamExt,
-    std::future::Future,
+use fidl::endpoints::{Proxy, RequestStream};
+use fidl::{AsyncChannel, Channel, Error};
+use fidl_test_unknown_interactions::{
+    UnknownInteractionsAjarProtocolEvent, UnknownInteractionsAjarProtocolProxy,
+    UnknownInteractionsAjarProtocolRequest, UnknownInteractionsAjarProtocolRequestStream,
+    UnknownInteractionsAjarProtocolSynchronousProxy, UnknownInteractionsClosedProtocolProxy,
+    UnknownInteractionsClosedProtocolRequestStream,
+    UnknownInteractionsClosedProtocolSynchronousProxy, UnknownInteractionsProtocolControlHandle,
+    UnknownInteractionsProtocolEvent, UnknownInteractionsProtocolProxy,
+    UnknownInteractionsProtocolRequest, UnknownInteractionsProtocolRequestStream,
+    UnknownInteractionsProtocolSynchronousProxy,
 };
+use fuchsia_async as fasync;
+use fuchsia_zircon::{AsHandleRef, DurationNum, MessageBuf, Signals, Time};
+use futures::stream::StreamExt;
+use std::future::Future;
 
 trait ExpectResumeUnwind {
     type Result;

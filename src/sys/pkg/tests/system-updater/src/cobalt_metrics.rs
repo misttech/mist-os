@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {super::*, pretty_assertions::assert_eq};
+use super::*;
+use pretty_assertions::assert_eq;
 
 async fn test_resolve_error_maps_to_cobalt_status_code(
     error: fidl_fuchsia_pkg::ResolveError,

@@ -8,22 +8,17 @@
 //!
 //! For this to function, the user must have an available GUI, thus the name.
 
-use {
-    crate::{
-        auth::info::{AUTH_SCOPE, CLIENT_ID, CLIENT_SECRET, OAUTH_REFRESH_TOKEN_ENDPOINT},
-        error::GcsError,
-    },
-    anyhow::{bail, Context, Result},
-    base64::engine::{general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD, Engine as _},
-    hyper::{Body, Method, Request},
-    serde::{Deserialize, Serialize},
-    sha2::{Digest, Sha256},
-    std::{
-        io::{Read, Write},
-        net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream},
-    },
-    url::form_urlencoded,
-};
+use crate::auth::info::{AUTH_SCOPE, CLIENT_ID, CLIENT_SECRET, OAUTH_REFRESH_TOKEN_ENDPOINT};
+use crate::error::GcsError;
+use anyhow::{bail, Context, Result};
+use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD;
+use base64::engine::Engine as _;
+use hyper::{Body, Method, Request};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::io::{Read, Write};
+use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream};
+use url::form_urlencoded;
 
 const AUTHORIZATION_ENDPOINT: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 

@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::platform::PlatformServices,
-    anyhow::{Context, Result},
-    async_trait::async_trait,
-    fidl_fuchsia_virtualization::{
-        GuestManagerMarker, GuestManagerProxy, LinuxManagerMarker, LinuxManagerProxy,
-    },
-    fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path},
-    guest_cli_args::GuestType,
+use crate::platform::PlatformServices;
+use anyhow::{Context, Result};
+use async_trait::async_trait;
+use fidl_fuchsia_virtualization::{
+    GuestManagerMarker, GuestManagerProxy, LinuxManagerMarker, LinuxManagerProxy,
 };
+use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
+use guest_cli_args::GuestType;
 
 pub struct FuchsiaPlatformServices;
 

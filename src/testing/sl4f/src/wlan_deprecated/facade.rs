@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl_fuchsia_wlan_product_deprecatedconfiguration as fidl_deprecated,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_sync::RwLock,
-    std::fmt::Debug,
-};
+use anyhow::{format_err, Error};
+use fidl_fuchsia_wlan_product_deprecatedconfiguration as fidl_deprecated;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_sync::RwLock;
+use std::fmt::Debug;
 
 #[derive(Debug)]
 struct InnerWlanDeprecatedConfigurationFacade {

@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    collections::HashSet,
-    fmt,
-    marker::PhantomData,
-    path::{Path, PathBuf},
-    sync::{Arc, Condvar, Mutex},
-    time::{Duration, Instant},
-};
+use std::collections::HashSet;
+use std::fmt;
+use std::marker::PhantomData;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Condvar, Mutex};
+use std::time::{Duration, Instant};
 
 pub type Error = notify::Error;
 
@@ -356,10 +354,10 @@ impl fmt::Debug for EventFilter {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        std::{fs::File, io::Write, sync::mpsc},
-    };
+    use super::*;
+    use std::fs::File;
+    use std::io::Write;
+    use std::sync::mpsc;
 
     const BATCH_DURATION: Duration = Duration::from_millis(100);
 

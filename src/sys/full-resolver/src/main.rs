@@ -2,15 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{anyhow, Context};
+use fidl::endpoints::{create_proxy, ClientEnd, Proxy};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use futures::stream::{StreamExt as _, TryStreamExt as _};
+use tracing::{error, info, warn};
+use version_history::AbiRevision;
 use {
-    anyhow::{anyhow, Context},
-    fidl::endpoints::{create_proxy, ClientEnd, Proxy},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
-    fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
-    futures::stream::{StreamExt as _, TryStreamExt as _},
-    tracing::{error, info, warn},
-    version_history::AbiRevision,
 };
 
 enum IncomingService {
@@ -209,7 +210,8 @@ enum ResolverError {
 
 impl From<&ResolverError> for fresolution::ResolverError {
     fn from(err: &ResolverError) -> Self {
-        use {fresolution::ResolverError as ferr, ResolverError::*};
+        use fresolution::ResolverError as ferr;
+        use ResolverError::*;
         match err {
             DirectoryProxyIntoChannel => ferr::Internal,
             InvalidUrl(_) => ferr::InvalidArgs,
@@ -239,22 +241,23 @@ impl From<&ResolverError> for fresolution::ResolverError {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::Error,
-        assert_matches::assert_matches,
-        fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_component::server as fserver,
-        fuchsia_component_test::{
-            Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
-        },
-        futures::{channel::mpsc, lock::Mutex, SinkExt as _},
-        std::sync::Arc,
-        vfs::{
-            directory::entry_container::Directory, execution_scope::ExecutionScope,
-            file::vmo::read_only, path::Path, pseudo_directory,
-        },
+    use super::*;
+    use anyhow::Error;
+    use assert_matches::assert_matches;
+    use fuchsia_component::server as fserver;
+    use fuchsia_component_test::{
+        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
     };
+    use futures::channel::mpsc;
+    use futures::lock::Mutex;
+    use futures::SinkExt as _;
+    use std::sync::Arc;
+    use vfs::directory::entry_container::Directory;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::file::vmo::read_only;
+    use vfs::path::Path;
+    use vfs::pseudo_directory;
+    use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     async fn mock_pkg_resolver(
         trigger: Arc<Mutex<Option<mpsc::Sender<Result<(), Error>>>>>,

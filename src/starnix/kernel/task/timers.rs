@@ -5,22 +5,14 @@
 use starnix_sync::Mutex;
 use std::collections::HashMap;
 
-use crate::{
-    signals::{SignalEvent, SignalEventNotify, SignalEventValue},
-    task::{
-        interval_timer::{IntervalTimer, IntervalTimerHandle},
-        CurrentTask,
-    },
-    time::utc,
-};
-use starnix_uapi::{
-    __kernel_timer_t, error,
-    errors::Errno,
-    itimerspec,
-    signals::SIGALRM,
-    time::{duration_from_timespec, time_from_timespec},
-    uapi, TIMER_ABSTIME,
-};
+use crate::signals::{SignalEvent, SignalEventNotify, SignalEventValue};
+use crate::task::interval_timer::{IntervalTimer, IntervalTimerHandle};
+use crate::task::CurrentTask;
+use crate::time::utc;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::signals::SIGALRM;
+use starnix_uapi::time::{duration_from_timespec, time_from_timespec};
+use starnix_uapi::{__kernel_timer_t, error, itimerspec, uapi, TIMER_ABSTIME};
 
 // Table for POSIX timers from timer_create() that deliver timers via signals (not new-style
 // timerfd's).

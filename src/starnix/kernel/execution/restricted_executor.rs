@@ -5,14 +5,12 @@
 #![allow(non_camel_case_types)]
 
 use super::shared::{execute_syscall, process_completed_restricted_exit, TaskInfo};
-use crate::{
-    arch::execution::{generate_cfi_directives, restore_cfi_directives},
-    mm::MemoryManager,
-    signals::{deliver_signal, SignalActions, SignalInfo},
-    task::{
-        ptrace_attach_from_state, CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup,
-        PtraceCoreState, StopState, Task, TaskBuilder, ThreadGroup, ThreadGroupWriteGuard,
-    },
+use crate::arch::execution::{generate_cfi_directives, restore_cfi_directives};
+use crate::mm::MemoryManager;
+use crate::signals::{deliver_signal, SignalActions, SignalInfo};
+use crate::task::{
+    ptrace_attach_from_state, CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup,
+    PtraceCoreState, StopState, Task, TaskBuilder, ThreadGroup, ThreadGroupWriteGuard,
 };
 use anyhow::{format_err, Error};
 use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
@@ -27,13 +25,13 @@ use starnix_logging::{
 };
 use starnix_sync::{LockBefore, Locked, ProcessGroupState, Unlocked};
 use starnix_syscalls::decls::SyscallDecl;
-use starnix_uapi::{
-    errno, errors::Errno, from_status_like_fdio, ownership::WeakRef, pid_t, signals::SIGKILL,
-};
-use std::{
-    os::unix::thread::JoinHandleExt,
-    sync::{mpsc::sync_channel, Arc},
-};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::ownership::WeakRef;
+use starnix_uapi::signals::SIGKILL;
+use starnix_uapi::{errno, from_status_like_fdio, pid_t};
+use std::os::unix::thread::JoinHandleExt;
+use std::sync::mpsc::sync_channel;
+use std::sync::Arc;
 
 extern "C" {
     /// The function which enters restricted mode. This function never technically returns, instead

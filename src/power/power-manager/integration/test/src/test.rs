@@ -2,13 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_hardware_power_statecontrol as fpower, fuchsia_async as fasync,
-    power_manager_integration_test_lib::{
-        client_connectors::{RebootWatcherClient, ThermalClient},
-        TestEnvBuilder,
-    },
-};
+use power_manager_integration_test_lib::client_connectors::{RebootWatcherClient, ThermalClient};
+use power_manager_integration_test_lib::TestEnvBuilder;
+use {fidl_fuchsia_hardware_power_statecontrol as fpower, fuchsia_async as fasync};
 
 /// Integration test for Power Manager to verify correct behavior of the thermal client service.
 #[fuchsia::test]

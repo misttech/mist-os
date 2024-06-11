@@ -2,52 +2,41 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::fuchsia::{
-        debug::{handle_debug_request, FxfsDebug},
-        errors::map_to_status,
-        memory_pressure::MemoryPressureMonitor,
-        volumes_directory::VolumesDirectory,
-    },
-    anyhow::{bail, Context, Error},
-    async_trait::async_trait,
-    fidl::{
-        endpoints::{ClientEnd, DiscoverableProtocolMarker, RequestStream},
-        AsHandleRef,
-    },
-    fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream},
-    fidl_fuchsia_fs_startup::{
-        CheckOptions, StartOptions, StartupMarker, StartupRequest, StartupRequestStream,
-    },
-    fidl_fuchsia_fxfs::{
-        DebugMarker, DebugRequestStream, VolumesMarker, VolumesRequest, VolumesRequestStream,
-    },
-    fidl_fuchsia_hardware_block::BlockMarker,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream},
-    fs_inspect::{FsInspect, FsInspectTree, InfoData, UsageData},
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{lock::Mutex, TryStreamExt},
-    fxfs::{
-        filesystem::{mkfs, FxFilesystem, FxFilesystemBuilder, OpenFxFilesystem, MIN_BLOCK_SIZE},
-        fsck,
-        log::*,
-        metrics,
-        object_store::volume::root_volume,
-        serialized_types::LATEST_VERSION,
-    },
-    remote_block_device::{BlockClient as _, RemoteBlockClient},
-    std::{
-        ops::Deref,
-        sync::{Arc, Weak},
-    },
-    storage_device::{block_device::BlockDevice, DeviceHolder},
-    vfs::{
-        directory::{entry_container::Directory, helper::DirectlyMutable},
-        execution_scope::ExecutionScope,
-        path::Path,
-    },
+use crate::fuchsia::debug::{handle_debug_request, FxfsDebug};
+use crate::fuchsia::errors::map_to_status;
+use crate::fuchsia::memory_pressure::MemoryPressureMonitor;
+use crate::fuchsia::volumes_directory::VolumesDirectory;
+use anyhow::{bail, Context, Error};
+use async_trait::async_trait;
+use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, RequestStream};
+use fidl::AsHandleRef;
+use fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream};
+use fidl_fuchsia_fs_startup::{
+    CheckOptions, StartOptions, StartupMarker, StartupRequest, StartupRequestStream,
 };
+use fidl_fuchsia_fxfs::{
+    DebugMarker, DebugRequestStream, VolumesMarker, VolumesRequest, VolumesRequestStream,
+};
+use fidl_fuchsia_hardware_block::BlockMarker;
+use fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream};
+use fs_inspect::{FsInspect, FsInspectTree, InfoData, UsageData};
+use futures::lock::Mutex;
+use futures::TryStreamExt;
+use fxfs::filesystem::{mkfs, FxFilesystem, FxFilesystemBuilder, OpenFxFilesystem, MIN_BLOCK_SIZE};
+use fxfs::log::*;
+use fxfs::object_store::volume::root_volume;
+use fxfs::serialized_types::LATEST_VERSION;
+use fxfs::{fsck, metrics};
+use remote_block_device::{BlockClient as _, RemoteBlockClient};
+use std::ops::Deref;
+use std::sync::{Arc, Weak};
+use storage_device::block_device::BlockDevice;
+use storage_device::DeviceHolder;
+use vfs::directory::entry_container::Directory;
+use vfs::directory::helper::DirectlyMutable;
+use vfs::execution_scope::ExecutionScope;
+use vfs::path::Path;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 const FXFS_INFO_NAME: &'static str = "fxfs";
 
@@ -493,28 +482,25 @@ impl Component {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{new_block_client, Component},
-        fidl::endpoints::{Proxy, ServerEnd},
-        fidl_fuchsia_fs::AdminMarker,
-        fidl_fuchsia_fs_startup::{
-            CompressionAlgorithm, EvictionPolicyOverride, StartOptions, StartupMarker,
-        },
-        fidl_fuchsia_fxfs::{MountOptions, VolumesMarker},
-        fidl_fuchsia_io as fio,
-        fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleProxy},
-        fuchsia_async as fasync,
-        fuchsia_component::client::connect_to_protocol_at_dir_svc,
-        fuchsia_fs::directory::readdir,
-        fuchsia_zircon as zx,
-        futures::future::{BoxFuture, FusedFuture},
-        futures::{future::FutureExt, pin_mut, select},
-        fxfs::{filesystem::FxFilesystem, object_store::volume::root_volume},
-        ramdevice_client::RamdiskClientBuilder,
-        std::pin::Pin,
-        storage_device::block_device::BlockDevice,
-        storage_device::DeviceHolder,
+    use super::{new_block_client, Component};
+    use fidl::endpoints::{Proxy, ServerEnd};
+    use fidl_fuchsia_fs::AdminMarker;
+    use fidl_fuchsia_fs_startup::{
+        CompressionAlgorithm, EvictionPolicyOverride, StartOptions, StartupMarker,
     };
+    use fidl_fuchsia_fxfs::{MountOptions, VolumesMarker};
+    use fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleProxy};
+    use fuchsia_component::client::connect_to_protocol_at_dir_svc;
+    use fuchsia_fs::directory::readdir;
+    use futures::future::{BoxFuture, FusedFuture, FutureExt};
+    use futures::{pin_mut, select};
+    use fxfs::filesystem::FxFilesystem;
+    use fxfs::object_store::volume::root_volume;
+    use ramdevice_client::RamdiskClientBuilder;
+    use std::pin::Pin;
+    use storage_device::block_device::BlockDevice;
+    use storage_device::DeviceHolder;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
 
     async fn run_test(
         callback: impl Fn(&fio::DirectoryProxy, LifecycleProxy) -> BoxFuture<'static, ()>,

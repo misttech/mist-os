@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 use core::fmt;
 use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_component_sandbox as fsandbox;
-use fidl_fuchsia_io as fio;
+use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio};
 
 #[cfg(target_os = "fuchsia")]
 use fidl::handle::{AsHandleRef, Channel, Handle};

@@ -19,7 +19,8 @@ pub fn expected_protocols() -> Option<Vec<bredr::ProtocolDescriptor>> {
 #[cfg(test)]
 pub mod test {
     use super::*;
-    use crate::{descriptor::DescriptorList, peer_info::PeerInfo};
+    use crate::descriptor::DescriptorList;
+    use crate::peer_info::PeerInfo;
 
     macro_rules! make_attribute {
         ($ty: ident, $id: expr, $value: expr) => {

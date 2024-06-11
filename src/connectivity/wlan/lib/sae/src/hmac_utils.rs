@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use mundane::{
-    hash::{Digest, Hasher},
-    hmac::Hmac,
-};
+use mundane::hash::{Digest, Hasher};
+use mundane::hmac::Hmac;
 
 // IEEE Std. 802.11-2020 12.4: Simultaneous Authentication of Equals (SAE)
 // SAE uses a few constructions using HMACs, where the underlying cryptographic hash algorithm is
@@ -167,13 +165,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::boringssl::{Bignum, BignumCtx, EcGroup, EcGroupId},
-        hex::{decode, encode},
-        mundane::hash::Sha256,
-        std::convert::TryFrom,
-    };
+    use super::*;
+    use crate::boringssl::{Bignum, BignumCtx, EcGroup, EcGroupId};
+    use hex::{decode, encode};
+    use mundane::hash::Sha256;
+    use std::convert::TryFrom;
 
     // IEEE Std. 802.11-2020 J.10
     // The 802.11 spec does not specify test vectors for the individual HMAC constructions

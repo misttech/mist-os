@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        client::types,
-        util::pseudo_energy::{EwmaSignalData, RssiVelocity},
-    },
-    fuchsia_async as fasync,
-    futures::channel::mpsc,
-    tracing::error,
-};
+use crate::client::types;
+use crate::util::pseudo_energy::{EwmaSignalData, RssiVelocity};
+use fuchsia_async as fasync;
+use futures::channel::mpsc;
+use tracing::error;
 
 #[derive(Clone, Copy)]
 pub enum RoamingProfile {

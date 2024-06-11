@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, sys::zx_handle_t, AsHandleRef};
+use fuchsia_zircon::sys::zx_handle_t;
+use fuchsia_zircon::{self as zx, AsHandleRef};
 use lazy_static::lazy_static;
 use std::cell::RefCell;
 use std::ffi::c_char;

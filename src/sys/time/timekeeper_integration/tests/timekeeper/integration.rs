@@ -4,37 +4,34 @@
 
 use anyhow::{Context, Result};
 use fidl::{endpoints, HandleBased};
-use fidl_fuchsia_testing_harness as ftth;
-use fidl_fuchsia_time as fft;
-use fidl_test_time_realm as fttr;
+use fidl_fuchsia_metrics::MetricEvent;
+use fidl_fuchsia_metrics_test::{LogMethod, MetricEventLoggerQuerierProxy};
+use fidl_fuchsia_time_external::TimeSample;
+use fuchsia_cobalt_builders::MetricEventExt;
 use fuchsia_component::client;
+use fuchsia_zircon::{self as zx};
+use futures::stream::StreamExt;
+use futures::Future;
+use std::sync::Arc;
+use test_util::{assert_geq, assert_leq, assert_lt};
+use time_metrics_registry::{
+    RealTimeClockEventsMigratedMetricDimensionEventType as RtcEventType,
+    TimeMetricDimensionExperiment as Experiment, TimeMetricDimensionTrack as Track,
+    TimekeeperLifecycleEventsMigratedMetricDimensionEventType as LifecycleEventType,
+    TimekeeperTimeSourceEventsMigratedMetricDimensionEventType as TimeSourceEvent,
+    TimekeeperTrackEventsMigratedMetricDimensionEventType as TrackEvent,
+    REAL_TIME_CLOCK_EVENTS_MIGRATED_METRIC_ID, TIMEKEEPER_CLOCK_CORRECTION_MIGRATED_METRIC_ID,
+    TIMEKEEPER_LIFECYCLE_EVENTS_MIGRATED_METRIC_ID, TIMEKEEPER_SQRT_COVARIANCE_MIGRATED_METRIC_ID,
+    TIMEKEEPER_TIME_SOURCE_EVENTS_MIGRATED_METRIC_ID, TIMEKEEPER_TRACK_EVENTS_MIGRATED_METRIC_ID,
+};
+use timekeeper_integration_lib::{
+    create_cobalt_event_stream, new_nonshareable_clock, poll_until, poll_until_some_async,
+    rtc_time_to_zx_time, RemotePushSourcePuppet, RemoteRtcUpdates, BACKSTOP_TIME,
+    BEFORE_BACKSTOP_TIME, BETWEEN_SAMPLES, STD_DEV, VALID_RTC_TIME, VALID_TIME, VALID_TIME_2,
+};
 use {
-    fidl_fuchsia_metrics::MetricEvent,
-    fidl_fuchsia_metrics_test::{LogMethod, MetricEventLoggerQuerierProxy},
-    fidl_fuchsia_time_external::TimeSample,
+    fidl_fuchsia_testing_harness as ftth, fidl_fuchsia_time as fft, fidl_test_time_realm as fttr,
     fuchsia_async as fasync,
-    fuchsia_cobalt_builders::MetricEventExt,
-    fuchsia_zircon::{self as zx},
-    futures::{stream::StreamExt, Future},
-    std::sync::Arc,
-    test_util::{assert_geq, assert_leq, assert_lt},
-    time_metrics_registry::{
-        RealTimeClockEventsMigratedMetricDimensionEventType as RtcEventType,
-        TimeMetricDimensionExperiment as Experiment, TimeMetricDimensionTrack as Track,
-        TimekeeperLifecycleEventsMigratedMetricDimensionEventType as LifecycleEventType,
-        TimekeeperTimeSourceEventsMigratedMetricDimensionEventType as TimeSourceEvent,
-        TimekeeperTrackEventsMigratedMetricDimensionEventType as TrackEvent,
-        REAL_TIME_CLOCK_EVENTS_MIGRATED_METRIC_ID, TIMEKEEPER_CLOCK_CORRECTION_MIGRATED_METRIC_ID,
-        TIMEKEEPER_LIFECYCLE_EVENTS_MIGRATED_METRIC_ID,
-        TIMEKEEPER_SQRT_COVARIANCE_MIGRATED_METRIC_ID,
-        TIMEKEEPER_TIME_SOURCE_EVENTS_MIGRATED_METRIC_ID,
-        TIMEKEEPER_TRACK_EVENTS_MIGRATED_METRIC_ID,
-    },
-    timekeeper_integration_lib::{
-        create_cobalt_event_stream, new_nonshareable_clock, poll_until, poll_until_some_async,
-        rtc_time_to_zx_time, RemotePushSourcePuppet, RemoteRtcUpdates, BACKSTOP_TIME,
-        BEFORE_BACKSTOP_TIME, BETWEEN_SAMPLES, STD_DEV, VALID_RTC_TIME, VALID_TIME, VALID_TIME_2,
-    },
 };
 
 /// Run a test against an instance of timekeeper. Timekeeper will maintain the provided clock.

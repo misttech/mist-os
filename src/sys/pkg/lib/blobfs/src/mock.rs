@@ -4,14 +4,14 @@
 
 //! Mock implementation of blobfs for blobfs::Client.
 
-use {
-    fidl::endpoints::RequestStream as _,
-    fidl_fuchsia_io as fio,
-    fuchsia_hash::Hash,
-    fuchsia_zircon::{self as zx, AsHandleRef as _, Status},
-    futures::{Future, StreamExt as _, TryStreamExt as _},
-    std::{cmp::min, collections::HashSet, convert::TryInto as _},
-};
+use fidl::endpoints::RequestStream as _;
+use fidl_fuchsia_io as fio;
+use fuchsia_hash::Hash;
+use fuchsia_zircon::{self as zx, AsHandleRef as _, Status};
+use futures::{Future, StreamExt as _, TryStreamExt as _};
+use std::cmp::min;
+use std::collections::HashSet;
+use std::convert::TryInto as _;
 
 /// A testing server implementation of /blob.
 ///

@@ -2,29 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::format_err;
+use fidl_test_wlan_realm::WlanConfig;
+use fuchsia_async::Task;
+use fuchsia_zircon::prelude::*;
+use futures::channel::oneshot;
+use ieee80211::{Bssid, Ssid};
+use std::pin::pin;
+use wlan_common::bss::Protection;
+use wlan_common::channel::{Cbw, Channel};
+use wlan_common::ie::rsn::cipher::CIPHER_CCMP_128;
+use wlan_hw_sim::event::action::{self, AuthenticationControl, AuthenticationTap};
+use wlan_hw_sim::event::{branch, Handler};
+use wlan_hw_sim::*;
+use wlan_rsn::rsna::UpdateSink;
 use {
-    anyhow::format_err,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_tap as fidl_tap,
-    fidl_test_wlan_realm::WlanConfig,
-    fuchsia_async::Task,
-    fuchsia_zircon::prelude::*,
-    futures::channel::oneshot,
-    ieee80211::{Bssid, Ssid},
-    std::pin::pin,
-    wlan_common::{
-        bss::Protection,
-        channel::{Cbw, Channel},
-        ie::rsn::cipher::CIPHER_CCMP_128,
-    },
-    wlan_hw_sim::{
-        event::{
-            action::{self, AuthenticationControl, AuthenticationTap},
-            branch, Handler,
-        },
-        *,
-    },
-    wlan_rsn::rsna::UpdateSink,
 };
 
 async fn run_policy_and_assert_transparent_reconnect(
@@ -81,7 +75,8 @@ fn scan_and_reassociate<'h>(
         control,
         handler: action::authenticate_with_control_state().try_and(event::matched(
             move |control: &mut AuthenticationControl, _| {
-                use wlan_rsn::rsna::{SecAssocStatus::EssSaEstablished, SecAssocUpdate::Status};
+                use wlan_rsn::rsna::SecAssocStatus::EssSaEstablished;
+                use wlan_rsn::rsna::SecAssocUpdate::Status;
 
                 // TODO(https://fxbug.dev/42148729): Use `Vec::drain_filter` instead when the API is
                 //                        stabilized.

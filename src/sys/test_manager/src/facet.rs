@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::constants::{HERMETIC_TESTS_COLLECTION, TEST_TYPE_REALM_MAP};
+use crate::error::{FacetError, LaunchTestError};
+use anyhow::format_err;
+use std::sync::Arc;
 use {
-    crate::{
-        constants::{HERMETIC_TESTS_COLLECTION, TEST_TYPE_REALM_MAP},
-        error::{FacetError, LaunchTestError},
-    },
-    anyhow::format_err,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_data as fdata,
-    std::sync::Arc,
 };
 
 const TEST_TYPE_FACET_KEY: &'static str = "fuchsia.test.type";

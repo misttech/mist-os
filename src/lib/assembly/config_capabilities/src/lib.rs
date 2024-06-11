@@ -13,8 +13,7 @@
 
 mod config_capabilities;
 
-pub use crate::config_capabilities::build_config_capability_package;
-pub use crate::config_capabilities::CapabilityNamedMap;
-pub use crate::config_capabilities::Config;
-pub use crate::config_capabilities::ConfigNestedValueType;
-pub use crate::config_capabilities::ConfigValueType;
+pub use crate::config_capabilities::{
+    build_config_capability_package, CapabilityNamedMap, Config, ConfigNestedValueType,
+    ConfigValueType,
+};

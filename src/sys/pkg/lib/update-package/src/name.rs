@@ -4,11 +4,9 @@
 
 //! Typesafe wrappers around verifying the name of the update package.
 
-use {
-    fidl_fuchsia_io as fio,
-    fuchsia_pkg::{MetaPackage, MetaPackageError},
-    thiserror::Error,
-};
+use fidl_fuchsia_io as fio;
+use fuchsia_pkg::{MetaPackage, MetaPackageError};
+use thiserror::Error;
 
 /// An error encountered while verifying the board.
 #[derive(Debug, Error)]
@@ -48,12 +46,10 @@ pub(crate) async fn verify(proxy: &fio::DirectoryProxy) -> Result<(), VerifyName
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::TestUpdatePackage,
-        assert_matches::assert_matches,
-        fuchsia_pkg::{PackageName, PackageVariant},
-    };
+    use super::*;
+    use crate::TestUpdatePackage;
+    use assert_matches::assert_matches;
+    use fuchsia_pkg::{PackageName, PackageVariant};
 
     fn make_meta_package(name: &str) -> Vec<u8> {
         let meta_package = MetaPackage::from_name_and_variant_zero(name.parse().unwrap());

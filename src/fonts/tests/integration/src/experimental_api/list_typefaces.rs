@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file
 
-use {
-    super::util::*,
-    crate::{FONTS_LARGE_CM, FONTS_MEDIUM_CM, FONTS_SMALL_CM},
-    fidl_fuchsia_fonts_experimental as fonts_exp,
-};
+use super::util::*;
+use crate::{FONTS_LARGE_CM, FONTS_MEDIUM_CM, FONTS_SMALL_CM};
+use fidl_fuchsia_fonts_experimental as fonts_exp;
 
 // Add new tests here so we don't overload component manager with requests (b/42136076).
 #[fuchsia::test]

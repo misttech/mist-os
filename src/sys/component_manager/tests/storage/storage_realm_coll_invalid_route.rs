@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use component_events::events::*;
+use component_events::matcher::*;
+use fidl::endpoints::create_proxy;
+use fuchsia_component::client::connect_to_protocol;
 use {
-    component_events::{events::*, matcher::*},
-    fidl::endpoints::create_proxy,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
 };
 
 // This test is identical to storage_realm_coll, but the storage routing to `storage_user` is

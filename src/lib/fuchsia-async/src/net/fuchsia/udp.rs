@@ -4,20 +4,14 @@
 
 #![deny(missing_docs)]
 
-use {
-    crate::net::EventedFd,
-    futures::{
-        future::Future,
-        ready,
-        task::{Context, Poll},
-    },
-    std::{
-        io,
-        net::{self, SocketAddr},
-        ops::Deref,
-        pin::Pin,
-    },
-};
+use crate::net::EventedFd;
+use futures::future::Future;
+use futures::ready;
+use futures::task::{Context, Poll};
+use std::io;
+use std::net::{self, SocketAddr};
+use std::ops::Deref;
+use std::pin::Pin;
 
 fn new_socket_address_conversion_error() -> std::io::Error {
     io::Error::new(io::ErrorKind::Other, "socket address is not IPv4 or IPv6")

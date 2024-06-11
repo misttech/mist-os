@@ -9,19 +9,12 @@
 
 // Avoid unused crate warnings on non-test/non-debug builds because this needs to be an
 // unconditional dependency for rustdoc generation.
-use extended_pstate as _;
-use tracing_mutex as _;
+use {extended_pstate as _, tracing_mutex as _};
 
 use anyhow::{Context as _, Error};
 use fidl::endpoints::ControlHandle;
-use fidl_fuchsia_component_runner as frunner;
-use fidl_fuchsia_process_lifecycle as flifecycle;
-use fidl_fuchsia_starnix_container as fstarcontainer;
-use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::health::Reporter;
-use fuchsia_runtime as fruntime;
-use fuchsia_zircon as zx;
 use futures::{StreamExt, TryStreamExt};
 use starnix_core::mm::{init_usercopy, zxio_maybe_faultable_copy_impl};
 use starnix_kernel_runner::{
@@ -29,6 +22,11 @@ use starnix_kernel_runner::{
     ContainerServiceConfig,
 };
 use starnix_logging::{log_debug, trace_instant, CATEGORY_STARNIX, NAME_START_KERNEL};
+use {
+    fidl_fuchsia_component_runner as frunner, fidl_fuchsia_process_lifecycle as flifecycle,
+    fidl_fuchsia_starnix_container as fstarcontainer, fuchsia_async as fasync,
+    fuchsia_runtime as fruntime, fuchsia_zircon as zx,
+};
 
 /// Overrides the `zxio_maybe_faultable_copy` weak symbol found in zxio.
 #[no_mangle]

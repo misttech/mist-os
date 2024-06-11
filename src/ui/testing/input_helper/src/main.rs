@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Error, Result},
-    fidl_fuchsia_ui_test_input::RegistryRequestStream,
-    fuchsia_component::server::ServiceFs,
-    futures::StreamExt,
-    tracing::info,
-};
+use anyhow::{Error, Result};
+use fidl_fuchsia_ui_test_input::RegistryRequestStream;
+use fuchsia_component::server::ServiceFs;
+use futures::StreamExt;
+use tracing::info;
 
 enum Service {
     RegistryServer(RegistryRequestStream),

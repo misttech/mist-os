@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::marker::{PhantomData, PhantomPinned};
+use std::pin::Pin;
+use std::slice;
+use tracing::error;
+use wlan_fidl_ext::{TryUnpack, WithName};
 use {
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
-    std::{
-        marker::{PhantomData, PhantomPinned},
-        pin::Pin,
-        slice,
-    },
-    tracing::error,
-    wlan_fidl_ext::{TryUnpack, WithName},
     wlan_trace as wtrace,
 };
 

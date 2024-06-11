@@ -2,20 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::input_device::{InputDevice, InputHandler},
-    crate::wire,
-    anyhow::Error,
-    async_trait::async_trait,
-    fidl_fuchsia_input::Key,
-    fidl_fuchsia_ui_input3 as input3,
-    fidl_fuchsia_ui_input3::{KeyboardListenerRequest, KeyboardListenerRequestStream},
-    futures::{select, stream::Stream, StreamExt},
-    virtio_device::{
-        mem::DriverMem,
-        queue::{DescChain, DriverNotify},
-    },
-};
+use crate::input_device::{InputDevice, InputHandler};
+use crate::wire;
+use anyhow::Error;
+use async_trait::async_trait;
+use fidl_fuchsia_input::Key;
+use fidl_fuchsia_ui_input3 as input3;
+use fidl_fuchsia_ui_input3::{KeyboardListenerRequest, KeyboardListenerRequestStream};
+use futures::stream::Stream;
+use futures::{select, StreamExt};
+use virtio_device::mem::DriverMem;
+use virtio_device::queue::{DescChain, DriverNotify};
 
 const HID_USAGE_PAGE_KEYBOARD: u16 = 0x0007;
 const HID_USAGE_PAGE_CONSUMER: u16 = 0x000c;
@@ -403,17 +400,13 @@ impl<'a, 'b, N: DriverNotify, M: DriverMem, Q: Stream<Item = DescChain<'a, 'b, N
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_ui_input3::KeyboardListenerMarker,
-        futures::FutureExt,
-        virtio_device::{
-            fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue},
-            util::DescChainStream,
-        },
-        zerocopy::FromBytes,
-    };
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_ui_input3::KeyboardListenerMarker;
+    use futures::FutureExt;
+    use virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue};
+    use virtio_device::util::DescChainStream;
+    use zerocopy::FromBytes;
 
     const FUCHSIA_KEYS: [Key; 110] = [
         Key::A,

@@ -4,13 +4,13 @@
 
 pub mod args;
 
+use crate::common::{node_property_key_to_string, node_property_value_to_string};
+use anyhow::{anyhow, Result};
+use args::ListDevicesCommand;
+use fuchsia_driver_dev::{DFv1Device, DFv2Node, Device};
 use {
-    crate::common::{node_property_key_to_string, node_property_value_to_string},
-    anyhow::{anyhow, Result},
-    args::ListDevicesCommand,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_driver_development as fdd,
     fidl_fuchsia_driver_legacy as fdl, fidl_fuchsia_driver_legacy,
-    fuchsia_driver_dev::{DFv1Device, DFv2Node, Device},
 };
 
 trait DevicePrinter {

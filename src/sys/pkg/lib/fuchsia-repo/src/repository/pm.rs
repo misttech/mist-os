@@ -2,29 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        range::Range,
-        repo_keys,
-        repository::{
-            CopyMode, Error, FileSystemRepository, FileSystemRepositoryBuilder, RepoProvider,
-            RepoStorage,
-        },
-        resource::Resource,
-    },
-    anyhow::Result,
-    camino::{Utf8Path, Utf8PathBuf},
-    delivery_blob::DeliveryBlobType,
-    fuchsia_merkle::Hash,
-    futures::{future::BoxFuture, stream::BoxStream, AsyncRead},
-    std::{collections::BTreeSet, fmt::Debug, time::SystemTime},
-    tuf::{
-        metadata::{MetadataPath, MetadataVersion, TargetPath},
-        pouf::Pouf1,
-        repository::{
-            RepositoryProvider as TufRepositoryProvider, RepositoryStorage as TufRepositoryStorage,
-        },
-    },
+use crate::range::Range;
+use crate::repo_keys;
+use crate::repository::{
+    CopyMode, Error, FileSystemRepository, FileSystemRepositoryBuilder, RepoProvider, RepoStorage,
+};
+use crate::resource::Resource;
+use anyhow::Result;
+use camino::{Utf8Path, Utf8PathBuf};
+use delivery_blob::DeliveryBlobType;
+use fuchsia_merkle::Hash;
+use futures::future::BoxFuture;
+use futures::stream::BoxStream;
+use futures::AsyncRead;
+use std::collections::BTreeSet;
+use std::fmt::Debug;
+use std::time::SystemTime;
+use tuf::metadata::{MetadataPath, MetadataVersion, TargetPath};
+use tuf::pouf::Pouf1;
+use tuf::repository::{
+    RepositoryProvider as TufRepositoryProvider, RepositoryStorage as TufRepositoryStorage,
 };
 
 #[cfg(not(target_os = "fuchsia"))]

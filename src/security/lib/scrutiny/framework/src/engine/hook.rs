@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::collector::DataCollector, crate::model::controller::DataController,
-    std::collections::HashMap, std::sync::Arc,
-};
+use crate::model::collector::DataCollector;
+use crate::model::controller::DataController;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 /// `PluginHooks` holds all the collectors and controllers that a plugin needs
 /// to operate correctly. These are hooked into the `ControllerDispatcher` and
@@ -64,13 +64,12 @@ macro_rules! controllers {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::model::controller::DataController,
-        crate::model::model::DataModel,
-        anyhow::Result,
-        serde_json::{json, value::Value},
-        std::sync::Arc,
-    };
+    use crate::model::controller::DataController;
+    use crate::model::model::DataModel;
+    use anyhow::Result;
+    use serde_json::json;
+    use serde_json::value::Value;
+    use std::sync::Arc;
 
     #[derive(Default)]
     struct FakeController {}

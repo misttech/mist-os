@@ -2,39 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        meta_as_dir::MetaAsDir,
-        meta_file::{MetaFile, MetaFileLocation},
-        meta_subdir::MetaSubdir,
-        non_meta_subdir::NonMetaSubdir,
-        usize_to_u64_safe, Error,
-    },
-    anyhow::Context as _,
-    async_trait::async_trait,
-    async_utils::async_once::Once,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio,
-    fuchsia_fs::file::AsyncReadAtExt as _,
-    fuchsia_pkg::MetaContents,
-    fuchsia_zircon as zx,
-    futures::stream::StreamExt as _,
-    std::{collections::HashMap, sync::Arc},
-    tracing::error,
-    vfs::{
-        common::send_on_open_with_error,
-        directory::{
-            entry::{EntryInfo, FlagsOrProtocols, OpenRequest},
-            immutable::connection::ImmutableConnection,
-            traversal_position::TraversalPosition,
-        },
-        execution_scope::ExecutionScope,
-        file::vmo::VmoFile,
-        immutable_attributes,
-        path::Path as VfsPath,
-        CreationMode, ObjectRequestRef, ProtocolsExt as _, ToObjectRequest,
-    },
+use crate::meta_as_dir::MetaAsDir;
+use crate::meta_file::{MetaFile, MetaFileLocation};
+use crate::meta_subdir::MetaSubdir;
+use crate::non_meta_subdir::NonMetaSubdir;
+use crate::{usize_to_u64_safe, Error};
+use anyhow::Context as _;
+use async_trait::async_trait;
+use async_utils::async_once::Once;
+use fidl::endpoints::ServerEnd;
+use fuchsia_fs::file::AsyncReadAtExt as _;
+use fuchsia_pkg::MetaContents;
+use futures::stream::StreamExt as _;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tracing::error;
+use vfs::common::send_on_open_with_error;
+use vfs::directory::entry::{EntryInfo, FlagsOrProtocols, OpenRequest};
+use vfs::directory::immutable::connection::ImmutableConnection;
+use vfs::directory::traversal_position::TraversalPosition;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::vmo::VmoFile;
+use vfs::path::Path as VfsPath;
+use vfs::{
+    immutable_attributes, CreationMode, ObjectRequestRef, ProtocolsExt as _, ToObjectRequest,
 };
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// The root directory of Fuchsia package.
 #[derive(Debug)]
@@ -602,22 +595,20 @@ fn open_for_read(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::anyhow,
-        assert_matches::assert_matches,
-        fidl::endpoints::{create_proxy, Proxy as _},
-        fuchsia_fs::directory::{DirEntry, DirentKind},
-        fuchsia_pkg_testing::{blobfs::Fake as FakeBlobfs, PackageBuilder},
-        futures::TryStreamExt as _,
-        pretty_assertions::assert_eq,
-        std::convert::TryInto as _,
-        std::io::Cursor,
-        vfs::{
-            directory::{entry::DirectoryEntry, entry_container::Directory},
-            node::Node,
-        },
-    };
+    use super::*;
+    use anyhow::anyhow;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::{create_proxy, Proxy as _};
+    use fuchsia_fs::directory::{DirEntry, DirentKind};
+    use fuchsia_pkg_testing::blobfs::Fake as FakeBlobfs;
+    use fuchsia_pkg_testing::PackageBuilder;
+    use futures::TryStreamExt as _;
+    use pretty_assertions::assert_eq;
+    use std::convert::TryInto as _;
+    use std::io::Cursor;
+    use vfs::directory::entry::DirectoryEntry;
+    use vfs::directory::entry_container::Directory;
+    use vfs::node::Node;
 
     struct TestEnv {
         _blobfs_fake: FakeBlobfs,

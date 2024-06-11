@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::mac::{FrameControl, HtControl, MacAddr, OptionalField, Presence, SequenceControl},
-    wlan_bitfield::bitfield,
-    zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned},
-};
+use crate::mac::{FrameControl, HtControl, MacAddr, OptionalField, Presence, SequenceControl};
+use wlan_bitfield::bitfield;
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
 
 // IEEE Std 802.11-2016, 9.2.4.5.1, Table 9-6
 #[bitfield(
@@ -110,7 +108,9 @@ pub fn data_bssid(hdr: &FixedDataHdrFields) -> Option<MacAddr> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::mac::*, crate::test_utils::fake_frames::*};
+    use super::*;
+    use crate::mac::*;
+    use crate::test_utils::fake_frames::*;
 
     #[test]
     fn fixed_fields_len() {

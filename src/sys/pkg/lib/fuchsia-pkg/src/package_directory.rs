@@ -9,17 +9,14 @@ use crate::{
     MetaSubpackagesError,
 };
 use fidl::endpoints::ServerEnd;
-use fidl_fuchsia_io as fio;
 use fuchsia_hash::{Hash, ParseHashError};
-use fuchsia_zircon_status as zx_status;
 use thiserror::Error;
 use version_history::AbiRevision;
+use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
 
 // re-export wrapped fuchsia_fs errors.
-pub use fuchsia_fs::{
-    file::ReadError,
-    node::{CloneError, CloseError, OpenError},
-};
+pub use fuchsia_fs::file::ReadError;
+pub use fuchsia_fs::node::{CloneError, CloseError, OpenError};
 
 /// An error encountered while reading/parsing the package's hash
 #[derive(Debug, Error)]

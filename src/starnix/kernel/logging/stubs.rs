@@ -6,7 +6,8 @@ use fuchsia_inspect::Inspector;
 use futures::future::BoxFuture;
 use once_cell::sync::Lazy;
 use starnix_sync::Mutex;
-use std::{collections::HashMap, panic::Location};
+use std::collections::HashMap;
+use std::panic::Location;
 
 static STUB_COUNTS: Lazy<Mutex<HashMap<Invocation, Counts>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));

@@ -4,11 +4,9 @@
 
 //! Network Address Translation.
 
-use core::{
-    fmt::Debug,
-    num::NonZeroU16,
-    ops::{ControlFlow, RangeInclusive},
-};
+use core::fmt::Debug;
+use core::num::NonZeroU16;
+use core::ops::{ControlFlow, RangeInclusive};
 
 use log::{error, warn};
 use net_types::{SpecifiedAddr, Witness as _};
@@ -17,13 +15,11 @@ use once_cell::sync::OnceCell;
 use packet_formats::ip::IpExt;
 use rand::Rng as _;
 
-use crate::{
-    conntrack::{Connection, ConnectionDirection, Table, Tuple},
-    context::{FilterBindingsContext, FilterBindingsTypes, NatContext},
-    logic::{IngressVerdict, Interfaces, RoutineResult, Verdict},
-    packets::{IpPacket, MaybeTransportPacketMut as _, TransportPacketMut as _},
-    state::Hook,
-};
+use crate::conntrack::{Connection, ConnectionDirection, Table, Tuple};
+use crate::context::{FilterBindingsContext, FilterBindingsTypes, NatContext};
+use crate::logic::{IngressVerdict, Interfaces, RoutineResult, Verdict};
+use crate::packets::{IpPacket, MaybeTransportPacketMut as _, TransportPacketMut as _};
+use crate::state::Hook;
 
 #[derive(Default)]
 pub struct NatConfig {
@@ -487,26 +483,25 @@ where
 
 #[cfg(test)]
 mod tests {
-    use alloc::{collections::HashMap, vec};
+    use alloc::collections::HashMap;
+    use alloc::vec;
     use core::marker::PhantomData;
 
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
-    use net_types::{
-        ip::{Ip, Ipv4, Ipv6},
-        NonMappedAddr,
-    };
+    use net_types::ip::{Ip, Ipv4, Ipv6};
+    use net_types::NonMappedAddr;
     use netstack3_base::IntoCoreTimerCtx;
     use test_case::test_case;
 
     use super::*;
-    use crate::{
-        context::testutil::{FakeBindingsCtx, FakeNatCtx},
-        matchers::testutil::{ethernet_interface, FakeDeviceId},
-        matchers::PacketMatcher,
-        packets::testutil::internal::{ArbitraryValue, FakeIpPacket, FakeTcpSegment, TestIpExt},
-        state::{Action, Routine, Rule, TransparentProxy},
+    use crate::context::testutil::{FakeBindingsCtx, FakeNatCtx};
+    use crate::matchers::testutil::{ethernet_interface, FakeDeviceId};
+    use crate::matchers::PacketMatcher;
+    use crate::packets::testutil::internal::{
+        ArbitraryValue, FakeIpPacket, FakeTcpSegment, TestIpExt,
     };
+    use crate::state::{Action, Routine, Rule, TransparentProxy};
 
     #[test]
     fn accept_by_default_if_no_matching_rules_in_hook() {

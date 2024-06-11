@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        buffer_reader::{BufferReader, IntoBufferReader},
-        ie, UnalignedView,
-    },
-    ieee80211::MacAddr,
-    num::Unsigned,
-    zerocopy::{AsBytes, ByteSlice, NoCell, Ref},
-};
+use crate::buffer_reader::{BufferReader, IntoBufferReader};
+use crate::{ie, UnalignedView};
+use ieee80211::MacAddr;
+use num::Unsigned;
+use zerocopy::{AsBytes, ByteSlice, NoCell, Ref};
 
 mod ctrl;
 mod data;
@@ -22,7 +18,12 @@ mod fields;
 mod frame_class;
 mod mgmt;
 
-pub use {ctrl::*, data::*, eth::*, fields::*, frame_class::*, mgmt::*};
+pub use ctrl::*;
+pub use data::*;
+pub use eth::*;
+pub use fields::*;
+pub use frame_class::*;
+pub use mgmt::*;
 
 #[macro_export]
 macro_rules! frame_len {
@@ -304,10 +305,9 @@ fn round_up<T: Unsigned + Copy>(value: T, multiple: T) -> T {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{assert_variant, test_utils::fake_frames::*},
-    };
+    use super::*;
+    use crate::assert_variant;
+    use crate::test_utils::fake_frames::*;
 
     #[test]
     fn parse_mgmt_frame() {

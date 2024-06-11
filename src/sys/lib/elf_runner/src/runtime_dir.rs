@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio,
-    std::sync::Arc,
-    vfs::{
-        directory::entry_container::Directory, directory::helper::DirectlyMutable,
-        directory::immutable::simple as pfs, execution_scope::ExecutionScope, file::vmo::read_only,
-        path::Path as fvfsPath, tree_builder::TreeBuilder,
-    },
-};
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io as fio;
+use std::sync::Arc;
+use vfs::directory::entry_container::Directory;
+use vfs::directory::helper::DirectlyMutable;
+use vfs::directory::immutable::simple as pfs;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::vmo::read_only;
+use vfs::path::Path as fvfsPath;
+use vfs::tree_builder::TreeBuilder;
 
 // Simple directory type which is used to implement `ComponentStartInfo.runtime_directory`.
 pub struct RuntimeDirectory(Arc<pfs::Simple>);

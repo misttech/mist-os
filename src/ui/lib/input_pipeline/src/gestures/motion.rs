@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::gesture_arena::{
-        self, DetailedReasonUint, EndGestureEvent, ExamineEventResult, MouseEvent,
-        ProcessBufferedEventsResult, ProcessNewEventResult, Reason, RecognizedGesture,
-        TouchpadEvent, VerifyEventResult,
-    },
-    crate::mouse_binding,
-    crate::utils::{euclidean_distance, Position},
-    maplit::hashset,
+use super::gesture_arena::{
+    self, DetailedReasonUint, EndGestureEvent, ExamineEventResult, MouseEvent,
+    ProcessBufferedEventsResult, ProcessNewEventResult, Reason, RecognizedGesture, TouchpadEvent,
+    VerifyEventResult,
 };
+use crate::mouse_binding;
+use crate::utils::{euclidean_distance, Position};
+use maplit::hashset;
 
 /// The initial state of this recognizer, before a finger contact has been detected.
 #[derive(Debug)]
@@ -242,10 +240,12 @@ fn touchpad_event_to_mouse_motion_event(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::touch_binding, assert_matches::assert_matches, fuchsia_zircon as zx,
-        pretty_assertions::assert_eq, test_case::test_case,
-    };
+    use super::*;
+    use crate::touch_binding;
+    use assert_matches::assert_matches;
+    use fuchsia_zircon as zx;
+    use pretty_assertions::assert_eq;
+    use test_case::test_case;
 
     fn touch_contact(id: u32, position: Position) -> touch_binding::TouchContact {
         touch_binding::TouchContact { id, position, pressure: None, contact_size: None }

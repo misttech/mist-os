@@ -2,36 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::cache::{BlobFetcher, CacheError, MerkleForError, ToResolveError, ToResolveStatus};
+use crate::inspect_util::{self, InspectableRepositoryConfig};
+use crate::repository::Repository;
+use anyhow::{anyhow, Context as _};
+use fidl_contrib::protocol_connector::ProtocolSender;
+use fidl_fuchsia_metrics::MetricEvent;
+use fidl_fuchsia_pkg_ext::{self as pkg, cache, BlobId, RepositoryConfig, RepositoryConfigs};
+use fuchsia_pkg::PackageDirectory;
+use fuchsia_sync::{Mutex, RwLock};
+use fuchsia_url::{AbsolutePackageUrl, RepositoryUrl};
+use fuchsia_zircon::Status;
+use futures::future::LocalBoxFuture;
+use futures::lock::Mutex as AsyncMutex;
+use futures::prelude::*;
+use std::collections::hash_map::Entry;
+use std::collections::{btree_set, BTreeSet, HashMap};
+use std::ops::Deref;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::Duration;
+use std::{fs, io};
+use thiserror::Error;
+use tracing::{error, info};
 use {
-    crate::{
-        cache::{BlobFetcher, CacheError, MerkleForError, ToResolveError, ToResolveStatus},
-        inspect_util::{self, InspectableRepositoryConfig},
-        repository::Repository,
-    },
-    anyhow::{anyhow, Context as _},
-    cobalt_sw_delivery_registry as metrics,
-    fidl_contrib::protocol_connector::ProtocolSender,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_metrics::MetricEvent,
-    fidl_fuchsia_pkg as fpkg,
-    fidl_fuchsia_pkg_ext::{self as pkg, cache, BlobId, RepositoryConfig, RepositoryConfigs},
-    fuchsia_inspect as inspect,
-    fuchsia_pkg::PackageDirectory,
-    fuchsia_sync::{Mutex, RwLock},
-    fuchsia_trace as ftrace,
-    fuchsia_url::{AbsolutePackageUrl, RepositoryUrl},
-    fuchsia_zircon::Status,
-    futures::{future::LocalBoxFuture, lock::Mutex as AsyncMutex, prelude::*},
-    std::{
-        collections::{btree_set, hash_map::Entry, BTreeSet, HashMap},
-        fs, io,
-        ops::Deref,
-        path::{Path, PathBuf},
-        sync::Arc,
-        time::Duration,
-    },
-    thiserror::Error,
-    tracing::{error, info},
+    cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
+    fuchsia_inspect as inspect, fuchsia_trace as ftrace,
 };
 
 /// [RepositoryManager] controls access to all the repository configs used by the package resolver.
@@ -899,15 +895,15 @@ impl ToResolveStatus for GetPackageHashError {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        diagnostics_assertions::assert_data_tree,
-        fidl_fuchsia_pkg_ext::{MirrorConfigBuilder, RepositoryConfigBuilder, RepositoryKey},
-        fuchsia_async as fasync,
-        http::Uri,
-        maplit::hashmap,
-        std::{borrow::Borrow, fs::File, io::Write},
-    };
+    use super::*;
+    use diagnostics_assertions::assert_data_tree;
+    use fidl_fuchsia_pkg_ext::{MirrorConfigBuilder, RepositoryConfigBuilder, RepositoryKey};
+    use fuchsia_async as fasync;
+    use http::Uri;
+    use maplit::hashmap;
+    use std::borrow::Borrow;
+    use std::fs::File;
+    use std::io::Write;
 
     const DYNAMIC_CONFIG_NAME: &str = "dynamic-config.json";
 

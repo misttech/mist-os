@@ -2,15 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{any::TypeId, cell::Cell};
+use std::any::TypeId;
+use std::cell::Cell;
 
-use crate::{
-    animation::{CubicInterpolator, KeyFrameColor, KeyFrameDouble, KeyFrameId, KeyedProperty},
-    core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property},
-    importers::{ImportStack, KeyedPropertyImporter},
-    option_cell::OptionCell,
-    status_code::StatusCode,
+use crate::animation::{
+    CubicInterpolator, KeyFrameColor, KeyFrameDouble, KeyFrameId, KeyedProperty,
 };
+use crate::core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property};
+use crate::importers::{ImportStack, KeyedPropertyImporter};
+use crate::option_cell::OptionCell;
+use crate::status_code::StatusCode;
 
 #[derive(Debug, Default)]
 pub struct KeyFrame {

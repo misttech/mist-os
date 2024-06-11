@@ -16,16 +16,18 @@ use crate::{
     clone_get_vmo_file_proxy_assert_ok,
 };
 
-use crate::{execution_scope::ExecutionScope, file::test_utils::*, ToObjectRequest};
+use crate::execution_scope::ExecutionScope;
+use crate::file::test_utils::*;
+use crate::ToObjectRequest;
 
-use {
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_io as fio,
-    fuchsia_async::TestExecutor,
-    fuchsia_zircon::{sys::ZX_OK, Vmo},
-    futures::{channel::oneshot, future::join},
-    libc::{S_IRUSR, S_IWUSR},
-};
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_io as fio;
+use fuchsia_async::TestExecutor;
+use fuchsia_zircon::sys::ZX_OK;
+use fuchsia_zircon::Vmo;
+use futures::channel::oneshot;
+use futures::future::join;
+use libc::{S_IRUSR, S_IWUSR};
 
 /// Verify that [`read_only`] works with static and owned data. Compile-time test.
 #[test]

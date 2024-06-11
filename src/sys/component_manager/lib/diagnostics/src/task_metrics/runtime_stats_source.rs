@@ -2,14 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_trait::async_trait,
-    fidl_fuchsia_diagnostics_types::{ComponentDiagnostics, Task as DiagnosticsTask, TaskUnknown},
-    fuchsia_zircon::sys as zx_sys,
-    fuchsia_zircon::{self as zx, AsHandleRef, Task},
-    futures::channel::oneshot,
-    hooks::RuntimeInfo,
-};
+use async_trait::async_trait;
+use fidl_fuchsia_diagnostics_types::{ComponentDiagnostics, Task as DiagnosticsTask, TaskUnknown};
+use fuchsia_zircon::{self as zx, sys as zx_sys, AsHandleRef, Task};
+use futures::channel::oneshot;
+use hooks::RuntimeInfo;
 
 /// Trait that all structs that behave as Task's implement.
 /// Used for simplying testing.

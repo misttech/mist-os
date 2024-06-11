@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::wire, anyhow::Error, async_trait::async_trait, fuchsia_trace as ftrace,
-    std::borrow::Cow, virtio_device::mem::DeviceRange,
-};
+use crate::wire;
+use anyhow::Error;
+use async_trait::async_trait;
+use fuchsia_trace as ftrace;
+use std::borrow::Cow;
+use virtio_device::mem::DeviceRange;
 
 /// Represents a 512 byte sector.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -255,7 +257,8 @@ pub trait BlockBackend {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, virtio_device::fake_queue::IdentityDriverMem};
+    use super::*;
+    use virtio_device::fake_queue::IdentityDriverMem;
 
     #[fuchsia::test]
     fn test_ranges_bounded_no_change() {

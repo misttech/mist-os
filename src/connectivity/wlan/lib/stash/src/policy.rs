@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{stash_store::StashStore, storage_store::StorageStore, Store},
-    anyhow::{Context, Error},
-    fidl_fuchsia_stash as fidl_stash,
-    fuchsia_component::client::connect_to_protocol,
-    std::collections::HashMap,
-    wlan_stash_constants::POLICY_STASH_PREFIX,
-};
+use crate::stash_store::StashStore;
+use crate::storage_store::StorageStore;
+use crate::Store;
+use anyhow::{Context, Error};
+use fidl_fuchsia_stash as fidl_stash;
+use fuchsia_component::client::connect_to_protocol;
+use std::collections::HashMap;
+use wlan_stash_constants::POLICY_STASH_PREFIX;
 
 pub use wlan_stash_constants::{
     self, Credential, NetworkIdentifier, PersistentData, PersistentStorageData, SecurityType,
@@ -123,26 +123,18 @@ mod tests {
     #![allow(unused_variables)]
     #![allow(unused_imports)]
 
-    use {
-        super::*,
-        crate::tests::{network_id, new_stash_id},
-        fidl::endpoints::{create_proxy, create_request_stream},
-        fidl_fuchsia_stash::{SecureStoreRequest, StoreAccessorRequest},
-        fuchsia_async as fasync,
-        futures::StreamExt,
-        ieee80211::Ssid,
-        rand::{
-            distributions::{Alphanumeric, DistString as _},
-            thread_rng,
-        },
-        std::{
-            convert::TryFrom,
-            sync::{
-                atomic::{AtomicBool, Ordering},
-                Arc,
-            },
-        },
-    };
+    use super::*;
+    use crate::tests::{network_id, new_stash_id};
+    use fidl::endpoints::{create_proxy, create_request_stream};
+    use fidl_fuchsia_stash::{SecureStoreRequest, StoreAccessorRequest};
+    use fuchsia_async as fasync;
+    use futures::StreamExt;
+    use ieee80211::Ssid;
+    use rand::distributions::{Alphanumeric, DistString as _};
+    use rand::thread_rng;
+    use std::convert::TryFrom;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
 
     /// The PSK provided must be the bytes form of the 64 hexadecimal character hash. This is a
     /// duplicate of a definition in wlan/wlancfg/src, since I don't think there's a good way to

@@ -9,33 +9,28 @@
 use anyhow::Context as _;
 use async_utils::stream::{Tagged, TryFlattenUnorderedExt as _, WithTag as _};
 use const_unwrap::const_unwrap_option;
-use fidl::{
-    endpoints::{ControlHandle as _, RequestStream as _},
-    HandleBased as _, Peered as _,
-};
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_ext as fnet_ext;
-use fidl_fuchsia_posix as fposix;
-use fidl_fuchsia_posix_socket as fposix_socket;
+use fidl::endpoints::{ControlHandle as _, RequestStream as _};
+use fidl::{HandleBased as _, Peered as _};
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
-use fuchsia_zircon as zx;
-use futures::{io::AsyncReadExt as _, stream::SelectAll, FutureExt as _, StreamExt as _};
-use net_types::{
-    ip::{Ip, Ipv4, Ipv6},
-    SpecifiedAddr,
-};
+use futures::io::AsyncReadExt as _;
+use futures::stream::SelectAll;
+use futures::{FutureExt as _, StreamExt as _};
+use net_types::ip::{Ip, Ipv4, Ipv6};
+use net_types::SpecifiedAddr;
 use packet::{ParseBuffer as _, Serializer as _};
 use packet_formats::icmp::{
     IcmpEchoReply, IcmpEchoRequest, IcmpMessage, IcmpPacketBuilder, IcmpPacketRaw, IcmpUnusedCode,
 };
 use rand::Rng as _;
-use std::{
-    cell::RefCell,
-    collections::{HashMap, HashSet, VecDeque},
-    convert::{TryFrom as _, TryInto as _},
-    rc::Rc,
-};
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::convert::{TryFrom as _, TryInto as _};
+use std::rc::Rc;
 use tracing::{error, info};
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_posix as fposix,
+    fidl_fuchsia_posix_socket as fposix_socket, fuchsia_zircon as zx,
+};
 
 #[fuchsia::main]
 async fn main() {

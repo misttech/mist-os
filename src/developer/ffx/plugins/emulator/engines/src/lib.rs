@@ -19,7 +19,8 @@ use emulator_instance::{
 use errors::ffx_bail;
 use ffx_emulator_config::EmulatorEngine;
 use fho::{bug, return_user_error, Result};
-use qemu_based::{femu::FemuEngine, qemu::QemuEngine};
+use qemu_based::femu::FemuEngine;
+use qemu_based::qemu::QemuEngine;
 
 /// The EngineBuilder is used to create and configure an EmulatorEngine, while ensuring the
 /// configuration will result in a valid emulation instance.

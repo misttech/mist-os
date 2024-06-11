@@ -2,24 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::common::mac::WlanGi;
+use crate::probe_sequence::{ProbeEntry, ProbeSequence};
+use ieee80211::{MacAddr, MacAddrBytes};
+use std::collections::{hash_map, HashMap, HashSet};
+use std::time::Duration;
+use tracing::{debug, error};
+use wlan_common::ie::{HtCapabilities, RxMcsBitmask, SupportedRate};
+use wlan_common::mac::FrameControl;
+use wlan_common::tx_vector::{
+    TxVecIdx, TxVector, ERP_NUM_TX_VECTOR, ERP_START_IDX, HT_NUM_MCS, HT_NUM_UNIQUE_MCS,
+};
 use {
-    crate::common::mac::WlanGi,
-    crate::probe_sequence::{ProbeEntry, ProbeSequence},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_minstrel as fidl_minstrel,
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx,
-    ieee80211::{MacAddr, MacAddrBytes},
-    std::{
-        collections::{hash_map, HashMap, HashSet},
-        time::Duration,
-    },
-    tracing::{debug, error},
-    wlan_common::{
-        ie::{HtCapabilities, RxMcsBitmask, SupportedRate},
-        mac::FrameControl,
-        tx_vector::{
-            TxVecIdx, TxVector, ERP_NUM_TX_VECTOR, ERP_START_IDX, HT_NUM_MCS, HT_NUM_UNIQUE_MCS,
-        },
-    },
 };
 
 // TODO(https://fxbug.dev/42103418): Enable CBW40 support once its information is available from AssocCtx.
@@ -703,17 +699,13 @@ fn erp_idx_stats(tx_vector_idx: TxVecIdx, rate: SupportedRate) -> TxStats {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_fuchsia_wlan_common as fidl_common,
-        lazy_static::lazy_static,
-        std::sync::{Arc, Mutex},
-        wlan_common::{
-            ie::{ChanWidthSet, HtCapabilityInfo},
-            mac::FrameType,
-            tx_vector::HT_START_IDX,
-        },
-    };
+    use super::*;
+    use fidl_fuchsia_wlan_common as fidl_common;
+    use lazy_static::lazy_static;
+    use std::sync::{Arc, Mutex};
+    use wlan_common::ie::{ChanWidthSet, HtCapabilityInfo};
+    use wlan_common::mac::FrameType;
+    use wlan_common::tx_vector::HT_START_IDX;
 
     struct MockTimerManager {
         scheduled: Arc<Mutex<Option<Duration>>>,

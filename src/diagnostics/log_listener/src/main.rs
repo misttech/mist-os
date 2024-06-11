@@ -9,25 +9,19 @@
 
 use anyhow::Error;
 use async_trait::async_trait;
-use ffx_writer::Format;
-use ffx_writer::MachineWriter;
-use fidl_fuchsia_diagnostics::LogSettingsMarker;
-use fidl_fuchsia_diagnostics::StreamParameters;
+use ffx_writer::{Format, MachineWriter};
+use fidl_fuchsia_diagnostics::{LogSettingsMarker, StreamParameters};
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
 use fidl_fuchsia_sys2::RealmQueryMarker;
-use fuchsia_component::client::connect_to_protocol;
-use fuchsia_component::client::connect_to_protocol_at_path;
-use fuchsia_zircon as zx;
-use log_command as log_utils;
+use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
 use log_command::log_formatter;
-use log_formatter::dump_logs_from_socket as read_logs_from_socket;
-use log_formatter::DefaultLogFormatter;
-use log_formatter::LogEntry;
-use log_formatter::Symbolize;
+use log_formatter::{
+    dump_logs_from_socket as read_logs_from_socket, DefaultLogFormatter, LogEntry, Symbolize,
+};
 use log_utils::log_formatter::BootTimeAccessor;
-use log_utils::LogCommand;
-use log_utils::LogSubCommand;
+use log_utils::{LogCommand, LogSubCommand};
 use std::io::Write;
+use {fuchsia_zircon as zx, log_command as log_utils};
 
 /// Target-side symbolizer implementation.
 /// Does nothing as no symbols are available on the target.

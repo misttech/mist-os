@@ -5,30 +5,26 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
-use crate::{
-    bpf::{map::Map, program::Program, syscalls::BpfTypeFormat},
-    task::{CurrentTask, Kernel, Task},
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, fs_node_impl_not_dir, fs_node_impl_xattr_delegate, CacheMode,
-        FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-        FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-        MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrOp,
-    },
+use crate::bpf::map::Map;
+use crate::bpf::program::Program;
+use crate::bpf::syscalls::BpfTypeFormat;
+use crate::task::{CurrentTask, Kernel, Task};
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::{
+    fileops_impl_nonseekable, fs_node_impl_not_dir, fs_node_impl_xattr_delegate, CacheMode,
+    FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
+    FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, MemoryDirectoryFile,
+    MemoryXattrStorage, NamespaceNode, XattrOp,
 };
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked, WriteOps};
-use starnix_uapi::{
-    auth::FsCred,
-    device_type::DeviceType,
-    errno, error,
-    errors::Errno,
-    file_mode::{mode, FileMode},
-    open_flags::OpenFlags,
-    statfs,
-    vfs::default_statfs,
-    BPF_FS_MAGIC,
-};
+use starnix_uapi::auth::FsCred;
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::{mode, FileMode};
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::vfs::default_statfs;
+use starnix_uapi::{errno, error, statfs, BPF_FS_MAGIC};
 use std::sync::Arc;
 
 /// The default selinux context to use for each BPF object.

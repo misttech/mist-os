@@ -4,9 +4,9 @@
 
 use std::cmp::max;
 
-use crate::{
-    client::types, config_management::FailureReason::CredentialRejected, util::pseudo_energy::*,
-};
+use crate::client::types;
+use crate::config_management::FailureReason::CredentialRejected;
+use crate::util::pseudo_energy::*;
 
 const RSSI_AND_VELOCITY_SCORE_WEIGHT: f32 = 0.6;
 const SNR_SCORE_WEIGHT: f32 = 0.4;
@@ -172,18 +172,14 @@ pub fn score_current_connection_signal_data(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::{
-            config_management::{ConnectFailure, FailureReason, PastConnectionData},
-            util::testing::{
-                generate_channel, generate_random_bss, generate_random_saved_network_data,
-                generate_random_scanned_candidate, random_connection_data,
-            },
-        },
-        fuchsia_async as fasync, fuchsia_zircon as zx,
-        test_util::assert_gt,
+    use super::*;
+    use crate::config_management::{ConnectFailure, FailureReason, PastConnectionData};
+    use crate::util::testing::{
+        generate_channel, generate_random_bss, generate_random_saved_network_data,
+        generate_random_scanned_candidate, random_connection_data,
     };
+    use test_util::assert_gt;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     fn connect_failure_with_bssid(bssid: types::Bssid) -> ConnectFailure {
         ConnectFailure {

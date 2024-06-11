@@ -2,15 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_diagnostics::Severity,
-    proc_macro2::TokenStream,
-    quote::{quote, quote_spanned, TokenStreamExt},
-    syn::{
-        parse::{Parse, ParseStream},
-        Attribute, Block, Error, Ident, ItemFn, LitBool, LitInt, LitStr, Signature, Token,
-        Visibility,
-    },
+use fidl_fuchsia_diagnostics::Severity;
+use proc_macro2::TokenStream;
+use quote::{quote, quote_spanned, TokenStreamExt};
+use syn::parse::{Parse, ParseStream};
+use syn::{
+    Attribute, Block, Error, Ident, ItemFn, LitBool, LitInt, LitStr, Signature, Token, Visibility,
 };
 
 #[derive(Clone, Copy)]

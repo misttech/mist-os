@@ -2,22 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::{
-        actions::{Action, ActionKey},
-        component::instance::{InstanceState, ResolvedInstanceState},
-        component::ComponentInstance,
-        component::{Component, WeakComponentInstance},
-        resolver::Resolver,
-        routing::router_ext::WeakComponentTokenExt,
-    },
-    ::routing::{component_instance::ComponentInstanceInterface, resolving::ComponentAddress},
-    async_trait::async_trait,
-    cm_util::{AbortError, AbortHandle, AbortableScope},
-    errors::{ActionError, ResolveActionError},
-    hooks::EventPayload,
-    std::{ops::DerefMut, sync::Arc},
-};
+use crate::model::actions::{Action, ActionKey};
+use crate::model::component::instance::{InstanceState, ResolvedInstanceState};
+use crate::model::component::{Component, ComponentInstance, WeakComponentInstance};
+use crate::model::resolver::Resolver;
+use crate::model::routing::router_ext::WeakComponentTokenExt;
+use ::routing::component_instance::ComponentInstanceInterface;
+use ::routing::resolving::ComponentAddress;
+use async_trait::async_trait;
+use cm_util::{AbortError, AbortHandle, AbortableScope};
+use errors::{ActionError, ResolveActionError};
+use hooks::EventPayload;
+use std::ops::DerefMut;
+use std::sync::Arc;
 
 /// Resolves a component instance's declaration and initializes its state.
 pub struct ResolveAction {
@@ -146,22 +143,19 @@ async fn do_resolve(
 
 #[cfg(test)]
 pub mod tests {
-    use {
-        crate::model::{
-            actions::test_utils::{is_resolved, is_stopped},
-            actions::{
-                Action, ActionKey, ActionsManager, ResolveAction, ShutdownAction, ShutdownType,
-                StartAction, StopAction,
-            },
-            component::{IncomingCapabilities, StartReason},
-            testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
-        },
-        assert_matches::assert_matches,
-        cm_rust_testing::ComponentDeclBuilder,
-        errors::{ActionError, ResolveActionError},
-        futures::{channel::oneshot, FutureExt},
-        moniker::Moniker,
+    use crate::model::actions::test_utils::{is_resolved, is_stopped};
+    use crate::model::actions::{
+        Action, ActionKey, ActionsManager, ResolveAction, ShutdownAction, ShutdownType,
+        StartAction, StopAction,
     };
+    use crate::model::component::{IncomingCapabilities, StartReason};
+    use crate::model::testing::test_helpers::{component_decl_with_test_runner, ActionsTest};
+    use assert_matches::assert_matches;
+    use cm_rust_testing::ComponentDeclBuilder;
+    use errors::{ActionError, ResolveActionError};
+    use futures::channel::oneshot;
+    use futures::FutureExt;
+    use moniker::Moniker;
 
     #[fuchsia::test]
     async fn resolve_action_test() {

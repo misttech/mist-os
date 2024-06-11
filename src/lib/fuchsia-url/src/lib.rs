@@ -20,25 +20,23 @@ mod repository_url;
 pub mod test;
 mod unpinned_absolute_package_url;
 
-pub use crate::{
-    absolute_component_url::AbsoluteComponentUrl,
-    absolute_package_url::AbsolutePackageUrl,
-    component_url::ComponentUrl,
-    errors::ParseError,
-    package_url::PackageUrl,
-    parse::{validate_resource_path, PackageName, PackageVariant, MAX_PACKAGE_PATH_SEGMENT_BYTES},
-    pinned_absolute_package_url::PinnedAbsolutePackageUrl,
-    relative_component_url::RelativeComponentUrl,
-    relative_package_url::RelativePackageUrl,
-    repository_url::RepositoryUrl,
-    unpinned_absolute_package_url::UnpinnedAbsolutePackageUrl,
+pub use crate::absolute_component_url::AbsoluteComponentUrl;
+pub use crate::absolute_package_url::AbsolutePackageUrl;
+pub use crate::component_url::ComponentUrl;
+pub use crate::errors::ParseError;
+pub use crate::package_url::PackageUrl;
+pub use crate::parse::{
+    validate_resource_path, PackageName, PackageVariant, MAX_PACKAGE_PATH_SEGMENT_BYTES,
 };
+pub use crate::pinned_absolute_package_url::PinnedAbsolutePackageUrl;
+pub use crate::relative_component_url::RelativeComponentUrl;
+pub use crate::relative_package_url::RelativePackageUrl;
+pub use crate::repository_url::RepositoryUrl;
+pub use crate::unpinned_absolute_package_url::UnpinnedAbsolutePackageUrl;
 
-use {
-    crate::host::Host,
-    lazy_static::lazy_static,
-    percent_encoding::{AsciiSet, CONTROLS},
-};
+use crate::host::Host;
+use lazy_static::lazy_static;
+use percent_encoding::{AsciiSet, CONTROLS};
 
 /// https://url.spec.whatwg.org/#fragment-percent-encode-set
 const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
@@ -202,7 +200,8 @@ fn parse_path_to_name_and_variant(
 
 #[cfg(test)]
 mod test_validate_path {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     macro_rules! test_err {
         (
@@ -254,7 +253,8 @@ mod test_validate_path {
 
 #[cfg(test)]
 mod test_validate_inverse_relative_url {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     macro_rules! test_err {
         (
@@ -324,7 +324,8 @@ mod test_validate_inverse_relative_url {
 
 #[cfg(test)]
 mod test_parse_path_to_name_and_variant {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     macro_rules! test_err {
         (
@@ -389,7 +390,9 @@ mod test_parse_path_to_name_and_variant {
 
 #[cfg(test)]
 mod test_url_parts {
-    use {super::*, crate::errors::ResourcePathError, assert_matches::assert_matches};
+    use super::*;
+    use crate::errors::ResourcePathError;
+    use assert_matches::assert_matches;
 
     macro_rules! test_parse_err {
         (

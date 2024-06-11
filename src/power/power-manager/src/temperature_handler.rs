@@ -4,26 +4,25 @@
 
 use crate::common_utils::result_debug_panic::ResultDebugPanic;
 use crate::error::PowerManagerError;
-use crate::log_if_err;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
-use crate::ok_or_default_err;
 use crate::types::{Celsius, Nanoseconds, Seconds};
+use crate::{log_if_err, ok_or_default_err};
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use async_utils::event::Event as AsyncEvent;
-use fidl_fuchsia_hardware_temperature as ftemperature;
-use fuchsia_async as fasync;
 use fuchsia_inspect::{self as inspect, NumericProperty, Property};
-use fuchsia_inspect_contrib::{inspect_log, nodes::BoundedListNode};
-use fuchsia_zircon as zx;
+use fuchsia_inspect_contrib::inspect_log;
+use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use serde_derive::Deserialize;
-use serde_json as json;
-use std::cell::Cell;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 use tracing::*;
+use {
+    fidl_fuchsia_hardware_temperature as ftemperature, fuchsia_async as fasync,
+    fuchsia_zircon as zx, serde_json as json,
+};
 
 /// Node: TemperatureHandler
 ///
@@ -372,10 +371,8 @@ pub mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use async_utils::PollExt as _;
-    use diagnostics_assertions::assert_data_tree;
-    use diagnostics_assertions::TreeAssertion;
-    use futures::poll;
-    use futures::TryStreamExt;
+    use diagnostics_assertions::{assert_data_tree, TreeAssertion};
+    use futures::{poll, TryStreamExt};
     use std::task::Poll;
 
     /// Spawns a new task that acts as a fake temperature driver for testing purposes. Each

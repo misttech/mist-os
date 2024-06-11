@@ -2,26 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{format_err, Error};
+use assert_matches::assert_matches;
+use cm_rust::FidlIntoNative;
+use cm_rust_testing::*;
+use fidl_fidl_examples_routing_echo::{self as fecho, EchoMarker as EchoClientStatsMarker};
+use fidl_fuchsia_component::{self as fcomponent, EventStreamMarker};
+use fuchsia_component::server as fserver;
+use fuchsia_component_test::error::Error as RealmBuilderError;
+use fuchsia_component_test::{
+    Capability, ChildOptions, DirectoryContents, LocalComponentHandles, RealmBuilder,
+    RealmBuilderParams, Ref, Route,
+};
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
+use futures::channel::mpsc;
+use futures::future::pending;
+use futures::lock::Mutex;
+use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
+use std::sync::Arc;
 use {
-    anyhow::{format_err, Error},
-    assert_matches::assert_matches,
-    cm_rust::FidlIntoNative,
-    cm_rust_testing::*,
-    fidl_fidl_examples_routing_echo::{self as fecho, EchoMarker as EchoClientStatsMarker},
-    fidl_fuchsia_component::{self as fcomponent, EventStreamMarker},
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_test as ftest,
     fidl_fuchsia_data as fdata, fidl_fuchsia_examples_services as fex_services,
     fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
-    fuchsia_component::server as fserver,
-    fuchsia_component_test::{
-        error::Error as RealmBuilderError, Capability, ChildOptions, DirectoryContents,
-        LocalComponentHandles, RealmBuilder, RealmBuilderParams, Ref, Route,
-    },
-    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
-    futures::{
-        channel::mpsc, future::pending, lock::Mutex, FutureExt, SinkExt, StreamExt, TryStreamExt,
-    },
-    std::sync::Arc,
 };
 
 const V2_ECHO_CLIENT_ABSOLUTE_URL: &'static str =

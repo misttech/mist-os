@@ -2,20 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::events::{
-        dispatcher::{EventDispatcher, EventDispatcherScope},
-        event::Event,
-        registry::ComponentEventRoute,
-    },
-    futures::{channel::mpsc, stream::Peekable, task::Context, Stream, StreamExt},
-    moniker::ExtendedMoniker,
-    std::{
-        pin::Pin,
-        sync::{Arc, Weak},
-        task::Poll,
-    },
-};
+use crate::model::events::dispatcher::{EventDispatcher, EventDispatcherScope};
+use crate::model::events::event::Event;
+use crate::model::events::registry::ComponentEventRoute;
+use futures::channel::mpsc;
+use futures::stream::Peekable;
+use futures::task::Context;
+use futures::{Stream, StreamExt};
+use moniker::ExtendedMoniker;
+use std::pin::Pin;
+use std::sync::{Arc, Weak};
+use std::task::Poll;
 
 #[cfg(test)]
 use {

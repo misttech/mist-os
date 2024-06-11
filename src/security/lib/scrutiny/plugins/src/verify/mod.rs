@@ -6,36 +6,35 @@ mod collection;
 mod collector;
 mod controller;
 
-use {
-    crate::verify::{
-        collector::component_model::V2ComponentModelDataCollector,
-        controller::{
-            build::VerifyBuildController,
-            capability_routing::{CapabilityRouteController, V2ComponentModelMappingController},
-            component_resolvers::ComponentResolversController,
-            pre_signing::PreSigningController,
-            route_sources::RouteSourcesController,
-            structured_config::ExtractStructuredConfigController,
-            structured_config::VerifyStructuredConfigController,
-        },
-    },
-    cm_fidl_analyzer::route::CapabilityRouteError,
-    cm_rust::CapabilityTypeName,
-    cm_types::Name,
-    moniker::Moniker,
-    routing::mapper::RouteSegment,
-    scrutiny::prelude::*,
-    serde::{Deserialize, Serialize},
-    std::{collections::HashSet, error::Error, path::PathBuf, sync::Arc},
+use crate::verify::collector::component_model::V2ComponentModelDataCollector;
+use crate::verify::controller::build::VerifyBuildController;
+use crate::verify::controller::capability_routing::{
+    CapabilityRouteController, V2ComponentModelMappingController,
 };
+use crate::verify::controller::component_resolvers::ComponentResolversController;
+use crate::verify::controller::pre_signing::PreSigningController;
+use crate::verify::controller::route_sources::RouteSourcesController;
+use crate::verify::controller::structured_config::{
+    ExtractStructuredConfigController, VerifyStructuredConfigController,
+};
+use cm_fidl_analyzer::route::CapabilityRouteError;
+use cm_rust::CapabilityTypeName;
+use cm_types::Name;
+use moniker::Moniker;
+use routing::mapper::RouteSegment;
+use scrutiny::prelude::*;
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+use std::error::Error;
+use std::path::PathBuf;
+use std::sync::Arc;
 
-pub use controller::{
-    pre_signing::PreSigningResponse,
-    route_sources::{
-        RouteSourceError, Source, VerifyRouteSourcesResult, VerifyRouteSourcesResults,
-    },
-    structured_config::ExtractStructuredConfigResponse,
-    structured_config::VerifyStructuredConfigResponse,
+pub use controller::pre_signing::PreSigningResponse;
+pub use controller::route_sources::{
+    RouteSourceError, Source, VerifyRouteSourcesResult, VerifyRouteSourcesResults,
+};
+pub use controller::structured_config::{
+    ExtractStructuredConfigResponse, VerifyStructuredConfigResponse,
 };
 
 plugin!(
@@ -178,41 +177,39 @@ pub struct OkResult {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::core::collection::testing::fake_component_src_pkg;
+    use crate::core::collection::{
+        Component, Components, CoreDataDeps, Manifest, ManifestData, Manifests,
+    };
+    use crate::verify::collection::V2ComponentModel;
+    use crate::verify::collector::component_model::{DEFAULT_CONFIG_PATH, DEFAULT_ROOT_URL};
+    use crate::zbi::Zbi;
+    use anyhow::Result;
+    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+    use base64::engine::Engine as _;
+    use cm_config::RuntimeConfig;
+    use cm_fidl_analyzer::component_model::ModelBuilderForAnalyzer;
+    use cm_rust::{
+        Availability, CapabilityDecl, ChildDecl, ComponentDecl, DependencyType, DirectoryDecl,
+        FidlIntoNative, NativeIntoFidl, OfferDecl, OfferDirectoryDecl, OfferProtocolDecl,
+        OfferSource, OfferTarget, ProgramDecl, UseDecl, UseDirectoryDecl, UseProtocolDecl,
+        UseSource,
+    };
+    use cm_rust_testing::*;
+    use cm_types::Url;
+    use component_id_index::InstanceId;
+    use fidl::persist;
+    use maplit::hashset;
+    use routing::component_instance::ComponentInstanceInterface;
+    use routing::environment::RunnerRegistry;
+    use scrutiny_testing::fake::*;
+    use scrutiny_utils::bootfs::{BootfsFileIndex, BootfsPackageIndex};
+    use serde_json::json;
+    use std::collections::HashMap;
     use {
-        super::*,
-        crate::{
-            core::collection::{
-                testing::fake_component_src_pkg, Component, Components, CoreDataDeps, Manifest,
-                ManifestData, Manifests,
-            },
-            verify::{
-                collection::V2ComponentModel,
-                collector::component_model::{DEFAULT_CONFIG_PATH, DEFAULT_ROOT_URL},
-            },
-            zbi::Zbi,
-        },
-        anyhow::Result,
-        base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _},
-        cm_config::RuntimeConfig,
-        cm_fidl_analyzer::component_model::ModelBuilderForAnalyzer,
-        cm_rust::{
-            Availability, CapabilityDecl, ChildDecl, ComponentDecl, DependencyType, DirectoryDecl,
-            FidlIntoNative, NativeIntoFidl, OfferDecl, OfferDirectoryDecl, OfferProtocolDecl,
-            OfferSource, OfferTarget, ProgramDecl, UseDecl, UseDirectoryDecl, UseProtocolDecl,
-            UseSource,
-        },
-        cm_rust_testing::*,
-        cm_types::Url,
-        component_id_index::InstanceId,
-        fidl::persist,
         fidl_fuchsia_component_decl as fdecl,
         fidl_fuchsia_component_internal as component_internal, fidl_fuchsia_io as fio,
-        maplit::hashset,
-        routing::{component_instance::ComponentInstanceInterface, environment::RunnerRegistry},
-        scrutiny_testing::fake::*,
-        scrutiny_utils::bootfs::{BootfsFileIndex, BootfsPackageIndex},
-        serde_json::json,
-        std::collections::HashMap,
     };
 
     static CORE_DEP_STR: &str = "core_dep";

@@ -4,11 +4,10 @@
 use crate::base::{HasSettingType, SettingInfo, SettingType};
 use crate::handler::base::{Context, ControllerGenerateResult, Request};
 use crate::message::base::Audience;
-use crate::payload_convert;
 use crate::service::message::{MessageClient, Messenger, Signature};
 use crate::service_context::ServiceContext;
 use crate::storage::StorageInfo;
-use crate::{trace, trace_guard};
+use crate::{payload_convert, trace, trace_guard};
 use async_trait::async_trait;
 use core::convert::TryFrom;
 use fuchsia_async as fasync;
@@ -340,12 +339,9 @@ impl IntoHandlerResult for SettingInfo {
 }
 
 pub mod persist {
-    use super::ClientImpl as BaseProxy;
-    use super::*;
+    use super::{ClientImpl as BaseProxy, *};
     use crate::message::base::MessageEvent;
-    use crate::service;
-    use crate::storage;
-    use crate::trace;
+    use crate::{service, storage, trace};
     use fuchsia_trace as ftrace;
     use futures::StreamExt;
     use settings_storage::device_storage::DeviceStorageConvertible;

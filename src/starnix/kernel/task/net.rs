@@ -2,19 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    fs::proc::ProcSysNetDev,
-    task::CurrentTask,
-    vfs::{
-        emit_dotdot, fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek,
-        DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystemHandle, FsNode,
-        FsNodeHandle, FsNodeOps, FsStr, FsString, SeekTarget, StaticDirectoryBuilder,
-    },
+use crate::fs::proc::ProcSysNetDev;
+use crate::task::CurrentTask;
+use crate::vfs::{
+    emit_dotdot, fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek,
+    DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle,
+    FsNodeOps, FsStr, FsString, SeekTarget, StaticDirectoryBuilder,
 };
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked, Mutex};
-use starnix_uapi::{errno, errors::Errno, off_t, open_flags::OpenFlags};
-use std::{collections::HashMap, sync::Arc};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::{errno, off_t};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 struct NetstackDevice {
     /// The device-specific directories that are found under `/proc/sys/net`.

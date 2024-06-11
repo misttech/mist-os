@@ -4,9 +4,8 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::bail;
-use assembly_config_schema::{
-    platform_config::paravirtualization_config::PlatformParavirtualizationConfig, FeatureControl,
-};
+use assembly_config_schema::platform_config::paravirtualization_config::PlatformParavirtualizationConfig;
+use assembly_config_schema::FeatureControl;
 
 pub(crate) struct ParavirtualizationSubsystem;
 

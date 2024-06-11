@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::run_events::{RunEvent, SuiteEvents},
-    anyhow::Error,
-    fidl::endpoints::{create_proxy, create_request_stream, Proxy},
-    fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync,
-    futures::{channel::mpsc, pin_mut, prelude::*, stream::FusedStream, StreamExt, TryStreamExt},
-    tracing::warn,
-};
+use crate::run_events::{RunEvent, SuiteEvents};
+use anyhow::Error;
+use fidl::endpoints::{create_proxy, create_request_stream, Proxy};
+use futures::channel::mpsc;
+use futures::prelude::*;
+use futures::stream::FusedStream;
+use futures::{pin_mut, StreamExt, TryStreamExt};
+use tracing::warn;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync};
 
 const DEBUG_DATA_TIMEOUT_SECONDS: i64 = 15;
 const EARLY_BOOT_DEBUG_DATA_PATH: &'static str = "/debugdata";
@@ -189,14 +190,12 @@ pub(crate) async fn serve_iterator(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::run_events::{RunEventPayload, SuiteEventPayload},
-        fuchsia_async as fasync,
-        std::collections::HashSet,
-        tempfile::tempdir,
-        test_diagnostics::collect_string_from_socket,
-    };
+    use super::*;
+    use crate::run_events::{RunEventPayload, SuiteEventPayload};
+    use fuchsia_async as fasync;
+    use std::collections::HashSet;
+    use tempfile::tempdir;
+    use test_diagnostics::collect_string_from_socket;
 
     async fn serve_iterator_from_tmp(
         dir: &tempfile::TempDir,

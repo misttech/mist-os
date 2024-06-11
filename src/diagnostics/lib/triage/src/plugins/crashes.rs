@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::Plugin,
-    crate::{act::Action, metrics::fetch::FileDataFetcher},
-    regex::Regex,
-};
+use super::Plugin;
+use crate::act::Action;
+use crate::metrics::fetch::FileDataFetcher;
+use regex::Regex;
 
 pub struct CrashesPlugin();
 

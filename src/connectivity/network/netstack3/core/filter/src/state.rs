@@ -4,26 +4,26 @@
 
 pub mod validation;
 
-use alloc::{format, string::ToString as _, sync::Arc, vec::Vec};
-use core::{
-    fmt::Debug,
-    hash::{Hash, Hasher},
-    num::NonZeroU16,
-    ops::RangeInclusive,
-};
+use alloc::format;
+use alloc::string::ToString as _;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+use core::fmt::Debug;
+use core::hash::{Hash, Hasher};
+use core::num::NonZeroU16;
+use core::ops::RangeInclusive;
 
 use derivative::Derivative;
 use net_types::ip::{GenericOverIp, Ip};
 use netstack3_base::{CoreTimerContext, Inspectable, InspectableValue, Inspector as _};
 use packet_formats::ip::IpExt;
 
-use crate::{
-    conntrack,
-    context::{FilterBindingsContext, FilterBindingsTypes},
-    logic::{nat::NatConfig, FilterTimerId},
-    matchers::PacketMatcher,
-    state::validation::ValidRoutines,
-};
+use crate::conntrack;
+use crate::context::{FilterBindingsContext, FilterBindingsTypes};
+use crate::logic::nat::NatConfig;
+use crate::logic::FilterTimerId;
+use crate::matchers::PacketMatcher;
+use crate::state::validation::ValidRoutines;
 
 /// The action to take on a packet.
 #[derive(Derivative)]

@@ -4,12 +4,11 @@
 
 use crate::{Address, Properties, PropertiesAndState, Update, UpdateResult, WatcherOperationError};
 
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use futures::{Stream, TryStreamExt};
 use net_types::{LinkLocalAddress as _, ScopeableAddress as _};
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
+use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces as fnet_interfaces};
 
 /// Returns true iff the supplied [`Properties`] (expected to be fully populated)
 /// appears to provide network connectivity, i.e. is not loopback, is online, and has a default
@@ -153,11 +152,10 @@ mod tests {
     use super::*;
 
     use anyhow::Context as _;
-    use fidl_fuchsia_hardware_network as fnetwork;
-    use fuchsia_zircon_types as zx;
     use futures::FutureExt as _;
     use net_declare::fidl_subnet;
     use std::convert::TryInto as _;
+    use {fidl_fuchsia_hardware_network as fnetwork, fuchsia_zircon_types as zx};
 
     const IPV4_LINK_LOCAL: fnet::Subnet = fidl_subnet!("169.254.0.1/16");
     const IPV6_LINK_LOCAL: fnet::Subnet = fidl_subnet!("fe80::1/64");

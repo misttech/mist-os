@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Result},
-    scrutiny::{
-        engine::manager::{PluginManager, PluginState},
-        model::controller::DataController,
-        model::model::DataModel,
-    },
-    scrutiny_utils::usage::UsageBuilder,
-    serde::{Deserialize, Serialize},
-    serde_json::{json, value::Value},
-    std::sync::{Arc, Mutex, Weak},
-};
+use anyhow::{format_err, Result};
+use scrutiny::engine::manager::{PluginManager, PluginState};
+use scrutiny::model::controller::DataController;
+use scrutiny::model::model::DataModel;
+use scrutiny_utils::usage::UsageBuilder;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use serde_json::value::Value;
+use std::sync::{Arc, Mutex, Weak};
 
 pub struct PluginListController {
     manager: Weak<Mutex<PluginManager>>,

@@ -2,27 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::{
-        mpsc::{channel, Receiver},
-        Arc, Weak,
-    },
-};
+use std::collections::{HashMap, VecDeque};
+use std::sync::mpsc::{channel, Receiver};
+use std::sync::{Arc, Weak};
 
 use starnix_sync::{Locked, Mutex, Unlocked};
-use starnix_uapi::{
-    errno, error, errors::Errno, io_event, ownership::OwnedRef, ownership::WeakRef,
-    user_address::UserAddress, user_buffer::UserBuffer,
-};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::ownership::{OwnedRef, WeakRef};
+use starnix_uapi::user_address::UserAddress;
+use starnix_uapi::user_buffer::UserBuffer;
+use starnix_uapi::{errno, error, io_event};
 use std::sync::mpsc::Sender;
 use zerocopy::IntoBytes;
 
-use crate::{
-    mm::{MemoryAccessor, MemoryAccessorExt},
-    task::{CurrentTask, Task},
-    vfs::{FileHandle, VecInputBuffer, VecOutputBuffer, WeakFileHandle},
-};
+use crate::mm::{MemoryAccessor, MemoryAccessorExt};
+use crate::task::{CurrentTask, Task};
+use crate::vfs::{FileHandle, VecInputBuffer, VecOutputBuffer, WeakFileHandle};
 
 /// Kernel state-machine-based implementation of asynchronous I/O.
 /// See https://man7.org/linux/man-pages/man7/aio.7.html#NOTES

@@ -2,22 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        blob_written, compress_and_write_blob, get_missing_blobs, replace_retained_packages,
-        write_meta_far, write_needed_blobs, TestEnv,
-    },
-    assert_matches::assert_matches,
-    diagnostics_assertions::{assert_data_tree, tree_assertion, AnyProperty},
-    diagnostics_hierarchy::DiagnosticsHierarchy,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_pkg::{self as fpkg, BlobInfo, NeededBlobsMarker, PackageCacheMarker},
-    fidl_fuchsia_pkg_ext::BlobId,
-    fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder},
-    fuchsia_zircon as zx,
-    futures::prelude::*,
-    std::collections::HashMap,
+use crate::{
+    blob_written, compress_and_write_blob, get_missing_blobs, replace_retained_packages,
+    write_meta_far, write_needed_blobs, TestEnv,
 };
+use assert_matches::assert_matches;
+use diagnostics_assertions::{assert_data_tree, tree_assertion, AnyProperty};
+use diagnostics_hierarchy::DiagnosticsHierarchy;
+use fidl_fuchsia_pkg::{self as fpkg, BlobInfo, NeededBlobsMarker, PackageCacheMarker};
+use fidl_fuchsia_pkg_ext::BlobId;
+use fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder};
+use futures::prelude::*;
+use std::collections::HashMap;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 #[fuchsia::test]
 async fn system_image_hash_present() {

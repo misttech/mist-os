@@ -13,15 +13,11 @@ use core::time::Duration;
 
 use net_types::ip::{Ipv6, Ipv6Addr};
 use net_types::MulticastAddr;
-use packet::{
-    records::{ParsedRecord, RecordParseResult, Records, RecordsImpl, RecordsImplLayout},
-    serialize::InnerPacketBuilder,
-    BufferView,
-};
-use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref,
-    Unaligned,
-};
+use packet::records::{ParsedRecord, RecordParseResult, Records, RecordsImpl, RecordsImplLayout};
+use packet::serialize::InnerPacketBuilder;
+use packet::BufferView;
+use zerocopy::byteorder::network_endian::U16;
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 use crate::error::{ParseError, ParseResult, UnrecognizedProtocolCode};
 use crate::icmp::{IcmpIpExt, IcmpMessage, IcmpPacket, IcmpPacketRaw, IcmpUnusedCode, MessageBody};

@@ -4,13 +4,11 @@
 
 //! Helpers for capturing logs from Fuchsia processes.
 
-use {
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{future, AsyncReadExt as _, AsyncWriteExt as _, FutureExt as _},
-    std::num::NonZeroUsize,
-    thiserror::Error,
-    zx::HandleBased as _,
-};
+use futures::{future, AsyncReadExt as _, AsyncWriteExt as _, FutureExt as _};
+use std::num::NonZeroUsize;
+use thiserror::Error;
+use zx::HandleBased as _;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// Buffer size for socket read calls to `LoggerStream::buffer_and_drain`.
 const SOCKET_BUFFER_SIZE: usize = 2048;
@@ -160,17 +158,13 @@ impl SocketLogWriter {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::{format_err, Context as _, Error},
-        assert_matches::assert_matches,
-        futures::{try_join, TryStreamExt as _},
-        rand::{
-            distributions::{Alphanumeric, DistString as _},
-            thread_rng,
-        },
-        test_case::test_case,
-    };
+    use super::*;
+    use anyhow::{format_err, Context as _, Error};
+    use assert_matches::assert_matches;
+    use futures::{try_join, TryStreamExt as _};
+    use rand::distributions::{Alphanumeric, DistString as _};
+    use rand::thread_rng;
+    use test_case::test_case;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn log_writer_reader_work() {

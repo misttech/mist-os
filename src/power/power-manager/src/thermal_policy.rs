@@ -14,11 +14,9 @@ use crate::types::{Celsius, Nanoseconds, Seconds, ThermalLoad};
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use fuchsia_inspect::{self as inspect, Property};
-use futures::{
-    future::{FutureExt, LocalBoxFuture},
-    stream::FuturesUnordered,
-    StreamExt,
-};
+use futures::future::{FutureExt, LocalBoxFuture};
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use serde_derive::Deserialize;
 use serde_json as json;
 use std::cell::Cell;

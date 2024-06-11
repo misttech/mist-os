@@ -4,22 +4,15 @@
 
 //! This module contains code to generate types representing AT commands and responses.
 
-use {
-    super::{
-        common::{
-            codegen_block, to_initial_capital,
-            type_names::{HIGHLEVEL_COMMAND_TYPE, HIGHLEVEL_SUCCESS_TYPE},
-            write_indent, write_newline,
-        },
-        error::{Error, Result},
-    },
-    crate::definition::{
-        Argument, Arguments, Command, Definition, DelimitedArguments, PossiblyOptionType,
-        PrimitiveType, Type, Variant,
-    },
-    std::collections::HashSet,
-    std::io,
+use super::common::type_names::{HIGHLEVEL_COMMAND_TYPE, HIGHLEVEL_SUCCESS_TYPE};
+use super::common::{codegen_block, to_initial_capital, write_indent, write_newline};
+use super::error::{Error, Result};
+use crate::definition::{
+    Argument, Arguments, Command, Definition, DelimitedArguments, PossiblyOptionType,
+    PrimitiveType, Type, Variant,
 };
+use std::collections::HashSet;
+use std::io;
 
 pub fn codegen<W: io::Write>(sink: &mut W, indent: u64, definitions: &[Definition]) -> Result {
     // Commands and responses are variants in enums, so they all need to be defined together.  So we split

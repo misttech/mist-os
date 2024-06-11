@@ -5,18 +5,15 @@
 //! Test cases which simulate fshost running in the configuration used in recovery builds (which,
 //! among other things, sets the ramdisk_image flag to prevent binding of the on-disk filesystems.)
 
-use {
-    device_watcher::recursive_wait,
-    fidl::endpoints::{create_proxy, Proxy as _},
-    fidl_fuchsia_fshost as fshost,
-    fidl_fuchsia_hardware_block::BlockProxy,
-    fidl_fuchsia_hardware_block_partition::PartitionMarker,
-    fidl_fuchsia_io as fio,
-    fs_management::partition::{find_partition_in, PartitionMatcher},
-    fshost_test_fixture::{disk_builder::VolumesSpec, write_test_blob, write_test_blob_fxblob},
-    fuchsia_zircon as zx,
-    remote_block_device::{BlockClient, MutableBufferSlice, RemoteBlockClient},
-};
+use device_watcher::recursive_wait;
+use fidl::endpoints::{create_proxy, Proxy as _};
+use fidl_fuchsia_hardware_block::BlockProxy;
+use fidl_fuchsia_hardware_block_partition::PartitionMarker;
+use fs_management::partition::{find_partition_in, PartitionMatcher};
+use fshost_test_fixture::disk_builder::VolumesSpec;
+use fshost_test_fixture::{write_test_blob, write_test_blob_fxblob};
+use remote_block_device::{BlockClient, MutableBufferSlice, RemoteBlockClient};
+use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 pub mod config;
 use config::{blob_fs_type, data_fs_spec, data_fs_type, new_builder, volumes_spec};

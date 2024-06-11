@@ -2,26 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        color::Color,
-        render::{
-            BlendMode, Context as RenderContext, Fill, FillRule, Gradient, GradientType, Layer,
-            Path, PathBuilder, Raster, Style,
-        },
-        Point,
-    },
-    anyhow::{Context, Error},
-    euclid::{vec2, Transform2D},
-    fuchsia_trace::duration,
-    rive_rs::{
-        self as rive,
-        math::{self, Mat},
-        shapes::{Command, CommandPath},
-        ImportError, PaintColor, RenderPaint,
-    },
-    std::{collections::HashMap, fs, num::NonZeroU64},
+use crate::color::Color;
+use crate::render::{
+    BlendMode, Context as RenderContext, Fill, FillRule, Gradient, GradientType, Layer, Path,
+    PathBuilder, Raster, Style,
 };
+use crate::Point;
+use anyhow::{Context, Error};
+use euclid::{vec2, Transform2D};
+use fuchsia_trace::duration;
+use rive_rs::math::{self, Mat};
+use rive_rs::shapes::{Command, CommandPath};
+use rive_rs::{self as rive, ImportError, PaintColor, RenderPaint};
+use std::collections::HashMap;
+use std::fs;
+use std::num::NonZeroU64;
 
 pub fn load_rive<P: AsRef<std::path::Path> + std::fmt::Debug>(
     path: P,

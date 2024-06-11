@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        name::validate_name, DirectoryEntry, Error, Index, IndexEntry, CONTENT_ALIGNMENT,
-        DIRECTORY_ENTRY_LEN, DIR_CHUNK_TYPE, DIR_NAMES_CHUNK_TYPE, INDEX_ENTRY_LEN, INDEX_LEN,
-        MAGIC_INDEX_VALUE,
-    },
-    std::{
-        collections::BTreeMap,
-        convert::TryInto as _,
-        io::{copy, Read, Write},
-    },
-    zerocopy::AsBytes as _,
+use crate::name::validate_name;
+use crate::{
+    DirectoryEntry, Error, Index, IndexEntry, CONTENT_ALIGNMENT, DIRECTORY_ENTRY_LEN,
+    DIR_CHUNK_TYPE, DIR_NAMES_CHUNK_TYPE, INDEX_ENTRY_LEN, INDEX_LEN, MAGIC_INDEX_VALUE,
 };
+use std::collections::BTreeMap;
+use std::convert::TryInto as _;
+use std::io::{copy, Read, Write};
+use zerocopy::AsBytes as _;
 
 fn write_zeros(mut target: impl Write, count: usize) -> Result<(), Error> {
     let b = vec![0u8; count];
@@ -130,10 +126,11 @@ pub fn write(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::tests::example_archive, assert_matches::assert_matches,
-        itertools::assert_equal, std::io::Cursor,
-    };
+    use super::*;
+    use crate::tests::example_archive;
+    use assert_matches::assert_matches;
+    use itertools::assert_equal;
+    use std::io::Cursor;
 
     #[test]
     fn creates_example_archive() {

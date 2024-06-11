@@ -4,12 +4,10 @@
 
 #![allow(clippy::let_unit_value)]
 
-use {
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
-    fidl_fuchsia_pkg_test::{RealmFactoryMarker, RealmOptions},
-    fio::DirectoryMarker,
-    fuchsia_component::client::connect_to_protocol,
-};
+use fidl_fuchsia_pkg_test::{RealmFactoryMarker, RealmOptions};
+use fio::DirectoryMarker;
+use fuchsia_component::client::connect_to_protocol;
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio};
 
 mod directory;
 mod file;

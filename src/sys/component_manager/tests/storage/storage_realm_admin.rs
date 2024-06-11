@@ -1,15 +1,14 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    component_events::{events::*, matcher::*},
-    fidl::endpoints::{create_endpoints, ClientEnd},
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    fuchsia_component::client::connect_to_protocol,
-    futures::TryStreamExt,
-    maplit::hashset,
-    std::collections::HashSet,
-};
+use component_events::events::*;
+use component_events::matcher::*;
+use fidl::endpoints::{create_endpoints, ClientEnd};
+use fuchsia_component::client::connect_to_protocol;
+use futures::TryStreamExt;
+use maplit::hashset;
+use std::collections::HashSet;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
 
 #[fuchsia::main]
 async fn main() {

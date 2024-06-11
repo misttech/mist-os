@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_test_policy::{ExitControllerRequest, ExitControllerRequestStream},
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    futures::prelude::*,
-    std::process,
-};
+use anyhow::Error;
+use fidl_test_policy::{ExitControllerRequest, ExitControllerRequestStream};
+use fuchsia_async as fasync;
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
+use std::process;
 
 #[fasync::run_singlethreaded]
 async fn main() {

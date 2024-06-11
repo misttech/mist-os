@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::platform::PlatformServices,
-    anyhow::Result,
-    async_trait::async_trait,
-    fidl::endpoints::{create_proxy, DiscoverableProtocolMarker},
-    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
-    fidl_fuchsia_io::OpenFlags,
-    fidl_fuchsia_sys2 as fsys,
-    fidl_fuchsia_virtualization::{
-        GuestManagerMarker, GuestManagerProxy, LinuxManagerMarker, LinuxManagerProxy,
-    },
-    guest_cli_args::GuestType,
+use crate::platform::PlatformServices;
+use anyhow::Result;
+use async_trait::async_trait;
+use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker};
+use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use fidl_fuchsia_io::OpenFlags;
+use fidl_fuchsia_sys2 as fsys;
+use fidl_fuchsia_virtualization::{
+    GuestManagerMarker, GuestManagerProxy, LinuxManagerMarker, LinuxManagerProxy,
 };
+use guest_cli_args::GuestType;
 
 pub struct HostPlatformServices {
     remote_control: RemoteControlProxy,

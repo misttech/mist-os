@@ -2,22 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{format_err, Context as _, Error};
+use fidl::endpoints::{
+    create_request_stream, ClientEnd, ControlHandle, DiscoverableProtocolMarker, ProtocolMarker,
+    RequestStream, ServerEnd, ServiceMarker, ServiceProxy,
+};
+use fuchsia_component::DEFAULT_SERVICE_INSTANCE;
+use futures::channel::oneshot;
+use futures::future::BoxFuture;
+use futures::lock::Mutex;
+use futures::{select, FutureExt, TryStreamExt};
+use runner::get_value as get_dictionary_value;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tracing::*;
+use vfs::execution_scope::ExecutionScope;
 use {
-    anyhow::{format_err, Context as _, Error},
-    fidl::endpoints::{
-        create_request_stream, ClientEnd, ControlHandle, DiscoverableProtocolMarker,
-        ProtocolMarker, RequestStream, ServerEnd, ServiceMarker, ServiceProxy,
-    },
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
-    fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
-    fuchsia_component::DEFAULT_SERVICE_INSTANCE,
-    fuchsia_zircon as zx,
-    futures::{channel::oneshot, future::BoxFuture, lock::Mutex, select, FutureExt, TryStreamExt},
-    runner::get_value as get_dictionary_value,
-    std::{collections::HashMap, sync::Arc},
-    tracing::*,
-    vfs::execution_scope::ExecutionScope,
+    fidl_fuchsia_process as fprocess, fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 /// The handles from the framework over which the local component should interact with other
@@ -393,13 +396,11 @@ fn extract_local_component_name(dict: fdata::Dictionary) -> Result<String, Error
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl::endpoints::{create_proxy, Proxy as _},
-        fuchsia_zircon::AsHandleRef,
-        futures::future::pending,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::{create_proxy, Proxy as _};
+    use fuchsia_zircon::AsHandleRef;
+    use futures::future::pending;
 
     #[fuchsia::test]
     async fn runner_builder_correctly_stores_a_function() {

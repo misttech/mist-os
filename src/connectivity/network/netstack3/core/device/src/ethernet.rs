@@ -5,54 +5,48 @@
 //! The Ethernet protocol.
 
 use alloc::vec::Vec;
-use core::{fmt::Debug, num::NonZeroU32};
+use core::fmt::Debug;
+use core::num::NonZeroU32;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 
 use const_unwrap::const_unwrap_option;
 use log::{error, trace};
-use net_types::{
-    ethernet::Mac,
-    ip::{GenericOverIp, Ip, IpMarked, Ipv4, Ipv6, Mtu},
-    BroadcastAddress, MulticastAddr, UnicastAddr, Witness,
-};
+use net_types::ethernet::Mac;
+use net_types::ip::{GenericOverIp, Ip, IpMarked, Ipv4, Ipv6, Mtu};
+use net_types::{BroadcastAddress, MulticastAddr, UnicastAddr, Witness};
+use netstack3_base::ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult};
+use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{
-    ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult},
-    sync::{Mutex, RwLock},
     trace_duration, CoreTimerContext, Device, DeviceIdContext, FrameDestination, HandleableTimer,
     LinkDevice, NestedIntoCoreTimerCtx, ReceivableFrameMeta, RecvFrameContext, RecvIpFrameMeta,
     ResourceCounterContext, RngContext, SendableFrameMeta, TimerContext, TimerHandler,
     TracingContext, WeakDeviceIdentifier,
 };
-use netstack3_ip::{
-    nud::{
-        LinkResolutionContext, NudBindingsTypes, NudHandler, NudState, NudTimerId, NudUserConfig,
-    },
-    IpPacketDestination, IpTypesIpExt, WrapBroadcastMarker,
+use netstack3_ip::nud::{
+    LinkResolutionContext, NudBindingsTypes, NudHandler, NudState, NudTimerId, NudUserConfig,
 };
+use netstack3_ip::{IpPacketDestination, IpTypesIpExt, WrapBroadcastMarker};
 use packet::{Buf, BufferMut, Nested, Serializer};
-use packet_formats::{
-    arp::{peek_arp_types, ArpHardwareType, ArpNetworkType},
-    ethernet::{
-        EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
-        ETHERNET_HDR_LEN_NO_TAG,
-    },
+use packet_formats::arp::{peek_arp_types, ArpHardwareType, ArpNetworkType};
+use packet_formats::ethernet::{
+    EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
+    ETHERNET_HDR_LEN_NO_TAG,
 };
 
-use crate::internal::{
-    arp::{ArpFrameMetadata, ArpPacketHandler, ArpState, ArpTimerId},
-    base::{DeviceCounters, DeviceLayerTypes, DeviceReceiveFrameSpec, EthernetDeviceCounters},
-    id::DeviceId,
-    id::EthernetDeviceId,
-    queue::{
-        tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState},
-        DequeueState, TransmitQueueFrameError,
-    },
-    socket::{
-        DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, EthernetHeaderParams,
-        ReceivedFrame,
-    },
-    state::{DeviceStateSpec, IpLinkDeviceState},
+use crate::internal::arp::{ArpFrameMetadata, ArpPacketHandler, ArpState, ArpTimerId};
+use crate::internal::base::{
+    DeviceCounters, DeviceLayerTypes, DeviceReceiveFrameSpec, EthernetDeviceCounters,
 };
+use crate::internal::id::{DeviceId, EthernetDeviceId};
+use crate::internal::queue::tx::{
+    BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState,
+};
+use crate::internal::queue::{DequeueState, TransmitQueueFrameError};
+use crate::internal::socket::{
+    DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, EthernetHeaderParams,
+    ReceivedFrame,
+};
+use crate::internal::state::{DeviceStateSpec, IpLinkDeviceState};
 
 const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
 
@@ -880,27 +874,25 @@ pub(crate) mod testutil {
 mod tests {
     use alloc::vec;
 
-    use net_types::{
-        ip::{Ipv4Addr, Ipv6Addr},
-        SpecifiedAddr,
-    };
-    use netstack3_base::{
-        testutil::{FakeDeviceId, FakeInstant, FakeWeakDeviceId, TEST_ADDRS_V4},
-        CounterContext, CtxPair, IntoCoreTimerCtx,
-    };
+    use net_types::ip::{Ipv4Addr, Ipv6Addr};
+    use net_types::SpecifiedAddr;
+    use netstack3_base::testutil::{FakeDeviceId, FakeInstant, FakeWeakDeviceId, TEST_ADDRS_V4};
+    use netstack3_base::{CounterContext, CtxPair, IntoCoreTimerCtx};
     use netstack3_ip::nud::{
         self, DelegateNudContext, DynamicNeighborUpdateSource, NeighborApi, UseDelegateNudContext,
     };
     use packet_formats::testutil::parse_ethernet_frame;
 
     use super::*;
-    use crate::internal::{
-        arp::{ArpConfigContext, ArpContext, ArpCounters, ArpNudCtx, ArpSenderContext},
-        base::DeviceSendFrameError,
-        ethernet::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        queue::tx::{TransmitQueueBindingsContext, TransmitQueueCommon, TransmitQueueContext},
-        socket::{Frame, ParseSentFrameError, SentFrame},
+    use crate::internal::arp::{
+        ArpConfigContext, ArpContext, ArpCounters, ArpNudCtx, ArpSenderContext,
     };
+    use crate::internal::base::DeviceSendFrameError;
+    use crate::internal::ethernet::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
+    use crate::internal::queue::tx::{
+        TransmitQueueBindingsContext, TransmitQueueCommon, TransmitQueueContext,
+    };
+    use crate::internal::socket::{Frame, ParseSentFrameError, SentFrame};
 
     struct FakeEthernetCtx {
         static_state: StaticEthernetDeviceState,

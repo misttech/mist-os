@@ -4,7 +4,8 @@
 
 #![allow(clippy::let_unit_value)]
 
-use {anyhow::Error, fuchsia_async as fasync};
+use anyhow::Error;
+use fuchsia_async as fasync;
 
 mod args;
 mod channel;

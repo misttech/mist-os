@@ -13,10 +13,10 @@ pub mod registry;
 mod router;
 mod unit;
 
-use {
-    crate::ConversionError, fidl_fuchsia_component_sandbox as fsandbox, std::sync::Arc,
-    vfs::directory::entry::DirectoryEntry,
-};
+use crate::ConversionError;
+use fidl_fuchsia_component_sandbox as fsandbox;
+use std::sync::Arc;
+use vfs::directory::entry::DirectoryEntry;
 
 /// The trait which remotes Capabilities, either by turning them into
 /// FIDL or serving them in a VFS.

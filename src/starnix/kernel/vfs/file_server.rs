@@ -2,37 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    mm::ProtectionFlags,
-    task::{CurrentTask, Kernel},
-    vfs::{
-        buffers::{VecInputBuffer, VecOutputBuffer},
-        DirectoryEntryType, DirentSink, FileHandle, FileObject, FsStr, LookupContext,
-        NamespaceNode, RenameFlags, SeekTarget, UnlinkKind,
-    },
+use crate::mm::ProtectionFlags;
+use crate::task::{CurrentTask, Kernel};
+use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
+use crate::vfs::{
+    DirectoryEntryType, DirentSink, FileHandle, FileObject, FsStr, LookupContext, NamespaceNode,
+    RenameFlags, SeekTarget, UnlinkKind,
 };
 use async_trait::async_trait;
-use fidl::{
-    endpoints::{ClientEnd, ServerEnd},
-    HandleBased,
-};
-use fidl_fuchsia_io as fio;
-use fuchsia_zircon as zx;
+use fidl::endpoints::{ClientEnd, ServerEnd};
+use fidl::HandleBased;
 use starnix_logging::track_stub;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
-use starnix_uapi::{
-    device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode, ino_t, off_t,
-    open_flags::OpenFlags, vfs::ResolveFlags,
-};
-use std::{
-    ops::{Deref, DerefMut},
-    sync::{Arc, Weak},
-};
-use vfs::{
-    attributes,
-    directory::{self, entry_container::Directory},
-    execution_scope, file, path, ObjectRequestRef, ToObjectRequest,
-};
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::vfs::ResolveFlags;
+use starnix_uapi::{errno, error, ino_t, off_t};
+use std::ops::{Deref, DerefMut};
+use std::sync::{Arc, Weak};
+use vfs::directory::entry_container::Directory;
+use vfs::directory::{self};
+use vfs::{attributes, execution_scope, file, path, ObjectRequestRef, ToObjectRequest};
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// Returns a handle implementing a fuchsia.io.Node delegating to the given `file`.
 pub fn serve_file<L>(
@@ -716,7 +709,9 @@ impl vfs::node::IsDirectory for StarnixNodeConnection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{fs::tmpfs::TmpFs, testing::*, vfs::FsString};
+    use crate::fs::tmpfs::TmpFs;
+    use crate::testing::*;
+    use crate::vfs::FsString;
     use fuchsia_async as fasync;
     use std::collections::HashSet;
     use syncio::{zxio_node_attr_has_t, Zxio};

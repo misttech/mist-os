@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{
-    on_signals::OnSignalsRef,
-    rwhandle::{RWHandle, ReadableHandle, ReadableState, WritableHandle, WritableState},
-};
+use super::on_signals::OnSignalsRef;
+use super::rwhandle::{RWHandle, ReadableHandle, ReadableState, WritableHandle, WritableState};
 use fuchsia_zircon::{self as zx, AsHandleRef};
+use futures::future::poll_fn;
 use futures::io::{self, AsyncRead, AsyncWrite};
-use futures::{future::poll_fn, ready, stream::Stream, task::Context};
+use futures::ready;
+use futures::stream::Stream;
+use futures::task::Context;
 use std::fmt;
 use std::pin::Pin;
 use std::task::Poll;
@@ -253,19 +254,15 @@ impl Stream for DatagramStream<&Socket> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{TestExecutor, Time, TimeoutExt, Timer},
-        fuchsia_zircon::prelude::*,
-        futures::{
-            future::{self, join},
-            io::{AsyncReadExt as _, AsyncWriteExt as _},
-            stream::TryStreamExt,
-            task::noop_waker_ref,
-            FutureExt,
-        },
-        std::pin::pin,
-    };
+    use super::*;
+    use crate::{TestExecutor, Time, TimeoutExt, Timer};
+    use fuchsia_zircon::prelude::*;
+    use futures::future::{self, join};
+    use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
+    use futures::stream::TryStreamExt;
+    use futures::task::noop_waker_ref;
+    use futures::FutureExt;
+    use std::pin::pin;
 
     #[test]
     fn can_read_write() {

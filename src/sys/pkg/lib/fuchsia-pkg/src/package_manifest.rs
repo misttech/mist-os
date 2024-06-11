@@ -2,29 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        BlobEntry, MetaContents, MetaPackage, MetaPackageError, MetaSubpackages, Package,
-        PackageArchiveBuilder, PackageManifestError, PackageName, PackagePath, PackageVariant,
-    },
-    anyhow::{Context, Result},
-    camino::Utf8Path,
-    delivery_blob::DeliveryBlobType,
-    fuchsia_archive::Utf8Reader,
-    fuchsia_hash::Hash,
-    fuchsia_merkle::from_slice,
-    fuchsia_url::{RepositoryUrl, UnpinnedAbsolutePackageUrl},
-    serde::{Deserialize, Serialize},
-    std::{
-        collections::{BTreeMap, HashMap, HashSet},
-        fs::{self, create_dir_all, File},
-        io::{self, BufReader, Read, Seek, SeekFrom, Write},
-        path::Path,
-        str,
-    },
-    tempfile_ext::NamedTempFileExt as _,
-    utf8_path::{path_relative_from_file, resolve_path_from_file},
+use crate::{
+    BlobEntry, MetaContents, MetaPackage, MetaPackageError, MetaSubpackages, Package,
+    PackageArchiveBuilder, PackageManifestError, PackageName, PackagePath, PackageVariant,
 };
+use anyhow::{Context, Result};
+use camino::Utf8Path;
+use delivery_blob::DeliveryBlobType;
+use fuchsia_archive::Utf8Reader;
+use fuchsia_hash::Hash;
+use fuchsia_merkle::from_slice;
+use fuchsia_url::{RepositoryUrl, UnpinnedAbsolutePackageUrl};
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fs::{self, create_dir_all, File};
+use std::io::{self, BufReader, Read, Seek, SeekFrom, Write};
+use std::path::Path;
+use std::str;
+use tempfile_ext::NamedTempFileExt as _;
+use utf8_path::{path_relative_from_file, resolve_path_from_file};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
@@ -753,17 +749,16 @@ fn resolve_subpackage_manifest_path(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{path_to_string::PathToStringExt, PackageBuilder},
-        assert_matches::assert_matches,
-        camino::Utf8PathBuf,
-        fuchsia_url::RelativePackageUrl,
-        pretty_assertions::assert_eq,
-        serde_json::{json, Value},
-        std::path::PathBuf,
-        tempfile::{NamedTempFile, TempDir},
-    };
+    use super::*;
+    use crate::path_to_string::PathToStringExt;
+    use crate::PackageBuilder;
+    use assert_matches::assert_matches;
+    use camino::Utf8PathBuf;
+    use fuchsia_url::RelativePackageUrl;
+    use pretty_assertions::assert_eq;
+    use serde_json::{json, Value};
+    use std::path::PathBuf;
+    use tempfile::{NamedTempFile, TempDir};
 
     const FAKE_ABI_REVISION: version_history::AbiRevision =
         version_history::AbiRevision::from_u64(0x323dd69d73d957a7);

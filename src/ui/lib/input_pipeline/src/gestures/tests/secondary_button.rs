@@ -3,11 +3,9 @@
 // found in the LICENSE file.
 
 mod tests {
-    use {
-        super::super::utils,
-        crate::{input_device, mouse_binding, touch_binding, Position},
-        std::collections::HashSet,
-    };
+    use super::super::utils;
+    use crate::{input_device, mouse_binding, touch_binding, Position};
+    use std::collections::HashSet;
 
     fn touchpad_event(
         positions: Vec<Position>,
@@ -31,14 +29,12 @@ mod tests {
     }
 
     mod click {
-        use {
-            super::super::super::utils,
-            super::touchpad_event,
-            crate::{input_device, mouse_binding, Position},
-            assert_matches::assert_matches,
-            maplit::hashset,
-            pretty_assertions::assert_eq,
-        };
+        use super::super::super::utils;
+        use super::touchpad_event;
+        use crate::{input_device, mouse_binding, Position};
+        use assert_matches::assert_matches;
+        use maplit::hashset;
+        use pretty_assertions::assert_eq;
 
         #[fuchsia::test(allow_stalls = false)]
         async fn secondary_click_keep_contact() {
@@ -177,15 +173,14 @@ mod tests {
     }
 
     mod click_chain {
-        use {
-            super::super::super::utils,
-            super::touchpad_event,
-            crate::{gestures::args, input_device, mouse_binding, Position},
-            assert_matches::assert_matches,
-            maplit::hashset,
-            pretty_assertions::assert_eq,
-            test_util::{assert_gt, assert_near},
-        };
+        use super::super::super::utils;
+        use super::touchpad_event;
+        use crate::gestures::args;
+        use crate::{input_device, mouse_binding, Position};
+        use assert_matches::assert_matches;
+        use maplit::hashset;
+        use pretty_assertions::assert_eq;
+        use test_util::{assert_gt, assert_near};
 
         #[fuchsia::test(allow_stalls = false)]
         async fn secondary_click_then_one_finger_button_down() {
@@ -426,15 +421,14 @@ mod tests {
     }
 
     mod drag {
-        use {
-            super::super::super::utils,
-            super::touchpad_event,
-            crate::{gestures::args, input_device, mouse_binding, Position},
-            assert_matches::assert_matches,
-            maplit::hashset,
-            pretty_assertions::assert_eq,
-            test_util::{assert_gt, assert_near},
-        };
+        use super::super::super::utils;
+        use super::touchpad_event;
+        use crate::gestures::args;
+        use crate::{input_device, mouse_binding, Position};
+        use assert_matches::assert_matches;
+        use maplit::hashset;
+        use pretty_assertions::assert_eq;
+        use test_util::{assert_gt, assert_near};
 
         #[fuchsia::test(allow_stalls = false)]
         async fn secondary_drag_keep_contact() {
@@ -625,15 +619,14 @@ mod tests {
     }
 
     mod drag_chain {
-        use {
-            super::super::super::utils,
-            super::touchpad_event,
-            crate::{gestures::args, input_device, mouse_binding, Position},
-            assert_matches::assert_matches,
-            maplit::hashset,
-            pretty_assertions::assert_eq,
-            test_util::{assert_gt, assert_near},
-        };
+        use super::super::super::utils;
+        use super::touchpad_event;
+        use crate::gestures::args;
+        use crate::{input_device, mouse_binding, Position};
+        use assert_matches::assert_matches;
+        use maplit::hashset;
+        use pretty_assertions::assert_eq;
+        use test_util::{assert_gt, assert_near};
 
         #[fuchsia::test(allow_stalls = false)]
         async fn secondary_drag_then_one_finger_button_down() {

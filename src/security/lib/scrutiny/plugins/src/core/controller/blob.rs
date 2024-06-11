@@ -2,22 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _},
-    fuchsia_merkle::Hash,
-    scrutiny::{
-        model::controller::{DataController, HintDataType},
-        model::model::DataModel,
-    },
-    scrutiny_utils::{
-        artifact::{ArtifactReader, FileArtifactReader},
-        usage::UsageBuilder,
-    },
-    serde::{Deserialize, Serialize},
-    serde_json::value::Value,
-    std::{path::Path, path::PathBuf, sync::Arc},
-};
+use anyhow::{Context, Result};
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::engine::Engine as _;
+use fuchsia_merkle::Hash;
+use scrutiny::model::controller::{DataController, HintDataType};
+use scrutiny::model::model::DataModel;
+use scrutiny_utils::artifact::{ArtifactReader, FileArtifactReader};
+use scrutiny_utils::usage::UsageBuilder;
+use serde::{Deserialize, Serialize};
+use serde_json::value::Value;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 #[derive(Deserialize, Serialize)]
 struct BlobRequest {

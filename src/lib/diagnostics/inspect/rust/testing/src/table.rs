@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_inspect as inspect,
-    std::sync::atomic::{AtomicUsize, Ordering},
-};
+use fuchsia_inspect as inspect;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 static CURRENT_SUFFIX: AtomicUsize = AtomicUsize::new(0);
 

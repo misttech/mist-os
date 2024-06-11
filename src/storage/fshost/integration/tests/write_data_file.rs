@@ -5,12 +5,10 @@
 //! Test cases which simulate fshost running in the configuration used in recovery builds (which,
 //! among other things, sets the ramdisk_image flag to prevent binding of the on-disk filesystems.)
 
-use {
-    fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio,
-    fshost::{AdminProxy, AdminWriteDataFileResult},
-    fshost_test_fixture::disk_builder::VolumesSpec,
-    fuchsia_zircon::{self as zx, HandleBased as _},
-};
+use fshost::{AdminProxy, AdminWriteDataFileResult};
+use fshost_test_fixture::disk_builder::VolumesSpec;
+use fuchsia_zircon::{self as zx, HandleBased as _};
+use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio};
 
 pub mod config;
 use config::{

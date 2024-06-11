@@ -2,21 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::endpoints::{create_proxy, ServerEnd};
+use fidl_fuchsia_fxfs::BlobReaderMarker;
+use fuchsia_component::client::connect_to_protocol_at_dir_root;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use futures::channel::mpsc::{self};
+use futures::{FutureExt as _, StreamExt as _};
+use ramdevice_client::{RamdiskClient, RamdiskClientBuilder};
+use std::time::Duration;
 use {
-    fidl::endpoints::{create_proxy, ServerEnd},
-    fidl_fuchsia_boot as fboot, fidl_fuchsia_feedback as ffeedback,
-    fidl_fuchsia_fxfs::BlobReaderMarker,
-    fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fprocess,
-    fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol_at_dir_root,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
+    fidl_fuchsia_boot as fboot, fidl_fuchsia_feedback as ffeedback, fidl_fuchsia_io as fio,
+    fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
     fuchsia_zircon as zx,
-    futures::{
-        channel::mpsc::{self},
-        FutureExt as _, StreamExt as _,
-    },
-    ramdevice_client::{RamdiskClient, RamdiskClientBuilder},
-    std::time::Duration,
 };
 
 pub mod disk_builder;

@@ -3,17 +3,13 @@
 // found in the LICENSE file.
 
 use const_unwrap::const_unwrap_option;
-use net_types::{
-    ethernet::Mac as MacAddr,
-    ip::{Ipv4, NotSubnetMaskError, PrefixLength},
-};
+use net_types::ethernet::Mac as MacAddr;
+use net_types::ip::{Ipv4, NotSubnetMaskError, PrefixLength};
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
-use std::{
-    fmt,
-    net::Ipv4Addr,
-    num::{NonZeroU16, NonZeroU8},
-};
+use std::fmt;
+use std::net::Ipv4Addr;
+use std::num::{NonZeroU16, NonZeroU8};
 use thiserror::Error;
 use tracing::debug;
 
@@ -589,10 +585,8 @@ mod prefix_length {
     use std::net::Ipv4Addr;
 
     use net_types::ip::{Ipv4, NotSubnetMaskError, PrefixLength};
-    use serde::{
-        de::{Deserialize as _, Error},
-        Serialize as _,
-    };
+    use serde::de::{Deserialize as _, Error};
+    use serde::Serialize as _;
 
     pub(super) fn serialize<S: serde::Serializer>(
         prefix_length: &PrefixLength<Ipv4>,
@@ -2356,11 +2350,13 @@ fn trunc_string_to_n_and_push(s: &str, n: usize, buffer: &mut Vec<u8>) {
 
 #[cfg(test)]
 mod tests {
-    use net_declare::{net::prefix_length_v4, std::ip_v4};
+    use super::identifier::ClientIdentifier;
+    use super::*;
+    use net_declare::net::prefix_length_v4;
+    use net_declare::std::ip_v4;
     use rand::Rng as _;
     use std::str::FromStr;
     use test_case::test_case;
-    use {super::identifier::ClientIdentifier, super::*};
 
     const DEFAULT_SUBNET_MASK: PrefixLength<Ipv4> = prefix_length_v4!(24);
 

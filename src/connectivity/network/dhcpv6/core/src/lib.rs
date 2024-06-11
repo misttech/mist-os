@@ -4,7 +4,8 @@
 
 pub mod client;
 
-use std::{fmt::Debug, time::Duration};
+use std::fmt::Debug;
+use std::time::Duration;
 
 /// A type representing an instant in time.
 pub trait Instant: Sized + Ord + Copy + Clone + Debug + Send + Sync + 'static {

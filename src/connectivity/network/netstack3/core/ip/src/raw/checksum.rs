@@ -7,12 +7,10 @@
 use log::error;
 use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4Addr, Ipv6Addr};
 use packet::{Buf, BufferViewMut, ParsablePacket as _, ParseBuffer as _};
-use packet_formats::{
-    icmp::{IcmpParseArgs, Icmpv6Packet, Icmpv6PacketRaw},
-    ip::{IpPacket, IpProto, Ipv4Proto, Ipv6Proto},
-    ipv4::Ipv4Packet,
-    ipv6::Ipv6Packet,
-};
+use packet_formats::icmp::{IcmpParseArgs, Icmpv6Packet, Icmpv6PacketRaw};
+use packet_formats::ip::{IpPacket, IpProto, Ipv4Proto, Ipv6Proto};
+use packet_formats::ipv4::Ipv4Packet;
+use packet_formats::ipv6::Ipv6Packet;
 use zerocopy::ByteSlice;
 
 use crate::IpExt;

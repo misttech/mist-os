@@ -2,28 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{repo_keys::RepoKeys, repository::RepoStorageProvider},
-    anyhow::{anyhow, Context, Result},
-    camino::{Utf8Path, Utf8PathBuf},
-    chrono::{DateTime, Duration, Utc},
-    delivery_blob::DeliveryBlobType,
-    fuchsia_merkle::Hash,
-    fuchsia_pkg::{BlobInfo, PackageManifest, PackageManifestList, PackagePath, SubpackageInfo},
-    futures::stream::{StreamExt as _, TryStreamExt as _},
-    std::{
-        collections::{hash_map, BTreeMap, BTreeSet, HashMap, HashSet},
-        fs::{self, File},
-        future::Future,
-        os::unix::fs::MetadataExt,
-        pin::Pin,
-    },
-    tempfile::TempDir,
-    tuf::{
-        crypto::HashAlgorithm, metadata::TargetPath, pouf::Pouf1,
-        repo_builder::RepoBuilder as TufRepoBuilder, Database,
-    },
-};
+use crate::repo_keys::RepoKeys;
+use crate::repository::RepoStorageProvider;
+use anyhow::{anyhow, Context, Result};
+use camino::{Utf8Path, Utf8PathBuf};
+use chrono::{DateTime, Duration, Utc};
+use delivery_blob::DeliveryBlobType;
+use fuchsia_merkle::Hash;
+use fuchsia_pkg::{BlobInfo, PackageManifest, PackageManifestList, PackagePath, SubpackageInfo};
+use futures::stream::{StreamExt as _, TryStreamExt as _};
+use std::collections::{hash_map, BTreeMap, BTreeSet, HashMap, HashSet};
+use std::fs::{self, File};
+use std::future::Future;
+use std::os::unix::fs::MetadataExt;
+use std::pin::Pin;
+use tempfile::TempDir;
+use tuf::crypto::HashAlgorithm;
+use tuf::metadata::TargetPath;
+use tuf::pouf::Pouf1;
+use tuf::repo_builder::RepoBuilder as TufRepoBuilder;
+use tuf::Database;
 
 #[cfg(not(target_os = "fuchsia"))]
 use crate::repo_client::RepoClient;
@@ -862,22 +860,17 @@ fn check_manifests_are_equivalent(
 #[cfg(not(target_os = "fuchsia"))]
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            repository::{FileSystemRepository, PmRepository},
-            test_utils,
-        },
-        assert_matches::assert_matches,
-        fuchsia_pkg::PackageBuilder,
-        pretty_assertions::{assert_eq, assert_ne},
-        std::{io::Write as _, os::unix::fs::PermissionsExt as _},
-        tuf::{
-            crypto::Ed25519PrivateKey,
-            metadata::{Metadata as _, MetadataPath},
-        },
-        walkdir::WalkDir,
-    };
+    use super::*;
+    use crate::repository::{FileSystemRepository, PmRepository};
+    use crate::test_utils;
+    use assert_matches::assert_matches;
+    use fuchsia_pkg::PackageBuilder;
+    use pretty_assertions::{assert_eq, assert_ne};
+    use std::io::Write as _;
+    use std::os::unix::fs::PermissionsExt as _;
+    use tuf::crypto::Ed25519PrivateKey;
+    use tuf::metadata::{Metadata as _, MetadataPath};
+    use walkdir::WalkDir;
 
     pub(crate) fn read_dir(dir: &Utf8Path) -> BTreeMap<String, Vec<u8>> {
         let mut entries = BTreeMap::new();
