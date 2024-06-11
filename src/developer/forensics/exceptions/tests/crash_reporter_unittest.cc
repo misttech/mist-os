@@ -14,6 +14,7 @@
 #include <zircon/types.h>
 
 #include <memory>
+#include <queue>
 #include <utility>
 
 #include <gtest/gtest.h>
@@ -22,6 +23,7 @@
 #include "src/developer/forensics/exceptions/tests/crasher_wrapper.h"
 #include "src/developer/forensics/testing/gmatchers.h"
 #include "src/developer/forensics/testing/gpretty_printers.h"
+#include "src/developer/forensics/testing/stubs/wake_lease.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
 #include "src/lib/fostr/fidl/fuchsia/exception/formatting.h"
 #include "src/lib/fsl/handles/object_info.h"
@@ -61,6 +63,32 @@ class StubCrashReporter : public fuchsia::feedback::CrashReporter {
  private:
   std::vector<fuchsia::feedback::CrashReport> reports_;
 
+  fidl::BindingSet<fuchsia::feedback::CrashReporter> bindings_;
+};
+
+class StubCrashReporterDelaysResponse : public fuchsia::feedback::CrashReporter {
+ public:
+  void FileReport(fuchsia::feedback::CrashReport report, FileReportCallback callback) override {
+    pending_callbacks_.push(std::move(callback));
+  }
+
+  void PopResponse() {
+    FX_CHECK(!pending_callbacks_.empty());
+
+    fuchsia::feedback::CrashReporter_FileReport_Result result;
+    result.set_response({});
+    pending_callbacks_.front()(std::move(result));
+    pending_callbacks_.pop();
+  }
+
+  fidl::InterfaceRequestHandler<fuchsia::feedback::CrashReporter> GetHandler() {
+    return [this](fidl::InterfaceRequest<fuchsia::feedback::CrashReporter> request) {
+      bindings_.AddBinding(this, std::move(request));
+    };
+  }
+
+ private:
+  std::queue<FileReportCallback> pending_callbacks_;
   fidl::BindingSet<fuchsia::feedback::CrashReporter> bindings_;
 };
 
@@ -107,9 +135,8 @@ class HandlerTest : public UnitTestFixture {
   void HandleException(
       zx::exception exception, zx::duration component_lookup_timeout,
       CrashReporter::SendCallback callback = [](const ::fidl::StringPtr& moniker) {}) {
-    // TODO(https://fxbug.dev/333110044): Test with suspend enabled + disabled.
     handler_ = std::make_unique<CrashReporter>(dispatcher(), services(), component_lookup_timeout,
-                                               /*suspend_enabled=*/false);
+                                               /*wake_lease=*/nullptr);
 
     zx::process process;
     exception.get_process(&process);
@@ -125,9 +152,8 @@ class HandlerTest : public UnitTestFixture {
   void HandleException(
       zx::process process, zx::thread thread, zx::duration component_lookup_timeout,
       CrashReporter::SendCallback callback = [](const ::fidl::StringPtr& moniker) {}) {
-    // TODO(https://fxbug.dev/333110044): Test with suspend enabled + disabled.
     handler_ = std::make_unique<CrashReporter>(dispatcher(), services(), component_lookup_timeout,
-                                               /*suspend_enabled=*/false);
+                                               /*wake_lease=*/nullptr);
 
     handler_->Send(zx::exception{}, std::move(process), std::move(thread), std::move(callback));
     RunLoopUntilIdle();
@@ -412,6 +438,53 @@ TEST_F(HandlerTest, DelayForFeedbackCrash) {
   // doesn't get rescheduled. Otherwise the exception on the crash program would bubble out of our
   // environment and create noise on the overall system.
   exception.job.kill();
+}
+
+using HandlerTestWithPF = UnitTestFixture;
+
+TEST_F(HandlerTestWithPF, HoldsWakeLeaseUntilFeedbackResponse) {
+  StubCrashReporterDelaysResponse crash_reporter;
+  InjectServiceProvider(&crash_reporter);
+
+  StubCrashIntrospect introspect;
+  InjectServiceProvider(&introspect);
+
+  // Create the exception.
+  ExceptionContext exception_context;
+  ASSERT_TRUE(RetrieveExceptionContext(&exception_context));
+
+  // We kill the jobs. This kills the underlying process. We do this so that the crashed process
+  // doesn't get rescheduled. Otherwise the exception on the crash program would bubble out of our
+  // environment and create noise on the overall system.
+  exception_context.job.kill();
+
+  // Must explicitly wait for the job to be terminated to ensure consistency between asan and
+  // non-asan.
+  exception_context.job.wait_one(ZX_TASK_TERMINATED, zx::time::infinite(), nullptr);
+
+  auto wake_lease = std::make_unique<stubs::WakeLease>(dispatcher());
+  stubs::WakeLease* wake_lease_ptr = wake_lease.get();
+  CrashReporter handler(dispatcher(), services(), zx::duration::infinite(),
+                        /*wake_lease=*/std::move(wake_lease));
+
+  zx::process process;
+  exception_context.exception.get_process(&process);
+
+  zx::thread thread;
+  exception_context.exception.get_thread(&thread);
+
+  bool called = false;
+  handler.Send(std::move(exception_context.exception), std::move(process), std::move(thread),
+               [&called](const ::fidl::StringPtr& moniker) { called = true; });
+  RunLoopUntilIdle();
+
+  EXPECT_FALSE(called);
+  EXPECT_TRUE(wake_lease_ptr->LeaseHeld());
+
+  crash_reporter.PopResponse();
+  RunLoopUntilIdle();
+  EXPECT_TRUE(called);
+  EXPECT_FALSE(wake_lease_ptr->LeaseHeld());
 }
 
 }  // namespace

@@ -19,6 +19,7 @@
 #include "src/developer/forensics/exceptions/handler/component_lookup.h"
 #include "src/developer/forensics/exceptions/handler/minidump.h"
 #include "src/developer/forensics/exceptions/handler/report_builder.h"
+#include "src/developer/forensics/exceptions/handler/wake_lease.h"
 #include "src/developer/forensics/utils/fidl_oneshot.h"
 #include "src/lib/fsl/handles/object_info.h"
 
@@ -95,16 +96,13 @@ fpromise::promise<> Delay(async_dispatcher_t* dispatcher, const zx::duration dur
 
 CrashReporter::CrashReporter(async_dispatcher_t* dispatcher,
                              std::shared_ptr<sys::ServiceDirectory> services,
-                             zx::duration component_lookup_timeout, bool suspend_enabled)
+                             zx::duration component_lookup_timeout,
+                             std::unique_ptr<WakeLeaseBase> wake_lease)
     : dispatcher_(dispatcher),
       executor_(dispatcher_),
       services_(std::move(services)),
-      component_lookup_timeout_(component_lookup_timeout) {
-  if (suspend_enabled) {
-    // TODO(https://fxbug.dev/333110044): Acquire wake lease.
-    FX_LOGS(INFO) << "Suspend enabled";
-  }
-}
+      component_lookup_timeout_(component_lookup_timeout),
+      wake_lease_(std::move(wake_lease)) {}
 
 void CrashReporter::Send(zx::exception exception, zx::process crashed_process,
                          zx::thread crashed_thread, SendCallback callback) {
@@ -132,46 +130,71 @@ void CrashReporter::Send(zx::exception exception, zx::process crashed_process,
   if (IsProcessTerminated(crashed_process)) {
     builder.SetProcessTerminated();
   }
-  ResetException(dispatcher_, std::move(exception), crashed_process);
+
+  // If suspend is enabled, acquire a wake lease before releasing the exception. The wake lease
+  // should be kept in scope until after we're done filing the crash report.
+  fpromise::promise<fidl::Client<fuchsia_power_broker::LeaseControl>, Error> wake_lease_promise =
+      wake_lease_ != nullptr
+          ? wake_lease_->Acquire(kWakeLeaseAcquisitionTimeout)
+          : fpromise::make_result_promise<fidl::Client<fuchsia_power_broker::LeaseControl>, Error>(
+                fpromise::ok(fidl::Client<fuchsia_power_broker::LeaseControl>()));
 
   const auto thread_koid = fsl::GetKoid(crashed_thread.get());
-  auto file_crash_report =
-      GetComponentInfo(dispatcher_, services_, component_lookup_timeout_, thread_koid)
-          .then([dispatcher = dispatcher_, services = services_, builder = std::move(builder),
-                 callback =
-                     std::move(callback)](::fpromise::result<ComponentInfo>& result) mutable {
-            ComponentInfo component_info;
-            if (result.is_ok()) {
-              component_info = result.take_value();
-            }
+  auto join = fpromise::join_promises(
+      std::move(wake_lease_promise),
+      GetComponentInfo(dispatcher_, services_, component_lookup_timeout_, thread_koid));
 
-            builder.SetComponentInfo(component_info);
+  auto join_promise = join.and_then(
+      [dispatcher = dispatcher_, services = services_, builder = std::move(builder),
+       exception = std::move(exception), crashed_process = std::move(crashed_process),
+       callback = std::move(callback)](
+          std::tuple<fpromise::result<fidl::Client<::fuchsia_power_broker::LeaseControl>, Error>,
+                     fpromise::result<ComponentInfo>>& results) mutable {
+        fpromise::result<fidl::Client<fuchsia_power_broker::LeaseControl>, Error>&
+            wake_lease_result = std::get<0>(results);
+        fpromise::result<ComponentInfo>& component_info_result = std::get<1>(results);
 
-            fpromise::promise<> delay = (builder.ProcessName() != "feedback.cm")
-                                            ? fpromise::make_ok_promise()
-                                            : Delay(dispatcher, /*duration=*/zx::sec(5));
+        if (wake_lease_result.is_error()) {
+          FX_LOGS(ERROR) << "Wake lease not acquired: " + ToString(wake_lease_result.error());
+        }
 
-            return delay
-                .then([dispatcher, services,
-                       builder = std::move(builder)](const fpromise::result<>& result) mutable {
-                  return OneShotCall<fuchsia::feedback::CrashReporter,
-                                     &fuchsia::feedback::CrashReporter::FileReport>(
-                      dispatcher, services, kFileReportTimeout, builder.Consume());
-                })
-                .then([component_info = std::move(component_info), callback = std::move(callback)](
-                          const fpromise::result<fuchsia::feedback::CrashReporter_FileReport_Result,
-                                                 forensics::Error>& result) {
-                  ::fidl::StringPtr moniker = std::nullopt;
-                  if (!component_info.moniker.empty()) {
-                    moniker = component_info.moniker;
-                  }
-                  callback(std::move(moniker));
+        // Don't release the exception until after we attempted to acquire a wake lease, if
+        // applicable.
+        ResetException(dispatcher, std::move(exception), crashed_process);
 
-                  return ::fpromise::ok();
-                });
-          });
+        ComponentInfo component_info;
+        if (component_info_result.is_ok()) {
+          component_info = component_info_result.take_value();
+        }
 
-  executor_.schedule_task(std::move(file_crash_report));
+        builder.SetComponentInfo(component_info);
+
+        fpromise::promise<> delay = (builder.ProcessName() != "feedback.cm")
+                                        ? fpromise::make_ok_promise()
+                                        : Delay(dispatcher, /*duration=*/zx::sec(5));
+
+        return delay
+            .then([dispatcher, services,
+                   builder = std::move(builder)](const fpromise::result<>& result) mutable {
+              return OneShotCall<fuchsia::feedback::CrashReporter,
+                                 &fuchsia::feedback::CrashReporter::FileReport>(
+                  dispatcher, services, kFileReportTimeout, builder.Consume());
+            })
+            .then([wake_lease_result = std::move(wake_lease_result),
+                   component_info = std::move(component_info), callback = std::move(callback)](
+                      const fpromise::result<fuchsia::feedback::CrashReporter_FileReport_Result,
+                                             forensics::Error>& result) {
+              ::fidl::StringPtr moniker = std::nullopt;
+              if (!component_info.moniker.empty()) {
+                moniker = component_info.moniker;
+              }
+              callback(std::move(moniker));
+
+              return ::fpromise::ok();
+            });
+      });
+
+  executor_.schedule_task(std::move(join_promise));
 }
 
 }  // namespace handler

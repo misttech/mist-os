@@ -21,6 +21,8 @@ source_set("lib") {
     "wake_lease.h",
   ]
 
+  visibility += [ "//src/developer/forensics/testing/stubs/*" ]
+
   public_deps = [
     "//sdk/fidl/fuchsia.exception:fuchsia.exception_hlcpp",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
@@ -60,6 +62,7 @@ source_set("main") {
 
   deps = [
     ":lib",
+    "//sdk/lib/component/incoming/cpp:cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/developer/forensics/exceptions:constants",

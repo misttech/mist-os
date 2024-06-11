@@ -352,3 +352,17 @@ source_set("utc_clock_ready_watcher") {
 
   public_deps = [ "//src/developer/forensics/utils:utc_clock_ready_watcher" ]
 }
+
+source_set("wake_lease") {
+  testonly = true
+
+  sources = [
+    "wake_lease.cc",
+    "wake_lease.h",
+  ]
+
+  public_deps = [
+    ":power_broker",
+    "//src/developer/forensics/exceptions/handler:lib",
+  ]
+}

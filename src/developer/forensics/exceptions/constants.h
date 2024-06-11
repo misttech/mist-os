@@ -36,6 +36,8 @@ constexpr uint8_t kPowerLevelInactive = 0u;
 // System suspension is not allowed.
 constexpr uint8_t kPowerLevelActive = 1u;
 
+constexpr zx::duration kWakeLeaseAcquisitionTimeout{zx::sec(5)};
+
 }  // namespace exceptions
 }  // namespace forensics
 

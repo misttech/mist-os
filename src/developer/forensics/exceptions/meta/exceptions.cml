@@ -29,6 +29,13 @@
             ],
         },
         {
+            protocol: [
+                "fuchsia.power.broker.Topology",
+                "fuchsia.power.system.ActivityGovernor",
+            ],
+            availability: "optional",
+        },
+        {
             directory: "config-data",
             rights: [ "r*" ],
             path: "/config/data",

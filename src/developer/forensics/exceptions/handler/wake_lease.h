@@ -19,9 +19,17 @@
 
 namespace forensics::exceptions::handler {
 
+class WakeLeaseBase {
+ public:
+  virtual ~WakeLeaseBase() = default;
+
+  virtual fpromise::promise<fidl::Client<::fuchsia_power_broker::LeaseControl>, Error> Acquire(
+      zx::duration timeout) = 0;
+};
+
 // Adds a power element passively dependent on (ExecutionState, WakeHandling) and takes a lease on
 // that element.
-class WakeLease {
+class WakeLease : public WakeLeaseBase {
  public:
   WakeLease(async_dispatcher_t* dispatcher, const std::string& power_element_name,
             fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag_client_end,
@@ -37,7 +45,7 @@ class WakeLease {
   // This function can be called many times. If the lease returned falls out of scope, the lease
   // will be dropped and can be later reacquired.
   fpromise::promise<fidl::Client<::fuchsia_power_broker::LeaseControl>, Error> Acquire(
-      zx::duration timeout);
+      zx::duration timeout) override;
 
  private:
   // "Unsafe" because it does not have scoping to prevent |this| from being accessed in promise
