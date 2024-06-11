@@ -11,8 +11,10 @@ from pathlib import Path
 from enum import Enum
 import subprocess
 import os
+import re
 
 _CPP_EXTENSIONS = [".cc", ".c", ".cpp"]
+_OPT_PATTERN = re.compile("[\W]+")
 
 
 class Action:
@@ -143,6 +145,17 @@ def collect_actions(action_graph: Sequence[Dict]) -> Sequence[Action]:
     return actions
 
 
+def compilation_mode(args: Sequence[str]) -> str:
+    # sometimes the optimization is escape quoted so we clean it up.
+    opt = _OPT_PATTERN.sub("", args.optimization)
+    if opt == "debug":
+        return "--compilation_mode=dbg"
+    elif opt in ["size", "speed", "profile", "size_lto"]:
+        return "--compilation_mode=opt"
+    else:
+        return "--compilation_mode=fastbuild"
+
+
 def main(argv: Sequence[str]):
     parser = argparse.ArgumentParser(description="Refresh bazel compdb")
 
@@ -153,17 +166,22 @@ def main(argv: Sequence[str]):
     parser.add_argument(
         "--label", required=True, help="The bazel label to query"
     )
+    parser.add_argument(
+        "--optimization", required=True, help="The build level optimization"
+    )
     args = parser.parse_args(argv)
 
-    # TODO: make bazel not print output
     action_graph = json.loads(
         run(
             args.bazel,
             "aquery",
             "mnemonic('CppCompile',deps({label}))".format(label=args.label),
+            compilation_mode(args),
             "--output=jsonproto",
-            "--ui_event_filters=-info",
+            "--ui_event_filters=-info,-warning",
+            "--noshow_loading_progress",
             "--noshow_progress",
+            "--show_result=0",
         )
     )
 
