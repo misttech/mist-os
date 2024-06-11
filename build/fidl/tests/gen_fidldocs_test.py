@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import os
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -12,11 +13,11 @@ import gen_fidldocs
 
 
 class GenReferenceDocsTest(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         # Create a temporary directory
         self.temp_dir = tempfile.mkdtemp()
 
-    def test_read_fidl_docs(self):
+    def test_read_fidl_docs(self) -> None:
         with mock.patch(
             "builtins.open",
             mock.mock_open(
@@ -26,11 +27,11 @@ class GenReferenceDocsTest(unittest.TestCase):
             files = gen_fidldocs.read_fidl_packages(self.temp_dir)
             self.assertEquals(files, ["fakefidl_a", "fakefidl_b"])
 
-    def test_run_fidl_doc(self):
+    def test_run_fidl_doc(self) -> None:
         build_dir = os.path.join(self.temp_dir, "out")
         out_dir = os.path.join(self.temp_dir, "gen")
         mock_files = ["a", "b", "c"]
-        with mock.patch.object(gen_fidldocs.subprocess, "run") as mock_run:
+        with mock.patch.object(subprocess, "run") as mock_run:
             fidldoc_path = os.path.join(build_dir, "host-tools", "fidldoc")
             out_fidl = os.path.join(out_dir, "fidldoc")
             gen_fidldocs.run_fidl_doc(build_dir, out_dir, mock_files)

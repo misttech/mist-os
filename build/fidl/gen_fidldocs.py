@@ -16,7 +16,7 @@ import subprocess
 import sys
 
 
-def walk_rmtree(directory):
+def walk_rmtree(directory: str) -> None:
     """Manually remove all subdirectories and files of a directory
     via os.walk instead of using
     shutil.rmtree, to avoid registering spurious reads on stale
@@ -37,14 +37,19 @@ def walk_rmtree(directory):
     os.rmdir(directory)
 
 
-def read_fidl_packages(build_dir):
+def read_fidl_packages(build_dir: str) -> list[str]:
     fidldoc = os.path.join(build_dir, "sdk_fidl_json.json")
     with open(fidldoc, "r") as fdl_json:
         fidl_pkgs = json.load(fdl_json)
     return [pkg["ir"] for pkg in fidl_pkgs]
 
 
-def run_fidl_doc(build_dir, out_dir, fidl_files, zipped_result=False):
+def run_fidl_doc(
+    build_dir: str,
+    out_dir: str,
+    fidl_files: list[str],
+    zipped_result: bool = False,
+) -> int:
     fidldoc_path = os.path.join(build_dir, "host-tools", "fidldoc")
     out_fidl = os.path.join(out_dir, "fidldoc")
     gen_fidl = subprocess.run(
@@ -72,8 +77,10 @@ def run_fidl_doc(build_dir, out_dir, fidl_files, zipped_result=False):
         )
         walk_rmtree(out_fidl)
 
+    return 0
 
-def main():
+
+def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__,  # Prepend help doc with this file's docstring.
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -116,6 +123,8 @@ def main():
     run_fidl_doc(
         args.build_dir, args.out_dir, input_fidl_files, args.zipped_result
     )
+
+    return 0
 
 
 if __name__ == "__main__":
