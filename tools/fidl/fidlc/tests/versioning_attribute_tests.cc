@@ -59,7 +59,7 @@ library example;
 
 TEST(VersioningAttributeTests, GoodAllArgumentsOnLibrary) {
   TestLibrary library(R"FIDL(
-@available(platform="notexample", added=1, deprecated=2, removed=3, note="use xyz instead", legacy=false)
+@available(platform="notexample", added=1, deprecated=2, removed=3, note="use xyz instead")
 library example;
 )FIDL");
   library.SelectVersion("notexample", "1");
@@ -71,7 +71,7 @@ TEST(VersioningAttributeTests, GoodAllArgumentsOnDecl) {
 @available(added=1)
 library example;
 
-@available(added=1, deprecated=2, removed=3, note="use xyz instead", legacy=false)
+@available(added=1, deprecated=2, removed=3, note="use xyz instead")
 type Foo = struct {};
 )FIDL");
   library.SelectVersion("example", "1");
@@ -84,7 +84,7 @@ TEST(VersioningAttributeTests, GoodAllArgumentsOnMember) {
 library example;
 
 type Foo = struct {
-    @available(added=1, deprecated=2, removed=3, note="use xyz instead", legacy=false)
+    @available(added=1, deprecated=2, removed=3, note="use xyz instead")
     member string;
 };
 )FIDL");
@@ -584,34 +584,6 @@ type Foo = struct {};
 )FIDL");
   library.SelectVersion("example", "HEAD");
   library.ExpectFail(ErrInvalidAvailabilityOrder, "added <= deprecated < replaced");
-  ASSERT_COMPILER_DIAGNOSTICS(library);
-}
-
-TEST(VersioningAttributeTests, BadLegacyTrueNotRemoved) {
-  TestLibrary library(R"FIDL(
-@available(added=1, legacy=true)
-library example;
-)FIDL");
-  library.SelectVersion("example", "HEAD");
-  library.ExpectFail(ErrLegacyWithoutRemoval, "legacy");
-  ASSERT_COMPILER_DIAGNOSTICS(library);
-}
-
-TEST(VersioningAttributeTests, BadLegacyFalseNotRemoved) {
-  TestLibrary library(R"FIDL(
-@available(added=1, legacy=false)
-library example;
-)FIDL");
-  library.SelectVersion("example", "HEAD");
-  library.ExpectFail(ErrLegacyWithoutRemoval, "legacy");
-  ASSERT_COMPILER_DIAGNOSTICS(library);
-}
-
-TEST(VersioningAttributeTests, BadLegacyTrueNotRemovedMethod) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0182.test.fidl");
-  library.SelectVersion("test", "HEAD");
-  library.ExpectFail(ErrLegacyWithoutRemoval, "legacy");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

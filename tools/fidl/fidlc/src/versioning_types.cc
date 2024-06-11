@@ -186,7 +186,6 @@ void Availability::Fail() {
 
 bool Availability::Init(InitArgs args) {
   ZX_ASSERT_MSG(state_ == State::kUnset, "called Init in the wrong order");
-  ZX_ASSERT_MSG(args.legacy != Legacy::kNotApplicable, "legacy cannot be kNotApplicable");
   ZX_ASSERT_MSG(args.removed || !args.replaced, "cannot set replaced without removed");
   for (auto version : {args.added, args.deprecated, args.removed}) {
     ZX_ASSERT(version != Version::kNegInf);
@@ -196,7 +195,6 @@ bool Availability::Init(InitArgs args) {
   added_ = args.added;
   deprecated_ = args.deprecated;
   removed_ = args.removed;
-  legacy_ = args.legacy;
   if (args.removed) {
     ending_ = args.replaced ? Ending::kReplaced : Ending::kRemoved;
   }
@@ -263,43 +261,34 @@ Availability::InheritResult Availability::Inherit(const Availability& parent) {
   } else if (ending_.value() == Ending::kReplaced && removed_.value() == parent.removed_.value()) {
     result.removed = InheritResult::Status::kAfterParentRemoved;
   }
-  // Inherit and validate `legacy`.
-  if (!legacy_) {
-    if (removed_.value() == parent.removed_.value()) {
-      // Only inherit if the parent was removed at the same time. For example:
-      //
-      //     @available(added=1, removed=100, legacy=true)
-      //     type Foo = table {
-      //         @available(removed=2) 1: string bar;
-      //         @available(added=2)   1: string bar:10;
-      //         @available(removed=3) 2: bool qux;
-      //     };
-      //
-      // It's crucial we do not inherit legacy=true on the first `bar`,
-      // otherwise there will be two `bar` fields that collide at LEGACY. We
-      // also don't want to inherit legacy=true for `qux`: it had no legacy
-      // legacy support when it was removed at 3, so it doesn't make sense to
-      // change that when we later remove the entire table at 100.
-      //
-      // An alternative is to inherit when the child has no explicit `removed`.
-      // We prefer to base it on post-inheritance equality so that adding or
-      // removing a redundant `removed=...` on the child is purely stylistic.
-      legacy_ = parent.legacy_.value();
-    } else {
-      ZX_ASSERT_MSG(
-          removed_.value() != Version::kPosInf,
-          "impossible for child to be removed at +inf if parent is not also removed at +inf");
-      // By default, removed elements are not added back at LEGACY.
-      legacy_ = Legacy::kNo;
-    }
-  } else if (removed_.value() == Version::kPosInf) {
-    // Legacy is not applicable if the element is never removed. Note that we
-    // cannot check this earlier (e.g. in Init) because we don't know if the
-    // element is removed or not until performing inheritance.
-    result.legacy = InheritResult::LegacyStatus::kNeverRemoved;
-  } else if (legacy_.value() == Legacy::kYes && parent.legacy_.value() == Legacy::kNo) {
-    // We can't re-add the child at LEGACY without its parent.
-    result.legacy = InheritResult::LegacyStatus::kWithoutParent;
+  // Inherit `legacy`.
+  ZX_ASSERT_MSG(!legacy_.has_value(), "legacy cannot be set before Inherit");
+  if (removed_.value() == parent.removed_.value()) {
+    // Only inherit if the parent was removed at the same time. For example:
+    //
+    //     @available(added=1, removed=100, legacy=true)
+    //     type Foo = table {
+    //         @available(removed=2) 1: string bar;
+    //         @available(added=2)   1: string bar:10;
+    //         @available(removed=3) 2: bool qux;
+    //     };
+    //
+    // It's crucial we do not inherit legacy=true on the first `bar`,
+    // otherwise there will be two `bar` fields that collide at LEGACY. We
+    // also don't want to inherit legacy=true for `qux`: it had no legacy
+    // legacy support when it was removed at 3, so it doesn't make sense to
+    // change that when we later remove the entire table at 100.
+    //
+    // An alternative is to inherit when the child has no explicit `removed`.
+    // We prefer to base it on post-inheritance equality so that adding or
+    // removing a redundant `removed=...` on the child is purely stylistic.
+    legacy_ = parent.legacy_.value();
+  } else {
+    ZX_ASSERT_MSG(
+        removed_.value() != Version::kPosInf,
+        "impossible for child to be removed at +inf if parent is not also removed at +inf");
+    // By default, removed elements are not added back at LEGACY.
+    legacy_ = Legacy::kNo;
   }
 
   if (result.Ok()) {
@@ -311,6 +300,13 @@ Availability::InheritResult Availability::Inherit(const Availability& parent) {
     state_ = State::kFailed;
   }
   return result;
+}
+
+void Availability::SetLegacy() {
+  ZX_ASSERT_MSG(state_ == State::kInherited, "called SetLegacy in the wrong order");
+  ZX_ASSERT_MSG(legacy_.has_value(), "legacy_ should be set by Inherit");
+  ZX_ASSERT_MSG(removed_.value() != Version::kPosInf, "called SetLegacy for non-removed element");
+  legacy_ = Legacy::kYes;
 }
 
 void Availability::Narrow(VersionRange range) {
@@ -370,6 +366,12 @@ std::string Availability::Debug() const {
 bool VersionSelection::Insert(Platform platform, std::set<Version> versions) {
   ZX_ASSERT_MSG(!platform.is_unversioned(), "version selection cannot contain 'unversioned'");
   ZX_ASSERT_MSG(!versions.empty(), "cannot select an empty set of versions");
+  ZX_ASSERT_MSG(versions.count(Version::kLegacy) == 0, "targeting LEGACY is not allowed");
+  // TODO(https://fxbug.dev/42085274): Remove this restriction.
+  if (versions.size() > 1) {
+    ZX_ASSERT_MSG(versions.count(Version::kHead) != 0,
+                  "HEAD must be included when targeting multiple levels");
+  }
   auto [_, inserted] = map_.emplace(std::move(platform), std::move(versions));
   return inserted;
 }

@@ -94,7 +94,7 @@ type Spec = resource table {
 };
 
 /// Errors that can be returned when using the Manager protocol.
-@available(removed=19, legacy=true)
+@available(removed=19)
 type ProposeElementError = strict enum {
     /// The element spec was malformed.
     INVALID_ARGS = 1;

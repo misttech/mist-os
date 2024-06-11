@@ -20,7 +20,7 @@ type LogInterestSelector = struct {
 /// in the system.
 @discoverable(client="platform", server="platform")
 closed protocol LogSettings {
-    @available(deprecated=12, removed=18, legacy=true)
+    @available(deprecated=12, removed=18)
     strict RegisterInterest(struct {
         selectors vector<LogInterestSelector>:MAX_LOG_SELECTORS;
     });

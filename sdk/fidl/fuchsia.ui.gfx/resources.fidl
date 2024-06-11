@@ -10,7 +10,7 @@ using zx;
 
 /// These are all of the types of resources that can be created within a
 /// `Session`. Add new fields only to the bottom of the list.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type ResourceArgs = strict resource union {
     // Memory resources.
     1: memory MemoryArgs;
@@ -65,7 +65,7 @@ type ResourceArgs = strict resource union {
 };
 
 /// `ImagePipe2` is a `Resource` that can be used as a `Texture` for a `Material`.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type ImagePipe2Args = resource struct {
     image_pipe_request server_end:fuchsia.images.ImagePipe2;
 };
@@ -73,7 +73,7 @@ type ImagePipe2Args = resource struct {
 /// `Memory` is a `Resource` that wraps a client-provided Zircon vmo to register
 /// it with Scenic.
 // TODO: specify resizing behavior.  Who can resize?  Client/Scenic/both/none?
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type MemoryArgs = resource struct {
     /// The VMO which backs this memory.
     vmo zx.Handle:VMO;
@@ -88,7 +88,7 @@ type MemoryArgs = resource struct {
 
 /// An image mapped to a range of a `Memory` resource.
 // TODO: more precise and extensive docs.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type ImageArgs = struct {
     info fuchsia.images.ImageInfo;
 
@@ -97,7 +97,7 @@ type ImageArgs = struct {
 };
 
 /// An image mapped to a range of a `Memory` resource.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type ImageArgs2 = struct {
     width uint32;
     height uint32;
@@ -114,7 +114,7 @@ type ImageArgs2 = struct {
 };
 
 /// An image that is backed by a `BufferCollection` registered with `Allocator`.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type ImageArgs3 = resource struct {
     width uint32;
     height uint32;
@@ -130,7 +130,7 @@ type ImageArgs3 = resource struct {
 
 /// A buffer mapped to a range of `Memory`.
 // TODO: replace BufferArgs with BufferArgs2 that supports sysmem.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type BufferArgs = struct {
     memory_id uint32; // id of a `Memory` resource
     memory_offset uint32; // byte offset of buffer within `Memory` resource
@@ -148,7 +148,7 @@ type BufferArgs = struct {
 /// Usually the `View` and its associated `ViewHolder` exist in separate
 /// processes.  By combining them, the UI for an entire system can be built
 /// using content contributed from many different processes.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type ViewArgs = resource struct {
     token fuchsia.ui.views.ViewToken;
     debug_name string:optional;
@@ -171,7 +171,7 @@ type ViewArgs = resource struct {
 /// feed-forward style. It is accompanied by a `ViewRefControl`, which Scenic
 /// uses to signal `View` destruction across the system; the `ViewRefControl`
 /// must be unique - do not clone it.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type ViewArgs3 = resource struct {
     token fuchsia.ui.views.ViewToken;
     /// `control_ref.reference` must have default eventpair rights (i.e., with
@@ -191,7 +191,7 @@ type ViewArgs3 = resource struct {
 /// Usually the `ViewHolder` and its associated `View` exist in separate
 /// processes.  By combining them, the UI for an entire system can be built
 /// using content contributed from many different processes.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type ViewHolderArgs = resource struct {
     token fuchsia.ui.views.ViewHolderToken;
     debug_name string:optional;
@@ -200,7 +200,7 @@ type ViewHolderArgs = resource struct {
 /// A Compositor draws its `LayerStack` into a framebuffer provided by its
 /// attached `Display`, if any.  If no display is attached, nothing is rendered.
 // TODO(https://fxbug.dev/42097798): there is currently no way to create/attach a display.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type CompositorArgs = struct {
     @allow_deprecated_struct_defaults
     dummy uint32 = 0;
@@ -208,7 +208,7 @@ type CompositorArgs = struct {
 
 /// A DisplayCompositor draws its attached `LayerStack` into an image that is
 /// presented on a display.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type DisplayCompositorArgs = struct {
     @allow_deprecated_struct_defaults
     dummy uint32 = 0;
@@ -221,7 +221,7 @@ type DisplayCompositorArgs = struct {
 ///
 /// Supported commands:
 /// - AddLayer
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type LayerStackArgs = struct {
     @allow_deprecated_struct_defaults
     dummy uint32 = 0;
@@ -241,7 +241,7 @@ type LayerStackArgs = struct {
 /// - SetTranslation (z component determines the relative Z-ordering of layers)
 /// - SetRotation (must rotate around Z-axis)
 /// - SetScale
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type LayerArgs = struct {
     @allow_deprecated_struct_defaults
     dummy uint32 = 0;
@@ -253,7 +253,7 @@ type LayerArgs = struct {
 /// Supported commands:
 /// - Add/RemoveLight
 /// - AddChild
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SceneArgs = struct {
     @allow_deprecated_struct_defaults
     dummy uint32 = 0;
@@ -266,7 +266,7 @@ type SceneArgs = struct {
 /// - SetCameraTransform
 /// - SetCameraProjection
 /// - SetCameraPoseBuffer
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type CameraArgs = struct {
     /// The scene that the camera is viewing.
     scene_id uint32;
@@ -278,7 +278,7 @@ type CameraArgs = struct {
 /// StereoCamera.
 /// Additional supported commands:
 /// - SetStereoCameraProjection
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type StereoCameraArgs = struct {
     /// The scene that the camera is viewing.
     scene_id uint32;
@@ -289,7 +289,7 @@ type StereoCameraArgs = struct {
 /// Supported commands:
 /// - SetCamera
 /// - SetRendererParam
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type RendererArgs = struct {
     @allow_deprecated_struct_defaults
     dummy uint32 = 0;
@@ -300,7 +300,7 @@ type RendererArgs = struct {
 ///
 /// Supported commands:
 /// - SetLightColor
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type AmbientLightArgs = struct {
     @allow_deprecated_struct_defaults
     dummy uint32 = 0;
@@ -316,7 +316,7 @@ type AmbientLightArgs = struct {
 /// Supported commands:
 /// - SetLightColor
 /// - SetLightDirection
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type DirectionalLightArgs = struct {
     @allow_deprecated_struct_defaults
     dummy uint32 = 0;
@@ -331,7 +331,7 @@ type DirectionalLightArgs = struct {
 /// - SetLightColor
 /// - SetPointLightPosition
 /// - SetPointLightFalloff
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type PointLightArgs = struct {
     @allow_deprecated_struct_defaults
     dummy uint32 = 0;
@@ -343,14 +343,14 @@ type PointLightArgs = struct {
 /// - SetTextureCmd: sets the texture, or it can be left as zero (no texture).
 ///   The texture can be an Image or ImagePipe2.
 /// - SetColorCmd: sets the color.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type MaterialArgs = struct {
     @allow_deprecated_struct_defaults
     dummy uint32 = 0;
 };
 
 /// Describes a typed, client-modifiable value.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type VariableArgs = struct {
     type ValueType;
     initial_value Value; // Must match type.  Must not be a variable_id.
@@ -361,7 +361,7 @@ type VariableArgs = struct {
 ///
 /// NOTE: Currently just an enum of importable resource types, but may later be
 /// expanded to express concepts like "meshes with a particular vertex format".
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type ImportSpec = strict enum {
     NODE = 0;
 };

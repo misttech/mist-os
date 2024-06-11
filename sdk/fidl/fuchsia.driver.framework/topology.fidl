@@ -112,7 +112,6 @@ type NodeAddArgs = resource table {
     @available(
             deprecated=18,
             removed=19,
-            legacy=true,
             note="Replaced with 'offers2' which can carry the transport type.")
     2: offers vector<fuchsia.component.decl.Offer>:MAX_OFFER_COUNT;
 

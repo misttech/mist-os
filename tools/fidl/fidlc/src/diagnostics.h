@@ -358,13 +358,8 @@ constexpr ErrorDef<180, Name> ErrExperimentalZxCTypesDisallowed(
     "{0} is an experimental type that must be enabled by with `--experimental zx_c_types`");
 constexpr ErrorDef<181> ErrReferenceInLibraryAttribute(
     "attributes on the 'library' declaration do not support referencing constants");
-constexpr ErrorDef<182, const AttributeArg *> ErrLegacyWithoutRemoval(
-    "the argument '{0}' is not allowed on an element that is never removed");
-constexpr ErrorDef<183, const AttributeArg *, std::string_view, const AttributeArg *,
-                   std::string_view, SourceSpan>
-    ErrLegacyConflictsWithParent(
-        "the argument {0}={1} conflicts with {2}={3} at {4}; a child element "
-        "cannot be added back at LEGACY if its parent is removed");
+constexpr RetiredDef<182> ErrLegacyWithoutRemoval;
+constexpr RetiredDef<183> ErrLegacyConflictsWithParent;
 constexpr ErrorDef<184, std::string_view> ErrUnexpectedControlCharacter(
     "unexpected control character in string literal; use the Unicode escape `\\u{{0}}` instead");
 constexpr ErrorDef<185> ErrUnicodeEscapeMissingBraces(
@@ -440,12 +435,6 @@ constexpr ErrorDef<217, const Element *, Version, AbiKind, AbiValue, AbiValue, S
         "{0} is marked replaced={1}, but its {2} ({3}) does not match the "
         "replacement's {2} ({4}) at {5}; use removed={1} if you intend to "
         "remove the ABI, otherwise use the same {2}");
-constexpr ErrorDef<218, const Element *> ErrLegacyShouldBeTrue(
-    "{0} is in a supported API level, so it should have the @available argument legacy=true",
-    {.documented = false});
-constexpr ErrorDef<219, const Element *> ErrLegacyShouldBeFalse(
-    "{0} is NOT in a supported API level, so it should NOT have the @available argument legacy=true",
-    {.documented = false});
 
 // To add a new error:
 //
@@ -676,8 +665,6 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0215 */ &ErrInvalidReplacedAndRenamed,
     /* fi-0216 */ &ErrInvalidRemovedAbi,
     /* fi-0217 */ &ErrInvalidReplacedAbi,
-    /* fi-0218 */ &ErrLegacyShouldBeTrue,
-    /* fi-0219 */ &ErrLegacyShouldBeFalse,
 };
 
 // In reporter.h we assert that reported error IDs are <= kNumDiagnosticDefs.

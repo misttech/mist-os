@@ -56,6 +56,39 @@ struct LintArgs {
   std::set<std::string>* excluded_checks_not_found = nullptr;
 };
 
+// Wrapper around std::set<Version> for convenience in parameterized tests.
+struct TargetVersions {
+  TargetVersions(std::initializer_list<Version> set) : set(set) {}
+  explicit TargetVersions(std::string_view string);
+
+  // Returns a string suitable for GTest parameterized test name suffixes.
+  std::string ToString() const;
+
+  struct CmpProxy {
+    bool operator==(Version rhs) const { return Compare(std::equal_to{}, rhs); }
+    bool operator!=(Version rhs) const { return Compare(std::not_equal_to{}, rhs); }
+    bool operator<(Version rhs) const { return Compare(std::less{}, rhs); }
+    bool operator>(Version rhs) const { return Compare(std::greater{}, rhs); }
+    bool operator<=(Version rhs) const { return Compare(std::less_equal{}, rhs); }
+    bool operator>=(Version rhs) const { return Compare(std::greater_equal{}, rhs); }
+    template <typename Cmp>
+    bool Compare(Cmp cmp, Version rhs) const {
+      auto pred = [&](auto lhs) { return cmp(lhs, rhs); };
+      return all ? std::all_of(set.begin(), set.end(), pred)
+                 : std::any_of(set.begin(), set.end(), pred);
+    }
+    const std::set<Version>& set;
+    bool all;
+  };
+
+  // Any() and All() return a proxy object with comparison operators. For
+  // example, `Any() > V3` is true if any version in the set is greater than V3.
+  CmpProxy Any() const { return CmpProxy{set, false}; }
+  CmpProxy All() const { return CmpProxy{set, true}; }
+
+  std::set<Version> set;
+};
+
 // Behavior that applies to SharedAmongstLibraries, but that is also provided on
 // TestLibrary for convenience in single-library tests.
 class SharedInterface {
@@ -82,6 +115,10 @@ class SharedInterface {
   }
   void SelectVersion(std::string platform, Version version) {
     version_selection()->Insert(Platform::Parse(std::move(platform)).value(), {version});
+  }
+  void SelectVersions(std::string platform, TargetVersions versions) {
+    version_selection()->Insert(Platform::Parse(std::move(platform)).value(),
+                                std::move(versions).set);
   }
   void EnableFlag(ExperimentalFlag flag) { experimental_flags().Enable(flag); }
 };

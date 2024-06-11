@@ -168,7 +168,7 @@ type EqualizerElementState = table {
     /// The bands controlled by `bands_state` are determined by each `band.id`.
     ///
     /// Required.
-    @available(removed=20, legacy=true)
+    @available(removed=20)
     1: bands_state vector<EqualizerBandState>:MAX_COUNT_EQUALIZER_BANDS;
 
     /// The number of elements of the `band_states` vector must be equal or smaller than the

@@ -14,7 +14,6 @@ namespace {
 using Legacy = Availability::Legacy;
 using InheritResult = Availability::InheritResult;
 using Status = InheritResult::Status;
-using LegacyStatus = InheritResult::LegacyStatus;
 
 Version v(uint32_t x) { return Version::From(x).value(); }
 VersionRange range(uint32_t x, uint32_t y) { return VersionRange(v(x), v(y)); }
@@ -277,17 +276,10 @@ TEST(VersioningTypesTests, GoodAvailabilityInitAdded) {
   EXPECT_EQ(availability.Debug(), "1 _ _ _");
 }
 
-TEST(VersioningTypesTests, GoodAvailabilityInitLegacy) {
-  Availability availability;
-  ASSERT_TRUE(availability.Init({.legacy = Legacy::kYes}));
-  EXPECT_EQ(availability.Debug(), "_ _ _ yes");
-}
-
 TEST(VersioningTypesTests, GoodAvailabilityInitAll) {
   Availability availability;
-  ASSERT_TRUE(availability.Init(
-      {.added = v(1), .deprecated = v(2), .removed = v(3), .legacy = Legacy::kNo}));
-  EXPECT_EQ(availability.Debug(), "1 2 3 no");
+  ASSERT_TRUE(availability.Init({.added = v(1), .deprecated = v(2), .removed = v(3)}));
+  EXPECT_EQ(availability.Debug(), "1 2 3 _");
 }
 
 TEST(VersioningTypesTests, BadAvailabilityInitWrongOrder) {
@@ -352,46 +344,6 @@ TEST(VersioningTypesTests, GoodAvailabilityInheritEliminateDeprecation) {
   EXPECT_EQ(child.Debug(), "1 _ 2 no");
 }
 
-TEST(VersioningTypesTests, GoodAvailabilityInheritLegacyRemovedAtSameTime) {
-  Availability parent, child;
-  ASSERT_TRUE(parent.Init({.added = v(1), .removed = v(2), .legacy = Legacy::kYes}));
-  ASSERT_TRUE(child.Init({.removed = v(2)}));
-  ASSERT_TRUE(parent.Inherit(Availability::Unbounded()).Ok());
-  ASSERT_TRUE(child.Inherit(parent).Ok());
-  EXPECT_EQ(parent.Debug(), "1 _ 2 yes");
-  EXPECT_EQ(child.Debug(), "1 _ 2 yes");
-}
-
-TEST(VersioningTypesTests, GoodAvailabilityInheritLegacyRemovedEarlier) {
-  Availability parent, child;
-  ASSERT_TRUE(parent.Init({.added = v(1), .removed = v(3), .legacy = Legacy::kYes}));
-  ASSERT_TRUE(child.Init({.removed = v(2)}));
-  ASSERT_TRUE(parent.Inherit(Availability::Unbounded()).Ok());
-  ASSERT_TRUE(child.Inherit(parent).Ok());
-  EXPECT_EQ(parent.Debug(), "1 _ 3 yes");
-  EXPECT_EQ(child.Debug(), "1 _ 2 no");
-}
-
-TEST(VersioningTypesTests, GoodAvailabilityInheritLegacyOverride) {
-  Availability parent, child;
-  ASSERT_TRUE(parent.Init({.added = v(1), .removed = v(2), .legacy = Legacy::kYes}));
-  ASSERT_TRUE(child.Init({.legacy = Legacy::kNo}));
-  ASSERT_TRUE(parent.Inherit(Availability::Unbounded()).Ok());
-  ASSERT_TRUE(child.Inherit(parent).Ok());
-  EXPECT_EQ(parent.Debug(), "1 _ 2 yes");
-  EXPECT_EQ(child.Debug(), "1 _ 2 no");
-}
-
-TEST(VersioningTypesTests, GoodAvailabilityInheritLegacyExplicitNo) {
-  Availability parent, child;
-  ASSERT_TRUE(parent.Init({.added = v(1), .removed = v(2), .legacy = Legacy::kNo}));
-  ASSERT_TRUE(child.Init({.legacy = Legacy::kNo}));
-  ASSERT_TRUE(parent.Inherit(Availability::Unbounded()).Ok());
-  ASSERT_TRUE(child.Inherit(parent).Ok());
-  EXPECT_EQ(parent.Debug(), "1 _ 2 no");
-  EXPECT_EQ(child.Debug(), "1 _ 2 no");
-}
-
 TEST(VersioningTypesTests, BadAvailabilityInheritBeforeParentCompletely) {
   Availability parent, child;
   ASSERT_TRUE(parent.Init({.added = v(3)}));
@@ -402,7 +354,6 @@ TEST(VersioningTypesTests, BadAvailabilityInheritBeforeParentCompletely) {
   EXPECT_EQ(status.added, Status::kBeforeParentAdded);
   EXPECT_EQ(status.deprecated, Status::kBeforeParentAdded);
   EXPECT_EQ(status.removed, Status::kBeforeParentAdded);
-  EXPECT_EQ(status.legacy, LegacyStatus::kOk);
 }
 
 TEST(VersioningTypesTests, BadAvailabilityInheritBeforeParentPartially) {
@@ -415,7 +366,6 @@ TEST(VersioningTypesTests, BadAvailabilityInheritBeforeParentPartially) {
   EXPECT_EQ(status.added, Status::kBeforeParentAdded);
   EXPECT_EQ(status.deprecated, Status::kBeforeParentAdded);
   EXPECT_EQ(status.removed, Status::kOk);
-  EXPECT_EQ(status.legacy, LegacyStatus::kOk);
 }
 
 TEST(VersioningTypesTests, BadAvailabilityInheritAfterParentCompletely) {
@@ -428,7 +378,6 @@ TEST(VersioningTypesTests, BadAvailabilityInheritAfterParentCompletely) {
   EXPECT_EQ(status.added, Status::kAfterParentRemoved);
   EXPECT_EQ(status.deprecated, Status::kAfterParentRemoved);
   EXPECT_EQ(status.removed, Status::kAfterParentRemoved);
-  EXPECT_EQ(status.legacy, LegacyStatus::kOk);
 }
 
 TEST(VersioningTypesTests, BadAvailabilityInheritAfterParentPartially) {
@@ -441,7 +390,6 @@ TEST(VersioningTypesTests, BadAvailabilityInheritAfterParentPartially) {
   EXPECT_EQ(status.added, Status::kOk);
   EXPECT_EQ(status.deprecated, Status::kAfterParentRemoved);
   EXPECT_EQ(status.removed, Status::kAfterParentRemoved);
-  EXPECT_EQ(status.legacy, LegacyStatus::kOk);
 }
 
 TEST(VersioningTypesTests, BadAvailabilityInheritAfterParentDeprecated) {
@@ -454,46 +402,6 @@ TEST(VersioningTypesTests, BadAvailabilityInheritAfterParentDeprecated) {
   EXPECT_EQ(status.added, Status::kOk);
   EXPECT_EQ(status.deprecated, Status::kAfterParentDeprecated);
   EXPECT_EQ(status.removed, Status::kOk);
-  EXPECT_EQ(status.legacy, LegacyStatus::kOk);
-}
-
-TEST(VersioningTypesTests, BadAvailabilityInheritLegacyNoNeverRemoved) {
-  Availability parent, child;
-  ASSERT_TRUE(parent.Init({.added = v(1)}));
-  ASSERT_TRUE(child.Init({.legacy = Legacy::kNo}));
-  ASSERT_TRUE(parent.Inherit(Availability::Unbounded()).Ok());
-
-  auto status = child.Inherit(parent);
-  EXPECT_EQ(status.added, Status::kOk);
-  EXPECT_EQ(status.deprecated, Status::kOk);
-  EXPECT_EQ(status.removed, Status::kOk);
-  EXPECT_EQ(status.legacy, LegacyStatus::kNeverRemoved);
-}
-
-TEST(VersioningTypesTests, BadAvailabilityInheritLegacyYesNeverRemoved) {
-  Availability parent, child;
-  ASSERT_TRUE(parent.Init({.added = v(1)}));
-  ASSERT_TRUE(child.Init({.legacy = Legacy::kYes}));
-  ASSERT_TRUE(parent.Inherit(Availability::Unbounded()).Ok());
-
-  auto status = child.Inherit(parent);
-  EXPECT_EQ(status.added, Status::kOk);
-  EXPECT_EQ(status.deprecated, Status::kOk);
-  EXPECT_EQ(status.removed, Status::kOk);
-  EXPECT_EQ(status.legacy, LegacyStatus::kNeverRemoved);
-}
-
-TEST(VersioningTypesTests, BadAvailabilityInheritLegacyWithoutParent) {
-  Availability parent, child;
-  ASSERT_TRUE(parent.Init({.added = v(1), .removed = v(2)}));
-  ASSERT_TRUE(child.Init({.legacy = Legacy::kYes}));
-  ASSERT_TRUE(parent.Inherit(Availability::Unbounded()).Ok());
-
-  auto status = child.Inherit(parent);
-  EXPECT_EQ(status.added, Status::kOk);
-  EXPECT_EQ(status.deprecated, Status::kOk);
-  EXPECT_EQ(status.removed, Status::kOk);
-  EXPECT_EQ(status.legacy, LegacyStatus::kWithoutParent);
 }
 
 TEST(VersioningTypesTests, GoodAvailabilityDecomposeWhole) {

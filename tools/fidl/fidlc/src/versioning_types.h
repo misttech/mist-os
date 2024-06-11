@@ -295,7 +295,6 @@ class Availability final {
   // Named arguments for Init.
   struct InitArgs {
     std::optional<Version> added, deprecated, removed;
-    std::optional<Legacy> legacy;
     bool replaced;
   };
 
@@ -315,28 +314,22 @@ class Availability final {
       kAfterParentRemoved,
     };
 
-    enum class LegacyStatus : uint8_t {
-      kOk,
-      // Child marked `legacy=false` or `legacy=true`, but was never removed
-      // (neither directly nor through inheritance from parent).
-      kNeverRemoved,
-      // Child legacy is kYes but Parent legacy is kNo, and both are removed.
-      kWithoutParent,
-    };
-
     Status added = Status::kOk;
     Status deprecated = Status::kOk;
     Status removed = Status::kOk;
-    LegacyStatus legacy = LegacyStatus::kOk;
 
     bool Ok() const {
-      return added == Status::kOk && deprecated == Status::kOk && removed == Status::kOk &&
-             legacy == LegacyStatus::kOk;
+      return added == Status::kOk && deprecated == Status::kOk && removed == Status::kOk;
     }
   };
 
   // Must be called second. Inherits unset fields from `parent`.
   InheritResult Inherit(const Availability& parent);
+
+  // Optionally call this after Inherit to mark the availability as legacy=true.
+  // TODO(https://fxbug.dev/42085274): This is temporary for the transition from
+  // the LEGACY model to the RFC-0232 model. It will be removed.
+  void SetLegacy();
 
   // Must be called third. Narrows the availability to the given range, which
   // must be a subset of range().
