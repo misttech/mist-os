@@ -78,7 +78,7 @@ if (current_cpu == "arm64") {
     bazel_product_bundle_target = ":product_bundle.vim3"
     bazel_product_image_target = ":image.vim3"
     bazel_recovery_image_target = "//products/zedboot:vim3"
-    bazel_elf_sizes_target = ":elf_sizes.arm64"
+    bazel_elf_sizes_target = ":elf_sizes.vim3"
     bazel_inputs_from_gn = [
       "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
       "//build/images/zedboot:zedboot.bazel_legacy_aib",
