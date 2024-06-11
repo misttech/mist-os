@@ -25,7 +25,7 @@ To acknowledge this change, please run:
 """
 
 
-def filter_line(line):
+def filter_line(line: str) -> str:
     """Filter input .pb.go line to ignore non-problematic differences."""
     # Strip the compiler and plugin version numbers.
     #
@@ -65,13 +65,13 @@ def filter_line(line):
     return line
 
 
-def read_file(path):
+def read_file(path: str) -> list[str]:
     """Read input .pb.go file into a list of filtered lines."""
     with open(path) as f:
         return [filter_line(l) for l in f.readlines()]
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--golden", help="Path to the golden file", required=True
