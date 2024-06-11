@@ -369,11 +369,9 @@ template("board_configuration") {
   }
 
   # Make board configuration and hardware support bundle available to Bazel
-  bazel_input_resource_directory(labels.bazel_inputs) {
+  bazel_input_directory(labels.bazel_inputs) {
     forward_variables_from(invoker, [ "testonly" ])
-    source_dir = files.board_configuration_dir
-    dest_dir = rebase_path(files.board_configuration_dir, root_out_dir)
-    deps = [ ":${labels.main_target}" ]
-    gn_targets_name = labels.main_target
+    generator = ":${labels.main_target}"
+    output_directory = files.board_configuration_dir
   }
 }
