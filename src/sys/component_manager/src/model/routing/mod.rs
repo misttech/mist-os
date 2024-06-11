@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 mod bedrock;
+pub mod legacy;
 pub mod open;
 pub mod providers;
 pub mod router_ext;
