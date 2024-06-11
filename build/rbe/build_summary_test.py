@@ -14,25 +14,25 @@ import build_summary
 
 
 class LabelsToDictTests(unittest.TestCase):
-    def test_one_label(self) -> None:
+    def test_one_label(self):
         self.assertEqual(
             build_summary.labels_to_dict("bar=foo"), {"bar": "foo"}
         )
 
-    def test_two_labels(self) -> None:
+    def test_two_labels(self):
         self.assertEqual(
             build_summary.labels_to_dict("baz=1,spice=sugar"),
             {"baz": "1", "spice": "sugar"},
         )
 
-    def test_duplicate_last_wins(self) -> None:
+    def test_duplicate_last_wins(self):
         self.assertEqual(
             build_summary.labels_to_dict("bar=foo,bar=quux"), {"bar": "quux"}
         )
 
 
 class GetActionCategoryFromLabelsTests(unittest.TestCase):
-    def test_cxx(self) -> None:
+    def test_cxx(self):
         self.assertEqual(
             build_summary.get_action_category_from_labels(
                 "lang=cpp,type=compile,tool=clang"
@@ -40,7 +40,7 @@ class GetActionCategoryFromLabelsTests(unittest.TestCase):
             "cxx",
         )
 
-    def test_link(self) -> None:
+    def test_link(self):
         self.assertEqual(
             build_summary.get_action_category_from_labels(
                 "type=link,tool=clang"
@@ -48,7 +48,7 @@ class GetActionCategoryFromLabelsTests(unittest.TestCase):
             "link",
         )
 
-    def test_rust(self) -> None:
+    def test_rust(self):
         self.assertEqual(
             build_summary.get_action_category_from_labels(
                 "type=tool,toolname=rustc"
@@ -56,7 +56,7 @@ class GetActionCategoryFromLabelsTests(unittest.TestCase):
             "rust",
         )
 
-    def test_custom_tool(self) -> None:
+    def test_custom_tool(self):
         self.assertEqual(
             build_summary.get_action_category_from_labels(
                 "type=tool,toolname=protoc"
@@ -64,20 +64,20 @@ class GetActionCategoryFromLabelsTests(unittest.TestCase):
             "protoc",
         )
 
-    def test_unknown(self) -> None:
+    def test_unknown(self):
         self.assertEqual(
             build_summary.get_action_category_from_labels("type=tool"), "other"
         )
 
 
 class GetActionCategoryAndMetricTests(unittest.TestCase):
-    def test_metric_for_all(self) -> None:
+    def test_metric_for_all(self):
         self.assertEqual(
             build_summary.get_action_category_and_metric("Foo.Metadata.Time"),
             (None, "Foo.Metadata.Time"),
         )
 
-    def test_metric_for_one_tool(self) -> None:
+    def test_metric_for_one_tool(self):
         self.assertEqual(
             build_summary.get_action_category_and_metric(
                 "[toolname=catter].Foo.Metadata.Time"

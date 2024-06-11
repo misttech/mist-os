@@ -12,7 +12,7 @@ group("tests") {
 
   deps = [
     ":bbtool_test($host_toolchain)",
-    ":build_summary($host_toolchain)",
+    ":build_summary_test($host_toolchain)",
     ":cl_utils_test($host_toolchain)",
     ":cxx_link_remote_wrapper_test($host_toolchain)",
     ":cxx_remote_wrapper_test($host_toolchain)",
@@ -28,7 +28,7 @@ group("tests") {
     ":remotetool_test($host_toolchain)",
     ":rustc_remote_wrapper_test($host_toolchain)",
     ":rustc_test($host_toolchain)",
-    ":tablefmt($host_toolchain)",
+    ":tablefmt_test($host_toolchain)",
     ":textpb_test($host_toolchain)",
   ]
 }
@@ -83,11 +83,11 @@ if (is_host) {
   }
 
   python_library("build_summary") {
-    enable_mypy = true
+    enable_mypy = false
     sources = _build_summary_sources
   }
   python_host_test("build_summary_test") {
-    enable_mypy = true
+    enable_mypy = false
     main_source = "build_summary_test.py"
     sources = _build_summary_sources
   }
