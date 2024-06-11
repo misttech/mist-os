@@ -325,6 +325,9 @@ impl TilingWm {
         let fullscreen_height = self.layout_info.logical_size.unwrap().height;
         let fullscreen_width = self.layout_info.logical_size.unwrap().width;
         let num_tiles = self.tiles.len() as u32;
+        if num_tiles == 0 {
+            return;
+        }
         let mut columns = (num_tiles as f32).sqrt().ceil() as u32;
         let mut rows = (columns + num_tiles - 1) / columns;
         if fullscreen_height > fullscreen_width {
