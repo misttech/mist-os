@@ -46,7 +46,6 @@
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
-#include "src/lib/async-watchdog/watchdog.h"
 
 namespace display {
 
@@ -223,7 +222,6 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
 
   fdf::UnownedSynchronizedDispatcher client_dispatcher_;
 
-  std::unique_ptr<async_watchdog::Watchdog> watchdog_;
   std::unique_ptr<EngineDriverClient> engine_driver_client_;
 
   zx_time_t last_valid_apply_config_timestamp_{};
