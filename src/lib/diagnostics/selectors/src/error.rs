@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::types::{Identifier, OneOrMany, Operator, ValueType};
 use nom::error::ErrorKind;
 use thiserror::Error;
 
@@ -70,15 +69,6 @@ pub enum ValidationError {
 
     #[error("String patterns cannot be empty.")]
     EmptyStringPattern,
-
-    #[error("Operator {1:?} cannot be used with identifier {0:?}")]
-    InvalidOperator(Identifier, Operator),
-
-    #[error("Value {1:?} cannot be used with identifier {0:?}")]
-    InvalidValueType(Identifier, OneOrMany<ValueType>),
-
-    #[error("Value {1:?} cannot be used with operator {0:?}")]
-    InvalidOperatorRhs(Operator, OneOrMany<ValueType>),
 }
 
 #[derive(Debug)]
