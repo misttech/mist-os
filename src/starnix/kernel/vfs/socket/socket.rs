@@ -53,6 +53,15 @@ pub const DEFAULT_LISTEN_BACKLOG: usize = 1024;
 const NETLINK_ROUTE_BUF_SIZE: usize = 1024;
 
 pub trait SocketOps: Send + Sync + AsAny {
+    /// Returns the domain, type and protocol of the socket. This is only used for socket that are
+    /// build without previous knowledge of this information, and can be ignored if all sockets are
+    /// build with it.
+    fn get_socket_info(&self) -> Result<(SocketDomain, SocketType, SocketProtocol), Errno> {
+        // This should not be used by most socket type that are created with their domain, type and
+        // protocol.
+        error!(EINVAL)
+    }
+
     /// Connect the `socket` to the listening `peer`. On success
     /// a new socket is created and added to the accept queue.
     fn connect(
@@ -290,14 +299,19 @@ impl Socket {
         protocol: SocketProtocol,
     ) -> Result<SocketHandle, Errno> {
         let ops = create_socket_ops(current_task, domain, socket_type, protocol)?;
-        Ok(Arc::new(Socket { ops, domain, socket_type, protocol, state: Mutex::default() }))
+        Ok(Self::new_with_ops_and_info(ops, domain, socket_type, protocol))
     }
 
-    pub fn new_with_ops(
+    pub fn new_with_ops(ops: Box<dyn SocketOps>) -> Result<SocketHandle, Errno> {
+        let (domain, socket_type, protocol) = ops.get_socket_info()?;
+        Ok(Self::new_with_ops_and_info(ops, domain, socket_type, protocol))
+    }
+
+    pub fn new_with_ops_and_info(
+        ops: Box<dyn SocketOps>,
         domain: SocketDomain,
         socket_type: SocketType,
         protocol: SocketProtocol,
-        ops: Box<dyn SocketOps>,
     ) -> SocketHandle {
         Arc::new(Socket { ops, domain, socket_type, protocol, state: Mutex::default() })
     }

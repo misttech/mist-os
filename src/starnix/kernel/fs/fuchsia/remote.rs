@@ -8,6 +8,7 @@ use crate::mm::{ProtectionFlags, VMEX_RESOURCE};
 use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter};
 use crate::vfs::buffers::{with_iovec_segments, InputBuffer, OutputBuffer};
 use crate::vfs::fsverity::FsVerityState;
+use crate::vfs::socket::{Socket, SocketFile, ZxioBackedSocket};
 use crate::vfs::{
     default_ioctl, default_seek, fileops_impl_directory, fileops_impl_nonseekable,
     fileops_impl_seekable, fs_node_impl_not_dir, fs_node_impl_symlink, Anon, CacheConfig,
@@ -314,9 +315,9 @@ pub fn new_remote_file(
         | (_, ZXIO_OBJECT_TYPE_STREAM_SOCKET)
         | (_, ZXIO_OBJECT_TYPE_RAW_SOCKET)
         | (_, ZXIO_OBJECT_TYPE_PACKET_SOCKET) => {
-            // TODO(https://fxbug.dev/342434176): Build the correct file ops for the
-            // correct type of socket.
-            return error!(ENOTSUP);
+            let socket_ops = ZxioBackedSocket::new_with_zxio(zxio);
+            let socket = Socket::new_with_ops(Box::new(socket_ops))?;
+            Box::new(SocketFile::new(socket))
         }
         _ => return error!(ENOTSUP),
     };
