@@ -406,9 +406,9 @@ void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, bool value) {
   state->buffer.WriteKeyValue(key, value);
 }
 
-bool FlushRecord(LogBuffer* buffer) {
+bool LogBuffer::Flush() {
   GlobalStateLock log_state;
-  auto* state = RecordState::CreatePtr(buffer);
+  auto* state = RecordState::CreatePtr(this);
   if (state->raw_severity < log_state->min_severity()) {
     return true;
   }

@@ -293,12 +293,12 @@ TEST_F(LoggingFixture, BackendDirect) {
   syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_ERROR, "foo.cc", 42, "Log message",
                               "condition");
   syslog_runtime::WriteKeyValue(&buffer, "tag", "fake tag");
-  syslog_runtime::FlushRecord(&buffer);
+  buffer.Flush();
   syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_ERROR, "foo.cc", 42, "fake message",
                               "condition");
   syslog_runtime::WriteKeyValue(&buffer, "tag", "fake tag");
   syslog_runtime::WriteKeyValue(&buffer, "foo", static_cast<int64_t>(42));
-  syslog_runtime::FlushRecord(&buffer);
+  buffer.Flush();
 
   std::string log = ReadLogs(state);
   EXPECT_THAT(log,

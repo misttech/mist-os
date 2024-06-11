@@ -83,8 +83,6 @@ static void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, const char*
   WriteKeyValue(buffer, key, cpp17::string_view(value));
 }
 
-bool FlushRecord(LogBuffer* buffer);
-
 template <typename... Args>
 constexpr size_t ArgsSize(Args... args) {
   return sizeof...(args);
@@ -201,6 +199,9 @@ struct LogBuffer final {
   void Encode(KeyValue<const char*, bool> value) {
     syslog_runtime::WriteKeyValue(this, value.key, value.value);
   }
+
+  // Writes the log to a socket.
+  bool Flush();
 };
 }  // namespace syslog_runtime
 
@@ -369,7 +370,7 @@ void fx_slog_internal(fuchsia_logging::LogSeverity flag, const char* file, int l
   syslog_runtime::LogBuffer buffer;
   syslog_runtime::BeginRecord(&buffer, flag, file, line, msg, nullptr);
   (void)std::initializer_list<int>{(buffer.Encode(args), 0)...};
-  syslog_runtime::FlushRecord(&buffer);
+  buffer.Flush();
 }
 
 #define FX_SLOG_ETC(flag, args...)                         \

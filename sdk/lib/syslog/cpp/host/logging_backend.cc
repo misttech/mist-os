@@ -136,14 +136,14 @@ void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, bool value) {
 
 void EndRecord(LogBuffer* buffer) { EndRecordLegacy(buffer); }
 
-bool FlushRecord(LogBuffer* buffer) {
-  auto header = MsgHeader::CreatePtr(buffer);
+bool LogBuffer::Flush() {
+  auto header = MsgHeader::CreatePtr(this);
   *(header->offset++) = 0;
   if (header->user_tag) {
     auto tag = header->user_tag;
     std::cerr << "[" << tag << "] ";
   }
-  std::cerr << reinterpret_cast<const char*>(buffer->data) << std::endl;
+  std::cerr << reinterpret_cast<const char*>(this->data) << std::endl;
   return true;
 }
 

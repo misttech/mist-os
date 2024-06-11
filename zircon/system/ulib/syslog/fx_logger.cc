@@ -183,7 +183,7 @@ zx_status_t fx_logger::VLogWriteToSocket(fx_log_severity_t severity, const char*
     if (tag) {
       syslog_runtime::WriteKeyValue(&buffer, "tag", tag);
     }
-    if (!syslog_runtime::FlushRecord(&buffer)) {
+    if (!buffer.Flush()) {
       return ZX_ERR_IO;
     }
     return ZX_OK;

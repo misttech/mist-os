@@ -100,12 +100,12 @@ TEST(StructuredLogging, BackendDirect) {
   syslog_runtime::LogBuffer buffer;
   syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
                               "condition");
-  syslog_runtime::FlushRecord(&buffer);
+  buffer.Flush();
   syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
                               "condition");
   syslog_runtime::WriteKeyValue(&buffer, "foo", static_cast<int64_t>(42));
   syslog_runtime::WriteKeyValue(&buffer, "bar", true);
-  ASSERT_TRUE(syslog_runtime::FlushRecord(&buffer));
+  ASSERT_TRUE(buffer.Flush());
   // TODO(https://fxbug.dev/42135333): Figure out how to verify this appropriately.
 }
 
@@ -117,13 +117,13 @@ TEST(StructuredLogging, Overflow) {
   syslog_runtime::LogBuffer buffer;
   syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
                               "condition");
-  syslog_runtime::FlushRecord(&buffer);
+  buffer.Flush();
   syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
                               "condition");
   syslog_runtime::WriteKeyValue(&buffer, "foo", static_cast<int64_t>(42));
   syslog_runtime::WriteKeyValue(&buffer, "bar", very_large_string.data());
 
-  ASSERT_FALSE(syslog_runtime::FlushRecord(&buffer));
+  ASSERT_FALSE(buffer.Flush());
 }
 
 TEST(StructuredLogging, LOGS) {

@@ -73,6 +73,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
       } break;
     }
   }
-  syslog_runtime::FlushRecord(&buffer);
+  buffer.Flush();
   return 0;
 }

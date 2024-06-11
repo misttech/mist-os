@@ -29,7 +29,7 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
           syslog_runtime::LogBuffer buffer;
           syslog_runtime::BeginRecord(&buffer, severity, __FILE__, __LINE__, "Changed severity",
                                       nullptr);
-          syslog_runtime::FlushRecord(&buffer);
+          buffer.Flush();
         },
         nullptr);
   }
@@ -75,7 +75,7 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
           break;
       }
     }
-    syslog_runtime::FlushRecord(&buffer);
+    buffer.Flush();
     callback();
   }
 
