@@ -14,9 +14,9 @@ load(
 def _fuchsia_sdk_common_repository_impl(ctx):
     root = ctx.path(ctx.attr._fuchsia_sdk_workspace)
 
-    # Note: this file name needs to be kept in sync with the symlink that is
-    # created in fuchsia_sdk_repository.bzl
+    # LINT.IfChange
     ctx.symlink(root.dirname.get_child("common"), ".")
+    # LINT.ThenChange(sdk_templates/generate_sdk_build_rules.bzl)
 
 _fuchsia_sdk_common_repository = repository_rule(
     implementation = _fuchsia_sdk_common_repository_impl,
