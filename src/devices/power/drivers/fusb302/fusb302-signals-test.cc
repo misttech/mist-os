@@ -70,7 +70,10 @@ class Fusb302SignalsTest : public zxtest::Test {
     signals_.emplace(mock_i2c_client_, sensors_.value(), protocol_.value());
   }
 
-  void TearDown() override { fdf::Logger::SetGlobalInstance(nullptr); }
+  void TearDown() override {
+    mock_i2c_.VerifyAndClear();
+    fdf::Logger::SetGlobalInstance(nullptr);
+  }
 
  protected:
   inspect::Inspector inspect_;

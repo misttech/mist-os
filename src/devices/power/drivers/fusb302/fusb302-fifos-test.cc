@@ -65,8 +65,8 @@ class Fusb302FifosTest : public zxtest::Test {
   }
 
   void TearDown() override {
-    fdf::Logger::SetGlobalInstance(nullptr);
     mock_i2c_.VerifyAndClear();
+    fdf::Logger::SetGlobalInstance(nullptr);
   }
 
  protected:

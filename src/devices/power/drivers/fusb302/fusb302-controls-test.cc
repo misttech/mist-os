@@ -54,7 +54,10 @@ class Fusb302ControlsTest : public inspect::InspectTestHelper, public zxtest::Te
                       inspect_.GetRoot().CreateChild("Controls"));
   }
 
-  void TearDown() override { fdf::Logger::SetGlobalInstance(nullptr); }
+  void TearDown() override {
+    mock_i2c_.VerifyAndClear();
+    fdf::Logger::SetGlobalInstance(nullptr);
+  }
 
  protected:
   inspect::Inspector inspect_;
