@@ -230,7 +230,10 @@ alias LeaseId = string:64;
 open protocol Lessor {
     /// Request made to indicate client intends to raise the given element
     /// to the given power level and wants to have its direct and transitive
-    /// power dependencies satisfied.
+    /// power dependencies satisfied. When `LeaseControl.WatchStatus` reports
+    /// `LeaseStatus::SATISFIED` this does not indicate the `PowerElement` is at
+    /// the leased `PowerLevel`. Instead this indicates that the dependencies of
+    /// the leased `PowerLevel` are at level required by the `PowerLevel`.
     flexible Lease(resource struct {
         /// Power level of this element to be raised to.
         level PowerLevel;
@@ -248,7 +251,12 @@ type LeaseError = flexible enum {
 
 type LeaseStatus = flexible enum {
     UNKNOWN = 0;
+    /// The dependencies of the leased `PowerLevel` are not at their required
+    /// levels.
     PENDING = 1;
+    /// The `PowerElement` is **not** necessarily at the `PowerLevel` leased,
+    /// but the `PowerElement`s requried by the leased `PowerLevel`' are at
+    /// their required `PowerLevel`s.
     SATISFIED = 2;
 };
 
