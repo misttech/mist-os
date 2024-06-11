@@ -89,6 +89,7 @@ pub struct FullmacMlmeHandle {
 
 impl FullmacMlmeHandle {
     pub fn stop(&mut self) {
+        info!("Requesting MLME stop...");
         if let Err(e) = self.driver_event_sender.unbounded_send(FullmacDriverEvent::Stop) {
             error!("Cannot signal MLME event loop thread: {}", e);
         }
@@ -100,6 +101,7 @@ impl FullmacMlmeHandle {
             }
             None => warn!("Called stop on already stopped MLME"),
         }
+        info!("MLME main loop thread has shutdown.");
     }
 
     pub fn delete(mut self) {

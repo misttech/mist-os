@@ -3,11 +3,13 @@
 // found in the LICENSE file.
 
 use drivers_only_common::DriversOnlyTestRealm;
+use fidl::endpoints::create_endpoints;
 use fullmac_helpers::config::FullmacDriverConfig;
 use fullmac_helpers::recorded_request_stream::RecordedRequestStream;
 use {
     fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_sme as fidl_sme,
-    fidl_test_wlan_testcontroller as fidl_testcontroller, fuchsia_zircon as zx,
+    fidl_test_wlan_testcontroller as fidl_testcontroller, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
 };
 
 mod ap;
@@ -60,4 +62,43 @@ impl Drop for FullmacDriverFixture {
             .expect("FIDL error when calling DeleteFullmac")
             .expect("TestController error when calling DeleteFullmac");
     }
+}
+
+/// This tests that wlanif gracefully unbinds on a delete request that is sent during startup.
+/// It is expected that MLME goes through the whole startup sequence before handling the incoming
+/// delete request and shutting down.
+///
+/// When wlanif unbinds, it sends a `Stop` event to MLME's DriverEvent queue that gets handled in
+/// MLME's main loop. The purpose of this test is to show that if wlanif receives an early unbind
+/// request, it will wait until MLME handles this `Stop` event and gracefully shuts down.
+#[fuchsia::test]
+async fn test_delete_on_startup() {
+    let realm = DriversOnlyTestRealm::new().await;
+
+    let (fullmac_bridge_client, fullmac_bridge_server) = create_endpoints();
+    let fullmac_id = realm
+        .testcontroller_proxy()
+        .create_fullmac(fullmac_bridge_client)
+        .await
+        .expect("FIDL error on create_fullmac")
+        .expect("TestController returned an error on create fullmac");
+    let mut fullmac_bridge_stream =
+        fullmac_bridge_server.into_stream().expect("Could not create stream");
+    let config = FullmacDriverConfig { ..Default::default() };
+
+    let delete_fut = realm.testcontroller_proxy().delete_fullmac(fullmac_id);
+    let startup_fut = async {
+        // Sleep to give time for test controller to receive (and ideally complete) the delete
+        // request before handling startup. This should allow PrepareStop in wlanif to run as
+        // quickly as possible.
+        fasync::Timer::new(std::time::Duration::from_millis(10)).await;
+        fullmac_helpers::handle_fullmac_startup(&mut fullmac_bridge_stream, &config).await
+    };
+
+    // Bind to generic_sme_proxy on join to ensure it outlives wlanif
+    let (delete_fullmac_result, (_fullmac_ifc_proxy, _generic_sme_proxy)) =
+        futures::join!(delete_fut, startup_fut);
+    delete_fullmac_result
+        .expect("FIDL error on DeleteFullmac")
+        .expect("TestController error on DeleteFullmac");
 }

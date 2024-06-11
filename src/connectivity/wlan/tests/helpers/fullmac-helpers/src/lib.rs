@@ -69,6 +69,16 @@ pub async fn create_fullmac_driver(
         fullmac_bridge_server.into_stream().expect("Could not create stream");
 
     // Fullmac MLME queries driver before starting
+    let (fullmac_ifc_proxy, generic_sme_proxy) =
+        handle_fullmac_startup(&mut fullmac_bridge_stream, config).await;
+
+    (fullmac_id, fullmac_bridge_stream, fullmac_ifc_proxy, generic_sme_proxy)
+}
+
+pub async fn handle_fullmac_startup(
+    fullmac_bridge_stream: &mut fidl_fullmac::WlanFullmacImplBridgeRequestStream,
+    config: &config::FullmacDriverConfig,
+) -> (fidl_fullmac::WlanFullmacImplIfcBridgeProxy, fidl_sme::GenericSmeProxy) {
     assert_variant!(fullmac_bridge_stream.next().await,
         Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::QueryMacSublayerSupport { responder })) => {
             responder
@@ -144,5 +154,5 @@ pub async fn create_fullmac_driver(
         }
     );
 
-    (fullmac_id, fullmac_bridge_stream, fullmac_ifc_proxy, generic_sme_proxy)
+    (fullmac_ifc_proxy, generic_sme_proxy)
 }

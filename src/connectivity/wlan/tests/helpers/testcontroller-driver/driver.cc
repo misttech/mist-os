@@ -393,6 +393,10 @@ class TestController : public fdf::DriverBase,
     return zx::ok();
   }
 
+  // Creates a new fullmac driver.
+  // On success, this is guaranteed to complete only after wlanif has binded.
+  // The user can expect that the bridge channels are open and wlanif is up and running once this
+  // completes.
   void CreateFullmac(CreateFullmacRequest& request,
                      CreateFullmacCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
@@ -405,16 +409,34 @@ class TestController : public fdf::DriverBase,
         fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
     ZX_ASSERT(controller_endpoints.is_ok());
 
+    // The async completer is stored in a shared pointer so that we can pass it to the protocol
+    // handler callback while also retaining a reference to it in CreateFullmac.
+    // This lets us complete the call in the protocol handler on success and complete the call in
+    // CreateFullmac on error.
+    auto async_completer = std::make_shared<CreateFullmacCompleter::Async>(completer.ToAsync());
+
     auto protocol_handler =
-        [this, id, bridge_client = std::move(request.bridge_client()),
+        [this, async_completer, id, bridge_client = std::move(request.bridge_client()),
          controller_client = std::move(controller_endpoints->client)](
             fdf::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end) mutable {
           WLAN_LAMBDA_TRACE_DURATION("WlanFullmacImpl::Service protocol handler");
 
+          // It's assumed that this protocol handler runs exactly once, meaning that each call to
+          // CreateFullmac should result in exactly one call to this protocol handler.
+          // It's also assumed that this protocol handler runs on the same dispatcher as
+          // CreateFullmac and cannot run concurrently with CreateFullmac.
+
           // Ensure no duplicate bridges and all ids are unique.
           ZX_ASSERT(fullmac_bridges_.find(id) == fullmac_bridges_.end());
+
+          // Check that async completer exists and that no other references to async_completer
+          // exist. This ensures that once this callback runs we can drop async_completer.
+          ZX_ASSERT(async_completer && async_completer.use_count() == 1);
+
           fullmac_bridges_.try_emplace(id, driver_dispatcher()->get(), std::move(server_end),
                                        std::move(bridge_client), std::move(controller_client));
+          async_completer->Reply(zx::ok(id));
+          async_completer.reset();
         };
 
     fuchsia_wlan_fullmac::Service::InstanceHandler handler(
@@ -424,7 +446,8 @@ class TestController : public fdf::DriverBase,
         outgoing()->AddService<fuchsia_wlan_fullmac::Service>(std::move(handler), child_name);
     if (result.is_error()) {
       FDF_LOG(ERROR, "Failed to add fullmac service: %s", result.status_string());
-      completer.Reply(result.take_error());
+      async_completer->Reply(result.take_error());
+      async_completer.reset();
       return;
     }
 
@@ -442,15 +465,15 @@ class TestController : public fdf::DriverBase,
       FDF_SLOG(ERROR, "Failed to add child", KV("status", error.FormatDescription()));
 
       // AddChild's domain error is a NodeError, not a zx_status_t
-      completer.Reply(zx::error(
+      async_completer->Reply(zx::error(
           (error.is_domain_error() ? ZX_ERR_INTERNAL : error.framework_error().status())));
+      async_completer.reset();
       return;
     }
-    completer.Reply(zx::ok(id));
   }
 
   // Removes the WlanFullmacImpl service which initiates teardown of wlanif.
-  // This is guaranteed to complete only after wlanif has been fully torn down.
+  // On success, this is guaranteed to complete only after wlanif has been fully torn down.
   // The user can expect that the bridge channels are closed once this call completes.
   void DeleteFullmac(DeleteFullmacRequest& request,
                      DeleteFullmacCompleter::Sync& completer) override {
