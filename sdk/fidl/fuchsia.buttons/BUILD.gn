@@ -3,8 +3,10 @@
 # found in the LICENSE file.
 
 import("//build/fidl/fidl.gni")
+
 fidl("fuchsia.buttons") {
-  sdk_category = "internal"
+  sdk_category = "partner"
   sources = [ "metadata.fidl" ]
+  sdk_area = "Drivers"
   public_deps = [ "//sdk/fidl/fuchsia.input.report" ]
 }

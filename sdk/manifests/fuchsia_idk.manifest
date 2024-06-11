@@ -199,6 +199,7 @@ fidl_library://fidl/fuchsia.bluetooth.le
 fidl_library://fidl/fuchsia.bluetooth.sys
 fidl_library://fidl/fuchsia.buildinfo
 fidl_library://fidl/fuchsia.buildinfo.test
+fidl_library://fidl/fuchsia.buttons (unstable)
 fidl_library://fidl/fuchsia.camera
 fidl_library://fidl/fuchsia.camera2
 fidl_library://fidl/fuchsia.camera2.hal
