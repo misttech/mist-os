@@ -30,12 +30,12 @@
         {
             config: "fuchsia.gpu.test.SupportSysmemRenderableLinear",
             type: "bool",
-            value: false,
+            value: true,
         },
         {
             config: "fuchsia.gpu.test.SupportSysmemLinearNonRGBA",
             type: "bool",
-            value: false,
+            value: true,
         },
     ],
     offer: [
