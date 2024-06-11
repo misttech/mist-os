@@ -22,13 +22,20 @@ go_library("lib") {
 
 go_library("ffx") {
   source_dir = "ffx"
-  sources = [ "ffx.go" ]
+  sources = [
+    "ffx.go",
+    "ffx_test.go",
+  ]
   deps = [ ":utils" ]
 }
 
 go_library("utils") {
   source_dir = "utils"
-  sources = [ "utils.go" ]
+  sources = [
+    "utils.go",
+    "utils_test.go",
+  ]
+  deps = [ "//third_party/golibs:github.com/google/go-cmp" ]
 }
 
 go_library("main") {
@@ -41,6 +48,14 @@ go_library("main") {
     ":lib",
     "//third_party/golibs:github.com/google/subcommands",
   ]
+}
+
+go_test("utils_tests") {
+  library = ":utils"
+}
+
+go_test("ffx_tests") {
+  library = ":ffx"
 }
 
 go_test("orchestrate_tests") {
@@ -62,5 +77,9 @@ sdk_host_tool("orchestrate_sdk") {
 
 group("tests") {
   testonly = true
-  deps = [ ":orchestrate_tests" ]
+  deps = [
+    ":ffx_tests",
+    ":orchestrate_tests",
+    ":utils_tests",
+  ]
 }
