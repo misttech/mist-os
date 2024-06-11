@@ -17,6 +17,7 @@ board_configuration("power_testing_storage_vim3") {
     "fuchsia::driver_framework_v2_support",
     "fuchsia::pmm_checker",
   ]
+  devicetree = "//src/devices/board/drivers/vim3-devicetree:vim3"
   input_bundles = [
     ":drivers",
     ":board_driver",
@@ -174,9 +175,10 @@ board_input_bundle("board_driver") {
   }
   drivers = [
     {
-      package_target = "//src/devices/board/drivers/vim3:package"
+      package_target =
+          "//src/devices/board/drivers/vim3-devicetree:bazel_package"
       package_set = "bootfs"
-      driver_components = [ "meta/vim3.cm" ]
+      driver_components = [ "meta/vim3-devicetree.cm" ]
     },
   ]
 }
