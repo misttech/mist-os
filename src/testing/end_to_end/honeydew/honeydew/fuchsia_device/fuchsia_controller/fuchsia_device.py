@@ -26,6 +26,9 @@ from honeydew.affordances.ffx import session as session_ffx
 from honeydew.affordances.ffx.ui import screenshot as screenshot_ffx
 from honeydew.affordances.fuchsia_controller import rtc as rtc_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
+from honeydew.affordances.fuchsia_controller.bluetooth.profiles import (
+    bluetooth_gap as gap_fc,
+)
 from honeydew.affordances.fuchsia_controller.ui import (
     user_input as user_input_fc,
 )
@@ -394,7 +397,11 @@ class FuchsiaDevice(
         Returns:
             bluetooth_gap.BluetoothGap object
         """
-        raise NotImplementedError
+        return gap_fc.BluetoothGap(
+            device_name=self.device_name,
+            fuchsia_controller=self.fuchsia_controller,
+            reboot_affordance=self,
+        )
 
     @properties.Affordance
     def wlan_policy(self) -> wlan_policy.WlanPolicy:

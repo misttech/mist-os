@@ -26,6 +26,9 @@ from honeydew.affordances.ffx import session as session_ffx
 from honeydew.affordances.ffx.ui import screenshot as screenshot_ffx
 from honeydew.affordances.fuchsia_controller import rtc as rtc_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
+from honeydew.affordances.fuchsia_controller.bluetooth.profiles import (
+    bluetooth_gap as bluetooth_gap_fc,
+)
 from honeydew.affordances.fuchsia_controller.ui import (
     user_input as user_input_fc,
 )
@@ -287,11 +290,25 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             self.fd_obj.bluetooth_avrcp  # pylint: disable=pointless-statement
 
-    def test_bluetooth_gap(self) -> None:
+    @mock.patch.object(
+        bluetooth_gap_fc.BluetoothGap,
+        "__init__",
+        autospec=True,
+        return_value=None,
+    )
+    def test_bluetooth_gap(self, bt_gap_fc_init: mock.Mock) -> None:
         """Test case to make sure fc_fuchsia_device does not support
         bluetooth_gap affordance."""
-        with self.assertRaises(NotImplementedError):
-            self.fd_obj.bluetooth_gap  # pylint: disable=pointless-statement
+        self.assertIsInstance(
+            self.fd_obj.bluetooth_gap,
+            bluetooth_gap_fc.BluetoothGap,
+        )
+        bt_gap_fc_init.assert_called_once_with(
+            self.fd_obj.bluetooth_gap,
+            device_name=self.fd_obj._name,
+            fuchsia_controller=self.fd_obj.fuchsia_controller,
+            reboot_affordance=self.fd_obj,
+        )
 
     def test_wlan_policy(self) -> None:
         """Test case to make sure fc_fuchsia_device does not support

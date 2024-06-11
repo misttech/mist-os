@@ -100,6 +100,10 @@ class BluetoothCommon(abc.ABC):
         """
 
     @abc.abstractmethod
+    def run_pairing_delegate(self) -> None:
+        """Run Pairing Delegate Server calls."""
+
+    @abc.abstractmethod
     def set_discoverable(self, discoverable: bool) -> None:
         """Sets device to be discoverable by others.
 

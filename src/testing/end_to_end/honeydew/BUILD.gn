@@ -37,6 +37,11 @@ python_library("honeydew_no_testonly") {
     "affordances/ffx/ui/__init__.py",
     "affordances/ffx/ui/screenshot.py",
     "affordances/fuchsia_controller/__init__.py",
+    "affordances/fuchsia_controller/bluetooth/__init__.py",
+    "affordances/fuchsia_controller/bluetooth/bluetooth_common.py",
+    "affordances/fuchsia_controller/bluetooth/fidl_servers/bt_fidl_servers.py",
+    "affordances/fuchsia_controller/bluetooth/profiles/__init__.py",
+    "affordances/fuchsia_controller/bluetooth/profiles/bluetooth_gap.py",
     "affordances/fuchsia_controller/rtc.py",
     "affordances/fuchsia_controller/tracing.py",
     "affordances/fuchsia_controller/ui/__init__.py",
@@ -128,6 +133,9 @@ group("honeydew_fidl_ir_and_deps") {
 
   deps = [
     # Required by Fuchsia Controller usage in Honeydew affordances and device claseses.
+    "//sdk/fidl/fuchsia.bluetooth.gatt2:fuchsia.bluetooth.gatt2_host_test_data",
+    "//sdk/fidl/fuchsia.bluetooth.le:fuchsia.bluetooth.le_host_test_data",
+    "//sdk/fidl/fuchsia.bluetooth.sys:fuchsia.bluetooth.sys_host_test_data",
     "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_host_test_data",
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_host_test_data",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_host_test_data",
