@@ -42,7 +42,9 @@ def content_hash_for_files(paths: Sequence[Path | str]) -> str:
 
 
 def find_content_files(
-    source_dir: Path | str, cipd_name=None, exclude_extensions=[]
+    source_dir: Path | str,
+    cipd_name: str | None = None,
+    exclude_extensions: Sequence[str] = [],
 ) -> Sequence[Path]:
     """Return a list of content files to send for hashing from a source directory.
 
@@ -69,7 +71,7 @@ def find_content_files(
         if cipd_version_file.exists():
             return [cipd_version_file]
 
-    result = []
+    result: list[Path] = []
     for root, dirs, files in os.walk(source_dir):
         result.extend(
             Path(os.path.join(root, file))
@@ -84,7 +86,7 @@ def _depfile_quote(p: Path) -> str:
     return str(p).replace("\\", "\\\\").replace(" ", "\\ ")
 
 
-def main(commandline_args):
+def main(commandline_args: Sequence[str]) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter
     )
@@ -110,7 +112,7 @@ def main(commandline_args):
     args = parser.parse_args(commandline_args)
 
     if not args.source_path.exists():
-        parser.error("Path does not exist: %s", args.source_path)
+        parser.error(f"Path does not exist: {args.source_path}")
 
     if args.depfile and not args.output:
         parser.error("--depfile option requires --output.")

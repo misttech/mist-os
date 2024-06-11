@@ -9,33 +9,38 @@ import unittest
 import os
 import update_workspace
 from parameterized import parameterized
+from typing import Callable
+
+
+def _empty_dir(root: str) -> tuple[str, tuple[str, ...]]:
+    dir = tempfile.mkdtemp(dir=root)
+    return dir, (dir,)
+
+
+def _dir_with_file(root: str) -> tuple[str, tuple[str, ...]]:
+    dir = tempfile.mkdtemp(dir=root)
+    _, f = tempfile.mkstemp(dir=dir)
+    return dir, (dir, f)
+
+
+def _dir_with_symlink(root: str) -> tuple[str, tuple[str, ...]]:
+    dir = tempfile.mkdtemp(dir=root)
+    _, f = tempfile.mkstemp(dir=dir)
+    l = f"{f}_link"
+    os.symlink(f, l)
+    return dir, (dir, f, l)
+
+
+def _dir_with_subdir_symlink(root: str) -> tuple[str, tuple[str, ...]]:
+    dir = tempfile.mkdtemp(dir=root)
+    subdir = tempfile.mkdtemp(dir=dir)
+    _, f = tempfile.mkstemp(dir=subdir)
+    l = f"{subdir}_link"
+    os.symlink(subdir, l, target_is_directory=True)
+    return dir, (dir, subdir, f, l)
 
 
 class RemoveDirTests(unittest.TestCase):
-    def _empty_dir(root):
-        dir = tempfile.mkdtemp(dir=root)
-        return dir, (dir,)
-
-    def _dir_with_file(root):
-        dir = tempfile.mkdtemp(dir=root)
-        _, f = tempfile.mkstemp(dir=dir)
-        return dir, (dir, f)
-
-    def _dir_with_symlink(root):
-        dir = tempfile.mkdtemp(dir=root)
-        _, f = tempfile.mkstemp(dir=dir)
-        l = f"{f}_link"
-        os.symlink(f, l)
-        return dir, (dir, f, l)
-
-    def _dir_with_subdir_symlink(root):
-        dir = tempfile.mkdtemp(dir=root)
-        subdir = tempfile.mkdtemp(dir=dir)
-        _, f = tempfile.mkstemp(dir=subdir)
-        l = f"{subdir}_link"
-        os.symlink(subdir, l, target_is_directory=True)
-        return dir, (dir, subdir, f, l)
-
     @parameterized.expand(
         (
             ("empty_dir", _empty_dir),
@@ -44,7 +49,11 @@ class RemoveDirTests(unittest.TestCase):
             ("dir_with_subdir_symlink", _dir_with_subdir_symlink),
         )
     )
-    def test_remove_dir(self, name, create_test_dir):
+    def test_remove_dir(
+        self,
+        name: str,
+        create_test_dir: Callable[..., tuple[str, tuple[str, ...]]],
+    ) -> None:
         # Create all test dirs and files under a top-level temporary directory so
         # they are properly cleaned up on test failures as well.
         with tempfile.TemporaryDirectory() as root:
