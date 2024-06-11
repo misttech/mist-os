@@ -7,7 +7,7 @@ import verify_product_configuration
 import unittest
 
 
-def fake_file_sha1(path):
+def fake_file_sha1(path: str) -> str:
     return "abcdef"
 
 
@@ -15,7 +15,7 @@ verify_product_configuration.file_sha1 = fake_file_sha1
 
 
 class VerifyProductConfigurations(unittest.TestCase):
-    def test_sha_file(self):
+    def test_sha_file(self) -> None:
         dict_in = {
             "one": "path/to/file.txt",
         }
@@ -27,7 +27,7 @@ class VerifyProductConfigurations(unittest.TestCase):
         )
         self.assertEqual(expected, dict_in)
 
-    def test_sha_nested_file(self):
+    def test_sha_nested_file(self) -> None:
         dict_in = {
             "one": {
                 "two": {
@@ -47,7 +47,7 @@ class VerifyProductConfigurations(unittest.TestCase):
         )
         self.assertEqual(expected, dict_in)
 
-    def test_sha_nested_list(self):
+    def test_sha_nested_list(self) -> None:
         dict_in = {
             "one": {
                 "two": {
@@ -67,7 +67,7 @@ class VerifyProductConfigurations(unittest.TestCase):
         )
         self.assertEqual(expected, dict_in)
 
-    def test_sha_nested_files_under_list(self):
+    def test_sha_nested_files_under_list(self) -> None:
         dict_in = {
             "one": {
                 "two": [
@@ -91,7 +91,7 @@ class VerifyProductConfigurations(unittest.TestCase):
         )
         self.assertEqual(expected, dict_in)
 
-    def test_sha_nested_list_under_list(self):
+    def test_sha_nested_list_under_list(self) -> None:
         dict_in = {
             "one": {
                 "two": [
