@@ -52,7 +52,7 @@ the //:default target
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:140
+From //BUILD.gn:144
 
 ### all_cpu_kernel_boot_tests
 
@@ -196,6 +196,15 @@ room to initialize on boot.
 **Current value (from the default):** `false`
 
 From //build/images/args.gni:156
+
+### assembly_partitions_configs
+
+Platform builders should populate this list in their product.gni file.
+The result will be built and uploaded to CIPD by infra.
+
+**Current value (from the default):** `[]`
+
+From //BUILD.gn:140
 
 ### authorized_ssh_keys_label
 
@@ -1112,6 +1121,27 @@ The overall compilation mode to use.  The valid values are:
 **Current value (from the default):** `""`
 
 From //build/config/compilation_modes.gni:18
+
+### compilation_settings_overrides
+
+Overridden settings for the compilation mode.  This is a set of override
+values for variables whose default values are set by the chosen compilation
+mode (above).
+  * optimize:  The optimization mode to use.  Valid values are:
+      * `none`: really unoptimized, usually only build-tested and not run
+      * `debug`: "optimized for debugging", light enough to avoid confusion
+      * `default`: default optimization level
+      * `size`:  optimized for space rather than purely for speed
+      * `size_lto`:  optimize for space and use LTO
+      * `speed`: optimized purely for speed
+      * `sanitizer`: optimized for sanitizers (ASan, etc.)
+      * `profile`: optimized for coverage/profile data collection
+      * `coverage`: optimized for coverage data collection
+
+
+**Current value (from the default):** `{ }`
+
+From //build/config/compilation_modes.gni:34
 
 ### compress_debuginfo
 
@@ -4112,7 +4142,7 @@ From //out/not-default/args.gn:10
 
 **Overridden from the default:** `""`
 
-From //build/config/compilation_modes.gni:37
+From //build/config/compilation_modes.gni:54
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -4120,7 +4150,7 @@ From //out/not-default/args.gn:10
 
 **Overridden from the default:** `""`
 
-From //build/config/compilation_modes.gni:37
+From //build/config/compilation_modes.gni:54
 
 ### is_perfetto_build_generator
 
