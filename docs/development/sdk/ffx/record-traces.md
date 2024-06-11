@@ -309,6 +309,14 @@ Trace providers:
 - ktrace_provider
 ```
 
+## Additional tracing guides
+
+For a complete end-to-end guide on adding Fuchsia tracing to your code, see
+[Tutorial on Fuchsia tracing][tracing-tutorial].
+
+See [Fuchsia tracing guides][fuchsia-tracing-guides] for additional guides on
+using tracing in Fuchsia.
+
 ## Appendices
 
 ### Categories and category groups {:#categories-and-category-groups}
@@ -432,6 +440,8 @@ to trigger the event.
 
 <!-- Reference links -->
 
+[tracing-tutorial]: /docs/development/tracing/tutorial/README.md
+[fuchsia-tracing-guides]: /docs/development/tracing/README.md
 [ffx-trace]: https://fuchsia.dev/reference/tools/sdk/ffx#trace
 [fuchsia-tracing-system]: /docs/concepts/kernel/tracing-system.md
 [register-a-trace-provider]: /docs/development/tracing/tutorial/register-a-trace-provider.md
