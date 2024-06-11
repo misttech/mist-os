@@ -82,7 +82,7 @@ Learn how to write driver unit tests in the
 The diagram below shows unit tests running in a Fuchsia system.
 ![Unit Tests](images/unit-test.png "Diagram shows unit tests  running in a Fuchsia system.")
 
-### Integration Tests {#integration-tests}
+## Integration Tests {#integration-tests}
 
 Integration tests check that the interface and behavior of one component works alongside another component that calls it.
 Validate that different components work together as a system and interact as expected.
