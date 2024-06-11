@@ -17,7 +17,6 @@
 use cstr::cstr;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fuchsia_zircon::{self as zx};
-use futures::FutureExt as _;
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use {fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration, fuchsia_async as fasync};
@@ -130,15 +129,8 @@ pub async fn main() {
     )
     .expect("failed to spawn netstack");
 
-    let process_terminated = fasync::OnSignals::new(&proc, zx::Signals::PROCESS_TERMINATED).then(
-        |r| -> futures::future::Ready<()> {
-            let _: zx::Signals = r.expect("failed to observe process termination signals");
-            panic!("netstack exited unexpectedly");
-        },
-    );
-    let scope_finished = scope.wait().then(|()| -> futures::future::Ready<()> {
-        panic!("vfs scope exited unexpectedly");
-    });
-
-    futures::future::join(process_terminated, scope_finished).await;
+    let signals = fasync::OnSignals::new(&proc, zx::Signals::PROCESS_TERMINATED)
+        .await
+        .expect("failed to observe process termination signals");
+    panic!("netstack exited unexpectedly with {signals:?}");
 }
