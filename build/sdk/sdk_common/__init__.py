@@ -8,13 +8,13 @@ import functools
 import json
 import pathlib
 
-from typing import Sequence, Optional, List, Any, Iterator
+from typing import Sequence, Any, Iterator
 
 
 class File:
     """Wrapper class for file definitions."""
 
-    def __init__(self, json) -> None:
+    def __init__(self, json: dict[str, Any]) -> None:
         self.source: str = json["source"]
         self.destination: str = json["destination"]
 
@@ -26,39 +26,47 @@ class File:
 class Atom(object):
     """Wrapper class for atom data, adding convenience methods."""
 
-    def __init__(self, json) -> None:
+    def __init__(self, json: dict[str, Any]) -> None:
         self.json = json
         self.id: str = json["id"]
         self.metadata: str = json["meta"]
         self.label: str = json["gn-label"]
         self.category: str = json["category"]
-        self.area: Optional[str] = json["area"]
+        self.area: str | None = json["area"]
         self.deps: Sequence[str] = json["deps"]
         self.files: Sequence[File] = [File(f) for f in json["files"]]
         self.type: str = json["type"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self.id)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.label)
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, Atom):
+            return False
         return self.label == other.label
 
-    def __ne__(self, other):
-        return not __eq__(self, other)
+    def __ne__(self, other: Any) -> bool:
+        if not isinstance(other, Atom):
+            return True
+        return not self.__eq__(other)
 
-    def __lt__(self, other):
+    def __lt__(self, other: Any) -> bool:
+        if not isinstance(other, Atom):
+            return False
         return self.id < other.id
 
 
-def gather_dependencies(manifests):
+def gather_dependencies(
+    manifests: list[str] | None,
+) -> tuple[set[str], set[Atom]]:
     """Extracts the set of all required atoms from the given manifests, as well
     as the set of names of all the direct dependencies.
     """
-    direct_deps = set()
-    atoms = set()
+    direct_deps: set[str] = set()
+    atoms: set[Atom] = set()
 
     if manifests is None:
         return (direct_deps, atoms)
@@ -98,7 +106,7 @@ CATEGORIES = [
 ]
 
 
-def _index_for_category(category: str):
+def _index_for_category(category: str) -> int:
     if not category in CATEGORIES:
         raise Exception('Unknown SDK category "%s"' % category)
     return CATEGORIES.index(category)
@@ -117,7 +125,7 @@ def detect_category_violations(
             )
 
 
-def area_names_from_file(parsed_areas: Any) -> List[str]:
+def area_names_from_file(parsed_areas: Any) -> list[str]:
     """Given a parsed version of docs/contribute/governance/areas/_areas.yaml,
     return a list of acceptable area names."""
     return [area["name"] for area in parsed_areas] + ["Unknown"]
@@ -160,7 +168,7 @@ class Validator:
             return Validator(area_names_from_file(parsed_areas))
 
     def detect_violations(
-        self, category: Optional[str], atoms: Sequence[Atom]
+        self, category: str | None, atoms: Sequence[Atom]
     ) -> Iterator[str]:
         """Yield strings describing all violations found in `atoms`."""
         yield from detect_collisions(atoms)

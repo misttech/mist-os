@@ -10,7 +10,7 @@ import unittest
 from sdk_common import Atom, Validator, detect_category_violations
 
 
-def _atom(name: str, category: str, area=None) -> Atom:
+def _atom(name: str, category: str, area: str | None = None) -> Atom:
     return Atom(
         {
             "id": name,

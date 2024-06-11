@@ -14,11 +14,11 @@ from sdk_common import Atom
 
 # The type of a list of IDK parts, as it appears in the "parts"
 # field of the output manifest.
-IdkPart: T.TypeAlias = T.Dict[str, str]
+IdkPart: T.TypeAlias = dict[str, str]
 
 
-def get_sorted_parts(atoms: T.List[Atom]) -> T.Sequence[IdkPart]:
-    def key(ad: IdkPart) -> T.Tuple[str, str]:
+def get_sorted_parts(atoms: list[Atom]) -> T.Sequence[IdkPart]:
+    def key(ad: IdkPart) -> tuple[str, str]:
         return (ad["meta"], ad["type"])
 
     return sorted(

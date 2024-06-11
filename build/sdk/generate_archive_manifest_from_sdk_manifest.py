@@ -9,12 +9,13 @@ import argparse
 import json
 import os
 import sys
+from typing import Any, Sequence
 
 try:
     # Python 3
     from urllib.parse import urlparse
 except ImportError:
-    from urlparse import urlparse
+    from urllib.parse import urlparse as urlparse  # noqa: F811
 
 from sdk_common import Atom
 
@@ -22,14 +23,26 @@ from sdk_common import Atom
 class MappingAction(argparse.Action):
     """Parses file mappings flags."""
 
-    def __init__(self, option_strings, dest, nargs=None, **kwargs):
+    def __init__(
+        self,
+        option_strings: list[str],
+        dest: str,
+        nargs: int | None = None,
+        **kwargs: Any,
+    ) -> None:
         if nargs is not None:
             raise ValueError("nargs is not allowed")
         super(MappingAction, self).__init__(
             option_strings, dest, nargs=2, **kwargs
         )
 
-    def __call__(self, parser, namespace, values, option_string=None):
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: Any,
+        option_string: str | None = None,
+    ) -> None:
         mappings = getattr(namespace, "mappings", None)
         if mappings is None:
             mappings = {}
@@ -37,7 +50,7 @@ class MappingAction(argparse.Action):
         mappings[values[0]] = values[1]
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--manifest", help="Path to the input SDK manifest file.", required=True
@@ -55,9 +68,9 @@ def main():
     with open(args.manifest, "r") as manifest_file:
         manifest = json.load(manifest_file)
 
-    all_files = {}
+    all_files: dict[str, str] = {}
 
-    def add(dest_path, src_path):
+    def add(dest_path: str, src_path: str) -> int:
         dest = os.path.normpath(dest_path)
         src = os.path.normpath(src_path)
         if dest in all_files:
@@ -76,19 +89,26 @@ def main():
                 print("  - %s" % src)
                 return 1
         all_files[dest] = src
+        return 0
 
     for atom in [Atom(a) for a in manifest["atoms"]]:
         for file in atom.files:
-            add(file.destination, file.source)
+            rc = add(file.destination, file.source)
+            if rc != 0:
+                return rc
 
     for dest, source in args.mappings.items():
-        add(dest, source)
+        rc = add(dest, source)
+        if rc != 0:
+            return rc
 
     with open(args.output, "w") as output_file:
         for dest, src in sorted(all_files.items()):
             dest = os.path.relpath(dest)
             src = os.path.relpath(src)
             output_file.write("%s=%s\n" % (dest, src))
+
+    return 0
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@
 from tempfile import TemporaryDirectory
 import json
 import unittest
+from typing import Any
 from verify_json_schemas import (
     fail_on_breaking_changes,
     SchemaListMismatchError,
@@ -17,13 +18,13 @@ from verify_json_schemas import (
 
 
 class VerifyJsonSchemaTests(unittest.TestCase):
-    def generate_path(self, base_dir, file_name):
+    def generate_path(self, base_dir: str, file_name: str) -> str:
         return base_dir + "/" + file_name
 
-    def test_fail_on_breaking_changes(self):
+    def test_fail_on_breaking_changes(self) -> None:
         data_A = "some_data_A"
         data_B = "some_data_B"
-        manifest = {"atoms": []}
+        manifest: dict[str, Any] = {"atoms": []}
 
         with TemporaryDirectory() as base_dir:
             golden_m = self.generate_path(base_dir, "core.golden")
@@ -35,7 +36,7 @@ class VerifyJsonSchemaTests(unittest.TestCase):
                 json.dump(manifest, f)
             # Assert that a normal case will pass.
             self.assertTrue(
-                fail_on_breaking_changes([current_m], [golden_m]) is None
+                fail_on_breaking_changes([current_m], [golden_m]) is None  # type: ignore[func-returns-value]
             )
 
             manifest["atoms"] = []
@@ -50,7 +51,7 @@ class VerifyJsonSchemaTests(unittest.TestCase):
                 [golden_m],
             )
 
-            manifest2 = {"required": ["req1", "req2"]}
+            manifest2: dict[str, Any] = {"required": ["req1", "req2"]}
             with open(golden_m, "w") as f:
                 json.dump(manifest2, f)
             manifest2["required"].append("req3")

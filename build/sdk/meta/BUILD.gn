@@ -63,6 +63,7 @@ verify_json_schemas("verify_json_schemas") {
 
 if (is_host) {
   python_host_test("verify_json_schemas_test") {
+    enable_mypy = true
     main_source = "//sdk/ctf/build/scripts/verify_json_schemas_test.py"
     sources = [ "//sdk/ctf/build/scripts/verify_json_schemas.py" ]
   }
