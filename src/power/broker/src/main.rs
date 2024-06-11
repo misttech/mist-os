@@ -24,7 +24,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::broker::{Broker, LeaseID};
+use crate::broker::{Broker, LeaseID, RequiredLevelSubscriber};
 use crate::topology::ElementID;
 
 mod broker;
@@ -444,13 +444,11 @@ impl BrokerSvc {
         element_id: ElementID,
         server_end: ServerEnd<fpb::RequiredLevelMarker>,
     ) -> RequiredLevelHandler {
-        let receiver = {
-            let mut broker = self.broker.borrow_mut();
-            broker.watch_required_level(&element_id)
-        };
+        let required_level_subscriber =
+            self.broker.borrow_mut().new_required_level_subscriber(&element_id);
         let mut handler = RequiredLevelHandler::new(element_id.clone());
         let stream = server_end.into_stream().unwrap();
-        handler.start(stream, receiver);
+        handler.start(stream, required_level_subscriber);
         handler
     }
 
@@ -498,12 +496,13 @@ impl RequiredLevelHandler {
     fn start(
         &mut self,
         mut stream: RequiredLevelRequestStream,
-        mut receiver: UnboundedReceiver<Option<PowerLevel>>,
+        subscriber: RequiredLevelSubscriber,
     ) {
         let element_id = self.element_id.clone();
         let mut shutdown = self.shutdown.wait_or_dropped();
         tracing::debug!("Starting new RequiredLevelHandler for {:?}", &self.element_id);
         Task::local(async move {
+            let subscriber = subscriber;
             loop {
                 select! {
                     _ = shutdown => {
@@ -511,7 +510,7 @@ impl RequiredLevelHandler {
                     }
                     next = stream.next() => {
                         if let Some(Ok(request)) = next {
-                            if let Err(err) = RequiredLevelHandler::handle_request(element_id.clone(), request, &mut receiver).await {
+                            if let Err(err) = RequiredLevelHandler::handle_request(request, &subscriber).await {
                                 tracing::debug!("handle_request error: {:?}", err);
                             }
                         } else {
@@ -525,22 +524,13 @@ impl RequiredLevelHandler {
     }
 
     async fn handle_request(
-        element_id: ElementID,
         request: RequiredLevelRequest,
-        receiver: &mut UnboundedReceiver<Option<PowerLevel>>,
+        subscriber: &RequiredLevelSubscriber,
     ) -> Result<(), Error> {
         match request {
             RequiredLevelRequest::Watch { responder } => {
-                if let Some(Some(power_level)) = receiver.next().await {
-                    tracing::debug!("RequiredLevel.Watch: send({:?})", &power_level);
-                    responder.send(Ok(power_level)).context("response failed")
-                } else {
-                    tracing::info!(
-                        "RequiredLevel.Watch: receiver closed, element {:?} is no longer available.",
-                        &element_id
-                    );
-                    Ok(())
-                }
+                subscriber.register(responder)?;
+                Ok(())
             }
             RequiredLevelRequest::_UnknownMethod { ordinal, .. } => {
                 tracing::warn!("Received unknown RequiredLevelRequest: {ordinal}");

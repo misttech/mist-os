@@ -635,12 +635,6 @@ impl SystemActivityGovernor {
             let element_name = sag.execution_state_manager.name().await;
             let required_level = sag.execution_state_manager.required_level_proxy().await;
 
-            // Since the initial value sent to RequiredLevel.Watch is acquired on creation of
-            // execution_state, it will always be 0.
-            // Clear the initial value to remove the starting 0 power level.
-            // TODO(b/339092750): Remove this when the most up-to-date required level is returned.
-            let _ = required_level.watch().await;
-
             run_power_element(
                 &element_name,
                 &required_level,

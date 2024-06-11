@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Error};
+use anyhow::{anyhow, Context, Error};
+use async_utils::hanging_get::server::{HangingGet, Publisher, Subscriber};
 use fidl_fuchsia_power_broker::{
     self as fpb, DependencyType, LeaseStatus, Permissions, PowerLevel,
-    RegisterDependencyTokenError, UnregisterDependencyTokenError,
+    RegisterDependencyTokenError, RequiredLevelWatchResponder, UnregisterDependencyTokenError,
 };
 use fuchsia_inspect::{InspectType as IType, Node as INode};
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
@@ -26,13 +27,31 @@ const ID_DEBUG_MODE: bool = false;
 /// Max value for inspect event history.
 const INSPECT_GRAPH_EVENT_BUFFER_SIZE: usize = 512;
 
+// Below are a series of type aliases for convenience
+type StateChangeFn = Box<dyn Fn(&PowerLevel, RequiredLevelWatchResponder) -> bool>;
+type RequiredLevelHangingGet = HangingGet<PowerLevel, RequiredLevelWatchResponder, StateChangeFn>;
+type RequiredLevelPublisher = Publisher<PowerLevel, RequiredLevelWatchResponder, StateChangeFn>;
+pub type RequiredLevelSubscriber =
+    Subscriber<PowerLevel, RequiredLevelWatchResponder, StateChangeFn>;
+
+struct RequiredLevelAdmin {
+    /// We pass new power level values to the publisher, which takes care of updating the remote
+    /// clients using hanging-gets.
+    publisher: RequiredLevelPublisher,
+    /// We use this to vend a new `RequiredLevelSubscriber` for each new `RequiredLevel.Watch`
+    /// request stream.
+    hanging_get: RequiredLevelHangingGet,
+    /// Cached `PowerLevel` value. Simply used to determine if the value has changed.
+    level: PowerLevel,
+}
+
 pub struct Broker {
     catalog: Catalog,
     credentials: Registry,
     // The current level for each element, as reported to the broker.
     current: SubscribeMap<ElementID, PowerLevel>,
     // The level for each element required by the topology.
-    required: SubscribeMap<ElementID, PowerLevel>,
+    required: HashMap<ElementID, RequiredLevelAdmin>,
     _inspect_node: INode,
 }
 
@@ -42,7 +61,7 @@ impl Broker {
             catalog: Catalog::new(&inspect),
             credentials: Registry::new(),
             current: SubscribeMap::new(None),
-            required: SubscribeMap::new(None),
+            required: HashMap::new(),
             _inspect_node: inspect,
         }
     }
@@ -253,14 +272,19 @@ impl Broker {
 
     #[cfg(test)]
     pub fn get_required_level(&self, element_id: &ElementID) -> Option<PowerLevel> {
-        self.required.get(element_id)
+        self.required.get(element_id).map(|e| e.level)
     }
 
-    pub fn watch_required_level(
+    pub fn new_required_level_subscriber(
         &mut self,
         element_id: &ElementID,
-    ) -> UnboundedReceiver<Option<PowerLevel>> {
-        self.required.subscribe(element_id)
+    ) -> RequiredLevelSubscriber {
+        self.required
+            .get_mut(element_id)
+            .ok_or(anyhow!("Element ({element_id}) not added"))
+            .unwrap()
+            .hanging_get
+            .new_subscriber()
     }
 
     fn update_required_level(
@@ -268,12 +292,30 @@ impl Broker {
         element_id: &ElementID,
         level: PowerLevel,
     ) -> Option<PowerLevel> {
-        let previous = self.required.update(element_id, level);
-        // Only update inspect if the value has changed.
-        if previous != Some(level) {
-            if let Ok(elem_inspect) = self.catalog.topology.inspect_for_element(element_id) {
-                elem_inspect.borrow_mut().meta().set("required_level", level);
-            }
+        let previous = self.required.get(element_id).map(|e| e.level);
+        if previous == Some(level) {
+            return previous;
+        }
+        if let Some(required_level) = self.required.get_mut(element_id) {
+            required_level.publisher.set(level);
+            required_level.level = level;
+        } else {
+            let hanging_get = RequiredLevelHangingGet::new(
+                level,
+                Box::new(|level: &PowerLevel, res: RequiredLevelWatchResponder| -> bool {
+                    if let Err(error) = res.send(Ok(*level)).context("response failed") {
+                        tracing::warn!(?error, "Failed to send required level to client");
+                    }
+                    true
+                }),
+            );
+            let publisher = hanging_get.new_publisher();
+            self.required
+                .insert(element_id.clone(), RequiredLevelAdmin { hanging_get, publisher, level });
+        }
+
+        if let Ok(elem_inspect) = self.catalog.topology.inspect_for_element(element_id) {
+            elem_inspect.borrow_mut().meta().set("required_level", level);
         }
         previous
     }
