@@ -59,3 +59,4 @@ cipd_assembly_artifact_targets = [
 
 use_bazel_images_only = true
 assembly_board_configs = [ "//boards" ]
+assembly_partitions_configs = [ "//boards/partitions" ]

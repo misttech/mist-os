@@ -63,11 +63,27 @@ generated_partitions_config("riscv64") {
 
 group("partitions") {
   testonly = true
-  public_deps = [
-    ":arm64",
-    ":x64",
-    "vim3",
-  ]
+  public_deps = [ ":${target_cpu}_configs" ]
+}
+
+if (target_cpu == "x64") {
+  group("x64_configs") {
+    testonly = true
+    public_deps = [ ":x64" ]
+  }
+} else if (target_cpu == "arm64") {
+  group("arm64_configs") {
+    testonly = true
+    public_deps = [
+      ":arm64",
+      "vim3",
+    ]
+  }
+} else if (target_cpu == "riscv64") {
+  group("riscv64_configs") {
+    testonly = true
+    public_deps = [ ":riscv64" ]
+  }
 }
 
 group("verifications") {

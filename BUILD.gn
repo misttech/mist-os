@@ -135,6 +135,10 @@ declare_args() {
   # The result will be built and uploaded to CIPD by infra.
   assembly_board_configs = []
 
+  # Platform builders should populate this list in their product.gni file.
+  # The result will be built and uploaded to CIPD by infra.
+  assembly_partitions_configs = []
+
   # Platform builders can add targets to this list so that they get built with
   # the //:default target
   additional_default_targets = []
@@ -834,6 +838,23 @@ build_api_module("package_archives") {
   testonly = true
   data_keys = [ "exported_package_archives" ]
   deps = exported_package_labels
+}
+
+# Lists the partitions configurations that are defined in this build.
+#
+# Type: list (scope)
+#
+#  label
+#    Required: The GN label for the generated_partitions_config target
+#
+#  outdir
+#    Required: The path (relative to the root out dir) of the directory that
+#    contains the partitions configuration.
+#
+build_api_module("partitions") {
+  testonly = true
+  data_keys = [ "partitions_configs" ]
+  deps = assembly_partitions_configs
 }
 
 # Describes the platforms available for testing, in the file:

@@ -145,6 +145,16 @@ template("generated_partitions_config") {
     outputs = [ cwd_relative_partitions_config ]
     output_conversion = "json"
 
+    metadata = {
+      partitions_configs = [
+        {
+          label = get_label_info(target_name, "label_with_toolchain")
+          name = invoker.hw_revision
+          outdir = rebase_path(get_path_info(outputs[0], "dir"), root_build_dir)
+        },
+      ]
+    }
+
     # Aggregate all the non-bootloader partitions.
     _partitions = []
     if (defined(invoker.zbi_a) && invoker.zbi_a != "") {
