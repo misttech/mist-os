@@ -345,6 +345,8 @@ def fuchsia_prebuilt_test_package(
         test_components = [],
         test_realm = None,
         enumerated_component_filter = None,
+        retries = None,
+        disable_retries_on_failure = None,
         **kwargs):
     _make_prebuilt_package(
         name = name,
@@ -363,6 +365,8 @@ def fuchsia_prebuilt_test_package(
         is_test = True,
         enumerate_test_components = True,
         enumerated_component_filter = enumerated_component_filter,
+        retries = retries,
+        disable_retries_on_failure = disable_retries_on_failure,
         test_realm = test_realm,
         testonly = True,
         **kwargs

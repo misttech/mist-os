@@ -7,7 +7,16 @@ import argparse
 import re
 import subprocess
 
+from enum import Enum
+from typing import Iterable
+
 from fuchsia_task_lib import *
+
+
+class TestingResult(Enum):
+    PASS = 1
+    FLAKE = 2
+    FAIL = 3
 
 
 class FuchsiaTaskTestEnumeratedComponents(FuchsiaTask):
@@ -61,7 +70,42 @@ class FuchsiaTaskTestEnumeratedComponents(FuchsiaTask):
             required=False,
             scope=ArgumentScope.GLOBAL,
         )
+        parser.add_argument(
+            "--retries",
+            help="An additional amount of test attempts per test failure.",
+            type=int,
+            default=0,
+        )
+        parser.add_argument(
+            "--disable-retries-on-failure",
+            help="""Turns off test retrying for all tests once a test actually fails by reaching the `--retries` cap.
+
+            Useful for preventing an excessive amount of test retries for real caught regressions.""",
+            action="store_true",
+        )
         return parser.parse_args()
+
+    def run_cmd_with_retries(
+        self, retries: int, cmd: Iterable[str]
+    ) -> TestingResult:
+        for i in range(retries + 1, 0, -1):
+            retries_left = i - 1
+            is_first_try = retries_left == retries
+            try:
+                subprocess.check_call(cmd)
+                return (
+                    TestingResult.PASS if is_first_try else TestingResult.FLAKE
+                )
+            except subprocess.CalledProcessError as e:
+                if e.returncode != 1:
+                    raise e
+                if retries_left:
+                    print(
+                        Terminal.warn(
+                            f"Test failed, retrying {retries_left} more times."
+                        )
+                    )
+        return TestingResult.FAIL
 
     def run(self, parser: ScopedArgumentParser) -> None:
         args = self.parse_args(parser)
@@ -116,7 +160,9 @@ class FuchsiaTaskTestEnumeratedComponents(FuchsiaTask):
             f"Testing {len(test_component_names)} enumerated components: {', '.join(test_component_names)}"
         )
 
+        retry_budget = args.retries
         failing_tests = []
+        flaking_tests = []
         for i, component_name in enumerate(test_component_names):
             url = url_template.replace(
                 "{{META_COMPONENT}}", f"meta/{component_name}.cm"
@@ -124,21 +170,36 @@ class FuchsiaTaskTestEnumeratedComponents(FuchsiaTask):
             print(
                 f"Testing enumerated component {i + 1} of {len(test_component_names)}: {url}"
             )
-            try:
-                subprocess.check_call(
-                    [
-                        args.ffx_test,
-                        *target_args,
-                        "test",
-                        "run",
-                        *(["--realm", args.realm] if args.realm else []),
-                        url,
-                    ]
-                )
-            except subprocess.CalledProcessError as e:
+            test_result = self.run_cmd_with_retries(
+                retry_budget,
+                [
+                    args.ffx_test,
+                    *target_args,
+                    "test",
+                    "run",
+                    *(["--realm", args.realm] if args.realm else []),
+                    url,
+                ],
+            )
+            if test_result == TestingResult.FLAKE:
+                flaking_tests.append(url)
+            elif test_result == TestingResult.FAIL:
                 failing_tests.append(url)
-                if e.returncode != 1:
-                    raise e
+                if args.disable_retries_on_failure:
+                    print(
+                        Terminal.warn(
+                            f"Disabling retries since {url} failed. Subsequent failures may be flaky false positives."
+                        )
+                    )
+                    retry_budget = 0
+
+        if flaking_tests:
+            print(
+                Terminal.warn(
+                    f"There were {len(flaking_tests)} flaking tests:\n"
+                    + "\n".join(flaking_tests)
+                )
+            )
 
         if failing_tests:
             raise TaskExecutionException(
