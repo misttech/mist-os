@@ -1,0 +1,1 @@
+../sdk_templates/generate_sdk_build_rules.bzl

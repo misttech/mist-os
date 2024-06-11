@@ -1,0 +1,45 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+"""Provide a script to convert an IDK into a Bazel SDK repository at build time."""
+
+load("@rules_python//python:defs.bzl", "py_binary")
+
+# A script used to convert an IDK export directory into a Fuchsia Bazel SDK directory.
+#
+# Example usage with `bazel run`:
+#
+# ```
+# # Build IDK export directory
+# fx build sdk:final_fuchsia_idk.exported
+#
+# # Build the Fuchsia Bazel SDK directory. Absolute paths are required
+# # because `bazel run` scripts are launched from the Bazel execroot, not
+# # the current directory.
+# fx bazel run @fuchsia_sdk//fuchsia/workspace/sdk_export:idk_to_bazel_sdk -- \
+#    --input-idk $(pwd)/out/default/sdk/exported/fuchsia_idk \
+#    --output-sdk /tmp/fuchsia_sdk \
+#    --buildifier $(pwd)/prebuilt/third_party/buildifier/linux-x64/buildifier \
+#
+# # Run test suite to verify its content.
+# build/bazel_sdk/tests/scripts/bazel_test.py \
+#    --fuchsia_sdk_dir /tmp/fuchsia_sdk
+# ```
+py_binary(
+    name = "idk_to_bazel_sdk",
+    srcs = ["idk_to_bazel_sdk.py"],
+    data = [
+        # NOTE: Making this file a py_library() does not work because Bazel will
+        # resolve the symlink (to the .bzl file) then complain that the real file
+        # does not end in .py. Fortunately, just adding it here as a data dependency
+        # is enough to make it available in the runfile directory. But this requires
+        # idk_to_bazel_sdk.py to use sys.path.insert(...) to modify its search path
+        # before the import.
+        "generate_sdk_build_rules.py",
+
+        # The set of template files that are used by the script at runtime.
+        "//fuchsia/workspace/sdk_templates:templates",
+    ],
+    visibility = ["//visibility:public"],
+)
